@@ -1,0 +1,351 @@
+//! Inspector panel for `.material` assets.
+//!
+//! The UI is generated entirely from the material's shader metadata: each
+//! parameter the shader exposes draws the widget matching its kind (scalar
+//! slider, colour picker, vector row, or texture slot). This is what lets a
+//! future custom shader (e.g. a shader-node-builder output) get a working
+//! inspector for free — add parameters to its `ShaderDef` and they appear here.
+//!
+//! Editing mutates an in-memory copy held in fixed buffers (parallel to the
+//! shader's parameter list); "Save" writes it back to the `.material` file and
+//! reimports so the cached artifact stays in sync.
+const std = @import("std");
+const dvui = @import("dvui");
+const engine = @import("engine");
+const editor = @import("editor");
+const EditorState = @import("EditorState.zig");
+const PropDraw = @import("PropDraw.zig");
+
+const shader = engine.shader;
+const Material = engine.Material;
+
+const MAX_VALS = Material.MAX_PARAMS;
+const GUID_LEN = 36;
+
+/// One parameter's editable value. Only the field matching the parameter's kind
+/// is meaningful; they are stored together to keep one array parallel to the
+/// shader's parameter list.
+const ParamValue = struct {
+    scalar: f32 = 0,
+    vec: [4]f32 = .{ 0, 0, 0, 1 },
+    tex: [GUID_LEN]u8 = .{0} ** GUID_LEN,
+    tex_len: usize = 0,
+
+    fn texSlice(self: *const ParamValue) []const u8 {
+        return self.tex[0..self.tex_len];
+    }
+    fn setTex(self: *ParamValue, s: []const u8) void {
+        const l = @min(s.len, GUID_LEN);
+        @memcpy(self.tex[0..l], s[0..l]);
+        self.tex_len = l;
+    }
+};
+
+// ── Loaded-material state (persists across frames) ─────────────────────────────
+
+var loaded_path_buf: [1024]u8 = undefined;
+var loaded_path_len: usize = 0;
+
+var sh: shader.ShaderDef = undefined;
+var vals: [MAX_VALS]ParamValue = undefined;
+var val_count: usize = 0;
+var render: Material.RenderState = .{};
+var dirty: bool = false;
+
+fn loadedPath() []const u8 {
+    return loaded_path_buf[0..loaded_path_len];
+}
+
+/// Draw the material editor for the material at `asset_path`. Loads (or reloads)
+/// the file when the selection changes.
+pub fn draw(asset_path: []const u8) void {
+    if (!std.mem.eql(u8, asset_path, loadedPath())) load(asset_path);
+
+    {
+        var info = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
+        defer info.deinit();
+        dvui.label(@src(), "Shader:  {s}", .{sh.name}, .{ .gravity_y = 0.5 });
+    }
+
+    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+
+    // One widget per shader parameter, in declaration order.
+    for (sh.params[0..val_count], 0..) |param, i| {
+        switch (param.kind) {
+            .scalar => drawScalar(param, &vals[i], i),
+            .color => drawColor(param, &vals[i], i),
+            .vec2, .vec3, .vec4 => drawVector(param, &vals[i], i),
+            .texture => drawTexture(param, &vals[i], i),
+        }
+    }
+
+    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7001 });
+    drawRenderState();
+
+    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7002 });
+    {
+        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
+        defer row.deinit();
+
+        if (dirty) {
+            dvui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        } else {
+            dvui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        }
+
+        if (dvui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            save();
+        }
+    }
+}
+
+// ── Widgets ────────────────────────────────────────────────────────────────────
+
+fn drawScalar(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
+    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    defer row.deinit();
+
+    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+
+    if (param.ranged) {
+        if (dvui.sliderEntry(@src(), "{d:0.3}", .{ .value = &v.scalar, .min = param.min, .max = param.max, .interval = (param.max - param.min) / 1000.0 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i })) {
+            dirty = true;
+        }
+    } else {
+        const r = dvui.textEntryNumber(@src(), f32, .{ .value = &v.scalar }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i });
+        if (r.changed) dirty = true;
+    }
+}
+
+fn drawVector(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
+    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    defer row.deinit();
+
+    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+
+    var vec3 = engine.Vector3{ .x = v.vec[0], .y = v.vec[1], .z = v.vec[2] };
+    if (PropDraw.drawVec3Row(@src(), &vec3)) {
+        v.vec[0] = vec3.x;
+        v.vec[1] = vec3.y;
+        v.vec[2] = vec3.z;
+        dirty = true;
+    }
+}
+
+fn drawColor(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
+    if (dvui.expander(@src(), param.label, .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i })) {
+        var body = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 }, .id_extra = i });
+        defer body.deinit();
+
+        var hsv = dvui.Color.HSV.fromColor(vecToColor(v.vec));
+        if (dvui.colorPicker(@src(), .{ .hsv = &hsv, .alpha = true, .sliders = .rgb }, .{ .expand = .horizontal, .id_extra = i })) {
+            v.vec = colorToVec(hsv.toColor());
+            dirty = true;
+        }
+    }
+}
+
+fn drawTexture(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
+    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    defer row.deinit();
+
+    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+
+    if (PropDraw.drawRefDropZone(@src(), .asset_ref, v.texSlice(), i)) |new_guid| {
+        v.setTex(new_guid);
+        dirty = true;
+    }
+
+    const picker_id = dvui.parentGet().extendId(@src(), i);
+    if (dvui.button(@src(), "...", .{}, .{
+        .gravity_y = 0.5,
+        .min_size_content = .{ .w = 24 },
+        .id_extra = i,
+    })) {
+        dvui.dataSet(null, picker_id, "tex_open", true);
+    }
+
+    if (dvui.dataGet(null, picker_id, "tex_open", bool) orelse false) {
+        var fw = dvui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = i });
+        defer fw.deinit();
+
+        if (pickerTexture(v, fw)) {
+            dirty = true;
+            dvui.dataSet(null, picker_id, "tex_open", false);
+        }
+        if (dvui.minSizeGet(fw.data().id) != null and fw.data().id != dvui.focusedSubwindowId()) {
+            dvui.dataSet(null, picker_id, "tex_open", false);
+        }
+    }
+}
+
+fn pickerTexture(v: *ParamValue, fw: *dvui.FloatingMenuWidget) bool {
+    if (dvui.menuItemLabel(@src(), "(none)", .{}, .{ .expand = .horizontal }) != null) {
+        v.setTex("");
+        fw.close();
+        return true;
+    }
+
+    if (!EditorState.assetDbReady()) {
+        dvui.label(@src(), "(no project open)", .{}, .{});
+        return false;
+    }
+
+    var any_shown = false;
+    var idx: usize = 1; // 0 is reserved for "(none)" above
+    var map_it = EditorState.asset_db.by_guid.valueIterator();
+    while (map_it.next()) |info| {
+        if (info.asset_type != .image) continue;
+        any_shown = true;
+        const basename = if (std.mem.lastIndexOfScalar(u8, info.path, '/')) |sep|
+            info.path[sep + 1 ..]
+        else
+            info.path;
+        var guid_buf: [36]u8 = undefined;
+        const guid_str = info.guid.toString(&guid_buf);
+        if (dvui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            v.setTex(guid_str);
+            fw.close();
+            return true;
+        }
+        idx += 1;
+    }
+    if (!any_shown) dvui.label(@src(), "(no textures in project)", .{}, .{});
+    return false;
+}
+
+fn drawRenderState() void {
+    if (!dvui.expander(@src(), "Render State", .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) return;
+
+    var body = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 } });
+    defer body.deinit();
+
+    {
+        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer r.deinit();
+        dvui.label(@src(), "Blend", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
+        if (dvui.dropdownEnum(@src(), Material.BlendMode, .{ .choice = &render.blend }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5 })) dirty = true;
+    }
+    {
+        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 1 });
+        defer r.deinit();
+        dvui.label(@src(), "Cull", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 }, .id_extra = 1 });
+        if (dvui.dropdownEnum(@src(), Material.CullMode, .{ .choice = &render.cull }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = 1 })) dirty = true;
+    }
+    {
+        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 2 });
+        defer r.deinit();
+        const before_w = render.depth_write;
+        _ = dvui.checkbox(@src(), &render.depth_write, "Depth Write", .{ .gravity_y = 0.5, .id_extra = 2 });
+        if (render.depth_write != before_w) dirty = true;
+    }
+    {
+        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 3 });
+        defer r.deinit();
+        const before_t = render.depth_test;
+        _ = dvui.checkbox(@src(), &render.depth_test, "Depth Test", .{ .gravity_y = 0.5, .id_extra = 3 });
+        if (render.depth_test != before_t) dirty = true;
+    }
+}
+
+// ── Load / Save ────────────────────────────────────────────────────────────────
+
+fn load(asset_path: []const u8) void {
+    const n = @min(asset_path.len, loaded_path_buf.len);
+    @memcpy(loaded_path_buf[0..n], asset_path[0..n]);
+    loaded_path_len = n;
+    dirty = false;
+
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    // Default to the built-in shader; replace if the file specifies one.
+    sh = shader.default();
+
+    const mat: ?Material = Material.load(arena, dvui.io, asset_path) catch null;
+
+    if (mat) |m| sh = m.shaderDef();
+
+    val_count = @min(sh.params.len, MAX_VALS);
+    for (sh.params[0..val_count], 0..) |param, i| {
+        vals[i] = .{};
+        switch (param.kind) {
+            .scalar => vals[i].scalar = if (mat) |m| m.scalar(param.name, param.default_scalar) else param.default_scalar,
+            .texture => {
+                const g = if (mat) |m| m.texture(param.name) else "";
+                vals[i].setTex(g);
+            },
+            .vec2, .vec3, .vec4, .color => vals[i].vec = if (mat) |m| m.vector(param.name, param.default_vec) else param.default_vec,
+        }
+    }
+    render = if (mat) |m| m.render else .{};
+}
+
+fn save() void {
+    var scalars: [MAX_VALS]Material.ScalarParam = undefined;
+    var vectors: [MAX_VALS]Material.VectorParam = undefined;
+    var textures: [MAX_VALS]Material.TextureParam = undefined;
+    var ns: usize = 0;
+    var nv: usize = 0;
+    var nt: usize = 0;
+
+    for (sh.params[0..val_count], 0..) |param, i| {
+        switch (param.kind) {
+            .scalar => {
+                scalars[ns] = .{ .name = param.name, .value = vals[i].scalar };
+                ns += 1;
+            },
+            .texture => {
+                textures[nt] = .{ .name = param.name, .texture = vals[i].texSlice() };
+                nt += 1;
+            },
+            .vec2, .vec3, .vec4, .color => {
+                vectors[nv] = .{ .name = param.name, .value = vals[i].vec };
+                nv += 1;
+            },
+        }
+    }
+
+    const mat = Material{
+        .shader = sh.guid,
+        .scalars = scalars[0..ns],
+        .vectors = vectors[0..nv],
+        .textures = textures[0..nt],
+        .render = render,
+    };
+
+    const path = loadedPath();
+    mat.save(dvui.io, path) catch return;
+    dirty = false;
+
+    // Keep the cached artifact in sync with the freshly written source.
+    if (EditorState.project_path) |proj| {
+        editor.asset_importer.importAssetForce(dvui.io, dvui.currentWindow().arena(), proj, path);
+    }
+}
+
+// ── Colour conversion (material stores 0..1 floats; dvui uses 0..255 u8) ────────
+
+fn vecToColor(v: [4]f32) dvui.Color {
+    return .{
+        .r = chan(v[0]),
+        .g = chan(v[1]),
+        .b = chan(v[2]),
+        .a = chan(v[3]),
+    };
+}
+
+fn colorToVec(c: dvui.Color) [4]f32 {
+    return .{
+        @as(f32, @floatFromInt(c.r)) / 255.0,
+        @as(f32, @floatFromInt(c.g)) / 255.0,
+        @as(f32, @floatFromInt(c.b)) / 255.0,
+        @as(f32, @floatFromInt(c.a)) / 255.0,
+    };
+}
+
+fn chan(x: f32) u8 {
+    const clamped = std.math.clamp(x, 0.0, 1.0);
+    return @intFromFloat(clamped * 255.0 + 0.5);
+}

@@ -1,0 +1,153 @@
+# Turian Engine — GitLab CI/CD  (GitLab provider plugin)
+#
+# Provider split
+# ─────────────────────────────────────────────────────────────────────────────
+# tools/release.zig              Provider-agnostic logic (version bump,
+#   └─ release/ci/common.zig       CHANGELOG, packaging, types)
+#   └─ release/ci/gitlab.zig     GitLab plugin (Package Registry upload,
+#                                  Release API — JSON built in Zig, no jq)
+#
+# Stages
+# ─────────────────────────────────────────────────────────────────────────────
+#   test     — every push/MR:  build + unit tests + example regression
+#   check    — schedule only:  version bump, CHANGELOG, git tag, create release
+#   build    — tag trigger:    parallel per-platform compilation + upload + link
+
+variables:
+  ZIG_VERSION: "0.16.0"
+  ZIG_URL: "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+
+default:
+  image: ubuntu:26.04
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq curl xz-utils git git-lfs zip
+    - |
+      if ! command -v zig &>/dev/null || [ "$(zig version)" != "$ZIG_VERSION" ]; then
+        curl -fsSL "$ZIG_URL" | tar -xJ --strip-components=1 -C /usr/local/bin \
+          zig-x86_64-linux-${ZIG_VERSION}/zig \
+          zig-x86_64-linux-${ZIG_VERSION}/lib
+      fi
+      zig version
+
+stages:
+  - test
+  - check
+  - build
+
+# ── test ─────────────────────────────────────────────────────────────────────
+test:
+  stage: test
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      when: never
+    - if: "$CHECK_RELEASE"
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ /^chore\(release\):/'
+      when: never
+    - when: on_success
+  script:
+    - zig fmt --check engine/ editor/ studio/ tools/ examples/ build.zig build.zig.zon
+    - zig build
+    - zig build test
+    - |
+      for dir in examples/*/; do
+        [ -d "$dir" ] || continue
+        echo "==> $dir"
+        ./zig-out/bin/turian-cli build "$dir" || { echo "FAILED: $dir"; exit 1; }
+      done
+    - |
+      # SDK smoke-test: verify the CLI in the SDK can build a project using only
+      # SDK-resident sources (paths resolved by SdkLayout.zig, not baked paths).
+      # Uses the full SDK (with SDL3) so the game binary can link.
+      echo "==> SDK smoke-test"
+      zig build sdk
+      TMP_PROJ=$(mktemp -d)
+      cp -r examples/basic-project/. "$TMP_PROJ/"
+      ./zig-out/sdk/turian-cli build "$TMP_PROJ" || { echo "SDK build FAILED"; rm -rf "$TMP_PROJ"; exit 1; }
+      [ -f "$TMP_PROJ/.cache/zig-out/bin/game" ] || { echo "game binary not found"; rm -rf "$TMP_PROJ"; exit 1; }
+      [ -f "$TMP_PROJ/.cache/game.oap" ] || { echo "game.oap not found"; rm -rf "$TMP_PROJ"; exit 1; }
+      rm -rf "$TMP_PROJ"
+      echo "SDK smoke-test PASSED"
+  cache:
+    key: zig-cache-${CI_COMMIT_REF_SLUG}
+    paths: [.zig-cache/, ~/.cache/zig/]
+  artifacts:
+    paths: [zig-out/bin/turian-studio, zig-out/bin/turian-cli]
+    expire_in: 1 day
+
+# ── check_release ─────────────────────────────────────────────────────────────
+# Runs on schedule.  Bumps the version, updates CHANGELOG, commits, tags, and creates the GitLab release.
+check_release:
+  stage: check
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: "$CHECK_RELEASE"
+  script:
+    - |
+      if [ -z "$CI_PUSH_TOKEN" ]; then
+        echo "ERROR: CI_PUSH_TOKEN is not set. Go to Settings -> CI/CD -> Variables and add it."
+        echo "It needs 'write_repository' and 'api' scopes."
+        exit 1
+      fi
+      git config user.email "ci@turian.engine"
+      git config user.name "Turian CI"
+      git remote set-url origin "https://project_access_token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    # 1. Collect commits since last tag
+    - |
+      LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+      if [ -z "$LAST" ]; then
+        echo "No prior tags — initial release."
+        git log --format="%s" > .release-commits 2>/dev/null || true
+        EXTRA="--initial"
+      else
+        echo "Last tag: $LAST"
+        git log --format="%s" "$LAST"..HEAD > .release-commits 2>/dev/null || true
+        EXTRA=""
+      fi
+
+    # 2. Version bump + CHANGELOG
+    - zig build release-check -- --commits .release-commits $EXTRA
+
+    # 3. Commit + tag + push
+    - |
+      [ -f .release-version ] || { echo "Nothing to release. Skipping."; exit 0; }
+      NEW_VERSION=$(cat .release-version)
+      echo "Releasing v${NEW_VERSION}"
+      git add build.zig.zon CHANGELOG.md
+      git commit -m "chore(release): v${NEW_VERSION}"
+      git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
+      git push origin HEAD:${CI_COMMIT_REF_NAME} --tags
+
+    # 4. Create GitLab release (now that tag is pushed)
+    - zig build release-publish -- --provider gitlab
+  cache:
+    key: zig-cache-release
+    paths: [.zig-cache/, ~/.cache/zig/]
+
+# ── build_artifacts ───────────────────────────────────────────────────────────
+# Runs in parallel for each platform when a tag is pushed.
+# Builds, packages, and UPLOADS the artifact directly to the release.
+build_artifacts:
+  stage: build
+  rules:
+    - if: "$CI_COMMIT_TAG"
+  parallel:
+    matrix:
+      - PLATFORM: linux-x86_64
+        BUILD_FLAGS: "-Doptimize=ReleaseFast"
+      - PLATFORM: windows-x86_64
+        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dno-test -Doptimize=ReleaseFast"
+      - PLATFORM: macos-aarch64
+        BUILD_FLAGS: "-Dtarget=aarch64-macos -Dcli-only -Dno-test -Doptimize=ReleaseFast"
+  script:
+    # 1. Build binaries + tests
+    - zig build ci $BUILD_FLAGS
+    # 2. Assemble self-contained SDK in zig-out/sdk/
+    - zig build sdk $BUILD_FLAGS
+    # 3. Package SDK into .public/
+    - zig build release-package -- --platform $PLATFORM --version $CI_COMMIT_TAG
+    # 4. Upload and link to release
+    - zig build release-publish -- --provider gitlab
+  cache:
+    key: zig-cache-release
+    paths: [.zig-cache/, ~/.cache/zig/]

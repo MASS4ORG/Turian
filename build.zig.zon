@@ -1,0 +1,39 @@
+.{
+    .name = .turian,
+    .version = "1.0.0",
+    .fingerprint = 0x409f0fca51fd1364,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .dvui = .{
+            .url = "git+https://github.com/david-vanderson/dvui#01072101dc6090c493f9f62fb4a9f0614410ffa4",
+            .hash = "dvui-0.5.0-dev-AQFJmYL-9gCZErXZGGekVKV_5LW9lWhIM6Q3gz_XaoUR",
+        },
+        .guid = .{
+            .url = "git+https://gitlab.com/mass4org/mega4/guid#82a98833e35452ec458b06e0e9765278e012026a",
+            .hash = "guid-1.0.0-ewbraoEkAADVJSIeJno7pSGJ-SHkRKR_u_snCYOL3nH_",
+        },
+        .math3d = .{
+            .url = "git+https://gitlab.com/mass4org/mega4/math-3d#9fb10551a4f3e3e03900f0a80ad4591855737cbf",
+            .hash = "math3d-1.1.1-pUqn4FuaAQA6_q5KobDCOIxKtqMSbkqCkZZd1eAe62dU",
+        },
+        .open_asset_package = .{
+            .url = "git+https://gitlab.com/mass4org/mega4/open-asset-package#e49cf316c88ff421e6498dc63201c7c19887561c",
+            .hash = "open_asset_package-1.0.0-cc9sTkxNAQDQIRsqmCjLQRmLtXbif331a8RXBEGEVNEG",
+        },
+        .serde = .{
+            .url = "git+https://github.com/OrlovEvgeny/serde.zig#875e1b680b02bfbc2f146ea3d3f91d724f86c500",
+            .hash = "serde-1.0.1-1DszT_hrDQAURHcyOhR7wEKwqbF8FYl8vN26pKLLCkWn",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "engine",
+        "editor",
+        "studio",
+        "examples",
+        "docs",
+        "LICENSE",
+        "README.md",
+    },
+}

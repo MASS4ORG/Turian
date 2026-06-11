@@ -1,0 +1,479 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "name": "Main Camera",
+      "guid": "3f47b05a-ca48-46df-a484-23841992d193",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -1.2325797,
+          "y": 4.414592,
+          "z": 3.4203362
+        },
+        "rotation": {
+          "x": 51.528557,
+          "y": -117.16846,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "camera": {
+            "fov": 60,
+            "near": 0.01,
+            "far": 1000,
+            "orthographic": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Directional Light",
+      "guid": "cc5cf761-0704-404e-9e84-a2730ea8f865",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 50,
+          "y": -30,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "light": {
+            "kind": "directional",
+            "color_r": 1,
+            "color_g": 1,
+            "color_b": 1,
+            "intensity": 1,
+            "range": 10,
+            "spot_angle": 35,
+            "spot_softness": 0.15,
+            "cast_shadows": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Point Light",
+      "guid": "631b5aa1-ddf1-4e16-8a60-a18dc58bda81",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 1.5,
+          "y": 1.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "light": {
+            "kind": "point",
+            "color_r": 1,
+            "color_g": 0.55,
+            "color_b": 0.25,
+            "intensity": 6,
+            "range": 7,
+            "spot_angle": 35,
+            "spot_softness": 0.15,
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spot Light",
+      "guid": "5da00d41-4ce1-43ef-8047-704e728562d4",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -1.5,
+          "y": 4,
+          "z": 2
+        },
+        "rotation": {
+          "x": 80,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "light": {
+            "kind": "spot",
+            "color_r": 0.4,
+            "color_g": 0.6,
+            "color_b": 1,
+            "intensity": 8,
+            "range": 12,
+            "spot_angle": 28,
+            "spot_softness": 0.35,
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ground",
+      "guid": "817768d2-91be-4ed6-b8d7-6543c8c65e75",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": -0.5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 10,
+          "y": 0.1,
+          "z": 10
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+            "material_guid": "00000000-0000-4000-8000-000000000104"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spinning Cube",
+      "guid": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -1.5,
+          "y": 0.5,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+            "material_guid": "51029215-952f-466e-ae31-65d167bc85a6"
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "Rotator",
+            "source_file": "assets/Rotator.zig",
+            "fields": [
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Moving Platform",
+      "guid": "8e300f5f-8812-4d8b-85dc-c87d097ecddf",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 1.5,
+          "y": 0.5,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.5,
+          "y": 0.2,
+          "z": 1.5
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+            "material_guid": "00495134-ce8a-406d-bdcc-71310b6e5830"
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "Translator",
+            "source_file": "assets/Translator.zig",
+            "fields": [
+              {
+                "name": "target",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "mesh",
+                "kind": "asset_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "amplitude",
+                "kind": "f32",
+                "as_f32": 1.5,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "frequency",
+                "kind": "f32",
+                "as_f32": 0.5,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_elapsed",
+                "kind": "f32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Remote Cube",
+      "guid": "efa41ca6-92dd-461b-9a37-b964824a8e02",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 4,
+          "y": 0.5,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+            "material_guid": "00000000-0000-4000-8000-000000000103"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Remote Cube (copy)",
+      "guid": "fc611df5-89d2-4326-9eb9-ff600bbdd1fd",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -4,
+          "y": 0.5,
+          "z": 2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+            "material_guid": "00000000-0000-4000-8000-000000000103"
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "Rotator",
+            "source_file": "./examples/basic-project/assets/Rotator.zig",
+            "fields": [
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Operator",
+      "guid": "6867a39c-0c32-4cd5-8b0a-35c7c89f9882",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "user_script": {
+            "type_name": "RotateOther",
+            "source_file": "assets/RotateOther.zig",
+            "fields": [
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
