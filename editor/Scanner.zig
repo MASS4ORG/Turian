@@ -1,6 +1,7 @@
 const std = @import("std");
 const engine = @import("engine");
 pub const ComponentDef = @import("types/ComponentDef.zig").ComponentDef;
+pub const DefKind = @import("types/ComponentDef.zig").DefKind;
 
 pub const MAX_COMP_NAME = @import("types/ComponentDef.zig").MAX_COMP_NAME;
 pub const MAX_COMP_FILE = @import("types/ComponentDef.zig").MAX_COMP_FILE;
@@ -12,10 +13,10 @@ pub const FieldDef = @import("types/FieldDef.zig").FieldDef;
 
 const log = std.log.scoped(.scanner);
 
-/// Public declaration that marks a struct as a discoverable user component.
-/// A component author writes `pub const is_component = true;` inside the struct.
-/// Discovery walks the Zig AST for this marker — no regex, no comment scraping.
+/// Marks a struct as a discoverable user component.
 pub const COMPONENT_MARKER = "is_component";
+/// Marks a struct as a discoverable data asset.
+pub const DATA_ASSET_MARKER = "is_data_asset";
 
 /// Fills result[] with builtin component defs from the engine's static list.
 pub fn populateBuiltins(result: []ComponentDef, result_count: *usize) void {
@@ -100,7 +101,7 @@ fn scanFile(
     scanSource(allocator, source, full_path, result, result_count);
 }
 
-/// Parses one Zig source buffer and appends every component type it declares.
+/// Parses one Zig source buffer and appends every component/data-asset type it declares.
 /// Split out from `scanFile` so it can be unit-tested without touching disk.
 fn scanSource(
     allocator: std.mem.Allocator,
@@ -127,36 +128,45 @@ fn scanSource(
         const var_decl = ast.fullVarDecl(decl) orelse continue;
         const init_node = var_decl.ast.init_node.unwrap() orelse continue;
         const container = ast.fullContainerDecl(&buf, init_node) orelse continue;
-        if (!hasComponentMarker(&ast, container)) continue;
+
+        const is_comp = markerValue(&ast, container, COMPONENT_MARKER);
+        const is_da = markerValue(&ast, container, DATA_ASSET_MARKER);
+
+        if (!is_comp and !is_da) continue;
 
         const type_name = ast.tokenSlice(var_decl.ast.mut_token + 1);
 
-        if (findDuplicate(result, result_count.*, type_name)) |other| {
-            // Guarded so the duplicate-rejection unit test does not trip the
-            // test runner, which fails the command on any logged error.
+        if (is_comp and is_da) {
             if (!@import("builtin").is_test) log.err(
-                "duplicate component '{s}' in {s}; already defined in {s} — rename one of them",
+                "'{s}' in {s} declares both is_component and is_data_asset — only one allowed",
+                .{ type_name, file_path },
+            );
+            continue;
+        }
+
+        if (findDuplicate(result, result_count.*, type_name)) |other| {
+            if (!@import("builtin").is_test) log.err(
+                "duplicate '{s}' in {s}; already defined in {s} — rename one of them",
                 .{ type_name, file_path, other.sourceFile() },
             );
             continue;
         }
 
         var def = &result[result_count.*];
-        def.* = .{ .is_builtin = false };
+        def.* = .{ .is_builtin = false, .kind = if (is_da) .data_asset else .component };
         def.setTypeName(type_name);
         def.setSourceFile(file_path);
         result_count.* += 1;
     }
 }
 
-/// Returns true when a struct body contains `is_component` set to a value
-/// other than the `false` literal. The marker convention is
-/// `pub const is_component = true;`; writing `= false` opts the type out.
-fn hasComponentMarker(ast: *const std.zig.Ast, container: std.zig.Ast.full.ContainerDecl) bool {
+/// Returns true when a struct body contains `marker_name` set to a value
+/// other than the `false` literal.
+fn markerValue(ast: *const std.zig.Ast, container: std.zig.Ast.full.ContainerDecl, marker_name: []const u8) bool {
     for (container.ast.members) |member| {
         const member_decl = ast.fullVarDecl(member) orelse continue;
         const name = ast.tokenSlice(member_decl.ast.mut_token + 1);
-        if (!std.mem.eql(u8, name, COMPONENT_MARKER)) continue;
+        if (!std.mem.eql(u8, name, marker_name)) continue;
 
         const value_node = member_decl.ast.init_node.unwrap() orelse return true;
         const value = ast.tokenSlice(ast.nodeMainToken(value_node));
@@ -203,7 +213,78 @@ test "scanSource discovers marked components and ignores helpers" {
     try std.testing.expectEqual(@as(usize, 2), count);
     try std.testing.expectEqualStrings("Player", result[0].typeName());
     try std.testing.expectEqualStrings("assets/Player.zig", result[0].sourceFile());
+    try std.testing.expectEqual(DefKind.component, result[0].kind);
     try std.testing.expectEqualStrings("Rotator", result[1].typeName());
+    try std.testing.expectEqual(DefKind.component, result[1].kind);
+}
+
+test "scanSource discovers data asset marker" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const EnemyStats = struct {
+        \\    pub const is_data_asset = true;
+        \\    max_health: f32 = 100,
+        \\    move_speed: f32 = 5,
+        \\};
+        \\pub const Ignored = struct {
+        \\    x: f32 = 0,
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/EnemyStats.zig", &result, &count);
+
+    try std.testing.expectEqual(@as(usize, 1), count);
+    try std.testing.expectEqualStrings("EnemyStats", result[0].typeName());
+    try std.testing.expectEqual(DefKind.data_asset, result[0].kind);
+}
+
+test "scanSource respects is_data_asset = false opt-out" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const Disabled = struct {
+        \\    pub const is_data_asset = false;
+        \\    x: f32 = 0,
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/Disabled.zig", &result, &count);
+    try std.testing.expectEqual(@as(usize, 0), count);
+}
+
+test "scanSource rejects type with both markers" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const Both = struct {
+        \\    pub const is_component = true;
+        \\    pub const is_data_asset = true;
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/Both.zig", &result, &count);
+    try std.testing.expectEqual(@as(usize, 0), count);
+}
+
+test "scanSource discovers mixed component and data-asset types" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const MyComp = struct {
+        \\    pub const is_component = true;
+        \\    speed: f32 = 1,
+        \\};
+        \\pub const MyData = struct {
+        \\    pub const is_data_asset = true;
+        \\    value: i32 = 42,
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/Mixed.zig", &result, &count);
+    try std.testing.expectEqual(@as(usize, 2), count);
+    try std.testing.expectEqual(DefKind.component, result[0].kind);
+    try std.testing.expectEqual(DefKind.data_asset, result[1].kind);
 }
 
 test "scanSource respects is_component = false opt-out" {

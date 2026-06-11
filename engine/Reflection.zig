@@ -133,12 +133,12 @@ fn getDefaultValue(
     };
 }
 
-pub fn buildComponentInfo(comptime T: type, allocator: std.mem.Allocator) !api.ComponentInfo {
+/// Build reflection info for any reflectable struct (component or data asset).
+/// No marker assertion — callers are responsible for ensuring T is intentional.
+pub fn buildReflectedInfo(comptime T: type, allocator: std.mem.Allocator) !api.ComponentInfo {
     comptime {
         if (@typeInfo(T) != .@"struct")
-            @compileError("Component '" ++ @typeName(T) ++ "' must be a struct");
-        if (!@hasDecl(T, "is_component") or @field(T, "is_component") != true)
-            @compileError("Component '" ++ @typeName(T) ++ "' must declare `pub const is_component = true;`");
+            @compileError("'" ++ @typeName(T) ++ "' must be a struct");
     }
 
     const field_count = comptime countFields(T);
@@ -151,4 +151,14 @@ pub fn buildComponentInfo(comptime T: type, allocator: std.mem.Allocator) !api.C
         .fields = fields.ptr,
         .field_count = field_count,
     };
+}
+
+pub fn buildComponentInfo(comptime T: type, allocator: std.mem.Allocator) !api.ComponentInfo {
+    comptime {
+        if (@typeInfo(T) != .@"struct")
+            @compileError("Component '" ++ @typeName(T) ++ "' must be a struct");
+        if (!@hasDecl(T, "is_component") or @field(T, "is_component") != true)
+            @compileError("Component '" ++ @typeName(T) ++ "' must declare `pub const is_component = true;`");
+    }
+    return buildReflectedInfo(T, allocator);
 }

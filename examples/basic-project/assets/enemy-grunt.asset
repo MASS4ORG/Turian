@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "type_name": "EnemyStats",
+  "source_file": "examples/basic-project/assets/EnemyStats.zig",
+  "fields": [
+    { "name": "max_health", "kind": "f32", "as_f32": 80 },
+    { "name": "move_speed", "kind": "f32", "as_f32": 3.5 },
+    { "name": "damage", "kind": "i32", "as_i32": 15 },
+    { "name": "material", "kind": "asset_ref", "as_ref_guid": "" }
+  ]
+}

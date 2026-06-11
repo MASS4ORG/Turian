@@ -37,6 +37,7 @@ pub const ImportSettings = union(AssetType) {
     model: ModelImportSettings,
     scene: void,
     material: void,
+    data_asset: void,
 };
 
 /// Returns default import settings for the given asset type.
@@ -48,6 +49,7 @@ pub fn defaultFor(asset_type: AssetType) ImportSettings {
         .script => .{ .script = {} },
         .scene => .{ .scene = {} },
         .material => .{ .material = {} },
+        .data_asset => .{ .data_asset = {} },
         .unknown => .{ .unknown = {} },
     };
 }

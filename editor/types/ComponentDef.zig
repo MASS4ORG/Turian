@@ -11,13 +11,17 @@ pub const MAX_COMPONENTS = 64;
 /// Maximum number of reflected fields per component.
 pub const MAX_COMP_FIELDS = 16;
 
-/// Describes a component (builtin or user script) for the editor.
+/// Whether the marked type is a scene component or a standalone data asset.
+pub const DefKind = enum { component, data_asset };
+
+/// Describes a component or data-asset type for the editor.
 pub const ComponentDef = struct {
     type_name: [MAX_COMP_NAME]u8 = std.mem.zeroes([MAX_COMP_NAME]u8),
     type_name_len: usize = 0,
     source_file: [MAX_COMP_FILE]u8 = std.mem.zeroes([MAX_COMP_FILE]u8),
     source_file_len: usize = 0,
     is_builtin: bool = false,
+    kind: DefKind = .component,
     fields: [MAX_COMP_FIELDS]FieldDef = std.mem.zeroes([MAX_COMP_FIELDS]FieldDef),
     field_count: usize = 0,
 

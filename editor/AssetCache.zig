@@ -13,6 +13,7 @@ pub fn artifactExtension(asset_type: AssetType) []const u8 {
         .script => ".script",
         .scene => ".scene",
         .material => ".material",
+        .data_asset => ".asset",
         .unknown => ".bin",
     };
 }

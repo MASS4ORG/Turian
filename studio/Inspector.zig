@@ -5,6 +5,7 @@ const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const PropDraw = @import("PropDraw.zig");
 const MaterialEditor = @import("MaterialEditor.zig");
+const DataAssetEditor = @import("DataAssetEditor.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -219,12 +220,10 @@ fn drawScriptFields(sel: usize, obj: *EditorState.SceneNode, ci: usize) void {
     }
 }
 
-fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize) void {
-    const s = &obj.components[ci].user_script;
-    const fv = &s.field_values[fi];
-    const id = ci * 10000 + fi;
-
-    // For nested struct fields ("spring.stiffness"), show just the leaf name.
+/// Draw a labelled row for a single ScriptFieldValue. Returns true if changed.
+/// `id` must be unique among siblings at the same nesting level.
+/// Used by both the scene inspector and the DataAssetEditor.
+pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
     const full_name = fv.nameSlice();
     const display_name = if (std.mem.lastIndexOfScalar(u8, full_name, '.')) |d|
         full_name[d + 1 ..]
@@ -240,9 +239,7 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
         .id_extra = id,
     });
 
-    const obj_before = obj.*;
     var changed = false;
-
     switch (fv.kind) {
         .f32 => {
             const r = dvui.textEntryNumber(@src(), f32, .{ .value = &fv.as_f32 }, .{
@@ -336,8 +333,16 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
             }
         },
     }
+    return changed;
+}
 
-    if (changed) {
+fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize) void {
+    const s = &obj.components[ci].user_script;
+    const fv = &s.field_values[fi];
+    const id = ci * 10000 + fi;
+
+    const obj_before = obj.*;
+    if (drawScriptFieldValue(fv, id)) {
         EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
             .idx = sel,
             .before = obj_before,
@@ -384,6 +389,11 @@ fn drawAssetInspector(asset_path: []const u8) void {
     if (asset_type == .material) {
         _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 1 });
         MaterialEditor.draw(asset_path);
+    }
+
+    if (asset_type == .data_asset) {
+        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 2 });
+        DataAssetEditor.draw(asset_path);
     }
 }
 

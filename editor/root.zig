@@ -29,6 +29,11 @@ pub const sdk_layout = @import("SdkLayout.zig");
 pub const user_reflection = @import("UserReflection.zig");
 
 pub const ComponentDef = scanner.ComponentDef;
+pub const DefKind = scanner.DefKind;
+pub const SceneScriptField = @import("types/SceneScriptField.zig").SceneScriptField;
+/// Data-asset instance I/O (load/save/merge).
+pub const data_asset_io = @import("DataAssetIo.zig");
+pub const DataAssetFile = data_asset_io.DataAssetFile;
 pub const AssetType = @import("types/AssetType.zig").AssetType;
 pub const AssetDescriptor = @import("types/AssetDescriptor.zig").AssetDescriptor;
 pub const OpenMode = @import("types/AssetDescriptor.zig").OpenMode;

@@ -219,7 +219,7 @@ fn generateWrapper(allocator: std.mem.Allocator, type_names: []const []const u8)
             "        return .{{ .components = undefined, .count = 0 }};\n" ++
             "    var count: usize = 0;\n" ++
             "    inline for (types) |T| {{\n" ++
-            "        if (reflection.buildComponentInfo(T, gpa)) |info| {{\n" ++
+            "        if (reflection.buildReflectedInfo(T, gpa)) |info| {{\n" ++
             "            comps[count] = info;\n" ++
             "            count += 1;\n" ++
             "        }} else |_| {{}}\n" ++

@@ -51,6 +51,12 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .internal_editor,
             .icon_hint = .material,
         },
+        .data_asset => .{
+            .name = "Data Asset",
+            .extensions = &.{".asset"},
+            .open_mode = .internal_editor,
+            .icon_hint = .data,
+        },
     };
 }
 

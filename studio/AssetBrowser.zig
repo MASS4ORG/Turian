@@ -270,6 +270,7 @@ pub fn draw() void {
             .sound => dvui.entypo.sound,
             .model => dvui.entypo.layers,
             .material => dvui.entypo.colours,
+            .data => dvui.entypo.database,
         };
 
         // Check if this asset is the selected one
@@ -562,6 +563,15 @@ pub fn draw() void {
                     createNewMaterialFromPreset(browse_path, preset);
                 }
             }
+            for (EditorState.discovered_components[0..EditorState.discovered_count], 0..) |*def, di| {
+                if (def.kind != .data_asset) continue;
+                var label_buf: [128]u8 = undefined;
+                const label = std.fmt.bufPrint(&label_buf, "New {s}", .{def.displayName()}) catch continue;
+                if (dvui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = 1000 + di }) != null) {
+                    fw.close();
+                    createNewDataAsset(browse_path, def);
+                }
+            }
         }
     }
 }
@@ -728,6 +738,39 @@ fn createNewMaterialFromPreset(browse_path: []const u8, preset: engine.Material.
         };
         if (!exists) {
             engine.Material.savePreset(preset, engine.shader.default(), dvui.io, full_path) catch return;
+            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+            EditorState.selectAsset(full_path);
+            return;
+        }
+    }
+}
+
+fn createNewDataAsset(browse_path: []const u8, def: *const editor.ComponentDef) void {
+    var path_buf: [1024]u8 = undefined;
+    var name_buf: [192]u8 = undefined;
+    var n: usize = 0;
+    while (n < 100) : (n += 1) {
+        const type_name = def.typeName();
+        const lc_name = blk: {
+            var buf: [128]u8 = undefined;
+            const tl = @min(type_name.len, buf.len);
+            for (type_name[0..tl], 0..) |c, i| buf[i] = std.ascii.toLower(c);
+            break :blk buf[0..tl];
+        };
+        const file_name = if (n == 0)
+            std.fmt.bufPrint(&name_buf, "{s}.asset", .{lc_name}) catch return
+        else
+            std.fmt.bufPrint(&name_buf, "{s}_{d}.asset", .{ lc_name, n }) catch return;
+
+        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
+
+        const exists = blk: {
+            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
+            break :blk true;
+        };
+        if (!exists) {
+            const file = editor.data_asset_io.defaultFromDef(def);
+            editor.data_asset_io.save(dvui.io, full_path, file) catch return;
             EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
             EditorState.selectAsset(full_path);
             return;
