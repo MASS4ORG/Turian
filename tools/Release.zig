@@ -235,7 +235,10 @@ fn runPublish(io: std.Io, gpa: std.mem.Allocator, args: []const []const u8, envi
 // ── Versioning ────────────────────────────────────────────────────────────────
 
 fn bumpVersion(gpa: std.mem.Allocator, current: []const u8, bump: BumpKind) ![]u8 {
-    var it = std.mem.splitScalar(u8, current, '.');
+    const hyphen = std.mem.indexOfScalar(u8, current, '-');
+    const numeric = if (hyphen) |h| current[0..h] else current;
+
+    var it = std.mem.splitScalar(u8, numeric, '.');
     var ma = try std.fmt.parseInt(u32, it.next() orelse "0", 10);
     var mi = try std.fmt.parseInt(u32, it.next() orelse "0", 10);
     var pa = try std.fmt.parseInt(u32, it.next() orelse "0", 10);

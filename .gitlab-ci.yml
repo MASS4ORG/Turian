@@ -12,6 +12,13 @@
 #   test     — every push/MR:  build + unit tests + example regression
 #   check    — schedule only:  version bump, CHANGELOG, git tag, create release
 #   build    — tag trigger:    parallel per-platform compilation + upload + link
+#
+# Requirements:
+#   1. CI_PUSH_TOKEN (Project Variable): Scopes 'write_repository' + 'api'.
+#   2. Protected Tags (Settings -> Repository -> Protected Tags):
+#      - Pattern 'v*.*.*'
+#      - Pattern 'v*.*.*-*' (for pre-releases like -rc1)
+#      - Allowed to push: Maintainers (or CI account)
 
 variables:
   ZIG_VERSION: "0.16.0"

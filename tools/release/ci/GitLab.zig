@@ -37,10 +37,16 @@ pub fn run(
         std.debug.print("error: CI_PROJECT_ID not set\n", .{});
         return error.MissingEnv;
     };
-    const token = environ.get("CI_PUSH_TOKEN") orelse environ.get("GITLAB_TOKEN") orelse {
-        std.debug.print("error: CI_PUSH_TOKEN not set\n", .{});
+    const push_token = environ.get("CI_PUSH_TOKEN");
+    const job_token = environ.get("CI_JOB_TOKEN");
+    const generic_token = environ.get("GITLAB_TOKEN");
+
+    const token = push_token orelse job_token orelse generic_token orelse {
+        std.debug.print("error: no GitLab token found (CI_PUSH_TOKEN, CI_JOB_TOKEN, or GITLAB_TOKEN)\n", .{});
         return error.MissingEnv;
     };
+
+    const auth_header = if (push_token == null and job_token != null) "JOB-TOKEN" else "PRIVATE-TOKEN";
 
     // If CI_COMMIT_TAG is set, we are in a tag pipeline (traditional flow or artifact upload)
     // If not, we might be creating the release early in check_release (needs .release-version)
@@ -100,7 +106,7 @@ pub fn run(
             std.debug.print("[gitlab] uploading {s} …\n", .{art.file_name});
             const url = try std.fmt.allocPrint(gpa, "{s}/projects/{s}/packages/generic/turian/{s}/{s}", .{ api_url, project_id, version, art.file_name });
             defer gpa.free(url);
-            const auth = try std.fmt.allocPrint(gpa, "PRIVATE-TOKEN: {s}", .{token});
+            const auth = try std.fmt.allocPrint(gpa, "{s}: {s}", .{ auth_header, token });
             defer gpa.free(auth);
 
             try spawnAndWait(io, gpa, &.{
@@ -151,7 +157,7 @@ pub fn run(
 
     const release_url = try std.fmt.allocPrint(gpa, "{s}/projects/{s}/releases", .{ api_url, project_id });
     defer gpa.free(release_url);
-    const auth = try std.fmt.allocPrint(gpa, "PRIVATE-TOKEN: {s}", .{token});
+    const auth = try std.fmt.allocPrint(gpa, "{s}: {s}", .{ auth_header, token });
     defer gpa.free(auth);
 
     std.debug.print("[gitlab] creating release {s} …\n", .{tag_name});
