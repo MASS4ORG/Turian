@@ -1129,6 +1129,7 @@ fn pickerAsset(
         .texture => .image,
         .audio => .audio,
         .material => .material,
+        .input_actions => .input_actions,
     };
     var any_shown = false;
 

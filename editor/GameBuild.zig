@@ -456,6 +456,60 @@ fn generateMainZig(
             "extern fn SDL_RenderTexture(r: *SDL_Renderer, t: *SDL_Texture, src: ?*const anyopaque, dst: ?*const anyopaque) bool;\n\n",
     );
 
+    // Input: SDL3 event overlays + scancode mapping feeding engine.Input (issue #10).
+    try out.appendSlice(
+        a,
+        "const SDL_EVENT_KEY_DOWN: u32          = 0x300;\n" ++
+            "const SDL_EVENT_KEY_UP: u32            = 0x301;\n" ++
+            "const SDL_EVENT_MOUSE_MOTION: u32      = 0x400;\n" ++
+            "const SDL_EVENT_MOUSE_BUTTON_DOWN: u32 = 0x401;\n" ++
+            "const SDL_EVENT_MOUSE_BUTTON_UP: u32   = 0x402;\n" ++
+            "const SDL_EVENT_MOUSE_WHEEL: u32       = 0x403;\n" ++
+            "const SDL_KeyboardEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, scancode: u32, key: u32, mod: u16, raw: u16, down: bool, repeat: bool };\n" ++
+            "const SDL_MouseButtonEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, button: u8, down: bool, clicks: u8, pad: u8, x: f32, y: f32 };\n" ++
+            "const SDL_MouseMotionEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, state: u32, x: f32, y: f32, xrel: f32, yrel: f32 };\n" ++
+            "const SDL_MouseWheelEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, x: f32, y: f32, direction: u32, mouse_x: f32, mouse_y: f32 };\n\n" ++
+            "var g_input: engine.Input = engine.Input.init();\n" ++
+            "var g_services: engine.Services = engine.Services.init();\n\n" ++
+            "fn scancodeToKey(sc: u32) ?engine.Key {\n" ++
+            "    return switch (sc) {\n" ++
+            "        4...29 => @enumFromInt(@intFromEnum(engine.Key.a) + (sc - 4)),\n" ++
+            "        30...38 => @enumFromInt(@intFromEnum(engine.Key.num_1) + (sc - 30)),\n" ++
+            "        39 => .num_0,\n" ++
+            "        40 => .enter, 41 => .escape, 42 => .backspace, 43 => .tab, 44 => .space,\n" ++
+            "        79 => .right, 80 => .left, 81 => .down, 82 => .up,\n" ++
+            "        224 => .left_ctrl, 225 => .left_shift, 226 => .left_alt,\n" ++
+            "        228 => .right_ctrl, 229 => .right_shift, 230 => .right_alt,\n" ++
+            "        else => null,\n" ++
+            "    };\n" ++
+            "}\n\n" ++
+            "fn sdlButtonToMouse(b: u8) ?engine.MouseButton {\n" ++
+            "    return switch (b) { 1 => .left, 2 => .middle, 3 => .right, 4 => .x1, 5 => .x2, else => null };\n" ++
+            "}\n\n",
+    );
+
+    // Gamepad: SDL3 gamepad events feeding engine.Input (issue #10). SDL's
+    // SDL_GamepadButton/SDL_GamepadAxis enums share engine.GamepadButton/Axis order.
+    try out.appendSlice(
+        a,
+        "const SDL_INIT_GAMEPAD: u32                 = 0x00002000;\n" ++
+            "const SDL_EVENT_GAMEPAD_AXIS_MOTION: u32    = 0x650;\n" ++
+            "const SDL_EVENT_GAMEPAD_BUTTON_DOWN: u32    = 0x651;\n" ++
+            "const SDL_EVENT_GAMEPAD_BUTTON_UP: u32      = 0x652;\n" ++
+            "const SDL_EVENT_GAMEPAD_ADDED: u32          = 0x653;\n" ++
+            "const SDL_Gamepad = opaque {};\n" ++
+            "const SDL_GamepadButtonEvent = extern struct { type: u32, reserved: u32, timestamp: u64, which: u32, button: u8, down: bool, p1: u8, p2: u8 };\n" ++
+            "const SDL_GamepadAxisEvent = extern struct { type: u32, reserved: u32, timestamp: u64, which: u32, axis: u8, p1: u8, p2: u8, p3: u8, value: i16, p4: u16 };\n" ++
+            "const SDL_GamepadDeviceEvent = extern struct { type: u32, reserved: u32, timestamp: u64, which: u32 };\n" ++
+            "extern fn SDL_OpenGamepad(id: u32) ?*SDL_Gamepad;\n\n" ++
+            "fn sdlPadButton(b: u8) ?engine.GamepadButton {\n" ++
+            "    return if (b < 15) @enumFromInt(b) else null;\n" ++
+            "}\n" ++
+            "fn sdlPadAxis(ax: u8) ?engine.GamepadAxis {\n" ++
+            "    return if (ax < 6) @enumFromInt(ax) else null;\n" ++
+            "}\n\n",
+    );
+
     for (0..src_files.len) |i| {
         const s = std.fmt.bufPrint(&tmp, "const _uc{d}_mod = @import(\"script_{d}\");\n", .{ i, i }) catch return error.BufferTooSmall;
         try out.appendSlice(a, s);
@@ -540,20 +594,55 @@ fn generateMainZig(
                 "    return null;\n" ++
                 "}\n\n",
         );
+        // Builds the per-update context (ADR 0001) from the engine-owned services.
+        try out.appendSlice(
+            a,
+            "fn mkFrame(transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) engine.Frame {\n" ++
+                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services };\n" ++
+                "}\n\n",
+        );
+        // Lifecycle hooks accept either `hook(self)` or `hook(self, frame)` — the
+        // context is injected into every hook, not just update (ADR 0001).
         for ([_][]const u8{ "awake", "enable", "start", "disable", "destroy" }) |hook| {
             const s = std.fmt.bufPrint(
                 &tmp,
-                "fn call_{s}(comp: *LiveComponent) void {{\n" ++
-                    "    switch (comp.*) {{ inline else => |*c| if (comptime @hasDecl(@TypeOf(c.*), \"{s}\")) c.{s}() }}\n" ++
+                "fn call_{s}(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {{\n" ++
+                    "    switch (comp.*) {{ inline else => |*c| {{\n" ++
+                    "        const CT = @TypeOf(c.*);\n" ++
+                    "        if (comptime @hasDecl(CT, \"{s}\")) {{\n" ++
+                    "            const P = @typeInfo(@TypeOf(CT.{s})).@\"fn\".params;\n" ++
+                    "            if (P.len == 2 and P[1].type != null and P[1].type.? == engine.Frame) c.{s}(mkFrame(transform, objects, time)) else c.{s}();\n" ++
+                    "        }}\n" ++
+                    "    }} }}\n" ++
                     "}}\n\n",
-                .{ hook, hook, hook },
+                .{ hook, hook, hook, hook, hook },
             ) catch return error.BufferTooSmall;
             try out.appendSlice(a, s);
         }
         try out.appendSlice(
             a,
+            "fn call_configure_input(comp: *LiveComponent, input: *engine.Input) void {\n" ++
+                "    switch (comp.*) { inline else => |*c| if (comptime @hasDecl(@TypeOf(c.*), \"configureInput\")) c.configureInput(input) }\n" ++
+                "}\n\n",
+        );
+        // update() dispatch: support `update(frame)` (ADR 0001), `update(transform, objects, time)`,
+        // and the legacy `update(time)` form. Distinguish the Frame form by parameter type, not count.
+        try out.appendSlice(
+            a,
             "fn call_update(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {\n" ++
-                "    switch (comp.*) { inline else => |*c| { const CT = @TypeOf(c.*); if (@hasDecl(CT, \"update\")) { const np = @typeInfo(@TypeOf(CT.update)).@\"fn\".params.len; if (np >= 4) c.update(transform, objects, time) else c.update(time); } } }\n" ++
+                "    switch (comp.*) { inline else => |*c| {\n" ++
+                "        const CT = @TypeOf(c.*);\n" ++
+                "        if (@hasDecl(CT, \"update\")) {\n" ++
+                "            const P = @typeInfo(@TypeOf(CT.update)).@\"fn\".params;\n" ++
+                "            if (P.len == 2 and P[1].type != null and P[1].type.? == engine.Frame) {\n" ++
+                "                c.update(mkFrame(transform, objects, time));\n" ++
+                "            } else if (P.len >= 4) {\n" ++
+                "                c.update(transform, objects, time);\n" ++
+                "            } else {\n" ++
+                "                c.update(time);\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    } }\n" ++
                 "}\n\n",
         );
     }
@@ -582,6 +671,23 @@ fn generateMainZig(
             "    engine.software_renderer.setMeshSource(&meshSource);\n" ++
             "    engine.software_renderer.setMaterialSource(&materialSource);\n" ++
             "    engine.software_renderer.setTextureSource(&textureSource);\n\n" ++
+            "    // Build the input action map from every InputActions asset in the package\n" ++
+            "    // (data-driven bindings — issue #10). Runs before scripts so actions exist.\n" ++
+            "    {\n" ++
+            "        const ia_type: u8 = @intFromEnum(editor.AssetType.input_actions);\n" ++
+            "        var _ia_i: usize = 0;\n" ++
+            "        const _ia_n = g_assets.assetCount();\n" ++
+            "        while (_ia_i < _ia_n) : (_ia_i += 1) {\n" ++
+            "            const _ent = g_assets.assetEntryAt(_ia_i);\n" ++
+            "            if (_ent.asset_type != ia_type) continue;\n" ++
+            "            const _r = g_assets.readById(gpa, _ent.id) orelse continue;\n" ++
+            "            defer gpa.free(_r.bytes);\n" ++
+            "            const _ia = engine.assets.InputActions.loadFromBytes(gpa, _r.bytes) catch continue;\n" ++
+            "            defer _ia.deinit(gpa);\n" ++
+            "            _ia.applyTo(&g_input);\n" ++
+            "            std.debug.print(\"[Turian] Loaded input actions ({d} action(s))\\n\", .{_ia.actions.len});\n" ++
+            "        }\n" ++
+            "    }\n\n" ++
             "    // Load the scene from the package.\n" ++
             "    const scene_bytes = g_assets.readByPath(gpa, scene_vpath) orelse {\n" ++
             "        std.debug.print(\"[Turian] Scene '{s}' not found in package\\n\", .{scene_vpath});\n" ++
@@ -608,9 +714,12 @@ fn generateMainZig(
                 "                    if (instantiate(&comp.user_script)) |live| {\n" ++
                 "                        g_live[g_live_count] = live;\n" ++
                 "                        g_live_transform[g_live_count] = &obj.transform;\n" ++
-                "                        call_awake(&g_live[g_live_count]);\n" ++
-                "                        call_enable(&g_live[g_live_count]);\n" ++
-                "                        call_start(&g_live[g_live_count]);\n" ++
+                "                        const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "                        const objs = objects[0..object_count];\n" ++
+                "                        call_configure_input(&g_live[g_live_count], &g_input);\n" ++
+                "                        call_awake(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                        call_enable(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                        call_start(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
                 "                        g_live_count += 1;\n" ++
                 "                    }\n" ++
                 "                }\n" ++
@@ -622,7 +731,7 @@ fn generateMainZig(
 
     try out.appendSlice(
         a,
-        "    if (!SDL_Init(SDL_INIT_VIDEO)) {\n" ++
+        "    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {\n" ++
             "        std.debug.print(\"[Turian] SDL_Init failed\\n\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++
@@ -649,9 +758,46 @@ fn generateMainZig(
             "    var elapsed: f32 = 0;\n" ++
             "    var frame: u64 = 0;\n\n" ++
             "    main_loop: while (true) {\n" ++
+            "        g_input.newFrame();\n" ++
             "        var ev: SDL_Event align(8) = undefined;\n" ++
             "        while (SDL_PollEvent(&ev)) {\n" ++
-            "            if (ev.type == SDL_EVENT_QUIT) break :main_loop;\n" ++
+            "            switch (ev.type) {\n" ++
+            "                SDL_EVENT_QUIT => break :main_loop,\n" ++
+            "                SDL_EVENT_KEY_DOWN, SDL_EVENT_KEY_UP => {\n" ++
+            "                    const ke: *const SDL_KeyboardEvent = @ptrCast(&ev);\n" ++
+            "                    if (scancodeToKey(ke.scancode)) |k| g_input.setKey(k, ev.type == SDL_EVENT_KEY_DOWN);\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_MOUSE_MOTION => {\n" ++
+            "                    const me: *const SDL_MouseMotionEvent = @ptrCast(&ev);\n" ++
+            "                    g_input.setMousePosition(me.x, me.y);\n" ++
+            "                    g_input.addMouseMotion(me.xrel, me.yrel);\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP => {\n" ++
+            "                    const be: *const SDL_MouseButtonEvent = @ptrCast(&ev);\n" ++
+            "                    if (sdlButtonToMouse(be.button)) |mb| g_input.setMouseButton(mb, ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN);\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_MOUSE_WHEEL => {\n" ++
+            "                    const we: *const SDL_MouseWheelEvent = @ptrCast(&ev);\n" ++
+            "                    g_input.addWheel(we.y);\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_GAMEPAD_ADDED => {\n" ++
+            "                    const ge: *const SDL_GamepadDeviceEvent = @ptrCast(&ev);\n" ++
+            "                    _ = SDL_OpenGamepad(ge.which);\n" ++
+            "                    g_input.gamepad_connected = true;\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP => {\n" ++
+            "                    const be: *const SDL_GamepadButtonEvent = @ptrCast(&ev);\n" ++
+            "                    if (sdlPadButton(be.button)) |pb| g_input.setGamepadButton(pb, ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);\n" ++
+            "                },\n" ++
+            "                SDL_EVENT_GAMEPAD_AXIS_MOTION => {\n" ++
+            "                    const ae: *const SDL_GamepadAxisEvent = @ptrCast(&ev);\n" ++
+            "                    if (sdlPadAxis(ae.axis)) |pa| {\n" ++
+            "                        const norm = @as(f32, @floatFromInt(ae.value)) / 32767.0;\n" ++
+            "                        g_input.setGamepadAxis(pa, std.math.clamp(norm, -1.0, 1.0));\n" ++
+            "                    }\n" ++
+            "                },\n" ++
+            "                else => {},\n" ++
+            "            }\n" ++
             "        }\n\n" ++
             "        const now_ts = std.Io.Clock.awake.now(io);\n" ++
             "        const dur    = prev_ts.durationTo(now_ts);\n" ++

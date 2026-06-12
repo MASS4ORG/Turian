@@ -2,7 +2,7 @@ const FieldType = @import("FieldType.zig").FieldType;
 const MAX_REF_LEN = @import("GameObjectRef.zig").MAX_REF_LEN;
 
 /// Asset type category filter for typed asset references.
-pub const AssetFilter = enum { any, mesh, texture, audio, material };
+pub const AssetFilter = enum { any, mesh, texture, audio, material, input_actions };
 
 /// Weak reference to an asset by stable GUID string.
 pub const AssetRef = struct {

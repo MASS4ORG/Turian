@@ -57,6 +57,12 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .internal_editor,
             .icon_hint = .data,
         },
+        .input_actions => .{
+            .name = "Input Actions",
+            .extensions = &.{".inputactions"},
+            .open_mode = .internal_editor,
+            .icon_hint = .data,
+        },
     };
 }
 

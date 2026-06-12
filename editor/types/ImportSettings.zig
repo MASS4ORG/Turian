@@ -38,6 +38,7 @@ pub const ImportSettings = union(AssetType) {
     scene: void,
     material: void,
     data_asset: void,
+    input_actions: void,
 };
 
 /// Returns default import settings for the given asset type.
@@ -50,6 +51,7 @@ pub fn defaultFor(asset_type: AssetType) ImportSettings {
         .scene => .{ .scene = {} },
         .material => .{ .material = {} },
         .data_asset => .{ .data_asset = {} },
+        .input_actions => .{ .input_actions = {} },
         .unknown => .{ .unknown = {} },
     };
 }

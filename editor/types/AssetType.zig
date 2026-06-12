@@ -8,4 +8,5 @@ pub const AssetType = enum(u8) {
     scene,
     material,
     data_asset,
+    input_actions,
 };

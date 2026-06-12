@@ -31,6 +31,23 @@ pub const Time = @import("core/Time.zig").Time;
 /// Project metadata (name, version).
 pub const Project = @import("core/Project.zig").Project;
 
+/// Device-agnostic input snapshot + semantic action map (issue #10).
+pub const Input = @import("Input.zig").Input;
+/// Keyboard key identifier.
+pub const Key = @import("Input.zig").Key;
+/// Mouse button identifier.
+pub const MouseButton = @import("Input.zig").MouseButton;
+/// Gamepad button identifier.
+pub const GamepadButton = @import("Input.zig").GamepadButton;
+/// Gamepad analog axis identifier.
+pub const GamepadAxis = @import("Input.zig").GamepadAxis;
+/// A physical input source bound to an action.
+pub const Binding = @import("Input.zig").Binding;
+/// Per-update context object bundling engine services for scripts (ADR 0001).
+pub const Frame = @import("Frame.zig").Frame;
+/// Type-keyed registry for engine + user-defined services (ADR 0001).
+pub const Services = @import("Services.zig").Services;
+
 /// Asset loading subsystem (meshes, textures).
 pub const assets = @import("assets/root.zig");
 /// Triangle mesh type.
@@ -39,6 +56,8 @@ pub const Mesh = assets.Mesh;
 pub const Texture = assets.Texture;
 /// Material asset — shader parameter values and resource bindings.
 pub const Material = assets.Material;
+/// Data-driven input binding asset (`.inputactions`).
+pub const InputActions = assets.InputActions;
 /// Shader metadata (exposed parameters) driving materials and inspector UI.
 pub const shader = assets.shader;
 /// Shader parameter metadata descriptor.

@@ -1,0 +1,11 @@
+{
+  "guid": "f0e26d2f-3292-4ebd-860f-c39f824b259f",
+  "asset_type": "input_actions",
+  "importer_version": 1,
+  "source_hash": 486778402420503573,
+  "import_settings": "input_actions",
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ]
+}

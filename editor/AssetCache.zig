@@ -14,6 +14,7 @@ pub fn artifactExtension(asset_type: AssetType) []const u8 {
         .scene => ".scene",
         .material => ".material",
         .data_asset => ".asset",
+        .input_actions => ".inputactions",
         .unknown => ".bin",
     };
 }

@@ -12,6 +12,10 @@ pub const ShaderParam = shader.ShaderParam;
 pub const ParamKind = shader.ParamKind;
 pub const Material = @import("Material.zig").Material;
 
+// ── Input ─────────────────────────────────────────────────────────────────────
+/// Data-driven input binding asset (`.inputactions`), applied to `engine.Input`.
+pub const InputActions = @import("InputActions.zig").InputActions;
+
 // ── Asset Provider API ──────────────────────────────────────────────────────
 // Generic, swappable access to asset bytes: loose files in development, `.oap`
 // packages in release builds. Compose providers with AssetServer.

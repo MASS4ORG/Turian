@@ -44,6 +44,19 @@ pub fn provider(self: *OapProvider) Provider {
 /// package buffer and stays valid while this provider is alive.
 pub const ByIdResult = struct { bytes: []u8, ext: []const u8 };
 
+/// Number of assets in the package (for type-filtered enumeration).
+pub fn assetCount(self: *const OapProvider) usize {
+    return self.reader.count();
+}
+
+/// The id and packaged asset-type tag of the i-th asset. The tag is the editor's
+/// `@intFromEnum(AssetType)` value, so callers that know that enum can filter by
+/// type without the engine depending on the editor.
+pub fn assetEntryAt(self: *const OapProvider, i: usize) struct { id: oap.AssetId, asset_type: u8 } {
+    const e = self.reader.entryAt(i);
+    return .{ .id = e.asset_id, .asset_type = e.asset_type };
+}
+
 /// Look up an asset by its 128-bit id (e.g. an asset GUID) and decode it.
 /// Returns null if the package has no such asset or it fails to decode.
 pub fn readById(self: *OapProvider, gpa: std.mem.Allocator, id: oap.AssetId) ?ByIdResult {

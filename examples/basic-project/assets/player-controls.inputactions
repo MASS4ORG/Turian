@@ -1,0 +1,64 @@
+.{
+    .version = 1,
+    .actions = .{
+        .{
+            .name = "move",
+            .kind = .vector,
+            .pos = .{ // right
+                .{ .device = .key, .code = "d" },
+                .{ .device = .gamepad_axis, .code = "left_x", .axis_positive = true },
+            },
+            .neg = .{ // left
+                .{ .device = .key, .code = "a" },
+                .{ .device = .gamepad_axis, .code = "left_x", .axis_positive = false },
+            },
+            .up = .{ // forward (stick up is -Y)
+                .{ .device = .key, .code = "w" },
+                .{ .device = .gamepad_axis, .code = "left_y", .axis_positive = false },
+            },
+            .down = .{ // back
+                .{ .device = .key, .code = "s" },
+                .{ .device = .gamepad_axis, .code = "left_y", .axis_positive = true },
+            },
+        },
+        .{
+            .name = "look_axis",
+            .kind = .vector,
+            .pos = .{.{ .device = .gamepad_axis, .code = "right_x", .axis_positive = true }},
+            .neg = .{.{ .device = .gamepad_axis, .code = "right_x", .axis_positive = false }},
+            .up = .{.{ .device = .gamepad_axis, .code = "right_y", .axis_positive = false }},
+            .down = .{.{ .device = .gamepad_axis, .code = "right_y", .axis_positive = true }},
+        },
+        .{
+            .name = "ascend",
+            .kind = .button,
+            .pos = .{
+                .{ .device = .key, .code = "space" },
+                .{ .device = .gamepad_button, .code = "a" },
+                .{ .device = .gamepad_axis, .code = "right_trigger", .axis_positive = true },
+            },
+        },
+        .{
+            .name = "descend",
+            .kind = .button,
+            .pos = .{
+                .{ .device = .key, .code = "left_shift" },
+                .{ .device = .gamepad_button, .code = "b" },
+                .{ .device = .gamepad_axis, .code = "left_trigger", .axis_positive = true },
+            },
+        },
+        .{
+            .name = "boost",
+            .kind = .button,
+            .pos = .{
+                .{ .device = .key, .code = "left_ctrl" },
+                .{ .device = .gamepad_button, .code = "left_shoulder" },
+            },
+        },
+        .{
+            .name = "look",
+            .kind = .button,
+            .pos = .{.{ .device = .mouse, .code = "right" }},
+        },
+    },
+}
