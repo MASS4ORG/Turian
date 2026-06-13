@@ -143,6 +143,7 @@ fn populateFields(def: *ComponentDef, ci: api.ComponentInfo) void {
         fd.* = .{};
         fd.setName(std.mem.span(field.name));
         fd.kind = field.field_type;
+        fd.asset_filter = field.asset_filter;
         switch (field.field_type) {
             .f32 => fd.default_f32 = field.default_value.as_f32,
             .f64 => fd.default_f64 = field.default_value.as_f64,

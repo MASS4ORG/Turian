@@ -2,7 +2,9 @@ const FieldType = @import("FieldType.zig").FieldType;
 const MAX_REF_LEN = @import("GameObjectRef.zig").MAX_REF_LEN;
 
 /// Asset type category filter for typed asset references.
-pub const AssetFilter = enum { any, mesh, texture, audio, material, input_actions };
+/// Tagged `u32` so it can live inside the extern `FieldInfo` reflection struct.
+/// New variants may only be appended (C-ABI shared libraries depend on the values).
+pub const AssetFilter = enum(u32) { any, mesh, texture, audio, material, input_actions, scene };
 
 /// Weak reference to an asset by stable GUID string.
 pub const AssetRef = struct {
@@ -13,6 +15,11 @@ pub const AssetRef = struct {
 
     /// Returns the GUID string, or empty if unset.
     pub fn slice(self: *const @This()) []const u8 {
+        return self.buf[0..self.len];
+    }
+    /// Alias for `slice` — reads more naturally at component call sites
+    /// (e.g. `self.next_scene.guid()`).
+    pub fn guid(self: *const @This()) []const u8 {
         return self.buf[0..self.len];
     }
     /// Sets the GUID string, truncating if necessary.
@@ -35,6 +42,11 @@ pub fn TypedAssetRef(comptime filter: AssetFilter) type {
 
         /// Returns the GUID string, or empty if unset.
         pub fn slice(self: *const @This()) []const u8 {
+            return self.buf[0..self.len];
+        }
+        /// Alias for `slice` — reads more naturally at component call sites
+        /// (e.g. `self.next_scene.guid()`).
+        pub fn guid(self: *const @This()) []const u8 {
             return self.buf[0..self.len];
         }
         /// Sets the GUID string, truncating if necessary.

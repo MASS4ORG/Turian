@@ -13,6 +13,9 @@ pub const ScriptFieldValue = struct {
     name_len: usize = 0,
     /// The data type of this field.
     kind: api.FieldType = .f32,
+    /// Asset category for `asset_ref` fields (drives the inspector picker).
+    /// Restored from reflection — not persisted in the scene file.
+    asset_filter: api.AssetFilter = .any,
     // ── Numeric scalars ───────────────────────────────────────────────────────
     as_f32: f32 = 0,
     as_f64: f64 = 0,

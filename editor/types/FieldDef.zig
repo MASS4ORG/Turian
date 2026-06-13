@@ -9,6 +9,8 @@ pub const FieldDef = struct {
     name: [MAX_FIELD_NAME_LEN]u8 = std.mem.zeroes([MAX_FIELD_NAME_LEN]u8),
     name_len: usize = 0,
     kind: engine.api.FieldType = .f32,
+    /// Asset category for `asset_ref` fields (drives the inspector picker).
+    asset_filter: engine.api.AssetFilter = .any,
     // ── Scalar defaults ───────────────────────────────────────────────────────
     default_f32: f32 = 0,
     default_f64: f64 = 0,

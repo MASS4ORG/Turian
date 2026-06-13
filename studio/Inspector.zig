@@ -326,7 +326,16 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             defer te.deinit();
             if (te.text_changed) changed = true;
         },
-        .game_object_ref, .component_ref, .asset_ref => {
+        .asset_ref => {
+            // Drop zone + typed asset picker (e.g. `.scene` shows only scenes).
+            if (PropDraw.drawScriptAssetRef(@src(), fv.refSlice(), fv.asset_filter, id)) |new_guid| {
+                if (!std.mem.eql(u8, fv.refSlice(), new_guid)) {
+                    fv.setRef(new_guid);
+                    changed = true;
+                }
+            }
+        },
+        .game_object_ref, .component_ref => {
             if (PropDraw.drawRefDropZone(@src(), fv.kind, fv.refSlice(), id)) |new_guid| {
                 if (!std.mem.eql(u8, fv.refSlice(), new_guid)) {
                     fv.setRef(new_guid);

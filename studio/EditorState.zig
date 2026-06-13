@@ -1199,6 +1199,7 @@ pub fn makeComponent(def: *const ComponentDef) ?Component {
         var fv = engine.ScriptFieldValue{};
         fv.setName(fd.nameSlice());
         fv.kind = fd.kind;
+        fv.asset_filter = fd.asset_filter;
         fv.as_f32 = fd.default_f32;
         fv.as_f64 = fd.default_f64;
         fv.as_i32 = fd.default_i32;
@@ -1280,6 +1281,9 @@ pub fn syncSceneWithDefinitions() void {
                     fv.as_vec4_w = fd.default_vec4_w;
                     ordered[ordered_count] = fv;
                 }
+                // The filter is a static property of the script type (not
+                // persisted), so always refresh it from the live definition.
+                ordered[ordered_count].asset_filter = fd.asset_filter;
                 ordered_count += 1;
             }
 

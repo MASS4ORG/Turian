@@ -707,6 +707,7 @@ fn generateMainZig(
                 "                    .@\"struct\" => {\n" ++
                 "                        if (field.type == engine.Vector3) @field(comp, field.name) = .{ .x = fv.as_vec3_x, .y = fv.as_vec3_y, .z = fv.as_vec3_z }\n" ++
                 "                        else if (field.type == engine.GameObjectRef) { var r: engine.GameObjectRef = .{}; r.set(fv.refSlice()); @field(comp, field.name) = r; }\n" ++
+                "                        else if (@hasDecl(field.type, \"_turian_ref_kind\")) { var r: field.type = .{}; r.set(fv.refSlice()); @field(comp, field.name) = r; }\n" ++
                 "                    },\n" ++
                 "                    else => {},\n" ++
                 "                }\n" ++

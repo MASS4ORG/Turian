@@ -1075,7 +1075,8 @@ fn drawRef(
                     RefT._turian_asset_filter
                 else
                     engine.AssetFilter.any;
-                if (pickerAsset(filter, ptr, fw)) {
+                if (pickerAsset(filter, fw)) |g| {
+                    ptr.set(g);
                     changed = true;
                     dvui.dataSet(null, picker_id, "picker_open", false);
                 }
@@ -1099,21 +1100,23 @@ fn drawRef(
     return changed;
 }
 
-fn pickerAsset(
-    comptime filter: engine.AssetFilter,
-    ptr: anytype,
-    fw: *dvui.FloatingMenuWidget,
-) bool {
-    var changed = false;
+/// Floating list of assets matching `filter`. Returns the chosen GUID string
+/// (into a static buffer, valid until the next call) or null if nothing picked.
+/// The runtime `filter` lets both the comptime component path and the
+/// reflection-driven script-field path share one picker.
+var s_picked_guid_buf: [36]u8 = undefined;
 
+fn pickerAsset(
+    filter: engine.AssetFilter,
+    fw: *dvui.FloatingMenuWidget,
+) ?[]const u8 {
     // Built-in presets (material filter only).
-    if (comptime filter == .material) {
+    if (filter == .material) {
         dvui.label(@src(), "Built-in", .{}, .{ .expand = .horizontal, .style = .content });
         for (engine.Material.presets, 0..) |preset, pi| {
             if (dvui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = pi })) |_| {
-                ptr.set(preset.guid);
-                changed = true;
                 fw.close();
+                return preset.guid;
             }
         }
         _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(2) });
@@ -1121,7 +1124,7 @@ fn pickerAsset(
 
     if (!EditorState.assetDbReady()) {
         dvui.label(@src(), "(no project open)", .{}, .{});
-        return changed;
+        return null;
     }
     const asset_type: editor.AssetType = switch (filter) {
         .any => .unknown,
@@ -1130,6 +1133,7 @@ fn pickerAsset(
         .audio => .audio,
         .material => .material,
         .input_actions => .input_actions,
+        .scene => .scene,
     };
     var any_shown = false;
 
@@ -1145,14 +1149,59 @@ fn pickerAsset(
         var guid_buf: [36]u8 = undefined;
         const guid_str = info.guid.toString(&guid_buf);
         if (dvui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx })) |_| {
-            ptr.set(guid_str);
-            changed = true;
+            const n = @min(guid_str.len, s_picked_guid_buf.len);
+            @memcpy(s_picked_guid_buf[0..n], guid_str[0..n]);
             fw.close();
+            return s_picked_guid_buf[0..n];
         }
         idx += 1;
     }
     if (!any_shown and filter != .any) dvui.label(@src(), "(no project assets)", .{}, .{});
-    return changed;
+    return null;
+}
+
+/// Reference row for a reflection-driven script `asset_ref` field: a drag-drop
+/// zone plus a "..." picker filtered by `filter` (e.g. `.scene` shows only
+/// scene assets). Returns the chosen GUID string, or null if unchanged.
+pub fn drawScriptAssetRef(
+    src: std.builtin.SourceLocation,
+    current_guid: []const u8,
+    filter: engine.AssetFilter,
+    id: usize,
+) ?[]const u8 {
+    var row = dvui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    defer row.deinit();
+
+    var picked: ?[]const u8 = null;
+
+    if (drawRefDropZone(@src(), .asset_ref, current_guid, id)) |new_guid| picked = new_guid;
+
+    const picker_id = dvui.parentGet().extendId(@src(), id);
+    if (dvui.button(@src(), "...", .{}, .{
+        .gravity_y = 0.5,
+        .min_size_content = .{ .w = 24 },
+        .id_extra = id,
+    })) {
+        dvui.dataSet(null, picker_id, "picker_open", true);
+    }
+    const picker_open = dvui.dataGet(null, picker_id, "picker_open", bool) orelse false;
+    if (picker_open) {
+        var fw = dvui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = id });
+        defer fw.deinit();
+
+        if (pickerAsset(filter, fw)) |g| {
+            picked = g;
+            dvui.dataSet(null, picker_id, "picker_open", false);
+        }
+
+        // Close on focus loss — skip the floatingMenu's first frame (dvui only
+        // focuses a new floatingMenu on its second frame via minSizeGet).
+        if (dvui.minSizeGet(fw.data().id) != null and fw.data().id != dvui.focusedSubwindowId()) {
+            dvui.dataSet(null, picker_id, "picker_open", false);
+        }
+    }
+
+    return picked;
 }
 
 fn pickerSceneObject(

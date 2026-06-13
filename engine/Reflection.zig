@@ -40,6 +40,21 @@ fn zigTypeToFieldType(comptime T: type) ?api.FieldType {
     return null;
 }
 
+/// Asset category declared by a typed asset reference field, or `.any`
+/// for plain `AssetRef` and non-asset fields.
+fn assetFilterOf(comptime T: type) api.AssetFilter {
+    if (canHaveDecls(T) and @hasDecl(T, "_turian_asset_filter"))
+        return T._turian_asset_filter;
+    return .any;
+}
+
+fn canHaveDecls(comptime T: type) bool {
+    return switch (@typeInfo(T)) {
+        .@"struct", .@"union", .@"enum", .@"opaque" => true,
+        else => false,
+    };
+}
+
 /// True for struct types that aren't already leaf types and have at least one
 /// reflectable field (possibly through nesting). Used to decide whether to
 /// recurse into a field rather than skip it.
@@ -81,6 +96,7 @@ fn collectFields(
                 .name = full_name.ptr,
                 .field_type = ft,
                 .default_value = getDefaultValue(f, ft),
+                .asset_filter = comptime assetFilterOf(f.type),
             };
             idx.* += 1;
         } else if (comptime isNestedReflectableStruct(f.type)) {

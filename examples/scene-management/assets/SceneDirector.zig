@@ -14,15 +14,17 @@ const engine = @import("engine");
 /// survive every `single` transition (the SceneManager equivalent of keeping a
 /// DontDestroyOnLoad object across scene loads).
 ///
-/// Note: scene ids are hard-coded GUID strings here. Component fields cannot yet
-/// hold scene asset references (hydration of `TypedAssetRef` fields is a pending
-/// editor feature), so a real game would expose these as inspector-edited refs.
+/// The two levels are wired as `TypedAssetRef(.scene)` fields (issue #43): the
+/// inspector shows a scene-asset picker for each, and the chosen GUID is
+/// serialised into the scene JSON and hydrated back into these fields at
+/// runtime. No hard-coded GUID constants.
 pub const SceneDirector = struct {
     pub const is_component = true;
 
-    // Stable GUIDs authored in the matching `*.json.meta` files.
-    const LEVEL_A = "10000000-0000-4000-8000-00000000000a";
-    const LEVEL_B = "10000000-0000-4000-8000-00000000000b";
+    /// First level, streamed in additively at startup and on key 1.
+    level_a: engine.TypedAssetRef(.scene) = .{},
+    /// Second level, used by keys 2 (single) / 3 (additive) / 4 (unload).
+    level_b: engine.TypedAssetRef(.scene) = .{},
 
     booted: bool = false,
     reported: bool = false,
@@ -37,7 +39,7 @@ pub const SceneDirector = struct {
         // level transitions below.
         if (mgr.getActiveScene()) |boot| mgr.setScenePersistent(boot, true);
         // Stream the first level in additively so the bootstrap scene stays loaded.
-        mgr.requestLoad(LEVEL_A, .additive);
+        mgr.requestLoad(self.level_a.guid(), .additive);
         self.booted = true;
         std.debug.print("[SceneDirector] Bootstrap ready — loading Level A (additive)\n", .{});
     }
@@ -58,19 +60,19 @@ pub const SceneDirector = struct {
         }
 
         if (input.wasKeyPressed(.num_1)) {
-            mgr.requestLoad(LEVEL_A, .single);
+            mgr.requestLoad(self.level_a.guid(), .single);
             std.debug.print("[SceneDirector] Switch to Level A (single)\n", .{});
         }
         if (input.wasKeyPressed(.num_2)) {
-            mgr.requestLoad(LEVEL_B, .single);
+            mgr.requestLoad(self.level_b.guid(), .single);
             std.debug.print("[SceneDirector] Switch to Level B (single)\n", .{});
         }
         if (input.wasKeyPressed(.num_3)) {
-            mgr.requestLoad(LEVEL_B, .additive);
+            mgr.requestLoad(self.level_b.guid(), .additive);
             std.debug.print("[SceneDirector] Add Level B (additive)\n", .{});
         }
         if (input.wasKeyPressed(.num_4)) {
-            if (mgr.findById(LEVEL_B)) |h| {
+            if (mgr.findById(self.level_b.guid())) |h| {
                 mgr.requestUnload(h);
                 std.debug.print("[SceneDirector] Unload Level B\n", .{});
             }
