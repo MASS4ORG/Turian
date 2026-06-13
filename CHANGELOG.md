@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2026-06-13
+
+### Features
+- feat: in-editor Play mode! #31
+- feat: Scene references #43
+- feat: Project settings #13 and Scene Manager API #22
+
 ## [1.1.0] - 2026-06-12
 
 ### Features
