@@ -7,6 +7,7 @@ const SceneViewport = @import("SceneViewport.zig");
 const EditorState = @import("EditorState.zig");
 const TaskBar = @import("TaskBar.zig");
 const Tasks = @import("Tasks.zig");
+const PlayMode = @import("PlayMode.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
@@ -67,6 +68,10 @@ pub fn frame() bool {
                 e.handle(@src(), root.data());
                 EditorState.pasteObjects(dvui.frameTimeNS(), dvui.io);
             }
+        } else if (ke.code == .p and !ke.mod.shift()) {
+            // Ctrl+P toggles Play / Stop (issue #31).
+            e.handle(@src(), root.data());
+            PlayMode.toggle(dvui.io);
         }
     }
 
@@ -120,6 +125,10 @@ pub fn frame() bool {
 
     // Reap finished background jobs and keep frames flowing while one runs.
     Tasks.pump(dvui.io);
+
+    // Step the in-editor game simulation (issue #31). Keeps frames flowing
+    // while a scene is playing so the viewport animates continuously.
+    PlayMode.pump(dvui.io);
 
     return true;
 }

@@ -23,6 +23,8 @@ pub const asset_packager = @import("AssetPackager.zig");
 pub const asset_registry = @import("AssetRegistry.zig");
 /// Game build system (generates + compiles standalone game).
 pub const GameBuild = @import("GameBuild.zig");
+/// Play-mode build system (generates + compiles the in-editor play library).
+pub const PlayBuild = @import("PlayBuild.zig");
 /// SDK layout detection and BuildConfig resolution.
 pub const sdk_layout = @import("SdkLayout.zig");
 /// User script reflection via dynamic library compilation.

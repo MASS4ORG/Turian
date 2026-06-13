@@ -79,6 +79,9 @@ pub fn main(init: std.process.Init) !void {
     } else if (std.mem.eql(u8, cmd, "build")) {
         const path = args.next() orelse return printUsage();
         return cmdBuild(io, gpa, path, init.environ_map);
+    } else if (std.mem.eql(u8, cmd, "play-build")) {
+        const path = args.next() orelse return printUsage();
+        return cmdPlayBuild(io, gpa, path, init.environ_map);
     } else {
         printUsage();
         return error.UnknownCommand;
@@ -94,6 +97,7 @@ fn printUsage() void {
         \\  info        <project-path>  Print project metadata and component list
         \\  import      <project-path>  Import all assets (reports task progress)
         \\  build       <project-path>  Compile the project into a game executable
+        \\  play-build  <project-path>  Compile the in-editor Play-mode library (issue #31)
         \\
         \\Env-var overrides for 'build' (optional; build-time paths used by default):
         \\  TURIAN_ENGINE_ROOT    Path to engine/root.zig
@@ -177,6 +181,42 @@ fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *cons
     task.printStatus();
     if (!ok) return error.BuildFailed;
     std.debug.print("[Turian] Build complete.\n", .{});
+}
+
+/// Compile the Play-mode shared library headlessly (issue #31). Useful for CI:
+/// it exercises the play codegen + user-script compilation without a display.
+fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *const std.process.Environ.Map) !void {
+    const baked = GameBuild.BuildConfig{
+        .engine_root = build_options.engine_root_path,
+        .editor_root = build_options.editor_root_path,
+        .cgltf_wrap_c = build_options.cgltf_wrap_c_path,
+        .vendor_include = build_options.vendor_include_path,
+        .build_root = build_options.build_root_path,
+        .sdl3_lib = build_options.sdl3_lib_path,
+        .math_root = build_options.math_root_path,
+        .guid_root = build_options.guid_root_path,
+        .oap_root = build_options.oap_root_path,
+        .serde_root = build_options.serde_root_path,
+        .serde_compat_root = build_options.serde_compat_root_path,
+    };
+    var cfg_arena = std.heap.ArenaAllocator.init(gpa);
+    defer cfg_arena.deinit();
+    const a = cfg_arena.allocator();
+    const config = editor.sdk_layout.resolveBuildConfig(io, a, environ, baked);
+
+    var components: [scanner.MAX_COMPONENTS]scanner.ComponentDef = undefined;
+    var count: usize = 0;
+    scanner.populateBuiltins(&components, &count);
+
+    var assets_buf: [1024]u8 = undefined;
+    const assets = std.fmt.bufPrint(&assets_buf, "{s}/assets", .{path}) catch path;
+    scanner.scanAssetsDir(io, gpa, assets, &components, &count);
+
+    const lib = editor.PlayBuild.buildPlayLibrary(io, a, path, &components, count, config) orelse {
+        std.debug.print("Play library build failed\n", .{});
+        return error.BuildFailed;
+    };
+    std.debug.print("[Turian] Play library: {s}\n", .{lib});
 }
 
 fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {

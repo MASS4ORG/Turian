@@ -29,6 +29,15 @@ var g_depth_tex: ?*c.SDL_GPUTexture = null;
 var g_target_w: u32 = 0;
 var g_target_h: u32 = 0;
 
+/// While Play mode is running, the viewport renders this live node slice
+/// (owned by the play library) instead of the editor's edit-time scene. Cleared
+/// back to null on Stop so the editor scene is shown again (issue #31).
+var g_render_override: ?[]const engine.SceneNode = null;
+
+pub fn setRenderOverride(nodes: ?[]const engine.SceneNode) void {
+    g_render_override = nodes;
+}
+
 var g_white_tex: ?*c.SDL_GPUTexture = null;
 // Default tangent-space "flat" normal (points straight out): rgb (128,128,255).
 var g_flat_normal_tex: ?*c.SDL_GPUTexture = null;
@@ -209,7 +218,7 @@ pub fn renderViewport(w: u32, h: u32) ?dvui.TextureTarget {
     const depth_tex = g_depth_tex orelse return null;
     const bt: *BackendTex = @ptrCast(@alignCast(color_target.ptr));
 
-    const objects = EditorState.objects[0..EditorState.object_count];
+    const objects = g_render_override orelse EditorState.objects[0..EditorState.object_count];
     uploadNewAssets(cmd, dev, objects);
 
     var cam_pos = Vector3{ .x = 0, .y = 2, .z = -5 };

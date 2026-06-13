@@ -1,0 +1,504 @@
+/// Play-mode build system — generates and compiles a *play shared library*
+/// from the current scene's user scripts so the studio can run the game's
+/// update loop **in-process** inside the editor viewport (issue #31).
+///
+/// This mirrors `GameBuild` (which produces a standalone executable), but the
+/// product here is a `libturian_play.{so,dll,dylib}` exposing a small C ABI the
+/// studio dlopen()s. The studio owns the window, rendering and the main loop;
+/// the library only owns the scene node storage, the live user-script component
+/// instances and the input snapshot, and steps them on demand.
+///
+/// Execution-model rationale (see docs/decisions/0002-play-mode.md): user
+/// scripts are arbitrary `.zig` files compiled at project-build time, so they
+/// cannot be linked into the studio binary up front. The reflection library
+/// (UserReflection.zig) already proves the dlopen pattern works for metadata;
+/// Play reuses it to actually *run* the scripts. The alternative — launching
+/// the built game as a subprocess — cannot render inside the editor viewport,
+/// which is the whole point of Play mode.
+const std = @import("std");
+const engine = @import("engine");
+const ComponentDef = @import("Scanner.zig").ComponentDef;
+const GameBuild = @import("GameBuild.zig");
+
+pub const BuildConfig = GameBuild.BuildConfig;
+
+const lib_ext = if (@import("builtin").os.tag == .windows) ".dll" else if (@import("builtin").os.tag == .macos) ".dylib" else ".so";
+const lib_prefix = if (@import("builtin").os.tag == .windows) "" else "lib";
+
+/// Names of the C-ABI symbols the studio looks up after dlopen.
+pub const symbols = struct {
+    pub const start = "turianPlayStart";
+    pub const update = "turianPlayUpdate";
+    pub const stop = "turianPlayStop";
+    pub const nodes_ptr = "turianPlayNodesPtr";
+    pub const nodes_count = "turianPlayNodesCount";
+    pub const new_frame = "turianPlayNewFrame";
+    pub const set_key = "turianPlaySetKey";
+    pub const set_mouse_button = "turianPlaySetMouseButton";
+    pub const set_mouse_pos = "turianPlaySetMousePos";
+    pub const add_mouse_motion = "turianPlayAddMouseMotion";
+    pub const add_wheel = "turianPlayAddWheel";
+    pub const load_input_actions = "turianPlayLoadInputActions";
+};
+
+fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
+    return std.mem.replaceOwned(u8, a, path, "\\", "/");
+}
+
+/// Compile a play shared library for `project_path` from the current set of
+/// user-script component definitions. On success returns the absolute path to
+/// the produced library (allocated in `a`); returns null on any failure.
+///
+/// Blocks until compilation finishes. POSIX-only (needs dlopen on the studio
+/// side); returns null on Windows/WASI.
+pub fn buildPlayLibrary(
+    io: std.Io,
+    a: std.mem.Allocator,
+    project_path: []const u8,
+    components: []const ComponentDef,
+    component_count: usize,
+    config: BuildConfig,
+) ?[]const u8 {
+    if (comptime @import("builtin").os.tag == .windows or @import("builtin").os.tag == .wasi) return null;
+
+    return buildInner(io, a, project_path, components, component_count, config) catch |err| {
+        std.debug.print("[Turian] Play build failed: {any}\n", .{err});
+        return null;
+    };
+}
+
+fn buildInner(
+    io: std.Io,
+    a: std.mem.Allocator,
+    project_path: []const u8,
+    components: []const ComponentDef,
+    component_count: usize,
+    config: BuildConfig,
+) ![]const u8 {
+    const cache_path = try std.fmt.allocPrint(a, "{s}/.cache/play", .{project_path});
+    std.Io.Dir.cwd().createDirPath(io, cache_path) catch {};
+
+    // Collect the unique source files of all user (non-builtin) components.
+    var rel_files: [64][]const u8 = undefined;
+    var abs_files: [64][]const u8 = undefined;
+    var src_count: usize = 0;
+    for (components[0..component_count]) |*def| {
+        if (def.is_builtin) continue;
+        const src = def.sourceFile();
+        if (src.len == 0) continue;
+        var found = false;
+        for (rel_files[0..src_count]) |s| {
+            if (std.mem.eql(u8, s, src)) found = true;
+        }
+        if (!found and src_count < rel_files.len) {
+            rel_files[src_count] = src;
+            abs_files[src_count] = if (std.fs.path.isAbsolute(src))
+                try std.fmt.allocPrint(a, "{s}", .{src})
+            else
+                try std.fmt.allocPrint(a, "{s}/{s}", .{ config.build_root, src });
+            src_count += 1;
+        }
+    }
+
+    // Normalise every path embedded into generated Zig source (backslashes are
+    // invalid escapes in a "..." literal).
+    const gen_config = BuildConfig{
+        .engine_root = try normPath(a, config.engine_root),
+        .editor_root = try normPath(a, config.editor_root),
+        .cgltf_wrap_c = try normPath(a, config.cgltf_wrap_c),
+        .vendor_include = try normPath(a, config.vendor_include),
+        .build_root = try normPath(a, config.build_root),
+        .sdl3_lib = config.sdl3_lib,
+        .math_root = try normPath(a, config.math_root),
+        .guid_root = try normPath(a, config.guid_root),
+        .oap_root = try normPath(a, config.oap_root),
+        .serde_root = try normPath(a, config.serde_root),
+        .serde_compat_root = try normPath(a, config.serde_compat_root),
+    };
+    for (0..src_count) |i| abs_files[i] = try normPath(a, abs_files[i]);
+
+    const main_src = try generatePlayMainZig(a, rel_files[0..src_count], components, component_count);
+    const main_path = try std.fmt.allocPrint(a, "{s}/play_main.zig", .{cache_path});
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = main_path, .data = main_src });
+
+    const build_src = try generateBuildZig(a, gen_config, abs_files[0..src_count]);
+    const build_zig_path = try std.fmt.allocPrint(a, "{s}/build.zig", .{cache_path});
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = build_zig_path, .data = build_src });
+
+    std.debug.print("[Turian] Building play library...\n", .{});
+    const argv = [_][]const u8{ "zig", "build", "-Doptimize=Debug" };
+    try GameBuild.spawnAndWaitIn(io, a, &argv, cache_path);
+
+    const lib_out = try std.fmt.allocPrint(
+        a,
+        "{s}/zig-out/lib/{s}turian_play{s}",
+        .{ cache_path, lib_prefix, lib_ext },
+    );
+    std.debug.print("[Turian] Play library built: {s}\n", .{lib_out});
+    return lib_out;
+}
+
+// ---------------------------------------------------------------------------
+// build.zig generator — produces a shared library (no SDL: the software
+// renderer is pure and rendering happens in the studio, not the library).
+
+fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []const []const u8) ![]u8 {
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(a);
+
+    try out.appendSlice(a, "const std = @import(\"std\");\n\n");
+    try out.appendSlice(a, "pub fn build(b: *std.Build) void {\n");
+    try out.appendSlice(a, "    const target   = b.standardTargetOptions(.{});\n");
+    try out.appendSlice(a, "    const optimize = b.standardOptimizeOption(.{});\n\n");
+
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const math_mod = b.addModule(\"math\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n\n",
+        .{config.math_root},
+    ));
+
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const oap_mod = b.addModule(\"open_asset_package\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n\n",
+        .{config.oap_root},
+    ));
+
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const engine_mod = b.addModule(\"engine\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    engine_mod.link_libc = true;\n" ++
+            "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addImport(\"math\", math_mod);\n" ++
+            "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
+        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.vendor_include },
+    ));
+
+    for (src_files, 0..) |sf, i| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const script_{d}_mod = b.addModule(\"script_{d}\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    script_{d}_mod.addImport(\"engine\", engine_mod);\n\n",
+            .{ i, i, sf, i },
+        ));
+    }
+
+    try out.appendSlice(
+        a,
+        "    const play_mod = b.createModule(.{\n" ++
+            "        .root_source_file = b.path(\"play_main.zig\"),\n" ++
+            "        .target = target,\n" ++
+            "        .optimize = optimize,\n" ++
+            "        .imports = &.{\n" ++
+            "            .{ .name = \"engine\", .module = engine_mod },\n",
+    );
+    for (0..src_files.len) |i| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "            .{{ .name = \"script_{d}\", .module = script_{d}_mod }},\n",
+            .{ i, i },
+        ));
+    }
+    try out.appendSlice(a, "        },\n    });\n");
+    try out.appendSlice(a, "    play_mod.link_libc = true;\n");
+
+    try out.appendSlice(
+        a,
+        "    const lib = b.addLibrary(.{\n" ++
+            "        .name = \"turian_play\",\n" ++
+            "        .root_module = play_mod,\n" ++
+            "        .linkage = .dynamic,\n" ++
+            "    });\n" ++
+            "    b.installArtifact(lib);\n" ++
+            "}\n",
+    );
+
+    return try out.toOwnedSlice(a);
+}
+
+// ---------------------------------------------------------------------------
+// play_main.zig generator
+
+fn generatePlayMainZig(
+    a: std.mem.Allocator,
+    src_files: []const []const u8,
+    components: []const ComponentDef,
+    component_count: usize,
+) ![]u8 {
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(a);
+    var tmp: [512]u8 = undefined;
+
+    var type_names: [64][]const u8 = undefined;
+    var type_count: usize = 0;
+    for (components[0..component_count]) |*def| {
+        if (def.is_builtin) continue;
+        if (def.sourceFile().len == 0) continue;
+        const already = for (type_names[0..type_count]) |n| {
+            if (std.mem.eql(u8, n, def.typeName())) break true;
+        } else false;
+        if (!already and type_count < type_names.len) {
+            type_names[type_count] = def.typeName();
+            type_count += 1;
+        }
+    }
+    const has_user = type_count > 0;
+
+    try out.appendSlice(
+        a,
+        "// Generated by Turian Studio Play mode - do not edit\n" ++
+            "const std    = @import(\"std\");\n" ++
+            "const engine = @import(\"engine\");\n\n" ++
+            "const gpa = std.heap.page_allocator;\n\n" ++
+            "// The library owns the live scene: node storage, the input snapshot and\n" ++
+            "// (when there are user scripts) the instantiated component values.\n" ++
+            "var g_nodes: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;\n" ++
+            "var g_node_count: usize = 0;\n" ++
+            "var g_input: engine.Input = engine.Input.init();\n" ++
+            "var g_services: engine.Services = engine.Services.init();\n\n",
+    );
+
+    for (0..src_files.len) |i| {
+        const s = try std.fmt.bufPrint(&tmp, "const _uc{d}_mod = @import(\"script_{d}\");\n", .{ i, i });
+        try out.appendSlice(a, s);
+    }
+    if (src_files.len > 0) try out.append(a, '\n');
+
+    for (components[0..component_count]) |*def| {
+        if (def.is_builtin) continue;
+        const src = def.sourceFile();
+        if (src.len == 0) continue;
+        var src_idx: ?usize = null;
+        for (src_files, 0..) |sf, i| {
+            if (std.mem.eql(u8, sf, src)) src_idx = i;
+        }
+        const idx = src_idx orelse continue;
+        const s = try std.fmt.bufPrint(&tmp, "pub const {s} = _uc{d}_mod.{s};\n", .{ def.typeName(), idx, def.typeName() });
+        try out.appendSlice(a, s);
+    }
+    if (src_files.len > 0) try out.append(a, '\n');
+
+    if (has_user) {
+        try out.appendSlice(a, "const LiveComponent = union(enum) {\n");
+        for (type_names[0..type_count]) |name| {
+            const s = try std.fmt.bufPrint(&tmp, "    {s}: {s},\n", .{ name, name });
+            try out.appendSlice(a, s);
+        }
+        try out.appendSlice(a, "};\n\n");
+
+        try out.appendSlice(
+            a,
+            "var g_live: [engine.scene.MAX_OBJECTS]LiveComponent = undefined;\n" ++
+                "var g_live_transform: [engine.scene.MAX_OBJECTS]*engine.Transform = undefined;\n" ++
+                "var g_live_count: usize = 0;\n\n",
+        );
+
+        // hydrate / instantiate — identical semantics to GameBuild's runtime.
+        try out.appendSlice(
+            a,
+            "fn hydrateComponent(comptime T: type, comp: *T, script: *const engine.UserScriptRef) void {\n" ++
+                "    for (script.field_values[0..script.field_count]) |*fv| {\n" ++
+                "        const fname = fv.nameSlice();\n" ++
+                "        inline for (@typeInfo(T).@\"struct\".fields) |field| {\n" ++
+                "            if (field.is_comptime) continue;\n" ++
+                "            if (field.name[0] == '_') continue;\n" ++
+                "            if (std.mem.eql(u8, fname, field.name)) {\n" ++
+                "                switch (@typeInfo(field.type)) {\n" ++
+                "                    .float => @field(comp, field.name) = @floatCast(fv.as_f32),\n" ++
+                "                    .int   => @field(comp, field.name) = @intCast(fv.as_i32),\n" ++
+                "                    .bool  => @field(comp, field.name) = fv.as_bool,\n" ++
+                "                    .@\"struct\" => {\n" ++
+                "                        if (field.type == engine.Vector3) @field(comp, field.name) = .{ .x = fv.as_vec3_x, .y = fv.as_vec3_y, .z = fv.as_vec3_z }\n" ++
+                "                        else if (field.type == engine.GameObjectRef) { var r: engine.GameObjectRef = .{}; r.set(fv.refSlice()); @field(comp, field.name) = r; }\n" ++
+                "                    },\n" ++
+                "                    else => {},\n" ++
+                "                }\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "}\n\n" ++
+                "fn instantiate(script: *const engine.UserScriptRef) ?LiveComponent {\n" ++
+                "    const name = script.typeName();\n" ++
+                "    inline for (std.meta.fields(LiveComponent)) |f| {\n" ++
+                "        if (std.mem.eql(u8, name, f.name)) {\n" ++
+                "            var inst: f.type = .{};\n" ++
+                "            hydrateComponent(f.type, &inst, script);\n" ++
+                "            return @unionInit(LiveComponent, f.name, inst);\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    return null;\n" ++
+                "}\n\n",
+        );
+
+        try out.appendSlice(
+            a,
+            "fn mkFrame(transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) engine.Frame {\n" ++
+                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services };\n" ++
+                "}\n\n",
+        );
+
+        for ([_][]const u8{ "awake", "enable", "start", "disable", "destroy" }) |hook| {
+            const s = try std.fmt.bufPrint(
+                &tmp,
+                "fn call_{s}(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {{\n" ++
+                    "    switch (comp.*) {{ inline else => |*c| {{\n" ++
+                    "        const CT = @TypeOf(c.*);\n" ++
+                    "        if (comptime @hasDecl(CT, \"{s}\")) {{\n" ++
+                    "            const P = @typeInfo(@TypeOf(CT.{s})).@\"fn\".params;\n" ++
+                    "            if (P.len == 2 and P[1].type != null and P[1].type.? == engine.Frame) c.{s}(mkFrame(transform, objects, time)) else c.{s}();\n" ++
+                    "        }}\n" ++
+                    "    }} }}\n" ++
+                    "}}\n\n",
+                .{ hook, hook, hook, hook, hook },
+            );
+            try out.appendSlice(a, s);
+        }
+
+        try out.appendSlice(
+            a,
+            "fn call_configure_input(comp: *LiveComponent, input: *engine.Input) void {\n" ++
+                "    switch (comp.*) { inline else => |*c| if (comptime @hasDecl(@TypeOf(c.*), \"configureInput\")) c.configureInput(input) }\n" ++
+                "}\n\n",
+        );
+
+        try out.appendSlice(
+            a,
+            "fn call_update(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {\n" ++
+                "    switch (comp.*) { inline else => |*c| {\n" ++
+                "        const CT = @TypeOf(c.*);\n" ++
+                "        if (@hasDecl(CT, \"update\")) {\n" ++
+                "            const P = @typeInfo(@TypeOf(CT.update)).@\"fn\".params;\n" ++
+                "            if (P.len == 2 and P[1].type != null and P[1].type.? == engine.Frame) {\n" ++
+                "                c.update(mkFrame(transform, objects, time));\n" ++
+                "            } else if (P.len >= 4) {\n" ++
+                "                c.update(transform, objects, time);\n" ++
+                "            } else {\n" ++
+                "                c.update(time);\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    } }\n" ++
+                "}\n\n",
+        );
+    }
+
+    // ── Exported C ABI ──────────────────────────────────────────────────────
+    // The scene nodes are handed over directly from the studio: studio and
+    // library share the exact same `engine.SceneNode` layout (same engine
+    // source, same target), and SceneNode is self-contained POD (fixed buffers,
+    // no heap pointers), so a memcpy fully transfers ownership of a copy. This
+    // deliberately avoids running the JSON/serde parser inside the library.
+    try out.appendSlice(
+        a,
+        "export fn turianPlayStart(nodes: [*]const engine.SceneNode, count: usize) callconv(.c) bool {\n" ++
+            "    const n = @min(count, g_nodes.len);\n" ++
+            "    @memcpy(g_nodes[0..n], nodes[0..n]);\n" ++
+            "    g_node_count = n;\n",
+    );
+    if (has_user) {
+        try out.appendSlice(
+            a,
+            "    g_live_count = 0;\n" ++
+                "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "    for (g_nodes[0..g_node_count]) |*obj| {\n" ++
+                "        if (!obj.active) continue;\n" ++
+                "        for (obj.components[0..obj.component_count]) |*comp| {\n" ++
+                "            if (comp.* != .user_script or g_live_count >= g_live.len) continue;\n" ++
+                "            if (instantiate(&comp.user_script)) |live| {\n" ++
+                "                g_live[g_live_count] = live;\n" ++
+                "                g_live_transform[g_live_count] = &obj.transform;\n" ++
+                "                call_configure_input(&g_live[g_live_count], &g_input);\n" ++
+                "                call_awake(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "                call_enable(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "                call_start(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "                g_live_count += 1;\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    }\n",
+        );
+    }
+    try out.appendSlice(a, "    return true;\n}\n\n");
+
+    try out.appendSlice(
+        a,
+        "export fn turianPlayUpdate(dt: f32, elapsed: f32, frame: u64) callconv(.c) void {\n",
+    );
+    if (has_user) {
+        try out.appendSlice(
+            a,
+            "    const time = engine.Time{ .delta = dt, .elapsed = elapsed, .frame = frame };\n" ++
+                "    for (0..g_live_count) |i| call_update(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], time);\n",
+        );
+    } else {
+        try out.appendSlice(a, "    _ = dt; _ = elapsed; _ = frame;\n");
+    }
+    try out.appendSlice(a, "}\n\n");
+
+    try out.appendSlice(
+        a,
+        "export fn turianPlayStop() callconv(.c) void {\n",
+    );
+    if (has_user) {
+        try out.appendSlice(
+            a,
+            "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "    var i = g_live_count;\n" ++
+                "    while (i > 0) {\n" ++
+                "        i -= 1;\n" ++
+                "        call_disable(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], t0);\n" ++
+                "        call_destroy(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], t0);\n" ++
+                "    }\n" ++
+                "    g_live_count = 0;\n",
+        );
+    }
+    try out.appendSlice(a, "    g_node_count = 0;\n}\n\n");
+
+    try out.appendSlice(
+        a,
+        "export fn turianPlayNodesPtr() callconv(.c) [*]engine.SceneNode {\n" ++
+            "    return &g_nodes;\n" ++
+            "}\n\n" ++
+            "export fn turianPlayNodesCount() callconv(.c) usize {\n" ++
+            "    return g_node_count;\n" ++
+            "}\n\n" ++
+            "export fn turianPlayNewFrame() callconv(.c) void {\n" ++
+            "    g_input.newFrame();\n" ++
+            "}\n\n" ++
+            "export fn turianPlaySetKey(key: u16, down: bool) callconv(.c) void {\n" ++
+            "    if (key == 0 or key > @intFromEnum(engine.Key.right_alt)) return;\n" ++
+            "    g_input.setKey(@enumFromInt(key), down);\n" ++
+            "}\n\n" ++
+            "export fn turianPlaySetMouseButton(button: u8, down: bool) callconv(.c) void {\n" ++
+            "    if (button > @intFromEnum(engine.MouseButton.x2)) return;\n" ++
+            "    g_input.setMouseButton(@enumFromInt(button), down);\n" ++
+            "}\n\n" ++
+            "export fn turianPlaySetMousePos(x: f32, y: f32) callconv(.c) void {\n" ++
+            "    g_input.setMousePosition(x, y);\n" ++
+            "}\n\n" ++
+            "export fn turianPlayAddMouseMotion(dx: f32, dy: f32) callconv(.c) void {\n" ++
+            "    g_input.addMouseMotion(dx, dy);\n" ++
+            "}\n\n" ++
+            "export fn turianPlayAddWheel(delta: f32) callconv(.c) void {\n" ++
+            "    g_input.addWheel(delta);\n" ++
+            "}\n\n" ++
+            "export fn turianPlayLoadInputActions(ptr: [*]const u8, len: usize) callconv(.c) void {\n" ++
+            "    const ia = engine.assets.InputActions.loadFromBytes(gpa, ptr[0..len]) catch return;\n" ++
+            "    defer ia.deinit(gpa);\n" ++
+            "    ia.applyTo(&g_input);\n" ++
+            "}\n",
+    );
+
+    return try out.toOwnedSlice(a);
+}

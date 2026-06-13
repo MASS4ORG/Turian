@@ -79,15 +79,16 @@ fn sceneCompToEngine(sc: SceneComponent) engine.Component {
     };
 }
 
-/// Save the current scene to a .json file.
-pub fn saveScene(
-    io: std.Io,
-    path: []const u8,
+/// Serialize a scene to JSON bytes owned by `allocator` (caller frees).
+/// Returns null on any allocation/serialization failure. This is the in-memory
+/// half of `saveScene`, reused by Play mode to snapshot the live scene without
+/// touching the filesystem.
+pub fn serializeScene(
+    allocator: std.mem.Allocator,
     objects: []const engine.SceneNode,
     count: usize,
-    allocator: std.mem.Allocator,
-) void {
-    const scene_objects = allocator.alloc(SceneObject, count) catch return;
+) ?[]u8 {
+    const scene_objects = allocator.alloc(SceneObject, count) catch return null;
     defer allocator.free(scene_objects);
 
     var total_comps: usize = 0;
@@ -99,9 +100,9 @@ pub fn saveScene(
         }
     }
 
-    const all_comps = allocator.alloc(SceneComponent, total_comps) catch return;
+    const all_comps = allocator.alloc(SceneComponent, total_comps) catch return null;
     defer allocator.free(all_comps);
-    const all_script_fields = allocator.alloc(SceneScriptField, total_script_fields) catch return;
+    const all_script_fields = allocator.alloc(SceneScriptField, total_script_fields) catch return null;
     defer allocator.free(all_script_fields);
 
     var comp_offset: usize = 0;
@@ -165,10 +166,19 @@ pub fn saveScene(
     }
 
     const scene_data = SceneFile{ .version = 1, .objects = scene_objects };
+    return serde.json.toSliceWith(allocator, scene_data, .{ .pretty = true }) catch null;
+}
 
-    const content = serde.json.toSliceWith(allocator, scene_data, .{ .pretty = true }) catch return;
+/// Save the current scene to a .json file.
+pub fn saveScene(
+    io: std.Io,
+    path: []const u8,
+    objects: []const engine.SceneNode,
+    count: usize,
+    allocator: std.mem.Allocator,
+) void {
+    const content = serializeScene(allocator, objects, count) orelse return;
     defer allocator.free(content);
-
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = content }) catch {};
 }
 
