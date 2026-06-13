@@ -555,6 +555,10 @@ pub fn draw() void {
                 fw.close();
                 createNewScene(browse_path);
             }
+            if (dvui.menuItemLabel(@src(), "Create New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
+                fw.close();
+                createNewProjectSettings(browse_path);
+            }
             if (dvui.menuItemLabel(@src(), "Create New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 createNewInputActions(browse_path);
@@ -773,6 +777,33 @@ fn createNewInputActions(browse_path: []const u8) void {
                 },
             };
             default_ia.save(dvui.io, full_path) catch return;
+            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+            EditorState.selectAsset(full_path);
+            return;
+        }
+    }
+}
+
+fn createNewProjectSettings(browse_path: []const u8) void {
+    var path_buf: [1024]u8 = undefined;
+    var name_buf: [192]u8 = undefined;
+    var n: usize = 0;
+    while (n < 100) : (n += 1) {
+        const file_name = if (n == 0)
+            std.fmt.bufPrint(&name_buf, "project.projectsettings", .{}) catch return
+        else
+            std.fmt.bufPrint(&name_buf, "project_{d}.projectsettings", .{n}) catch return;
+
+        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
+
+        const exists = blk: {
+            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
+            break :blk true;
+        };
+        if (!exists) {
+            const name = if (EditorState.current_project) |*p| p.nameSlice() else "Untitled";
+            const default_ps = engine.ProjectSettings{ .project = .{ .name = name } };
+            default_ps.save(dvui.io, full_path) catch return;
             EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
             EditorState.selectAsset(full_path);
             return;

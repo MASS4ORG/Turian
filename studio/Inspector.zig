@@ -7,6 +7,7 @@ const PropDraw = @import("PropDraw.zig");
 const MaterialEditor = @import("MaterialEditor.zig");
 const DataAssetEditor = @import("DataAssetEditor.zig");
 const InputActionsEditor = @import("InputActionsEditor.zig");
+const ProjectSettingsEditor = @import("ProjectSettingsEditor.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -400,6 +401,11 @@ fn drawAssetInspector(asset_path: []const u8) void {
     if (asset_type == .input_actions) {
         _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 3 });
         InputActionsEditor.draw(asset_path);
+    }
+
+    if (asset_type == .project_settings) {
+        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 4 });
+        ProjectSettingsEditor.draw(asset_path);
     }
 }
 

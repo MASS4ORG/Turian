@@ -1,11 +1,26 @@
 /// Game build system — generates and compiles a standalone game executable
 /// from the current scene and user scripts.  Pure logic with no GUI dependency.
 const std = @import("std");
+const engine = @import("engine");
+const Guid = @import("guid").Guid;
 const ComponentDef = @import("Scanner.zig").ComponentDef;
 const AssetDatabase = @import("AssetDatabase.zig").AssetDatabase;
+const AssetInfo = @import("AssetDatabase.zig").AssetInfo;
 const asset_importer = @import("AssetImporter.zig");
 const asset_packager = @import("AssetPackager.zig");
 const Progress = @import("Progress.zig").Progress;
+
+/// Window / runtime options baked into the generated game from the project's
+/// `ProjectSettings` asset (issue #13). Defaults mirror `ProjectSettings`.
+pub const RuntimeConfig = struct {
+    title: []const u8 = "Turian Game",
+    width: u32 = 1280,
+    height: u32 = 720,
+    vsync: bool = true,
+    /// GUID of the scene the game boots into (loaded through the SceneManager,
+    /// issue #22). Empty if no scene could be resolved.
+    boot_scene_guid: []const u8 = "",
+};
 
 /// Return `path` with every backslash replaced by a forward-slash.
 /// Zig string literals (and most tooling) accept `/` on all platforms, but
@@ -13,6 +28,19 @@ const Progress = @import("Progress.zig").Progress;
 /// compilation on Windows.
 fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, path, "\\", "/");
+}
+
+/// Append `s` to `list`, escaping characters that would break a Zig `"..."`
+/// string literal in the generated source (quotes, backslashes, control chars).
+fn zigEscapeInto(a: std.mem.Allocator, list: *std.ArrayList(u8), s: []const u8) !void {
+    for (s) |c| switch (c) {
+        '"' => try list.appendSlice(a, "\\\""),
+        '\\' => try list.appendSlice(a, "\\\\"),
+        '\n' => try list.appendSlice(a, "\\n"),
+        '\r' => try list.appendSlice(a, "\\r"),
+        '\t' => try list.appendSlice(a, "\\t"),
+        else => try list.append(a, c),
+    };
 }
 
 /// Paths required to generate a game build. Most values come from
@@ -109,14 +137,19 @@ fn buildGameInner(
         }
     }
 
-    const scene_path = if (std.fs.path.isAbsolute(project_path))
-        try std.fmt.allocPrint(a, "{s}/assets/scene-01.json", .{project_path})
+    // Resolve the boot scene + window options from the project's ProjectSettings
+    // asset (issue #13). Falls back to the conventional `assets/scene-01.json`
+    // and default window options when no settings asset is present.
+    const assets_dir = if (std.fs.path.isAbsolute(project_path))
+        try std.fmt.allocPrint(a, "{s}/assets", .{project_path})
     else
-        try std.fmt.allocPrint(a, "{s}/{s}/assets/scene-01.json", .{ config.build_root, project_path });
+        try std.fmt.allocPrint(a, "{s}/{s}/assets", .{ config.build_root, project_path });
+
+    var runtime = RuntimeConfig{};
+    resolveRuntime(io, a, assets_dir, &runtime);
 
     // Normalise all paths that will be embedded in generated Zig source files.
     // Backslashes inside string literals are invalid escape sequences.
-    const gen_scene = try normPath(a, scene_path);
     const gen_config = BuildConfig{
         .engine_root = try normPath(a, config.engine_root),
         .editor_root = try normPath(a, config.editor_root),
@@ -136,7 +169,7 @@ fn buildGameInner(
 
     progress.report(0.1, "Generating project");
     const gen_project = try normPath(a, project_path);
-    const main_src = try generateMainZig(a, gen_project, gen_scene, rel_files[0..src_count], components, component_count);
+    const main_src = try generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime);
     const main_path = try std.fmt.allocPrint(a, "{s}/main.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = main_path, .data = main_src });
 
@@ -158,6 +191,67 @@ fn buildGameInner(
 
     const game_out = try std.fmt.allocPrint(a, "{s}/zig-out/bin/game", .{cache_path});
     std.debug.print("[Turian] Game built: {s}\n", .{game_out});
+}
+
+/// Resolve runtime config from the project's `ProjectSettings` asset and the
+/// asset database: window title/size/vsync (issue #13) and the boot scene GUID
+/// the game loads through the SceneManager (issue #22). Falls back to the
+/// conventional `scene-01.json` (or the first scene asset) when no settings
+/// asset selects a boot scene. All strings are allocated in `a`.
+fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out: *RuntimeConfig) void {
+    var db = AssetDatabase.init(a);
+    defer db.deinit();
+    db.scan(io, assets_dir);
+
+    // Window options + explicit boot scene from ProjectSettings, if present.
+    var it = db.enumerate(.project_settings);
+    if (it.next()) |info| {
+        if (readFileAlloc(io, a, info.path)) |bytes| {
+            if (engine.ProjectSettings.loadFromBytes(a, bytes)) |ps| {
+                if (ps.project.name.len > 0) out.title = a.dupe(u8, ps.project.name) catch out.title;
+                out.width = ps.graphics.width;
+                out.height = ps.graphics.height;
+                out.vsync = ps.graphics.vsync;
+                if (ps.first_scene.len > 0) {
+                    if (Guid.parse(ps.first_scene)) |gid| {
+                        if (db.findByGuid(gid)) |sinfo| {
+                            if (sinfo.asset_type == .scene)
+                                out.boot_scene_guid = a.dupe(u8, ps.first_scene) catch ""
+                            else
+                                std.debug.print("[Turian] first_scene {s} is not a scene asset\n", .{ps.first_scene});
+                        } else std.debug.print("[Turian] Boot scene {s} not found in assets\n", .{ps.first_scene});
+                    } else |_| std.debug.print("[Turian] Invalid first_scene GUID '{s}'\n", .{ps.first_scene});
+                }
+            } else |err| std.debug.print("[Turian] Failed to parse {s}: {any}\n", .{ info.path, err });
+        }
+    }
+
+    // Fallback: pick scene-01.json if present, else the first scene asset.
+    if (out.boot_scene_guid.len == 0) {
+        var fallback: ?AssetInfo = null;
+        var scenes = db.enumerate(.scene);
+        while (scenes.next()) |sinfo| {
+            if (std.mem.endsWith(u8, sinfo.path, "scene-01.json")) {
+                fallback = sinfo;
+                break;
+            }
+            if (fallback == null) fallback = sinfo;
+        }
+        if (fallback) |sinfo| {
+            var gbuf: [64]u8 = undefined;
+            const gstr = std.fmt.bufPrint(&gbuf, "{f}", .{sinfo.guid}) catch return;
+            out.boot_scene_guid = a.dupe(u8, gstr) catch "";
+        }
+    }
+}
+
+/// Read an entire file into a buffer owned by `a`. Returns null on any error.
+fn readFileAlloc(io: std.Io, a: std.mem.Allocator, path: []const u8) ?[]u8 {
+    var file = std.Io.Dir.cwd().openFile(io, path, .{}) catch return null;
+    defer file.close(io);
+    var fbuf: [4096]u8 = undefined;
+    var reader = file.reader(io, &fbuf);
+    return reader.interface.allocRemaining(a, .unlimited) catch null;
 }
 
 /// Cook every asset into `<project>/.cache/assets`, then bundle those artifacts
@@ -374,10 +468,10 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
 fn generateMainZig(
     a: std.mem.Allocator,
     project_path: []const u8,
-    scene_path: []const u8,
     src_files: []const []const u8,
     components: []const ComponentDef,
     component_count: usize,
+    runtime: RuntimeConfig,
 ) ![]u8 {
     _ = project_path; // assets (incl. scene) now come from the package, not a path
     var out: std.ArrayList(u8) = .empty;
@@ -429,6 +523,41 @@ fn generateMainZig(
             "}\n\n",
     );
 
+    // Scene management runtime (issue #22): the SceneManager owns all scene node
+    // storage. The loader resolves a scene asset GUID to nodes via the package.
+    try out.appendSlice(
+        a,
+        "// Scene management (issue #22). The SceneManager owns every loaded scene's\n" ++
+            "// nodes; the loader resolves a scene asset GUID → SceneNodes from the package.\n" ++
+            "var g_scene_mgr: engine.SceneManager = undefined;\n" ++
+            "const RENDER_CAP = engine.scene.MAX_OBJECTS * engine.SCENE_MANAGER_MAX_SCENES;\n" ++
+            "var g_render_nodes: [RENDER_CAP]engine.SceneNode = undefined;\n\n" ++
+            "fn sceneLoader(ctx: ?*anyopaque, id: []const u8, out: []engine.SceneNode, out_count: *usize) bool {\n" ++
+            "    _ = ctx;\n" ++
+            "    if (!g_assets_ready) return false;\n" ++
+            "    const gid = (editor.Guid.parse(id) catch return false).bytes;\n" ++
+            "    const r = g_assets.readById(std.heap.page_allocator, gid) orelse return false;\n" ++
+            "    defer std.heap.page_allocator.free(r.bytes);\n" ++
+            "    return editor.scene_io.loadSceneFromBytes(std.heap.page_allocator, r.bytes, out, out_count);\n" ++
+            "}\n\n" ++
+            "// Gather the nodes of every loaded scene into one buffer for the renderer,\n" ++
+            "// which draws a single combined node list per frame (additive scenes share\n" ++
+            "// one camera/light set).\n" ++
+            "fn gatherRenderNodes() []engine.SceneNode {\n" ++
+            "    var n: usize = 0;\n" ++
+            "    var handles: [engine.SCENE_MANAGER_MAX_SCENES]engine.SceneHandle = undefined;\n" ++
+            "    const loaded = g_scene_mgr.getLoadedScenes(&handles);\n" ++
+            "    for (loaded) |h| {\n" ++
+            "        for (g_scene_mgr.nodes(h)) |node| {\n" ++
+            "            if (n >= RENDER_CAP) break;\n" ++
+            "            g_render_nodes[n] = node;\n" ++
+            "            n += 1;\n" ++
+            "        }\n" ++
+            "    }\n" ++
+            "    return g_render_nodes[0..n];\n" ++
+            "}\n\n",
+    );
+
     try out.appendSlice(
         a,
         "// SDL3 bindings\n" ++
@@ -448,6 +577,7 @@ fn generateMainZig(
             "extern fn SDL_Delay(ms: u32) void;\n" ++
             "extern fn SDL_CreateRenderer(w: *SDL_Window, name: ?[*:0]const u8) ?*SDL_Renderer;\n" ++
             "extern fn SDL_DestroyRenderer(r: *SDL_Renderer) void;\n" ++
+            "extern fn SDL_SetRenderVSync(r: *SDL_Renderer, vsync: c_int) bool;\n" ++
             "extern fn SDL_RenderClear(r: *SDL_Renderer) bool;\n" ++
             "extern fn SDL_RenderPresent(r: *SDL_Renderer) bool;\n" ++
             "extern fn SDL_CreateTexture(r: *SDL_Renderer, fmt: u32, access: c_int, w: c_int, h: c_int) ?*SDL_Texture;\n" ++
@@ -534,14 +664,10 @@ fn generateMainZig(
     if (src_files.len > 0) try out.append(a, '\n');
 
     {
-        // Derive the scene's virtual path (project-relative, matching how the
-        // packager keys assets). The packaged vpath is `assets/<...>`, so locate
-        // the final `/assets/` segment in the absolute scene path.
-        const sv = if (std.mem.lastIndexOf(u8, scene_path, "/assets/")) |idx|
-            scene_path[idx + 1 ..]
-        else
-            scene_path;
-        const ss = std.fmt.bufPrint(&tmp, "const scene_vpath:   []const u8 = \"{s}\";\n\n", .{sv}) catch return error.BufferTooSmall;
+        // The boot scene GUID is loaded through the SceneManager at startup
+        // (issue #22/#13). It is resolved from ProjectSettings.first_scene, or a
+        // conventional fallback, at build time.
+        const ss = std.fmt.bufPrint(&tmp, "const boot_scene_guid: []const u8 = \"{s}\";\n\n", .{runtime.boot_scene_guid}) catch return error.BufferTooSmall;
         try out.appendSlice(a, ss);
     }
 
@@ -554,10 +680,16 @@ fn generateMainZig(
         try out.appendSlice(a, "};\n\n");
         try out.appendSlice(
             a,
-            "const MAX_LIVE = engine.scene.MAX_OBJECTS * engine.scene.MAX_COMPONENTS;\n" ++
+            "const MAX_LIVE = engine.scene.MAX_OBJECTS * engine.SCENE_MANAGER_MAX_SCENES;\n" ++
                 "var g_live: [MAX_LIVE]LiveComponent = undefined;\n" ++
                 "var g_live_transform: [MAX_LIVE]*engine.Transform = undefined;\n" ++
-                "var g_live_count: usize = 0;\n\n",
+                "// The scene each live component belongs to, so we can destroy it when\n" ++
+                "// its scene unloads and re-instantiate when a scene loads (issue #22).\n" ++
+                "var g_live_handle: [MAX_LIVE]engine.SceneHandle = undefined;\n" ++
+                "var g_live_count: usize = 0;\n" ++
+                "// Per-scene-slot instantiation tracking (index → generation last seen).\n" ++
+                "var g_slot_inst: [engine.SCENE_MANAGER_MAX_SCENES]bool = .{false} ** engine.SCENE_MANAGER_MAX_SCENES;\n" ++
+                "var g_slot_inst_gen: [engine.SCENE_MANAGER_MAX_SCENES]u16 = .{0} ** engine.SCENE_MANAGER_MAX_SCENES;\n\n",
         );
         try out.appendSlice(
             a,
@@ -645,6 +777,57 @@ fn generateMainZig(
                 "    } }\n" ++
                 "}\n\n",
         );
+        // Reconcile live components against the set of loaded scenes (issue #22):
+        // destroy components whose scene unloaded, instantiate components for newly
+        // loaded scenes. Persistent scenes stay loaded, so their components persist.
+        try out.appendSlice(
+            a,
+            "fn slotInstantiated(h: engine.SceneHandle) bool {\n" ++
+                "    return g_slot_inst[h.index] and g_slot_inst_gen[h.index] == h.generation;\n" ++
+                "}\n\n" ++
+                "fn syncLive() void {\n" ++
+                "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "    // 1. Destroy live components whose owning scene is gone.\n" ++
+                "    var i: usize = 0;\n" ++
+                "    while (i < g_live_count) {\n" ++
+                "        if (!g_scene_mgr.isLoaded(g_live_handle[i])) {\n" ++
+                "            call_disable(&g_live[i], g_live_transform[i], &.{}, t0);\n" ++
+                "            call_destroy(&g_live[i], g_live_transform[i], &.{}, t0);\n" ++
+                "            g_live_count -= 1;\n" ++
+                "            g_live[i] = g_live[g_live_count];\n" ++
+                "            g_live_transform[i] = g_live_transform[g_live_count];\n" ++
+                "            g_live_handle[i] = g_live_handle[g_live_count];\n" ++
+                "            continue;\n" ++
+                "        }\n" ++
+                "        i += 1;\n" ++
+                "    }\n" ++
+                "    // 2. Instantiate components for scenes not yet instantiated.\n" ++
+                "    var handles: [engine.SCENE_MANAGER_MAX_SCENES]engine.SceneHandle = undefined;\n" ++
+                "    const loaded = g_scene_mgr.getLoadedScenes(&handles);\n" ++
+                "    for (loaded) |h| {\n" ++
+                "        if (slotInstantiated(h)) continue;\n" ++
+                "        g_slot_inst[h.index] = true;\n" ++
+                "        g_slot_inst_gen[h.index] = h.generation;\n" ++
+                "        const objs = g_scene_mgr.nodes(h);\n" ++
+                "        for (objs) |*obj| {\n" ++
+                "            if (!obj.active) continue;\n" ++
+                "            for (obj.components[0..obj.component_count]) |*comp| {\n" ++
+                "                if (comp.* != .user_script or g_live_count >= MAX_LIVE) continue;\n" ++
+                "                if (instantiate(&comp.user_script)) |live| {\n" ++
+                "                    g_live[g_live_count] = live;\n" ++
+                "                    g_live_transform[g_live_count] = &obj.transform;\n" ++
+                "                    g_live_handle[g_live_count] = h;\n" ++
+                "                    call_configure_input(&g_live[g_live_count], &g_input);\n" ++
+                "                    call_awake(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                    call_enable(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                    call_start(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                    g_live_count += 1;\n" ++
+                "                }\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "}\n\n",
+        );
     }
 
     try out.appendSlice(
@@ -688,45 +871,28 @@ fn generateMainZig(
             "            std.debug.print(\"[Turian] Loaded input actions ({d} action(s))\\n\", .{_ia.actions.len});\n" ++
             "        }\n" ++
             "    }\n\n" ++
-            "    // Load the scene from the package.\n" ++
-            "    const scene_bytes = g_assets.readByPath(gpa, scene_vpath) orelse {\n" ++
-            "        std.debug.print(\"[Turian] Scene '{s}' not found in package\\n\", .{scene_vpath});\n" ++
-            "        return;\n" ++
-            "    };\n" ++
-            "    defer gpa.free(scene_bytes);\n" ++
-            "    var objects: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;\n" ++
-            "    var object_count: usize = 0;\n" ++
-            "    if (!editor.scene_io.loadSceneFromBytes(gpa, scene_bytes, &objects, &object_count)) {\n" ++
-            "        std.debug.print(\"[Turian] No scene loaded\\n\", .{});\n" ++
+            "    // Initialise the scene manager and boot into the configured first\n" ++
+            "    // scene (issue #22). The manager owns all scene node storage and is\n" ++
+            "    // published as a service so scripts can load/unload scenes.\n" ++
+            "    g_scene_mgr = engine.SceneManager.init(gpa);\n" ++
+            "    defer g_scene_mgr.deinit();\n" ++
+            "    g_scene_mgr.setLoader(sceneLoader, null);\n" ++
+            "    g_services.register(engine.SceneManager, &g_scene_mgr);\n" ++
+            "    if (boot_scene_guid.len == 0) {\n" ++
+            "        std.debug.print(\"[Turian] No boot scene configured\\n\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++
-            "    std.debug.print(\"[Turian] Loaded {d} objects\\n\", .{object_count});\n\n",
+            "    _ = g_scene_mgr.loadScene(boot_scene_guid, .single) catch |err| {\n" ++
+            "        std.debug.print(\"[Turian] Failed to load boot scene {s}: {any}\\n\", .{ boot_scene_guid, err });\n" ++
+            "        return;\n" ++
+            "    };\n" ++
+            "    std.debug.print(\"[Turian] Booted scene {s}\\n\", .{boot_scene_guid});\n\n",
     );
 
     if (has_user) {
-        try out.appendSlice(
-            a,
-            "    for (objects[0..object_count]) |*obj| {\n" ++
-                "        if (!obj.active) continue;\n" ++
-                "        for (obj.components[0..obj.component_count]) |*comp| {\n" ++
-                "            if (comp.* == .user_script) {\n" ++
-                "                if (g_live_count < MAX_LIVE) {\n" ++
-                "                    if (instantiate(&comp.user_script)) |live| {\n" ++
-                "                        g_live[g_live_count] = live;\n" ++
-                "                        g_live_transform[g_live_count] = &obj.transform;\n" ++
-                "                        const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
-                "                        const objs = objects[0..object_count];\n" ++
-                "                        call_configure_input(&g_live[g_live_count], &g_input);\n" ++
-                "                        call_awake(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
-                "                        call_enable(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
-                "                        call_start(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
-                "                        g_live_count += 1;\n" ++
-                "                    }\n" ++
-                "                }\n" ++
-                "            }\n" ++
-                "        }\n" ++
-                "    }\n\n",
-        );
+        // Instantiate live components for the boot scene (and any additively
+        // loaded scenes) via the same reconciler used every frame.
+        try out.appendSlice(a, "    syncLive();\n\n");
     }
 
     try out.appendSlice(
@@ -735,18 +901,35 @@ fn generateMainZig(
             "        std.debug.print(\"[Turian] SDL_Init failed\\n\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++
-            "    defer SDL_Quit();\n\n" ++
-            "    const window = SDL_CreateWindow(\"Turian Game\", 1280, 720, 0) orelse {\n" ++
-            "        std.debug.print(\"[Turian] SDL_CreateWindow failed\\n\", .{});\n" ++
-            "        return;\n" ++
-            "    };\n" ++
-            "    defer SDL_DestroyWindow(window);\n\n" ++
-            "    const renderer = SDL_CreateRenderer(window, null) orelse {\n" ++
-            "        std.debug.print(\"[Turian] SDL_CreateRenderer failed\\n\", .{});\n" ++
-            "        return;\n" ++
-            "    };\n" ++
-            "    defer SDL_DestroyRenderer(renderer);\n\n" ++
-            "    const vp_w: c_int = engine.software_renderer.VP_W;\n" ++
+            "    defer SDL_Quit();\n\n",
+    );
+
+    // Window + renderer options come from ProjectSettings (issue #13):
+    // title, resolution, and vsync are baked in from the project's settings asset.
+    {
+        var esc: std.ArrayList(u8) = .empty;
+        try zigEscapeInto(a, &esc, runtime.title);
+        const vsync_flag: u8 = if (runtime.vsync) 1 else 0;
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const window = SDL_CreateWindow(\"{s}\", {d}, {d}, 0) orelse {{\n" ++
+                "        std.debug.print(\"[Turian] SDL_CreateWindow failed\\n\", .{{}});\n" ++
+                "        return;\n" ++
+                "    }};\n" ++
+                "    defer SDL_DestroyWindow(window);\n\n" ++
+                "    const renderer = SDL_CreateRenderer(window, null) orelse {{\n" ++
+                "        std.debug.print(\"[Turian] SDL_CreateRenderer failed\\n\", .{{}});\n" ++
+                "        return;\n" ++
+                "    }};\n" ++
+                "    defer SDL_DestroyRenderer(renderer);\n" ++
+                "    _ = SDL_SetRenderVSync(renderer, {d});\n\n",
+            .{ esc.items, runtime.width, runtime.height, vsync_flag },
+        ));
+    }
+
+    try out.appendSlice(
+        a,
+        "    const vp_w: c_int = engine.software_renderer.VP_W;\n" ++
             "    const vp_h: c_int = engine.software_renderer.VP_H;\n" ++
             "    const sdl_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,\n" ++
             "        SDL_TEXTUREACCESS_STREAMING, vp_w, vp_h) orelse {\n" ++
@@ -811,13 +994,16 @@ fn generateMainZig(
         try out.appendSlice(
             a,
             "        const time = engine.Time{ .delta = delta, .elapsed = elapsed, .frame = frame };\n" ++
-                "        for (0..g_live_count) |_li| call_update(&g_live[_li], g_live_transform[_li], objects[0..object_count], time);\n\n",
+                "        for (0..g_live_count) |_li| call_update(&g_live[_li], g_live_transform[_li], g_scene_mgr.nodes(g_live_handle[_li]), time);\n" ++
+                "        // Apply any scene load/unload a script requested this frame, then\n" ++
+                "        // reconcile live components against the new set of loaded scenes.\n" ++
+                "        if (g_scene_mgr.flushRequests()) syncLive();\n\n",
         );
     }
 
     try out.appendSlice(
         a,
-        "        engine.software_renderer.renderScene(io, objects[0..object_count]);\n" ++
+        "        engine.software_renderer.renderScene(io, gatherRenderNodes());\n" ++
             "        const pixels = engine.software_renderer.pixelsSlice();\n" ++
             "        _ = SDL_UpdateTexture(sdl_tex, null, pixels.ptr, vp_w * 4);\n" ++
             "        _ = SDL_RenderClear(renderer);\n" ++

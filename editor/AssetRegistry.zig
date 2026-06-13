@@ -63,6 +63,12 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .internal_editor,
             .icon_hint = .data,
         },
+        .project_settings => .{
+            .name = "Project Settings",
+            .extensions = &.{".projectsettings"},
+            .open_mode = .internal_editor,
+            .icon_hint = .data,
+        },
     };
 }
 

@@ -16,6 +16,11 @@ pub const Material = @import("Material.zig").Material;
 /// Data-driven input binding asset (`.inputactions`), applied to `engine.Input`.
 pub const InputActions = @import("InputActions.zig").InputActions;
 
+// ── Project / game settings ─────────────────────────────────────────────────────
+/// Game/project configuration asset (`.projectsettings`): metadata, graphics,
+/// platform options, and the boot scene (issue #13).
+pub const ProjectSettings = @import("ProjectSettings.zig").ProjectSettings;
+
 // ── Asset Provider API ──────────────────────────────────────────────────────
 // Generic, swappable access to asset bytes: loose files in development, `.oap`
 // packages in release builds. Compose providers with AssetServer.

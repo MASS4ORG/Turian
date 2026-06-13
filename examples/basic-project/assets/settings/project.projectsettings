@@ -1,0 +1,22 @@
+.{
+    .version = 1,
+    .project = .{
+        .name = "Turian Basic Project",
+        .company = "Turian",
+        .version = "0.1.0",
+        .icon = "",
+    },
+    .graphics = .{
+        .width = 1280,
+        .height = 720,
+        .vsync = true,
+        .fullscreen = false,
+        .quality = .high,
+    },
+    .platform = .{
+        .target = .auto,
+        .optimize = .debug,
+    },
+    // Boot into scene-01 (its GUID, from scene-01.json.meta).
+    .first_scene = "5ffea51a-788f-40cf-9f75-bcab9e439034",
+}

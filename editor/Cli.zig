@@ -114,14 +114,15 @@ fn cmdNewProject(io: std.Io, path: []const u8, proj_name: []const u8) !void {
 
 fn cmdInfo(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     const result = project_ops.openProject(io, gpa, path);
+    if (!result.valid) {
+        std.debug.print("Not a Turian project (no project.json): {s}\n", .{path});
+        return error.ProjectNotFound;
+    }
     const p = result.project;
     if (p.nameSlice().len > 0) {
         std.debug.print("Project: {s}  v{d}.{d}.{d}\n", .{
             p.nameSlice(), p.major, p.minor, p.patch,
         });
-    } else {
-        std.debug.print("No project.json found at: {s}\n", .{path});
-        return error.ProjectNotFound;
     }
 
     var components: [scanner.MAX_COMPONENTS]scanner.ComponentDef = undefined;
@@ -180,8 +181,8 @@ fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *cons
 
 fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     const result = project_ops.openProject(io, gpa, path);
-    if (result.project.nameSlice().len == 0) {
-        std.debug.print("No project.json found at: {s}\n", .{path});
+    if (!result.valid) {
+        std.debug.print("Not a Turian project (no project.json): {s}\n", .{path});
         return error.ProjectNotFound;
     }
 

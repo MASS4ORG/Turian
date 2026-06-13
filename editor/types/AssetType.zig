@@ -9,4 +9,5 @@ pub const AssetType = enum(u8) {
     material,
     data_asset,
     input_actions,
+    project_settings,
 };

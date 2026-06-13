@@ -1,0 +1,17 @@
+{
+  "guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
+  "asset_type": "model",
+  "importer_version": 1,
+  "source_hash": 16448737136527106491,
+  "import_settings": {
+    "model": {
+      "import_animations": true,
+      "import_materials": true,
+      "scale_factor": 1
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ]
+}

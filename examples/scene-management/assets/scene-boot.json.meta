@@ -1,0 +1,11 @@
+{
+  "guid": "10000000-0000-4000-8000-000000000001",
+  "asset_type": "scene",
+  "importer_version": 1,
+  "source_hash": 9091561988304304054,
+  "import_settings": "scene",
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ]
+}

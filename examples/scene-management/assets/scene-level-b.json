@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "name": "Level B Cube Left",
+      "guid": "2000000b-0000-4000-8000-000000000001",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": { "x": -1.5, "y": 0.5, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "components": [
+        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guid": "00000000-0000-4000-8000-000000000105" } }
+      ]
+    },
+    {
+      "name": "Level B Cube Right",
+      "guid": "2000000b-0000-4000-8000-000000000002",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": { "x": 1.5, "y": 0.5, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 },
+        "scale": { "x": 1, "y": 2, "z": 1 }
+      },
+      "components": [
+        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guid": "00000000-0000-4000-8000-000000000106" } }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "name": "Main Camera",
+      "guid": "20000000-0000-4000-8000-000000000001",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": { "x": -1.2325797, "y": 4.414592, "z": 3.4203362 },
+        "rotation": { "x": 51.528557, "y": -117.16846, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "components": [
+        { "camera": { "fov": 60, "near": 0.01, "far": 1000, "orthographic": false } }
+      ]
+    },
+    {
+      "name": "Directional Light",
+      "guid": "20000000-0000-4000-8000-000000000002",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": { "x": 0, "y": 5, "z": 0 },
+        "rotation": { "x": 50, "y": -30, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "components": [
+        { "light": { "kind": "directional", "color_r": 1, "color_g": 1, "color_b": 1, "intensity": 1, "range": 10, "spot_angle": 35, "spot_softness": 0.15, "cast_shadows": true } }
+      ]
+    },
+    {
+      "name": "Scene Director",
+      "guid": "20000000-0000-4000-8000-000000000003",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": { "x": 0, "y": 0, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "components": [
+        { "user_script": { "type_name": "SceneDirector", "source_file": "assets/SceneDirector.zig", "fields": [] } }
+      ]
+    }
+  ]
+}

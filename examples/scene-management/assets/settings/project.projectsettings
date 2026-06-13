@@ -1,0 +1,23 @@
+.{
+    .version = 1,
+    .project = .{
+        .name = "Scene Management Demo",
+        .company = "Turian",
+        .version = "0.1.0",
+        .icon = "",
+    },
+    .graphics = .{
+        .width = 1280,
+        .height = 720,
+        .vsync = true,
+        .fullscreen = false,
+        .quality = .high,
+    },
+    .platform = .{
+        .target = .auto,
+        .optimize = .debug,
+    },
+    // Boot into the bootstrap scene (camera + light + SceneDirector). The
+    // director then streams the levels in/out at runtime.
+    .first_scene = "10000000-0000-4000-8000-000000000001",
+}

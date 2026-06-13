@@ -2,48 +2,63 @@ const std = @import("std");
 const engine = @import("engine");
 const OpenResult = @import("types/OpenResult.zig").OpenResult;
 
+/// Sentinel file that marks a directory as a Turian project.
 const PROJECT_FILE = "project.json";
+/// JSON written to PROJECT_FILE for new projects.
+const PROJECT_SENTINEL = "{\"turian_version\":\"0.16\"}\n";
 
-/// Open a project directory and parse its project.json file.
+/// Relative path (from project root) to the primary ProjectSettings asset.
+const SETTINGS_SUBPATH = "assets/settings/project.projectsettings";
+
+/// Open a project directory.  Returns valid=true when project.json is found;
+/// the project name is hydrated from ProjectSettings when available.
 pub fn openProject(io: std.Io, allocator: std.mem.Allocator, path: []const u8) OpenResult {
-    var proj = engine.Project{};
-
-    var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return .{ .project = proj };
+    var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return .{};
     defer dir.close(io);
 
-    var file = dir.openFile(io, PROJECT_FILE, .{}) catch return .{ .project = proj };
-    defer file.close(io);
+    // Validate: project.json must exist (content not used — it's just a sentinel).
+    {
+        var sentinel = dir.openFile(io, PROJECT_FILE, .{}) catch return .{};
+        sentinel.close(io);
+    }
 
-    var fbuf: [4096]u8 = undefined;
-    var file_reader = file.reader(io, &fbuf);
-    const content = file_reader.interface.allocRemaining(allocator, .unlimited) catch return .{ .project = proj };
+    var result = OpenResult{ .valid = true };
+
+    // Hydrate project name from ProjectSettings when present.
+    var sf = dir.openFile(io, SETTINGS_SUBPATH, .{}) catch return result;
+    defer sf.close(io);
+
+    var fbuf: [8192]u8 = undefined;
+    var reader = sf.reader(io, &fbuf);
+    const content = reader.interface.allocRemaining(allocator, .unlimited) catch return result;
     defer allocator.free(content);
 
-    if (parseProjectName(content)) |n| proj.setName(n);
+    const ps = engine.ProjectSettings.loadFromBytes(allocator, content) catch return result;
+    defer ps.deinit(allocator);
+    result.project = ps.toProject();
 
-    return .{ .project = proj };
+    return result;
 }
 
-/// Create a new project directory with default assets/scenes structure.
+/// Create a new project directory with the standard asset layout.
 pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
     std.Io.Dir.cwd().createDirPath(io, path) catch {};
 
     var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return;
     defer dir.close(io);
 
-    dir.createDirPath(io, "assets") catch {};
+    dir.createDirPath(io, "assets/settings") catch {};
     dir.createDirPath(io, "scenes") catch {};
 
-    var json_buf: [512]u8 = undefined;
-    const json = std.fmt.bufPrint(&json_buf, "{{\"name\":\"{s}\",\"version\":\"0.1.0\"}}\n", .{proj_name}) catch return;
-    dir.writeFile(io, .{ .sub_path = PROJECT_FILE, .data = json }) catch {};
-}
+    dir.writeFile(io, .{ .sub_path = PROJECT_FILE, .data = PROJECT_SENTINEL }) catch {};
 
-fn parseProjectName(json: []const u8) ?[]const u8 {
-    const key = "\"name\":\"";
-    const start_pos = std.mem.indexOf(u8, json, key) orelse return null;
-    const value_start = start_pos + key.len;
-    const end_pos = std.mem.indexOf(u8, json[value_start..], "\"") orelse return null;
-    const value = json[value_start .. value_start + end_pos];
-    return if (value.len > 0) value else null;
+    const settings = engine.ProjectSettings{ .project = .{ .name = proj_name } };
+    var settings_buf: [4096]u8 = undefined;
+    var settings_writer = std.Io.Writer.fixed(&settings_buf);
+    if (settings.serialize(&settings_writer)) |_| {
+        dir.writeFile(io, .{
+            .sub_path = SETTINGS_SUBPATH,
+            .data = settings_writer.buffered(),
+        }) catch {};
+    } else |_| {}
 }

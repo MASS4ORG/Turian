@@ -58,6 +58,9 @@ pub const Texture = assets.Texture;
 pub const Material = assets.Material;
 /// Data-driven input binding asset (`.inputactions`).
 pub const InputActions = assets.InputActions;
+/// Game/project configuration asset (`.projectsettings`): metadata, graphics,
+/// platform options, and the boot scene.
+pub const ProjectSettings = assets.ProjectSettings;
 /// Shader metadata (exposed parameters) driving materials and inspector UI.
 pub const shader = assets.shader;
 /// Shader parameter metadata descriptor.
@@ -106,6 +109,16 @@ pub const UserScriptRef = @import("scene/UserScriptRef.zig").UserScriptRef;
 pub const Component = @import("scene/Component.zig").Component;
 /// A scene node with transform and component list.
 pub const SceneNode = @import("scene/SceneNode.zig").SceneNode;
+
+/// Formal scene-management API: async/additive/persistent scene load & unload,
+/// lifecycle events, and active-scene tracking (issue #22).
+pub const SceneManager = @import("scene/SceneManager.zig").SceneManager;
+pub const SceneHandle = @import("scene/SceneManager.zig").SceneHandle;
+pub const SceneLoadMode = @import("scene/SceneManager.zig").LoadMode;
+pub const SceneEvent = @import("scene/SceneManager.zig").Event;
+pub const SceneLoader = @import("scene/SceneManager.zig").Loader;
+/// Maximum number of concurrently loaded scenes the SceneManager supports.
+pub const SCENE_MANAGER_MAX_SCENES = @import("scene/SceneManager.zig").MAX_SCENES;
 
 /// Scene-wide constants.
 pub const scene = struct {
