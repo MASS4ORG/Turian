@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.0] - 2026-06-15
+
+### Features
+- feat: materials and textures from glTF/GLB #16 #28 #5 #18
+
 ## [1.2.0] - 2026-06-13
 
 ### Features
