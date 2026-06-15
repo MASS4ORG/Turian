@@ -158,6 +158,11 @@ fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *cons
         .oap_root = build_options.oap_root_path,
         .serde_root = build_options.serde_root_path,
         .serde_compat_root = build_options.serde_compat_root_path,
+        .ktx2_root = build_options.ktx2_root_path,
+        .gpu_root = build_options.gpu_root_path,
+        .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
+        .render_root = build_options.render_root_path,
+        .sdl3_include = build_options.sdl3_include_path,
     };
     // Config strings (SDK-relative paths) live for the whole build; an arena
     // frees them in one shot and keeps the leak-checking allocator quiet.
@@ -198,6 +203,11 @@ fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *
         .oap_root = build_options.oap_root_path,
         .serde_root = build_options.serde_root_path,
         .serde_compat_root = build_options.serde_compat_root_path,
+        .ktx2_root = build_options.ktx2_root_path,
+        .gpu_root = build_options.gpu_root_path,
+        .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
+        .render_root = build_options.render_root_path,
+        .sdl3_include = build_options.sdl3_include_path,
     };
     var cfg_arena = std.heap.ArenaAllocator.init(gpa);
     defer cfg_arena.deinit();

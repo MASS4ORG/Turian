@@ -1,0 +1,25 @@
+{
+  "guid": "10000000-0000-4000-8000-0000000000a0",
+  "asset_type": "model",
+  "importer_version": 3,
+  "source_hash": 1654303361106391657,
+  "import_settings": {
+    "model": {
+      "import_animations": true,
+      "import_materials": true,
+      "scale_factor": 1
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+    {
+      "guid": "10000000-0000-4000-8000-0000000000a1",
+      "asset_type": "material",
+      "key": "material:0",
+      "name": "BottleMat.material"
+    }
+  ]
+}

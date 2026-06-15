@@ -1,6 +1,8 @@
 pub const Mesh = @import("Mesh.zig").Mesh;
 pub const Vertex = @import("Mesh.zig").Vertex;
 pub const Texture = @import("Texture.zig").Texture;
+pub const TextureFormat = @import("Texture.zig").Format;
+pub const TextureMip = @import("Texture.zig").Mip;
 pub const ObjLoader = @import("ObjLoader.zig");
 pub const GltfLoader = @import("GltfLoader.zig");
 pub const ImageLoader = @import("ImageLoader.zig");
@@ -38,10 +40,12 @@ pub fn loadMesh(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mes
     return error.UnsupportedMeshFormat;
 }
 
-/// Load a mesh from an in-memory byte buffer, dispatching on `ext` (e.g. ".obj").
-/// Used to load assets supplied by an `AssetProvider` / `.oap` package instead
-/// of from a file path. glTF-from-memory is not yet supported.
+/// Load a mesh from an in-memory byte buffer. Cooked canonical meshes (what the
+/// importer writes to the cache, detected by magic) load directly; otherwise
+/// `ext` selects a source parser (`.obj`). glTF/GLB are not parsed from memory —
+/// they are cooked to the canonical format at import time.
 pub fn loadMeshFromMemory(allocator: std.mem.Allocator, bytes: []const u8, ext: []const u8) !Mesh {
+    if (Mesh.isCanonical(bytes)) return Mesh.fromBytes(allocator, bytes);
     if (ascii_ieql(ext, ".obj")) return ObjLoader.parse(allocator, bytes);
     return error.UnsupportedMeshFormat;
 }

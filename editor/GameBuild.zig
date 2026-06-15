@@ -30,6 +30,15 @@ fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, path, "\\", "/");
 }
 
+/// Normalize `path` and make it absolute (relative paths are taken under
+/// `root`). Generated build.zig files run from the project's `.cache` dir, so
+/// every embedded path must be absolute, not relative to the editor's cwd.
+fn absUnder(a: std.mem.Allocator, root: []const u8, path: []const u8) ![]const u8 {
+    if (path.len == 0 or std.fs.path.isAbsolute(path)) return normPath(a, path);
+    const joined = try std.fmt.allocPrint(a, "{s}/{s}", .{ root, path });
+    return normPath(a, joined);
+}
+
 /// Append `s` to `list`, escaping characters that would break a Zig `"..."`
 /// string literal in the generated source (quotes, backslashes, control chars).
 fn zigEscapeInto(a: std.mem.Allocator, list: *std.ArrayList(u8), s: []const u8) !void {
@@ -68,6 +77,17 @@ pub const BuildConfig = struct {
     serde_root: []const u8,
     /// Path to serde/src/compat_0_16.zig (serde's internal compat shim).
     serde_compat_root: []const u8,
+    /// Path to ktx2/src/root.zig. The module's `vendor/` C/C++ sources are
+    /// derived from this (its grandparent directory).
+    ktx2_root: []const u8,
+    /// Path to gpu/src/root.zig (SDL3 window + device platform module).
+    gpu_root: []const u8,
+    /// Path to gpu/src/sdl3-c.h (translate-c root header for the SDL3 bindings).
+    gpu_sdl3_c: []const u8,
+    /// Path to render/root.zig (the shared GPU scene renderer).
+    render_root: []const u8,
+    /// SDL3 headers include directory (for translating the GPU bindings).
+    sdl3_include: []const u8,
 };
 
 /// Build the user game into <project>/.cache/zig-out/bin/game.
@@ -162,6 +182,14 @@ fn buildGameInner(
         .oap_root = try normPath(a, config.oap_root),
         .serde_root = try normPath(a, config.serde_root),
         .serde_compat_root = try normPath(a, config.serde_compat_root),
+        .ktx2_root = try normPath(a, config.ktx2_root),
+        .gpu_root = try absUnder(a, config.build_root, config.gpu_root),
+        .gpu_sdl3_c = try absUnder(a, config.build_root, config.gpu_sdl3_c),
+        .render_root = try absUnder(a, config.build_root, config.render_root),
+        // The SDL3 include tree is a generated artifact, emitted as a path
+        // relative to the editor's build root — absolutize it so the game build
+        // (which runs in the project's .cache dir) can find the headers.
+        .sdl3_include = try absUnder(a, config.build_root, config.sdl3_include),
     };
     for (0..src_count) |i| {
         abs_files[i] = try normPath(a, abs_files[i]);
@@ -169,7 +197,8 @@ fn buildGameInner(
 
     progress.report(0.1, "Generating project");
     const gen_project = try normPath(a, project_path);
-    const main_src = try generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime);
+    const use_gpu = sdl3LibPath(a, config).len > 0 and config.sdl3_include.len > 0;
+    const main_src = try generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime, use_gpu);
     const main_path = try std.fmt.allocPrint(a, "{s}/main.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = main_path, .data = main_src });
 
@@ -304,6 +333,33 @@ pub fn spawnAndWait(io: std.Io, a: std.mem.Allocator, argv: []const []const u8) 
 // ---------------------------------------------------------------------------
 // build.zig generator
 
+/// Emit the `ktx2` module (with its vendored Basis Universal transcoder + zstd
+/// C/C++ sources) into a generated build.zig and import it into `engine_mod`.
+/// The vendor paths are derived from `config.ktx2_root`'s module directory.
+/// Shared by the game and play-mode generators.
+pub fn appendKtx2Module(a: std.mem.Allocator, out: *std.ArrayList(u8), config: BuildConfig) !void {
+    const d1 = std.fs.path.dirname(config.ktx2_root) orelse ".";
+    const dir = std.fs.path.dirname(d1) orelse ".";
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const ktx2_mod = b.addModule(\"ktx2\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    ktx2_mod.link_libc = true;\n" ++
+            "    ktx2_mod.link_libcpp = true;\n" ++
+            "    ktx2_mod.addIncludePath(.{{ .cwd_relative = \"{s}/vendor\" }});\n" ++
+            "    ktx2_mod.addIncludePath(.{{ .cwd_relative = \"{s}/vendor/basisu/transcoder\" }});\n" ++
+            "    ktx2_mod.addIncludePath(.{{ .cwd_relative = \"{s}/vendor/basisu/zstd\" }});\n" ++
+            "    const ktx2_flags = [_][]const u8{{ \"-std=c++17\", \"-fno-strict-aliasing\", \"-DBASISD_SUPPORT_KTX2=1\", \"-DBASISD_SUPPORT_KTX2_ZSTD=1\", \"-DBASISD_SUPPORT_DXT1=1\", \"-DBASISD_SUPPORT_DXT5A=1\", \"-DBASISD_SUPPORT_BC7_MODE5=1\", \"-DBASISD_SUPPORT_UASTC=1\", \"-DBASISD_SUPPORT_PVRTC1=0\", \"-DBASISD_SUPPORT_PVRTC2=0\", \"-DBASISD_SUPPORT_ATC=0\", \"-DBASISD_SUPPORT_ASTC=0\", \"-DBASISD_SUPPORT_FXT1=0\", \"-DBASISD_SUPPORT_ETC2_EAC_RG11=0\" }};\n" ++
+            "    ktx2_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/vendor/ktx2_basis.cpp\" }}, .flags = &ktx2_flags }});\n" ++
+            "    ktx2_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/vendor/basisu/transcoder/basisu_transcoder.cpp\" }}, .flags = &ktx2_flags }});\n" ++
+            "    ktx2_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/vendor/basisu/zstd/zstddeclib.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addImport(\"ktx2\", ktx2_mod);\n\n",
+        .{ config.ktx2_root, dir, dir, dir, dir, dir, dir },
+    ));
+}
+
 fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []const []const u8) ![]u8 {
     var out: std.ArrayList(u8) = .empty;
     errdefer out.deinit(a);
@@ -313,6 +369,10 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
         std.fs.path.dirname(sdl3_abs) orelse "."
     else
         ".";
+
+    // GPU rendering needs SDL3 (lib + headers). Without it (e.g. headless CI),
+    // the game falls back to the CPU software renderer.
+    const use_gpu = sdl3_abs.len > 0 and config.sdl3_include.len > 0;
 
     try out.appendSlice(a, "const std = @import(\"std\");\n\n");
     try out.appendSlice(a, "pub fn build(b: *std.Build) void {\n");
@@ -356,6 +416,8 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
         .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.vendor_include },
     ));
 
+    try appendKtx2Module(a, &out, config);
+
     try out.appendSlice(a, try std.fmt.allocPrint(
         a,
         "    const guid_mod = b.addModule(\"guid\", .{{\n" ++
@@ -375,7 +437,9 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
             "        .target = target,\n" ++
             "    }});\n" ++
-            "    serde_mod.addImport(\"compat\", serde_compat_mod);\n\n",
+            "    serde_mod.addImport(\"compat\", serde_compat_mod);\n" ++
+            // engine imports serde (e.g. Material JSON load/save).
+            "    engine_mod.addImport(\"serde\", serde_mod);\n\n",
         .{ config.serde_compat_root, config.serde_root },
     ));
 
@@ -391,6 +455,34 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             "    editor_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
         .{config.editor_root},
     ));
+
+    if (use_gpu) {
+        // SDL3 C bindings (translate-c) → gpu platform module → render module.
+        // The exe links SDL3 below, satisfying the GPU symbols these reference.
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const sdl3_tc = b.addTranslateC(.{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "        .optimize = optimize,\n" ++
+                "    }});\n" ++
+                "    sdl3_tc.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
+                "    const sdl3_c_mod = sdl3_tc.createModule();\n" ++
+                "    const gpu_mod = b.addModule(\"gpu\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "        .imports = &.{{.{{ .name = \"sdl3-c\", .module = sdl3_c_mod }}}},\n" ++
+                "    }});\n" ++
+                "    gpu_mod.link_libc = true;\n" ++
+                "    const render_mod = b.addModule(\"render\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    render_mod.addImport(\"engine\", engine_mod);\n" ++
+                "    render_mod.addImport(\"gpu\", gpu_mod);\n\n",
+            .{ config.gpu_sdl3_c, config.sdl3_include, config.gpu_root, config.render_root },
+        ));
+    }
 
     for (src_files, 0..) |sf, i| {
         try out.appendSlice(a, try std.fmt.allocPrint(
@@ -416,6 +508,13 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             "                .{ .name = \"engine\", .module = engine_mod },\n" ++
             "                .{ .name = \"editor\", .module = editor_mod },\n",
     );
+    if (use_gpu) {
+        try out.appendSlice(
+            a,
+            "                .{ .name = \"render\", .module = render_mod },\n" ++
+                "                .{ .name = \"gpu\", .module = gpu_mod },\n",
+        );
+    }
     for (0..src_files.len) |i| {
         try out.appendSlice(a, try std.fmt.allocPrint(
             a,
@@ -472,6 +571,7 @@ fn generateMainZig(
     components: []const ComponentDef,
     component_count: usize,
     runtime: RuntimeConfig,
+    use_gpu: bool,
 ) ![]u8 {
     _ = project_path; // assets (incl. scene) now come from the package, not a path
     var out: std.ArrayList(u8) = .empty;
@@ -522,6 +622,22 @@ fn generateMainZig(
             "    return .{ .bytes = r.bytes, .owned = true };\n" ++
             "}\n\n",
     );
+
+    if (use_gpu) {
+        // GPU renderer + its byte-source callbacks (one shared seam with the
+        // editor; here backed by the packaged .oap by GUID).
+        try out.appendSlice(
+            a,
+            "const gpu = @import(\"gpu\");\n" ++
+                "const render = @import(\"render\");\n\n" ++
+                "fn gpuSource(guid: []const u8) ?render.Bytes {\n" ++
+                "    if (!g_assets_ready) return null;\n" ++
+                "    const gid = (editor.Guid.parse(guid) catch return null).bytes;\n" ++
+                "    const r = g_assets.readById(std.heap.page_allocator, gid) orelse return null;\n" ++
+                "    return .{ .data = r.bytes, .owned = true };\n" ++
+                "}\n\n",
+        );
+    }
 
     // Scene management runtime (issue #22): the SceneManager owns all scene node
     // storage. The loader resolves a scene asset GUID to nodes via the package.
@@ -910,35 +1026,58 @@ fn generateMainZig(
     {
         var esc: std.ArrayList(u8) = .empty;
         try zigEscapeInto(a, &esc, runtime.title);
-        const vsync_flag: u8 = if (runtime.vsync) 1 else 0;
-        try out.appendSlice(a, try std.fmt.allocPrint(
-            a,
-            "    const window = SDL_CreateWindow(\"{s}\", {d}, {d}, 0) orelse {{\n" ++
-                "        std.debug.print(\"[Turian] SDL_CreateWindow failed\\n\", .{{}});\n" ++
-                "        return;\n" ++
-                "    }};\n" ++
-                "    defer SDL_DestroyWindow(window);\n\n" ++
-                "    const renderer = SDL_CreateRenderer(window, null) orelse {{\n" ++
-                "        std.debug.print(\"[Turian] SDL_CreateRenderer failed\\n\", .{{}});\n" ++
-                "        return;\n" ++
-                "    }};\n" ++
-                "    defer SDL_DestroyRenderer(renderer);\n" ++
-                "    _ = SDL_SetRenderVSync(renderer, {d});\n\n",
-            .{ esc.items, runtime.width, runtime.height, vsync_flag },
-        ));
+        if (use_gpu) {
+            // GPU path: the gpu module owns the window + SDL3 GPU device; the
+            // shared render module draws the scene into the swapchain.
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "    var win = gpu.Window.create(\"{s}\", .{{ .width = {d}, .height = {d}, .vsync = {s}, .shader_formats = .{{ .spirv = true }} }}) catch {{\n" ++
+                    "        std.debug.print(\"[Turian] GPU window/device init failed\\n\", .{{}});\n" ++
+                    "        return;\n" ++
+                    "    }};\n" ++
+                    "    defer win.deinit();\n" ++
+                    "    render.init(win.device) catch {{\n" ++
+                    "        std.debug.print(\"[Turian] render init failed\\n\", .{{}});\n" ++
+                    "        return;\n" ++
+                    "    }};\n" ++
+                    "    defer render.deinit();\n" ++
+                    "    render.setSources(gpuSource, gpuSource, gpuSource);\n\n",
+                .{ esc.items, runtime.width, runtime.height, if (runtime.vsync) "true" else "false" },
+            ));
+        } else {
+            const vsync_flag: u8 = if (runtime.vsync) 1 else 0;
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "    const window = SDL_CreateWindow(\"{s}\", {d}, {d}, 0) orelse {{\n" ++
+                    "        std.debug.print(\"[Turian] SDL_CreateWindow failed\\n\", .{{}});\n" ++
+                    "        return;\n" ++
+                    "    }};\n" ++
+                    "    defer SDL_DestroyWindow(window);\n\n" ++
+                    "    const renderer = SDL_CreateRenderer(window, null) orelse {{\n" ++
+                    "        std.debug.print(\"[Turian] SDL_CreateRenderer failed\\n\", .{{}});\n" ++
+                    "        return;\n" ++
+                    "    }};\n" ++
+                    "    defer SDL_DestroyRenderer(renderer);\n" ++
+                    "    _ = SDL_SetRenderVSync(renderer, {d});\n\n",
+                .{ esc.items, runtime.width, runtime.height, vsync_flag },
+            ));
+            try out.appendSlice(
+                a,
+                "    const vp_w: c_int = engine.software_renderer.VP_W;\n" ++
+                    "    const vp_h: c_int = engine.software_renderer.VP_H;\n" ++
+                    "    const sdl_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,\n" ++
+                    "        SDL_TEXTUREACCESS_STREAMING, vp_w, vp_h) orelse {\n" ++
+                    "        std.debug.print(\"[Turian] SDL_CreateTexture failed\\n\", .{});\n" ++
+                    "        return;\n" ++
+                    "    };\n" ++
+                    "    defer SDL_DestroyTexture(sdl_tex);\n\n",
+            );
+        }
     }
 
     try out.appendSlice(
         a,
-        "    const vp_w: c_int = engine.software_renderer.VP_W;\n" ++
-            "    const vp_h: c_int = engine.software_renderer.VP_H;\n" ++
-            "    const sdl_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,\n" ++
-            "        SDL_TEXTUREACCESS_STREAMING, vp_w, vp_h) orelse {\n" ++
-            "        std.debug.print(\"[Turian] SDL_CreateTexture failed\\n\", .{});\n" ++
-            "        return;\n" ++
-            "    };\n" ++
-            "    defer SDL_DestroyTexture(sdl_tex);\n\n" ++
-            "    var prev_ts = std.Io.Clock.awake.now(io);\n" ++
+        "    var prev_ts = std.Io.Clock.awake.now(io);\n" ++
             "    var elapsed: f32 = 0;\n" ++
             "    var frame: u64 = 0;\n\n" ++
             "    main_loop: while (true) {\n" ++
@@ -1002,17 +1141,29 @@ fn generateMainZig(
         );
     }
 
-    try out.appendSlice(
-        a,
-        "        engine.software_renderer.renderScene(io, gatherRenderNodes());\n" ++
-            "        const pixels = engine.software_renderer.pixelsSlice();\n" ++
-            "        _ = SDL_UpdateTexture(sdl_tex, null, pixels.ptr, vp_w * 4);\n" ++
-            "        _ = SDL_RenderClear(renderer);\n" ++
-            "        _ = SDL_RenderTexture(renderer, sdl_tex, null, null);\n" ++
-            "        _ = SDL_RenderPresent(renderer);\n" ++
-            "    }\n" ++
-            "}\n",
-    );
+    if (use_gpu) {
+        try out.appendSlice(
+            a,
+            "        if (win.beginFrame()) |fr| {\n" ++
+                "            render.renderScene(fr.cmd, fr.swapchain, fr.width, fr.height, gatherRenderNodes());\n" ++
+                "            fr.submit();\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "}\n",
+        );
+    } else {
+        try out.appendSlice(
+            a,
+            "        engine.software_renderer.renderScene(io, gatherRenderNodes());\n" ++
+                "        const pixels = engine.software_renderer.pixelsSlice();\n" ++
+                "        _ = SDL_UpdateTexture(sdl_tex, null, pixels.ptr, vp_w * 4);\n" ++
+                "        _ = SDL_RenderClear(renderer);\n" ++
+                "        _ = SDL_RenderTexture(renderer, sdl_tex, null, null);\n" ++
+                "        _ = SDL_RenderPresent(renderer);\n" ++
+                "    }\n" ++
+                "}\n",
+        );
+    }
 
     return try out.toOwnedSlice(a);
 }

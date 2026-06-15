@@ -6,10 +6,11 @@ Turian Studio via **File → Open Project…**.
 | Example | Focus |
 |---------|-------|
 | [`basic-project/`](basic-project/) | Scripting lifecycle, component fields, object/asset references |
+| [`scene-management/`](scene-management/) | Multiple scenes and scene transitions |
+| [`3d-model-materials/`](3d-model-materials/) | glTF/GLB import generating PBR materials + textures |
 
 ## Planned examples
 
-- `asset-loading/` — OBJ, glTF, and GLB model loading
 - `physics/` — RigidBody and Collider components
 - `audio/` — AudioSource component
 - `ui-overlay/` — Rendering a 2D HUD with the software renderer

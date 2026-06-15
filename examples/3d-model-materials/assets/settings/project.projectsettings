@@ -1,0 +1,22 @@
+.{
+    .version = 1,
+    .project = .{
+        .name = "3D Model Materials",
+        .company = "Turian",
+        .version = "0.1.0",
+        .icon = "",
+    },
+    .graphics = .{
+        .width = 1280,
+        .height = 720,
+        .vsync = true,
+        .fullscreen = false,
+        .quality = .high,
+    },
+    .platform = .{
+        .target = .auto,
+        .optimize = .debug,
+    },
+    // Boot into scene-main (its GUID, from scene-main.json.meta).
+    .first_scene = "10000000-0000-4000-8000-0000000000c0",
+}

@@ -8,9 +8,17 @@
             .url = "git+https://github.com/david-vanderson/dvui#01072101dc6090c493f9f62fb4a9f0614410ffa4",
             .hash = "dvui-0.5.0-dev-AQFJmYL-9gCZErXZGGekVKV_5LW9lWhIM6Q3gz_XaoUR",
         },
+        .gpu = .{
+            .url = "git+https://gitlab.com/mass4org/mega4/gpu#46d869b551656c4797797a74bff3b3008df85a2e",
+            .hash = "gpu-0.1.0-B3kvdYUvAAD9av4opyu-_jU_OHSX3qz2C-mGRtM44uXc",
+        },
         .guid = .{
             .url = "git+https://gitlab.com/mass4org/mega4/guid#82a98833e35452ec458b06e0e9765278e012026a",
             .hash = "guid-1.0.0-ewbraoEkAADVJSIeJno7pSGJ-SHkRKR_u_snCYOL3nH_",
+        },
+        .ktx2 = .{
+            .url = "git+https://gitlab.com/mass4org/mega4/ktx2#793ca1d203c1553b740c23b688972f24754cf681",
+            .hash = "ktx2-1.0.0-_ha8z9rlSQArWqLEO34QRvI3EclvelWUDKHJ2SS9r8br",
         },
         .math3d = .{
             .url = "git+https://gitlab.com/mass4org/mega4/math-3d#9fb10551a4f3e3e03900f0a80ad4591855737cbf",

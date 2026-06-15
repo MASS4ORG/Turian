@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "name": "Main Camera",
+      "guid": "2a000000-0000-4000-8000-000000000001",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": -7
+        },
+        "rotation": {
+          "x": 7,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "camera": {
+            "fov": 55,
+            "near": 0.01,
+            "far": 1000,
+            "orthographic": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Key Light",
+      "guid": "2a000000-0000-4000-8000-000000000002",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 5,
+          "z": 0
+        },
+        "rotation": {
+          "x": 50,
+          "y": -30,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "light": {
+            "kind": "directional",
+            "color_r": 1,
+            "color_g": 0.98,
+            "color_b": 0.95,
+            "intensity": 3.2,
+            "range": 10,
+            "spot_angle": 35,
+            "spot_softness": 0.15,
+            "cast_shadows": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fill Light",
+      "guid": "2a000000-0000-4000-8000-000000000003",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -2,
+          "y": 1.5,
+          "z": -2
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "light": {
+            "kind": "point",
+            "color_r": 0.5,
+            "color_g": 0.7,
+            "color_b": 1,
+            "intensity": 30,
+            "range": 14,
+            "spot_angle": 35,
+            "spot_softness": 0.15,
+            "cast_shadows": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cube (OBJ + KTX2 texture)",
+      "guid": "2a000000-0000-4000-8000-000000000005",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": -2.4,
+          "y": -0.6,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.2,
+          "y": 1.2,
+          "z": 1.2
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "10000000-0000-4000-8000-0000000000b0",
+            "material_guid": "10000000-0000-4000-8000-0000000000e1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Water Bottle (glTF + external PNGs)",
+      "guid": "2a000000-0000-4000-8000-000000000006",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 160,
+          "z": 0
+        },
+        "scale": {
+          "x": 12,
+          "y": 12,
+          "z": 12
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "10000000-0000-4000-8000-0000000000a0",
+            "material_guid": "10000000-0000-4000-8000-0000000000a1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Water Bottle (GLB + embedded textures)",
+      "guid": "2a000000-0000-4000-8000-000000000007",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 2.4,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 160,
+          "z": 0
+        },
+        "scale": {
+          "x": 12,
+          "y": 12,
+          "z": 12
+        }
+      },
+      "components": [
+        {
+          "mesh_renderer": {
+            "cast_shadows": true,
+            "receive_shadows": true,
+            "mesh_guid": "10000000-0000-4000-8000-0000000000d0",
+            "material_guid": "10000000-0000-4000-8000-0000000000d1"
+          }
+        }
+      ]
+    }
+  ]
+}

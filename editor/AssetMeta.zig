@@ -74,18 +74,30 @@ pub fn hashFile(io: std.Io, allocator: std.mem.Allocator, file_path: []const u8)
 /// Creates or upgrades it with a fresh GUID when the existing meta has a nil GUID
 /// (missing file, legacy format, or parse failure). Returns the up-to-date meta.
 pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u8) MetaFile {
-    var meta = readMeta(io, allocator, asset_path);
-    if (!meta.guid.isNil()) return meta;
+    // Parse in a scratch arena so the meta's heap slices (manifests) don't leak;
+    // the returned value carries only the scalar fields (see clearing below).
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
 
-    meta.guid = Guid.v4(io);
-    if (meta.asset_type == .unknown)
-        meta.asset_type = classifyByName(asset_path);
-    if (std.meta.activeTag(meta.import_settings) == .unknown and meta.asset_type != .unknown)
-        meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
-    if (meta.source_hash == 0)
-        meta.source_hash = hashFile(io, allocator, asset_path);
+    var meta = readMeta(io, a, asset_path);
+    if (meta.guid.isNil()) {
+        meta.guid = Guid.v4(io);
+        if (meta.asset_type == .unknown)
+            meta.asset_type = classifyByName(asset_path);
+        if (std.meta.activeTag(meta.import_settings) == .unknown and meta.asset_type != .unknown)
+            meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
+        if (meta.source_hash == 0)
+            meta.source_hash = hashFile(io, a, asset_path);
 
-    writeMeta(io, allocator, asset_path, meta);
+        writeMeta(io, a, asset_path, meta);
+    }
+
+    // The slice fields live in the arena and would dangle after return. Callers
+    // of ensureMeta use only the GUID/type/version, so clear the manifests.
+    meta.source_deps = &.{};
+    meta.artifact_deps = &.{};
+    meta.sub_assets = &.{};
     return meta;
 }
 

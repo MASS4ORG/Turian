@@ -1,0 +1,13 @@
+{
+  "guid": "10000000-0000-4000-8000-0000000000e1",
+  "asset_type": "material",
+  "importer_version": 1,
+  "source_hash": 10246890007568456720,
+  "import_settings": "material",
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+  ]
+}

@@ -19,6 +19,14 @@ pub fn build(b: *std.Build) void {
     const oap_dep = b.dependency("open_asset_package", .{ .target = target, .optimize = optimize });
     const oap_mod = oap_dep.module("open_asset_package");
 
+    // ── KTX2 texture reader (+ vendored Basis Universal transcoder) ──────────
+    const ktx2_dep = b.dependency("ktx2", .{ .target = target, .optimize = optimize });
+    const ktx2_mod = ktx2_dep.module("ktx2");
+
+    // ── GPU platform module (SDL3 window + device), shared by studio + game ──
+    const gpu_dep = b.dependency("gpu", .{ .target = target, .optimize = optimize });
+    const gpu_mod = gpu_dep.module("gpu");
+
     // ── Engine module ────────────────────────────────────────────────────────
     const engine_mod = b.addModule("engine", .{
         .root_source_file = b.path("engine/root.zig"),
@@ -29,6 +37,8 @@ pub fn build(b: *std.Build) void {
     engine_mod.addCSourceFile(.{ .file = b.path("engine/vendor/cgltf_wrap.c"), .flags = &.{"-std=c99"} });
     engine_mod.addImport("math", math3d_mod);
     engine_mod.addImport("open_asset_package", oap_mod);
+    engine_mod.addImport("serde", serde_mod);
+    engine_mod.addImport("ktx2", ktx2_mod);
 
     // ── Editor module ────────────────────────────────────────────────────────
     const editor_mod = b.addModule("editor", .{
@@ -39,6 +49,17 @@ pub fn build(b: *std.Build) void {
     editor_mod.addImport("guid", guid_mod);
     editor_mod.addImport("serde", serde_mod);
     editor_mod.addImport("open_asset_package", oap_mod);
+
+    // ── Render module ─────────────────────────────────────────────────────────
+    // SDL3-GPU scene renderer shared by the studio viewport and the built game.
+    // Depends on engine (scene/asset types) + gpu (SDL3 device/window) — never
+    // pulled into the headless CLI.
+    const render_mod = b.addModule("render", .{
+        .root_source_file = b.path("render/root.zig"),
+        .target = target,
+    });
+    render_mod.addImport("engine", engine_mod);
+    render_mod.addImport("gpu", gpu_mod);
 
     // ── CLI-only mode (skips studio/dvui; used for cross-compilation) ────────
     const cli_only = b.option(bool, "cli-only", "Build only turian-cli (no studio/dvui)") orelse false;
@@ -74,14 +95,26 @@ pub fn build(b: *std.Build) void {
     turian_opts.addOptionPath("oap_root_path", oap_dep.path("src/root.zig"));
     turian_opts.addOptionPath("serde_root_path", serde_dep.path("src/root.zig"));
     turian_opts.addOptionPath("serde_compat_root_path", serde_dep.path("src/compat_0_16.zig"));
+    turian_opts.addOptionPath("ktx2_root_path", ktx2_dep.path("src/root.zig"));
+    turian_opts.addOptionPath("gpu_root_path", gpu_dep.path("src/root.zig"));
+    turian_opts.addOptionPath("gpu_sdl3_c_path", gpu_dep.path("src/sdl3-c.h"));
+    turian_opts.addOption([]const u8, "render_root_path", b.pathJoin(&.{ build_root, "render", "root.zig" }));
 
+    // SDL3 include tree, captured for the SDK step so it can ship the headers.
+    var sdl3_include_tree: ?std.Build.LazyPath = null;
     if (!cli_only) {
-        if (dvui_dep.?.builder.lazyDependency("sdl3", .{ .target = target, .optimize = optimize })) |sdl3_dep|
-            turian_opts.addOptionPath("sdl3_lib_path", sdl3_dep.artifact("SDL3").getEmittedBin())
-        else
+        if (dvui_dep.?.builder.lazyDependency("sdl3", .{ .target = target, .optimize = optimize })) |sdl3_dep| {
+            turian_opts.addOptionPath("sdl3_lib_path", sdl3_dep.artifact("SDL3").getEmittedBin());
+            const inc = sdl3_dep.artifact("SDL3").getEmittedIncludeTree();
+            turian_opts.addOptionPath("sdl3_include_path", inc);
+            sdl3_include_tree = inc;
+        } else {
             turian_opts.addOption([]const u8, "sdl3_lib_path", "");
+            turian_opts.addOption([]const u8, "sdl3_include_path", "");
+        }
     } else {
         turian_opts.addOption([]const u8, "sdl3_lib_path", "");
+        turian_opts.addOption([]const u8, "sdl3_include_path", "");
     }
 
     // ── Studio (GUI editor) ──────────────────────────────────────────────────
@@ -96,6 +129,8 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "dvui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
+                    .{ .name = "render", .module = render_mod },
+                    .{ .name = "gpu", .module = gpu_mod },
                 },
             }),
         });
@@ -150,10 +185,28 @@ pub fn build(b: *std.Build) void {
     });
     studio_tests.root_module.addOptions("turian_build_options", turian_opts);
 
-    const test_step = b.step("test", "Run engine + editor + studio tests");
+    // The render module pulls in engine's ImageLoader (stb_image symbols). In
+    // real builds stb comes from dvui (studio) or the game build; the standalone
+    // test provides its own copy so it links.
+    const render_test_mod = b.createModule(.{
+        .root_source_file = b.path("render/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "engine", .module = engine_mod },
+            .{ .name = "gpu", .module = gpu_mod },
+        },
+    });
+    render_test_mod.link_libc = true;
+    render_test_mod.addIncludePath(b.path("engine/vendor"));
+    render_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
+    const render_tests = b.addTest(.{ .root_module = render_test_mod });
+
+    const test_step = b.step("test", "Run engine + editor + studio + render tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
     test_step.dependOn(&b.addRunArtifact(studio_tests).step);
+    test_step.dependOn(&b.addRunArtifact(render_tests).step);
 
     // ── CI step (test + release artifacts) ───────────────────────────────────
     // Pass -Dno-test=true when cross-compiling: the test runner can't execute
@@ -172,6 +225,8 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "dvui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
+                    .{ .name = "render", .module = render_mod },
+                    .{ .name = "gpu", .module = gpu_mod },
                 },
             }),
         });
@@ -277,6 +332,8 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "dvui", .module = dvui_mod.? },
                         .{ .name = "engine", .module = engine_mod },
                         .{ .name = "editor", .module = editor_mod },
+                        .{ .name = "render", .module = render_mod },
+                        .{ .name = "gpu", .module = gpu_mod },
                     },
                 }),
             });
@@ -303,12 +360,25 @@ pub fn build(b: *std.Build) void {
         for ([_]struct { src: []const u8, dst: []const u8 }{
             .{ .src = "engine", .dst = "sdk/engine" },
             .{ .src = "editor", .dst = "sdk/editor" },
+            // The render module ships as source (incl. its .spv shaders) so the
+            // game build can compile the GPU renderer.
+            .{ .src = "render", .dst = "sdk/render" },
         }) |d| {
             sdk_step.dependOn(&b.addInstallDirectory(.{
                 .source_dir = b.path(d.src),
                 .install_dir = .prefix,
                 .install_subdir = d.dst,
                 .exclude_extensions = &.{"md"},
+            }).step);
+        }
+
+        // SDL3 headers — the game build translate-c's the gpu module's bindings
+        // against these, so an SDK build is fully offline.
+        if (sdl3_include_tree) |inc| {
+            sdk_step.dependOn(&b.addInstallDirectory(.{
+                .source_dir = inc,
+                .install_dir = .prefix,
+                .install_subdir = "sdk/sdl3-include",
             }).step);
         }
 
@@ -320,6 +390,8 @@ pub fn build(b: *std.Build) void {
             .{ .dep = guid_dep, .name = "guid" },
             .{ .dep = serde_dep, .name = "serde" },
             .{ .dep = oap_dep, .name = "open_asset_package" },
+            .{ .dep = ktx2_dep, .name = "ktx2" },
+            .{ .dep = gpu_dep, .name = "gpu" },
         };
         for (dep_installs) |di| {
             sdk_step.dependOn(&b.addInstallDirectory(.{
@@ -329,6 +401,14 @@ pub fn build(b: *std.Build) void {
                 .exclude_extensions = &.{"md"},
             }).step);
         }
+
+        // ktx2 also ships its vendored C/C++ transcoder sources (Basis Universal
+        // + zstd), which the game/play build generators compile from disk.
+        sdk_step.dependOn(&b.addInstallDirectory(.{
+            .source_dir = ktx2_dep.path("vendor"),
+            .install_dir = .prefix,
+            .install_subdir = "sdk/deps/ktx2/vendor",
+        }).step);
 
         // ── turian-sdk.json marker ────────────────────────────────────────────
         // Presence of this file (next to the binaries) tells SdkLayout.zig the

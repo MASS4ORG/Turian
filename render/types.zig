@@ -1,0 +1,91 @@
+//! Plain data types and constants shared across the renderer (no GPU state).
+const engine = @import("engine");
+
+pub const MAX_LIGHTS = 8;
+
+// Shadow mapping (primary directional light).
+pub const SHADOW_DIM: u32 = 2048;
+
+/// Bytes for an asset resolved by GUID, plus whether the renderer frees them.
+pub const Bytes = struct { data: []const u8, owned: bool = true };
+
+/// GUID→bytes asset source. Meshes are canonical cooked bytes; textures are
+/// encoded image bytes (PNG/KTX2/...); materials are `.material` JSON bytes.
+pub const SourceFn = *const fn (guid: []const u8) ?Bytes;
+
+/// Vertex-stage uniforms — model + model-view-projection.
+pub const VertexUB = extern struct { mvp: [16]f32, model: [16]f32 };
+
+/// Shadow-pass vertex uniforms — `light_vp * model`.
+pub const ShadowUB = extern struct { light_mvp: [16]f32 };
+
+/// One scene light. Layout must match `struct Light` in scene.frag.glsl.
+pub const GpuLight = extern struct {
+    position: [4]f32 = .{ 0, 0, 0, 0 }, // xyz world pos, w = type (0 dir,1 point,2 spot)
+    direction: [4]f32 = .{ 0, -1, 0, 0 }, // xyz travel dir, w = range
+    color: [4]f32 = .{ 0, 0, 0, 0 }, // rgb, w = intensity
+    cone: [4]f32 = .{ -1, 1, 0, 0 }, // cos(outer), cos(inner)
+};
+
+/// Fragment uniforms — layout must match FragUB in scene.frag.glsl exactly.
+/// All members are vec4 (or vec4 arrays) to keep std140 16-byte alignment trivial.
+pub const FragUB = extern struct {
+    ambient_color: [4]f32, // rgb
+    camera_pos: [4]f32, // xyz, w = light_count
+    base_color: [4]f32, // rgba
+    mr_ns_oc: [4]f32, // metallic, roughness, normal_scale, occlusion_strength
+    emissive: [4]f32, // rgb, w strength
+    flags: [4]f32, // has_albedo, has_mr, has_normal, has_emissive
+    flags2: [4]f32, // has_occlusion, alpha_cutoff, alpha_mask_on, shadows_enabled
+    light_vp: [16]f32, // shadow light view-projection (primary directional)
+    lights: [MAX_LIGHTS]GpuLight,
+};
+
+/// Vertex layout uploaded to the GPU (matches the pipeline's attributes).
+pub const GpuVertex = extern struct {
+    px: f32,
+    py: f32,
+    pz: f32,
+    nx: f32,
+    ny: f32,
+    nz: f32,
+    u: f32,
+    v: f32,
+};
+
+/// PBR maps in shader binding order (set=2, binding 0..4).
+pub const MapSlot = enum(usize) { albedo = 0, mr = 1, normal = 2, emissive = 3, occlusion = 4 };
+
+/// A short string buffer holding a bound texture's GUID.
+pub const GuidBuf = struct {
+    buf: [64]u8 = undefined,
+    len: usize = 0,
+
+    pub fn slice(self: *const GuidBuf) []const u8 {
+        return self.buf[0..self.len];
+    }
+    pub fn set(self: *GuidBuf, s: []const u8) void {
+        self.len = @min(s.len, self.buf.len);
+        @memcpy(self.buf[0..self.len], s[0..self.len]);
+    }
+};
+
+/// A material flattened into scalar values and the GUIDs of its texture maps,
+/// ready to drive the fragment uniforms and sampler bindings for one draw.
+pub const ResolvedMaterial = struct {
+    base_color: [4]f32 = .{ 0.72, 0.72, 0.76, 1.0 },
+    metallic: f32 = 0,
+    roughness: f32 = 0.5,
+    normal_scale: f32 = 1,
+    occlusion_strength: f32 = 1,
+    emissive: [3]f32 = .{ 0, 0, 0 },
+    emissive_strength: f32 = 0,
+    alpha_cutoff: f32 = 0.5,
+    maps: [5]GuidBuf = .{ .{}, .{}, .{}, .{}, .{} },
+
+    pub fn map(self: *const ResolvedMaterial, slot: MapSlot) []const u8 {
+        return self.maps[@intFromEnum(slot)].slice();
+    }
+};
+
+pub const SceneNode = engine.SceneNode;

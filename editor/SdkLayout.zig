@@ -64,6 +64,11 @@ fn configFromSdk(io: std.Io, gpa: std.mem.Allocator, sdk_root: []const u8) GameB
         .oap_root = p.join(gpa, sdk_root, "deps/open_asset_package/src/root.zig"),
         .serde_root = p.join(gpa, sdk_root, "deps/serde/src/root.zig"),
         .serde_compat_root = p.join(gpa, sdk_root, "deps/serde/src/compat_0_16.zig"),
+        .ktx2_root = p.join(gpa, sdk_root, "deps/ktx2/src/root.zig"),
+        .gpu_root = p.join(gpa, sdk_root, "deps/gpu/src/root.zig"),
+        .gpu_sdl3_c = p.join(gpa, sdk_root, "deps/gpu/src/sdl3-c.h"),
+        .render_root = p.join(gpa, sdk_root, "render/root.zig"),
+        .sdl3_include = p.join(gpa, sdk_root, "sdl3-include"),
     };
 }
 
@@ -81,6 +86,11 @@ fn applyEnvOverrides(cfg: *GameBuild.BuildConfig, environ: *const std.process.En
     if (environ.get("TURIAN_OAP_ROOT")) |v| cfg.oap_root = v;
     if (environ.get("TURIAN_SERDE_ROOT")) |v| cfg.serde_root = v;
     if (environ.get("TURIAN_SERDE_COMPAT_ROOT")) |v| cfg.serde_compat_root = v;
+    if (environ.get("TURIAN_KTX2_ROOT")) |v| cfg.ktx2_root = v;
+    if (environ.get("TURIAN_GPU_ROOT")) |v| cfg.gpu_root = v;
+    if (environ.get("TURIAN_GPU_SDL3_C")) |v| cfg.gpu_sdl3_c = v;
+    if (environ.get("TURIAN_RENDER_ROOT")) |v| cfg.render_root = v;
+    if (environ.get("TURIAN_SDL3_INCLUDE")) |v| cfg.sdl3_include = v;
 }
 
 /// Resolve a UserReflection.ReflectionConfig with the same priority logic.

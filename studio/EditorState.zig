@@ -392,6 +392,13 @@ pub fn clearUndoStack() void {
     for (0..redo_len) |i| redo_stack[i].deinit();
     undo_len = 0;
     redo_len = 0;
+    last_modified_idx = null;
+    // Free a group that was mid-capture (e.g. on shutdown).
+    if (group_buffer) |*gb| {
+        for (gb.items) |*cmd| cmd.deinit();
+        gb.deinit(undo_alloc);
+        group_buffer = null;
+    }
     saved_undo_depth = 0;
     scene_dirty = false;
 }
@@ -1131,6 +1138,44 @@ pub fn resolveAssetGuid(guid_str: []const u8) ?[]const u8 {
     if (guid_str.len == 0 or !assetDbReady()) return null;
     const guid = editor.Guid.parse(guid_str) catch return null;
     return if (asset_db.findByGuid(guid)) |info| info.path else null;
+}
+
+/// Resolve the GUID of the material a model mesh should use by default — the
+/// material generated for the primitive's glTF material (falling back to the
+/// model's first generated material). Returns null for non-model meshes or
+/// models without generated materials. Used to auto-assign a MeshRenderer's
+/// material when its mesh is set to a model.
+pub fn modelPrimaryMaterial(io: std.Io, mesh_guid_str: []const u8, buf: *[36]u8) ?[]const u8 {
+    if (mesh_guid_str.len == 0 or !assetDbReady()) return null;
+    const guid = editor.Guid.parse(mesh_guid_str) catch return null;
+    const info = asset_db.findByGuid(guid) orelse return null;
+    if (info.asset_type != .model) return null;
+
+    const meta = editor.asset_meta.readMeta(io, std.heap.page_allocator, info.path);
+    if (meta.sub_assets.len == 0) return null;
+
+    // Prefer the material the first primitive references; else the first one.
+    var chosen: ?editor.Guid = null;
+    if (engine.assets.GltfLoader.firstMaterialIndex(info.path)) |idx| {
+        var key_buf: [32]u8 = undefined;
+        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{idx}) catch return null;
+        for (meta.sub_assets) |s| {
+            if (s.asset_type == .material and std.mem.eql(u8, s.key, key)) {
+                chosen = s.guid;
+                break;
+            }
+        }
+    }
+    if (chosen == null) {
+        for (meta.sub_assets) |s| {
+            if (s.asset_type == .material) {
+                chosen = s.guid;
+                break;
+            }
+        }
+    }
+    const g = chosen orelse return null;
+    return g.toString(buf);
 }
 
 pub fn resolveObjectGuid(guid_str: []const u8) ?[]const u8 {

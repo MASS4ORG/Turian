@@ -8,6 +8,7 @@ const MaterialEditor = @import("MaterialEditor.zig");
 const DataAssetEditor = @import("DataAssetEditor.zig");
 const InputActionsEditor = @import("InputActionsEditor.zig");
 const ProjectSettingsEditor = @import("ProjectSettingsEditor.zig");
+const ImportSettingsEditor = @import("ImportSettingsEditor.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -119,6 +120,31 @@ pub fn draw() void {
                         });
                     } else {
                         drawScriptFields(sel, obj, ci);
+                    }
+                },
+                .mesh_renderer => |*mr| {
+                    const obj_before_field = obj.*;
+                    var changed = PropDraw.drawComponent(@TypeOf(mr.*), mr, ci + 1, false);
+
+                    // When the mesh is set to a model and no material is bound
+                    // yet, default to the model's generated (primary) material.
+                    const prev_mesh = obj_before_field.components[ci].mesh_renderer.mesh.slice();
+                    const mesh_changed = !std.mem.eql(u8, prev_mesh, mr.mesh.slice());
+                    if (mesh_changed and mr.material.slice().len == 0) {
+                        var guid_buf: [36]u8 = undefined;
+                        if (EditorState.modelPrimaryMaterial(dvui.io, mr.mesh.slice(), &guid_buf)) |g| {
+                            mr.material.set(g);
+                            changed = true;
+                        }
+                    }
+
+                    if (changed) {
+                        EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+                            .idx = sel,
+                            .before = obj_before_field,
+                            .after = obj.*,
+                        } });
+                        EditorState.scene_dirty = true;
                     }
                 },
                 inline else => |*field_data| {
@@ -415,6 +441,40 @@ fn drawAssetInspector(asset_path: []const u8) void {
     if (asset_type == .project_settings) {
         _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 4 });
         ProjectSettingsEditor.draw(asset_path);
+    }
+
+    if (ImportSettingsEditor.handles(asset_type)) {
+        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 5 });
+        ImportSettingsEditor.draw(asset_path, asset_type);
+    }
+
+    if (asset_type == .model) drawSubAssets(asset_path);
+}
+
+/// List the assets generated from a model (materials/textures recorded in its
+/// `.meta`). Selecting one opens it in the inspector — e.g. to tweak a generated
+/// material's colour. The generated `.material` lives in the cache; edits persist
+/// across reimports (the importer only regenerates missing ones).
+fn drawSubAssets(asset_path: []const u8) void {
+    const proj = EditorState.project_path orelse return;
+
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const meta = editor.asset_meta.readMeta(dvui.io, arena, asset_path);
+    if (meta.sub_assets.len == 0) return;
+
+    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 6 });
+    dvui.label(@src(), "Generated Assets", .{}, .{ .padding = .{ .x = 8, .y = 6 } });
+
+    for (meta.sub_assets, 0..) |sub, i| {
+        var label_buf: [160]u8 = undefined;
+        const label = std.fmt.bufPrint(&label_buf, "{s}  ({s})", .{ sub.name, @tagName(sub.asset_type) }) catch sub.name;
+        if (dvui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i, .padding = .{ .x = 10, .y = 2 } })) {
+            var path_buf: [1024]u8 = undefined;
+            if (editor.asset_cache.artifactPath(proj, sub.guid, sub.asset_type, &path_buf)) |cache_path|
+                EditorState.selectAsset(cache_path);
+        }
     }
 }
 

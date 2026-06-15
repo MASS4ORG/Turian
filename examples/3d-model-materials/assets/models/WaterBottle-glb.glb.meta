@@ -1,0 +1,49 @@
+{
+  "guid": "10000000-0000-4000-8000-0000000000d0",
+  "asset_type": "model",
+  "importer_version": 3,
+  "source_hash": 15404368991504354982,
+  "import_settings": {
+    "model": {
+      "import_animations": true,
+      "import_materials": true,
+      "scale_factor": 1
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+    {
+      "guid": "11a84bca-fa8e-43f9-8c08-f3f1e695985c",
+      "asset_type": "image",
+      "key": "image:0",
+      "name": "image_0.png"
+    },
+    {
+      "guid": "27b6751b-9292-4242-bdc4-39ba76fce4ef",
+      "asset_type": "image",
+      "key": "image:1",
+      "name": "image_1.png"
+    },
+    {
+      "guid": "ce455c9a-16c1-4b84-84f4-39d3750603cc",
+      "asset_type": "image",
+      "key": "image:2",
+      "name": "image_2.png"
+    },
+    {
+      "guid": "d887ed9f-92a1-48bc-a2ef-52b2666a88d5",
+      "asset_type": "image",
+      "key": "image:3",
+      "name": "image_3.png"
+    },
+    {
+      "guid": "10000000-0000-4000-8000-0000000000d1",
+      "asset_type": "material",
+      "key": "material:0",
+      "name": "BottleMat.material"
+    }
+  ]
+}

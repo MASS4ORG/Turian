@@ -114,6 +114,13 @@ fn buildInner(
         .oap_root = try normPath(a, config.oap_root),
         .serde_root = try normPath(a, config.serde_root),
         .serde_compat_root = try normPath(a, config.serde_compat_root),
+        .ktx2_root = try normPath(a, config.ktx2_root),
+        // The play library never renders (the editor draws play nodes), so these
+        // are unused there — set to keep the shared BuildConfig complete.
+        .gpu_root = config.gpu_root,
+        .gpu_sdl3_c = config.gpu_sdl3_c,
+        .render_root = config.render_root,
+        .sdl3_include = config.sdl3_include,
     };
     for (0..src_count) |i| abs_files[i] = try normPath(a, abs_files[i]);
 
@@ -169,6 +176,21 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
         .{config.oap_root},
     ));
 
+    // serde (+ its compat shim) — engine imports it (e.g. Material JSON load).
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const serde_compat_mod = b.addModule(\"compat\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    const serde_mod = b.addModule(\"serde\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    serde_mod.addImport(\"compat\", serde_compat_mod);\n\n",
+        .{ config.serde_compat_root, config.serde_root },
+    ));
+
     try out.appendSlice(a, try std.fmt.allocPrint(
         a,
         "    const engine_mod = b.addModule(\"engine\", .{{\n" ++
@@ -180,9 +202,12 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addImport(\"math\", math_mod);\n" ++
-            "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
+            "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n" ++
+            "    engine_mod.addImport(\"serde\", serde_mod);\n\n",
         .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.vendor_include },
     ));
+
+    try GameBuild.appendKtx2Module(a, &out, config);
 
     for (src_files, 0..) |sf, i| {
         try out.appendSlice(a, try std.fmt.allocPrint(

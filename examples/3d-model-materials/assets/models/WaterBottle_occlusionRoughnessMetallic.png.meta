@@ -1,0 +1,23 @@
+{
+  "guid": "10000000-0000-4000-8000-0000000000a3",
+  "asset_type": "image",
+  "importer_version": 1,
+  "source_hash": 403800470071975071,
+  "import_settings": {
+    "image": {
+      "texture_type": "default",
+      "color_space": "srgb",
+      "generate_mipmaps": true,
+      "compression": "none",
+      "filter": "linear",
+      "wrap": "repeat",
+      "max_size": 2048
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+  ]
+}

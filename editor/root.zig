@@ -41,7 +41,16 @@ pub const AssetDescriptor = @import("types/AssetDescriptor.zig").AssetDescriptor
 pub const OpenMode = @import("types/AssetDescriptor.zig").OpenMode;
 pub const Guid = @import("guid").Guid;
 pub const MetaFile = @import("types/MetaFile.zig").MetaFile;
-pub const ImportSettings = @import("types/ImportSettings.zig").ImportSettings;
+pub const SubAsset = @import("types/MetaFile.zig").SubAsset;
+const import_settings_types = @import("types/ImportSettings.zig");
+pub const ImportSettings = import_settings_types.ImportSettings;
+pub const ImageImportSettings = import_settings_types.ImageImportSettings;
+pub const ModelImportSettings = import_settings_types.ModelImportSettings;
+pub const TextureType = import_settings_types.TextureType;
+pub const ColorSpace = import_settings_types.ColorSpace;
+pub const TextureCompression = import_settings_types.TextureCompression;
+pub const ImageFilter = import_settings_types.ImageFilter;
+pub const ImageWrap = import_settings_types.ImageWrap;
 
 /// Centralised asset index — single source of truth for all project assets.
 pub const AssetDatabase = @import("AssetDatabase.zig").AssetDatabase;

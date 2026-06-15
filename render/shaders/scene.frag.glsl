@@ -91,6 +91,14 @@ vec3 fresnelSchlick(float ct, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
 }
 
+// Roughness-aware Fresnel for the ambient term, so metals (which have no diffuse)
+// still pick up an ambient specular tint instead of rendering black in the
+// absence of an environment/IBL probe.
+vec3 fresnelSchlickRoughness(float ct, vec3 F0, float rough) {
+    vec3 Fr = max(vec3(1.0 - rough), F0);
+    return F0 + (Fr - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
+}
+
 // Shadow visibility (1 = lit, 0 = fully shadowed) for the primary directional
 // light. Matches the clip-space conventions applied in shadow.vert.glsl.
 float shadowFactor(float ndl) {
@@ -193,7 +201,12 @@ void main() {
         Lo += (kD * albedo / PI + specular) * radiance * ndl * shadow;
     }
 
-    vec3 ambient = ubo.ambient_color.rgb * albedo * occlusion;
+    // Ambient: a diffuse term plus a Fresnel-weighted specular term. Without the
+    // specular part, metallic surfaces (kD ~ 0) would render black when no light
+    // hits them directly. F0 tints the ambient specular with the metal's colour.
+    vec3 F_amb = fresnelSchlickRoughness(ndv, F0, roughness);
+    vec3 kD_amb = (vec3(1.0) - F_amb) * (1.0 - metallic);
+    vec3 ambient = ubo.ambient_color.rgb * (kD_amb * albedo + F_amb) * occlusion;
     vec3 color = ambient + Lo * occlusion;
 
     vec3 emis = ubo.emissive.rgb * ubo.emissive.w;

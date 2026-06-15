@@ -2,6 +2,7 @@ const std = @import("std");
 const Guid = @import("guid").Guid;
 const AssetType = @import("types/AssetType.zig").AssetType;
 const asset_meta = @import("AssetMeta.zig");
+const asset_cache = @import("AssetCache.zig");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,56 @@ pub const AssetDatabase = struct {
     pub fn scan(self: *AssetDatabase, io: std.Io, assets_path: []const u8) void {
         self.clearEntries();
         self.scanDir(io, assets_path);
+        // Index any already-generated sub-assets (materials/textures cooked from
+        // models) so they resolve before the next import runs.
+        const project_path = std.fs.path.dirname(assets_path) orelse ".";
+        self.registerDerived(io, project_path);
+    }
+
+    /// Index derived sub-assets recorded in source `.meta` manifests as virtual
+    /// entries whose path points at their cooked cache artifact. Idempotent —
+    /// already-registered GUIDs are skipped — so it is safe to call after both
+    /// `scan` and an import pass.
+    pub fn registerDerived(self: *AssetDatabase, io: std.Io, project_path: []const u8) void {
+        // Snapshot source paths first: inserting may rehash and invalidate the
+        // iterator and its value pointers.
+        var paths: std.ArrayList([]const u8) = .empty;
+        defer {
+            for (paths.items) |p| self.allocator.free(p);
+            paths.deinit(self.allocator);
+        }
+        {
+            var it = self.by_guid.valueIterator();
+            while (it.next()) |info| {
+                const dup = self.allocator.dupe(u8, info.path) catch continue;
+                paths.append(self.allocator, dup) catch self.allocator.free(dup);
+            }
+        }
+
+        // Parse metas in a scratch arena — only the GUID/type (values) and the
+        // duped artifact path are kept; the rest is freed each iteration.
+        var scratch = std.heap.ArenaAllocator.init(self.allocator);
+        defer scratch.deinit();
+
+        var art_buf: [1024]u8 = undefined;
+        for (paths.items) |path| {
+            _ = scratch.reset(.retain_capacity);
+            const meta = asset_meta.readMeta(io, scratch.allocator(), path);
+            for (meta.sub_assets) |sub| {
+                if (sub.guid.isNil() or self.by_guid.contains(sub.guid)) continue;
+                const art = asset_cache.artifactPath(project_path, sub.guid, sub.asset_type, &art_buf) orelse continue;
+                const owned = self.allocator.dupe(u8, art) catch continue;
+                self.by_guid.put(sub.guid, .{
+                    .guid = sub.guid,
+                    .path = owned,
+                    .asset_type = sub.asset_type,
+                }) catch {
+                    self.allocator.free(owned);
+                    continue;
+                };
+                self.by_path.put(owned, sub.guid) catch {};
+            }
+        }
     }
 
     fn scanDir(self: *AssetDatabase, io: std.Io, dir_path: []const u8) void {
@@ -112,6 +163,12 @@ pub const AssetDatabase = struct {
         if (meta.guid.isNil()) return;
 
         const owned_path = self.allocator.dupe(u8, asset_path) catch return;
+        // Free the previous path if this GUID is already indexed (e.g. two assets
+        // mistakenly share a GUID) so the old allocation isn't leaked.
+        if (self.by_guid.fetchRemove(meta.guid)) |old| {
+            _ = self.by_path.remove(old.value.path);
+            self.allocator.free(old.value.path);
+        }
         self.by_guid.put(meta.guid, .{
             .guid = meta.guid,
             .path = owned_path,

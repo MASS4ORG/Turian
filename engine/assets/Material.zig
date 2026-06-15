@@ -1,5 +1,5 @@
 //! Material asset — a collection of shader parameter values and resource
-//! bindings, serialized to a `.material` file as ZON (same on-disk family as
+//! bindings, serialized to a `.material` file as JSON (same on-disk family as
 //! scenes).
 //!
 //! A material references a shader by GUID and stores values for the parameters
@@ -16,6 +16,7 @@
 //! caller (e.g. the editor, pointing slices at its own buffers) must NOT be
 //! passed to `deinit`; just serialize them with `save`/`serialize`.
 const std = @import("std");
+const serde = @import("serde");
 const shader = @import("Shader.zig");
 
 /// A material asset.
@@ -106,13 +107,16 @@ pub const Material = struct {
 
     // ── Load ───────────────────────────────────────────────────────────────
 
-    /// Parse a material from in-memory `.material` (ZON) bytes. The returned
+    /// Parse a material from in-memory `.material` (JSON) bytes. The returned
     /// value owns its slices; free with `deinit`. `bytes` need not be
     /// NUL-terminated.
     pub fn loadFromBytes(allocator: std.mem.Allocator, bytes: []const u8) !Material {
-        const z = try allocator.dupeZ(u8, bytes);
-        defer allocator.free(z);
-        var mat = try std.zon.parse.fromSliceAlloc(Material, allocator, z, null, .{});
+        var mat = try serde.json.fromSlice(Material, allocator, bytes);
+        // Absent fields keep their compile-time defaults. `shader` then aliases
+        // the `pbr_guid` literal, which `deinit` must not free — normalise it to
+        // an owned copy so freeing is uniform.
+        if (mat.shader.ptr == shader.pbr_guid.ptr)
+            mat.shader = try allocator.dupe(u8, mat.shader);
         migrate(&mat);
         return mat;
     }
@@ -130,15 +134,26 @@ pub const Material = struct {
     }
 
     /// Free slices owned by a material produced via `load`/`loadFromBytes`.
+    /// Must not be called on a material assembled by a caller (e.g. the editor),
+    /// whose slices point at caller-owned buffers.
     pub fn deinit(self: Material, allocator: std.mem.Allocator) void {
-        std.zon.parse.free(allocator, self);
+        allocator.free(self.shader);
+        for (self.scalars) |p| allocator.free(p.name);
+        if (self.scalars.len != 0) allocator.free(self.scalars);
+        for (self.vectors) |p| allocator.free(p.name);
+        if (self.vectors.len != 0) allocator.free(self.vectors);
+        for (self.textures) |p| {
+            allocator.free(p.name);
+            allocator.free(p.texture);
+        }
+        if (self.textures.len != 0) allocator.free(self.textures);
     }
 
     // ── Save ───────────────────────────────────────────────────────────────
 
-    /// Serialize this material as ZON into `writer`.
+    /// Serialize this material as pretty-printed JSON into `writer`.
     pub fn serialize(self: Material, writer: *std.Io.Writer) !void {
-        try std.zon.stringify.serialize(self, .{}, writer);
+        try serde.json.toWriterWith(writer, self, .{ .pretty = true });
     }
 
     /// Write this material to `path` as a `.material` ZON file.
@@ -398,7 +413,7 @@ test "edited material round-trips values and references" {
 
 test "missing parameters fall back to provided defaults" {
     const a = std.testing.allocator;
-    const empty = ".{}"; // empty material literal — all fields defaulted
+    const empty = "{}"; // empty JSON object — all fields defaulted
     var mat = try Material.loadFromBytes(a, empty);
     defer mat.deinit(a);
     try std.testing.expectEqual(@as(f32, 1.5), mat.scalar("absent", 1.5));
