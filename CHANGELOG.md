@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.4.0] - 2026-06-16
+
+### Features
+- feat(studio): editor UX cleanup — inspector, asset browser, rename, play controls #44
+
 ## [1.3.0] - 2026-06-15
 
 ### Features
