@@ -5,6 +5,7 @@ const EditorState = @import("EditorState.zig");
 const Window = @import("Window.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
+const AssetWatcher = @import("AssetWatcher.zig");
 const build_options = @import("turian_build_options");
 
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
@@ -128,6 +129,13 @@ pub fn main(main_init: std.process.Init) !void {
                     quit = true;
                 }
             }
+        }
+
+        // Auto-detect external asset changes (replaces the manual Refresh
+        // button): poll the assets tree and hot-reload when it changes.
+        if (AssetWatcher.poll(dvui.io, nstime)) {
+            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+            dvui.refresh(null, @src(), null);
         }
 
         if (!quit and !Window.frame()) quit = true;

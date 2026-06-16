@@ -36,7 +36,92 @@
           "user_script": {
             "type_name": "FreeflyCamera",
             "source_file": "assets/FreeflyCamera.zig",
-            "fields": []
+            "fields": [
+              {
+                "name": "move_speed",
+                "kind": "f32",
+                "as_f32": 6,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "look_sensitivity",
+                "kind": "f32",
+                "as_f32": 0.15,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "look_stick_speed",
+                "kind": "f32",
+                "as_f32": 140,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "boost_multiplier",
+                "kind": "f32",
+                "as_f32": 3,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              }
+            ]
           }
         }
       ]
@@ -409,7 +494,7 @@
       ]
     },
     {
-      "name": "Remote Cube (copy)",
+      "name": "Remote Cube 2",
       "guid": "fc611df5-89d2-4326-9eb9-ff600bbdd1fd",
       "parent": -1,
       "active": true,

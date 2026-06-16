@@ -4,6 +4,7 @@ const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const Tasks = @import("Tasks.zig");
+const PlayMode = @import("PlayMode.zig");
 const build_options = @import("turian_build_options");
 
 const AboutInfo = struct {
@@ -135,6 +136,12 @@ pub fn draw(should_quit: *bool) void {
         }
     }
 
+    // Centered Play transport (like most engines): spacers on both sides push
+    // the play controls to the middle of the menu bar.
+    _ = dvui.spacer(@src(), .{ .expand = .horizontal });
+    drawPlayControls();
+    _ = dvui.spacer(@src(), .{ .expand = .horizontal, .id_extra = 1 });
+
     if (dvui.menuItemLabel(@src(), "Help", .{ .submenu = true }, .{})) |r| {
         var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
@@ -190,7 +197,7 @@ pub fn draw(should_quit: *bool) void {
                                 ProjectOps.openProject(path);
                                 EditorState.clearScene();
                             } else if (!exists) {
-                                editor.recent_projects.remove(&EditorState.settings, arena, path);
+                                editor.recent_projects.remove(&EditorState.settings, dvui.io, arena, path);
                                 EditorState.settings.save(dvui.io);
                             }
                         }
@@ -205,6 +212,42 @@ pub fn draw(should_quit: *bool) void {
                 }
             }
         }
+    }
+}
+
+/// Play transport embedded in the menu bar: Play / Pause / Resume / Step /
+/// Stop, plus "Play First Scene" (runs the project's configured first scene
+/// regardless of which scene is open), and a live FPS readout while running.
+fn drawPlayControls() void {
+    switch (PlayMode.state()) {
+        .edit => {
+            if (dvui.button(@src(), "Play", .{}, .{ .style = .highlight, .gravity_y = 0.5 }))
+                PlayMode.play(dvui.io);
+            if (dvui.button(@src(), "Play First Scene", .{}, .{ .gravity_y = 0.5 }))
+                PlayMode.playFirstScene(dvui.io);
+        },
+        .playing => {
+            if (dvui.button(@src(), "Pause", .{}, .{ .gravity_y = 0.5 }))
+                PlayMode.pause();
+            if (dvui.button(@src(), "Stop", .{}, .{ .gravity_y = 0.5 }))
+                PlayMode.stop();
+        },
+        .paused => {
+            if (dvui.button(@src(), "Resume", .{}, .{ .style = .highlight, .gravity_y = 0.5 }))
+                PlayMode.play(dvui.io);
+            if (dvui.button(@src(), "Step", .{}, .{ .gravity_y = 0.5 }))
+                PlayMode.step();
+            if (dvui.button(@src(), "Stop", .{}, .{ .gravity_y = 0.5, .id_extra = 1 }))
+                PlayMode.stop();
+        },
+    }
+
+    if (PlayMode.state() != .edit) {
+        dvui.label(@src(), "{d:.0} FPS", .{PlayMode.fps()}, .{
+            .gravity_y = 0.5,
+            .padding = .{ .x = 8, .y = 2, .w = 8, .h = 2 },
+            .font = .theme(.heading),
+        });
     }
 }
 

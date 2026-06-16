@@ -5,7 +5,14 @@ pub const MAX = 10;
 pub const KEY = "editor.recent_projects";
 
 /// Add or move `path` to the front of the recent list, trimming to MAX entries.
-pub fn push(settings: *Settings, allocator: std.mem.Allocator, path: []const u8) void {
+///
+/// `path` is canonicalised to its absolute real path before storing/comparing,
+/// so opening the same directory via different spellings (e.g. `../sample-01`
+/// and `/dev/sample-01`) does not create duplicate entries.
+pub fn push(settings: *Settings, io: std.Io, allocator: std.mem.Allocator, path: []const u8) void {
+    var abs_buf: [1024]u8 = undefined;
+    const canon = canonical(io, path, &abs_buf);
+
     var buf: [MAX][]const u8 = undefined;
     var count: usize = 0;
     readPaths(settings, allocator, &buf, &count);
@@ -13,19 +20,23 @@ pub fn push(settings: *Settings, allocator: std.mem.Allocator, path: []const u8)
 
     var out: [MAX][]const u8 = undefined;
     var n: usize = 0;
-    out[n] = path;
+    out[n] = canon;
     n += 1;
+    var entry_buf: [1024]u8 = undefined;
     for (buf[0..count]) |p| {
         if (n >= MAX) break;
-        if (std.mem.eql(u8, p, path)) continue;
+        if (std.mem.eql(u8, canonical(io, p, &entry_buf), canon)) continue;
         out[n] = p;
         n += 1;
     }
     writePaths(settings, allocator, out[0..n]);
 }
 
-/// Remove the entry whose path exactly matches `path`.
-pub fn remove(settings: *Settings, allocator: std.mem.Allocator, path: []const u8) void {
+/// Remove the entry whose canonical path matches `path`.
+pub fn remove(settings: *Settings, io: std.Io, allocator: std.mem.Allocator, path: []const u8) void {
+    var abs_buf: [1024]u8 = undefined;
+    const canon = canonical(io, path, &abs_buf);
+
     var buf: [MAX][]const u8 = undefined;
     var count: usize = 0;
     readPaths(settings, allocator, &buf, &count);
@@ -33,12 +44,22 @@ pub fn remove(settings: *Settings, allocator: std.mem.Allocator, path: []const u
 
     var out: [MAX][]const u8 = undefined;
     var n: usize = 0;
+    var entry_buf: [1024]u8 = undefined;
     for (buf[0..count]) |p| {
-        if (std.mem.eql(u8, p, path)) continue;
+        if (std.mem.eql(u8, canonical(io, p, &entry_buf), canon)) continue;
         out[n] = p;
         n += 1;
     }
     writePaths(settings, allocator, out[0..n]);
+}
+
+/// Resolve `path` to its canonical absolute path. Falls back to `path`
+/// unchanged if it cannot be opened (e.g. the directory no longer exists).
+fn canonical(io: std.Io, path: []const u8, buf: []u8) []const u8 {
+    var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return path;
+    defer dir.close(io);
+    const n = dir.realPath(io, buf) catch return path;
+    return buf[0..n];
 }
 
 /// Returns an allocated slice of paths, most recent first.

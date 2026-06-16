@@ -34,11 +34,11 @@ pub fn draw() void {
         }
     }
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     if (EditorState.object_count == 0) {
-        dvui.label(@src(), "No objects in scene.", .{}, .{ .gravity_x = 0.5, .padding = .all(12) });
+        // Blank state is cleaner than a placeholder message.
         if (EditorState.isRenaming()) EditorState.cancelRename();
         return;
     }
@@ -73,7 +73,7 @@ fn handleKeyboard(root_wd: *dvui.WidgetData) void {
         if (e.handled) continue;
         if (e.evt != .key) continue;
         const ke = e.evt.key;
-        if (ke.action != .down) continue;
+        if (ke.action != .down and ke.action != .repeat) continue;
 
         if (EditorState.isRenaming()) {
             if (ke.code == .escape) {
@@ -84,7 +84,15 @@ fn handleKeyboard(root_wd: *dvui.WidgetData) void {
             return;
         }
 
-        if (ke.code == .f2 and !EditorState.isRenaming()) {
+        if (ke.code == .up or ke.code == .down) {
+            e.handle(@src(), root_wd);
+            navigateSelection(ke.code == .up);
+            return;
+        }
+
+        if (ke.action != .down) continue;
+
+        if (ke.code == .f2) {
             if (EditorState.selected_object) |sel| {
                 e.handle(@src(), root_wd);
                 EditorState.startRenameObject(sel);
@@ -100,6 +108,44 @@ fn handleKeyboard(root_wd: *dvui.WidgetData) void {
             }
         }
     }
+}
+
+fn buildVisualOrder(out: []usize, count: *usize, parent: i32) void {
+    for (EditorState.objects[0..EditorState.object_count], 0..) |*obj, i| {
+        if (obj.parent == parent) {
+            if (count.* < out.len) {
+                out[count.*] = i;
+                count.* += 1;
+            }
+            buildVisualOrder(out, count, @intCast(i));
+        }
+    }
+}
+
+fn navigateSelection(go_up: bool) void {
+    var visual: [EditorState.MAX_OBJECTS]usize = undefined;
+    var count: usize = 0;
+    buildVisualOrder(&visual, &count, -1);
+    if (count == 0) return;
+
+    const new_idx = blk: {
+        if (EditorState.selected_object) |sel| {
+            for (visual[0..count], 0..) |v, i| {
+                if (v == sel) {
+                    if (go_up) {
+                        break :blk visual[if (i > 0) i - 1 else 0];
+                    } else {
+                        break :blk visual[if (i + 1 < count) i + 1 else count - 1];
+                    }
+                }
+            }
+        }
+        break :blk visual[0];
+    };
+
+    EditorState.clearSelectedObjects();
+    EditorState.selected_object = new_idx;
+    EditorState.selectObject(new_idx);
 }
 
 fn handleDeleteDialog() void {
@@ -152,6 +198,9 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
 
     const is_selected = EditorState.selected_object != null and EditorState.selected_object.? == idx;
     const is_multi_selected = EditorState.isObjectSelected(idx);
+    const is_renaming_this = EditorState.isRenaming() and
+        EditorState.g_rename.target == .scene_object and
+        EditorState.g_rename.idx == idx;
 
     const branch = tree.branch(@src(), .{ .expanded = depth == 0 }, .{
         .id_extra = idx,
@@ -168,7 +217,7 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     if (branch.insertBefore()) insert_before.* = idx;
     if (branch.removed()) had_removed.* = true;
 
-    if (branch.button.clicked()) {
+    if (branch.button.clicked() and !is_renaming_this) {
         const now = dvui.frameTimeNS();
 
         var ctrl_held = false;
@@ -218,7 +267,7 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
         .id_extra = idx,
     });
 
-    if (EditorState.isRenaming() and EditorState.g_rename.target == .scene_object and EditorState.g_rename.idx == idx) {
+    if (is_renaming_this) {
         var te = dvui.textEntry(@src(), .{
             .text = .{ .buffer = EditorState.g_rename.buf[0..] },
             .placeholder = "Name",
@@ -229,6 +278,12 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
             .min_size_content = .{ .w = 100, .h = 22 },
         });
         defer te.deinit();
+
+        // Grab keyboard focus on the first frame so the field is editable.
+        if (EditorState.g_rename.just_started) {
+            dvui.focusWidget(te.data().id, null, null);
+            EditorState.g_rename.just_started = false;
+        }
 
         if (te.enter_pressed) {
             const text = te.textGet();

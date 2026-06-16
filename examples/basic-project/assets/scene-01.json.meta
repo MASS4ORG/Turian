@@ -2,10 +2,12 @@
   "guid": "5ffea51a-788f-40cf-9f75-bcab9e439034",
   "asset_type": "scene",
   "importer_version": 1,
-  "source_hash": 16687600719676343742,
+  "source_hash": 17421243408082987377,
   "import_settings": "scene",
   "source_deps": [
   ],
   "artifact_deps": [
+  ],
+  "sub_assets": [
   ]
 }

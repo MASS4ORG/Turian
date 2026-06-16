@@ -1,18 +1,20 @@
 const std = @import("std");
 const dvui = @import("dvui");
 const EditorState = @import("EditorState.zig");
+const AssetWatcher = @import("AssetWatcher.zig");
 const editor = @import("editor");
 
 /// Open an existing project at the given filesystem path.
 pub fn openProject(path: []const u8) void {
     EditorState.setProjectPath(path);
+    AssetWatcher.reset();
     const result = editor.project_ops.openProject(dvui.io, dvui.currentWindow().arena(), path);
     EditorState.current_project = result.project;
     EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
 
     if (EditorState.settingsReady()) {
         const arena = dvui.currentWindow().arena();
-        editor.recent_projects.push(&EditorState.settings, arena, path);
+        editor.recent_projects.push(&EditorState.settings, dvui.io, arena, path);
         EditorState.settings.save(dvui.io);
     }
 }

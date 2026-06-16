@@ -608,10 +608,16 @@ pub const RenameTarget = enum { none, scene_object, asset };
 pub const RenameState = struct {
     target: RenameTarget = .none,
     idx: usize = 0,
-    buf: [NAME_MAX]u8 = undefined,
+    /// Editable text buffer. Sized larger than NAME_MAX so the inline field can
+    /// hold full file names (with extension) and let the user type past the
+    /// original length without clamping.
+    buf: [256]u8 = undefined,
     len: usize = 0,
     asset_path_buf: [1024]u8 = undefined,
     asset_path_len: usize = 0,
+    /// Set when a rename begins so the widget can grab keyboard focus on the
+    /// first frame it appears (otherwise the inline field is not editable).
+    just_started: bool = false,
 };
 
 pub var g_rename: RenameState = .{};
@@ -620,7 +626,7 @@ pub var g_rename: RenameState = .{};
 pub fn startRenameObject(idx: usize) void {
     if (idx >= object_count) return;
     const name = objects[idx].nameSlice();
-    g_rename = .{ .target = .scene_object, .idx = idx };
+    g_rename = .{ .target = .scene_object, .idx = idx, .just_started = true };
     const n = @min(name.len, g_rename.buf.len);
     @memcpy(g_rename.buf[0..n], name[0..n]);
     if (n < g_rename.buf.len) g_rename.buf[n] = 0;
@@ -633,7 +639,7 @@ pub fn startRenameAsset(path: []const u8) void {
         path[sep + 1 ..]
     else
         path;
-    g_rename = .{ .target = .asset, .idx = 0 };
+    g_rename = .{ .target = .asset, .idx = 0, .just_started = true };
     const n = @min(file_name.len, g_rename.buf.len);
     @memcpy(g_rename.buf[0..n], file_name[0..n]);
     if (n < g_rename.buf.len) g_rename.buf[n] = 0;
@@ -905,6 +911,29 @@ pub fn clearSelectedAsset() void {
     selected_asset_path_len = 0;
 }
 
+// ── Reveal-in-browser request ────────────────────────────────────────────────
+// Set by e.g. double-clicking an asset reference in the inspector. The asset
+// browser consumes it on its next frame: navigates to the asset's folder and
+// highlights it. One-shot — the browser clears it after handling.
+var reveal_asset_buf: [1024]u8 = undefined;
+var reveal_asset_len: usize = 0;
+pub var reveal_asset_request: ?[]const u8 = null;
+
+pub fn revealAsset(path: []const u8) void {
+    if (path.len == 0) return;
+    selectAsset(path);
+    const len = @min(path.len, reveal_asset_buf.len);
+    @memcpy(reveal_asset_buf[0..len], path[0..len]);
+    reveal_asset_len = len;
+    reveal_asset_request = reveal_asset_buf[0..len];
+}
+
+pub fn takeRevealRequest() ?[]const u8 {
+    const r = reveal_asset_request;
+    reveal_asset_request = null;
+    return r;
+}
+
 // ── Drag state ──────────────────────────────────────────────────────────────
 
 pub const DragKind = enum { none, game_object, asset };
@@ -1138,6 +1167,47 @@ pub fn resolveAssetGuid(guid_str: []const u8) ?[]const u8 {
     if (guid_str.len == 0 or !assetDbReady()) return null;
     const guid = editor.Guid.parse(guid_str) catch return null;
     return if (asset_db.findByGuid(guid)) |info| info.path else null;
+}
+
+/// Resolve the project's "first scene": the scene referenced by
+/// `ProjectSettings.first_scene`, falling back to `scene-01.json` or the first
+/// scene asset in the project. Returns the asset path (owned by `asset_db`, so
+/// it outlives `arena`) or null if no scene exists. Mirrors the build-time
+/// boot-scene resolution in `editor/GameBuild.zig`.
+pub fn firstScenePath(io: std.Io, arena: std.mem.Allocator) ?[]const u8 {
+    if (!assetDbReady()) return null;
+
+    var settings_it = asset_db.enumerate(.project_settings);
+    if (settings_it.next()) |info| {
+        if (readFileArena(io, arena, info.path)) |bytes| {
+            if (engine.ProjectSettings.loadFromBytes(arena, bytes)) |ps| {
+                if (ps.first_scene.len > 0) {
+                    if (editor.Guid.parse(ps.first_scene)) |gid| {
+                        if (asset_db.findByGuid(gid)) |sinfo| {
+                            if (sinfo.asset_type == .scene) return sinfo.path;
+                        }
+                    } else |_| {}
+                }
+            } else |_| {}
+        }
+    }
+
+    // Fallback: scene-01.json if present, else the first scene asset.
+    var fallback: ?[]const u8 = null;
+    var scenes = asset_db.enumerate(.scene);
+    while (scenes.next()) |sinfo| {
+        if (std.mem.endsWith(u8, sinfo.path, "scene-01.json")) return sinfo.path;
+        if (fallback == null) fallback = sinfo.path;
+    }
+    return fallback;
+}
+
+fn readFileArena(io: std.Io, arena: std.mem.Allocator, path: []const u8) ?[]u8 {
+    var file = std.Io.Dir.cwd().openFile(io, path, .{}) catch return null;
+    defer file.close(io);
+    var buf: [4096]u8 = undefined;
+    var reader = file.reader(io, &buf);
+    return reader.interface.allocRemaining(arena, .unlimited) catch null;
 }
 
 /// Resolve the GUID of the material a model mesh should use by default — the

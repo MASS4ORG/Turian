@@ -81,7 +81,12 @@ pub fn fps() f32 {
 
 // ── Public controls ────────────────────────────────────────────────────────
 
-/// Enter Play (from edit) or resume (from paused).
+/// Buffer for the "Play First Scene" nodes (loaded independently of the
+/// currently-edited scene).
+var g_first_scene_nodes: [EditorState.objects.len]engine.SceneNode = undefined;
+
+/// Enter Play (from edit) or resume (from paused), using the currently-edited
+/// scene.
 pub fn play(io: std.Io) void {
     switch (g_state) {
         .playing => return,
@@ -92,10 +97,44 @@ pub fn play(io: std.Io) void {
         },
         .edit => {},
     }
+    _ = startFromNodes(io, EditorState.objects[0..EditorState.object_count]);
+}
 
+/// Enter Play running the project's *first scene* (from ProjectSettings),
+/// independent of whichever scene is currently open in the editor. Useful to
+/// test the real game entry point without switching scenes. The editor's own
+/// scene is untouched and shown again on Stop.
+pub fn playFirstScene(io: std.Io) void {
+    switch (g_state) {
+        .playing, .paused => return,
+        .edit => {},
+    }
+
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const scene_path = EditorState.firstScenePath(io, arena.allocator()) orelse {
+        dvui.toast(@src(), .{ .message = "No first scene found. Set one in Project Settings." });
+        return;
+    };
+
+    var count: usize = 0;
+    if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, &g_first_scene_nodes, &count)) {
+        dvui.toast(@src(), .{ .message = "Failed to load the first scene." });
+        return;
+    }
+
+    _ = startFromNodes(io, g_first_scene_nodes[0..count]);
+}
+
+/// Build (if needed), start the play library on `nodes`, and enter the playing
+/// state. The edit-time editor scene is always snapshotted so Stop restores it
+/// verbatim — so playing an off-screen scene (Play First Scene) never disturbs
+/// what the editor is showing.
+fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     const project = EditorState.project_path orelse {
         dvui.toast(@src(), .{ .message = "Open a project before entering Play mode." });
-        return;
+        return false;
     };
 
     // (Re)build the play library if the scripts changed since last build.
@@ -105,7 +144,7 @@ pub fn play(io: std.Io) void {
         dvui.toast(@src(), .{ .message = "Compiling play library..." });
         if (!loadLibrary(io, project)) {
             dvui.toast(@src(), .{ .message = "Play build failed — see console." });
-            return;
+            return false;
         }
         g_lib_hash = hash;
     }
@@ -114,12 +153,12 @@ pub fn play(io: std.Io) void {
     g_snapshot_count = EditorState.object_count;
     @memcpy(g_snapshot[0..g_snapshot_count], EditorState.objects[0..g_snapshot_count]);
 
-    // Hand the library a copy of the current scene nodes directly (no JSON):
-    // studio and library share the same SceneNode layout, and the library
-    // memcpy's its own copy, so play-time mutations never touch EditorState.
-    if (!g_fns.start(&EditorState.objects, EditorState.object_count)) {
+    // Hand the library a copy of the nodes directly (no JSON): studio and
+    // library share the same SceneNode layout, and the library memcpy's its own
+    // copy, so play-time mutations never touch EditorState.
+    if (!g_fns.start(nodes.ptr, nodes.len)) {
         dvui.toast(@src(), .{ .message = "Play start failed." });
-        return;
+        return false;
     }
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -133,6 +172,7 @@ pub fn play(io: std.Io) void {
     g_frame = 0;
     g_fps = 0;
     g_step_once = false;
+    return true;
 }
 
 /// Pause a running simulation (no effect from edit/paused).

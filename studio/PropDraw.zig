@@ -3,27 +3,21 @@ const dvui = @import("dvui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
+const PropDrawMath = @import("PropDrawMath.zig");
 
 const FieldHint = engine.FieldHint;
 const math = engine.math;
 
-// ─── Axis colour palette ──────────────────────────────────────────────────────
-const col_x = dvui.Color{ .r = 210, .g = 60, .b = 60 };
-const col_y = dvui.Color{ .r = 60, .g = 180, .b = 60 };
-const col_z = dvui.Color{ .r = 60, .g = 100, .b = 210 };
-const col_w = dvui.Color{ .r = 180, .g = 100, .b = 210 };
-
-// ─── DrawCtx ──────────────────────────────────────────────────────────────────
-
-/// Threaded context for the recursive property drawer.
-/// Do not persist across frames — create fresh each draw call.
-pub const DrawCtx = struct {
-    al: *dvui.Alignment,
-    depth: u32 = 0,
-    read_only: bool = false,
-    /// Allocator for slice field mutations (add/remove). Null disables those controls.
-    allocator: ?std.mem.Allocator = null,
-};
+// ─── Re-exports from PropDrawMath ─────────────────────────────────────────────
+pub const DrawCtx = PropDrawMath.DrawCtx;
+pub const drawVec3Row = PropDrawMath.drawVec3Row;
+pub const drawVec2Row = PropDrawMath.drawVec2Row;
+pub const drawVec4Row = PropDrawMath.drawVec4Row;
+const col_x = PropDrawMath.col_x;
+const col_y = PropDrawMath.col_y;
+const col_z = PropDrawMath.col_z;
+const col_w = PropDrawMath.col_w;
+const tooltipIfAny = PropDrawMath.tooltipIfAny;
 
 // ─── Public entry points ──────────────────────────────────────────────────────
 
@@ -85,77 +79,15 @@ pub fn drawValue(
     };
 }
 
-// ─── Legacy helpers (kept for Inspector.drawScriptField) ──────────────────────
-
-/// Draw a row of X / Y / Z number inputs for a Vector3 value.
-/// Returns true if any component changed.
-pub fn drawVec3Row(src: std.builtin.SourceLocation, v: *engine.Vector3) bool {
-    var changed = false;
-    var row = dvui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
-    defer row.deinit();
-
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = dvui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rx.changed) changed = true;
-
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = dvui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (ry.changed) changed = true;
-
-    dvui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rz = dvui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rz.changed) changed = true;
-
-    return changed;
-}
-
-/// Draw a row of X / Y number inputs for a Vector2 value.
-/// Returns true if any component changed.
-pub fn drawVec2Row(src: std.builtin.SourceLocation, v: *engine.Vector2) bool {
-    var changed = false;
-    var row = dvui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
-    defer row.deinit();
-
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = dvui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rx.changed) changed = true;
-
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = dvui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (ry.changed) changed = true;
-
-    return changed;
-}
-
-/// Draw a row of X / Y / Z / W number inputs for a Vector4 value.
-/// Returns true if any component changed.
-pub fn drawVec4Row(src: std.builtin.SourceLocation, v: *engine.Vector4) bool {
-    var changed = false;
-    var row = dvui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
-    defer row.deinit();
-
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = dvui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rx.changed) changed = true;
-
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = dvui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (ry.changed) changed = true;
-
-    dvui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rz = dvui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rz.changed) changed = true;
-
-    dvui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rw = dvui.textEntryNumber(@src(), f32, .{ .value = &v.w }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
-    if (rw.changed) changed = true;
-
-    return changed;
-}
+// drawVec3Row / drawVec2Row / drawVec4Row are re-exported from PropDrawMath above.
 
 /// Drop-zone that accepts dragged asset / game-object references.
 /// Returns the accepted GUID string if something was dropped, null otherwise.
 var s_accepted_guid_buf: [36]u8 = undefined;
+
+// Double-click tracking for asset-ref drop zones (reveal in browser).
+var s_last_ref_click_ns: i128 = 0;
+var s_last_ref_click_id: dvui.Id = .zero;
 
 pub fn drawRefDropZone(
     src: std.builtin.SourceLocation,
@@ -185,6 +117,21 @@ pub fn drawRefDropZone(
         if (!dvui.eventMatchSimple(e, drop_box.data())) continue;
         switch (e.evt) {
             .mouse => |me| {
+                // Double-click an asset reference to reveal it in the asset
+                // browser (navigate to its folder + highlight it).
+                if (kind == .asset_ref and me.action == .press and me.button == .left) {
+                    const now = dvui.frameTimeNS();
+                    const dbl = s_last_ref_click_id == drop_box.data().id and
+                        now - s_last_ref_click_ns < 500 * std.time.ns_per_ms;
+                    s_last_ref_click_id = drop_box.data().id;
+                    s_last_ref_click_ns = now;
+                    if (dbl) {
+                        if (EditorState.resolveAssetGuid(current_guid)) |path| {
+                            e.handle(@src(), drop_box.data());
+                            EditorState.revealAsset(path);
+                        }
+                    }
+                }
                 if (me.action == .release and me.button == .left and drag_compatible) {
                     e.handle(@src(), drop_box.data());
                     accepted = switch (EditorState.drag_kind) {
@@ -303,17 +250,17 @@ fn drawStructValue(
     ctx: *DrawCtx,
     id: usize,
 ) bool {
-    // Known engine math types matched by identity.
-    if (comptime T == math.Vector2) return drawVec2(label, ptr, hint, ctx, id);
-    if (comptime T == math.Vector3) return drawVec3(label, ptr, hint, ctx, id);
+    // Known engine math types matched by identity — delegated to PropDrawMath.
+    if (comptime T == math.Vector2) return PropDrawMath.drawVec2(label, ptr, hint, ctx, id);
+    if (comptime T == math.Vector3) return PropDrawMath.drawVec3(label, ptr, hint, ctx, id);
     if (comptime T == math.Vector4) {
-        return if (hint.is_color) drawColorVec4(label, ptr, hint, ctx, id) else drawVec4(label, ptr, hint, ctx, id);
+        return if (hint.is_color) PropDrawMath.drawColorVec4(label, ptr, hint, ctx, id) else PropDrawMath.drawVec4(label, ptr, hint, ctx, id);
     }
-    if (comptime T == math.Vector2i) return drawVec2i(label, ptr, hint, ctx, id);
-    if (comptime T == math.Vector3i) return drawVec3i(label, ptr, hint, ctx, id);
-    if (comptime T == math.Vector4i) return drawVec4i(label, ptr, hint, ctx, id);
-    if (comptime T == math.Quaternion) return drawQuaternion(label, ptr, hint, ctx, id);
-    if (comptime T == math.Matrix4) return drawMatrix4(label, ptr, hint, ctx, id);
+    if (comptime T == math.Vector2i) return PropDrawMath.drawVec2i(label, ptr, hint, ctx, id);
+    if (comptime T == math.Vector3i) return PropDrawMath.drawVec3i(label, ptr, hint, ctx, id);
+    if (comptime T == math.Vector4i) return PropDrawMath.drawVec4i(label, ptr, hint, ctx, id);
+    if (comptime T == math.Quaternion) return PropDrawMath.drawQuaternion(label, ptr, hint, ctx, id);
+    if (comptime T == math.Matrix4) return PropDrawMath.drawMatrix4(label, ptr, hint, ctx, id);
     if (comptime @hasDecl(T, "_turian_ref_kind")) return drawRef(T, label, ptr, hint, ctx, id);
     // Generic struct — recurse under a collapsible sub-group.
     return drawNestedStruct(T, label, ptr, hint, ctx, id);
@@ -735,286 +682,7 @@ fn drawNestedStruct(
     return false;
 }
 
-// ─── Math type drawers ────────────────────────────────────────────────────────
-
-fn drawVec2(label: []const u8, ptr: *math.Vector2, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d:.3}, {d:.3})", .{ ptr.x, ptr.y }, .{ .id_extra = id });
-        return false;
-    }
-    var changed = false;
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 + 1 }).changed) changed = true;
-    return changed;
-}
-
-fn drawVec3(label: []const u8, ptr: *math.Vector3, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d:.3}, {d:.3}, {d:.3})", .{ ptr.x, ptr.y, ptr.z }, .{ .id_extra = id });
-        return false;
-    }
-    return drawVec3Row(@src(), ptr);
-}
-
-fn drawVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d:.3}, {d:.3}, {d:.3}, {d:.3})", .{ ptr.x, ptr.y, ptr.z, ptr.w }, .{ .id_extra = id });
-        return false;
-    }
-    var changed = false;
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 }).changed) changed = true;
-    dvui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 }).changed) changed = true;
-    dvui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &ptr.w }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 }).changed) changed = true;
-    return changed;
-}
-
-fn drawColorVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    const ro = ctx.read_only or hint.read_only;
-    const r8: u8 = @intFromFloat(std.math.clamp(ptr.x, 0, 1) * 255);
-    const g8: u8 = @intFromFloat(std.math.clamp(ptr.y, 0, 1) * 255);
-    const b8: u8 = @intFromFloat(std.math.clamp(ptr.z, 0, 1) * 255);
-    const a8: u8 = @intFromFloat(std.math.clamp(ptr.w, 0, 1) * 255);
-    var swatch = dvui.box(@src(), .{}, .{
-        .min_size_content = .{ .w = 20, .h = 20 },
-        .background = true,
-        .color_fill = .fromColor(.{ .r = r8, .g = g8, .b = b8, .a = a8 }),
-        .border = .all(1),
-        .corner_radius = .all(2),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    swatch.deinit();
-    if (!ro) {
-        var changed = false;
-        dvui.label(@src(), "R", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-        if (dvui.sliderEntry(@src(), null, .{ .value = &ptr.x, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 })) changed = true;
-        dvui.label(@src(), "G", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-        if (dvui.sliderEntry(@src(), null, .{ .value = &ptr.y, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 })) changed = true;
-        dvui.label(@src(), "B", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-        if (dvui.sliderEntry(@src(), null, .{ .value = &ptr.z, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 })) changed = true;
-        dvui.label(@src(), "A", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-        if (dvui.sliderEntry(@src(), null, .{ .value = &ptr.w, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 })) changed = true;
-        return changed;
-    }
-    return false;
-}
-
-fn drawVec2i(label: []const u8, ptr: *math.Vector2i, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d}, {d})", .{ ptr.x, ptr.y }, .{ .id_extra = id });
-        return false;
-    }
-    var changed = false;
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 + 1 }).changed) changed = true;
-    return changed;
-}
-
-fn drawVec3i(label: []const u8, ptr: *math.Vector3i, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d}, {d}, {d})", .{ ptr.x, ptr.y, ptr.z }, .{ .id_extra = id });
-        return false;
-    }
-    var changed = false;
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 1 }).changed) changed = true;
-    dvui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 2 }).changed) changed = true;
-    return changed;
-}
-
-fn drawVec4i(label: []const u8, ptr: *math.Vector4i, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-    if (ctx.read_only or hint.read_only) {
-        dvui.label(@src(), "({d}, {d}, {d}, {d})", .{ ptr.x, ptr.y, ptr.z, ptr.w }, .{ .id_extra = id });
-        return false;
-    }
-    var changed = false;
-    dvui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 }).changed) changed = true;
-    dvui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 }).changed) changed = true;
-    dvui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), i32, .{ .value = &ptr.w }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 }).changed) changed = true;
-    return changed;
-}
-
-fn drawQuaternion(label: []const u8, ptr: *math.Quaternion, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-    tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer al_box.deinit();
-    ctx.al.record(row.data().id, al_box.data());
-
-    var euler = quatToEulerDeg(ptr.*);
-
-    const ro = ctx.read_only or hint.read_only;
-    if (ro) {
-        dvui.label(@src(), "P:{d:.1} Y:{d:.1} R:{d:.1}", .{ euler[0], euler[1], euler[2] }, .{ .id_extra = id });
-        return false;
-    }
-
-    // Persist euler angles per widget id to avoid losing precision on unchanged axes.
-    const eid = dvui.parentGet().extendId(@src(), id);
-    const stored = dvui.dataGet(null, eid, "euler", [3]f32);
-    // Only use stored euler if the underlying quaternion hasn't changed externally.
-    const stored_quat = dvui.dataGet(null, eid, "quat", math.Quaternion);
-    if (stored != null and stored_quat != null and std.meta.eql(stored_quat.?, ptr.*)) {
-        euler = stored.?;
-    }
-
-    var changed = false;
-    dvui.label(@src(), "P", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &euler[0] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 }).changed) changed = true;
-    dvui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &euler[1] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 1 }).changed) changed = true;
-    dvui.label(@src(), "R", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    if (dvui.textEntryNumber(@src(), f32, .{ .value = &euler[2] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 2 }).changed) changed = true;
-
-    if (changed) {
-        ptr.* = math.Quaternion.fromEuler(euler[0], euler[1], euler[2]);
-        dvui.dataSet(null, eid, "euler", euler);
-        dvui.dataSet(null, eid, "quat", ptr.*);
-    } else {
-        dvui.dataSet(null, eid, "euler", euler);
-        dvui.dataSet(null, eid, "quat", ptr.*);
-    }
-
-    return changed;
-}
-
-// ─── Matrix4 drawer (read-only) ───────────────────────────────────────────────
-
-fn drawMatrix4(label: []const u8, ptr: *math.Matrix4, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    _ = ctx;
-    _ = hint;
-    if (dvui.expander(@src(), label, .{ .default_expanded = false }, .{
-        .expand = .horizontal,
-        .padding = .all(2),
-        .id_extra = id,
-    })) {
-        var grid = dvui.box(@src(), .{}, .{
-            .expand = .horizontal,
-            .padding = .{ .x = 12, .y = 2 },
-            .id_extra = id,
-        });
-        defer grid.deinit();
-        // Column-major storage: m[col*4 + row]. Display in row-major visual order.
-        inline for (0..4) |row_i| {
-            var row_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
-                .expand = .horizontal,
-                .id_extra = row_i,
-            });
-            defer row_box.deinit();
-            inline for (0..4) |col_i| {
-                dvui.label(@src(), "{d:.3}", .{ptr.m[col_i * 4 + row_i]}, .{
-                    .expand = .horizontal,
-                    .gravity_x = 0.5,
-                    .id_extra = row_i * 4 + col_i,
-                });
-            }
-        }
-    }
-    return false;
-}
+// Math type drawers (drawVec2 … drawMatrix4) live in PropDrawMath.zig.
 
 // ─── Reference drawer ─────────────────────────────────────────────────────────
 
@@ -1250,24 +918,6 @@ fn castHintBound(comptime T: type, val: f64) T {
     };
 }
 
-fn quatToEulerDeg(q: math.Quaternion) [3]f32 {
-    const sinr = 2.0 * (q.w * q.x + q.y * q.z);
-    const cosr = 1.0 - 2.0 * (q.x * q.x + q.y * q.y);
-    const pitch = std.math.atan2(sinr, cosr) * (180.0 / std.math.pi);
-
-    const sinp = 2.0 * (q.w * q.y - q.z * q.x);
-    const yaw = if (@abs(sinp) >= 1.0)
-        std.math.copysign(@as(f32, 90.0), sinp)
-    else
-        std.math.asin(sinp) * (180.0 / std.math.pi);
-
-    const siny = 2.0 * (q.w * q.z + q.x * q.y);
-    const cosy = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
-    const roll = std.math.atan2(siny, cosy) * (180.0 / std.math.pi);
-
-    return .{ pitch, yaw, roll };
-}
-
 fn guidDisplayName(kind: engine.api.FieldType, guid_str: []const u8) []const u8 {
     if (guid_str.len == 0) return "(none)";
     const opt: ?[]const u8 = switch (kind) {
@@ -1280,15 +930,4 @@ fn guidDisplayName(kind: engine.api.FieldType, guid_str: []const u8) []const u8 
         resolved[sep + 1 ..]
     else
         resolved;
-}
-
-fn tooltipIfAny(
-    src: std.builtin.SourceLocation,
-    active_rect: dvui.Rect.Physical,
-    hint: FieldHint,
-    id: usize,
-) void {
-    if (hint.tooltip) |tip| {
-        dvui.tooltip(src, .{ .active_rect = active_rect }, "{s}", .{tip}, .{ .id_extra = id });
-    }
 }

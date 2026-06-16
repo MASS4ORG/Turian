@@ -33,9 +33,8 @@ pub fn draw() void {
     const sel = EditorState.selected_object orelse {
         if (EditorState.selected_asset_path) |asset_path| {
             drawAssetInspector(asset_path);
-            return;
         }
-        dvui.label(@src(), "No object selected.", .{}, .{ .gravity_x = 0.5, .padding = .all(12) });
+        // Empty/blank state when nothing is selected (cleaner than a message).
         return;
     };
 
@@ -46,7 +45,11 @@ pub fn draw() void {
 
     const obj = &EditorState.objects[sel];
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+    var scroll = dvui.scrollArea(@src(), .{}, .{
+        .expand = .both,
+        .min_size_content = .{ .h = 0 },
+        .max_size_content = .height(0),
+    });
     defer scroll.deinit();
 
     {
@@ -190,7 +193,7 @@ pub fn draw() void {
         });
         defer add_menu.deinit();
 
-        if (dvui.menuItemLabel(@src(), "Add Component  \u{25BE}", .{ .submenu = true }, .{
+        if (dvui.menuItemLabel(@src(), "Add Component...", .{ .submenu = true }, .{
             .expand = .horizontal,
         })) |r| {
             var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -391,14 +394,17 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
 
 fn drawAssetInspector(asset_path: []const u8) void {
     const asset_type = editor.asset_registry.lookupByFilename(asset_path);
-    const desc = editor.asset_registry.get(asset_type);
 
     const file_name = if (std.mem.lastIndexOfScalar(u8, asset_path, '/')) |sep|
         asset_path[sep + 1 ..]
     else
         asset_path;
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both });
+    var scroll = dvui.scrollArea(@src(), .{}, .{
+        .expand = .both,
+        .min_size_content = .{ .h = 0 },
+        .max_size_content = .height(0),
+    });
     defer scroll.deinit();
 
     {
@@ -411,17 +417,6 @@ fn drawAssetInspector(asset_path: []const u8) void {
     }
 
     _ = dvui.separator(@src(), .{ .expand = .horizontal });
-
-    {
-        var info = dvui.box(@src(), .{}, .{
-            .expand = .horizontal,
-            .padding = .{ .x = 8, .y = 6 },
-        });
-        defer info.deinit();
-
-        dvui.label(@src(), "Type:  {s}", .{desc.name}, .{});
-        dvui.label(@src(), "Path:  {s}", .{asset_path}, .{});
-    }
 
     if (asset_type == .material) {
         _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 1 });

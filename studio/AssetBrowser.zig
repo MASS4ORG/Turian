@@ -4,6 +4,7 @@ const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const ProjectOps = @import("ProjectOps.zig");
+const AssetActions = @import("AssetActions.zig");
 
 var last_click_name_buf: [256]u8 = undefined;
 var last_click_name_len: usize = 0;
@@ -23,6 +24,15 @@ var g_delete_dialog_result: ?bool = null;
 
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var g_drag_hover_idx: ?usize = null;
+
+// Navigation list: entry names collected each frame for arrow-key navigation.
+// Used the NEXT frame so the keyboard handler can reference the previous listing.
+const NAV_MAX = 256;
+var g_nav_names: [NAV_MAX][256]u8 = undefined;
+var g_nav_name_lens: [NAV_MAX]usize = [_]usize{0} ** NAV_MAX;
+var g_nav_is_dir: [NAV_MAX]bool = [_]bool{false} ** NAV_MAX;
+var g_nav_count: usize = 0;
+var g_nav_has_up: bool = false; // whether ".." tile is present
 
 fn currentSubdir() []const u8 {
     return current_subdir_buf[0..current_subdir_len];
@@ -53,12 +63,59 @@ fn goUp() void {
     last_click_name_len = 0;
 }
 
+/// Navigate the browser to the folder containing `full_path` (an asset path
+/// under `assets_path`). Used to reveal an asset double-clicked in the
+/// inspector. No-op if the asset is not under this project's assets dir.
+fn revealTo(assets_path: []const u8, full_path: []const u8) void {
+    if (!std.mem.startsWith(u8, full_path, assets_path)) return;
+    var rest = full_path[assets_path.len..];
+    if (rest.len > 0 and rest[0] == '/') rest = rest[1..];
+    const sub = if (std.mem.lastIndexOfScalar(u8, rest, '/')) |sep| rest[0..sep] else "";
+    const len = @min(sub.len, current_subdir_buf.len);
+    @memcpy(current_subdir_buf[0..len], sub[0..len]);
+    current_subdir_len = len;
+    last_click_name_len = 0;
+}
+
 fn fullPathFor(name: []const u8, browse_path: []const u8, buf: []u8) []const u8 {
     const sub = currentSubdir();
     return if (sub.len > 0)
         std.fmt.bufPrint(buf, "{s}/{s}", .{ browse_path, name }) catch ""
     else
         std.fmt.bufPrint(buf, "{s}/{s}", .{ browse_path, name }) catch "";
+}
+
+fn navigateBrowserItems(go_prev: bool, browse_path: []const u8) void {
+    if (g_nav_count == 0) return;
+    const sel = EditorState.selected_asset_path;
+
+    // Find current selection index in nav list. ".." is at virtual index -1.
+    var cur: ?usize = null;
+    if (sel) |s| {
+        for (0..g_nav_count) |i| {
+            var p_buf: [1024]u8 = undefined;
+            const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, g_nav_names[i][0..g_nav_name_lens[i]] }) catch continue;
+            if (std.mem.eql(u8, p, s)) {
+                cur = i;
+                break;
+            }
+        }
+    }
+
+    const new_idx: usize = blk: {
+        if (cur) |ci| {
+            if (go_prev) {
+                break :blk if (ci > 0) ci - 1 else 0;
+            } else {
+                break :blk if (ci + 1 < g_nav_count) ci + 1 else g_nav_count - 1;
+            }
+        }
+        break :blk 0;
+    };
+
+    var p_buf: [1024]u8 = undefined;
+    const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, g_nav_names[new_idx][0..g_nav_name_lens[new_idx]] }) catch return;
+    EditorState.selectAsset(p);
 }
 
 /// Draw the asset browser panel with file tiles and navigation.
@@ -91,17 +148,14 @@ pub fn draw() void {
 
         dvui.label(@src(), "Asset Browser", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
 
-        if (EditorState.project_path) |p| {
-            if (current_subdir_len > 0) {
-                dvui.label(@src(), "  {s}/assets/{s}", .{ p, currentSubdir() }, .{ .gravity_y = 0.5, .expand = .horizontal });
-            } else {
-                dvui.label(@src(), "  {s}/assets", .{p}, .{ .gravity_y = 0.5, .expand = .horizontal });
-            }
-        }
-
+        // Show the path relative to the project (from `assets/` onward); the
+        // full project path is redundant and clutters the header. File changes
+        // are picked up by the file watcher, so there is no Refresh button.
         if (EditorState.project_path != null) {
-            if (dvui.button(@src(), "Refresh", .{}, .{ .gravity_y = 0.5 })) {
-                EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+            if (current_subdir_len > 0) {
+                dvui.label(@src(), "  assets/{s}", .{currentSubdir()}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            } else {
+                dvui.label(@src(), "  assets", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
             }
         }
     }
@@ -124,36 +178,53 @@ pub fn draw() void {
         return;
     };
 
+    // Reveal-in-browser request (e.g. from double-clicking an asset reference
+    // in the inspector): navigate to the asset's folder before listing.
+    if (EditorState.takeRevealRequest()) |rp| revealTo(assets_path, rp);
+
     var browse_path_buf: [1024]u8 = undefined;
     const browse_path: []const u8 = if (current_subdir_len > 0)
         std.fmt.bufPrint(&browse_path_buf, "{s}/{s}", .{ assets_path, currentSubdir() }) catch assets_path
     else
         assets_path;
 
-    // Handle keyboard events (Escape cancels rename, F2 starts rename)
+    // Handle keyboard events
     for (dvui.events()) |*e| {
         if (e.handled) continue;
-        if (e.evt == .key) {
-            const ke = e.evt.key;
-            if (ke.action != .down) continue;
-            const mod = ke.mod;
-            if (mod.control() and ke.code == .c and EditorState.selected_asset_path != null) {
-                e.handle(@src(), outer.data());
-                dvui.clipboardTextSet(EditorState.selected_asset_path.?);
-            } else if (ke.code == .escape and EditorState.isRenaming()) {
+        if (e.evt != .key) continue;
+        const ke = e.evt.key;
+        if (ke.action != .down and ke.action != .repeat) continue;
+        const mod = ke.mod;
+
+        if (EditorState.isRenaming()) {
+            if (ke.action == .down and ke.code == .escape) {
                 e.handle(@src(), outer.data());
                 EditorState.cancelRename();
-            } else if (ke.code == .f2 and !EditorState.isRenaming() and EditorState.selected_asset_path != null) {
-                e.handle(@src(), outer.data());
-                EditorState.startRenameAsset(EditorState.selected_asset_path.?);
             }
+            continue;
+        }
+
+        if (ke.code == .up or ke.code == .down or ke.code == .left or ke.code == .right) {
+            e.handle(@src(), outer.data());
+            navigateBrowserItems(ke.code == .up or ke.code == .left, browse_path);
+            continue;
+        }
+
+        if (ke.action != .down) continue;
+
+        if (mod.control() and ke.code == .c and EditorState.selected_asset_path != null) {
+            e.handle(@src(), outer.data());
+            dvui.clipboardTextSet(EditorState.selected_asset_path.?);
+        } else if (ke.code == .f2 and EditorState.selected_asset_path != null) {
+            e.handle(@src(), outer.data());
+            EditorState.startRenameAsset(EditorState.selected_asset_path.?);
         }
     }
 
     // Handle delete confirmation dialog
     handleDeleteDialog();
 
-    var scroll = dvui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both });
+    var scroll = dvui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     var dir = std.Io.Dir.cwd().openDir(dvui.io, browse_path, .{ .iterate = true }) catch {
@@ -167,6 +238,9 @@ pub fn draw() void {
 
     // Reset drag-hover each frame; set again below via move events
     g_drag_hover_idx = null;
+
+    // Reset nav list; will be rebuilt during tile rendering for next frame's keyboard handler
+    var new_nav_count: usize = 0;
 
     var entry_idx: usize = 0;
     if (current_subdir_len > 0) {
@@ -228,6 +302,7 @@ pub fn draw() void {
                                         }
                                         EditorState.clearDrag();
                                         EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+                                        dvui.refresh(null, @src(), null);
                                     }
                                 }
                             }
@@ -252,6 +327,15 @@ pub fn draw() void {
         defer entry_idx += 1;
 
         const is_dir = entry.kind == .directory;
+
+        // Collect into nav list for next frame's keyboard handler
+        if (new_nav_count < NAV_MAX) {
+            const n = @min(entry.name.len, g_nav_names[new_nav_count].len);
+            @memcpy(g_nav_names[new_nav_count][0..n], entry.name[0..n]);
+            g_nav_name_lens[new_nav_count] = n;
+            g_nav_is_dir[new_nav_count] = is_dir;
+            new_nav_count += 1;
+        }
         var full_path_buf: [1024]u8 = undefined;
         const asset_type: editor.AssetType = if (is_dir) .unknown else blk: {
             const full_path = std.fmt.bufPrint(&full_path_buf, "{s}/{s}", .{ browse_path, entry.name }) catch "";
@@ -347,7 +431,7 @@ pub fn draw() void {
 
                 if (dvui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
-                    revealInFileManager(browse_path, entry.name);
+                    AssetActions.revealInFileManager(browse_path, entry.name);
                 }
 
                 if (!is_dir) {
@@ -405,34 +489,43 @@ pub fn draw() void {
             EditorState.g_rename.target == .asset and
             std.mem.eql(u8, EditorState.g_rename.asset_path_buf[0..EditorState.g_rename.asset_path_len], fullPathFor(entry.name, browse_path, &full_path_buf));
 
-        for (dvui.events()) |*e| {
-            if (!dvui.eventMatchSimple(e, tile.data())) continue;
-            switch (e.evt) {
-                .mouse => |me| {
-                    if (me.action == .press and me.button == .left) {
-                        e.handle(@src(), tile.data());
-                        const now = dvui.frameTimeNS();
-                        const same_name = std.mem.eql(u8, last_click_name_buf[0..last_click_name_len], entry.name);
-                        if (same_name and now - last_click_ns < 500 * std.time.ns_per_ms) {
-                            if (is_dir) {
-                                enterSubdir(entry.name);
-                            } else if (desc.open_mode != .none) {
-                                openAsset(proj_path, browse_path, entry.name, desc.open_mode);
+        // While renaming this entry, let mouse events reach the inline text
+        // field (to position the cursor) instead of re-selecting / dragging.
+        if (!is_renaming_this) {
+            for (dvui.events()) |*e| {
+                if (!dvui.eventMatchSimple(e, tile.data())) continue;
+                switch (e.evt) {
+                    .mouse => |me| {
+                        if (me.action == .press and me.button == .left) {
+                            e.handle(@src(), tile.data());
+                            const now = dvui.frameTimeNS();
+                            const same_name = std.mem.eql(u8, last_click_name_buf[0..last_click_name_len], entry.name);
+                            if (same_name and now - last_click_ns < 500 * std.time.ns_per_ms) {
+                                if (is_dir) {
+                                    enterSubdir(entry.name);
+                                } else if (desc.open_mode != .none) {
+                                    openAsset(proj_path, browse_path, entry.name, desc.open_mode);
+                                }
+                            } else if (is_dir) {
+                                // Single-click on folder: select it so F2 / arrow keys work.
+                                var folder_sel_buf: [1024]u8 = undefined;
+                                const folder_sel = fullPathFor(entry.name, browse_path, &folder_sel_buf);
+                                EditorState.selectAsset(folder_sel);
+                            }
+                            const n = @min(entry.name.len, last_click_name_buf.len);
+                            @memcpy(last_click_name_buf[0..n], entry.name[0..n]);
+                            last_click_name_len = n;
+                            last_click_ns = now;
+                            if (!is_dir) EditorState.startDragAsset(asset_full_path);
+                        } else if (me.action == .release and me.button == .left) {
+                            if (!is_dir) {
+                                e.handle(@src(), tile.data());
+                                EditorState.selectAsset(asset_full_path);
                             }
                         }
-                        const n = @min(entry.name.len, last_click_name_buf.len);
-                        @memcpy(last_click_name_buf[0..n], entry.name[0..n]);
-                        last_click_name_len = n;
-                        last_click_ns = now;
-                        if (!is_dir) EditorState.startDragAsset(asset_full_path);
-                    } else if (me.action == .release and me.button == .left) {
-                        if (!is_dir) {
-                            e.handle(@src(), tile.data());
-                            EditorState.selectAsset(asset_full_path);
-                        }
-                    }
-                },
-                else => {},
+                    },
+                    else => {},
+                }
             }
         }
 
@@ -453,6 +546,13 @@ pub fn draw() void {
                 .id_extra = entry_idx,
             });
             defer te.deinit();
+
+            // Grab keyboard focus on the first frame so the field is editable
+            // (and doesn't lose focus and vanish on the next frame).
+            if (EditorState.g_rename.just_started) {
+                dvui.focusWidget(te.data().id, null, null);
+                EditorState.g_rename.just_started = false;
+            }
 
             if (te.enter_pressed) {
                 const text = te.textGet();
@@ -505,6 +605,7 @@ pub fn draw() void {
                                                 }
                                                 EditorState.clearDrag();
                                                 EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+                                                dvui.refresh(null, @src(), null);
                                             }
                                         }
                                     }
@@ -518,6 +619,10 @@ pub fn draw() void {
         }
     }
 
+    // Commit nav list for next frame's arrow-key handler
+    g_nav_count = new_nav_count;
+    g_nav_has_up = current_subdir_len > 0;
+
     // Empty area context menu
     {
         const cxt = dvui.context(@src(), .{ .rect = outer.data().borderRectScale().r }, .{});
@@ -529,7 +634,7 @@ pub fn draw() void {
 
             if (dvui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                revealInFileManager(browse_path, "");
+                AssetActions.revealInFileManager(browse_path, "");
             }
             if (dvui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
@@ -553,22 +658,22 @@ pub fn draw() void {
 
             if (dvui.menuItemLabel(@src(), "Create New Scene", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                createNewScene(browse_path);
+                AssetActions.createNewScene(browse_path);
             }
             if (dvui.menuItemLabel(@src(), "Create New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                createNewProjectSettings(browse_path);
+                AssetActions.createNewProjectSettings(browse_path);
             }
             if (dvui.menuItemLabel(@src(), "Create New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                createNewInputActions(browse_path);
+                AssetActions.createNewInputActions(browse_path);
             }
             for (engine.Material.presets, 0..) |preset, pi| {
                 var label_buf: [64]u8 = undefined;
                 const label = std.fmt.bufPrint(&label_buf, "New Material: {s}", .{preset.name}) catch continue;
                 if (dvui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = pi }) != null) {
                     fw.close();
-                    createNewMaterialFromPreset(browse_path, preset);
+                    AssetActions.createNewMaterialFromPreset(browse_path, preset);
                 }
             }
             for (EditorState.discovered_components[0..EditorState.discovered_count], 0..) |*def, di| {
@@ -577,7 +682,7 @@ pub fn draw() void {
                 const label = std.fmt.bufPrint(&label_buf, "New {s}", .{def.displayName()}) catch continue;
                 if (dvui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = 1000 + di }) != null) {
                     fw.close();
-                    createNewDataAsset(browse_path, def);
+                    AssetActions.createNewDataAsset(browse_path, def);
                 }
             }
         }
@@ -639,7 +744,7 @@ fn handleDeleteDialog() void {
 fn openAsset(proj_path: []const u8, browse_path: []const u8, file_name: []const u8, open_mode: editor.asset_registry.OpenMode) void {
     switch (open_mode) {
         .internal_editor => openScene(proj_path, file_name),
-        .external_editor => openExternal(browse_path, file_name),
+        .external_editor => AssetActions.openExternal(browse_path, file_name),
         .none => {},
     }
 }
@@ -656,190 +761,4 @@ fn openScene(proj_path: []const u8, file_name: []const u8) void {
     _ = ProjectOps.loadScene(full_path);
 }
 
-fn openExternal(browse_path: []const u8, file_name: []const u8) void {
-    var path_buf: [1024]u8 = undefined;
-    const path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-    const builtin = @import("builtin");
-    if (comptime builtin.os.tag == .windows) {
-        const argv = [_][]const u8{ "cmd.exe", "/c", "start", "", path };
-        const child = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        _ = child;
-    } else if (comptime builtin.os.tag == .macos) {
-        const argv = [_][]const u8{ "open", path };
-        const child = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        _ = child;
-    } else {
-        const argv = [_][]const u8{ "xdg-open", path };
-        const child = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        _ = child;
-    }
-}
-
-fn revealInFileManager(browse_path: []const u8, file_name: []const u8) void {
-    const builtin = @import("builtin");
-    if (comptime builtin.os.tag == .windows) {
-        if (file_name.len > 0) {
-            var path_buf: [1024]u8 = undefined;
-            const path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-            const argv = [_][]const u8{ "explorer.exe", "/select,", path };
-            _ = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        } else {
-            const argv = [_][]const u8{ "explorer.exe", browse_path };
-            _ = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        }
-    } else if (comptime builtin.os.tag == .macos) {
-        if (file_name.len > 0) {
-            var path_buf: [1024]u8 = undefined;
-            const path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-            const argv = [_][]const u8{ "open", "-R", path };
-            _ = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        } else {
-            const argv = [_][]const u8{ "open", browse_path };
-            _ = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-        }
-    } else {
-        const argv = [_][]const u8{ "xdg-open", browse_path };
-        _ = std.process.spawn(dvui.io, .{ .argv = &argv }) catch return;
-    }
-}
-
-fn createNewScene(browse_path: []const u8) void {
-    var path_buf: [1024]u8 = undefined;
-    var name_buf: [64]u8 = undefined;
-    var n: usize = 0;
-    while (n < 100) : (n += 1) {
-        const file_name = if (n == 0)
-            std.fmt.bufPrint(&name_buf, "new_scene.json", .{}) catch return
-        else
-            std.fmt.bufPrint(&name_buf, "new_scene_{d}.json", .{n}) catch return;
-
-        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-
-        const exists = blk: {
-            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
-            break :blk true;
-        };
-        if (!exists) {
-            ProjectOps.saveScene(full_path);
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            EditorState.selectAsset(full_path);
-            return;
-        }
-    }
-}
-
-fn createNewMaterialFromPreset(browse_path: []const u8, preset: engine.Material.Preset) void {
-    var path_buf: [1024]u8 = undefined;
-    var name_buf: [64]u8 = undefined;
-    var n: usize = 0;
-    while (n < 100) : (n += 1) {
-        const file_name = if (n == 0)
-            std.fmt.bufPrint(&name_buf, "new_material.material", .{}) catch return
-        else
-            std.fmt.bufPrint(&name_buf, "new_material_{d}.material", .{n}) catch return;
-
-        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-
-        const exists = blk: {
-            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
-            break :blk true;
-        };
-        if (!exists) {
-            engine.Material.savePreset(preset, engine.shader.default(), dvui.io, full_path) catch return;
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            EditorState.selectAsset(full_path);
-            return;
-        }
-    }
-}
-
-fn createNewInputActions(browse_path: []const u8) void {
-    var path_buf: [1024]u8 = undefined;
-    var name_buf: [192]u8 = undefined;
-    var n: usize = 0;
-    while (n < 100) : (n += 1) {
-        const file_name = if (n == 0)
-            std.fmt.bufPrint(&name_buf, "input.inputactions", .{}) catch return
-        else
-            std.fmt.bufPrint(&name_buf, "input_{d}.inputactions", .{n}) catch return;
-
-        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-
-        const exists = blk: {
-            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
-            break :blk true;
-        };
-        if (!exists) {
-            const default_ia = engine.InputActions{
-                .version = engine.InputActions.CURRENT_VERSION,
-                .actions = &.{
-                    .{ .name = "jump", .kind = .button, .pos = &.{.{ .device = .key, .code = "space" }} },
-                },
-            };
-            default_ia.save(dvui.io, full_path) catch return;
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            EditorState.selectAsset(full_path);
-            return;
-        }
-    }
-}
-
-fn createNewProjectSettings(browse_path: []const u8) void {
-    var path_buf: [1024]u8 = undefined;
-    var name_buf: [192]u8 = undefined;
-    var n: usize = 0;
-    while (n < 100) : (n += 1) {
-        const file_name = if (n == 0)
-            std.fmt.bufPrint(&name_buf, "project.projectsettings", .{}) catch return
-        else
-            std.fmt.bufPrint(&name_buf, "project_{d}.projectsettings", .{n}) catch return;
-
-        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-
-        const exists = blk: {
-            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
-            break :blk true;
-        };
-        if (!exists) {
-            const name = if (EditorState.current_project) |*p| p.nameSlice() else "Untitled";
-            const default_ps = engine.ProjectSettings{ .project = .{ .name = name } };
-            default_ps.save(dvui.io, full_path) catch return;
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            EditorState.selectAsset(full_path);
-            return;
-        }
-    }
-}
-
-fn createNewDataAsset(browse_path: []const u8, def: *const editor.ComponentDef) void {
-    var path_buf: [1024]u8 = undefined;
-    var name_buf: [192]u8 = undefined;
-    var n: usize = 0;
-    while (n < 100) : (n += 1) {
-        const type_name = def.typeName();
-        const lc_name = blk: {
-            var buf: [128]u8 = undefined;
-            const tl = @min(type_name.len, buf.len);
-            for (type_name[0..tl], 0..) |c, i| buf[i] = std.ascii.toLower(c);
-            break :blk buf[0..tl];
-        };
-        const file_name = if (n == 0)
-            std.fmt.bufPrint(&name_buf, "{s}.asset", .{lc_name}) catch return
-        else
-            std.fmt.bufPrint(&name_buf, "{s}_{d}.asset", .{ lc_name, n }) catch return;
-
-        const full_path = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ browse_path, file_name }) catch return;
-
-        const exists = blk: {
-            _ = std.Io.Dir.cwd().openFile(dvui.io, full_path, .{}) catch break :blk false;
-            break :blk true;
-        };
-        if (!exists) {
-            const file = editor.data_asset_io.defaultFromDef(def);
-            editor.data_asset_io.save(dvui.io, full_path, file) catch return;
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            EditorState.selectAsset(full_path);
-            return;
-        }
-    }
-}
+// Asset open/reveal/create helpers live in AssetActions.zig.

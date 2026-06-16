@@ -1,4 +1,5 @@
 const dvui = @import("dvui");
+const editor = @import("editor");
 const MenuBar = @import("MenuBar.zig");
 const SceneTree = @import("SceneTree.zig");
 const Inspector = @import("Inspector.zig");
@@ -12,6 +13,9 @@ const PlayMode = @import("PlayMode.zig");
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
 var g_inspector_ratio: f32 = 0.7;
+var g_mouse_x: f32 = 0;
+var g_mouse_y: f32 = 0;
+var g_drag_ghost_rect: dvui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
@@ -19,9 +23,16 @@ pub fn frame() bool {
         if (e.evt == .window and e.evt.window.action == .close) return false;
         if (e.evt == .app and e.evt.app.action == .quit) return false;
         switch (e.evt) {
-            .mouse => |me| if (me.button == .left) {
-                if (me.action == .press) mouse_left_held = true;
-                if (me.action == .release) mouse_left_held = false;
+            .mouse => |me| {
+                if (me.action == .position or me.action == .press or me.action == .release) {
+                    const scale = dvui.windowNaturalScale();
+                    g_mouse_x = me.p.x / scale;
+                    g_mouse_y = me.p.y / scale;
+                }
+                if (me.button == .left) {
+                    if (me.action == .press) mouse_left_held = true;
+                    if (me.action == .release) mouse_left_held = false;
+                }
             },
             else => {},
         }
@@ -123,6 +134,8 @@ pub fn frame() bool {
     _ = dvui.separator(@src(), .{ .expand = .horizontal });
     TaskBar.draw();
 
+    drawDragGhost();
+
     // Reap finished background jobs and keep frames flowing while one runs.
     Tasks.pump(dvui.io);
 
@@ -131,4 +144,75 @@ pub fn frame() bool {
     PlayMode.pump(dvui.io);
 
     return true;
+}
+
+/// Small floating label that follows the cursor during asset / scene-node drags,
+/// showing an icon and the name of the item being dragged.
+fn drawDragGhost() void {
+    if (EditorState.drag_kind == .none) return;
+
+    // Change cursor to "move" while dragging.
+    dvui.cursorSet(.arrow_all);
+
+    // Position the ghost 12px below-right of the cursor.
+    g_drag_ghost_rect.x = g_mouse_x + 12;
+    g_drag_ghost_rect.y = g_mouse_y + 12;
+
+    var fw = dvui.floatingWindow(@src(), .{
+        .rect = &g_drag_ghost_rect,
+        .resize = .none,
+        .stay_above_parent_window = true,
+        .window_avoid = .none,
+    }, .{
+        .background = true,
+        .style = .window,
+        .border = .all(1),
+        .corner_radius = .all(4),
+        .padding = .all(4),
+    });
+    defer fw.deinit();
+
+    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .background = false });
+    defer row.deinit();
+
+    switch (EditorState.drag_kind) {
+        .asset => {
+            const path = EditorState.dragAssetPath();
+            const name = if (@import("std").mem.lastIndexOfScalar(u8, path, '/')) |sep|
+                path[sep + 1 ..]
+            else
+                path;
+            const asset_type = editor.asset_registry.lookupByFilename(name);
+            const desc = editor.asset_registry.get(asset_type);
+            const icon_bytes = switch (desc.icon_hint) {
+                .document => dvui.entypo.text_document,
+                .code => dvui.entypo.code,
+                .image => dvui.entypo.image,
+                .sound => dvui.entypo.sound,
+                .model => dvui.entypo.layers,
+                .material => dvui.entypo.colours,
+                .data => dvui.entypo.database,
+            };
+            dvui.icon(@src(), "di", icon_bytes, .{}, .{
+                .min_size_content = .{ .w = 14, .h = 14 },
+                .gravity_y = 0.5,
+                .padding = .{ .w = 4 },
+            });
+            dvui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
+        },
+        .game_object => {
+            const idx = EditorState.drag_object_idx;
+            const name = if (idx < EditorState.object_count)
+                EditorState.objects[idx].nameSlice()
+            else
+                "Object";
+            dvui.icon(@src(), "di", dvui.entypo.layers, .{}, .{
+                .min_size_content = .{ .w = 14, .h = 14 },
+                .gravity_y = 0.5,
+                .padding = .{ .w = 4 },
+            });
+            dvui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
+        },
+        .none => {},
+    }
 }

@@ -2,10 +2,12 @@
   "guid": "51029215-952f-466e-ae31-65d167bc85a6",
   "asset_type": "material",
   "importer_version": 1,
-  "source_hash": 18245094534861406137,
+  "source_hash": 4452215520569588491,
   "import_settings": "material",
   "source_deps": [
   ],
   "artifact_deps": [
+  ],
+  "sub_assets": [
   ]
 }
