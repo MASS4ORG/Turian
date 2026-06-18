@@ -88,10 +88,11 @@ fn finishCreate(full_path: []const u8) void {
     EditorState.selectAsset(full_path);
 }
 
-pub fn createNewScene(browse_path: []const u8) void {
+/// Create a new empty prefab (serialized scene-hierarchy asset) in `browse_path`.
+pub fn createNewPrefab(browse_path: []const u8) void {
     var name_buf: [192]u8 = undefined;
     var path_buf: [1024]u8 = undefined;
-    const full_path = uniquePath(browse_path, "new_scene", "json", &name_buf, &path_buf) orelse return;
+    const full_path = uniquePath(browse_path, "new_prefab", "prefab", &name_buf, &path_buf) orelse return;
     ProjectOps.saveScene(full_path);
     finishCreate(full_path);
 }

@@ -530,6 +530,20 @@ pub const SceneManager = struct {
         return slot.nodes[0..slot.node_count];
     }
 
+    /// Full-capacity node buffer for a loaded scene (length == MAX_OBJECTS while
+    /// loaded), for runtime spawning into the scene (issue #32). Empty if stale.
+    pub fn nodeBuffer(self: *SceneManager, handle: SceneHandle) []SceneNode {
+        const slot = self.slotPtr(handle) orelse return &.{};
+        return slot.nodes;
+    }
+
+    /// Pointer to a loaded scene's live node count, so a runtime spawner can grow
+    /// or shrink the scene. Null if the handle is stale.
+    pub fn nodeCountPtr(self: *SceneManager, handle: SceneHandle) ?*usize {
+        const slot = self.slotPtr(handle) orelse return null;
+        return &slot.node_count;
+    }
+
     /// Find a loaded scene by its asset id, or null.
     pub fn findById(self: *SceneManager, id: []const u8) ?SceneHandle {
         var i: u16 = 0;

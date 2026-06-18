@@ -34,6 +34,22 @@ var g_nav_is_dir: [NAV_MAX]bool = [_]bool{false} ** NAV_MAX;
 var g_nav_count: usize = 0;
 var g_nav_has_up: bool = false; // whether ".." tile is present
 
+// Directory listing, collected and sorted each frame (folders first, then files,
+// each alphabetical) before tiles are rendered.
+const MAX_ENTRIES = 2048;
+var g_ent_name: [MAX_ENTRIES][256]u8 = undefined;
+var g_ent_name_len: [MAX_ENTRIES]u16 = undefined;
+var g_ent_is_dir: [MAX_ENTRIES]bool = undefined;
+var g_ent_order: [MAX_ENTRIES]usize = undefined;
+
+/// Sort order: directories before files, then case-insensitive alphabetical.
+fn entryLessThan(_: void, ia: usize, ib: usize) bool {
+    if (g_ent_is_dir[ia] != g_ent_is_dir[ib]) return g_ent_is_dir[ia];
+    const an = g_ent_name[ia][0..g_ent_name_len[ia]];
+    const bn = g_ent_name[ib][0..g_ent_name_len[ib]];
+    return std.ascii.orderIgnoreCase(an, bn) == .lt;
+}
+
 fn currentSubdir() []const u8 {
     return current_subdir_buf[0..current_subdir_len];
 }
@@ -188,6 +204,10 @@ pub fn draw() void {
     else
         assets_path;
 
+    // Publish the current folder so folder-agnostic actions (e.g. "Create
+    // Prefab" from the Scene Tree) write into the folder on screen.
+    EditorState.setActiveBrowseDir(browse_path);
+
     // Handle keyboard events
     for (dvui.events()) |*e| {
         if (e.handled) continue;
@@ -321,12 +341,29 @@ pub fn draw() void {
         dvui.label(@src(), "..", .{}, .{ .gravity_x = 0.5, .id_extra = 99999 });
     }
 
-    var iter = dir.iterate();
-    while (iter.next(dvui.io) catch null) |entry| {
-        if (entry.kind != .directory and std.mem.endsWith(u8, entry.name, ".meta")) continue;
+    // Collect entries (skipping .meta sidecars), then sort folders-first /
+    // alphabetical so the listing order is stable and predictable.
+    var ent_count: usize = 0;
+    {
+        var iter = dir.iterate();
+        while (iter.next(dvui.io) catch null) |e| {
+            if (e.kind != .directory and std.mem.endsWith(u8, e.name, ".meta")) continue;
+            if (ent_count >= MAX_ENTRIES) break;
+            const n = @min(e.name.len, g_ent_name[ent_count].len);
+            @memcpy(g_ent_name[ent_count][0..n], e.name[0..n]);
+            g_ent_name_len[ent_count] = @intCast(n);
+            g_ent_is_dir[ent_count] = e.kind == .directory;
+            g_ent_order[ent_count] = ent_count;
+            ent_count += 1;
+        }
+    }
+    std.mem.sort(usize, g_ent_order[0..ent_count], {}, entryLessThan);
+
+    for (g_ent_order[0..ent_count]) |ei| {
+        const entry = .{ .name = g_ent_name[ei][0..g_ent_name_len[ei]], .is_dir = g_ent_is_dir[ei] };
         defer entry_idx += 1;
 
-        const is_dir = entry.kind == .directory;
+        const is_dir = entry.is_dir;
 
         // Collect into nav list for next frame's keyboard handler
         if (new_nav_count < NAV_MAX) {
@@ -398,6 +435,15 @@ pub fn draw() void {
                     if (dvui.menuItemLabel(@src(), open_label, .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         openAsset(proj_path, browse_path, entry.name, desc.open_mode);
+                    }
+                }
+
+                // A scene asset can also be instantiated as a linked prefab
+                // instance in the current scene (issue #32).
+                if (!is_dir and asset_type == .scene) {
+                    if (dvui.menuItemLabel(@src(), "Instantiate into Scene", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                        fw.close();
+                        instantiatePrefabFile(proj_path, entry.name);
                     }
                 }
 
@@ -623,6 +669,23 @@ pub fn draw() void {
     g_nav_count = new_nav_count;
     g_nav_has_up = current_subdir_len > 0;
 
+    // Drop a dragged scene object onto the browser to save it (and its
+    // children) as a prefab asset in the current folder (issue #32).
+    if (EditorState.drag_kind == .game_object) {
+        for (dvui.events()) |*e| {
+            if (!dvui.eventMatchSimple(e, outer.data())) continue;
+            if (e.evt == .mouse) {
+                const me = e.evt.mouse;
+                if (me.action == .release and me.button == .left) {
+                    e.handle(@src(), outer.data());
+                    _ = EditorState.createPrefabFromObject(dvui.frameTimeNS(), dvui.io, EditorState.drag_object_idx);
+                    EditorState.clearDrag();
+                    dvui.refresh(null, @src(), null);
+                }
+            }
+        }
+    }
+
     // Empty area context menu
     {
         const cxt = dvui.context(@src(), .{ .rect = outer.data().borderRectScale().r }, .{});
@@ -656,15 +719,15 @@ pub fn draw() void {
 
             _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4) });
 
-            if (dvui.menuItemLabel(@src(), "Create New Scene", .{}, .{ .expand = .horizontal }) != null) {
+            if (dvui.menuItemLabel(@src(), "New Prefab", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                AssetActions.createNewScene(browse_path);
+                AssetActions.createNewPrefab(browse_path);
             }
-            if (dvui.menuItemLabel(@src(), "Create New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
+            if (dvui.menuItemLabel(@src(), "New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewProjectSettings(browse_path);
             }
-            if (dvui.menuItemLabel(@src(), "Create New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
+            if (dvui.menuItemLabel(@src(), "New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewInputActions(browse_path);
             }
@@ -747,6 +810,17 @@ fn openAsset(proj_path: []const u8, browse_path: []const u8, file_name: []const 
         .external_editor => AssetActions.openExternal(browse_path, file_name),
         .none => {},
     }
+}
+
+/// Instantiate a scene/prefab asset as a linked subtree in the active scene.
+fn instantiatePrefabFile(proj_path: []const u8, file_name: []const u8) void {
+    var path_buf: [1024]u8 = undefined;
+    const sub = currentSubdir();
+    const full_path = if (sub.len > 0)
+        std.fmt.bufPrint(&path_buf, "{s}/assets/{s}/{s}", .{ proj_path, sub, file_name }) catch return
+    else
+        std.fmt.bufPrint(&path_buf, "{s}/assets/{s}", .{ proj_path, file_name }) catch return;
+    _ = EditorState.instantiatePrefab(dvui.frameTimeNS(), dvui.io, full_path);
 }
 
 fn openScene(proj_path: []const u8, file_name: []const u8) void {

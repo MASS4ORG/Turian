@@ -39,6 +39,7 @@ pub const symbols = struct {
     pub const add_mouse_motion = "turianPlayAddMouseMotion";
     pub const add_wheel = "turianPlayAddWheel";
     pub const load_input_actions = "turianPlayLoadInputActions";
+    pub const register_prefab = "turianPlayRegisterPrefab";
 };
 
 fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -293,7 +294,8 @@ fn generatePlayMainZig(
             "var g_nodes: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;\n" ++
             "var g_node_count: usize = 0;\n" ++
             "var g_input: engine.Input = engine.Input.init();\n" ++
-            "var g_services: engine.Services = engine.Services.init();\n\n",
+            "var g_services: engine.Services = engine.Services.init();\n" ++
+            "var g_spawner: engine.Spawner = engine.Spawner.init(gpa);\n\n",
     );
 
     for (0..src_files.len) |i| {
@@ -328,6 +330,11 @@ fn generatePlayMainZig(
             a,
             "var g_live: [engine.scene.MAX_OBJECTS]LiveComponent = undefined;\n" ++
                 "var g_live_transform: [engine.scene.MAX_OBJECTS]*engine.Transform = undefined;\n" ++
+                // Each live component remembers its owning node's GUID, so the live
+                // set can be reconciled after runtime spawn/destroy (node storage
+                // is compacted on destroy, which moves transforms — issue #32).
+                "var g_live_guid: [engine.scene.MAX_OBJECTS][36]u8 = undefined;\n" ++
+                "var g_live_guid_len: [engine.scene.MAX_OBJECTS]usize = undefined;\n" ++
                 "var g_live_count: usize = 0;\n\n",
         );
 
@@ -348,6 +355,7 @@ fn generatePlayMainZig(
                 "                    .@\"struct\" => {\n" ++
                 "                        if (field.type == engine.Vector3) @field(comp, field.name) = .{ .x = fv.as_vec3_x, .y = fv.as_vec3_y, .z = fv.as_vec3_z }\n" ++
                 "                        else if (field.type == engine.GameObjectRef) { var r: engine.GameObjectRef = .{}; r.set(fv.refSlice()); @field(comp, field.name) = r; }\n" ++
+                "                        else if (@hasDecl(field.type, \"_turian_ref_kind\")) { var r: field.type = .{}; r.set(fv.refSlice()); @field(comp, field.name) = r; }\n" ++
                 "                    },\n" ++
                 "                    else => {},\n" ++
                 "                }\n" ++
@@ -371,7 +379,7 @@ fn generatePlayMainZig(
         try out.appendSlice(
             a,
             "fn mkFrame(transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) engine.Frame {\n" ++
-                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services };\n" ++
+                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services, .spawn = &g_spawner };\n" ++
                 "}\n\n",
         );
 
@@ -417,6 +425,64 @@ fn generatePlayMainZig(
                 "    } }\n" ++
                 "}\n\n",
         );
+
+        // Runtime spawn/destroy support (issue #32): instantiate live components
+        // for a node, and reconcile the live set with the node buffer after a
+        // spawn/destroy flush (re-pointing transforms by GUID, dropping comps for
+        // destroyed nodes, and bringing freshly spawned nodes to life).
+        try out.appendSlice(
+            a,
+            "fn liveAddNode(ni: usize) void {\n" ++
+                "    const obj = &g_nodes[ni];\n" ++
+                "    if (!obj.active) return;\n" ++
+                "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "    for (obj.components[0..obj.component_count]) |*comp| {\n" ++
+                "        if (comp.* != .user_script or g_live_count >= g_live.len) continue;\n" ++
+                "        if (instantiate(&comp.user_script)) |live| {\n" ++
+                "            g_live[g_live_count] = live;\n" ++
+                "            g_live_transform[g_live_count] = &obj.transform;\n" ++
+                "            const gs = obj.guidSlice();\n" ++
+                "            @memcpy(g_live_guid[g_live_count][0..gs.len], gs);\n" ++
+                "            g_live_guid_len[g_live_count] = gs.len;\n" ++
+                "            call_configure_input(&g_live[g_live_count], &g_input);\n" ++
+                "            call_awake(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "            call_enable(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "            call_start(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
+                "            g_live_count += 1;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "}\n\n" ++
+                "fn findNodeByGuid(guid: []const u8) ?usize {\n" ++
+                "    for (g_nodes[0..g_node_count], 0..) |*o, i| {\n" ++
+                "        if (std.mem.eql(u8, o.guidSlice(), guid)) return i;\n" ++
+                "    }\n" ++
+                "    return null;\n" ++
+                "}\n\n" ++
+                "fn liveHasNode(guid: []const u8) bool {\n" ++
+                "    for (0..g_live_count) |i| {\n" ++
+                "        if (std.mem.eql(u8, g_live_guid[i][0..g_live_guid_len[i]], guid)) return true;\n" ++
+                "    }\n" ++
+                "    return false;\n" ++
+                "}\n\n" ++
+                "fn reconcileLive() void {\n" ++
+                "    var w: usize = 0;\n" ++
+                "    for (0..g_live_count) |r| {\n" ++
+                "        if (findNodeByGuid(g_live_guid[r][0..g_live_guid_len[r]])) |ni| {\n" ++
+                "            g_live[w] = g_live[r];\n" ++
+                "            g_live_guid[w] = g_live_guid[r];\n" ++
+                "            g_live_guid_len[w] = g_live_guid_len[r];\n" ++
+                "            g_live_transform[w] = &g_nodes[ni].transform;\n" ++
+                "            w += 1;\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    g_live_count = w;\n" ++
+                "    for (0..g_node_count) |ni| {\n" ++
+                "        if (!g_nodes[ni].active) continue;\n" ++
+                "        if (liveHasNode(g_nodes[ni].guidSlice())) continue;\n" ++
+                "        liveAddNode(ni);\n" ++
+                "    }\n" ++
+                "}\n\n",
+        );
     }
 
     // ── Exported C ABI ──────────────────────────────────────────────────────
@@ -436,22 +502,8 @@ fn generatePlayMainZig(
         try out.appendSlice(
             a,
             "    g_live_count = 0;\n" ++
-                "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
-                "    for (g_nodes[0..g_node_count]) |*obj| {\n" ++
-                "        if (!obj.active) continue;\n" ++
-                "        for (obj.components[0..obj.component_count]) |*comp| {\n" ++
-                "            if (comp.* != .user_script or g_live_count >= g_live.len) continue;\n" ++
-                "            if (instantiate(&comp.user_script)) |live| {\n" ++
-                "                g_live[g_live_count] = live;\n" ++
-                "                g_live_transform[g_live_count] = &obj.transform;\n" ++
-                "                call_configure_input(&g_live[g_live_count], &g_input);\n" ++
-                "                call_awake(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
-                "                call_enable(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
-                "                call_start(&g_live[g_live_count], &obj.transform, g_nodes[0..g_node_count], t0);\n" ++
-                "                g_live_count += 1;\n" ++
-                "            }\n" ++
-                "        }\n" ++
-                "    }\n",
+                "    g_spawner.command_count = 0;\n" ++
+                "    for (0..g_node_count) |ni| liveAddNode(ni);\n",
         );
     }
     try out.appendSlice(a, "    return true;\n}\n\n");
@@ -464,7 +516,12 @@ fn generatePlayMainZig(
         try out.appendSlice(
             a,
             "    const time = engine.Time{ .delta = dt, .elapsed = elapsed, .frame = frame };\n" ++
-                "    for (0..g_live_count) |i| call_update(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], time);\n",
+                "    for (0..g_live_count) |i| call_update(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], time);\n" ++
+                // Apply any prefab spawns/destroys queued by scripts this frame,
+                // then reconcile the live component set with the new node buffer.
+                "    if (g_spawner.pending() > 0) {\n" ++
+                "        if (g_spawner.flush(std.Io.Threaded.global_single_threaded.io(), &g_nodes, &g_node_count)) reconcileLive();\n" ++
+                "    }\n",
         );
     } else {
         try out.appendSlice(a, "    _ = dt; _ = elapsed; _ = frame;\n");
@@ -522,6 +579,11 @@ fn generatePlayMainZig(
             "    const ia = engine.assets.InputActions.loadFromBytes(gpa, ptr[0..len]) catch return;\n" ++
             "    defer ia.deinit(gpa);\n" ++
             "    ia.applyTo(&g_input);\n" ++
+            "}\n\n" ++
+            // Register a prefab's template nodes so scripts can Instantiate it by
+            // GUID at runtime (issue #32). Fed by the studio before play starts.
+            "export fn turianPlayRegisterPrefab(guid_ptr: [*]const u8, guid_len: usize, nodes_ptr: [*]const engine.SceneNode, nodes_count: usize) callconv(.c) void {\n" ++
+            "    g_spawner.registerPrefab(guid_ptr[0..guid_len], nodes_ptr[0..nodes_count]);\n" ++
             "}\n",
     );
 

@@ -93,8 +93,10 @@ pub fn serializeScene(
 
     var total_comps: usize = 0;
     var total_script_fields: usize = 0;
+    var total_overrides: usize = 0;
     for (objects[0..count]) |*obj| {
         total_comps += obj.component_count;
+        total_overrides += obj.override_count;
         for (obj.components[0..obj.component_count]) |*c| {
             if (c.* == .user_script) total_script_fields += c.user_script.field_count;
         }
@@ -104,6 +106,10 @@ pub fn serializeScene(
     defer allocator.free(all_comps);
     const all_script_fields = allocator.alloc(SceneScriptField, total_script_fields) catch return null;
     defer allocator.free(all_script_fields);
+    // Override group keys point straight into the node buffers (objects outlives us).
+    const all_overrides = allocator.alloc([]const u8, total_overrides) catch return null;
+    defer allocator.free(all_overrides);
+    var ovr_offset: usize = 0;
 
     var comp_offset: usize = 0;
     var sf_offset: usize = 0;
@@ -151,6 +157,12 @@ pub fn serializeScene(
         }
         comp_offset += cc;
 
+        const ovr_slice = all_overrides[ovr_offset .. ovr_offset + obj.override_count];
+        for (0..obj.override_count) |oi| {
+            ovr_slice[oi] = obj.overrides[oi][0..obj.override_lens[oi]];
+        }
+        ovr_offset += obj.override_count;
+
         scene_objects[i] = .{
             .name = obj.nameSlice(),
             .guid = obj.guidSlice(),
@@ -162,6 +174,9 @@ pub fn serializeScene(
                 .scale = .{ .x = t.scale.x, .y = t.scale.y, .z = t.scale.z },
             },
             .components = comp_slice,
+            .prefab_source = obj.prefabSourceSlice(),
+            .prefab_node = obj.prefabNodeSlice(),
+            .overrides = ovr_slice,
         };
     }
 
@@ -233,6 +248,9 @@ pub fn loadSceneFromBytes(
         for (so.components) |sc| {
             _ = obj.addComponent(sceneCompToEngine(sc));
         }
+        obj.setPrefabSource(so.prefab_source);
+        obj.setPrefabNode(so.prefab_node);
+        for (so.overrides) |key| obj.addOverrideKey(key);
         out_objects[i] = obj;
     }
     out_count.* = max;

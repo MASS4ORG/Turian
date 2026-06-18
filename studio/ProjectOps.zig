@@ -62,6 +62,8 @@ pub fn loadScene(path: []const u8) bool {
     }
     EditorState.object_count = tmp_count;
     EditorState.syncSceneWithDefinitions();
+    // Pull in any source-prefab edits made since this scene was saved.
+    EditorState.resyncPrefabInstances(dvui.io);
     EditorState.setCurrentScenePath(path);
     EditorState.markSceneSaved();
     return true;

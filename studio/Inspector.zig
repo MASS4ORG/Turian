@@ -44,6 +44,7 @@ pub fn draw() void {
     }
 
     const obj = &EditorState.objects[sel];
+    const prefab_root = EditorState.prefabInstanceRoot(sel);
 
     var scroll = dvui.scrollArea(@src(), .{}, .{
         .expand = .both,
@@ -67,9 +68,11 @@ pub fn draw() void {
         });
     }
 
+    if (prefab_root) |root| drawPrefabBanner(obj, root);
+
     _ = dvui.separator(@src(), .{ .expand = .horizontal });
 
-    if (dvui.expander(@src(), "Transform", .{ .default_expanded = true }, .{
+    if (dvui.expander(@src(), if (obj.hasOverride(.transform)) "Transform  (overridden)" else "Transform", .{ .default_expanded = true }, .{
         .expand = .horizontal,
         .padding = .all(4),
     })) {
@@ -207,6 +210,52 @@ pub fn draw() void {
                 EditorState.scene_dirty = true;
             }
         }
+    }
+
+    // Keep override highlights live: re-derive this instance's overrides from
+    // its (stable) source template each frame, after any edits above.
+    if (prefab_root) |root| EditorState.recomputePrefabOverrides(dvui.io, root);
+}
+
+/// Banner shown atop the inspector for a prefab-instance node: identifies it as
+/// an instance, lists the node's overridden groups, and offers Revert / Apply.
+fn drawPrefabBanner(obj: *EditorState.SceneNode, root: usize) void {
+    var banner = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        .expand = .horizontal,
+        .padding = .all(6),
+        .margin = .{ .x = 4, .y = 2 },
+        .background = true,
+        .border = .all(1),
+        .corner_radius = dvui.Rect.all(4),
+        .style = .highlight,
+    });
+    defer banner.deinit();
+
+    dvui.icon(@src(), "prefab", dvui.entypo.box, .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 16, .h = 16 } });
+
+    const groups = [_]engine.scene.OverrideGroup{ .name, .active, .transform, .components };
+    var ovr_buf: [96]u8 = undefined;
+    var w = std.Io.Writer.fixed(&ovr_buf);
+    var any = false;
+    for (groups) |g| {
+        if (obj.hasOverride(g)) {
+            if (any) w.writeAll(", ") catch {};
+            w.writeAll(g.key()) catch {};
+            any = true;
+        }
+    }
+    dvui.label(@src(), "Prefab Instance", .{}, .{ .gravity_y = 0.5, .font = .theme(.body) });
+    if (any) {
+        dvui.label(@src(), "  overrides: {s}", .{w.buffered()}, .{ .gravity_y = 0.5, .expand = .horizontal });
+    } else {
+        dvui.label(@src(), "", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+    }
+
+    if (dvui.button(@src(), "Revert", .{}, .{ .gravity_y = 0.5 })) {
+        _ = EditorState.revertPrefabInstance(dvui.frameTimeNS(), dvui.io, root);
+    }
+    if (dvui.button(@src(), "Apply", .{}, .{ .gravity_y = 0.5 })) {
+        _ = EditorState.applyPrefabInstance(dvui.frameTimeNS(), dvui.io, root);
     }
 }
 

@@ -43,6 +43,7 @@ const Fns = struct {
     add_mouse_motion: *const fn (f32, f32) callconv(.c) void,
     add_wheel: *const fn (f32) callconv(.c) void,
     load_input_actions: *const fn ([*]const u8, usize) callconv(.c) void,
+    register_prefab: *const fn ([*]const u8, usize, [*]const engine.SceneNode, usize) callconv(.c) void,
 };
 
 var g_state: State = .edit;
@@ -164,6 +165,7 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     loadInputActions(io, arena.allocator());
+    registerPrefabs(io);
 
     GpuRenderer.setRenderOverride(playNodes());
     g_state = .playing;
@@ -340,6 +342,26 @@ fn mapKey(code: dvui.enums.Key) ?u16 {
     return if (ek) |k| @intFromEnum(k) else null;
 }
 
+/// Scratch buffer for parsing each prefab/scene asset before registering it.
+var g_prefab_buf: [EditorState.objects.len]engine.SceneNode = undefined;
+
+/// Register every scene/prefab asset's template nodes with the play library so
+/// scripts can `Instantiate` them by GUID at runtime (issue #32).
+fn registerPrefabs(io: std.Io) void {
+    if (!EditorState.assetDbReady()) return;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    var it = EditorState.asset_db.enumerate(.scene);
+    while (it.next()) |info| {
+        var count: usize = 0;
+        if (!editor.scene_io.loadScene(io, arena.allocator(), info.path, &g_prefab_buf, &count)) continue;
+        var gbuf: [36]u8 = undefined;
+        const guid = info.guid.toString(&gbuf);
+        g_fns.register_prefab(guid.ptr, guid.len, &g_prefab_buf, count);
+        _ = arena.reset(.retain_capacity);
+    }
+}
+
 /// Feed every InputActions asset in the project into the live input map so
 /// scripts that read actions by name work in Play (reuses the build data path).
 fn loadInputActions(io: std.Io, a: std.mem.Allocator) void {
@@ -389,6 +411,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
         .add_mouse_motion = lib.lookup(@TypeOf(g_fns.add_mouse_motion), S.add_mouse_motion) orelse return failLookup(&lib),
         .add_wheel = lib.lookup(@TypeOf(g_fns.add_wheel), S.add_wheel) orelse return failLookup(&lib),
         .load_input_actions = lib.lookup(@TypeOf(g_fns.load_input_actions), S.load_input_actions) orelse return failLookup(&lib),
+        .register_prefab = lib.lookup(@TypeOf(g_fns.register_prefab), S.register_prefab) orelse return failLookup(&lib),
     };
     g_lib = lib;
     g_lib_valid = true;

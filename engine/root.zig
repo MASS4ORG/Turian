@@ -113,6 +113,8 @@ pub const SceneNode = @import("scene/SceneNode.zig").SceneNode;
 /// Formal scene-management API: async/additive/persistent scene load & unload,
 /// lifecycle events, and active-scene tracking (issue #22).
 pub const SceneManager = @import("scene/SceneManager.zig").SceneManager;
+/// Runtime prefab spawner: deferred Instantiate/Destroy (issue #32).
+pub const Spawner = @import("scene/Spawner.zig").Spawner;
 pub const SceneHandle = @import("scene/SceneManager.zig").SceneHandle;
 pub const SceneLoadMode = @import("scene/SceneManager.zig").LoadMode;
 pub const SceneEvent = @import("scene/SceneManager.zig").Event;
@@ -128,6 +130,8 @@ pub const scene = struct {
     pub const MAX_COMPONENTS = @import("scene/SceneNode.zig").MAX_COMPONENTS;
     /// Maximum length of a scene node name.
     pub const NAME_MAX = @import("scene/SceneNode.zig").NAME_MAX;
+    /// Prefab override group (issue #32).
+    pub const OverrideGroup = @import("scene/SceneNode.zig").OverrideGroup;
 };
 
 /// Weak reference to a scene node (by name/path).

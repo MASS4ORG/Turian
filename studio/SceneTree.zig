@@ -5,6 +5,11 @@ const EditorState = @import("EditorState.zig");
 
 var g_dragging_idx: ?usize = null;
 
+/// Where the dragged node will land relative to the hovered target row.
+const DropZone = enum { before, into, after };
+var g_drop_target: ?usize = null;
+var g_drop_zone: DropZone = .into;
+
 var g_last_click_idx: ?usize = null;
 var g_last_click_ns: i128 = 0;
 
@@ -34,37 +39,114 @@ pub fn draw() void {
         }
     }
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
-    defer scroll.deinit();
+    {
+        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+        defer scroll.deinit();
 
-    if (EditorState.object_count == 0) {
-        // Blank state is cleaner than a placeholder message.
-        if (EditorState.isRenaming()) EditorState.cancelRename();
-        return;
+        if (EditorState.object_count == 0) {
+            // Blank state is cleaner than a placeholder message.
+            if (EditorState.isRenaming()) EditorState.cancelRename();
+        } else {
+            handleKeyboard(outer.data());
+
+            handleDeleteDialog();
+
+            var tree = dvui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .expand = .horizontal });
+            defer tree.deinit();
+
+            var had_removed: bool = false;
+
+            // Recomputed each frame while a node is dragged (see renderNode).
+            g_drop_target = null;
+            renderLevel(tree, -1, 0, &had_removed);
+
+            // On drop, reparent/reorder the dragged node based on the hovered
+            // drop zone (into / before / after). See applyDrop.
+            if (had_removed) {
+                if (g_dragging_idx) |di| {
+                    if (g_drop_target) |tgt| applyDrop(di, tgt, g_drop_zone);
+                }
+                g_dragging_idx = null;
+                g_drop_target = null;
+            }
+        }
     }
 
-    handleKeyboard(outer.data());
+    // Empty-area context menu: create objects (right-click the panel). Only
+    // meaningful when a scene/prefab is open, and never while a node is being
+    // dragged (so it can't interfere with drag-reordering / reparenting).
+    if (EditorState.hasOpenScene() and g_dragging_idx == null) drawBackgroundMenu(outer.data());
+}
 
-    handleDeleteDialog();
+/// Highlight the hovered drop target: a line at the row's top/bottom edge for a
+/// sibling drop, or a translucent fill across the row for a child ("into") drop.
+fn drawDropIndicator(row: dvui.Rect.Physical, zone: DropZone) void {
+    const line = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
+    const fill = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 70 };
+    switch (zone) {
+        .before => {
+            var r = row;
+            r.h = 2;
+            r.fill(.{}, .{ .color = line });
+        },
+        .after => {
+            var r = row;
+            r.y = row.y + row.h - 2;
+            r.h = 2;
+            r.fill(.{}, .{ .color = line });
+        },
+        .into => row.fill(.{}, .{ .color = fill }),
+    }
+}
 
-    var tree = dvui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .expand = .horizontal });
-    defer tree.deinit();
+/// Array index of the sibling immediately after `idx` (same parent), or -1.
+fn nextSibling(idx: usize) i32 {
+    const p = EditorState.objects[idx].parent;
+    var i = idx + 1;
+    while (i < EditorState.object_count) : (i += 1) {
+        if (EditorState.objects[i].parent == p) return @intCast(i);
+    }
+    return -1;
+}
 
-    var insert_before_idx: ?usize = null;
-    var had_removed: bool = false;
+/// Apply a finished drag: reparent / reorder `drag` relative to `target`.
+fn applyDrop(drag: usize, target: usize, zone: DropZone) void {
+    if (target >= EditorState.object_count) return;
+    const now = dvui.frameTimeNS();
+    const t_parent = EditorState.objects[target].parent;
+    switch (zone) {
+        .into => EditorState.reparentObject(now, drag, @intCast(target), -1),
+        .before => EditorState.reparentObject(now, drag, t_parent, @intCast(target)),
+        .after => EditorState.reparentObject(now, drag, t_parent, nextSibling(target)),
+    }
+}
 
-    renderLevel(tree, -1, 0, &insert_before_idx, &had_removed);
+/// Right-click context menu for the hierarchy background: create scene objects.
+fn drawBackgroundMenu(wd: *dvui.WidgetData) void {
+    const cxt = dvui.context(@src(), .{ .rect = wd.borderRectScale().r }, .{});
+    defer cxt.deinit();
 
-    if (insert_before_idx) |ibi| {
-        if (g_dragging_idx) |di| {
-            if (di != ibi) {
-                EditorState.moveObjectBefore(dvui.frameTimeNS(), di, ibi);
-                EditorState.scene_dirty = true;
-            }
-            g_dragging_idx = null;
+    if (cxt.activePoint()) |cp| {
+        var fw = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
+        defer fw.deinit();
+
+        if (dvui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal }) != null) {
+            fw.close();
+            const idx = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", -1);
+            EditorState.clearSelectedObjects();
+            EditorState.selected_object = idx;
+            EditorState.selectObject(idx);
         }
-    } else if (had_removed) {
-        g_dragging_idx = null;
+
+        if (EditorState.selected_object) |sel| {
+            if (dvui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal }) != null) {
+                fw.close();
+                const idx = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", @intCast(sel));
+                EditorState.clearSelectedObjects();
+                EditorState.selected_object = idx;
+                EditorState.selectObject(idx);
+            }
+        }
     }
 }
 
@@ -180,15 +262,15 @@ fn handleDeleteDialog() void {
     });
 }
 
-fn renderLevel(tree: *dvui.TreeWidget, parent: i32, depth: usize, insert_before: *?usize, had_removed: *bool) void {
+fn renderLevel(tree: *dvui.TreeWidget, parent: i32, depth: usize, had_removed: *bool) void {
     for (EditorState.objects[0..EditorState.object_count], 0..) |*obj, i| {
         if (obj.parent == parent) {
-            renderNode(tree, i, obj, depth, insert_before, had_removed);
+            renderNode(tree, i, obj, depth, had_removed);
         }
     }
 }
 
-fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, depth: usize, insert_before: *?usize, had_removed: *bool) void {
+fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, depth: usize, had_removed: *bool) void {
     const has_children = blk: {
         for (EditorState.objects[0..EditorState.object_count]) |*child| {
             if (child.parent == @as(i32, @intCast(idx))) break :blk true;
@@ -214,8 +296,25 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
         g_dragging_idx = idx;
         EditorState.startDragObject(idx);
     }
-    if (branch.insertBefore()) insert_before.* = idx;
     if (branch.removed()) had_removed.* = true;
+
+    // While a node is dragged, treat each row as three drop zones — top quarter
+    // = drop before (sibling), middle = drop into (make child), bottom quarter =
+    // drop after (sibling) — and draw an indicator for the hovered one. The drop
+    // itself is applied in draw() once the drag ends. Own subtree is skipped.
+    if (g_dragging_idx) |di| {
+        if (di != idx and !EditorState.isAncestorOrSelf(idx, @intCast(di))) {
+            const row = branch.button.data().borderRectScale().r;
+            const mp = dvui.currentWindow().mouse_pt;
+            if (row.contains(mp)) {
+                const rel = if (row.h > 0) (mp.y - row.y) / row.h else 0.5;
+                const zone: DropZone = if (rel < 0.25) .before else if (rel > 0.75) .after else .into;
+                g_drop_target = idx;
+                g_drop_zone = zone;
+                drawDropIndicator(row, zone);
+            }
+        }
+    }
 
     if (branch.button.clicked() and !is_renaming_this) {
         const now = dvui.frameTimeNS();
@@ -260,11 +359,23 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
         }
     }
 
-    const icon_bytes = if (has_children) dvui.entypo.folder else dvui.entypo.text_document;
+    // Prefab instances are tinted blue and use a box icon, so a linked instance
+    // is distinguishable at a glance from a plain object (issue #32).
+    const is_prefab_root = obj.isPrefabInstanceRoot();
+    const is_prefab_part = obj.isPartOfPrefab();
+    const prefab_tint = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
+
+    const icon_bytes = if (is_prefab_root)
+        dvui.entypo.box
+    else if (has_children)
+        dvui.entypo.folder
+    else
+        dvui.entypo.text_document;
     dvui.icon(@src(), "icon", icon_bytes, .{}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 16, .h = 16 },
         .id_extra = idx,
+        .color_text = if (is_prefab_part) prefab_tint else null,
     });
 
     if (is_renaming_this) {
@@ -291,7 +402,11 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
             EditorState.commitRename(dvui.frameTimeNS(), dvui.io);
         }
     } else {
-        dvui.label(@src(), "{s}", .{obj.nameSlice()}, .{ .gravity_y = 0.5, .id_extra = idx });
+        dvui.label(@src(), "{s}", .{obj.nameSlice()}, .{
+            .gravity_y = 0.5,
+            .id_extra = idx,
+            .color_text = if (is_prefab_part) prefab_tint else null,
+        });
     }
 
     {
@@ -332,6 +447,32 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
 
             _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4) });
 
+            // Scene-wide creation, reachable from any node's menu (so it's
+            // available even when the hierarchy is full and has no empty space).
+            if (dvui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+                fw.close();
+                const ni = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", @intCast(idx));
+                EditorState.clearSelectedObjects();
+                EditorState.selected_object = ni;
+                EditorState.selectObject(ni);
+            }
+            if (dvui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+                fw.close();
+                const ni = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", EditorState.objects[idx].parent);
+                EditorState.clearSelectedObjects();
+                EditorState.selected_object = ni;
+                EditorState.selectObject(ni);
+            }
+
+            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4), .id_extra = 200 + idx });
+
+            if (dvui.menuItemLabel(@src(), "Create Prefab", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+                fw.close();
+                _ = EditorState.createPrefabFromObject(dvui.frameTimeNS(), dvui.io, idx);
+            }
+
+            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4), .id_extra = 100 + idx });
+
             if (dvui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 const gs = EditorState.objects[idx].guidSlice();
@@ -355,7 +496,7 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
         );
 
         if (branch.expander(@src(), .{ .indent = 16.0 }, .{ .expand = .horizontal, .id_extra = idx })) {
-            renderLevel(tree, @intCast(idx), depth + 1, insert_before, had_removed);
+            renderLevel(tree, @intCast(idx), depth + 1, had_removed);
         }
     }
 }

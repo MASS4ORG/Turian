@@ -95,6 +95,12 @@ pub const UndoCommand = union(enum) {
         before: Snapshot,
         after: Snapshot,
     },
+    /// Prefab create / instantiate / revert / propagate — any whole-scene
+    /// prefab mutation (issue #32). Snapshot-based like add/delete.
+    prefab_op: struct {
+        before: Snapshot,
+        after: Snapshot,
+    },
     group: struct {
         items: []UndoCommand, // owned by undo_alloc
     },
@@ -109,6 +115,7 @@ pub const UndoCommand = union(enum) {
             .add_component => "Add Component",
             .remove_component => "Remove Component",
             .add_object => "Add Object",
+            .prefab_op => "Prefab",
             .group => "Group",
         };
     }
@@ -128,6 +135,10 @@ pub const UndoCommand = union(enum) {
                 freeSnapshot(cmd.after);
             },
             .add_object => |cmd| {
+                freeSnapshot(cmd.before);
+                freeSnapshot(cmd.after);
+            },
+            .prefab_op => |cmd| {
                 freeSnapshot(cmd.before);
                 freeSnapshot(cmd.after);
             },
@@ -175,6 +186,9 @@ pub const UndoCommand = union(enum) {
             .add_object => |cmd| {
                 restoreSnapshot(cmd.before);
             },
+            .prefab_op => |cmd| {
+                restoreSnapshot(cmd.before);
+            },
             .group => |cmd| {
                 var i = cmd.items.len;
                 while (i > 0) {
@@ -212,6 +226,9 @@ pub const UndoCommand = union(enum) {
                 objects[cmd.obj_idx].removeComponent(cmd.rem_idx);
             },
             .add_object => |cmd| {
+                restoreSnapshot(cmd.after);
+            },
+            .prefab_op => |cmd| {
                 restoreSnapshot(cmd.after);
             },
             .group => |cmd| {
@@ -911,6 +928,27 @@ pub fn clearSelectedAsset() void {
     selected_asset_path_len = 0;
 }
 
+// ── Active asset-browser folder ──────────────────────────────────────────────
+// The asset browser publishes the folder it is currently showing each frame, so
+// folder-agnostic callers (e.g. "Create Prefab" from the Scene Tree) can write
+// new assets into the folder the user is looking at.
+var active_browse_dir_buf: [1024]u8 = undefined;
+var active_browse_dir_len: usize = 0;
+
+pub fn setActiveBrowseDir(path: []const u8) void {
+    const len = @min(path.len, active_browse_dir_buf.len);
+    @memcpy(active_browse_dir_buf[0..len], path[0..len]);
+    active_browse_dir_len = len;
+}
+
+/// The folder the asset browser is currently showing, or the project's
+/// `assets/` root if the browser hasn't reported one yet. Empty if no project.
+pub fn activeBrowseDir(buf: []u8) []const u8 {
+    if (active_browse_dir_len > 0) return active_browse_dir_buf[0..active_browse_dir_len];
+    const proj = project_path orelse return "";
+    return std.fmt.bufPrint(buf, "{s}/assets", .{proj}) catch "";
+}
+
 // ── Reveal-in-browser request ────────────────────────────────────────────────
 // Set by e.g. double-clicking an asset reference in the inspector. The asset
 // browser consumes it on its next frame: navigates to the asset's folder and
@@ -968,10 +1006,22 @@ pub fn endFrameDrag(mouse_left_held: bool) void {
     if (drag_kind != .none and !mouse_left_held) clearDrag();
 }
 
+/// Whether a scene/prefab is currently open in the hierarchy. Drives whether
+/// the hierarchy create-menu and the Play button are available.
+pub var scene_open: bool = false;
+
+/// True when a scene is loaded in the hierarchy (so Play / object creation make
+/// sense). A scene saved to disk, a freshly-created default scene, or any scene
+/// with objects all count as open.
+pub fn hasOpenScene() bool {
+    return scene_open or object_count > 0 or current_scene_path != null;
+}
+
 pub fn setCurrentScenePath(path: []const u8) void {
     const len = @min(path.len, current_scene_path_buf.len);
     @memcpy(current_scene_path_buf[0..len], path[0..len]);
     current_scene_path = current_scene_path_buf[0..len];
+    scene_open = true;
 }
 
 pub fn clearScene() void {
@@ -980,6 +1030,7 @@ pub fn clearScene() void {
     clearSelectedObjects();
     scene_dirty = false;
     current_scene_path = null;
+    scene_open = false;
     clearUndoStack();
     saved_undo_depth = 0;
 }
@@ -990,6 +1041,7 @@ pub fn initDefaultScene(io: std.Io) void {
     clearSelectedObjects();
     scene_dirty = false;
     current_scene_path = null;
+    scene_open = true;
     clearUndoStack();
 
     const env = addObject(io, "Environment", -1);
@@ -1080,6 +1132,112 @@ pub fn moveObjectBefore(now: i128, src_idx: usize, before_idx: usize) void {
             }
         }
     }
+
+    scene_dirty = true;
+    const after = captureSnapshot();
+    pushCommand(now, &.{ .reparent_object = .{ .before = before, .after = after } });
+}
+
+/// True when `maybe_ancestor` is `node` or one of its ancestors.
+pub fn isAncestorOrSelf(node: usize, maybe_ancestor: i32) bool {
+    var p: i32 = @intCast(node);
+    while (p >= 0) {
+        if (p == maybe_ancestor) return true;
+        p = objects[@intCast(p)].parent;
+    }
+    return false;
+}
+
+/// Move `drag` (and its whole subtree) to become a child of `new_parent`
+/// (-1 = scene root), inserted immediately before `before_sibling` among
+/// `new_parent`'s children, or appended last when `before_sibling` is -1.
+/// Indices are the *current* array indices. No-op if it would create a cycle.
+/// Rebuilds the array via a tree walk, so the parent-precedes-child invariant
+/// is preserved and all parent indices stay correct.
+pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i32) void {
+    if (drag >= object_count) return;
+    if (new_parent == @as(i32, @intCast(drag))) return;
+    // Reparenting under one's own descendant would orphan the subtree.
+    if (new_parent >= 0 and isAncestorOrSelf(@intCast(new_parent), @intCast(drag))) return;
+
+    // Children lists keyed by (parent + 1) so root (-1) lives at index 0.
+    const KEYS = MAX_OBJECTS + 1;
+    var children: [KEYS][MAX_OBJECTS]i32 = undefined;
+    var child_count: [KEYS]usize = .{0} ** KEYS;
+    for (0..object_count) |i| {
+        if (i == drag) continue; // re-inserted at the target below
+        const key: usize = @intCast(objects[i].parent + 1);
+        children[key][child_count[key]] = @intCast(i);
+        child_count[key] += 1;
+    }
+
+    // Insert `drag` into the new parent's child list before `before_sibling`.
+    const pkey: usize = @intCast(new_parent + 1);
+    var pos: usize = child_count[pkey];
+    if (before_sibling >= 0) {
+        for (0..child_count[pkey]) |k| {
+            if (children[pkey][k] == before_sibling) {
+                pos = k;
+                break;
+            }
+        }
+    }
+    var k = child_count[pkey];
+    while (k > pos) : (k -= 1) children[pkey][k] = children[pkey][k - 1];
+    children[pkey][pos] = @intCast(drag);
+    child_count[pkey] += 1;
+
+    const before = captureSnapshot();
+
+    // DFS from the root to produce the new linear order of old indices.
+    var order: [MAX_OBJECTS]usize = undefined;
+    var order_n: usize = 0;
+    var stack: [MAX_OBJECTS]i32 = undefined; // old indices pending emit (parent already emitted)
+    var sp: usize = 0;
+    // Seed with root children in reverse (so they pop in order).
+    var ri = child_count[0];
+    while (ri > 0) : (ri -= 1) {
+        stack[sp] = children[0][ri - 1];
+        sp += 1;
+    }
+    while (sp > 0) {
+        sp -= 1;
+        const old: usize = @intCast(stack[sp]);
+        order[order_n] = old;
+        order_n += 1;
+        const ckey: usize = @intCast(old + 1);
+        var ci = child_count[ckey];
+        while (ci > 0) : (ci -= 1) {
+            stack[sp] = children[ckey][ci - 1];
+            sp += 1;
+        }
+    }
+    if (order_n != object_count) return; // safety: malformed tree, abort
+
+    // old index -> new index
+    var new_of_old: [MAX_OBJECTS]i32 = undefined;
+    for (order[0..order_n], 0..) |old, ni| new_of_old[old] = @intCast(ni);
+
+    var rebuilt: [MAX_OBJECTS]SceneNode = undefined;
+    for (order[0..order_n], 0..) |old, ni| {
+        var node = objects[old];
+        if (old == drag) {
+            node.parent = if (new_parent < 0) -1 else new_of_old[@intCast(new_parent)];
+        } else {
+            node.parent = if (node.parent < 0) -1 else new_of_old[@intCast(node.parent)];
+        }
+        rebuilt[ni] = node;
+    }
+    @memcpy(objects[0..order_n], rebuilt[0..order_n]);
+
+    // Remap selection.
+    if (selected_object) |s| selected_object = @intCast(new_of_old[s]);
+    var new_set: [MAX_OBJECTS]bool = .{false} ** MAX_OBJECTS;
+    for (0..order_n) |old| {
+        if (selected_set[old]) new_set[@intCast(new_of_old[old])] = true;
+    }
+    @memcpy(selected_set[0..MAX_OBJECTS], new_set[0..MAX_OBJECTS]);
+    if (last_select_idx) |l| last_select_idx = @intCast(new_of_old[l]);
 
     scene_dirty = true;
     const after = captureSnapshot();
@@ -1408,6 +1566,285 @@ pub fn syncSceneWithDefinitions() void {
     }
 }
 
+// ── Prefabs (issue #32) ────────────────────────────────────────────────────
+
+/// Walk up from `idx` to the enclosing prefab-instance root, or null if `idx`
+/// is not part of a prefab instance.
+pub fn prefabInstanceRoot(idx: usize) ?usize {
+    if (idx >= object_count) return null;
+    var cur: i32 = @intCast(idx);
+    while (cur >= 0) {
+        const c: usize = @intCast(cur);
+        if (objects[c].isPrefabInstanceRoot()) return c;
+        cur = objects[c].parent;
+    }
+    return null;
+}
+
+/// Collect `root` plus all of its descendants (transitively) into `out`.
+fn collectInstanceIndices(root: usize, out: []usize) usize {
+    var n: usize = 0;
+    out[n] = root;
+    n += 1;
+    var i: usize = 0;
+    while (i < object_count) : (i += 1) {
+        if (objects[i].parent < 0) continue;
+        const p: usize = @intCast(objects[i].parent);
+        var has_p = false;
+        var has_i = false;
+        for (out[0..n]) |c| {
+            if (c == p) has_p = true;
+            if (c == i) has_i = true;
+        }
+        if (has_p and !has_i and n < out.len) {
+            out[n] = i;
+            n += 1;
+        }
+    }
+    return n;
+}
+
+/// Read the prefab template referenced by `guid_str` into `out`, returning the
+/// node count or null. Uses `arena` for the file bytes + parse.
+fn readPrefabTemplate(io: std.Io, arena: std.mem.Allocator, guid_str: []const u8, out: []SceneNode) ?usize {
+    const path = resolveAssetGuid(guid_str) orelse return null;
+    const bytes = readFileArena(io, arena, path) orelse return null;
+    return editor.prefab.parse(arena, bytes, out);
+}
+
+/// Build a non-colliding `<dir>/<base>.prefab` path, written into `buf`.
+/// Returns null on overflow / 100 collisions.
+fn uniquePrefabPath(io: std.Io, dir: []const u8, base: []const u8, buf: []u8) ?[]const u8 {
+    var n: usize = 0;
+    while (n < 100) : (n += 1) {
+        const path = if (n == 0)
+            std.fmt.bufPrint(buf, "{s}/{s}.prefab", .{ dir, base }) catch return null
+        else
+            std.fmt.bufPrint(buf, "{s}/{s}_{d}.prefab", .{ dir, base, n }) catch return null;
+        const exists = blk: {
+            _ = std.Io.Dir.cwd().openFile(io, path, .{}) catch break :blk false;
+            break :blk true;
+        };
+        if (!exists) return path;
+    }
+    return null;
+}
+
+/// Sanitise an object name into a filename stem (alnum/_/- kept, others → '_').
+fn sanitizeStem(name: []const u8, buf: []u8) []const u8 {
+    var n: usize = 0;
+    for (name) |c| {
+        if (n >= buf.len) break;
+        buf[n] = if (std.ascii.isAlphanumeric(c) or c == '_' or c == '-') c else '_';
+        n += 1;
+    }
+    if (n == 0) {
+        const fallback = "prefab";
+        @memcpy(buf[0..fallback.len], fallback);
+        return buf[0..fallback.len];
+    }
+    return buf[0..n];
+}
+
+/// Create a `.prefab` asset from the subtree rooted at `idx` and turn that
+/// subtree into the first instance of it. Returns true on success.
+pub fn createPrefabFromObject(now: i128, io: std.Io, idx: usize) bool {
+    if (idx >= object_count) return false;
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const bytes = editor.prefab.serializeSubtree(arena, &objects, object_count, idx) orelse return false;
+
+    var stem_buf: [NAME_MAX]u8 = undefined;
+    const stem = sanitizeStem(objects[idx].nameSlice(), &stem_buf);
+    var dir_buf: [1024]u8 = undefined;
+    const dir = activeBrowseDir(&dir_buf);
+    if (dir.len == 0) return false;
+    var path_buf: [1024]u8 = undefined;
+    const path = uniquePrefabPath(io, dir, stem, &path_buf) orelse return false;
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = bytes }) catch return false;
+
+    const meta = editor.asset_meta.ensureMeta(io, arena, path);
+    var guid_buf: [36]u8 = undefined;
+    const guid_str = meta.guid.toString(&guid_buf);
+
+    const before = captureSnapshot();
+
+    // Link the selected subtree as the first instance.
+    var indices: [MAX_OBJECTS]usize = undefined;
+    const n = collectInstanceIndices(idx, &indices);
+    for (indices[0..n]) |i| {
+        objects[i].setPrefabNode(objects[i].guidSlice());
+        objects[i].clearOverrides();
+    }
+    objects[idx].setPrefabSource(guid_str);
+
+    scene_dirty = true;
+    const after = captureSnapshot();
+    pushCommand(now, &.{ .prefab_op = .{ .before = before, .after = after } });
+
+    // Surface the new asset in the browser / asset database.
+    refreshComponents(io, arena);
+    return true;
+}
+
+/// Instantiate the prefab at `prefab_path` into the current scene, parented
+/// under the current selection (or scene root). Selects the new root. Returns
+/// the new root index, or null.
+pub fn instantiatePrefab(now: i128, io: std.Io, prefab_path: []const u8) ?usize {
+    if (!assetDbReady()) return null;
+    const info = asset_db.findByPath(prefab_path) orelse return null;
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const bytes = readFileArena(io, arena, prefab_path) orelse return null;
+    var guid_buf: [36]u8 = undefined;
+    const guid_str = info.guid.toString(&guid_buf);
+
+    const parent: i32 = if (selected_object) |s| @intCast(s) else -1;
+
+    const before = captureSnapshot();
+    const root = editor.prefab.instantiate(arena, io, bytes, guid_str, &objects, &object_count, parent) orelse return null;
+
+    syncSceneWithDefinitions();
+    clearSelectedObjects();
+    selected_object = root;
+    selectObject(root);
+    clearSelectedAsset();
+    scene_dirty = true;
+
+    const after = captureSnapshot();
+    pushCommand(now, &.{ .prefab_op = .{ .before = before, .after = after } });
+    return root;
+}
+
+/// Recompute the override record for every node of the prefab instance rooted
+/// at `root`, diffing against the source template. Call after editing a node
+/// that belongs to a prefab instance.
+pub fn recomputePrefabOverrides(io: std.Io, root: usize) void {
+    if (root >= object_count or !objects[root].isPrefabInstanceRoot()) return;
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), &tmpl) orelse return;
+
+    var indices: [MAX_OBJECTS]usize = undefined;
+    const n = collectInstanceIndices(root, &indices);
+    for (indices[0..n]) |i| {
+        if (editor.prefab.findTemplate(&objects[i], tmpl[0..tn])) |t| {
+            editor.prefab.recomputeOverrides(&objects[i], t);
+        }
+    }
+}
+
+/// Re-apply every prefab instance's source template (respecting overrides) for
+/// the whole scene. Called after loading a scene so edits made to a source
+/// prefab since the scene was saved flow into its instances. Does not mark the
+/// scene dirty or push undo — it reconciles loaded state with sources.
+pub fn resyncPrefabInstances(io: std.Io) void {
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var r: usize = 0;
+    while (r < object_count) : (r += 1) {
+        if (!objects[r].isPrefabInstanceRoot()) continue;
+
+        var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+        const tn = readPrefabTemplate(io, arena, objects[r].prefabSourceSlice(), &tmpl) orelse continue;
+
+        var indices: [MAX_OBJECTS]usize = undefined;
+        const n = collectInstanceIndices(r, &indices);
+        for (indices[0..n]) |i| {
+            if (editor.prefab.findTemplate(&objects[i], tmpl[0..tn])) |t| {
+                editor.prefab.applyTemplate(&objects[i], t, true);
+            }
+        }
+        _ = arena_state.reset(.retain_capacity);
+    }
+}
+
+/// Revert the prefab instance rooted at `root` to its source template,
+/// discarding all per-instance overrides.
+pub fn revertPrefabInstance(now: i128, io: std.Io, root: usize) bool {
+    if (root >= object_count or !objects[root].isPrefabInstanceRoot()) return false;
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), &tmpl) orelse return false;
+
+    const before = captureSnapshot();
+    var indices: [MAX_OBJECTS]usize = undefined;
+    const n = collectInstanceIndices(root, &indices);
+    for (indices[0..n]) |i| {
+        if (editor.prefab.findTemplate(&objects[i], tmpl[0..tn])) |t| {
+            editor.prefab.applyTemplate(&objects[i], t, false);
+            objects[i].clearOverrides();
+        }
+    }
+    scene_dirty = true;
+    const after = captureSnapshot();
+    pushCommand(now, &.{ .prefab_op = .{ .before = before, .after = after } });
+    return true;
+}
+
+/// Apply the prefab instance rooted at `root` back to its source asset, then
+/// propagate the change to every other instance of that prefab in the scene
+/// (preserving their overrides). Returns true on success.
+pub fn applyPrefabInstance(now: i128, io: std.Io, root: usize) bool {
+    if (root >= object_count or !objects[root].isPrefabInstanceRoot()) return false;
+    const src_guid = objects[root].prefabSourceSlice();
+    const path = resolveAssetGuid(src_guid) orelse return false;
+
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    // Rewrite the source template from this instance (preserving identities).
+    const bytes = editor.prefab.serializeInstanceAsTemplate(arena, &objects, object_count, root) orelse return false;
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = bytes }) catch return false;
+
+    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    const tn = editor.prefab.parse(arena, bytes, &tmpl) orelse return false;
+
+    const before = captureSnapshot();
+
+    // Propagate to every instance of this prefab (including resetting this one's
+    // now-applied overrides).
+    var r: usize = 0;
+    while (r < object_count) : (r += 1) {
+        if (!objects[r].isPrefabInstanceRoot()) continue;
+        if (!std.mem.eql(u8, objects[r].prefabSourceSlice(), src_guid)) continue;
+
+        var indices: [MAX_OBJECTS]usize = undefined;
+        const n = collectInstanceIndices(r, &indices);
+        const is_source = (r == root);
+        for (indices[0..n]) |i| {
+            if (editor.prefab.findTemplate(&objects[i], tmpl[0..tn])) |t| {
+                if (is_source) {
+                    objects[i].clearOverrides();
+                } else {
+                    editor.prefab.applyTemplate(&objects[i], t, true);
+                }
+            }
+        }
+    }
+    scene_dirty = true;
+    const after = captureSnapshot();
+    pushCommand(now, &.{ .prefab_op = .{ .before = before, .after = after } });
+    return true;
+}
+
 test "deleteObject subtree reindexing" {
     const allocator = std.testing.allocator;
     initUndo(allocator);
@@ -1470,4 +1907,66 @@ test "deleteObject subtree reindexing" {
     try std.testing.expectEqual(@as(i32, 0), objects[1].parent);
     try std.testing.expectEqual(@as(i32, 0), objects[2].parent);
     try std.testing.expectEqual(@as(i32, 2), objects[3].parent);
+}
+
+fn testIndexByName(name: []const u8) ?usize {
+    for (0..object_count) |i| {
+        if (std.mem.eql(u8, objects[i].nameSlice(), name)) return i;
+    }
+    return null;
+}
+
+/// Assert every node's parent index points to a node that precedes it (the
+/// array invariant) and resolves to the expected named parent.
+fn expectParentName(child: []const u8, parent: ?[]const u8) !void {
+    const ci = testIndexByName(child).?;
+    const p = objects[ci].parent;
+    if (parent) |pn| {
+        try std.testing.expect(p >= 0);
+        try std.testing.expect(@as(usize, @intCast(p)) < ci); // parent precedes child
+        try std.testing.expectEqualStrings(pn, objects[@intCast(p)].nameSlice());
+    } else {
+        try std.testing.expectEqual(@as(i32, -1), p);
+    }
+}
+
+test "reparentObject: into, before, after, and cycle prevention" {
+    const allocator = std.testing.allocator;
+    initUndo(allocator);
+    defer clearUndoStack();
+    const io = std.Io.Threaded.global_single_threaded.io();
+
+    object_count = 0;
+    selected_object = null;
+    clearSelectedObjects();
+
+    _ = addObject(io, "Root", -1); // 0
+    _ = addObject(io, "A", 0); // 1, under Root
+    _ = addObject(io, "B", 0); // 2, under Root
+    _ = addObject(io, "C", -1); // 3, root level
+    _ = addObject(io, "A1", 1); // 4, under A (subtree)
+
+    // 1) Move C *into* B (append as child).
+    reparentObject(0, testIndexByName("C").?, @intCast(testIndexByName("B").?), -1);
+    try expectParentName("C", "B");
+    try std.testing.expectEqual(@as(usize, 5), object_count);
+
+    // 2) Move A (with child A1) *into* B too (append) — subtree moves along.
+    reparentObject(0, testIndexByName("A").?, @intCast(testIndexByName("B").?), -1);
+    try expectParentName("A", "B");
+    try expectParentName("A1", "A"); // subtree preserved
+    // Appended after C, so C comes before A among B's children.
+    try std.testing.expect(testIndexByName("C").? < testIndexByName("A").?);
+
+    // 3) Reorder: move A to be *before* C under B.
+    reparentObject(0, testIndexByName("A").?, @intCast(testIndexByName("B").?), @intCast(testIndexByName("C").?));
+    try std.testing.expect(testIndexByName("A").? < testIndexByName("C").?);
+    try expectParentName("A", "B");
+    try expectParentName("A1", "A");
+
+    // 4) Cycle prevention: moving B into its own descendant A1 is a no-op.
+    const before_count = object_count;
+    reparentObject(0, testIndexByName("B").?, @intCast(testIndexByName("A1").?), -1);
+    try std.testing.expectEqual(before_count, object_count);
+    try expectParentName("A", "B"); // structure unchanged
 }

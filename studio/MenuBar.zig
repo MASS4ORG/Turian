@@ -221,7 +221,9 @@ pub fn draw(should_quit: *bool) void {
 fn drawPlayControls() void {
     switch (PlayMode.state()) {
         .edit => {
-            if (dvui.button(@src(), "Play", .{}, .{ .style = .highlight, .gravity_y = 0.5 }))
+            // Playing the *current* scene only makes sense when one is open.
+            const can_play = EditorState.hasOpenScene();
+            if (dvui.button(@src(), "Play", .{ .grayed = !can_play }, .{ .style = .highlight, .gravity_y = 0.5 }) and can_play)
                 PlayMode.play(dvui.io);
             if (dvui.button(@src(), "Play First Scene", .{}, .{ .gravity_y = 0.5 }))
                 PlayMode.playFirstScene(dvui.io);

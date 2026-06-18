@@ -1,6 +1,7 @@
 const dvui = @import("dvui");
 const GpuRenderer = @import("GpuRenderer.zig");
 const PlayMode = @import("PlayMode.zig");
+const EditorState = @import("EditorState.zig");
 
 /// Border tint shown around the viewport while a simulation runs (issue #31):
 /// orange while playing, blue while paused — a Unity-style visual play-state cue.
@@ -42,6 +43,29 @@ pub fn draw() void {
         .color_border = border_color,
     });
     defer content.deinit();
+
+    // Drop a dragged scene/prefab asset here to instantiate it as a linked
+    // prefab instance in the active scene (issue #32, #24).
+    if (EditorState.drag_kind == .asset) {
+        for (dvui.events()) |*e| {
+            if (!dvui.eventMatchSimple(e, content.data())) continue;
+            if (e.evt == .mouse) {
+                const me = e.evt.mouse;
+                if (me.action == .release and me.button == .left) {
+                    const path = EditorState.dragAssetPath();
+                    if (EditorState.assetDbReady() and path.len > 0) {
+                        if (EditorState.asset_db.findByPath(path)) |info| {
+                            if (info.asset_type == .scene) {
+                                e.handle(@src(), content.data());
+                                _ = EditorState.instantiatePrefab(dvui.frameTimeNS(), dvui.io, path);
+                            }
+                        }
+                    }
+                    EditorState.clearDrag();
+                }
+            }
+        }
+    }
 
     const scale = dvui.windowNaturalScale();
     const nat_rect = content.wd.rect;

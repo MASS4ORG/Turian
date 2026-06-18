@@ -406,6 +406,7 @@ pub fn generateMainZig(
         "// Scene management (issue #22). The SceneManager owns every loaded scene's\n" ++
             "// nodes; the loader resolves a scene asset GUID → SceneNodes from the package.\n" ++
             "var g_scene_mgr: engine.SceneManager = undefined;\n" ++
+            "var g_spawner: engine.Spawner = undefined;\n" ++
             "const RENDER_CAP = engine.scene.MAX_OBJECTS * engine.SCENE_MANAGER_MAX_SCENES;\n" ++
             "var g_render_nodes: [RENDER_CAP]engine.SceneNode = undefined;\n\n" ++
             "fn sceneLoader(ctx: ?*anyopaque, id: []const u8, out: []engine.SceneNode, out_count: *usize) bool {\n" ++
@@ -486,6 +487,10 @@ pub fn generateMainZig(
                 "// The scene each live component belongs to, so we can destroy it when\n" ++
                 "// its scene unloads and re-instantiate when a scene loads (issue #22).\n" ++
                 "var g_live_handle: [MAX_LIVE]engine.SceneHandle = undefined;\n" ++
+                // Owning node GUID per live component, for runtime spawn/destroy
+                // reconciliation within a scene (issue #32).
+                "var g_live_guid: [MAX_LIVE][36]u8 = undefined;\n" ++
+                "var g_live_guid_len: [MAX_LIVE]usize = undefined;\n" ++
                 "var g_live_count: usize = 0;\n" ++
                 "// Per-scene-slot instantiation tracking (index → generation last seen).\n" ++
                 "var g_slot_inst: [engine.SCENE_MANAGER_MAX_SCENES]bool = .{false} ** engine.SCENE_MANAGER_MAX_SCENES;\n" ++
@@ -531,7 +536,7 @@ pub fn generateMainZig(
         try out.appendSlice(
             a,
             "fn mkFrame(transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) engine.Frame {\n" ++
-                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services };\n" ++
+                "    return .{ .time = time, .input = &g_input, .transform = transform, .objects = objects, .services = &g_services, .spawn = &g_spawner };\n" ++
                 "}\n\n",
         );
         // Lifecycle hooks accept either `hook(self)` or `hook(self, frame)` — the
@@ -618,12 +623,73 @@ pub fn generateMainZig(
                 "                    g_live[g_live_count] = live;\n" ++
                 "                    g_live_transform[g_live_count] = &obj.transform;\n" ++
                 "                    g_live_handle[g_live_count] = h;\n" ++
+                "                    const _gs = obj.guidSlice();\n" ++
+                "                    @memcpy(g_live_guid[g_live_count][0.._gs.len], _gs);\n" ++
+                "                    g_live_guid_len[g_live_count] = _gs.len;\n" ++
                 "                    call_configure_input(&g_live[g_live_count], &g_input);\n" ++
                 "                    call_awake(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
                 "                    call_enable(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
                 "                    call_start(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
                 "                    g_live_count += 1;\n" ++
                 "                }\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "}\n\n",
+        );
+
+        // Within-scene reconcile after a runtime spawn/destroy flush (issue #32):
+        // re-point transforms (node storage compacts on destroy), drop components
+        // whose node is gone, and bring freshly spawned nodes to life.
+        try out.appendSlice(
+            a,
+            "fn sceneNodeIndex(objs: []engine.SceneNode, guid: []const u8) ?usize {\n" ++
+                "    for (objs, 0..) |*o, i| if (std.mem.eql(u8, o.guidSlice(), guid)) return i;\n" ++
+                "    return null;\n" ++
+                "}\n\n" ++
+                "fn liveHasNodeInScene(h: engine.SceneHandle, guid: []const u8) bool {\n" ++
+                "    for (0..g_live_count) |i| {\n" ++
+                "        if (g_live_handle[i].index == h.index and g_live_handle[i].generation == h.generation and\n" ++
+                "            std.mem.eql(u8, g_live_guid[i][0..g_live_guid_len[i]], guid)) return true;\n" ++
+                "    }\n" ++
+                "    return false;\n" ++
+                "}\n\n" ++
+                "fn reconcileScene(h: engine.SceneHandle) void {\n" ++
+                "    const t0 = engine.Time{ .delta = 0, .elapsed = 0, .frame = 0 };\n" ++
+                "    const objs = g_scene_mgr.nodes(h);\n" ++
+                "    var i: usize = 0;\n" ++
+                "    while (i < g_live_count) {\n" ++
+                "        const owns = g_live_handle[i].index == h.index and g_live_handle[i].generation == h.generation;\n" ++
+                "        if (!owns) { i += 1; continue; }\n" ++
+                "        if (sceneNodeIndex(objs, g_live_guid[i][0..g_live_guid_len[i]])) |ni| {\n" ++
+                "            g_live_transform[i] = &objs[ni].transform;\n" ++
+                "            i += 1;\n" ++
+                "        } else {\n" ++
+                "            g_live_count -= 1;\n" ++
+                "            g_live[i] = g_live[g_live_count];\n" ++
+                "            g_live_transform[i] = g_live_transform[g_live_count];\n" ++
+                "            g_live_handle[i] = g_live_handle[g_live_count];\n" ++
+                "            g_live_guid[i] = g_live_guid[g_live_count];\n" ++
+                "            g_live_guid_len[i] = g_live_guid_len[g_live_count];\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    for (objs) |*obj| {\n" ++
+                "        if (!obj.active or g_live_count >= MAX_LIVE) continue;\n" ++
+                "        if (liveHasNodeInScene(h, obj.guidSlice())) continue;\n" ++
+                "        for (obj.components[0..obj.component_count]) |*comp| {\n" ++
+                "            if (comp.* != .user_script or g_live_count >= MAX_LIVE) continue;\n" ++
+                "            if (instantiate(&comp.user_script)) |live| {\n" ++
+                "                g_live[g_live_count] = live;\n" ++
+                "                g_live_transform[g_live_count] = &obj.transform;\n" ++
+                "                g_live_handle[g_live_count] = h;\n" ++
+                "                const _gs = obj.guidSlice();\n" ++
+                "                @memcpy(g_live_guid[g_live_count][0.._gs.len], _gs);\n" ++
+                "                g_live_guid_len[g_live_count] = _gs.len;\n" ++
+                "                call_configure_input(&g_live[g_live_count], &g_input);\n" ++
+                "                call_awake(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                call_enable(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                call_start(&g_live[g_live_count], &obj.transform, objs, t0);\n" ++
+                "                g_live_count += 1;\n" ++
                 "            }\n" ++
                 "        }\n" ++
                 "    }\n" ++
@@ -679,6 +745,11 @@ pub fn generateMainZig(
             "    defer g_scene_mgr.deinit();\n" ++
             "    g_scene_mgr.setLoader(sceneLoader, null);\n" ++
             "    g_services.register(engine.SceneManager, &g_scene_mgr);\n" ++
+            "    // Runtime prefab spawner (issue #32): resolves prefab GUIDs from the\n" ++
+            "    // same package as scenes, lazily on first Instantiate.\n" ++
+            "    g_spawner = engine.Spawner.init(gpa);\n" ++
+            "    defer g_spawner.deinit();\n" ++
+            "    g_spawner.setResolver(sceneLoader, null);\n" ++
             "    if (boot_scene_guid.len == 0) {\n" ++
             "        std.debug.print(\"[Turian] No boot scene configured\\n\", .{});\n" ++
             "        return;\n" ++
@@ -821,7 +892,16 @@ pub fn generateMainZig(
                 "        for (0..g_live_count) |_li| call_update(&g_live[_li], g_live_transform[_li], g_scene_mgr.nodes(g_live_handle[_li]), time);\n" ++
                 "        // Apply any scene load/unload a script requested this frame, then\n" ++
                 "        // reconcile live components against the new set of loaded scenes.\n" ++
-                "        if (g_scene_mgr.flushRequests()) syncLive();\n\n",
+                "        if (g_scene_mgr.flushRequests()) syncLive();\n" ++
+                "        // Apply runtime prefab spawns/destroys into the active scene.\n" ++
+                "        if (g_spawner.pending() > 0) {\n" ++
+                "            if (g_scene_mgr.getActiveScene()) |_ah| {\n" ++
+                "                const _buf = g_scene_mgr.nodeBuffer(_ah);\n" ++
+                "                if (_buf.len > 0) {\n" ++
+                "                    if (g_spawner.flush(io, _buf, g_scene_mgr.nodeCountPtr(_ah).?)) reconcileScene(_ah);\n" ++
+                "                }\n" ++
+                "            }\n" ++
+                "        }\n\n",
         );
     }
 

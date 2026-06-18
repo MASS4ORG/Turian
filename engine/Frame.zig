@@ -21,6 +21,8 @@ const Input = @import("Input.zig").Input;
 const Services = @import("Services.zig").Services;
 const Transform = @import("scene/Transform.zig").Transform;
 const SceneNode = @import("scene/SceneNode.zig").SceneNode;
+const Spawner = @import("scene/Spawner.zig").Spawner;
+const Vector3 = @import("root.zig").Vector3;
 
 /// Services made available to a script's lifecycle hooks.
 pub const Frame = struct {
@@ -34,10 +36,28 @@ pub const Frame = struct {
     objects: []SceneNode,
     /// Type-keyed registry for all other engine and user-defined services.
     services: *Services,
+    /// Runtime prefab spawner, or null in contexts without one (e.g. unit tests).
+    /// Use `instantiate` / `destroy` rather than touching this directly.
+    spawn: ?*Spawner = null,
 
     /// Convenience: fetch a registered service by type (null if unregistered).
     pub fn service(self: Frame, comptime T: type) ?*T {
         return self.services.get(T);
+    }
+
+    /// Spawn an instance of the prefab with asset GUID `prefab_guid` into the
+    /// active scene (Unity's `Instantiate`). `position` / `rotation` override the
+    /// prefab root's transform when given. Deferred: the instance appears after
+    /// the current update completes. Pass a `TypedAssetRef(.scene)` field's
+    /// `.slice()` as the guid.
+    pub fn instantiate(self: Frame, prefab_guid: []const u8, position: ?Vector3, rotation: ?Vector3) void {
+        if (self.spawn) |s| s.instantiate(prefab_guid, position, rotation);
+    }
+
+    /// Destroy `node` and its children (Unity's `Destroy`). Deferred to the end
+    /// of the update. Safe to call on the script's own object.
+    pub fn destroy(self: Frame, node: *const SceneNode) void {
+        if (self.spawn) |s| s.destroy(node.guidSlice());
     }
 };
 
