@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.0] - 2026-06-19
+
+### Features
+- feat: prefabs system #32
+
 ## [1.4.0] - 2026-06-16
 
 ### Features
