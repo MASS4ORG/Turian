@@ -12,6 +12,7 @@ const engine = @import("engine");
 const editor = @import("editor");
 const render = @import("render");
 const EditorState = @import("EditorState.zig");
+const GizmoSystem = @import("GizmoSystem.zig");
 
 const dc = dvui.backend.c;
 const SDLBackend = dvui.backend.SDLBackend;
@@ -37,6 +38,26 @@ var g_render_override: ?[]const engine.SceneNode = null;
 
 pub fn setRenderOverride(nodes: ?[]const engine.SceneNode) void {
     g_render_override = nodes;
+}
+
+/// When true, the editor gizmo overlay (built by `GizmoSystem`) is drawn over
+/// the scene. The viewport enables this in edit mode only.
+var g_gizmos_enabled: bool = false;
+
+pub fn setGizmosEnabled(on: bool) void {
+    g_gizmos_enabled = on;
+}
+
+/// Impose (or clear) the editor free-look camera on the viewport.
+pub fn setEditorCamera(cam: ?render.EditorCam) void {
+    render.setEditorCamera(cam);
+}
+
+/// The camera the renderer would use this frame for `w`×`h`, so the viewport can
+/// build picking rays and gizmos that line up exactly with the rendered scene.
+pub fn cameraFor(w: u32, h: u32) render.Camera {
+    const objects = g_render_override orelse EditorState.objects[0..EditorState.object_count];
+    return render.sceneCamera(w, h, objects);
 }
 
 /// Initialize the renderer with dvui's SDL backend (must be SPIR-V).
@@ -76,6 +97,12 @@ pub fn renderViewport(w: u32, h: u32) ?dvui.TextureTarget {
 
     const objects = g_render_override orelse EditorState.objects[0..EditorState.object_count];
     render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+
+    if (g_gizmos_enabled) {
+        const vp = render.sceneCamera(w, h, objects).view_proj.m;
+        render.renderGizmos(@ptrCast(cmd), @ptrCast(bt.texture), w, h, vp, GizmoSystem.worldVertices(), false);
+        render.renderGizmos(@ptrCast(cmd), @ptrCast(bt.texture), w, h, vp, GizmoSystem.overlayVertices(), true);
+    }
     return ct;
 }
 

@@ -16,6 +16,7 @@ const state = @import("state.zig");
 const pipeline = @import("pipeline.zig");
 const assets = @import("assets.zig");
 const shadow = @import("shadow.zig");
+const gizmos = @import("gizmos.zig");
 
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
@@ -23,6 +24,95 @@ const Vector3 = engine.Vector3;
 
 pub const Bytes = types.Bytes;
 pub const SourceFn = types.SourceFn;
+
+/// Gizmo line vertex and uniform types, re-exported for the editor overlay.
+pub const GizmoVertex = gizmos.GizmoVertex;
+pub const GizmoUB = gizmos.GizmoUB;
+
+/// Resolved scene camera: the same view/projection the renderer uses, exposed so
+/// the editor can build picking rays and draw gizmos that line up exactly.
+pub const Camera = struct {
+    pos: Vector3,
+    rotation: Vector3,
+    fov: f32,
+    near: f32,
+    far: f32,
+    view: Matrix4,
+    proj: Matrix4,
+    /// proj * view.
+    view_proj: Matrix4,
+};
+
+/// A free-look camera pose the editor can impose on the viewport, independent of
+/// any scene camera component (issue #3 follow-up).
+pub const EditorCam = types.EditorCam;
+
+/// Set (or clear) the editor free-look camera override. Cleared in Play mode so
+/// the running game's own camera drives the viewport again.
+pub fn setEditorCamera(cam: ?EditorCam) void {
+    state.editor_cam = cam;
+}
+
+/// Compute the camera used to render `objects` at `w`×`h`. Uses the editor
+/// free-look override if set, otherwise the first active camera component (or a
+/// default if none). Mirrors the camera setup in `renderScene`.
+pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
+    var cam_pos = Vector3{ .x = 0, .y = 2, .z = -5 };
+    var cam_rot = Vector3{};
+    var cam_fov: f32 = 60.0;
+    var cam_near: f32 = 0.01;
+    var cam_far: f32 = 1000.0;
+    if (state.editor_cam) |ec| {
+        cam_pos = ec.pos;
+        cam_rot = ec.rot;
+        cam_fov = ec.fov;
+        cam_near = ec.near;
+        cam_far = ec.far;
+    } else cam_search: for (objects) |*obj| {
+        if (!obj.active) continue;
+        for (obj.components[0..obj.component_count]) |*comp| {
+            if (comp.* == .camera) {
+                cam_pos = obj.transform.position;
+                cam_rot = obj.transform.rotation;
+                cam_fov = comp.camera.fov;
+                cam_near = comp.camera.near;
+                cam_far = comp.camera.far;
+                break :cam_search;
+            }
+        }
+    }
+    const rm = Matrix4.rotationEuler(cam_rot.x, cam_rot.y, cam_rot.z);
+    const fwd_v = rm.transformDirection(.{ .x = 0, .y = 0, .z = 1 });
+    const look_at = Vector3{ .x = cam_pos.x + fwd_v.x, .y = cam_pos.y + fwd_v.y, .z = cam_pos.z + fwd_v.z };
+    const view = Matrix4.lookAt(cam_pos, look_at, .{ .x = 0, .y = 1, .z = 0 });
+    const asp = @as(f32, @floatFromInt(w)) / @as(f32, @floatFromInt(@max(h, 1)));
+    const proj = Matrix4.perspective(cam_fov, asp, cam_near, cam_far);
+    return .{
+        .pos = cam_pos,
+        .rotation = cam_rot,
+        .fov = cam_fov,
+        .near = cam_near,
+        .far = cam_far,
+        .view = view,
+        .proj = proj,
+        .view_proj = proj.multiply(view),
+    };
+}
+
+/// Draw recorded gizmo line vertices over the already-rendered scene. `overlay`
+/// selects the always-on-top pipeline (manipulation handles) vs. depth-tested
+/// world gizmos. Call after `renderScene`, outside any render pass.
+pub fn renderGizmos(
+    cmd: *c.SDL_GPUCommandBuffer,
+    color_tex: *c.SDL_GPUTexture,
+    w: u32,
+    h: u32,
+    view_proj: [16]f32,
+    verts: []const GizmoVertex,
+    overlay: bool,
+) void {
+    gizmos.renderGizmos(cmd, color_tex, w, h, view_proj, verts, overlay);
+}
 
 /// Register the GUID→bytes callbacks (mesh / texture / material). Call once
 /// before rendering.
@@ -44,6 +134,14 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     state.shadow_pipeline = pipeline.createShadowPipeline(device) catch |err| p: {
         std.debug.print("[render] shadow pipeline failed: {any} — shadows disabled.\n", .{err});
         break :p null;
+    };
+    state.gizmo_pipeline = gizmos.createGizmoPipeline(device, true) catch |err| g: {
+        std.debug.print("[render] gizmo pipeline failed: {any} — gizmos disabled.\n", .{err});
+        break :g null;
+    };
+    state.gizmo_overlay_pipeline = gizmos.createGizmoPipeline(device, false) catch |err| g: {
+        std.debug.print("[render] gizmo overlay pipeline failed: {any} — handles disabled.\n", .{err});
+        break :g null;
     };
     std.debug.print("[render] Ready (SPIRV).\n", .{});
 }
@@ -97,32 +195,9 @@ pub fn renderScene(
     assets.uploadNewAssets(cmd, dev, objects);
 
     // ── Camera ──────────────────────────────────────────────────────────────
-    var cam_pos = Vector3{ .x = 0, .y = 2, .z = -5 };
-    var cam_rot = Vector3{};
-    var cam_fov: f32 = 60.0;
-    var cam_near: f32 = 0.01;
-    var cam_far: f32 = 1000.0;
-    cam_search: for (objects) |*obj| {
-        if (!obj.active) continue;
-        for (obj.components[0..obj.component_count]) |*comp| {
-            if (comp.* == .camera) {
-                cam_pos = obj.transform.position;
-                cam_rot = obj.transform.rotation;
-                cam_fov = comp.camera.fov;
-                cam_near = comp.camera.near;
-                cam_far = comp.camera.far;
-                break :cam_search;
-            }
-        }
-    }
-
-    const rm = Matrix4.rotationEuler(cam_rot.x, cam_rot.y, cam_rot.z);
-    const fwd_v = rm.transformDirection(.{ .x = 0, .y = 0, .z = 1 });
-    const look_at = Vector3{ .x = cam_pos.x + fwd_v.x, .y = cam_pos.y + fwd_v.y, .z = cam_pos.z + fwd_v.z };
-    const view = Matrix4.lookAt(cam_pos, look_at, .{ .x = 0, .y = 1, .z = 0 });
-    const asp = @as(f32, @floatFromInt(w)) / @as(f32, @floatFromInt(h));
-    const proj = Matrix4.perspective(cam_fov, asp, cam_near, cam_far);
-    const vp = proj.multiply(view);
+    const cam = sceneCamera(w, h, objects);
+    const cam_pos = cam.pos;
+    const vp = cam.view_proj;
 
     const ambient = [4]f32{ 0.15, 0.15, 0.18, 0.0 };
 
@@ -179,7 +254,8 @@ pub fn renderScene(
     var depth_info = std.mem.zeroes(c.SDL_GPUDepthStencilTargetInfo);
     depth_info.texture = depth_tex;
     depth_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
-    depth_info.store_op = c.SDL_GPU_STOREOP_DONT_CARE;
+    // Preserve depth so the gizmo overlay pass can depth-test against the scene.
+    depth_info.store_op = c.SDL_GPU_STOREOP_STORE;
     depth_info.clear_depth = 1.0;
 
     const pass = c.SDL_BeginGPURenderPass(cmd, &color_info, 1, &depth_info) orelse return;
@@ -259,6 +335,7 @@ pub fn renderScene(
 /// Release all GPU resources.
 pub fn deinit() void {
     const dev = state.device orelse return;
+    gizmos.deinit(dev);
     destroyDepth(dev);
     if (state.white_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.flat_normal_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);

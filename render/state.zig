@@ -24,6 +24,19 @@ pub var depth_tex: ?*c.SDL_GPUTexture = null;
 pub var target_w: u32 = 0;
 pub var target_h: u32 = 0;
 
+/// Editor free-look camera override (null = use a scene camera component).
+pub var editor_cam: ?types.EditorCam = null;
+
+// Gizmo line rendering (editor overlay — issue #3). Two pipelines: one
+// depth-tested (world gizmos occluded by geometry) and one overlay (always on
+// top, for manipulation handles). The vertex buffer is grown on demand; index
+// 0 holds depth-tested verts, index 1 the overlay verts, so two draws per frame
+// never clobber each other's data.
+pub var gizmo_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var gizmo_overlay_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var gizmo_vtx_buf: [2]?*c.SDL_GPUBuffer = .{ null, null };
+pub var gizmo_vtx_cap: [2]usize = .{ 0, 0 };
+
 // Asset sources (GUID → bytes).
 pub var mesh_src: ?types.SourceFn = null;
 pub var texture_src: ?types.SourceFn = null;

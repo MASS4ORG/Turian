@@ -89,3 +89,14 @@ pub const ResolvedMaterial = struct {
 };
 
 pub const SceneNode = engine.SceneNode;
+
+/// A free-look camera pose the editor imposes on the viewport, independent of
+/// any scene camera component. When set, the renderer uses it instead of
+/// scanning for a camera component. The shipped game never sets it.
+pub const EditorCam = struct {
+    pos: engine.Vector3,
+    rot: engine.Vector3,
+    fov: f32 = 60,
+    near: f32 = 0.05,
+    far: f32 = 2000,
+};

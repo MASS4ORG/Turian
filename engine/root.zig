@@ -45,6 +45,8 @@ pub const GamepadAxis = @import("Input.zig").GamepadAxis;
 pub const Binding = @import("Input.zig").Binding;
 /// Per-update context object bundling engine services for scripts (ADR 0001).
 pub const Frame = @import("Frame.zig").Frame;
+/// Immediate-mode debug/editor draw API: lines, boxes, spheres, labels (issue #3).
+pub const Gizmos = @import("Gizmos.zig").Gizmos;
 /// Type-keyed registry for engine + user-defined services (ADR 0001).
 pub const Services = @import("Services.zig").Services;
 
