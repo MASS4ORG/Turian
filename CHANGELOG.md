@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0] - 2026-06-23
+
+### Features
+- feat: Gizmos API + interactive transform gizmo #3
+
 ## [1.5.0] - 2026-06-19
 
 ### Features
