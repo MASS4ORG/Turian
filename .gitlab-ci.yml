@@ -143,7 +143,7 @@ build_artifacts:
       - PLATFORM: linux-x86_64
         BUILD_FLAGS: "-Doptimize=ReleaseFast"
       - PLATFORM: windows-x86_64
-        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dno-test -Doptimize=ReleaseFast"
+        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dcli-only -Dno-test -Doptimize=ReleaseFast"
       - PLATFORM: macos-aarch64
         BUILD_FLAGS: "-Dtarget=aarch64-macos -Dcli-only -Dno-test -Doptimize=ReleaseFast"
   script:

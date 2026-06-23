@@ -23,9 +23,12 @@ pub fn build(b: *std.Build) void {
     const ktx2_dep = b.dependency("ktx2", .{ .target = target, .optimize = optimize });
     const ktx2_mod = ktx2_dep.module("ktx2");
 
+    // ── CLI-only mode (skips studio/dvui/gpu/render; used for cross‑compilation) ─
+    const cli_only = b.option(bool, "cli-only", "Build only turian-cli (no studio/dvui/gpu/render)") orelse false;
+
     // ── GPU platform module (SDL3 window + device), shared by studio + game ──
-    const gpu_dep = b.dependency("gpu", .{ .target = target, .optimize = optimize });
-    const gpu_mod = gpu_dep.module("gpu");
+    const gpu_dep = if (!cli_only) b.dependency("gpu", .{ .target = target, .optimize = optimize }) else null;
+    const gpu_mod = if (gpu_dep) |d| d.module("gpu") else null;
 
     // ── Engine module ────────────────────────────────────────────────────────
     const engine_mod = b.addModule("engine", .{
@@ -54,15 +57,15 @@ pub fn build(b: *std.Build) void {
     // SDL3-GPU scene renderer shared by the studio viewport and the built game.
     // Depends on engine (scene/asset types) + gpu (SDL3 device/window) — never
     // pulled into the headless CLI.
-    const render_mod = b.addModule("render", .{
-        .root_source_file = b.path("render/root.zig"),
-        .target = target,
-    });
-    render_mod.addImport("engine", engine_mod);
-    render_mod.addImport("gpu", gpu_mod);
-
-    // ── CLI-only mode (skips studio/dvui; used for cross-compilation) ────────
-    const cli_only = b.option(bool, "cli-only", "Build only turian-cli (no studio/dvui)") orelse false;
+    const render_mod = if (!cli_only) blk: {
+        const m = b.addModule("render", .{
+            .root_source_file = b.path("render/root.zig"),
+            .target = target,
+        });
+        m.addImport("engine", engine_mod);
+        m.addImport("gpu", gpu_mod.?);
+        break :blk m;
+    } else null;
 
     // ── DVUI dependency ──────────────────────────────────────────────────────
     const dvui_dep = if (!cli_only) b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3gpu }) else null;
@@ -96,8 +99,13 @@ pub fn build(b: *std.Build) void {
     turian_opts.addOptionPath("serde_root_path", serde_dep.path("src/root.zig"));
     turian_opts.addOptionPath("serde_compat_root_path", serde_dep.path("src/compat_0_16.zig"));
     turian_opts.addOptionPath("ktx2_root_path", ktx2_dep.path("src/root.zig"));
-    turian_opts.addOptionPath("gpu_root_path", gpu_dep.path("src/root.zig"));
-    turian_opts.addOptionPath("gpu_sdl3_c_path", gpu_dep.path("src/sdl3-c.h"));
+    if (!cli_only) {
+        turian_opts.addOptionPath("gpu_root_path", gpu_dep.?.path("src/root.zig"));
+        turian_opts.addOptionPath("gpu_sdl3_c_path", gpu_dep.?.path("src/sdl3-c.h"));
+    } else {
+        turian_opts.addOption([]const u8, "gpu_root_path", "");
+        turian_opts.addOption([]const u8, "gpu_sdl3_c_path", "");
+    }
     turian_opts.addOption([]const u8, "render_root_path", b.pathJoin(&.{ build_root, "render", "root.zig" }));
 
     // SDL3 include tree, captured for the SDK step so it can ship the headers.
@@ -129,8 +137,8 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "dvui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
-                    .{ .name = "render", .module = render_mod },
-                    .{ .name = "gpu", .module = gpu_mod },
+                    .{ .name = "render", .module = render_mod.? },
+                    .{ .name = "gpu", .module = gpu_mod.? },
                 },
             }),
         });
@@ -185,28 +193,30 @@ pub fn build(b: *std.Build) void {
     });
     studio_tests.root_module.addOptions("turian_build_options", turian_opts);
 
-    // The render module pulls in engine's ImageLoader (stb_image symbols). In
-    // real builds stb comes from dvui (studio) or the game build; the standalone
-    // test provides its own copy so it links.
-    const render_test_mod = b.createModule(.{
-        .root_source_file = b.path("render/root.zig"),
-        .target = target,
-        .optimize = optimize,
-        .imports = &.{
-            .{ .name = "engine", .module = engine_mod },
-            .{ .name = "gpu", .module = gpu_mod },
-        },
-    });
-    render_test_mod.link_libc = true;
-    render_test_mod.addIncludePath(b.path("engine/vendor"));
-    render_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
-    const render_tests = b.addTest(.{ .root_module = render_test_mod });
-
     const test_step = b.step("test", "Run engine + editor + studio + render tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
     test_step.dependOn(&b.addRunArtifact(studio_tests).step);
-    test_step.dependOn(&b.addRunArtifact(render_tests).step);
+
+    if (!cli_only) {
+        // The render module pulls in engine's ImageLoader (stb_image symbols). In
+        // real builds stb comes from dvui (studio) or the game build; the standalone
+        // test provides its own copy so it links.
+        const render_test_mod = b.createModule(.{
+            .root_source_file = b.path("render/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine_mod },
+                .{ .name = "gpu", .module = gpu_mod.? },
+            },
+        });
+        render_test_mod.link_libc = true;
+        render_test_mod.addIncludePath(b.path("engine/vendor"));
+        render_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
+        const render_tests = b.addTest(.{ .root_module = render_test_mod });
+        test_step.dependOn(&b.addRunArtifact(render_tests).step);
+    }
 
     // ── CI step (test + release artifacts) ───────────────────────────────────
     // Pass -Dno-test=true when cross-compiling: the test runner can't execute
@@ -225,8 +235,8 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "dvui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
-                    .{ .name = "render", .module = render_mod },
-                    .{ .name = "gpu", .module = gpu_mod },
+                    .{ .name = "render", .module = render_mod.? },
+                    .{ .name = "gpu", .module = gpu_mod.? },
                 },
             }),
         });
@@ -332,8 +342,8 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "dvui", .module = dvui_mod.? },
                         .{ .name = "engine", .module = engine_mod },
                         .{ .name = "editor", .module = editor_mod },
-                        .{ .name = "render", .module = render_mod },
-                        .{ .name = "gpu", .module = gpu_mod },
+                        .{ .name = "render", .module = render_mod.? },
+                        .{ .name = "gpu", .module = gpu_mod.? },
                     },
                 }),
             });
@@ -385,19 +395,28 @@ pub fn build(b: *std.Build) void {
         // ── Dependency sources (src/ only — deps are self-contained Zig libs) ─
         // Each dep is installed to sdk/deps/<name>/src/ so SdkLayout.zig finds
         // src/root.zig at a fixed relative path; build.zig/docs/examples dropped.
-        const dep_installs = [_]struct { dep: *std.Build.Dependency, name: []const u8 }{
-            .{ .dep = math3d_dep, .name = "math3d" },
-            .{ .dep = guid_dep, .name = "guid" },
-            .{ .dep = serde_dep, .name = "serde" },
-            .{ .dep = oap_dep, .name = "open_asset_package" },
-            .{ .dep = ktx2_dep, .name = "ktx2" },
-            .{ .dep = gpu_dep, .name = "gpu" },
-        };
-        for (dep_installs) |di| {
+        {
+            const dep_list = [_]struct { dep: *std.Build.Dependency, name: []const u8 }{
+                .{ .dep = math3d_dep, .name = "math3d" },
+                .{ .dep = guid_dep, .name = "guid" },
+                .{ .dep = serde_dep, .name = "serde" },
+                .{ .dep = oap_dep, .name = "open_asset_package" },
+                .{ .dep = ktx2_dep, .name = "ktx2" },
+            };
+            inline for (dep_list) |di| {
+                sdk_step.dependOn(&b.addInstallDirectory(.{
+                    .source_dir = di.dep.path("src"),
+                    .install_dir = .prefix,
+                    .install_subdir = b.fmt("sdk/deps/{s}/src", .{di.name}),
+                    .exclude_extensions = &.{"md"},
+                }).step);
+            }
+        }
+        if (!cli_only) {
             sdk_step.dependOn(&b.addInstallDirectory(.{
-                .source_dir = di.dep.path("src"),
+                .source_dir = gpu_dep.?.path("src"),
                 .install_dir = .prefix,
-                .install_subdir = b.fmt("sdk/deps/{s}/src", .{di.name}),
+                .install_subdir = "sdk/deps/gpu/src",
                 .exclude_extensions = &.{"md"},
             }).step);
         }
