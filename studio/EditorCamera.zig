@@ -45,6 +45,34 @@ pub const Nav = struct {
     dt: f32 = 0,
 };
 
+/// Snapshot of the free-look camera pose, saved/restored per document tab so
+/// each open scene keeps its own viewpoint (issue #1 follow-up).
+pub const State = struct {
+    pos: Vector3 = .{ .x = 0, .y = 2, .z = -6 },
+    yaw: f32 = 0,
+    pitch: f32 = 0,
+    fov: f32 = 60,
+    initialized: bool = false,
+};
+
+pub fn getState() State {
+    return .{ .pos = pos, .yaw = yaw, .pitch = pitch, .fov = fov, .initialized = initialized };
+}
+
+pub fn setState(s: State) void {
+    pos = s.pos;
+    yaw = s.yaw;
+    pitch = s.pitch;
+    fov = s.fov;
+    initialized = s.initialized;
+}
+
+/// Forget the current pose so the next `ensureInit` re-seeds from the (new)
+/// scene's camera. Used when a fresh scene tab is opened.
+pub fn reset() void {
+    initialized = false;
+}
+
 /// On first use, seed the editor camera from the scene's first camera component
 /// so the viewport opens looking at roughly what the game would show.
 pub fn ensureInit(objects: []const engine.SceneNode, count: usize) void {

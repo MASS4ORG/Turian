@@ -6,6 +6,7 @@ const Window = @import("Window.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
+const Documents = @import("Documents.zig");
 const build_options = @import("turian_build_options");
 
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
@@ -146,6 +147,11 @@ pub fn main(main_init: std.process.Init) !void {
         const wait_event_micros = win.waitTime(end_micros);
         interrupted = try backend.waitEventTimeout(wait_event_micros);
     }
+
+    // Persist the open document tabs so they restore on next launch (issue #1),
+    // then free the per-tab scene snapshots held on the heap.
+    Documents.persist();
+    Documents.closeAll();
 
     GpuRenderer.deinit();
     EditorState.clearUndoStack(); // free undo/redo snapshots held at exit

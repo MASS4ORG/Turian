@@ -195,7 +195,6 @@ pub fn draw(should_quit: *bool) void {
                             if (exists and !is_current) {
                                 m.close();
                                 ProjectOps.openProject(path);
-                                EditorState.clearScene();
                             } else if (!exists) {
                                 editor.recent_projects.remove(&EditorState.settings, dvui.io, arena, path);
                                 EditorState.settings.save(dvui.io);
@@ -271,7 +270,6 @@ fn openProjectDialog() void {
 
     if (path) |p| {
         ProjectOps.openProject(p);
-        EditorState.clearScene();
     }
 }
 

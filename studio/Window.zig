@@ -9,10 +9,12 @@ const EditorState = @import("EditorState.zig");
 const TaskBar = @import("TaskBar.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("PlayMode.zig");
+const Documents = @import("Documents.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
 var g_inspector_ratio: f32 = 0.7;
+var g_asset_doc_ratio: f32 = 0.75;
 var g_mouse_x: f32 = 0;
 var g_mouse_y: f32 = 0;
 var g_drag_ghost_rect: dvui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
@@ -90,44 +92,62 @@ pub fn frame() bool {
 
     _ = dvui.separator(@src(), .{ .expand = .horizontal });
 
+    // Document tab strip (MDI, issue #1). Drawn above the editing surface.
+    Documents.drawTabBar(mouse_left_held);
+
     // Main editor area. Scoped in a block so the paned widgets are deinit'd
     // (popped from dvui's layout stack) *before* the bottom task bar is drawn;
     // otherwise the task bar would nest inside the still-open paned.
     {
-        var split_h = dvui.paned(@src(), .{
-            .direction = .horizontal,
-            .collapsed_size = 0,
-            .handle_margin = 4,
-            .split_ratio = &g_inspector_ratio,
-        }, .{ .expand = .both });
-        defer split_h.deinit();
-        if (split_h.showFirst()) {
-            var split_v = dvui.paned(@src(), .{
-                .direction = .vertical,
+        if (Documents.activeIsAsset()) {
+            // A non-scene asset tab hosts its dedicated editor full-area. The
+            // asset browser stays available as a docked side panel so other
+            // assets can be opened while editing one.
+            var split_h = dvui.paned(@src(), .{
+                .direction = .horizontal,
                 .collapsed_size = 0,
                 .handle_margin = 4,
+                .split_ratio = &g_asset_doc_ratio,
             }, .{ .expand = .both });
-            defer split_v.deinit();
-
-            if (split_v.showFirst()) {
-                var split_h2 = dvui.paned(@src(), .{
-                    .direction = .horizontal,
+            defer split_h.deinit();
+            if (split_h.showFirst()) Inspector.drawAssetDocument(Documents.activePath());
+            if (split_h.showSecond()) AssetBrowser.draw();
+        } else {
+            var split_h = dvui.paned(@src(), .{
+                .direction = .horizontal,
+                .collapsed_size = 0,
+                .handle_margin = 4,
+                .split_ratio = &g_inspector_ratio,
+            }, .{ .expand = .both });
+            defer split_h.deinit();
+            if (split_h.showFirst()) {
+                var split_v = dvui.paned(@src(), .{
+                    .direction = .vertical,
                     .collapsed_size = 0,
                     .handle_margin = 4,
                 }, .{ .expand = .both });
-                defer split_h2.deinit();
+                defer split_v.deinit();
 
-                if (split_h2.showFirst()) SceneTree.draw();
-                if (split_h2.showSecond()) SceneViewport.draw();
+                if (split_v.showFirst()) {
+                    var split_h2 = dvui.paned(@src(), .{
+                        .direction = .horizontal,
+                        .collapsed_size = 0,
+                        .handle_margin = 4,
+                    }, .{ .expand = .both });
+                    defer split_h2.deinit();
+
+                    if (split_h2.showFirst()) SceneTree.draw();
+                    if (split_h2.showSecond()) SceneViewport.draw();
+                }
+
+                if (split_v.showSecond()) {
+                    AssetBrowser.draw();
+                }
             }
 
-            if (split_v.showSecond()) {
-                AssetBrowser.draw();
+            if (split_h.showSecond()) {
+                Inspector.draw();
             }
-        }
-
-        if (split_h.showSecond()) {
-            Inspector.draw();
         }
     }
 

@@ -2,6 +2,7 @@ const std = @import("std");
 const dvui = @import("dvui");
 const EditorState = @import("EditorState.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
+const Documents = @import("Documents.zig");
 const editor = @import("editor");
 
 /// Open an existing project at the given filesystem path.
@@ -17,6 +18,11 @@ pub fn openProject(path: []const u8) void {
         editor.recent_projects.push(&EditorState.settings, dvui.io, arena, path);
         EditorState.settings.save(dvui.io);
     }
+
+    // Start from a clean scene, then restore the document tabs that were open
+    // for this project when it was last closed (MDI, issue #1).
+    EditorState.clearScene();
+    Documents.restore();
 }
 
 /// Create a new project at the given path with the given name.

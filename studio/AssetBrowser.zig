@@ -3,8 +3,8 @@ const dvui = @import("dvui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
-const ProjectOps = @import("ProjectOps.zig");
 const AssetActions = @import("AssetActions.zig");
+const Documents = @import("Documents.zig");
 
 var last_click_name_buf: [256]u8 = undefined;
 var last_click_name_len: usize = 0;
@@ -805,10 +805,27 @@ fn handleDeleteDialog() void {
 }
 
 fn openAsset(proj_path: []const u8, browse_path: []const u8, file_name: []const u8, open_mode: editor.asset_registry.OpenMode) void {
+    _ = proj_path;
     switch (open_mode) {
-        .internal_editor => openScene(proj_path, file_name),
-        .external_editor => AssetActions.openExternal(browse_path, file_name),
-        .none => {},
+        .external_editor => {
+            AssetActions.openExternal(browse_path, file_name);
+            return;
+        },
+        .none => return,
+        .internal_editor => {},
+    }
+
+    // Open the asset as a document tab (MDI, issue #1). Scenes/prefabs route to
+    // the scene-editing surface; everything else to its dedicated editor.
+    var path_buf: [1024]u8 = undefined;
+    const full_path = fullPathFor(file_name, browse_path, &path_buf);
+    const asset_type = editor.asset_registry.lookupByFilename(file_name);
+    if (asset_type == .scene) {
+        EditorState.selected_object = null;
+        EditorState.clearSelectedAsset();
+        Documents.openScene(full_path);
+    } else {
+        Documents.openAsset(full_path, asset_type);
     }
 }
 
@@ -821,18 +838,6 @@ fn instantiatePrefabFile(proj_path: []const u8, file_name: []const u8) void {
     else
         std.fmt.bufPrint(&path_buf, "{s}/assets/{s}", .{ proj_path, file_name }) catch return;
     _ = EditorState.instantiatePrefab(dvui.frameTimeNS(), dvui.io, full_path);
-}
-
-fn openScene(proj_path: []const u8, file_name: []const u8) void {
-    var path_buf: [1024]u8 = undefined;
-    const sub = currentSubdir();
-    const full_path = if (sub.len > 0)
-        std.fmt.bufPrint(&path_buf, "{s}/assets/{s}/{s}", .{ proj_path, sub, file_name }) catch return
-    else
-        std.fmt.bufPrint(&path_buf, "{s}/assets/{s}", .{ proj_path, file_name }) catch return;
-    EditorState.selected_object = null;
-    EditorState.clearSelectedAsset();
-    _ = ProjectOps.loadScene(full_path);
 }
 
 // Asset open/reveal/create helpers live in AssetActions.zig.
