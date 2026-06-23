@@ -1,4 +1,4 @@
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const MenuBar = @import("MenuBar.zig");
 const SceneTree = @import("SceneTree.zig");
@@ -17,17 +17,17 @@ var g_inspector_ratio: f32 = 0.7;
 var g_asset_doc_ratio: f32 = 0.75;
 var g_mouse_x: f32 = 0;
 var g_mouse_y: f32 = 0;
-var g_drag_ghost_rect: dvui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
+var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
-    for (dvui.events()) |*e| {
+    for (gui.events()) |*e| {
         if (e.evt == .window and e.evt.window.action == .close) return false;
         if (e.evt == .app and e.evt.app.action == .quit) return false;
         switch (e.evt) {
             .mouse => |me| {
                 if (me.action == .position or me.action == .press or me.action == .release) {
-                    const scale = dvui.windowNaturalScale();
+                    const scale = gui.windowNaturalScale();
                     g_mouse_x = me.p.x / scale;
                     g_mouse_y = me.p.y / scale;
                 }
@@ -43,7 +43,7 @@ pub fn frame() bool {
 
     if (should_quit) return false;
 
-    var root = dvui.box(@src(), .{}, .{
+    var root = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
         .style = .window,
@@ -51,7 +51,7 @@ pub fn frame() bool {
     defer root.deinit();
 
     // Handle global keyboard shortcuts after root is created
-    for (dvui.events()) |*e| {
+    for (gui.events()) |*e| {
         if (e.evt != .key) continue;
         const ke = e.evt.key;
         if (ke.action != .down or !ke.mod.control()) continue;
@@ -74,23 +74,23 @@ pub fn frame() bool {
             if (EditorState.selectedCount() > 0) {
                 e.handle(@src(), root.data());
                 EditorState.copySelectedObjects();
-                EditorState.deleteSelectedObjects(dvui.frameTimeNS());
+                EditorState.deleteSelectedObjects(gui.frameTimeNS());
             }
         } else if (ke.code == .v and !ke.mod.shift()) {
             if (EditorState.hasClipboard()) {
                 e.handle(@src(), root.data());
-                EditorState.pasteObjects(dvui.frameTimeNS(), dvui.io);
+                EditorState.pasteObjects(gui.frameTimeNS(), gui.io);
             }
         } else if (ke.code == .p and !ke.mod.shift()) {
             // Ctrl+P toggles Play / Stop (issue #31).
             e.handle(@src(), root.data());
-            PlayMode.toggle(dvui.io);
+            PlayMode.toggle(gui.io);
         }
     }
 
     MenuBar.draw(&should_quit);
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     // Document tab strip (MDI, issue #1). Drawn above the editing surface.
     Documents.drawTabBar(mouse_left_held);
@@ -103,7 +103,7 @@ pub fn frame() bool {
             // A non-scene asset tab hosts its dedicated editor full-area. The
             // asset browser stays available as a docked side panel so other
             // assets can be opened while editing one.
-            var split_h = dvui.paned(@src(), .{
+            var split_h = gui.paned(@src(), .{
                 .direction = .horizontal,
                 .collapsed_size = 0,
                 .handle_margin = 4,
@@ -113,7 +113,7 @@ pub fn frame() bool {
             if (split_h.showFirst()) Inspector.drawAssetDocument(Documents.activePath());
             if (split_h.showSecond()) AssetBrowser.draw();
         } else {
-            var split_h = dvui.paned(@src(), .{
+            var split_h = gui.paned(@src(), .{
                 .direction = .horizontal,
                 .collapsed_size = 0,
                 .handle_margin = 4,
@@ -121,7 +121,7 @@ pub fn frame() bool {
             }, .{ .expand = .both });
             defer split_h.deinit();
             if (split_h.showFirst()) {
-                var split_v = dvui.paned(@src(), .{
+                var split_v = gui.paned(@src(), .{
                     .direction = .vertical,
                     .collapsed_size = 0,
                     .handle_margin = 4,
@@ -129,7 +129,7 @@ pub fn frame() bool {
                 defer split_v.deinit();
 
                 if (split_v.showFirst()) {
-                    var split_h2 = dvui.paned(@src(), .{
+                    var split_h2 = gui.paned(@src(), .{
                         .direction = .horizontal,
                         .collapsed_size = 0,
                         .handle_margin = 4,
@@ -151,17 +151,17 @@ pub fn frame() bool {
         }
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
     TaskBar.draw();
 
     drawDragGhost();
 
     // Reap finished background jobs and keep frames flowing while one runs.
-    Tasks.pump(dvui.io);
+    Tasks.pump(gui.io);
 
     // Step the in-editor game simulation (issue #31). Keeps frames flowing
     // while a scene is playing so the viewport animates continuously.
-    PlayMode.pump(dvui.io);
+    PlayMode.pump(gui.io);
 
     return true;
 }
@@ -172,13 +172,13 @@ fn drawDragGhost() void {
     if (EditorState.drag_kind == .none) return;
 
     // Change cursor to "move" while dragging.
-    dvui.cursorSet(.arrow_all);
+    gui.cursorSet(.arrow_all);
 
     // Position the ghost 12px below-right of the cursor.
     g_drag_ghost_rect.x = g_mouse_x + 12;
     g_drag_ghost_rect.y = g_mouse_y + 12;
 
-    var fw = dvui.floatingWindow(@src(), .{
+    var fw = gui.floatingWindow(@src(), .{
         .rect = &g_drag_ghost_rect,
         .resize = .none,
         .stay_above_parent_window = true,
@@ -192,7 +192,7 @@ fn drawDragGhost() void {
     });
     defer fw.deinit();
 
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .background = false });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .background = false });
     defer row.deinit();
 
     switch (EditorState.drag_kind) {
@@ -205,20 +205,20 @@ fn drawDragGhost() void {
             const asset_type = editor.asset_registry.lookupByFilename(name);
             const desc = editor.asset_registry.get(asset_type);
             const icon_bytes = switch (desc.icon_hint) {
-                .document => dvui.entypo.text_document,
-                .code => dvui.entypo.code,
-                .image => dvui.entypo.image,
-                .sound => dvui.entypo.sound,
-                .model => dvui.entypo.layers,
-                .material => dvui.entypo.colours,
-                .data => dvui.entypo.database,
+                .document => gui.entypo.text_document,
+                .code => gui.entypo.code,
+                .image => gui.entypo.image,
+                .sound => gui.entypo.sound,
+                .model => gui.entypo.layers,
+                .material => gui.entypo.colours,
+                .data => gui.entypo.database,
             };
-            dvui.icon(@src(), "di", icon_bytes, .{}, .{
+            gui.icon(@src(), "di", icon_bytes, .{}, .{
                 .min_size_content = .{ .w = 14, .h = 14 },
                 .gravity_y = 0.5,
                 .padding = .{ .w = 4 },
             });
-            dvui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
+            gui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
         },
         .game_object => {
             const idx = EditorState.drag_object_idx;
@@ -226,12 +226,12 @@ fn drawDragGhost() void {
                 EditorState.objects[idx].nameSlice()
             else
                 "Object";
-            dvui.icon(@src(), "di", dvui.entypo.layers, .{}, .{
+            gui.icon(@src(), "di", gui.entypo.layers, .{}, .{
                 .min_size_content = .{ .w = 14, .h = 14 },
                 .gravity_y = 0.5,
                 .padding = .{ .w = 4 },
             });
-            dvui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
+            gui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5 });
         },
         .none => {},
     }

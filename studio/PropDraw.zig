@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -27,12 +27,12 @@ const tooltipIfAny = PropDrawMath.tooltipIfAny;
 pub fn drawComponent(comptime T: type, ptr: *T, id_base: usize, read_only: bool) bool {
     // Check for full type-level override first.
     if (comptime canHaveDecls(T) and @hasDecl(T, "turian_draw")) {
-        var al = dvui.Alignment.init(@src(), id_base);
+        var al = gui.Alignment.init(@src(), id_base);
         defer al.deinit();
         var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = std.heap.page_allocator };
         return T.turian_draw("", ptr, FieldHint{}, &ctx, id_base);
     }
-    var al = dvui.Alignment.init(@src(), id_base);
+    var al = gui.Alignment.init(@src(), id_base);
     defer al.deinit();
     var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = std.heap.page_allocator };
     return drawStructFields(T, ptr, &ctx);
@@ -87,7 +87,7 @@ var s_accepted_guid_buf: [36]u8 = undefined;
 
 // Double-click tracking for asset-ref drop zones (reveal in browser).
 var s_last_ref_click_ns: i128 = 0;
-var s_last_ref_click_id: dvui.Id = .zero;
+var s_last_ref_click_id: gui.Id = .zero;
 
 pub fn drawRefDropZone(
     src: std.builtin.SourceLocation,
@@ -101,7 +101,7 @@ pub fn drawRefDropZone(
         else => false,
     };
 
-    var drop_box = dvui.box(src, .{}, .{
+    var drop_box = gui.box(src, .{}, .{
         .expand = .horizontal,
         .gravity_y = 0.5,
         .border = .all(if (drag_compatible) 2 else 1),
@@ -113,14 +113,14 @@ pub fn drawRefDropZone(
     defer drop_box.deinit();
 
     var accepted: ?[]const u8 = null;
-    for (dvui.events()) |*e| {
-        if (!dvui.eventMatchSimple(e, drop_box.data())) continue;
+    for (gui.events()) |*e| {
+        if (!gui.eventMatchSimple(e, drop_box.data())) continue;
         switch (e.evt) {
             .mouse => |me| {
                 // Double-click an asset reference to reveal it in the asset
                 // browser (navigate to its folder + highlight it).
                 if (kind == .asset_ref and me.action == .press and me.button == .left) {
-                    const now = dvui.frameTimeNS();
+                    const now = gui.frameTimeNS();
                     const dbl = s_last_ref_click_id == drop_box.data().id and
                         now - s_last_ref_click_ns < 500 * std.time.ns_per_ms;
                     s_last_ref_click_id = drop_box.data().id;
@@ -154,7 +154,7 @@ pub fn drawRefDropZone(
     }
 
     const display = guidDisplayName(kind, current_guid);
-    dvui.label(@src(), "{s}", .{display}, .{
+    gui.label(@src(), "{s}", .{display}, .{
         .expand = .horizontal,
         .gravity_y = 0.5,
         .id_extra = id_extra,
@@ -205,12 +205,12 @@ fn drawStructFields(comptime T: type, ptr: *T, ctx: *DrawCtx) bool {
 
     // Pass 2 — grouped fields, each group under its own collapsible expander.
     inline for (groups, 0..) |g, gi| {
-        if (dvui.expander(@src(), g, .{ .default_expanded = true }, .{
+        if (gui.expander(@src(), g, .{ .default_expanded = true }, .{
             .expand = .horizontal,
             .padding = .all(2),
             .id_extra = gi,
         })) {
-            var indent = dvui.box(@src(), .{}, .{
+            var indent = gui.box(@src(), .{}, .{
                 .expand = .horizontal,
                 .padding = .{ .x = 12, .y = 0 },
                 .id_extra = gi,
@@ -218,7 +218,7 @@ fn drawStructFields(comptime T: type, ptr: *T, ctx: *DrawCtx) bool {
             defer indent.deinit();
 
             // Fresh alignment scope for each group.
-            var grp_al = dvui.Alignment.init(@src(), gi);
+            var grp_al = gui.Alignment.init(@src(), gi);
             defer grp_al.deinit();
             var grp_ctx = DrawCtx{ .al = &grp_al, .depth = ctx.depth + 1, .read_only = ctx.read_only, .allocator = ctx.allocator };
 
@@ -278,12 +278,12 @@ fn drawOptional(
     var changed = false;
     var has_val = ptr.* != null;
 
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
 
-    var aligned = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -294,7 +294,7 @@ fn drawOptional(
 
     const ro = ctx.read_only or hint.read_only;
     if (!ro) {
-        if (dvui.checkbox(@src(), &has_val, null, .{ .gravity_y = 0.5, .id_extra = id })) {
+        if (gui.checkbox(@src(), &has_val, null, .{ .gravity_y = 0.5, .id_extra = id })) {
             if (has_val) {
                 ptr.* = std.mem.zeroes(Child);
             } else {
@@ -303,16 +303,16 @@ fn drawOptional(
             changed = true;
         }
     } else {
-        dvui.label(@src(), "{s}", .{if (has_val) "set" else "null"}, .{ .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{s}", .{if (has_val) "set" else "null"}, .{ .gravity_y = 0.5, .id_extra = id });
     }
     aligned.deinit();
     row.deinit();
 
     if (ptr.*) |*inner| {
-        var inner_al = dvui.Alignment.init(@src(), id);
+        var inner_al = gui.Alignment.init(@src(), id);
         defer inner_al.deinit();
         var inner_ctx = DrawCtx{ .al = &inner_al, .depth = ctx.depth + 1, .read_only = ro, .allocator = ctx.allocator };
-        var indent = dvui.box(@src(), .{}, .{
+        var indent = gui.box(@src(), .{}, .{
             .expand = .horizontal,
             .padding = .{ .x = 20, .y = 0 },
             .id_extra = id,
@@ -328,13 +328,13 @@ fn drawOptional(
 // ─── Leaf drawers ─────────────────────────────────────────────────────────────
 
 fn drawBool(label: []const u8, ptr: *bool, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
     tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
 
-    var aligned = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -345,10 +345,10 @@ fn drawBool(label: []const u8, ptr: *bool, hint: FieldHint, ctx: *DrawCtx, id: u
 
     const ro = ctx.read_only or hint.read_only;
     if (ro) {
-        dvui.label(@src(), "{}", .{ptr.*}, .{ .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{}", .{ptr.*}, .{ .gravity_y = 0.5, .id_extra = id });
         return false;
     }
-    return dvui.checkbox(@src(), ptr, null, .{ .gravity_y = 0.5, .id_extra = id });
+    return gui.checkbox(@src(), ptr, null, .{ .gravity_y = 0.5, .id_extra = id });
 }
 
 fn drawNumber(
@@ -359,13 +359,13 @@ fn drawNumber(
     ctx: *DrawCtx,
     id: usize,
 ) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
     tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
 
-    var aligned = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -376,7 +376,7 @@ fn drawNumber(
 
     const ro = ctx.read_only or hint.read_only;
     if (ro) {
-        dvui.label(@src(), "{d}", .{ptr.*}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{d}", .{ptr.*}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
         return false;
     }
 
@@ -387,7 +387,7 @@ fn drawNumber(
             const lo: f32 = @floatCast(hint.min.?);
             const hi: f32 = @floatCast(hint.max.?);
             if (hint.widget == .slider_entry) {
-                return dvui.sliderEntry(@src(), null, .{
+                return gui.sliderEntry(@src(), null, .{
                     .value = ptr,
                     .min = lo,
                     .max = hi,
@@ -396,7 +396,7 @@ fn drawNumber(
             }
             if (hint.widget == .slider) {
                 var frac: f32 = if (hi > lo) std.math.clamp((ptr.* - lo) / (hi - lo), 0, 1) else 0;
-                if (dvui.slider(@src(), .{ .fraction = &frac }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id })) {
+                if (gui.slider(@src(), .{ .fraction = &frac }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id })) {
                     ptr.* = lo + frac * (hi - lo);
                     if (hint.step) |s| {
                         const sf: f32 = @floatCast(s);
@@ -411,7 +411,7 @@ fn drawNumber(
     }
 
     // Generic number entry.
-    const result = dvui.textEntryNumber(@src(), T, .{
+    const result = gui.textEntryNumber(@src(), T, .{
         .value = ptr,
         .min = if (hint.min) |m| castHintBound(T, m) else null,
         .max = if (hint.max) |m| castHintBound(T, m) else null,
@@ -427,13 +427,13 @@ fn drawEnum(
     ctx: *DrawCtx,
     id: usize,
 ) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
     tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
 
-    var aligned = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -444,17 +444,17 @@ fn drawEnum(
 
     const ro = ctx.read_only or hint.read_only;
     if (ro) {
-        dvui.label(@src(), "{s}", .{@tagName(ptr.*)}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{s}", .{@tagName(ptr.*)}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
         return false;
     }
-    return dvui.dropdownEnum(@src(), T, .{ .choice = ptr }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+    return gui.dropdownEnum(@src(), T, .{ .choice = ptr }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
 }
 
 fn drawStringSlice(label: []const u8, ptr: *[]const u8, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
     // Mutable string slices via the inspector are unusual — show as read-only label.
     _ = hint;
     _ = ctx;
-    dvui.label(@src(), "{s}: {s}", .{ label, ptr.* }, .{ .expand = .horizontal, .id_extra = id });
+    gui.label(@src(), "{s}: {s}", .{ label, ptr.* }, .{ .expand = .horizontal, .id_extra = id });
     return false;
 }
 
@@ -471,9 +471,9 @@ fn drawStringArray(
 
     if (hint.multiline) {
         // Multiline text area — label above, textarea below.
-        dvui.label(@src(), "{s}", .{label}, .{ .id_extra = id });
+        gui.label(@src(), "{s}", .{label}, .{ .id_extra = id });
         if (ro) return false;
-        var te = dvui.textEntry(@src(), .{
+        var te = gui.textEntry(@src(), .{
             .text = .{ .buffer = buf },
             .multiline = true,
         }, .{ .expand = .horizontal, .min_size_content = .{ .h = 80 }, .id_extra = id });
@@ -482,11 +482,11 @@ fn drawStringArray(
     }
 
     // Single-line: standard label + entry row.
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
     tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
-    var aligned = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -498,10 +498,10 @@ fn drawStringArray(
     if (ro) {
         // Show null-terminated portion only.
         const end = std.mem.indexOfScalar(u8, buf, 0) orelse buf.len;
-        dvui.label(@src(), "{s}", .{buf[0..end]}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{s}", .{buf[0..end]}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
         return false;
     }
-    var te = dvui.textEntry(@src(), .{
+    var te = gui.textEntry(@src(), .{
         .text = .{ .buffer = buf },
     }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
     defer te.deinit();
@@ -518,18 +518,18 @@ fn drawGenericArray(
     id: usize,
 ) bool {
     const len = @typeInfo(T).array.len;
-    if (dvui.expander(@src(), label, .{ .default_expanded = false }, .{
+    if (gui.expander(@src(), label, .{ .default_expanded = false }, .{
         .expand = .horizontal,
         .padding = .all(2),
         .id_extra = id,
     })) {
-        var indent = dvui.box(@src(), .{}, .{
+        var indent = gui.box(@src(), .{}, .{
             .expand = .horizontal,
             .padding = .{ .x = 12, .y = 0 },
             .id_extra = id,
         });
         defer indent.deinit();
-        var arr_al = dvui.Alignment.init(@src(), id);
+        var arr_al = gui.Alignment.init(@src(), id);
         defer arr_al.deinit();
         var arr_ctx = DrawCtx{ .al = &arr_al, .depth = ctx.depth + 1, .read_only = ctx.read_only or hint.read_only, .allocator = ctx.allocator };
         var changed = false;
@@ -559,21 +559,21 @@ fn drawGenericSlice(
     // ── Header row: label  [N]  [+] ──────────────────────────────────────────
     var add = false;
     {
-        var hdr = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var hdr = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .padding = .{ .x = 0, .y = 2 },
             .id_extra = id,
         });
         defer hdr.deinit();
 
-        dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-        dvui.label(@src(), "[{d}]", .{ptr.*.len}, .{
+        gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+        gui.label(@src(), "[{d}]", .{ptr.*.len}, .{
             .expand = .horizontal,
             .gravity_y = 0.5,
             .id_extra = id,
         });
         if (can_mutate) {
-            if (dvui.button(@src(), "+", .{}, .{ .gravity_y = 0.5, .id_extra = id })) add = true;
+            if (gui.button(@src(), "+", .{}, .{ .gravity_y = 0.5, .id_extra = id })) add = true;
         }
     }
 
@@ -582,14 +582,14 @@ fn drawGenericSlice(
     var remove_idx: ?usize = null;
 
     if (ptr.*.len > 0) {
-        var indent = dvui.box(@src(), .{}, .{
+        var indent = gui.box(@src(), .{}, .{
             .expand = .horizontal,
             .padding = .{ .x = 12, .y = 0 },
             .id_extra = id,
         });
         defer indent.deinit();
 
-        var elem_al = dvui.Alignment.init(@src(), id);
+        var elem_al = gui.Alignment.init(@src(), id);
         defer elem_al.deinit();
         var elem_ctx = DrawCtx{
             .al = &elem_al,
@@ -599,14 +599,14 @@ fn drawGenericSlice(
         };
 
         for (0..ptr.*.len) |ei| {
-            var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+            var row = gui.box(@src(), .{ .dir = .horizontal }, .{
                 .expand = .horizontal,
                 .id_extra = id * 10000 + ei + 1,
             });
             defer row.deinit();
 
             if (can_mutate) {
-                if (dvui.button(@src(), "×", .{}, .{
+                if (gui.button(@src(), "×", .{}, .{
                     .style = .err,
                     .gravity_y = 0.5,
                     .id_extra = id * 10000 + ei + 1,
@@ -647,9 +647,9 @@ fn drawGenericSlice(
 
 fn drawFallback(label: []const u8, ctx: *DrawCtx, id: usize) bool {
     _ = ctx;
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
-    dvui.label(@src(), "{s}: (unsupported type)", .{label}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+    gui.label(@src(), "{s}: (unsupported type)", .{label}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
     return false;
 }
 
@@ -663,18 +663,18 @@ fn drawNestedStruct(
     ctx: *DrawCtx,
     id: usize,
 ) bool {
-    if (dvui.expander(@src(), label, .{ .default_expanded = true }, .{
+    if (gui.expander(@src(), label, .{ .default_expanded = true }, .{
         .expand = .horizontal,
         .padding = .all(2),
         .id_extra = id,
     })) {
-        var indent = dvui.box(@src(), .{}, .{
+        var indent = gui.box(@src(), .{}, .{
             .expand = .horizontal,
             .padding = .{ .x = 12, .y = 0 },
             .id_extra = id,
         });
         defer indent.deinit();
-        var sub_al = dvui.Alignment.init(@src(), id);
+        var sub_al = gui.Alignment.init(@src(), id);
         defer sub_al.deinit();
         var sub_ctx = DrawCtx{ .al = &sub_al, .depth = ctx.depth + 1, .read_only = ctx.read_only or hint.read_only, .allocator = ctx.allocator };
         return drawStructFields(T, ptr, &sub_ctx);
@@ -694,11 +694,11 @@ fn drawRef(
     ctx: *DrawCtx,
     id: usize,
 ) bool {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
-    dvui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
     tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
-    var al_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var al_box = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .margin = ctx.al.margin(row.data().id),
         .gravity_y = 0.5,
@@ -710,7 +710,7 @@ fn drawRef(
     const ro = ctx.read_only or hint.read_only;
     if (ro) {
         const display = guidDisplayName(RefT._turian_ref_kind, ptr.slice());
-        dvui.label(@src(), "{s}", .{display}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+        gui.label(@src(), "{s}", .{display}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
         return false;
     }
 
@@ -724,17 +724,17 @@ fn drawRef(
 
     // Picker button — opens a floating list of matching assets or scene objects.
     // picker_id must be computed before the button so dataSet and dataGet share the same ID.
-    const picker_id = dvui.parentGet().extendId(@src(), id);
-    if (dvui.button(@src(), "...", .{}, .{
+    const picker_id = gui.parentGet().extendId(@src(), id);
+    if (gui.button(@src(), "...", .{}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 24 },
         .id_extra = id,
     })) {
-        dvui.dataSet(null, picker_id, "picker_open", true);
+        gui.dataSet(null, picker_id, "picker_open", true);
     }
-    const picker_open = dvui.dataGet(null, picker_id, "picker_open", bool) orelse false;
+    const picker_open = gui.dataGet(null, picker_id, "picker_open", bool) orelse false;
     if (picker_open) {
-        var fw = dvui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = id });
+        var fw = gui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = id });
         defer fw.deinit();
 
         switch (RefT._turian_ref_kind) {
@@ -746,13 +746,13 @@ fn drawRef(
                 if (pickerAsset(filter, fw)) |g| {
                     ptr.set(g);
                     changed = true;
-                    dvui.dataSet(null, picker_id, "picker_open", false);
+                    gui.dataSet(null, picker_id, "picker_open", false);
                 }
             },
             .game_object_ref, .component_ref => {
                 if (pickerSceneObject(RefT._turian_ref_kind, ptr, fw)) {
                     changed = true;
-                    dvui.dataSet(null, picker_id, "picker_open", false);
+                    gui.dataSet(null, picker_id, "picker_open", false);
                 }
             },
             else => {},
@@ -760,8 +760,8 @@ fn drawRef(
 
         // Close on focus loss — but skip the check on the floatingMenu's first frame
         // because dvui only focuses a new floatingMenu on its second frame (via minSizeGet).
-        if (dvui.minSizeGet(fw.data().id) != null and fw.data().id != dvui.focusedSubwindowId()) {
-            dvui.dataSet(null, picker_id, "picker_open", false);
+        if (gui.minSizeGet(fw.data().id) != null and fw.data().id != gui.focusedSubwindowId()) {
+            gui.dataSet(null, picker_id, "picker_open", false);
         }
     }
 
@@ -776,22 +776,22 @@ var s_picked_guid_buf: [36]u8 = undefined;
 
 fn pickerAsset(
     filter: engine.AssetFilter,
-    fw: *dvui.FloatingMenuWidget,
+    fw: *gui.FloatingMenuWidget,
 ) ?[]const u8 {
     // Built-in presets (material filter only).
     if (filter == .material) {
-        dvui.label(@src(), "Built-in", .{}, .{ .expand = .horizontal, .style = .content });
+        gui.label(@src(), "Built-in", .{}, .{ .expand = .horizontal, .style = .content });
         for (engine.Material.presets, 0..) |preset, pi| {
-            if (dvui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = pi })) |_| {
+            if (gui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = pi })) |_| {
                 fw.close();
                 return preset.guid;
             }
         }
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(2) });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(2) });
     }
 
     if (!EditorState.assetDbReady()) {
-        dvui.label(@src(), "(no project open)", .{}, .{});
+        gui.label(@src(), "(no project open)", .{}, .{});
         return null;
     }
     const asset_type: editor.AssetType = switch (filter) {
@@ -816,7 +816,7 @@ fn pickerAsset(
             info.path;
         var guid_buf: [36]u8 = undefined;
         const guid_str = info.guid.toString(&guid_buf);
-        if (dvui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx })) |_| {
+        if (gui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx })) |_| {
             const n = @min(guid_str.len, s_picked_guid_buf.len);
             @memcpy(s_picked_guid_buf[0..n], guid_str[0..n]);
             fw.close();
@@ -824,7 +824,7 @@ fn pickerAsset(
         }
         idx += 1;
     }
-    if (!any_shown and filter != .any) dvui.label(@src(), "(no project assets)", .{}, .{});
+    if (!any_shown and filter != .any) gui.label(@src(), "(no project assets)", .{}, .{});
     return null;
 }
 
@@ -837,35 +837,35 @@ pub fn drawScriptAssetRef(
     filter: engine.AssetFilter,
     id: usize,
 ) ?[]const u8 {
-    var row = dvui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
     var picked: ?[]const u8 = null;
 
     if (drawRefDropZone(@src(), .asset_ref, current_guid, id)) |new_guid| picked = new_guid;
 
-    const picker_id = dvui.parentGet().extendId(@src(), id);
-    if (dvui.button(@src(), "...", .{}, .{
+    const picker_id = gui.parentGet().extendId(@src(), id);
+    if (gui.button(@src(), "...", .{}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 24 },
         .id_extra = id,
     })) {
-        dvui.dataSet(null, picker_id, "picker_open", true);
+        gui.dataSet(null, picker_id, "picker_open", true);
     }
-    const picker_open = dvui.dataGet(null, picker_id, "picker_open", bool) orelse false;
+    const picker_open = gui.dataGet(null, picker_id, "picker_open", bool) orelse false;
     if (picker_open) {
-        var fw = dvui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = id });
+        var fw = gui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = id });
         defer fw.deinit();
 
         if (pickerAsset(filter, fw)) |g| {
             picked = g;
-            dvui.dataSet(null, picker_id, "picker_open", false);
+            gui.dataSet(null, picker_id, "picker_open", false);
         }
 
         // Close on focus loss — skip the floatingMenu's first frame (dvui only
         // focuses a new floatingMenu on its second frame via minSizeGet).
-        if (dvui.minSizeGet(fw.data().id) != null and fw.data().id != dvui.focusedSubwindowId()) {
-            dvui.dataSet(null, picker_id, "picker_open", false);
+        if (gui.minSizeGet(fw.data().id) != null and fw.data().id != gui.focusedSubwindowId()) {
+            gui.dataSet(null, picker_id, "picker_open", false);
         }
     }
 
@@ -875,18 +875,18 @@ pub fn drawScriptAssetRef(
 fn pickerSceneObject(
     kind: engine.api.FieldType,
     ptr: anytype,
-    fw: *dvui.FloatingMenuWidget,
+    fw: *gui.FloatingMenuWidget,
 ) bool {
     _ = kind;
     var changed = false;
     if (EditorState.object_count == 0) {
-        dvui.label(@src(), "(no scene objects)", .{}, .{});
+        gui.label(@src(), "(no scene objects)", .{}, .{});
         return false;
     }
     for (EditorState.objects[0..EditorState.object_count], 0..) |*obj, oi| {
         const gs = obj.guidSlice();
         if (gs.len == 0) continue;
-        if (dvui.menuItemLabel(@src(), obj.nameSlice(), .{}, .{ .expand = .horizontal, .id_extra = oi })) |_| {
+        if (gui.menuItemLabel(@src(), obj.nameSlice(), .{}, .{ .expand = .horizontal, .id_extra = oi })) |_| {
             ptr.set(gs);
             changed = true;
             fw.close();

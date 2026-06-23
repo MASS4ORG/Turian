@@ -12,7 +12,7 @@
 //! At most one background job runs at a time; build is an exclusive operation
 //! and serialising reimport with it keeps the asset database access simple.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const build_options = @import("turian_build_options");
@@ -121,10 +121,10 @@ pub fn pump(io: std.Io) void {
         finishJob(job);
         active_job = null;
         // One more frame so the bar reflects the final state immediately.
-        dvui.refresh(null, @src(), null);
+        gui.refresh(null, @src(), null);
     } else {
         // Worker thread is updating progress; schedule the next frame.
-        dvui.refresh(null, @src(), null);
+        gui.refresh(null, @src(), null);
     }
 }
 
@@ -189,7 +189,7 @@ fn finishJob(job: *Job) void {
 
 fn rejectIfBusy() bool {
     if (active_job == null) return false;
-    dvui.dialog(@src(), .{}, .{
+    gui.dialog(@src(), .{}, .{
         .title = "Task Running",
         .message = "A task is already running. Wait for it to finish.",
     });
@@ -197,7 +197,7 @@ fn rejectIfBusy() bool {
 }
 
 fn noProjectDialog() void {
-    dvui.dialog(@src(), .{}, .{
+    gui.dialog(@src(), .{}, .{
         .title = "No Project",
         .message = "Open a project first.",
     });
@@ -223,5 +223,5 @@ fn buildConfig(alloc: std.mem.Allocator) editor.GameBuild.BuildConfig {
         .render_root = build_options.render_root_path,
         .sdl3_include = build_options.sdl3_include_path,
     };
-    return editor.sdk_layout.resolveBuildConfig(dvui.io, alloc, EditorState.environ_map, baked);
+    return editor.sdk_layout.resolveBuildConfig(gui.io, alloc, EditorState.environ_map, baked);
 }

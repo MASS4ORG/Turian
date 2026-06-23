@@ -2,7 +2,7 @@
 //! follow-up). Click-to-select ray-tests against these so picking matches the
 //! actual mesh extent instead of assuming every mesh is a unit cube.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -48,7 +48,7 @@ fn compute(guid: []const u8) ?Bounds {
     const g = editor.Guid.parse(guid) catch return null;
     var buf: [1024]u8 = undefined;
     const path = editor.asset_cache.artifactPath(proj, g, .model, &buf) orelse return null;
-    const bytes = std.Io.Dir.cwd().readFileAlloc(dvui.io, path, page, .unlimited) catch return null;
+    const bytes = std.Io.Dir.cwd().readFileAlloc(gui.io, path, page, .unlimited) catch return null;
     defer page.free(bytes);
 
     var mesh = engine.assets.loadMeshFromMemory(page, bytes, "") catch return null;

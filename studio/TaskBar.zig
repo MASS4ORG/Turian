@@ -5,7 +5,7 @@
 //! All state is read from the studio `TaskManager` (via `Tasks`) as a per-frame
 //! snapshot, so this file never touches worker-thread state directly.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const Tasks = @import("Tasks.zig");
 
@@ -25,7 +25,7 @@ pub fn draw() void {
 
     notifyCompletions(tasks);
 
-    var outer = dvui.box(@src(), .{ .dir = .vertical }, .{
+    var outer = gui.box(@src(), .{ .dir = .vertical }, .{
         .expand = .horizontal,
         .background = true,
         .style = .control,
@@ -33,7 +33,7 @@ pub fn draw() void {
     defer outer.deinit();
 
     if (show_list and tasks.len > 0) {
-        var scroll = dvui.scrollArea(@src(), .{ .vertical = .auto }, .{
+        var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{
             .expand = .horizontal,
             .min_size_content = .{ .h = 110 },
         });
@@ -41,15 +41,15 @@ pub fn draw() void {
         for (tasks, 0..) |*t, i| drawRow(tm, t, i);
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
     drawStatusRow(tm, tasks);
 }
 
 /// The compact always-visible row: current task summary + expand toggle.
 fn drawStatusRow(tm: *editor.TaskManager, tasks: []Task) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
-        .padding = dvui.Rect.all(4),
+        .padding = gui.Rect.all(4),
     });
     defer row.deinit();
 
@@ -69,58 +69,58 @@ fn drawStatusRow(tm: *editor.TaskManager, tasks: []Task) void {
             std.fmt.bufPrint(&line_buf, "{s}: {s}", .{ t.label(), t.note() }) catch t.label()
         else
             t.label();
-        dvui.label(@src(), "{s}", .{line}, .{ .gravity_y = 0.5 });
-        dvui.progress(@src(), .{ .percent = t.progress }, .{
+        gui.label(@src(), "{s}", .{line}, .{ .gravity_y = 0.5 });
+        gui.progress(@src(), .{ .percent = t.progress }, .{
             .min_size_content = .{ .w = 160, .h = 12 },
             .gravity_y = 0.5,
-            .margin = dvui.Rect.all(6),
+            .margin = gui.Rect.all(6),
         });
-        if (dvui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
+        if (gui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
             tm.requestCancel(t.id);
         }
     } else {
-        dvui.label(@src(), "Ready", .{}, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "Ready", .{}, .{ .gravity_y = 0.5 });
     }
 
-    _ = dvui.spacer(@src(), .{ .expand = .horizontal });
+    _ = gui.spacer(@src(), .{ .expand = .horizontal });
 
     if (tasks.len > 0) {
-        if (dvui.button(@src(), "Clear", .{}, .{ .gravity_y = 0.5 })) tm.clearFinished();
+        if (gui.button(@src(), "Clear", .{}, .{ .gravity_y = 0.5 })) tm.clearFinished();
     }
 
     var btn_buf: [32]u8 = undefined;
     const btn = std.fmt.bufPrint(&btn_buf, "Tasks ({d})", .{active_count}) catch "Tasks";
-    if (dvui.button(@src(), btn, .{}, .{ .gravity_y = 0.5 })) show_list = !show_list;
+    if (gui.button(@src(), btn, .{}, .{ .gravity_y = 0.5 })) show_list = !show_list;
 }
 
 /// One row in the expanded list: kind, label, progress/status, cancel.
 fn drawRow(tm: *editor.TaskManager, t: *const Task, i: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .id_extra = i,
-        .padding = dvui.Rect.all(3),
+        .padding = gui.Rect.all(3),
     });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{t.kind.text()}, .{
+    gui.label(@src(), "{s}", .{t.kind.text()}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 70 },
     });
-    dvui.label(@src(), "{s}", .{t.label()}, .{ .gravity_y = 0.5 });
+    gui.label(@src(), "{s}", .{t.label()}, .{ .gravity_y = 0.5 });
 
-    _ = dvui.spacer(@src(), .{ .expand = .horizontal });
+    _ = gui.spacer(@src(), .{ .expand = .horizontal });
 
     if (t.isActive()) {
-        dvui.progress(@src(), .{ .percent = t.progress }, .{
+        gui.progress(@src(), .{ .percent = t.progress }, .{
             .min_size_content = .{ .w = 140, .h = 12 },
             .gravity_y = 0.5,
-            .margin = dvui.Rect.all(4),
+            .margin = gui.Rect.all(4),
         });
-        if (dvui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
+        if (gui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
             tm.requestCancel(t.id);
         }
     } else {
-        dvui.label(@src(), "{s}", .{t.status.text()}, .{
+        gui.label(@src(), "{s}", .{t.status.text()}, .{
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 90 },
         });
@@ -141,7 +141,7 @@ fn notifyCompletions(tasks: []Task) void {
             .cancelled => std.fmt.bufPrint(&msg_buf, "{s}: cancelled", .{t.label()}) catch t.label(),
             else => unreachable,
         };
-        dvui.toast(@src(), .{ .id_extra = @intCast(t.id), .message = msg });
+        gui.toast(@src(), .{ .id_extra = @intCast(t.id), .message = msg });
     }
     notified_id = max_seen;
 }

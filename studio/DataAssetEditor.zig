@@ -4,7 +4,7 @@
 //! text entry widgets). Conversion to/from SceneScriptField happens only on
 //! load and save.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -44,35 +44,35 @@ pub fn draw(asset_path: []const u8) void {
     const def = findDef(loadedTypeName());
 
     {
-        var info = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
+        var info = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer info.deinit();
         if (def) |d| {
-            dvui.label(@src(), "Type:  {s}", .{d.displayName()}, .{});
+            gui.label(@src(), "Type:  {s}", .{d.displayName()}, .{});
         } else {
-            dvui.label(@src(), "Type:  {s} (definition not found)", .{loadedTypeName()}, .{});
+            gui.label(@src(), "Type:  {s} (definition not found)", .{loadedTypeName()}, .{});
         }
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     if (field_count == 0) {
-        dvui.label(@src(), "(no fields)", .{}, .{ .expand = .horizontal, .padding = .all(8) });
+        gui.label(@src(), "(no fields)", .{}, .{ .expand = .horizontal, .padding = .all(8) });
     } else {
         drawFields();
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9001 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9001 });
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
 
         if (dirty) {
-            dvui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
         } else {
-            dvui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
         }
 
-        if (dvui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             saveCurrent();
         }
     }
@@ -96,12 +96,12 @@ fn drawFields() void {
                 fi += 1;
             }
             const group_id = run_start * 10 + 1;
-            if (dvui.expander(@src(), prefix, .{ .default_expanded = true }, .{
+            if (gui.expander(@src(), prefix, .{ .default_expanded = true }, .{
                 .expand = .horizontal,
                 .padding = .all(2),
                 .id_extra = group_id,
             })) {
-                var indent = dvui.box(@src(), .{}, .{
+                var indent = gui.box(@src(), .{}, .{
                     .expand = .horizontal,
                     .padding = .{ .x = 12, .y = 0 },
                     .id_extra = group_id,
@@ -138,7 +138,7 @@ fn load(asset_path: []const u8) void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const file: ?DataAssetFile = editor.data_asset_io.load(arena, dvui.io, asset_path) catch null;
+    const file: ?DataAssetFile = editor.data_asset_io.load(arena, gui.io, asset_path) catch null;
     if (file == null) return;
     const f = file.?;
 
@@ -181,11 +181,11 @@ fn saveCurrent() void {
         .fields = scene_fields,
     };
 
-    editor.data_asset_io.save(dvui.io, loadedPath(), file) catch return;
+    editor.data_asset_io.save(gui.io, loadedPath(), file) catch return;
     dirty = false;
 
     if (EditorState.project_path) |proj| {
-        editor.asset_importer.importAssetForce(dvui.io, arena, proj, loadedPath());
+        editor.asset_importer.importAssetForce(gui.io, arena, proj, loadedPath());
     }
 }
 

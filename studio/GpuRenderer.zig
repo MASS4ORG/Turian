@@ -6,7 +6,7 @@
 //! the editor (`EditorState` + the cooked `.cache`). dvui still owns the window;
 //! the renderer just draws into the dvui target.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const gpu = @import("gpu");
 const engine = @import("engine");
 const editor = @import("editor");
@@ -14,8 +14,8 @@ const render = @import("render");
 const EditorState = @import("EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 
-const dc = dvui.backend.c;
-const SDLBackend = dvui.backend.SDLBackend;
+const dc = gui.backend.c;
+const SDLBackend = gui.backend.SDLBackend;
 const page = std.heap.page_allocator;
 
 /// dvui's TextureTarget wraps an SDL_GPUTexture + sampler; we draw into the
@@ -27,7 +27,7 @@ const BackendTex = extern struct {
 
 var g_backend: ?*SDLBackend = null;
 var g_cmd: ?*dc.SDL_GPUCommandBuffer = null;
-var g_color_target: ?dvui.TextureTarget = null;
+var g_color_target: ?gui.TextureTarget = null;
 var g_target_w: u32 = 0;
 var g_target_h: u32 = 0;
 var g_ready = false;
@@ -80,7 +80,7 @@ pub fn beginFrame(cmd: ?*dc.SDL_GPUCommandBuffer) void {
 }
 
 /// Render the scene into the dvui offscreen target and return it for display.
-pub fn renderViewport(w: u32, h: u32) ?dvui.TextureTarget {
+pub fn renderViewport(w: u32, h: u32) ?gui.TextureTarget {
     if (!g_ready) return null;
     const cmd = g_cmd orelse return null;
     const backend = g_backend orelse return null;
@@ -118,7 +118,7 @@ pub fn deinit() void {
 // ── Asset sources (GUID → bytes for the render module) ──────────────────────────
 
 fn readOwned(path: []const u8) ?render.Bytes {
-    const data = std.Io.Dir.cwd().readFileAlloc(dvui.io, path, page, .unlimited) catch return null;
+    const data = std.Io.Dir.cwd().readFileAlloc(gui.io, path, page, .unlimited) catch return null;
     return .{ .data = data, .owned = true };
 }
 

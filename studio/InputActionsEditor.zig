@@ -6,7 +6,7 @@
 //! of `MaterialEditor` / `DataAssetEditor` (module-level loaded state + a Save row).
 
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -83,7 +83,7 @@ pub fn draw(asset_path: []const u8) void {
 
     for (actions[0..action_count], 0..) |*act, ai| drawAction(act, ai);
 
-    if (dvui.button(@src(), "+ Add Action", .{}, .{ .expand = .horizontal, .padding = .all(6) })) {
+    if (gui.button(@src(), "+ Add Action", .{}, .{ .expand = .horizontal, .padding = .all(6) })) {
         if (action_count < MAX_ACTIONS) {
             actions[action_count] = .{};
             setBuf(&actions[action_count].name, "new_action");
@@ -92,16 +92,16 @@ pub fn draw(asset_path: []const u8) void {
         }
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9001 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9001 });
 
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
         if (dirty)
-            dvui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            dvui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (dvui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
@@ -110,14 +110,14 @@ pub fn draw(asset_path: []const u8) void {
 }
 
 fn drawAction(act: *EdAction, ai: usize) void {
-    var box = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .all(6), .id_extra = ai });
+    var box = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .all(6), .id_extra = ai });
     defer box.deinit();
 
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = ai });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = ai });
         defer row.deinit();
 
-        var te = dvui.textEntry(@src(), .{ .text = .{ .buffer = &act.name } }, .{
+        var te = gui.textEntry(@src(), .{ .text = .{ .buffer = &act.name } }, .{
             .id_extra = ai,
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 150 },
@@ -126,13 +126,13 @@ fn drawAction(act: *EdAction, ai: usize) void {
         te.deinit();
         if (name_changed) dirty = true;
 
-        if (dvui.dropdownEnum(@src(), InputActions.Kind, .{ .choice = &act.kind }, .{}, .{
+        if (gui.dropdownEnum(@src(), InputActions.Kind, .{ .choice = &act.kind }, .{}, .{
             .id_extra = ai,
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 90 },
         })) dirty = true;
 
-        if (dvui.button(@src(), "Remove", .{}, .{ .id_extra = ai, .gravity_y = 0.5 })) {
+        if (gui.button(@src(), "Remove", .{}, .{ .id_extra = ai, .gravity_y = 0.5 })) {
             cmd_remove_action = ai;
         }
     }
@@ -156,23 +156,23 @@ fn drawRole(act: *EdAction, ai: usize, role_id: RoleId, label: []const u8, rextr
     const role = roleById(act, role_id);
     const id = ai * 16 + rextra;
 
-    var box = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 14, .y = 2 }, .id_extra = id });
+    var box = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 14, .y = 2 }, .id_extra = id });
     defer box.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .min_size_content = .{ .w = 80 } });
+    gui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .min_size_content = .{ .w = 80 } });
 
     for (role.items[0..role.count], 0..) |*src, bi| {
         const bid = id * 8 + bi;
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 1 }, .id_extra = bid });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 1 }, .id_extra = bid });
         defer row.deinit();
 
-        if (dvui.dropdownEnum(@src(), InputActions.Device, .{ .choice = &src.device }, .{}, .{
+        if (gui.dropdownEnum(@src(), InputActions.Device, .{ .choice = &src.device }, .{}, .{
             .id_extra = bid,
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 70 },
         })) dirty = true;
 
-        var te = dvui.textEntry(@src(), .{ .text = .{ .buffer = &src.code } }, .{
+        var te = gui.textEntry(@src(), .{ .text = .{ .buffer = &src.code } }, .{
             .id_extra = bid,
             .gravity_y = 0.5,
             .expand = .horizontal,
@@ -184,17 +184,17 @@ fn drawRole(act: *EdAction, ai: usize, role_id: RoleId, label: []const u8, rextr
         // Gamepad axes bind one direction (+/-) of the stick/trigger.
         if (src.device == .gamepad_axis) {
             const before = src.axis_positive;
-            _ = dvui.checkbox(@src(), &src.axis_positive, "+", .{ .id_extra = bid, .gravity_y = 0.5 });
+            _ = gui.checkbox(@src(), &src.axis_positive, "+", .{ .id_extra = bid, .gravity_y = 0.5 });
             if (src.axis_positive != before) dirty = true;
         }
 
-        if (dvui.button(@src(), "x", .{}, .{ .id_extra = bid, .gravity_y = 0.5 })) {
+        if (gui.button(@src(), "x", .{}, .{ .id_extra = bid, .gravity_y = 0.5 })) {
             cmd_remove_binding = .{ .action = ai, .role = role_id, .idx = bi };
         }
     }
 
     if (role.count < MAX_ROLE) {
-        if (dvui.button(@src(), "+ binding", .{}, .{ .id_extra = id, .padding = .{ .x = 6, .y = 2 } })) {
+        if (gui.button(@src(), "+ binding", .{}, .{ .id_extra = id, .padding = .{ .x = 6, .y = 2 } })) {
             cmd_add_binding = .{ .action = ai, .role = role_id };
         }
     }
@@ -248,7 +248,7 @@ fn load(asset_path: []const u8) void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const bytes = std.Io.Dir.cwd().readFileAlloc(dvui.io, asset_path, arena, .unlimited) catch return;
+    const bytes = std.Io.Dir.cwd().readFileAlloc(gui.io, asset_path, arena, .unlimited) catch return;
     const ia = InputActions.loadFromBytes(arena, bytes) catch return;
 
     for (ia.actions) |a| {
@@ -292,12 +292,12 @@ fn save() void {
     }
 
     const ia = InputActions{ .version = InputActions.CURRENT_VERSION, .actions = defs };
-    ia.save(dvui.io, loadedPath()) catch return;
+    ia.save(gui.io, loadedPath()) catch return;
     dirty = false;
 
     // Keep the cached artifact in sync with the freshly written source.
     if (EditorState.project_path) |proj| {
-        editor.asset_importer.importAssetForce(dvui.io, dvui.currentWindow().arena(), proj, loadedPath());
+        editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, loadedPath());
     }
 }
 

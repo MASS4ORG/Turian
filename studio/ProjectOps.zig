@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const EditorState = @import("EditorState.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
@@ -9,14 +9,14 @@ const editor = @import("editor");
 pub fn openProject(path: []const u8) void {
     EditorState.setProjectPath(path);
     AssetWatcher.reset();
-    const result = editor.project_ops.openProject(dvui.io, dvui.currentWindow().arena(), path);
+    const result = editor.project_ops.openProject(gui.io, gui.currentWindow().arena(), path);
     EditorState.current_project = result.project;
-    EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+    EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
 
     if (EditorState.settingsReady()) {
-        const arena = dvui.currentWindow().arena();
-        editor.recent_projects.push(&EditorState.settings, dvui.io, arena, path);
-        EditorState.settings.save(dvui.io);
+        const arena = gui.currentWindow().arena();
+        editor.recent_projects.push(&EditorState.settings, gui.io, arena, path);
+        EditorState.settings.save(gui.io);
     }
 
     // Start from a clean scene, then restore the document tabs that were open
@@ -27,7 +27,7 @@ pub fn openProject(path: []const u8) void {
 
 /// Create a new project at the given path with the given name.
 pub fn newProject(path: []const u8, proj_name: []const u8) void {
-    editor.project_ops.newProject(dvui.io, path, proj_name);
+    editor.project_ops.newProject(gui.io, path, proj_name);
     openProject(path);
 
     if (EditorState.current_project) |*p| {
@@ -42,11 +42,11 @@ pub fn newProject(path: []const u8, proj_name: []const u8) void {
 /// Save the current scene to a .zon file at the given path.
 pub fn saveScene(path: []const u8) void {
     editor.scene_io.saveScene(
-        dvui.io,
+        gui.io,
         path,
         &EditorState.objects,
         EditorState.object_count,
-        dvui.currentWindow().arena(),
+        gui.currentWindow().arena(),
     );
     EditorState.markSceneSaved();
 }
@@ -56,7 +56,7 @@ pub fn loadScene(path: []const u8) bool {
     var tmp_objects: [EditorState.MAX_OBJECTS]EditorState.SceneNode = undefined;
     var tmp_count: usize = 0;
 
-    if (!editor.scene_io.loadScene(dvui.io, dvui.currentWindow().arena(), path, &tmp_objects, &tmp_count)) {
+    if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, &tmp_objects, &tmp_count)) {
         return false;
     }
 
@@ -69,7 +69,7 @@ pub fn loadScene(path: []const u8) bool {
     EditorState.object_count = tmp_count;
     EditorState.syncSceneWithDefinitions();
     // Pull in any source-prefab edits made since this scene was saved.
-    EditorState.resyncPrefabInstances(dvui.io);
+    EditorState.resyncPrefabInstances(gui.io);
     EditorState.setCurrentScenePath(path);
     EditorState.markSceneSaved();
     return true;

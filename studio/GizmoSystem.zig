@@ -10,7 +10,7 @@
 //! registered via `registerGizmo`, so components/extensions plug in their own
 //! visualization. Visibility is filtered per type through `show`.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const render = @import("render");
 const EditorState = @import("EditorState.zig");
@@ -94,7 +94,7 @@ pub const DrawerFn = *const fn (giz: *Gizmos, node: *const engine.SceneNode, com
 const Registered = struct {
     name: []const u8,
     drawer: ?DrawerFn = null,
-    /// TVG icon bytes (e.g. `dvui.entypo.*`), or null for no billboard icon.
+    /// TVG icon bytes (e.g. `gui.entypo.*`), or null for no billboard icon.
     icon: ?[]const u8 = null,
     /// Named visibility layer (free-form). Defaults to "Default".
     layer: []const u8 = "Default",
@@ -169,8 +169,8 @@ pub const IconPlacement = struct {
 };
 
 /// Built-in icons for the standard light/camera components (TVG bytes).
-const light_icon = dvui.entypo.light_bulb;
-const camera_icon = dvui.entypo.video_camera;
+const light_icon = gui.entypo.light_bulb;
+const camera_icon = gui.entypo.video_camera;
 
 /// Project each visible object's icon to screen and fill `out`. Returns the
 /// count written. Lights and cameras get built-in icons; user-script components
@@ -365,7 +365,7 @@ fn interact(cam: Camera, rect: Rect, objects: []engine.SceneNode, sel: ?usize, m
         applyDrag(cam, rect, node, m.pos, scale);
         if (m.left_released) {
             // One undo entry per drag.
-            EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+            EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
                 .idx = idx,
                 .before = drag_before,
                 .after = node.*,

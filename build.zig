@@ -134,7 +134,7 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = optimize,
                 .imports = &.{
-                    .{ .name = "dvui", .module = dvui_mod.? },
+                    .{ .name = "gui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
@@ -232,7 +232,7 @@ pub fn build(b: *std.Build) void {
                 .target = target,
                 .optimize = .ReleaseFast,
                 .imports = &.{
-                    .{ .name = "dvui", .module = dvui_mod.? },
+                    .{ .name = "gui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
@@ -339,7 +339,7 @@ pub fn build(b: *std.Build) void {
                     .target = target,
                     .optimize = optimize,
                     .imports = &.{
-                        .{ .name = "dvui", .module = dvui_mod.? },
+                        .{ .name = "gui", .module = dvui_mod.? },
                         .{ .name = "engine", .module = engine_mod },
                         .{ .name = "editor", .module = editor_mod },
                         .{ .name = "render", .module = render_mod.? },

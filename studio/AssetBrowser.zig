@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -136,7 +136,7 @@ fn navigateBrowserItems(go_prev: bool, browse_path: []const u8) void {
 
 /// Draw the asset browser panel with file tiles and navigation.
 pub fn draw() void {
-    var outer = dvui.box(@src(), .{}, .{
+    var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
         .style = .window,
@@ -154,7 +154,7 @@ pub fn draw() void {
     }
 
     {
-        var header = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .border = .all(1),
             .background = true,
@@ -162,35 +162,35 @@ pub fn draw() void {
         });
         defer header.deinit();
 
-        dvui.label(@src(), "Asset Browser", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
+        gui.label(@src(), "Asset Browser", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
 
         // Show the path relative to the project (from `assets/` onward); the
         // full project path is redundant and clutters the header. File changes
         // are picked up by the file watcher, so there is no Refresh button.
         if (EditorState.project_path != null) {
             if (current_subdir_len > 0) {
-                dvui.label(@src(), "  assets/{s}", .{currentSubdir()}, .{ .gravity_y = 0.5, .expand = .horizontal });
+                gui.label(@src(), "  assets/{s}", .{currentSubdir()}, .{ .gravity_y = 0.5, .expand = .horizontal });
             } else {
-                dvui.label(@src(), "  assets", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+                gui.label(@src(), "  assets", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
             }
         }
     }
 
     const proj_path = EditorState.project_path orelse {
-        var center = dvui.box(@src(), .{}, .{
+        var center = gui.box(@src(), .{}, .{
             .expand = .both,
             .gravity_x = 0.5,
             .gravity_y = 0.5,
         });
         defer center.deinit();
-        dvui.label(@src(), "No project open.", .{}, .{ .gravity_x = 0.5 });
-        dvui.label(@src(), "Use File > Open Project... to open a project folder.", .{}, .{ .gravity_x = 0.5 });
+        gui.label(@src(), "No project open.", .{}, .{ .gravity_x = 0.5 });
+        gui.label(@src(), "Use File > Open Project... to open a project folder.", .{}, .{ .gravity_x = 0.5 });
         return;
     };
 
     var assets_path_buf: [1024]u8 = undefined;
     const assets_path = std.fmt.bufPrint(&assets_path_buf, "{s}/assets", .{proj_path}) catch {
-        dvui.label(@src(), "Path too long.", .{}, .{});
+        gui.label(@src(), "Path too long.", .{}, .{});
         return;
     };
 
@@ -209,7 +209,7 @@ pub fn draw() void {
     EditorState.setActiveBrowseDir(browse_path);
 
     // Handle keyboard events
-    for (dvui.events()) |*e| {
+    for (gui.events()) |*e| {
         if (e.handled) continue;
         if (e.evt != .key) continue;
         const ke = e.evt.key;
@@ -234,7 +234,7 @@ pub fn draw() void {
 
         if (mod.control() and ke.code == .c and EditorState.selected_asset_path != null) {
             e.handle(@src(), outer.data());
-            dvui.clipboardTextSet(EditorState.selected_asset_path.?);
+            gui.clipboardTextSet(EditorState.selected_asset_path.?);
         } else if (ke.code == .f2 and EditorState.selected_asset_path != null) {
             e.handle(@src(), outer.data());
             EditorState.startRenameAsset(EditorState.selected_asset_path.?);
@@ -244,16 +244,16 @@ pub fn draw() void {
     // Handle delete confirmation dialog
     handleDeleteDialog();
 
-    var scroll = dvui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+    var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
-    var dir = std.Io.Dir.cwd().openDir(dvui.io, browse_path, .{ .iterate = true }) catch {
-        dvui.label(@src(), "No assets folder found. Create {s}/assets.", .{proj_path}, .{ .padding = .all(8) });
+    var dir = std.Io.Dir.cwd().openDir(gui.io, browse_path, .{ .iterate = true }) catch {
+        gui.label(@src(), "No assets folder found. Create {s}/assets.", .{proj_path}, .{ .padding = .all(8) });
         return;
     };
-    defer dir.close(dvui.io);
+    defer dir.close(gui.io);
 
-    var flex = dvui.flexbox(@src(), .{}, .{ .expand = .horizontal, .padding = .all(4) });
+    var flex = gui.flexbox(@src(), .{}, .{ .expand = .horizontal, .padding = .all(4) });
     defer flex.deinit();
 
     // Reset drag-hover each frame; set again below via move events
@@ -265,7 +265,7 @@ pub fn draw() void {
     var entry_idx: usize = 0;
     if (current_subdir_len > 0) {
         const up_hovered = EditorState.drag_kind == .asset and g_drag_hover_idx == 99999;
-        var tile = dvui.box(@src(), .{}, .{
+        var tile = gui.box(@src(), .{}, .{
             .id_extra = 99999,
             .min_size_content = .{ .w = 72, .h = 72 },
             .background = true,
@@ -278,8 +278,8 @@ pub fn draw() void {
         });
         defer tile.deinit();
 
-        for (dvui.events()) |*e| {
-            if (!dvui.eventMatchSimple(e, tile.data())) continue;
+        for (gui.events()) |*e| {
+            if (!gui.eventMatchSimple(e, tile.data())) continue;
             switch (e.evt) {
                 .mouse => |me| {
                     if (me.action == .position and EditorState.drag_kind == .asset) {
@@ -287,7 +287,7 @@ pub fn draw() void {
                     }
                     if (me.action == .press and me.button == .left) {
                         e.handle(@src(), tile.data());
-                        const now = dvui.frameTimeNS();
+                        const now = gui.frameTimeNS();
                         const same = std.mem.eql(u8, last_click_name_buf[0..last_click_name_len], "..");
                         if (same and now - last_click_ns < 500 * std.time.ns_per_ms) {
                             goUp();
@@ -312,17 +312,17 @@ pub fn draw() void {
                                     var full_dest_buf: [1024]u8 = undefined;
                                     const full_dest = std.fmt.bufPrint(&full_dest_buf, "{s}/{s}", .{ dest, file_name }) catch "";
                                     if (full_dest.len > 0) {
-                                        std.Io.Dir.rename(std.Io.Dir.cwd(), src_path, std.Io.Dir.cwd(), full_dest, dvui.io) catch {};
+                                        std.Io.Dir.rename(std.Io.Dir.cwd(), src_path, std.Io.Dir.cwd(), full_dest, gui.io) catch {};
                                         var src_meta_buf: [1024 + 5]u8 = undefined;
                                         var dest_meta_buf: [1024 + 5]u8 = undefined;
                                         const src_meta = std.fmt.bufPrint(&src_meta_buf, "{s}.meta", .{src_path}) catch "";
                                         const dest_meta = std.fmt.bufPrint(&dest_meta_buf, "{s}.meta", .{full_dest}) catch "";
                                         if (src_meta.len > 0 and dest_meta.len > 0) {
-                                            std.Io.Dir.rename(std.Io.Dir.cwd(), src_meta, std.Io.Dir.cwd(), dest_meta, dvui.io) catch {};
+                                            std.Io.Dir.rename(std.Io.Dir.cwd(), src_meta, std.Io.Dir.cwd(), dest_meta, gui.io) catch {};
                                         }
                                         EditorState.clearDrag();
-                                        EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-                                        dvui.refresh(null, @src(), null);
+                                        EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
+                                        gui.refresh(null, @src(), null);
                                     }
                                 }
                             }
@@ -333,12 +333,12 @@ pub fn draw() void {
             }
         }
 
-        dvui.icon(@src(), "up_icon", dvui.entypo.arrow_up, .{}, .{
+        gui.icon(@src(), "up_icon", gui.entypo.arrow_up, .{}, .{
             .gravity_x = 0.5,
             .min_size_content = .{ .w = 32, .h = 32 },
             .id_extra = 99999,
         });
-        dvui.label(@src(), "..", .{}, .{ .gravity_x = 0.5, .id_extra = 99999 });
+        gui.label(@src(), "..", .{}, .{ .gravity_x = 0.5, .id_extra = 99999 });
     }
 
     // Collect entries (skipping .meta sidecars), then sort folders-first /
@@ -346,7 +346,7 @@ pub fn draw() void {
     var ent_count: usize = 0;
     {
         var iter = dir.iterate();
-        while (iter.next(dvui.io) catch null) |e| {
+        while (iter.next(gui.io) catch null) |e| {
             if (e.kind != .directory and std.mem.endsWith(u8, e.name, ".meta")) continue;
             if (ent_count >= MAX_ENTRIES) break;
             const n = @min(e.name.len, g_ent_name[ent_count].len);
@@ -383,15 +383,15 @@ pub fn draw() void {
         };
         const desc = editor.asset_registry.get(asset_type);
         const icon_bytes = if (is_dir)
-            dvui.entypo.folder
+            gui.entypo.folder
         else switch (desc.icon_hint) {
-            .document => dvui.entypo.text_document,
-            .code => dvui.entypo.code,
-            .image => dvui.entypo.image,
-            .sound => dvui.entypo.sound,
-            .model => dvui.entypo.layers,
-            .material => dvui.entypo.colours,
-            .data => dvui.entypo.database,
+            .document => gui.entypo.text_document,
+            .code => gui.entypo.code,
+            .image => gui.entypo.image,
+            .sound => gui.entypo.sound,
+            .model => gui.entypo.layers,
+            .material => gui.entypo.colours,
+            .data => gui.entypo.database,
         };
 
         // Check if this asset is the selected one
@@ -402,7 +402,7 @@ pub fn draw() void {
         } else false;
 
         const is_drag_target = is_dir and EditorState.drag_kind == .asset and g_drag_hover_idx == entry_idx;
-        var tile = dvui.box(@src(), .{}, .{
+        var tile = gui.box(@src(), .{}, .{
             .id_extra = entry_idx,
             .min_size_content = .{ .w = 72, .h = 72 },
             .background = true,
@@ -417,13 +417,13 @@ pub fn draw() void {
 
         // Context menu for all tiles (including dirs)
         {
-            const cxt = dvui.context(@src(), .{
+            const cxt = gui.context(@src(), .{
                 .rect = tile.data().borderRectScale().r,
             }, .{ .id_extra = entry_idx });
             defer cxt.deinit();
 
             if (cxt.activePoint()) |cp| {
-                var fw = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = entry_idx });
+                var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = entry_idx });
                 defer fw.deinit();
 
                 if (!is_dir and desc.open_mode != .none) {
@@ -432,7 +432,7 @@ pub fn draw() void {
                         .external_editor => "Open in External Editor",
                         .none => unreachable,
                     };
-                    if (dvui.menuItemLabel(@src(), open_label, .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                    if (gui.menuItemLabel(@src(), open_label, .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         openAsset(proj_path, browse_path, entry.name, desc.open_mode);
                     }
@@ -441,14 +441,14 @@ pub fn draw() void {
                 // A scene asset can also be instantiated as a linked prefab
                 // instance in the current scene (issue #32).
                 if (!is_dir and asset_type == .scene) {
-                    if (dvui.menuItemLabel(@src(), "Instantiate into Scene", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                    if (gui.menuItemLabel(@src(), "Instantiate into Scene", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         instantiatePrefabFile(proj_path, entry.name);
                     }
                 }
 
                 // Rename option for files and directories
-                if (dvui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                if (gui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
                     var asset_path: [1024]u8 = undefined;
                     const ap = fullPathFor(entry.name, browse_path, &asset_path);
@@ -456,7 +456,7 @@ pub fn draw() void {
                 }
 
                 // Delete option for files and directories
-                if (dvui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                if (gui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
                     var asset_path: [1024]u8 = undefined;
                     const ap = fullPathFor(entry.name, browse_path, &asset_path);
@@ -469,28 +469,28 @@ pub fn draw() void {
                 if (!is_dir) {
                     var reimport_path_buf: [1024]u8 = undefined;
                     const reimport_path = std.fmt.bufPrint(&reimport_path_buf, "{s}/{s}", .{ browse_path, entry.name }) catch "";
-                    if (dvui.menuItemLabel(@src(), "Reimport Asset", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                    if (gui.menuItemLabel(@src(), "Reimport Asset", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
-                        editor.asset_importer.importAssetForce(dvui.io, dvui.currentWindow().arena(), proj_path, reimport_path);
+                        editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj_path, reimport_path);
                     }
                 }
 
-                if (dvui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                if (gui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
                     AssetActions.revealInFileManager(browse_path, entry.name);
                 }
 
                 if (!is_dir) {
-                    if (dvui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                    if (gui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         var copy_abs_raw_buf: [1024]u8 = undefined;
                         const copy_abs_raw = std.fmt.bufPrint(&copy_abs_raw_buf, "{s}/{s}", .{ browse_path, entry.name }) catch "";
                         var copy_abs_resolved_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-                        const copy_abs_len = std.Io.Dir.realPathFile(std.Io.Dir.cwd(), dvui.io, copy_abs_raw, &copy_abs_resolved_buf) catch 0;
+                        const copy_abs_len = std.Io.Dir.realPathFile(std.Io.Dir.cwd(), gui.io, copy_abs_raw, &copy_abs_resolved_buf) catch 0;
                         const copy_abs = if (copy_abs_len > 0) copy_abs_resolved_buf[0..copy_abs_len] else copy_abs_raw;
-                        dvui.clipboardTextSet(copy_abs);
+                        gui.clipboardTextSet(copy_abs);
                     }
-                    if (dvui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                    if (gui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         const sub = currentSubdir();
                         var copy_rel_buf: [1024]u8 = undefined;
@@ -498,7 +498,7 @@ pub fn draw() void {
                             std.fmt.bufPrint(&copy_rel_buf, "assets/{s}/{s}", .{ sub, entry.name }) catch ""
                         else
                             std.fmt.bufPrint(&copy_rel_buf, "assets/{s}", .{entry.name}) catch "";
-                        dvui.clipboardTextSet(copy_rel);
+                        gui.clipboardTextSet(copy_rel);
                     }
 
                     var guid_buf: [36]u8 = undefined;
@@ -512,9 +512,9 @@ pub fn draw() void {
                     } else "";
 
                     if (maybe_guid_str.len > 0) {
-                        if (dvui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                        if (gui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                             fw.close();
-                            dvui.clipboardTextSet(maybe_guid_str);
+                            gui.clipboardTextSet(maybe_guid_str);
                         }
                     }
                 }
@@ -538,13 +538,13 @@ pub fn draw() void {
         // While renaming this entry, let mouse events reach the inline text
         // field (to position the cursor) instead of re-selecting / dragging.
         if (!is_renaming_this) {
-            for (dvui.events()) |*e| {
-                if (!dvui.eventMatchSimple(e, tile.data())) continue;
+            for (gui.events()) |*e| {
+                if (!gui.eventMatchSimple(e, tile.data())) continue;
                 switch (e.evt) {
                     .mouse => |me| {
                         if (me.action == .press and me.button == .left) {
                             e.handle(@src(), tile.data());
-                            const now = dvui.frameTimeNS();
+                            const now = gui.frameTimeNS();
                             const same_name = std.mem.eql(u8, last_click_name_buf[0..last_click_name_len], entry.name);
                             if (same_name and now - last_click_ns < 500 * std.time.ns_per_ms) {
                                 if (is_dir) {
@@ -575,7 +575,7 @@ pub fn draw() void {
             }
         }
 
-        dvui.icon(@src(), "tile_icon", icon_bytes, .{}, .{
+        gui.icon(@src(), "tile_icon", icon_bytes, .{}, .{
             .gravity_x = 0.5,
             .min_size_content = .{ .w = 32, .h = 32 },
             .id_extra = entry_idx,
@@ -583,7 +583,7 @@ pub fn draw() void {
 
         // Inline rename or label
         if (is_renaming_this) {
-            var te = dvui.textEntry(@src(), .{
+            var te = gui.textEntry(@src(), .{
                 .text = .{ .buffer = EditorState.g_rename.buf[0..] },
                 .placeholder = "Filename",
             }, .{
@@ -596,19 +596,19 @@ pub fn draw() void {
             // Grab keyboard focus on the first frame so the field is editable
             // (and doesn't lose focus and vanish on the next frame).
             if (EditorState.g_rename.just_started) {
-                dvui.focusWidget(te.data().id, null, null);
+                gui.focusWidget(te.data().id, null, null);
                 EditorState.g_rename.just_started = false;
             }
 
             if (te.enter_pressed) {
                 const text = te.textGet();
                 EditorState.g_rename.len = text.len;
-                EditorState.commitRename(dvui.frameTimeNS(), dvui.io);
+                EditorState.commitRename(gui.frameTimeNS(), gui.io);
             }
             // Escape is handled by the main keyboard handler
             // (Escape during rename cancels it)
         } else {
-            dvui.label(@src(), "{s}", .{entry.name}, .{
+            gui.label(@src(), "{s}", .{entry.name}, .{
                 .gravity_x = 0.5,
                 .min_size_content = .{ .w = 64 },
                 .id_extra = entry_idx,
@@ -619,8 +619,8 @@ pub fn draw() void {
         if (is_dir) {
             const drag_compatible = EditorState.drag_kind == .asset;
             if (drag_compatible) {
-                for (dvui.events()) |*e| {
-                    if (!dvui.eventMatchSimple(e, tile.data())) continue;
+                for (gui.events()) |*e| {
+                    if (!gui.eventMatchSimple(e, tile.data())) continue;
                     switch (e.evt) {
                         .mouse => |me| {
                             if (me.action == .position) {
@@ -640,18 +640,18 @@ pub fn draw() void {
                                             var full_dest_buf: [1024]u8 = undefined;
                                             const full_dest = std.fmt.bufPrint(&full_dest_buf, "{s}/{s}", .{ dest_path, file_name }) catch "";
                                             if (full_dest.len > 0) {
-                                                std.Io.Dir.rename(std.Io.Dir.cwd(), src_path, std.Io.Dir.cwd(), full_dest, dvui.io) catch {};
+                                                std.Io.Dir.rename(std.Io.Dir.cwd(), src_path, std.Io.Dir.cwd(), full_dest, gui.io) catch {};
                                                 // Also move .meta file
                                                 var src_meta_buf: [1024 + 5]u8 = undefined;
                                                 var dest_meta_buf: [1024 + 5]u8 = undefined;
                                                 const src_meta = std.fmt.bufPrint(&src_meta_buf, "{s}.meta", .{src_path}) catch "";
                                                 const dest_meta = std.fmt.bufPrint(&dest_meta_buf, "{s}.meta", .{full_dest}) catch "";
                                                 if (src_meta.len > 0 and dest_meta.len > 0) {
-                                                    std.Io.Dir.rename(std.Io.Dir.cwd(), src_meta, std.Io.Dir.cwd(), dest_meta, dvui.io) catch {};
+                                                    std.Io.Dir.rename(std.Io.Dir.cwd(), src_meta, std.Io.Dir.cwd(), dest_meta, gui.io) catch {};
                                                 }
                                                 EditorState.clearDrag();
-                                                EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-                                                dvui.refresh(null, @src(), null);
+                                                EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
+                                                gui.refresh(null, @src(), null);
                                             }
                                         }
                                     }
@@ -672,15 +672,15 @@ pub fn draw() void {
     // Drop a dragged scene object onto the browser to save it (and its
     // children) as a prefab asset in the current folder (issue #32).
     if (EditorState.drag_kind == .game_object) {
-        for (dvui.events()) |*e| {
-            if (!dvui.eventMatchSimple(e, outer.data())) continue;
+        for (gui.events()) |*e| {
+            if (!gui.eventMatchSimple(e, outer.data())) continue;
             if (e.evt == .mouse) {
                 const me = e.evt.mouse;
                 if (me.action == .release and me.button == .left) {
                     e.handle(@src(), outer.data());
-                    _ = EditorState.createPrefabFromObject(dvui.frameTimeNS(), dvui.io, EditorState.drag_object_idx);
+                    _ = EditorState.createPrefabFromObject(gui.frameTimeNS(), gui.io, EditorState.drag_object_idx);
                     EditorState.clearDrag();
-                    dvui.refresh(null, @src(), null);
+                    gui.refresh(null, @src(), null);
                 }
             }
         }
@@ -688,25 +688,25 @@ pub fn draw() void {
 
     // Empty area context menu
     {
-        const cxt = dvui.context(@src(), .{ .rect = outer.data().borderRectScale().r }, .{});
+        const cxt = gui.context(@src(), .{ .rect = outer.data().borderRectScale().r }, .{});
         defer cxt.deinit();
 
         if (cxt.activePoint()) |cp| {
-            var fw = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
+            var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
             defer fw.deinit();
 
-            if (dvui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.revealInFileManager(browse_path, "");
             }
-            if (dvui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 var resolve_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
-                const resolve_len = std.Io.Dir.realPathFile(std.Io.Dir.cwd(), dvui.io, browse_path, &resolve_buf) catch 0;
+                const resolve_len = std.Io.Dir.realPathFile(std.Io.Dir.cwd(), gui.io, browse_path, &resolve_buf) catch 0;
                 const resolved_path = if (resolve_len > 0) resolve_buf[0..resolve_len] else browse_path;
-                dvui.clipboardTextSet(resolved_path);
+                gui.clipboardTextSet(resolved_path);
             }
-            if (dvui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 const sub = currentSubdir();
                 var copy_rel_buf: [1024]u8 = undefined;
@@ -714,27 +714,27 @@ pub fn draw() void {
                     std.fmt.bufPrint(&copy_rel_buf, "assets/{s}", .{sub}) catch "assets"
                 else
                     "assets";
-                dvui.clipboardTextSet(copy_rel);
+                gui.clipboardTextSet(copy_rel);
             }
 
-            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4) });
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (dvui.menuItemLabel(@src(), "New Prefab", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "New Prefab", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewPrefab(browse_path);
             }
-            if (dvui.menuItemLabel(@src(), "New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "New Project Settings", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewProjectSettings(browse_path);
             }
-            if (dvui.menuItemLabel(@src(), "New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewInputActions(browse_path);
             }
             for (engine.Material.presets, 0..) |preset, pi| {
                 var label_buf: [64]u8 = undefined;
                 const label = std.fmt.bufPrint(&label_buf, "New Material: {s}", .{preset.name}) catch continue;
-                if (dvui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = pi }) != null) {
+                if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = pi }) != null) {
                     fw.close();
                     AssetActions.createNewMaterialFromPreset(browse_path, preset);
                 }
@@ -743,7 +743,7 @@ pub fn draw() void {
                 if (def.kind != .data_asset) continue;
                 var label_buf: [128]u8 = undefined;
                 const label = std.fmt.bufPrint(&label_buf, "New {s}", .{def.displayName()}) catch continue;
-                if (dvui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = 1000 + di }) != null) {
+                if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = 1000 + di }) != null) {
                     fw.close();
                     AssetActions.createNewDataAsset(browse_path, def);
                 }
@@ -760,20 +760,20 @@ fn handleDeleteDialog() void {
             result.* = null;
             if (confirmed) {
                 const del_path = g_pending_delete_path[0..g_pending_delete_len];
-                std.Io.Dir.cwd().deleteFile(dvui.io, del_path) catch {
-                    std.Io.Dir.cwd().deleteDir(dvui.io, del_path) catch {};
+                std.Io.Dir.cwd().deleteFile(gui.io, del_path) catch {
+                    std.Io.Dir.cwd().deleteDir(gui.io, del_path) catch {};
                 };
                 var meta_buf: [1024 + 5]u8 = undefined;
                 const meta_path = std.fmt.bufPrint(&meta_buf, "{s}.meta", .{del_path}) catch "";
                 if (meta_path.len > 0) {
-                    std.Io.Dir.cwd().deleteFile(dvui.io, meta_path) catch {};
+                    std.Io.Dir.cwd().deleteFile(gui.io, meta_path) catch {};
                 }
                 if (EditorState.selected_asset_path) |sel| {
                     if (std.mem.eql(u8, sel, del_path)) {
                         EditorState.clearSelectedAsset();
                     }
                 }
-                EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+                EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
             }
             g_pending_delete_len = 0;
         }
@@ -790,14 +790,14 @@ fn handleDeleteDialog() void {
 
     var msg_buf: [512]u8 = undefined;
     const msg = std.fmt.bufPrint(&msg_buf, "Delete '{s}' permanently?", .{file_name}) catch "Delete permanently?";
-    dvui.dialog(@src(), .{}, .{
+    gui.dialog(@src(), .{}, .{
         .title = "Delete Asset",
         .message = msg,
         .ok_label = "Delete",
         .cancel_label = "Cancel",
         .default = .cancel,
         .callafterFn = struct {
-            fn callafter(_: dvui.Id, response: dvui.enums.DialogResponse) !void {
+            fn callafter(_: gui.Id, response: gui.enums.DialogResponse) !void {
                 g_delete_dialog_result = response == .ok;
             }
         }.callafter,
@@ -837,7 +837,7 @@ fn instantiatePrefabFile(proj_path: []const u8, file_name: []const u8) void {
         std.fmt.bufPrint(&path_buf, "{s}/assets/{s}/{s}", .{ proj_path, sub, file_name }) catch return
     else
         std.fmt.bufPrint(&path_buf, "{s}/assets/{s}", .{ proj_path, file_name }) catch return;
-    _ = EditorState.instantiatePrefab(dvui.frameTimeNS(), dvui.io, full_path);
+    _ = EditorState.instantiatePrefab(gui.frameTimeNS(), gui.io, full_path);
 }
 
 // Asset open/reveal/create helpers live in AssetActions.zig.

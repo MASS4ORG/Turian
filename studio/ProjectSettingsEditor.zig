@@ -6,7 +6,7 @@
 //! `InputActionsEditor` / `MaterialEditor` (module-level loaded state + Save row).
 
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -77,36 +77,36 @@ pub fn draw(asset_path: []const u8) void {
     section("Boot");
     textRow("First Scene (GUID)", &scene_buf, 12);
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9100 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9100 });
 
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
         if (dirty)
-            dvui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            dvui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (dvui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
 }
 
 fn section(title: []const u8) void {
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = @intFromPtr(title.ptr) });
-    dvui.label(@src(), "{s}", .{title}, .{
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = @intFromPtr(title.ptr) });
+    gui.label(@src(), "{s}", .{title}, .{
         .id_extra = @intFromPtr(title.ptr),
         .padding = .{ .x = 6, .y = 6 },
     });
 }
 
 fn textRow(label: []const u8, buf: []u8, id: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
+    gui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
 
-    var te = dvui.textEntry(@src(), .{ .text = .{ .buffer = buf } }, .{
+    var te = gui.textEntry(@src(), .{ .text = .{ .buffer = buf } }, .{
         .id_extra = id,
         .gravity_y = 0.5,
         .expand = .horizontal,
@@ -117,23 +117,23 @@ fn textRow(label: []const u8, buf: []u8, id: usize) void {
 }
 
 fn checkRow(label: []const u8, value: *bool, id: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
+    gui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
 
     const before = value.*;
-    _ = dvui.checkbox(@src(), value, "", .{ .id_extra = id, .gravity_y = 0.5 });
+    _ = gui.checkbox(@src(), value, "", .{ .id_extra = id, .gravity_y = 0.5 });
     if (value.* != before) dirty = true;
 }
 
 fn enumRow(comptime T: type, label: []const u8, value: *T, id: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
+    gui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
 
-    if (dvui.dropdownEnum(@src(), T, .{ .choice = value }, .{}, .{
+    if (gui.dropdownEnum(@src(), T, .{ .choice = value }, .{}, .{
         .id_extra = id,
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 120 },
@@ -154,7 +154,7 @@ fn load(asset_path: []const u8) void {
     // Start from defaults so a malformed/empty file still yields a usable form.
     const def = ProjectSettings{};
     var ps = def;
-    if (std.Io.Dir.cwd().readFileAlloc(dvui.io, asset_path, arena, .unlimited)) |bytes| {
+    if (std.Io.Dir.cwd().readFileAlloc(gui.io, asset_path, arena, .unlimited)) |bytes| {
         if (ProjectSettings.loadFromBytes(arena, bytes)) |parsed| {
             ps = parsed;
         } else |_| {}
@@ -200,11 +200,11 @@ fn save() void {
         .first_scene = bufStr(&scene_buf),
     };
 
-    ps.save(dvui.io, loadedPath()) catch return;
+    ps.save(gui.io, loadedPath()) catch return;
     dirty = false;
 
     // Keep the cached artifact in sync with the freshly written source.
     if (EditorState.project_path) |proj| {
-        editor.asset_importer.importAssetForce(dvui.io, dvui.currentWindow().arena(), proj, loadedPath());
+        editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, loadedPath());
     }
 }

@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 
@@ -18,7 +18,7 @@ var g_delete_dialog_result: ?bool = null;
 
 /// Draw the scene hierarchy tree with drag-and-drop reordering.
 pub fn draw() void {
-    var outer = dvui.box(@src(), .{}, .{
+    var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
         .style = .window,
@@ -26,21 +26,21 @@ pub fn draw() void {
     defer outer.deinit();
 
     {
-        var header = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .border = .all(1),
             .background = true,
             .padding = .all(6),
         });
         defer header.deinit();
-        dvui.label(@src(), "Scene Hierarchy", .{}, .{ .font = .theme(.heading) });
+        gui.label(@src(), "Scene Hierarchy", .{}, .{ .font = .theme(.heading) });
         if (EditorState.scene_dirty) {
-            dvui.label(@src(), " *", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
+            gui.label(@src(), " *", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
         }
     }
 
     {
-        var scroll = dvui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+        var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
         defer scroll.deinit();
 
         if (EditorState.object_count == 0) {
@@ -51,7 +51,7 @@ pub fn draw() void {
 
             handleDeleteDialog();
 
-            var tree = dvui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .expand = .horizontal });
+            var tree = gui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .expand = .horizontal });
             defer tree.deinit();
 
             var had_removed: bool = false;
@@ -80,9 +80,9 @@ pub fn draw() void {
 
 /// Highlight the hovered drop target: a line at the row's top/bottom edge for a
 /// sibling drop, or a translucent fill across the row for a child ("into") drop.
-fn drawDropIndicator(row: dvui.Rect.Physical, zone: DropZone) void {
-    const line = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
-    const fill = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 70 };
+fn drawDropIndicator(row: gui.Rect.Physical, zone: DropZone) void {
+    const line = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
+    const fill = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 70 };
     switch (zone) {
         .before => {
             var r = row;
@@ -112,7 +112,7 @@ fn nextSibling(idx: usize) i32 {
 /// Apply a finished drag: reparent / reorder `drag` relative to `target`.
 fn applyDrop(drag: usize, target: usize, zone: DropZone) void {
     if (target >= EditorState.object_count) return;
-    const now = dvui.frameTimeNS();
+    const now = gui.frameTimeNS();
     const t_parent = EditorState.objects[target].parent;
     switch (zone) {
         .into => EditorState.reparentObject(now, drag, @intCast(target), -1),
@@ -122,26 +122,26 @@ fn applyDrop(drag: usize, target: usize, zone: DropZone) void {
 }
 
 /// Right-click context menu for the hierarchy background: create scene objects.
-fn drawBackgroundMenu(wd: *dvui.WidgetData) void {
-    const cxt = dvui.context(@src(), .{ .rect = wd.borderRectScale().r }, .{});
+fn drawBackgroundMenu(wd: *gui.WidgetData) void {
+    const cxt = gui.context(@src(), .{ .rect = wd.borderRectScale().r }, .{});
     defer cxt.deinit();
 
     if (cxt.activePoint()) |cp| {
-        var fw = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{});
+        var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
         defer fw.deinit();
 
-        if (dvui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal }) != null) {
+        if (gui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal }) != null) {
             fw.close();
-            const idx = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", -1);
+            const idx = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", -1);
             EditorState.clearSelectedObjects();
             EditorState.selected_object = idx;
             EditorState.selectObject(idx);
         }
 
         if (EditorState.selected_object) |sel| {
-            if (dvui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
-                const idx = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", @intCast(sel));
+                const idx = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", @intCast(sel));
                 EditorState.clearSelectedObjects();
                 EditorState.selected_object = idx;
                 EditorState.selectObject(idx);
@@ -150,8 +150,8 @@ fn drawBackgroundMenu(wd: *dvui.WidgetData) void {
     }
 }
 
-fn handleKeyboard(root_wd: *dvui.WidgetData) void {
-    for (dvui.events()) |*e| {
+fn handleKeyboard(root_wd: *gui.WidgetData) void {
+    for (gui.events()) |*e| {
         if (e.handled) continue;
         if (e.evt != .key) continue;
         const ke = e.evt.key;
@@ -237,7 +237,7 @@ fn handleDeleteDialog() void {
             g_show_delete_dialog = false;
             result.* = null;
             if (confirmed) {
-                EditorState.deleteSelectedObjects(dvui.frameTimeNS());
+                EditorState.deleteSelectedObjects(gui.frameTimeNS());
             }
         }
     }
@@ -248,21 +248,21 @@ fn handleDeleteDialog() void {
         return;
     };
 
-    dvui.dialog(@src(), .{}, .{
+    gui.dialog(@src(), .{}, .{
         .title = "Delete Object",
         .message = "Delete selected object and all its children?",
         .ok_label = "Delete",
         .cancel_label = "Cancel",
         .default = .cancel,
         .callafterFn = struct {
-            fn callafter(_: dvui.Id, response: dvui.enums.DialogResponse) !void {
+            fn callafter(_: gui.Id, response: gui.enums.DialogResponse) !void {
                 g_delete_dialog_result = response == .ok;
             }
         }.callafter,
     });
 }
 
-fn renderLevel(tree: *dvui.TreeWidget, parent: i32, depth: usize, had_removed: *bool) void {
+fn renderLevel(tree: *gui.TreeWidget, parent: i32, depth: usize, had_removed: *bool) void {
     for (EditorState.objects[0..EditorState.object_count], 0..) |*obj, i| {
         if (obj.parent == parent) {
             renderNode(tree, i, obj, depth, had_removed);
@@ -270,7 +270,7 @@ fn renderLevel(tree: *dvui.TreeWidget, parent: i32, depth: usize, had_removed: *
     }
 }
 
-fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, depth: usize, had_removed: *bool) void {
+fn renderNode(tree: *gui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, depth: usize, had_removed: *bool) void {
     const has_children = blk: {
         for (EditorState.objects[0..EditorState.object_count]) |*child| {
             if (child.parent == @as(i32, @intCast(idx))) break :blk true;
@@ -305,7 +305,7 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     if (g_dragging_idx) |di| {
         if (di != idx and !EditorState.isAncestorOrSelf(idx, @intCast(di))) {
             const row = branch.button.data().borderRectScale().r;
-            const mp = dvui.currentWindow().mouse_pt;
+            const mp = gui.currentWindow().mouse_pt;
             if (row.contains(mp)) {
                 const rel = if (row.h > 0) (mp.y - row.y) / row.h else 0.5;
                 const zone: DropZone = if (rel < 0.25) .before else if (rel > 0.75) .after else .into;
@@ -317,11 +317,11 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     }
 
     if (branch.button.clicked() and !is_renaming_this) {
-        const now = dvui.frameTimeNS();
+        const now = gui.frameTimeNS();
 
         var ctrl_held = false;
         var shift_held = false;
-        for (dvui.events()) |*e| {
+        for (gui.events()) |*e| {
             if (e.evt == .mouse) {
                 const me = e.evt.mouse;
                 ctrl_held = me.mod.control();
@@ -363,15 +363,15 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     // is distinguishable at a glance from a plain object (issue #32).
     const is_prefab_root = obj.isPrefabInstanceRoot();
     const is_prefab_part = obj.isPartOfPrefab();
-    const prefab_tint = dvui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
+    const prefab_tint = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
 
     const icon_bytes = if (is_prefab_root)
-        dvui.entypo.box
+        gui.entypo.box
     else if (has_children)
-        dvui.entypo.folder
+        gui.entypo.folder
     else
-        dvui.entypo.text_document;
-    dvui.icon(@src(), "icon", icon_bytes, .{}, .{
+        gui.entypo.text_document;
+    gui.icon(@src(), "icon", icon_bytes, .{}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 16, .h = 16 },
         .id_extra = idx,
@@ -379,7 +379,7 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     });
 
     if (is_renaming_this) {
-        var te = dvui.textEntry(@src(), .{
+        var te = gui.textEntry(@src(), .{
             .text = .{ .buffer = EditorState.g_rename.buf[0..] },
             .placeholder = "Name",
         }, .{
@@ -392,17 +392,17 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
 
         // Grab keyboard focus on the first frame so the field is editable.
         if (EditorState.g_rename.just_started) {
-            dvui.focusWidget(te.data().id, null, null);
+            gui.focusWidget(te.data().id, null, null);
             EditorState.g_rename.just_started = false;
         }
 
         if (te.enter_pressed) {
             const text = te.textGet();
             EditorState.g_rename.len = text.len;
-            EditorState.commitRename(dvui.frameTimeNS(), dvui.io);
+            EditorState.commitRename(gui.frameTimeNS(), gui.io);
         }
     } else {
-        dvui.label(@src(), "{s}", .{obj.nameSlice()}, .{
+        gui.label(@src(), "{s}", .{obj.nameSlice()}, .{
             .gravity_y = 0.5,
             .id_extra = idx,
             .color_text = if (is_prefab_part) prefab_tint else null,
@@ -410,30 +410,30 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     }
 
     {
-        const cxt = dvui.context(@src(), .{
+        const cxt = gui.context(@src(), .{
             .rect = branch.button.data().borderRectScale().r,
         }, .{ .id_extra = idx });
         defer cxt.deinit();
 
         if (cxt.activePoint()) |cp| {
-            var fw = dvui.floatingMenu(@src(), .{ .from = dvui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = idx });
+            var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = idx });
             defer fw.deinit();
 
-            if (dvui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 EditorState.startRenameObject(idx);
             }
 
-            if (dvui.menuItemLabel(@src(), "Duplicate", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Duplicate", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 if (EditorState.selectedCount() > 1 and EditorState.isObjectSelected(idx)) {
-                    EditorState.duplicateSelectedObjects(dvui.frameTimeNS(), dvui.io);
+                    EditorState.duplicateSelectedObjects(gui.frameTimeNS(), gui.io);
                 } else {
-                    EditorState.duplicateObject(dvui.frameTimeNS(), dvui.io, idx);
+                    EditorState.duplicateObject(gui.frameTimeNS(), gui.io, idx);
                 }
             }
 
-            if (dvui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 if (EditorState.selectedCount() > 1 and EditorState.isObjectSelected(idx)) {
                     g_show_delete_dialog = true;
@@ -445,41 +445,41 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
                 }
             }
 
-            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4) });
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
             // Scene-wide creation, reachable from any node's menu (so it's
             // available even when the hierarchy is full and has no empty space).
-            if (dvui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
-                const ni = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", @intCast(idx));
+                const ni = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", @intCast(idx));
                 EditorState.clearSelectedObjects();
                 EditorState.selected_object = ni;
                 EditorState.selectObject(ni);
             }
-            if (dvui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
-                const ni = EditorState.addObjectWithUndo(dvui.frameTimeNS(), dvui.io, "New Object", EditorState.objects[idx].parent);
+                const ni = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", EditorState.objects[idx].parent);
                 EditorState.clearSelectedObjects();
                 EditorState.selected_object = ni;
                 EditorState.selectObject(ni);
             }
 
-            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4), .id_extra = 200 + idx });
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 200 + idx });
 
-            if (dvui.menuItemLabel(@src(), "Create Prefab", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Create Prefab", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
-                _ = EditorState.createPrefabFromObject(dvui.frameTimeNS(), dvui.io, idx);
+                _ = EditorState.createPrefabFromObject(gui.frameTimeNS(), gui.io, idx);
             }
 
-            _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4), .id_extra = 100 + idx });
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 100 + idx });
 
-            if (dvui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 const gs = EditorState.objects[idx].guidSlice();
-                if (gs.len > 0) dvui.clipboardTextSet(gs);
+                if (gs.len > 0) gui.clipboardTextSet(gs);
             }
 
-            if (dvui.menuItemLabel(@src(), "Frame Object", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+            if (gui.menuItemLabel(@src(), "Frame Object", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                 fw.close();
                 EditorState.focusOnObject(idx);
             }
@@ -487,10 +487,10 @@ fn renderNode(tree: *dvui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, d
     }
 
     if (has_children) {
-        dvui.icon(
+        gui.icon(
             @src(),
             "arrow",
-            if (branch.expanded) dvui.entypo.triangle_down else dvui.entypo.triangle_right,
+            if (branch.expanded) gui.entypo.triangle_down else gui.entypo.triangle_right,
             .{},
             .{ .gravity_y = 0.5, .gravity_x = 1.0, .min_size_content = .{ .w = 12, .h = 12 }, .id_extra = idx },
         );

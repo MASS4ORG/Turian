@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -12,7 +12,7 @@ const ImportSettingsEditor = @import("ImportSettingsEditor.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
-    var outer = dvui.box(@src(), .{}, .{
+    var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
         .style = .window,
@@ -20,14 +20,14 @@ pub fn draw() void {
     defer outer.deinit();
 
     {
-        var header = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .border = .all(1),
             .background = true,
             .padding = .all(6),
         });
         defer header.deinit();
-        dvui.label(@src(), "Inspector", .{}, .{ .font = .theme(.heading) });
+        gui.label(@src(), "Inspector", .{}, .{ .font = .theme(.heading) });
     }
 
     const sel = EditorState.selected_object orelse {
@@ -46,7 +46,7 @@ pub fn draw() void {
     const obj = &EditorState.objects[sel];
     const prefab_root = EditorState.prefabInstanceRoot(sel);
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{
+    var scroll = gui.scrollArea(@src(), .{}, .{
         .expand = .both,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),
@@ -54,14 +54,14 @@ pub fn draw() void {
     defer scroll.deinit();
 
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .padding = .all(6),
         });
         defer row.deinit();
 
-        _ = dvui.checkbox(@src(), &obj.active, null, .{ .gravity_y = 0.5 });
-        dvui.label(@src(), "{s}", .{obj.nameSlice()}, .{
+        _ = gui.checkbox(@src(), &obj.active, null, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "{s}", .{obj.nameSlice()}, .{
             .font = .theme(.heading),
             .gravity_y = 0.5,
             .expand = .horizontal,
@@ -70,13 +70,13 @@ pub fn draw() void {
 
     if (prefab_root) |root| drawPrefabBanner(obj, root);
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
 
-    if (dvui.expander(@src(), if (obj.hasOverride(.transform)) "Transform  (overridden)" else "Transform", .{ .default_expanded = true }, .{
+    if (gui.expander(@src(), if (obj.hasOverride(.transform)) "Transform  (overridden)" else "Transform", .{ .default_expanded = true }, .{
         .expand = .horizontal,
         .padding = .all(4),
     })) {
-        var comp_box = dvui.box(@src(), .{}, .{
+        var comp_box = gui.box(@src(), .{}, .{
             .expand = .horizontal,
             .padding = .{ .x = 12, .y = 4 },
         });
@@ -84,7 +84,7 @@ pub fn draw() void {
 
         const obj_before = obj.*;
         if (PropDraw.drawComponent(EditorState.Transform, &obj.transform, 0, false)) {
-            EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+            EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
                 .idx = sel,
                 .before = obj_before,
                 .after = obj.*,
@@ -93,24 +93,24 @@ pub fn draw() void {
         }
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 0 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 0 });
 
     var remove_idx: ?usize = null;
 
     for (obj.components[0..obj.component_count], 0..) |*comp, ci| {
-        if (dvui.expander(@src(), comp.displayName(), .{ .default_expanded = true }, .{
+        if (gui.expander(@src(), comp.displayName(), .{ .default_expanded = true }, .{
             .expand = .horizontal,
             .padding = .all(4),
             .id_extra = ci,
         })) {
-            var fields_box = dvui.box(@src(), .{ .dir = .horizontal }, .{
+            var fields_box = gui.box(@src(), .{ .dir = .horizontal }, .{
                 .expand = .horizontal,
                 .padding = .{ .x = 12, .y = 4 },
                 .id_extra = ci,
             });
             defer fields_box.deinit();
 
-            var data_box = dvui.box(@src(), .{}, .{
+            var data_box = gui.box(@src(), .{}, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = ci,
@@ -120,7 +120,7 @@ pub fn draw() void {
             switch (comp.*) {
                 .user_script => |*s| {
                     if (s.field_count == 0) {
-                        dvui.label(@src(), "(no fields)", .{}, .{
+                        gui.label(@src(), "(no fields)", .{}, .{
                             .expand = .horizontal,
                             .id_extra = ci,
                         });
@@ -138,14 +138,14 @@ pub fn draw() void {
                     const mesh_changed = !std.mem.eql(u8, prev_mesh, mr.mesh.slice());
                     if (mesh_changed and mr.material.slice().len == 0) {
                         var guid_buf: [36]u8 = undefined;
-                        if (EditorState.modelPrimaryMaterial(dvui.io, mr.mesh.slice(), &guid_buf)) |g| {
+                        if (EditorState.modelPrimaryMaterial(gui.io, mr.mesh.slice(), &guid_buf)) |g| {
                             mr.material.set(g);
                             changed = true;
                         }
                     }
 
                     if (changed) {
-                        EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+                        EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
                             .idx = sel,
                             .before = obj_before_field,
                             .after = obj.*,
@@ -156,7 +156,7 @@ pub fn draw() void {
                 inline else => |*field_data| {
                     const obj_before_field = obj.*;
                     if (PropDraw.drawComponent(@TypeOf(field_data.*), field_data, ci + 1, false)) {
-                        EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+                        EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
                             .idx = sel,
                             .before = obj_before_field,
                             .after = obj.*,
@@ -166,7 +166,7 @@ pub fn draw() void {
                 },
             }
 
-            if (dvui.button(@src(), "Remove", .{}, .{
+            if (gui.button(@src(), "Remove", .{}, .{
                 .gravity_y = 0.5,
                 .gravity_x = 1.0,
                 .id_extra = ci,
@@ -175,13 +175,13 @@ pub fn draw() void {
                 remove_idx = ci;
             }
         }
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = ci + 1 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = ci + 1 });
     }
 
     if (remove_idx) |ri| {
         const removed_comp = obj.components[ri];
         obj.removeComponent(ri);
-        EditorState.pushCommand(dvui.frameTimeNS(), &.{ .remove_component = .{
+        EditorState.pushCommand(gui.frameTimeNS(), &.{ .remove_component = .{
             .obj_idx = sel,
             .comp = removed_comp,
             .rem_idx = ri,
@@ -190,19 +190,19 @@ pub fn draw() void {
     }
 
     {
-        var add_menu = dvui.menu(@src(), .vertical, .{
+        var add_menu = gui.menu(@src(), .vertical, .{
             .expand = .horizontal,
             .padding = .all(6),
         });
         defer add_menu.deinit();
 
-        if (dvui.menuItemLabel(@src(), "Add Component...", .{ .submenu = true }, .{
+        if (gui.menuItemLabel(@src(), "Add Component...", .{ .submenu = true }, .{
             .expand = .horizontal,
         })) |r| {
-            var fw = dvui.floatingMenu(@src(), .{ .from = r }, .{});
+            var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
             if (addComponentMenu(obj, fw)) {
-                EditorState.pushCommand(dvui.frameTimeNS(), &.{ .add_component = .{
+                EditorState.pushCommand(gui.frameTimeNS(), &.{ .add_component = .{
                     .obj_idx = sel,
                     .comp = obj.components[obj.component_count - 1],
                     .ins_idx = obj.component_count - 1,
@@ -214,24 +214,24 @@ pub fn draw() void {
 
     // Keep override highlights live: re-derive this instance's overrides from
     // its (stable) source template each frame, after any edits above.
-    if (prefab_root) |root| EditorState.recomputePrefabOverrides(dvui.io, root);
+    if (prefab_root) |root| EditorState.recomputePrefabOverrides(gui.io, root);
 }
 
 /// Banner shown atop the inspector for a prefab-instance node: identifies it as
 /// an instance, lists the node's overridden groups, and offers Revert / Apply.
 fn drawPrefabBanner(obj: *EditorState.SceneNode, root: usize) void {
-    var banner = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var banner = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .padding = .all(6),
         .margin = .{ .x = 4, .y = 2 },
         .background = true,
         .border = .all(1),
-        .corner_radius = dvui.Rect.all(4),
+        .corner_radius = gui.Rect.all(4),
         .style = .highlight,
     });
     defer banner.deinit();
 
-    dvui.icon(@src(), "prefab", dvui.entypo.box, .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 16, .h = 16 } });
+    gui.icon(@src(), "prefab", gui.entypo.box, .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 16, .h = 16 } });
 
     const groups = [_]engine.scene.OverrideGroup{ .name, .active, .transform, .components };
     var ovr_buf: [96]u8 = undefined;
@@ -244,18 +244,18 @@ fn drawPrefabBanner(obj: *EditorState.SceneNode, root: usize) void {
             any = true;
         }
     }
-    dvui.label(@src(), "Prefab Instance", .{}, .{ .gravity_y = 0.5, .font = .theme(.body) });
+    gui.label(@src(), "Prefab Instance", .{}, .{ .gravity_y = 0.5, .font = .theme(.body) });
     if (any) {
-        dvui.label(@src(), "  overrides: {s}", .{w.buffered()}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        gui.label(@src(), "  overrides: {s}", .{w.buffered()}, .{ .gravity_y = 0.5, .expand = .horizontal });
     } else {
-        dvui.label(@src(), "", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        gui.label(@src(), "", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
     }
 
-    if (dvui.button(@src(), "Revert", .{}, .{ .gravity_y = 0.5 })) {
-        _ = EditorState.revertPrefabInstance(dvui.frameTimeNS(), dvui.io, root);
+    if (gui.button(@src(), "Revert", .{}, .{ .gravity_y = 0.5 })) {
+        _ = EditorState.revertPrefabInstance(gui.frameTimeNS(), gui.io, root);
     }
-    if (dvui.button(@src(), "Apply", .{}, .{ .gravity_y = 0.5 })) {
-        _ = EditorState.applyPrefabInstance(dvui.frameTimeNS(), dvui.io, root);
+    if (gui.button(@src(), "Apply", .{}, .{ .gravity_y = 0.5 })) {
+        _ = EditorState.applyPrefabInstance(gui.frameTimeNS(), gui.io, root);
     }
 }
 
@@ -280,12 +280,12 @@ fn drawScriptFields(sel: usize, obj: *EditorState.SceneNode, ci: usize) void {
             }
             // Draw the whole run under an expander.
             const group_id = ci * 100000 + run_start * 10 + 1;
-            if (dvui.expander(@src(), prefix, .{ .default_expanded = true }, .{
+            if (gui.expander(@src(), prefix, .{ .default_expanded = true }, .{
                 .expand = .horizontal,
                 .padding = .all(2),
                 .id_extra = group_id,
             })) {
-                var indent = dvui.box(@src(), .{}, .{
+                var indent = gui.box(@src(), .{}, .{
                     .expand = .horizontal,
                     .padding = .{ .x = 12, .y = 0 },
                     .id_extra = group_id,
@@ -310,10 +310,10 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
     else
         full_name;
 
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{display_name}, .{
+    gui.label(@src(), "{s}", .{display_name}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 80 },
         .id_extra = id,
@@ -322,7 +322,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
     var changed = false;
     switch (fv.kind) {
         .f32 => {
-            const r = dvui.textEntryNumber(@src(), f32, .{ .value = &fv.as_f32 }, .{
+            const r = gui.textEntryNumber(@src(), f32, .{ .value = &fv.as_f32 }, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = id,
@@ -330,7 +330,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             if (r.changed) changed = true;
         },
         .i32 => {
-            const r = dvui.textEntryNumber(@src(), i32, .{ .value = &fv.as_i32 }, .{
+            const r = gui.textEntryNumber(@src(), i32, .{ .value = &fv.as_i32 }, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = id,
@@ -338,7 +338,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             if (r.changed) changed = true;
         },
         .bool => {
-            if (dvui.checkbox(@src(), &fv.as_bool, null, .{ .gravity_y = 0.5, .id_extra = id })) {
+            if (gui.checkbox(@src(), &fv.as_bool, null, .{ .gravity_y = 0.5, .id_extra = id })) {
                 changed = true;
             }
         },
@@ -352,7 +352,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             }
         },
         .f64 => {
-            const r = dvui.textEntryNumber(@src(), f64, .{ .value = &fv.as_f64 }, .{
+            const r = gui.textEntryNumber(@src(), f64, .{ .value = &fv.as_f64 }, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = id,
@@ -360,7 +360,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             if (r.changed) changed = true;
         },
         .i64 => {
-            const r = dvui.textEntryNumber(@src(), i64, .{ .value = &fv.as_i64 }, .{
+            const r = gui.textEntryNumber(@src(), i64, .{ .value = &fv.as_i64 }, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = id,
@@ -368,7 +368,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             if (r.changed) changed = true;
         },
         .u32 => {
-            const r = dvui.textEntryNumber(@src(), u32, .{ .value = &fv.as_u32 }, .{
+            const r = gui.textEntryNumber(@src(), u32, .{ .value = &fv.as_u32 }, .{
                 .expand = .horizontal,
                 .gravity_y = 0.5,
                 .id_extra = id,
@@ -394,7 +394,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
             }
         },
         .string => {
-            var te = dvui.textEntry(@src(), .{
+            var te = gui.textEntry(@src(), .{
                 .text = .{ .buffer = fv.as_string[0..] },
             }, .{
                 .expand = .horizontal,
@@ -432,7 +432,7 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
 
     const obj_before = obj.*;
     if (drawScriptFieldValue(fv, id)) {
-        EditorState.pushCommand(dvui.frameTimeNS(), &.{ .modify_object = .{
+        EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
             .idx = sel,
             .before = obj_before,
             .after = obj.*,
@@ -445,7 +445,7 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
 /// (issue #1). Reuses the same per-type editor dispatch the inspector uses when
 /// an asset is merely selected, but as the main editing surface.
 pub fn drawAssetDocument(asset_path: []const u8) void {
-    var outer = dvui.box(@src(), .{}, .{
+    var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
         .style = .window,
@@ -462,7 +462,7 @@ fn drawAssetInspector(asset_path: []const u8) void {
     else
         asset_path;
 
-    var scroll = dvui.scrollArea(@src(), .{}, .{
+    var scroll = gui.scrollArea(@src(), .{}, .{
         .expand = .both,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),
@@ -470,38 +470,38 @@ fn drawAssetInspector(asset_path: []const u8) void {
     defer scroll.deinit();
 
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .padding = .all(6),
         });
         defer row.deinit();
-        dvui.label(@src(), "{s}", .{file_name}, .{ .font = .theme(.heading), .expand = .horizontal });
+        gui.label(@src(), "{s}", .{file_name}, .{ .font = .theme(.heading), .expand = .horizontal });
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     if (asset_type == .material) {
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 1 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 1 });
         MaterialEditor.draw(asset_path);
     }
 
     if (asset_type == .data_asset) {
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 2 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 2 });
         DataAssetEditor.draw(asset_path);
     }
 
     if (asset_type == .input_actions) {
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 3 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 3 });
         InputActionsEditor.draw(asset_path);
     }
 
     if (asset_type == .project_settings) {
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 4 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 4 });
         ProjectSettingsEditor.draw(asset_path);
     }
 
     if (ImportSettingsEditor.handles(asset_type)) {
-        _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 5 });
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 5 });
         ImportSettingsEditor.draw(asset_path, asset_type);
     }
 
@@ -518,16 +518,16 @@ fn drawSubAssets(asset_path: []const u8) void {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    const meta = editor.asset_meta.readMeta(dvui.io, arena, asset_path);
+    const meta = editor.asset_meta.readMeta(gui.io, arena, asset_path);
     if (meta.sub_assets.len == 0) return;
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 6 });
-    dvui.label(@src(), "Generated Assets", .{}, .{ .padding = .{ .x = 8, .y = 6 } });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 6 });
+    gui.label(@src(), "Generated Assets", .{}, .{ .padding = .{ .x = 8, .y = 6 } });
 
     for (meta.sub_assets, 0..) |sub, i| {
         var label_buf: [160]u8 = undefined;
         const label = std.fmt.bufPrint(&label_buf, "{s}  ({s})", .{ sub.name, @tagName(sub.asset_type) }) catch sub.name;
-        if (dvui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i, .padding = .{ .x = 10, .y = 2 } })) {
+        if (gui.button(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i, .padding = .{ .x = 10, .y = 2 } })) {
             var path_buf: [1024]u8 = undefined;
             if (editor.asset_cache.artifactPath(proj, sub.guid, sub.asset_type, &path_buf)) |cache_path|
                 EditorState.selectAsset(cache_path);
@@ -535,28 +535,28 @@ fn drawSubAssets(asset_path: []const u8) void {
     }
 }
 
-fn addComponentMenu(obj: *EditorState.SceneNode, fw: *dvui.FloatingMenuWidget) bool {
+fn addComponentMenu(obj: *EditorState.SceneNode, fw: *gui.FloatingMenuWidget) bool {
     var added = false;
     var prev_is_builtin: ?bool = null;
 
     for (EditorState.discovered_components[0..EditorState.discovered_count], 0..) |*def, di| {
         if (prev_is_builtin) |prev| {
             if (prev and !def.is_builtin) {
-                _ = dvui.separator(@src(), .{ .expand = .horizontal, .margin = dvui.Rect.all(4) });
-                dvui.label(@src(), "Scripts", .{}, .{
+                _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+                gui.label(@src(), "Scripts", .{}, .{
                     .padding = .{ .x = 8, .y = 4 },
                     .font = .theme(.body),
                 });
             }
         } else {
-            dvui.label(@src(), "Components", .{}, .{
+            gui.label(@src(), "Components", .{}, .{
                 .padding = .{ .x = 8, .y = 4 },
                 .font = .theme(.body),
             });
         }
         prev_is_builtin = def.is_builtin;
 
-        if (dvui.menuItemLabel(@src(), def.displayName(), .{}, .{
+        if (gui.menuItemLabel(@src(), def.displayName(), .{}, .{
             .expand = .horizontal,
             .id_extra = di,
         }) != null) {

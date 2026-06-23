@@ -10,7 +10,7 @@
 //! shader's parameter list); "Save" writes it back to the `.material` file and
 //! reimports so the cached artifact stays in sync.
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -62,12 +62,12 @@ pub fn draw(asset_path: []const u8) void {
     if (!std.mem.eql(u8, asset_path, loadedPath())) load(asset_path);
 
     {
-        var info = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
+        var info = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer info.deinit();
-        dvui.label(@src(), "Shader:  {s}", .{sh.name}, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "Shader:  {s}", .{sh.name}, .{ .gravity_y = 0.5 });
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal });
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     // One widget per shader parameter, in declaration order.
     for (sh.params[0..val_count], 0..) |param, i| {
@@ -79,21 +79,21 @@ pub fn draw(asset_path: []const u8) void {
         }
     }
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7001 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7001 });
     drawRenderState();
 
-    _ = dvui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7002 });
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7002 });
     {
-        var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
 
         if (dirty) {
-            dvui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
         } else {
-            dvui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
         }
 
-        if (dvui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
@@ -102,26 +102,26 @@ pub fn draw(asset_path: []const u8) void {
 // ── Widgets ────────────────────────────────────────────────────────────────────
 
 fn drawScalar(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+    gui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
 
     if (param.ranged) {
-        if (dvui.sliderEntry(@src(), "{d:0.3}", .{ .value = &v.scalar, .min = param.min, .max = param.max, .interval = (param.max - param.min) / 1000.0 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i })) {
+        if (gui.sliderEntry(@src(), "{d:0.3}", .{ .value = &v.scalar, .min = param.min, .max = param.max, .interval = (param.max - param.min) / 1000.0 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i })) {
             dirty = true;
         }
     } else {
-        const r = dvui.textEntryNumber(@src(), f32, .{ .value = &v.scalar }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i });
+        const r = gui.textEntryNumber(@src(), f32, .{ .value = &v.scalar }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = i });
         if (r.changed) dirty = true;
     }
 }
 
 fn drawVector(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+    gui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
 
     var vec3 = engine.Vector3{ .x = v.vec[0], .y = v.vec[1], .z = v.vec[2] };
     if (PropDraw.drawVec3Row(@src(), &vec3)) {
@@ -133,12 +133,12 @@ fn drawVector(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
 }
 
 fn drawColor(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
-    if (dvui.expander(@src(), param.label, .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i })) {
-        var body = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 }, .id_extra = i });
+    if (gui.expander(@src(), param.label, .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i })) {
+        var body = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 }, .id_extra = i });
         defer body.deinit();
 
-        var hsv = dvui.Color.HSV.fromColor(vecToColor(v.vec));
-        if (dvui.colorPicker(@src(), .{ .hsv = &hsv, .alpha = true, .sliders = .rgb }, .{ .expand = .horizontal, .id_extra = i })) {
+        var hsv = gui.Color.HSV.fromColor(vecToColor(v.vec));
+        if (gui.colorPicker(@src(), .{ .hsv = &hsv, .alpha = true, .sliders = .rgb }, .{ .expand = .horizontal, .id_extra = i })) {
             v.vec = colorToVec(hsv.toColor());
             dirty = true;
         }
@@ -146,48 +146,48 @@ fn drawColor(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
 }
 
 fn drawTexture(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = i });
     defer row.deinit();
 
-    dvui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
+    gui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
 
     if (PropDraw.drawRefDropZone(@src(), .asset_ref, v.texSlice(), i)) |new_guid| {
         v.setTex(new_guid);
         dirty = true;
     }
 
-    const picker_id = dvui.parentGet().extendId(@src(), i);
-    if (dvui.button(@src(), "...", .{}, .{
+    const picker_id = gui.parentGet().extendId(@src(), i);
+    if (gui.button(@src(), "...", .{}, .{
         .gravity_y = 0.5,
         .min_size_content = .{ .w = 24 },
         .id_extra = i,
     })) {
-        dvui.dataSet(null, picker_id, "tex_open", true);
+        gui.dataSet(null, picker_id, "tex_open", true);
     }
 
-    if (dvui.dataGet(null, picker_id, "tex_open", bool) orelse false) {
-        var fw = dvui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = i });
+    if (gui.dataGet(null, picker_id, "tex_open", bool) orelse false) {
+        var fw = gui.floatingMenu(@src(), .{ .from = row.data().rectScale().r.toNatural() }, .{ .id_extra = i });
         defer fw.deinit();
 
         if (pickerTexture(v, fw)) {
             dirty = true;
-            dvui.dataSet(null, picker_id, "tex_open", false);
+            gui.dataSet(null, picker_id, "tex_open", false);
         }
-        if (dvui.minSizeGet(fw.data().id) != null and fw.data().id != dvui.focusedSubwindowId()) {
-            dvui.dataSet(null, picker_id, "tex_open", false);
+        if (gui.minSizeGet(fw.data().id) != null and fw.data().id != gui.focusedSubwindowId()) {
+            gui.dataSet(null, picker_id, "tex_open", false);
         }
     }
 }
 
-fn pickerTexture(v: *ParamValue, fw: *dvui.FloatingMenuWidget) bool {
-    if (dvui.menuItemLabel(@src(), "(none)", .{}, .{ .expand = .horizontal }) != null) {
+fn pickerTexture(v: *ParamValue, fw: *gui.FloatingMenuWidget) bool {
+    if (gui.menuItemLabel(@src(), "(none)", .{}, .{ .expand = .horizontal }) != null) {
         v.setTex("");
         fw.close();
         return true;
     }
 
     if (!EditorState.assetDbReady()) {
-        dvui.label(@src(), "(no project open)", .{}, .{});
+        gui.label(@src(), "(no project open)", .{}, .{});
         return false;
     }
 
@@ -203,47 +203,47 @@ fn pickerTexture(v: *ParamValue, fw: *dvui.FloatingMenuWidget) bool {
             info.path;
         var guid_buf: [36]u8 = undefined;
         const guid_str = info.guid.toString(&guid_buf);
-        if (dvui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), basename, .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             v.setTex(guid_str);
             fw.close();
             return true;
         }
         idx += 1;
     }
-    if (!any_shown) dvui.label(@src(), "(no textures in project)", .{}, .{});
+    if (!any_shown) gui.label(@src(), "(no textures in project)", .{}, .{});
     return false;
 }
 
 fn drawRenderState() void {
-    if (!dvui.expander(@src(), "Render State", .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) return;
+    if (!gui.expander(@src(), "Render State", .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) return;
 
-    var body = dvui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 } });
+    var body = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 } });
     defer body.deinit();
 
     {
-        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer r.deinit();
-        dvui.label(@src(), "Blend", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
-        if (dvui.dropdownEnum(@src(), Material.BlendMode, .{ .choice = &render.blend }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5 })) dirty = true;
+        gui.label(@src(), "Blend", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
+        if (gui.dropdownEnum(@src(), Material.BlendMode, .{ .choice = &render.blend }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5 })) dirty = true;
     }
     {
-        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 1 });
+        var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 1 });
         defer r.deinit();
-        dvui.label(@src(), "Cull", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 }, .id_extra = 1 });
-        if (dvui.dropdownEnum(@src(), Material.CullMode, .{ .choice = &render.cull }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = 1 })) dirty = true;
+        gui.label(@src(), "Cull", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 }, .id_extra = 1 });
+        if (gui.dropdownEnum(@src(), Material.CullMode, .{ .choice = &render.cull }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = 1 })) dirty = true;
     }
     {
-        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 2 });
+        var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 2 });
         defer r.deinit();
         const before_w = render.depth_write;
-        _ = dvui.checkbox(@src(), &render.depth_write, "Depth Write", .{ .gravity_y = 0.5, .id_extra = 2 });
+        _ = gui.checkbox(@src(), &render.depth_write, "Depth Write", .{ .gravity_y = 0.5, .id_extra = 2 });
         if (render.depth_write != before_w) dirty = true;
     }
     {
-        var r = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 3 });
+        var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 3 });
         defer r.deinit();
         const before_t = render.depth_test;
-        _ = dvui.checkbox(@src(), &render.depth_test, "Depth Test", .{ .gravity_y = 0.5, .id_extra = 3 });
+        _ = gui.checkbox(@src(), &render.depth_test, "Depth Test", .{ .gravity_y = 0.5, .id_extra = 3 });
         if (render.depth_test != before_t) dirty = true;
     }
 }
@@ -263,7 +263,7 @@ fn load(asset_path: []const u8) void {
     // Default to the built-in shader; replace if the file specifies one.
     sh = shader.default();
 
-    const mat: ?Material = Material.load(arena, dvui.io, asset_path) catch null;
+    const mat: ?Material = Material.load(arena, gui.io, asset_path) catch null;
 
     if (mat) |m| sh = m.shaderDef();
 
@@ -316,18 +316,18 @@ fn save() void {
     };
 
     const path = loadedPath();
-    mat.save(dvui.io, path) catch return;
+    mat.save(gui.io, path) catch return;
     dirty = false;
 
     // Keep the cached artifact in sync with the freshly written source.
     if (EditorState.project_path) |proj| {
-        editor.asset_importer.importAssetForce(dvui.io, dvui.currentWindow().arena(), proj, path);
+        editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, path);
     }
 }
 
 // ── Colour conversion (material stores 0..1 floats; dvui uses 0..255 u8) ────────
 
-fn vecToColor(v: [4]f32) dvui.Color {
+fn vecToColor(v: [4]f32) gui.Color {
     return .{
         .r = chan(v[0]),
         .g = chan(v[1]),
@@ -336,7 +336,7 @@ fn vecToColor(v: [4]f32) dvui.Color {
     };
 }
 
-fn colorToVec(c: dvui.Color) [4]f32 {
+fn colorToVec(c: gui.Color) [4]f32 {
     return .{
         @as(f32, @floatFromInt(c.r)) / 255.0,
         @as(f32, @floatFromInt(c.g)) / 255.0,

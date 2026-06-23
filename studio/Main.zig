@@ -1,5 +1,5 @@
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const Window = @import("Window.zig");
@@ -12,16 +12,16 @@ const build_options = @import("turian_build_options");
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
 pub fn main(main_init: std.process.Init) !void {
     if (@import("builtin").os.tag == .windows) {
-        dvui.Backend.Common.windowsAttachConsole() catch {};
+        gui.Backend.Common.windowsAttachConsole() catch {};
         // Request Vulkan on Windows so the GPU renderer can use SPIRV shaders.
         // Falls back to D3D12 silently if Vulkan is unavailable (3D viewport
         // will show "unavailable" but the rest of the editor still works).
-        _ = dvui.backend.c.SDL_SetHint("SDL_GPU_DRIVER", "vulkan");
+        _ = gui.backend.c.SDL_SetHint("SDL_GPU_DRIVER", "vulkan");
     }
 
-    dvui.backend.enableSDLLogging();
+    gui.backend.enableSDLLogging();
 
-    var backend = try dvui.backend.initWindow(.{
+    var backend = try gui.backend.initWindow(.{
         .io = main_init.io,
         .allocator = main_init.gpa,
         .size = .{ .w = 1280.0, .h = 720.0 },
@@ -31,10 +31,10 @@ pub fn main(main_init: std.process.Init) !void {
     });
     defer backend.deinit();
 
-    var win = try dvui.Window.init(@src(), main_init.gpa, backend.backend(), .{
+    var win = try gui.Window.init(@src(), main_init.gpa, backend.backend(), .{
         .theme = switch (backend.preferredColorScheme() orelse .dark) {
-            .light => dvui.Theme.builtin.adwaita_light,
-            .dark => dvui.Theme.builtin.adwaita_dark,
+            .light => gui.Theme.builtin.adwaita_light,
+            .dark => gui.Theme.builtin.adwaita_dark,
         },
     });
     defer win.deinit();
@@ -94,7 +94,7 @@ pub fn main(main_init: std.process.Init) !void {
 
         if (!project_opened_from_arg) {
             project_opened_from_arg = true;
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
+            EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
             if (cli_project_path) |p| {
                 ProjectOps.openProject(p);
                 if (cli_build) {
@@ -118,9 +118,9 @@ pub fn main(main_init: std.process.Init) !void {
                     };
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
                     defer cfg_arena.deinit();
-                    const config = editor.sdk_layout.resolveBuildConfig(dvui.io, cfg_arena.allocator(), main_init.environ_map, baked);
+                    const config = editor.sdk_layout.resolveBuildConfig(gui.io, cfg_arena.allocator(), main_init.environ_map, baked);
                     _ = editor.GameBuild.buildGame(
-                        dvui.io,
+                        gui.io,
                         p,
                         &EditorState.discovered_components,
                         EditorState.discovered_count,
@@ -134,9 +134,9 @@ pub fn main(main_init: std.process.Init) !void {
 
         // Auto-detect external asset changes (replaces the manual Refresh
         // button): poll the assets tree and hot-reload when it changes.
-        if (AssetWatcher.poll(dvui.io, nstime)) {
-            EditorState.refreshComponents(dvui.io, dvui.currentWindow().arena());
-            dvui.refresh(null, @src(), null);
+        if (AssetWatcher.poll(gui.io, nstime)) {
+            EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
+            gui.refresh(null, @src(), null);
         }
 
         if (!quit and !Window.frame()) quit = true;

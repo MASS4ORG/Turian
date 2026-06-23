@@ -20,7 +20,7 @@
 //! nothing the simulation does can leak into the saved scene. (Play edits live
 //! only inside the library's own node copy, seeded from a serialized snapshot.)
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
@@ -93,7 +93,7 @@ pub fn play(io: std.Io) void {
         .playing => return,
         .paused => {
             g_state = .playing;
-            g_prev_ns = dvui.frameTimeNS();
+            g_prev_ns = gui.frameTimeNS();
             return;
         },
         .edit => {},
@@ -115,13 +115,13 @@ pub fn playFirstScene(io: std.Io) void {
     defer arena.deinit();
 
     const scene_path = EditorState.firstScenePath(io, arena.allocator()) orelse {
-        dvui.toast(@src(), .{ .message = "No first scene found. Set one in Project Settings." });
+        gui.toast(@src(), .{ .message = "No first scene found. Set one in Project Settings." });
         return;
     };
 
     var count: usize = 0;
     if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, &g_first_scene_nodes, &count)) {
-        dvui.toast(@src(), .{ .message = "Failed to load the first scene." });
+        gui.toast(@src(), .{ .message = "Failed to load the first scene." });
         return;
     }
 
@@ -134,7 +134,7 @@ pub fn playFirstScene(io: std.Io) void {
 /// what the editor is showing.
 fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     const project = EditorState.project_path orelse {
-        dvui.toast(@src(), .{ .message = "Open a project before entering Play mode." });
+        gui.toast(@src(), .{ .message = "Open a project before entering Play mode." });
         return false;
     };
 
@@ -142,9 +142,9 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     const hash = sourceHash(io);
     if (!g_lib_valid or hash != g_lib_hash) {
         unloadLibrary();
-        dvui.toast(@src(), .{ .message = "Compiling play library..." });
+        gui.toast(@src(), .{ .message = "Compiling play library..." });
         if (!loadLibrary(io, project)) {
-            dvui.toast(@src(), .{ .message = "Play build failed — see console." });
+            gui.toast(@src(), .{ .message = "Play build failed — see console." });
             return false;
         }
         g_lib_hash = hash;
@@ -158,7 +158,7 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     // library share the same SceneNode layout, and the library memcpy's its own
     // copy, so play-time mutations never touch EditorState.
     if (!g_fns.start(nodes.ptr, nodes.len)) {
-        dvui.toast(@src(), .{ .message = "Play start failed." });
+        gui.toast(@src(), .{ .message = "Play start failed." });
         return false;
     }
 
@@ -169,7 +169,7 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
 
     GpuRenderer.setRenderOverride(playNodes());
     g_state = .playing;
-    g_prev_ns = dvui.frameTimeNS();
+    g_prev_ns = gui.frameTimeNS();
     g_elapsed = 0;
     g_frame = 0;
     g_fps = 0;
@@ -214,7 +214,7 @@ pub fn pump(io: std.Io) void {
     _ = io;
     if (g_state == .edit) return;
 
-    const now = dvui.frameTimeNS();
+    const now = gui.frameTimeNS();
     var dt: f32 = @as(f32, @floatFromInt(now - g_prev_ns)) / 1_000_000_000.0;
     g_prev_ns = now;
     // Clamp pathological deltas (first frame after a long compile, breakpoints).
@@ -238,7 +238,7 @@ pub fn pump(io: std.Io) void {
     // Keep the render override pointing at the (stable) live node storage and
     // request another frame so the simulation animates.
     GpuRenderer.setRenderOverride(playNodes());
-    dvui.refresh(null, @src(), null);
+    gui.refresh(null, @src(), null);
 }
 
 // ── Internals ──────────────────────────────────────────────────────────────
@@ -252,7 +252,7 @@ fn playNodes() []const engine.SceneNode {
 
 /// Forward this frame's dvui input events into the live simulation.
 fn feedInput() void {
-    for (dvui.events()) |*e| {
+    for (gui.events()) |*e| {
         switch (e.evt) {
             .key => |ke| {
                 if (ke.action == .repeat) continue;
@@ -272,7 +272,7 @@ fn feedInput() void {
     }
 }
 
-fn mapButton(b: dvui.enums.Button) ?u8 {
+fn mapButton(b: gui.enums.Button) ?u8 {
     return switch (b) {
         .left => @intFromEnum(engine.MouseButton.left),
         .right => @intFromEnum(engine.MouseButton.right),
@@ -283,7 +283,7 @@ fn mapButton(b: dvui.enums.Button) ?u8 {
     };
 }
 
-fn mapKey(code: dvui.enums.Key) ?u16 {
+fn mapKey(code: gui.enums.Key) ?u16 {
     const K = engine.Key;
     const ek: ?K = switch (code) {
         .a => .a,
@@ -482,5 +482,5 @@ fn buildConfig(a: std.mem.Allocator) editor.PlayBuild.BuildConfig {
         .render_root = build_options.render_root_path,
         .sdl3_include = build_options.sdl3_include_path,
     };
-    return editor.sdk_layout.resolveBuildConfig(dvui.io, a, EditorState.environ_map, baked);
+    return editor.sdk_layout.resolveBuildConfig(gui.io, a, EditorState.environ_map, baked);
 }

@@ -24,7 +24,7 @@
 //! future work — reordering within the one tab strip is supported.
 
 const std = @import("std");
-const dvui = @import("dvui");
+const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const ProjectOps = @import("ProjectOps.zig");
@@ -76,7 +76,7 @@ var active: ?usize = null;
 /// Index of the tab currently being dragged for reorder, if any.
 var g_drag_tab: ?usize = null;
 /// Per-frame cache of each tab's physical rect, used for reorder hit-testing.
-var tab_rects: [MAX_DOCS]dvui.Rect.Physical = undefined;
+var tab_rects: [MAX_DOCS]gui.Rect.Physical = undefined;
 
 /// Index of the leftmost tab currently shown; the strip pages by this when more
 /// tabs are open than fit the window (the ‹ › nav buttons adjust it).
@@ -387,7 +387,7 @@ pub fn drawTabBar(mouse_held: bool) void {
     // When empty the bar is an invisible placeholder: it still reserves
     // TAB_STRIP_H so the editor below never shifts as the last tab closes.
     const has_docs = doc_count > 0;
-    var bar = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var bar = gui.box(@src(), .{ .dir = .horizontal }, .{
         .expand = .horizontal,
         .background = has_docs,
         .style = .window,
@@ -409,7 +409,7 @@ pub fn drawTabBar(mouse_held: bool) void {
 
     // ── Paging: decide which tabs are visible ─────────────────────────────────
     // Work in physical pixels (tab widths are measured from physical rects).
-    const scale = dvui.windowNaturalScale();
+    const scale = gui.windowNaturalScale();
     const content_w = bar.data().contentRectScale().r.w;
 
     var total_w: f32 = 0;
@@ -434,7 +434,7 @@ pub fn drawTabBar(mouse_held: bool) void {
     const show_right = end < doc_count;
 
     if (show_left) {
-        if (dvui.buttonIcon(@src(), "tabs_left", dvui.entypo.chevron_left, .{}, .{}, .{
+        if (gui.buttonIcon(@src(), "tabs_left", gui.entypo.chevron_left, .{}, .{}, .{
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 14, .h = 14 },
             .padding = .all(2),
@@ -444,7 +444,7 @@ pub fn drawTabBar(mouse_held: bool) void {
     }
 
     {
-        var strip = dvui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_y = 1.0, .expand = .horizontal });
+        var strip = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_y = 1.0, .expand = .horizontal });
         defer strip.deinit();
 
         var i: usize = first_tab;
@@ -454,7 +454,7 @@ pub fn drawTabBar(mouse_held: bool) void {
     }
 
     if (show_right) {
-        if (dvui.buttonIcon(@src(), "tabs_right", dvui.entypo.chevron_right, .{}, .{}, .{
+        if (gui.buttonIcon(@src(), "tabs_right", gui.entypo.chevron_right, .{}, .{}, .{
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 14, .h = 14 },
             .padding = .all(2),
@@ -470,7 +470,7 @@ pub fn drawTabBar(mouse_held: bool) void {
     if (!mouse_held) {
         g_drag_tab = null;
     } else if (g_drag_tab) |di| if (di >= first_tab and di < end) {
-        const mx = dvui.currentWindow().mouse_pt.x;
+        const mx = gui.currentWindow().mouse_pt.x;
         if (di + 1 < end and mx > tab_rects[di + 1].x + tab_rects[di + 1].w / 2) {
             move(di, di + 1);
         } else if (di > first_tab and mx < tab_rects[di - 1].x + tab_rects[di - 1].w / 2) {
@@ -496,7 +496,7 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
     const is_active = (active != null and active.? == i);
     const is_dragged = (g_drag_tab != null and g_drag_tab.? == i and mouse_held);
 
-    var tab = dvui.box(@src(), .{ .dir = .horizontal }, .{
+    var tab = gui.box(@src(), .{ .dir = .horizontal }, .{
         .id_extra = i,
         .background = true,
         // A dragged tab lifts to the highlight style as a drag affordance.
@@ -513,13 +513,13 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
     const tr = tab.data().rectScale().r;
     tab_rects[i] = tr;
     // Record width (incl. the inter-tab margin) for next frame's paging maths.
-    tab_w[i] = tr.w + 4 * dvui.windowNaturalScale();
-    const hovered = tr.contains(dvui.currentWindow().mouse_pt);
+    tab_w[i] = tr.w + 4 * gui.windowNaturalScale();
+    const hovered = tr.contains(gui.currentWindow().mouse_pt);
 
     // Left-press activates + starts a reorder drag; middle-press closes the tab.
     // Neither is `e.handle`d so the close button can still receive its clicks.
-    for (dvui.events()) |*e| {
-        if (!dvui.eventMatchSimple(e, tab.data())) continue;
+    for (gui.events()) |*e| {
+        if (!gui.eventMatchSimple(e, tab.data())) continue;
         switch (e.evt) {
             .mouse => |me| {
                 if (me.action == .press and me.button == .left) {
@@ -535,7 +535,7 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
 
     // Unsaved-changes indicator.
     if (isDocDirty(i)) {
-        dvui.label(@src(), "*", .{}, .{
+        gui.label(@src(), "*", .{}, .{
             .id_extra = i,
             .gravity_y = 0.5,
             .padding = .{ .w = 4 },
@@ -544,7 +544,7 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
     }
 
     var name_buf: [256]u8 = undefined;
-    dvui.label(@src(), "{s}", .{trimTitle(docs[i].name(), title_max_cache, &name_buf)}, .{
+    gui.label(@src(), "{s}", .{trimTitle(docs[i].name(), title_max_cache, &name_buf)}, .{
         .id_extra = i,
         .gravity_y = 0.5,
     });
@@ -553,14 +553,14 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
     // but is made invisible unless the tab is hovered or active. It stays
     // clickable — if you're clicking it you're hovering, so it's visible.
     const show_close = hovered or is_active;
-    if (dvui.buttonIcon(@src(), "close", dvui.entypo.cross, .{}, .{}, .{
+    if (gui.buttonIcon(@src(), "close", gui.entypo.cross, .{}, .{}, .{
         .id_extra = i,
         .gravity_y = 0.5,
         .min_size_content = .{ .w = CLOSE_SLOT, .h = CLOSE_SLOT },
         .margin = .{ .x = 4 },
         .padding = .all(2),
         .background = show_close,
-        .color_text = if (show_close) null else dvui.Color.transparent,
+        .color_text = if (show_close) null else gui.Color.transparent,
     })) {
         to_close.* = i;
     }
@@ -589,14 +589,14 @@ fn drawDragGhost(mouse_held: bool) void {
     const di = g_drag_tab orelse return;
     if (di >= doc_count) return;
 
-    dvui.cursorSet(.arrow_all);
+    gui.cursorSet(.arrow_all);
 
-    const mp = dvui.currentWindow().mouse_pt;
-    const scale = dvui.windowNaturalScale();
+    const mp = gui.currentWindow().mouse_pt;
+    const scale = gui.windowNaturalScale();
     g_ghost_rect.x = mp.x / scale + 12;
     g_ghost_rect.y = mp.y / scale + 12;
 
-    var fw = dvui.floatingWindow(@src(), .{
+    var fw = gui.floatingWindow(@src(), .{
         .rect = &g_ghost_rect,
         .resize = .none,
         .stay_above_parent_window = true,
@@ -611,9 +611,9 @@ fn drawDragGhost(mouse_held: bool) void {
     defer fw.deinit();
 
     var name_buf: [256]u8 = undefined;
-    dvui.label(@src(), "{s}", .{trimTitle(docs[di].name(), title_max_cache, &name_buf)}, .{ .gravity_y = 0.5 });
+    gui.label(@src(), "{s}", .{trimTitle(docs[di].name(), title_max_cache, &name_buf)}, .{ .gravity_y = 0.5 });
 }
-var g_ghost_rect: dvui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
+var g_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
 /// Modal save/discard/cancel prompt shown when closing a document with unsaved
 /// changes (issue #1 follow-up).
@@ -624,41 +624,41 @@ fn drawConfirmClose() void {
         return;
     }
 
-    var win = dvui.floatingWindow(@src(), .{
+    var win = gui.floatingWindow(@src(), .{
         .modal = true,
-        .center_on = dvui.currentWindow().subwindows.current_rect,
+        .center_on = gui.currentWindow().subwindows.current_rect,
         .window_avoid = .nudge,
     }, .{ .role = .dialog, .min_size_content = .{ .w = 320 } });
     defer win.deinit();
 
     var open_flag = true;
-    win.dragAreaSet(dvui.windowHeader("Unsaved Changes", "", &open_flag));
+    win.dragAreaSet(gui.windowHeader("Unsaved Changes", "", &open_flag));
     if (!open_flag) {
         g_confirm_close = null;
         return;
     }
 
     var name_buf: [256]u8 = undefined;
-    dvui.label(@src(), "Save changes to \"{s}\" before closing?", .{
+    gui.label(@src(), "Save changes to \"{s}\" before closing?", .{
         trimTitle(docs[i].name(), 48, &name_buf),
     }, .{ .padding = .all(8) });
 
-    var row = dvui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_x = 1.0, .padding = .all(4) });
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_x = 1.0, .padding = .all(4) });
     defer row.deinit();
 
-    if (dvui.button(@src(), "Save", .{}, .{})) {
+    if (gui.button(@src(), "Save", .{}, .{})) {
         // Load the doc so EditorState holds its scene, then save + close.
         activate(i);
         if (docs[i].kind == .scene) ProjectOps.saveScene(docs[i].path());
         g_confirm_close = null;
         close(i);
     }
-    if (dvui.button(@src(), "Don't Save", .{}, .{ .id_extra = 1 })) {
+    if (gui.button(@src(), "Don't Save", .{}, .{ .id_extra = 1 })) {
         const idx = i;
         g_confirm_close = null;
         close(idx);
     }
-    if (dvui.button(@src(), "Cancel", .{}, .{ .id_extra = 2 })) {
+    if (gui.button(@src(), "Cancel", .{}, .{ .id_extra = 2 })) {
         g_confirm_close = null;
     }
 }
@@ -704,7 +704,7 @@ pub fn restore() void {
     const proj = EditorState.project_path orelse return;
 
     const raw_ref = EditorState.settings.get(OPEN_KEY) orelse return;
-    const arena = dvui.currentWindow().arena();
+    const arena = gui.currentWindow().arena();
     // Copy out of settings memory: opening tabs below triggers settings writes
     // that can invalidate `raw_ref` (and JSON strings reference their source).
     const raw = arena.dupe(u8, raw_ref) catch return;
@@ -743,8 +743,8 @@ pub fn restore() void {
 }
 
 fn fileExists(full: []const u8) bool {
-    var f = std.Io.Dir.cwd().openFile(dvui.io, full, .{}) catch return false;
-    f.close(dvui.io);
+    var f = std.Io.Dir.cwd().openFile(gui.io, full, .{}) catch return false;
+    f.close(gui.io);
     return true;
 }
 
