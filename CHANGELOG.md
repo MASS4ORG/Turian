@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.0] - 2026-06-24
+
+### Features
+- feat(studio): MDI (multiple asset edit via tabs) #1
+
+### Bug Fixes
+- fix(ci): macOS and Windows builds
+
+### Other
+- refactor(studio): import DVUI as `gui` namespace
+
 ## [1.6.0] - 2026-06-23
 
 ### Features
