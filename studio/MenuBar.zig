@@ -5,6 +5,8 @@ const EditorState = @import("EditorState.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("PlayMode.zig");
+const ProfilerPanel = @import("ProfilerPanel.zig");
+const Screenshots = @import("Screenshots.zig");
 const build_options = @import("turian_build_options");
 
 const AboutInfo = struct {
@@ -133,6 +135,22 @@ pub fn draw(should_quit: *bool) void {
             if (EditorState.project_path) |p| {
                 editor.asset_cache.clearAll(gui.io, p);
             }
+        }
+    }
+
+    if (gui.menuItemLabel(@src(), "View", .{ .submenu = true }, .{})) |r| {
+        var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+
+        const profiler_label = if (ProfilerPanel.isOpen()) "Hide Profiler" else "Show Profiler";
+        if (gui.menuItemLabel(@src(), profiler_label, .{}, .{ .expand = .horizontal }) != null) {
+            m.close();
+            ProfilerPanel.toggle();
+        }
+
+        if (gui.menuItemLabel(@src(), "Capture Screenshot", .{}, .{ .expand = .horizontal }) != null) {
+            m.close();
+            _ = Screenshots.capture();
         }
     }
 

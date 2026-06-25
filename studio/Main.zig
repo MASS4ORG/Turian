@@ -1,5 +1,6 @@
 const std = @import("std");
 const gui = @import("gui");
+const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const Window = @import("Window.zig");
@@ -20,6 +21,10 @@ pub fn main(main_init: std.process.Init) !void {
     }
 
     gui.backend.enableSDLLogging();
+
+    // Give the engine profiler a monotonic clock source (issue #35). It's
+    // enabled per-frame only while Play mode runs (see studio/Window.zig).
+    engine.Profiler.setIo(main_init.io);
 
     var backend = try gui.backend.initWindow(.{
         .io = main_init.io,
@@ -80,6 +85,10 @@ pub fn main(main_init: std.process.Init) !void {
     var project_opened_from_arg = false;
 
     main_loop: while (true) {
+        // Apply a pending vsync change here — between frames, before the
+        // swapchain texture is acquired in win.begin (issue #35).
+        GpuRenderer.applyPendingVsync();
+
         const nstime = win.beginWait(interrupted);
         try win.begin(nstime);
         _ = try backend.addAllEvents(&win);

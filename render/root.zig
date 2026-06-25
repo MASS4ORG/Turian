@@ -169,6 +169,9 @@ pub fn renderScene(
     h: u32,
     objects: []const engine.SceneNode,
 ) void {
+    var scene_zone = engine.Profiler.zone("render.scene");
+    defer scene_zone.end();
+
     const pl = state.pipeline orelse return;
     const dev = state.device orelse return;
     const sampler = state.sampler orelse return;
@@ -192,7 +195,13 @@ pub fn renderScene(
     }
     const depth_tex = state.depth_tex orelse return;
 
-    assets.uploadNewAssets(cmd, dev, objects);
+    {
+        var upload_zone = engine.Profiler.zone("render.upload");
+        defer upload_zone.end();
+        const tex_before = state.texture_count;
+        assets.uploadNewAssets(cmd, dev, objects);
+        engine.Profiler.countTexturesCreated(@intCast(state.texture_count -| tex_before));
+    }
 
     // ── Camera ──────────────────────────────────────────────────────────────
     const cam = sceneCamera(w, h, objects);
@@ -242,9 +251,15 @@ pub fn renderScene(
     const light_vp = if (shadow_dir) |sd| shadow.shadowMatrix(sd, bounds) else Matrix4{};
     const shadows_on = shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
 
-    if (shadows_on) shadow.renderShadowPass(cmd, light_vp, objects);
+    if (shadows_on) {
+        var shadow_zone = engine.Profiler.zone("render.shadow");
+        defer shadow_zone.end();
+        shadow.renderShadowPass(cmd, light_vp, objects);
+    }
 
     // ── Main pass ───────────────────────────────────────────────────────────
+    var main_zone = engine.Profiler.zone("render.main");
+    defer main_zone.end();
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
     color_info.texture = color_tex;
     color_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
@@ -269,6 +284,9 @@ pub fn renderScene(
         .max_depth = 1.0,
     });
 
+    // Track the previously bound material GUID so we can count pipeline/material
+    // switches for the profiler (a draw with the same material is "free").
+    var prev_mat: []const u8 = "";
     for (objects) |*obj| {
         if (!obj.active) continue;
         for (obj.components[0..obj.component_count]) |*comp| {
@@ -277,6 +295,12 @@ pub fn renderScene(
             if (guid_str.len == 0) continue;
             const gm = assets.findGpuMesh(guid_str) orelse continue;
             if (gm.idx_count == 0) continue;
+
+            const mat_guid = comp.mesh_renderer.material.slice();
+            if (!std.mem.eql(u8, mat_guid, prev_mat)) {
+                engine.Profiler.countMaterialSwitch();
+                prev_mat = mat_guid;
+            }
 
             const t = &obj.transform;
             const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
@@ -326,6 +350,9 @@ pub fn renderScene(
             c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
             c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
             c.SDL_DrawGPUIndexedPrimitives(pass, gm.idx_count, 1, 0, 0, 0);
+            // Indexed draw: index count == vertices referenced; triangles = /3.
+            // Every mesh binds samplers, so this draw always counts as textured.
+            engine.Profiler.countDraw(gm.idx_count / 3, gm.idx_count, true);
         }
     }
 

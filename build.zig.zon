@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui#01072101dc6090c493f9f62fb4a9f0614410ffa4",
-            .hash = "dvui-0.5.0-dev-AQFJmYL-9gCZErXZGGekVKV_5LW9lWhIM6Q3gz_XaoUR",
+            .url = "git+https://github.com/brmassa/dvui#ff920c16d25407a9101eb4af0a7884012d0ac19a",
+            .hash = "dvui-0.5.0-dev-AQFJmT7-9wBmqC26dNKJy8w3rDroLEtdxgBDa9nC62KO",
         },
         .gpu = .{
             .url = "git+https://gitlab.com/mass4org/mega4/gpu#46d869b551656c4797797a74bff3b3008df85a2e",

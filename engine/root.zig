@@ -49,6 +49,9 @@ pub const Frame = @import("Frame.zig").Frame;
 pub const Gizmos = @import("Gizmos.zig").Gizmos;
 /// Type-keyed registry for engine + user-defined services (ADR 0001).
 pub const Services = @import("Services.zig").Services;
+/// In-engine performance profiler: scoped CPU zones, per-thread timeline, and
+/// render counters for the Studio panel and built-game overlay (issue #35).
+pub const Profiler = @import("Profiler.zig");
 
 /// Asset loading subsystem (meshes, textures).
 pub const assets = @import("assets/root.zig");

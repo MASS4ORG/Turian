@@ -183,8 +183,6 @@ pub fn draw() void {
             .gravity_y = 0.5,
         });
         defer center.deinit();
-        gui.label(@src(), "No project open.", .{}, .{ .gravity_x = 0.5 });
-        gui.label(@src(), "Use File > Open Project... to open a project folder.", .{}, .{ .gravity_x = 0.5 });
         return;
     };
 

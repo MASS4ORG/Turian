@@ -106,6 +106,84 @@ pub fn renderViewport(w: u32, h: u32) ?gui.TextureTarget {
     return ct;
 }
 
+/// RGBA8 CPU pixels downloaded from the viewport color target, plus its size.
+pub const Capture = struct {
+    /// RGBA8 pixels, `w*h*4` bytes, owned by the caller's allocator.
+    pixels: []u8,
+    w: u32,
+    h: u32,
+};
+
+/// Download the editor viewport color target (the real GPU-rendered scene) to
+/// RGBA8 CPU pixels (issue #35). Caller owns `Capture.pixels`. Null if the
+/// renderer/target isn't ready. The pixels come from the most recently
+/// *submitted* frame — fine for a debug snapshot.
+pub fn capturePixels(allocator: std.mem.Allocator) ?Capture {
+    const backend = g_backend orelse return null;
+    const ct = g_color_target orelse return null;
+    if (g_target_w == 0 or g_target_h == 0) return null;
+    const bt: *BackendTex = @ptrCast(@alignCast(ct.ptr));
+    const pixels = gpu.captureTexture(
+        @ptrCast(backend.device),
+        allocator,
+        @ptrCast(bt.texture),
+        g_target_w,
+        g_target_h,
+        gpu.c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+    ) catch |err| {
+        std.debug.print("[GpuRenderer] capture failed: {any}\n", .{err});
+        return null;
+    };
+    return .{ .pixels = pixels, .w = g_target_w, .h = g_target_h };
+}
+
+// ── VSync (runtime swapchain present mode) ───────────────────────────────────
+// The window is created vsync-on; the profiler panel can flip it at runtime so
+// fps caps above the refresh rate take effect. dvui acquires the swapchain
+// texture in `Window.begin`, so reconfiguring the swapchain *during* a frame
+// invalidates that texture and crashes the next render pass. We therefore only
+// record the request here and apply it from the main loop between frames, via
+// `applyPendingVsync` (called before `Window.begin`).
+
+var g_vsync: bool = true;
+var g_vsync_pending: ?bool = null;
+
+/// The effective vsync state, reflecting a pending request so the UI updates
+/// immediately.
+pub fn vsyncOn() bool {
+    return g_vsync_pending orelse g_vsync;
+}
+
+/// Request a vsync change; applied between frames by `applyPendingVsync`.
+pub fn requestVsync(on: bool) void {
+    g_vsync_pending = on;
+}
+
+/// Apply a pending vsync change at a safe point (no swapchain texture acquired,
+/// no live command buffer). Call once per loop iteration before `Window.begin`.
+pub fn applyPendingVsync() void {
+    const want = g_vsync_pending orelse return;
+    g_vsync_pending = null;
+    if (want == g_vsync) return;
+    const backend = g_backend orelse return;
+
+    // Off: prefer IMMEDIATE (true uncapped, may tear); fall back to MAILBOX
+    // (uncapped render, no tearing) if the platform lacks IMMEDIATE.
+    const mode: dc.SDL_GPUPresentMode = if (want) dc.SDL_GPU_PRESENTMODE_VSYNC else blk: {
+        if (dc.SDL_WindowSupportsGPUPresentMode(backend.device, backend.window, dc.SDL_GPU_PRESENTMODE_IMMEDIATE))
+            break :blk dc.SDL_GPU_PRESENTMODE_IMMEDIATE;
+        if (dc.SDL_WindowSupportsGPUPresentMode(backend.device, backend.window, dc.SDL_GPU_PRESENTMODE_MAILBOX))
+            break :blk dc.SDL_GPU_PRESENTMODE_MAILBOX;
+        std.debug.print("[GpuRenderer] no uncapped present mode supported; keeping vsync on.\n", .{});
+        return;
+    };
+    if (!dc.SDL_SetGPUSwapchainParameters(backend.device, backend.window, dc.SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode)) {
+        std.debug.print("[GpuRenderer] set vsync={} failed: {s}\n", .{ want, dc.SDL_GetError() });
+        return;
+    }
+    g_vsync = want;
+}
+
 pub fn deinit() void {
     render.deinit();
     if (g_color_target) |ct| {

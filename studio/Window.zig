@@ -1,4 +1,5 @@
 const gui = @import("gui");
+const engine = @import("engine");
 const editor = @import("editor");
 const MenuBar = @import("MenuBar.zig");
 const SceneTree = @import("SceneTree.zig");
@@ -10,6 +11,7 @@ const TaskBar = @import("TaskBar.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("PlayMode.zig");
 const Documents = @import("Documents.zig");
+const ProfilerPanel = @import("ProfilerPanel.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
@@ -21,6 +23,13 @@ var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
+    // Recording is tied to Play and controlled from the panel (Record/Pause +
+    // auto-on-Play). `tickRecording` arms `engine.Profiler.enabled` for this
+    // frame (#35). When disabled, begin/end and all zones/counters early-out.
+    ProfilerPanel.tickRecording();
+    engine.Profiler.beginFrame();
+    defer engine.Profiler.endFrame();
+
     for (gui.events()) |*e| {
         if (e.evt == .window and e.evt.window.action == .close) return false;
         if (e.evt == .app and e.evt.app.action == .quit) return false;
@@ -49,6 +58,10 @@ pub fn frame() bool {
         .style = .window,
     });
     defer root.deinit();
+
+    // Times the editor's CPU build + viewport render work for the timeline.
+    var ui_zone = engine.Profiler.zone("studio.ui");
+    defer ui_zone.end();
 
     // Handle global keyboard shortcuts after root is created
     for (gui.events()) |*e| {
@@ -153,6 +166,9 @@ pub fn frame() bool {
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
     TaskBar.draw();
+
+    // Floating performance profiler (toggled from View ▸ Show Profiler).
+    ProfilerPanel.draw();
 
     drawDragGhost();
 

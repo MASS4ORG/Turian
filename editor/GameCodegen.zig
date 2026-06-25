@@ -835,7 +835,11 @@ pub fn generateMainZig(
         "    var prev_ts = std.Io.Clock.awake.now(io);\n" ++
             "    var elapsed: f32 = 0;\n" ++
             "    var frame: u64 = 0;\n\n" ++
+            "    // In-engine profiler (issue #35): give it the clock; it self-disables\n" ++
+            "    // outside Debug so release builds pay nothing.\n" ++
+            "    engine.Profiler.setIo(io);\n\n" ++
             "    main_loop: while (true) {\n" ++
+            "        engine.Profiler.beginFrame();\n" ++
             "        g_input.newFrame();\n" ++
             "        var ev: SDL_Event align(8) = undefined;\n" ++
             "        while (SDL_PollEvent(&ev)) {\n" ++
@@ -889,7 +893,11 @@ pub fn generateMainZig(
         try out.appendSlice(
             a,
             "        const time = engine.Time{ .delta = delta, .elapsed = elapsed, .frame = frame };\n" ++
-                "        for (0..g_live_count) |_li| call_update(&g_live[_li], g_live_transform[_li], g_scene_mgr.nodes(g_live_handle[_li]), time);\n" ++
+                "        {\n" ++
+                "            var _upd_zone = engine.Profiler.zone(\"scripts.update\");\n" ++
+                "            defer _upd_zone.end();\n" ++
+                "            for (0..g_live_count) |_li| call_update(&g_live[_li], g_live_transform[_li], g_scene_mgr.nodes(g_live_handle[_li]), time);\n" ++
+                "        }\n" ++
                 "        // Apply any scene load/unload a script requested this frame, then\n" ++
                 "        // reconcile live components against the new set of loaded scenes.\n" ++
                 "        if (g_scene_mgr.flushRequests()) syncLive();\n" ++
@@ -912,6 +920,7 @@ pub fn generateMainZig(
                 "            render.renderScene(fr.cmd, fr.swapchain, fr.width, fr.height, gatherRenderNodes());\n" ++
                 "            fr.submit();\n" ++
                 "        }\n" ++
+                "        engine.Profiler.endFrame();\n" ++
                 "    }\n" ++
                 "}\n",
         );
@@ -924,6 +933,7 @@ pub fn generateMainZig(
                 "        _ = SDL_RenderClear(renderer);\n" ++
                 "        _ = SDL_RenderTexture(renderer, sdl_tex, null, null);\n" ++
                 "        _ = SDL_RenderPresent(renderer);\n" ++
+                "        engine.Profiler.endFrame();\n" ++
                 "    }\n" ++
                 "}\n",
         );
