@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.0] - 2026-06-25
+
+### Features
+- feat(studio): In-engine profiler #35
+
 ## [1.7.0] - 2026-06-24
 
 ### Features
