@@ -95,7 +95,20 @@ pub const ProjectSettings = struct {
 
     /// Free slices owned by a ProjectSettings produced via `loadFromBytes`.
     pub fn deinit(self: ProjectSettings, allocator: std.mem.Allocator) void {
-        std.zon.parse.free(allocator, self);
+        // std.zon.parse.free crashes when a []const u8 field was not present in
+        // the ZON source: the parser stores the default literal pointer directly,
+        // and the allocator rejects freeing a read-only section address.
+        // We compare each string pointer to its known default to skip literals.
+        const d = ProjectSettings{};
+        freeOwnedSlice(allocator, self.first_scene, d.first_scene);
+        freeOwnedSlice(allocator, self.project.name, d.project.name);
+        freeOwnedSlice(allocator, self.project.company, d.project.company);
+        freeOwnedSlice(allocator, self.project.version, d.project.version);
+        freeOwnedSlice(allocator, self.project.icon, d.project.icon);
+    }
+
+    fn freeOwnedSlice(allocator: std.mem.Allocator, s: []const u8, default: []const u8) void {
+        if (s.ptr != default.ptr) allocator.free(s);
     }
 
     /// Serialize this asset as ZON into `writer`.

@@ -52,6 +52,9 @@ pub const Services = @import("Services.zig").Services;
 /// In-engine performance profiler: scoped CPU zones, per-thread timeline, and
 /// render counters for the Studio panel and built-game overlay (issue #35).
 pub const Profiler = @import("Profiler.zig");
+/// Diagnostic log ring buffer: captures recent std.log warn/err for the Remote
+/// Debug Protocol's `errors` method / MCP `list_errors` tool (issue #50).
+pub const DiagLog = @import("DiagLog.zig");
 
 /// Asset loading subsystem (meshes, textures).
 pub const assets = @import("assets/root.zig");
@@ -84,6 +87,13 @@ pub const software_renderer = @import("SoftwareRenderer.zig");
 
 /// C-ABI types for user script reflection.
 pub const api = @import("api/root.zig");
+
+/// Runtime introspection layer (issue #2): structured, JSON-serialisable views
+/// of live engine state, plus queries and mutation. The single source of truth
+/// for the editor, CLI, Remote Debug Protocol (#49), and MCP server (#50).
+pub const introspect = @import("introspect/root.zig");
+/// Engine-wide runtime metrics (FPS, memory, draw calls, ECS counts).
+pub const Metrics = introspect.Metrics;
 
 /// Built-in component types.
 pub const components = @import("components/root.zig");
@@ -149,3 +159,11 @@ pub const AssetRef = api.AssetRef;
 pub const AssetFilter = api.AssetFilter;
 /// AssetRef with a compile-time asset type filter.
 pub const TypedAssetRef = api.TypedAssetRef;
+
+test {
+    // Force every re-exported module to be analysed so their `test` blocks are
+    // collected by the test runner. Without this, `addTest` on the engine module
+    // discovers zero tests (the root file has no direct tests; everything is
+    // reached only through `pub const X = @import(...)`).
+    @import("std").testing.refAllDecls(@This());
+}

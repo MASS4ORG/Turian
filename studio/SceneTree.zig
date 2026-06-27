@@ -34,9 +34,6 @@ pub fn draw() void {
         });
         defer header.deinit();
         gui.label(@src(), "Scene Hierarchy", .{}, .{ .font = .theme(.heading) });
-        if (EditorState.scene_dirty) {
-            gui.label(@src(), " *", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
-        }
     }
 
     {

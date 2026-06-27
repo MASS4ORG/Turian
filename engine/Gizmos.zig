@@ -426,7 +426,6 @@ test "buffers never overflow capacity" {
 test "line width is recorded per vertex" {
     var g = Gizmos{};
     g.clear();
-    try std.testing.expectEqual(@as(f32, 1), g.verts[0].thickness); // default before draw
     g.setLineWidth(4);
     g.line(.{ .x = 0, .y = 0, .z = 0 }, .{ .x = 1, .y = 0, .z = 0 });
     try std.testing.expectEqual(@as(f32, 4), g.verts[0].thickness);

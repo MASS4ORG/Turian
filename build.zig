@@ -43,6 +43,23 @@ pub fn build(b: *std.Build) void {
     engine_mod.addImport("serde", serde_mod);
     engine_mod.addImport("ktx2", ktx2_mod);
 
+    // ── Debug module (opt-in; never linked into game builds) ─────────────────
+    // Hosts the JSON-RPC 2.0 TCP server + CLI client. Depends on engine for
+    // scene/introspect types. Games must explicitly add this to link it.
+    const debug_mod = b.addModule("debug", .{
+        .root_source_file = b.path("debug/root.zig"),
+        .target = target,
+    });
+    debug_mod.addImport("engine", engine_mod);
+
+    // ── MCP module (opt-in; stdio MCP server over debug protocol) ────────────
+    const mcp_mod = b.addModule("mcp", .{
+        .root_source_file = b.path("mcp/root.zig"),
+        .target = target,
+    });
+    mcp_mod.addImport("engine", engine_mod);
+    mcp_mod.addImport("debug", debug_mod);
+
     // ── Editor module ────────────────────────────────────────────────────────
     const editor_mod = b.addModule("editor", .{
         .root_source_file = b.path("editor/root.zig"),
@@ -139,6 +156,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
                     .{ .name = "gpu", .module = gpu_mod.? },
+                    .{ .name = "debug", .module = debug_mod },
                 },
             }),
         });
@@ -163,6 +181,8 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "engine", .module = engine_mod },
                 .{ .name = "editor", .module = editor_mod },
+                .{ .name = "debug", .module = debug_mod },
+                .{ .name = "mcp", .module = mcp_mod },
             },
         }),
     });
@@ -177,8 +197,48 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| cli_run_cmd.addArgs(args);
 
     // ── Tests ────────────────────────────────────────────────────────────────
-    const engine_tests = b.addTest(.{ .root_module = engine_mod });
+    // engine_mod doesn't link stb_image (studio provides it via dvui; the game
+    // build compiles it per-game). The test module mirrors the render test
+    // pattern: same source + deps, but adds the stb C file so the linker is
+    // satisfied when refAllDecls pulls in ImageLoader.
+    const engine_test_mod = b.createModule(.{
+        .root_source_file = b.path("engine/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "math", .module = math3d_mod },
+            .{ .name = "open_asset_package", .module = oap_mod },
+            .{ .name = "serde", .module = serde_mod },
+            .{ .name = "ktx2", .module = ktx2_mod },
+        },
+    });
+    engine_test_mod.link_libc = true;
+    engine_test_mod.addIncludePath(b.path("engine/vendor"));
+    engine_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
+    engine_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/cgltf_wrap.c"), .flags = &.{"-std=c99"} });
+    const engine_tests = b.addTest(.{ .root_module = engine_test_mod });
     const editor_tests = b.addTest(.{ .root_module = editor_mod });
+
+    const debug_test_mod = b.createModule(.{
+        .root_source_file = b.path("debug/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "engine", .module = engine_test_mod },
+        },
+    });
+    const debug_tests = b.addTest(.{ .root_module = debug_test_mod });
+
+    const mcp_test_mod = b.createModule(.{
+        .root_source_file = b.path("mcp/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "engine", .module = engine_test_mod },
+            .{ .name = "debug", .module = debug_test_mod },
+        },
+    });
+    const mcp_tests = b.addTest(.{ .root_module = mcp_test_mod });
 
     const studio_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -193,10 +253,17 @@ pub fn build(b: *std.Build) void {
     });
     studio_tests.root_module.addOptions("turian_build_options", turian_opts);
 
-    const test_step = b.step("test", "Run engine + editor + studio + render tests");
+    const test_step = b.step("test", "Run engine + editor + studio + render + debug + mcp tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
     test_step.dependOn(&b.addRunArtifact(studio_tests).step);
+    test_step.dependOn(&b.addRunArtifact(debug_tests).step);
+    test_step.dependOn(&b.addRunArtifact(mcp_tests).step);
+
+    // Focused steps for fast iteration on the debug/mcp stack.
+    const test_debug_step = b.step("test-debug", "Run debug + mcp tests only");
+    test_debug_step.dependOn(&b.addRunArtifact(debug_tests).step);
+    test_debug_step.dependOn(&b.addRunArtifact(mcp_tests).step);
 
     if (!cli_only) {
         // The render module pulls in engine's ImageLoader (stb_image symbols). In
@@ -237,6 +304,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
                     .{ .name = "gpu", .module = gpu_mod.? },
+                    .{ .name = "debug", .module = debug_mod },
                 },
             }),
         });
@@ -253,6 +321,8 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "engine", .module = engine_mod },
                 .{ .name = "editor", .module = editor_mod },
+                .{ .name = "debug", .module = debug_mod },
+                .{ .name = "mcp", .module = mcp_mod },
             },
         }),
     });
@@ -322,6 +392,8 @@ pub fn build(b: *std.Build) void {
                 .imports = &.{
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
+                    .{ .name = "debug", .module = debug_mod },
+                    .{ .name = "mcp", .module = mcp_mod },
                 },
             }),
         });
@@ -344,6 +416,7 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "editor", .module = editor_mod },
                         .{ .name = "render", .module = render_mod.? },
                         .{ .name = "gpu", .module = gpu_mod.? },
+                        .{ .name = "debug", .module = debug_mod },
                     },
                 }),
             });
@@ -373,6 +446,10 @@ pub fn build(b: *std.Build) void {
             // The render module ships as source (incl. its .spv shaders) so the
             // game build can compile the GPU renderer.
             .{ .src = "render", .dst = "sdk/render" },
+            // Debug module ships as source; game builds opt in explicitly.
+            .{ .src = "debug", .dst = "sdk/debug" },
+            // MCP module ships as source; never linked into game builds.
+            .{ .src = "mcp", .dst = "sdk/mcp" },
         }) |d| {
             sdk_step.dependOn(&b.addInstallDirectory(.{
                 .source_dir = b.path(d.src),

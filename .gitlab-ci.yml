@@ -68,6 +68,12 @@ test:
       # Uses the full SDK (with SDL3) so the game binary can link.
       echo "==> SDK smoke-test"
       zig build sdk
+      # Free disk space accumulated by previous steps before the game compile.
+      # The SDK is already in zig-out/sdk/; object files in .zig-cache and
+      # example .cache dirs are no longer needed.
+      rm -rf .zig-cache
+      find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
+      df -h / || true
       TMP_PROJ=$(mktemp -d)
       cp -r examples/basic-project/. "$TMP_PROJ/"
       ./zig-out/sdk/turian-cli build "$TMP_PROJ" || { echo "SDK build FAILED"; rm -rf "$TMP_PROJ"; exit 1; }

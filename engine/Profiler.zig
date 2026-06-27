@@ -327,6 +327,43 @@ pub fn frameAt(i: usize) *const Frame {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
+/// Serialises the most recently captured frame as structured JSON for the
+/// Remote Debug Protocol's `profiler.capture` (issue #50): frame timing, the
+/// render counters, and each thread's zones (name + duration in microseconds).
+pub fn writeFrameJson(jw: *std.json.Stringify) !void {
+    const f = captured();
+    try jw.beginObject();
+    try jw.objectField("frame_index");
+    try jw.write(f.index);
+    try jw.objectField("total_ms");
+    try jw.write(@as(f64, @floatFromInt(f.total_ns)) / 1_000_000.0);
+    try jw.objectField("period_ms");
+    try jw.write(@as(f64, @floatFromInt(f.period_ns)) / 1_000_000.0);
+    try jw.objectField("counters");
+    try jw.write(f.counters);
+    try jw.objectField("threads");
+    try jw.beginArray();
+    for (f.threadSlice()) |*t| {
+        try jw.beginObject();
+        try jw.objectField("name");
+        try jw.write(t.name());
+        try jw.objectField("zones");
+        try jw.beginArray();
+        for (t.slice()) |*z| {
+            try jw.beginObject();
+            try jw.objectField("name");
+            try jw.write(z.name());
+            try jw.objectField("duration_us");
+            try jw.write(@as(f64, @floatFromInt(z.durationNs())) / 1000.0);
+            try jw.endObject();
+        }
+        try jw.endArray();
+        try jw.endObject();
+    }
+    try jw.endArray();
+    try jw.endObject();
+}
+
 fn writeJsonEscaped(w: *std.Io.Writer, s: []const u8) !void {
     for (s) |ch| switch (ch) {
         '"' => try w.writeAll("\\\""),

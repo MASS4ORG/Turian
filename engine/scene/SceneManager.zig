@@ -375,6 +375,7 @@ pub const SceneManager = struct {
         self.fire(handle, .unloaded);
 
         if (self.active_index != null and self.active_index.? == handle.index) {
+            self.fire(handle, .deactivated);
             self.active_index = null;
             // Promote another loaded, non-persistent scene to active if any.
             var j: u16 = 0;

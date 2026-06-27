@@ -2,6 +2,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
+const rdebug = @import("debug");
 const EditorState = @import("EditorState.zig");
 const Window = @import("Window.zig");
 const ProjectOps = @import("ProjectOps.zig");
@@ -9,6 +10,92 @@ const GpuRenderer = @import("GpuRenderer.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
 const build_options = @import("turian_build_options");
+
+/// Route std.log through the engine diagnostic ring so the Remote Debug
+/// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
+/// and errors (issue #50). Still forwards to the default logger.
+pub const std_options: std.Options = .{ .logFn = engine.DiagLog.logFn };
+
+/// Default debug server port for the Studio.
+/// Games use 7777; Studio uses 7778 so both can run simultaneously.
+const STUDIO_DEBUG_PORT: u16 = 7778;
+
+/// Builds a read-only snapshot of the currently open scene for the debug server.
+/// `views` is a caller-owned buffer whose lifetime must span the `pump` call —
+/// the returned `World.scenes` borrows it. Also refreshes live metrics.
+fn studioWorld(views: *[1]engine.introspect.SceneView) engine.introspect.World {
+    EditorState.refreshDebugMetrics();
+    const assets = EditorState.refreshDebugAssets();
+    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets };
+    views[0] = .{
+        .name = if (EditorState.current_scene_path) |p| std.fs.path.basename(p) else "(unsaved)",
+        .id = if (EditorState.current_scene_path) |p| p else "",
+        .active = true,
+        .nodes = EditorState.objects[0..EditorState.object_count],
+    };
+    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets };
+}
+
+/// Applies a remote-debug mutation to the open scene. Runs on the main thread
+/// inside `debug_srv.pump`, so it routes through the editor's undo stack — AI /
+/// CLI edits are undoable and consistent with the UI.
+fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResult {
+    const now = gui.frameTimeNS();
+    switch (m) {
+        .set_component => |sc| {
+            const idx = EditorState.findObjectByName(sc.entity) orelse
+                return .{ .ok = false, .message = "entity not found" };
+            if (EditorState.debugSetComponentField(now, idx, sc.component, sc.field, sc.value))
+                return .{ .ok = true, .message = "component field updated" };
+            return .{ .ok = false, .message = "unknown component/field or value type mismatch" };
+        },
+        .set_transform => |st| {
+            const idx = EditorState.findObjectByName(st.entity) orelse
+                return .{ .ok = false, .message = "entity not found" };
+            if (EditorState.debugSetTransform(now, idx, st.channel, st.value))
+                return .{ .ok = true, .message = "transform updated" };
+            return .{ .ok = false, .message = "unknown transform channel (use position/rotation/scale)" };
+        },
+        .spawn => |sp| {
+            if (!EditorState.scene_open) return .{ .ok = false, .message = "no scene open" };
+            const idx = EditorState.addObjectWithUndo(now, gui.io, sp.name, -1);
+            EditorState.clearSelectedObjects();
+            EditorState.selectObject(idx);
+            gui.refresh(null, @src(), null);
+            return .{ .ok = true, .message = "entity spawned" };
+        },
+        .destroy => |d| {
+            const idx = EditorState.findObjectByName(d.entity) orelse
+                return .{ .ok = false, .message = "entity not found" };
+            EditorState.deleteObject(now, idx);
+            gui.refresh(null, @src(), null);
+            return .{ .ok = true, .message = "entity destroyed" };
+        },
+        .reload_asset => |r| {
+            const arena = gui.currentWindow().arena();
+            if (EditorState.debugReloadAsset(gui.io, arena, r.guid))
+                return .{ .ok = true, .message = "asset reloaded" };
+            return .{ .ok = false, .message = "asset GUID not found" };
+        },
+    }
+}
+
+/// Emits a `scene.loaded` / `scene.unloaded` notification over the debug server
+/// (issue #49 event catalog). `id` is the scene's project-relative path (or empty
+/// for an unsaved scene); the name is its basename. Strings are JSON-escaped so
+/// Windows paths and odd names stay well-formed.
+fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const u8) void {
+    const name = if (id.len > 0) std.fs.path.basename(id) else "(unsaved)";
+    var buf: [1400]u8 = undefined;
+    var w = std.Io.Writer.fixed(&buf);
+    var jw = std.json.Stringify{ .writer = &w, .options = .{} };
+    w.writeAll("{\"scene\":") catch return;
+    jw.write(name) catch return;
+    w.writeAll(",\"id\":") catch return;
+    jw.write(id) catch return;
+    w.writeAll("}") catch return;
+    srv.emit(ev, w.buffered());
+}
 
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
 pub fn main(main_init: std.process.Init) !void {
@@ -53,6 +140,15 @@ pub fn main(main_init: std.process.Init) !void {
     EditorState.gpa = main_init.gpa;
     EditorState.environ_map = main_init.environ_map;
 
+    // Start the Studio debug server so LLM tools (MCP) can inspect the open
+    // scene while the developer works. Runs on port 7778 to coexist with a
+    // running game on the default 7777.
+    var debug_srv = rdebug.Server.init(main_init.gpa, .{ .port = STUDIO_DEBUG_PORT, .allow_write = true });
+    debug_srv.start(main_init.io) catch |err|
+        std.debug.print("[studio] debug server failed to start: {s}\n", .{@errorName(err)});
+    defer debug_srv.deinit(main_init.io);
+    const studio_applier = rdebug.MutationApplier{ .ctx = null, .applyFn = studioMutationApplier };
+
     {
         const home = main_init.environ_map.get(
             if (@import("builtin").os.tag == .windows) "USERPROFILE" else "HOME",
@@ -83,6 +179,15 @@ pub fn main(main_init: std.process.Init) !void {
 
     var interrupted = false;
     var project_opened_from_arg = false;
+    var last_fps_bucket: u32 = 0;
+    // Lightweight per-frame FPS so `fps.changed` works outside Play mode, where
+    // the engine profiler is off (issue #49 / H3).
+    var last_frame_ns: i128 = 0;
+    // Last observed scene identity, to detect open/close transitions and emit
+    // scene.loaded / scene.unloaded (issue #49 / H3).
+    var last_scene_open = false;
+    var last_scene_id_buf: [1024]u8 = undefined;
+    var last_scene_id_len: usize = 0;
 
     main_loop: while (true) {
         // Apply a pending vsync change here — between frames, before the
@@ -149,6 +254,54 @@ pub fn main(main_init: std.process.Init) !void {
         }
 
         if (!quit and !Window.frame()) quit = true;
+
+        // Execute any queued remote-debug requests on the main thread against
+        // live editor state (issue #2/#49/#50: race-free reads + RW mutation).
+        var debug_views: [1]engine.introspect.SceneView = undefined;
+        debug_srv.pump(studioWorld(&debug_views), studio_applier);
+
+        // Compute a lightweight FPS from the wall-clock frame delta. The engine
+        // profiler only runs in Play mode, so its FPS is 0 while editing; fall
+        // back to this so `fps.changed` and the `metrics` tool stay meaningful
+        // outside Play (issue #49 / H3).
+        if (last_frame_ns != 0 and EditorState.debug_metrics.fps == 0) {
+            const dt_ns = nstime - last_frame_ns;
+            if (dt_ns > 0) {
+                EditorState.debug_metrics.fps = @floatCast(1_000_000_000.0 / @as(f64, @floatFromInt(dt_ns)));
+                EditorState.debug_metrics.frame_time_ms = @floatCast(@as(f64, @floatFromInt(dt_ns)) / 1_000_000.0);
+            }
+        }
+        last_frame_ns = nstime;
+
+        // Emit fps.changed only when the integer FPS bucket changes (issue #49).
+        {
+            const bucket: u32 = @intFromFloat(@round(EditorState.debug_metrics.fps));
+            if (bucket != last_fps_bucket) {
+                last_fps_bucket = bucket;
+                var fbuf: [48]u8 = undefined;
+                if (std.fmt.bufPrint(&fbuf, "{{\"fps\":{d}}}", .{bucket})) |p|
+                    debug_srv.emit(.fps_changed, p)
+                else |_| {}
+            }
+        }
+
+        // Emit scene.loaded / scene.unloaded on scene open/close/switch so LLM
+        // tools can track which scene is live (issue #49 / H3). Polling the live
+        // EditorState here captures every transition regardless of its source
+        // (tab open, new scene, close), without threading the server into
+        // Documents/ProjectOps.
+        {
+            const cur_open = EditorState.scene_open;
+            const cur_id: []const u8 = if (EditorState.current_scene_path) |p| p else "";
+            const last_id = last_scene_id_buf[0..last_scene_id_len];
+            if (cur_open != last_scene_open or (cur_open and !std.mem.eql(u8, cur_id, last_id))) {
+                if (last_scene_open) emitSceneEvent(&debug_srv, .scene_unloaded, last_id);
+                if (cur_open) emitSceneEvent(&debug_srv, .scene_loaded, cur_id);
+                last_scene_open = cur_open;
+                last_scene_id_len = @min(cur_id.len, last_scene_id_buf.len);
+                @memcpy(last_scene_id_buf[0..last_scene_id_len], cur_id[0..last_scene_id_len]);
+            }
+        }
 
         const end_micros = try win.end(.{});
         if (quit) break :main_loop;
