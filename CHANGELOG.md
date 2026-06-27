@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.9.0] - 2026-06-27
+
+### Features
+- feat: Remote debug and MCP server #2 #49 #50 #51
+
 ## [1.8.0] - 2026-06-25
 
 ### Features
