@@ -1,4 +1,4 @@
-//! Inspector panel for an asset's import settings (issue #5), shown for image
+//! Inspector panel for an asset's import settings, shown for image
 //! and model assets. Edits live in `<asset>.meta`; Save writes the meta and
 //! re-cooks the asset. Mirrors `ProjectSettingsEditor`'s loaded-state + Save row.
 const std = @import("std");

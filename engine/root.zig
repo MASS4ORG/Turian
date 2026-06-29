@@ -31,7 +31,7 @@ pub const Time = @import("core/Time.zig").Time;
 /// Project metadata (name, version).
 pub const Project = @import("core/Project.zig").Project;
 
-/// Device-agnostic input snapshot + semantic action map (issue #10).
+/// Device-agnostic input snapshot + semantic action map.
 pub const Input = @import("Input.zig").Input;
 /// Keyboard key identifier.
 pub const Key = @import("Input.zig").Key;
@@ -45,15 +45,15 @@ pub const GamepadAxis = @import("Input.zig").GamepadAxis;
 pub const Binding = @import("Input.zig").Binding;
 /// Per-update context object bundling engine services for scripts (ADR 0001).
 pub const Frame = @import("Frame.zig").Frame;
-/// Immediate-mode debug/editor draw API: lines, boxes, spheres, labels (issue #3).
+/// Immediate-mode debug/editor draw API: lines, boxes, spheres, labels.
 pub const Gizmos = @import("Gizmos.zig").Gizmos;
 /// Type-keyed registry for engine + user-defined services (ADR 0001).
 pub const Services = @import("Services.zig").Services;
 /// In-engine performance profiler: scoped CPU zones, per-thread timeline, and
-/// render counters for the Studio panel and built-game overlay (issue #35).
+/// render counters for the Studio panel and built-game overlay.
 pub const Profiler = @import("Profiler.zig");
 /// Diagnostic log ring buffer: captures recent std.log warn/err for the Remote
-/// Debug Protocol's `errors` method / MCP `list_errors` tool (issue #50).
+/// Debug Protocol's `errors` method / MCP `list_errors` tool.
 pub const DiagLog = @import("DiagLog.zig");
 
 /// Asset loading subsystem (meshes, textures).
@@ -88,9 +88,9 @@ pub const software_renderer = @import("SoftwareRenderer.zig");
 /// C-ABI types for user script reflection.
 pub const api = @import("api/root.zig");
 
-/// Runtime introspection layer (issue #2): structured, JSON-serialisable views
+/// Runtime introspection layer: structured, JSON-serialisable views
 /// of live engine state, plus queries and mutation. The single source of truth
-/// for the editor, CLI, Remote Debug Protocol (#49), and MCP server (#50).
+/// for the editor, CLI, Remote Debug Protocol, and MCP server.
 pub const introspect = @import("introspect/root.zig");
 /// Engine-wide runtime metrics (FPS, memory, draw calls, ECS counts).
 pub const Metrics = introspect.Metrics;
@@ -126,9 +126,9 @@ pub const Component = @import("scene/Component.zig").Component;
 pub const SceneNode = @import("scene/SceneNode.zig").SceneNode;
 
 /// Formal scene-management API: async/additive/persistent scene load & unload,
-/// lifecycle events, and active-scene tracking (issue #22).
+/// lifecycle events, and active-scene tracking.
 pub const SceneManager = @import("scene/SceneManager.zig").SceneManager;
-/// Runtime prefab spawner: deferred Instantiate/Destroy (issue #32).
+/// Runtime prefab spawner: deferred Instantiate/Destroy.
 pub const Spawner = @import("scene/Spawner.zig").Spawner;
 pub const SceneHandle = @import("scene/SceneManager.zig").SceneHandle;
 pub const SceneLoadMode = @import("scene/SceneManager.zig").LoadMode;
@@ -145,7 +145,7 @@ pub const scene = struct {
     pub const MAX_COMPONENTS = @import("scene/SceneNode.zig").MAX_COMPONENTS;
     /// Maximum length of a scene node name.
     pub const NAME_MAX = @import("scene/SceneNode.zig").NAME_MAX;
-    /// Prefab override group (issue #32).
+    /// Prefab override group.
     pub const OverrideGroup = @import("scene/SceneNode.zig").OverrideGroup;
 };
 

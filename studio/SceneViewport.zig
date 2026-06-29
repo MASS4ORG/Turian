@@ -5,7 +5,7 @@ const EditorState = @import("EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 const EditorCamera = @import("EditorCamera.zig");
 
-/// Border tint shown around the viewport while a simulation runs (issue #31):
+/// Border tint shown around the viewport while a simulation runs:
 /// orange while playing, blue while paused — a Unity-style visual play-state cue.
 /// The Play transport controls live in the main menu bar (see MenuBar.zig);
 /// the viewport only renders and shows this state-cue border.
@@ -70,7 +70,7 @@ pub fn draw() void {
     defer content.deinit();
 
     // Drop a dragged scene/prefab asset here to instantiate it as a linked
-    // prefab instance in the active scene (issue #32, #24).
+    // prefab instance in the active scene.
     if (EditorState.drag_kind == .asset) {
         for (gui.events()) |*e| {
             if (!gui.eventMatchSimple(e, content.data())) continue;

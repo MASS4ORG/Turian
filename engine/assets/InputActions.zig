@@ -1,4 +1,4 @@
-//! InputActions — a data-driven, reusable input binding asset (issue #10).
+//! InputActions — a data-driven, reusable input binding asset.
 //!
 //! Modeled on Unity's Input Actions asset, in the Zig/Turian idiom: a ZON file
 //! lists named actions and the device bindings that drive them. The game loads

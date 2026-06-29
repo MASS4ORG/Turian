@@ -1,4 +1,4 @@
-//! Prefab system (issue #32) — reusable SceneNode subtrees with per-instance
+//! Prefab system — reusable SceneNode subtrees with per-instance
 //! overrides and source-edit propagation.
 //!
 //! A prefab is simply a **scene asset** reused as an instantiable template —

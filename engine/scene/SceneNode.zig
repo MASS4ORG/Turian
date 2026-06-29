@@ -11,12 +11,12 @@ pub const NAME_MAX = 64;
 /// Length of a UUID string stored in guid_buf.
 const GUID_LEN = 36;
 
-/// Maximum number of prefab override group keys per node (issue #32).
+/// Maximum number of prefab override group keys per node.
 pub const MAX_OVERRIDES = 8;
 /// Maximum length of a prefab override group key (e.g. "transform").
 pub const OVERRIDE_KEY_MAX = 16;
 
-/// Prefab override groups (issue #32). A node only stores the *keys* of the
+/// Prefab override groups. A node only stores the *keys* of the
 /// groups it has overridden; each key means "this instance changed this group,
 /// so keep it when the source prefab propagates". Group granularity (rather than
 /// per-field) keeps the fixed-size node tractable and is correct for propagation.
@@ -48,7 +48,7 @@ pub const SceneNode = struct {
     /// Number of active components.
     component_count: usize = 0,
 
-    // ── Prefab linkage (issue #32) ──────────────────────────────────────────
+    // ── Prefab linkage ──────────────────────────────────────────
     /// Source prefab asset GUID. Non-empty **only on a prefab-instance root**;
     /// its presence marks this node as the root of a prefab instance.
     prefab_source_buf: [GUID_LEN]u8 = .{0} ** GUID_LEN,
@@ -100,7 +100,7 @@ pub const SceneNode = struct {
         self.component_count -= 1;
     }
 
-    // ── Prefab linkage helpers (issue #32) ──────────────────────────────────
+    // ── Prefab linkage helpers ──────────────────────────────────
 
     /// Source prefab asset GUID, or empty for non-instance-root nodes.
     pub fn prefabSourceSlice(self: *const SceneNode) []const u8 {

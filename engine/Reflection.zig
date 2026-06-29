@@ -90,7 +90,6 @@ fn collectFields(
     inline for (std.meta.fields(T)) |f| {
         if (f.is_comptime) continue;
         if (comptime zigTypeToFieldType(f.type)) |ft| {
-            // Build a statically-allocated null-terminated name.
             const full_name: [:0]const u8 = comptime std.fmt.comptimePrint("{s}{s}", .{ prefix, f.name });
             out[idx.*] = .{
                 .name = full_name.ptr,

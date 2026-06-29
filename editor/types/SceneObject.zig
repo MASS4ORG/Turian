@@ -16,7 +16,7 @@ pub const SceneObject = struct {
     /// Component list.
     components: []const SceneComponent = &.{},
 
-    // ── Prefab linkage (issue #32) ──────────────────────────────────────────
+    // ── Prefab linkage ──────────────────────────────────────────
     /// Source prefab asset GUID — present only on a prefab-instance root.
     prefab_source: []const u8 = "",
     /// Corresponding template-node GUID inside the prefab — present on every

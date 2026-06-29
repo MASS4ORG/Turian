@@ -27,7 +27,7 @@ pub var target_h: u32 = 0;
 /// Editor free-look camera override (null = use a scene camera component).
 pub var editor_cam: ?types.EditorCam = null;
 
-// Gizmo line rendering (editor overlay — issue #3). Two pipelines: one
+// Gizmo line rendering. Two pipelines: one
 // depth-tested (world gizmos occluded by geometry) and one overlay (always on
 // top, for manipulation handles). The vertex buffer is grown on demand; index
 // 0 holds depth-tested verts, index 1 the overlay verts, so two draws per frame

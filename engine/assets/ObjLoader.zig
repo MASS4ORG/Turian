@@ -2,6 +2,7 @@ const std = @import("std");
 const Mesh = @import("Mesh.zig").Mesh;
 const Vertex = @import("Mesh.zig").Vertex;
 
+/// Load a Wavefront OBJ mesh from a file on disk.
 pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     var file = try std.Io.Dir.cwd().openFile(io, path, .{});
     defer file.close(io);

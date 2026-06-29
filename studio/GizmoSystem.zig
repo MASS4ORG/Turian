@@ -1,4 +1,4 @@
-//! Editor gizmo system (issue #3): builds the per-frame gizmo line buffers and
+//! Editor gizmo system: builds the per-frame gizmo line buffers and
 //! drives the interactive transform gizmo (move / rotate / scale with snapping).
 //!
 //! Two buffers are produced each frame and handed to the `render` module:

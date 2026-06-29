@@ -1,4 +1,4 @@
-//! Runtime event catalog (issue #49 — event streaming / subscriptions).
+//! Runtime event catalog.
 //!
 //! A small, stable enumeration of the runtime events external tools can
 //! subscribe to over the Remote Debug Protocol. The wire name (`method`) is the
@@ -39,7 +39,7 @@ pub const Event = enum(u5) {
 };
 
 /// Writes the full event catalog as JSON: `[{ "name", "description" }, ...]`.
-/// Consumed by `turian-cli docs export-ai-context` (issue #51).
+/// Consumed by `turian-cli docs export-ai-context`.
 pub fn writeCatalog(jw: *std.json.Stringify) !void {
     try jw.beginArray();
     inline for (std.meta.fields(Event)) |f| {

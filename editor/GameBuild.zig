@@ -77,7 +77,7 @@ fn buildGameInner(
     }
 
     // Resolve the boot scene + window options from the project's ProjectSettings
-    // asset (issue #13). Falls back to the conventional `assets/scene-01.json`
+    // asset. Falls back to the conventional `assets/scene-01.json`
     // and default window options when no settings asset is present.
     const assets_dir = if (std.fs.path.isAbsolute(project_path))
         try std.fmt.allocPrint(a, "{s}/assets", .{project_path})
@@ -142,8 +142,8 @@ fn buildGameInner(
 }
 
 /// Resolve runtime config from the project's `ProjectSettings` asset and the
-/// asset database: window title/size/vsync (issue #13) and the boot scene GUID
-/// the game loads through the SceneManager (issue #22). Falls back to the
+/// asset database: window title/size/vsync and the boot scene GUID
+/// the game loads through the SceneManager. Falls back to the
 /// conventional `scene-01.json` (or the first scene asset) when no settings
 /// asset selects a boot scene. All strings are allocated in `a`.
 fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out: *RuntimeConfig) void {

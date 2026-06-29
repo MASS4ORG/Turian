@@ -1,4 +1,4 @@
-//! Dedicated editor panel for `.projectsettings` assets (issue #13).
+//! Dedicated editor panel for `.projectsettings` assets.
 //!
 //! Edits the game/project configuration DataAsset (`engine.ProjectSettings`):
 //! project metadata, graphics options, platform options, and the boot scene.

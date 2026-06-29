@@ -19,6 +19,8 @@ const CgltfMeshData = extern struct {
 extern fn cgltf_wrap_load(path: [*:0]const u8, out: *CgltfMeshData) c_int;
 extern fn cgltf_wrap_free(data: *CgltfMeshData) void;
 
+/// Load the first mesh primitive from a glTF 2.0 / GLB file.
+/// Allocates vertex and index storage via `allocator`; the caller owns the Mesh.
 pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     _ = io;
 

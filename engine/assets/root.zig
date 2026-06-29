@@ -20,7 +20,7 @@ pub const InputActions = @import("InputActions.zig").InputActions;
 
 // ── Project / game settings ─────────────────────────────────────────────────────
 /// Game/project configuration asset (`.projectsettings`): metadata, graphics,
-/// platform options, and the boot scene (issue #13).
+/// platform options, and the boot scene.
 pub const ProjectSettings = @import("ProjectSettings.zig").ProjectSettings;
 
 // ── Asset Provider API ──────────────────────────────────────────────────────

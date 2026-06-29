@@ -254,7 +254,6 @@ pub fn draw() void {
     var flex = gui.flexbox(@src(), .{}, .{ .expand = .horizontal, .padding = .all(4) });
     defer flex.deinit();
 
-    // Reset drag-hover each frame; set again below via move events
     g_drag_hover_idx = null;
 
     // Reset nav list; will be rebuilt during tile rendering for next frame's keyboard handler
@@ -392,7 +391,6 @@ pub fn draw() void {
             .data => gui.entypo.database,
         };
 
-        // Check if this asset is the selected one
         const is_selected = if (EditorState.selected_asset_path) |sel_path| blk: {
             var asset_path_check: [1024]u8 = undefined;
             const ap = fullPathFor(entry.name, browse_path, &asset_path_check);
@@ -437,7 +435,7 @@ pub fn draw() void {
                 }
 
                 // A scene asset can also be instantiated as a linked prefab
-                // instance in the current scene (issue #32).
+                // instance in the current scene.
                 if (!is_dir and asset_type == .scene) {
                     if (gui.menuItemLabel(@src(), "Instantiate into Scene", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
@@ -613,7 +611,6 @@ pub fn draw() void {
             });
         }
 
-        // Drop zone for folders: accept asset drops to move files
         if (is_dir) {
             const drag_compatible = EditorState.drag_kind == .asset;
             if (drag_compatible) {
@@ -626,13 +623,11 @@ pub fn draw() void {
                             }
                             if (me.action == .release and me.button == .left) {
                                 e.handle(@src(), tile.data());
-                                // Move the dragged asset into this directory
                                 const src_path = EditorState.dragAssetPath();
                                 if (src_path.len > 0) {
                                     var dest_buf: [1024]u8 = undefined;
                                     const dest_path = std.fmt.bufPrint(&dest_buf, "{s}/{s}", .{ browse_path, entry.name }) catch "";
                                     if (dest_path.len > 0) {
-                                        // Get the filename from the source path
                                         if (std.mem.lastIndexOfScalar(u8, src_path, '/')) |sep| {
                                             const file_name = src_path[sep + 1 ..];
                                             var full_dest_buf: [1024]u8 = undefined;
@@ -668,7 +663,7 @@ pub fn draw() void {
     g_nav_has_up = current_subdir_len > 0;
 
     // Drop a dragged scene object onto the browser to save it (and its
-    // children) as a prefab asset in the current folder (issue #32).
+    // children) as a prefab asset in the current folder.
     if (EditorState.drag_kind == .game_object) {
         for (gui.events()) |*e| {
             if (!gui.eventMatchSimple(e, outer.data())) continue;
@@ -813,7 +808,7 @@ fn openAsset(proj_path: []const u8, browse_path: []const u8, file_name: []const 
         .internal_editor => {},
     }
 
-    // Open the asset as a document tab (MDI, issue #1). Scenes/prefabs route to
+    // Open the asset as a document tab. Scenes/prefabs route to
     // the scene-editing surface; everything else to its dedicated editor.
     var path_buf: [1024]u8 = undefined;
     const full_path = fullPathFor(file_name, browse_path, &path_buf);

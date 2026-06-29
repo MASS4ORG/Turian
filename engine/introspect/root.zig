@@ -1,7 +1,7 @@
-//! Runtime introspection layer (issue #2): structured, JSON-serialisable views
+//! Runtime introspection layer: structured, JSON-serialisable views
 //! of live engine state, plus queries and mutation. The single source of truth
-//! consumed by the editor, the CLI, the Remote Debug Protocol (#49), and the
-//! MCP server (#50).
+//! consumed by the editor, the CLI, the Remote Debug Protocol, and the
+//! MCP server.
 
 const Inspector = @import("Inspector.zig");
 
@@ -17,7 +17,7 @@ pub const World = Inspector.World;
 /// A typed value used when mutating a field by name.
 pub const Value = Inspector.Value;
 
-// ── Events (issue #49) ────────────────────────────────────────────────────────
+// ── Events ────────────────────────────────────────────────────────
 /// Runtime event catalog clients can subscribe to over the debug protocol.
 pub const Event = @import("Event.zig").Event;
 /// Writes the event catalog as JSON (used by the AI-context export).

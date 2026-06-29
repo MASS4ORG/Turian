@@ -1,11 +1,11 @@
-//! Runtime introspection layer (issue #2) — the single source of truth for
+//! Runtime introspection layer — the single source of truth for
 //! debugging, editor tooling, CLI automation, testing, and AI integration.
 //!
 //! The inspector is *pure*: it never reaches for globals. The host (composition
 //! root) hands it a `World` — read-only views into the live scenes plus the
 //! shared `Metrics` — and the inspector turns that into structured JSON. The
-//! Remote Debug Protocol (#49) builds the `World` from the live `SceneManager`
-//! and forwards these calls; the MCP server (#50) sits on top of that. Keeping
+//! Remote Debug Protocol builds the `World` from the live `SceneManager`
+//! and forwards these calls; the MCP server sits on top of that. Keeping
 //! every consumer on one authoritative representation is what lets external
 //! tools query real engine state instead of inferring it from source.
 //!
@@ -312,8 +312,8 @@ fn writeEngineInfo(jw: *Stringify) Error!void {
 }
 
 /// Writes a complete runtime snapshot: engine info, metrics, and every scene
-/// with full detail. This is the serialisable "everything" form (issue #2:
-/// "Snapshots can be serialized to JSON").
+/// with full detail. This is the serialisable "everything" form
+/// ("Snapshots can be serialized to JSON").
 pub fn writeSnapshot(jw: *Stringify, world: World) Error!void {
     try jw.beginObject();
     try jw.objectField("engine");
@@ -359,7 +359,7 @@ fn writeComponentSchema(jw: *Stringify, tag_name: []const u8, comptime T: type) 
 }
 
 /// Writes the component-type catalog: every built-in component, its fields,
-/// field types, and enum value sets. Agents (#50) and tools use this to
+/// field types, and enum value sets. Agents and tools use this to
 /// discover what exists without hardcoded knowledge.
 pub fn writeSchema(jw: *Stringify) Error!void {
     try jw.beginObject();

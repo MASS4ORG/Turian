@@ -62,7 +62,7 @@ pub const Frame = struct {
 };
 
 // ---------------------------------------------------------------------------
-// Tests — dependency-injection proof of concept (issue #12).
+// Tests — dependency-injection proof of concept.
 //
 // A "system" depends only on what arrives through `Frame`. The test constructs
 // fake services (an `Input` with scripted state, a fresh `Transform`) and

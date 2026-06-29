@@ -1,4 +1,4 @@
-//! Dedicated editor panel for `.inputactions` assets (issue #10).
+//! Dedicated editor panel for `.inputactions` assets.
 //!
 //! Edits the data-driven `engine.InputActions` binding asset: add/remove actions,
 //! pick each action's kind (button/axis/vector), and edit the device bindings per

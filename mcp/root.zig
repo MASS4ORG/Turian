@@ -1,5 +1,5 @@
-//! Turian MCP server (issue #50): Model Context Protocol adapter over the
-//! Remote Debug Protocol (#49). Exposes engine runtime state as MCP tools
+//! Turian MCP server: Model Context Protocol adapter over the
+//! Remote Debug Protocol. Exposes engine runtime state as MCP tools
 //! so Claude Code, Cursor, and other MCP clients can inspect live games.
 //!
 //! Wire: JSON-RPC 2.0 over stdio (newline-delimited), MCP version 2024-11-05.

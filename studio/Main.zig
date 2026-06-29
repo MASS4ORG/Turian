@@ -13,7 +13,7 @@ const build_options = @import("turian_build_options");
 
 /// Route std.log through the engine diagnostic ring so the Remote Debug
 /// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
-/// and errors (issue #50). Still forwards to the default logger.
+/// and errors. Still forwards to the default logger.
 pub const std_options: std.Options = .{ .logFn = engine.DiagLog.logFn };
 
 /// Default debug server port for the Studio.
@@ -81,7 +81,7 @@ fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResu
 }
 
 /// Emits a `scene.loaded` / `scene.unloaded` notification over the debug server
-/// (issue #49 event catalog). `id` is the scene's project-relative path (or empty
+/// via the event catalog. `id` is the scene's project-relative path (or empty
 /// for an unsaved scene); the name is its basename. Strings are JSON-escaped so
 /// Windows paths and odd names stay well-formed.
 fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const u8) void {
@@ -109,7 +109,7 @@ pub fn main(main_init: std.process.Init) !void {
 
     gui.backend.enableSDLLogging();
 
-    // Give the engine profiler a monotonic clock source (issue #35). It's
+    // Give the engine profiler a monotonic clock source. It's
     // enabled per-frame only while Play mode runs (see studio/Window.zig).
     engine.Profiler.setIo(main_init.io);
 
@@ -181,17 +181,17 @@ pub fn main(main_init: std.process.Init) !void {
     var project_opened_from_arg = false;
     var last_fps_bucket: u32 = 0;
     // Lightweight per-frame FPS so `fps.changed` works outside Play mode, where
-    // the engine profiler is off (issue #49 / H3).
+    // the engine profiler is off.
     var last_frame_ns: i128 = 0;
     // Last observed scene identity, to detect open/close transitions and emit
-    // scene.loaded / scene.unloaded (issue #49 / H3).
+    // scene.loaded / scene.unloaded.
     var last_scene_open = false;
     var last_scene_id_buf: [1024]u8 = undefined;
     var last_scene_id_len: usize = 0;
 
     main_loop: while (true) {
         // Apply a pending vsync change here — between frames, before the
-        // swapchain texture is acquired in win.begin (issue #35).
+        // swapchain texture is acquired in win.begin.
         GpuRenderer.applyPendingVsync();
 
         const nstime = win.beginWait(interrupted);
@@ -256,14 +256,14 @@ pub fn main(main_init: std.process.Init) !void {
         if (!quit and !Window.frame()) quit = true;
 
         // Execute any queued remote-debug requests on the main thread against
-        // live editor state (issue #2/#49/#50: race-free reads + RW mutation).
+        // live editor state.
         var debug_views: [1]engine.introspect.SceneView = undefined;
         debug_srv.pump(studioWorld(&debug_views), studio_applier);
 
         // Compute a lightweight FPS from the wall-clock frame delta. The engine
         // profiler only runs in Play mode, so its FPS is 0 while editing; fall
         // back to this so `fps.changed` and the `metrics` tool stay meaningful
-        // outside Play (issue #49 / H3).
+        // outside Play.
         if (last_frame_ns != 0 and EditorState.debug_metrics.fps == 0) {
             const dt_ns = nstime - last_frame_ns;
             if (dt_ns > 0) {
@@ -273,7 +273,7 @@ pub fn main(main_init: std.process.Init) !void {
         }
         last_frame_ns = nstime;
 
-        // Emit fps.changed only when the integer FPS bucket changes (issue #49).
+        // Emit fps.changed only when the integer FPS bucket changes.
         {
             const bucket: u32 = @intFromFloat(@round(EditorState.debug_metrics.fps));
             if (bucket != last_fps_bucket) {
@@ -286,7 +286,7 @@ pub fn main(main_init: std.process.Init) !void {
         }
 
         // Emit scene.loaded / scene.unloaded on scene open/close/switch so LLM
-        // tools can track which scene is live (issue #49 / H3). Polling the live
+        // tools can track which scene is live. Polling the live
         // EditorState here captures every transition regardless of its source
         // (tab open, new scene, close), without threading the server into
         // Documents/ProjectOps.
@@ -310,7 +310,7 @@ pub fn main(main_init: std.process.Init) !void {
         interrupted = try backend.waitEventTimeout(wait_event_micros);
     }
 
-    // Persist the open document tabs so they restore on next launch (issue #1),
+    // Persist the open document tabs so they restore on next launch,
     // then free the per-tab scene snapshots held on the heap.
     Documents.persist();
     Documents.closeAll();

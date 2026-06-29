@@ -1,4 +1,4 @@
-//! SceneManager — a formal scene-management API (issue #22).
+//! SceneManager — a formal scene-management API.
 //!
 //! Where a Turian *scene* (like a Godot scene or a Unity prefab) can be
 //! instantiated as a node tree, the SceneManager treats scenes the way Unity's
@@ -210,7 +210,7 @@ pub const SceneManager = struct {
 
     /// Load `id` plus a set of dependency scene ids. Dependencies load additively
     /// first and are linked to the main scene, so unloading the main scene
-    /// cascades to them (issue #22 — scene dependencies).
+    /// cascades to them.
     pub fn loadSceneWithDeps(
         self: *SceneManager,
         id: []const u8,
@@ -532,7 +532,7 @@ pub const SceneManager = struct {
     }
 
     /// Full-capacity node buffer for a loaded scene (length == MAX_OBJECTS while
-    /// loaded), for runtime spawning into the scene (issue #32). Empty if stale.
+    /// loaded), for runtime spawning into the scene. Empty if stale.
     pub fn nodeBuffer(self: *SceneManager, handle: SceneHandle) []SceneNode {
         const slot = self.slotPtr(handle) orelse return &.{};
         return slot.nodes;

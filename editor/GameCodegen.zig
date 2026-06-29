@@ -5,14 +5,14 @@ const ComponentDef = @import("Scanner.zig").ComponentDef;
 const sdl3 = @import("platform/Sdl3Codegen.zig");
 
 /// Window / runtime options baked into the generated game from the project's
-/// `ProjectSettings` asset (issue #13). Defaults mirror `ProjectSettings`.
+/// `ProjectSettings` asset. Defaults mirror `ProjectSettings`.
 pub const RuntimeConfig = struct {
     title: []const u8 = "Turian Game",
     width: u32 = 1280,
     height: u32 = 720,
     vsync: bool = true,
     /// GUID of the scene the game boots into (loaded through the SceneManager,
-    /// issue #22). Empty if no scene could be resolved.
+    ///). Empty if no scene could be resolved.
     boot_scene_guid: []const u8 = "",
 };
 
@@ -399,11 +399,11 @@ pub fn generateMainZig(
         );
     }
 
-    // Scene management runtime (issue #22): the SceneManager owns all scene node
+    // Scene management runtime: the SceneManager owns all scene node
     // storage. The loader resolves a scene asset GUID to nodes via the package.
     try out.appendSlice(
         a,
-        "// Scene management (issue #22). The SceneManager owns every loaded scene's\n" ++
+        "// Scene management. The SceneManager owns every loaded scene's\n" ++
             "// nodes; the loader resolves a scene asset GUID → SceneNodes from the package.\n" ++
             "var g_scene_mgr: engine.SceneManager = undefined;\n" ++
             "var g_spawner: engine.Spawner = undefined;\n" ++
@@ -436,7 +436,7 @@ pub fn generateMainZig(
     );
 
     // Platform layer (windowing + input + gamepad). Split into a dedicated
-    // backend module so other platforms can be added later (issue #44 item 8).
+    // backend module so other platforms can be added later.
     try out.appendSlice(a, sdl3.bindings);
     try out.appendSlice(a, sdl3.input);
     try out.appendSlice(a, sdl3.gamepad);
@@ -466,7 +466,7 @@ pub fn generateMainZig(
 
     {
         // The boot scene GUID is loaded through the SceneManager at startup
-        // (issue #22/#13). It is resolved from ProjectSettings.first_scene, or a
+        //. It is resolved from ProjectSettings.first_scene, or a
         // conventional fallback, at build time.
         const ss = std.fmt.bufPrint(&tmp, "const boot_scene_guid: []const u8 = \"{s}\";\n\n", .{runtime.boot_scene_guid}) catch return error.BufferTooSmall;
         try out.appendSlice(a, ss);
@@ -485,10 +485,10 @@ pub fn generateMainZig(
                 "var g_live: [MAX_LIVE]LiveComponent = undefined;\n" ++
                 "var g_live_transform: [MAX_LIVE]*engine.Transform = undefined;\n" ++
                 "// The scene each live component belongs to, so we can destroy it when\n" ++
-                "// its scene unloads and re-instantiate when a scene loads (issue #22).\n" ++
+                "// its scene unloads and re-instantiate when a scene loads.\n" ++
                 "var g_live_handle: [MAX_LIVE]engine.SceneHandle = undefined;\n" ++
                 // Owning node GUID per live component, for runtime spawn/destroy
-                // reconciliation within a scene (issue #32).
+                // reconciliation within a scene.
                 "var g_live_guid: [MAX_LIVE][36]u8 = undefined;\n" ++
                 "var g_live_guid_len: [MAX_LIVE]usize = undefined;\n" ++
                 "var g_live_count: usize = 0;\n" ++
@@ -583,7 +583,7 @@ pub fn generateMainZig(
                 "    } }\n" ++
                 "}\n\n",
         );
-        // Reconcile live components against the set of loaded scenes (issue #22):
+        // Reconcile live components against the set of loaded scenes:
         // destroy components whose scene unloaded, instantiate components for newly
         // loaded scenes. Persistent scenes stay loaded, so their components persist.
         try out.appendSlice(
@@ -638,7 +638,7 @@ pub fn generateMainZig(
                 "}\n\n",
         );
 
-        // Within-scene reconcile after a runtime spawn/destroy flush (issue #32):
+        // Within-scene reconcile after a runtime spawn/destroy flush:
         // re-point transforms (node storage compacts on destroy), drop components
         // whose node is gone, and bring freshly spawned nodes to life.
         try out.appendSlice(
@@ -722,7 +722,7 @@ pub fn generateMainZig(
             "    engine.software_renderer.setMaterialSource(&materialSource);\n" ++
             "    engine.software_renderer.setTextureSource(&textureSource);\n\n" ++
             "    // Build the input action map from every InputActions asset in the package\n" ++
-            "    // (data-driven bindings — issue #10). Runs before scripts so actions exist.\n" ++
+            "    //. Runs before scripts so actions exist.\n" ++
             "    {\n" ++
             "        const ia_type: u8 = @intFromEnum(editor.AssetType.input_actions);\n" ++
             "        var _ia_i: usize = 0;\n" ++
@@ -739,13 +739,13 @@ pub fn generateMainZig(
             "        }\n" ++
             "    }\n\n" ++
             "    // Initialise the scene manager and boot into the configured first\n" ++
-            "    // scene (issue #22). The manager owns all scene node storage and is\n" ++
+            "    // scene. The manager owns all scene node storage and is\n" ++
             "    // published as a service so scripts can load/unload scenes.\n" ++
             "    g_scene_mgr = engine.SceneManager.init(gpa);\n" ++
             "    defer g_scene_mgr.deinit();\n" ++
             "    g_scene_mgr.setLoader(sceneLoader, null);\n" ++
             "    g_services.register(engine.SceneManager, &g_scene_mgr);\n" ++
-            "    // Runtime prefab spawner (issue #32): resolves prefab GUIDs from the\n" ++
+            "    // Runtime prefab spawner: resolves prefab GUIDs from the\n" ++
             "    // same package as scenes, lazily on first Instantiate.\n" ++
             "    g_spawner = engine.Spawner.init(gpa);\n" ++
             "    defer g_spawner.deinit();\n" ++
@@ -776,7 +776,7 @@ pub fn generateMainZig(
             "    defer SDL_Quit();\n\n",
     );
 
-    // Window + renderer options come from ProjectSettings (issue #13):
+    // Window + renderer options come from ProjectSettings:
     // title, resolution, and vsync are baked in from the project's settings asset.
     {
         var esc: std.ArrayList(u8) = .empty;
@@ -835,7 +835,7 @@ pub fn generateMainZig(
         "    var prev_ts = std.Io.Clock.awake.now(io);\n" ++
             "    var elapsed: f32 = 0;\n" ++
             "    var frame: u64 = 0;\n\n" ++
-            "    // In-engine profiler (issue #35): give it the clock; it self-disables\n" ++
+            "    // In-engine profiler: give it the clock; it self-disables\n" ++
             "    // outside Debug so release builds pay nothing.\n" ++
             "    engine.Profiler.setIo(io);\n\n" ++
             "    main_loop: while (true) {\n" ++

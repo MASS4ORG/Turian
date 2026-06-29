@@ -1,9 +1,9 @@
-//! In-engine performance profiler (issue #35) — the *game-side* foundation.
+//! In-engine performance profiler — the *game-side* foundation.
 //!
 //! This is the engine's own profiler, independent of the GUI toolkit. It powers
 //! the Studio timeline panel and the built-game overlay, and is the engine
 //! counterpart to the GUI-side primitives staged on the Guinevere dvui fork
-//! (`Window.renderStats` #1, `Window.frameTiming` #3). Where dvui measures the
+//! (Window.renderStats, Window.frameTiming). Where dvui measures the
 //! editor's *own* widget frame, this measures the *game*: script/system update
 //! time, the GPU scene renderer's draw work, and arbitrary user scopes.
 //!
@@ -34,7 +34,7 @@
 //! Every entry point early-outs on the `enabled` flag (a single predictable
 //! branch). Release builds that want literally zero cost can leave it `false`
 //! (the default outside Debug). Comptime elision and Tracy export are tracked as
-//! follow-ups in #35.
+//! follow-ups.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -96,7 +96,7 @@ pub const Zone = struct {
 };
 
 /// Per-frame rendering cost counters, bumped by the renderer. Mirrors the
-/// GUI-side `RenderStats` (#1) but for the game's GPU scene renderer.
+/// GUI-side `RenderStats` but for the game's GPU scene renderer.
 pub const Counters = struct {
     draw_calls: u32 = 0,
     triangles: u32 = 0,
@@ -150,8 +150,8 @@ pub const Frame = struct {
 const StackEntry = struct {
     name: []const u8 = "",
     start_ns: u64 = 0,
-    /// Recorded-zone index reserved at push time, or null if dropped (buffer
-    /// full). Kept so `end` writes the matching slot.
+    /// Recorded-zone index reserved at push time. Null when the per-thread
+    /// zone buffer is full (zones beyond the limit are silently dropped).
     rec: ?usize = null,
 };
 
@@ -328,7 +328,7 @@ pub fn frameAt(i: usize) *const Frame {
 // ── Export ───────────────────────────────────────────────────────────────────
 
 /// Serialises the most recently captured frame as structured JSON for the
-/// Remote Debug Protocol's `profiler.capture` (issue #50): frame timing, the
+/// Remote Debug Protocol's `profiler.capture`: frame timing, the
 /// render counters, and each thread's zones (name + duration in microseconds).
 pub fn writeFrameJson(jw: *std.json.Stringify) !void {
     const f = captured();
@@ -376,7 +376,7 @@ fn writeJsonEscaped(w: *std.Io.Writer, s: []const u8) !void {
 /// (`{"traceEvents":[...]}`) — load it directly in <https://ui.perfetto.dev> or
 /// `chrome://tracing` to analyse zones across frames. Each zone becomes a
 /// complete ("X") event with µs `ts`/`dur`; threads are one Perfetto track each
-/// (issue #35).
+///.
 pub fn writeChromeTrace(w: *std.Io.Writer) !void {
     try w.writeAll("{\"traceEvents\":[");
     var first = true;
@@ -443,8 +443,6 @@ pub fn beginZone(name: []const u8) void {
     }
 
     const start = nowNs();
-    // Reserve a recorded-zone slot now so children nest correctly; fill in the
-    // end time on pop. Drop (rec=null) if this thread's buffer is full.
     var rec: ?usize = null;
     if (t.zone_count < MAX_ZONES_PER_THREAD) {
         const i = t.zone_count;

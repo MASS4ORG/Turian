@@ -1,4 +1,4 @@
-//! Export captured profiler history to a Chrome/Perfetto trace file (issue #35).
+//! Export captured profiler history to a Chrome/Perfetto trace file.
 //!
 //! Writes the engine profiler's frame ring as Chrome trace-event JSON, which
 //! loads directly in <https://ui.perfetto.dev> or `chrome://tracing` for deep

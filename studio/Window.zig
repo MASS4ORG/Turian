@@ -25,7 +25,7 @@ var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 pub fn frame() bool {
     // Recording is tied to Play and controlled from the panel (Record/Pause +
     // auto-on-Play). `tickRecording` arms `engine.Profiler.enabled` for this
-    // frame (#35). When disabled, begin/end and all zones/counters early-out.
+    // frame. When disabled, begin/end and all zones/counters early-out.
     ProfilerPanel.tickRecording();
     engine.Profiler.beginFrame();
     defer engine.Profiler.endFrame();
@@ -95,7 +95,7 @@ pub fn frame() bool {
                 EditorState.pasteObjects(gui.frameTimeNS(), gui.io);
             }
         } else if (ke.code == .p and !ke.mod.shift()) {
-            // Ctrl+P toggles Play / Stop (issue #31).
+            // Ctrl+P toggles Play / Stop.
             e.handle(@src(), root.data());
             PlayMode.toggle(gui.io);
         }
@@ -105,7 +105,7 @@ pub fn frame() bool {
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
-    // Document tab strip (MDI, issue #1). Drawn above the editing surface.
+    // Document tab strip. Drawn above the editing surface.
     Documents.drawTabBar(mouse_left_held);
 
     // Main editor area. Scoped in a block so the paned widgets are deinit'd
@@ -175,7 +175,7 @@ pub fn frame() bool {
     // Reap finished background jobs and keep frames flowing while one runs.
     Tasks.pump(gui.io);
 
-    // Step the in-editor game simulation (issue #31). Keeps frames flowing
+    // Step the in-editor game simulation. Keeps frames flowing
     // while a scene is playing so the viewport animates continuously.
     PlayMode.pump(gui.io);
 
@@ -187,10 +187,8 @@ pub fn frame() bool {
 fn drawDragGhost() void {
     if (EditorState.drag_kind == .none) return;
 
-    // Change cursor to "move" while dragging.
     gui.cursorSet(.arrow_all);
 
-    // Position the ghost 12px below-right of the cursor.
     g_drag_ghost_rect.x = g_mouse_x + 12;
     g_drag_ghost_rect.y = g_mouse_y + 12;
 

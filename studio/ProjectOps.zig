@@ -20,7 +20,7 @@ pub fn openProject(path: []const u8) void {
     }
 
     // Start from a clean scene, then restore the document tabs that were open
-    // for this project when it was last closed (MDI, issue #1).
+    // for this project when it was last closed.
     EditorState.clearScene();
     Documents.restore();
 }

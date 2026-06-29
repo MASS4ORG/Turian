@@ -1,4 +1,4 @@
-//! Viewport screenshot capture for the Studio (issue #35).
+//! Viewport screenshot capture for the Studio.
 //!
 //! Captures the editor 3D viewport (the shared `render` module's color target,
 //! i.e. the actual game scene as rendered by the GPU renderer) to a **PNG** file.
@@ -84,8 +84,6 @@ pub fn capture() ?[]const u8 {
         return null;
     };
 
-    // Download the viewport pixels, then encode PNG (via dvui's stb-backed
-    // encoder) into a growable buffer and write the file in one shot.
     const cap = GpuRenderer.capturePixels(page) orelse {
         setLast(false, "capture failed");
         return null;

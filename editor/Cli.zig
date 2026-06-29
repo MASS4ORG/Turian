@@ -108,7 +108,7 @@ fn printUsage() void {
         \\  info        <project-path>  Print project metadata and component list
         \\  import      <project-path>  Import all assets (reports task progress)
         \\  build       <project-path>  Compile the project into a game executable
-        \\  play-build  <project-path>  Compile the in-editor Play-mode library (issue #31)
+        \\  play-build  <project-path>  Compile the in-editor Play-mode library
         \\  debug       <subcommand>    Connect to a running Turian debug server
         \\  mcp                         Start an MCP server (stdio) backed by the debug server
         \\  docs        <subcommand>    Generate AI context or documentation
@@ -246,7 +246,7 @@ fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *cons
     std.debug.print("[Turian] Build complete.\n", .{});
 }
 
-/// Compile the Play-mode shared library headlessly (issue #31). Useful for CI:
+/// Compile the Play-mode shared library headlessly. Useful for CI:
 /// it exercises the play codegen + user-script compilation without a display.
 fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *const std.process.Environ.Map) !void {
     const baked = GameBuild.BuildConfig{
@@ -583,7 +583,6 @@ fn cmdDocsExportAiContext(io: std.Io, gpa: std.mem.Allocator, args: *std.process
             const v = args.next() orelse return error.MissingArg;
             const n = @min(v.len, out_dir_buf.len - 2);
             @memcpy(out_dir_buf[0..n], v[0..n]);
-            // Ensure trailing slash.
             if (out_dir_buf[n - 1] != '/') {
                 out_dir_buf[n] = '/';
                 out_dir_len = n + 1;

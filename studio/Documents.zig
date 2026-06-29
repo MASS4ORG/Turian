@@ -1,4 +1,4 @@
-//! Multi-Document Interface (MDI) — open assets in tabs (issue #1).
+//! Multi-Document Interface (MDI) — open assets in tabs.
 //!
 //! The editor historically edited a single scene at a time, backed by the
 //! singleton state in `EditorState` (`objects`, `selected_object`, …). This
@@ -97,7 +97,7 @@ const TAB_STRIP_H: f32 = 30;
 /// so the tab width doesn't change on hover).
 const CLOSE_SLOT: f32 = 18;
 
-/// Settings key + bounds for the max displayed tab-title length (issue #1).
+/// Settings key + bounds for the max displayed tab-title length.
 const TITLE_MAX_KEY = "editor.tab_title_max";
 const TITLE_MAX_DEFAULT: i64 = 18;
 const TITLE_MIN: i64 = 6;
@@ -166,7 +166,7 @@ pub fn openScene(full_path: []const u8) void {
     docs[idx].dirty = EditorState.scene_dirty;
     docs[idx].snapshot = null; // live in EditorState while active
     // Re-seed the viewport camera from this scene rather than inheriting the
-    // previous tab's pose (issue #1 follow-up: per-tab camera).
+    // previous tab's pose.
     EditorCamera.reset();
 
     persist();
@@ -583,7 +583,7 @@ fn trimTitle(name: []const u8, max: usize, buf: []u8) []const u8 {
 }
 
 /// Small label that follows the cursor while a tab is being dragged, so the user
-/// can see the drag is active (issue #1 follow-up).
+/// can see the drag is active.
 fn drawDragGhost(mouse_held: bool) void {
     if (!mouse_held) return;
     const di = g_drag_tab orelse return;
@@ -616,7 +616,7 @@ fn drawDragGhost(mouse_held: bool) void {
 var g_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
 /// Modal save/discard/cancel prompt shown when closing a document with unsaved
-/// changes (issue #1 follow-up).
+/// changes.
 fn drawConfirmClose() void {
     const i = g_confirm_close orelse return;
     if (i >= doc_count) {
@@ -663,7 +663,7 @@ fn drawConfirmClose() void {
     }
 }
 
-// ── Persistence (issue #1: restore tab state on restart) ──────────────────────
+// ── Persistence ──────────────────────
 
 const OPEN_KEY = "editor.open_documents";
 

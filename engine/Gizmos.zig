@@ -3,7 +3,7 @@ const math = @import("math");
 const Vector3 = math.Vector3;
 const Matrix4 = math.Matrix4;
 
-/// Immediate-mode debug-draw command buffer (issue #3).
+/// Immediate-mode debug-draw command buffer.
 ///
 /// `Gizmos` is **pure data** — it records colored line segments and text labels
 /// into fixed-capacity buffers and does no rendering itself. The editor's GPU
@@ -249,7 +249,6 @@ pub const Gizmos = struct {
     pub fn box(self: *Gizmos, center: Vector3, size: Vector3) void {
         const h = size.scale(0.5);
         const c = center;
-        // 8 corners.
         const corners = [8]Vector3{
             .{ .x = c.x - h.x, .y = c.y - h.y, .z = c.z - h.z },
             .{ .x = c.x + h.x, .y = c.y - h.y, .z = c.z - h.z },
@@ -260,7 +259,6 @@ pub const Gizmos = struct {
             .{ .x = c.x + h.x, .y = c.y + h.y, .z = c.z + h.z },
             .{ .x = c.x - h.x, .y = c.y + h.y, .z = c.z + h.z },
         };
-        // bottom ring, top ring, verticals
         const edges = [12][2]usize{
             .{ 0, 1 }, .{ 1, 2 }, .{ 2, 3 }, .{ 3, 0 },
             .{ 4, 5 }, .{ 5, 6 }, .{ 6, 7 }, .{ 7, 4 },
@@ -285,7 +283,6 @@ pub const Gizmos = struct {
     /// normal is `axis`, approximated with `segments` line segments.
     pub fn circle(self: *Gizmos, center: Vector3, axis: Vector3, radius: f32, segments: usize) void {
         const n = axis.normalizeEps(1e-6);
-        // Build an orthonormal basis (u, v) spanning the circle's plane.
         const ref = if (@abs(n.y) > 0.95) Vector3.right() else Vector3.up();
         const u = n.cross(ref).normalize();
         const v = n.cross(u).normalize();

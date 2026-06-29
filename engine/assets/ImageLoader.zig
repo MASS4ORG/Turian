@@ -69,6 +69,8 @@ test "decodes a Basis KTX2 into a compressed texture" {
     try std.testing.expect(tex.width > 0 and tex.height > 0);
 }
 
+/// Load an image from a file path. Detects KTX2 by identifier; otherwise
+/// delegates to stb_image for PNG/JPEG/etc.
 pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Texture {
     var file = try std.Io.Dir.cwd().openFile(io, path, .{});
     defer file.close(io);

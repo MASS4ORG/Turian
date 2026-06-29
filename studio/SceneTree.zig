@@ -357,7 +357,7 @@ fn renderNode(tree: *gui.TreeWidget, idx: usize, obj: *EditorState.SceneNode, de
     }
 
     // Prefab instances are tinted blue and use a box icon, so a linked instance
-    // is distinguishable at a glance from a plain object (issue #32).
+    // is distinguishable at a glance from a plain object.
     const is_prefab_root = obj.isPrefabInstanceRoot();
     const is_prefab_part = obj.isPartOfPrefab();
     const prefab_tint = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };

@@ -186,7 +186,7 @@ fn handleToolCall(
         return;
     };
 
-    // Confirmation gate (issue #50): mutating tools must be called twice —
+    // Confirmation gate: mutating tools must be called twice —
     // first returns a preview, then `confirm:true` actually forwards the call.
     // Defense-in-depth on top of the MCP client's own approval prompt.
     if (tool.mutates and !argConfirmed(parsed.value.object)) {

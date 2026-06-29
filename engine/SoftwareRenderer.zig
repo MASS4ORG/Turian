@@ -427,7 +427,6 @@ fn shadePixel(normal: [3]f32, world_pos: [3]f32, uv: [2]f32, mat: ResolvedMateri
 
     var lit = [3]f32{ 0.08, 0.08, 0.08 };
     for (lights) |l| {
-        // Direction to light (l_dir) and distance attenuation.
         var l_dir: [3]f32 = undefined;
         var atten: f32 = 1.0;
         if (l.kind == .directional) {
@@ -512,7 +511,6 @@ fn rasterizeTriangle(
                 if (w0 > 0 or w1 > 0 or w2 > 0) continue;
             }
 
-            // Normalized barycentric weights, then perspective-correct factors.
             const l0 = w0 / area;
             const l1 = w1 / area;
             const l2 = w2 / area;

@@ -1,4 +1,4 @@
-//! Diagnostic log ring buffer (issue #50 — `list_errors`).
+//! Diagnostic log ring buffer.
 //!
 //! Captures the most recent `std.log` `.warn`/`.err` messages into a fixed ring
 //! so external tools (the Remote Debug Protocol's `errors` method, the MCP
@@ -90,7 +90,6 @@ pub fn writeJson(jw: *std.json.Stringify) !void {
     try jw.beginArray();
     var i: usize = 0;
     while (i < g_count) : (i += 1) {
-        // Walk backwards from the most recent entry.
         const idx = (g_head + RING_CAP - 1 - i) % RING_CAP;
         const e = &g_ring[idx];
         try jw.beginObject();

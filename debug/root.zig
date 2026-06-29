@@ -1,4 +1,4 @@
-//! Remote Debug Protocol (issue #49): JSON-RPC 2.0 over TCP, backed by the
+//! Remote Debug Protocol: JSON-RPC 2.0 over TCP, backed by the
 //! Runtime Introspection Layer. Separate from the engine module so games never
 //! link the TCP server or JSON-RPC stack unless they explicitly opt in.
 

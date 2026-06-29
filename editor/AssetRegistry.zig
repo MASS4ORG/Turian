@@ -41,7 +41,7 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
         },
         .scene => .{
             // The serialized node-hierarchy asset is a "Prefab"; the live,
-            // open hierarchy is the "Scene" (issue #32). `.prefab` is the
+            // open hierarchy is the "Scene". `.prefab` is the
             // canonical extension; `.json` is still read for older scenes.
             .name = "Prefab",
             .extensions = &.{ ".prefab", ".json" },

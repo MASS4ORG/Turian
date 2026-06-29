@@ -1,7 +1,7 @@
 //! Input core: a device-agnostic snapshot of the current input state plus a
 //! semantic **action map** layered on top of it.
 //!
-//! Design (issue #10): gameplay code reacts to *actions* (named, remappable),
+//! Design: gameplay code reacts to *actions* (named, remappable),
 //! never raw key codes. The host loop (game `main` or the studio viewport)
 //! feeds raw device events into an `Input` each frame; scripts poll it through
 //! `engine.Frame` (see ADR 0001). `Input` is plain data — no globals, no SDL

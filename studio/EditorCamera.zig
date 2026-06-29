@@ -1,4 +1,4 @@
-//! The Scene View's free-look navigation camera (issue #3 follow-up).
+//! The Scene View's free-look navigation camera.
 //!
 //! The editor viewport renders from this camera, not from a scene `Camera`
 //! component, so you can fly around to inspect the scene without disturbing the
@@ -46,7 +46,7 @@ pub const Nav = struct {
 };
 
 /// Snapshot of the free-look camera pose, saved/restored per document tab so
-/// each open scene keeps its own viewpoint (issue #1 follow-up).
+/// each open scene keeps its own viewpoint.
 pub const State = struct {
     pos: Vector3 = .{ .x = 0, .y = 2, .z = -6 },
     yaw: f32 = 0,

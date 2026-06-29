@@ -1,5 +1,5 @@
-//! Local-space bounding boxes for cooked meshes, cached by GUID (issue #3
-//! follow-up). Click-to-select ray-tests against these so picking matches the
+//! Local-space bounding boxes for cooked meshes, cached by GUID.
+//! Click-to-select ray-tests against these so picking matches the
 //! actual mesh extent instead of assuming every mesh is a unit cube.
 const std = @import("std");
 const gui = @import("gui");

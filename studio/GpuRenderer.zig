@@ -33,7 +33,7 @@ var g_target_h: u32 = 0;
 var g_ready = false;
 
 /// While Play mode runs, render this live node slice (owned by the play library)
-/// instead of the editor's edit-time scene. Cleared on Stop (issue #31).
+/// instead of the editor's edit-time scene. Cleared on Stop.
 var g_render_override: ?[]const engine.SceneNode = null;
 
 pub fn setRenderOverride(nodes: ?[]const engine.SceneNode) void {
@@ -115,7 +115,7 @@ pub const Capture = struct {
 };
 
 /// Download the editor viewport color target (the real GPU-rendered scene) to
-/// RGBA8 CPU pixels (issue #35). Caller owns `Capture.pixels`. Null if the
+/// RGBA8 CPU pixels. Caller owns `Capture.pixels`. Null if the
 /// renderer/target isn't ready. The pixels come from the most recently
 /// *submitted* frame — fine for a debug snapshot.
 pub fn capturePixels(allocator: std.mem.Allocator) ?Capture {

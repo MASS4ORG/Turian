@@ -106,7 +106,7 @@ pub const Client = struct {
 
     /// Records a session: subscribes to all events and appends every received
     /// notification line (newline-delimited JSON) to `file_writer` until the
-    /// connection closes. A simple JSONL session log (issue #49).
+    /// connection closes. A simple JSONL session log.
     pub fn record(self: *Self, allocator: std.mem.Allocator, file_writer: *std.Io.Writer) !void {
         const resp = try self.call(allocator, "subscribe", "{\"event\":\"*\"}");
         allocator.free(resp);

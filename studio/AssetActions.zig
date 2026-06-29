@@ -1,4 +1,4 @@
-//! Asset file actions for the asset browser (issue #44 item 7): opening assets
+//! Asset file actions for the asset browser: opening assets
 //! in external tools, revealing them in the OS file manager, and creating new
 //! assets of each kind. Split out of AssetBrowser.zig to keep that file focused
 //! on browsing/navigation UI.

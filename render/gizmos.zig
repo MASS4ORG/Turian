@@ -1,4 +1,4 @@
-//! Gizmo line rendering (issue #3): draws the editor's debug/manipulation
+//! Gizmo line rendering: draws the editor's debug/manipulation
 //! overlay — colored line lists recorded into an `engine.Gizmos` buffer. The
 //! geometry is UI-toolkit independent; the editor populates the buffer and the
 //! studio viewport calls `renderGizmos` after `renderScene`.

@@ -44,7 +44,7 @@ pub const Camera = struct {
 };
 
 /// A free-look camera pose the editor can impose on the viewport, independent of
-/// any scene camera component (issue #3 follow-up).
+/// any scene camera component.
 pub const EditorCam = types.EditorCam;
 
 /// Set (or clear) the editor free-look camera override. Cleared in Play mode so
@@ -350,7 +350,6 @@ pub fn renderScene(
             c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
             c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
             c.SDL_DrawGPUIndexedPrimitives(pass, gm.idx_count, 1, 0, 0, 0);
-            // Indexed draw: index count == vertices referenced; triangles = /3.
             // Every mesh binds samplers, so this draw always counts as textured.
             engine.Profiler.countDraw(gm.idx_count / 3, gm.idx_count, true);
         }

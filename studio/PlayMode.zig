@@ -1,4 +1,4 @@
-//! Play mode (issue #31) — runs the current scene's game simulation in-process,
+//! Play mode — runs the current scene's game simulation in-process,
 //! inside the editor viewport, with clean enter/exit and exact state restore.
 //!
 //! ## State machine
@@ -138,7 +138,6 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
         return false;
     };
 
-    // (Re)build the play library if the scripts changed since last build.
     const hash = sourceHash(io);
     if (!g_lib_valid or hash != g_lib_hash) {
         unloadLibrary();
@@ -346,7 +345,7 @@ fn mapKey(code: gui.enums.Key) ?u16 {
 var g_prefab_buf: [EditorState.objects.len]engine.SceneNode = undefined;
 
 /// Register every scene/prefab asset's template nodes with the play library so
-/// scripts can `Instantiate` them by GUID at runtime (issue #32).
+/// scripts can `Instantiate` them by GUID at runtime.
 fn registerPrefabs(io: std.Io) void {
     if (!EditorState.assetDbReady()) return;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);

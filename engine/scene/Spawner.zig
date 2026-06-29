@@ -1,4 +1,4 @@
-//! Runtime prefab spawning (issue #32) — the engine-side `Instantiate`/`Destroy`
+//! Runtime prefab spawning — the engine-side `Instantiate`/`Destroy`
 //! API, the bread-and-butter of gameplay code.
 //!
 //! Scripts don't touch scene storage directly; they **queue** commands through

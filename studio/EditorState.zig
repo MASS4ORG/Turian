@@ -96,7 +96,7 @@ pub const UndoCommand = union(enum) {
         after: Snapshot,
     },
     /// Prefab create / instantiate / revert / propagate — any whole-scene
-    /// prefab mutation (issue #32). Snapshot-based like add/delete.
+    /// prefab mutation. Snapshot-based like add/delete.
     prefab_op: struct {
         before: Snapshot,
         after: Snapshot,
@@ -293,23 +293,18 @@ pub fn pushCommand(now: i128, cmd: *const UndoCommand) void {
         return;
     }
 
-    // Try to merge with the last command (coalescing)
-
     if (undo_len > 0) {
         const can_merge = now - last_push_ns < 500 * std.time.ns_per_ms;
         if (can_merge and tryMergeCommands(&undo_stack[undo_len - 1], cmd)) {
-            // Discard the new_cmd since it was merged.
             var mutable_cmd = cmd.*;
             mutable_cmd.deinit();
 
-            // Clear redo stack on new command
             for (0..redo_len) |i| redo_stack[i].deinit();
             redo_len = 0;
             return;
         }
     }
 
-    // Clear redo stack on new command
     for (0..redo_len) |i| redo_stack[i].deinit();
     redo_len = 0;
 
@@ -498,7 +493,6 @@ pub fn deleteSelectedObjects(now: i128) void {
         }
     }
 
-    // Build a new→old index map and reconstruct in a temp buffer
     var index_map: [MAX_OBJECTS]i32 = undefined;
     var next_idx: usize = 0;
     for (0..object_count) |i| {
@@ -854,7 +848,6 @@ pub fn copySelectedObjects() void {
         }
     }
 
-    // Build orig→clipboard index map
     var orig_to_clip: [MAX_OBJECTS]i32 = undefined;
     @memset(&orig_to_clip, -1);
     var ci: usize = 0;
@@ -866,7 +859,6 @@ pub fn copySelectedObjects() void {
     }
     clipboard_count = ci;
 
-    // Copy nodes, remapping parent indices relative to clipboard
     ci = 0;
     for (0..object_count) |i| {
         if (!in_copy[i]) continue;
@@ -1264,7 +1256,7 @@ pub fn addObjectWithUndo(now: i128, io: std.Io, n: []const u8, parent: i32) usiz
     return idx;
 }
 
-// ── Remote-debug mutation helpers (issues #2 / #50) ────────────────────────────
+// ── Remote-debug mutation helpers ────────────────────────────
 //
 // The Remote Debug Protocol's MutationApplier (see studio/Main.zig) routes LLM /
 // CLI edits through these, so AI edits go through the same undo stack as the UI
@@ -1654,7 +1646,7 @@ pub fn syncSceneWithDefinitions() void {
     }
 }
 
-// ── Prefabs (issue #32) ────────────────────────────────────────────────────
+// ── Prefabs ────────────────────────────────────────────────────
 
 /// Walk up from `idx` to the enclosing prefab-instance root, or null if `idx`
 /// is not part of a prefab instance.

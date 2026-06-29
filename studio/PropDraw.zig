@@ -410,7 +410,6 @@ fn drawNumber(
         }
     }
 
-    // Generic number entry.
     const result = gui.textEntryNumber(@src(), T, .{
         .value = ptr,
         .min = if (hint.min) |m| castHintBound(T, m) else null,
@@ -470,7 +469,6 @@ fn drawStringArray(
     const buf: []u8 = ptr[0..];
 
     if (hint.multiline) {
-        // Multiline text area — label above, textarea below.
         gui.label(@src(), "{s}", .{label}, .{ .id_extra = id });
         if (ro) return false;
         var te = gui.textEntry(@src(), .{
@@ -481,7 +479,6 @@ fn drawStringArray(
         return te.text_changed;
     }
 
-    // Single-line: standard label + entry row.
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
     gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
@@ -716,7 +713,6 @@ fn drawRef(
 
     var changed = false;
 
-    // Drop zone for drag-and-drop.
     if (drawRefDropZone(@src(), RefT._turian_ref_kind, ptr.slice(), id)) |new_guid| {
         ptr.set(new_guid);
         changed = true;

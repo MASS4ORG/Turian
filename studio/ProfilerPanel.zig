@@ -1,4 +1,4 @@
-//! In-editor performance profiler (Guinevere/Turian, issue #35). A floating,
+//! In-editor performance profiler (Guinevere/Turian,). A floating,
 //! toggleable window with a Unity-style multi-track timeline, a recordable
 //! history you can scrub, and Perfetto trace export.
 //!
@@ -24,7 +24,7 @@ const Frame = engine.Profiler.Frame;
 
 var g_open: bool = false;
 
-// ── Recording control (issue #35) ────────────────────────────────────────────
+// ── Recording control ────────────────────────────────────────────
 /// Whether the profiler is actively recording (only effective during Play).
 var g_record: bool = false;
 /// Setting: start recording the moment Play mode is entered.
@@ -181,7 +181,7 @@ pub fn draw() void {
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-    // --- editor window phases (secondary; collapsed by default, #5) ---
+    // --- editor window phases (secondary; collapsed by default) ---
     if (gui.expander(@src(), "Editor CPU (studio)", .{ .expanded = &g_show_editor_cpu }, .{ .expand = .horizontal })) {
         const ft = cw.frameTiming();
         gui.label(@src(), "fps           {d:.0}", .{cw.FPS()}, .{});

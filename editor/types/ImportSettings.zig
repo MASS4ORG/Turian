@@ -6,7 +6,7 @@ pub const ImageFilter = enum { linear, nearest };
 pub const ImageWrap = enum { repeat, clamp };
 
 /// How an imported image is intended to be used. Drives sensible defaults for
-/// color space and compression (issue #5).
+/// color space and compression.
 pub const TextureType = enum { default, normal_map, sprite, ui, hdr };
 
 /// Color space the source image is authored in. Albedo/UI are sRGB; data maps
@@ -17,7 +17,7 @@ pub const ColorSpace = enum { srgb, linear };
 /// texture type; `none` keeps RGBA8.
 pub const TextureCompression = enum { none, auto, bc7, bc3, bc1 };
 
-/// Settings for image asset import (issue #5).
+/// Settings for image asset import.
 pub const ImageImportSettings = struct {
     texture_type: TextureType = .default,
     color_space: ColorSpace = .srgb,

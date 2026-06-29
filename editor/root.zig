@@ -12,7 +12,7 @@ pub const project_ops = @import("ProjectOps.zig");
 /// Scene serialization (save/load .json files).
 pub const scene_io = @import("SceneIo.zig");
 /// Prefab system: instantiate scene assets as linked, overridable subtrees
-/// with source-edit propagation (issue #32). A prefab is just a scene asset.
+/// with source-edit propagation. A prefab is just a scene asset.
 pub const prefab = @import("Prefab.zig");
 /// Asset .meta file management.
 pub const asset_meta = @import("AssetMeta.zig");

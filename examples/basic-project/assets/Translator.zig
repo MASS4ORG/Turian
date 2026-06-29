@@ -16,7 +16,6 @@ pub const Translator = struct {
     pub fn update(self: *@This(), time: engine.Time) void {
         self._elapsed += time.delta;
 
-        // Compute offset along Y using a sine wave.
         const offset_y = self.amplitude * @sin(2.0 * std.math.pi * self.frequency * self._elapsed);
 
         // TODO: apply offset_y to the parent Transform once the

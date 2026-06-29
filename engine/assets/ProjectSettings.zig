@@ -1,4 +1,4 @@
-//! ProjectSettings — game/project configuration as a DataAsset (issue #13).
+//! ProjectSettings — game/project configuration as a DataAsset.
 //!
 //! Where the editor `Settings` store (editor/Settings.zig) holds *editor*
 //! preferences, this asset holds *game/project* configuration that ships with the

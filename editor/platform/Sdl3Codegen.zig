@@ -4,7 +4,7 @@
 //! pieces — windowing, the event pump, input device bindings — were previously
 //! inlined as string literals inside GameBuild. They are collected here so the
 //! generator's platform layer lives in one place and so additional backends
-//! (Android, iOS, consoles — see issue #44 item 8) can be added as sibling
+//! (Android, iOS, consoles — see item 8) can be added as sibling
 //! modules exposing the same `pub const` source-fragment interface.
 //!
 //! These fragments are SDL3-ABI exact (field offsets/enum values) and are not
@@ -39,7 +39,7 @@ pub const bindings =
     "extern fn SDL_RenderTexture(r: *SDL_Renderer, t: *SDL_Texture, src: ?*const anyopaque, dst: ?*const anyopaque) bool;\n\n";
 
 /// SDL3 keyboard/mouse event overlays + scancode mapping feeding engine.Input
-/// (issue #10). Also declares the global Input/Services instances.
+///. Also declares the global Input/Services instances.
 pub const input =
     "const SDL_EVENT_KEY_DOWN: u32          = 0x300;\n" ++
     "const SDL_EVENT_KEY_UP: u32            = 0x301;\n" ++
@@ -69,7 +69,7 @@ pub const input =
     "    return switch (b) { 1 => .left, 2 => .middle, 3 => .right, 4 => .x1, 5 => .x2, else => null };\n" ++
     "}\n\n";
 
-/// SDL3 gamepad events feeding engine.Input (issue #10). SDL's
+/// SDL3 gamepad events feeding engine.Input. SDL's
 /// SDL_GamepadButton/SDL_GamepadAxis enums share engine.GamepadButton/Axis order.
 pub const gamepad =
     "const SDL_INIT_GAMEPAD: u32                 = 0x00002000;\n" ++

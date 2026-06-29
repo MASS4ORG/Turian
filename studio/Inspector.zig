@@ -442,7 +442,7 @@ fn drawScriptField(sel: usize, obj: *EditorState.SceneNode, ci: usize, fi: usize
 }
 
 /// Host a non-scene asset's dedicated editor full-area as an MDI document tab
-/// (issue #1). Reuses the same per-type editor dispatch the inspector uses when
+///. Reuses the same per-type editor dispatch the inspector uses when
 /// an asset is merely selected, but as the main editing surface.
 pub fn drawAssetDocument(asset_path: []const u8) void {
     var outer = gui.box(@src(), .{}, .{

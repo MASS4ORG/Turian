@@ -1,6 +1,6 @@
 /// Play-mode build system — generates and compiles a *play shared library*
 /// from the current scene's user scripts so the studio can run the game's
-/// update loop **in-process** inside the editor viewport (issue #31).
+/// update loop **in-process** inside the editor viewport.
 ///
 /// This mirrors `GameBuild` (which produces a standalone executable), but the
 /// product here is a `libturian_play.{so,dll,dylib}` exposing a small C ABI the
@@ -332,7 +332,7 @@ fn generatePlayMainZig(
                 "var g_live_transform: [engine.scene.MAX_OBJECTS]*engine.Transform = undefined;\n" ++
                 // Each live component remembers its owning node's GUID, so the live
                 // set can be reconciled after runtime spawn/destroy (node storage
-                // is compacted on destroy, which moves transforms — issue #32).
+                // is compacted on destroy, which moves transforms).
                 "var g_live_guid: [engine.scene.MAX_OBJECTS][36]u8 = undefined;\n" ++
                 "var g_live_guid_len: [engine.scene.MAX_OBJECTS]usize = undefined;\n" ++
                 "var g_live_count: usize = 0;\n\n",
@@ -426,7 +426,7 @@ fn generatePlayMainZig(
                 "}\n\n",
         );
 
-        // Runtime spawn/destroy support (issue #32): instantiate live components
+        // Runtime spawn/destroy support: instantiate live components
         // for a node, and reconcile the live set with the node buffer after a
         // spawn/destroy flush (re-pointing transforms by GUID, dropping comps for
         // destroyed nodes, and bringing freshly spawned nodes to life).
@@ -581,7 +581,7 @@ fn generatePlayMainZig(
             "    ia.applyTo(&g_input);\n" ++
             "}\n\n" ++
             // Register a prefab's template nodes so scripts can Instantiate it by
-            // GUID at runtime (issue #32). Fed by the studio before play starts.
+            // GUID at runtime. Fed by the studio before play starts.
             "export fn turianPlayRegisterPrefab(guid_ptr: [*]const u8, guid_len: usize, nodes_ptr: [*]const engine.SceneNode, nodes_count: usize) callconv(.c) void {\n" ++
             "    g_spawner.registerPrefab(guid_ptr[0..guid_len], nodes_ptr[0..nodes_count]);\n" ++
             "}\n",

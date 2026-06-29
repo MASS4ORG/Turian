@@ -6,7 +6,7 @@ const Profiler = @import("../Profiler.zig");
 /// Subsystems (renderer, scene manager, allocators) write into one shared
 /// instance each frame; the introspection layer reads it without knowing which
 /// subsystem produced which number. This keeps "engine subsystems expose
-/// diagnostics consistently" (issue #2) true by construction: there is exactly
+/// diagnostics consistently" true by construction: there is exactly
 /// one struct to fill and one struct to read.
 ///
 /// All fields are plain data so `std.json.Stringify.write` serialises the whole
@@ -46,7 +46,7 @@ pub const Metrics = struct {
     /// frame period) plus the renderer's per-frame counters (draw calls,
     /// triangles). The host fills in scene/entity counts and memory afterwards
     /// (see `withScene`). This keeps the profiler the single instrumentation
-    /// source rather than re-counting draws separately (issue #2).
+    /// source rather than re-counting draws separately.
     pub fn fromProfiler(frame: *const Profiler.Frame) Metrics {
         var m: Metrics = .{};
         m.frame_count = frame.index;
