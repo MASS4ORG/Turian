@@ -1,0 +1,16 @@
+{
+  "name": "com.example.spawner",
+  "version": "1.0.0",
+  "author": "Example",
+  "description": "Sample source+plugin package: exports a SpawnerService module and registers it at startup.",
+  "license": "MIT",
+  "engine_compat": ">=1.0.0",
+  "types": ["source", "plugin"],
+  "modules": [
+    { "name": "spawner", "root": "src/root.zig" }
+  ],
+  "plugin": {
+    "register": "spawner",
+    "entry": "register"
+  }
+}

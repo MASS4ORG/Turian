@@ -72,3 +72,15 @@ pub const settings = @import("Settings.zig");
 pub const Settings = settings.Settings;
 /// MRU recent-projects list persisted via the Settings API.
 pub const recent_projects = @import("RecentProjects.zig");
+/// Package manifest parser for `turian-package.json` (issue #56/#58).
+pub const PackageManifest = @import("types/PackageManifest.zig").PackageManifest;
+pub const PackageType = @import("types/PackageManifest.zig").PackageType;
+/// Package discovery and dependency graph (issue #58).
+pub const PackageManager = @import("PackageManager.zig").PackageManager;
+pub const checkEngineCompat = @import("PackageManager.zig").checkEngineCompat;
+/// Project configuration (`project.json`) — source of truth for project
+/// identity and dependencies; generates `build.zig.zon` (issue #57).
+pub const project_config = @import("ProjectConfig.zig");
+pub const ProjectConfig = project_config.ProjectConfig;
+/// Central, machine-wide package store shared across projects (issue #20).
+pub const package_store = @import("PackageStore.zig");

@@ -3,6 +3,7 @@
 const std = @import("std");
 const ComponentDef = @import("Scanner.zig").ComponentDef;
 const sdl3 = @import("platform/Sdl3Codegen.zig");
+const sanitizeZigId = @import("ProjectConfig.zig").sanitizeId;
 
 /// Window / runtime options baked into the generated game from the project's
 /// `ProjectSettings` asset. Defaults mirror `ProjectSettings`.
@@ -52,6 +53,60 @@ pub const BuildConfig = struct {
     render_root: []const u8,
     /// SDL3 headers include directory (for translating the GPU bindings).
     sdl3_include: []const u8,
+    /// Additional asset-root directories contributed by installed packages (#59).
+    /// Each entry is an absolute path to an asset directory.
+    extra_asset_roots: []const []const u8 = &.{},
+    /// Names of third-party dependencies declared in the project's
+    /// `project.json` / generated `build.zig.zon` (#57). The generated build
+    /// resolves each via `b.dependency()` so Zig's package manager fetches and
+    /// hash-pins them. Source/native packages (#61/#62) extend this seam to
+    /// `addImport`/`linkLibrary` the resolved artifacts.
+    extra_deps: []const []const u8 = &.{},
+    /// Running engine/SDK version (e.g. "1.8.0"), used to validate installed
+    /// packages' `engine_compat` ranges (#58). Empty disables the check.
+    engine_version: []const u8 = "",
+    /// Central package store root (issue #20). Asset/hybrid packages recorded in
+    /// `project.json` are resolved from here. Empty = store discovery disabled.
+    package_store: []const u8 = "",
+    /// Native libraries contributed by installed packages (#62), linked into the
+    /// game executable.
+    extra_native: []const NativeLibSpec = &.{},
+    /// Zig source modules exported by installed packages (#61). Each becomes a
+    /// `b.addModule` importable from `main.zig` and from user scripts.
+    extra_modules: []const ModuleSpec = &.{},
+};
+
+/// A Zig source module exported by a source/hybrid package (#61).
+pub const ModuleSpec = struct {
+    /// Module import name (e.g. "platformer").
+    name: []const u8,
+    /// Absolute path to the module's root `.zig` file.
+    root_abs: []const u8,
+};
+
+/// A plugin runtime-registration entry point (#64): call `module.entry(&services)`
+/// at startup so the package can register components/systems/services.
+pub const PluginSpec = struct {
+    /// Name of the exported module that holds the entry function.
+    module: []const u8,
+    /// Entry function name, called as `module.entry(&g_services)`.
+    entry: []const u8,
+};
+
+/// A precompiled native library contributed by a package (#62). `lib_template`
+/// is a package-root-relative path that may contain `{target}` (replaced with
+/// the build's Zig target triple at build time, e.g. `lib/{target}/libfoo.a`).
+pub const NativeLibSpec = struct {
+    /// Absolute path to the package root directory.
+    pkg_root: []const u8,
+    /// System library name (for shared libs) / diagnostic name.
+    name: []const u8,
+    /// "static" or "shared".
+    kind: []const u8,
+    /// Package-root-relative path template to the library file.
+    lib_template: []const u8,
+    /// Package-root-relative include directory (may be empty).
+    include: []const u8,
 };
 
 /// Return `path` with every backslash replaced by a forward-slash.
@@ -256,6 +311,46 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
         ));
     }
 
+    // Source modules exported by installed packages (#61). Each is a real
+    // b.addModule importable from main.zig and from user scripts. Engine is
+    // imported into each so package code can use the engine API.
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const pkgmod_{d} = b.addModule(\"{s}\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    pkgmod_{d}.addImport(\"engine\", engine_mod);\n",
+            .{ mi, m.name, m.root_abs, mi },
+        ));
+        // Let user scripts import package modules by name.
+        for (0..src_files.len) |si| {
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "    script_{d}_mod.addImport(\"{s}\", pkgmod_{d});\n",
+                .{ si, m.name, mi },
+            ));
+        }
+    }
+    if (config.extra_modules.len > 0) try out.append(a, '\n');
+
+    // Resolve third-party project dependencies through Zig's package manager
+    // (#57). Declared in project.json → generated build.zig.zon; reachable here
+    // via b.dependency(). Source/native packages (#61/#62) will extend this to
+    // import modules / link artifacts; for now resolving proves the seam works.
+    for (config.extra_deps) |dep_name| {
+        var id_buf: [128]u8 = undefined;
+        const dep_id = sanitizeZigId(dep_name, &id_buf);
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const {s}_dep = b.dependency(\"{s}\", .{{ .target = target, .optimize = optimize }});\n" ++
+                "    _ = {s}_dep; // resolved via Zig PM; imported by source/native packages (#61/#62)\n",
+            .{ dep_id, dep_id, dep_id },
+        ));
+    }
+    if (config.extra_deps.len > 0) try out.append(a, '\n');
+
     try out.appendSlice(
         a,
         "    const exe = b.addExecutable(.{\n" ++
@@ -280,6 +375,13 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
             a,
             "                .{{ .name = \"script_{d}\", .module = script_{d}_mod }},\n",
             .{ i, i },
+        ));
+    }
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "                .{{ .name = \"{s}\", .module = pkgmod_{d} }},\n",
+            .{ m.name, mi },
         ));
     }
     try out.appendSlice(a, "            },\n        }),\n    });\n");
@@ -307,6 +409,50 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
         );
     }
 
+    // Native libraries from installed packages (#62). The `{target}` token in a
+    // lib path template is replaced with the build's Zig target triple so the
+    // platform-correct binary is selected. Static libs are added as object
+    // files; shared libs are linked by name from their directory.
+    for (config.extra_native, 0..) |nl, i| {
+        const include_abs = if (nl.include.len > 0)
+            try std.fmt.allocPrint(a, "{s}/{s}", .{ nl.pkg_root, nl.include })
+        else
+            "";
+        const is_static = !std.mem.eql(u8, nl.kind, "shared");
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    {{\n" ++
+                "        const _nt{d} = target.result.zigTriple(b.allocator) catch \"\";\n" ++
+                "        const _nrel{d} = std.mem.replaceOwned(u8, b.allocator, \"{s}\", \"{{target}}\", _nt{d}) catch \"{s}\";\n" ++
+                "        const _nabs{d} = b.pathJoin(&.{{ \"{s}\", _nrel{d} }});\n",
+            .{ i, i, nl.lib_template, i, nl.lib_template, i, nl.pkg_root, i },
+        ));
+        if (is_static) {
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "        exe.root_module.addObjectFile(.{{ .cwd_relative = _nabs{d} }});\n",
+                .{i},
+            ));
+        } else {
+            // Shared: link by name from the resolved file's directory.
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "        const _ndir{d} = std.fs.path.dirname(_nabs{d}) orelse \".\";\n" ++
+                    "        exe.root_module.addLibraryPath(.{{ .cwd_relative = _ndir{d} }});\n" ++
+                    "        exe.root_module.linkSystemLibrary(\"{s}\", .{{}});\n",
+                .{ i, i, i, nl.name },
+            ));
+        }
+        if (include_abs.len > 0) {
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "        exe.root_module.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n",
+                .{include_abs},
+            ));
+        }
+        try out.appendSlice(a, "        exe.root_module.link_libc = true;\n    }\n");
+    }
+
     try out.appendSlice(
         a,
         "    b.installArtifact(exe);\n" ++
@@ -321,6 +467,289 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
     return try out.toOwnedSlice(a);
 }
 
+/// Generate a `build.zig` for a one-shot reflection dynamic library.
+///
+/// Called by `UserReflection.compileAndPopulate`; the produced lib exports
+/// `getRegistry()` from `wrapper_abs` (a generated wrapper file) and compiles
+/// `source_abs` (the user's script file) with the full engine dep graph so
+/// every `@import("engine")` inside user components resolves correctly.
+///
+/// `lib_name` becomes the `b.addLibrary` name; the output lands at
+/// `<build_dir>/zig-out/lib/lib{lib_name}.{so,dll,dylib}`.
+pub fn generateReflectionBuildZig(
+    a: std.mem.Allocator,
+    config: BuildConfig,
+    reflection_zig: []const u8,
+    source_abs: []const u8,
+    wrapper_abs: []const u8,
+    lib_name: []const u8,
+) ![]u8 {
+    var out: std.ArrayList(u8) = .empty;
+    errdefer out.deinit(a);
+
+    try out.appendSlice(a, "const std = @import(\"std\");\n\n");
+    try out.appendSlice(a, "pub fn build(b: *std.Build) void {\n");
+    try out.appendSlice(a, "    const target  = b.standardTargetOptions(.{});\n");
+    try out.appendSlice(a, "    const optimize = b.standardOptimizeOption(.{});\n\n");
+
+    // math — engine/root.zig re-exports it, so it must exist.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const math_mod = b.addModule(\"math\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n\n",
+        .{try normPath(a, config.math_root)},
+    ));
+
+    // open_asset_package — used by engine/assets/*.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const oap_mod = b.addModule(\"open_asset_package\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n\n",
+        .{try normPath(a, config.oap_root)},
+    ));
+
+    // engine (with cgltf + stb_image C sources, link_libc).
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const engine_mod = b.addModule(\"engine\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    engine_mod.link_libc = true;\n" ++
+            "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addImport(\"math\", math_mod);\n" ++
+            "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
+        .{
+            try normPath(a, config.engine_root),
+            try normPath(a, config.vendor_include),
+            try normPath(a, config.cgltf_wrap_c),
+            try normPath(a, config.vendor_include),
+        },
+    ));
+
+    // ktx2 — engine/assets/Texture.zig and ImageLoader.zig import it.
+    try appendKtx2Module(a, &out, config);
+
+    // serde — engine/assets/Material.zig imports it.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const serde_compat_mod = b.addModule(\"compat\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    const serde_mod = b.addModule(\"serde\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    serde_mod.addImport(\"compat\", serde_compat_mod);\n" ++
+            "    engine_mod.addImport(\"serde\", serde_mod);\n\n",
+        .{ try normPath(a, config.serde_compat_root), try normPath(a, config.serde_root) },
+    ));
+
+    // reflection — the comptime field-inspector, depends on engine.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const reflection_mod = b.addModule(\"reflection\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    reflection_mod.addImport(\"engine\", engine_mod);\n\n",
+        .{try normPath(a, reflection_zig)},
+    ));
+
+    // Source package modules (#61): user scripts may @import them, so they
+    // must be declared here or the user module will fail to compile.
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const pkgmod_{d} = b.addModule(\"{s}\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    pkgmod_{d}.addImport(\"engine\", engine_mod);\n",
+            .{ mi, m.name, m.root_abs, mi },
+        ));
+    }
+    if (config.extra_modules.len > 0) try out.append(a, '\n');
+
+    // user_module — the script file being reflected.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const user_mod = b.addModule(\"user_module\", .{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "    }});\n" ++
+            "    user_mod.addImport(\"engine\", engine_mod);\n",
+        .{try normPath(a, source_abs)},
+    ));
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    user_mod.addImport(\"{s}\", pkgmod_{d});\n",
+            .{ m.name, mi },
+        ));
+    }
+    try out.append(a, '\n');
+
+    // root = generated wrapper (imports engine + reflection + user_module).
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const root_mod = b.createModule(.{{\n" ++
+            "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+            "        .target = target,\n" ++
+            "        .optimize = optimize,\n" ++
+            "        .imports = &.{{\n" ++
+            "            .{{ .name = \"engine\",      .module = engine_mod }},\n" ++
+            "            .{{ .name = \"reflection\",  .module = reflection_mod }},\n" ++
+            "            .{{ .name = \"user_module\", .module = user_mod }},\n" ++
+            "        }},\n" ++
+            "    }});\n" ++
+            "    root_mod.link_libc = true;\n\n",
+        .{try normPath(a, wrapper_abs)},
+    ));
+
+    // Dynamic library output.
+    try out.appendSlice(a, try std.fmt.allocPrint(
+        a,
+        "    const lib = b.addLibrary(.{{\n" ++
+            "        .name = \"{s}\",\n" ++
+            "        .root_module = root_mod,\n" ++
+            "        .linkage = .dynamic,\n" ++
+            "    }});\n" ++
+            "    b.installArtifact(lib);\n" ++
+            "}}\n",
+        .{lib_name},
+    ));
+
+    return try out.toOwnedSlice(a);
+}
+
+test "generateBuildZig emits native lib linking" {
+    const a = std.testing.allocator;
+    const native = [_]NativeLibSpec{.{
+        .pkg_root = "/store/com.acme.physx/1.0.0",
+        .name = "physx",
+        .kind = "static",
+        .lib_template = "lib/{target}/libphysx.a",
+        .include = "include",
+    }};
+    const cfg = BuildConfig{
+        .engine_root = "/e/root.zig",
+        .editor_root = "/ed/root.zig",
+        .cgltf_wrap_c = "/v/cgltf.c",
+        .vendor_include = "/v",
+        .build_root = "/r",
+        .sdl3_lib = "",
+        .math_root = "/m/root.zig",
+        .guid_root = "/g/root.zig",
+        .oap_root = "/o/root.zig",
+        .serde_root = "/s/root.zig",
+        .serde_compat_root = "/s/compat.zig",
+        .ktx2_root = "/k/src/root.zig",
+        .gpu_root = "",
+        .gpu_sdl3_c = "",
+        .render_root = "",
+        .sdl3_include = "",
+        .extra_native = &native,
+    };
+    const out = try generateBuildZig(a, cfg, &.{});
+    defer a.free(out);
+    // Static lib is added as an object file, the target token is substituted,
+    // and the include path is wired.
+    try std.testing.expect(std.mem.indexOf(u8, out, "addObjectFile") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "replaceOwned(u8, b.allocator, \"lib/{target}/libphysx.a\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "/store/com.acme.physx/1.0.0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "addIncludePath(.{ .cwd_relative = \"/store/com.acme.physx/1.0.0/include\" })") != null);
+}
+
+test "generateBuildZig emits source package modules and wires them into scripts" {
+    const a = std.testing.allocator;
+    const mods = [_]ModuleSpec{.{
+        .name = "platformer",
+        .root_abs = "/store/com.acme.platformer/1.0.0/src/root.zig",
+    }};
+    const cfg = BuildConfig{
+        .engine_root = "/e/root.zig",
+        .editor_root = "/ed/root.zig",
+        .cgltf_wrap_c = "/v/cgltf.c",
+        .vendor_include = "/v",
+        .build_root = "/r",
+        .sdl3_lib = "",
+        .math_root = "/m/root.zig",
+        .guid_root = "/g/root.zig",
+        .oap_root = "/o/root.zig",
+        .serde_root = "/s/root.zig",
+        .serde_compat_root = "/s/compat.zig",
+        .ktx2_root = "/k/src/root.zig",
+        .gpu_root = "",
+        .gpu_sdl3_c = "",
+        .render_root = "",
+        .sdl3_include = "",
+        .extra_modules = &mods,
+    };
+    const src = [_][]const u8{"/proj/src/Player.zig"};
+    const out = try generateBuildZig(a, cfg, &src);
+    defer a.free(out);
+    // Package module declared and imported into engine.
+    try std.testing.expect(std.mem.indexOf(u8, out, "pkgmod_0") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "\"platformer\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "/store/com.acme.platformer/1.0.0/src/root.zig") != null);
+    // Package module imported into user script.
+    try std.testing.expect(std.mem.indexOf(u8, out, "script_0_mod.addImport(\"platformer\", pkgmod_0)") != null);
+    // Package module available in the exe imports.
+    try std.testing.expect(std.mem.indexOf(u8, out, ".{ .name = \"platformer\", .module = pkgmod_0 }") != null);
+}
+
+test "generateMainZig emits plugin registration calls" {
+    const a = std.testing.allocator;
+    const plugins = [_]PluginSpec{.{ .module = "com_acme_phys", .entry = "register" }};
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
+    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, false, &plugins);
+    defer a.free(out);
+    try std.testing.expect(std.mem.indexOf(u8, out, "@import(\"com_acme_phys\").register(&g_services)") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "Plugin packages register their services here") != null);
+}
+
+test "generateBuildZig emits shared lib link by name" {
+    const a = std.testing.allocator;
+    const native = [_]NativeLibSpec{.{
+        .pkg_root = "/store/com.acme.snd/2.0.0",
+        .name = "snd",
+        .kind = "shared",
+        .lib_template = "lib/{target}/libsnd.so",
+        .include = "",
+    }};
+    const cfg = BuildConfig{
+        .engine_root = "/e/root.zig",
+        .editor_root = "/ed/root.zig",
+        .cgltf_wrap_c = "/v/cgltf.c",
+        .vendor_include = "/v",
+        .build_root = "/r",
+        .sdl3_lib = "",
+        .math_root = "/m/root.zig",
+        .guid_root = "/g/root.zig",
+        .oap_root = "/o/root.zig",
+        .serde_root = "/s/root.zig",
+        .serde_compat_root = "/s/compat.zig",
+        .ktx2_root = "/k/src/root.zig",
+        .gpu_root = "",
+        .gpu_sdl3_c = "",
+        .render_root = "",
+        .sdl3_include = "",
+        .extra_native = &native,
+    };
+    const out = try generateBuildZig(a, cfg, &.{});
+    defer a.free(out);
+    try std.testing.expect(std.mem.indexOf(u8, out, "linkSystemLibrary(\"snd\", .{})") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "addLibraryPath") != null);
+}
+
 // ---------------------------------------------------------------------------
 // main.zig generator
 
@@ -332,6 +761,7 @@ pub fn generateMainZig(
     component_count: usize,
     runtime: RuntimeConfig,
     use_gpu: bool,
+    plugins: []const PluginSpec,
 ) ![]u8 {
     _ = project_path; // assets (incl. scene) now come from the package, not a path
     var out: std.ArrayList(u8) = .empty;
@@ -749,8 +1179,24 @@ pub fn generateMainZig(
             "    // same package as scenes, lazily on first Instantiate.\n" ++
             "    g_spawner = engine.Spawner.init(gpa);\n" ++
             "    defer g_spawner.deinit();\n" ++
-            "    g_spawner.setResolver(sceneLoader, null);\n" ++
-            "    if (boot_scene_guid.len == 0) {\n" ++
+            "    g_spawner.setResolver(sceneLoader, null);\n",
+    );
+
+    // Plugin runtime registration (#64): each installed plugin package's entry
+    // point is handed the live service registry so it can register
+    // components/systems/services before the boot scene loads.
+    if (plugins.len > 0) {
+        try out.appendSlice(a, "    // Plugin packages register their services here (issue #64).\n");
+        for (plugins) |p| {
+            const s = std.fmt.bufPrint(&tmp, "    @import(\"{s}\").{s}(&g_services);\n", .{ p.module, p.entry }) catch return error.BufferTooSmall;
+            try out.appendSlice(a, s);
+        }
+        try out.append(a, '\n');
+    }
+
+    try out.appendSlice(
+        a,
+        "    if (boot_scene_guid.len == 0) {\n" ++
             "        std.debug.print(\"[Turian] No boot scene configured\\n\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++

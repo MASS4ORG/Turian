@@ -88,12 +88,16 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
     const name = if (id.len > 0) std.fs.path.basename(id) else "(unsaved)";
     var buf: [1400]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
+    // One Stringify document: mixing raw writes with multiple top-level
+    // `jw.write` values trips its "document already complete" assert. Use the
+    // object API so the whole payload is a single JSON value.
     var jw = std.json.Stringify{ .writer = &w, .options = .{} };
-    w.writeAll("{\"scene\":") catch return;
+    jw.beginObject() catch return;
+    jw.objectField("scene") catch return;
     jw.write(name) catch return;
-    w.writeAll(",\"id\":") catch return;
+    jw.objectField("id") catch return;
     jw.write(id) catch return;
-    w.writeAll("}") catch return;
+    jw.endObject() catch return;
     srv.emit(ev, w.buffered());
 }
 
@@ -229,6 +233,7 @@ pub fn main(main_init: std.process.Init) !void {
                         .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
                         .render_root = build_options.render_root_path,
                         .sdl3_include = build_options.sdl3_include_path,
+                        .engine_version = build_options.version,
                     };
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
                     defer cfg_arena.deinit();

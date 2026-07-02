@@ -103,7 +103,6 @@ pub fn build(b: *std.Build) void {
 
     const turian_opts = b.addOptions();
     turian_opts.addOption([]const u8, "api_zig_path", b.pathJoin(&.{ build_root, "engine", "api", "root.zig" }));
-    turian_opts.addOption([]const u8, "reflection_zig_path", b.pathJoin(&.{ build_root, "engine", "Reflection.zig" }));
     turian_opts.addOption([]const u8, "engine_root_path", b.pathJoin(&.{ build_root, "engine", "root.zig" }));
     turian_opts.addOption([]const u8, "editor_root_path", b.pathJoin(&.{ build_root, "editor", "root.zig" }));
     turian_opts.addOption([]const u8, "cgltf_wrap_c_path", b.pathJoin(&.{ build_root, "engine", "vendor", "cgltf_wrap.c" }));

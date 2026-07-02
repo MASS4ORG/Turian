@@ -1,11 +1,10 @@
 const std = @import("std");
 const engine = @import("engine");
 const OpenResult = @import("types/OpenResult.zig").OpenResult;
+const ProjectConfig = @import("ProjectConfig.zig").ProjectConfig;
 
 /// Sentinel file that marks a directory as a Turian project.
 const PROJECT_FILE = "project.json";
-/// JSON written to PROJECT_FILE for new projects.
-const PROJECT_SENTINEL = "{\"turian_version\":\"0.16\"}\n";
 
 /// Relative path (from project root) to the primary ProjectSettings asset.
 const SETTINGS_SUBPATH = "assets/settings/project.projectsettings";
@@ -49,8 +48,22 @@ pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
 
     dir.createDirPath(io, "assets/settings") catch {};
     dir.createDirPath(io, "scenes") catch {};
+    dir.createDirPath(io, "packages") catch {};
 
-    dir.writeFile(io, .{ .sub_path = PROJECT_FILE, .data = PROJECT_SENTINEL }) catch {};
+    // `project.json` is the source of truth; `build.zig.zon` is generated from
+    // it (see ProjectConfig). Both are written from the same config so they
+    // never drift, and the user never hand-edits the ZON.
+    var fba_buf: [8192]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
+    const a = fba.allocator();
+    if (ProjectConfig.initDefault(a, proj_name)) |cfg| {
+        if (cfg.toJson(a)) |json| {
+            dir.writeFile(io, .{ .sub_path = PROJECT_FILE, .data = json }) catch {};
+        } else |_| {}
+        if (cfg.toBuildZon(a, proj_name, "")) |zon| {
+            dir.writeFile(io, .{ .sub_path = "build.zig.zon", .data = zon }) catch {};
+        } else |_| {}
+    } else |_| {}
 
     const settings = engine.ProjectSettings{ .project = .{ .name = proj_name } };
     var settings_buf: [4096]u8 = undefined;

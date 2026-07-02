@@ -222,6 +222,7 @@ fn buildConfig(alloc: std.mem.Allocator) editor.GameBuild.BuildConfig {
         .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
         .render_root = build_options.render_root_path,
         .sdl3_include = build_options.sdl3_include_path,
+        .engine_version = build_options.version,
     };
     return editor.sdk_layout.resolveBuildConfig(gui.io, alloc, EditorState.environ_map, baked);
 }

@@ -1,0 +1,10 @@
+{
+  "name": "com.example.color-palette",
+  "version": "1.0.0",
+  "author": "Example",
+  "description": "A sample asset-only package with color palette textures for CI testing.",
+  "license": "MIT",
+  "engine_compat": ">=1.0.0",
+  "types": ["asset"],
+  "assets": ["assets"]
+}

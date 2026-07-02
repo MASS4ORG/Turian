@@ -1529,12 +1529,28 @@ pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
 
         // Resolve from the per-frame arena: config strings are only needed for
         // the loadFieldInfo call below and are freed when the frame ends.
-        const config = editor.sdk_layout.resolveReflectionConfig(
-            io,
-            allocator,
-            build_options.reflection_zig_path,
-            build_options.engine_root_path,
-        );
+        // Pass the full baked BuildConfig so the reflection build can wire
+        // the complete engine dep tree (math, oap, serde, ktx2 — issue #61).
+        const baked_ref_cfg = editor.GameBuild.BuildConfig{
+            .engine_root = build_options.engine_root_path,
+            .editor_root = build_options.editor_root_path,
+            .cgltf_wrap_c = build_options.cgltf_wrap_c_path,
+            .vendor_include = build_options.vendor_include_path,
+            .build_root = build_options.build_root_path,
+            .sdl3_lib = build_options.sdl3_lib_path,
+            .math_root = build_options.math_root_path,
+            .guid_root = build_options.guid_root_path,
+            .oap_root = build_options.oap_root_path,
+            .serde_root = build_options.serde_root_path,
+            .serde_compat_root = build_options.serde_compat_root_path,
+            .ktx2_root = build_options.ktx2_root_path,
+            .gpu_root = build_options.gpu_root_path,
+            .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
+            .render_root = build_options.render_root_path,
+            .sdl3_include = build_options.sdl3_include_path,
+            .engine_version = build_options.version,
+        };
+        const config = editor.sdk_layout.resolveReflectionConfig(io, allocator, environ_map, baked_ref_cfg);
         editor.user_reflection.loadFieldInfo(io, &discovered_components, discovered_count, config);
     }
     // Re-sync any loaded scene so new/renamed fields appear immediately on hot-reload.

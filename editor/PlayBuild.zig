@@ -19,6 +19,8 @@ const std = @import("std");
 const engine = @import("engine");
 const ComponentDef = @import("Scanner.zig").ComponentDef;
 const GameBuild = @import("GameBuild.zig");
+const codegen = @import("GameCodegen.zig");
+const PackageManager = @import("PackageManager.zig").PackageManager;
 
 pub const BuildConfig = GameBuild.BuildConfig;
 
@@ -101,6 +103,20 @@ fn buildInner(
         }
     }
 
+    // Source modules from installed packages (#61): wired into user scripts so
+    // package code is importable from play-mode components too.
+    var pm_pkgs = PackageManager.discover(io, a, project_path, PackageManager.parseEngineVersion(config.engine_version), config.package_store);
+    defer pm_pkgs.deinit();
+    const module_specs = blk: {
+        const mods = pm_pkgs.sourceModules(a) catch break :blk &[_]codegen.ModuleSpec{};
+        const specs = a.alloc(codegen.ModuleSpec, mods.len) catch break :blk &[_]codegen.ModuleSpec{};
+        for (mods, 0..) |sm, i| {
+            const abs = std.fmt.allocPrint(a, "{s}/{s}", .{ sm.root, sm.module.root }) catch sm.module.root;
+            specs[i] = .{ .name = sm.module.name, .root_abs = codegen.normPath(a, abs) catch abs };
+        }
+        break :blk specs;
+    };
+
     // Normalise every path embedded into generated Zig source (backslashes are
     // invalid escapes in a "..." literal).
     const gen_config = BuildConfig{
@@ -122,6 +138,7 @@ fn buildInner(
         .gpu_sdl3_c = config.gpu_sdl3_c,
         .render_root = config.render_root,
         .sdl3_include = config.sdl3_include,
+        .extra_modules = module_specs,
     };
     for (0..src_count) |i| abs_files[i] = try normPath(a, abs_files[i]);
 
@@ -222,6 +239,28 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
         ));
     }
 
+    // Source modules from installed packages (#61): each user script gets
+    // the package module wired so it can `@import("pkgname")` in play mode.
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const pkgmod_{d} = b.addModule(\"{s}\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    pkgmod_{d}.addImport(\"engine\", engine_mod);\n",
+            .{ mi, m.name, m.root_abs, mi },
+        ));
+        for (0..src_files.len) |si| {
+            try out.appendSlice(a, try std.fmt.allocPrint(
+                a,
+                "    script_{d}_mod.addImport(\"{s}\", pkgmod_{d});\n",
+                .{ si, m.name, mi },
+            ));
+        }
+    }
+    if (config.extra_modules.len > 0) try out.append(a, '\n');
+
     try out.appendSlice(
         a,
         "    const play_mod = b.createModule(.{\n" ++
@@ -236,6 +275,13 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             a,
             "            .{{ .name = \"script_{d}\", .module = script_{d}_mod }},\n",
             .{ i, i },
+        ));
+    }
+    for (config.extra_modules, 0..) |m, mi| {
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "            .{{ .name = \"{s}\", .module = pkgmod_{d} }},\n",
+            .{ m.name, mi },
         ));
     }
     try out.appendSlice(a, "        },\n    });\n");

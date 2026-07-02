@@ -8,6 +8,7 @@
 /// resolved relative to <sdk>/.
 const std = @import("std");
 const GameBuild = @import("GameBuild.zig");
+const package_store = @import("PackageStore.zig");
 
 /// Detect the SDK root from the current executable's directory.
 /// Returns an owned slice (caller must free) or null if not in an SDK.
@@ -93,30 +94,26 @@ fn applyEnvOverrides(cfg: *GameBuild.BuildConfig, environ: *const std.process.En
     if (environ.get("TURIAN_SDL3_INCLUDE")) |v| cfg.sdl3_include = v;
 }
 
-/// Resolve a UserReflection.ReflectionConfig with the same priority logic.
-/// Returns paths owned by `gpa` (SDK mode) or borrowed from build_options (dev mode).
+/// Resolve a UserReflection.ReflectionConfig using the same three-layer
+/// priority as `resolveBuildConfig`.  `baked` is the compile-time default
+/// BuildConfig (from build_options); the returned config's string slices are
+/// owned by `gpa` (SDK paths) or borrowed from `baked` (dev paths).
+///
+/// `reflection_zig` is derived from the resolved engine_root so it stays
+/// consistent with whichever SDK layout wins.
 pub fn resolveReflectionConfig(
     io: std.Io,
     gpa: std.mem.Allocator,
-    baked_reflection_zig: []const u8,
-    baked_engine_root: []const u8,
+    environ: *const std.process.Environ.Map,
+    baked: GameBuild.BuildConfig,
 ) @import("UserReflection.zig").ReflectionConfig {
-    const p = struct {
-        fn join(a: std.mem.Allocator, root: []const u8, suffix: []const u8) []const u8 {
-            return std.fmt.allocPrint(a, "{s}/{s}", .{ root, suffix }) catch suffix;
-        }
-    };
-    if (detectSdkRoot(io, gpa)) |sdk_root| {
-        defer gpa.free(sdk_root);
-        return .{
-            .reflection_zig = p.join(gpa, sdk_root, "engine/Reflection.zig"),
-            .engine_root = p.join(gpa, sdk_root, "engine/root.zig"),
-        };
-    }
-    return .{
-        .reflection_zig = baked_reflection_zig,
-        .engine_root = baked_engine_root,
-    };
+    const build_cfg = resolveBuildConfig(io, gpa, environ, baked);
+    // Derive reflection_zig from the resolved engine_root:
+    //   engine_root = {engine_dir}/root.zig  →  reflection_zig = {engine_dir}/Reflection.zig
+    // This works in both SDK mode and dev mode without an extra baked path.
+    const engine_dir = std.fs.path.dirname(build_cfg.engine_root) orelse build_cfg.build_root;
+    const reflection_zig = std.fmt.allocPrint(gpa, "{s}/Reflection.zig", .{engine_dir}) catch build_cfg.engine_root;
+    return .{ .reflection_zig = reflection_zig, .build_config = build_cfg };
 }
 
 /// Resolve a GameBuild.BuildConfig with three-layer priority:
@@ -138,6 +135,11 @@ pub fn resolveBuildConfig(
         break :blk configFromSdk(io, gpa, sdk_root);
     } else baked;
 
+    // `engine_version` is a build-time constant, not an SDK-layout path, so it is
+    // never set by `configFromSdk`; carry it over from the baked config.
+    cfg.engine_version = baked.engine_version;
+    // Resolve the central package store root from the environment (issue #20).
+    cfg.package_store = package_store.resolveRoot(gpa, environ) catch "";
     applyEnvOverrides(&cfg, environ);
     return cfg;
 }

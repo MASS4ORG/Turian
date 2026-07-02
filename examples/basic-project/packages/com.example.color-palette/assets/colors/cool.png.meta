@@ -1,0 +1,23 @@
+{
+  "guid": "c2943105-f57b-47aa-abef-96708644d61a",
+  "asset_type": "image",
+  "importer_version": 1,
+  "source_hash": 5582770948644562896,
+  "import_settings": {
+    "image": {
+      "texture_type": "default",
+      "color_space": "srgb",
+      "generate_mipmaps": true,
+      "compression": "none",
+      "filter": "linear",
+      "wrap": "repeat",
+      "max_size": 2048
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+  ]
+}

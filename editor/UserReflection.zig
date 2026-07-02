@@ -4,20 +4,23 @@ const std = @import("std");
 const engine = @import("engine");
 const scanner = @import("Scanner.zig");
 const GameBuild = @import("GameBuild.zig");
+const codegen = @import("GameCodegen.zig");
 
 const api = engine.api;
 const ComponentDef = scanner.ComponentDef;
 const MAX_COMP_FIELDS = scanner.MAX_COMP_FIELDS;
 
-/// Paths required to build a reflection dynamic library for user scripts.
+/// Configuration for building a reflection dynamic library.
 pub const ReflectionConfig = struct {
-    /// Path to the reflection wrapper build.zig.
+    /// Absolute path to engine/Reflection.zig.
     reflection_zig: []const u8,
-    /// Path to engine/root.zig.
-    engine_root: []const u8,
+    /// Full engine build config: carries all module paths needed to compile
+    /// user scripts that @import("engine") (math, oap, serde, ktx2, …).
+    build_config: GameBuild.BuildConfig,
 };
 
 const lib_ext = if (@import("builtin").os.tag == .windows) ".dll" else if (@import("builtin").os.tag == .macos) ".dylib" else ".so";
+const lib_prefix = if (@import("builtin").os.tag == .windows) "" else "lib";
 
 const GetRegistryFn = *const fn () callconv(.c) api.Registry;
 
@@ -81,35 +84,51 @@ fn compileAndPopulate(
     const a = arena.allocator();
 
     const tmp_dir = getTempDir(a);
+    const sep = std.fs.path.sep_str;
 
     var h = std.hash.Wyhash.init(0);
     h.update(source_file);
     const hash = h.final();
 
-    const sep = std.fs.path.sep_str;
+    const lib_name = std.fmt.allocPrint(a, "turian_ref_{x}", .{hash}) catch return;
+    // Build dir is a stable temp subdir; reused across hot-reloads of the same file.
+    const build_dir = std.fmt.allocPrint(a, "{s}{s}turian_ref_{x}", .{ tmp_dir, sep, hash }) catch return;
     const wrapper_path = std.fmt.allocPrint(a, "{s}{s}turian_wrapper_{x}.zig", .{ tmp_dir, sep, hash }) catch return;
-    const lib_path = std.fmt.allocPrint(a, "{s}{s}turian_{x}{s}", .{ tmp_dir, sep, hash, lib_ext }) catch return;
 
+    // Absolutize source_file so paths embedded in the generated build.zig
+    // resolve correctly when `zig build` runs from build_dir (a /tmp subdir).
+    const abs_source = if (std.fs.path.isAbsolute(source_file))
+        source_file
+    else
+        std.fmt.allocPrint(a, "{s}/{s}", .{ config.build_config.build_root, source_file }) catch source_file;
+
+    // Write the generated wrapper and the build.zig.
     const wrapper_content = generateWrapper(a, type_names) catch return;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = wrapper_path, .data = wrapper_content }) catch return;
 
-    const mroot = std.fmt.allocPrint(a, "-Mroot={s}", .{wrapper_path}) catch return;
-    const mref = std.fmt.allocPrint(a, "-Mreflection={s}", .{config.reflection_zig}) catch return;
-    const muser = std.fmt.allocPrint(a, "-Muser_module={s}", .{source_file}) catch return;
-    const mengine = std.fmt.allocPrint(a, "-Mengine={s}", .{config.engine_root}) catch return;
-    const femit = std.fmt.allocPrint(a, "-femit-bin={s}", .{lib_path}) catch return;
+    std.Io.Dir.cwd().createDirPath(io, build_dir) catch {};
+    const build_src = codegen.generateReflectionBuildZig(
+        a,
+        config.build_config,
+        config.reflection_zig,
+        abs_source,
+        wrapper_path,
+        lib_name,
+    ) catch return;
+    const build_zig_path = std.fmt.allocPrint(a, "{s}{s}build.zig", .{ build_dir, sep }) catch return;
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = build_zig_path, .data = build_src }) catch return;
 
-    const argv = [_][]const u8{
-        "zig",        "build-lib", "-ODebug",
-        "--dep",      "engine",    "--dep",
-        "reflection", "--dep",     "user_module",
-        mroot,        "--dep",     "engine",
-        mref,         "--dep",     "engine",
-        muser,        mengine,     "-dynamic",
-        "-lc",        femit,
-    };
+    // Compile via `zig build` (identical pattern to PlayBuild): no build.zig.zon
+    // needed because every path is absolute (.cwd_relative with absolute strings).
+    const argv = [_][]const u8{ "zig", "build", "-Doptimize=Debug" };
+    GameBuild.spawnAndWaitIn(io, a, &argv, build_dir) catch return;
 
-    GameBuild.spawnAndWait(io, a, &argv) catch return;
+    // The produced library lands at the standard zig build output path.
+    const lib_path = std.fmt.allocPrint(
+        a,
+        "{s}{s}zig-out{s}lib{s}{s}{s}{s}",
+        .{ build_dir, sep, sep, sep, lib_prefix, lib_name, lib_ext },
+    ) catch return;
 
     var lib = std.DynLib.open(lib_path) catch return;
     defer lib.close();

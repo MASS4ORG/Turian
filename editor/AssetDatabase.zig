@@ -50,6 +50,15 @@ const GuidMap = std.AutoHashMap(Guid, AssetInfo);
 // ── AssetDatabase ─────────────────────────────────────────────────────────────
 
 /// In-memory index of all assets in a project, keyed by GUID and path.
+/// A GUID found in two different asset roots (a hard error for package builds:
+/// package authors must keep GUIDs globally unique — see ADR-0001).
+pub const GuidCollision = struct {
+    guid: Guid,
+    /// Owned paths of the two conflicting assets.
+    path_a: []const u8,
+    path_b: []const u8,
+};
+
 pub const AssetDatabase = struct {
     allocator: std.mem.Allocator,
     /// Primary index: GUID → AssetInfo (owns the path strings).
@@ -57,12 +66,23 @@ pub const AssetDatabase = struct {
     /// Secondary index: path → GUID. Keys point into by_guid values.
     by_path: std.StringHashMap(Guid),
 
+    /// Cross-root GUID-collision tracking, active only during `scanRoots`.
+    /// `guid_root` maps a GUID to the index of the root that first declared it;
+    /// `collisions` accumulates duplicates seen in a *different* root.
+    guid_root: std.AutoHashMap(Guid, usize),
+    collisions: std.ArrayList(GuidCollision),
+    /// Index of the root currently being scanned (null = single-root scan, no
+    /// cross-root tracking).
+    scan_root_index: ?usize = null,
+
     /// Create an empty database.
     pub fn init(allocator: std.mem.Allocator) AssetDatabase {
         return .{
             .allocator = allocator,
             .by_guid = GuidMap.init(allocator),
             .by_path = std.StringHashMap(Guid).init(allocator),
+            .guid_root = std.AutoHashMap(Guid, usize).init(allocator),
+            .collisions = .empty,
         };
     }
 
@@ -72,6 +92,17 @@ pub const AssetDatabase = struct {
         while (it.next()) |info| self.allocator.free(info.path);
         self.by_guid.deinit();
         self.by_path.deinit();
+        self.guid_root.deinit();
+        self.clearCollisions();
+        self.collisions.deinit(self.allocator);
+    }
+
+    fn clearCollisions(self: *AssetDatabase) void {
+        for (self.collisions.items) |c| {
+            self.allocator.free(c.path_a);
+            self.allocator.free(c.path_b);
+        }
+        self.collisions.clearRetainingCapacity();
     }
 
     fn clearEntries(self: *AssetDatabase) void {
@@ -79,6 +110,8 @@ pub const AssetDatabase = struct {
         while (it.next()) |info| self.allocator.free(info.path);
         self.by_guid.clearRetainingCapacity();
         self.by_path.clearRetainingCapacity();
+        self.guid_root.clearRetainingCapacity();
+        self.clearCollisions();
     }
 
     // ── Asset Discovery ───────────────────────────────────────────────────────
@@ -92,6 +125,27 @@ pub const AssetDatabase = struct {
         // models) so they resolve before the next import runs.
         const project_path = std.fs.path.dirname(assets_path) orelse ".";
         self.registerDerived(io, project_path);
+    }
+
+    /// Rescan multiple asset root directories into one unified database.
+    /// `project_path` is the main project root used to locate `.cache/` for
+    /// derived sub-assets. All roots are indexed into the same GUID map. A GUID
+    /// that appears in two *different* roots is recorded in `collisions` — the
+    /// package build treats this as a hard error (ADR-0001). After this call,
+    /// inspect `collisions` via `hasCollisions`.
+    pub fn scanRoots(self: *AssetDatabase, io: std.Io, project_path: []const u8, asset_roots: []const []const u8) void {
+        self.clearEntries();
+        for (asset_roots, 0..) |root, i| {
+            self.scan_root_index = i;
+            self.scanDir(io, root);
+        }
+        self.scan_root_index = null;
+        self.registerDerived(io, project_path);
+    }
+
+    /// True if `scanRoots` found the same GUID in more than one asset root.
+    pub fn hasCollisions(self: *const AssetDatabase) bool {
+        return self.collisions.items.len > 0;
     }
 
     /// Index derived sub-assets recorded in source `.meta` manifests as virtual
@@ -161,6 +215,23 @@ pub const AssetDatabase = struct {
     fn register(self: *AssetDatabase, io: std.Io, asset_path: []const u8) void {
         const meta = asset_meta.ensureMeta(io, self.allocator, asset_path);
         if (meta.guid.isNil()) return;
+
+        // Cross-root collision detection (scanRoots only): the same GUID
+        // declared in two different roots is a hard error per ADR-0001.
+        if (self.scan_root_index) |root_i| {
+            if (self.guid_root.get(meta.guid)) |prev_i| {
+                if (prev_i != root_i) {
+                    const prev_path = if (self.by_guid.get(meta.guid)) |info| info.path else "";
+                    self.collisions.append(self.allocator, .{
+                        .guid = meta.guid,
+                        .path_a = self.allocator.dupe(u8, prev_path) catch "",
+                        .path_b = self.allocator.dupe(u8, asset_path) catch "",
+                    }) catch {};
+                }
+            } else {
+                self.guid_root.put(meta.guid, root_i) catch {};
+            }
+        }
 
         const owned_path = self.allocator.dupe(u8, asset_path) catch return;
         // Free the previous path if this GUID is already indexed (e.g. two assets

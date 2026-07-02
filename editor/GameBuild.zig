@@ -10,6 +10,8 @@ const asset_importer = @import("AssetImporter.zig");
 const asset_packager = @import("AssetPackager.zig");
 const Progress = @import("Progress.zig").Progress;
 const codegen = @import("GameCodegen.zig");
+const PackageManager = @import("PackageManager.zig").PackageManager;
+const ProjectConfig = @import("ProjectConfig.zig").ProjectConfig;
 
 pub const RuntimeConfig = codegen.RuntimeConfig;
 pub const BuildConfig = codegen.BuildConfig;
@@ -87,6 +89,49 @@ fn buildGameInner(
     var runtime = RuntimeConfig{};
     resolveRuntime(io, a, assets_dir, &runtime);
 
+    // Third-party dependency names from project.json — emitted as b.dependency()
+    // calls in the generated build so Zig's PM resolves them (#57).
+    var project_cfg = ProjectConfig.load(io, a, project_path) catch try ProjectConfig.initDefault(a, "");
+    defer project_cfg.deinit();
+    const dep_names = project_cfg.dependencyNames(a) catch &.{};
+
+    // Native libs (#62), source modules (#61), and plugin entries (#64) from
+    // installed packages. `pm_pkgs` must outlive codegen because the specs below
+    // borrow its manifest strings.
+    var pm_pkgs = PackageManager.discover(io, a, project_path, PackageManager.parseEngineVersion(config.engine_version), config.package_store);
+    defer pm_pkgs.deinit();
+    const native_specs = blk: {
+        const libs = pm_pkgs.nativeLibs(a) catch break :blk &[_]codegen.NativeLibSpec{};
+        const specs = a.alloc(codegen.NativeLibSpec, libs.len) catch break :blk &[_]codegen.NativeLibSpec{};
+        for (libs, 0..) |nl, i| {
+            specs[i] = .{
+                .pkg_root = codegen.normPath(a, nl.root) catch nl.root,
+                .name = nl.native.name,
+                .kind = nl.native.kind,
+                .lib_template = codegen.normPath(a, nl.native.lib) catch nl.native.lib,
+                .include = nl.native.include,
+            };
+        }
+        break :blk specs;
+    };
+    const module_specs = blk: {
+        const mods = pm_pkgs.sourceModules(a) catch break :blk &[_]codegen.ModuleSpec{};
+        const specs = a.alloc(codegen.ModuleSpec, mods.len) catch break :blk &[_]codegen.ModuleSpec{};
+        for (mods, 0..) |sm, i| {
+            const abs = std.fmt.allocPrint(a, "{s}/{s}", .{ sm.root, sm.module.root }) catch sm.module.root;
+            specs[i] = .{ .name = sm.module.name, .root_abs = codegen.normPath(a, abs) catch abs };
+        }
+        break :blk specs;
+    };
+    const plugin_specs = blk: {
+        const pls = pm_pkgs.plugins(a) catch break :blk &[_]codegen.PluginSpec{};
+        const specs = a.alloc(codegen.PluginSpec, pls.len) catch break :blk &[_]codegen.PluginSpec{};
+        for (pls, 0..) |pl, i| {
+            specs[i] = .{ .module = pl.plugin.register, .entry = pl.plugin.entry };
+        }
+        break :blk specs;
+    };
+
     // Normalise all paths that will be embedded in generated Zig source files.
     // Backslashes inside string literals are invalid escape sequences.
     const gen_config = BuildConfig{
@@ -109,6 +154,10 @@ fn buildGameInner(
         // relative to the editor's build root — absolutize it so the game build
         // (which runs in the project's .cache dir) can find the headers.
         .sdl3_include = try codegen.absUnder(a, config.build_root, config.sdl3_include),
+        .extra_asset_roots = config.extra_asset_roots,
+        .extra_deps = dep_names,
+        .extra_native = native_specs,
+        .extra_modules = module_specs,
     };
     for (0..src_count) |i| {
         abs_files[i] = try codegen.normPath(a, abs_files[i]);
@@ -117,7 +166,7 @@ fn buildGameInner(
     progress.report(0.1, "Generating project");
     const gen_project = try codegen.normPath(a, project_path);
     const use_gpu = codegen.sdl3LibPath(a, config).len > 0 and config.sdl3_include.len > 0;
-    const main_src = try codegen.generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime, use_gpu);
+    const main_src = try codegen.generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime, use_gpu, plugin_specs);
     const main_path = try std.fmt.allocPrint(a, "{s}/main.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = main_path, .data = main_src });
 
@@ -125,10 +174,20 @@ fn buildGameInner(
     const build_zig_path = try std.fmt.allocPrint(a, "{s}/build.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = build_zig_path, .data = build_src });
 
-    // Cook all assets and package them into game.oap *before* compiling, so the
-    // shipped game loads from the package instead of the loose assets/ folder.
+    // Regenerate build.zig.zon from project.json (the source of truth) so the
+    // user never hand-edits ZON. One copy lands at the project root (kept in
+    // sync) and one in .cache/ (with path deps absolutized) so dependencies
+    // declared in project.json resolve via b.dependency() in the generated build.
+    const abs_project = if (std.fs.path.isAbsolute(project_path))
+        try a.dupe(u8, project_path)
+    else
+        try std.fmt.allocPrint(a, "{s}/{s}", .{ config.build_root, project_path });
+    regenerateBuildZon(io, a, project_path, cache_path, abs_project);
+
+    // Cook all assets (project + installed packages) into game.oap *before*
+    // compiling, so the shipped game loads from the package.
     progress.report(0.25, "Packaging assets");
-    packageAssets(io, a, project_path);
+    try packageAssets(io, a, project_path, config.extra_asset_roots, PackageManager.parseEngineVersion(config.engine_version), config.package_store);
 
     if (progress.cancelled()) return error.Cancelled;
 
@@ -202,15 +261,66 @@ fn readFileAlloc(io: std.Io, a: std.mem.Allocator, path: []const u8) ?[]u8 {
     return reader.interface.allocRemaining(a, .unlimited) catch null;
 }
 
-/// Cook every asset into `<project>/.cache/assets`, then bundle those artifacts
-/// into `<project>/.cache/game.oap`. Failures are logged but non-fatal so a
+/// Cook every asset (project + installed packages) into `<project>/.cache/assets`,
+/// then bundle those artifacts into `<project>/.cache/game.oap`.
+/// `extra_roots` are the package asset directories from `BuildConfig.extra_asset_roots`.
+/// Returns `error.PackageError` on a hard error (incompatible package graph or a
+/// cross-package GUID collision). Other failures are logged but non-fatal so a
 /// project with no assets still builds.
-fn packageAssets(io: std.Io, a: std.mem.Allocator, project_path: []const u8) void {
+fn packageAssets(
+    io: std.Io,
+    a: std.mem.Allocator,
+    project_path: []const u8,
+    extra_roots: []const []const u8,
+    engine_version: std.SemanticVersion,
+    store_root: []const u8,
+) !void {
+    // Discover installed packages and collect their asset roots.
+    var pm = PackageManager.discover(io, a, project_path, engine_version, store_root);
+    defer pm.deinit();
+
+    for (pm.diagnostics.items) |d| {
+        std.debug.print("[Turian] Package {s}: {s}\n", .{ if (d.is_error) "error" else "warning", d.message });
+    }
+    // A package-graph error (duplicate name, etc.) fails the build (ADR-0001).
+    if (pm.hasErrors()) return error.PackageError;
+
+    // Build the full list of asset roots: project first, then packages.
+    var all_roots: std.ArrayList([]const u8) = .empty;
+    defer all_roots.deinit(a);
+
+    const project_assets = std.fmt.allocPrint(a, "{s}/assets", .{project_path}) catch return;
+    all_roots.append(a, project_assets) catch return;
+
+    // Roots from config injection seam (set by Studio/PlayBuild callers).
+    for (extra_roots) |r| all_roots.append(a, r) catch {};
+
+    // Roots from installed packages.
+    const pkg_roots = pm.assetRoots(a) catch &.{};
+    defer {
+        for (pkg_roots) |r| a.free(r);
+        a.free(pkg_roots);
+    }
+    for (pkg_roots) |r| {
+        all_roots.append(a, r) catch {};
+        std.debug.print("[Turian] Package asset root: {s}\n", .{r});
+    }
+
     var db = AssetDatabase.init(a);
     defer db.deinit();
+    db.scanRoots(io, project_path, all_roots.items);
 
-    const assets_dir = std.fmt.allocPrint(a, "{s}/assets", .{project_path}) catch return;
-    db.scan(io, assets_dir);
+    // A GUID shared across two asset roots is a hard error: package authors must
+    // keep GUIDs globally unique (ADR-0001).
+    if (db.hasCollisions()) {
+        for (db.collisions.items) |c| {
+            std.debug.print("[Turian] error: GUID collision {f} between '{s}' and '{s}'\n", .{
+                c.guid, c.path_a, c.path_b,
+            });
+        }
+        return error.GuidCollision;
+    }
+
     asset_importer.importAll(io, a, project_path, &db, Progress.none);
 
     const oap_path = std.fmt.allocPrint(a, "{s}/.cache/game.oap", .{project_path}) catch return;
@@ -219,6 +329,38 @@ fn packageAssets(io: std.Io, a: std.mem.Allocator, project_path: []const u8) voi
         return;
     };
     std.debug.print("[Turian] Packaged {d} asset(s) into {s}\n", .{ n, oap_path });
+}
+
+/// Regenerate `build.zig.zon` from the project's `project.json` (the source of
+/// truth). Writes the project-root `build.zig.zon` (relative path deps as
+/// authored) and the `.cache/build.zig.zon` (relative `.path` deps absolutized
+/// against the project root so they resolve from the `.cache` working dir).
+/// URL+hash deps resolve from the global Zig cache regardless of location.
+fn regenerateBuildZon(
+    io: std.Io,
+    a: std.mem.Allocator,
+    project_path: []const u8,
+    cache_path: []const u8,
+    abs_project: []const u8,
+) void {
+    var cfg = ProjectConfig.load(io, a, project_path) catch return;
+    defer cfg.deinit();
+    const fallback = std.fs.path.basename(project_path);
+
+    // Project-root copy: keeps the generated ZON in sync with project.json.
+    if (cfg.toBuildZon(a, fallback, "")) |zon| {
+        defer a.free(zon);
+        const root_path = std.fmt.allocPrint(a, "{s}/build.zig.zon", .{project_path}) catch return;
+        std.Io.Dir.cwd().writeFile(io, .{ .sub_path = root_path, .data = zon }) catch {};
+    } else |_| {}
+
+    // .cache copy: absolutize relative path deps against the project root so
+    // they resolve from the .cache working directory.
+    if (cfg.toBuildZon(a, fallback, abs_project)) |zon| {
+        defer a.free(zon);
+        const dst_path = std.fmt.allocPrint(a, "{s}/build.zig.zon", .{cache_path}) catch return;
+        std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dst_path, .data = zon }) catch {};
+    } else |_| {}
 }
 
 // ---------------------------------------------------------------------------

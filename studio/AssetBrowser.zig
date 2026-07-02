@@ -134,6 +134,33 @@ fn navigateBrowserItems(go_prev: bool, browse_path: []const u8) void {
     EditorState.selectAsset(p);
 }
 
+/// Render a collapsible, read-only "Packages" section listing every installed
+/// package (name + version + types) and the asset directories it contributes
+/// (issue #59). Package assets are authored in the package, so they are shown
+/// as read-only labels rather than editable tiles.
+fn drawPackagesSection(proj_path: []const u8) void {
+    const arena = gui.currentWindow().arena();
+    const store_root = editor.package_store.resolveRoot(arena, EditorState.environ_map) catch "";
+    var pm = editor.PackageManager.discover(gui.io, arena, proj_path, editor.PackageManager.parseEngineVersion(""), store_root);
+    defer pm.deinit();
+    if (pm.packageCount() == 0) return;
+
+    var label_buf: [128]u8 = undefined;
+    const header = std.fmt.bufPrint(&label_buf, "Packages ({d})", .{pm.packageCount()}) catch "Packages";
+    if (gui.expander(@src(), header, .{ .default_expanded = false }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) {
+        // Labels are drawn directly into the (vertical) scroll area, mirroring
+        // the ProfilerPanel pattern — one row per package, then its asset dirs.
+        for (pm.packages.items, 0..) |*pkg, i| {
+            const m = &pkg.manifest;
+            gui.label(@src(), "  {s}  v{s}  (read-only)", .{ m.name, m.version }, .{ .id_extra = i, .expand = .horizontal });
+            for (m.asset_dirs, 0..) |adir, j| {
+                gui.label(@src(), "      Packages/{s}/{s}", .{ m.name, adir }, .{ .id_extra = i * 64 + j, .expand = .horizontal });
+            }
+        }
+    }
+    _ = gui.separator(@src(), .{ .expand = .horizontal });
+}
+
 /// Draw the asset browser panel with file tiles and navigation.
 pub fn draw() void {
     var outer = gui.box(@src(), .{}, .{
@@ -244,6 +271,11 @@ pub fn draw() void {
 
     var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
+
+    // Read-only "Packages" section: assets contributed by installed packages
+    // (issue #59). Shown only at the assets root. Editing happens in the package,
+    // not the consuming project, so these are listed, never tiles.
+    if (current_subdir_len == 0) drawPackagesSection(proj_path);
 
     var dir = std.Io.Dir.cwd().openDir(gui.io, browse_path, .{ .iterate = true }) catch {
         gui.label(@src(), "No assets folder found. Create {s}/assets.", .{proj_path}, .{ .padding = .all(8) });
