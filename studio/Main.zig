@@ -103,6 +103,19 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
 
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
 pub fn main(main_init: std.process.Init) !void {
+    try run(main_init);
+    // Hard-exit rather than returning normally. By this point our own state
+    // (documents, GPU renderer, debug server, dvui window/backend) is already
+    // torn down cleanly — see the log lines above this call. What's left is
+    // the Zig runtime's post-main cleanup (io thread pool, debug allocator
+    // leak scan) and then libc's exit(), which runs atexit handlers
+    // registered by the statically-linked SDL3/Vulkan loader. That teardown
+    // segfaults on this machine's Vulkan/RADV stack; `_exit` skips it
+    // entirely (the OS reclaims everything anyway).
+    std.c._exit(0);
+}
+
+fn run(main_init: std.process.Init) !void {
     if (@import("builtin").os.tag == .windows) {
         gui.Backend.Common.windowsAttachConsole() catch {};
         // Request Vulkan on Windows so the GPU renderer can use SPIRV shaders.
@@ -238,6 +251,11 @@ pub fn main(main_init: std.process.Init) !void {
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
                     defer cfg_arena.deinit();
                     const config = editor.sdk_layout.resolveBuildConfig(gui.io, cfg_arena.allocator(), main_init.environ_map, baked);
+                    // openProject above kicked off the script-reflection
+                    // compile in the background; this CLI path needs fully
+                    // populated component fields before building, so wait
+                    // for it here instead of racing it.
+                    EditorState.waitForReflect(gui.io);
                     _ = editor.GameBuild.buildGame(
                         gui.io,
                         p,

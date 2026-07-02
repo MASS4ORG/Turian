@@ -9,9 +9,20 @@
 #
 # Stages
 # ─────────────────────────────────────────────────────────────────────────────
+#   .pre     — Dockerfile/version changes only: rebuild+push the CI image
 #   test     — every push/MR:  build + unit tests + example regression
 #   check    — schedule only:  version bump, CHANGELOG, git tag, create release
 #   build    — tag trigger:    parallel per-platform compilation + upload + link
+#
+# CI image
+# ─────────────────────────────────────────────────────────────────────────────
+# Every job below runs on `$CI_REGISTRY_IMAGE/ci:$ZIG_VERSION` (built from the
+# root `Dockerfile` by `build_ci_image`) instead of installing Zig + apt packages
+# from scratch on every job. There's no ready-made image that both bundles Zig
+# and has a shell (e.g. kassany/ziglang has neither `sh` nor `bash`, which
+# GitLab's executor needs), so we build our own — it's still Ubuntu-based, just
+# with Zig preinstalled, and only rebuilds when the Dockerfile or ZIG_VERSION
+# actually changes.
 #
 # Requirements:
 #   1. CI_PUSH_TOKEN (Project Variable): Scopes 'write_repository' + 'api'.
@@ -19,27 +30,51 @@
 #      - Pattern 'v*.*.*'
 #      - Pattern 'v*.*.*-*' (for pre-releases like -rc1)
 #      - Allowed to push: Maintainers (or CI account)
+#   3. Container Registry enabled for this project (Settings -> General ->
+#      Visibility -> Container Registry), for the CI image above.
 
 variables:
   ZIG_VERSION: "0.16.0"
-  ZIG_URL: "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
 
 default:
-  image: ubuntu:26.04
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq curl xz-utils git git-lfs zip
-    - |
-      if ! command -v zig &>/dev/null || [ "$(zig version)" != "$ZIG_VERSION" ]; then
-        curl -fsSL "$ZIG_URL" | tar -xJ --strip-components=1 -C /usr/local/bin \
-          zig-x86_64-linux-${ZIG_VERSION}/zig \
-          zig-x86_64-linux-${ZIG_VERSION}/lib
-      fi
-      zig version
+  image: "${CI_REGISTRY_IMAGE}/ci:${ZIG_VERSION}"
 
 stages:
   - test
   - check
   - build
+
+# ── build_ci_image ────────────────────────────────────────────────────────────
+# Rebuilds+pushes the shared CI image. Runs in `.pre` (always first, no need to
+# list it in `stages:`) so a Dockerfile/version bump is ready before any other
+# job tries to pull it. Kaniko builds from within a container with no Docker
+# daemon required (no dind, no privileged runner).
+build_ci_image:
+  stage: .pre
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      changes:
+        - Dockerfile
+        - .gitlab-ci.yml
+    # Manual escape hatch: lets a feature branch build+push the image (e.g. to
+    # bootstrap it the very first time, before it exists in the registry, or
+    # to try out a Dockerfile change ahead of merging).
+    - when: manual
+      allow_failure: true
+  script:
+    - mkdir -p /kaniko/.docker
+    - |
+      echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf '%s:%s' "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - >
+      /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --build-arg "ZIG_VERSION=${ZIG_VERSION}"
+      --destination "${CI_REGISTRY_IMAGE}/ci:${ZIG_VERSION}"
+      --cache=true
 
 # ── test ─────────────────────────────────────────────────────────────────────
 test:
@@ -53,9 +88,11 @@ test:
       when: never
     - when: on_success
   script:
-    - zig fmt --check engine/ editor/ studio/ tools/ examples/ build.zig build.zig.zon
-    - zig build
-    - zig build test
+    - zig fmt --check engine/ editor/ studio/ subsystems/ tools/ examples/ build.zig build.zig.zon
+    - echo "==> zig build"
+    - zig build --summary all
+    - echo "==> zig build test"
+    - zig build test --summary all
     - |
       for dir in examples/*/; do
         [ -d "$dir" ] || continue
@@ -67,10 +104,12 @@ test:
       # SDK-resident sources (paths resolved by SdkLayout.zig, not baked paths).
       # Uses the full SDK (with SDL3) so the game binary can link.
       echo "==> SDK smoke-test"
-      zig build sdk
+      zig build sdk --summary all
       # Free disk space accumulated by previous steps before the game compile.
       # The SDK is already in zig-out/sdk/; object files in .zig-cache and
-      # example .cache dirs are no longer needed.
+      # example .cache dirs are no longer needed. This does mean the saved
+      # zig-cache-* cache is empty from this job — it's kept warm by
+      # check_release/build_artifacts runs instead (they don't do this).
       rm -rf .zig-cache
       find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
       df -h / || true
@@ -81,9 +120,30 @@ test:
       [ -f "$TMP_PROJ/.cache/game.oap" ] || { echo "game.oap not found"; rm -rf "$TMP_PROJ"; exit 1; }
       rm -rf "$TMP_PROJ"
       echo "SDK smoke-test PASSED"
+    - |
+      # Zig has no built-in cache GC (0.16): every distinct set of inputs gets
+      # a new entry under .../o/<hash>/ and old ones are never evicted, so the
+      # global cache we share across every branch (zig-global-cache-v1) grows
+      # without bound. Age out entries untouched in the last 14 days before
+      # the cache is saved, to keep future restores fast — each is a
+      # self-contained, content-addressed unit, so pruning one only costs a
+      # recompile if it's ever needed again, never correctness.
+      echo "==> Pruning global zig cache entries older than 14 days"
+      du -sh ~/.cache/zig 2>/dev/null || true
+      find ~/.cache/zig/o -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + 2>/dev/null || true
+      du -sh ~/.cache/zig 2>/dev/null || true
   cache:
-    key: zig-cache-${CI_COMMIT_REF_SLUG}
-    paths: [.zig-cache/, ~/.cache/zig/]
+    # Zig's global cache (fetched build.zig.zon dependencies, the compiler's
+    # own cache) isn't branch-specific, so it's shared by every branch under
+    # one fixed key instead of being rebuilt per-ref.
+    - key: zig-global-cache-v1
+      paths: [~/.cache/zig/]
+    # The incremental project build cache is per-branch, but a branch/MR that
+    # doesn't have one yet (e.g. freshly created) falls back to the default
+    # branch's cache instead of starting fully cold.
+    - key: zig-cache-${CI_COMMIT_REF_SLUG}
+      fallback_keys: ["zig-cache-${CI_DEFAULT_BRANCH}"]
+      paths: [.zig-cache/]
   artifacts:
     paths: [zig-out/bin/turian-studio, zig-out/bin/turian-cli]
     expire_in: 1 day
@@ -134,8 +194,12 @@ check_release:
     # 4. Create GitLab release (now that tag is pushed)
     - zig build release-publish -- --provider gitlab
   cache:
-    key: zig-cache-release
-    paths: [.zig-cache/, ~/.cache/zig/]
+    - key: zig-global-cache-v1
+      paths: [~/.cache/zig/]
+    # Runs off the default branch, so it shares (and warms) the same project
+    # build cache as `test`'s default-branch runs.
+    - key: zig-cache-${CI_DEFAULT_BRANCH}
+      paths: [.zig-cache/]
 
 # ── build_artifacts ───────────────────────────────────────────────────────────
 # Runs in parallel for each platform when a tag is pushed.
@@ -161,6 +225,13 @@ build_artifacts:
     - zig build release-package -- --platform $PLATFORM --version $CI_COMMIT_TAG
     # 4. Upload and link to release
     - zig build release-publish -- --provider gitlab
+    # See the `test` job for why: bounds the shared global cache's growth.
+    - find ~/.cache/zig/o -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + 2>/dev/null || true
   cache:
-    key: zig-cache-release
-    paths: [.zig-cache/, ~/.cache/zig/]
+    - key: zig-global-cache-v1
+      paths: [~/.cache/zig/]
+    # Keyed per platform: the 3 matrix jobs cross-compile different targets
+    # and must not share (and thrash) one another's build cache.
+    - key: zig-cache-release-${PLATFORM}
+      fallback_keys: ["zig-cache-${CI_DEFAULT_BRANCH}"]
+      paths: [.zig-cache/]

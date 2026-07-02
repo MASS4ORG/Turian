@@ -5,6 +5,7 @@ const engine = @import("engine");
 const scanner = @import("Scanner.zig");
 const GameBuild = @import("GameBuild.zig");
 const codegen = @import("GameCodegen.zig");
+const Progress = @import("Progress.zig").Progress;
 
 const api = engine.api;
 const ComponentDef = scanner.ComponentDef;
@@ -24,16 +25,23 @@ const lib_prefix = if (@import("builtin").os.tag == .windows) "" else "lib";
 
 const GetRegistryFn = *const fn () callconv(.c) api.Registry;
 
-/// Compile user script components to a shared library and populate their FieldDef metadata.
+/// Compile user script components to a shared library and populate their
+/// FieldDef metadata. Reports 0..1 completion (one step per distinct source
+/// file) and stops early if `progress` reports a cancellation request —
+/// callers should run this off the UI thread (see `studio/EditorState.zig`'s
+/// background reflect job) since each group spawns a `zig build`.
 pub fn loadFieldInfo(
     io: std.Io,
     components: []ComponentDef,
     count: usize,
     config: ReflectionConfig,
+    progress: Progress,
 ) void {
     var processed = std.mem.zeroes([scanner.MAX_COMPONENTS]bool);
+    const denom: f32 = @floatFromInt(@max(count, 1));
 
     for (0..count) |i| {
+        if (progress.cancelled()) return;
         if (components[i].is_builtin or processed[i]) continue;
 
         const src_file = components[i].sourceFile();
@@ -55,8 +63,10 @@ pub fn loadFieldInfo(
         }
 
         if (type_count == 0) continue;
+        progress.report(@as(f32, @floatFromInt(i)) / denom, src_file);
         compileAndPopulate(io, src_file, type_names[0..type_count], components, def_indices[0..type_count], config);
     }
+    progress.report(1, "");
 }
 
 fn getTempDir(a: std.mem.Allocator) []const u8 {

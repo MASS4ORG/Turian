@@ -56,7 +56,7 @@ Open an issue and use the `t:feature` label. Describe the use case — not just 
 1. **Fork** the repository and create a feature branch from `main`.
 2. Run the formatter and tests before pushing:
    ```bash
-   zig fmt engine/ editor/ studio/ tools/ examples/ build.zig
+   zig fmt engine/ editor/ studio/ subsystems/ tools/ examples/ build.zig
    zig build test
    ```
 3. Keep commits small and focused; use [Conventional Commits](https://www.conventionalcommits.org/)
@@ -64,7 +64,7 @@ Open an issue and use the `t:feature` label. Describe the use case — not just 
 4. Open the MR against `main` with a clear description of *what* and *why*.
 5. Link any related issues with `Closes #N` in the description.
 
-CI must pass (format check + unit tests + example builds) before a MR can be merged.
+CI must pass (format check + unit tests + example builds) before a MR can be merged. See [docs/ci.md](docs/ci.md) for how the pipeline itself works (the CI image, caching, and the one-time bootstrap a Dockerfile change needs).
 
 ---
 

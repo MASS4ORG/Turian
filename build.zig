@@ -47,14 +47,14 @@ pub fn build(b: *std.Build) void {
     // Hosts the JSON-RPC 2.0 TCP server + CLI client. Depends on engine for
     // scene/introspect types. Games must explicitly add this to link it.
     const debug_mod = b.addModule("debug", .{
-        .root_source_file = b.path("debug/root.zig"),
+        .root_source_file = b.path("subsystems/debug/root.zig"),
         .target = target,
     });
     debug_mod.addImport("engine", engine_mod);
 
     // ── MCP module (opt-in; stdio MCP server over debug protocol) ────────────
     const mcp_mod = b.addModule("mcp", .{
-        .root_source_file = b.path("mcp/root.zig"),
+        .root_source_file = b.path("subsystems/mcp/root.zig"),
         .target = target,
     });
     mcp_mod.addImport("engine", engine_mod);
@@ -76,7 +76,7 @@ pub fn build(b: *std.Build) void {
     // pulled into the headless CLI.
     const render_mod = if (!cli_only) blk: {
         const m = b.addModule("render", .{
-            .root_source_file = b.path("render/root.zig"),
+            .root_source_file = b.path("subsystems/render/root.zig"),
             .target = target,
         });
         m.addImport("engine", engine_mod);
@@ -122,7 +122,7 @@ pub fn build(b: *std.Build) void {
         turian_opts.addOption([]const u8, "gpu_root_path", "");
         turian_opts.addOption([]const u8, "gpu_sdl3_c_path", "");
     }
-    turian_opts.addOption([]const u8, "render_root_path", b.pathJoin(&.{ build_root, "render", "root.zig" }));
+    turian_opts.addOption([]const u8, "render_root_path", b.pathJoin(&.{ build_root, "subsystems", "render", "root.zig" }));
 
     // SDL3 include tree, captured for the SDK step so it can ship the headers.
     var sdl3_include_tree: ?std.Build.LazyPath = null;
@@ -149,6 +149,13 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("studio/Main.zig"),
                 .target = target,
                 .optimize = optimize,
+                // Debug keeps symbols for local dev; anything else (Release*)
+                // strips them — shipped binaries shouldn't carry debug info.
+                // Most of the Debug/Release size gap is actually from Debug's
+                // undefined-memory 0xaa safety fill forcing large fixed-size
+                // scene-node buffers into real initialized .data bytes;
+                // Release modes need neither that fill nor these symbols.
+                .strip = optimize != .Debug,
                 .imports = &.{
                     .{ .name = "gui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
@@ -177,6 +184,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("editor/Cli.zig"),
             .target = target,
             .optimize = optimize,
+            .strip = optimize != .Debug,
             .imports = &.{
                 .{ .name = "engine", .module = engine_mod },
                 .{ .name = "editor", .module = editor_mod },
@@ -219,7 +227,7 @@ pub fn build(b: *std.Build) void {
     const editor_tests = b.addTest(.{ .root_module = editor_mod });
 
     const debug_test_mod = b.createModule(.{
-        .root_source_file = b.path("debug/root.zig"),
+        .root_source_file = b.path("subsystems/debug/root.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -229,7 +237,7 @@ pub fn build(b: *std.Build) void {
     const debug_tests = b.addTest(.{ .root_module = debug_test_mod });
 
     const mcp_test_mod = b.createModule(.{
-        .root_source_file = b.path("mcp/root.zig"),
+        .root_source_file = b.path("subsystems/mcp/root.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -269,7 +277,7 @@ pub fn build(b: *std.Build) void {
         // real builds stb comes from dvui (studio) or the game build; the standalone
         // test provides its own copy so it links.
         const render_test_mod = b.createModule(.{
-            .root_source_file = b.path("render/root.zig"),
+            .root_source_file = b.path("subsystems/render/root.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -297,6 +305,7 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("studio/Main.zig"),
                 .target = target,
                 .optimize = .ReleaseFast,
+                .strip = true,
                 .imports = &.{
                     .{ .name = "gui", .module = dvui_mod.? },
                     .{ .name = "engine", .module = engine_mod },
@@ -317,6 +326,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("editor/Cli.zig"),
             .target = target,
             .optimize = .ReleaseFast,
+            .strip = true,
             .imports = &.{
                 .{ .name = "engine", .module = engine_mod },
                 .{ .name = "editor", .module = editor_mod },
@@ -388,6 +398,7 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("editor/Cli.zig"),
                 .target = target,
                 .optimize = optimize,
+                .strip = optimize != .Debug,
                 .imports = &.{
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
@@ -409,6 +420,7 @@ pub fn build(b: *std.Build) void {
                     .root_source_file = b.path("studio/Main.zig"),
                     .target = target,
                     .optimize = optimize,
+                    .strip = optimize != .Debug,
                     .imports = &.{
                         .{ .name = "gui", .module = dvui_mod.? },
                         .{ .name = "engine", .module = engine_mod },
@@ -444,11 +456,11 @@ pub fn build(b: *std.Build) void {
             .{ .src = "editor", .dst = "sdk/editor" },
             // The render module ships as source (incl. its .spv shaders) so the
             // game build can compile the GPU renderer.
-            .{ .src = "render", .dst = "sdk/render" },
+            .{ .src = "subsystems/render", .dst = "sdk/render" },
             // Debug module ships as source; game builds opt in explicitly.
-            .{ .src = "debug", .dst = "sdk/debug" },
+            .{ .src = "subsystems/debug", .dst = "sdk/debug" },
             // MCP module ships as source; never linked into game builds.
-            .{ .src = "mcp", .dst = "sdk/mcp" },
+            .{ .src = "subsystems/mcp", .dst = "sdk/mcp" },
         }) |d| {
             sdk_step.dependOn(&b.addInstallDirectory(.{
                 .source_dir = b.path(d.src),

@@ -1,4 +1,5 @@
 const std = @import("std");
+const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const build_options = @import("turian_build_options");
@@ -813,6 +814,160 @@ pub var current_project: ?Project = null;
 pub var discovered_components: [MAX_DISCOVERED]ComponentDef = undefined;
 pub var discovered_count: usize = 0;
 
+// ── Background task registry ─────────────────────────────────────────────────
+// Owned here (rather than in `studio/Tasks.zig`) so this file's own background
+// reflect job below can create/update tasks without a circular import — every
+// other studio file already depends on `EditorState`, never the reverse.
+// `Tasks.tm()` exposes this same instance to the task bar / menu.
+var task_manager: editor.TaskManager = editor.TaskManager.init();
+
+pub fn taskManager() *editor.TaskManager {
+    return &task_manager;
+}
+
+// ── Background component reflection (script compile) ────────────────────────
+// `refreshComponents` scans quickly (just parsing source files), but compiling
+// user script reflection spawns a `zig build` per source file and can take
+// seconds. Running that inline used to freeze the whole editor on project
+// open/switch and on every hot-reload; it now runs on a worker via
+// `io.concurrent`, tracked in `task_manager` so the task bar shows progress.
+
+const ReflectJob = struct {
+    arena: std.heap.ArenaAllocator,
+    io: std.Io,
+    task_id: u64,
+    /// `reflect_generation` at launch time — lets a completing job detect
+    /// that a newer scan has already superseded it.
+    generation: usize,
+    components: [MAX_DISCOVERED]ComponentDef = undefined,
+    count: usize = 0,
+    config: editor.user_reflection.ReflectionConfig = undefined,
+};
+
+var reflect_generation: usize = 0;
+var reflect_job: ?*ReflectJob = null;
+var reflect_future: std.Io.Future(void) = undefined;
+/// A newer request that arrived while `reflect_job` was still running.
+/// Launched as soon as it finishes; only the latest request is kept.
+var reflect_pending: ?*ReflectJob = null;
+
+/// Snapshot `discovered_components` and the resolved reflection config into a
+/// job, then dispatch it (or queue it if one is already running).
+fn launchReflect(io: std.Io) void {
+    reflect_generation += 1;
+    const job = std.heap.page_allocator.create(ReflectJob) catch return;
+    job.* = .{
+        .arena = std.heap.ArenaAllocator.init(std.heap.page_allocator),
+        .io = io,
+        .task_id = 0,
+        .generation = reflect_generation,
+    };
+    const a = job.arena.allocator();
+    job.count = discovered_count;
+    @memcpy(job.components[0..discovered_count], discovered_components[0..discovered_count]);
+
+    const baked_ref_cfg = editor.GameBuild.BuildConfig{
+        .engine_root = build_options.engine_root_path,
+        .editor_root = build_options.editor_root_path,
+        .cgltf_wrap_c = build_options.cgltf_wrap_c_path,
+        .vendor_include = build_options.vendor_include_path,
+        .build_root = build_options.build_root_path,
+        .sdl3_lib = build_options.sdl3_lib_path,
+        .math_root = build_options.math_root_path,
+        .guid_root = build_options.guid_root_path,
+        .oap_root = build_options.oap_root_path,
+        .serde_root = build_options.serde_root_path,
+        .serde_compat_root = build_options.serde_compat_root_path,
+        .ktx2_root = build_options.ktx2_root_path,
+        .gpu_root = build_options.gpu_root_path,
+        .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
+        .render_root = build_options.render_root_path,
+        .sdl3_include = build_options.sdl3_include_path,
+        .engine_version = build_options.version,
+    };
+    // Resolved from the job's own arena (not the caller's per-frame arena),
+    // so the config's strings stay valid for the worker's lifetime.
+    job.config = editor.sdk_layout.resolveReflectionConfig(io, a, environ_map, baked_ref_cfg);
+
+    if (reflect_job != null) {
+        if (reflect_pending) |old| {
+            old.arena.deinit();
+            std.heap.page_allocator.destroy(old);
+        }
+        reflect_pending = job;
+        return;
+    }
+    dispatchReflect(job);
+}
+
+fn dispatchReflect(job: *ReflectJob) void {
+    job.task_id = task_manager.begin(.compile, "Compile scripts");
+    reflect_future = job.io.concurrent(runReflectJob, .{job}) catch {
+        // Concurrency unavailable: run synchronously (UI blocks, but the
+        // scan is still tracked and correct).
+        runReflectJob(job);
+        finishReflect(job);
+        return;
+    };
+    reflect_job = job;
+}
+
+fn runReflectJob(job: *ReflectJob) void {
+    const progress = task_manager.progressFor(job.task_id);
+    editor.user_reflection.loadFieldInfo(job.io, job.components[0..job.count], job.count, job.config, progress);
+    if (task_manager.isCancelRequested(job.task_id)) {
+        task_manager.cancel(job.task_id);
+    } else {
+        task_manager.complete(job.task_id);
+    }
+}
+
+/// Merge a finished job's compiled field data back into the live component
+/// list (unless a newer scan already superseded it) and free the job.
+fn finishReflect(job: *ReflectJob) void {
+    if (job.generation == reflect_generation) {
+        @memcpy(discovered_components[0..job.count], job.components[0..job.count]);
+        if (object_count > 0) syncSceneWithDefinitions();
+    }
+    job.arena.deinit();
+    std.heap.page_allocator.destroy(job);
+}
+
+/// Call once per frame (see `studio/Window.zig`) to reap a finished background
+/// reflect job, keep the UI redrawing while one is in flight, and launch any
+/// request that was queued behind it.
+pub fn pumpReflect(io: std.Io) void {
+    const job = reflect_job orelse return;
+    const finished = if (task_manager.get(job.task_id)) |t| t.isFinished() else true;
+    if (!finished) {
+        gui.refresh(null, @src(), null);
+        return;
+    }
+    reflect_future.await(io);
+    finishReflect(job);
+    reflect_job = null;
+    if (reflect_pending) |pending| {
+        reflect_pending = null;
+        dispatchReflect(pending);
+    }
+    gui.refresh(null, @src(), null);
+}
+
+/// Block until any in-flight background reflect job (and anything queued
+/// behind it) finishes, merging its results in. For synchronous callers (the
+/// `--build` CLI path) that need fully-populated field data before proceeding.
+pub fn waitForReflect(io: std.Io) void {
+    while (reflect_job) |job| {
+        reflect_future.await(io);
+        finishReflect(job);
+        reflect_job = null;
+        if (reflect_pending) |pending| {
+            reflect_pending = null;
+            dispatchReflect(pending);
+        }
+    }
+}
+
 pub var scene_dirty: bool = false;
 pub var saved_undo_depth: ?usize = 0;
 
@@ -1527,34 +1682,16 @@ pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
 
         editor.asset_importer.importAll(io, std.heap.page_allocator, p, &asset_db, editor.Progress.none);
 
-        // Resolve from the per-frame arena: config strings are only needed for
-        // the loadFieldInfo call below and are freed when the frame ends.
-        // Pass the full baked BuildConfig so the reflection build can wire
-        // the complete engine dep tree (math, oap, serde, ktx2 — issue #61).
-        const baked_ref_cfg = editor.GameBuild.BuildConfig{
-            .engine_root = build_options.engine_root_path,
-            .editor_root = build_options.editor_root_path,
-            .cgltf_wrap_c = build_options.cgltf_wrap_c_path,
-            .vendor_include = build_options.vendor_include_path,
-            .build_root = build_options.build_root_path,
-            .sdl3_lib = build_options.sdl3_lib_path,
-            .math_root = build_options.math_root_path,
-            .guid_root = build_options.guid_root_path,
-            .oap_root = build_options.oap_root_path,
-            .serde_root = build_options.serde_root_path,
-            .serde_compat_root = build_options.serde_compat_root_path,
-            .ktx2_root = build_options.ktx2_root_path,
-            .gpu_root = build_options.gpu_root_path,
-            .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
-            .render_root = build_options.render_root_path,
-            .sdl3_include = build_options.sdl3_include_path,
-            .engine_version = build_options.version,
-        };
-        const config = editor.sdk_layout.resolveReflectionConfig(io, allocator, environ_map, baked_ref_cfg);
-        editor.user_reflection.loadFieldInfo(io, &discovered_components, discovered_count, config);
+        // Compiling user script reflection spawns a `zig build` per source
+        // file and can take seconds; run it in the background so opening or
+        // hot-reloading a project doesn't freeze the editor. `finishReflect`
+        // re-syncs the scene once the compiled field data lands.
+        launchReflect(io);
+    } else if (object_count > 0) {
+        // No project open: only builtins are known, and those need no
+        // compiling, so the scene can be re-synced immediately.
+        syncSceneWithDefinitions();
     }
-    // Re-sync any loaded scene so new/renamed fields appear immediately on hot-reload.
-    if (object_count > 0) syncSceneWithDefinitions();
 }
 
 pub fn makeComponent(def: *const ComponentDef) ?Component {

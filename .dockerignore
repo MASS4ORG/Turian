@@ -1,0 +1,5 @@
+# The CI image's Dockerfile only RUNs apt-get/curl — it doesn't COPY anything
+# from the repo — so keep the build context empty. Without this, Kaniko would
+# otherwise read the whole repo (examples/ alone is several GB of LFS assets)
+# on every image rebuild for no reason.
+*

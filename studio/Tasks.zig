@@ -20,11 +20,13 @@ const build_options = @import("turian_build_options");
 const ComponentDef = EditorState.ComponentDef;
 const Future = std.Io.Future(void);
 
-/// The single editor-wide task registry. Read by the task bar each frame.
-var manager: editor.TaskManager = editor.TaskManager.init();
-
+/// The single editor-wide task registry, actually owned by `EditorState`
+/// (whose own background script-reflection job needs it too, and can't
+/// import this file without a cycle — every other studio file already
+/// depends on `EditorState`, never the reverse). Read by the task bar each
+/// frame.
 pub fn tm() *editor.TaskManager {
-    return &manager;
+    return EditorState.taskManager();
 }
 
 /// True while a background job is running (build/reimport are exclusive).
@@ -64,6 +66,11 @@ pub fn launchBuild(io: std.Io) void {
         return;
     };
 
+    // Script reflection may still be compiling in the background (see
+    // `EditorState.launchReflect`); block until it lands so the build doesn't
+    // snapshot components with stale/zeroed field defaults.
+    EditorState.waitForReflect(io);
+
     const job = std.heap.page_allocator.create(Job) catch return;
     job.* = .{
         .arena = std.heap.ArenaAllocator.init(std.heap.page_allocator),
@@ -80,7 +87,7 @@ pub fn launchBuild(io: std.Io) void {
         EditorState.discovered_components[0..EditorState.discovered_count],
     );
     job.config = buildConfig(a);
-    job.task_id = manager.begin(.build, "Build game");
+    job.task_id = tm().begin(.build, "Build game");
 
     dispatch(io, job);
 }
@@ -103,7 +110,7 @@ pub fn launchReimport(io: std.Io) void {
         .project_path = "",
     };
     job.project_path = job.arena.allocator().dupe(u8, project) catch project;
-    job.task_id = manager.begin(.import, "Reimport assets");
+    job.task_id = tm().begin(.import, "Reimport assets");
 
     dispatch(io, job);
 }
@@ -115,7 +122,7 @@ pub fn launchReimport(io: std.Io) void {
 pub fn pump(io: std.Io) void {
     const job = active_job orelse return;
 
-    const finished = if (manager.get(job.task_id)) |t| t.isFinished() else true;
+    const finished = if (tm().get(job.task_id)) |t| t.isFinished() else true;
     if (finished) {
         active_future.await(io);
         finishJob(job);
@@ -143,7 +150,7 @@ fn dispatch(io: std.Io, job: *Job) void {
 
 /// Worker entry point — runs on a background thread (or inline on fallback).
 fn runJob(job: *Job) void {
-    const progress = manager.progressFor(job.task_id);
+    const progress = tm().progressFor(job.task_id);
     switch (job.kind) {
         .build => {
             const ok = editor.GameBuild.buildGame(
@@ -173,12 +180,12 @@ fn runJob(job: *Job) void {
 
 /// Move a task to its terminal state, preferring a cancel observed mid-flight.
 fn finalize(task_id: u64, ok: bool, fail_msg: []const u8) void {
-    if (manager.isCancelRequested(task_id)) {
-        manager.cancel(task_id);
+    if (tm().isCancelRequested(task_id)) {
+        tm().cancel(task_id);
     } else if (ok) {
-        manager.complete(task_id);
+        tm().complete(task_id);
     } else {
-        manager.fail(task_id, fail_msg);
+        tm().fail(task_id, fail_msg);
     }
 }
 
