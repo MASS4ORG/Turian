@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.0] - 2026-07-02
+
+### Features
+- feat: Plugin & Package System (#4 #20 #56 #57 #58 #59 #60 #61 #62 #64) — manifest, modules and plugin runtime registration
+
 ## [1.9.0] - 2026-06-27
 
 ### Features
