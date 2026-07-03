@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.0] - 2026-07-03
+
+### Features
+- feat: Asset preview API for Inspector & Asset Browser (#19 #25)
+
+### Bug Fixes
+- fix(studio): hard-exit after cleanup to avoid crash on window close
+
 ## [1.10.0] - 2026-07-02
 
 ### Features
