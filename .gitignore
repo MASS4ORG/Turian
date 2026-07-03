@@ -45,3 +45,4 @@ local.zig
 # Release packaging output (release-package writes archives here)
 .public/
 **/.cache
+docs/decisions/

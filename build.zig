@@ -260,10 +260,22 @@ pub fn build(b: *std.Build) void {
     });
     studio_tests.root_module.addOptions("turian_build_options", turian_opts);
 
+    // Pure CPU-side raster/audio math behind the asset preview system (#19/#25)
+    // — no gui/render/gpu imports, so it's cheap to test standalone rather than
+    // dragging in the full studio build graph.
+    const preview_raster_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("studio/PreviewRaster.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+
     const test_step = b.step("test", "Run engine + editor + studio + render + debug + mcp tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
     test_step.dependOn(&b.addRunArtifact(studio_tests).step);
+    test_step.dependOn(&b.addRunArtifact(preview_raster_tests).step);
     test_step.dependOn(&b.addRunArtifact(debug_tests).step);
     test_step.dependOn(&b.addRunArtifact(mcp_tests).step);
 
@@ -290,6 +302,20 @@ pub fn build(b: *std.Build) void {
         render_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
         const render_tests = b.addTest(.{ .root_module = render_test_mod });
         test_step.dependOn(&b.addRunArtifact(render_tests).step);
+
+        // Preview orbital-camera math (`studio/PreviewCamera.zig`) only needs
+        // engine + render, not the full gui/dvui graph — test it standalone.
+        const preview_camera_test_mod = b.createModule(.{
+            .root_source_file = b.path("studio/PreviewCamera.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine_mod },
+                .{ .name = "render", .module = render_test_mod },
+            },
+        });
+        const preview_camera_tests = b.addTest(.{ .root_module = preview_camera_test_mod });
+        test_step.dependOn(&b.addRunArtifact(preview_camera_tests).step);
     }
 
     // ── CI step (test + release artifacts) ───────────────────────────────────

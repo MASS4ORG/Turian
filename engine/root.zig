@@ -60,6 +60,9 @@ pub const DiagLog = @import("DiagLog.zig");
 pub const assets = @import("assets/root.zig");
 /// Triangle mesh type.
 pub const Mesh = assets.Mesh;
+/// Procedural built-in meshes (cube/sphere) used to preview materials without a
+/// model asset.
+pub const PrimitiveMesh = assets.PrimitiveMesh;
 /// RGBA8 image type.
 pub const Texture = assets.Texture;
 /// Material asset — shader parameter values and resource bindings.

@@ -7,6 +7,7 @@ const EditorState = @import("EditorState.zig");
 const Window = @import("Window.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
+const PreviewSystem = @import("PreviewSystem.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
 const build_options = @import("turian_build_options");
@@ -150,6 +151,7 @@ fn run(main_init: std.process.Init) !void {
 
     GpuRenderer.init(&backend) catch |err|
         std.debug.print("[GpuRenderer] init failed: {any}\n", .{err});
+    PreviewSystem.init();
 
     EditorState.clearScene();
     EditorState.initUndo(main_init.gpa);
@@ -216,6 +218,7 @@ fn run(main_init: std.process.Init) !void {
         _ = try backend.addAllEvents(&win);
 
         GpuRenderer.beginFrame(backend.cmd);
+        PreviewSystem.beginFrame();
 
         // Whether this frame is the last one. We must still call win.end()
         // below so the frame's command buffer is submitted — breaking out
@@ -273,6 +276,7 @@ fn run(main_init: std.process.Init) !void {
         // button): poll the assets tree and hot-reload when it changes.
         if (AssetWatcher.poll(gui.io, nstime)) {
             EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
+            PreviewSystem.bumpGeneration();
             gui.refresh(null, @src(), null);
         }
 

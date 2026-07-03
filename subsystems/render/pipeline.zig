@@ -161,7 +161,14 @@ pub fn createPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
     info.rasterizer_state = .{
         .fill_mode = c.SDL_GPU_FILLMODE_FILL,
         .cull_mode = c.SDL_GPU_CULLMODE_BACK,
-        .front_face = c.SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
+        // Meshes wind counter-clockwise for their outward faces, but the scene
+        // vertex shader negates clip.y (`clip.y = -clip.y`) to reach Vulkan's
+        // Y-down NDC — and mirroring Y reverses triangle winding in framebuffer
+        // space. So outward faces present as CLOCKWISE to the rasterizer; front
+        // faces must be declared clockwise or every solid object renders
+        // inside-out (front faces culled, you see the far interior walls — the
+        // "see-through" preview bug).
+        .front_face = c.SDL_GPU_FRONTFACE_CLOCKWISE,
         .depth_bias_constant_factor = 0,
         .depth_bias_clamp = 0,
         .depth_bias_slope_factor = 0,

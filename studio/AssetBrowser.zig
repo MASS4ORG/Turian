@@ -5,6 +5,221 @@ const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const AssetActions = @import("AssetActions.zig");
 const Documents = @import("Documents.zig");
+const PreviewSystem = @import("PreviewSystem.zig");
+
+/// Tile content size (icon or preview thumbnail), adjustable via the header's
+/// slider (issue #25's "preview size can be adjusted"). Not persisted —
+/// resets each session, matching most other per-panel view toggles here.
+var g_tile_content: f32 = 32;
+const TILE_CONTENT_MIN: f32 = 20;
+const TILE_CONTENT_MAX: f32 = 128;
+
+fn tileBoxSize() f32 {
+    return g_tile_content + 40;
+}
+
+// Cached sub-asset count per model path, so the expand-arrow check (drawn for
+// every visible model tile, every frame) doesn't re-read+parse that model's
+// `.meta` every frame — the exact same class of bug fixed in `PreviewSystem`
+// for thumbnails. Explicitly dropped by `invalidatePreviewAndSubAssets` on
+// reimport; otherwise a model's sub-asset count never changes without one.
+const MAX_SUBCOUNT_CACHE = 128;
+var subcount_paths: [MAX_SUBCOUNT_CACHE][1024]u8 = undefined;
+var subcount_lens: [MAX_SUBCOUNT_CACHE]usize = [_]usize{0} ** MAX_SUBCOUNT_CACHE;
+var subcount_vals: [MAX_SUBCOUNT_CACHE]usize = undefined;
+var subcount_count: usize = 0;
+var subcount_next: usize = 0; // FIFO eviction cursor once full
+
+fn cachedSubAssetCount(path: []const u8) ?usize {
+    for (0..subcount_count) |i| {
+        if (std.mem.eql(u8, subcount_paths[i][0..subcount_lens[i]], path)) return subcount_vals[i];
+    }
+    return null;
+}
+
+fn setSubAssetCount(path: []const u8, n: usize) void {
+    for (0..subcount_count) |i| {
+        if (std.mem.eql(u8, subcount_paths[i][0..subcount_lens[i]], path)) {
+            subcount_vals[i] = n;
+            return;
+        }
+    }
+    const slot = if (subcount_count < MAX_SUBCOUNT_CACHE) blk: {
+        const s = subcount_count;
+        subcount_count += 1;
+        break :blk s;
+    } else blk: {
+        const s = subcount_next;
+        subcount_next = (subcount_next + 1) % MAX_SUBCOUNT_CACHE;
+        break :blk s;
+    };
+    const len = @min(path.len, subcount_paths[slot].len);
+    @memcpy(subcount_paths[slot][0..len], path[0..len]);
+    subcount_lens[slot] = len;
+    subcount_vals[slot] = n;
+}
+
+fn invalidateSubAssetCount(path: []const u8) void {
+    for (0..subcount_count) |i| {
+        if (std.mem.eql(u8, subcount_paths[i][0..subcount_lens[i]], path)) {
+            subcount_lens[i] = 0;
+            return;
+        }
+    }
+}
+
+/// Small round chevron toggle drawn at a model tile's right edge, shown only
+/// when the model actually produced sub-assets on import. Toggles whether its
+/// sub-asset group box is revealed to the right.
+fn drawExpandToggle(asset_path: []const u8, id_extra: usize) void {
+    const count = cachedSubAssetCount(asset_path) orelse blk: {
+        var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer meta_arena.deinit();
+        const meta = editor.asset_meta.readMeta(gui.io, meta_arena.allocator(), asset_path);
+        setSubAssetCount(asset_path, meta.sub_assets.len);
+        break :blk meta.sub_assets.len;
+    };
+    if (count == 0) return;
+
+    const expanded = isExpanded(asset_path);
+    // Small round toggle sitting at the model tile's right edge, vertically
+    // centered — a chevron that points right (toward where the sub-assets
+    // appear) when collapsed, left (collapse) when expanded.
+    if (gui.buttonIcon(
+        @src(),
+        "expand_toggle",
+        if (expanded) gui.entypo.circle_with_minus else gui.entypo.circle_with_plus,
+        .{},
+        .{},
+        .{
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+            .min_size_content = .{ .w = 16, .h = 16 },
+            .padding = .all(4),
+            .margin = .all(2),
+            .corner_radius = gui.Rect.all(999),
+            .id_extra = id_extra,
+        },
+    )) {
+        toggleExpanded(asset_path);
+    }
+}
+
+/// After an explicit reimport, drop the cached preview for `asset_path` and
+/// every sub-asset it lists — a model's sub-asset GUIDs stay stable across
+/// reimports (so referencing scenes don't break), but their *content* can
+/// change, and `PreviewSystem.imageSourceForGuid` has no `.meta`/source_hash
+/// of its own to notice that automatically (see its doc comment).
+fn invalidatePreviewAndSubAssets(asset_path: []const u8) void {
+    if (!EditorState.assetDbReady()) return;
+    const info = EditorState.asset_db.findByPath(asset_path) orelse return;
+    var guid_buf: [36]u8 = undefined;
+    PreviewSystem.invalidate(info.guid.toString(&guid_buf));
+
+    var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer meta_arena.deinit();
+    const meta = editor.asset_meta.readMeta(gui.io, meta_arena.allocator(), asset_path);
+    for (meta.sub_assets) |sub| {
+        var sub_guid_buf: [36]u8 = undefined;
+        PreviewSystem.invalidate(sub.guid.toString(&sub_guid_buf));
+    }
+    invalidateSubAssetCount(asset_path);
+}
+
+fn iconForHint(hint: editor.asset_registry.IconHint) []const u8 {
+    return switch (hint) {
+        .document => gui.entypo.text_document,
+        .code => gui.entypo.code,
+        .image => gui.entypo.image,
+        .sound => gui.entypo.sound,
+        .model => gui.entypo.layers,
+        .material => gui.entypo.colours,
+        .data => gui.entypo.database,
+    };
+}
+
+/// Draw an expanded model's generated sub-assets (materials/textures) as tiles
+/// flowing inline in the *main* grid flexbox, right after the model's own tile
+/// (Unity-style), rather than a separate boxed block that would break the grid
+/// flow. They are ordinary tiles — same size, same wrapping — just drawn on a
+/// distinct background (see `drawSubAssetTile`) so the run of them reads as a
+/// group belonging to the model, continuing onto the next line when it wraps
+/// (issue #19/#25). Called from the main tile loop after the model tile closes.
+fn drawInlineSubAssets(proj_path: []const u8, model_path: []const u8, entry_idx: usize) void {
+    var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer meta_arena.deinit();
+    const meta = editor.asset_meta.readMeta(gui.io, meta_arena.allocator(), model_path);
+
+    for (meta.sub_assets, 0..) |sub, si| {
+        // id_extra kept clear of the main tiles' `entry_idx` range and the
+        // up-tile (99999) so sub-asset tile ids never collide with them.
+        drawSubAssetTile(proj_path, sub, 2_000_000 + entry_idx * 100 + si);
+    }
+}
+
+/// A single generated sub-asset (material/texture/… from a model's import) as
+/// a tile: previewed via `PreviewSystem.imageSourceForGuid`, click selects it
+/// in the Inspector — the same navigation `Inspector.drawSubAssets`'s button
+/// list already offers, just with a thumbnail and inline in the browser.
+fn drawSubAssetTile(proj_path: []const u8, sub: editor.SubAsset, id_extra: usize) void {
+    var path_buf: [1024]u8 = undefined;
+    const cache_path = editor.asset_cache.artifactPath(proj_path, sub.guid, sub.asset_type, &path_buf) orelse return;
+
+    var guid_buf: [36]u8 = undefined;
+    const guid_str = sub.guid.toString(&guid_buf);
+
+    const is_selected = if (EditorState.selected_asset_path) |sel| std.mem.eql(u8, sel, cache_path) else false;
+
+    // Same footprint as a regular tile so it flows/wraps identically in the
+    // grid, but drawn on the `.window` fill (vs regular tiles' `.content`) and
+    // butted together horizontally (zero x-margin) so a run of sub-assets reads
+    // as one continuous background band that carries onto the next line when it
+    // wraps — the inline-"span" grouping, not a separate block.
+    var tile = gui.box(@src(), .{}, .{
+        .id_extra = id_extra,
+        .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
+        .background = true,
+        .style = if (is_selected) .highlight else .window,
+        .border = .all(if (is_selected) 2 else 0),
+        .corner_radius = .all(0),
+        .margin = .{ .x = 0, .y = 2, .w = 0, .h = 2 },
+        .padding = .all(4),
+        .gravity_x = 0.5,
+    });
+    defer tile.deinit();
+
+    for (gui.events()) |*e| {
+        if (!gui.eventMatchSimple(e, tile.data())) continue;
+        if (e.evt == .mouse) {
+            const me = e.evt.mouse;
+            if (me.action == .press and me.button == .left) {
+                e.handle(@src(), tile.data());
+                EditorState.selectAsset(cache_path);
+            }
+        }
+    }
+
+    const desc = editor.asset_registry.get(sub.asset_type);
+    if (PreviewSystem.imageSourceForGuid(guid_str, cache_path, sub.asset_type)) |source| {
+        _ = gui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
+            .gravity_x = 0.5,
+            .min_size_content = .{ .w = g_tile_content, .h = g_tile_content },
+            .id_extra = id_extra,
+        });
+    } else {
+        gui.icon(@src(), "sub_tile_icon", iconForHint(desc.icon_hint), .{}, .{
+            .gravity_x = 0.5,
+            .min_size_content = .{ .w = g_tile_content, .h = g_tile_content },
+            .id_extra = id_extra,
+        });
+    }
+
+    gui.label(@src(), "{s}", .{sub.name}, .{
+        .gravity_x = 0.5,
+        .min_size_content = .{ .w = 64 },
+        .id_extra = id_extra,
+    });
+}
 
 var last_click_name_buf: [256]u8 = undefined;
 var last_click_name_len: usize = 0;
@@ -24,6 +239,38 @@ var g_delete_dialog_result: ?bool = null;
 
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var g_drag_hover_idx: ?usize = null;
+
+// Expand/collapse state for model tiles with sub-assets (issue #19/#25:
+// "expand a compound asset into its generated materials/textures", Unity-
+// style, instead of cramming them all into one Inspector preview). Keyed by
+// full asset path; not persisted (resets each session).
+const MAX_EXPANDED = 64;
+var g_expanded_paths: [MAX_EXPANDED][1024]u8 = undefined;
+var g_expanded_lens: [MAX_EXPANDED]usize = [_]usize{0} ** MAX_EXPANDED;
+var g_expanded_count: usize = 0;
+
+fn isExpanded(path: []const u8) bool {
+    for (0..g_expanded_count) |i| {
+        if (std.mem.eql(u8, g_expanded_paths[i][0..g_expanded_lens[i]], path)) return true;
+    }
+    return false;
+}
+
+fn toggleExpanded(path: []const u8) void {
+    for (0..g_expanded_count) |i| {
+        if (std.mem.eql(u8, g_expanded_paths[i][0..g_expanded_lens[i]], path)) {
+            g_expanded_paths[i] = g_expanded_paths[g_expanded_count - 1];
+            g_expanded_lens[i] = g_expanded_lens[g_expanded_count - 1];
+            g_expanded_count -= 1;
+            return;
+        }
+    }
+    if (g_expanded_count >= MAX_EXPANDED) return;
+    const n = @min(path.len, g_expanded_paths[g_expanded_count].len);
+    @memcpy(g_expanded_paths[g_expanded_count][0..n], path[0..n]);
+    g_expanded_lens[g_expanded_count] = n;
+    g_expanded_count += 1;
+}
 
 // Navigation list: entry names collected each frame for arrow-key navigation.
 // Used the NEXT frame so the keyboard handler can reference the previous listing.
@@ -194,6 +441,8 @@ pub fn draw() void {
         // Show the path relative to the project (from `assets/` onward); the
         // full project path is redundant and clutters the header. File changes
         // are picked up by the file watcher, so there is no Refresh button.
+        // `.expand = .horizontal` also makes this the flexible spacer that
+        // pushes the tile-size slider (below) to the header's right edge.
         if (EditorState.project_path != null) {
             if (current_subdir_len > 0) {
                 gui.label(@src(), "  assets/{s}", .{currentSubdir()}, .{ .gravity_y = 0.5, .expand = .horizontal });
@@ -201,6 +450,15 @@ pub fn draw() void {
                 gui.label(@src(), "  assets", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
             }
         }
+
+        // Preview tile size (issue #25) — continuous slider, right-aligned.
+        _ = gui.sliderEntry(@src(), "{d:0.0}", .{
+            .value = &g_tile_content,
+            .min = TILE_CONTENT_MIN,
+            .max = TILE_CONTENT_MAX,
+            .interval = 1,
+            .label = "Size",
+        }, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
     }
 
     const proj_path = EditorState.project_path orelse {
@@ -283,8 +541,10 @@ pub fn draw() void {
     };
     defer dir.close(gui.io);
 
+    // Not `defer`red: closed explicitly right after the loop below. Expanded
+    // models' sub-asset tiles are drawn inline in this same flexbox (see
+    // `drawInlineSubAssets`), so they must flow before it is deinit'd.
     var flex = gui.flexbox(@src(), .{}, .{ .expand = .horizontal, .padding = .all(4) });
-    defer flex.deinit();
 
     g_drag_hover_idx = null;
 
@@ -296,7 +556,7 @@ pub fn draw() void {
         const up_hovered = EditorState.drag_kind == .asset and g_drag_hover_idx == 99999;
         var tile = gui.box(@src(), .{}, .{
             .id_extra = 99999,
-            .min_size_content = .{ .w = 72, .h = 72 },
+            .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
             .background = true,
             .style = if (up_hovered) .highlight else .content,
             .border = .all(if (up_hovered) 2 else 1),
@@ -411,17 +671,7 @@ pub fn draw() void {
             break :blk editor.asset_registry.lookupByFilename(entry.name);
         };
         const desc = editor.asset_registry.get(asset_type);
-        const icon_bytes = if (is_dir)
-            gui.entypo.folder
-        else switch (desc.icon_hint) {
-            .document => gui.entypo.text_document,
-            .code => gui.entypo.code,
-            .image => gui.entypo.image,
-            .sound => gui.entypo.sound,
-            .model => gui.entypo.layers,
-            .material => gui.entypo.colours,
-            .data => gui.entypo.database,
-        };
+        const icon_bytes = if (is_dir) gui.entypo.folder else iconForHint(desc.icon_hint);
 
         const is_selected = if (EditorState.selected_asset_path) |sel_path| blk: {
             var asset_path_check: [1024]u8 = undefined;
@@ -432,7 +682,7 @@ pub fn draw() void {
         const is_drag_target = is_dir and EditorState.drag_kind == .asset and g_drag_hover_idx == entry_idx;
         var tile = gui.box(@src(), .{}, .{
             .id_extra = entry_idx,
-            .min_size_content = .{ .w = 72, .h = 72 },
+            .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
             .background = true,
             .style = if (is_selected or is_drag_target) .highlight else .content,
             .border = .all(if (is_selected or is_drag_target) 2 else 1),
@@ -441,7 +691,10 @@ pub fn draw() void {
             .padding = .all(4),
             .gravity_x = 0.5,
         });
-        defer tile.deinit();
+        // Closed explicitly at the end of the iteration (not `defer`red) so an
+        // expanded model's sub-asset tiles can flow *after* this tile inside the
+        // same grid flexbox — see the `drawInlineSubAssets` call below. The
+        // outer entry loop has no `continue`/`return` that would skip it.
 
         // Context menu for all tiles (including dirs)
         {
@@ -500,6 +753,7 @@ pub fn draw() void {
                     if (gui.menuItemLabel(@src(), "Reimport Asset", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                         fw.close();
                         editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj_path, reimport_path);
+                        invalidatePreviewAndSubAssets(reimport_path);
                     }
                 }
 
@@ -603,11 +857,20 @@ pub fn draw() void {
             }
         }
 
-        gui.icon(@src(), "tile_icon", icon_bytes, .{}, .{
-            .gravity_x = 0.5,
-            .min_size_content = .{ .w = 32, .h = 32 },
-            .id_extra = entry_idx,
-        });
+        const preview_source = if (is_dir) null else PreviewSystem.imageSourceFor(asset_full_path);
+        if (preview_source) |source| {
+            _ = gui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
+                .gravity_x = 0.5,
+                .min_size_content = .{ .w = g_tile_content, .h = g_tile_content },
+                .id_extra = entry_idx,
+            });
+        } else {
+            gui.icon(@src(), "tile_icon", icon_bytes, .{}, .{
+                .gravity_x = 0.5,
+                .min_size_content = .{ .w = g_tile_content, .h = g_tile_content },
+                .id_extra = entry_idx,
+            });
+        }
 
         // Inline rename or label
         if (is_renaming_this) {
@@ -688,7 +951,23 @@ pub fn draw() void {
                 }
             }
         }
+
+        tile.deinit();
+
+        // Compound-model expansion (Unity-style): a small round toggle at the
+        // model's right edge, and — when expanded — its generated materials/
+        // textures enclosed in a bordered group box flowing right after it, so
+        // it's visually clear those assets are embedded in the model rather than
+        // real files. Drawn as siblings of the tile (their own rects), so the
+        // toggle never competes with tile selection for a click.
+        if (!is_dir and asset_type == .model and !is_renaming_this) {
+            drawExpandToggle(asset_full_path, entry_idx);
+            if (isExpanded(asset_full_path))
+                drawInlineSubAssets(proj_path, asset_full_path, entry_idx);
+        }
     }
+
+    flex.deinit();
 
     // Commit nav list for next frame's arrow-key handler
     g_nav_count = new_nav_count;

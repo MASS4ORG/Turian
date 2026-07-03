@@ -99,4 +99,9 @@ pub const EditorCam = struct {
     fov: f32 = 60,
     near: f32 = 0.05,
     far: f32 = 2000,
+    /// When > 0, the camera projects orthographically with this vertical
+    /// half-extent (world units from center to top edge) instead of using a
+    /// perspective `fov`. Asset previews use this so a model framed close up
+    /// doesn't fan out under perspective foreshortening.
+    ortho_half_height: f32 = 0,
 };

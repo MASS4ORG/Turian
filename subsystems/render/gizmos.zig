@@ -190,7 +190,8 @@ pub fn renderGizmos(
     const segments = verts.len / 2;
     if (segments == 0) return;
     const dev = state.device orelse return;
-    const depth_tex = state.depth_tex orelse return;
+    // Depth-test against the depth `renderScene` produced for this same size.
+    const depth_tex = state.findDepth(w, h) orelse return;
     const pl = (if (overlay) state.gizmo_overlay_pipeline else state.gizmo_pipeline) orelse return;
 
     const expanded_count = segments * CORNERS_PER_SEGMENT;

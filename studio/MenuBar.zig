@@ -24,6 +24,26 @@ const AboutInfo = struct {
 
 var hamburger_open: bool = false;
 
+/// Editor-FPS display toggle (View menu). Distinct from the FPS shown while
+/// Play Mode is running (`PlayMode.fps()`, the *game's* FPS) — this is the
+/// Studio UI's own frame rate, useful when diagnosing an editor slowdown
+/// (e.g. a heavy asset folder) independent of whether the game is playing.
+/// Persisted across sessions via the editor Settings store.
+var show_editor_fps: bool = false;
+/// Settings key for `show_editor_fps`. Lazily synced on first ready frame
+/// (`syncFpsFromSettings`) because settings aren't loaded when this module's
+/// globals initialize.
+const FPS_SETTING_KEY = "editor.show_fps";
+var fps_setting_loaded: bool = false;
+
+/// Load the persisted FPS-toggle state once settings are available. A no-op
+/// after the first successful sync (and until then the default `false` shows).
+fn syncFpsFromSettings() void {
+    if (fps_setting_loaded or !EditorState.settingsReady()) return;
+    show_editor_fps = EditorState.settings.getBool(FPS_SETTING_KEY, false);
+    fps_setting_loaded = true;
+}
+
 fn projectDirExists(path: []const u8) bool {
     var d = std.Io.Dir.cwd().openDir(gui.io, path, .{}) catch return false;
     d.close(gui.io);
@@ -34,6 +54,8 @@ fn projectDirExists(path: []const u8) bool {
 /// (File, Edit, Scene, …) in the bar horizontally; clicking outside the
 /// menu area collapses them back.
 pub fn draw(should_quit: *bool) void {
+    syncFpsFromSettings();
+
     var m = gui.menu(@src(), .horizontal, .{ .expand = .horizontal });
     defer m.deinit();
 
@@ -159,6 +181,16 @@ pub fn draw(should_quit: *bool) void {
                 m.close();
                 _ = Screenshots.capture();
             }
+
+            const fps_label = if (show_editor_fps) "Hide Editor FPS" else "Show Editor FPS";
+            if (gui.menuItemLabel(@src(), fps_label, .{}, .{ .expand = .horizontal }) != null) {
+                m.close();
+                show_editor_fps = !show_editor_fps;
+                if (EditorState.settingsReady()) {
+                    EditorState.settings.setBool(FPS_SETTING_KEY, show_editor_fps) catch {};
+                    EditorState.settings.save(gui.io);
+                }
+            }
         }
 
         if (gui.menuItemLabel(@src(), "Help", .{ .submenu = true }, .{})) |r| {
@@ -259,6 +291,14 @@ fn drawProjectDropdown(m: *gui.MenuWidget) void {
 fn drawPlayControls() void {
     if (PlayMode.state() != .edit) {
         gui.label(@src(), "{d:.0} FPS", .{PlayMode.fps()}, .{
+            .gravity_y = 0.5,
+            .padding = .{ .x = 8, .y = 2, .w = 8, .h = 2 },
+            .font = .theme(.heading),
+        });
+    } else if (show_editor_fps) {
+        // The Studio UI's own frame rate (not the game's) — see
+        // `show_editor_fps`'s doc comment.
+        gui.label(@src(), "{d:.0} FPS", .{EditorState.debug_metrics.fps}, .{
             .gravity_y = 0.5,
             .padding = .{ .x = 8, .y = 2, .w = 8, .h = 2 },
             .font = .theme(.heading),

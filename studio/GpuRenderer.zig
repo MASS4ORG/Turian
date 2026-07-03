@@ -114,6 +114,76 @@ pub const Capture = struct {
     h: u32,
 };
 
+// ── Asset preview rendering ──────────────────────────────────────────────────
+// Renders an arbitrary (usually synthetic, 1-2 node) scene into its own
+// offscreen target under a caller-supplied camera, independent of the main
+// editor viewport. Used by `PreviewSystem` (thumbnail generation) and
+// `MaterialEditor` (live interactive preview).
+
+var g_preview_target: ?gui.TextureTarget = null;
+var g_preview_w: u32 = 0;
+var g_preview_h: u32 = 0;
+
+/// Render `objects` under `cam` into a reusable `w`×`h` offscreen target and
+/// return it for display via `gui.Texture.fromTargetTemp`. Live/per-frame use
+/// (e.g. an interactive orbiting preview) — the target's contents change every
+/// call, so don't hold onto the returned handle across frames.
+pub fn renderPreview(objects: []const engine.SceneNode, cam: render.EditorCam, w: u32, h: u32) ?gui.TextureTarget {
+    if (!g_ready) return null;
+    const cmd = g_cmd orelse return null;
+    const backend = g_backend orelse return null;
+    if (w == 0 or h == 0) return null;
+
+    if (w != g_preview_w or h != g_preview_h) {
+        if (g_preview_target) |t| backend.textureDestroyTarget(t);
+        g_preview_target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
+        g_preview_w = w;
+        g_preview_h = h;
+    }
+    const target = g_preview_target orelse return null;
+    const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
+
+    const saved_cam = render.editorCamera();
+    render.setEditorCamera(cam);
+    render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.setEditorCamera(saved_cam);
+    return target;
+}
+
+/// Render `objects` under `cam` into a fresh `w`×`h` offscreen target and read
+/// the result back to CPU RGBA8 pixels, synchronously. Unlike `renderPreview`,
+/// this is self-contained (its own command buffer, submitted and waited on
+/// immediately) so the very first call already sees the freshly-rendered
+/// content — suitable for one-shot thumbnail generation, not per-frame display.
+/// Blocks on the GPU; call only on a cache miss.
+pub fn renderAndCapture(allocator: std.mem.Allocator, objects: []const engine.SceneNode, cam: render.EditorCam, w: u32, h: u32) ?Capture {
+    if (!g_ready) return null;
+    const backend = g_backend orelse return null;
+    if (w == 0 or h == 0) return null;
+
+    const target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch return null;
+    defer backend.textureDestroyTarget(target);
+    const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
+
+    const dev: *gpu.c.SDL_GPUDevice = @ptrCast(backend.device);
+    const own_cmd = gpu.c.SDL_AcquireGPUCommandBuffer(dev) orelse return null;
+
+    const saved_cam = render.editorCamera();
+    render.setEditorCamera(cam);
+    render.renderScene(own_cmd, @ptrCast(bt.texture), w, h, objects);
+    render.setEditorCamera(saved_cam);
+
+    const fence = gpu.c.SDL_SubmitGPUCommandBufferAndAcquireFence(own_cmd) orelse return null;
+    _ = gpu.c.SDL_WaitForGPUFences(dev, true, &fence, 1);
+    gpu.c.SDL_ReleaseGPUFence(dev, fence);
+
+    const pixels = gpu.captureTexture(dev, allocator, @ptrCast(bt.texture), w, h, gpu.c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM) catch |err| {
+        std.debug.print("[GpuRenderer] preview capture failed: {any}\n", .{err});
+        return null;
+    };
+    return .{ .pixels = pixels, .w = w, .h = h };
+}
+
 /// Download the editor viewport color target (the real GPU-rendered scene) to
 /// RGBA8 CPU pixels. Caller owns `Capture.pixels`. Null if the
 /// renderer/target isn't ready. The pixels come from the most recently
@@ -201,7 +271,12 @@ fn readOwned(path: []const u8) ?render.Bytes {
 }
 
 /// Meshes come from the cooked canonical artifact in `.cache` (one fast loader).
+/// Built-in preview primitives (cube/sphere) are generated on the fly instead of
+/// resolved through the asset database — the preview system references them by
+/// a reserved GUID that doesn't correspond to any project asset.
 fn meshBytes(guid: []const u8) ?render.Bytes {
+    if (engine.assets.PrimitiveMesh.builtinBytes(page, guid) catch null) |bytes|
+        return .{ .data = bytes, .owned = true };
     const proj = EditorState.project_path orelse return null;
     const g = editor.Guid.parse(guid) catch return null;
     var buf: [1024]u8 = undefined;

@@ -53,6 +53,28 @@ pub fn setEditorCamera(cam: ?EditorCam) void {
     state.editor_cam = cam;
 }
 
+/// The current editor free-look camera override, if any. Lets a caller that
+/// temporarily imposes its own camera (e.g. an asset preview renderer) save and
+/// restore the viewport's camera around its own render.
+pub fn editorCamera() ?EditorCam {
+    return state.editor_cam;
+}
+
+/// Serve `bytes` for `guid` from `resolveMaterial` instead of `material_src`,
+/// until cleared. Used by live-editing panels (e.g. the material inspector) to
+/// preview unsaved edits without writing to disk every frame.
+pub fn setMaterialOverride(guid: []const u8, bytes: []const u8) void {
+    state.material_override_key_len = @min(guid.len, state.OVERRIDE_KEY_CAP);
+    @memcpy(state.material_override_key[0..state.material_override_key_len], guid[0..state.material_override_key_len]);
+    state.material_override_bytes = bytes;
+}
+
+/// Stop overriding any material GUID.
+pub fn clearMaterialOverride() void {
+    state.material_override_key_len = 0;
+    state.material_override_bytes = &.{};
+}
+
 /// Compute the camera used to render `objects` at `w`×`h`. Uses the editor
 /// free-look override if set, otherwise the first active camera component (or a
 /// default if none). Mirrors the camera setup in `renderScene`.
@@ -62,12 +84,14 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     var cam_fov: f32 = 60.0;
     var cam_near: f32 = 0.01;
     var cam_far: f32 = 1000.0;
+    var ortho_half_height: f32 = 0;
     if (state.editor_cam) |ec| {
         cam_pos = ec.pos;
         cam_rot = ec.rot;
         cam_fov = ec.fov;
         cam_near = ec.near;
         cam_far = ec.far;
+        ortho_half_height = ec.ortho_half_height;
     } else cam_search: for (objects) |*obj| {
         if (!obj.active) continue;
         for (obj.components[0..obj.component_count]) |*comp| {
@@ -86,7 +110,11 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     const look_at = Vector3{ .x = cam_pos.x + fwd_v.x, .y = cam_pos.y + fwd_v.y, .z = cam_pos.z + fwd_v.z };
     const view = Matrix4.lookAt(cam_pos, look_at, .{ .x = 0, .y = 1, .z = 0 });
     const asp = @as(f32, @floatFromInt(w)) / @as(f32, @floatFromInt(@max(h, 1)));
-    const proj = Matrix4.perspective(cam_fov, asp, cam_near, cam_far);
+    const proj = if (ortho_half_height > 0) blk: {
+        const hh = ortho_half_height;
+        const hw = hh * asp;
+        break :blk Matrix4.orthographic(-hw, hw, -hh, hh, cam_near, cam_far);
+    } else Matrix4.perspective(cam_fov, asp, cam_near, cam_far);
     return .{
         .pos = cam_pos,
         .rotation = cam_rot,
@@ -146,17 +174,40 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     std.debug.print("[render] Ready (SPIRV).\n", .{});
 }
 
-fn ensureDepth(dev: *c.SDL_GPUDevice, w: u32, h: u32) !void {
-    state.depth_tex = try pipeline.createDepth(dev, w, h);
+/// Depth texture for a `w`×`h` pass, cached by size (see `state.depth_targets`).
+/// Reuses a same-size texture, fills an empty slot, or evicts the round-robin
+/// slot when full. Eviction only frees a size not requested in the current
+/// frame — the distinct sizes rendered per frame (viewport + previews) stay well
+/// under `MAX_DEPTH_TARGETS` — so it never releases a depth attachment an
+/// in-flight command buffer still references.
+fn depthFor(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?*c.SDL_GPUTexture {
+    if (state.findDepth(w, h)) |t| return t;
+
+    for (&state.depth_targets) |*d| {
+        if (d.tex == null) {
+            d.tex = pipeline.createDepth(dev, w, h) catch return null;
+            d.w = w;
+            d.h = h;
+            return d.tex;
+        }
+    }
+
+    const d = &state.depth_targets[state.depth_evict_cursor];
+    state.depth_evict_cursor = (state.depth_evict_cursor + 1) % state.depth_targets.len;
+    if (d.tex) |old| c.SDL_ReleaseGPUTexture(dev, old);
+    d.* = .{ .tex = pipeline.createDepth(dev, w, h) catch {
+        d.* = .{};
+        return null;
+    }, .w = w, .h = h };
+    return d.tex;
 }
 
-fn destroyDepth(dev: *c.SDL_GPUDevice) void {
-    if (state.depth_tex) |dt| {
-        c.SDL_ReleaseGPUTexture(dev, dt);
-        state.depth_tex = null;
+fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
+    for (&state.depth_targets) |*d| {
+        if (d.tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        d.* = .{};
     }
-    state.target_w = 0;
-    state.target_h = 0;
+    state.depth_evict_cursor = 0;
 }
 
 /// Render `objects` into `color_tex` (a `w`×`h` target) using `cmd`. The caller
@@ -184,16 +235,10 @@ pub fn renderScene(
     if (state.shadow_map == null)
         state.shadow_map = pipeline.createShadowMap(dev) catch null;
 
-    if (w != state.target_w or h != state.target_h) {
-        destroyDepth(dev);
-        ensureDepth(dev, w, h) catch |err| {
-            std.debug.print("[render] depth target failed: {any}\n", .{err});
-            return;
-        };
-        state.target_w = w;
-        state.target_h = h;
-    }
-    const depth_tex = state.depth_tex orelse return;
+    const depth_tex = depthFor(dev, w, h) orelse {
+        std.debug.print("[render] depth target failed\n", .{});
+        return;
+    };
 
     {
         var upload_zone = engine.Profiler.zone("render.upload");
@@ -362,7 +407,7 @@ pub fn renderScene(
 pub fn deinit() void {
     const dev = state.device orelse return;
     gizmos.deinit(dev);
-    destroyDepth(dev);
+    destroyDepthTargets(dev);
     if (state.white_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.flat_normal_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     state.white_tex = null;

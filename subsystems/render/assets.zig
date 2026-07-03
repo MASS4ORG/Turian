@@ -59,13 +59,19 @@ pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     var out = types.ResolvedMaterial{};
     if (mat_guid.len == 0) return out;
 
-    const src = state.material_src orelse return out;
-    const b = src(mat_guid) orelse return out;
-    defer if (b.owned) page.free(b.data);
-
     var arena = std.heap.ArenaAllocator.init(page);
     defer arena.deinit();
-    const mat = engine.Material.loadFromBytes(arena.allocator(), b.data) catch return out;
+
+    const is_override = mat_guid.len == state.material_override_key_len and
+        std.mem.eql(u8, mat_guid, state.material_override_key[0..state.material_override_key_len]);
+    const mat = if (is_override)
+        engine.Material.loadFromBytes(arena.allocator(), state.material_override_bytes) catch return out
+    else blk: {
+        const src = state.material_src orelse return out;
+        const b = src(mat_guid) orelse return out;
+        defer if (b.owned) page.free(b.data);
+        break :blk engine.Material.loadFromBytes(arena.allocator(), b.data) catch return out;
+    };
 
     out.base_color = mat.vector("base_color", out.base_color);
     out.metallic = mat.scalar("metallic", out.metallic);
