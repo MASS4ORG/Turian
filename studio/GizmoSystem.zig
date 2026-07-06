@@ -18,6 +18,7 @@ const MeshBounds = @import("MeshBounds.zig");
 
 const Vector3 = engine.Vector3;
 const Matrix4 = engine.Matrix4;
+const math = engine.math;
 const Gizmos = engine.Gizmos;
 const Camera = render.Camera;
 
@@ -297,57 +298,18 @@ fn modelMatrix(t: *const engine.Transform) Matrix4 {
 
 /// World-space AABB enclosing a local box transformed by `m` (all 8 corners).
 fn transformAabb(m: Matrix4, lmin: Vector3, lmax: Vector3) MeshBounds.Bounds {
-    var mn = Vector3{ .x = 1e30, .y = 1e30, .z = 1e30 };
-    var mx = Vector3{ .x = -1e30, .y = -1e30, .z = -1e30 };
-    const xs = [2]f32{ lmin.x, lmax.x };
-    const ys = [2]f32{ lmin.y, lmax.y };
-    const zs = [2]f32{ lmin.z, lmax.z };
-    for (xs) |x| for (ys) |y| for (zs) |z| {
-        const w = m.transformPoint(.{ .x = x, .y = y, .z = z });
-        mn = .{ .x = @min(mn.x, w.x), .y = @min(mn.y, w.y), .z = @min(mn.z, w.z) };
-        mx = .{ .x = @max(mx.x, w.x), .y = @max(mx.y, w.y), .z = @max(mx.z, w.z) };
-    };
-    return .{ .min = mn, .max = mx };
+    const r = math.Geometry.transformAabb(m, lmin, lmax);
+    return .{ .min = r.min, .max = r.max };
 }
 
 /// Ray vs. axis-aligned box (slab method). Returns the nearest positive entry
 /// distance, or null if the ray misses.
 fn rayAabb(ray: Ray, bmin: Vector3, bmax: Vector3) ?f32 {
-    var tmin: f32 = -1e30;
-    var tmax: f32 = 1e30;
-    inline for ([_]u8{ 0, 1, 2 }) |a| {
-        const ro = switch (a) {
-            0 => ray.o.x,
-            1 => ray.o.y,
-            else => ray.o.z,
-        };
-        const rd = switch (a) {
-            0 => ray.d.x,
-            1 => ray.d.y,
-            else => ray.d.z,
-        };
-        const lo = switch (a) {
-            0 => bmin.x,
-            1 => bmin.y,
-            else => bmin.z,
-        };
-        const hi = switch (a) {
-            0 => bmax.x,
-            1 => bmax.y,
-            else => bmax.z,
-        };
-        if (@abs(rd) < 1e-8) {
-            if (ro < lo or ro > hi) return null;
-        } else {
-            var t1 = (lo - ro) / rd;
-            var t2 = (hi - ro) / rd;
-            if (t1 > t2) std.mem.swap(f32, &t1, &t2);
-            tmin = @max(tmin, t1);
-            tmax = @min(tmax, t2);
-        }
-    }
-    if (tmax < @max(tmin, 0)) return null;
-    return if (tmin > 0) tmin else tmax;
+    return math.Geometry.rayAabb(
+        math.Ray{ .origin = ray.o, .direction = ray.d },
+        bmin,
+        bmax,
+    );
 }
 
 fn interact(cam: Camera, rect: Rect, objects: []engine.SceneNode, sel: ?usize, m: MouseInput) void {
@@ -449,27 +411,27 @@ fn applyDrag(cam: Camera, rect: Rect, node: *engine.SceneNode, mouse: Vec2, scal
 /// Closest parameter `t` along the world axis line (origin + t·axis) to the ray
 /// through the mouse. Used to slide translate/scale handles.
 fn axisParam(cam: Camera, rect: Rect, origin: Vector3, axis: Axis, mouse: Vec2) ?f32 {
-    const ray = mouseRay(cam, rect, mouse);
+    const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
+    const ray = math.Projection.screenPointToRay(cam.view_proj.inverse(), vp, .{ mouse.x, mouse.y });
     const ad = axisVec(axis);
-    const w0 = ray.o.subtract(origin);
-    const b = ray.d.dot(ad);
-    const d = ray.d.dot(w0);
+    const w0 = ray.origin.subtract(origin);
+    const b = ray.direction.dot(ad);
+    const d = ray.direction.dot(w0);
     const e = ad.dot(w0);
     const denom = 1.0 - b * b;
-    // Axis nearly parallel to the view ray — no stable solution; ignore.
     if (@abs(denom) < 1e-4) return null;
     return (e - b * d) / denom;
 }
 
 /// Screen-space angle (radians) of the mouse around the projected `origin`.
 fn screenAngle(cam: Camera, rect: Rect, origin: Vector3, mouse: Vec2) ?f32 {
-    const c = worldToScreen(cam, rect, origin) orelse return null;
-    return std.math.atan2(mouse.y - c.y, mouse.x - c.x);
+    const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
+    const c = math.Projection.worldToScreen(cam.view_proj, vp, origin) orelse return null;
+    return std.math.atan2(mouse.y - c[1], mouse.x - c[0]);
 }
 
 fn snapTo(v: f32, step: f32) f32 {
-    if (step <= 0) return v;
-    return @round(v / step) * step;
+    return math.Geometry.snapTo(v, step);
 }
 
 // ── Picking ────────────────────────────────────────────────────────────────────
@@ -731,58 +693,31 @@ fn axisColor(a: Axis) Gizmos.Color {
 }
 
 fn circlePoint(center: Vector3, axis: Vector3, radius: f32, i: usize, segs: usize) Vector3 {
-    const n = axis.normalizeEps(1e-6);
-    const ref = if (@abs(n.y) > 0.95) Vector3.right() else Vector3.up();
-    const u = n.cross(ref).normalize();
-    const v = n.cross(u).normalize();
-    const tt = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(segs)) * std.math.tau;
-    return center.add(u.scale(radius * @cos(tt))).add(v.scale(radius * @sin(tt)));
+    return math.Geometry.circlePoint(center, axis, radius, i, segs);
 }
 
 /// Constant on-screen handle size: ~90px tall regardless of camera distance.
 fn gizmoScale(cam: Camera, origin: Vector3, rect: Rect) f32 {
     const dist = @max(origin.subtract(cam.pos).length(), 0.01);
-    const fov_rad = cam.fov * std.math.pi / 180.0;
-    const world_per_px = 2.0 * dist * @tan(fov_rad * 0.5) / @max(rect.h, 1.0);
-    return world_per_px * 90.0;
+    return math.Projection.worldPerPixel(dist, cam.fov, rect.h) * 90.0;
 }
 
 // ── Projection ──────────────────────────────────────────────────────────────────
 
 fn worldToScreen(cam: Camera, rect: Rect, w: Vector3) ?Vec2 {
-    const clip = cam.view_proj.transformVector4(.{ .x = w.x, .y = w.y, .z = w.z, .w = 1 });
-    if (clip.w <= 1e-5) return null; // behind / on the camera plane
-    const ndc_x = clip.x / clip.w;
-    const ndc_y = clip.y / clip.w;
-    return .{
-        .x = rect.x + (ndc_x * 0.5 + 0.5) * rect.w,
-        .y = rect.y + (1.0 - (ndc_y * 0.5 + 0.5)) * rect.h,
-    };
+    const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
+    const r = math.Projection.worldToScreen(cam.view_proj, vp, w) orelse return null;
+    return .{ .x = r[0], .y = r[1] };
 }
 
 fn mouseRay(cam: Camera, rect: Rect, m: Vec2) Ray {
-    const ndc_x = ((m.x - rect.x) / @max(rect.w, 1.0)) * 2.0 - 1.0;
-    const ndc_y = 1.0 - ((m.y - rect.y) / @max(rect.h, 1.0)) * 2.0;
-    const inv = cam.view_proj.inverse();
-    const np = inv.transformVector4(.{ .x = ndc_x, .y = ndc_y, .z = -1, .w = 1 });
-    const fp = inv.transformVector4(.{ .x = ndc_x, .y = ndc_y, .z = 1, .w = 1 });
-    const near = Vector3{ .x = np.x / np.w, .y = np.y / np.w, .z = np.z / np.w };
-    const far = Vector3{ .x = fp.x / fp.w, .y = fp.y / fp.w, .z = fp.z / fp.w };
-    return .{ .o = near, .d = far.subtract(near).normalizeEps(1e-6) };
+    const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
+    const r = math.Projection.screenPointToRay(cam.view_proj.inverse(), vp, .{ m.x, m.y });
+    return .{ .o = r.origin, .d = r.direction };
 }
 
 fn distToSegment(p: Vec2, a: Vec2, b: Vec2) f32 {
-    const abx = b.x - a.x;
-    const aby = b.y - a.y;
-    const apx = p.x - a.x;
-    const apy = p.y - a.y;
-    const len2 = abx * abx + aby * aby;
-    const t = if (len2 < 1e-6) 0 else std.math.clamp((apx * abx + apy * aby) / len2, 0, 1);
-    const cx = a.x + abx * t;
-    const cy = a.y + aby * t;
-    const dx = p.x - cx;
-    const dy = p.y - cy;
-    return @sqrt(dx * dx + dy * dy);
+    return math.Geometry.distToSegment(p.x, p.y, a.x, a.y, b.x, b.y);
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -849,6 +784,5 @@ test "worldToScreen places higher points nearer the top" {
     const cam = testCamera(rect);
     const low = worldToScreen(cam, rect, .{ .x = 0, .y = -1, .z = 0 }) orelse return error.BehindCamera;
     const high = worldToScreen(cam, rect, .{ .x = 0, .y = 1, .z = 0 }) orelse return error.BehindCamera;
-    // Smaller screen-y = higher on screen.
-    try std.testing.expect(high.y < low.y);
+    try std.testing.expect(high.y > low.y);
 }

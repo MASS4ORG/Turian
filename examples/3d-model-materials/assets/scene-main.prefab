@@ -208,6 +208,43 @@
           }
         }
       ]
+    },
+    {
+      "name": "UI",
+      "guid": "a5e0bb7c-3dbc-4bf3-9fd3-9a565b7baec1",
+      "parent": -1,
+      "active": true,
+      "transform": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      "components": [
+        {
+          "ui_document": {
+            "document_guid": "feaf5d88-784c-4db6-ada4-aaa0e53b8ba8"
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "MenuController",
+            "source_file": "assets/MenuController.zig",
+            "fields": []
+          }
+        }
+      ]
     }
   ]
 }

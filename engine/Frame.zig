@@ -23,6 +23,7 @@ const Transform = @import("scene/Transform.zig").Transform;
 const SceneNode = @import("scene/SceneNode.zig").SceneNode;
 const Spawner = @import("scene/Spawner.zig").Spawner;
 const Vector3 = @import("root.zig").Vector3;
+const ui = @import("ui/root.zig");
 
 /// Services made available to a script's lifecycle hooks.
 pub const Frame = struct {
@@ -58,6 +59,15 @@ pub const Frame = struct {
     /// of the update. Safe to call on the script's own object.
     pub fn destroy(self: Frame, node: *const SceneNode) void {
         if (self.spawn) |s| s.destroy(node.guidSlice());
+    }
+
+    /// The live UI document instance owned by `node`'s `ui_document`
+    /// component (C4), or null when the node has none / the runtime doesn't
+    /// render UI. Hold a serialized `GameObjectRef` to the owning node and
+    /// call `find()` once in `awake` — see `engine/ui/UiInstance.zig`.
+    pub fn uiDocument(self: Frame, node: *const SceneNode) ?*ui.UiInstance {
+        const rt = self.service(ui.UiRuntime) orelse return null;
+        return rt.instanceFor(node.guidSlice());
     }
 };
 

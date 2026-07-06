@@ -251,7 +251,14 @@ pub const Spawner = struct {
             if (objects[i].parent >= 0 and remove[@intCast(objects[i].parent)]) remove[i] = true;
         }
 
-        // Build old→new index map and compact.
+        // Build old→new index map and compact IN PLACE — no `[MAX_OBJECTS]SceneNode`
+        // scratch buffer (that stack allocation overflowed the thread stack:
+        // SceneNode embeds MAX_COMPONENTS UserScriptRef-sized slots, so
+        // MAX_OBJECTS of them is several MB). Safe without a temp buffer
+        // because `map[k] <= k` always (compaction only ever shifts entries
+        // toward index 0), so scanning `k` forward and writing
+        // `objects[map[k]] = objects[k]` never clobbers a source index the
+        // loop hasn't read yet.
         var map = [_]i32{-1} ** MAX_OBJECTS;
         var next: usize = 0;
         for (0..n) |k| {
@@ -260,14 +267,12 @@ pub const Spawner = struct {
                 next += 1;
             }
         }
-        var tmp: [MAX_OBJECTS]SceneNode = undefined;
         for (0..n) |k| {
             if (map[k] < 0) continue;
             var node = objects[k];
             if (node.parent >= 0) node.parent = map[@intCast(node.parent)];
-            tmp[@intCast(map[k])] = node;
+            objects[@intCast(map[k])] = node;
         }
-        @memcpy(objects[0..next], tmp[0..next]);
         count.* = next;
         return true;
     }

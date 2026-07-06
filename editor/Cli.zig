@@ -225,6 +225,9 @@ fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *cons
         .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
         .render_root = build_options.render_root_path,
         .sdl3_include = build_options.sdl3_include_path,
+        .ui_render_root = build_options.ui_render_root_path,
+        .dvui_url = build_options.dvui_url,
+        .dvui_hash = build_options.dvui_hash,
         .engine_version = build_options.version,
     };
     // Config strings (SDK-relative paths) live for the whole build; an arena

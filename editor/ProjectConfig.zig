@@ -254,6 +254,23 @@ pub const ProjectConfig = struct {
         fallback_name: []const u8,
         path_prefix: []const u8,
     ) ![]u8 {
+        return self.toBuildZonExtra(allocator, fallback_name, path_prefix, &.{});
+    }
+
+    /// Like `toBuildZon`, plus `extra_deps` appended to the dependency table —
+    /// used to inject the `dvui` entry (C10 pay-for-use) for projects that
+    /// reference a `.uidoc` asset, without polluting `self.dependencies`
+    /// (which stays the user-authored `project.json` source of truth and
+    /// feeds the separate `b.dependency()` no-op resolution loop in
+    /// `GameCodegen` — `dvui` is wired specially there instead, with its own
+    /// backend option, so it must NOT also appear in that generic loop).
+    pub fn toBuildZonExtra(
+        self: ProjectConfig,
+        allocator: std.mem.Allocator,
+        fallback_name: []const u8,
+        path_prefix: []const u8,
+        extra_deps: []const Dependency,
+    ) ![]u8 {
         const raw_name = if (self.name.len > 0) self.name else fallback_name;
         var id_buf: [128]u8 = undefined;
         const id = sanitizeId(raw_name, &id_buf);
@@ -273,26 +290,12 @@ pub const ProjectConfig = struct {
             \\
         , .{ id, version, fingerprint, MIN_ZIG_VERSION });
 
-        if (self.dependencies.len == 0) {
+        if (self.dependencies.len == 0 and extra_deps.len == 0) {
             try w.appendSlice(allocator, "    .dependencies = .{},\n");
         } else {
             try w.appendSlice(allocator, "    .dependencies = .{\n");
-            for (self.dependencies) |d| {
-                var dep_id_buf: [128]u8 = undefined;
-                const dep_id = sanitizeId(d.name, &dep_id_buf);
-                try w.print(allocator, "        .{s} = .{{\n", .{dep_id});
-                if (d.path.len > 0) {
-                    if (path_prefix.len > 0 and !std.fs.path.isAbsolute(d.path)) {
-                        try w.print(allocator, "            .path = \"{s}/{s}\",\n", .{ path_prefix, d.path });
-                    } else {
-                        try w.print(allocator, "            .path = \"{s}\",\n", .{d.path});
-                    }
-                } else {
-                    if (d.url.len > 0) try w.print(allocator, "            .url = \"{s}\",\n", .{d.url});
-                    if (d.hash.len > 0) try w.print(allocator, "            .hash = \"{s}\",\n", .{d.hash});
-                }
-                try w.appendSlice(allocator, "        },\n");
-            }
+            for (self.dependencies) |d| try writeDepEntry(allocator, w, d, path_prefix);
+            for (extra_deps) |d| try writeDepEntry(allocator, w, d, path_prefix);
             try w.appendSlice(allocator, "    },\n");
         }
 
@@ -308,6 +311,23 @@ pub const ProjectConfig = struct {
             \\
         );
         return out.toOwnedSlice(allocator);
+    }
+
+    fn writeDepEntry(allocator: std.mem.Allocator, w: *std.ArrayList(u8), d: Dependency, path_prefix: []const u8) !void {
+        var dep_id_buf: [128]u8 = undefined;
+        const dep_id = sanitizeId(d.name, &dep_id_buf);
+        try w.print(allocator, "        .{s} = .{{\n", .{dep_id});
+        if (d.path.len > 0) {
+            if (path_prefix.len > 0 and !std.fs.path.isAbsolute(d.path)) {
+                try w.print(allocator, "            .path = \"{s}/{s}\",\n", .{ path_prefix, d.path });
+            } else {
+                try w.print(allocator, "            .path = \"{s}\",\n", .{d.path});
+            }
+        } else {
+            if (d.url.len > 0) try w.print(allocator, "            .url = \"{s}\",\n", .{d.url});
+            if (d.hash.len > 0) try w.print(allocator, "            .hash = \"{s}\",\n", .{d.hash});
+        }
+        try w.appendSlice(allocator, "        },\n");
     }
 
     /// Names of all declared dependencies (for the generated `b.dependency()`

@@ -504,16 +504,20 @@ pub fn deleteSelectedObjects(now: i128) void {
         };
     }
 
-    var new_objects: [MAX_OBJECTS]SceneNode = undefined;
+    // Compact in place — no `[MAX_OBJECTS]SceneNode` scratch buffer (that
+    // stack allocation overflowed the thread stack; same class of bug as the
+    // Spawner.zig fix). Safe without a temp buffer because `index_map[i] <=
+    // i` always (compaction only ever shifts entries toward index 0), so
+    // scanning `i` forward and writing `objects[index_map[i]] = objects[i]`
+    // never clobbers a source index the loop hasn't read yet.
     for (0..object_count) |i| {
         const ni = index_map[i];
         if (ni != -1) {
             var obj = objects[i];
             if (obj.parent >= 0) obj.parent = index_map[@intCast(obj.parent)];
-            new_objects[@intCast(ni)] = obj;
+            objects[@intCast(ni)] = obj;
         }
     }
-    @memcpy(objects[0..next_idx], new_objects[0..next_idx]);
     object_count = next_idx;
     selected_object = null;
     clearSelectedObjects();
@@ -588,9 +592,13 @@ pub fn deleteObject(now: i128, idx: usize) void {
         }
     }
 
-    // 3. Rebuild objects array in-place (or into temp)
-    // We'll use a temp array to avoid corruption while reading/writing
-    var new_objects: [MAX_OBJECTS]SceneNode = undefined;
+    // 3. Rebuild the objects array in place — no `[MAX_OBJECTS]SceneNode`
+    // scratch buffer (that stack allocation overflowed the thread stack;
+    // same class of bug as the Spawner.zig fix). Safe without a temp buffer
+    // because `index_map[i] <= i` always (compaction only ever shifts
+    // entries toward index 0), so scanning `i` forward and writing
+    // `objects[index_map[i]] = objects[i]` never clobbers a source index the
+    // loop hasn't read yet.
     for (0..object_count) |i| {
         const new_idx = index_map[i];
         if (new_idx != -1) {
@@ -598,11 +606,10 @@ pub fn deleteObject(now: i128, idx: usize) void {
             if (obj.parent >= 0) {
                 obj.parent = index_map[@as(usize, @intCast(obj.parent))];
             }
-            new_objects[@as(usize, @intCast(new_idx))] = obj;
+            objects[@as(usize, @intCast(new_idx))] = obj;
         }
     }
 
-    @memcpy(objects[0..next_new_idx], new_objects[0..next_new_idx]);
     object_count = next_new_idx;
 
     selected_object = null;
@@ -883,6 +890,9 @@ fn launchReflect(io: std.Io) void {
         .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
         .render_root = build_options.render_root_path,
         .sdl3_include = build_options.sdl3_include_path,
+        .ui_render_root = build_options.ui_render_root_path,
+        .dvui_url = build_options.dvui_url,
+        .dvui_hash = build_options.dvui_hash,
         .engine_version = build_options.version,
     };
     // Resolved from the job's own arena (not the caller's per-frame arena),
@@ -1365,7 +1375,13 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
     var new_of_old: [MAX_OBJECTS]i32 = undefined;
     for (order[0..order_n], 0..) |old, ni| new_of_old[old] = @intCast(ni);
 
-    var rebuilt: [MAX_OBJECTS]SceneNode = undefined;
+    // Heap, not `[MAX_OBJECTS]SceneNode` on the stack — that overflowed the
+    // thread stack (same class of bug as the Spawner.zig fix). Unlike the
+    // delete-path compaction above, this reorder is an arbitrary DFS-order
+    // permutation (`new_of_old[old]` isn't monotonic in `old`), so it can't
+    // be proven safe to apply in place — a real scratch buffer is needed.
+    const rebuilt = gpa.alloc(SceneNode, order_n) catch return;
+    defer gpa.free(rebuilt);
     for (order[0..order_n], 0..) |old, ni| {
         var node = objects[old];
         if (old == drag) {
@@ -1965,8 +1981,10 @@ pub fn recomputePrefabOverrides(io: std.Io, root: usize) void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
-    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), &tmpl) orelse return;
+    // Arena-allocated, not `[MAX_OBJECTS]SceneNode` on the stack — that
+    // overflowed the thread stack (same class of bug as the Spawner.zig fix).
+    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return;
+    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), tmpl) orelse return;
 
     var indices: [MAX_OBJECTS]usize = undefined;
     const n = collectInstanceIndices(root, &indices);
@@ -1990,8 +2008,8 @@ pub fn resyncPrefabInstances(io: std.Io) void {
     while (r < object_count) : (r += 1) {
         if (!objects[r].isPrefabInstanceRoot()) continue;
 
-        var tmpl: [MAX_OBJECTS]SceneNode = undefined;
-        const tn = readPrefabTemplate(io, arena, objects[r].prefabSourceSlice(), &tmpl) orelse continue;
+        const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch continue;
+        const tn = readPrefabTemplate(io, arena, objects[r].prefabSourceSlice(), tmpl) orelse continue;
 
         var indices: [MAX_OBJECTS]usize = undefined;
         const n = collectInstanceIndices(r, &indices);
@@ -2013,8 +2031,8 @@ pub fn revertPrefabInstance(now: i128, io: std.Io, root: usize) bool {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
-    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), &tmpl) orelse return false;
+    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return false;
+    const tn = readPrefabTemplate(io, arena, objects[root].prefabSourceSlice(), tmpl) orelse return false;
 
     const before = captureSnapshot();
     var indices: [MAX_OBJECTS]usize = undefined;
@@ -2047,8 +2065,8 @@ pub fn applyPrefabInstance(now: i128, io: std.Io, root: usize) bool {
     const bytes = editor.prefab.serializeInstanceAsTemplate(arena, &objects, object_count, root) orelse return false;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = bytes }) catch return false;
 
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
-    const tn = editor.prefab.parse(arena, bytes, &tmpl) orelse return false;
+    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return false;
+    const tn = editor.prefab.parse(arena, bytes, tmpl) orelse return false;
 
     const before = captureSnapshot();
 

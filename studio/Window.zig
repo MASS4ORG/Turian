@@ -12,6 +12,7 @@ const Tasks = @import("Tasks.zig");
 const PlayMode = @import("PlayMode.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
+const UiDocumentEditor = @import("UiDocumentEditor.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
@@ -112,8 +113,14 @@ pub fn frame() bool {
     // (popped from dvui's layout stack) *before* the bottom task bar is drawn;
     // otherwise the task bar would nest inside the still-open paned.
     {
-        if (Documents.activeIsAsset()) {
-            // A non-scene asset tab hosts its dedicated editor full-area. The
+        // `.uidoc` tabs reuse the scene's 3-pane skeleton with Hierarchy and
+        // Viewport swapped for their UI-editing counterparts (Unity/Godot-
+        // style panel replacement) — `Inspector.draw()` itself detects this
+        // same tab context and shows the selected node's properties.
+        const is_uidoc = Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document;
+
+        if (Documents.activeIsAsset() and !is_uidoc) {
+            // Any other asset tab hosts its dedicated editor full-area. The
             // asset browser stays available as a docked side panel so other
             // assets can be opened while editing one.
             var split_h = gui.paned(@src(), .{
@@ -126,6 +133,8 @@ pub fn frame() bool {
             if (split_h.showFirst()) Inspector.drawAssetDocument(Documents.activePath());
             if (split_h.showSecond()) AssetBrowser.draw();
         } else {
+            const uidoc_path = if (is_uidoc) Documents.activePath() else "";
+
             var split_h = gui.paned(@src(), .{
                 .direction = .horizontal,
                 .collapsed_size = 0,
@@ -149,8 +158,12 @@ pub fn frame() bool {
                     }, .{ .expand = .both });
                     defer split_h2.deinit();
 
-                    if (split_h2.showFirst()) SceneTree.draw();
-                    if (split_h2.showSecond()) SceneViewport.draw();
+                    if (split_h2.showFirst()) {
+                        if (is_uidoc) UiDocumentEditor.drawHierarchyPanel(uidoc_path) else SceneTree.draw();
+                    }
+                    if (split_h2.showSecond()) {
+                        if (is_uidoc) UiDocumentEditor.drawViewPanel(uidoc_path) else SceneViewport.draw();
+                    }
                 }
 
                 if (split_v.showSecond()) {
@@ -202,7 +215,7 @@ fn drawDragGhost() void {
         .background = true,
         .style = .window,
         .border = .all(1),
-        .corner_radius = .all(4),
+        .corners = .all(4),
         .padding = .all(4),
     });
     defer fw.deinit();

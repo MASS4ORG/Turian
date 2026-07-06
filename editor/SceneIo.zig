@@ -23,6 +23,9 @@ fn engineCompToScene(c: *const engine.Component) SceneComponent {
         .collider => |v| .{ .collider = v },
         .audio_source => |v| .{ .audio_source = v },
         .animator => |v| .{ .animator = v },
+        .ui_document => |*v| .{ .ui_document = .{
+            .document_guid = v.document.slice(),
+        } },
         .user_script => |*s| .{ .user_script = .{
             .type_name = s.typeName(),
             .source_file = s.sourceFile(),
@@ -47,6 +50,11 @@ fn sceneCompToEngine(sc: SceneComponent) engine.Component {
         .collider => |v| .{ .collider = v },
         .audio_source => |v| .{ .audio_source = v },
         .animator => |v| .{ .animator = v },
+        .ui_document => |v| blk: {
+            var ud = engine.UiDocumentComponent{};
+            ud.document.set(v.document_guid);
+            break :blk .{ .ui_document = ud };
+        },
         .user_script => |s| blk: {
             var ref = engine.UserScriptRef{};
             ref.setTypeName(s.type_name);

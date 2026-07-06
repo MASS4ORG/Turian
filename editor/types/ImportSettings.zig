@@ -55,6 +55,7 @@ pub const ImportSettings = union(AssetType) {
     data_asset: void,
     input_actions: void,
     project_settings: void,
+    ui_document: void,
 };
 
 /// Returns default import settings for the given asset type.
@@ -69,6 +70,7 @@ pub fn defaultFor(asset_type: AssetType) ImportSettings {
         .data_asset => .{ .data_asset = {} },
         .input_actions => .{ .input_actions = {} },
         .project_settings => .{ .project_settings = {} },
+        .ui_document => .{ .ui_document = {} },
         .unknown => .{ .unknown = {} },
     };
 }

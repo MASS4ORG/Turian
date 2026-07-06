@@ -129,6 +129,15 @@ pub fn createNewProjectSettings(browse_path: []const u8) void {
     finishCreate(full_path);
 }
 
+pub fn createNewUiDocument(browse_path: []const u8) void {
+    var name_buf: [192]u8 = undefined;
+    var path_buf: [1024]u8 = undefined;
+    const full_path = uniquePath(browse_path, "ui", "uidoc", &name_buf, &path_buf) orelse return;
+    const default_doc = engine.UiDocument{};
+    default_doc.save(gui.io, full_path) catch return;
+    finishCreate(full_path);
+}
+
 pub fn createNewDataAsset(browse_path: []const u8, def: *const editor.ComponentDef) void {
     const type_name = def.typeName();
     var lc_buf: [128]u8 = undefined;

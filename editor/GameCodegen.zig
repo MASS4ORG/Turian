@@ -15,6 +15,11 @@ pub const RuntimeConfig = struct {
     /// GUID of the scene the game boots into (loaded through the SceneManager,
     ///). Empty if no scene could be resolved.
     boot_scene_guid: []const u8 = "",
+    /// True when the project's asset database has at least one `.uidoc`
+    /// asset (C10 pay-for-use): gates whether `gui`/`ui_render`/dvui are
+    /// wired into the generated build at all. A project that never
+    /// references Guinevere ships with zero dvui linkage.
+    uses_ui: bool = false,
 };
 
 /// Paths required to generate a game build. Most values come from
@@ -74,6 +79,17 @@ pub const BuildConfig = struct {
     /// Zig source modules exported by installed packages (#61). Each becomes a
     /// `b.addModule` importable from `main.zig` and from user scripts.
     extra_modules: []const ModuleSpec = &.{},
+    /// Path to subsystems/ui_render/root.zig (in-game GUI tree-walk, shared
+    /// with the Studio viewport overlay). Empty in CLI-only/SDK builds that
+    /// don't ship dvui — see `dvui_url`/`dvui_hash`.
+    ui_render_root: []const u8 = "",
+    /// dvui's pinned `url`/`hash` (C10 pay-for-use): only games that
+    /// reference a `.uidoc` asset get a `dvui` entry injected into their
+    /// generated `build.zig.zon`, so a project with no UI ships with zero
+    /// dvui linkage. Empty disables UI rendering entirely (e.g. SDK builds,
+    /// which don't currently vendor dvui).
+    dvui_url: []const u8 = "",
+    dvui_hash: []const u8 = "",
 };
 
 /// A Zig source module exported by a source/hybrid package (#61).
@@ -175,7 +191,7 @@ pub fn appendKtx2Module(a: std.mem.Allocator, out: *std.ArrayList(u8), config: B
 // ---------------------------------------------------------------------------
 // build.zig generator
 
-pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []const []const u8) ![]u8 {
+pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []const []const u8, uses_ui: bool) ![]u8 {
     var out: std.ArrayList(u8) = .empty;
     errdefer out.deinit(a);
 
@@ -223,13 +239,22 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
             "    engine_mod.link_libc = true;\n" ++
             "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
-            // stb_image implementation — the headless game has no other stb provider
-            // (the studio gets it from dvui). Needed for material texture decoding.
-            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addImport(\"math\", math_mod);\n" ++
             "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
-        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.vendor_include },
+        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c },
     ));
+    if (!uses_ui) {
+        // stb_image implementation — needed for material texture decoding.
+        // Skipped when dvui is also linked (uses_ui): dvui vendors its own
+        // stb_image implementation, and linking both into the same exe is a
+        // duplicate-symbol error (mirrors Studio's own build.zig, which
+        // always relies on dvui's copy instead of engine's).
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n\n",
+            .{config.vendor_include},
+        ));
+    }
 
     try appendKtx2Module(a, &out, config);
 
@@ -296,6 +321,28 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
                 "    render_mod.addImport(\"engine\", engine_mod);\n" ++
                 "    render_mod.addImport(\"gpu\", gpu_mod);\n\n",
             .{ config.gpu_sdl3_c, config.sdl3_include, config.gpu_root, config.render_root },
+        ));
+    }
+
+    if (uses_ui) {
+        // In-game GUI (C10 pay-for-use): only emitted when the project
+        // references a `.uidoc` asset, so a project that never uses
+        // Guinevere ships with zero dvui linkage. `dvui`'s own build.zig
+        // (resolved via b.dependency, matching Studio's exact wiring) owns
+        // all backend/freetype/stb/tree-sitter selection — this only needs
+        // to pick the `sdl3gpu` backend and re-share the SAME SDL3 the game
+        // already links for its `gpu`/`render` modules.
+        try out.appendSlice(a, try std.fmt.allocPrint(
+            a,
+            "    const dvui_dep = b.dependency(\"dvui\", .{{ .target = target, .optimize = optimize, .backend = .sdl3gpu }});\n" ++
+                "    const dvui_mod = dvui_dep.module(\"dvui_sdl3gpu\");\n" ++
+                "    const ui_render_mod = b.addModule(\"ui_render\", .{{\n" ++
+                "        .root_source_file = .{{ .cwd_relative = \"{s}\" }},\n" ++
+                "        .target = target,\n" ++
+                "    }});\n" ++
+                "    ui_render_mod.addImport(\"engine\", engine_mod);\n" ++
+                "    ui_render_mod.addImport(\"gui\", dvui_mod);\n\n",
+            .{config.ui_render_root},
         ));
     }
 
@@ -368,6 +415,13 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
             a,
             "                .{ .name = \"render\", .module = render_mod },\n" ++
                 "                .{ .name = \"gpu\", .module = gpu_mod },\n",
+        );
+    }
+    if (uses_ui) {
+        try out.appendSlice(
+            a,
+            "                .{ .name = \"gui\", .module = dvui_mod },\n" ++
+                "                .{ .name = \"ui_render\", .module = ui_render_mod },\n",
         );
     }
     for (0..src_files.len) |i| {
@@ -631,7 +685,13 @@ pub fn generateReflectionBuildZig(
 }
 
 test "generateBuildZig emits native lib linking" {
-    const a = std.testing.allocator;
+    // Arena, not `testing.allocator` — every real caller (GameBuild.zig's CLI
+    // path, PlayMode.zig's loadLibrary) wraps this generator in an arena and
+    // frees it all at once; matching that here avoids flagging the internal
+    // `allocPrint` temporaries (never individually freed, by design) as leaks.
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
     const native = [_]NativeLibSpec{.{
         .pkg_root = "/store/com.acme.physx/1.0.0",
         .name = "physx",
@@ -658,8 +718,7 @@ test "generateBuildZig emits native lib linking" {
         .sdl3_include = "",
         .extra_native = &native,
     };
-    const out = try generateBuildZig(a, cfg, &.{});
-    defer a.free(out);
+    const out = try generateBuildZig(a, cfg, &.{}, false);
     // Static lib is added as an object file, the target token is substituted,
     // and the include path is wired.
     try std.testing.expect(std.mem.indexOf(u8, out, "addObjectFile") != null);
@@ -669,7 +728,9 @@ test "generateBuildZig emits native lib linking" {
 }
 
 test "generateBuildZig emits source package modules and wires them into scripts" {
-    const a = std.testing.allocator;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
     const mods = [_]ModuleSpec{.{
         .name = "platformer",
         .root_abs = "/store/com.acme.platformer/1.0.0/src/root.zig",
@@ -694,8 +755,7 @@ test "generateBuildZig emits source package modules and wires them into scripts"
         .extra_modules = &mods,
     };
     const src = [_][]const u8{"/proj/src/Player.zig"};
-    const out = try generateBuildZig(a, cfg, &src);
-    defer a.free(out);
+    const out = try generateBuildZig(a, cfg, &src, false);
     // Package module declared and imported into engine.
     try std.testing.expect(std.mem.indexOf(u8, out, "pkgmod_0") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "\"platformer\"") != null);
@@ -707,17 +767,20 @@ test "generateBuildZig emits source package modules and wires them into scripts"
 }
 
 test "generateMainZig emits plugin registration calls" {
-    const a = std.testing.allocator;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
     const plugins = [_]PluginSpec{.{ .module = "com_acme_phys", .entry = "register" }};
     const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
-    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, false, &plugins);
-    defer a.free(out);
+    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, false, false, &plugins);
     try std.testing.expect(std.mem.indexOf(u8, out, "@import(\"com_acme_phys\").register(&g_services)") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "Plugin packages register their services here") != null);
 }
 
 test "generateBuildZig emits shared lib link by name" {
-    const a = std.testing.allocator;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
     const native = [_]NativeLibSpec{.{
         .pkg_root = "/store/com.acme.snd/2.0.0",
         .name = "snd",
@@ -744,8 +807,7 @@ test "generateBuildZig emits shared lib link by name" {
         .sdl3_include = "",
         .extra_native = &native,
     };
-    const out = try generateBuildZig(a, cfg, &.{});
-    defer a.free(out);
+    const out = try generateBuildZig(a, cfg, &.{}, false);
     try std.testing.expect(std.mem.indexOf(u8, out, "linkSystemLibrary(\"snd\", .{})") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "addLibraryPath") != null);
 }
@@ -761,6 +823,7 @@ pub fn generateMainZig(
     component_count: usize,
     runtime: RuntimeConfig,
     use_gpu: bool,
+    uses_ui: bool,
     plugins: []const PluginSpec,
 ) ![]u8 {
     _ = project_path; // assets (incl. scene) now come from the package, not a path
@@ -865,11 +928,68 @@ pub fn generateMainZig(
             "}\n\n",
     );
 
+    if (uses_ui) {
+        // In-game GUI runtime (C4/C9): `UiInstance`/`UiRuntime` are pure data
+        // (zero dvui imports, D7) — only the per-frame draw call below needs
+        // `gui`/`ui_render`. One instance per scene node carrying a
+        // `ui_document` component, keyed by that node's GUID; `syncUi`
+        // reconciles the live set against whichever scenes are currently
+        // loaded (called at the same points `syncLive` already is).
+        try out.appendSlice(
+            a,
+            "const gui = @import(\"gui\");\n" ++
+                "const ui_render = @import(\"ui_render\");\n\n" ++
+                "var g_ui_events: engine.ui.UiEvents = engine.ui.UiEvents.init();\n" ++
+                "var g_ui_runtime: engine.ui.UiRuntime = engine.ui.UiRuntime.init();\n" ++
+                // Per-frame SDL events are buffered here, then applied to g_input
+                // AFTER the UI walk so the GUI gets first claim on them (input
+                // priority). Sized well above any realistic per-frame event count.
+                "var g_event_buf: [256]SDL_Event align(8) = undefined;\n" ++
+                "var g_event_count: usize = 0;\n\n" ++
+                // Reads into the current dvui frame's arena (freed automatically
+                // next frame) — only ever called from within dvui_win.begin()/end().
+                "fn uiTextureSource(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {\n" ++
+                "    _ = ctx;\n" ++
+                "    if (!g_assets_ready) return null;\n" ++
+                "    const gid = (editor.Guid.parse(guid) catch return null).bytes;\n" ++
+                "    const r = g_assets.readById(gui.currentWindow().arena(), gid) orelse return null;\n" ++
+                "    return r.bytes;\n" ++
+                "}\n\n" ++
+                "fn syncUi() void {\n" ++
+                "    var keep_buf: [engine.ui.UiRuntime.MAX_INSTANCES][]const u8 = undefined;\n" ++
+                "    var keep_count: usize = 0;\n" ++
+                "    for (gatherRenderNodes()) |*node| {\n" ++
+                "        if (!node.active) continue;\n" ++
+                "        const node_guid = node.guidSlice();\n" ++
+                "        if (node_guid.len == 0) continue;\n" ++
+                "        for (node.components[0..node.component_count]) |comp| {\n" ++
+                "            if (comp != .ui_document) continue;\n" ++
+                "            const doc_guid = comp.ui_document.document.slice();\n" ++
+                "            if (doc_guid.len == 0) continue;\n" ++
+                "            if (keep_count < keep_buf.len) {\n" ++
+                "                keep_buf[keep_count] = node_guid;\n" ++
+                "                keep_count += 1;\n" ++
+                "            }\n" ++
+                "            if (g_ui_runtime.instanceFor(node_guid) != null) continue;\n" ++
+                "            if (!g_assets_ready) continue;\n" ++
+                "            const gid = (editor.Guid.parse(doc_guid) catch continue).bytes;\n" ++
+                "            const r = g_assets.readById(std.heap.page_allocator, gid) orelse continue;\n" ++
+                "            defer std.heap.page_allocator.free(r.bytes);\n" ++
+                "            var inst = engine.ui.UiInstance.load(std.heap.page_allocator, r.bytes, &g_ui_events) catch continue;\n" ++
+                "            if (!g_ui_runtime.add(node_guid, inst)) inst.deinit();\n" ++
+                "        }\n" ++
+                "    }\n" ++
+                "    g_ui_runtime.retainOnly(keep_buf[0..keep_count]);\n" ++
+                "}\n\n",
+        );
+    }
+
     // Platform layer (windowing + input + gamepad). Split into a dedicated
     // backend module so other platforms can be added later.
     try out.appendSlice(a, sdl3.bindings);
     try out.appendSlice(a, sdl3.input);
     try out.appendSlice(a, sdl3.gamepad);
+    try out.appendSlice(a, sdl3.apply_input);
 
     for (0..src_files.len) |i| {
         const s = std.fmt.bufPrint(&tmp, "const _uc{d}_mod = @import(\"script_{d}\");\n", .{ i, i }) catch return error.BufferTooSmall;
@@ -1179,8 +1299,23 @@ pub fn generateMainZig(
             "    // same package as scenes, lazily on first Instantiate.\n" ++
             "    g_spawner = engine.Spawner.init(gpa);\n" ++
             "    defer g_spawner.deinit();\n" ++
-            "    g_spawner.setResolver(sceneLoader, null);\n",
+            "    g_spawner.setResolver(sceneLoader, null);\n" ++
+            "    // Published so scripts and UI button handlers can request an orderly\n" ++
+            "    // shutdown: `frame.service(engine.Application).?.quit()`.\n" ++
+            "    g_services.register(engine.Application, &g_application);\n",
     );
+    if (uses_ui) {
+        try out.appendSlice(
+            a,
+            "    // Published so scripts can reach their document instance via\n" ++
+                "    // `frame.uiDocument(node)` (C4).\n" ++
+                "    g_services.register(engine.ui.UiRuntime, &g_ui_runtime);\n" ++
+                "    defer g_ui_runtime.deinitAll();\n" ++
+                "    // Published so scripts can subscribe to button clicks via the\n" ++
+                "    // typed-event API (D4): `frame.service(engine.ui.UiEvents).?.on(MyEvent, self, onMyEvent)`.\n" ++
+                "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n",
+        );
+    }
 
     // Plugin runtime registration (#64): each installed plugin package's entry
     // point is handed the live service registry so it can register
@@ -1211,6 +1346,12 @@ pub fn generateMainZig(
         // Instantiate live components for the boot scene (and any additively
         // loaded scenes) via the same reconciler used every frame.
         try out.appendSlice(a, "    syncLive();\n\n");
+    }
+    if (uses_ui) {
+        // Load `.uidoc` instances for the boot scene's `ui_document`
+        // components — unconditional on `has_user` so a script-less,
+        // purely UI-driven game (e.g. a menu) still renders its UI.
+        try out.appendSlice(a, "    syncUi();\n\n");
     }
 
     try out.appendSlice(
@@ -1245,6 +1386,24 @@ pub fn generateMainZig(
                     "    render.setSources(gpuSource, gpuSource, gpuSource);\n\n",
                 .{ esc.items, runtime.width, runtime.height, if (runtime.vsync) "true" else "false" },
             ));
+            if (uses_ui) {
+                // dvui draws "ontop" of the already-rendered scene, sharing
+                // the SAME SDL3 window/device `gpu.Window` owns (D9's
+                // sdl3gpu-ontop backend) — `@ptrCast` bridges dvui's own
+                // translate-c'd SDL3 types to `gpu`'s (two separate
+                // translate-c invocations of the same headers, so distinct
+                // Zig types for what's ABI-identical opaque C structs).
+                try out.appendSlice(
+                    a,
+                    "    var dvui_backend = gui.backend.init(io, @ptrCast(win.window), @ptrCast(win.device), gpa);\n" ++
+                        "    defer dvui_backend.deinit();\n" ++
+                        "    var dvui_win = gui.Window.init(@src(), gpa, dvui_backend.backend(), .{}) catch {\n" ++
+                        "        std.debug.print(\"[Turian] dvui window init failed\\n\", .{});\n" ++
+                        "        return;\n" ++
+                        "    };\n" ++
+                        "    defer dvui_win.deinit();\n\n",
+                );
+            }
         } else {
             const vsync_flag: u8 = if (runtime.vsync) 1 else 0;
             try out.appendSlice(a, try std.fmt.allocPrint(
@@ -1287,47 +1446,64 @@ pub fn generateMainZig(
             "    main_loop: while (true) {\n" ++
             "        engine.Profiler.beginFrame();\n" ++
             "        g_input.newFrame();\n" ++
-            "        var ev: SDL_Event align(8) = undefined;\n" ++
+            "        var ev: SDL_Event align(8) = undefined;\n",
+    );
+    if (uses_ui) {
+        // Input priority (#47): buffer this frame's SDL events, then run the
+        // in-game GUI *before* applying them to gameplay, so a widget can claim
+        // an event (dvui sets `.handled`) and suppress it from world input this
+        // same frame — the shipped-game counterpart to `PlayMode.feedInput`.
+        // The GUI walk needs this frame's swapchain (its buffered draw commands
+        // flush at dvui_win.end()), so acquire the frame up front; `_frame` is
+        // reused by the render step below. dvui defers all drawing to end(), so
+        // walking here (ahead of renderScene) has no GPU-ordering cost.
+        try out.appendSlice(
+            a,
+            "        g_event_count = 0;\n" ++
+                "        while (SDL_PollEvent(&ev)) {\n" ++
+                "            if (ev.type == SDL_EVENT_QUIT) break :main_loop;\n" ++
+                "            _ = dvui_backend.addEvent(&dvui_win, @bitCast(ev)) catch false;\n" ++
+                "            if (g_event_count < g_event_buf.len) {\n" ++
+                "                g_event_buf[g_event_count] = ev;\n" ++
+                "                g_event_count += 1;\n" ++
+                "            }\n" ++
+                "        }\n\n" ++
+                "        const _frame = win.beginFrame();\n" ++
+                "        var _ui_mouse = false;\n" ++
+                "        var _ui_key = false;\n" ++
+                "        if (_frame) |fr| {\n" ++
+                "            dvui_backend.cmd = @ptrCast(fr.cmd);\n" ++
+                "            dvui_backend.swapchain_texture = @ptrCast(fr.swapchain);\n" ++
+                "            try dvui_win.begin(std.Io.Clock.boot.now(io).nanoseconds);\n" ++
+                "            for (g_ui_runtime.instances()) |*ui_entry| {\n" ++
+                "                if (!ui_entry.instance.visible) continue;\n" ++
+                "                const lb = ui_render.fit(.{ .w = @floatFromInt(fr.width), .h = @floatFromInt(fr.height) }, &ui_entry.instance.doc);\n" ++
+                "                const result = ui_render.drawTree(&ui_entry.instance.doc, lb, .{ .texture_source = uiTextureSource });\n" ++
+                "                ui_render.dispatchClicks(result, ui_entry.instance.resolved, &g_ui_events);\n" ++
+                "            }\n" ++
+                "            for (gui.events()) |*e| {\n" ++
+                "                if (!e.handled) continue;\n" ++
+                "                switch (e.evt) {\n" ++
+                "                    .mouse => _ui_mouse = true,\n" ++
+                "                    .key => _ui_key = true,\n" ++
+                "                    else => {},\n" ++
+                "                }\n" ++
+                "            }\n" ++
+                "        }\n" ++
+                "        for (g_event_buf[0..g_event_count]) |*bev| applyInputEvent(bev, _ui_mouse, _ui_key);\n\n",
+        );
+    } else {
+        try out.appendSlice(
+            a,
             "        while (SDL_PollEvent(&ev)) {\n" ++
-            "            switch (ev.type) {\n" ++
-            "                SDL_EVENT_QUIT => break :main_loop,\n" ++
-            "                SDL_EVENT_KEY_DOWN, SDL_EVENT_KEY_UP => {\n" ++
-            "                    const ke: *const SDL_KeyboardEvent = @ptrCast(&ev);\n" ++
-            "                    if (scancodeToKey(ke.scancode)) |k| g_input.setKey(k, ev.type == SDL_EVENT_KEY_DOWN);\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_MOUSE_MOTION => {\n" ++
-            "                    const me: *const SDL_MouseMotionEvent = @ptrCast(&ev);\n" ++
-            "                    g_input.setMousePosition(me.x, me.y);\n" ++
-            "                    g_input.addMouseMotion(me.xrel, me.yrel);\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP => {\n" ++
-            "                    const be: *const SDL_MouseButtonEvent = @ptrCast(&ev);\n" ++
-            "                    if (sdlButtonToMouse(be.button)) |mb| g_input.setMouseButton(mb, ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN);\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_MOUSE_WHEEL => {\n" ++
-            "                    const we: *const SDL_MouseWheelEvent = @ptrCast(&ev);\n" ++
-            "                    g_input.addWheel(we.y);\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_GAMEPAD_ADDED => {\n" ++
-            "                    const ge: *const SDL_GamepadDeviceEvent = @ptrCast(&ev);\n" ++
-            "                    _ = SDL_OpenGamepad(ge.which);\n" ++
-            "                    g_input.gamepad_connected = true;\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP => {\n" ++
-            "                    const be: *const SDL_GamepadButtonEvent = @ptrCast(&ev);\n" ++
-            "                    if (sdlPadButton(be.button)) |pb| g_input.setGamepadButton(pb, ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);\n" ++
-            "                },\n" ++
-            "                SDL_EVENT_GAMEPAD_AXIS_MOTION => {\n" ++
-            "                    const ae: *const SDL_GamepadAxisEvent = @ptrCast(&ev);\n" ++
-            "                    if (sdlPadAxis(ae.axis)) |pa| {\n" ++
-            "                        const norm = @as(f32, @floatFromInt(ae.value)) / 32767.0;\n" ++
-            "                        g_input.setGamepadAxis(pa, std.math.clamp(norm, -1.0, 1.0));\n" ++
-            "                    }\n" ++
-            "                },\n" ++
-            "                else => {},\n" ++
-            "            }\n" ++
-            "        }\n\n" ++
-            "        const now_ts = std.Io.Clock.awake.now(io);\n" ++
+                "            if (ev.type == SDL_EVENT_QUIT) break :main_loop;\n" ++
+                "            applyInputEvent(&ev, false, false);\n" ++
+                "        }\n\n",
+        );
+    }
+    try out.appendSlice(
+        a,
+        "        const now_ts = std.Io.Clock.awake.now(io);\n" ++
             "        const dur    = prev_ts.durationTo(now_ts);\n" ++
             "        const delta: f32 = @as(f32, @floatFromInt(@as(i64, @intCast(dur.nanoseconds)))) / 1_000_000_000.0;\n" ++
             "        prev_ts = now_ts;\n" ++
@@ -1346,20 +1522,53 @@ pub fn generateMainZig(
                 "        }\n" ++
                 "        // Apply any scene load/unload a script requested this frame, then\n" ++
                 "        // reconcile live components against the new set of loaded scenes.\n" ++
-                "        if (g_scene_mgr.flushRequests()) syncLive();\n" ++
-                "        // Apply runtime prefab spawns/destroys into the active scene.\n" ++
+                "        const _scene_changed = g_scene_mgr.flushRequests();\n" ++
+                "        if (_scene_changed) syncLive();\n",
+        );
+        if (uses_ui) try out.appendSlice(a, "        if (_scene_changed) syncUi();\n");
+        try out.appendSlice(
+            a,
+            "        // Apply runtime prefab spawns/destroys into the active scene.\n" ++
                 "        if (g_spawner.pending() > 0) {\n" ++
                 "            if (g_scene_mgr.getActiveScene()) |_ah| {\n" ++
                 "                const _buf = g_scene_mgr.nodeBuffer(_ah);\n" ++
                 "                if (_buf.len > 0) {\n" ++
-                "                    if (g_spawner.flush(io, _buf, g_scene_mgr.nodeCountPtr(_ah).?)) reconcileScene(_ah);\n" ++
+                "                    if (g_spawner.flush(io, _buf, g_scene_mgr.nodeCountPtr(_ah).?)) {\n" ++
+                "                        reconcileScene(_ah);\n",
+        );
+        if (uses_ui) try out.appendSlice(a, "                        syncUi();\n");
+        try out.appendSlice(
+            a,
+            "                    }\n" ++
                 "                }\n" ++
                 "            }\n" ++
                 "        }\n\n",
         );
     }
 
-    if (use_gpu) {
+    try out.appendSlice(
+        a,
+        "        // A script or UI button handler called `frame.service(engine.Application).quit()`.\n" ++
+            "        if (g_application.quit_requested) break :main_loop;\n\n",
+    );
+
+    if (use_gpu and uses_ui) {
+        // The UI tree was already walked above (before gameplay input) using
+        // `_frame`; its draw commands are buffered inside dvui. Render the scene
+        // into the same command buffer, then dvui_win.end() flushes the UI
+        // "ontop" of it (D9's sdl3gpu-ontop pattern) and we submit.
+        try out.appendSlice(
+            a,
+            "        if (_frame) |fr| {\n" ++
+                "            render.renderScene(fr.cmd, fr.swapchain, fr.width, fr.height, gatherRenderNodes());\n" ++
+                "            _ = try dvui_win.end(.{ .manage_backend = false });\n" ++
+                "            fr.submit();\n" ++
+                "        }\n" ++
+                "        engine.Profiler.endFrame();\n" ++
+                "    }\n" ++
+                "}\n",
+        );
+    } else if (use_gpu) {
         try out.appendSlice(
             a,
             "        if (win.beginFrame()) |fr| {\n" ++

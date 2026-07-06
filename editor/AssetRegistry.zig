@@ -72,6 +72,12 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .internal_editor,
             .icon_hint = .data,
         },
+        .ui_document => .{
+            .name = "UI Document",
+            .extensions = &.{".uidoc"},
+            .open_mode = .internal_editor,
+            .icon_hint = .document,
+        },
     };
 }
 

@@ -19,6 +19,7 @@ const Screenshots = @import("Screenshots.zig");
 const ProfileExport = @import("ProfileExport.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
 const PlayMode = @import("PlayMode.zig");
+const EditorFrameTiming = @import("EditorFrameTiming.zig");
 
 const Frame = engine.Profiler.Frame;
 
@@ -183,7 +184,7 @@ pub fn draw() void {
 
     // --- editor window phases (secondary; collapsed by default) ---
     if (gui.expander(@src(), "Editor CPU (studio)", .{ .expanded = &g_show_editor_cpu }, .{ .expand = .horizontal })) {
-        const ft = cw.frameTiming();
+        const ft = EditorFrameTiming.last();
         gui.label(@src(), "fps           {d:.0}", .{cw.FPS()}, .{});
         gui.label(@src(), "frame total   {d:.3} ms", .{ms(ft.total_ns)}, .{});
         gui.label(@src(), "  events {d:.3}", .{ms(ft.events_ns)}, .{});

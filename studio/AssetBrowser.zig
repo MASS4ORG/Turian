@@ -97,7 +97,7 @@ fn drawExpandToggle(asset_path: []const u8, id_extra: usize) void {
             .min_size_content = .{ .w = 16, .h = 16 },
             .padding = .all(4),
             .margin = .all(2),
-            .corner_radius = gui.Rect.all(999),
+            .corners = gui.CornerRect.all(999),
             .id_extra = id_extra,
         },
     )) {
@@ -181,7 +181,7 @@ fn drawSubAssetTile(proj_path: []const u8, sub: editor.SubAsset, id_extra: usize
         .background = true,
         .style = if (is_selected) .highlight else .window,
         .border = .all(if (is_selected) 2 else 0),
-        .corner_radius = .all(0),
+        .corners = .all(0),
         .margin = .{ .x = 0, .y = 2, .w = 0, .h = 2 },
         .padding = .all(4),
         .gravity_x = 0.5,
@@ -560,7 +560,7 @@ pub fn draw() void {
             .background = true,
             .style = if (up_hovered) .highlight else .content,
             .border = .all(if (up_hovered) 2 else 1),
-            .corner_radius = .all(4),
+            .corners = .all(4),
             .margin = .all(2),
             .padding = .all(4),
             .gravity_x = 0.5,
@@ -686,7 +686,7 @@ pub fn draw() void {
             .background = true,
             .style = if (is_selected or is_drag_target) .highlight else .content,
             .border = .all(if (is_selected or is_drag_target) 2 else 1),
-            .corner_radius = .all(4),
+            .corners = .all(4),
             .margin = .all(2),
             .padding = .all(4),
             .gravity_x = 0.5,
@@ -1034,6 +1034,10 @@ pub fn draw() void {
             if (gui.menuItemLabel(@src(), "New Input Actions", .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.createNewInputActions(browse_path);
+            }
+            if (gui.menuItemLabel(@src(), "New UI Document", .{}, .{ .expand = .horizontal }) != null) {
+                fw.close();
+                AssetActions.createNewUiDocument(browse_path);
             }
             for (engine.Material.presets, 0..) |preset, pi| {
                 var label_buf: [64]u8 = undefined;

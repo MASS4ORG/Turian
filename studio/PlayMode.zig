@@ -252,6 +252,11 @@ fn playNodes() []const engine.SceneNode {
 /// Forward this frame's dvui input events into the live simulation.
 fn feedInput() void {
     for (gui.events()) |*e| {
+        // UI (e.g. a `.uidoc` button in the "Show UI overlay") already
+        // consumed this event this frame — don't also feed it to gameplay
+        // input, or a click on a UI button would fire the game's click
+        // handling underneath it too (#47 M2 input-priority fix).
+        if (e.handled) continue;
         switch (e.evt) {
             .key => |ke| {
                 if (ke.action == .repeat) continue;

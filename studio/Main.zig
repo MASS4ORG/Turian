@@ -10,6 +10,7 @@ const GpuRenderer = @import("GpuRenderer.zig");
 const PreviewSystem = @import("PreviewSystem.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
+const EditorFrameTiming = @import("EditorFrameTiming.zig");
 const build_options = @import("turian_build_options");
 
 /// Route std.log through the engine diagnostic ring so the Remote Debug
@@ -214,8 +215,10 @@ fn run(main_init: std.process.Init) !void {
         GpuRenderer.applyPendingVsync();
 
         const nstime = win.beginWait(interrupted);
+        EditorFrameTiming.beginFrame(nstime);
         try win.begin(nstime);
         _ = try backend.addAllEvents(&win);
+        EditorFrameTiming.markEventsEnd(backend.nanoTime());
 
         GpuRenderer.beginFrame(backend.cmd);
         PreviewSystem.beginFrame();
@@ -249,6 +252,9 @@ fn run(main_init: std.process.Init) !void {
                         .gpu_sdl3_c = build_options.gpu_sdl3_c_path,
                         .render_root = build_options.render_root_path,
                         .sdl3_include = build_options.sdl3_include_path,
+                        .ui_render_root = build_options.ui_render_root_path,
+                        .dvui_url = build_options.dvui_url,
+                        .dvui_hash = build_options.dvui_hash,
                         .engine_version = build_options.version,
                     };
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
@@ -330,7 +336,10 @@ fn run(main_init: std.process.Init) !void {
             }
         }
 
+        EditorFrameTiming.markBuildEnd(backend.nanoTime());
+        win.endRendering(.{});
         const end_micros = try win.end(.{});
+        EditorFrameTiming.endFrame(backend.nanoTime());
         if (quit) break :main_loop;
 
         const wait_event_micros = win.waitTime(end_micros);

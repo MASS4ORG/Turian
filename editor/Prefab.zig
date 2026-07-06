@@ -87,7 +87,12 @@ pub fn serializeSubtree(
     @memset(remap[0..count], -1);
     for (indices[0..n], 0..) |orig, new_i| remap[orig] = @intCast(new_i);
 
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    // Heap/arena-allocated, not `[MAX_OBJECTS]SceneNode` on the stack — that
+    // temp buffer overflowed the thread stack (SceneNode is large enough that
+    // MAX_OBJECTS of them is several MB; see the Spawner.zig fix for the same
+    // class of bug).
+    const tmpl = allocator.alloc(SceneNode, n) catch return null;
+    defer allocator.free(tmpl);
     for (indices[0..n], 0..) |orig, new_i| {
         var node = objects[orig];
         node.parent = if (node.parent >= 0) remap[@intCast(node.parent)] else -1;
@@ -95,7 +100,7 @@ pub fn serializeSubtree(
         tmpl[new_i] = node;
     }
 
-    return scene_io.serializeScene(allocator, &tmpl, n);
+    return scene_io.serializeScene(allocator, tmpl, n);
 }
 
 /// Serialise an existing prefab *instance* subtree back into template bytes,
@@ -117,7 +122,8 @@ pub fn serializeInstanceAsTemplate(
     @memset(remap[0..count], -1);
     for (indices[0..n], 0..) |orig, new_i| remap[orig] = @intCast(new_i);
 
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    const tmpl = allocator.alloc(SceneNode, n) catch return null;
+    defer allocator.free(tmpl);
     for (indices[0..n], 0..) |orig, new_i| {
         var node = objects[orig];
         node.parent = if (node.parent >= 0) remap[@intCast(node.parent)] else -1;
@@ -128,7 +134,7 @@ pub fn serializeInstanceAsTemplate(
         tmpl[new_i] = node;
     }
 
-    return scene_io.serializeScene(allocator, &tmpl, n);
+    return scene_io.serializeScene(allocator, tmpl, n);
 }
 
 // ── Instantiation ───────────────────────────────────────────────────────────
@@ -148,9 +154,13 @@ pub fn instantiate(
     out_count: *usize,
     parent: i32,
 ) ?usize {
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
+    // Upper-bound sized (the parsed count isn't known until after the call),
+    // so this can't shrink to an exact-fit allocation like the other
+    // functions here — still heap, not `[MAX_OBJECTS]SceneNode` on the stack.
+    const tmpl = allocator.alloc(SceneNode, MAX_OBJECTS) catch return null;
+    defer allocator.free(tmpl);
     var tn: usize = 0;
-    if (!scene_io.loadSceneFromBytes(allocator, prefab_bytes, &tmpl, &tn)) return null;
+    if (!scene_io.loadSceneFromBytes(allocator, prefab_bytes, tmpl, &tn)) return null;
     if (tn == 0) return null;
 
     const base = out_count.*;
@@ -285,8 +295,14 @@ test "serialize subtree then instantiate links template nodes" {
     const a = testing.allocator;
     const io = testing.io;
 
+    // Heap, not `[MAX_OBJECTS]SceneNode` on the stack — that overflows the
+    // thread stack (same class of bug as the Spawner.zig fix; this file's
+    // own tests never ran until `editor/root.zig` gained a `refAllDecls`
+    // block, which is how this was finally caught).
+    const objects = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(objects);
+
     // Scene: 0 Root, 1 Child(parent 0), 2 Unrelated.
-    var objects: [MAX_OBJECTS]SceneNode = undefined;
     objects[0] = testNode("Root", -1, io);
     objects[0].transform.position = .{ .x = 1, .y = 2, .z = 3 };
     _ = objects[0].addComponent(.{ .light = .{} });
@@ -294,13 +310,14 @@ test "serialize subtree then instantiate links template nodes" {
     objects[2] = testNode("Unrelated", -1, io);
     const count: usize = 3;
 
-    const bytes = serializeSubtree(a, &objects, count, 0).?;
+    const bytes = serializeSubtree(a, objects, count, 0).?;
     defer a.free(bytes);
 
     // Instantiate into a fresh scene under no parent.
-    var scene: [MAX_OBJECTS]SceneNode = undefined;
+    const scene = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(scene);
     var sc: usize = 0;
-    const root = instantiate(a, io, bytes, "11111111-1111-4111-8111-111111111111", &scene, &sc, -1).?;
+    const root = instantiate(a, io, bytes, "11111111-1111-4111-8111-111111111111", scene, &sc, -1).?;
 
     try testing.expectEqual(@as(usize, 0), root);
     try testing.expectEqual(@as(usize, 2), sc); // only the subtree (Root + Child)
@@ -328,16 +345,18 @@ test "two instances are independent and reparent under a host" {
     const a = testing.allocator;
     const io = testing.io;
 
-    var objects: [MAX_OBJECTS]SceneNode = undefined;
+    const objects = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(objects);
     objects[0] = testNode("Coin", -1, io);
-    const bytes = serializeSubtree(a, &objects, 1, 0).?;
+    const bytes = serializeSubtree(a, objects, 1, 0).?;
     defer a.free(bytes);
 
-    var scene: [MAX_OBJECTS]SceneNode = undefined;
+    const scene = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(scene);
     scene[0] = testNode("Host", -1, io);
     var sc: usize = 1;
-    const r1 = instantiate(a, io, bytes, "22222222-2222-4222-8222-222222222222", &scene, &sc, 0).?;
-    const r2 = instantiate(a, io, bytes, "22222222-2222-4222-8222-222222222222", &scene, &sc, 0).?;
+    const r1 = instantiate(a, io, bytes, "22222222-2222-4222-8222-222222222222", scene, &sc, 0).?;
+    const r2 = instantiate(a, io, bytes, "22222222-2222-4222-8222-222222222222", scene, &sc, 0).?;
 
     try testing.expect(r1 != r2);
     try testing.expectEqual(@as(usize, 3), sc);
@@ -352,20 +371,23 @@ test "recompute, propagate, and revert respect overrides" {
     const io = testing.io;
 
     // Template subtree from a single node.
-    var objects: [MAX_OBJECTS]SceneNode = undefined;
+    const objects = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(objects);
     objects[0] = testNode("Enemy", -1, io);
     objects[0].transform.position = .{ .x = 0, .y = 0, .z = 0 };
     objects[0].active = true;
-    const bytes = serializeSubtree(a, &objects, 1, 0).?;
+    const bytes = serializeSubtree(a, objects, 1, 0).?;
     defer a.free(bytes);
 
-    var scene: [MAX_OBJECTS]SceneNode = undefined;
+    const scene = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(scene);
     var sc: usize = 0;
-    _ = instantiate(a, io, bytes, "33333333-3333-4333-8333-333333333333", &scene, &sc, -1).?;
+    _ = instantiate(a, io, bytes, "33333333-3333-4333-8333-333333333333", scene, &sc, -1).?;
 
     // Parse the template for reconciliation.
-    var tmpl: [MAX_OBJECTS]SceneNode = undefined;
-    const tn = parse(a, bytes, &tmpl).?;
+    const tmpl = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(tmpl);
+    const tn = parse(a, bytes, tmpl).?;
 
     // User moves the instance → transform becomes an override.
     scene[0].transform.position = .{ .x = 5, .y = 0, .z = 0 };
@@ -374,14 +396,16 @@ test "recompute, propagate, and revert respect overrides" {
     try testing.expect(!scene[0].hasOverride(.name));
 
     // Source prefab is edited: renamed + repositioned. Rebuild the template.
-    var objects2: [MAX_OBJECTS]SceneNode = undefined;
+    const objects2 = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(objects2);
     objects2[0] = objects[0];
     objects2[0].setName("Boss");
     objects2[0].transform.position = .{ .x = 0, .y = 9, .z = 0 };
-    const bytes2 = serializeSubtree(a, &objects2, 1, 0).?;
+    const bytes2 = serializeSubtree(a, objects2, 1, 0).?;
     defer a.free(bytes2);
-    var tmpl2: [MAX_OBJECTS]SceneNode = undefined;
-    const tn2 = parse(a, bytes2, &tmpl2).?;
+    const tmpl2 = try a.alloc(SceneNode, MAX_OBJECTS);
+    defer a.free(tmpl2);
+    const tn2 = parse(a, bytes2, tmpl2).?;
 
     // Propagate: name (inherited) updates, transform (overridden) is kept.
     syncInstance(scene[0..sc], tmpl2[0..tn2], .propagate);

@@ -9,6 +9,9 @@ const DataAssetEditor = @import("DataAssetEditor.zig");
 const InputActionsEditor = @import("InputActionsEditor.zig");
 const ProjectSettingsEditor = @import("ProjectSettingsEditor.zig");
 const ImportSettingsEditor = @import("ImportSettingsEditor.zig");
+const UiDocumentEditor = @import("UiDocumentEditor.zig");
+const EditorRegistry = @import("EditorRegistry.zig");
+const Documents = @import("Documents.zig");
 const PreviewSystem = @import("PreviewSystem.zig");
 const Preview3D = @import("Preview3D.zig");
 const MeshBounds = @import("MeshBounds.zig");
@@ -31,6 +34,25 @@ pub fn draw() void {
         });
         defer header.deinit();
         gui.label(@src(), "Inspector", .{}, .{ .font = .theme(.heading) });
+    }
+
+    // A `.uidoc` tab open for editing takes over the Inspector with the
+    // selected UI node's properties (or the document's global settings when
+    // no node is selected) — the Hierarchy/View panel trio wired in
+    // `Window.zig` for this same tab context. Gated on the document also
+    // being the *current selection target* (`selected_asset_path`), not just
+    // the active tab: peeking a different asset in the Asset Browser moves
+    // selection away (`EditorState.selectAsset` nulls the other one out) and
+    // must show that asset's own Inspector — otherwise an open `.uidoc` tab
+    // would permanently block single-click "peek" for every other asset.
+    if (Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document) {
+        const uidoc_path = Documents.activePath();
+        if (EditorState.selected_asset_path) |sel_path| {
+            if (std.mem.eql(u8, sel_path, uidoc_path)) {
+                UiDocumentEditor.drawInspector(uidoc_path);
+                return;
+            }
+        }
     }
 
     const sel = EditorState.selected_object orelse {
@@ -156,6 +178,24 @@ pub fn draw() void {
                         EditorState.scene_dirty = true;
                     }
                 },
+                .ui_document => |*ud| {
+                    const obj_before_field = obj.*;
+                    if (PropDraw.drawComponent(@TypeOf(ud.*), ud, ci + 1, false)) {
+                        EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
+                            .idx = sel,
+                            .before = obj_before_field,
+                            .after = obj.*,
+                        } });
+                        EditorState.scene_dirty = true;
+                    }
+                    // C3: editing always happens in the `.uidoc` tab (like
+                    // prefab isolation editing) — "Open" jumps there.
+                    if (EditorState.resolveAssetGuid(ud.document.slice())) |path| {
+                        if (gui.button(@src(), "Open", .{}, .{ .id_extra = ci })) {
+                            Documents.openAsset(path, .ui_document);
+                        }
+                    }
+                },
                 inline else => |*field_data| {
                     const obj_before_field = obj.*;
                     if (PropDraw.drawComponent(@TypeOf(field_data.*), field_data, ci + 1, false)) {
@@ -229,7 +269,7 @@ fn drawPrefabBanner(obj: *EditorState.SceneNode, root: usize) void {
         .margin = .{ .x = 4, .y = 2 },
         .background = true,
         .border = .all(1),
-        .corner_radius = gui.Rect.all(4),
+        .corners = gui.CornerRect.all(4),
         .style = .highlight,
     });
     defer banner.deinit();
@@ -457,6 +497,47 @@ pub fn drawAssetDocument(asset_path: []const u8) void {
     drawAssetInspector(asset_path);
 }
 
+var registry_initialized: bool = false;
+
+/// Register the built-in per-asset-type editors with `EditorRegistry`, once.
+/// New asset editors (e.g. this epic's `UiDocumentEditor`, M2) add a
+/// `register` call here instead of another `if (asset_type == .X)` branch.
+fn ensureRegistered() void {
+    if (registry_initialized) return;
+    registry_initialized = true;
+    EditorRegistry.register(.material, drawMaterial);
+    EditorRegistry.register(.data_asset, drawDataAsset);
+    EditorRegistry.register(.input_actions, drawInputActions);
+    EditorRegistry.register(.project_settings, drawProjectSettings);
+    EditorRegistry.register(.image, ImportSettingsEditor.draw);
+    EditorRegistry.register(.model, ImportSettingsEditor.draw);
+    EditorRegistry.register(.ui_document, drawUiDocument);
+}
+
+/// Merely-selected (not opened as a tab) `.uidoc`: document-level fields
+/// only. Opening it as a tab instead swaps in the Hierarchy/View/Inspector
+/// panel trio — see `draw()`'s `Documents.activeAssetType() == .ui_document`
+/// branch below.
+fn drawUiDocument(asset_path: []const u8, _: editor.AssetType) void {
+    UiDocumentEditor.drawGlobalSettings(asset_path);
+}
+
+fn drawMaterial(asset_path: []const u8, _: editor.AssetType) void {
+    MaterialEditor.draw(asset_path);
+}
+
+fn drawDataAsset(asset_path: []const u8, _: editor.AssetType) void {
+    DataAssetEditor.draw(asset_path);
+}
+
+fn drawInputActions(asset_path: []const u8, _: editor.AssetType) void {
+    InputActionsEditor.draw(asset_path);
+}
+
+fn drawProjectSettings(asset_path: []const u8, _: editor.AssetType) void {
+    ProjectSettingsEditor.draw(asset_path);
+}
+
 fn drawAssetInspector(asset_path: []const u8) void {
     const asset_type = editor.asset_registry.lookupByFilename(asset_path);
 
@@ -483,29 +564,10 @@ fn drawAssetInspector(asset_path: []const u8) void {
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
-    if (asset_type == .material) {
+    ensureRegistered();
+    if (EditorRegistry.has(asset_type)) {
         _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 1 });
-        MaterialEditor.draw(asset_path);
-    }
-
-    if (asset_type == .data_asset) {
-        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 2 });
-        DataAssetEditor.draw(asset_path);
-    }
-
-    if (asset_type == .input_actions) {
-        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 3 });
-        InputActionsEditor.draw(asset_path);
-    }
-
-    if (asset_type == .project_settings) {
-        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 4 });
-        ProjectSettingsEditor.draw(asset_path);
-    }
-
-    if (ImportSettingsEditor.handles(asset_type)) {
-        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 5 });
-        ImportSettingsEditor.draw(asset_path, asset_type);
+        _ = EditorRegistry.draw(asset_type, asset_path);
     }
 
     // A model's generated sub-assets (materials/textures) are NOT listed here:

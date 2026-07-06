@@ -52,7 +52,8 @@ pub const input =
     "const SDL_MouseMotionEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, state: u32, x: f32, y: f32, xrel: f32, yrel: f32 };\n" ++
     "const SDL_MouseWheelEvent = extern struct { type: u32, reserved: u32, timestamp: u64, windowID: u32, which: u32, x: f32, y: f32, direction: u32, mouse_x: f32, mouse_y: f32 };\n\n" ++
     "var g_input: engine.Input = engine.Input.init();\n" ++
-    "var g_services: engine.Services = engine.Services.init();\n\n" ++
+    "var g_services: engine.Services = engine.Services.init();\n" ++
+    "var g_application: engine.Application = .{};\n\n" ++
     "fn scancodeToKey(sc: u32) ?engine.Key {\n" ++
     "    return switch (sc) {\n" ++
     "        4...29 => @enumFromInt(@intFromEnum(engine.Key.a) + (sc - 4)),\n" ++
@@ -87,4 +88,55 @@ pub const gamepad =
     "}\n" ++
     "fn sdlPadAxis(ax: u8) ?engine.GamepadAxis {\n" ++
     "    return if (ax < 6) @enumFromInt(ax) else null;\n" ++
+    "}\n\n";
+
+/// Applies one SDL event to `g_input`. `ui_mouse`/`ui_key` say whether the
+/// in-game GUI consumed the pointer / keyboard this frame (dvui set `.handled`
+/// on those events); when set, the corresponding button/wheel/key presses are
+/// withheld from world input so a click on a UI widget doesn't also reach
+/// gameplay — the shipped-game half of the input-priority rule Studio's
+/// `PlayMode.feedInput` already applies. Mouse *motion* and all gamepad input
+/// are never suppressed (a cursor merely passing over a HUD must not freeze a
+/// live camera, and UI does not consume gamepad events yet — post-MVP nav).
+pub const apply_input =
+    "fn applyInputEvent(ev: *align(8) const SDL_Event, ui_mouse: bool, ui_key: bool) void {\n" ++
+    "    switch (ev.type) {\n" ++
+    "        SDL_EVENT_KEY_DOWN, SDL_EVENT_KEY_UP => {\n" ++
+    "            if (ui_key) return;\n" ++
+    "            const ke: *const SDL_KeyboardEvent = @ptrCast(ev);\n" ++
+    "            if (scancodeToKey(ke.scancode)) |k| g_input.setKey(k, ev.type == SDL_EVENT_KEY_DOWN);\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_MOUSE_MOTION => {\n" ++
+    "            const me: *const SDL_MouseMotionEvent = @ptrCast(ev);\n" ++
+    "            g_input.setMousePosition(me.x, me.y);\n" ++
+    "            g_input.addMouseMotion(me.xrel, me.yrel);\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP => {\n" ++
+    "            if (ui_mouse) return;\n" ++
+    "            const be: *const SDL_MouseButtonEvent = @ptrCast(ev);\n" ++
+    "            if (sdlButtonToMouse(be.button)) |mb| g_input.setMouseButton(mb, ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN);\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_MOUSE_WHEEL => {\n" ++
+    "            if (ui_mouse) return;\n" ++
+    "            const we: *const SDL_MouseWheelEvent = @ptrCast(ev);\n" ++
+    "            g_input.addWheel(we.y);\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_GAMEPAD_ADDED => {\n" ++
+    "            const ge: *const SDL_GamepadDeviceEvent = @ptrCast(ev);\n" ++
+    "            _ = SDL_OpenGamepad(ge.which);\n" ++
+    "            g_input.gamepad_connected = true;\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP => {\n" ++
+    "            const be: *const SDL_GamepadButtonEvent = @ptrCast(ev);\n" ++
+    "            if (sdlPadButton(be.button)) |pb| g_input.setGamepadButton(pb, ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);\n" ++
+    "        },\n" ++
+    "        SDL_EVENT_GAMEPAD_AXIS_MOTION => {\n" ++
+    "            const ae: *const SDL_GamepadAxisEvent = @ptrCast(ev);\n" ++
+    "            if (sdlPadAxis(ae.axis)) |pa| {\n" ++
+    "                const norm = @as(f32, @floatFromInt(ae.value)) / 32767.0;\n" ++
+    "                g_input.setGamepadAxis(pa, std.math.clamp(norm, -1.0, 1.0));\n" ++
+    "            }\n" ++
+    "        },\n" ++
+    "        else => {},\n" ++
+    "    }\n" ++
     "}\n\n";

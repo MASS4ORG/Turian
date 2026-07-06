@@ -84,9 +84,32 @@ pub fn build(b: *std.Build) void {
         break :blk m;
     } else null;
 
+    // ── UI-render module ──────────────────────────────────────────────────────
+    // Single node-tree -> dvui draw walk (#47 in-game GUI epic), shared by the
+    // studio viewport overlay and the shipped game. Depends on engine (for
+    // engine.UiDocument) + gui (dvui) — never pulled into the headless CLI.
+    const ui_render_mod = if (!cli_only) blk: {
+        const m = b.addModule("ui_render", .{
+            .root_source_file = b.path("subsystems/ui_render/root.zig"),
+            .target = target,
+        });
+        m.addImport("engine", engine_mod);
+        break :blk m;
+    } else null;
+
     // ── DVUI dependency ──────────────────────────────────────────────────────
     const dvui_dep = if (!cli_only) b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .sdl3gpu }) else null;
     const dvui_mod = if (dvui_dep) |d| d.module("dvui_sdl3gpu") else null;
+
+    // Second dvui backend variant: dvui's own headless `.testing` backend (no
+    // GPU/window/X11) — lets `subsystems/ui_render/`'s tests actually run real
+    // dvui frames (widget layout, ninepatch/image rendering, click simulation,
+    // `dvui.testing.capturePng`) in `zig build test`, instead of relying on a
+    // live Studio window that isn't reliably screenshot-able in CI/sandboxes.
+    const dvui_testing_dep = if (!cli_only) b.dependency("dvui", .{ .target = target, .optimize = optimize, .backend = .testing }) else null;
+    const dvui_testing_mod = if (dvui_testing_dep) |d| d.module("dvui_testing") else null;
+
+    if (!cli_only) ui_render_mod.?.addImport("gui", dvui_mod.?);
 
     // ── Build options (paths baked in for game build system & CLI) ───────────
     const build_root = b.build_root.path orelse ".";
@@ -123,6 +146,16 @@ pub fn build(b: *std.Build) void {
         turian_opts.addOption([]const u8, "gpu_sdl3_c_path", "");
     }
     turian_opts.addOption([]const u8, "render_root_path", b.pathJoin(&.{ build_root, "subsystems", "render", "root.zig" }));
+    turian_opts.addOption([]const u8, "ui_render_root_path", b.pathJoin(&.{ build_root, "subsystems", "ui_render", "root.zig" }));
+
+    // dvui's url+hash, so a generated game's build.zig.zon can declare the
+    // SAME pinned dependency (C10: only games that reference a `.uidoc`
+    // asset get this entry — see `GameBuild.regenerateBuildZon`). Read from
+    // this project's own manifest so the two never drift apart.
+    const dvui_url: []const u8 = "git+https://github.com/david-vanderson/dvui#405b282a2ef35c304ce61f33f840eeffa02ef3bd";
+    const dvui_hash: []const u8 = "dvui-0.5.0-dev-AQFJmVem-QDeh_jOTFsL7_S-dKYGYbcOohEVdqyV7Eov";
+    turian_opts.addOption([]const u8, "dvui_url", dvui_url);
+    turian_opts.addOption([]const u8, "dvui_hash", dvui_hash);
 
     // SDL3 include tree, captured for the SDK step so it can ship the headers.
     var sdl3_include_tree: ?std.Build.LazyPath = null;
@@ -161,6 +194,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
+                    .{ .name = "ui_render", .module = ui_render_mod.? },
                     .{ .name = "gpu", .module = gpu_mod.? },
                     .{ .name = "debug", .module = debug_mod },
                 },
@@ -271,11 +305,36 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // Editor-CPU frame phase timing (in-game GUI epic M0) — pure std, no gui
+    // deps, cheap to test standalone like preview_raster_tests.
+    const editor_frame_timing_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("studio/EditorFrameTiming.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+
+    // asset_type -> editor draw-fn registry (issue #40, in-game GUI epic M0)
+    // — only needs `editor` for AssetType, no gui/render/gpu graph.
+    const editor_registry_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("studio/EditorRegistry.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "editor", .module = editor_mod },
+            },
+        }),
+    });
+
     const test_step = b.step("test", "Run engine + editor + studio + render + debug + mcp tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
     test_step.dependOn(&b.addRunArtifact(studio_tests).step);
     test_step.dependOn(&b.addRunArtifact(preview_raster_tests).step);
+    test_step.dependOn(&b.addRunArtifact(editor_frame_timing_tests).step);
+    test_step.dependOn(&b.addRunArtifact(editor_registry_tests).step);
     test_step.dependOn(&b.addRunArtifact(debug_tests).step);
     test_step.dependOn(&b.addRunArtifact(mcp_tests).step);
 
@@ -316,6 +375,22 @@ pub fn build(b: *std.Build) void {
         });
         const preview_camera_tests = b.addTest(.{ .root_module = preview_camera_test_mod });
         test_step.dependOn(&b.addRunArtifact(preview_camera_tests).step);
+
+        // UI node-tree -> dvui draw walk (#47 in-game GUI epic, M2). Tested
+        // against dvui's own headless `.testing` backend so the composition
+        // rule, stable IDs, and image/ninepatch styling run through real
+        // dvui frames without a GPU/window.
+        const ui_render_test_mod = b.createModule(.{
+            .root_source_file = b.path("subsystems/ui_render/root.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine_mod },
+                .{ .name = "gui", .module = dvui_testing_mod.? },
+            },
+        });
+        const ui_render_tests = b.addTest(.{ .root_module = ui_render_test_mod });
+        test_step.dependOn(&b.addRunArtifact(ui_render_tests).step);
     }
 
     // ── CI step (test + release artifacts) ───────────────────────────────────
@@ -337,6 +412,7 @@ pub fn build(b: *std.Build) void {
                     .{ .name = "engine", .module = engine_mod },
                     .{ .name = "editor", .module = editor_mod },
                     .{ .name = "render", .module = render_mod.? },
+                    .{ .name = "ui_render", .module = ui_render_mod.? },
                     .{ .name = "gpu", .module = gpu_mod.? },
                     .{ .name = "debug", .module = debug_mod },
                 },
@@ -452,6 +528,7 @@ pub fn build(b: *std.Build) void {
                         .{ .name = "engine", .module = engine_mod },
                         .{ .name = "editor", .module = editor_mod },
                         .{ .name = "render", .module = render_mod.? },
+                        .{ .name = "ui_render", .module = ui_render_mod.? },
                         .{ .name = "gpu", .module = gpu_mod.? },
                         .{ .name = "debug", .module = debug_mod },
                     },

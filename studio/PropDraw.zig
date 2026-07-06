@@ -25,16 +25,23 @@ const tooltipIfAny = PropDrawMath.tooltipIfAny;
 /// `id_base` must be unique per component slot (e.g. the component index).
 /// Returns true if any field value changed this frame.
 pub fn drawComponent(comptime T: type, ptr: *T, id_base: usize, read_only: bool) bool {
+    return drawComponentAlloc(T, ptr, id_base, read_only, std.heap.page_allocator);
+}
+
+/// Like `drawComponent`, but string/slice mutations are duped into `allocator`
+/// instead of the session-lifetime page allocator — used by editors whose
+/// model is arena-owned (e.g. `UiDocumentEditor`).
+pub fn drawComponentAlloc(comptime T: type, ptr: *T, id_base: usize, read_only: bool, allocator: std.mem.Allocator) bool {
     // Check for full type-level override first.
     if (comptime canHaveDecls(T) and @hasDecl(T, "turian_draw")) {
         var al = gui.Alignment.init(@src(), id_base);
         defer al.deinit();
-        var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = std.heap.page_allocator };
+        var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = allocator };
         return T.turian_draw("", ptr, FieldHint{}, &ctx, id_base);
     }
     var al = gui.Alignment.init(@src(), id_base);
     defer al.deinit();
-    var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = std.heap.page_allocator };
+    var ctx = DrawCtx{ .al = &al, .read_only = read_only, .allocator = allocator };
     return drawStructFields(T, ptr, &ctx);
 }
 
@@ -59,15 +66,19 @@ pub fn drawValue(
     if (comptime canHaveDecls(T) and @hasDecl(T, "turian_draw"))
         return T.turian_draw(label, ptr, hint, ctx, id);
 
+    // Engine types with a dedicated drawer, matched by identity (C2) — these
+    // render correctly wherever they appear in any component/struct.
+    if (comptime T == engine.ui.EventBinding) return drawEventBinding(label, ptr, hint, ctx, id);
+
     return switch (comptime @typeInfo(T)) {
         .bool => drawBool(label, ptr, hint, ctx, id),
         .int, .float => drawNumber(T, label, ptr, hint, ctx, id),
         .@"enum" => drawEnum(T, label, ptr, hint, ctx, id),
         .optional => drawOptional(T, label, ptr, hint, ctx, id),
         .@"struct" => drawStructValue(T, label, ptr, hint, ctx, id),
-        .pointer => |info| if (info.size == .Slice and info.child == u8)
+        .pointer => |info| if (info.size == .slice and info.child == u8)
             drawStringSlice(label, ptr, hint, ctx, id)
-        else if (info.size == .Slice)
+        else if (info.size == .slice)
             drawGenericSlice(T, info.child, label, ptr, hint, ctx, id)
         else
             drawFallback(label, ctx, id),
@@ -107,7 +118,7 @@ pub fn drawRefDropZone(
         .border = .all(if (drag_compatible) 2 else 1),
         .style = if (drag_compatible) .highlight else .content,
         .padding = .{ .x = 4, .y = 2 },
-        .corner_radius = .all(3),
+        .corners = .all(3),
         .id_extra = id_extra,
     });
     defer drop_box.deinit();
@@ -277,36 +288,38 @@ fn drawOptional(
     const Child = @typeInfo(T).optional.child;
     var changed = false;
     var has_val = ptr.* != null;
-
-    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
-    defer row.deinit();
-
-    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
-
-    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .margin = ctx.al.margin(row.data().id),
-        .gravity_y = 0.5,
-        .id_extra = id,
-    });
-    defer aligned.deinit();
-    ctx.al.record(row.data().id, aligned.data());
-
     const ro = ctx.read_only or hint.read_only;
-    if (!ro) {
-        if (gui.checkbox(@src(), &has_val, null, .{ .gravity_y = 0.5, .id_extra = id })) {
-            if (has_val) {
-                ptr.* = std.mem.zeroes(Child);
-            } else {
-                ptr.* = null;
+
+    // Scoped so the row closes before the indented inner value below —
+    // never deinit a dvui widget twice (use-after-deinit assert).
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+        defer row.deinit();
+
+        gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+
+        var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
+            .expand = .horizontal,
+            .margin = ctx.al.margin(row.data().id),
+            .gravity_y = 0.5,
+            .id_extra = id,
+        });
+        defer aligned.deinit();
+        ctx.al.record(row.data().id, aligned.data());
+
+        if (!ro) {
+            if (gui.checkbox(@src(), &has_val, null, .{ .gravity_y = 0.5, .id_extra = id })) {
+                if (has_val) {
+                    ptr.* = std.mem.zeroes(Child);
+                } else {
+                    ptr.* = null;
+                }
+                changed = true;
             }
-            changed = true;
+        } else {
+            gui.label(@src(), "{s}", .{if (has_val) "set" else "null"}, .{ .gravity_y = 0.5, .id_extra = id });
         }
-    } else {
-        gui.label(@src(), "{s}", .{if (has_val) "set" else "null"}, .{ .gravity_y = 0.5, .id_extra = id });
     }
-    aligned.deinit();
-    row.deinit();
 
     if (ptr.*) |*inner| {
         var inner_al = gui.Alignment.init(@src(), id);
@@ -450,11 +463,73 @@ fn drawEnum(
 }
 
 fn drawStringSlice(label: []const u8, ptr: *[]const u8, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
-    // Mutable string slices via the inspector are unusual — show as read-only label.
-    _ = hint;
-    _ = ctx;
-    gui.label(@src(), "{s}: {s}", .{ label, ptr.* }, .{ .expand = .horizontal, .id_extra = id });
+    return drawStringEdit(label, ptr, hint, ctx, id);
+}
+
+/// Editable `[]const u8` (C2): the text entry keeps its own persistent buffer
+/// (dvui `.internal` storage keyed by widget id) and re-syncs from the model
+/// whenever the widget is not focused — external mutations (undo, document
+/// reload, selection change) show up, but an in-progress edit is never
+/// stomped. On change the new text is duped into `ctx.allocator` and assigned
+/// to `ptr`; without an allocator the field renders read-only.
+pub fn drawStringEdit(label: []const u8, ptr: *[]const u8, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    defer row.deinit();
+
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
+
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
+        .expand = .horizontal,
+        .margin = ctx.al.margin(row.data().id),
+        .gravity_y = 0.5,
+        .id_extra = id,
+    });
+    defer aligned.deinit();
+    ctx.al.record(row.data().id, aligned.data());
+
+    const ro = ctx.read_only or hint.read_only;
+    if (ro or ctx.allocator == null) {
+        gui.label(@src(), "{s}", .{ptr.*}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+        return false;
+    }
+    const alloc = ctx.allocator.?;
+
+    var te = gui.textEntry(@src(), .{ .text = .{ .internal = .{} } }, .{
+        .expand = .horizontal,
+        .gravity_y = 0.5,
+        .id_extra = id,
+    });
+    defer te.deinit();
+
+    const focused = (gui.focusedWidgetId() orelse .zero) == te.data().id;
+    var synced = false;
+    if (!focused and !std.mem.eql(u8, te.getText(), ptr.*)) {
+        // Model -> widget sync (dvui's textSet itself raises text_changed,
+        // so remember this wasn't a user edit).
+        te.textSet(ptr.*, false);
+        synced = true;
+    }
+    if (te.text_changed and !synced) {
+        ptr.* = alloc.dupe(u8, te.getText()) catch return false;
+        return true;
+    }
     return false;
+}
+
+/// `EventBinding` drawer (C2): v1's `named` variant is a plain event-name
+/// text entry; future variants get their own row here without touching any
+/// component editor.
+fn drawEventBinding(
+    label: []const u8,
+    ptr: *engine.ui.EventBinding,
+    hint: FieldHint,
+    ctx: *DrawCtx,
+    id: usize,
+) bool {
+    switch (ptr.*) {
+        .named => |*name| return drawStringEdit(label, name, hint, ctx, id),
+    }
 }
 
 fn drawStringArray(
@@ -798,6 +873,7 @@ fn pickerAsset(
         .material => .material,
         .input_actions => .input_actions,
         .scene => .scene,
+        .ui_document => .ui_document,
     };
     var any_shown = false;
 

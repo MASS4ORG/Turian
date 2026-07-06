@@ -84,3 +84,12 @@ pub const project_config = @import("ProjectConfig.zig");
 pub const ProjectConfig = project_config.ProjectConfig;
 /// Central, machine-wide package store shared across projects (issue #20).
 pub const package_store = @import("PackageStore.zig");
+
+test {
+    // Force every re-exported module to be analysed so their `test` blocks
+    // are collected by the test runner. Without this, `addTest` on the
+    // editor module discovers zero tests (the root file has no direct
+    // tests; everything is reached only through `pub const X = @import(...)`)
+    // — see the identical block in engine/root.zig.
+    @import("std").testing.refAllDecls(@This());
+}

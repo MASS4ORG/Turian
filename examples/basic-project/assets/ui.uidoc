@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "reference_size": [1920, 1080],
+  "scale_mode": "letterbox_zoom",
+  "nodes": [
+    {
+      "guid": "5f0a1c2d-3e4b-4a5c-8d6e-7f8091a2b3c4",
+      "name": "Root",
+      "parent": -1,
+      "active": true,
+      "item": { "expand": "both" },
+      "style": {},
+      "components": [
+        { "layout": { "mode": "column", "gap": 24, "padding": [48, 48, 48, 48] } }
+      ]
+    },
+    {
+      "guid": "6a1b2c3d-4e5f-4a6b-9c7d-8e9fa0b1c2d3",
+      "name": "Title",
+      "parent": 0,
+      "active": true,
+      "item": { "gravity": [0.5, 0] },
+      "style": { "font_style": "title" },
+      "components": [
+        { "text": { "text": "TURIAN DEMO", "text_align": "center" } }
+      ]
+    },
+    {
+      "guid": "7b2c3d4e-5f6a-4b7c-8d9e-9fa0b1c2d3e4",
+      "name": "PlayButton",
+      "parent": 0,
+      "active": true,
+      "item": { "gravity": [0.5, 0], "min_size": [240, 64] },
+      "style": { "style_class": "highlight" },
+      "components": [
+        { "text": { "text": "Play", "text_align": "center" } },
+        { "button": { "on_click": { "named": "play_clicked" } } }
+      ]
+    },
+    {
+      "guid": "8c3d4e5f-6a7b-4c8d-9ea0-a0b1c2d3e4f5",
+      "name": "QuitButton",
+      "parent": 0,
+      "active": true,
+      "item": { "gravity": [0.5, 0], "min_size": [240, 64] },
+      "style": { "style_class": "control" },
+      "components": [
+        { "text": { "text": "Quit", "text_align": "center" } },
+        { "button": { "on_click": { "named": "quit_clicked" } } }
+      ]
+    },
+    {
+      "guid": "9d4e5f6a-7b8c-4d9e-af1b-b1c2d3e4f5a6",
+      "name": "HealthLabel",
+      "parent": 0,
+      "active": true,
+      "item": { "rect": [20, 20, 240, 40] },
+      "style": {},
+      "components": [
+        { "text": { "text": "HP: 100", "text_align": "start" } }
+      ]
+    },
+    {
+      "guid": "a5f6a7b8-8c9d-4eaf-b02c-c2d3e4f5a6b7",
+      "name": "EnemyMarker",
+      "parent": 0,
+      "active": false,
+      "item": { "rect": [880, 400, 140, 28] },
+      "style": { "style_class": "err", "tint": [0.6, 0.1, 0.1, 0.85] },
+      "components": [
+        { "text": { "text": "Grunt", "text_align": "center" } }
+      ]
+    }
+  ]
+}

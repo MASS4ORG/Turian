@@ -7,6 +7,7 @@ const RigidBodyComponent = @import("../components/RigidBodyComponent.zig").Rigid
 const ColliderComponent = @import("../components/ColliderComponent.zig").ColliderComponent;
 const AudioSourceComponent = @import("../components/AudioSourceComponent.zig").AudioSourceComponent;
 const AnimatorComponent = @import("../components/AnimatorComponent.zig").AnimatorComponent;
+const UiDocumentComponent = @import("../components/UiDocumentComponent.zig").UiDocumentComponent;
 
 /// Tagged union over all builtin and user script component types.
 pub const Component = union(enum) {
@@ -17,6 +18,7 @@ pub const Component = union(enum) {
     collider: ColliderComponent,
     audio_source: AudioSourceComponent,
     animator: AnimatorComponent,
+    ui_document: UiDocumentComponent,
     user_script: UserScriptRef,
 
     /// Returns the human-readable display name for this component.
@@ -31,6 +33,7 @@ pub const Component = union(enum) {
             .collider => "Collider",
             .audio_source => "Audio Source",
             .animator => "Animator",
+            .ui_document => "UI Document",
             .user_script => self.user_script.type_name[0..self.user_script.type_name_len],
         };
     }
@@ -44,6 +47,7 @@ pub const Component = union(enum) {
         if (std.mem.eql(u8, name, "ColliderComponent")) return .{ .collider = .{} };
         if (std.mem.eql(u8, name, "AudioSourceComponent")) return .{ .audio_source = .{} };
         if (std.mem.eql(u8, name, "AnimatorComponent")) return .{ .animator = .{} };
+        if (std.mem.eql(u8, name, "UiDocumentComponent")) return .{ .ui_document = .{} };
         return null;
     }
 };

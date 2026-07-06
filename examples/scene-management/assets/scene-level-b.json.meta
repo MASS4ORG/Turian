@@ -7,5 +7,7 @@
   "source_deps": [
   ],
   "artifact_deps": [
+  ],
+  "sub_assets": [
   ]
 }

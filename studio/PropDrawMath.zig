@@ -204,7 +204,7 @@ pub fn drawColorVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx
         .background = true,
         .color_fill = .fromColor(.{ .r = r8, .g = g8, .b = b8, .a = a8 }),
         .border = .all(1),
-        .corner_radius = .all(2),
+        .corners = .all(2),
         .gravity_y = 0.5,
         .id_extra = id,
     });

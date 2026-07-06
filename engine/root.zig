@@ -49,6 +49,9 @@ pub const Frame = @import("Frame.zig").Frame;
 pub const Gizmos = @import("Gizmos.zig").Gizmos;
 /// Type-keyed registry for engine + user-defined services (ADR 0001).
 pub const Services = @import("Services.zig").Services;
+/// Cross-cutting application control (quit, ...) reachable from scripts and
+/// UI button handlers alike via `frame.service(engine.Application)`.
+pub const Application = @import("Application.zig").Application;
 /// In-engine performance profiler: scoped CPU zones, per-thread timeline, and
 /// render counters for the Studio panel and built-game overlay.
 pub const Profiler = @import("Profiler.zig");
@@ -88,6 +91,20 @@ pub const AssetServer = assets.AssetServer;
 /// Software rasterizer for game builds.
 pub const software_renderer = @import("SoftwareRenderer.zig");
 
+/// In-game GUI data + logic (#47): `.uidoc` document model, event registry.
+/// Zero dvui imports — see `subsystems/ui_render/` for the draw walk.
+pub const ui = @import("ui/root.zig");
+/// UI document asset (`.uidoc`) — a flat, parent-indexed tree of `UiNode`s.
+pub const UiDocument = ui.UiDocument;
+/// Typed UI event registry (strings at rest, handles at runtime).
+pub const UiEvents = ui.UiEvents;
+
+/// World->viewport projection (C5/C8): screen-anchored UI elements (enemy
+/// health bars, name plates) computed from a script without the `gpu`/
+/// `render` modules (#40's shared-library boundary keeps those out of user
+/// script `.so`s).
+pub const Projection = @import("Projection.zig");
+
 /// C-ABI types for user script reflection.
 pub const api = @import("api/root.zig");
 
@@ -114,6 +131,8 @@ pub const ColliderComponent = components.ColliderComponent;
 pub const AudioSourceComponent = components.AudioSourceComponent;
 /// Animator component type.
 pub const AnimatorComponent = components.AnimatorComponent;
+/// UI document component type — instantiates a `.uidoc` asset into the scene.
+pub const UiDocumentComponent = components.UiDocumentComponent;
 /// List of builtin component metadata entries.
 pub const BUILTIN_COMPONENTS = components.BUILTIN_COMPONENTS;
 

@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/brmassa/dvui#ff920c16d25407a9101eb4af0a7884012d0ac19a",
-            .hash = "dvui-0.5.0-dev-AQFJmT7-9wBmqC26dNKJy8w3rDroLEtdxgBDa9nC62KO",
+            .url = "git+https://github.com/david-vanderson/dvui#405b282a2ef35c304ce61f33f840eeffa02ef3bd",
+            .hash = "dvui-0.5.0-dev-AQFJmVem-QDeh_jOTFsL7_S-dKYGYbcOohEVdqyV7Eov",
         },
         .gpu = .{
-            .url = "git+https://gitlab.com/mass4org/mega4/gpu#46d869b551656c4797797a74bff3b3008df85a2e",
-            .hash = "gpu-0.1.0-B3kvdYUvAAD9av4opyu-_jU_OHSX3qz2C-mGRtM44uXc",
+            .url = "git+https://gitlab.com/mass4org/mega4/gpu#68963cc927252e15c5ca27330ae5d7fe837dd5e1",
+            .hash = "gpu-1.0.1-B3kvdSFFAADXQP_G_2tgmI5u_2mY_YZ_TaspkOWLc2uK",
         },
         .guid = .{
             .url = "git+https://gitlab.com/mass4org/mega4/guid#82a98833e35452ec458b06e0e9765278e012026a",
@@ -21,8 +21,8 @@
             .hash = "ktx2-1.0.0-_ha8z9rlSQArWqLEO34QRvI3EclvelWUDKHJ2SS9r8br",
         },
         .math3d = .{
-            .url = "git+https://gitlab.com/mass4org/mega4/math-3d#9fb10551a4f3e3e03900f0a80ad4591855737cbf",
-            .hash = "math3d-1.1.1-pUqn4FuaAQA6_q5KobDCOIxKtqMSbkqCkZZd1eAe62dU",
+            .url = "git+https://gitlab.com/mass4org/mega4/math-3d#368d7013205c6103f159025f61d0a87740564625",
+            .hash = "math3d-1.2.0-pUqn4AvJAQCOU09-Kk1wm_2Ahe15HjDSFqWmbcwFuPIv",
         },
         .open_asset_package = .{
             .url = "git+https://gitlab.com/mass4org/mega4/open-asset-package#e49cf316c88ff421e6498dc63201c7c19887561c",

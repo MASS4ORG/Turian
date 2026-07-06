@@ -93,6 +93,8 @@ test:
     - zig build --summary all
     - echo "==> zig build test"
     - zig build test --summary all
+    - echo "==> zig build (windows cross-compile)"
+    - zig build -Dtarget=x86_64-windows-gnu -Dcli-only -Dno-test --summary all
     - |
       for dir in examples/*/; do
         [ -d "$dir" ] || continue
@@ -104,15 +106,16 @@ test:
       # SDK-resident sources (paths resolved by SdkLayout.zig, not baked paths).
       # Uses the full SDK (with SDL3) so the game binary can link.
       echo "==> SDK smoke-test"
+      # Free disk space before the SDK build: the debug bins and .zig-cache from
+      # previous steps are no longer needed (examples already tested the CLI).
+      rm -rf .zig-cache zig-out/bin/turian-studio zig-out/bin/turian-cli
+      find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
+      df -h / || true
       zig build sdk --summary all
-      # Free disk space accumulated by previous steps before the game compile.
       # The SDK is already in zig-out/sdk/; object files in .zig-cache and
       # example .cache dirs are no longer needed. This does mean the saved
       # zig-cache-* cache is empty from this job — it's kept warm by
       # check_release/build_artifacts runs instead (they don't do this).
-      rm -rf .zig-cache
-      find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
-      df -h / || true
       TMP_PROJ=$(mktemp -d)
       cp -r examples/basic-project/. "$TMP_PROJ/"
       ./zig-out/sdk/turian-cli build "$TMP_PROJ" || { echo "SDK build FAILED"; rm -rf "$TMP_PROJ"; exit 1; }

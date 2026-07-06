@@ -1,9 +1,18 @@
+const std = @import("std");
 const gui = @import("gui");
+const engine = @import("engine");
 const GpuRenderer = @import("GpuRenderer.zig");
 const PlayMode = @import("PlayMode.zig");
 const EditorState = @import("EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 const EditorCamera = @import("EditorCamera.zig");
+const UiOverlay = @import("UiOverlay.zig");
+
+/// "Show UI overlay" toggle (#47 M2, C3): draws the scene's referenced
+/// `.uidoc` documents (plus the one open in `UiDocumentEditor`) letterboxed
+/// over the 3D viewport, WYSIWYG with what the shipped game will render via
+/// the same `ui_render.drawTree` call (D9). See `UiOverlay.zig`.
+var show_ui_overlay: bool = false;
 
 /// Border tint shown around the viewport while a simulation runs:
 /// orange while playing, blue while paused — a Unity-style visual play-state cue.
@@ -53,6 +62,7 @@ pub fn draw() void {
         defer header.deinit();
         gui.label(@src(), "Scene View", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
         if (PlayMode.state() == .edit) drawGizmoToolbar();
+        _ = gui.checkbox(@src(), &show_ui_overlay, "Show UI overlay", .{ .gravity_y = 0.5 });
     }
 
     const st = PlayMode.state();
@@ -136,6 +146,9 @@ pub fn draw() void {
             .gravity_y = 0.5,
         });
         if (st == .edit) drawIcons(vp_w, vp_h, nat_rect);
+        if (show_ui_overlay) {
+            UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
+        }
     } else {
         gui.label(@src(), "3D viewport unavailable", .{}, .{
             .gravity_x = 0.5,

@@ -502,7 +502,7 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
         // A dragged tab lifts to the highlight style as a drag affordance.
         .style = if (is_active or is_dragged) .highlight else .window,
         .border = .all(1),
-        .corner_radius = .{ .x = 4, .y = 4, .w = 0, .h = 0 },
+        .corners = .{ .tl = .theme(4), .tr = .theme(4), .bl = .square, .br = .square },
         .padding = .{ .x = 8, .y = 4, .w = 4, .h = 4 },
         .margin = .{ .w = 2 },
         .gravity_y = 1.0,
@@ -605,7 +605,7 @@ fn drawDragGhost(mouse_held: bool) void {
         .background = true,
         .style = .highlight,
         .border = .all(1),
-        .corner_radius = .all(4),
+        .corners = .all(4),
         .padding = .all(4),
     });
     defer fw.deinit();

@@ -70,6 +70,14 @@ fn configFromSdk(io: std.Io, gpa: std.mem.Allocator, sdk_root: []const u8) GameB
         .gpu_sdl3_c = p.join(gpa, sdk_root, "deps/gpu/src/sdl3-c.h"),
         .render_root = p.join(gpa, sdk_root, "render/root.zig"),
         .sdl3_include = p.join(gpa, sdk_root, "sdl3-include"),
+        // SDK bundles don't currently vendor dvui/ui_render — a `.uidoc`
+        // referenced by an SDK-built project won't render (C10's "no dvui
+        // by default" extended to a known, explicit gap rather than a
+        // regression). `TURIAN_DVUI_URL`/`_HASH`/`_UI_RENDER_ROOT` env
+        // overrides remain available for an SDK that does vendor them.
+        .ui_render_root = "",
+        .dvui_url = "",
+        .dvui_hash = "",
     };
 }
 
@@ -92,6 +100,9 @@ fn applyEnvOverrides(cfg: *GameBuild.BuildConfig, environ: *const std.process.En
     if (environ.get("TURIAN_GPU_SDL3_C")) |v| cfg.gpu_sdl3_c = v;
     if (environ.get("TURIAN_RENDER_ROOT")) |v| cfg.render_root = v;
     if (environ.get("TURIAN_SDL3_INCLUDE")) |v| cfg.sdl3_include = v;
+    if (environ.get("TURIAN_UI_RENDER_ROOT")) |v| cfg.ui_render_root = v;
+    if (environ.get("TURIAN_DVUI_URL")) |v| cfg.dvui_url = v;
+    if (environ.get("TURIAN_DVUI_HASH")) |v| cfg.dvui_hash = v;
 }
 
 /// Resolve a UserReflection.ReflectionConfig using the same three-layer

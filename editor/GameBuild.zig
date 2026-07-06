@@ -12,6 +12,7 @@ const Progress = @import("Progress.zig").Progress;
 const codegen = @import("GameCodegen.zig");
 const PackageManager = @import("PackageManager.zig").PackageManager;
 const ProjectConfig = @import("ProjectConfig.zig").ProjectConfig;
+const ProjectDependency = @import("ProjectConfig.zig").Dependency;
 
 pub const RuntimeConfig = codegen.RuntimeConfig;
 pub const BuildConfig = codegen.BuildConfig;
@@ -154,6 +155,9 @@ fn buildGameInner(
         // relative to the editor's build root — absolutize it so the game build
         // (which runs in the project's .cache dir) can find the headers.
         .sdl3_include = try codegen.absUnder(a, config.build_root, config.sdl3_include),
+        .ui_render_root = try codegen.absUnder(a, config.build_root, config.ui_render_root),
+        .dvui_url = config.dvui_url,
+        .dvui_hash = config.dvui_hash,
         .extra_asset_roots = config.extra_asset_roots,
         .extra_deps = dep_names,
         .extra_native = native_specs,
@@ -166,11 +170,17 @@ fn buildGameInner(
     progress.report(0.1, "Generating project");
     const gen_project = try codegen.normPath(a, project_path);
     const use_gpu = codegen.sdl3LibPath(a, config).len > 0 and config.sdl3_include.len > 0;
-    const main_src = try codegen.generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime, use_gpu, plugin_specs);
+    // C10 pay-for-use: UI rendering additionally needs the GPU renderer
+    // (dvui's sdl3gpu backend shares that same device/window) and a real
+    // dvui dep (gen_config.dvui_*) — a project referencing `.uidoc` from an
+    // SDK build that doesn't vendor dvui, or one without the GPU renderer
+    // available, still ships without UI rather than failing the build.
+    const uses_ui = runtime.uses_ui and use_gpu and gen_config.dvui_url.len > 0 and gen_config.ui_render_root.len > 0;
+    const main_src = try codegen.generateMainZig(a, gen_project, rel_files[0..src_count], components, component_count, runtime, use_gpu, uses_ui, plugin_specs);
     const main_path = try std.fmt.allocPrint(a, "{s}/main.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = main_path, .data = main_src });
 
-    const build_src = try codegen.generateBuildZig(a, gen_config, abs_files[0..src_count]);
+    const build_src = try codegen.generateBuildZig(a, gen_config, abs_files[0..src_count], uses_ui);
     const build_zig_path = try std.fmt.allocPrint(a, "{s}/build.zig", .{cache_path});
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = build_zig_path, .data = build_src });
 
@@ -182,7 +192,11 @@ fn buildGameInner(
         try a.dupe(u8, project_path)
     else
         try std.fmt.allocPrint(a, "{s}/{s}", .{ config.build_root, project_path });
-    regenerateBuildZon(io, a, project_path, cache_path, abs_project);
+    const dvui_dep: ?ProjectDependency = if (uses_ui)
+        .{ .name = "dvui", .url = gen_config.dvui_url, .hash = gen_config.dvui_hash }
+    else
+        null;
+    regenerateBuildZon(io, a, project_path, cache_path, abs_project, dvui_dep);
 
     // Cook all assets (project + installed packages) into game.oap *before*
     // compiling, so the shipped game loads from the package.
@@ -209,6 +223,10 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
     var db = AssetDatabase.init(a);
     defer db.deinit();
     db.scan(io, assets_dir);
+
+    // C10 pay-for-use: any `.uidoc` asset in the project pulls in dvui.
+    var uidocs = db.enumerate(.ui_document);
+    out.uses_ui = uidocs.next() != null;
 
     // Window options + explicit boot scene from ProjectSettings, if present.
     var it = db.enumerate(.project_settings);
@@ -342,13 +360,15 @@ fn regenerateBuildZon(
     project_path: []const u8,
     cache_path: []const u8,
     abs_project: []const u8,
+    dvui_dep: ?ProjectDependency,
 ) void {
     var cfg = ProjectConfig.load(io, a, project_path) catch return;
     defer cfg.deinit();
     const fallback = std.fs.path.basename(project_path);
+    const extra: []const ProjectDependency = if (dvui_dep) |d| (&[1]ProjectDependency{d})[0..] else &.{};
 
     // Project-root copy: keeps the generated ZON in sync with project.json.
-    if (cfg.toBuildZon(a, fallback, "")) |zon| {
+    if (cfg.toBuildZonExtra(a, fallback, "", extra)) |zon| {
         defer a.free(zon);
         const root_path = std.fmt.allocPrint(a, "{s}/build.zig.zon", .{project_path}) catch return;
         std.Io.Dir.cwd().writeFile(io, .{ .sub_path = root_path, .data = zon }) catch {};
@@ -356,7 +376,7 @@ fn regenerateBuildZon(
 
     // .cache copy: absolutize relative path deps against the project root so
     // they resolve from the .cache working directory.
-    if (cfg.toBuildZon(a, fallback, abs_project)) |zon| {
+    if (cfg.toBuildZonExtra(a, fallback, abs_project, extra)) |zon| {
         defer a.free(zon);
         const dst_path = std.fmt.allocPrint(a, "{s}/build.zig.zon", .{cache_path}) catch return;
         std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dst_path, .data = zon }) catch {};
@@ -389,4 +409,12 @@ pub fn spawnAndWait(io: std.Io, a: std.mem.Allocator, argv: []const []const u8) 
         .exited => |code| if (code != 0) return error.ProcessFailed,
         else => return error.ProcessKilled,
     }
+}
+
+test {
+    // `refAllDecls` at editor/root.zig only forces this file's own top-level
+    // decls, not two hops deep — without this, `codegen`'s (GameCodegen.zig)
+    // `test` blocks are silently never collected by the test runner. Same
+    // gotcha as the one documented in engine/root.zig, one level deeper.
+    @import("std").testing.refAllDecls(@This());
 }
