@@ -105,6 +105,7 @@ Drop `spinner.zig` in your project's `assets/` folder. Turian discovers it autom
 | [Getting started](docs/getting-started.md) | Open a project, write a component, build a game |
 | [Install / build from source](docs/install.md) | Developer setup |
 | [SDK guide](docs/sdk.md) | Ship games without the engine checkout |
+| [ADRs](docs/ADR/README.md) | Architecture decision records |
 
 Full documentation is at **[turian.mass4.org/docs](https://turian.mass4.org/docs/)**.
 

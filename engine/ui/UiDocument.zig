@@ -70,7 +70,6 @@ pub const StyleBlock = struct {
 /// Serialized binding is a union from day one so future binding kinds are
 /// additive, not schema-breaking. JSON form: `{"named": "play_clicked"}`.
 /// Reserved, post-MVP (do NOT implement): `target: {guid, endpoint}` for
-/// SOAP / Inspector-wired bindings (GitLab #41) — intentionally absent below.
 pub const EventBinding = union(enum) {
     named: []const u8,
 };
