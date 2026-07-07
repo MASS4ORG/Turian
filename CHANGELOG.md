@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.12.1] - 2026-07-07
+
+### Other
+- docs: Architecture Decision Records (ADRs)
+
 ## [1.12.0] - 2026-07-06
 
 ### Features
