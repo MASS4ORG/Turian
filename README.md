@@ -8,7 +8,7 @@
 
 [![pipeline status](https://gitlab.com/mass4org/mega4/turian/badges/main/pipeline.svg)](https://gitlab.com/mass4org/mega4/turian/-/commits/main)
 [![latest release](https://gitlab.com/mass4org/mega4/turian/-/badges/release.svg)](https://gitlab.com/mass4org/mega4/turian/-/releases)
-[![license: GPLv3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![license: MPLv2](https://img.shields.io/badge/license-MPLv2-blue.svg)](LICENSE)
 [![Zig 0.16.0](https://img.shields.io/badge/Zig-0.16.0-F7A41D.svg?logo=zig&logoColor=white)](https://ziglang.org/)
 
 Turian gives you a Unity-style workflow — scene hierarchy, inspector, drag-and-drop asset management, and live script discovery — without the runtime overhead or licensing fees of commercial engines.
@@ -73,7 +73,7 @@ Most engines force a trade-off: the productivity of a visual editor **or** the c
 - **One language, top to bottom.** The engine, the editor, your game logic, and   the build tooling are all Zig. No VM, no scripting bridge, no FFI tax.
 - **No garbage collector, no hidden allocations.** Your game ships as a single   native executable with predictable performance.
 - **Editor-first, but never locked in.** Scenes are human-readable text you can   diff and merge; the CLI builds the exact same game headlessly for CI.
-- **Free as in freedom.** GPLv3, no seats, no revenue share, no per-title fees.
+- **Free as in freedom.** MPLv2, no seats, no revenue share, no per-title fees.
 
 ---
 
@@ -133,5 +133,5 @@ If it saves you time or money, consider supporting the project:
 
 ## License
 
-Turian is free software, licensed under the **[GNU GPLv3](LICENSE)**.
+Turian is free software, licensed under the **[MPL v2](LICENSE)**.
 Copyright © 2026 Bruno Massa.

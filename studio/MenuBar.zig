@@ -13,7 +13,7 @@ const AboutInfo = struct {
     const name = "Turian Studio";
     const version = build_options.version;
     const authors = "Bruno Massa";
-    const license = "GPL v3";
+    const license = "MPL v2";
     const description = "A Zig game engine editor.";
 
     const dialog_message = std.fmt.comptimePrint(
