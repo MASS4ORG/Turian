@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.12.2] - 2026-07-09
+
+### Other
+- chore: change the license to MPL v2
+
 ## [1.12.1] - 2026-07-07
 
 ### Other
