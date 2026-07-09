@@ -158,6 +158,15 @@ fn printUsageDebug() void {
         \\  spawn <name>         Create a new empty entity
         \\  destroy <name>       Remove an entity by name
         \\
+        \\Machine-driven UI interaction (Studio only, read-write mode; applied
+        \\the frame after the call — dvui needs events before it builds widgets):
+        \\  mousemove <x> <y>            Move the synthetic mouse cursor
+        \\  click <x> <y> [button]       Move + press + release (button: left/right/middle, default left)
+        \\  key <code> [up]              Key down (default) or up — code is a dvui.enums.Key name (e.g. "a", "enter")
+        \\  text <str>                   Synthesize a text-input event
+        \\  capture                      Schedule a whole-window screenshot (see `screenshot`)
+        \\  screenshot                   Poll the last whole-window screenshot's result/path
+        \\
     , .{});
 }
 
@@ -457,6 +466,44 @@ fn cmdDebug(
         const params = try std.fmt.allocPrint(gpa, "{{\"entity\":\"{s}\"}}", .{extra1});
         defer gpa.free(params);
         const resp = try client.call(gpa, "entity.destroy", params);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "click")) {
+        if (extra1.len == 0 or extra2.len == 0) return printUsageDebug();
+        const button = if (extra3.len > 0) extra3 else "left";
+        const params = try std.fmt.allocPrint(gpa, "{{\"x\":{s},\"y\":{s},\"button\":\"{s}\"}}", .{ extra1, extra2, button });
+        defer gpa.free(params);
+        const resp = try client.call(gpa, "input.click", params);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "mousemove")) {
+        if (extra1.len == 0 or extra2.len == 0) return printUsageDebug();
+        const params = try std.fmt.allocPrint(gpa, "{{\"x\":{s},\"y\":{s}}}", .{ extra1, extra2 });
+        defer gpa.free(params);
+        const resp = try client.call(gpa, "input.mouseMove", params);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "key")) {
+        if (extra1.len == 0) return printUsageDebug();
+        const down = extra2.len == 0 or !std.mem.eql(u8, extra2, "up");
+        const params = try std.fmt.allocPrint(gpa, "{{\"code\":\"{s}\",\"down\":{s}}}", .{ extra1, if (down) "true" else "false" });
+        defer gpa.free(params);
+        const resp = try client.call(gpa, "input.key", params);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "text")) {
+        if (extra1.len == 0) return printUsageDebug();
+        const params = try std.fmt.allocPrint(gpa, "{{\"text\":\"{s}\"}}", .{extra1});
+        defer gpa.free(params);
+        const resp = try client.call(gpa, "input.text", params);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "capture")) {
+        const resp = try client.call(gpa, "screenshot.capture", "{}");
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "screenshot")) {
+        const resp = try client.call(gpa, "screenshot.last", null);
         defer gpa.free(resp);
         try printResponseStderr(gpa, resp);
     } else if (std.mem.eql(u8, sub, "watch")) {

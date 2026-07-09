@@ -48,10 +48,11 @@ fn fileExists(full: []const u8) bool {
     return true;
 }
 
-/// Capture the viewport to the next free `screenshots/shot_NNNN.tga`. Returns
-/// the project-relative path on success, null on failure. Both outcomes update
-/// `last()` for UI feedback.
-pub fn capture() ?[]const u8 {
+/// Finds the next free `<project>/screenshots/shot_NNNN.png` path (so
+/// sessions never clobber prior shots). Returns the full and project-relative
+/// paths written into the given buffers, or null on failure (also updates
+/// `last()`).
+fn nextShotPath(fullbuf: []u8, relbuf: []u8) ?struct { full: []const u8, rel: []const u8 } {
     const io = gui.io;
     const dir = EditorState.project_path orelse ".";
 
@@ -66,46 +67,77 @@ pub fn capture() ?[]const u8 {
         return null;
     };
 
-    // Find the first free index so sessions never clobber prior shots.
-    var fullbuf: [1280]u8 = undefined;
-    var relbuf: [256]u8 = undefined;
     var n: u32 = 1;
-    const full, const rel = while (n < 100_000) : (n += 1) {
-        const full = std.fmt.bufPrint(&fullbuf, "{s}/shot_{d:0>4}.png", .{ shots_dir, n }) catch {
+    return while (n < 100_000) : (n += 1) {
+        const full = std.fmt.bufPrint(fullbuf, "{s}/shot_{d:0>4}.png", .{ shots_dir, n }) catch {
             setLast(false, "path too long");
             return null;
         };
         if (!fileExists(full)) {
-            const rel = std.fmt.bufPrint(&relbuf, "screenshots/shot_{d:0>4}.png", .{n}) catch full;
-            break .{ full, rel };
+            const rel = std.fmt.bufPrint(relbuf, "screenshots/shot_{d:0>4}.png", .{n}) catch full;
+            break .{ .full = full, .rel = rel };
         }
     } else {
         setLast(false, "too many screenshots");
         return null;
     };
+}
 
-    const cap = GpuRenderer.capturePixels(page) orelse {
-        setLast(false, "capture failed");
-        return null;
-    };
-    defer page.free(cap.pixels);
+/// Encodes `pixels` (RGBA8, `w`x`h`) as PNG and writes it to the next free
+/// `screenshots/shot_NNNN.png`. Returns the project-relative path on success,
+/// null on failure. Both outcomes update `last()` for UI feedback. Shared by
+/// `capture()` (bare 3D viewport) and `captureWindow()` (the whole window).
+fn writeShot(pixels: []u8, w: u32, h: u32) ?[]const u8 {
+    var fullbuf: [1280]u8 = undefined;
+    var relbuf: [256]u8 = undefined;
+    const paths = nextShotPath(&fullbuf, &relbuf) orelse return null;
 
     var out: std.Io.Writer.Allocating = std.Io.Writer.Allocating.initCapacity(page, 64 * 1024) catch {
         setLast(false, "out of memory");
         return null;
     };
     defer out.deinit();
-    gui.PNGEncoder.write(&out.writer, cap.pixels, cap.w, cap.h) catch |err| {
+    // writeWithResolution, not write: the latter calls dvui.windowNaturalScale(),
+    // which needs a live dvui.current_window — gone by the time captureWindow's
+    // caller (Main.zig, after win.end()) reaches this point.
+    gui.PNGEncoder.writeWithResolution(&out.writer, pixels, w, h, 96) catch |err| {
         std.debug.print("[Screenshots] PNG encode failed: {any}\n", .{err});
         setLast(false, "encode failed");
         return null;
     };
-    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = full, .data = out.written() }) catch |err| {
-        std.debug.print("[Screenshots] write {s} failed: {any}\n", .{ rel, err });
+    std.Io.Dir.cwd().writeFile(gui.io, .{ .sub_path = paths.full, .data = out.written() }) catch |err| {
+        std.debug.print("[Screenshots] write {s} failed: {any}\n", .{ paths.rel, err });
         setLast(false, "write failed");
         return null;
     };
-    std.debug.print("[Screenshots] saved {s}\n", .{rel});
-    setLast(true, rel);
+    std.debug.print("[Screenshots] saved {s}\n", .{paths.rel});
+    setLast(true, paths.rel);
     return g_last.path();
+}
+
+/// Capture the 3D viewport (bare render target, no gizmos/UI/panels — see
+/// `captureWindow` for the whole composited window) to the next free
+/// `screenshots/shot_NNNN.png`. Returns the project-relative path on success,
+/// null on failure. Both outcomes update `last()` for UI feedback.
+pub fn capture() ?[]const u8 {
+    const cap = GpuRenderer.capturePixels(page) orelse {
+        setLast(false, "capture failed");
+        return null;
+    };
+    defer page.free(cap.pixels);
+    return writeShot(cap.pixels, cap.w, cap.h);
+}
+
+/// Capture the ENTIRE composited Studio window — menu bar, panels, inspector,
+/// the 3D viewport, gizmos, icons, and any in-game GUI overlay — to the next
+/// free `screenshots/shot_NNNN.png`. Unlike `capture()`, which only grabs the
+/// bare 3D-viewport render target (drawn before dvui composites anything on
+/// top), this sees exactly what a user would see on screen.
+///
+/// Must be driven from the main loop around a single frame's
+/// `win.begin`/`win.end` — see `Main.zig`'s env-var-triggered capture — since
+/// it needs to redirect that whole frame's render output through
+/// `SDLBackend.beginFrameCapture`/`endFrameCapture`.
+pub fn captureWindow(pixels: []u8, w: u32, h: u32) ?[]const u8 {
+    return writeShot(pixels, w, h);
 }

@@ -105,8 +105,7 @@ float shadowFactor(float ndl) {
     if (ubo.flags2.w < 0.5) return 1.0;
 
     vec4 lp = ubo.light_vp * vec4(in_world_pos, 1.0);
-    // Same Vulkan remap shadow.vert applies before depth write.
-    lp.y = -lp.y;
+    // Same Z remap shadow.vert applies before depth write (see scene.vert.glsl).
     lp.z = (lp.z + lp.w) * 0.5;
     vec3 proj = lp.xyz / lp.w;
     vec2 uv = proj.xy * 0.5 + 0.5;

@@ -14,6 +14,8 @@ pub const SceneView = Inspector.SceneView;
 pub const AssetView = Inspector.AssetView;
 /// Everything the inspector can see at one instant (scenes + metrics).
 pub const World = Inspector.World;
+/// Result of the last whole-window screenshot capture, for `screenshot.last`.
+pub const ScreenshotView = Inspector.ScreenshotView;
 /// A typed value used when mutating a field by name.
 pub const Value = Inspector.Value;
 

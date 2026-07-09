@@ -88,6 +88,9 @@ fn loadInto(e: *Entry, path: []const u8, mtime: i128) void {
                 .named => |name| if (name.len != 0) {
                     _ = e.events.registerName(name);
                 },
+                // Resolved at dispatch time via GameEventRegistry, not a
+                // name intern — nothing to pre-register here.
+                .channel => {},
             }
         }
     }
@@ -98,8 +101,10 @@ fn loadInto(e: *Entry, path: []const u8, mtime: i128) void {
 
 /// Resolves a texture GUID to file bytes for `ui_render`'s image content,
 /// reading into the current dvui frame's arena (freed automatically next
-/// frame — matches dvui's own per-frame allocation convention).
-fn resolveTextureBytes(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {
+/// frame — matches dvui's own per-frame allocation convention). Shared with
+/// `SceneViewport`'s Play-mode UI draw (#47) — same asset source, same
+/// per-frame-arena lifetime rule.
+pub fn resolveTextureBytes(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {
     _ = ctx;
     const path = EditorState.resolveAssetGuid(guid) orelse return null;
     return std.Io.Dir.cwd().readFileAlloc(gui.io, path, gui.currentWindow().arena(), .unlimited) catch null;
@@ -117,6 +122,9 @@ fn toastButtonClick(doc: *const ui.UiDocument, node_index: usize) void {
         switch (c.button.on_click) {
             .named => |n| if (n.len != 0) {
                 name = n;
+            },
+            .channel => |ch| if (ch.slice().len != 0) {
+                name = ch.slice();
             },
         }
     }
@@ -150,7 +158,9 @@ fn drawDocument(
         .texture_source = resolveTextureBytes,
     });
     for (result.clicked()) |node_index| toastButtonClick(doc, node_index);
-    ui_render.dispatchClicks(result, resolved, events);
+    // No live game to raise a channel into during this edit-time preview —
+    // `toastButtonClick` above already surfaces what a click would fire.
+    ui_render.dispatchClicks(doc, result, resolved, events, null);
 }
 
 /// The "Show UI overlay" body (C3): scene-referenced documents in scene-node

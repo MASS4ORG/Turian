@@ -50,6 +50,43 @@
       ]
     },
     {
+      "guid": "b1c2d3e4-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "JumpButton",
+      "parent": 0,
+      "active": true,
+      "item": { "rect": [1660, 940, 220, 70] },
+      "style": {},
+      "components": [
+        { "image": { "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0", "ninepatch": [16, 16, 16, 16] } },
+        { "text": { "text": "Jump!", "text_align": "center" } },
+        { "button": { "on_click": { "named": "jump_clicked" } } }
+      ]
+    },
+    {
+      "guid": "e4f5a6b7-9c0d-4eaf-bf31-4b5c6d7e8f91",
+      "name": "DoorButton",
+      "parent": 0,
+      "active": true,
+      "item": { "rect": [1660, 850, 220, 70] },
+      "style": {},
+      "components": [
+        { "image": { "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0", "ninepatch": [16, 16, 16, 16] } },
+        { "text": { "text": "Door", "text_align": "center" } },
+        { "button": { "on_click": { "channel": "49533407-fb6c-48c5-a800-5e162cf5d5a6" } } }
+      ]
+    },
+    {
+      "guid": "c2d3e4f5-7a8b-4c9d-ae1f-2a3b4c5d6e7f",
+      "name": "HealthPanel",
+      "parent": 0,
+      "active": true,
+      "item": { "rect": [12, 12, 256, 56] },
+      "style": {},
+      "components": [
+        { "image": { "texture": "493824cd-08c7-47bf-a876-a9a02886cae9", "ninepatch": [12, 12, 12, 12] } }
+      ]
+    },
+    {
       "guid": "9d4e5f6a-7b8c-4d9e-af1b-b1c2d3e4f5a6",
       "name": "HealthLabel",
       "parent": 0,
@@ -69,6 +106,18 @@
       "style": { "style_class": "err", "tint": [0.6, 0.1, 0.1, 0.85] },
       "components": [
         { "text": { "text": "Grunt", "text_align": "center" } }
+      ]
+    },
+    {
+      "guid": "d3e4f5a6-8b9c-4dae-bf20-3b4c5d6e7f80",
+      "name": "ProximityDialog",
+      "parent": 0,
+      "active": false,
+      "item": { "rect": [760, 880, 400, 90] },
+      "style": {},
+      "components": [
+        { "image": { "texture": "493824cd-08c7-47bf-a876-a9a02886cae9", "ninepatch": [12, 12, 12, 12] } },
+        { "text": { "text": "You found the cube!", "text_align": "center" } }
       ]
     }
   ]

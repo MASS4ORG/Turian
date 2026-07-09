@@ -412,7 +412,7 @@ fn applyDrag(cam: Camera, rect: Rect, node: *engine.SceneNode, mouse: Vec2, scal
 /// through the mouse. Used to slide translate/scale handles.
 fn axisParam(cam: Camera, rect: Rect, origin: Vector3, axis: Axis, mouse: Vec2) ?f32 {
     const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
-    const ray = math.Projection.screenPointToRay(cam.view_proj.inverse(), vp, .{ mouse.x, mouse.y });
+    const ray = engine.Projection.viewportPointToRay(cam.view_proj.inverse(), vp, .{ mouse.x, mouse.y });
     const ad = axisVec(axis);
     const w0 = ray.origin.subtract(origin);
     const b = ray.direction.dot(ad);
@@ -425,9 +425,8 @@ fn axisParam(cam: Camera, rect: Rect, origin: Vector3, axis: Axis, mouse: Vec2) 
 
 /// Screen-space angle (radians) of the mouse around the projected `origin`.
 fn screenAngle(cam: Camera, rect: Rect, origin: Vector3, mouse: Vec2) ?f32 {
-    const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
-    const c = math.Projection.worldToScreen(cam.view_proj, vp, origin) orelse return null;
-    return std.math.atan2(mouse.y - c[1], mouse.x - c[0]);
+    const c = worldToScreen(cam, rect, origin) orelse return null;
+    return std.math.atan2(mouse.y - c.y, mouse.x - c.x);
 }
 
 fn snapTo(v: f32, step: f32) f32 {
@@ -706,13 +705,16 @@ fn gizmoScale(cam: Camera, origin: Vector3, rect: Rect) f32 {
 
 fn worldToScreen(cam: Camera, rect: Rect, w: Vector3) ?Vec2 {
     const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
-    const r = math.Projection.worldToScreen(cam.view_proj, vp, w) orelse return null;
+    // engine.Projection.worldToViewport (not math.Projection.worldToScreen
+    // directly) — math-3d returns Y-up, but the viewport rect/mouse position
+    // this is compared against is Y-down.
+    const r = engine.Projection.worldToViewport(cam.view_proj, vp, w) orelse return null;
     return .{ .x = r[0], .y = r[1] };
 }
 
 fn mouseRay(cam: Camera, rect: Rect, m: Vec2) Ray {
     const vp = [_]f32{ rect.x, rect.y, rect.w, rect.h };
-    const r = math.Projection.screenPointToRay(cam.view_proj.inverse(), vp, .{ m.x, m.y });
+    const r = engine.Projection.viewportPointToRay(cam.view_proj.inverse(), vp, .{ m.x, m.y });
     return .{ .o = r.origin, .d = r.direction };
 }
 
@@ -784,5 +786,6 @@ test "worldToScreen places higher points nearer the top" {
     const cam = testCamera(rect);
     const low = worldToScreen(cam, rect, .{ .x = 0, .y = -1, .z = 0 }) orelse return error.BehindCamera;
     const high = worldToScreen(cam, rect, .{ .x = 0, .y = 1, .z = 0 }) orelse return error.BehindCamera;
-    try std.testing.expect(high.y > low.y);
+    // y-down (GUI/viewport convention): nearer the top means a *smaller* y.
+    try std.testing.expect(high.y < low.y);
 }

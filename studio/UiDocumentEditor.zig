@@ -111,6 +111,9 @@ fn load(path: []const u8) void {
                 .named => |name| if (name.len != 0) {
                     _ = preview_events.registerName(name);
                 },
+                // Resolved at dispatch time via GameEventRegistry, not a
+                // name intern — nothing to pre-register here.
+                .channel => {},
             }
         }
     }
@@ -128,6 +131,9 @@ fn reresolveEvents() void {
                 .named => |name| if (name.len != 0) {
                     _ = preview_events.registerName(name);
                 },
+                // Resolved at dispatch time via GameEventRegistry, not a
+                // name intern — nothing to pre-register here.
+                .channel => {},
             }
         }
     }
@@ -385,7 +391,9 @@ pub fn drawViewPanel(asset_path: []const u8) void {
     const lb = ui_render.fit(.{ .w = nat_rect.w, .h = nat_rect.h }, &doc);
     const result = ui_render.drawTree(&doc, lb, .{ .texture_source = resolveTextureBytes });
     for (result.clicked()) |node_index| toastButtonClick(node_index);
-    ui_render.dispatchClicks(result, resolved_ids, &preview_events);
+    // No live game to raise a channel into while authoring — `toastButtonClick`
+    // above already surfaces what a click would fire.
+    ui_render.dispatchClicks(&doc, result, resolved_ids, &preview_events, null);
 
     drawSelectionGizmo();
 }
@@ -411,6 +419,9 @@ fn toastButtonClick(node_index: usize) void {
         switch (c.button.on_click) {
             .named => |n| if (n.len != 0) {
                 name = n;
+            },
+            .channel => |ch| if (ch.slice().len != 0) {
+                name = ch.slice();
             },
         }
     }

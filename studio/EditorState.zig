@@ -821,6 +821,12 @@ pub var current_project: ?Project = null;
 pub var discovered_components: [MAX_DISCOVERED]ComponentDef = undefined;
 pub var discovered_count: usize = 0;
 
+/// UI event types declared in the project's scripts (#112), for the event
+/// dropdown picker (`PropDraw.drawEventBinding`). Refreshed alongside
+/// `discovered_components` in `refreshComponents`.
+pub var discovered_events: [editor.event_scanner.MAX_EVENTS]editor.event_scanner.EventDef = undefined;
+pub var discovered_event_count: usize = 0;
+
 // ── Background task registry ─────────────────────────────────────────────────
 // Owned here (rather than in `studio/Tasks.zig`) so this file's own background
 // reflect job below can create/update tasks without a circular import — every
@@ -1685,11 +1691,13 @@ pub fn setProjectPath(path: []const u8) void {
 pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
     discovered_count = 0;
     editor.scanner.populateBuiltins(&discovered_components, &discovered_count);
+    discovered_event_count = 0;
 
     if (project_path) |p| {
         var path_buf: [1024]u8 = undefined;
         const assets = std.fmt.bufPrint(&path_buf, "{s}/assets", .{p}) catch return;
         editor.scanner.scanAssetsDir(io, allocator, assets, &discovered_components, &discovered_count);
+        editor.event_scanner.scanEventNames(io, allocator, assets, &discovered_events, &discovered_event_count);
 
         if (asset_db_initialized) asset_db.deinit();
         asset_db = editor.AssetDatabase.init(std.heap.page_allocator);

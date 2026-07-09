@@ -19,8 +19,8 @@ void main() {
     out_world_pos = world.xyz;
 
     vec4 clip = ubo.mvp * vec4(in_pos, 1.0);
-    // Vulkan NDC: Y points down, Z in [0,1]
-    clip.y = -clip.y;
+    // SDL_GPU's unified NDC is Y-up (it auto-converts per backend); only the
+    // Z range needs remapping here, from our GL-style [-1,1] to SDL_GPU's [0,1].
     clip.z = (clip.z + clip.w) * 0.5;
     gl_Position = clip;
 

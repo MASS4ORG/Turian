@@ -398,17 +398,39 @@ pub fn drawTree(doc: *const ui.UiDocument, lb: Letterbox, draw_opts: DrawOptions
     return result;
 }
 
-/// Fires every clicked node's resolved `EventId` through `events` (M2.9:
-/// `clicked() -> resolved EventId -> fireId`). `resolved_ids` is the
-/// per-document cache from `UiEvents.resolveDocument` (parallel to
-/// `doc.nodes`, built once at load time) — this function itself does zero
-/// string work, just index lookups + integer dispatch. Shared by both
-/// Studio's viewport overlay and the shipped game (same call, same result).
-pub fn dispatchClicks(result: DrawResult, resolved_ids: []const ?ui.EventId, events: *ui.UiEvents) void {
+/// Fires every clicked node's `on_click` binding (M2.9 `.named`, #107/#41
+/// `.channel`). `.named` uses `resolved_ids`, the per-document cache from
+/// `UiEvents.resolveDocument` (parallel to `doc.nodes`, built once at load
+/// time) — zero string work, just an index lookup + integer dispatch.
+/// `.channel` resolves its asset GUID through `channels` (a
+/// `GameEventRegistry`) and calls `raise()` — null in contexts with no live
+/// game to fire into (e.g. an editor authoring preview), where it's simply
+/// skipped. Shared by Studio's viewport overlay, the `.uidoc` editor's
+/// preview, Play mode, and the shipped game (same call, same result).
+pub fn dispatchClicks(
+    doc: *const ui.UiDocument,
+    result: DrawResult,
+    resolved_ids: []const ?ui.EventId,
+    events: *ui.UiEvents,
+    channels: ?*engine.GameEventRegistry,
+) void {
     for (result.clicked()) |node_index| {
-        if (node_index >= resolved_ids.len) continue;
-        const id = resolved_ids[node_index] orelse continue;
-        events.fireId(id);
+        if (node_index >= doc.nodes.len) continue;
+        for (doc.nodes[node_index].components) |c| {
+            if (c != .button) continue;
+            switch (c.button.on_click) {
+                .named => {
+                    if (node_index >= resolved_ids.len) continue;
+                    const id = resolved_ids[node_index] orelse continue;
+                    events.fireId(id);
+                },
+                .channel => |ch| {
+                    const reg = channels orelse continue;
+                    const ge = reg.getOrCreate(ch.slice()) orelse continue;
+                    ge.raise();
+                },
+            }
+        }
     }
 }
 
@@ -584,7 +606,57 @@ test "full pipeline: click -> resolved EventId -> fireId (M2.9)" {
     _ = try gui.testing.step(Ctx.frame);
 
     try std.testing.expect(!Sub.fired);
-    dispatchClicks(Ctx.last_result, resolved, &events);
+    dispatchClicks(&doc, Ctx.last_result, resolved, &events, null);
+    try std.testing.expect(Sub.fired);
+}
+
+test "channel binding raises the shared GameEvent through GameEventRegistry" {
+    var t = try gui.testing.init(.{});
+    defer t.deinit();
+
+    var button_components = [_]ui.UiComponent{
+        .{ .button = .{ .on_click = .{ .channel = channel_ref: {
+            var r: engine.TypedAssetRef(.game_event) = .{};
+            r.set("door-channel-guid");
+            break :channel_ref r;
+        } } } },
+    };
+    var nodes = [_]ui.UiNode{
+        .{ .guid = "btn", .parent = -1, .item = .{ .min_size = .{ 100, 50 } }, .components = &button_components },
+    };
+    const doc = ui.UiDocument{ .nodes = &nodes };
+
+    var events = ui.UiEvents.init();
+    const resolved = try events.resolveDocument(std.testing.allocator, &doc);
+    defer std.testing.allocator.free(resolved);
+
+    var registry = engine.GameEventRegistry.init();
+    const Sub = struct {
+        var fired = false;
+        fn onRaised(_: *u8) void {
+            fired = true;
+        }
+    };
+    var dummy_ctx: u8 = 0;
+    registry.getOrCreate("door-channel-guid").?.on(&dummy_ctx, Sub.onRaised);
+
+    const Ctx = struct {
+        var d: *const ui.UiDocument = undefined;
+        var last_result: DrawResult = .{};
+        fn frame() !gui.App.Result {
+            last_result = drawTree(d, .{ .rect = .{ .w = 200, .h = 100 }, .scale = 1 }, .{});
+            return .ok;
+        }
+    };
+    Ctx.d = &doc;
+
+    try gui.testing.settle(Ctx.frame);
+    try gui.testing.moveTo("btn");
+    try gui.testing.click(.left);
+    _ = try gui.testing.step(Ctx.frame);
+
+    try std.testing.expect(!Sub.fired);
+    dispatchClicks(&doc, Ctx.last_result, resolved, &events, &registry);
     try std.testing.expect(Sub.fired);
 }
 

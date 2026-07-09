@@ -72,6 +72,9 @@ pub const Texture = assets.Texture;
 pub const Material = assets.Material;
 /// Data-driven input binding asset (`.inputactions`).
 pub const InputActions = assets.InputActions;
+/// Inspector-wireable event channel (#41 SOAP slice) — see `engine.ui.EventBinding.channel`.
+pub const GameEvent = assets.GameEvent;
+pub const GameEventRegistry = assets.GameEventRegistry;
 /// Game/project configuration asset (`.projectsettings`): metadata, graphics,
 /// platform options, and the boot scene.
 pub const ProjectSettings = assets.ProjectSettings;

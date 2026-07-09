@@ -38,6 +38,8 @@ variables:
 
 default:
   image: "${CI_REGISTRY_IMAGE}/ci:${ZIG_VERSION}"
+  tags:
+    - local-runner
 
 stages:
   - test
@@ -88,7 +90,7 @@ test:
       when: never
     - when: on_success
   script:
-    - zig fmt --check engine/ editor/ studio/ subsystems/ tools/ examples/ build.zig build.zig.zon
+    - zig fmt --check .
     - echo "==> zig build"
     - zig build --summary all
     - echo "==> zig build test"

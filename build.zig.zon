@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/david-vanderson/dvui#405b282a2ef35c304ce61f33f840eeffa02ef3bd",
-            .hash = "dvui-0.5.0-dev-AQFJmVem-QDeh_jOTFsL7_S-dKYGYbcOohEVdqyV7Eov",
+            .url = "git+https://github.com/brmassa/dvui?ref=mr-4-texture-readback-and-frame-capture#c2506f2afbc840f2f4386f074e515fd8d8d0a0c0",
+            .hash = "dvui-0.5.0-dev-AQFJmQyV-gB3Bgc6LKscyTCu3o7dD7fIJyzoWK6nuQP0",
         },
         .gpu = .{
             .url = "git+https://gitlab.com/mass4org/mega4/gpu#68963cc927252e15c5ca27330ae5d7fe837dd5e1",
@@ -21,8 +21,8 @@
             .hash = "ktx2-1.0.0-_ha8z9rlSQArWqLEO34QRvI3EclvelWUDKHJ2SS9r8br",
         },
         .math3d = .{
-            .url = "git+https://gitlab.com/mass4org/mega4/math-3d#368d7013205c6103f159025f61d0a87740564625",
-            .hash = "math3d-1.2.0-pUqn4AvJAQCOU09-Kk1wm_2Ahe15HjDSFqWmbcwFuPIv",
+            .url = "git+https://gitlab.com/mass4org/mega4/math-3d#39a6fd5eec7117ebe65fcc0c8c56e7caf8663031",
+            .hash = "math3d-1.3.0-pUqn4LXcAQATQ2o2RRad4GqGgD5uSU8ImFvgEAz1DbNN",
         },
         .open_asset_package = .{
             .url = "git+https://gitlab.com/mass4org/mega4/open-asset-package#e49cf316c88ff421e6498dc63201c7c19887561c",

@@ -42,6 +42,10 @@ pub const symbols = struct {
     pub const add_wheel = "turianPlayAddWheel";
     pub const load_input_actions = "turianPlayLoadInputActions";
     pub const register_prefab = "turianPlayRegisterPrefab";
+    pub const load_ui_document = "turianPlayLoadUiDocument";
+    pub const ui_runtime_ptr = "turianPlayUiRuntimePtr";
+    pub const ui_events_ptr = "turianPlayUiEventsPtr";
+    pub const game_event_registry_ptr = "turianPlayGameEventRegistryPtr";
 };
 
 fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -341,7 +345,20 @@ fn generatePlayMainZig(
             "var g_node_count: usize = 0;\n" ++
             "var g_input: engine.Input = engine.Input.init();\n" ++
             "var g_services: engine.Services = engine.Services.init();\n" ++
-            "var g_spawner: engine.Spawner = engine.Spawner.init(gpa);\n\n",
+            "var g_spawner: engine.Spawner = engine.Spawner.init(gpa);\n\n" ++
+            // In-game GUI runtime (#47): pure data, zero dvui import (D7) — the
+            // library never renders (the studio draws, same as scene nodes), it
+            // only owns the document instances scripts read/mutate via
+            // `frame.uiDocument`/`frame.service(engine.ui.UiEvents)` and the
+            // studio populates (`turianPlayLoadUiDocument`) / draws+dispatches
+            // (`turianPlayUiRuntimePtr`/`turianPlayUiEventsPtr`).\n" ++
+            "var g_ui_events: engine.ui.UiEvents = engine.ui.UiEvents.init();\n" ++
+            "var g_ui_runtime: engine.ui.UiRuntime = engine.ui.UiRuntime.init();\n" ++
+            // #41/#107: shared event-channel registry a button's `channel`
+            // binding raises into (studio draws+dispatches via
+            // `turianPlayGameEventRegistryPtr`, same pattern as the UI runtime
+            // above); any script anywhere subscribes via `frame.gameEvent(ref)`.
+            "var g_game_events: engine.GameEventRegistry = engine.GameEventRegistry.init();\n\n",
     );
 
     for (0..src_files.len) |i| {
@@ -542,7 +559,10 @@ fn generatePlayMainZig(
         "export fn turianPlayStart(nodes: [*]const engine.SceneNode, count: usize) callconv(.c) bool {\n" ++
             "    const n = @min(count, g_nodes.len);\n" ++
             "    @memcpy(g_nodes[0..n], nodes[0..n]);\n" ++
-            "    g_node_count = n;\n",
+            "    g_node_count = n;\n" ++
+            "    g_services.register(engine.ui.UiRuntime, &g_ui_runtime);\n" ++
+            "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n" ++
+            "    g_services.register(engine.GameEventRegistry, &g_game_events);\n",
     );
     if (has_user) {
         try out.appendSlice(
@@ -591,6 +611,7 @@ fn generatePlayMainZig(
                 "    g_live_count = 0;\n",
         );
     }
+    try out.appendSlice(a, "    g_ui_runtime.deinitAll();\n");
     try out.appendSlice(a, "    g_node_count = 0;\n}\n\n");
 
     try out.appendSlice(
@@ -630,6 +651,29 @@ fn generatePlayMainZig(
             // GUID at runtime. Fed by the studio before play starts.
             "export fn turianPlayRegisterPrefab(guid_ptr: [*]const u8, guid_len: usize, nodes_ptr: [*]const engine.SceneNode, nodes_count: usize) callconv(.c) void {\n" ++
             "    g_spawner.registerPrefab(guid_ptr[0..guid_len], nodes_ptr[0..nodes_count]);\n" ++
+            "}\n\n" ++
+            // Loads one `.uidoc`'s bytes (read by the studio, which owns asset
+            // access — the library never touches the asset database) into a
+            // `UiInstance` owned by `node_guid`. The studio draws + dispatches
+            // clicks against the *same* instance/events via the two pointer
+            // accessors below (same process — dlopen, not a subprocess — so a
+            // raw pointer to this pure-data struct is safe to alias from the
+            // studio's own independently-compiled `engine.ui` code, exactly
+            // like `turianPlayNodesPtr`'s `engine.SceneNode` pointer already is).\n" ++
+            "export fn turianPlayLoadUiDocument(node_guid_ptr: [*]const u8, node_guid_len: usize, bytes_ptr: [*]const u8, bytes_len: usize) callconv(.c) void {\n" ++
+            "    const node_guid = node_guid_ptr[0..node_guid_len];\n" ++
+            "    if (g_ui_runtime.instanceFor(node_guid) != null) return;\n" ++
+            "    var inst = engine.ui.UiInstance.load(gpa, bytes_ptr[0..bytes_len], &g_ui_events) catch return;\n" ++
+            "    if (!g_ui_runtime.add(node_guid, inst)) inst.deinit();\n" ++
+            "}\n\n" ++
+            "export fn turianPlayUiRuntimePtr() callconv(.c) *engine.ui.UiRuntime {\n" ++
+            "    return &g_ui_runtime;\n" ++
+            "}\n\n" ++
+            "export fn turianPlayUiEventsPtr() callconv(.c) *engine.ui.UiEvents {\n" ++
+            "    return &g_ui_events;\n" ++
+            "}\n\n" ++
+            "export fn turianPlayGameEventRegistryPtr() callconv(.c) *engine.GameEventRegistry {\n" ++
+            "    return &g_game_events;\n" ++
             "}\n",
     );
 

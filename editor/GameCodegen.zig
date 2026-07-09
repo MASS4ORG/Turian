@@ -941,6 +941,10 @@ pub fn generateMainZig(
                 "const ui_render = @import(\"ui_render\");\n\n" ++
                 "var g_ui_events: engine.ui.UiEvents = engine.ui.UiEvents.init();\n" ++
                 "var g_ui_runtime: engine.ui.UiRuntime = engine.ui.UiRuntime.init();\n" ++
+                // #41/#107: shared event-channel registry a button's `channel`
+                // binding raises into; any script anywhere subscribes via
+                // `frame.gameEvent(ref)`.
+                "var g_game_events: engine.GameEventRegistry = engine.GameEventRegistry.init();\n" ++
                 // Per-frame SDL events are buffered here, then applied to g_input
                 // AFTER the UI walk so the GUI gets first claim on them (input
                 // priority). Sized well above any realistic per-frame event count.
@@ -1313,7 +1317,10 @@ pub fn generateMainZig(
                 "    defer g_ui_runtime.deinitAll();\n" ++
                 "    // Published so scripts can subscribe to button clicks via the\n" ++
                 "    // typed-event API (D4): `frame.service(engine.ui.UiEvents).?.on(MyEvent, self, onMyEvent)`.\n" ++
-                "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n",
+                "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n" ++
+                "    // #41/#107: `frame.gameEvent(ref)` resolves a `channel` binding's\n" ++
+                "    // shared instance through this registry.\n" ++
+                "    g_services.register(engine.GameEventRegistry, &g_game_events);\n",
         );
     }
 
@@ -1479,7 +1486,7 @@ pub fn generateMainZig(
                 "                if (!ui_entry.instance.visible) continue;\n" ++
                 "                const lb = ui_render.fit(.{ .w = @floatFromInt(fr.width), .h = @floatFromInt(fr.height) }, &ui_entry.instance.doc);\n" ++
                 "                const result = ui_render.drawTree(&ui_entry.instance.doc, lb, .{ .texture_source = uiTextureSource });\n" ++
-                "                ui_render.dispatchClicks(result, ui_entry.instance.resolved, &g_ui_events);\n" ++
+                "                ui_render.dispatchClicks(&ui_entry.instance.doc, result, ui_entry.instance.resolved, &g_ui_events, &g_game_events);\n" ++
                 "            }\n" ++
                 "            for (gui.events()) |*e| {\n" ++
                 "                if (!e.handled) continue;\n" ++

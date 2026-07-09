@@ -893,6 +893,114 @@
             "source_file": "assets/MenuController.zig",
             "fields": []
           }
+        },
+        {
+          "user_script": {
+            "type_name": "JumpOnClick",
+            "source_file": "assets/JumpOnClick.zig",
+            "fields": [
+              {
+                "name": "target",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
+                "as_string": ""
+              }
+            ]
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "ProximityDialog",
+            "source_file": "assets/ProximityDialog.zig",
+            "fields": [
+              {
+                "name": "hud",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "25b21610-6255-40a6-98d4-c9f9858ac972",
+                "as_string": ""
+              },
+              {
+                "name": "target",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
+                "as_string": ""
+              }
+            ]
+          }
+        },
+        {
+          "user_script": {
+            "type_name": "ChannelSubscriber",
+            "source_file": "assets/ChannelSubscriber.zig",
+            "fields": [
+              {
+                "name": "channel",
+                "kind": "asset_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "49533407-fb6c-48c5-a800-5e162cf5d5a6",
+                "as_string": ""
+              }
+            ]
+          }
         }
       ]
     }

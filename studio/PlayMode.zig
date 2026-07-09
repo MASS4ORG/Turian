@@ -44,6 +44,10 @@ const Fns = struct {
     add_wheel: *const fn (f32) callconv(.c) void,
     load_input_actions: *const fn ([*]const u8, usize) callconv(.c) void,
     register_prefab: *const fn ([*]const u8, usize, [*]const engine.SceneNode, usize) callconv(.c) void,
+    load_ui_document: *const fn ([*]const u8, usize, [*]const u8, usize) callconv(.c) void,
+    ui_runtime_ptr: *const fn () callconv(.c) *engine.ui.UiRuntime,
+    ui_events_ptr: *const fn () callconv(.c) *engine.ui.UiEvents,
+    game_event_registry_ptr: *const fn () callconv(.c) *engine.GameEventRegistry,
 };
 
 var g_state: State = .edit;
@@ -78,6 +82,28 @@ pub fn isActive() bool {
 
 pub fn fps() f32 {
     return g_fps;
+}
+
+/// The running play library's live `UiRuntime`/`UiEvents` (#47), for the
+/// viewport to draw+dispatch against — same process (dlopen), so this is a
+/// raw pointer into the library's own memory, not a copy. Null outside
+/// Play/Paused or before the library has loaded.
+pub fn uiRuntime() ?*engine.ui.UiRuntime {
+    if (!g_lib_valid or g_state == .edit) return null;
+    return g_fns.ui_runtime_ptr();
+}
+
+pub fn uiEvents() ?*engine.ui.UiEvents {
+    if (!g_lib_valid or g_state == .edit) return null;
+    return g_fns.ui_events_ptr();
+}
+
+/// The running play library's live `GameEventRegistry` (#41/#107), for a
+/// `channel` binding to raise into — same raw-pointer-across-dlopen pattern
+/// as `uiRuntime`/`uiEvents`.
+pub fn gameEvents() ?*engine.GameEventRegistry {
+    if (!g_lib_valid or g_state == .edit) return null;
+    return g_fns.game_event_registry_ptr();
 }
 
 // ── Public controls ────────────────────────────────────────────────────────
@@ -165,6 +191,7 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     defer arena.deinit();
     loadInputActions(io, arena.allocator());
     registerPrefabs(io);
+    loadUiDocuments(io, nodes);
 
     GpuRenderer.setRenderOverride(playNodes());
     g_state = .playing;
@@ -366,6 +393,36 @@ fn registerPrefabs(io: std.Io) void {
     }
 }
 
+/// Push each `ui_document` node's referenced `.uidoc` bytes into the play
+/// library's `UiRuntime` (#47): the library never touches the asset database
+/// (only the studio does), so the studio reads the bytes and hands them over,
+/// mirroring `registerPrefabs`/`loadInputActions`. Scoped to Play start, like
+/// those two — a script spawning a *new* `ui_document` node at runtime is a
+/// follow-up, not required for the MVP.
+fn loadUiDocuments(io: std.Io, nodes: []const engine.SceneNode) void {
+    if (!EditorState.assetDbReady()) return;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    for (nodes) |*node| {
+        if (!node.active) continue;
+        const node_guid = node.guidSlice();
+        if (node_guid.len == 0) continue;
+        for (node.components[0..node.component_count]) |comp| {
+            if (comp != .ui_document) continue;
+            const doc_guid = comp.ui_document.document.slice();
+            if (doc_guid.len == 0) continue;
+            const path = EditorState.resolveAssetGuid(doc_guid) orelse continue;
+            var file = std.Io.Dir.cwd().openFile(io, path, .{}) catch continue;
+            defer file.close(io);
+            var fbuf: [4096]u8 = undefined;
+            var reader = file.reader(io, &fbuf);
+            const bytes = reader.interface.allocRemaining(arena.allocator(), .unlimited) catch continue;
+            g_fns.load_ui_document(node_guid.ptr, node_guid.len, bytes.ptr, bytes.len);
+            _ = arena.reset(.retain_capacity);
+        }
+    }
+}
+
 /// Feed every InputActions asset in the project into the live input map so
 /// scripts that read actions by name work in Play (reuses the build data path).
 fn loadInputActions(io: std.Io, a: std.mem.Allocator) void {
@@ -416,6 +473,10 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
         .add_wheel = lib.lookup(@TypeOf(g_fns.add_wheel), S.add_wheel) orelse return failLookup(&lib),
         .load_input_actions = lib.lookup(@TypeOf(g_fns.load_input_actions), S.load_input_actions) orelse return failLookup(&lib),
         .register_prefab = lib.lookup(@TypeOf(g_fns.register_prefab), S.register_prefab) orelse return failLookup(&lib),
+        .load_ui_document = lib.lookup(@TypeOf(g_fns.load_ui_document), S.load_ui_document) orelse return failLookup(&lib),
+        .ui_runtime_ptr = lib.lookup(@TypeOf(g_fns.ui_runtime_ptr), S.ui_runtime_ptr) orelse return failLookup(&lib),
+        .ui_events_ptr = lib.lookup(@TypeOf(g_fns.ui_events_ptr), S.ui_events_ptr) orelse return failLookup(&lib),
+        .game_event_registry_ptr = lib.lookup(@TypeOf(g_fns.game_event_registry_ptr), S.game_event_registry_ptr) orelse return failLookup(&lib),
     };
     g_lib = lib;
     g_lib_valid = true;

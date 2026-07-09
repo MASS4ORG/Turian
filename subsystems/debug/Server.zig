@@ -61,6 +61,20 @@ pub const Mutation = union(enum) {
     spawn: struct { name: []const u8 },
     destroy: struct { entity: []const u8 },
     reload_asset: struct { guid: []const u8 },
+    // Machine-driven UI interaction (Studio only — the applier is a no-op for
+    // the shipped game): synthesizes real dvui input events so any Studio
+    // state (open a document, select a node, open a dropdown) is reachable
+    // from an external tool/script, not just a fixed startup capture.
+    input_mouse_move: struct { x: f32, y: f32 },
+    /// Combined move + press + release at (x, y) — the common case. `button`
+    /// is "left"/"right"/"middle".
+    input_click: struct { x: f32, y: f32, button: []const u8 },
+    input_key: struct { code: []const u8, down: bool },
+    input_text: struct { text: []const u8 },
+    /// Schedules a whole-window screenshot on the next frame (see
+    /// `Screenshots.captureWindow`); poll the `screenshot.last` query for the
+    /// resulting path.
+    capture_window: struct {},
 };
 
 pub const MutationResult = struct {

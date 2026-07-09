@@ -7,6 +7,7 @@ const EditorState = @import("EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 const EditorCamera = @import("EditorCamera.zig");
 const UiOverlay = @import("UiOverlay.zig");
+const ui_render = @import("ui_render");
 
 /// "Show UI overlay" toggle (#47 M2, C3): draws the scene's referenced
 /// `.uidoc` documents (plus the one open in `UiDocumentEditor`) letterboxed
@@ -145,9 +146,20 @@ pub fn draw() void {
             .gravity_x = 0.5,
             .gravity_y = 0.5,
         });
-        if (st == .edit) drawIcons(vp_w, vp_h, nat_rect);
-        if (show_ui_overlay) {
-            UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
+        if (st == .edit) {
+            drawIcons(vp_w, vp_h, nat_rect);
+            if (show_ui_overlay) {
+                UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
+            }
+        } else {
+            // Live GUI during Play/Paused (#47) — unconditional, unlike the
+            // "Show UI overlay" edit-time authoring preview above: this is the
+            // actual running game's UI, not a WYSIWYG preview of it. Runs
+            // before `PlayMode.pump()` (see Window.zig's per-frame order) so
+            // `bw.processEvents()` below can claim the click first — the same
+            // input-priority ordering `PlayMode.feedInput`'s `e.handled` check
+            // expects.
+            drawPlayModeUi(.{ .w = nat_rect.w, .h = nat_rect.h });
         }
     } else {
         gui.label(@src(), "3D viewport unavailable", .{}, .{
@@ -155,6 +167,23 @@ pub fn draw() void {
             .gravity_y = 0.5,
             .expand = .both,
         });
+    }
+}
+
+/// Draw + dispatch the running game's live `.uidoc` instances (#47) during
+/// Play/Paused, reading the play library's `UiRuntime`/`UiEvents` (same
+/// process, populated by `PlayMode.loadUiDocuments` at Play start).
+fn drawPlayModeUi(target: gui.Rect) void {
+    const rt = PlayMode.uiRuntime() orelse return;
+    const events = PlayMode.uiEvents() orelse return;
+    const channels = PlayMode.gameEvents();
+    for (rt.instances()) |*entry| {
+        if (!entry.instance.visible) continue;
+        const lb = ui_render.fit(.{ .w = target.w, .h = target.h }, &entry.instance.doc);
+        const result = ui_render.drawTree(&entry.instance.doc, lb, .{
+            .texture_source = UiOverlay.resolveTextureBytes,
+        });
+        ui_render.dispatchClicks(&entry.instance.doc, result, entry.instance.resolved, events, channels);
     }
 }
 

@@ -38,6 +38,7 @@ pub fn dispatch(
     if (std.mem.eql(u8, m, "asset.inspect")) return callAssetInspect(allocator, req, world, out);
     if (std.mem.eql(u8, m, "schema")) return callSchema(allocator, req, out);
     if (std.mem.eql(u8, m, "metrics")) return callMetrics(allocator, req, world, out);
+    if (std.mem.eql(u8, m, "screenshot.last")) return callScreenshotLast(allocator, req, world, out);
     if (std.mem.eql(u8, m, "profiler.capture")) return callProfilerCapture(allocator, req, out);
     if (std.mem.eql(u8, m, "memory")) return callMemory(allocator, req, world, out);
     if (std.mem.eql(u8, m, "errors")) return callErrors(allocator, req, out);
@@ -323,6 +324,11 @@ const mutating_methods = [_][]const u8{
     "entity.spawn",
     "entity.destroy",
     "asset.reload",
+    "input.mouseMove",
+    "input.click",
+    "input.key",
+    "input.text",
+    "screenshot.capture",
 };
 
 /// True if `method` is a mutating method (handled via the applier, not dispatch).
@@ -370,6 +376,31 @@ pub fn buildMutation(arena: std.mem.Allocator, req: *const Request) MutationErro
     if (std.mem.eql(u8, m, "asset.reload")) {
         return .{ .reload_asset = .{ .guid = try dupField(arena, obj, "guid") } };
     }
+    if (std.mem.eql(u8, m, "input.mouseMove")) {
+        return .{ .input_mouse_move = .{
+            .x = try numField(obj, "x"),
+            .y = try numField(obj, "y"),
+        } };
+    }
+    if (std.mem.eql(u8, m, "input.click")) {
+        return .{ .input_click = .{
+            .x = try numField(obj, "x"),
+            .y = try numField(obj, "y"),
+            .button = if (obj.get("button")) |v| (if (v == .string) try arena.dupe(u8, v.string) else "left") else "left",
+        } };
+    }
+    if (std.mem.eql(u8, m, "input.key")) {
+        return .{ .input_key = .{
+            .code = try dupField(arena, obj, "code"),
+            .down = if (obj.get("down")) |v| (v == .bool and v.bool) else true,
+        } };
+    }
+    if (std.mem.eql(u8, m, "input.text")) {
+        return .{ .input_text = .{ .text = try dupField(arena, obj, "text") } };
+    }
+    if (std.mem.eql(u8, m, "screenshot.capture")) {
+        return .{ .capture_window = .{} };
+    }
     return error.InvalidParams;
 }
 
@@ -377,6 +408,16 @@ fn dupField(arena: std.mem.Allocator, obj: std.json.ObjectMap, key: []const u8) 
     const v = obj.get(key) orelse return error.InvalidParams;
     if (v != .string) return error.InvalidParams;
     return try arena.dupe(u8, v.string);
+}
+
+fn numField(obj: std.json.ObjectMap, key: []const u8) MutationError!f32 {
+    const v = obj.get(key) orelse return error.InvalidParams;
+    return switch (v) {
+        .integer => |n| @floatFromInt(n),
+        .float => |f| @floatCast(f),
+        .number_string => |s| std.fmt.parseFloat(f32, s) catch return error.InvalidParams,
+        else => error.InvalidParams,
+    };
 }
 
 /// Maps a JSON value to an `introspect.Value`. Numbers → number, bools →
@@ -462,6 +503,21 @@ fn callMetrics(allocator: std.mem.Allocator, req: *const Request, world: World, 
     var jw = std.json.Stringify{ .writer = &buf.writer, .options = .{} };
     if (world.metrics) |m|
         jw.write(m.*) catch {}
+    else
+        jw.write(null) catch {};
+    const json = allocator.dupe(u8, buf.written()) catch return;
+    defer allocator.free(json);
+    okJson(req, out, json);
+}
+
+/// Poll after `screenshot.capture` (the actual capture completes on a later
+/// frame, not synchronously with that mutation) to get the resulting path.
+fn callScreenshotLast(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
+    var buf: std.Io.Writer.Allocating = .init(allocator);
+    defer buf.deinit();
+    var jw = std.json.Stringify{ .writer = &buf.writer, .options = .{} };
+    if (world.last_screenshot) |s|
+        jw.write(s) catch {}
     else
         jw.write(null) catch {};
     const json = allocator.dupe(u8, buf.written()) catch return;

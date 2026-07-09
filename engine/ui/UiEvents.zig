@@ -129,6 +129,10 @@ pub const UiEvents = struct {
                         if (name.len == 0) continue;
                         resolved[i] = self.resolveOrWarn(name);
                     },
+                    // Resolved at dispatch time instead (GameEventRegistry
+                    // lookup by GUID, not a name-to-EventId intern) — see
+                    // `ui_render.dispatchClicks`.
+                    .channel => {},
                 }
             }
         }

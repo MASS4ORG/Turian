@@ -1,0 +1,13 @@
+{
+  "guid": "49533407-fb6c-48c5-a800-5e162cf5d5a6",
+  "asset_type": "data_asset",
+  "importer_version": 1,
+  "source_hash": 14354569712411377117,
+  "import_settings": "data_asset",
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+  ]
+}

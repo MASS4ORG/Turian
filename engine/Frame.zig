@@ -24,6 +24,8 @@ const SceneNode = @import("scene/SceneNode.zig").SceneNode;
 const Spawner = @import("scene/Spawner.zig").Spawner;
 const Vector3 = @import("root.zig").Vector3;
 const ui = @import("ui/root.zig");
+const assets = @import("assets/root.zig");
+const TypedAssetRef = @import("api/AssetRef.zig").TypedAssetRef;
 
 /// Services made available to a script's lifecycle hooks.
 pub const Frame = struct {
@@ -68,6 +70,16 @@ pub const Frame = struct {
     pub fn uiDocument(self: Frame, node: *const SceneNode) ?*ui.UiInstance {
         const rt = self.service(ui.UiRuntime) orelse return null;
         return rt.instanceFor(node.guidSlice());
+    }
+
+    /// The shared `GameEvent` channel referenced by `ref` (#41/#107), or null
+    /// when the runtime doesn't publish the registry (unit tests) or the
+    /// channel table is full. A publisher and every subscriber referencing
+    /// the same asset GUID resolve to the SAME instance, decoupled from each
+    /// other — see `engine.GameEventRegistry`.
+    pub fn gameEvent(self: Frame, ref: TypedAssetRef(.game_event)) ?*assets.GameEvent {
+        const reg = self.service(assets.GameEventRegistry) orelse return null;
+        return reg.getOrCreate(ref.slice());
     }
 };
 

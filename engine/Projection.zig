@@ -16,7 +16,20 @@ pub const cameraViewProj = math.Projection.cameraViewProj;
 pub fn worldToViewport(view_proj: math.Matrix4, viewport: [4]f32, world: math.Vector3) ?[2]f32 {
     const r = math.Projection.worldToScreen(view_proj, viewport, world) orelse return null;
     // Flip Y: math-3d returns Y-up; the engine's GUI uses Y-down.
-    return .{ r[0], viewport[1] + viewport[3] - (r[1] - viewport[1]) };
+    return .{ r[0], flipY(viewport, r[1]) };
+}
+
+/// Unproject a y-down (GUI convention) viewport point into a world-space ray.
+/// Inverse counterpart of `worldToViewport` for hit-testing/picking.
+pub fn viewportPointToRay(inv_view_proj: math.Matrix4, viewport: [4]f32, screen: [2]f32) math.Ray {
+    // Flip Y back to math-3d's y-up convention before unprojecting.
+    return math.Projection.screenPointToRay(inv_view_proj, viewport, .{ screen[0], flipY(viewport, screen[1]) });
+}
+
+/// Reflects a y coordinate across the vertical center of `viewport` — the
+/// y-up/y-down conversion is its own inverse.
+fn flipY(viewport: [4]f32, y: f32) f32 {
+    return viewport[1] + viewport[3] - (y - viewport[1]);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -367,6 +367,74 @@ pub const Input = struct {
         return null;
     }
 
+    // --- Typed handles (#108): strings at rest, dense handles at runtime,
+    // porting `engine.ui.UiEvents`' resolution pattern. `ActionId` is just the
+    // action's stable index into `actions` — indices never change after
+    // `defineButton`/`defineAxis`/`defineVector` (only appended to, never
+    // removed/reordered) — so resolving once (e.g. in a script's `awake`) and
+    // polling by id every frame after is zero string work, same as `fireId`.
+
+    pub const ActionId = u32;
+    pub const INVALID_ACTION_ID: ActionId = std.math.maxInt(ActionId);
+
+    /// Resolve `action_name` to its dense id, or null if no action with that
+    /// name has been defined (yet).
+    pub fn resolve(self: *const Input, action_name: []const u8) ?ActionId {
+        for (self.actions[0..self.action_count], 0..) |*a, i| {
+            if (std.mem.eql(u8, a.name(), action_name)) return @intCast(i);
+        }
+        return null;
+    }
+
+    /// Like `resolve`, but logs a warning listing every defined action name
+    /// when `action_name` doesn't resolve — for load-time binding resolution
+    /// (mirrors `UiEvents.resolveOrWarn`).
+    pub fn resolveOrWarn(self: *const Input, action_name: []const u8) ?ActionId {
+        if (self.resolve(action_name)) |id| return id;
+        var buf: [1024]u8 = undefined;
+        var w: std.Io.Writer = .fixed(&buf);
+        w.print("unknown input action \"{s}\"; defined: ", .{action_name}) catch {};
+        for (self.actions[0..self.action_count], 0..) |*a, i| {
+            if (i != 0) w.writeAll(", ") catch {};
+            w.writeAll(a.name()) catch {};
+        }
+        if (self.action_count == 0) w.writeAll("(none)") catch {};
+        std.log.warn("{s}", .{w.buffered()});
+        return null;
+    }
+
+    fn actionById(self: *const Input, id: ActionId) ?*const Action {
+        if (id >= self.action_count) return null;
+        return &self.actions[id];
+    }
+
+    /// Id-based counterpart of `isPressed` — zero string work.
+    pub fn isPressedId(self: *const Input, id: ActionId) bool {
+        const a = self.actionById(id) orelse return false;
+        return a.pos.value(self) >= PRESS_THRESHOLD;
+    }
+
+    /// Id-based counterpart of `wasPressed` — zero string work.
+    pub fn wasPressedId(self: *const Input, id: ActionId) bool {
+        const a = self.actionById(id) orelse return false;
+        return a.pos.value(self) >= PRESS_THRESHOLD and a.pos.valuePrev(self) < PRESS_THRESHOLD;
+    }
+
+    /// Id-based counterpart of `axis` — zero string work.
+    pub fn axisId(self: *const Input, id: ActionId) f32 {
+        const a = self.actionById(id) orelse return 0;
+        return std.math.clamp(a.pos.value(self) - a.neg.value(self), -1, 1);
+    }
+
+    /// Id-based counterpart of `vector` — zero string work.
+    pub fn vectorId(self: *const Input, id: ActionId) Vector2 {
+        const a = self.actionById(id) orelse return .{ .x = 0, .y = 0 };
+        return .{
+            .x = std.math.clamp(a.pos.value(self) - a.neg.value(self), -1, 1),
+            .y = std.math.clamp(a.up.value(self) - a.down.value(self), -1, 1),
+        };
+    }
+
     // --- Action polling --------------------------------------------------
 
     /// True while a button action's strongest source is past the press threshold
@@ -513,6 +581,77 @@ test "button action with multiple bindings" {
 
     // Unknown action is inert, never crashes.
     try std.testing.expect(!in.isPressed("nope"));
+}
+
+test "resolve returns the same stable id as the action's define order" {
+    var in = Input.init();
+    in.defineButton("jump", &.{.{ .key = .space }});
+    in.defineAxis("move_x", &.{.{ .key = .d }}, &.{.{ .key = .a }});
+
+    const jump_id = in.resolve("jump").?;
+    const move_id = in.resolve("move_x").?;
+    try std.testing.expect(jump_id != move_id);
+    try std.testing.expectEqual(@as(?Input.ActionId, null), in.resolve("nope"));
+
+    // Resolving again returns the exact same id (stable across calls).
+    try std.testing.expectEqual(jump_id, in.resolve("jump").?);
+}
+
+test "resolveOrWarn returns null and does not crash for an unknown name" {
+    var in = Input.init();
+    in.defineButton("jump", &.{.{ .key = .space }});
+    try std.testing.expectEqual(@as(?Input.ActionId, null), in.resolveOrWarn("missing_action"));
+    try std.testing.expect(in.resolveOrWarn("jump") != null);
+}
+
+test "id-based polling matches the string-based equivalent, zero string work" {
+    var in = Input.init();
+    in.defineButton("jump", &.{ .{ .key = .space }, .{ .mouse = .right } });
+    const jump_id = in.resolve("jump").?;
+
+    try std.testing.expectEqual(in.isPressed("jump"), in.isPressedId(jump_id));
+
+    in.newFrame();
+    in.setMouseButton(.right, true);
+    try std.testing.expect(in.isPressedId(jump_id));
+    try std.testing.expect(in.wasPressedId(jump_id));
+    try std.testing.expectEqual(in.isPressed("jump"), in.isPressedId(jump_id));
+    try std.testing.expectEqual(in.wasPressed("jump"), in.wasPressedId(jump_id));
+
+    in.newFrame();
+    try std.testing.expect(in.isPressedId(jump_id));
+    try std.testing.expect(!in.wasPressedId(jump_id)); // held, not a new press
+
+    // An invalid/unresolved id is inert, never a crash.
+    try std.testing.expect(!in.isPressedId(Input.INVALID_ACTION_ID));
+}
+
+test "axisId/vectorId match the string-based equivalent" {
+    var in = Input.init();
+    in.defineAxis("move_x", &.{.{ .key = .d }}, &.{.{ .key = .a }});
+    in.defineVector(
+        "move",
+        &.{.{ .key = .d }},
+        &.{.{ .key = .a }},
+        &.{.{ .key = .w }},
+        &.{.{ .key = .s }},
+    );
+    const axis_id = in.resolve("move_x").?;
+    const vec_id = in.resolve("move").?;
+
+    in.setKey(.d, true);
+    in.setKey(.w, true);
+    try std.testing.expectEqual(in.axis("move_x"), in.axisId(axis_id));
+    const v_str = in.vector("move");
+    const v_id = in.vectorId(vec_id);
+    try std.testing.expectEqual(v_str.x, v_id.x);
+    try std.testing.expectEqual(v_str.y, v_id.y);
+
+    // Unresolved id degrades to zero, never a crash.
+    try std.testing.expectEqual(@as(f32, 0), in.axisId(Input.INVALID_ACTION_ID));
+    const v_invalid = in.vectorId(Input.INVALID_ACTION_ID);
+    try std.testing.expectEqual(@as(f32, 0), v_invalid.x);
+    try std.testing.expectEqual(@as(f32, 0), v_invalid.y);
 }
 
 test "axis action resolves to [-1, 1]" {

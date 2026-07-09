@@ -7,6 +7,9 @@ pub const version = engine.version;
 
 /// User script scanner (discovers `is_component` types in assets via the Zig AST).
 pub const scanner = @import("Scanner.zig");
+/// UI event type scanner (#112: discovers `event_name` declarations in assets
+/// via the Zig AST, feeding the Studio inspector's event dropdown).
+pub const event_scanner = @import("EventScanner.zig");
 /// Project open/create operations.
 pub const project_ops = @import("ProjectOps.zig");
 /// Scene serialization (save/load .json files).

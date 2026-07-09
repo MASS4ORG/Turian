@@ -5,7 +5,7 @@ const MAX_REF_LEN = @import("GameObjectRef.zig").MAX_REF_LEN;
 /// Asset type category filter for typed asset references.
 /// Tagged `u32` so it can live inside the extern `FieldInfo` reflection struct.
 /// New variants may only be appended (C-ABI shared libraries depend on the values).
-pub const AssetFilter = enum(u32) { any, mesh, texture, audio, material, input_actions, scene, ui_document };
+pub const AssetFilter = enum(u32) { any, mesh, texture, audio, material, input_actions, scene, ui_document, game_event };
 
 /// Weak reference to an asset by stable GUID string.
 pub const AssetRef = struct {

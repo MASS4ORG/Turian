@@ -517,9 +517,9 @@ pub fn drawStringEdit(label: []const u8, ptr: *[]const u8, hint: FieldHint, ctx:
     return false;
 }
 
-/// `EventBinding` drawer (C2): v1's `named` variant is a plain event-name
-/// text entry; future variants get their own row here without touching any
-/// component editor.
+/// `EventBinding` drawer (C2): v1's `named` variant is an event-name picker;
+/// future variants get their own row here without touching any component
+/// editor.
 fn drawEventBinding(
     label: []const u8,
     ptr: *engine.ui.EventBinding,
@@ -528,8 +528,79 @@ fn drawEventBinding(
     id: usize,
 ) bool {
     switch (ptr.*) {
-        .named => |*name| return drawStringEdit(label, name, hint, ctx, id),
+        .named => |*name| return drawEventNameDropdown(label, name, hint, ctx, id),
+        // #107 reframed on #41's event-channel slice: a plain asset picker,
+        // filtered to `.game_event`-kind assets via `_turian_asset_filter` —
+        // `drawRef` (the same generic ref/asset-picker every other
+        // `TypedAssetRef`/`GameObjectRef` field already uses) needs no new UI.
+        .channel => |*ch| return drawRef(@TypeOf(ch.*), label, ch, hint, ctx, id),
     }
+}
+
+/// Event-name picker (#112): a dropdown of every `event_name` the project's
+/// scripts declare (`EditorState.discovered_events`, via `EventScanner`'s
+/// Zig-AST scan), so authors pick a name the game actually defines instead of
+/// hand-typing one that might not resolve. Falls back to the plain text entry
+/// (v1's hand-typed name, still a valid escape hatch — e.g. before the
+/// relevant script exists yet) when read-only, allocator-less, or nothing has
+/// been discovered.
+fn drawEventNameDropdown(label: []const u8, ptr: *[]const u8, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {
+    const discovered = EditorState.discovered_events[0..EditorState.discovered_event_count];
+    const ro = ctx.read_only or hint.read_only;
+    if (ro or ctx.allocator == null or discovered.len == 0) {
+        return drawStringEdit(label, ptr, hint, ctx, id);
+    }
+
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
+    defer row.deinit();
+
+    gui.label(@src(), "{s}", .{label}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 }, .id_extra = id });
+    tooltipIfAny(@src(), row.data().rectScale().r, hint, id);
+
+    var aligned = gui.box(@src(), .{ .dir = .horizontal }, .{
+        .expand = .horizontal,
+        .margin = ctx.al.margin(row.data().id),
+        .gravity_y = 0.5,
+        .id_extra = id,
+    });
+    defer aligned.deinit();
+    ctx.al.record(row.data().id, aligned.data());
+
+    // Entries: every discovered event name, plus the current value if it
+    // isn't one of them (an unresolved/stale/custom binding) — so picking
+    // from the list never silently discards the existing value.
+    var entries_buf: [editor.event_scanner.MAX_EVENTS + 1][]const u8 = undefined;
+    var n: usize = 0;
+    for (discovered) |*e| {
+        entries_buf[n] = e.name();
+        n += 1;
+    }
+    var selected: usize = 0;
+    var found = false;
+    for (entries_buf[0..n], 0..) |e, i| {
+        if (std.mem.eql(u8, e, ptr.*)) {
+            selected = i;
+            found = true;
+            break;
+        }
+    }
+    if (!found and ptr.len != 0) {
+        entries_buf[n] = ptr.*;
+        selected = n;
+        n += 1;
+    }
+    const entries = entries_buf[0..n];
+
+    const changed = gui.dropdown(@src(), entries, .{ .choice = &selected }, .{}, .{
+        .expand = .horizontal,
+        .gravity_y = 0.5,
+        .id_extra = id,
+    });
+    if (changed) {
+        ptr.* = ctx.allocator.?.dupe(u8, entries[selected]) catch return false;
+        return true;
+    }
+    return false;
 }
 
 fn drawStringArray(
@@ -874,6 +945,9 @@ fn pickerAsset(
         .input_actions => .input_actions,
         .scene => .scene,
         .ui_document => .ui_document,
+        // GameEvent channels are authored as generic `.asset` JSON data
+        // assets (#41/#107) — no dedicated file format/extension of their own.
+        .game_event => .data_asset,
     };
     var any_shown = false;
 

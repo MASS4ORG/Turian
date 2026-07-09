@@ -68,10 +68,18 @@ pub const StyleBlock = struct {
 // ── Events (D4): strings at rest, handles at runtime, types in user code ───
 
 /// Serialized binding is a union from day one so future binding kinds are
-/// additive, not schema-breaking. JSON form: `{"named": "play_clicked"}`.
-/// Reserved, post-MVP (do NOT implement): `target: {guid, endpoint}` for
+/// additive, not schema-breaking. JSON form: `{"named": "play_clicked"}` or
+/// `{"channel": "<game_event asset GUID>"}`.
+///
+/// `channel` is #107 reframed around #41's event-channel DataAsset instead of
+/// a Unity-`UnityEvent`-style node+method binding: the button raises a
+/// `GameEvent` asset by GUID (`ui_render.dispatchClicks` resolves it through
+/// `GameEventRegistry` and calls `raise()`), and any script anywhere
+/// subscribes via `frame.gameEvent(ref).?.on(...)` — decoupled, Inspector-wired,
+/// no scene-node coupling and no runtime method-name dispatch to build.
 pub const EventBinding = union(enum) {
     named: []const u8,
+    channel: TypedAssetRef(.game_event),
 };
 
 // ── Components (D2) ──────────────────────────────────────────────────────────
@@ -203,6 +211,9 @@ pub const UiDocument = struct {
                 .text => |t| allocator.free(t.text),
                 .button => |b| switch (b.on_click) {
                     .named => |n| allocator.free(n),
+                    // TypedAssetRef is inline POD (fixed-size buf/len) — no
+                    // owned heap memory to free.
+                    .channel => {},
                 },
                 .layout => {},
             };

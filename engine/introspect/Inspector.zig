@@ -55,10 +55,20 @@ pub const AssetView = struct {
 
 /// Everything the inspector can see at one instant. All views are borrowed;
 /// the inspector never frees them.
+/// Result of the last whole-window screenshot capture (see
+/// `studio/Screenshots.captureWindow`), for the `screenshot.last` debug-RPC
+/// query — polled after a `screenshot.capture` mutation since the actual
+/// capture completes on a later frame, not synchronously with the RPC call.
+pub const ScreenshotView = struct {
+    ok: bool = false,
+    path: []const u8 = "",
+};
+
 pub const World = struct {
     scenes: []const SceneView = &.{},
     metrics: ?*const Metrics = null,
     assets: []const AssetView = &.{},
+    last_screenshot: ?ScreenshotView = null,
 };
 
 /// A typed value used when mutating a field by name (see `setComponentField`).

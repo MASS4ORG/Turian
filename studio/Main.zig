@@ -11,6 +11,7 @@ const PreviewSystem = @import("PreviewSystem.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
 const EditorFrameTiming = @import("EditorFrameTiming.zig");
+const Screenshots = @import("Screenshots.zig");
 const build_options = @import("turian_build_options");
 
 /// Route std.log through the engine diagnostic ring so the Remote Debug
@@ -28,14 +29,49 @@ const STUDIO_DEBUG_PORT: u16 = 7778;
 fn studioWorld(views: *[1]engine.introspect.SceneView) engine.introspect.World {
     EditorState.refreshDebugMetrics();
     const assets = EditorState.refreshDebugAssets();
-    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets };
+    const last_shot: ?engine.introspect.ScreenshotView = last_shot: {
+        const p = Screenshots.last();
+        if (p.path().len == 0) break :last_shot null;
+        break :last_shot .{ .ok = p.ok, .path = p.path() };
+    };
+    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot };
     views[0] = .{
         .name = if (EditorState.current_scene_path) |p| std.fs.path.basename(p) else "(unsaved)",
         .id = if (EditorState.current_scene_path) |p| p else "",
         .active = true,
         .nodes = EditorState.objects[0..EditorState.object_count],
     };
-    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets };
+    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot };
+}
+
+// ── Machine-driven UI interaction (remote-debug input injection) ────────────
+// Synthetic input requested over the debug protocol is queued here (by
+// `studioMutationApplier`, called late in the frame it arrives) and injected
+// into dvui for real — `win.addEventMouseMotion`/etc — early in the NEXT
+// frame, before the widget tree is built (dvui events must be added before
+// `Window.frame()`, or no widget ever sees them). One frame of latency is
+// irrelevant for scripted verification. `capture_pending_remote` reuses the
+// same env-var-triggered whole-window capture machinery below.
+
+const SynthEvent = union(enum) {
+    mouse_move: struct { x: f32, y: f32 },
+    mouse_button: struct { button: gui.enums.Button, press: bool },
+    key: struct { code: gui.enums.Key, down: bool },
+    text: struct { buf: [256]u8, len: usize },
+};
+
+var synth_queue: [64]SynthEvent = undefined;
+var synth_count: usize = 0;
+var capture_pending_remote: bool = false;
+
+fn queueSynth(e: SynthEvent) void {
+    if (synth_count >= synth_queue.len) return;
+    synth_queue[synth_count] = e;
+    synth_count += 1;
+}
+
+fn parseButton(name: []const u8) gui.enums.Button {
+    return std.meta.stringToEnum(gui.enums.Button, name) orelse .left;
 }
 
 /// Applies a remote-debug mutation to the open scene. Runs on the main thread
@@ -78,6 +114,35 @@ fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResu
             if (EditorState.debugReloadAsset(gui.io, arena, r.guid))
                 return .{ .ok = true, .message = "asset reloaded" };
             return .{ .ok = false, .message = "asset GUID not found" };
+        },
+        .input_mouse_move => |mm| {
+            queueSynth(.{ .mouse_move = .{ .x = mm.x, .y = mm.y } });
+            return .{ .ok = true, .message = "queued for next frame" };
+        },
+        .input_click => |ic| {
+            const b = parseButton(ic.button);
+            queueSynth(.{ .mouse_move = .{ .x = ic.x, .y = ic.y } });
+            queueSynth(.{ .mouse_button = .{ .button = b, .press = true } });
+            queueSynth(.{ .mouse_button = .{ .button = b, .press = false } });
+            return .{ .ok = true, .message = "queued for next frame" };
+        },
+        .input_key => |ik| {
+            const code = std.meta.stringToEnum(gui.enums.Key, ik.code) orelse
+                return .{ .ok = false, .message = "unknown key code" };
+            queueSynth(.{ .key = .{ .code = code, .down = ik.down } });
+            return .{ .ok = true, .message = "queued for next frame" };
+        },
+        .input_text => |it| {
+            var se = SynthEvent{ .text = .{ .buf = undefined, .len = 0 } };
+            const n = @min(it.text.len, se.text.buf.len);
+            @memcpy(se.text.buf[0..n], it.text[0..n]);
+            se.text.len = n;
+            queueSynth(se);
+            return .{ .ok = true, .message = "queued for next frame" };
+        },
+        .capture_window => {
+            capture_pending_remote = true;
+            return .{ .ok = true, .message = "capture scheduled for next frame" };
         },
     }
 }
@@ -209,6 +274,22 @@ fn run(main_init: std.process.Init) !void {
     var last_scene_id_buf: [1024]u8 = undefined;
     var last_scene_id_len: usize = 0;
 
+    // Self-verifiable whole-window screenshots (no external tool, no GUI
+    // automation needed): set TURIAN_CAPTURE_AFTER_MS to capture the entire
+    // composited window (menu bar, panels, inspector, 3D viewport, gizmos,
+    // in-game GUI overlay — everything, unlike the viewport-only
+    // `Screenshots.capture()`) that many milliseconds after startup, written
+    // to the open project's `screenshots/shot_NNNN.png` (path printed to
+    // stdout). TURIAN_CAPTURE_QUIT additionally quits right after, for
+    // one-shot scripted verification.
+    const capture_after_ms: u64 = if (main_init.environ_map.get("TURIAN_CAPTURE_AFTER_MS")) |s|
+        std.fmt.parseInt(u64, s, 10) catch 0
+    else
+        0;
+    const capture_quit_after = main_init.environ_map.get("TURIAN_CAPTURE_QUIT") != null;
+    var capture_pending = capture_after_ms > 0;
+    var capture_start_ns: ?i128 = null;
+
     main_loop: while (true) {
         // Apply a pending vsync change here — between frames, before the
         // swapchain texture is acquired in win.begin.
@@ -216,7 +297,40 @@ fn run(main_init: std.process.Init) !void {
 
         const nstime = win.beginWait(interrupted);
         EditorFrameTiming.beginFrame(nstime);
+
+        var do_capture = false;
+        if (capture_pending) {
+            if (capture_start_ns == null) capture_start_ns = nstime;
+            const elapsed_ms: u64 = @intCast(@divTrunc(nstime - capture_start_ns.?, 1_000_000));
+            if (elapsed_ms >= capture_after_ms) {
+                do_capture = true;
+                capture_pending = false;
+            }
+        }
+        if (capture_pending_remote) {
+            do_capture = true;
+            capture_pending_remote = false;
+        }
+
         try win.begin(nstime);
+        if (do_capture) backend.beginFrameCapture() catch |err| {
+            std.debug.print("[Turian] beginFrameCapture failed: {any}\n", .{err});
+            do_capture = false;
+        };
+
+        // Inject any synthetic input queued last frame by `studioMutationApplier`
+        // (remote-debug `input.*` mutations) — must happen before any dvui
+        // widget is built this frame, or nothing will see these events.
+        for (synth_queue[0..synth_count]) |se| {
+            switch (se) {
+                .mouse_move => |mm| _ = win.addEventMouseMotion(.{ .pt = .{ .x = mm.x, .y = mm.y } }) catch {},
+                .mouse_button => |mb| _ = win.addEventMouseButton(mb.button, if (mb.press) .press else .release) catch {},
+                .key => |k| _ = win.addEventKey(.{ .code = k.code, .action = if (k.down) .down else .up, .mod = .none }) catch {},
+                .text => |t| _ = win.addEventText(.{ .text = t.buf[0..t.len] }) catch {},
+            }
+        }
+        synth_count = 0;
+
         _ = try backend.addAllEvents(&win);
         EditorFrameTiming.markEventsEnd(backend.nanoTime());
 
@@ -338,7 +452,27 @@ fn run(main_init: std.process.Init) !void {
 
         EditorFrameTiming.markBuildEnd(backend.nanoTime());
         win.endRendering(.{});
-        const end_micros = try win.end(.{});
+        const end_micros = if (do_capture) capture_blk: {
+            // manage_backend = false: we call setCursor/textInputRect/renderPresent
+            // ourselves below, with the capture's blit-to-swapchain + readback
+            // spliced in between backend.end() (already done inside win.end())
+            // and renderPresent (so the window still shows this frame normally).
+            const em = try win.end(.{ .manage_backend = false });
+            backend.setCursor(win.cursorRequested());
+            backend.textInputRect(win.textInputRequested());
+            if (backend.endFrameCapture(main_init.gpa)) |pixels| {
+                defer main_init.gpa.free(pixels);
+                const size = backend.pixelSize();
+                if (Screenshots.captureWindow(pixels, @intFromFloat(size.w), @intFromFloat(size.h))) |path| {
+                    std.debug.print("[Turian] Whole-window capture saved: {s}\n", .{path});
+                }
+            } else |err| {
+                std.debug.print("[Turian] endFrameCapture failed: {any}\n", .{err});
+            }
+            backend.renderPresent();
+            if (capture_quit_after) quit = true;
+            break :capture_blk em;
+        } else try win.end(.{});
         EditorFrameTiming.endFrame(backend.nanoTime());
         if (quit) break :main_loop;
 

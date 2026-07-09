@@ -43,8 +43,8 @@ void main() {
     vec2 ndc_off = offset_px / (0.5 * ubo.viewport);
     clip.xy += ndc_off * clip.w;
 
-    // Vulkan NDC: Y points down, Z in [0,1] — match scene.vert.glsl.
-    clip.y = -clip.y;
+    // SDL_GPU's unified NDC is Y-up (it auto-converts per backend); only the
+    // Z range needs remapping here, from our GL-style [-1,1] to SDL_GPU's [0,1].
     clip.z = (clip.z + clip.w) * 0.5;
     gl_Position = clip;
     out_color = in_color;
