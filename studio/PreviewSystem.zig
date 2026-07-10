@@ -80,10 +80,71 @@ fn providerFor(asset_type: editor.AssetType) ?ProviderFn {
     return null;
 }
 
-/// Register the built-in providers (texture / model / material / audio). Call
-/// once at studio startup, after `GpuRenderer.init`.
+// ── Live/interactive preview registry ───────────────────────────────────────
+// Some asset types need more than a static raster: a material's preview edits
+// live (unsaved) values, a model's orbits interactively, a font's is vector
+// text redrawn every frame. Registering a `LiveDrawFn` here — instead of a
+// per-type `if` chain in `Inspector.drawPreviewPanel` — is the same
+// data-driven idiom `EditorRegistry`/`registerProvider` already use: the
+// Inspector stays a thin host, editors own their own preview.
+
+/// Draws a live/interactive preview inline (dvui calls), given the resolved
+/// GUID so implementations don't each re-derive it. Implementations keep
+/// their own state (module-level vars), same as `EditorRegistry`'s per-type
+/// editors — this is a plain draw callback, not a snapshot generator.
+pub const LiveDrawFn = *const fn (asset_path: []const u8, guid: []const u8) void;
+
+const MAX_LIVE_PROVIDERS = 8;
+const LiveProviderEntry = struct { asset_type: editor.AssetType, f: LiveDrawFn };
+var live_providers: [MAX_LIVE_PROVIDERS]LiveProviderEntry = undefined;
+var live_provider_count: usize = 0;
+
+/// Register (or replace) the live preview drawer for `asset_type`.
+pub fn registerLiveProvider(asset_type: editor.AssetType, f: LiveDrawFn) void {
+    for (live_providers[0..live_provider_count]) |*p| {
+        if (p.asset_type == asset_type) {
+            p.f = f;
+            return;
+        }
+    }
+    if (live_provider_count >= MAX_LIVE_PROVIDERS) return;
+    live_providers[live_provider_count] = .{ .asset_type = asset_type, .f = f };
+    live_provider_count += 1;
+}
+
+/// Whether a live preview drawer is registered for `asset_type`.
+pub fn hasLiveProvider(asset_type: editor.AssetType) bool {
+    for (live_providers[0..live_provider_count]) |p| {
+        if (p.asset_type == asset_type) return true;
+    }
+    return false;
+}
+
+/// Draw the registered live preview for the asset at `asset_path`, if any.
+/// Returns whether one was drawn — callers fall back to the static raster
+/// path (`imageSourceFor`) when this returns false.
+pub fn drawLive(asset_type: editor.AssetType, asset_path: []const u8) bool {
+    const f = for (live_providers[0..live_provider_count]) |p| {
+        if (p.asset_type == asset_type) break p.f;
+    } else return false;
+
+    if (!EditorState.assetDbReady()) return false;
+    const info = EditorState.asset_db.findByPath(asset_path) orelse return false;
+    var guid_buf: [36]u8 = undefined;
+    const guid = info.guid.toString(&guid_buf);
+    f(asset_path, guid);
+    return true;
+}
+
+/// Register the built-in providers (texture / model / material / audio /
+/// font). Call once at studio startup, after `GpuRenderer.init`. Live
+/// previewers (model/material/font) are registered separately from
+/// `studio/Main.zig` right after this call, per `registerLiveProvider`'s doc
+/// comment — this function only owns the built-in *raster* providers so it
+/// doesn't need to import every editor module.
 pub fn init() void {
     provider_count = 0;
+    live_provider_count = 0;
     cache_count = 0;
     cache_next = 0;
     g_generation = 0;
@@ -91,6 +152,7 @@ pub fn init() void {
     registerProvider(.model, genModel);
     registerProvider(.material, genMaterial);
     registerProvider(.audio, genAudio);
+    registerProvider(.font, genFont);
 }
 
 /// Reset the per-frame render-preview generation budget. Call once per frame
@@ -389,4 +451,60 @@ fn genAudio(ctx: GenCtx) ?Raster {
     const wav = PreviewRaster.parseWav(bytes) orelse return null;
     const r = PreviewRaster.waveformRaster(page, wav, THUMB_SIZE) orelse return null;
     return .{ .pixels = r.pixels, .w = r.w, .h = r.h };
+}
+
+/// Font preview: a big "A" rasterized directly from the font's own glyphs via
+/// FreeType, white-on-transparent, centered in the thumb square. Bypasses
+/// dvui's live font/atlas system entirely (no `Window`/`Backend` needed, same
+/// synchronous-decode style as `genTexture`) — `dvui.ft2lib` is a process-wide
+/// FreeType library handle `Window.init` already sets up, so this reuses it
+/// rather than initializing a second one. Falls back to the type icon (`null`)
+/// on any FreeType error, or if this build doesn't link FreeType at all
+/// (`gui.useFreeType == false`, e.g. a future WASM target).
+fn genFont(ctx: GenCtx) ?Raster {
+    if (comptime !gui.useFreeType) return null;
+
+    const bytes = readSourceBytes(ctx.path) orelse return null;
+    defer page.free(bytes);
+
+    var face: gui.c.FT_Face = undefined;
+    var args: gui.c.FT_Open_Args = undefined;
+    args.flags = @as(u32, @bitCast(gui.Font.FreeType.OpenFlags{ .memory = true }));
+    args.memory_base = bytes.ptr;
+    args.memory_size = @intCast(bytes.len);
+    gui.Font.FreeType.intToError(gui.c.FT_Open_Face(gui.ft2lib, &args, 0, &face)) catch return null;
+    defer _ = gui.c.FT_Done_Face(face);
+
+    const px: u32 = THUMB_SIZE - 32; // leave a margin so ascenders/descenders don't clip
+    gui.Font.FreeType.intToError(gui.c.FT_Set_Pixel_Sizes(face, px, px)) catch return null;
+    gui.Font.FreeType.intToError(gui.c.FT_Load_Char(face, 'A', @bitCast(gui.Font.FreeType.LoadFlags{ .render = true }))) catch return null;
+
+    const bitmap = face.*.glyph.*.bitmap;
+    if (bitmap.width == 0 or bitmap.rows == 0) return null;
+
+    const pixels = page.alloc(u8, THUMB_SIZE * THUMB_SIZE * 4) catch return null;
+    @memset(pixels, 0);
+
+    const gw: i32 = @intCast(bitmap.width);
+    const gh: i32 = @intCast(bitmap.rows);
+    const ox = @divTrunc(@as(i32, THUMB_SIZE) - gw, 2);
+    const oy = @divTrunc(@as(i32, THUMB_SIZE) - gh, 2);
+
+    var row: i32 = 0;
+    while (row < gh) : (row += 1) {
+        const dy = oy + row;
+        if (dy < 0 or dy >= THUMB_SIZE) continue;
+        var col: i32 = 0;
+        while (col < gw) : (col += 1) {
+            const dx = ox + col;
+            if (dx < 0 or dx >= THUMB_SIZE) continue;
+            const src = bitmap.buffer[@intCast(row * bitmap.pitch + col)];
+            const di = (@as(usize, @intCast(dy)) * THUMB_SIZE + @as(usize, @intCast(dx))) * 4;
+            pixels[di + 0] = 255;
+            pixels[di + 1] = 255;
+            pixels[di + 2] = 255;
+            pixels[di + 3] = src;
+        }
+    }
+    return .{ .pixels = pixels, .w = THUMB_SIZE, .h = THUMB_SIZE };
 }

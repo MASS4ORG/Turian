@@ -17,6 +17,7 @@ pub fn artifactExtension(asset_type: AssetType) []const u8 {
         .input_actions => ".inputactions",
         .project_settings => ".projectsettings",
         .ui_document => ".uidoc",
+        .font => ".font",
         .unknown => ".bin",
     };
 }

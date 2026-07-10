@@ -78,6 +78,12 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .internal_editor,
             .icon_hint = .document,
         },
+        .font => .{
+            .name = "Font",
+            .extensions = &.{ ".ttf", ".otf" },
+            .open_mode = .external_editor,
+            .icon_hint = .font,
+        },
     };
 }
 

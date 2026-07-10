@@ -52,6 +52,7 @@ const import_settings_types = @import("types/ImportSettings.zig");
 pub const ImportSettings = import_settings_types.ImportSettings;
 pub const ImageImportSettings = import_settings_types.ImageImportSettings;
 pub const ModelImportSettings = import_settings_types.ModelImportSettings;
+pub const FontImportSettings = import_settings_types.FontImportSettings;
 pub const TextureType = import_settings_types.TextureType;
 pub const ColorSpace = import_settings_types.ColorSpace;
 pub const TextureCompression = import_settings_types.TextureCompression;

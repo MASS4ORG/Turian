@@ -389,13 +389,41 @@ pub fn drawViewPanel(asset_path: []const u8) void {
 
     const nat_rect = content.wd.rect;
     const lb = ui_render.fit(.{ .w = nat_rect.w, .h = nat_rect.h }, &doc);
-    const result = ui_render.drawTree(&doc, lb, .{ .texture_source = resolveTextureBytes });
-    for (result.clicked()) |node_index| toastButtonClick(node_index);
-    // No live game to raise a channel into while authoring — `toastButtonClick`
-    // above already surfaces what a click would fire.
-    ui_render.dispatchClicks(&doc, result, resolved_ids, &preview_events, null);
+    _ = ui_render.drawTree(&doc, lb, .{ .texture_source = resolveTextureBytes, .font_source = resolveTextureBytes });
+    // This is an authoring surface, not a live game (D9): clicking an element
+    // selects its node in the Hierarchy — mirroring how the 3D Scene View
+    // picks an object rather than running its scripts — instead of firing
+    // whatever `on_click` binding it has. `result`/`dispatchClicks`/the old
+    // `preview_events` registry (and the toast that surfaced what a click
+    // *would* fire) are gone: they made a button's binding visibly "act",
+    // which read as the real thing running, not a preview.
+    pickClickedNode(stack.data());
 
     drawSelectionGizmo();
+}
+
+/// Hit-tests this frame's left-click (if any) against every visible node's
+/// dvui-tagged rect (same GUID tag `drawSelectionGizmo` already looks up),
+/// picking the last match in draw order (later-drawn = on top, mirrors
+/// z-order picking). Works for any node, not just ones with a `button`
+/// component — the Hierarchy-selection equivalent of Scene View picking.
+fn pickClickedNode(view_box: *gui.WidgetData) void {
+    for (gui.events()) |*e| {
+        if (e.evt != .mouse) continue;
+        const me = e.evt.mouse;
+        if (me.action != .press or me.button != .left) continue;
+        if (!gui.eventMatchSimple(e, view_box)) continue;
+
+        var hit: ?usize = null;
+        for (doc.nodes, 0..) |*node, i| {
+            if (!node.active or node.guid.len == 0) continue;
+            const tag = gui.tagGet(node.guid) orelse continue;
+            if (!tag.visible) continue;
+            if (tag.rect.contains(me.p)) hit = i;
+        }
+        e.handle(@src(), view_box);
+        if (hit) |idx| selected_node = idx;
+    }
 }
 
 /// Resolves a texture GUID to file bytes for `ui_render`'s image content,
@@ -405,32 +433,6 @@ fn resolveTextureBytes(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {
     _ = ctx;
     const path = EditorState.resolveAssetGuid(guid) orelse return null;
     return std.Io.Dir.cwd().readFileAlloc(gui.io, path, gui.currentWindow().arena(), .unlimited) catch null;
-}
-
-/// Authoring feedback: a clicked button has no live game/Frame to visibly
-/// react in edit mode, so surface the `on_click` binding it would fire as a
-/// toast — independent of whether the name actually resolved.
-fn toastButtonClick(node_index: usize) void {
-    if (node_index >= doc.nodes.len) return;
-    const node = doc.nodes[node_index];
-    var name: []const u8 = "(no on_click binding)";
-    for (node.components) |c| {
-        if (c != .button) continue;
-        switch (c.button.on_click) {
-            .named => |n| if (n.len != 0) {
-                name = n;
-            },
-            .channel => |ch| if (ch.slice().len != 0) {
-                name = ch.slice();
-            },
-        }
-    }
-    var buf: [160]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "UI click: {s} -> {s}", .{
-        if (node.name.len != 0) node.name else "(node)",
-        name,
-    }) catch return;
-    gui.toast(@src(), .{ .message = msg });
 }
 
 /// Selection "gizmo" (v1: a highlight rectangle, no drag handles yet — see

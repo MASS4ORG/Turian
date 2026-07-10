@@ -22,6 +22,10 @@ var max_size_buf: [12]u8 = .{0} ** 12;
 var model: editor.ModelImportSettings = .{};
 var scale_buf: [16]u8 = .{0} ** 16;
 
+// Font fields.
+var font: editor.FontImportSettings = .{};
+var default_size_buf: [12]u8 = .{0} ** 12;
+
 fn loadedPath() []const u8 {
     return loaded_path_buf[0..loaded_path_len];
 }
@@ -39,7 +43,7 @@ fn setBuf(dst: []u8, s: []const u8) void {
 
 /// Returns true if `asset_type` has editable import settings.
 pub fn handles(asset_type: editor.AssetType) bool {
-    return asset_type == .image or asset_type == .model;
+    return asset_type == .image or asset_type == .model or asset_type == .font;
 }
 
 // ── Draw ───────────────────────────────────────────────────────────────────────
@@ -64,6 +68,9 @@ pub fn draw(asset_path: []const u8, asset_type: editor.AssetType) void {
             checkRow("Import Materials", &model.import_materials, 1);
             checkRow("Import Animations", &model.import_animations, 2);
             textRow("Scale Factor", &scale_buf, 3);
+        },
+        .font => {
+            textRow("Default Size", &default_size_buf, 1);
         },
         else => return,
     }
@@ -127,9 +134,11 @@ fn load(asset_path: []const u8, asset_type: editor.AssetType) void {
 
     img = .{};
     model = .{};
+    font = .{};
     switch (meta.import_settings) {
         .image => |s| img = s,
         .model => |s| model = s,
+        .font => |s| font = s,
         else => {},
     }
 
@@ -137,6 +146,8 @@ fn load(asset_path: []const u8, asset_type: editor.AssetType) void {
     setBuf(&max_size_buf, std.fmt.bufPrint(&nb, "{d}", .{img.max_size}) catch "2048");
     var sb: [16]u8 = undefined;
     setBuf(&scale_buf, std.fmt.bufPrint(&sb, "{d}", .{model.scale_factor}) catch "1");
+    var fb: [12]u8 = undefined;
+    setBuf(&default_size_buf, std.fmt.bufPrint(&fb, "{d}", .{font.default_size}) catch "16");
 }
 
 fn save() void {
@@ -155,6 +166,10 @@ fn save() void {
         .model => {
             model.scale_factor = std.fmt.parseFloat(f32, bufStr(&scale_buf)) catch model.scale_factor;
             meta.import_settings = .{ .model = model };
+        },
+        .font => {
+            font.default_size = std.fmt.parseFloat(f32, bufStr(&default_size_buf)) catch font.default_size;
+            meta.import_settings = .{ .font = font };
         },
         else => return,
     }

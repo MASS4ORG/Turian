@@ -18,24 +18,31 @@ pub const QuitClicked = struct {
 /// which would silently invalidate a `self` pointer registered here.
 /// Every other cross-script reference in this codebase resolves a GUID
 /// fresh each frame for the same reason; a callback context can't do that,
-/// so it anchors to something that never moves instead.
-var g_menu_ctx: u8 = 0;
+/// so it anchors to something that never moves instead. Also caches the
+/// `Application` service pointer from `awake`'s `Frame` — `UiEvents.on`
+/// handlers aren't passed a `Frame` themselves, and `Application`'s host
+/// instance is stable for the whole session (registered once into
+/// `Services`), so stashing it here is safe.
+const MenuCtx = struct { app: ?*engine.Application = null };
+var g_menu_ctx: MenuCtx = .{};
 
 pub const MenuController = struct {
     pub const is_component = true;
 
     pub fn awake(self: *@This(), frame: engine.Frame) void {
         _ = self;
+        g_menu_ctx.app = frame.service(engine.Application);
         const ev = frame.service(engine.ui.UiEvents) orelse return;
         ev.on(PlayClicked, &g_menu_ctx, onPlay);
         ev.on(QuitClicked, &g_menu_ctx, onQuit);
     }
 
-    fn onPlay(_: *u8, _: PlayClicked) void {
+    fn onPlay(_: *MenuCtx, _: PlayClicked) void {
         std.debug.print("[MenuController] Play clicked\n", .{});
     }
 
-    fn onQuit(_: *u8, _: QuitClicked) void {
+    fn onQuit(ctx: *MenuCtx, _: QuitClicked) void {
         std.debug.print("[MenuController] Quit clicked\n", .{});
+        if (ctx.app) |app| app.quit();
     }
 };

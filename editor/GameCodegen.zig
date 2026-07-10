@@ -1485,7 +1485,7 @@ pub fn generateMainZig(
                 "            for (g_ui_runtime.instances()) |*ui_entry| {\n" ++
                 "                if (!ui_entry.instance.visible) continue;\n" ++
                 "                const lb = ui_render.fit(.{ .w = @floatFromInt(fr.width), .h = @floatFromInt(fr.height) }, &ui_entry.instance.doc);\n" ++
-                "                const result = ui_render.drawTree(&ui_entry.instance.doc, lb, .{ .texture_source = uiTextureSource });\n" ++
+                "                const result = ui_render.drawTree(&ui_entry.instance.doc, lb, .{ .texture_source = uiTextureSource, .font_source = uiTextureSource });\n" ++
                 "                ui_render.dispatchClicks(&ui_entry.instance.doc, result, ui_entry.instance.resolved, &g_ui_events, &g_game_events);\n" ++
                 "            }\n" ++
                 "            for (gui.events()) |*e| {\n" ++

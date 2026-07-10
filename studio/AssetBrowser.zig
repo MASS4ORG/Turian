@@ -135,6 +135,7 @@ fn iconForHint(hint: editor.asset_registry.IconHint) []const u8 {
         .model => gui.entypo.layers,
         .material => gui.entypo.colours,
         .data => gui.entypo.database,
+        .font => gui.entypo.text,
     };
 }
 

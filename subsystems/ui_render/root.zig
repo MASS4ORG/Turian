@@ -70,7 +70,59 @@ pub const TextureSource = *const fn (ctx: ?*anyopaque, guid: []const u8) ?[]cons
 pub const DrawOptions = struct {
     texture_source: ?TextureSource = null,
     texture_ctx: ?*anyopaque = null,
+    /// Resolves a Font asset GUID (`StyleBlock.font`) to raw TTF/OTF bytes —
+    /// same shape as `texture_source` (both are "give me this GUID's raw
+    /// asset bytes"), so a host wires the same function to both. Unlike a
+    /// texture, the resolved bytes get registered with dvui exactly once per
+    /// GUID (see `ensureFontRegistered`) rather than re-read every draw call.
+    font_source: ?TextureSource = null,
+    font_ctx: ?*anyopaque = null,
 };
+
+// ── Font resolution (GUID -> registered dvui family) ────────────────────────
+// Fonts must be registered with dvui exactly once (no per-draw-call
+// resolution like a texture — dvui has no "replace a registered font" API),
+// so this owns a small process-lifetime cache shared by every host (studio
+// viewport + shipped game, #109 follow-up) rather than each duplicating its
+// own bookkeeping.
+
+const MAX_REGISTERED_FONTS = 32;
+var registered_font_guids: [MAX_REGISTERED_FONTS][36]u8 = undefined;
+var registered_font_count: usize = 0;
+
+fn fontRegistered(guid: []const u8) bool {
+    if (guid.len != 36) return false;
+    for (registered_font_guids[0..registered_font_count]) |*g| {
+        if (std.mem.eql(u8, g, guid)) return true;
+    }
+    return false;
+}
+
+/// Ensures `guid`'s font is registered with dvui under `guid` as the family
+/// name (bytes resolved via `src_fn`, the same contract as `TextureSource`).
+/// Returns the family name to build a `gui.Font` with, or null if
+/// unresolved, an invalid font, or the registry is at capacity.
+fn ensureFontRegistered(guid: []const u8, src_fn: TextureSource, ctx: ?*anyopaque) ?[]const u8 {
+    if (guid.len != 36) return null;
+    if (fontRegistered(guid)) return guid;
+    if (registered_font_count >= MAX_REGISTERED_FONTS) return null;
+
+    const bytes = src_fn(ctx, guid) orelse return null;
+    // dvui keeps referencing these bytes for the process lifetime (re-atlas
+    // whenever a new size is needed), but `src_fn` typically returns bytes
+    // scoped to the current frame's arena (matches `texture_source`'s
+    // per-frame-read convention) — duplicate into a permanently-owned buffer
+    // before handing ownership to dvui.
+    const owned = std.heap.page_allocator.dupe(u8, bytes) catch return null;
+    gui.addFont(guid, owned, std.heap.page_allocator) catch {
+        std.heap.page_allocator.free(owned);
+        return null;
+    };
+
+    @memcpy(&registered_font_guids[registered_font_count], guid[0..36]);
+    registered_font_count += 1;
+    return guid;
+}
 
 // ── Interaction results ─────────────────────────────────────────────────────
 
@@ -157,7 +209,7 @@ fn findButton(components: []const ui.UiComponent) ?ui.ButtonComponent {
 /// for a node's outermost widget (the interaction wrapper if present, else
 /// the node's own box). All values are in document (reference-resolution)
 /// coordinates — the ScaleWidget wrapping the tree applies the C7 zoom.
-fn outerOptions(node: *const ui.UiNode, id_extra: usize) gui.Options {
+fn outerOptions(node: *const ui.UiNode, id_extra: usize, draw_opts: DrawOptions) gui.Options {
     const item = node.item;
     var opts: gui.Options = .{
         .id_extra = id_extra,
@@ -183,10 +235,17 @@ fn outerOptions(node: *const ui.UiNode, id_extra: usize) gui.Options {
 
     const style = node.style;
     if (style.style_class) |sc| opts.style = dvuiStyle(sc);
-    // Font selection is by theme font style name (D5: no font-file assets in
-    // v1). Unknown names fall back to the inherited font rather than warning
-    // per frame — load-time validation is the place for that.
-    if (style.font_style) |fs| {
+    // `font` (a specific Font asset) wins over `font_style` (a theme name)
+    // when set (#109 follow-up). Unresolved GUIDs/unknown theme names fall
+    // back to the inherited font rather than warning per frame — load-time
+    // validation is the place for that.
+    if (style.font.slice().len != 0) {
+        if (draw_opts.font_source) |fsrc| {
+            if (ensureFontRegistered(style.font.slice(), fsrc, draw_opts.font_ctx)) |family| {
+                opts.font = .find(.{ .family = family, .size = style.font_size orelse 24 });
+            }
+        }
+    } else if (style.font_style) |fs| {
         if (std.meta.stringToEnum(gui.Font.ThemeFontName, fs)) |name| {
             opts.font = .theme(name);
         }
@@ -235,11 +294,22 @@ fn dvuiTextAlign(a: ui.TextAlign) f32 {
     };
 }
 
-fn drawTextContent(t: ui.TextComponent, id_extra: usize) void {
-    gui.labelNoFmt(@src(), t.text, .{ .align_x = dvuiTextAlign(t.text_align) }, .{ .id_extra = id_extra });
+/// `font` is the node's resolved font (from `outerOptions`, D5/#109) — passed
+/// in rather than re-resolved here because a label is its own dvui widget
+/// with its own `Options`; it does NOT inherit `.font` from the wrapping
+/// box/button `outerOptions` builds (dvui has no such cascade). `.expand =
+/// .horizontal` gives `align_x` a width to actually align within — without
+/// it the label sizes to fit its own text and start/center/end look
+/// identical.
+fn drawTextContent(t: ui.TextComponent, id_extra: usize, font: ?gui.Font) void {
+    gui.labelNoFmt(@src(), t.text, .{ .align_x = dvuiTextAlign(t.text_align) }, .{
+        .id_extra = id_extra,
+        .font = font,
+        .expand = .horizontal,
+    });
 }
 
-fn drawContent(components: []const ui.UiComponent, id_extra_base: usize, draw_opts: DrawOptions) void {
+fn drawContent(components: []const ui.UiComponent, id_extra_base: usize, draw_opts: DrawOptions, font: ?gui.Font) void {
     for (components, 0..) |*c, ci| {
         const id_extra = id_extra_base +% ci +% 1;
         switch (c.*) {
@@ -247,7 +317,7 @@ fn drawContent(components: []const ui.UiComponent, id_extra_base: usize, draw_op
             // handed to dvui point at the document's stable storage, not a
             // stack copy.
             .image => |*img| drawImageContent(img, id_extra, draw_opts),
-            .text => |t| drawTextContent(t, id_extra),
+            .text => |t| drawTextContent(t, id_extra, font),
             .layout, .button => {},
         }
     }
@@ -262,6 +332,7 @@ fn drawBoxContentAndChildren(
     layout: ?ui.LayoutComponent,
     id_extra: usize,
     draw_opts: DrawOptions,
+    font: ?gui.Font,
     result: *DrawResult,
 ) void {
     const mode = if (layout) |l| l.mode else .row;
@@ -280,7 +351,7 @@ fn drawBoxContentAndChildren(
     });
     defer box.deinit();
 
-    drawContent(node.components, id_extra, draw_opts);
+    drawContent(node.components, id_extra, draw_opts, font);
 
     var sibling_i: usize = 0;
     for (doc.nodes, 0..) |*child, ci| {
@@ -314,7 +385,7 @@ fn drawNode(
     const layout = findLayout(node.components);
     const button = findButton(node.components);
 
-    var opts = outerOptions(node, id_extra);
+    var opts = outerOptions(node, id_extra, draw_opts);
     // Gap-as-margin only makes sense for flow-positioned siblings: dvui insets
     // an already-final rect by its margin when drawing background/border
     // (`WidgetData.backgroundRect`/`borderRect`), so adding gap-margin to an
@@ -338,7 +409,7 @@ fn drawNode(
         bw.drawBackground();
         if (bw.clicked()) result.push(index);
 
-        drawBoxContentAndChildren(doc, index, node, layout, id_extra, draw_opts, result);
+        drawBoxContentAndChildren(doc, index, node, layout, id_extra, draw_opts, opts.font, result);
 
         bw.drawFocus();
         bw.deinit();
@@ -355,7 +426,7 @@ fn drawNode(
         }));
         defer box.deinit();
 
-        drawContent(node.components, id_extra, draw_opts);
+        drawContent(node.components, id_extra, draw_opts, opts.font);
 
         var child_sibling_i: usize = 0;
         const gap = if (layout) |l| l.gap else 0;

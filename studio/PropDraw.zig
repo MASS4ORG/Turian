@@ -948,6 +948,7 @@ fn pickerAsset(
         // GameEvent channels are authored as generic `.asset` JSON data
         // assets (#41/#107) — no dedicated file format/extension of their own.
         .game_event => .data_asset,
+        .font => .font,
     };
     var any_shown = false;
 

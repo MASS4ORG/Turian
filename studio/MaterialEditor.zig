@@ -74,9 +74,6 @@ fn loadedPath() []const u8 {
 pub fn draw(asset_path: []const u8) void {
     if (!std.mem.eql(u8, asset_path, loadedPath())) load(asset_path);
 
-    drawPreview();
-    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7000 });
-
     {
         var info = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer info.deinit();
@@ -121,13 +118,18 @@ pub fn draw(asset_path: []const u8) void {
 // an orbital camera the user can drag/scroll. Unity-style "swap preview mesh
 // + orbit" for materials specifically, per the issue's ask; static thumbnails
 // elsewhere (Asset Browser grid, other asset types) always use the sphere at a
-// fixed angle — see `PreviewSystem`.
+// fixed angle — see `PreviewSystem`. Registered as `.material`'s
+// `PreviewSystem.LiveDrawFn` (matches its `(asset_path, guid)` signature; both
+// unused here — the shape swap needs only the in-memory edits already loaded
+// into this file's own module state by `draw()`, which always runs first in
+// the same frame).
 
-fn drawPreview() void {
+pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
+    _ = asset_path;
+    _ = guid;
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer row.deinit();
-        gui.label(@src(), "Preview", .{}, .{ .gravity_y = 0.5, .expand = .horizontal, .font = .theme(.heading) });
         if (gui.button(@src(), "Sphere", .{}, .{ .gravity_y = 0.5, .style = if (preview_shape == .sphere) .highlight else .control })) {
             preview_shape = .sphere;
         }

@@ -8,6 +8,9 @@ const Window = @import("Window.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
 const PreviewSystem = @import("PreviewSystem.zig");
+const Preview3D = @import("Preview3D.zig");
+const MaterialEditor = @import("MaterialEditor.zig");
+const FontEditor = @import("FontEditor.zig");
 const AssetWatcher = @import("AssetWatcher.zig");
 const Documents = @import("Documents.zig");
 const EditorFrameTiming = @import("EditorFrameTiming.zig");
@@ -218,6 +221,12 @@ fn run(main_init: std.process.Init) !void {
     GpuRenderer.init(&backend) catch |err|
         std.debug.print("[GpuRenderer] init failed: {any}\n", .{err});
     PreviewSystem.init();
+    // Live/interactive previews (need more than a static raster) — see
+    // `PreviewSystem.registerLiveProvider`'s doc comment for why these are
+    // registered here rather than inside `PreviewSystem.init()` itself.
+    PreviewSystem.registerLiveProvider(.model, Preview3D.drawPreview);
+    PreviewSystem.registerLiveProvider(.material, MaterialEditor.drawPreview);
+    PreviewSystem.registerLiveProvider(.font, FontEditor.drawPreview);
 
     EditorState.clearScene();
     EditorState.initUndo(main_init.gpa);

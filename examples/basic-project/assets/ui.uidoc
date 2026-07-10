@@ -1,6 +1,9 @@
 {
   "version": 1,
-  "reference_size": [1920, 1080],
+  "reference_size": [
+    1920,
+    1080
+  ],
   "scale_mode": "letterbox_zoom",
   "nodes": [
     {
@@ -8,10 +11,45 @@
       "name": "Root",
       "parent": -1,
       "active": true,
-      "item": { "expand": "both" },
-      "style": {},
+      "item": {
+        "expand": "both",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": null
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "43a91ecf-4a30-4273-911c-df629521450f",
+        "font_size": 30
+      },
       "components": [
-        { "layout": { "mode": "column", "gap": 24, "padding": [48, 48, 48, 48] } }
+        {
+          "layout": {
+            "mode": "column",
+            "gap": 24,
+            "padding": [
+              48,
+              48,
+              48,
+              48
+            ]
+          }
+        }
       ]
     },
     {
@@ -19,10 +57,39 @@
       "name": "Title",
       "parent": 0,
       "active": true,
-      "item": { "gravity": [0.5, 0] },
-      "style": { "font_style": "title" },
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0.5,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": null
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "43a91ecf-4a30-4273-911c-df629521450f",
+        "font_size": 64
+      },
       "components": [
-        { "text": { "text": "TURIAN DEMO", "text_align": "center" } }
+        {
+          "text": {
+            "text": "TURIAN DEMO",
+            "text_align": "center"
+          }
+        }
       ]
     },
     {
@@ -30,11 +97,46 @@
       "name": "PlayButton",
       "parent": 0,
       "active": true,
-      "item": { "gravity": [0.5, 0], "min_size": [240, 64] },
-      "style": { "style_class": "highlight" },
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0.5,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          240,
+          64
+        ],
+        "rect": null
+      },
+      "style": {
+        "style_class": "highlight",
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "f77714a6-8324-4d3d-947b-68adead99601",
+        "font_size": 60
+      },
       "components": [
-        { "text": { "text": "Play", "text_align": "center" } },
-        { "button": { "on_click": { "named": "play_clicked" } } }
+        {
+          "text": {
+            "text": "Play",
+            "text_align": "center"
+          }
+        },
+        {
+          "button": {
+            "on_click": {
+              "named": "play_clicked"
+            }
+          }
+        }
       ]
     },
     {
@@ -42,11 +144,46 @@
       "name": "QuitButton",
       "parent": 0,
       "active": true,
-      "item": { "gravity": [0.5, 0], "min_size": [240, 64] },
-      "style": { "style_class": "control" },
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0.5,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          240,
+          64
+        ],
+        "rect": null
+      },
+      "style": {
+        "style_class": "err",
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "text": { "text": "Quit", "text_align": "center" } },
-        { "button": { "on_click": { "named": "quit_clicked" } } }
+        {
+          "text": {
+            "text": "Quit",
+            "text_align": "center"
+          }
+        },
+        {
+          "button": {
+            "on_click": {
+              "named": "quit_clicked"
+            }
+          }
+        }
       ]
     },
     {
@@ -54,12 +191,62 @@
       "name": "JumpButton",
       "parent": 0,
       "active": true,
-      "item": { "rect": [1660, 940, 220, 70] },
-      "style": {},
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          1660,
+          940,
+          220,
+          70
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "7be63565-a39e-45f6-a7dc-420d505be1ec",
+        "font_size": null
+      },
       "components": [
-        { "image": { "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0", "ninepatch": [16, 16, 16, 16] } },
-        { "text": { "text": "Jump!", "text_align": "center" } },
-        { "button": { "on_click": { "named": "jump_clicked" } } }
+        {
+          "image": {
+            "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0",
+            "ninepatch": [
+              16,
+              16,
+              16,
+              16
+            ]
+          }
+        },
+        {
+          "text": {
+            "text": "Jump!",
+            "text_align": "center"
+          }
+        },
+        {
+          "button": {
+            "on_click": {
+              "named": "jump_clicked"
+            }
+          }
+        }
       ]
     },
     {
@@ -67,12 +254,62 @@
       "name": "DoorButton",
       "parent": 0,
       "active": true,
-      "item": { "rect": [1660, 850, 220, 70] },
-      "style": {},
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          1660,
+          850,
+          220,
+          70
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "image": { "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0", "ninepatch": [16, 16, 16, 16] } },
-        { "text": { "text": "Door", "text_align": "center" } },
-        { "button": { "on_click": { "channel": "49533407-fb6c-48c5-a800-5e162cf5d5a6" } } }
+        {
+          "image": {
+            "texture": "0f7ade1d-d86f-436f-b927-2a6a11249da0",
+            "ninepatch": [
+              16,
+              16,
+              16,
+              16
+            ]
+          }
+        },
+        {
+          "text": {
+            "text": "Door",
+            "text_align": "center"
+          }
+        },
+        {
+          "button": {
+            "on_click": {
+              "channel": "49533407-fb6c-48c5-a800-5e162cf5d5a6"
+            }
+          }
+        }
       ]
     },
     {
@@ -80,10 +317,49 @@
       "name": "HealthPanel",
       "parent": 0,
       "active": true,
-      "item": { "rect": [12, 12, 256, 56] },
-      "style": {},
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          12,
+          12,
+          256,
+          56
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "image": { "texture": "493824cd-08c7-47bf-a876-a9a02886cae9", "ninepatch": [12, 12, 12, 12] } }
+        {
+          "image": {
+            "texture": "493824cd-08c7-47bf-a876-a9a02886cae9",
+            "ninepatch": [
+              12,
+              12,
+              12,
+              12
+            ]
+          }
+        }
       ]
     },
     {
@@ -91,10 +367,44 @@
       "name": "HealthLabel",
       "parent": 0,
       "active": true,
-      "item": { "rect": [20, 20, 240, 40] },
-      "style": {},
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          20,
+          20,
+          240,
+          40
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "text": { "text": "HP: 100", "text_align": "start" } }
+        {
+          "text": {
+            "text": "HP: 100",
+            "text_align": "start"
+          }
+        }
       ]
     },
     {
@@ -102,10 +412,49 @@
       "name": "EnemyMarker",
       "parent": 0,
       "active": false,
-      "item": { "rect": [880, 400, 140, 28] },
-      "style": { "style_class": "err", "tint": [0.6, 0.1, 0.1, 0.85] },
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          880,
+          400,
+          140,
+          28
+        ]
+      },
+      "style": {
+        "style_class": "err",
+        "tint": [
+          0.6,
+          0.1,
+          0.1,
+          0.85
+        ],
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "text": { "text": "Grunt", "text_align": "center" } }
+        {
+          "text": {
+            "text": "Grunt",
+            "text_align": "center"
+          }
+        }
       ]
     },
     {
@@ -113,11 +462,55 @@
       "name": "ProximityDialog",
       "parent": 0,
       "active": false,
-      "item": { "rect": [760, 880, 400, 90] },
-      "style": {},
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          760,
+          880,
+          400,
+          90
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
       "components": [
-        { "image": { "texture": "493824cd-08c7-47bf-a876-a9a02886cae9", "ninepatch": [12, 12, 12, 12] } },
-        { "text": { "text": "You found the cube!", "text_align": "center" } }
+        {
+          "image": {
+            "texture": "493824cd-08c7-47bf-a876-a9a02886cae9",
+            "ninepatch": [
+              12,
+              12,
+              12,
+              12
+            ]
+          }
+        },
+        {
+          "text": {
+            "text": "You found the cube!",
+            "text_align": "center"
+          }
+        }
       ]
     }
   ]

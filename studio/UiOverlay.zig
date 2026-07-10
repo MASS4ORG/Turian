@@ -156,6 +156,7 @@ fn drawDocument(
     const lb = ui_render.fit(.{ .w = target.w, .h = target.h }, doc);
     const result = ui_render.drawTree(doc, lb, .{
         .texture_source = resolveTextureBytes,
+        .font_source = resolveTextureBytes,
     });
     for (result.clicked()) |node_index| toastButtonClick(doc, node_index);
     // No live game to raise a channel into during this edit-time preview —

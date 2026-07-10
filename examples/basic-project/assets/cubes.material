@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "shader": "00000000-0000-4000-8000-000000000001",
+  "scalars": [
+    {
+      "name": "metallic",
+      "value": 0
+    },
+    {
+      "name": "roughness",
+      "value": 0.9990001
+    },
+    {
+      "name": "emissive_strength",
+      "value": 0
+    },
+    {
+      "name": "normal_scale",
+      "value": 1.1400001
+    },
+    {
+      "name": "occlusion_strength",
+      "value": 1
+    },
+    {
+      "name": "alpha_cutoff",
+      "value": 0.5
+    }
+  ],
+  "vectors": [
+    {
+      "name": "base_color",
+      "value": [
+        1,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "emissive",
+      "value": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "name": "albedo_map",
+      "texture": ""
+    },
+    {
+      "name": "metallic_roughness_map",
+      "texture": ""
+    },
+    {
+      "name": "normal_map",
+      "texture": ""
+    },
+    {
+      "name": "emissive_map",
+      "texture": ""
+    },
+    {
+      "name": "occlusion_map",
+      "texture": ""
+    }
+  ],
+  "render": {
+    "blend": "disabled",
+    "cull": "back",
+    "depth_write": true,
+    "depth_test": true
+  }
+}

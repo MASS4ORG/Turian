@@ -240,6 +240,7 @@ fn drawDragGhost() void {
                 .model => gui.entypo.layers,
                 .material => gui.entypo.colours,
                 .data => gui.entypo.database,
+                .font => gui.entypo.text,
             };
             gui.icon(@src(), "di", icon_bytes, .{}, .{
                 .min_size_content = .{ .w = 14, .h = 14 },

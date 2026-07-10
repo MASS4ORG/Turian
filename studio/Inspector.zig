@@ -9,12 +9,11 @@ const DataAssetEditor = @import("DataAssetEditor.zig");
 const InputActionsEditor = @import("InputActionsEditor.zig");
 const ProjectSettingsEditor = @import("ProjectSettingsEditor.zig");
 const ImportSettingsEditor = @import("ImportSettingsEditor.zig");
+const FontEditor = @import("FontEditor.zig");
 const UiDocumentEditor = @import("UiDocumentEditor.zig");
 const EditorRegistry = @import("EditorRegistry.zig");
 const Documents = @import("Documents.zig");
 const PreviewSystem = @import("PreviewSystem.zig");
-const Preview3D = @import("Preview3D.zig");
-const MeshBounds = @import("MeshBounds.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -511,6 +510,7 @@ fn ensureRegistered() void {
     EditorRegistry.register(.project_settings, drawProjectSettings);
     EditorRegistry.register(.image, ImportSettingsEditor.draw);
     EditorRegistry.register(.model, ImportSettingsEditor.draw);
+    EditorRegistry.register(.font, FontEditor.draw);
     EditorRegistry.register(.ui_document, drawUiDocument);
 }
 
@@ -577,23 +577,19 @@ fn drawAssetInspector(asset_path: []const u8) void {
     // list only confused which surface "owns" them.
 
     // Shared preview panel (issue #19), Unity-style: bottom of the panel,
-    // with a Show/Hide toggle. Materials get their own *interactive* preview
-    // (mesh swap + orbit) at the top of `MaterialEditor` instead, since
-    // editing a material wants a live, unsaved-edits-aware render rather than
-    // the cached static one used here.
-    if (asset_type != .material) {
-        _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 6 });
-        drawPreviewPanel(asset_path, asset_type);
-    }
+    // with a Show/Hide toggle. Every asset type goes through the same panel
+    // now (#109 follow-up) — types needing more than a static raster
+    // (material's live unsaved-edits-aware render, model's orbit-drag, font's
+    // live specimen text) register a `PreviewSystem.LiveDrawFn` instead of
+    // the Inspector special-casing each one.
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 6 });
+    drawPreviewPanel(asset_path, asset_type);
 }
 
 var preview_enabled: bool = true;
-var model_preview_panel: Preview3D.Panel = .{};
 
-/// Bottom preview panel for non-material assets. Models get an interactive
-/// orbit-drag preview (like the material editor's); texture/audio get the
-/// cached static thumbnail from `PreviewSystem`. Toggleable — hidden state
-/// persists across selections for the session (not saved to disk).
+/// Bottom preview panel, shared by every asset type. Toggleable — hidden
+/// state persists across selections for the session (not saved to disk).
 fn drawPreviewPanel(asset_path: []const u8, asset_type: editor.AssetType) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
@@ -603,10 +599,7 @@ fn drawPreviewPanel(asset_path: []const u8, asset_type: editor.AssetType) void {
     }
     if (!preview_enabled) return;
 
-    if (asset_type == .model) {
-        drawModelPreview(asset_path);
-        return;
-    }
+    if (PreviewSystem.drawLive(asset_type, asset_path)) return;
 
     const source = PreviewSystem.imageSourceFor(asset_path) orelse return;
     var box = gui.box(@src(), .{}, .{
@@ -619,34 +612,6 @@ fn drawPreviewPanel(asset_path: []const u8, asset_type: editor.AssetType) void {
         .min_size_content = .{ .w = 160, .h = 160 },
         .gravity_x = 0.5,
     });
-}
-
-/// Interactive model preview: the mesh with its resolved default material
-/// (mirrors the auto-assign logic in the mesh_renderer field above),
-/// auto-framed to its bounds, orbit-drag-to-look — the same
-/// `Preview3D.Panel` the material editor uses.
-fn drawModelPreview(asset_path: []const u8) void {
-    if (!EditorState.assetDbReady()) return;
-    const info = EditorState.asset_db.findByPath(asset_path) orelse return;
-    var guid_buf: [36]u8 = undefined;
-    const guid = info.guid.toString(&guid_buf);
-
-    const bounds = MeshBounds.local(guid) orelse return;
-    const center = engine.Vector3{
-        .x = (bounds.min.x + bounds.max.x) * 0.5,
-        .y = (bounds.min.y + bounds.max.y) * 0.5,
-        .z = (bounds.min.z + bounds.max.z) * 0.5,
-    };
-    const ext = engine.Vector3{ .x = bounds.max.x - bounds.min.x, .y = bounds.max.y - bounds.min.y, .z = bounds.max.z - bounds.min.z };
-    const radius = @sqrt(ext.x * ext.x + ext.y * ext.y + ext.z * ext.z) * 0.5;
-
-    var mat_buf: [36]u8 = undefined;
-    const mat_guid = EditorState.modelPrimaryMaterial(gui.io, guid, &mat_buf) orelse engine.Material.presets[0].guid;
-
-    model_preview_panel.ensureFramed(guid, center, if (radius > 0.001) radius else 0.5);
-    const lights = Preview3D.keyFillLights();
-    const nodes = [_]engine.SceneNode{ lights[0], lights[1], Preview3D.meshNode(guid, mat_guid) };
-    model_preview_panel.draw(&nodes, 220);
 }
 
 fn addComponentMenu(obj: *EditorState.SceneNode, fw: *gui.FloatingMenuWidget) bool {

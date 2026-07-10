@@ -8,6 +8,8 @@ const gui = @import("gui");
 const engine = @import("engine");
 const GpuRenderer = @import("GpuRenderer.zig");
 const PreviewCamera = @import("PreviewCamera.zig");
+const MeshBounds = @import("MeshBounds.zig");
+const EditorState = @import("EditorState.zig");
 
 /// Two-light rig (key + a softer, cooler fill from the opposite side) so a
 /// previewed object always reads clearly instead of half-vanishing into the
@@ -114,3 +116,31 @@ pub const Panel = struct {
         }
     }
 };
+
+// ── Model live preview (`PreviewSystem.registerLiveProvider(.model, ...)`) ─
+
+var model_panel: Panel = .{};
+
+/// Interactive model preview: the mesh with its resolved default material
+/// (mirrors the auto-assign logic in the mesh_renderer inspector field),
+/// auto-framed to its bounds, orbit-drag-to-look. Matches `LiveDrawFn`
+/// (`asset_path`, `guid`) so `PreviewSystem.drawLive` can call it directly.
+pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
+    _ = asset_path;
+    const bounds = MeshBounds.local(guid) orelse return;
+    const center = engine.Vector3{
+        .x = (bounds.min.x + bounds.max.x) * 0.5,
+        .y = (bounds.min.y + bounds.max.y) * 0.5,
+        .z = (bounds.min.z + bounds.max.z) * 0.5,
+    };
+    const ext = engine.Vector3{ .x = bounds.max.x - bounds.min.x, .y = bounds.max.y - bounds.min.y, .z = bounds.max.z - bounds.min.z };
+    const radius = @sqrt(ext.x * ext.x + ext.y * ext.y + ext.z * ext.z) * 0.5;
+
+    var mat_buf: [36]u8 = undefined;
+    const mat_guid = EditorState.modelPrimaryMaterial(gui.io, guid, &mat_buf) orelse engine.Material.presets[0].guid;
+
+    model_panel.ensureFramed(guid, center, if (radius > 0.001) radius else 0.5);
+    const lights = keyFillLights();
+    const nodes = [_]engine.SceneNode{ lights[0], lights[1], meshNode(guid, mat_guid) };
+    model_panel.draw(&nodes, 220);
+}

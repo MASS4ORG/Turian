@@ -48,6 +48,7 @@ const Fns = struct {
     ui_runtime_ptr: *const fn () callconv(.c) *engine.ui.UiRuntime,
     ui_events_ptr: *const fn () callconv(.c) *engine.ui.UiEvents,
     game_event_registry_ptr: *const fn () callconv(.c) *engine.GameEventRegistry,
+    quit_requested: *const fn () callconv(.c) bool,
 };
 
 var g_state: State = .edit;
@@ -258,6 +259,19 @@ pub fn pump(io: std.Io) void {
         if (g_state == .playing and dt > 0) {
             const inst = 1.0 / dt;
             g_fps = if (g_fps == 0) inst else g_fps * 0.9 + inst * 0.1;
+        }
+
+        // A script/UI handler called `frame.service(engine.Application).quit()`.
+        // Unity's `Application.Quit()` is a no-op in the editor and needs a
+        // `#if UNITY_EDITOR` guard to actually stop play mode; here the host
+        // decides what "quit" means for the same call, so Stop is just what
+        // Play mode does with it — no branch needed in user scripts (a
+        // shipped build's generated `main` instead breaks its loop, see
+        // `GameCodegen`).
+        if (g_fns.quit_requested()) {
+            gui.toast(@src(), .{ .message = "Application.quit() called — stopping Play mode" });
+            stop();
+            return;
         }
     }
 
@@ -477,6 +491,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
         .ui_runtime_ptr = lib.lookup(@TypeOf(g_fns.ui_runtime_ptr), S.ui_runtime_ptr) orelse return failLookup(&lib),
         .ui_events_ptr = lib.lookup(@TypeOf(g_fns.ui_events_ptr), S.ui_events_ptr) orelse return failLookup(&lib),
         .game_event_registry_ptr = lib.lookup(@TypeOf(g_fns.game_event_registry_ptr), S.game_event_registry_ptr) orelse return failLookup(&lib),
+        .quit_requested = lib.lookup(@TypeOf(g_fns.quit_requested), S.quit_requested) orelse return failLookup(&lib),
     };
     g_lib = lib;
     g_lib_valid = true;

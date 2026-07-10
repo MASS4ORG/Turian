@@ -182,6 +182,7 @@ fn drawPlayModeUi(target: gui.Rect) void {
         const lb = ui_render.fit(.{ .w = target.w, .h = target.h }, &entry.instance.doc);
         const result = ui_render.drawTree(&entry.instance.doc, lb, .{
             .texture_source = UiOverlay.resolveTextureBytes,
+            .font_source = UiOverlay.resolveTextureBytes,
         });
         ui_render.dispatchClicks(&entry.instance.doc, result, entry.instance.resolved, events, channels);
     }

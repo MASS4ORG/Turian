@@ -41,6 +41,13 @@ pub const ModelImportSettings = struct {
     scale_factor: f32 = 1.0,
 };
 
+/// Settings for font asset import (v1: theme fonts only — see #109; this
+/// governs the point size a font registers at when a future UI text
+/// component gains a typed font reference).
+pub const FontImportSettings = struct {
+    default_size: f32 = 16,
+};
+
 /// Per-asset-type import configuration.
 /// Serializes as an externally-tagged JSON object, e.g.:
 ///   {"image": {"generate_mipmaps": true, "filter": "linear", ...}}
@@ -56,6 +63,7 @@ pub const ImportSettings = union(AssetType) {
     input_actions: void,
     project_settings: void,
     ui_document: void,
+    font: FontImportSettings,
 };
 
 /// Returns default import settings for the given asset type.
@@ -71,6 +79,7 @@ pub fn defaultFor(asset_type: AssetType) ImportSettings {
         .input_actions => .{ .input_actions = {} },
         .project_settings => .{ .project_settings = {} },
         .ui_document => .{ .ui_document = {} },
+        .font => .{ .font = .{} },
         .unknown => .{ .unknown = {} },
     };
 }

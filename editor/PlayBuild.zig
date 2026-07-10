@@ -46,6 +46,7 @@ pub const symbols = struct {
     pub const ui_runtime_ptr = "turianPlayUiRuntimePtr";
     pub const ui_events_ptr = "turianPlayUiEventsPtr";
     pub const game_event_registry_ptr = "turianPlayGameEventRegistryPtr";
+    pub const quit_requested = "turianPlayQuitRequested";
 };
 
 fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -358,7 +359,14 @@ fn generatePlayMainZig(
             // binding raises into (studio draws+dispatches via
             // `turianPlayGameEventRegistryPtr`, same pattern as the UI runtime
             // above); any script anywhere subscribes via `frame.gameEvent(ref)`.
-            "var g_game_events: engine.GameEventRegistry = engine.GameEventRegistry.init();\n\n",
+            "var g_game_events: engine.GameEventRegistry = engine.GameEventRegistry.init();\n" ++
+            // Unity's `Application.Quit()` analogue (#109's off-topic follow-up):
+            // a script/UI handler calling `frame.service(engine.Application).quit()`
+            // sets this; the studio (`PlayMode.pump`) polls it and Stops Play
+            // mode — the same call a shipped game's generated `main` interprets
+            // as "exit the process" (`GameCodegen`). One API, host decides what
+            // "quit" means, no `#if EDITOR` branch needed in user scripts.\n" ++
+            "var g_application: engine.Application = .{};\n\n",
     );
 
     for (0..src_files.len) |i| {
@@ -560,9 +568,15 @@ fn generatePlayMainZig(
             "    const n = @min(count, g_nodes.len);\n" ++
             "    @memcpy(g_nodes[0..n], nodes[0..n]);\n" ++
             "    g_node_count = n;\n" ++
+            // Fresh instance each Play session: the library (and its globals)
+            // can outlive one session when the studio reuses an unchanged
+            // build (see `PlayMode.startFromNodes`'s hash check), so a prior
+            // session's one-way `quit_requested` must not leak into the next.
+            "    g_application = .{};\n" ++
             "    g_services.register(engine.ui.UiRuntime, &g_ui_runtime);\n" ++
             "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n" ++
-            "    g_services.register(engine.GameEventRegistry, &g_game_events);\n",
+            "    g_services.register(engine.GameEventRegistry, &g_game_events);\n" ++
+            "    g_services.register(engine.Application, &g_application);\n",
     );
     if (has_user) {
         try out.appendSlice(
@@ -674,6 +688,9 @@ fn generatePlayMainZig(
             "}\n\n" ++
             "export fn turianPlayGameEventRegistryPtr() callconv(.c) *engine.GameEventRegistry {\n" ++
             "    return &g_game_events;\n" ++
+            "}\n\n" ++
+            "export fn turianPlayQuitRequested() callconv(.c) bool {\n" ++
+            "    return g_application.quit_requested;\n" ++
             "}\n",
     );
 

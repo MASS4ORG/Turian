@@ -1,0 +1,17 @@
+{
+  "guid": "43a91ecf-4a30-4273-911c-df629521450f",
+  "asset_type": "font",
+  "importer_version": 1,
+  "source_hash": 10964896979717340474,
+  "import_settings": {
+    "font": {
+      "default_size": 16
+    }
+  },
+  "source_deps": [
+  ],
+  "artifact_deps": [
+  ],
+  "sub_assets": [
+  ]
+}

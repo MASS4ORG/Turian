@@ -60,9 +60,20 @@ pub const StyleBlock = struct {
     style_class: ?StyleClass = null,
     tint: ?[4]f32 = null,
     corner_radius: ?[4]f32 = null,
-    /// v1 selects a dvui theme font style by name (e.g. "heading", "body",
-    /// "caption") — no font-file asset type yet (D5, deferred issue).
+    /// Selects a dvui theme font style by name (e.g. "heading", "body",
+    /// "caption"). Ignored when `font` below is set — a specific Font asset
+    /// always wins over the theme name.
     font_style: ?[]const u8 = null,
+    /// Direct reference to a Font asset (#109 follow-up), for text that needs
+    /// a specific imported typeface rather than the active theme's. Takes
+    /// precedence over `font_style` when set. Independent of the future
+    /// Theme asset (#104) that will let a whole document set one in bulk —
+    /// this is the per-node escape hatch that doesn't need it.
+    font: TypedAssetRef(.font) = .{},
+    /// Point size for `font`; ignored for `font_style` (theme fonts carry
+    /// their own size). Defaults to a readable UI size (see
+    /// `subsystems/ui_render`) when `font` is set but this is left unset.
+    font_size: ?f32 = null,
 };
 
 // ── Events (D4): strings at rest, handles at runtime, types in user code ───
