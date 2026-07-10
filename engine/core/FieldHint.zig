@@ -23,4 +23,7 @@ pub const FieldHint = struct {
     tooltip: ?[]const u8 = null,
     /// Optional group label. Fields sharing the same group are drawn under one expander.
     group: ?[]const u8 = null,
+    /// Explicit display label. Overrides the auto-generated one (the field
+    /// name title-cased — see `studio.PropDraw.displayLabel`).
+    label: ?[]const u8 = null,
 };

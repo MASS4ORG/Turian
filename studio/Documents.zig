@@ -29,6 +29,7 @@ const editor = @import("editor");
 const EditorState = @import("EditorState.zig");
 const ProjectOps = @import("ProjectOps.zig");
 const EditorCamera = @import("EditorCamera.zig");
+const SettingsEditor = @import("SettingsEditor.zig");
 
 pub const MAX_DOCS = 32;
 
@@ -649,7 +650,11 @@ fn drawConfirmClose() void {
     if (gui.button(@src(), "Save", .{}, .{})) {
         // Load the doc so EditorState holds its scene, then save + close.
         activate(i);
-        if (docs[i].kind == .scene) ProjectOps.saveScene(docs[i].path());
+        if (docs[i].kind == .scene) {
+            ProjectOps.saveScene(docs[i].path());
+        } else if (docs[i].asset_type == .studio_settings) {
+            SettingsEditor.save();
+        }
         g_confirm_close = null;
         close(i);
     }

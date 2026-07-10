@@ -205,11 +205,12 @@ fn drawStructFields(comptime T: type, ptr: *T, ctx: *DrawCtx) bool {
         const hint = comptime fieldHint(T, field.name);
         if (comptime hint.hidden) continue;
         if (comptime hint.group != null) continue;
+        const label = comptime displayLabel(field.name, hint);
         if (comptime @hasDecl(T, "turian_drawers") and @hasDecl(T.turian_drawers, field.name)) {
             const drawer = comptime @field(T.turian_drawers, field.name);
-            changed = drawer(field.name, &@field(ptr, field.name), hint, ctx, fi) or changed;
+            changed = drawer(label, &@field(ptr, field.name), hint, ctx, fi) or changed;
         } else {
-            if (drawValue(field.type, field.name, &@field(ptr, field.name), hint, ctx, fi))
+            if (drawValue(field.type, label, &@field(ptr, field.name), hint, ctx, fi))
                 changed = true;
         }
     }
@@ -237,11 +238,12 @@ fn drawStructFields(comptime T: type, ptr: *T, ctx: *DrawCtx) bool {
                 const hint = comptime fieldHint(T, field.name);
                 if (comptime hint.hidden) continue;
                 if (comptime hint.group == null or !std.mem.eql(u8, hint.group.?, g)) continue;
+                const label = comptime displayLabel(field.name, hint);
                 if (comptime @hasDecl(T, "turian_drawers") and @hasDecl(T.turian_drawers, field.name)) {
                     const drawer = comptime @field(T.turian_drawers, field.name);
-                    changed = drawer(field.name, &@field(ptr, field.name), hint, &grp_ctx, fi) or changed;
+                    changed = drawer(label, &@field(ptr, field.name), hint, &grp_ctx, fi) or changed;
                 } else {
-                    if (drawValue(field.type, field.name, &@field(ptr, field.name), hint, &grp_ctx, fi))
+                    if (drawValue(field.type, label, &@field(ptr, field.name), hint, &grp_ctx, fi))
                         changed = true;
                 }
             }
@@ -1055,6 +1057,28 @@ fn fieldHint(comptime T: type, comptime name: []const u8) FieldHint {
     if (@hasDecl(T, "turian_hints") and @hasDecl(T.turian_hints, name))
         return @field(T.turian_hints, name);
     return .{};
+}
+
+/// The label to show for a struct field: `hint.label` if the field declared
+/// one, otherwise `field_name` title-cased (see `titleCase`). Shared by
+/// `drawStructFields` and any caller drawing a single field directly (e.g.
+/// `SettingsEditor`'s per-field rows) so labels look the same everywhere.
+pub fn displayLabel(comptime field_name: []const u8, hint: FieldHint) []const u8 {
+    if (hint.label) |l| return l;
+    return comptime titleCase(field_name);
+}
+
+/// Converts a `snake_case` identifier into a display label at comptime:
+/// underscores become spaces and only the first character is capitalized
+/// (e.g. `move_speed` -> `Move speed`, `show_editor_fps` -> `Show editor fps`).
+fn titleCase(comptime name: []const u8) []const u8 {
+    comptime {
+        var buf: [name.len]u8 = undefined;
+        for (name, 0..) |c, i| buf[i] = if (c == '_') ' ' else c;
+        if (buf.len > 0) buf[0] = std.ascii.toUpper(buf[0]);
+        const final = buf;
+        return &final;
+    }
 }
 
 fn castHintBound(comptime T: type, val: f64) T {

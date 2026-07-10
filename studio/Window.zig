@@ -13,6 +13,8 @@ const PlayMode = @import("PlayMode.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
 const UiDocumentEditor = @import("UiDocumentEditor.zig");
+const SettingsEditor = @import("SettingsEditor.zig");
+const ProjectOps = @import("ProjectOps.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
@@ -99,6 +101,12 @@ pub fn frame() bool {
             // Ctrl+P toggles Play / Stop.
             e.handle(@src(), root.data());
             PlayMode.toggle(gui.io);
+        } else if (ke.code == .s and !ke.mod.shift()) {
+            // Ctrl+S saves the active scene (replaces the old File ▸ Save Scene item).
+            if (EditorState.current_scene_path) |path| {
+                e.handle(@src(), root.data());
+                ProjectOps.saveScene(path);
+            }
         }
     }
 
@@ -116,10 +124,17 @@ pub fn frame() bool {
         // `.uidoc` tabs reuse the scene's 3-pane skeleton with Hierarchy and
         // Viewport swapped for their UI-editing counterparts (Unity/Godot-
         // style panel replacement) — `Inspector.draw()` itself detects this
-        // same tab context and shows the selected node's properties.
+        // same tab context and shows the selected node's properties. The
+        // Settings tab (#88) joins the same skeleton: its category sidebar
+        // takes the "local" slot (no second/View pane — Settings has none),
+        // and the global Inspector column shows the selected category's
+        // fields (`Inspector.zig`'s dispatch) — so every tab type gets the
+        // same always-present Inspector + Asset Browser, only the local
+        // per-tab panel(s) differ.
         const is_uidoc = Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document;
+        const is_settings = Documents.activeIsAsset() and Documents.activeAssetType() == .studio_settings;
 
-        if (Documents.activeIsAsset() and !is_uidoc) {
+        if (Documents.activeIsAsset() and !is_uidoc and !is_settings) {
             // Any other asset tab hosts its dedicated editor full-area. The
             // asset browser stays available as a docked side panel so other
             // assets can be opened while editing one.
@@ -151,18 +166,22 @@ pub fn frame() bool {
                 defer split_v.deinit();
 
                 if (split_v.showFirst()) {
-                    var split_h2 = gui.paned(@src(), .{
-                        .direction = .horizontal,
-                        .collapsed_size = 0,
-                        .handle_margin = 4,
-                    }, .{ .expand = .both });
-                    defer split_h2.deinit();
+                    if (is_settings) {
+                        SettingsEditor.drawSidebar();
+                    } else {
+                        var split_h2 = gui.paned(@src(), .{
+                            .direction = .horizontal,
+                            .collapsed_size = 0,
+                            .handle_margin = 4,
+                        }, .{ .expand = .both });
+                        defer split_h2.deinit();
 
-                    if (split_h2.showFirst()) {
-                        if (is_uidoc) UiDocumentEditor.drawHierarchyPanel(uidoc_path) else SceneTree.draw();
-                    }
-                    if (split_h2.showSecond()) {
-                        if (is_uidoc) UiDocumentEditor.drawViewPanel(uidoc_path) else SceneViewport.draw();
+                        if (split_h2.showFirst()) {
+                            if (is_uidoc) UiDocumentEditor.drawHierarchyPanel(uidoc_path) else SceneTree.draw();
+                        }
+                        if (split_h2.showSecond()) {
+                            if (is_uidoc) UiDocumentEditor.drawViewPanel(uidoc_path) else SceneViewport.draw();
+                        }
                     }
                 }
 

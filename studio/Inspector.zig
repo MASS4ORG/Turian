@@ -14,6 +14,7 @@ const UiDocumentEditor = @import("UiDocumentEditor.zig");
 const EditorRegistry = @import("EditorRegistry.zig");
 const Documents = @import("Documents.zig");
 const PreviewSystem = @import("PreviewSystem.zig");
+const SettingsEditor = @import("SettingsEditor.zig");
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -52,6 +53,15 @@ pub fn draw() void {
                 return;
             }
         }
+    }
+
+    // The Settings tab (#88) has no scene-object/asset selection of its own —
+    // its category sidebar lives in the "local" panel (`Window.zig`), and its
+    // fields are the Inspector's content whenever that tab is active, same
+    // shape as the uidoc branch above.
+    if (Documents.activeIsAsset() and Documents.activeAssetType() == .studio_settings) {
+        SettingsEditor.drawFields();
+        return;
     }
 
     const sel = EditorState.selected_object orelse {

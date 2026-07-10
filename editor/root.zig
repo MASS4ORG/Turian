@@ -74,6 +74,12 @@ pub const TaskKind = TaskManager.Kind;
 /// Cascading JSON settings store (global + project layers).
 pub const settings = @import("Settings.zig");
 pub const Settings = settings.Settings;
+/// Typed schema for Studio-wide configuration, drawn by
+/// `studio/SettingsEditor.zig` via the shared `PropDraw` reflection system.
+const studio_settings_types = @import("StudioSettings.zig");
+pub const StudioSettings = studio_settings_types.StudioSettings;
+pub const StudioSettingsCategoryMeta = studio_settings_types.CategoryMeta;
+pub const studio_settings_categories = studio_settings_types.categories;
 /// MRU recent-projects list persisted via the Settings API.
 pub const recent_projects = @import("RecentProjects.zig");
 /// Package manifest parser for `turian-package.json` (issue #56/#58).

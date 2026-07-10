@@ -84,6 +84,14 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .external_editor,
             .icon_hint = .font,
         },
+        .studio_settings => .{
+            .name = "Studio Settings",
+            // Opened programmatically (`Documents.openAsset`), never via
+            // extension lookup.
+            .extensions = &.{},
+            .open_mode = .internal_editor,
+            .icon_hint = .data,
+        },
     };
 }
 

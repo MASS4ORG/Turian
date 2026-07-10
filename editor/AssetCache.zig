@@ -18,6 +18,7 @@ pub fn artifactExtension(asset_type: AssetType) []const u8 {
         .project_settings => ".projectsettings",
         .ui_document => ".uidoc",
         .font => ".font",
+        .studio_settings => ".bin", // never cached — not a project asset
         .unknown => ".bin",
     };
 }

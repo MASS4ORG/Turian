@@ -7,6 +7,7 @@ const Tasks = @import("Tasks.zig");
 const PlayMode = @import("PlayMode.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
 const Screenshots = @import("Screenshots.zig");
+const Documents = @import("Documents.zig");
 const build_options = @import("turian_build_options");
 
 const AboutInfo = struct {
@@ -24,12 +25,15 @@ const AboutInfo = struct {
 
 var hamburger_open: bool = false;
 
-/// Editor-FPS display toggle (View menu). Distinct from the FPS shown while
-/// Play Mode is running (`PlayMode.fps()`, the *game's* FPS) — this is the
-/// Studio UI's own frame rate, useful when diagnosing an editor slowdown
-/// (e.g. a heavy asset folder) independent of whether the game is playing.
-/// Persisted across sessions via the editor Settings store.
-var show_editor_fps: bool = false;
+/// Editor-FPS display toggle (Turian ▸ Settings ▸ General). Distinct from the
+/// FPS shown while Play Mode is running (`PlayMode.fps()`, the *game's* FPS)
+/// — this is the Studio UI's own frame rate, useful when diagnosing an editor
+/// slowdown (e.g. a heavy asset folder) independent of whether the game is
+/// playing. Persisted across sessions via the editor Settings store; `pub`
+/// so `SettingsEditor.save()` can push a live change immediately (otherwise
+/// the toggle wouldn't take effect until restart, since this var is only
+/// ever synced *from* settings once, at startup).
+pub var show_editor_fps: bool = false;
 /// Settings key for `show_editor_fps`. Lazily synced on first ready frame
 /// (`syncFpsFromSettings`) because settings aren't loaded when this module's
 /// globals initialize.
@@ -51,8 +55,8 @@ fn projectDirExists(path: []const u8) bool {
 }
 
 /// Draw the main menu bar.  A hamburger icon toggles the main menu items
-/// (File, Edit, Scene, …) in the bar horizontally; clicking outside the
-/// menu area collapses them back.
+/// (File, Edit, Project, View, Turian) in the bar horizontally; clicking
+/// outside the menu area collapses them back.
 pub fn draw(should_quit: *bool) void {
     syncFpsFromSettings();
 
@@ -80,15 +84,6 @@ pub fn draw(should_quit: *bool) void {
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "Save Scene", .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                if (EditorState.current_scene_path) |path| {
-                    ProjectOps.saveScene(path);
-                }
-            }
-
-            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-
             if (gui.menuItemLabel(@src(), "Exit", .{}, .{ .expand = .horizontal }) != null) {
                 should_quit.* = true;
             }
@@ -100,15 +95,15 @@ pub fn draw(should_quit: *bool) void {
 
             var undo_buf: [128]u8 = undefined;
             const undo_str = if (EditorState.canUndo())
-                std.fmt.bufPrint(&undo_buf, "Undo  {s}\tCtrl+Z", .{EditorState.undoLabel().?}) catch "Undo\tCtrl+Z"
+                std.fmt.bufPrint(&undo_buf, "Undo  {s}    Ctrl+Z", .{EditorState.undoLabel().?}) catch "Undo    Ctrl+Z"
             else
-                "Undo\tCtrl+Z";
+                "Undo    Ctrl+Z";
 
             var redo_buf: [128]u8 = undefined;
             const redo_str = if (EditorState.canRedo())
-                std.fmt.bufPrint(&redo_buf, "Redo  {s}\tCtrl+Shift+Z", .{EditorState.redoLabel().?}) catch "Redo\tCtrl+Shift+Z"
+                std.fmt.bufPrint(&redo_buf, "Redo  {s}    Ctrl+Shift+Z", .{EditorState.redoLabel().?}) catch "Redo    Ctrl+Shift+Z"
             else
-                "Redo\tCtrl+Shift+Z";
+                "Redo    Ctrl+Shift+Z";
 
             const do_undo = gui.menuItemLabel(@src(), undo_str, .{}, .{ .expand = .horizontal });
             if (do_undo != null and EditorState.canUndo()) {
@@ -123,24 +118,7 @@ pub fn draw(should_quit: *bool) void {
             }
         }
 
-        if (gui.menuItemLabel(@src(), "Scene", .{ .submenu = true }, .{})) |r| {
-            var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
-            defer fw.deinit();
-
-            if (gui.menuItemLabel(@src(), "Add Empty Object", .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                _ = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", -1);
-            }
-
-            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-
-            if (gui.menuItemLabel(@src(), "Reset Scene", .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                EditorState.initDefaultScene(gui.io);
-            }
-        }
-
-        if (gui.menuItemLabel(@src(), "Build", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), "Project", .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
@@ -148,11 +126,8 @@ pub fn draw(should_quit: *bool) void {
                 m.close();
                 Tasks.launchBuild(gui.io);
             }
-        }
 
-        if (gui.menuItemLabel(@src(), "Assets", .{ .submenu = true }, .{})) |r| {
-            var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
-            defer fw.deinit();
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
             if (gui.menuItemLabel(@src(), "Reimport All", .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
@@ -181,21 +156,20 @@ pub fn draw(should_quit: *bool) void {
                 m.close();
                 _ = Screenshots.capture();
             }
-
-            const fps_label = if (show_editor_fps) "Hide Editor FPS" else "Show Editor FPS";
-            if (gui.menuItemLabel(@src(), fps_label, .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                show_editor_fps = !show_editor_fps;
-                if (EditorState.settingsReady()) {
-                    EditorState.settings.setBool(FPS_SETTING_KEY, show_editor_fps) catch {};
-                    EditorState.settings.save(gui.io);
-                }
-            }
         }
 
-        if (gui.menuItemLabel(@src(), "Help", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), "Turian", .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
+
+            if (!EditorState.settingsReady()) {
+                gui.label(@src(), "Settings not ready", .{}, .{ .expand = .horizontal, .padding = .all(8) });
+            } else if (gui.menuItemLabel(@src(), "Settings", .{}, .{ .expand = .horizontal }) != null) {
+                m.close();
+                Documents.openAsset(EditorState.settings.global_path, .studio_settings);
+            }
+
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
             if (gui.menuItemLabel(@src(), "About", .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
