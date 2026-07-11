@@ -38,8 +38,13 @@ pub const Mods = struct {
 };
 
 pub const RowIcon = struct {
-    bytes: []const u8,
+    /// Entypo icon glyph, drawn when `image` is null.
+    bytes: []const u8 = "",
     tint: ?gui.Color = null,
+    /// Real thumbnail (e.g. `PreviewSystem.imageSourceFor`) to draw instead of
+    /// `bytes` when available — used by the asset tree to show the same
+    /// previews the grid tiles do, just row-sized instead of tile-sized.
+    image: ?gui.ImageSource = null,
 };
 
 pub fn TreeView(comptime Model: type) type {
@@ -307,12 +312,20 @@ pub fn TreeView(comptime Model: type) type {
             }
 
             const icon = Model.rowIcon(idx, has_children);
-            gui.icon(@src(), "icon", icon.bytes, .{}, .{
-                .gravity_y = 0.5,
-                .min_size_content = .{ .w = 16, .h = 16 },
-                .id_extra = idx,
-                .color_text = icon.tint,
-            });
+            if (icon.image) |source| {
+                _ = gui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
+                    .gravity_y = 0.5,
+                    .min_size_content = .{ .w = 16, .h = 16 },
+                    .id_extra = idx,
+                });
+            } else {
+                gui.icon(@src(), "icon", icon.bytes, .{}, .{
+                    .gravity_y = 0.5,
+                    .min_size_content = .{ .w = 16, .h = 16 },
+                    .id_extra = idx,
+                    .color_text = icon.tint,
+                });
+            }
 
             if (is_renaming_this) {
                 var te = gui.textEntry(@src(), .{

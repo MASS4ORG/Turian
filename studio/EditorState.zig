@@ -808,6 +808,12 @@ pub fn assetDbReady() bool {
     return asset_db_initialized;
 }
 
+/// Bumped every time `refreshComponents` runs (project load, watcher-detected
+/// filesystem change, or any mutating asset operation that calls it directly).
+/// `AssetTree` compares this against the generation it last scanned to decide
+/// whether its cached recursive folder/file listing needs rebuilding.
+pub var asset_refresh_generation: u64 = 0;
+
 // ── Scene state ───────────────────────────────────────────────────────────────
 
 pub var objects: [MAX_OBJECTS]SceneNode = undefined;
@@ -1689,6 +1695,7 @@ pub fn setProjectPath(path: []const u8) void {
 }
 
 pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
+    asset_refresh_generation += 1;
     discovered_count = 0;
     editor.scanner.populateBuiltins(&discovered_components, &discovered_count);
     discovered_event_count = 0;

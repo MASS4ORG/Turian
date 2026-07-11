@@ -56,6 +56,31 @@ pub fn revealInFileManager(browse_path: []const u8, file_name: []const u8) void 
     }
 }
 
+/// Move `src_path` (file or directory) into `dest_dir`, keeping its `.meta`
+/// sidecar (if any) alongside it. No-op if source and destination already
+/// coincide. Shared by the grid's drag-to-folder drop handling and the
+/// folder/full asset trees' drag-reparent (`TreeView.Model.reparent`).
+pub fn moveAsset(src_path: []const u8, dest_dir: []const u8) void {
+    const file_name = if (std.mem.lastIndexOfScalar(u8, src_path, '/')) |sep| src_path[sep + 1 ..] else src_path;
+    var dest_buf: [1024]u8 = undefined;
+    const dest_path = std.fmt.bufPrint(&dest_buf, "{s}/{s}", .{ dest_dir, file_name }) catch return;
+    if (std.mem.eql(u8, src_path, dest_path)) return;
+
+    std.Io.Dir.rename(std.Io.Dir.cwd(), src_path, std.Io.Dir.cwd(), dest_path, gui.io) catch return;
+
+    var src_meta_buf: [1024 + 5]u8 = undefined;
+    var dest_meta_buf: [1024 + 5]u8 = undefined;
+    const src_meta = std.fmt.bufPrint(&src_meta_buf, "{s}.meta", .{src_path}) catch "";
+    const dest_meta = std.fmt.bufPrint(&dest_meta_buf, "{s}.meta", .{dest_path}) catch "";
+    if (src_meta.len > 0 and dest_meta.len > 0) {
+        std.Io.Dir.rename(std.Io.Dir.cwd(), src_meta, std.Io.Dir.cwd(), dest_meta, gui.io) catch {};
+    }
+
+    EditorState.clearDrag();
+    EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
+    gui.refresh(null, @src(), null);
+}
+
 /// Find the first non-colliding name `base`/`base_N` (with `ext`) inside
 /// `browse_path` and return the full path. Returns null if 100 names collide
 /// or the path overflows. Writes into the caller-supplied buffers.
@@ -86,6 +111,37 @@ fn uniquePath(
 fn finishCreate(full_path: []const u8) void {
     EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
     EditorState.selectAsset(full_path);
+}
+
+/// Find the first non-colliding directory name `base`/`base N` inside
+/// `browse_path` and return the full path. Mirrors `uniquePath` but probes
+/// with `openDir` (a directory, not a file, is being created).
+fn uniqueDirPath(browse_path: []const u8, base: []const u8, name_buf: []u8, path_buf: []u8) ?[]const u8 {
+    var n: usize = 0;
+    while (n < 100) : (n += 1) {
+        const dir_name = if (n == 0)
+            std.fmt.bufPrint(name_buf, "{s}", .{base}) catch return null
+        else
+            std.fmt.bufPrint(name_buf, "{s} {d}", .{ base, n }) catch return null;
+        const full_path = std.fmt.bufPrint(path_buf, "{s}/{s}", .{ browse_path, dir_name }) catch return null;
+        const exists = blk: {
+            var d = std.Io.Dir.cwd().openDir(gui.io, full_path, .{}) catch break :blk false;
+            d.close(gui.io);
+            break :blk true;
+        };
+        if (!exists) return full_path;
+    }
+    return null;
+}
+
+/// Create a new, empty subfolder inside `browse_path`. Folders need no
+/// `.meta` sidecar (`AssetDatabase.scan` only assigns GUIDs to files).
+pub fn createNewFolder(browse_path: []const u8) void {
+    var name_buf: [192]u8 = undefined;
+    var path_buf: [1024]u8 = undefined;
+    const full_path = uniqueDirPath(browse_path, "New Folder", &name_buf, &path_buf) orelse return;
+    std.Io.Dir.cwd().createDir(gui.io, full_path, .default_dir) catch return;
+    EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
 }
 
 /// Create a new empty prefab (serialized scene-hierarchy asset) in `browse_path`.
