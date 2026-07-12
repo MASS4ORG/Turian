@@ -2,9 +2,9 @@
 /// metadata via dlopen/getRegistry.  Pure logic — no GUI dependency.
 const std = @import("std");
 const engine = @import("engine");
-const scanner = @import("Scanner.zig");
-const GameBuild = @import("GameBuild.zig");
-const codegen = @import("GameCodegen.zig");
+const scanner = @import("assets/Scanner.zig");
+const GameBuild = @import("build/GameBuild.zig");
+const codegen = @import("build/GameCodegen.zig");
 const Progress = @import("Progress.zig").Progress;
 
 const api = engine.api;
@@ -28,7 +28,7 @@ const GetRegistryFn = *const fn () callconv(.c) api.Registry;
 /// Compile user script components to a shared library and populate their
 /// FieldDef metadata. Reports 0..1 completion (one step per distinct source
 /// file) and stops early if `progress` reports a cancellation request —
-/// callers should run this off the UI thread (see `studio/EditorState.zig`'s
+/// callers should run this off the UI thread (see `studio/state/EditorState.zig`'s
 /// background reflect job) since each group spawns a `zig build`.
 pub fn loadFieldInfo(
     io: std.Io,

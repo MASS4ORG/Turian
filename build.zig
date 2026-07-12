@@ -215,7 +215,7 @@ pub fn build(b: *std.Build) void {
     const cli_exe = b.addExecutable(.{
         .name = "turian-cli",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("editor/Cli.zig"),
+            .root_source_file = b.path("editor/cli/Cli.zig"),
             .target = target,
             .optimize = optimize,
             .strip = optimize != .Debug,
@@ -283,7 +283,7 @@ pub fn build(b: *std.Build) void {
 
     const studio_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("studio/EditorState.zig"),
+            .root_source_file = b.path("studio/services/EditorState.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -299,7 +299,7 @@ pub fn build(b: *std.Build) void {
     // dragging in the full studio build graph.
     const preview_raster_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("studio/PreviewRaster.zig"),
+            .root_source_file = b.path("studio/asset-browser/preview/PreviewRaster.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -309,7 +309,7 @@ pub fn build(b: *std.Build) void {
     // deps, cheap to test standalone like preview_raster_tests.
     const editor_frame_timing_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("studio/EditorFrameTiming.zig"),
+            .root_source_file = b.path("studio/services/EditorFrameTiming.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -319,7 +319,7 @@ pub fn build(b: *std.Build) void {
     // — only needs `editor` for AssetType, no gui/render/gpu graph.
     const editor_registry_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("studio/EditorRegistry.zig"),
+            .root_source_file = b.path("studio/services/EditorRegistry.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -365,7 +365,7 @@ pub fn build(b: *std.Build) void {
         // Preview orbital-camera math (`studio/PreviewCamera.zig`) only needs
         // engine + render, not the full gui/dvui graph — test it standalone.
         const preview_camera_test_mod = b.createModule(.{
-            .root_source_file = b.path("studio/PreviewCamera.zig"),
+            .root_source_file = b.path("studio/asset-browser/preview/PreviewCamera.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -425,7 +425,7 @@ pub fn build(b: *std.Build) void {
     const rel_cli = b.addExecutable(.{
         .name = "turian-cli",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("editor/Cli.zig"),
+            .root_source_file = b.path("editor/cli/Cli.zig"),
             .target = target,
             .optimize = .ReleaseFast,
             .strip = true,
@@ -497,7 +497,7 @@ pub fn build(b: *std.Build) void {
         const sdk_cli = b.addExecutable(.{
             .name = "turian-cli",
             .root_module = b.createModule(.{
-                .root_source_file = b.path("editor/Cli.zig"),
+                .root_source_file = b.path("editor/cli/Cli.zig"),
                 .target = target,
                 .optimize = optimize,
                 .strip = optimize != .Debug,

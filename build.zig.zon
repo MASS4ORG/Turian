@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/brmassa/dvui?ref=mr-4-texture-readback-and-frame-capture#c2506f2afbc840f2f4386f074e515fd8d8d0a0c0",
-            .hash = "dvui-0.5.0-dev-AQFJmQyV-gB3Bgc6LKscyTCu3o7dD7fIJyzoWK6nuQP0",
+            .url = "git+https://github.com/david-vanderson/dvui#ecffdbf85beea10e9cbabcb370c60619b75e4282",
+            .hash = "dvui-0.5.0-dev-AQFJmWfx-wBObpJ1cR37uegD8XexNPqnhOI41jPAOYcY",
         },
         .gpu = .{
             .url = "git+https://gitlab.com/mass4org/mega4/gpu#68963cc927252e15c5ca27330ae5d7fe837dd5e1",
