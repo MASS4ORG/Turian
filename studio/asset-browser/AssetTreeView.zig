@@ -141,14 +141,14 @@ fn Model(comptime files_included: bool) type {
             const idx = node(i);
             if (!files_included) {
                 _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 5000 + i });
-                AssetContextMenus.drawCreateAssetMenuItems(fw, AssetTree.path(idx), 6000 + i * 100);
+                AssetContextMenus.drawCreateAssetMenuItems(AssetTree.path(idx), 6000 + i * 100);
                 return;
             }
             const proj_path = EditorState.project_path orelse return;
             AssetContextMenus.drawAssetExtraMenuItems(fw, proj_path, AssetTree.dirOf(idx), AssetTree.name(idx), AssetTree.isDir(idx), AssetTree.assetType(idx), 8000 + i);
             if (AssetTree.isDir(idx)) {
                 _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 9000 + i });
-                AssetContextMenus.drawCreateAssetMenuItems(fw, AssetTree.path(idx), 10000 + i * 100);
+                AssetContextMenus.drawCreateAssetMenuItems(AssetTree.path(idx), 10000 + i * 100);
             }
         }
     };
@@ -216,7 +216,7 @@ pub fn drawFolderSidebar() void {
         if (cxt.activePoint()) |cp| {
             var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
             defer fw.deinit();
-            AssetContextMenus.drawCreateAssetMenuItems(fw, AssetTree.rootPath(), 0);
+            AssetContextMenus.drawCreateAssetMenuItems(AssetTree.rootPath(), 0);
         }
     }
 }
@@ -242,7 +242,7 @@ pub fn drawFullTree(outer_wd: *gui.WidgetData) void {
         if (cxt.activePoint()) |cp| {
             var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
             defer fw.deinit();
-            AssetContextMenus.drawCreateAssetMenuItems(fw, AssetTree.rootPath(), 0);
+            AssetContextMenus.drawCreateAssetMenuItems(AssetTree.rootPath(), 0);
         }
     }
 }

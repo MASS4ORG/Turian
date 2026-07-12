@@ -30,4 +30,13 @@ pub const AssetDescriptor = struct {
     open_mode: OpenMode = .none,
     /// Icon hint for the asset browser.
     icon_hint: IconHint = .document,
+    /// Cascaded Create-menu path (issues #85/#72), e.g. `"UI/Document"`.
+    /// Null for types that aren't creatable from the asset browser's Create
+    /// menu (imported types like Image/Model/Script/Audio/Font). Declared
+    /// here, next to the rest of the type's editor behaviour, rather than in
+    /// a separate list — the same "attribute lives with the type" idea
+    /// `menu_path` gives user components (`Scanner.MENU_PATH_MARKER`), just
+    /// expressed as a table field since builtin types have no source file
+    /// for the scanner to read a marker from.
+    create_menu_path: ?[]const u8 = null,
 };

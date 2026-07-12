@@ -448,7 +448,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
                     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = entry_idx });
                     var folder_path_buf: [1024]u8 = undefined;
                     const folder_path = std.fmt.bufPrint(&folder_path_buf, "{s}/{s}", .{ browse_path, entry.name }) catch browse_path;
-                    AssetContextMenus.drawCreateAssetMenuItems(fw, folder_path, 2000 + entry_idx * 2000);
+                    AssetContextMenus.drawCreateAssetMenuItems(folder_path, 2000 + entry_idx * 2000);
                 }
             }
         }
@@ -648,7 +648,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-            AssetContextMenus.drawCreateAssetMenuItems(fw, browse_path, 0);
+            AssetContextMenus.drawCreateAssetMenuItems(browse_path, 0);
         }
     }
 }

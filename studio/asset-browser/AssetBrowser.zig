@@ -103,17 +103,14 @@ pub fn draw() void {
 
         gui.label(@src(), "Asset Browser", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
 
-        // Show the path relative to the project (from `assets/` onward); the
-        // full project path is redundant and clutters the header. File changes
-        // are picked up by the file watcher, so there is no Refresh button.
-        // `.expand = .horizontal` also makes this the flexible spacer that
-        // pushes the tile-size slider (below) to the header's right edge.
+        // Clickable breadcrumb for the path relative to the project (from
+        // `assets/` onward, issues #68/#81); the full project path is
+        // redundant and clutters the header. File changes are picked up by
+        // the file watcher, so there is no Refresh button. The breadcrumb row
+        // expands horizontally, making it the flexible spacer that pushes the
+        // tile-size slider (below) to the header's right edge.
         if (EditorState.project_path != null) {
-            if (AssetNav.current_subdir_len > 0) {
-                gui.label(@src(), "  assets/{s}", .{AssetNav.currentSubdir()}, .{ .gravity_y = 0.5, .expand = .horizontal });
-            } else {
-                gui.label(@src(), "  assets", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-            }
+            AssetNav.drawBreadcrumb();
         }
 
         // Preview tile size (issue #25) — continuous slider, right-aligned.

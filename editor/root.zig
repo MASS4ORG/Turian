@@ -94,6 +94,8 @@ pub const project_config = @import("project/ProjectConfig.zig");
 pub const ProjectConfig = project_config.ProjectConfig;
 /// Central, machine-wide package store shared across projects (issue #20).
 pub const package_store = @import("package/PackageStore.zig");
+/// Runtime path-based menu tree builder for cascaded menus (issues #85/#72).
+pub const menu_tree = @import("MenuTree.zig");
 
 test {
     // Force every re-exported module to be analysed so their `test` blocks

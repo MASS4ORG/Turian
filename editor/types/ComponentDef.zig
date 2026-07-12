@@ -10,6 +10,8 @@ pub const MAX_COMP_FILE = 256;
 pub const MAX_COMPONENTS = 64;
 /// Maximum number of reflected fields per component.
 pub const MAX_COMP_FIELDS = 16;
+/// Maximum length of a declared `menu_path` (issues #85/#72).
+pub const MAX_MENU_PATH = 128;
 
 /// Whether the marked type is a scene component or a standalone data asset.
 pub const DefKind = enum { component, data_asset };
@@ -24,6 +26,12 @@ pub const ComponentDef = struct {
     kind: DefKind = .component,
     fields: [MAX_COMP_FIELDS]FieldDef = std.mem.zeroes([MAX_COMP_FIELDS]FieldDef),
     field_count: usize = 0,
+    /// Optional cascaded Create-menu path declared via `pub const menu_path
+    /// = "Category/Name";` on the type (issues #85/#72) — e.g.
+    /// `"Gameplay/Enemy Stats"`. Empty when not declared; callers building
+    /// the Create menu fall back to a default path in that case.
+    menu_path: [MAX_MENU_PATH]u8 = std.mem.zeroes([MAX_MENU_PATH]u8),
+    menu_path_len: usize = 0,
 
     pub fn typeName(self: *const ComponentDef) []const u8 {
         return self.type_name[0..self.type_name_len];
@@ -31,6 +39,11 @@ pub const ComponentDef = struct {
 
     pub fn sourceFile(self: *const ComponentDef) []const u8 {
         return self.source_file[0..self.source_file_len];
+    }
+
+    /// The declared `menu_path`, or `""` if the type didn't declare one.
+    pub fn menuPath(self: *const ComponentDef) []const u8 {
+        return self.menu_path[0..self.menu_path_len];
     }
 
     pub fn setTypeName(self: *ComponentDef, n: []const u8) void {
@@ -43,6 +56,12 @@ pub const ComponentDef = struct {
         const len = @min(p.len, MAX_COMP_FILE);
         @memcpy(self.source_file[0..len], p[0..len]);
         self.source_file_len = len;
+    }
+
+    pub fn setMenuPath(self: *ComponentDef, p: []const u8) void {
+        const len = @min(p.len, MAX_MENU_PATH);
+        @memcpy(self.menu_path[0..len], p[0..len]);
+        self.menu_path_len = len;
     }
 
     /// Returns the human-readable display name (uses BUILTIN_COMPONENTS for builtins).

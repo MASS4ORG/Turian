@@ -1,10 +1,12 @@
 //! Context-menu content shared by all three asset browser views (grid tiles,
-//! folder tree, full tree): "New <asset kind>" creation items, and the
-//! per-asset Open/Instantiate/Reimport/Reveal/Copy-path/Copy-GUID items. Each
-//! view still draws its own Rename/Delete (the grid manages inline rename
-//! state itself; `TreeView` provides Rename/Delete generically for tree
-//! rows) — this file covers everything else, so the three views can't drift
-//! out of sync with each other.
+//! folder tree, full tree): the cascaded "Create" asset-creation menu
+//! (issues #85/#72, built at runtime from `editor.menu_tree` over each
+//! entry's declared path), and the per-asset
+//! Open/Instantiate/Reimport/Reveal/Copy-path/Copy-GUID items. Each view
+//! still draws its own Rename/Delete (the grid manages inline rename state
+//! itself; `TreeView` provides Rename/Delete generically for tree rows) —
+//! this file covers everything else, so the three views can't drift out of
+//! sync with each other.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -127,47 +129,142 @@ pub fn invalidatePreviewAndSubAssets(asset_path: []const u8) void {
     invalidateSubAssetCount(asset_path);
 }
 
-/// "New <asset kind>" menu items, scoped to create inside `browse_path`.
-/// Shared by the grid's empty-area menu, the folder tree's per-folder menu,
-/// and the full tree's per-folder menu. `id_base` keeps `id_extra`s from
-/// colliding when a caller draws more than one of these in the same menu.
-pub fn drawCreateAssetMenuItems(fw: *gui.FloatingMenuWidget, browse_path: []const u8, id_base: usize) void {
-    if (gui.menuItemLabel(@src(), "New Folder", .{}, .{ .expand = .horizontal, .id_extra = id_base + 20 }) != null) {
-        fw.close();
-        AssetActions.createNewFolder(browse_path);
+/// What a "Create" leaf entry does when picked. Kept as a closed union
+/// (rather than a function pointer) because two variants need to carry data
+/// (`preset`, `def`) that the caller only has as a runtime value, not
+/// something a plain `*const fn(browse_path)` could capture.
+const CreateAction = union(enum) {
+    folder,
+    prefab,
+    project_settings,
+    input_actions,
+    ui_document,
+    material_preset: engine.Material.Preset,
+    data_asset: *const editor.ComponentDef,
+};
+
+fn runCreateAction(action: CreateAction, browse_path: []const u8) void {
+    switch (action) {
+        .folder => AssetActions.createNewFolder(browse_path),
+        .prefab => AssetActions.createNewPrefab(browse_path),
+        .project_settings => AssetActions.createNewProjectSettings(browse_path),
+        .input_actions => AssetActions.createNewInputActions(browse_path),
+        .ui_document => AssetActions.createNewUiDocument(browse_path),
+        .material_preset => |preset| AssetActions.createNewMaterialFromPreset(browse_path, preset),
+        .data_asset => |def| AssetActions.createNewDataAsset(browse_path, def),
     }
-    if (gui.menuItemLabel(@src(), "New Prefab", .{}, .{ .expand = .horizontal, .id_extra = id_base }) != null) {
-        fw.close();
-        AssetActions.createNewPrefab(browse_path);
+}
+
+/// One entry in the "Create" cascaded menu (issues #85/#72): a runtime
+/// `menu_path` string (e.g. `"Material/Metal"`) grouped into a tree by
+/// `editor.menu_tree`, plus the action to run when picked.
+const CreateEntry = struct {
+    menu_path: []const u8,
+    action: CreateAction,
+};
+
+/// Builtin entries plus the runtime-discovered material presets and
+/// data-asset component types, each declaring its own cascaded `menu_path`.
+/// This is the "registration" the issue asks for — adding a new builtin
+/// creatable type, or a plugin contributing one later (#4), is just another
+/// entry with a path, no attribute/macro system required.
+///
+/// Paths aren't hardcoded here: each *type* owns its own path at the
+/// declaration site closest to it —
+///   - builtin file-backed types (Prefab, Settings, UI Document, Material's
+///     category) declare `AssetDescriptor.create_menu_path` next to their
+///     other editor metadata in `asset_registry.get()`.
+///   - user data-asset types declare `pub const menu_path = "...";` on the
+///     type itself (`Scanner.MENU_PATH_MARKER`), read into
+///     `ComponentDef.menuPath()`.
+/// `collectCreateEntries` just gathers what each type already declared
+/// (falling back to `Data/<display name>` for data-asset types that don't
+/// bother declaring one) — it doesn't own the taxonomy itself. "Folder" has
+/// no `AssetType` (it's not a file extension), so it stays a literal here.
+fn collectCreateEntries(alloc: std.mem.Allocator) []const CreateEntry {
+    var entries: std.ArrayList(CreateEntry) = .empty;
+    entries.append(alloc, .{ .menu_path = "Folder", .action = .folder }) catch {};
+
+    const prefab_path = editor.asset_registry.get(.scene).create_menu_path orelse "Prefab";
+    entries.append(alloc, .{ .menu_path = prefab_path, .action = .prefab }) catch {};
+    const project_settings_path = editor.asset_registry.get(.project_settings).create_menu_path orelse "Project Settings";
+    entries.append(alloc, .{ .menu_path = project_settings_path, .action = .project_settings }) catch {};
+    const input_actions_path = editor.asset_registry.get(.input_actions).create_menu_path orelse "Input Actions";
+    entries.append(alloc, .{ .menu_path = input_actions_path, .action = .input_actions }) catch {};
+    const ui_document_path = editor.asset_registry.get(.ui_document).create_menu_path orelse "UI Document";
+    entries.append(alloc, .{ .menu_path = ui_document_path, .action = .ui_document }) catch {};
+
+    const material_category = editor.asset_registry.get(.material).create_menu_path orelse "Material";
+    for (engine.Material.presets) |preset| {
+        const path = std.fmt.allocPrint(alloc, "{s}/{s}", .{ material_category, preset.name }) catch continue;
+        entries.append(alloc, .{ .menu_path = path, .action = .{ .material_preset = preset } }) catch {};
     }
-    if (gui.menuItemLabel(@src(), "New Project Settings", .{}, .{ .expand = .horizontal, .id_extra = id_base + 1 }) != null) {
-        fw.close();
-        AssetActions.createNewProjectSettings(browse_path);
-    }
-    if (gui.menuItemLabel(@src(), "New Input Actions", .{}, .{ .expand = .horizontal, .id_extra = id_base + 2 }) != null) {
-        fw.close();
-        AssetActions.createNewInputActions(browse_path);
-    }
-    if (gui.menuItemLabel(@src(), "New UI Document", .{}, .{ .expand = .horizontal, .id_extra = id_base + 3 }) != null) {
-        fw.close();
-        AssetActions.createNewUiDocument(browse_path);
-    }
-    for (engine.Material.presets, 0..) |preset, pi| {
-        var label_buf: [64]u8 = undefined;
-        const label = std.fmt.bufPrint(&label_buf, "New Material: {s}", .{preset.name}) catch continue;
-        if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = id_base + 10 + pi }) != null) {
-            fw.close();
-            AssetActions.createNewMaterialFromPreset(browse_path, preset);
-        }
-    }
-    for (EditorState.discovered_components[0..EditorState.discovered_count], 0..) |*def, di| {
+
+    for (EditorState.discovered_components[0..EditorState.discovered_count]) |*def| {
         if (def.kind != .data_asset) continue;
-        var label_buf: [128]u8 = undefined;
-        const label = std.fmt.bufPrint(&label_buf, "New {s}", .{def.displayName()}) catch continue;
-        if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = id_base + 1000 + di }) != null) {
-            fw.close();
-            AssetActions.createNewDataAsset(browse_path, def);
+        const declared = def.menuPath();
+        const path = if (declared.len > 0)
+            declared
+        else
+            std.fmt.allocPrint(alloc, "Data/{s}", .{def.displayName()}) catch continue;
+        entries.append(alloc, .{ .menu_path = path, .action = .{ .data_asset = def } }) catch {};
+    }
+
+    return entries.items;
+}
+
+/// Recursively render one level of the cascaded "Create" menu: categories
+/// (nodes with children) open a nested `floatingMenu`; leaves run their
+/// action and close the whole chain via the outermost `fw`. Reusing the same
+/// `@src()` at every recursion depth is safe — each level runs inside its
+/// own freshly opened `floatingMenu`, which is what gives sibling and
+/// cross-depth widgets distinct ids (the same pattern dvui's own recursive
+/// `submenus()` example relies on).
+fn drawMenuNode(node: *const editor.menu_tree.Node, fw: *gui.FloatingMenuWidget, entries: []const CreateEntry, browse_path: []const u8) void {
+    for (node.children.items, 0..) |*child, i| {
+        if (child.children.items.len > 0) {
+            // Trailing "▸" (issue: submenus need a visual has-children signal,
+            // same glyph `UiDocumentEditor`'s "Add Control ▸" already uses for
+            // "this opens another menu").
+            var cat_label_buf: [160]u8 = undefined;
+            const cat_label = std.fmt.bufPrint(&cat_label_buf, "{s} \u{25b8}", .{child.name}) catch child.name;
+            if (gui.menuItemLabel(@src(), cat_label, .{ .submenu = true }, .{ .expand = .horizontal, .id_extra = i })) |r| {
+                var sub_fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
+                defer sub_fw.deinit();
+                drawMenuNode(child, sub_fw, entries, browse_path);
+            }
+        } else if (child.leaf) |leaf_idx| {
+            var label_buf: [160]u8 = undefined;
+            const label = std.fmt.bufPrint(&label_buf, "{s}", .{child.name}) catch child.name;
+            if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
+                fw.close();
+                runCreateAction(entries[leaf_idx].action, browse_path);
+            }
         }
+    }
+}
+
+/// "Create" cascaded menu item (issues #85/#72), scoped to create inside
+/// `browse_path`. Shared by the grid's empty-area menu, the folder tree's
+/// per-folder menu, and the full tree's per-folder menu. `id_base` keeps
+/// `id_extra` from colliding when a caller draws more than one of these in
+/// the same menu. Closing the enclosing context menu on pick is handled by
+/// `MenuWidget.close_chain` (any nested `floatingMenu.close()` walks up to
+/// and closes the whole chain), so this doesn't need the caller's `fw`.
+pub fn drawCreateAssetMenuItems(browse_path: []const u8, id_base: usize) void {
+    const alloc = gui.currentWindow().arena();
+    const entries = collectCreateEntries(alloc);
+
+    var paths = alloc.alloc([]const u8, entries.len) catch return;
+    for (entries, 0..) |e, i| paths[i] = e.menu_path;
+
+    var root = editor.menu_tree.build(alloc, paths) catch return;
+    defer root.deinit(alloc);
+
+    if (gui.menuItemLabel(@src(), "Create \u{25b8}", .{ .submenu = true }, .{ .expand = .horizontal, .id_extra = id_base })) |r| {
+        var sub_fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer sub_fw.deinit();
+        drawMenuNode(&root, sub_fw, entries, browse_path);
     }
 }
 

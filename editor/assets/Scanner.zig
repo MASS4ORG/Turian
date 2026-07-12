@@ -17,6 +17,9 @@ const log = std.log.scoped(.scanner);
 pub const COMPONENT_MARKER = "is_component";
 /// Marks a struct as a discoverable data asset.
 pub const DATA_ASSET_MARKER = "is_data_asset";
+/// Declares a custom cascaded Create-menu path for the type (issues
+/// #85/#72), e.g. `pub const menu_path = "Gameplay/Enemy Stats";`.
+pub const MENU_PATH_MARKER = "menu_path";
 
 /// Fills result[] with builtin component defs from the engine's static list.
 pub fn populateBuiltins(result: []ComponentDef, result_count: *usize) void {
@@ -156,6 +159,10 @@ fn scanSource(
         def.* = .{ .is_builtin = false, .kind = if (is_da) .data_asset else .component };
         def.setTypeName(type_name);
         def.setSourceFile(file_path);
+        if (stringMarkerValue(allocator, &ast, container, MENU_PATH_MARKER)) |menu_path| {
+            defer allocator.free(menu_path);
+            def.setMenuPath(menu_path);
+        }
         result_count.* += 1;
     }
 }
@@ -173,6 +180,23 @@ fn markerValue(ast: *const std.zig.Ast, container: std.zig.Ast.full.ContainerDec
         return !std.mem.eql(u8, value, "false");
     }
     return false;
+}
+
+/// Returns the unescaped string value of `marker_name`'s string-literal
+/// initializer, or null if the struct has no such member (or it isn't a
+/// plain string literal). Caller owns the returned memory.
+fn stringMarkerValue(allocator: std.mem.Allocator, ast: *const std.zig.Ast, container: std.zig.Ast.full.ContainerDecl, marker_name: []const u8) ?[]u8 {
+    for (container.ast.members) |member| {
+        const member_decl = ast.fullVarDecl(member) orelse continue;
+        const name = ast.tokenSlice(member_decl.ast.mut_token + 1);
+        if (!std.mem.eql(u8, name, marker_name)) continue;
+
+        const value_node = member_decl.ast.init_node.unwrap() orelse return null;
+        if (ast.nodeTag(value_node) != .string_literal) return null;
+        const raw = ast.tokenSlice(ast.nodeMainToken(value_node));
+        return std.zig.string_literal.parseAlloc(allocator, raw) catch null;
+    }
+    return null;
 }
 
 /// Finds an already-discovered component with the same type name, if any.
@@ -237,6 +261,39 @@ test "scanSource discovers data asset marker" {
     try std.testing.expectEqual(@as(usize, 1), count);
     try std.testing.expectEqualStrings("EnemyStats", result[0].typeName());
     try std.testing.expectEqual(DefKind.data_asset, result[0].kind);
+}
+
+test "scanSource discovers a custom menu_path" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const EnemyStats = struct {
+        \\    pub const is_data_asset = true;
+        \\    pub const menu_path = "Gameplay/Enemy Stats";
+        \\    max_health: f32 = 100,
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/EnemyStats.zig", &result, &count);
+
+    try std.testing.expectEqual(@as(usize, 1), count);
+    try std.testing.expectEqualStrings("Gameplay/Enemy Stats", result[0].menuPath());
+}
+
+test "scanSource leaves menu_path empty when not declared" {
+    const a = std.testing.allocator;
+    const src =
+        \\pub const EnemyStats = struct {
+        \\    pub const is_data_asset = true;
+        \\    max_health: f32 = 100,
+        \\};
+    ;
+    var result: [MAX_COMPONENTS]ComponentDef = undefined;
+    var count: usize = 0;
+    scanSource(a, src, "assets/EnemyStats.zig", &result, &count);
+
+    try std.testing.expectEqual(@as(usize, 1), count);
+    try std.testing.expectEqualStrings("", result[0].menuPath());
 }
 
 test "scanSource respects is_data_asset = false opt-out" {

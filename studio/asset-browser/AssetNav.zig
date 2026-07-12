@@ -71,6 +71,49 @@ pub fn revealTo(assets_path: []const u8, full_path: []const u8) void {
     setCurrentSubdir(sub);
 }
 
+/// Draw the current folder as clickable breadcrumb segments (issues #68/#81):
+/// "assets" (root) followed by one button per path component, each jumping
+/// straight to that ancestor folder. Replaces the old static path label.
+pub fn drawBreadcrumb() void {
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .gravity_y = 0.5 });
+    defer row.deinit();
+
+    if (gui.button(@src(), "assets", .{}, .{
+        .gravity_y = 0.5,
+        .padding = .{ .x = 4, .y = 2 },
+        .margin = .{ .x = 4 },
+        .style = if (current_subdir_len == 0) .highlight else .content,
+    })) {
+        setCurrentSubdir("");
+    }
+
+    const sub = currentSubdir();
+    var start: usize = 0;
+    var seg: usize = 0;
+    while (start < sub.len) : (seg += 1) {
+        const end = if (std.mem.indexOfScalarPos(u8, sub, start, '/')) |sep| sep else sub.len;
+
+        gui.label(@src(), "/", .{}, .{ .gravity_y = 0.5, .id_extra = seg });
+
+        // `sub[start..end]` is a slice into `current_subdir_buf` itself, so
+        // navigating here only needs to truncate the length (like `goUp`) —
+        // the bytes up to `end` are already the correct prefix. Avoids
+        // `setCurrentSubdir` aliasing its own buffer as src and dest.
+        if (gui.button(@src(), sub[start..end], .{}, .{
+            .gravity_y = 0.5,
+            .padding = .{ .x = 4, .y = 2 },
+            .margin = .{ .x = 4 },
+            .id_extra = seg,
+            .style = if (end == sub.len) .highlight else .content,
+        })) {
+            current_subdir_len = end;
+            last_click_name_len = 0;
+        }
+
+        start = end + 1;
+    }
+}
+
 /// `browse_path/name`, written into `buf`.
 pub fn fullPathFor(name: []const u8, browse_path: []const u8, buf: []u8) []const u8 {
     return std.fmt.bufPrint(buf, "{s}/{s}", .{ browse_path, name }) catch "";

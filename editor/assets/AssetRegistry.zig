@@ -47,12 +47,16 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .extensions = &.{ ".prefab", ".json" },
             .open_mode = .internal_editor,
             .icon_hint = .document,
+            .create_menu_path = "Prefab",
         },
         .material => .{
             .name = "Material",
             .extensions = &.{".material"},
             .open_mode = .internal_editor,
             .icon_hint = .material,
+            // Leaf-less: the asset browser appends "/<preset name>" per
+            // built-in `engine.Material.presets` entry.
+            .create_menu_path = "Material",
         },
         .data_asset => .{
             .name = "Data Asset",
@@ -65,18 +69,21 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .extensions = &.{".inputactions"},
             .open_mode = .internal_editor,
             .icon_hint = .data,
+            .create_menu_path = "Settings/Input Actions",
         },
         .project_settings => .{
             .name = "Project Settings",
             .extensions = &.{".projectsettings"},
             .open_mode = .internal_editor,
             .icon_hint = .data,
+            .create_menu_path = "Settings/Project Settings",
         },
         .ui_document => .{
             .name = "UI Document",
             .extensions = &.{".uidoc"},
             .open_mode = .internal_editor,
             .icon_hint = .document,
+            .create_menu_path = "UI/Document",
         },
         .font => .{
             .name = "Font",
