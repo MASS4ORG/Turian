@@ -119,6 +119,74 @@ pub fn fullPathFor(name: []const u8, browse_path: []const u8, buf: []u8) []const
     return std.fmt.bufPrint(buf, "{s}/{s}", .{ browse_path, name }) catch "";
 }
 
+// ── Arrow-key entry navigation (grid tiles) ─────────────────────────────────
+//
+// `AssetGridView.draw` records its folder listing here each frame (in display
+// order) so `navigateBrowserItems` — driven by `AssetBrowser.zig`'s arrow-key
+// handler — can move the selection to the previous/next entry. Used the NEXT
+// frame so the keyboard handler can reference the previous listing.
+
+const NAV_MAX = 256;
+var nav_names: [NAV_MAX][256]u8 = undefined;
+var nav_name_lens: [NAV_MAX]usize = [_]usize{0} ** NAV_MAX;
+var nav_count: usize = 0;
+var new_nav_count: usize = 0;
+
+/// Start collecting this frame's entry listing. Call once before iterating
+/// the folder's entries.
+pub fn beginNavList() void {
+    new_nav_count = 0;
+}
+
+/// Record one entry, in listing order, for the next frame's arrow-key handler.
+pub fn recordNavEntry(name: []const u8) void {
+    if (new_nav_count >= NAV_MAX) return;
+    const n = @min(name.len, nav_names[new_nav_count].len);
+    @memcpy(nav_names[new_nav_count][0..n], name[0..n]);
+    nav_name_lens[new_nav_count] = n;
+    new_nav_count += 1;
+}
+
+/// Commit this frame's listing (collected via `recordNavEntry`) so the next
+/// frame's arrow-key handler sees it.
+pub fn commitNavList() void {
+    nav_count = new_nav_count;
+}
+
+/// Move the asset selection to the previous/next entry in the current
+/// folder's alphabetical listing — driven by the panel's arrow-key handler.
+pub fn navigateBrowserItems(go_prev: bool, browse_path: []const u8) void {
+    if (nav_count == 0) return;
+    const sel = EditorState.selected_asset_path;
+
+    var cur: ?usize = null;
+    if (sel) |s| {
+        for (0..nav_count) |i| {
+            var p_buf: [1024]u8 = undefined;
+            const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, nav_names[i][0..nav_name_lens[i]] }) catch continue;
+            if (std.mem.eql(u8, p, s)) {
+                cur = i;
+                break;
+            }
+        }
+    }
+
+    const new_idx: usize = blk: {
+        if (cur) |ci| {
+            if (go_prev) {
+                break :blk if (ci > 0) ci - 1 else 0;
+            } else {
+                break :blk if (ci + 1 < nav_count) ci + 1 else nav_count - 1;
+            }
+        }
+        break :blk 0;
+    };
+
+    var p_buf: [1024]u8 = undefined;
+    const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, nav_names[new_idx][0..nav_name_lens[new_idx]] }) catch return;
+    EditorState.selectAsset(p);
+}
+
 // ── Delete confirmation dialog ───────────────────────────────────────────────
 //
 // Shared by the grid tiles' Delete menu item and both asset trees' Delete

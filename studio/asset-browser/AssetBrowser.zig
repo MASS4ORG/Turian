@@ -15,6 +15,7 @@ const EditorState = @import("../services/EditorState.zig");
 const AssetNav = @import("AssetNav.zig");
 const AssetGridView = @import("AssetGridView.zig");
 const AssetTreeView = @import("AssetTreeView.zig");
+const AssetTileLayout = @import("AssetTileLayout.zig");
 
 /// How the browser lays out folder navigation (issues #79/#80/#83): the
 /// original tile grid, the grid with an added folder-only tree sidebar for
@@ -108,7 +109,9 @@ pub fn draw() void {
         // redundant and clutters the header. File changes are picked up by
         // the file watcher, so there is no Refresh button. The breadcrumb row
         // expands horizontally, making it the flexible spacer that pushes the
-        // tile-size slider (below) to the header's right edge.
+        // tile-size slider (below) to the header's right edge. Name-length
+        // cap and hide-extensions live in the Studio Settings editor instead
+        // (issue #84/#88) — less of a real-time control than zoom.
         if (EditorState.project_path != null) {
             AssetNav.drawBreadcrumb();
         }
@@ -117,9 +120,9 @@ pub fn draw() void {
         // Meaningless without tiles on screen, so hidden in tree-only mode.
         if (g_nav_mode != .tree_only) {
             _ = gui.sliderEntry(@src(), "{d:0.0}", .{
-                .value = &AssetGridView.tile_content,
-                .min = AssetGridView.TILE_CONTENT_MIN,
-                .max = AssetGridView.TILE_CONTENT_MAX,
+                .value = &AssetTileLayout.tile_content,
+                .min = AssetTileLayout.TILE_CONTENT_MIN,
+                .max = AssetTileLayout.TILE_CONTENT_MAX,
                 .interval = 1,
                 .label = "Size",
             }, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
@@ -178,7 +181,7 @@ pub fn draw() void {
 
             if (ke.code == .up or ke.code == .down or ke.code == .left or ke.code == .right) {
                 e.handle(@src(), outer.data());
-                AssetGridView.navigateBrowserItems(ke.code == .up or ke.code == .left, browse_path);
+                AssetNav.navigateBrowserItems(ke.code == .up or ke.code == .left, browse_path);
                 continue;
             }
 

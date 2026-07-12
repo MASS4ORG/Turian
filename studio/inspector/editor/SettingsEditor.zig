@@ -20,6 +20,7 @@ const PropDraw = @import("../PropDraw.zig");
 const AssetActions = @import("../../asset-browser/AssetActions.zig");
 const EditorCamera = @import("../../scene-view/EditorCamera.zig");
 const MenuBar = @import("../../main-window/MenuBar.zig");
+const AssetTileLayout = @import("../../asset-browser/AssetTileLayout.zig");
 
 var model: editor.StudioSettings = .{};
 /// Baseline for the per-field dirty marker (`*`) and revert button: the
@@ -55,8 +56,10 @@ pub fn load() void {
 /// Persist the in-memory model, push the live globals it mirrors — camera
 /// speeds (the same `EditorCamera.move_speed`/`look_sensitivity`/`zoom_speed`
 /// `pub var`s `SceneViewport.zig`'s own "Camera ▾" quick menu edits directly)
-/// and the editor-FPS overlay toggle (`MenuBar.show_editor_fps`) — and clear
-/// the dirty flag. Called by the footer's Save button and by `Documents`'s
+/// the editor-FPS overlay toggle (`MenuBar.show_editor_fps`), and the asset
+/// browser's name-truncation length + hide-extensions toggle
+/// (`AssetTileLayout.max_name_chars`/`hide_extensions`) — and clear the dirty
+/// flag. Called by the footer's Save button and by `Documents`'s
 /// unsaved-changes close confirmation.
 pub fn save() void {
     if (!EditorState.settingsReady()) return;
@@ -66,6 +69,8 @@ pub fn save() void {
     EditorCamera.look_sensitivity = model.camera.look_sensitivity;
     EditorCamera.zoom_speed = model.camera.zoom_speed;
     MenuBar.show_editor_fps = model.general.show_editor_fps;
+    AssetTileLayout.max_name_chars = model.asset_browser.name_char_length;
+    AssetTileLayout.hide_extensions = model.asset_browser.hide_extensions;
     saved = model;
     dirty = false;
     Documents.setActiveDirty(false);

@@ -21,6 +21,7 @@ pub const CategoryMeta = struct {
 pub const categories = [_]CategoryMeta{
     .{ .field = "general", .title = "General", .description = "Editor-wide display and UI behavior." },
     .{ .field = "camera", .title = "Editor Camera", .description = "Free-look viewport camera movement and feel." },
+    .{ .field = "asset_browser", .title = "Asset Browser", .description = "Grid tile filename display." },
 };
 
 pub const General = struct {
@@ -49,20 +50,38 @@ pub const Camera = struct {
     };
 };
 
+pub const AssetBrowser = struct {
+    /// Max characters of a filename shown in a tile label before truncating
+    /// with an ellipsis (issue #84) — independent of the tile zoom slider
+    /// (`studio/asset-browser/AssetBrowser.zig`'s header "Size" slider, which
+    /// only affects icon/tile pixel size, not how much of the name shows).
+    name_char_length: i64 = 12,
+    /// Hide file extensions in tile labels, e.g. show "MyTexture" instead of
+    /// "MyTexture.png".
+    hide_extensions: bool = true,
+
+    pub const turian_hints = struct {
+        pub const name_char_length = FieldHint{ .min = 4, .max = 40, .widget = .slider_entry, .label = "Name Length", .tooltip = "Max characters of a filename shown in a tile before truncating with an ellipsis." };
+    };
+};
+
 pub const StudioSettings = struct {
     general: General = .{},
     camera: Camera = .{},
+    asset_browser: AssetBrowser = .{},
 
     // Key strings match the pre-existing keys each panel already reads/writes
     // directly (`MenuBar.zig`'s `FPS_SETTING_KEY`, `Documents.zig`'s
-    // `TITLE_MAX_KEY`, `SceneViewport.zig`'s `CAM_*_KEY`) so this editor
-    // becomes another reader/writer of the same values rather than a
-    // competing copy.
+    // `TITLE_MAX_KEY`, `SceneViewport.zig`'s `CAM_*_KEY`,
+    // `AssetGridView.zig`'s `HIDE_EXT_SETTING_KEY`) so this editor becomes
+    // another reader/writer of the same values rather than a competing copy.
     const KEY_SHOW_FPS = "editor.show_fps";
     const KEY_TAB_TITLE_MAX = "editor.tab_title_max";
     const KEY_CAM_MOVE_SPEED = "editor.camera.move_speed";
     const KEY_CAM_LOOK_SENSITIVITY = "editor.camera.look_sensitivity";
     const KEY_CAM_ZOOM_SPEED = "editor.camera.zoom_speed";
+    const KEY_NAME_CHAR_LENGTH = "asset_browser.name_char_length";
+    const KEY_HIDE_EXTENSIONS = "asset_browser.hide_extensions";
 
     /// Populate from the on-disk/in-memory KV store, falling back to each
     /// field's default when the key is missing or malformed.
@@ -73,6 +92,8 @@ pub const StudioSettings = struct {
         self.camera.move_speed = @floatCast(s.getFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed));
         self.camera.look_sensitivity = @floatCast(s.getFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity));
         self.camera.zoom_speed = @floatCast(s.getFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed));
+        self.asset_browser.name_char_length = s.getInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
+        self.asset_browser.hide_extensions = s.getBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
         return self;
     }
 
@@ -84,5 +105,7 @@ pub const StudioSettings = struct {
         try s.setFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed);
         try s.setFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity);
         try s.setFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed);
+        try s.setInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
+        try s.setBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
     }
 };

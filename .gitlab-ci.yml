@@ -25,11 +25,18 @@
 # actually changes.
 #
 # Requirements:
-#   1. CI_PUSH_TOKEN (Project Variable): Scopes 'write_repository' + 'api'.
-#   2. Protected Tags (Settings -> Repository -> Protected Tags):
-#      - Pattern 'v*.*.*'
-#      - Pattern 'v*.*.*-*' (for pre-releases like -rc1)
-#      - Allowed to push: Maintainers (or CI account)
+#   1. Push credentials for `check_release` — pick one:
+#      a. CI_JOB_TOKEN (default, no setup): auto-issued per job, never needs
+#         rotation. Acts as the pipeline-schedule owner, so that user must be
+#         a Maintainer with push rights on branch `main` and tag `v*.*.*`
+#         (see #2 below). This is what runs unless CI_PUSH_TOKEN is set.
+#      b. CI_PUSH_TOKEN (Project Variable): project access token, scopes
+#         'write_repository' + 'api'. GitLab.com requires an expiry on all
+#         tokens (no "never expires" option) — max ~365 days — so this needs
+#         periodic rotation. Prefer (a) unless something needs a real PAT.
+#   2. Protected Branches/Tags (Settings -> Repository):
+#      - Branch 'main': Allowed to push = Maintainers (or the schedule owner)
+#      - Tag pattern 'v*.*.*' and 'v*.*.*-*' (pre-releases): same
 #   3. Container Registry enabled for this project (Settings -> General ->
 #      Visibility -> Container Registry), for the CI image above.
 
@@ -165,14 +172,22 @@ check_release:
     - if: "$CHECK_RELEASE"
   script:
     - |
-      if [ -z "$CI_PUSH_TOKEN" ]; then
-        echo "ERROR: CI_PUSH_TOKEN is not set. Go to Settings -> CI/CD -> Variables and add it."
-        echo "It needs 'write_repository' and 'api' scopes."
-        exit 1
-      fi
       git config user.email "ci@turian.engine"
       git config user.name "Turian CI"
-      git remote set-url origin "https://project_access_token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      if [ -n "$CI_PUSH_TOKEN" ]; then
+        git remote set-url origin "https://project_access_token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      else
+        # Falls back to the job's own (auto-rotated, never-expiring-to-maintain) token.
+        # Requires the pipeline-schedule owner to have push rights on protected
+        # branch `main` and protected tag pattern `v*.*.*`.
+        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+      fi
+    # 0. This runner reuses a persistent checkout across jobs (GIT_STRATEGY=fetch),
+    #    so a tag created locally by a previous run that then failed before its
+    #    `git push` (e.g. expired token) lingers forever — `git fetch` never
+    #    deletes local-only tags on its own. Prune to match the remote exactly
+    #    before computing/creating anything, so this job is safe to retry.
+    - git fetch origin --tags --prune --prune-tags
     # 1. Collect commits since last tag
     - |
       LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -196,6 +211,9 @@ check_release:
       echo "Releasing v${NEW_VERSION}"
       git add build.zig.zon CHANGELOG.md
       git commit -m "chore(release): v${NEW_VERSION}"
+      # Defense-in-depth on top of the prune above: drop any same-named local
+      # tag left by an interrupted prior run before (re-)creating it.
+      git tag -d "v${NEW_VERSION}" 2>/dev/null || true
       git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
       git push origin HEAD:${CI_COMMIT_REF_NAME} --tags
 

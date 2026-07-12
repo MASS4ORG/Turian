@@ -17,6 +17,7 @@ const PreviewSystem = @import("preview/PreviewSystem.zig");
 const AssetTree = @import("AssetTree.zig");
 const AssetNav = @import("AssetNav.zig");
 const AssetContextMenus = @import("AssetContextMenus.zig");
+const AssetTileLayout = @import("AssetTileLayout.zig");
 const tree_view = @import("../TreeView.zig");
 
 /// Navigate the grid to folder node `node_idx` — strips `AssetTree`'s
@@ -78,8 +79,13 @@ fn Model(comptime files_included: bool) type {
         pub fn parentOf(i: usize) i32 {
             return if (files_included) AssetTree.parentOf(i) else AssetTree.folderParentOf(i);
         }
+        /// Respects the Settings-panel `hide_extensions` toggle (issue #84
+        /// follow-up), same as the grid tiles. `max_name_chars` doesn't apply
+        /// here — tree rows aren't fixed-size tiles, so there's nothing to
+        /// protect from overflow by truncating.
         pub fn name(i: usize) []const u8 {
-            return AssetTree.name(node(i));
+            const idx = node(i);
+            return AssetTileLayout.stripExtensionIfHidden(AssetTree.name(idx), AssetTree.isDir(idx));
         }
         pub fn isSelected(i: usize) bool {
             return isPrimary(i);

@@ -2,7 +2,10 @@
 //! view (issue #25's preview tiles, compound-model expansion, drag/drop),
 //! shared by `.grid` mode (fills the whole panel) and `.grid_tree` mode (the
 //! right pane of the Grid+Tree split). See `AssetBrowser.zig` for the
-//! panel-level orchestration that picks which view(s) to draw.
+//! panel-level orchestration that picks which view(s) to draw. Tile sizing
+//! and label truncation live in `AssetTileLayout.zig`; compound-model
+//! sub-asset tiles live in `AssetSubAssetTiles.zig` — both split out to keep
+//! this file under the project's long-file budget.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -12,213 +15,11 @@ const AssetActions = @import("AssetActions.zig");
 const PreviewSystem = @import("preview/PreviewSystem.zig");
 const AssetNav = @import("AssetNav.zig");
 const AssetContextMenus = @import("AssetContextMenus.zig");
-
-/// Tile content size (icon or preview thumbnail), adjustable via the header's
-/// slider (issue #25's "preview size can be adjusted"). Not persisted —
-/// resets each session, matching most other per-panel view toggles here.
-pub var tile_content: f32 = 32;
-pub const TILE_CONTENT_MIN: f32 = 20;
-pub const TILE_CONTENT_MAX: f32 = 128;
-
-fn tileBoxSize() f32 {
-    return tile_content + 40;
-}
-
-/// Small round chevron toggle drawn at a model tile's right edge, shown only
-/// when the model actually produced sub-assets on import. Toggles whether its
-/// sub-asset group box is revealed to the right.
-fn drawExpandToggle(asset_path: []const u8, id_extra: usize) void {
-    const count = AssetContextMenus.cachedSubAssetCount(asset_path) orelse blk: {
-        var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        defer meta_arena.deinit();
-        const meta = editor.asset_meta.readMeta(gui.io, meta_arena.allocator(), asset_path);
-        AssetContextMenus.setSubAssetCount(asset_path, meta.sub_assets.len);
-        break :blk meta.sub_assets.len;
-    };
-    if (count == 0) return;
-
-    const expanded = isExpanded(asset_path);
-    // Small round toggle sitting at the model tile's right edge, vertically
-    // centered — a chevron that points right (toward where the sub-assets
-    // appear) when collapsed, left (collapse) when expanded.
-    if (gui.buttonIcon(
-        @src(),
-        "expand_toggle",
-        if (expanded) gui.entypo.circle_with_minus else gui.entypo.circle_with_plus,
-        .{},
-        .{},
-        .{
-            .gravity_x = 0.5,
-            .gravity_y = 0.5,
-            .min_size_content = .{ .w = 16, .h = 16 },
-            .padding = .all(4),
-            .margin = .all(2),
-            .corners = gui.CornerRect.all(999),
-            .id_extra = id_extra,
-        },
-    )) {
-        toggleExpanded(asset_path);
-    }
-}
-
-/// Draw an expanded model's generated sub-assets (materials/textures) as tiles
-/// flowing inline in the *main* grid flexbox, right after the model's own tile
-/// (Unity-style), rather than a separate boxed block that would break the grid
-/// flow. They are ordinary tiles — same size, same wrapping — just drawn on a
-/// distinct background (see `drawSubAssetTile`) so the run of them reads as a
-/// group belonging to the model, continuing onto the next line when it wraps
-/// (issue #19/#25). Called from the main tile loop after the model tile closes.
-fn drawInlineSubAssets(proj_path: []const u8, model_path: []const u8, entry_idx: usize) void {
-    var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer meta_arena.deinit();
-    const meta = editor.asset_meta.readMeta(gui.io, meta_arena.allocator(), model_path);
-
-    for (meta.sub_assets, 0..) |sub, si| {
-        // id_extra kept clear of the main tiles' `entry_idx` range and the
-        // up-tile (99999) so sub-asset tile ids never collide with them.
-        drawSubAssetTile(proj_path, sub, 2_000_000 + entry_idx * 100 + si);
-    }
-}
-
-/// A single generated sub-asset (material/texture/… from a model's import) as
-/// a tile: previewed via `PreviewSystem.imageSourceForGuid`, click selects it
-/// in the Inspector — the same navigation `Inspector.drawSubAssets`'s button
-/// list already offers, just with a thumbnail and inline in the browser.
-fn drawSubAssetTile(proj_path: []const u8, sub: editor.SubAsset, id_extra: usize) void {
-    var path_buf: [1024]u8 = undefined;
-    const cache_path = editor.asset_cache.artifactPath(proj_path, sub.guid, sub.asset_type, &path_buf) orelse return;
-
-    var guid_buf: [36]u8 = undefined;
-    const guid_str = sub.guid.toString(&guid_buf);
-
-    const is_selected = if (EditorState.selected_asset_path) |sel| std.mem.eql(u8, sel, cache_path) else false;
-
-    // Same footprint as a regular tile so it flows/wraps identically in the
-    // grid, but drawn on the `.window` fill (vs regular tiles' `.content`) and
-    // butted together horizontally (zero x-margin) so a run of sub-assets reads
-    // as one continuous background band that carries onto the next line when it
-    // wraps — the inline-"span" grouping, not a separate block.
-    var tile = gui.box(@src(), .{}, .{
-        .id_extra = id_extra,
-        .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
-        .background = true,
-        .style = if (is_selected) .highlight else .window,
-        .border = .all(if (is_selected) 2 else 0),
-        .corners = .all(0),
-        .margin = .{ .x = 0, .y = 2, .w = 0, .h = 2 },
-        .padding = .all(4),
-        .gravity_x = 0.5,
-    });
-    defer tile.deinit();
-
-    for (gui.events()) |*e| {
-        if (!gui.eventMatchSimple(e, tile.data())) continue;
-        if (e.evt == .mouse) {
-            const me = e.evt.mouse;
-            if (me.action == .press and me.button == .left) {
-                e.handle(@src(), tile.data());
-                EditorState.selectAsset(cache_path);
-            }
-        }
-    }
-
-    const desc = editor.asset_registry.get(sub.asset_type);
-    if (PreviewSystem.imageSourceForGuid(guid_str, cache_path, sub.asset_type)) |source| {
-        _ = gui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
-            .gravity_x = 0.5,
-            .min_size_content = .{ .w = tile_content, .h = tile_content },
-            .id_extra = id_extra,
-        });
-    } else {
-        gui.icon(@src(), "sub_tile_icon", AssetContextMenus.iconForHint(desc.icon_hint), .{}, .{
-            .gravity_x = 0.5,
-            .min_size_content = .{ .w = tile_content, .h = tile_content },
-            .id_extra = id_extra,
-        });
-    }
-
-    gui.label(@src(), "{s}", .{sub.name}, .{
-        .gravity_x = 0.5,
-        .min_size_content = .{ .w = 64 },
-        .id_extra = id_extra,
-    });
-}
+const AssetTileLayout = @import("AssetTileLayout.zig");
+const AssetSubAssetTiles = @import("AssetSubAssetTiles.zig");
 
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var drag_hover_idx: ?usize = null;
-
-// Expand/collapse state for model tiles with sub-assets (issue #19/#25:
-// "expand a compound asset into its generated materials/textures", Unity-
-// style, instead of cramming them all into one Inspector preview). Keyed by
-// full asset path; not persisted (resets each session).
-const MAX_EXPANDED = 64;
-var expanded_paths: [MAX_EXPANDED][1024]u8 = undefined;
-var expanded_lens: [MAX_EXPANDED]usize = [_]usize{0} ** MAX_EXPANDED;
-var expanded_count: usize = 0;
-
-fn isExpanded(path: []const u8) bool {
-    for (0..expanded_count) |i| {
-        if (std.mem.eql(u8, expanded_paths[i][0..expanded_lens[i]], path)) return true;
-    }
-    return false;
-}
-
-fn toggleExpanded(path: []const u8) void {
-    for (0..expanded_count) |i| {
-        if (std.mem.eql(u8, expanded_paths[i][0..expanded_lens[i]], path)) {
-            expanded_paths[i] = expanded_paths[expanded_count - 1];
-            expanded_lens[i] = expanded_lens[expanded_count - 1];
-            expanded_count -= 1;
-            return;
-        }
-    }
-    if (expanded_count >= MAX_EXPANDED) return;
-    const n = @min(path.len, expanded_paths[expanded_count].len);
-    @memcpy(expanded_paths[expanded_count][0..n], path[0..n]);
-    expanded_lens[expanded_count] = n;
-    expanded_count += 1;
-}
-
-// Navigation list: entry names collected each frame for arrow-key navigation.
-// Used the NEXT frame so the keyboard handler can reference the previous listing.
-const NAV_MAX = 256;
-var nav_names: [NAV_MAX][256]u8 = undefined;
-var nav_name_lens: [NAV_MAX]usize = [_]usize{0} ** NAV_MAX;
-var nav_count: usize = 0;
-
-/// Move the asset selection to the previous/next entry in the current
-/// folder's alphabetical listing — driven by the panel's arrow-key handler.
-pub fn navigateBrowserItems(go_prev: bool, browse_path: []const u8) void {
-    if (nav_count == 0) return;
-    const sel = EditorState.selected_asset_path;
-
-    var cur: ?usize = null;
-    if (sel) |s| {
-        for (0..nav_count) |i| {
-            var p_buf: [1024]u8 = undefined;
-            const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, nav_names[i][0..nav_name_lens[i]] }) catch continue;
-            if (std.mem.eql(u8, p, s)) {
-                cur = i;
-                break;
-            }
-        }
-    }
-
-    const new_idx: usize = blk: {
-        if (cur) |ci| {
-            if (go_prev) {
-                break :blk if (ci > 0) ci - 1 else 0;
-            } else {
-                break :blk if (ci + 1 < nav_count) ci + 1 else nav_count - 1;
-            }
-        }
-        break :blk 0;
-    };
-
-    var p_buf: [1024]u8 = undefined;
-    const p = std.fmt.bufPrint(&p_buf, "{s}/{s}", .{ browse_path, nav_names[new_idx][0..nav_name_lens[new_idx]] }) catch return;
-    EditorState.selectAsset(p);
-}
 
 // Directory listing, collected and sorted each frame (folders first, then files,
 // each alphabetical) before tiles are rendered.
@@ -267,6 +68,8 @@ fn drawPackagesSection(proj_path: []const u8) void {
 /// panel) and `.grid_tree` (right pane of the split, `show_up_button` false
 /// since the folder-tree sidebar makes `..` redundant).
 pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.WidgetData, show_up_button: bool) void {
+    AssetTileLayout.syncFromSettings();
+
     var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
@@ -283,20 +86,22 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
 
     // Not `defer`red: closed explicitly right after the loop below. Expanded
     // models' sub-asset tiles are drawn inline in this same flexbox (see
-    // `drawInlineSubAssets`), so they must flow before it is deinit'd.
+    // `AssetSubAssetTiles.drawInlineSubAssets`), so they must flow before it
+    // is deinit'd.
     var flex = gui.flexbox(@src(), .{}, .{ .expand = .horizontal, .padding = .all(4) });
 
     drag_hover_idx = null;
 
     // Reset nav list; will be rebuilt during tile rendering for next frame's keyboard handler
-    var new_nav_count: usize = 0;
+    AssetNav.beginNavList();
 
     var entry_idx: usize = 0;
     if (show_up_button and AssetNav.current_subdir_len > 0) {
         const up_hovered = EditorState.drag_kind == .asset and drag_hover_idx == 99999;
         var tile = gui.box(@src(), .{}, .{
             .id_extra = 99999,
-            .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
+            .min_size_content = .{ .w = AssetTileLayout.tileWidth(), .h = AssetTileLayout.tileHeight() },
+            .max_size_content = .{ .w = AssetTileLayout.tileWidth(), .h = AssetTileLayout.tileHeight() },
             .background = true,
             .style = if (up_hovered) .highlight else .content,
             .border = .all(if (up_hovered) 2 else 1),
@@ -376,12 +181,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         const is_dir = entry.is_dir;
 
         // Collect into nav list for next frame's keyboard handler
-        if (new_nav_count < NAV_MAX) {
-            const n = @min(entry.name.len, nav_names[new_nav_count].len);
-            @memcpy(nav_names[new_nav_count][0..n], entry.name[0..n]);
-            nav_name_lens[new_nav_count] = n;
-            new_nav_count += 1;
-        }
+        AssetNav.recordNavEntry(entry.name);
         var full_path_buf: [1024]u8 = undefined;
         const asset_type: editor.AssetType = if (is_dir) .unknown else blk: {
             const full_path = std.fmt.bufPrint(&full_path_buf, "{s}/{s}", .{ browse_path, entry.name }) catch "";
@@ -402,7 +202,8 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         const is_drag_target = is_dir and EditorState.drag_kind == .asset and drag_hover_idx == entry_idx;
         var tile = gui.box(@src(), .{}, .{
             .id_extra = entry_idx,
-            .min_size_content = .{ .w = tileBoxSize(), .h = tileBoxSize() },
+            .min_size_content = .{ .w = AssetTileLayout.tileWidth(), .h = AssetTileLayout.tileHeight() },
+            .max_size_content = .{ .w = AssetTileLayout.tileWidth(), .h = AssetTileLayout.tileHeight() },
             .background = true,
             .style = if (is_selected or is_drag_target) .highlight else .content,
             .border = .all(if (is_selected or is_drag_target) 2 else 1),
@@ -413,8 +214,9 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         });
         // Closed explicitly at the end of the iteration (not `defer`red) so an
         // expanded model's sub-asset tiles can flow *after* this tile inside the
-        // same grid flexbox — see the `drawInlineSubAssets` call below. The
-        // outer entry loop has no `continue`/`return` that would skip it.
+        // same grid flexbox — see the `AssetSubAssetTiles.drawInlineSubAssets`
+        // call below. The outer entry loop has no `continue`/`return` that
+        // would skip it.
 
         // Context menu for all tiles (including dirs)
         {
@@ -508,13 +310,13 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         if (preview_source) |source| {
             _ = gui.image(@src(), .{ .source = source, .shrink = .ratio }, .{
                 .gravity_x = 0.5,
-                .min_size_content = .{ .w = tile_content, .h = tile_content },
+                .min_size_content = .{ .w = AssetTileLayout.tile_content, .h = AssetTileLayout.tile_content },
                 .id_extra = entry_idx,
             });
         } else {
             gui.icon(@src(), "tile_icon", icon_bytes, .{}, .{
                 .gravity_x = 0.5,
-                .min_size_content = .{ .w = tile_content, .h = tile_content },
+                .min_size_content = .{ .w = AssetTileLayout.tile_content, .h = AssetTileLayout.tile_content },
                 .id_extra = entry_idx,
             });
         }
@@ -546,11 +348,15 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
             // Escape is handled by the main keyboard handler
             // (Escape during rename cancels it)
         } else {
-            gui.label(@src(), "{s}", .{entry.name}, .{
+            var name_buf: [300]u8 = undefined;
+            const display_name = AssetTileLayout.truncatedDisplayName(entry.name, is_dir, AssetTileLayout.tileContentWidth(), &name_buf);
+            gui.label(@src(), "{s}", .{display_name orelse entry.name}, .{
                 .gravity_x = 0.5,
-                .min_size_content = .{ .w = 64 },
                 .id_extra = entry_idx,
             });
+            if (display_name != null) {
+                gui.tooltip(@src(), .{ .active_rect = tile.data().rectScale().r }, "{s}", .{entry.name}, .{ .id_extra = entry_idx });
+            }
         }
 
         if (is_dir) {
@@ -588,16 +394,16 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         // real files. Drawn as siblings of the tile (their own rects), so the
         // toggle never competes with tile selection for a click.
         if (!is_dir and asset_type == .model and !is_renaming_this) {
-            drawExpandToggle(asset_full_path, entry_idx);
-            if (isExpanded(asset_full_path))
-                drawInlineSubAssets(proj_path, asset_full_path, entry_idx);
+            AssetSubAssetTiles.drawExpandToggle(asset_full_path, entry_idx);
+            if (AssetSubAssetTiles.isExpanded(asset_full_path))
+                AssetSubAssetTiles.drawInlineSubAssets(proj_path, asset_full_path, entry_idx);
         }
     }
 
     flex.deinit();
 
     // Commit nav list for next frame's arrow-key handler
-    nav_count = new_nav_count;
+    AssetNav.commitNavList();
 
     // Drop a dragged scene object onto the browser to save it (and its
     // children) as a prefab asset in the current folder.

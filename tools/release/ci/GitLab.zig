@@ -2,8 +2,8 @@
 ///
 /// Required environment variables (set automatically by GitLab CI):
 ///   CI_API_V4_URL, CI_PROJECT_ID, CI_COMMIT_TAG
-/// Required project variable (Settings → CI/CD → Variables):
-///   CI_PUSH_TOKEN  — project access token, scopes: write_repository + api
+/// Auth (first one set wins): CI_PUSH_TOKEN (project access token, scopes
+/// write_repository + api) > CI_JOB_TOKEN (auto-issued, no setup) > GITLAB_TOKEN.
 ///
 /// To add a new provider, create a sibling file with the same
 /// `pub fn run(io, gpa, environ)` entry point.
