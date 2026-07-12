@@ -185,13 +185,46 @@ pub fn main(main_init: std.process.Init) !void {
     std.c._exit(0);
 }
 
+/// Create the SDL3-GPU window/device, preferring a Vulkan device so the 3D
+/// viewport's SPIRV shaders work, but falling back to whatever SDL picks by
+/// default (D3D12 on Windows, Metal on macOS) when Vulkan is unavailable.
+///
+/// dvui's backend requests SPIRV+DXIL+MSL shader formats, so the editor UI
+/// renders on any of these backends; only the 3D viewport (`GpuRenderer`,
+/// SPIRV-only) degrades to "unavailable" on a non-Vulkan device. Without this
+/// fallback the whole editor fails to start on machines with no Vulkan driver
+/// (e.g. a stock Windows install or bare Wine) because forcing the
+/// `SDL_GPU_DRIVER=vulkan` hint makes SDL error out instead of trying D3D12.
+fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
+    const opts: gui.backend.InitOptions = .{
+        .io = main_init.io,
+        .allocator = main_init.gpa,
+        .size = .{ .w = 1280.0, .h = 720.0 },
+        .min_size = .{ .w = 800.0, .h = 600.0 },
+        .vsync = true,
+        .title = "Turian Studio",
+    };
+
+    // First try: prefer Vulkan (needed by the SPIRV 3D viewport).
+    _ = gui.backend.c.SDL_SetHint("SDL_GPU_DRIVER", "vulkan");
+    if (gui.backend.initWindow(opts)) |backend| {
+        return backend;
+    } else |err| {
+        std.debug.print("[Turian] Vulkan GPU backend unavailable ({any}); " ++
+            "retrying with the platform default driver\n", .{err});
+    }
+
+    // Fallback: reset the driver hint (an empty string is itself an invalid
+    // driver name — SDL must pick from its own default priority list: D3D12 on
+    // Windows, Metal on macOS, Vulkan on Linux). The 3D viewport will show
+    // "unavailable" on a non-SPIRV backend but the rest of the editor works.
+    _ = gui.backend.c.SDL_ResetHint("SDL_GPU_DRIVER");
+    return gui.backend.initWindow(opts);
+}
+
 fn run(main_init: std.process.Init) !void {
     if (@import("builtin").os.tag == .windows) {
         gui.Backend.Common.windowsAttachConsole() catch {};
-        // Request Vulkan on Windows so the GPU renderer can use SPIRV shaders.
-        // Falls back to D3D12 silently if Vulkan is unavailable (3D viewport
-        // will show "unavailable" but the rest of the editor still works).
-        _ = gui.backend.c.SDL_SetHint("SDL_GPU_DRIVER", "vulkan");
     }
 
     gui.backend.enableSDLLogging();
@@ -200,14 +233,7 @@ fn run(main_init: std.process.Init) !void {
     // enabled per-frame only while Play mode runs (see studio/Window.zig).
     engine.Profiler.setIo(main_init.io);
 
-    var backend = try gui.backend.initWindow(.{
-        .io = main_init.io,
-        .allocator = main_init.gpa,
-        .size = .{ .w = 1280.0, .h = 720.0 },
-        .min_size = .{ .w = 800.0, .h = 600.0 },
-        .vsync = true,
-        .title = "Turian Studio",
-    });
+    var backend = try initBackend(main_init);
     defer backend.deinit();
 
     var win = try gui.Window.init(@src(), main_init.gpa, backend.backend(), .{
@@ -485,7 +511,12 @@ fn run(main_init: std.process.Init) !void {
         EditorFrameTiming.endFrame(backend.nanoTime());
         if (quit) break :main_loop;
 
-        const wait_event_micros = win.waitTime(end_micros);
+        var wait_event_micros = win.waitTime(end_micros);
+        // While a timed capture is pending, don't let the loop sleep until the
+        // next input event — the capture timer only advances when the loop runs.
+        // Cap the wait so an idle window still reaches the capture deadline
+        // (otherwise TURIAN_CAPTURE_AFTER_MS never fires on a quiet screen).
+        if (capture_pending) wait_event_micros = @min(wait_event_micros, 16_000);
         interrupted = try backend.waitEventTimeout(wait_event_micros);
     }
 

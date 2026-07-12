@@ -93,8 +93,33 @@ Tests live inline in source files using Zig's built-in `test` blocks.
 
 ## Platform notes
 
-| Platform | Studio | CLI | User reflection |
-|----------|--------|-----|-----------------|
-| Windows  | ✓      | ✓   | not yet (dlopen) |
-| Linux    | ✓      | ✓   | ✓               |
-| macOS    | ✓      | ✓   | ✓               |
+| Platform | Studio | CLI | 3D viewport |
+|----------|--------|-----|-------------|
+| Windows  | ✓      | ✓   | Vulkan driver only (D3D12 falls back to a disabled viewport) |
+| Linux    | ✓      | ✓   | ✓ (Vulkan) |
+| macOS    | ✓      | ✓   | Metal falls back to a disabled viewport (SPIRV-only renderer) |
+
+### GPU backend selection
+
+The Studio uses SDL3-GPU. On startup it **prefers a Vulkan device** so the 3D
+viewport (whose shaders are SPIRV) works, and **falls back** to the platform
+default (D3D12 on Windows, Metal on macOS) when no Vulkan driver is present. The
+editor UI renders on any of these backends — only the 3D scene viewport is
+Vulkan-only and shows *"3D viewport unavailable"* on the fallback path. Most
+modern Windows GPUs ship a Vulkan driver, so the viewport works out of the box;
+a bare install with no Vulkan driver still gets a fully functional editor minus
+the 3D preview.
+
+### Cross-compiling for Windows from Linux
+
+Zig cross-compiles the whole Studio (SDL3, dvui, freetype and all are built from
+source) — no Windows toolchain required:
+
+```bash
+zig build -Dtarget=x86_64-windows-gnu -Dno-test
+```
+
+`-Dno-test` is required because the Linux host can't run the Windows test
+binaries. The resulting `zig-out/bin/turian-studio.exe` is self-contained (SDL3
+is statically linked; it only imports standard system DLLs) and runs under Wine
+for smoke-testing.

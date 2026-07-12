@@ -95,8 +95,11 @@ test:
     - zig build --summary all
     - echo "==> zig build test"
     - zig build test --summary all
-    - echo "==> zig build (windows cross-compile)"
-    - zig build -Dtarget=x86_64-windows-gnu -Dcli-only -Dno-test --summary all
+    - echo "==> zig build (windows cross-compile, full studio + cli)"
+    # Build the whole Studio (not just -Dcli-only) so a Windows regression in
+    # the GUI/GPU/render stack is caught here. -Dno-test: the Linux runner
+    # can't execute the Windows binaries.
+    - zig build -Dtarget=x86_64-windows-gnu -Dno-test --summary all
     - |
       for dir in examples/*/; do
         [ -d "$dir" ] || continue
@@ -218,7 +221,7 @@ build_artifacts:
       - PLATFORM: linux-x86_64
         BUILD_FLAGS: "-Doptimize=ReleaseFast"
       - PLATFORM: windows-x86_64
-        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dcli-only -Dno-test -Doptimize=ReleaseFast"
+        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dno-test -Doptimize=ReleaseFast"
       - PLATFORM: macos-aarch64
         BUILD_FLAGS: "-Dtarget=aarch64-macos -Dcli-only -Dno-test -Doptimize=ReleaseFast"
   script:

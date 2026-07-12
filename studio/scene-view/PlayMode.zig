@@ -25,6 +25,7 @@ const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
+const DynLib = @import("DynLib.zig");
 const build_options = @import("turian_build_options");
 
 pub const State = enum { edit, playing, paused };
@@ -53,7 +54,7 @@ const Fns = struct {
 
 var g_state: State = .edit;
 
-var g_lib: ?std.DynLib = null;
+var g_lib: ?DynLib = null;
 var g_fns: Fns = undefined;
 /// Hash of the script sources the loaded library was built from. A change means
 /// the user edited a script, so the library must be rebuilt before the next Play.
@@ -467,7 +468,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
         buildConfig(a),
     ) orelse return false;
 
-    var lib = std.DynLib.open(lib_path) catch |err| {
+    var lib = DynLib.open(lib_path) catch |err| {
         std.debug.print("[Turian] dlopen play library failed: {any}\n", .{err});
         return false;
     };
@@ -498,7 +499,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
     return true;
 }
 
-fn failLookup(lib: *std.DynLib) bool {
+fn failLookup(lib: *DynLib) bool {
     std.debug.print("[Turian] play library missing an expected symbol\n", .{});
     lib.close();
     return false;

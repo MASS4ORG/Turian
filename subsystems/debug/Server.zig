@@ -261,7 +261,15 @@ pub const Server = struct {
         // NOT reliably unblock a thread already blocked in accept(); making a
         // local connection does — the accept returns, then the loop sees
         // stop_flag and exits.
-        {
+        //
+        // Skip this when the listener never came up (e.g. `listen()` failed):
+        // the accept loop has already returned, so there's nothing to wake, and
+        // the connect attempt would just fail — noisily so on some platforms
+        // (Wine's ws2_32 rejects a socket option std sets and dumps a trace).
+        self.listener_mutex.lockUncancelable(io);
+        const has_listener = self.listener != null;
+        self.listener_mutex.unlock(io);
+        if (has_listener) {
             const addr: net.IpAddress = .{ .ip4 = net.Ip4Address.loopback(self.options.port) };
             if (net.IpAddress.connect(&addr, io, .{ .mode = .stream })) |s| {
                 s.close(io);
