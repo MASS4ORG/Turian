@@ -1,6 +1,6 @@
-//! In-editor performance profiler (Guinevere/Turian,). A floating,
-//! toggleable window with a Unity-style multi-track timeline, a recordable
-//! history you can scrub, and Perfetto trace export.
+//! In-editor performance profiler (Guinevere/Turian,). A dockable panel
+//! (#90 — see `Panels.zig`) with a Unity-style multi-track timeline, a
+//! recordable history you can scrub, and Perfetto trace export.
 //!
 //! Data source: **`engine.Profiler`** — the *game-side* profiler. It keeps a
 //! ring of recent frames; each holds per-thread CPU zones (`render.scene` & co.,
@@ -9,8 +9,8 @@
 //! (Record/Pause + auto-on-Play). The `gui` (DVUI) frame timing is shown as a
 //! secondary, collapsible "Editor CPU" readout.
 //!
-//! Toggle from View ▸ Show Profiler. Capture a screenshot or export a trace from
-//! the panel.
+//! Toggle from View ▸ Show/Hide Profiler, or drag it around like any other
+//! dock panel. Capture a screenshot or export a trace from the panel.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -22,8 +22,6 @@ const PlayMode = @import("../scene-view/PlayMode.zig");
 const EditorFrameTiming = @import("../services/EditorFrameTiming.zig");
 
 const Frame = engine.Profiler.Frame;
-
-var g_open: bool = false;
 
 // ── Recording control ────────────────────────────────────────────
 /// Whether the profiler is actively recording (only effective during Play).
@@ -44,15 +42,6 @@ var g_show_editor_cpu: bool = false;
 /// True while the left button is held over the chart, so dragging scrubs the
 /// pinned frame continuously (not just on click).
 var g_chart_drag: bool = false;
-
-/// Toggle the profiler window.
-pub fn toggle() void {
-    g_open = !g_open;
-}
-
-pub fn isOpen() bool {
-    return g_open;
-}
 
 /// Update recording state and arm `engine.Profiler` for this frame. MUST run
 /// once per editor frame *before* `Profiler.beginFrame` (called from Window.zig).
@@ -135,24 +124,16 @@ fn displayFrame() *const Frame {
     return engine.Profiler.captured();
 }
 
-/// Record the last completed frame and draw the window when open. Call once
-/// per editor frame.
-pub fn draw() void {
-    if (!g_open) return;
+/// Panel content only (no window chrome) — for hosting inside `dvui.dockspace`.
+/// Call once per editor frame while the panel is visible; the dockspace's own
+/// walk only invokes this when the panel is actually part of the layout, so
+/// there's no separate open/closed flag to check here.
+pub fn drawContent() void {
     const cw = gui.currentWindow();
 
-    // While the profiler is open, request a frame every frame so the chart and
-    // timeline animate live even when the editor is otherwise idle.
+    // Request a frame every frame so the chart and timeline animate live even
+    // when the editor is otherwise idle.
     gui.refresh(null, @src(), null);
-
-    var float = gui.floatingWindow(@src(), .{ .open_flag = &g_open }, .{
-        .min_size_content = .{ .w = 460, .h = 580 },
-    });
-    defer float.deinit();
-    float.dragAreaSet(gui.windowHeader("Profiler", "", &g_open));
-
-    var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both });
-    defer scroll.deinit();
 
     const frame = displayFrame();
 

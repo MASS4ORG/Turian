@@ -2,27 +2,26 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const MenuBar = @import("MenuBar.zig");
-const SceneTree = @import("../scene-hierarchy/SceneTree.zig");
-const Inspector = @import("../inspector/Inspector.zig");
-const AssetBrowser = @import("../asset-browser/AssetBrowser.zig");
-const SceneViewport = @import("../scene-view/SceneViewport.zig");
 const EditorState = @import("../services/EditorState.zig");
 const TaskBar = @import("TaskBar.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
-const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
-const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
+const Panels = @import("Panels.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
+const LayoutStore = @import("../services/LayoutStore.zig");
 
 var should_quit: bool = false;
 var mouse_left_held: bool = false;
-var g_inspector_ratio: f32 = 0.7;
-var g_asset_doc_ratio: f32 = 0.75;
 var g_mouse_x: f32 = 0;
 var g_mouse_y: f32 = 0;
 var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
+
+fn panelInfo(id: []const u8) gui.DockingWidget.PanelInfo {
+    if (Panels.find(id)) |p| return .{ .title = p.title, .icon = p.icon, .closable = p.closable };
+    return .{ .title = id, .closable = true };
+}
 
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
@@ -117,90 +116,25 @@ pub fn frame() bool {
     // Document tab strip. Drawn above the editing surface.
     Documents.drawTabBar(mouse_left_held);
 
-    // Main editor area. Scoped in a block so the paned widgets are deinit'd
+    // Main editor area. Scoped in a block so the dockspace is deinit'd
     // (popped from dvui's layout stack) *before* the bottom task bar is drawn;
-    // otherwise the task bar would nest inside the still-open paned.
+    // otherwise the task bar would nest inside the still-open dockspace.
     {
-        // `.uidoc` tabs reuse the scene's 3-pane skeleton with Hierarchy and
-        // Viewport swapped for their UI-editing counterparts (Unity/Godot-
-        // style panel replacement) — `Inspector.draw()` itself detects this
-        // same tab context and shows the selected node's properties. The
-        // Settings tab (#88) joins the same skeleton: its category sidebar
-        // takes the "local" slot (no second/View pane — Settings has none),
-        // and the global Inspector column shows the selected category's
-        // fields (`Inspector.zig`'s dispatch) — so every tab type gets the
-        // same always-present Inspector + Asset Browser, only the local
-        // per-tab panel(s) differ.
-        const is_uidoc = Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document;
-        const is_settings = Documents.activeIsAsset() and Documents.activeAssetType() == .studio_settings;
-
-        if (Documents.activeIsAsset() and !is_uidoc and !is_settings) {
-            // Any other asset tab hosts its dedicated editor full-area. The
-            // asset browser stays available as a docked side panel so other
-            // assets can be opened while editing one.
-            var split_h = gui.paned(@src(), .{
-                .direction = .horizontal,
-                .collapsed_size = 0,
-                .handle_margin = 4,
-                .split_ratio = &g_asset_doc_ratio,
-            }, .{ .expand = .both });
-            defer split_h.deinit();
-            if (split_h.showFirst()) Inspector.drawAssetDocument(Documents.activePath());
-            if (split_h.showSecond()) AssetBrowser.draw();
-        } else {
-            const uidoc_path = if (is_uidoc) Documents.activePath() else "";
-
-            var split_h = gui.paned(@src(), .{
-                .direction = .horizontal,
-                .collapsed_size = 0,
-                .handle_margin = 4,
-                .split_ratio = &g_inspector_ratio,
-            }, .{ .expand = .both });
-            defer split_h.deinit();
-            if (split_h.showFirst()) {
-                var split_v = gui.paned(@src(), .{
-                    .direction = .vertical,
-                    .collapsed_size = 0,
-                    .handle_margin = 4,
-                }, .{ .expand = .both });
-                defer split_v.deinit();
-
-                if (split_v.showFirst()) {
-                    if (is_settings) {
-                        SettingsEditor.drawSidebar();
-                    } else {
-                        var split_h2 = gui.paned(@src(), .{
-                            .direction = .horizontal,
-                            .collapsed_size = 0,
-                            .handle_margin = 4,
-                        }, .{ .expand = .both });
-                        defer split_h2.deinit();
-
-                        if (split_h2.showFirst()) {
-                            if (is_uidoc) UiDocumentEditor.drawHierarchyPanel(uidoc_path) else SceneTree.draw();
-                        }
-                        if (split_h2.showSecond()) {
-                            if (is_uidoc) UiDocumentEditor.drawViewPanel(uidoc_path) else SceneViewport.draw();
-                        }
-                    }
-                }
-
-                if (split_v.showSecond()) {
-                    AssetBrowser.draw();
-                }
-            }
-
-            if (split_h.showSecond()) {
-                Inspector.draw();
-            }
+        var dock = gui.dockspace(@src(), .{
+            .layout = LayoutStore.get(),
+            .panelInfo = panelInfo,
+            .close_button_visibility = .hover,
+        }, .{ .expand = .both });
+        defer dock.deinit();
+        while (dock.panel()) |p| {
+            defer p.end();
+            Panels.drawById(p.id);
         }
+        if (dock.changed) LayoutStore.save(gui.io);
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
     TaskBar.draw();
-
-    // Floating performance profiler (toggled from View ▸ Show Profiler).
-    ProfilerPanel.draw();
 
     drawDragGhost();
 

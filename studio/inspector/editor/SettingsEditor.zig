@@ -21,6 +21,7 @@ const AssetActions = @import("../../asset-browser/AssetActions.zig");
 const EditorCamera = @import("../../scene-view/EditorCamera.zig");
 const MenuBar = @import("../../main-window/MenuBar.zig");
 const AssetTileLayout = @import("../../asset-browser/AssetTileLayout.zig");
+const LayoutStore = @import("../../services/LayoutStore.zig");
 
 var model: editor.StudioSettings = .{};
 /// Baseline for the per-field dirty marker (`*`) and revert button: the
@@ -283,6 +284,9 @@ fn drawFooter() void {
     }
     if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .id_extra = 2, .style = if (dirty) .highlight else .control })) {
         save();
+    }
+    if (gui.button(@src(), "Reset Layout", .{}, .{ .gravity_y = 0.5, .id_extra = 3 })) {
+        LayoutStore.reset(gui.io);
     }
 }
 

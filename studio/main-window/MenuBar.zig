@@ -5,9 +5,10 @@ const EditorState = @import("../services/EditorState.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
-const ProfilerPanel = @import("ProfilerPanel.zig");
 const Screenshots = @import("../services/Screenshots.zig");
 const Documents = @import("Documents.zig");
+const Panels = @import("Panels.zig");
+const LayoutStore = @import("../services/LayoutStore.zig");
 const build_options = @import("turian_build_options");
 
 const AboutInfo = struct {
@@ -146,11 +147,30 @@ pub fn draw(should_quit: *bool) void {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            const profiler_label = if (ProfilerPanel.isOpen()) "Hide Profiler" else "Show Profiler";
-            if (gui.menuItemLabel(@src(), profiler_label, .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                ProfilerPanel.toggle();
+            const l = LayoutStore.get();
+            for (Panels.all, 0..) |p, i| {
+                const shown = l.contains(p.id);
+                var buf: [64]u8 = undefined;
+                const label = std.fmt.bufPrint(&buf, "{s} {s}", .{ if (shown) "Hide" else "Show", p.title }) catch p.title;
+                if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
+                    m.close();
+                    if (shown) {
+                        l.removePanel(p.id);
+                    } else {
+                        l.insertTabOwned(l.firstLeaf(l.root), 0, p.id) catch {};
+                    }
+                    LayoutStore.save(gui.io);
+                }
             }
+
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+
+            if (gui.menuItemLabel(@src(), "Reset Layout", .{}, .{ .expand = .horizontal }) != null) {
+                m.close();
+                LayoutStore.reset(gui.io);
+            }
+
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
             if (gui.menuItemLabel(@src(), "Capture Screenshot", .{}, .{ .expand = .horizontal }) != null) {
                 m.close();

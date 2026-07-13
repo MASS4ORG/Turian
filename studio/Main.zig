@@ -15,6 +15,7 @@ const AssetWatcher = @import("asset-browser/AssetWatcher.zig");
 const Documents = @import("main-window/Documents.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
 const Screenshots = @import("services/Screenshots.zig");
+const LayoutStore = @import("services/LayoutStore.zig");
 const build_options = @import("turian_build_options");
 
 /// Route std.log through the engine diagnostic ring so the Remote Debug
@@ -274,8 +275,10 @@ fn run(main_init: std.process.Init) !void {
             if (@import("builtin").os.tag == .windows) "USERPROFILE" else "HOME",
         ) orelse ".";
         try EditorState.initSettings(main_init.io, main_init.gpa, home);
+        LayoutStore.init(main_init.gpa, main_init.io, home);
     }
     defer EditorState.deinitSettings(main_init.io);
+    defer LayoutStore.deinit(main_init.io);
 
     var cli_project_buf: [1024]u8 = undefined;
     var cli_project_path: ?[]const u8 = null;
