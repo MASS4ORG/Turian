@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.13.0] - 2026-07-13
+
+### Features
+- feat: fixed-width asset browser guid cells #84
+- feat(studio): build and run Studio on Windows (D3D12 fallback,cross-platform DynLib) #119
+- feat(studio): asset browser clickable breadcrumb and cascaded Create menu (#81 #68 #85 #72)
+- feat(studio): add Grid+Tree and Tree Only navigation modes to Asset Browser #79 #80 #83
+- feat(studio): add unified Settings editor with category sidebar and search (#88)
+- feat: add Font as a first-class asset type (#109)
+- feat: In-game GUI enhancements, screenshot verification, and GameEvent channel assets #103, #107
+
 ## [1.12.2] - 2026-07-09
 
 ### Other
