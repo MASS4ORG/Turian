@@ -17,6 +17,7 @@ const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
 const Screenshots = @import("services/Screenshots.zig");
 const LayoutStore = @import("services/LayoutStore.zig");
 const build_options = @import("turian_build_options");
+const Icon = @import("Icon.zig");
 
 /// Route std.log through the engine diagnostic ring so the Remote Debug
 /// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
@@ -204,6 +205,7 @@ fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
         .min_size = .{ .w = 800.0, .h = 600.0 },
         .vsync = true,
         .title = "Turian Studio",
+        .icon = Icon.png,
     };
 
     // First try: prefer Vulkan (needed by the SPIRV 3D viewport).

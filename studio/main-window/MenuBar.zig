@@ -11,6 +11,7 @@ const Panels = @import("Panels.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
 const LayoutPresets = @import("../services/LayoutPresets.zig");
 const build_options = @import("turian_build_options");
+const Icon = @import("../Icon.zig");
 
 const AboutInfo = struct {
     const name = "Turian Studio";
@@ -24,6 +25,65 @@ const AboutInfo = struct {
         .{ name, version, description, authors, license },
     );
 };
+
+/// Custom About-dialog display, mirroring `gui.dialogDisplay` but with the
+/// Turian logo shown above the message text.
+fn aboutDialogDisplay(id: gui.Id) anyerror!void {
+    const modal = gui.dataGet(null, id, "_modal", bool) orelse {
+        gui.dialogRemove(id);
+        return;
+    };
+    const title = gui.dataGetSlice(null, id, "_title", []u8) orelse {
+        gui.dialogRemove(id);
+        return;
+    };
+    const message = gui.dataGetSlice(null, id, "_message", []u8) orelse {
+        gui.dialogRemove(id);
+        return;
+    };
+    const ok_label = gui.dataGetSlice(null, id, "_ok_label", []u8) orelse {
+        gui.dialogRemove(id);
+        return;
+    };
+    const center_on = gui.dataGet(null, id, "_center_on", gui.Rect.Natural) orelse gui.currentWindow().subwindows.current_rect;
+    const default = gui.dataGet(null, id, "_default", gui.enums.DialogResponse);
+
+    var win = gui.floatingWindow(@src(), .{ .modal = modal, .center_on = center_on, .window_avoid = .nudge }, .{ .role = .dialog, .id_extra = id.asUsize() });
+    defer win.deinit();
+
+    var header_openflag = true;
+    win.dragAreaSet(gui.windowHeader(title, "", &header_openflag));
+    if (!header_openflag) {
+        gui.dialogRemove(id);
+        return;
+    }
+
+    {
+        var hbox = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_x = 1.0, .gravity_y = 1.0, .margin = gui.Rect.all(4) });
+        defer hbox.deinit();
+
+        var ok_data: gui.WidgetData = undefined;
+        if (gui.button(@src(), ok_label, .{}, .{ .tab_index = 2, .data_out = &ok_data })) {
+            gui.dialogRemove(id);
+            return;
+        }
+        if (default != null and gui.firstFrame(hbox.data().id) and default.? == .ok) {
+            gui.focusWidget(ok_data.id, null, null);
+        }
+    }
+
+    var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .window });
+    defer scroll.deinit();
+
+    _ = gui.image(@src(), .{
+        .source = .{ .imageFile = .{ .bytes = Icon.png, .name = "turian_icon" } },
+        .shrink = .ratio,
+    }, .{ .min_size_content = .{ .w = 96, .h = 96 }, .gravity_x = 0.5, .margin = gui.Rect.all(4) });
+
+    var tl = gui.textLayout(@src(), .{}, .{ .background = false });
+    tl.addText(message, .{});
+    tl.deinit();
+}
 
 var hamburger_open: bool = false;
 
@@ -189,6 +249,7 @@ pub fn draw(should_quit: *bool) void {
                 gui.dialog(@src(), .{}, .{
                     .title = AboutInfo.name,
                     .message = AboutInfo.dialog_message,
+                    .displayFn = aboutDialogDisplay,
                 });
             }
         }
