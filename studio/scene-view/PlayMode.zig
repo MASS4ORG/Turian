@@ -284,7 +284,7 @@ pub fn pump(io: std.Io) void {
 
 // ── Internals ──────────────────────────────────────────────────────────────
 
-fn playNodes() []const engine.SceneNode {
+pub fn playNodes() []const engine.SceneNode {
     if (!g_lib_valid) return &.{};
     const ptr = g_fns.nodes_ptr();
     const count = g_fns.nodes_count();

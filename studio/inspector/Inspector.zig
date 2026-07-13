@@ -25,17 +25,6 @@ pub fn draw() void {
     });
     defer outer.deinit();
 
-    {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .border = .all(1),
-            .background = true,
-            .padding = .all(6),
-        });
-        defer header.deinit();
-        gui.label(@src(), "Inspector", .{}, .{ .font = .theme(.heading) });
-    }
-
     // A `.uidoc` tab open for editing takes over the Inspector with the
     // selected UI node's properties (or the document's global settings when
     // no node is selected) — the Hierarchy/View panel trio wired in

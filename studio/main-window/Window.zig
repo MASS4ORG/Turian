@@ -1,3 +1,4 @@
+const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
@@ -11,20 +12,101 @@ const ProfilerPanel = @import("ProfilerPanel.zig");
 const Panels = @import("Panels.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
+const ReflectJob = @import("../services/ReflectJob.zig");
 
 var should_quit: bool = false;
+var hooks_installed: bool = false;
 var mouse_left_held: bool = false;
 var g_mouse_x: f32 = 0;
 var g_mouse_y: f32 = 0;
 var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 
+/// `closable = false` on a `PanelDesc` guarantees at least one instance of a
+/// pinned panel stays open — it pins only the canonical (bare-id) instance,
+/// not every extra copy a user opened via Add Panel, which should close
+/// like any other added tab.
 fn panelInfo(id: []const u8) gui.DockingWidget.PanelInfo {
-    if (Panels.find(id)) |p| return .{ .title = p.title, .icon = p.icon, .closable = p.closable };
-    return .{ .title = id, .closable = true };
+    const p = Panels.find(id) orelse return .{ .title = id, .closable = true };
+    const instance_n = Panels.instanceNumber(id);
+    const title = if (instance_n) |n|
+        std.fmt.allocPrint(gui.currentWindow().arena(), "{s} ({d})", .{ p.title, n }) catch p.title
+    else
+        p.title;
+    const closable = p.closable or instance_n != null;
+    return .{ .title = title, .icon = p.icon, .closable = closable };
+}
+
+/// `Dockspace.InitOptions.drawHeaderExtra`: draws into the leaf header's
+/// trailing space, which dvui hands us claiming the whole leftover width —
+/// see `DockingWidget.zig`'s `tw_expand` note. Used for a
+/// right-click-anywhere-in-here "Add Panel" context menu targeting this
+/// dock zone, and, right-aligned, the "..." settings button (dvui knows
+/// nothing about settings menus, dots icons, or floating menus — that all
+/// lives here).
+fn panelDrawHeaderExtra(id: []const u8) void {
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
+    defer row.deinit();
+
+    const l = LayoutStore.get();
+    if (l.findPanel(id)) |leaf| {
+        var cxt = gui.context(@src(), .{ .rect = row.data().borderRectScale().r }, .{});
+        defer cxt.deinit();
+        if (cxt.activePoint()) |cp| {
+            var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
+            defer fw.deinit();
+            if (Panels.drawAddPanelMenuItems(l, leaf)) {
+                fw.close();
+                LayoutStore.save(gui.io);
+            }
+        }
+    }
+
+    _ = gui.spacer(@src(), .{ .expand = .horizontal });
+
+    const p = Panels.find(id) orelse return;
+    const settings_fn = p.settings orelse return;
+    var m = gui.menu(@src(), .horizontal, .{ .gravity_y = 0.5 });
+    defer m.deinit();
+    if (gui.menuItemIcon(@src(), "docktab_settings", gui.entypo.dots_three_vertical, .{ .submenu = true }, .{
+        .gravity_y = 0.5,
+        .padding = gui.Rect.all(2),
+        .margin = gui.Rect.all(2),
+    })) |r| {
+        var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+        settings_fn(id);
+    }
+}
+
+/// `Dockspace.InitOptions.onTabContextMenu`: right-clicking an existing tab
+/// (as opposed to the empty header space `panelDrawHeaderExtra` already
+/// handles) opens the same Add-Panel list, targeting that tab's leaf.
+fn panelTabContextMenu(id: []const u8, pt: gui.Point.Natural) void {
+    const l = LayoutStore.get();
+    const leaf = l.findPanel(id) orelse return;
+
+    var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(pt) }, .{});
+    defer fw.deinit();
+    if (Panels.drawAddPanelMenuItems(l, leaf)) {
+        fw.close();
+        LayoutStore.save(gui.io);
+    }
+}
+
+/// Wired to `ReflectJob.onRescan` on the first frame: re-syncs the
+/// custom-panel registry after a user-code discovery scan. See
+/// `Panels.zig`'s module doc for why nothing populates it yet.
+fn rescanCustomPanels() void {
+    Panels.registerCustom(&.{});
 }
 
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
+    if (!hooks_installed) {
+        hooks_installed = true;
+        ReflectJob.onRescan = rescanCustomPanels;
+    }
+
     // Recording is tied to Play and controlled from the panel (Record/Pause +
     // auto-on-Play). `tickRecording` arms `engine.Profiler.enabled` for this
     // frame. When disabled, begin/end and all zones/counters early-out.
@@ -124,6 +206,8 @@ pub fn frame() bool {
             .layout = LayoutStore.get(),
             .panelInfo = panelInfo,
             .close_button_visibility = .hover,
+            .drawHeaderExtra = panelDrawHeaderExtra,
+            .onTabContextMenu = panelTabContextMenu,
         }, .{ .expand = .both });
         defer dock.deinit();
         while (dock.panel()) |p| {

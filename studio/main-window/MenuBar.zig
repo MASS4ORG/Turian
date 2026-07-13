@@ -9,6 +9,7 @@ const Screenshots = @import("../services/Screenshots.zig");
 const Documents = @import("Documents.zig");
 const Panels = @import("Panels.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
+const LayoutPresets = @import("../services/LayoutPresets.zig");
 const build_options = @import("turian_build_options");
 
 const AboutInfo = struct {
@@ -148,22 +149,14 @@ pub fn draw(should_quit: *bool) void {
             defer fw.deinit();
 
             const l = LayoutStore.get();
-            for (Panels.all, 0..) |p, i| {
-                const shown = l.contains(p.id);
-                var buf: [64]u8 = undefined;
-                const label = std.fmt.bufPrint(&buf, "{s} {s}", .{ if (shown) "Hide" else "Show", p.title }) catch p.title;
-                if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
-                    m.close();
-                    if (shown) {
-                        l.removePanel(p.id);
-                    } else {
-                        l.insertTabOwned(l.firstLeaf(l.root), 0, p.id) catch {};
-                    }
-                    LayoutStore.save(gui.io);
-                }
+            if (Panels.drawAddPanelMenuItems(l, l.firstLeaf(l.root))) {
+                m.close();
+                LayoutStore.save(gui.io);
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+
+            drawLayoutMenu(m);
 
             if (gui.menuItemLabel(@src(), "Reset Layout", .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
@@ -217,6 +210,57 @@ pub fn draw(should_quit: *bool) void {
                 else => {},
             }
             if (!hamburger_open) break;
+        }
+    }
+}
+
+/// View ▸ Layout submenu: built-in presets, then any user-saved presets,
+/// then a one-click "save current" action. Auto-names saved
+/// presets ("Custom Layout", "Custom Layout 2", ...) rather than prompting
+/// for a name — this codebase's existing naming convention is
+/// create-then-rename (see `AssetActions.uniqueDirPath`'s "New Folder"),
+/// not a modal text-entry dialog, and there's no persistent row here to
+/// rename in place the way a grid tile or tree row would offer.
+fn drawLayoutMenu(m: *gui.MenuWidget) void {
+    if (gui.menuItemLabel(@src(), "Layout", .{ .submenu = true }, .{ .expand = .horizontal })) |r| {
+        var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
+        defer fw.deinit();
+
+        for (LayoutPresets.builtins, 0..) |preset, i| {
+            if (gui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
+                m.close();
+                const built = preset.build(std.heap.page_allocator) catch {
+                    gui.toast(@src(), .{ .message = "Failed to build layout preset" });
+                    return;
+                };
+                LayoutStore.replace(built, gui.io);
+            }
+        }
+
+        const arena = gui.currentWindow().arena();
+        const custom = LayoutStore.listPresetNames(arena, gui.io);
+        if (custom.len > 0) {
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+            for (custom, 0..) |name, i| {
+                if (gui.menuItemLabel(@src(), name, .{}, .{ .expand = .horizontal, .id_extra = i + 100 }) != null) {
+                    m.close();
+                    if (LayoutStore.loadPreset(name, std.heap.page_allocator, gui.io)) |loaded| {
+                        LayoutStore.replace(loaded, gui.io);
+                    } else {
+                        gui.toast(@src(), .{ .message = "Failed to load layout preset" });
+                    }
+                }
+            }
+        }
+
+        _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+
+        if (gui.menuItemLabel(@src(), "Save Current as Preset", .{}, .{ .expand = .horizontal }) != null) {
+            m.close();
+            const name = LayoutStore.uniquePresetName(arena, gui.io);
+            LayoutStore.savePreset(name, gui.io);
+            const msg = std.fmt.allocPrint(arena, "Saved layout as '{s}'", .{name}) catch "Saved layout preset";
+            gui.toast(@src(), .{ .message = msg });
         }
     }
 }

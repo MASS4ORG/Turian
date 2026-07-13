@@ -17,6 +17,7 @@ const AssetNav = @import("AssetNav.zig");
 const AssetContextMenus = @import("AssetContextMenus.zig");
 const AssetTileLayout = @import("AssetTileLayout.zig");
 const AssetSubAssetTiles = @import("AssetSubAssetTiles.zig");
+const AssetBrowser = @import("AssetBrowser.zig");
 
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var drag_hover_idx: ?usize = null;
@@ -66,17 +67,32 @@ fn drawPackagesSection(proj_path: []const u8) void {
 
 /// Grid tile listing for the current folder. Shared by `.grid` (fills the
 /// panel) and `.grid_tree` (right pane of the split, `show_up_button` false
-/// since the folder-tree sidebar makes `..` redundant).
+/// since the folder-tree sidebar makes `..` redundant). Also draws the
+/// breadcrumb (rather than `AssetBrowser`'s own header): it has little
+/// value once a folder tree is on screen for navigation, so it only shows
+/// up alongside the grid, never in tree-only mode.
 pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.WidgetData, show_up_button: bool) void {
     AssetTileLayout.syncFromSettings();
+
+    {
+        var toolbar = gui.box(@src(), .{ .dir = .horizontal }, .{
+            .expand = .horizontal,
+            .border = .all(1),
+            .background = true,
+            .padding = .all(6),
+        });
+        defer toolbar.deinit();
+        if (EditorState.project_path != null) AssetNav.drawBreadcrumb();
+    }
 
     var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     // Read-only "Packages" section: assets contributed by installed packages
-    // (issue #59). Shown only at the assets root. Editing happens in the package,
-    // not the consuming project, so these are listed, never tiles.
-    if (AssetNav.current_subdir_len == 0) drawPackagesSection(proj_path);
+    // (issue #59). Shown only at the assets root, and only when enabled in
+    // the panel's settings menu (hidden by default). Editing happens in the
+    // package, not the consuming project, so these are listed, never tiles.
+    if (AssetNav.current_subdir_len == 0 and AssetBrowser.showPackages()) drawPackagesSection(proj_path);
 
     var dir = std.Io.Dir.cwd().openDir(gui.io, browse_path, .{ .iterate = true }) catch {
         gui.label(@src(), "No assets folder found. Create {s}/assets.", .{proj_path}, .{ .padding = .all(8) });

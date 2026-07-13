@@ -106,6 +106,43 @@ pub fn renderViewport(w: u32, h: u32) ?gui.TextureTarget {
     return ct;
 }
 
+// ── Game panel rendering ─────────────────────────────────────────────────────
+// A second, independent offscreen target so the Play-mode "Game" panel
+// (a dedicated panel, split out of the Scene viewport) can render the
+// scene's own camera simultaneously with the Scene panel's editor-camera
+// view — same save/restore-the-global-camera-override idiom as
+// `renderPreview` above, just with its own target so the two don't stomp
+// each other's contents within the same frame.
+
+var g_game_target: ?gui.TextureTarget = null;
+var g_game_w: u32 = 0;
+var g_game_h: u32 = 0;
+
+/// Render `objects` under the scene's own camera (no editor-camera override)
+/// into a reusable `w`×`h` offscreen target. Live/per-frame use, like
+/// `renderPreview` — don't hold the returned handle across frames.
+pub fn renderGameViewport(objects: []const engine.SceneNode, w: u32, h: u32) ?gui.TextureTarget {
+    if (!g_ready) return null;
+    const cmd = g_cmd orelse return null;
+    const backend = g_backend orelse return null;
+    if (w == 0 or h == 0) return null;
+
+    if (w != g_game_w or h != g_game_h) {
+        if (g_game_target) |t| backend.textureDestroyTarget(t);
+        g_game_target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
+        g_game_w = w;
+        g_game_h = h;
+    }
+    const target = g_game_target orelse return null;
+    const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
+
+    const saved_cam = render.editorCamera();
+    render.setEditorCamera(null);
+    render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.setEditorCamera(saved_cam);
+    return target;
+}
+
 /// RGBA8 CPU pixels downloaded from the viewport color target, plus its size.
 pub const Capture = struct {
     /// RGBA8 pixels, `w*h*4` bytes, owned by the caller's allocator.
@@ -259,6 +296,10 @@ pub fn deinit() void {
     if (g_color_target) |ct| {
         if (g_backend) |b| b.textureDestroyTarget(ct);
         g_color_target = null;
+    }
+    if (g_game_target) |ct| {
+        if (g_backend) |b| b.textureDestroyTarget(ct);
+        g_game_target = null;
     }
     g_ready = false;
 }

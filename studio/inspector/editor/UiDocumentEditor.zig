@@ -330,17 +330,6 @@ pub fn drawHierarchyPanel(asset_path: []const u8) void {
     });
     defer outer.deinit();
 
-    {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .border = .all(1),
-            .background = true,
-            .padding = .all(6),
-        });
-        defer header.deinit();
-        gui.label(@src(), "UI Hierarchy", .{}, .{ .font = .theme(.heading) });
-    }
-
     drawToolbar();
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
@@ -369,17 +358,6 @@ pub fn drawViewPanel(asset_path: []const u8) void {
         .style = .window,
     });
     defer vp.deinit();
-
-    {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .border = .all(1),
-            .background = true,
-            .padding = .all(4),
-        });
-        defer header.deinit();
-        gui.label(@src(), "UI View", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
-    }
 
     var content = gui.box(@src(), .{}, .{ .expand = .both });
     defer content.deinit();

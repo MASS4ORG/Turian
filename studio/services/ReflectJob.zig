@@ -7,6 +7,14 @@ const build_options = @import("turian_build_options");
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
 
+/// Called after a rescan's results land in `EditorState.discovered_components`,
+/// to re-sync a custom-panel registry with what was just discovered. A
+/// callback rather than a direct `main-window/Panels.zig` import: this file
+/// is reachable from the isolated `studio_tests` build module (root
+/// `EditorState.zig`, no `gui` dependency), and `Panels.zig` pulls in `gui`
+/// transitively — set once at startup by main-window code.
+pub var onRescan: ?*const fn () void = null;
+
 pub const Vector3 = engine.Vector3;
 pub const Transform = engine.Transform;
 pub const Component = engine.Component;
@@ -121,6 +129,7 @@ pub fn finishReflect(job: *ReflectJob) void {
             const AssetResolution = @import("AssetResolution.zig");
             AssetResolution.syncSceneWithDefinitions();
         }
+        if (onRescan) |cb| cb();
     }
     job.arena.deinit();
     std.heap.page_allocator.destroy(job);

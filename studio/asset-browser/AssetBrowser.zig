@@ -1,8 +1,9 @@
 //! Asset browser panel: top-level orchestration only. Picks which view(s) to
-//! draw for the current `NavMode` (issues #79/#80/#83) and owns the header
-//! (breadcrumb, tile-size slider, mode toggle) plus the panel-wide keyboard
-//! shortcuts. The views themselves live in dedicated files so this one stays
-//! readable:
+//! draw for the current `NavMode` (issues #79/#80/#83), owns the panel-wide
+//! keyboard shortcuts, and the "..." settings menu content (zoom, view
+//! mode, Packages visibility). No header/toolbar of its own; the breadcrumb
+//! lives in `AssetGridView` instead. The views themselves live in dedicated
+//! files so this one stays readable:
 //!   - `AssetGridView.zig` — the tile grid (`.grid` / `.grid_tree`)
 //!   - `AssetTreeView.zig` — the folder sidebar and the full tree
 //!     (`.grid_tree` / `.tree_only`)
@@ -36,6 +37,25 @@ fn syncNavModeFromSettings() void {
     const raw = EditorState.settings.getString(NAV_MODE_SETTING_KEY, @tagName(NavMode.grid));
     g_nav_mode = std.meta.stringToEnum(NavMode, raw) orelse .grid;
     nav_mode_loaded = true;
+}
+
+/// Whether the read-only "Packages" section (`AssetGridView.drawPackagesSection`)
+/// is shown at all, not just collapsed — hidden by default since most
+/// projects care about their own assets, not installed packages' contents.
+var g_show_packages: bool = false;
+const SHOW_PACKAGES_SETTING_KEY = "asset_browser.show_packages";
+var show_packages_loaded: bool = false;
+
+fn syncShowPackagesFromSettings() void {
+    if (show_packages_loaded or !EditorState.settingsReady()) return;
+    g_show_packages = EditorState.settings.getBool(SHOW_PACKAGES_SETTING_KEY, false);
+    show_packages_loaded = true;
+}
+
+/// Read by `AssetGridView` to decide whether to draw the Packages section.
+pub fn showPackages() bool {
+    syncShowPackagesFromSettings();
+    return g_show_packages;
 }
 
 var prev_project_path_buf: [1024]u8 = undefined;
@@ -73,6 +93,32 @@ fn drawNavModeToggle() void {
     }
 }
 
+/// Draws the dock header's "..." settings menu: the tile-size zoom slider,
+/// the view-mode toggle, and the Packages-section visibility —
+/// infrequently-touched options, exactly what that menu is for.
+pub fn drawSettings(instance_id: []const u8) void {
+    _ = instance_id;
+    syncShowPackagesFromSettings();
+
+    _ = gui.sliderEntry(@src(), "{d:0.0}", .{
+        .value = &AssetTileLayout.tile_content,
+        .min = AssetTileLayout.TILE_CONTENT_MIN,
+        .max = AssetTileLayout.TILE_CONTENT_MAX,
+        .interval = 1,
+        .label = "Size",
+    }, .{ .expand = .horizontal, .min_size_content = .{ .w = 150 } });
+
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+    drawNavModeToggle();
+
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+    if (gui.checkbox(@src(), &g_show_packages, "Show Packages", .{ .expand = .horizontal })) {
+        if (EditorState.settingsReady()) {
+            EditorState.settings.setBool(SHOW_PACKAGES_SETTING_KEY, g_show_packages) catch {};
+        }
+    }
+}
+
 /// Draw the asset browser panel with file tiles and navigation.
 pub fn draw() void {
     syncNavModeFromSettings();
@@ -91,44 +137,6 @@ pub fn draw() void {
         const n = @min(cur_path_slice.len, prev_project_path_buf.len);
         @memcpy(prev_project_path_buf[0..n], cur_path_slice[0..n]);
         prev_project_path_len = n;
-    }
-
-    {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .border = .all(1),
-            .background = true,
-            .padding = .all(6),
-        });
-        defer header.deinit();
-
-        gui.label(@src(), "Asset Browser", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
-
-        // Clickable breadcrumb for the path relative to the project (from
-        // `assets/` onward, issues #68/#81); the full project path is
-        // redundant and clutters the header. File changes are picked up by
-        // the file watcher, so there is no Refresh button. The breadcrumb row
-        // expands horizontally, making it the flexible spacer that pushes the
-        // tile-size slider (below) to the header's right edge. Name-length
-        // cap and hide-extensions live in the Studio Settings editor instead
-        // (issue #84/#88) — less of a real-time control than zoom.
-        if (EditorState.project_path != null) {
-            AssetNav.drawBreadcrumb();
-        }
-
-        // Preview tile size (issue #25) — continuous slider, right-aligned.
-        // Meaningless without tiles on screen, so hidden in tree-only mode.
-        if (g_nav_mode != .tree_only) {
-            _ = gui.sliderEntry(@src(), "{d:0.0}", .{
-                .value = &AssetTileLayout.tile_content,
-                .min = AssetTileLayout.TILE_CONTENT_MIN,
-                .max = AssetTileLayout.TILE_CONTENT_MAX,
-                .interval = 1,
-                .label = "Size",
-            }, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
-        }
-
-        drawNavModeToggle();
     }
 
     const proj_path = EditorState.project_path orelse {

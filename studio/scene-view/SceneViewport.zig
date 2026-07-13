@@ -22,20 +22,33 @@ var show_ui_overlay: bool = false;
 const play_border = gui.Color{ .r = 240, .g = 130, .b = 30, .a = 255 };
 const pause_border = gui.Color{ .r = 70, .g = 150, .b = 230, .a = 255 };
 
-/// Persistent left-button state, so the transform gizmo can track a drag across
-/// frames (dvui delivers press/release as discrete events).
-var left_down: bool = false;
-var last_mouse: gui.Point.Physical = .{ .x = 0, .y = 0 };
-
-/// Persistent free-look navigation state (held across frames).
-var rmb_down: bool = false;
-var nav_fwd = false;
-var nav_back = false;
-var nav_left = false;
-var nav_right = false;
-var nav_up = false;
-var nav_down = false;
-var nav_fast = false;
+/// Per-Scene-instance camera + navigation state, so multiple Scene panels
+/// can view/edit from several angles at once. Retained via dvui's own
+/// per-widget storage (`dataGetPtrDefault`), keyed by the current
+/// parent widget's id — the dockspace content box `Dockspace.openLeaf`
+/// creates, which is already unique per dock-tab *instance* (not just per
+/// panel type, see `Panels.newInstanceId`). `EditorCamera`'s pose lives in
+/// that module's own globals only for the duration of one `draw()` call,
+/// swapped in/out at the top/bottom — same pattern `Documents.zig` already
+/// uses to give each open scene *tab* its own camera; this just keys by
+/// dock instance instead. Selection and the object list stay global/shared
+/// (Unity does the same — only the camera differs per Scene view).
+const InstanceState = struct {
+    cam: EditorCamera.State = .{},
+    /// Persistent left-button state, so the transform gizmo can track a drag
+    /// across frames (dvui delivers press/release as discrete events).
+    left_down: bool = false,
+    last_mouse: gui.Point.Physical = .{ .x = 0, .y = 0 },
+    /// Persistent free-look navigation state (held across frames).
+    rmb_down: bool = false,
+    nav_fwd: bool = false,
+    nav_back: bool = false,
+    nav_left: bool = false,
+    nav_right: bool = false,
+    nav_up: bool = false,
+    nav_down: bool = false,
+    nav_fast: bool = false,
+};
 
 /// Camera navigation speeds are loaded from Settings once they are ready.
 var cam_settings_loaded = false;
@@ -44,8 +57,22 @@ const CAM_MOVE_KEY = "editor.camera.move_speed";
 const CAM_LOOK_KEY = "editor.camera.look_sensitivity";
 const CAM_ZOOM_KEY = "editor.camera.zoom_speed";
 
-/// Draw the 3D scene viewport using the GPU renderer.
+/// Draw the Scene panel — the edit-time 3D viewport: editor-camera
+/// free-look, gizmo interaction, billboard icons. Always shows the editor
+/// camera over `EditorState.objects`, even while a simulation runs — those
+/// objects are a frozen snapshot during Play (the running sim owns its own
+/// copy, see `PlayMode.zig`), so this is just Unity's "Scene tab stays
+/// navigable during Play" behavior, not live gameplay state. The running
+/// game's own camera lives in the separate `drawGame` panel.
 pub fn draw() void {
+    // Must be captured before creating any widget below (which would
+    // become the new "current parent") — this is the dockspace's per-tab
+    // content box, unique per Scene *instance*.
+    const inst_id = gui.parentGet().data().id;
+    const inst = gui.dataGetPtrDefault(null, inst_id, "_scene_inst", InstanceState, .{});
+    EditorCamera.setState(inst.cam);
+    defer inst.cam = EditorCamera.getState();
+
     var vp = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
@@ -54,30 +81,18 @@ pub fn draw() void {
     defer vp.deinit();
 
     {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
+        var toolbar = gui.box(@src(), .{ .dir = .horizontal }, .{
             .expand = .horizontal,
             .border = .all(1),
             .background = true,
             .padding = .all(4),
         });
-        defer header.deinit();
-        gui.label(@src(), "Scene View", .{}, .{ .font = .theme(.heading), .gravity_y = 0.5 });
-        if (PlayMode.state() == .edit) drawGizmoToolbar();
+        defer toolbar.deinit();
+        drawGizmoToolbar();
         _ = gui.checkbox(@src(), &show_ui_overlay, "Show UI overlay", .{ .gravity_y = 0.5 });
     }
 
-    const st = PlayMode.state();
-    const border_color: ?gui.Color = switch (st) {
-        .edit => null,
-        .playing => play_border,
-        .paused => pause_border,
-    };
-
-    var content = gui.box(@src(), .{}, .{
-        .expand = .both,
-        .border = if (border_color != null) .all(3) else .all(0),
-        .color_border = border_color,
-    });
+    var content = gui.box(@src(), .{}, .{ .expand = .both });
     defer content.deinit();
 
     // Drop a dragged scene/prefab asset here to instantiate it as a linked
@@ -108,29 +123,23 @@ pub fn draw() void {
     const vp_w: u32 = @max(1, @as(u32, @intFromFloat(nat_rect.w * scale)));
     const vp_h: u32 = @max(1, @as(u32, @intFromFloat(nat_rect.h * scale)));
 
-    // ── Editor camera + gizmo interaction (edit mode only) ──────────────────────
-    if (st == .edit) {
-        const phys = content.data().contentRectScale().r;
+    // ── Editor camera + gizmo interaction ────────────────────────────────────
+    const phys = content.data().contentRectScale().r;
 
-        // Free-look navigation drives the editor camera, independent of any
-        // scene Camera component.
-        EditorCamera.ensureInit(&EditorState.objects, EditorState.object_count);
-        loadCameraSettings();
-        const nav = gatherNav(content, phys);
-        _ = EditorCamera.navigate(nav);
-        GpuRenderer.setEditorCamera(EditorCamera.pose());
-        handleHotkeys();
+    // Free-look navigation drives the editor camera, independent of any
+    // scene Camera component.
+    EditorCamera.ensureInit(&EditorState.objects, EditorState.object_count);
+    loadCameraSettings();
+    const nav = gatherNav(inst, content, phys);
+    _ = EditorCamera.navigate(nav);
+    GpuRenderer.setEditorCamera(EditorCamera.pose());
+    handleHotkeys(inst);
 
-        const m = gatherMouse(content, phys);
-        const cam = GpuRenderer.cameraFor(vp_w, vp_h);
-        const grect = GizmoSystem.Rect{ .x = phys.x, .y = phys.y, .w = phys.w, .h = phys.h };
-        GizmoSystem.update(cam, grect, &EditorState.objects, EditorState.object_count, m);
-        GpuRenderer.setGizmosEnabled(true);
-    } else {
-        // Play mode shows the running game's own camera again.
-        GpuRenderer.setEditorCamera(null);
-        GpuRenderer.setGizmosEnabled(false);
-    }
+    const m = gatherMouse(inst, content, phys);
+    const cam = GpuRenderer.cameraFor(vp_w, vp_h);
+    const grect = GizmoSystem.Rect{ .x = phys.x, .y = phys.y, .w = phys.w, .h = phys.h };
+    GizmoSystem.update(cam, grect, &EditorState.objects, EditorState.object_count, m);
+    GpuRenderer.setGizmosEnabled(true);
 
     // The image and the billboard-icon overlay share an overlay container so the
     // icons stack on top of the rendered scene instead of below it.
@@ -146,21 +155,72 @@ pub fn draw() void {
             .gravity_x = 0.5,
             .gravity_y = 0.5,
         });
-        if (st == .edit) {
-            drawIcons(vp_w, vp_h, nat_rect);
-            if (show_ui_overlay) {
-                UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
-            }
-        } else {
-            // Live GUI during Play/Paused (#47) — unconditional, unlike the
-            // "Show UI overlay" edit-time authoring preview above: this is the
-            // actual running game's UI, not a WYSIWYG preview of it. Runs
-            // before `PlayMode.pump()` (see Window.zig's per-frame order) so
-            // `bw.processEvents()` below can claim the click first — the same
-            // input-priority ordering `PlayMode.feedInput`'s `e.handled` check
-            // expects.
-            drawPlayModeUi(.{ .w = nat_rect.w, .h = nat_rect.h });
+        drawIcons(vp_w, vp_h, nat_rect);
+        if (show_ui_overlay) {
+            UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
         }
+    } else {
+        gui.label(@src(), "3D viewport unavailable", .{}, .{
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+            .expand = .both,
+        });
+    }
+}
+
+/// Draw the Game panel — dedicated Play-mode viewport, split from Scene:
+/// the running simulation's own camera + live in-game GUI, Unity-style — a
+/// "Display 1 / No cameras rendering" placeholder outside Play, matching
+/// Unity's Game tab when nothing is running.
+pub fn drawGame() void {
+    var vp = gui.box(@src(), .{}, .{
+        .expand = .both,
+        .background = true,
+        .style = .window,
+    });
+    defer vp.deinit();
+
+    const st = PlayMode.state();
+    const border_color: ?gui.Color = switch (st) {
+        .edit => null,
+        .playing => play_border,
+        .paused => pause_border,
+    };
+
+    var content = gui.box(@src(), .{}, .{
+        .expand = .both,
+        .border = if (border_color != null) .all(3) else .all(0),
+        .color_border = border_color,
+    });
+    defer content.deinit();
+
+    if (st == .edit) {
+        var center = gui.box(@src(), .{}, .{ .expand = .both, .gravity_x = 0.5, .gravity_y = 0.5 });
+        defer center.deinit();
+        gui.label(@src(), "Display 1", .{}, .{ .gravity_x = 0.5, .font = .theme(.heading) });
+        gui.label(@src(), "No cameras rendering", .{}, .{ .gravity_x = 0.5 });
+        return;
+    }
+
+    const scale = gui.windowNaturalScale();
+    const nat_rect = content.wd.rect;
+    const vp_w: u32 = @max(1, @as(u32, @intFromFloat(nat_rect.w * scale)));
+    const vp_h: u32 = @max(1, @as(u32, @intFromFloat(nat_rect.h * scale)));
+
+    if (GpuRenderer.renderGameViewport(PlayMode.playNodes(), vp_w, vp_h)) |target| {
+        const tex = gui.Texture.fromTargetTemp(target) catch return;
+        _ = gui.image(@src(), .{
+            .source = .{ .texture = tex },
+        }, .{
+            .expand = .both,
+            .gravity_x = 0.5,
+            .gravity_y = 0.5,
+        });
+        // Live GUI during Play/Paused (#47). Runs before `PlayMode.pump()`
+        // (see Window.zig's per-frame order) so `bw.processEvents()` below
+        // can claim the click first — the same input-priority ordering
+        // `PlayMode.feedInput`'s `e.handled` check expects.
+        drawPlayModeUi(.{ .w = nat_rect.w, .h = nat_rect.h });
     } else {
         gui.label(@src(), "3D viewport unavailable", .{}, .{
             .gravity_x = 0.5,
@@ -211,34 +271,34 @@ fn drawIcons(vp_w: u32, vp_h: u32, nat_rect: gui.Rect) void {
 }
 
 /// Collect this frame's mouse state for the gizmo system. Position and release
-/// are tracked globally (so a drag continues off-widget); a press only counts
-/// when it lands inside the viewport.
-fn gatherMouse(content: *gui.BoxWidget, phys: gui.Rect.Physical) GizmoSystem.MouseInput {
+/// are tracked per-instance (so a drag continues off-widget); a press only
+/// counts when it lands inside the viewport.
+fn gatherMouse(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physical) GizmoSystem.MouseInput {
     var pressed = false;
     var released = false;
     for (gui.events()) |*e| {
         if (e.evt != .mouse) continue;
         const me = e.evt.mouse;
         switch (me.action) {
-            .position => last_mouse = me.p,
-            .motion => last_mouse = me.p,
+            .position => inst.last_mouse = me.p,
+            .motion => inst.last_mouse = me.p,
             .press => if (me.button == .left and gui.eventMatchSimple(e, content.data())) {
-                last_mouse = me.p;
+                inst.last_mouse = me.p;
                 pressed = true;
-                left_down = true;
+                inst.left_down = true;
             },
             .release => if (me.button == .left) {
-                released = left_down;
-                left_down = false;
+                released = inst.left_down;
+                inst.left_down = false;
             },
             else => {},
         }
     }
     return .{
-        .pos = .{ .x = last_mouse.x, .y = last_mouse.y },
-        .inside = phys.contains(last_mouse),
+        .pos = .{ .x = inst.last_mouse.x, .y = inst.last_mouse.y },
+        .inside = phys.contains(inst.last_mouse),
         .left_pressed = pressed,
-        .left_down = left_down,
+        .left_down = inst.left_down,
         .left_released = released,
     };
 }
@@ -351,7 +411,7 @@ fn drawVisibilityMenu() void {
 /// Collect this frame's free-look navigation input. Held movement keys persist
 /// across frames; look deltas and wheel are per-frame. Movement is only applied
 /// while the right mouse button is held (see `EditorCamera`).
-fn gatherNav(content: *gui.BoxWidget, phys: gui.Rect.Physical) EditorCamera.Nav {
+fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physical) EditorCamera.Nav {
     var look_dx: f32 = 0;
     var look_dy: f32 = 0;
     var wheel: f32 = 0;
@@ -361,29 +421,29 @@ fn gatherNav(content: *gui.BoxWidget, phys: gui.Rect.Physical) EditorCamera.Nav 
                 if (ke.action == .repeat) continue;
                 const pressed = ke.action != .up;
                 switch (ke.code) {
-                    .w => nav_fwd = pressed,
-                    .s => nav_back = pressed,
-                    .a => nav_left = pressed,
-                    .d => nav_right = pressed,
-                    .e => nav_up = pressed,
-                    .q => nav_down = pressed,
-                    .left_shift, .right_shift => nav_fast = pressed,
+                    .w => inst.nav_fwd = pressed,
+                    .s => inst.nav_back = pressed,
+                    .a => inst.nav_left = pressed,
+                    .d => inst.nav_right = pressed,
+                    .e => inst.nav_up = pressed,
+                    .q => inst.nav_down = pressed,
+                    .left_shift, .right_shift => inst.nav_fast = pressed,
                     .f => if (pressed) focusSelection(),
                     else => {},
                 }
             },
             .mouse => |me| switch (me.action) {
                 .press => if (me.button == .right and gui.eventMatchSimple(e, content.data())) {
-                    rmb_down = true;
+                    inst.rmb_down = true;
                 },
                 .release => if (me.button == .right) {
-                    rmb_down = false;
+                    inst.rmb_down = false;
                 },
-                .motion => |delta| if (rmb_down) {
+                .motion => |delta| if (inst.rmb_down) {
                     look_dx += delta.x;
                     look_dy += delta.y;
                 },
-                .wheel_y => |amt| if (phys.contains(last_mouse)) {
+                .wheel_y => |amt| if (phys.contains(inst.last_mouse)) {
                     wheel += amt;
                 },
                 else => {},
@@ -392,22 +452,24 @@ fn gatherNav(content: *gui.BoxWidget, phys: gui.Rect.Physical) EditorCamera.Nav 
         }
     }
     return .{
-        .rmb_down = rmb_down,
+        .rmb_down = inst.rmb_down,
         .look_dx = look_dx,
         .look_dy = look_dy,
         .wheel = wheel,
-        .forward = nav_fwd,
-        .back = nav_back,
-        .left = nav_left,
-        .right = nav_right,
-        .up = nav_up,
-        .down = nav_down,
-        .fast = nav_fast,
+        .forward = inst.nav_fwd,
+        .back = inst.nav_back,
+        .left = inst.nav_left,
+        .right = inst.nav_right,
+        .up = inst.nav_up,
+        .down = inst.nav_down,
+        .fast = inst.nav_fast,
         .dt = gui.secondsSinceLastFrame(),
     };
 }
 
 /// Frame the editor camera on the primary selection (F key).
+/// `EditorCamera.focusOn` writes through the globals `draw()` already
+/// swapped this instance's state into — no `InstanceState` needed here.
 fn focusSelection() void {
     const sel = EditorState.selected_object orelse return;
     if (sel >= EditorState.object_count) return;
@@ -418,8 +480,8 @@ fn focusSelection() void {
 
 /// W = move, E = rotate, R = scale (Unity convention). Suppressed while the
 /// right mouse button is held, when W/E act as free-look movement keys instead.
-fn handleHotkeys() void {
-    if (rmb_down) return;
+fn handleHotkeys(inst: *InstanceState) void {
+    if (inst.rmb_down) return;
     for (gui.events()) |*e| {
         if (e.evt != .key) continue;
         const ke = e.evt.key;

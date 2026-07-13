@@ -183,17 +183,6 @@ pub fn draw() void {
     defer outer.deinit();
 
     {
-        var header = gui.box(@src(), .{ .dir = .horizontal }, .{
-            .expand = .horizontal,
-            .border = .all(1),
-            .background = true,
-            .padding = .all(6),
-        });
-        defer header.deinit();
-        gui.label(@src(), "Scene Hierarchy", .{}, .{ .font = .theme(.heading) });
-    }
-
-    {
         var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
         defer scroll.deinit();
 
