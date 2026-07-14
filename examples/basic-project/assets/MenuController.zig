@@ -1,6 +1,8 @@
 const std = @import("std");
 const engine = @import("engine");
 
+const log = std.log.scoped(.menu_controller);
+
 /// M3.12 demo: wires the announcement demo's Play/Quit buttons to real game
 /// code via typed events (D4) — not just names that resolve, actual handlers
 /// that run.
@@ -38,11 +40,11 @@ pub const MenuController = struct {
     }
 
     fn onPlay(_: *MenuCtx, _: PlayClicked) void {
-        std.debug.print("[MenuController] Play clicked\n", .{});
+        log.info("Play clicked", .{});
     }
 
     fn onQuit(ctx: *MenuCtx, _: QuitClicked) void {
-        std.debug.print("[MenuController] Quit clicked\n", .{});
+        log.info("Quit clicked", .{});
         if (ctx.app) |app| app.quit();
     }
 };

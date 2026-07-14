@@ -54,6 +54,15 @@ pub fn generateMainZig(
             "const std    = @import(\"std\");\n" ++
             "const engine = @import(\"engine\");\n" ++
             "const editor = @import(\"editor\");\n\n" ++
+            // Routes every `std.log.*` call in the whole game (this file and
+            // every user script — `@import(\"root\")` resolves to this file
+            // for the entire compilation, regardless of which module logs)
+            // through the diagnostic ring: colored/timestamped stderr output,
+            // plus an in-memory history (`engine.DiagLog`) a console/server
+            // build can expose however it likes (e.g. wiring up
+            // `subsystems/debug`'s RPC server, the same `errors` method
+            // Turian Studio itself uses for the Output panel).\n" ++
+            "pub const std_options: std.Options = .{ .logFn = engine.DiagLog.logFn };\n\n" ++
             "// All assets are loaded from the packaged game.oap — never the loose\n" ++
             "// filesystem. The software renderer pulls mesh bytes by GUID from here.\n" ++
             "var g_assets: engine.OapProvider = undefined;\n" ++
@@ -143,7 +152,7 @@ pub fn generateMainZig(
                 "const ui_render = @import(\"ui_render\");\n\n" ++
                 "var g_ui_events: engine.ui.UiEvents = engine.ui.UiEvents.init();\n" ++
                 "var g_ui_runtime: engine.ui.UiRuntime = engine.ui.UiRuntime.init();\n" ++
-                // #41/#107: shared event-channel registry a button's `channel`
+                // shared event-channel registry a button's `channel`
                 // binding raises into; any script anywhere subscribes via
                 // `frame.gameEvent(ref)`.
                 "var g_game_events: engine.GameEventRegistry = engine.GameEventRegistry.init();\n" ++
@@ -462,14 +471,14 @@ pub fn generateMainZig(
             "    // Every asset (meshes, textures, scenes) is served from here, so the\n" ++
             "    // game needs no source tree and no particular working directory.\n" ++
             "    const exe_dir = std.process.executableDirPathAlloc(io, gpa) catch {\n" ++
-            "        std.debug.print(\"[Turian] Cannot locate executable directory\\n\", .{});\n" ++
+            "        std.log.err(\"Cannot locate executable directory\", .{});\n" ++
             "        return;\n" ++
             "    };\n" ++
             "    defer gpa.free(exe_dir);\n" ++
             "    const oap_path = std.fmt.allocPrint(gpa, \"{s}/game.oap\", .{exe_dir}) catch return;\n" ++
             "    defer gpa.free(oap_path);\n" ++
             "    g_assets = engine.OapProvider.initFromFile(io, gpa, oap_path) catch |err| {\n" ++
-            "        std.debug.print(\"[Turian] Failed to open {s}: {any}\\n\", .{ oap_path, err });\n" ++
+            "        std.log.err(\"Failed to open {s}: {any}\", .{ oap_path, err });\n" ++
             "        return;\n" ++
             "    };\n" ++
             "    defer g_assets.deinit();\n" ++
@@ -491,7 +500,7 @@ pub fn generateMainZig(
             "            const _ia = engine.assets.InputActions.loadFromBytes(gpa, _r.bytes) catch continue;\n" ++
             "            defer _ia.deinit(gpa);\n" ++
             "            _ia.applyTo(&g_input);\n" ++
-            "            std.debug.print(\"[Turian] Loaded input actions ({d} action(s))\\n\", .{_ia.actions.len});\n" ++
+            "            std.log.info(\"Loaded input actions ({d} action(s))\", .{_ia.actions.len});\n" ++
             "        }\n" ++
             "    }\n\n" ++
             "    // Initialise the scene manager and boot into the configured first\n" ++
@@ -520,17 +529,17 @@ pub fn generateMainZig(
                 "    // Published so scripts can subscribe to button clicks via the\n" ++
                 "    // typed-event API (D4): `frame.service(engine.ui.UiEvents).?.on(MyEvent, self, onMyEvent)`.\n" ++
                 "    g_services.register(engine.ui.UiEvents, &g_ui_events);\n" ++
-                "    // #41/#107: `frame.gameEvent(ref)` resolves a `channel` binding's\n" ++
+                "    // `frame.gameEvent(ref)` resolves a `channel` binding's\n" ++
                 "    // shared instance through this registry.\n" ++
                 "    g_services.register(engine.GameEventRegistry, &g_game_events);\n",
         );
     }
 
-    // Plugin runtime registration (#64): each installed plugin package's entry
+    // Plugin runtime registration: each installed plugin package's entry
     // point is handed the live service registry so it can register
     // components/systems/services before the boot scene loads.
     if (plugins.len > 0) {
-        try out.appendSlice(a, "    // Plugin packages register their services here (issue #64).\n");
+        try out.appendSlice(a, "    // Plugin packages register their services here .\n");
         for (plugins) |p| {
             const s = std.fmt.bufPrint(&tmp, "    @import(\"{s}\").{s}(&g_services);\n", .{ p.module, p.entry }) catch return error.BufferTooSmall;
             try out.appendSlice(a, s);
@@ -541,14 +550,14 @@ pub fn generateMainZig(
     try out.appendSlice(
         a,
         "    if (boot_scene_guid.len == 0) {\n" ++
-            "        std.debug.print(\"[Turian] No boot scene configured\\n\", .{});\n" ++
+            "        std.log.warn(\"No boot scene configured\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++
             "    _ = g_scene_mgr.loadScene(boot_scene_guid, .single) catch |err| {\n" ++
-            "        std.debug.print(\"[Turian] Failed to load boot scene {s}: {any}\\n\", .{ boot_scene_guid, err });\n" ++
+            "        std.log.err(\"Failed to load boot scene {s}: {any}\", .{ boot_scene_guid, err });\n" ++
             "        return;\n" ++
             "    };\n" ++
-            "    std.debug.print(\"[Turian] Booted scene {s}\\n\", .{boot_scene_guid});\n\n",
+            "    std.log.info(\"Booted scene {s}\", .{boot_scene_guid});\n\n",
     );
 
     if (has_user) {
@@ -566,7 +575,7 @@ pub fn generateMainZig(
     try out.appendSlice(
         a,
         "    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {\n" ++
-            "        std.debug.print(\"[Turian] SDL_Init failed\\n\", .{});\n" ++
+            "        std.log.err(\"SDL_Init failed\", .{});\n" ++
             "        return;\n" ++
             "    }\n" ++
             "    defer SDL_Quit();\n\n",
@@ -583,12 +592,12 @@ pub fn generateMainZig(
             try out.appendSlice(a, try std.fmt.allocPrint(
                 a,
                 "    var win = gpu.Window.create(\"{s}\", .{{ .width = {d}, .height = {d}, .vsync = {s}, .shader_formats = .{{ .spirv = true }} }}) catch {{\n" ++
-                    "        std.debug.print(\"[Turian] GPU window/device init failed\\n\", .{{}});\n" ++
+                    "        std.log.err(\"GPU window/device init failed\", .{{}});\n" ++
                     "        return;\n" ++
                     "    }};\n" ++
                     "    defer win.deinit();\n" ++
                     "    render.init(win.device) catch {{\n" ++
-                    "        std.debug.print(\"[Turian] render init failed\\n\", .{{}});\n" ++
+                    "        std.log.err(\"render init failed\", .{{}});\n" ++
                     "        return;\n" ++
                     "    }};\n" ++
                     "    defer render.deinit();\n" ++
@@ -607,7 +616,7 @@ pub fn generateMainZig(
                     "    var dvui_backend = gui.backend.init(io, @ptrCast(win.window), @ptrCast(win.device), gpa);\n" ++
                         "    defer dvui_backend.deinit();\n" ++
                         "    var dvui_win = gui.Window.init(@src(), gpa, dvui_backend.backend(), .{}) catch {\n" ++
-                        "        std.debug.print(\"[Turian] dvui window init failed\\n\", .{});\n" ++
+                        "        std.log.err(\"dvui window init failed\", .{});\n" ++
                         "        return;\n" ++
                         "    };\n" ++
                         "    defer dvui_win.deinit();\n\n",
@@ -618,12 +627,12 @@ pub fn generateMainZig(
             try out.appendSlice(a, try std.fmt.allocPrint(
                 a,
                 "    const window = SDL_CreateWindow(\"{s}\", {d}, {d}, 0) orelse {{\n" ++
-                    "        std.debug.print(\"[Turian] SDL_CreateWindow failed\\n\", .{{}});\n" ++
+                    "        std.log.err(\"SDL_CreateWindow failed\", .{{}});\n" ++
                     "        return;\n" ++
                     "    }};\n" ++
                     "    defer SDL_DestroyWindow(window);\n\n" ++
                     "    const renderer = SDL_CreateRenderer(window, null) orelse {{\n" ++
-                    "        std.debug.print(\"[Turian] SDL_CreateRenderer failed\\n\", .{{}});\n" ++
+                    "        std.log.err(\"SDL_CreateRenderer failed\", .{{}});\n" ++
                     "        return;\n" ++
                     "    }};\n" ++
                     "    defer SDL_DestroyRenderer(renderer);\n" ++
@@ -636,7 +645,7 @@ pub fn generateMainZig(
                     "    const vp_h: c_int = engine.software_renderer.VP_H;\n" ++
                     "    const sdl_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,\n" ++
                     "        SDL_TEXTUREACCESS_STREAMING, vp_w, vp_h) orelse {\n" ++
-                    "        std.debug.print(\"[Turian] SDL_CreateTexture failed\\n\", .{});\n" ++
+                    "        std.log.err(\"SDL_CreateTexture failed\", .{});\n" ++
                     "        return;\n" ++
                     "    };\n" ++
                     "    defer SDL_DestroyTexture(sdl_tex);\n\n",
@@ -658,7 +667,7 @@ pub fn generateMainZig(
             "        var ev: SDL_Event align(8) = undefined;\n",
     );
     if (uses_ui) {
-        // Input priority (#47): buffer this frame's SDL events, then run the
+        // Input priority: buffer this frame's SDL events, then run the
         // in-game GUI *before* applying them to gameplay, so a widget can claim
         // an event (dvui sets `.handled`) and suppress it from world input this
         // same frame — the shipped-game counterpart to `PlayMode.feedInput`.

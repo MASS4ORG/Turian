@@ -28,6 +28,8 @@ const GpuRenderer = @import("GpuRenderer.zig");
 const DynLib = @import("DynLib.zig");
 const build_options = @import("turian_build_options");
 
+const log = std.log.scoped(.play_mode);
+
 pub const State = enum { edit, playing, paused };
 
 /// C-ABI entry points resolved from the play library after dlopen.
@@ -50,6 +52,9 @@ const Fns = struct {
     ui_events_ptr: *const fn () callconv(.c) *engine.ui.UiEvents,
     game_event_registry_ptr: *const fn () callconv(.c) *engine.GameEventRegistry,
     quit_requested: *const fn () callconv(.c) bool,
+    diag_log_pump: *const fn () callconv(.c) void,
+    diag_log_ptr: *const fn () callconv(.c) [*]engine.DiagLog.Entry,
+    diag_log_count: *const fn () callconv(.c) usize,
 };
 
 var g_state: State = .edit;
@@ -74,6 +79,16 @@ var g_step_once: bool = false;
 // FPS (exponential moving average of instantaneous 1/dt).
 var g_fps: f32 = 0;
 
+// Log bridging: the play library keeps its own `DiagLog` ring (a
+// separate compiled instance from the studio's own, despite being dlopen'd
+// into the same process — see `loadLibrary`'s doc comment), so its entries
+// have to be actively pulled into the studio's ring each frame to show up in
+// the Output panel. `g_diag_last_seq` is the library's own highest `seq`
+// already forwarded; it resets whenever a fresh library is loaded, since a
+// new `.so` instance restarts its own seq counter at 0.
+var g_diag_last_seq: u64 = 0;
+var g_diag_buf: [engine.DiagLog.capacity]engine.DiagLog.Entry = undefined;
+
 pub fn state() State {
     return g_state;
 }
@@ -86,7 +101,7 @@ pub fn fps() f32 {
     return g_fps;
 }
 
-/// The running play library's live `UiRuntime`/`UiEvents` (#47), for the
+/// The running play library's live `UiRuntime`/`UiEvents`, for the
 /// viewport to draw+dispatch against — same process (dlopen), so this is a
 /// raw pointer into the library's own memory, not a copy. Null outside
 /// Play/Paused or before the library has loaded.
@@ -100,7 +115,7 @@ pub fn uiEvents() ?*engine.ui.UiEvents {
     return g_fns.ui_events_ptr();
 }
 
-/// The running play library's live `GameEventRegistry` (#41/#107), for a
+/// The running play library's live `GameEventRegistry`, for a
 /// `channel` binding to raise into — same raw-pointer-across-dlopen pattern
 /// as `uiRuntime`/`uiEvents`.
 pub fn gameEvents() ?*engine.GameEventRegistry {
@@ -242,6 +257,8 @@ pub fn pump(io: std.Io) void {
     _ = io;
     if (g_state == .edit) return;
 
+    drainDiagLog();
+
     const now = gui.frameTimeNS();
     var dt: f32 = @as(f32, @floatFromInt(now - g_prev_ns)) / 1_000_000_000.0;
     g_prev_ns = now;
@@ -284,6 +301,29 @@ pub fn pump(io: std.Io) void {
 
 // ── Internals ──────────────────────────────────────────────────────────────
 
+/// Pulls log entries the play library recorded (its own `std.log.*` calls,
+/// and every user script's — same compilation, see `PlayBuild.zig`'s
+/// `std_options`) into the studio's own `DiagLog` ring, so Play-mode script
+/// logging shows up in the Output panel alongside the editor's own.
+/// Stack traces aren't forwarded — see `DiagLog.recordRemote`.
+fn drainDiagLog() void {
+    if (!g_lib_valid) return;
+    g_fns.diag_log_pump();
+    const n = @min(g_fns.diag_log_count(), g_diag_buf.len);
+    const ptr = g_fns.diag_log_ptr();
+    @memcpy(g_diag_buf[0..n], ptr[0..n]);
+
+    // Newest first; forward the ones not yet seen, oldest first.
+    var i = n;
+    while (i > 0) {
+        i -= 1;
+        const e = &g_diag_buf[i];
+        if (e.seq <= g_diag_last_seq) continue;
+        engine.DiagLog.recordRemote(e.level, e.scope(), e.message());
+    }
+    if (n > 0) g_diag_last_seq = g_diag_buf[0].seq;
+}
+
 pub fn playNodes() []const engine.SceneNode {
     if (!g_lib_valid) return &.{};
     const ptr = g_fns.nodes_ptr();
@@ -297,7 +337,7 @@ fn feedInput() void {
         // UI (e.g. a `.uidoc` button in the "Show UI overlay") already
         // consumed this event this frame — don't also feed it to gameplay
         // input, or a click on a UI button would fire the game's click
-        // handling underneath it too (#47 M2 input-priority fix).
+        // handling underneath it too.
         if (e.handled) continue;
         switch (e.evt) {
             .key => |ke| {
@@ -409,7 +449,7 @@ fn registerPrefabs(io: std.Io) void {
 }
 
 /// Push each `ui_document` node's referenced `.uidoc` bytes into the play
-/// library's `UiRuntime` (#47): the library never touches the asset database
+/// library's `UiRuntime`: the library never touches the asset database
 /// (only the studio does), so the studio reads the bytes and hands them over,
 /// mirroring `registerPrefabs`/`loadInputActions`. Scoped to Play start, like
 /// those two — a script spawning a *new* `ui_document` node at runtime is a
@@ -469,7 +509,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
     ) orelse return false;
 
     var lib = DynLib.open(lib_path) catch |err| {
-        std.debug.print("[Turian] dlopen play library failed: {any}\n", .{err});
+        log.err("dlopen play library failed: {any}", .{err});
         return false;
     };
 
@@ -493,14 +533,21 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
         .ui_events_ptr = lib.lookup(@TypeOf(g_fns.ui_events_ptr), S.ui_events_ptr) orelse return failLookup(&lib),
         .game_event_registry_ptr = lib.lookup(@TypeOf(g_fns.game_event_registry_ptr), S.game_event_registry_ptr) orelse return failLookup(&lib),
         .quit_requested = lib.lookup(@TypeOf(g_fns.quit_requested), S.quit_requested) orelse return failLookup(&lib),
+        .diag_log_pump = lib.lookup(@TypeOf(g_fns.diag_log_pump), S.diag_log_pump) orelse return failLookup(&lib),
+        .diag_log_ptr = lib.lookup(@TypeOf(g_fns.diag_log_ptr), S.diag_log_ptr) orelse return failLookup(&lib),
+        .diag_log_count = lib.lookup(@TypeOf(g_fns.diag_log_count), S.diag_log_count) orelse return failLookup(&lib),
     };
     g_lib = lib;
     g_lib_valid = true;
+    // A fresh `.so` instance restarts its own `DiagLog` seq counter at 0, so
+    // last frame's high-water mark from a previous session would otherwise
+    // make every one of its (lower-numbered) entries look "already seen".
+    g_diag_last_seq = 0;
     return true;
 }
 
 fn failLookup(lib: *DynLib) bool {
-    std.debug.print("[Turian] play library missing an expected symbol\n", .{});
+    log.err("play library missing an expected symbol", .{});
     lib.close();
     return false;
 }

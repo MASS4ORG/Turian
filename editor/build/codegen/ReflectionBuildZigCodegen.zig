@@ -101,7 +101,7 @@ pub fn generateReflectionBuildZig(
         .{try normPath(a, reflection_zig)},
     ));
 
-    // Source package modules (#61): user scripts may @import them, so they
+    // Source package modules: user scripts may @import them, so they
     // must be declared here or the user module will fail to compile.
     for (config.extra_modules, 0..) |m, mi| {
         try out.appendSlice(a, try std.fmt.allocPrint(

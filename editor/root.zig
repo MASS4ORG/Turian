@@ -7,8 +7,7 @@ pub const version = engine.version;
 
 /// User script scanner (discovers `is_component` types in assets via the Zig AST).
 pub const scanner = @import("assets/Scanner.zig");
-/// UI event type scanner (#112: discovers `event_name` declarations in assets
-/// via the Zig AST, feeding the Studio inspector's event dropdown).
+/// UI event type scanner.
 pub const event_scanner = @import("assets/EventScanner.zig");
 /// Project open/create operations.
 pub const project_ops = @import("project/ProjectOps.zig");
@@ -82,20 +81,23 @@ pub const StudioSettingsCategoryMeta = studio_settings_types.CategoryMeta;
 pub const studio_settings_categories = studio_settings_types.categories;
 /// MRU recent-projects list persisted via the Settings API.
 pub const recent_projects = @import("project/RecentProjects.zig");
-/// Package manifest parser for `turian-package.json` (issue #56/#58).
+/// Package manifest parser for `turian-package.json`.
 pub const PackageManifest = @import("package/PackageManifest.zig").PackageManifest;
 pub const PackageType = @import("package/PackageManifest.zig").PackageType;
-/// Package discovery and dependency graph (issue #58).
+/// Package discovery and dependency graph .
 pub const PackageManager = @import("package/PackageManager.zig").PackageManager;
 pub const checkEngineCompat = @import("package/PackageManager.zig").checkEngineCompat;
 /// Project configuration (`project.json`) — source of truth for project
-/// identity and dependencies; generates `build.zig.zon` (issue #57).
+/// identity and dependencies; generates `build.zig.zon` .
 pub const project_config = @import("project/ProjectConfig.zig");
 pub const ProjectConfig = project_config.ProjectConfig;
-/// Central, machine-wide package store shared across projects (issue #20).
+/// Central, machine-wide package store shared across projects .
 pub const package_store = @import("package/PackageStore.zig");
-/// Runtime path-based menu tree builder for cascaded menus (issues #85/#72).
+/// Runtime path-based menu tree builder for cascaded menus.
 pub const menu_tree = @import("MenuTree.zig");
+
+/// `path:line` reference parser for the Studio Output panel.
+pub const log_location = @import("LogLocation.zig");
 
 test {
     // Force every re-exported module to be analysed so their `test` blocks

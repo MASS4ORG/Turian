@@ -4,8 +4,8 @@ const engine = @import("engine");
 /// Create instances from the Asset Browser → Create ▸ Gameplay ▸ Enemy Stats.
 pub const EnemyStats = struct {
     pub const is_data_asset = true;
-    /// Where this shows up in the Asset Browser's cascaded Create menu
-    /// (issues #85/#72). Without this, it would fall back to
+    /// Where this shows up in the Asset Browser's cascaded Create menu.
+    /// Without this, it would fall back to
     /// "Data/EnemyStats".
     pub const menu_path = "Gameplay/Enemy Stats";
 

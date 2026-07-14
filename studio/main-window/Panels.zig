@@ -19,6 +19,7 @@ const AssetBrowser = @import("../asset-browser/AssetBrowser.zig");
 const SceneViewport = @import("../scene-view/SceneViewport.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
+const LogPanel = @import("LogPanel.zig");
 const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
 
@@ -54,6 +55,7 @@ const builtin_panels = [_]PanelDesc{
     .{ .id = "inspector", .title = "Inspector", .icon = gui.entypo.list, .draw = Inspector.draw },
     .{ .id = "assets", .title = "Assets", .icon = gui.entypo.folder, .draw = AssetBrowser.draw, .settings = AssetBrowser.drawSettings },
     .{ .id = "profiler", .title = "Profiler", .icon = gui.entypo.gauge, .draw = ProfilerPanel.drawContent },
+    .{ .id = "output", .title = "Output", .icon = gui.entypo.text_document, .draw = LogPanel.draw, .settings = LogPanel.drawSettings },
 };
 
 /// The registry backing `all()`: builtins first (fixed), then whatever

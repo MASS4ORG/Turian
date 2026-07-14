@@ -1,5 +1,5 @@
 //! Typed schema for Studio-wide (not per-project) editor configuration
-//! (issue #88). Bridges to the generic key/value `Settings` store
+//! . Bridges to the generic key/value `Settings` store
 //! (`editor/Settings.zig`) so existing scattered readers keep working
 //! unmodified while `studio/SettingsEditor.zig` gains a single reflected
 //! object to draw via `PropDraw` (mirrors `engine`'s component `turian_hints`
@@ -52,7 +52,7 @@ pub const Camera = struct {
 
 pub const AssetBrowser = struct {
     /// Max characters of a filename shown in a tile label before truncating
-    /// with an ellipsis (issue #84) — independent of the tile zoom slider
+    /// with an ellipsis  — independent of the tile zoom slider
     /// (`studio/asset-browser/AssetBrowser.zig`'s header "Size" slider, which
     /// only affects icon/tile pixel size, not how much of the name shows).
     name_char_length: i64 = 12,

@@ -17,6 +17,7 @@ const GizmoSystem = @import("GizmoSystem.zig");
 const dc = gui.backend.c;
 const SDLBackend = gui.backend.SDLBackend;
 const page = std.heap.page_allocator;
+const log = std.log.scoped(.gpu_renderer);
 
 /// dvui's TextureTarget wraps an SDL_GPUTexture + sampler; we draw into the
 /// texture and hand the target back to dvui for display.
@@ -64,7 +65,7 @@ pub fn cameraFor(w: u32, h: u32) render.Camera {
 pub fn init(backend: *SDLBackend) !void {
     g_backend = backend;
     if (backend.shaderformat != dc.SDL_GPU_SHADERFORMAT_SPIRV) {
-        std.debug.print("[GpuRenderer] Non-SPIRV backend – 3D viewport disabled.\n", .{});
+        log.warn("Non-SPIRV backend – 3D viewport disabled.", .{});
         return;
     }
     // dvui's SDL device and the render module's SDL device are the same library,
@@ -215,7 +216,7 @@ pub fn renderAndCapture(allocator: std.mem.Allocator, objects: []const engine.Sc
     gpu.c.SDL_ReleaseGPUFence(dev, fence);
 
     const pixels = gpu.captureTexture(dev, allocator, @ptrCast(bt.texture), w, h, gpu.c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM) catch |err| {
-        std.debug.print("[GpuRenderer] preview capture failed: {any}\n", .{err});
+        log.err("preview capture failed: {any}", .{err});
         return null;
     };
     return .{ .pixels = pixels, .w = w, .h = h };
@@ -238,7 +239,7 @@ pub fn capturePixels(allocator: std.mem.Allocator) ?Capture {
         g_target_h,
         gpu.c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
     ) catch |err| {
-        std.debug.print("[GpuRenderer] capture failed: {any}\n", .{err});
+        log.err("capture failed: {any}", .{err});
         return null;
     };
     return .{ .pixels = pixels, .w = g_target_w, .h = g_target_h };
@@ -281,11 +282,11 @@ pub fn applyPendingVsync() void {
             break :blk dc.SDL_GPU_PRESENTMODE_IMMEDIATE;
         if (dc.SDL_WindowSupportsGPUPresentMode(backend.device, backend.window, dc.SDL_GPU_PRESENTMODE_MAILBOX))
             break :blk dc.SDL_GPU_PRESENTMODE_MAILBOX;
-        std.debug.print("[GpuRenderer] no uncapped present mode supported; keeping vsync on.\n", .{});
+        log.warn("no uncapped present mode supported; keeping vsync on", .{});
         return;
     };
     if (!dc.SDL_SetGPUSwapchainParameters(backend.device, backend.window, dc.SDL_GPU_SWAPCHAINCOMPOSITION_SDR, mode)) {
-        std.debug.print("[GpuRenderer] set vsync={} failed: {s}\n", .{ want, dc.SDL_GetError() });
+        log.err("set vsync={} failed: {s}", .{ want, dc.SDL_GetError() });
         return;
     }
     g_vsync = want;

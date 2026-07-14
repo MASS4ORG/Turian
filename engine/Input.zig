@@ -367,7 +367,7 @@ pub const Input = struct {
         return null;
     }
 
-    // --- Typed handles (#108): strings at rest, dense handles at runtime,
+    // --- Typed handles: strings at rest, dense handles at runtime,
     // porting `engine.ui.UiEvents`' resolution pattern. `ActionId` is just the
     // action's stable index into `actions` — indices never change after
     // `defineButton`/`defineAxis`/`defineVector` (only appended to, never

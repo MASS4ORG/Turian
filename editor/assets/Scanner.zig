@@ -17,8 +17,8 @@ const log = std.log.scoped(.scanner);
 pub const COMPONENT_MARKER = "is_component";
 /// Marks a struct as a discoverable data asset.
 pub const DATA_ASSET_MARKER = "is_data_asset";
-/// Declares a custom cascaded Create-menu path for the type (issues
-/// #85/#72), e.g. `pub const menu_path = "Gameplay/Enemy Stats";`.
+/// Declares a custom cascaded Create-menu path for the type
+/// , e.g. `pub const menu_path = "Gameplay/Enemy Stats";`.
 pub const MENU_PATH_MARKER = "menu_path";
 
 /// Fills result[] with builtin component defs from the engine's static list.

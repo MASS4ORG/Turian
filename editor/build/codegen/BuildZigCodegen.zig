@@ -183,7 +183,7 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
         ));
     }
 
-    // Source modules exported by installed packages (#61). Each is a real
+    // Source modules exported by installed packages. Each is a real
     // b.addModule importable from main.zig and from user scripts. Engine is
     // imported into each so package code can use the engine API.
     for (config.extra_modules, 0..) |m, mi| {
@@ -208,8 +208,8 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
     if (config.extra_modules.len > 0) try out.append(a, '\n');
 
     // Resolve third-party project dependencies through Zig's package manager
-    // (#57). Declared in project.json → generated build.zig.zon; reachable here
-    // via b.dependency(). Source/native packages (#61/#62) will extend this to
+    //. Declared in project.json → generated build.zig.zon; reachable here
+    // via b.dependency(). Source/native packages will extend this to
     // import modules / link artifacts; for now resolving proves the seam works.
     for (config.extra_deps) |dep_name| {
         var id_buf: [128]u8 = undefined;
@@ -217,7 +217,7 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
         try out.appendSlice(a, try std.fmt.allocPrint(
             a,
             "    const {s}_dep = b.dependency(\"{s}\", .{{ .target = target, .optimize = optimize }});\n" ++
-                "    _ = {s}_dep; // resolved via Zig PM; imported by source/native packages (#61/#62)\n",
+                "    _ = {s}_dep; // resolved via Zig PM; imported by source/native packages\n",
             .{ dep_id, dep_id, dep_id },
         ));
     }
@@ -288,7 +288,7 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
         );
     }
 
-    // Native libraries from installed packages (#62). The `{target}` token in a
+    // Native libraries from installed packages. The `{target}` token in a
     // lib path template is replaced with the build's Zig target triple so the
     // platform-correct binary is selected. Static libs are added as object
     // files; shared libs are linked by name from their directory.

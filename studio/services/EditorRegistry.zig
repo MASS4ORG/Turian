@@ -1,8 +1,8 @@
-//! Editor registry (issue #40): a data-driven `asset_type -> draw fn` table
+//! Editor registry : a data-driven `asset_type -> draw fn` table
 //! replacing `studio/Inspector.zig`'s hardcoded `if (asset_type == .X)` chain.
 //! Callers `register` once (see `Inspector.ensureRegistered`) and then
 //! dispatch through `has`/`draw` instead of adding another branch. This epic
-//! (#47, in-game GUI) will register a `UiDocumentEditor` here in M2 — the
+//! will register a `UiDocumentEditor` here in M2 — the
 //! reason to build this now rather than grow the if-chain a 6th time.
 
 const std = @import("std");

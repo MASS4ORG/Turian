@@ -1,6 +1,6 @@
 const engine = @import("engine");
 
-/// Freefly (no-clip) camera controller — issue #10 example.
+/// Freefly (no-clip) camera controller.
 ///
 /// Reads *actions*, never raw key codes, through the `engine.Frame` context
 /// (ADR 0001). The bindings are **not** defined here in code — they live in the
@@ -24,7 +24,7 @@ pub const FreeflyCamera = struct {
     /// Speed multiplier while the boost action is held.
     boost_multiplier: f32 = 3.0,
 
-    // Typed action handles (#108): resolved once (lazily, below) instead of
+    // Typed action handles: resolved once (lazily, below) instead of
     // string-compared every frame — same strings-at-rest/dense-handles port
     // as `engine.ui.UiEvents`.
     _look: engine.Input.ActionId = engine.Input.INVALID_ACTION_ID,

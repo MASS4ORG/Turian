@@ -1,8 +1,8 @@
 //! Compound-model expansion (Unity-style): a model tile can be expanded to
 //! reveal its generated sub-assets (materials/textures) as ordinary tiles
 //! flowing inline in the *main* grid flexbox, right after the model's own
-//! tile, rather than a separate boxed block that would break the grid flow
-//! (issue #19/#25). Split out of `AssetGridView.zig` to keep that file under
+//! tile, rather than a separate boxed block that would break the grid flow.
+//! Split out of `AssetGridView.zig` to keep that file under
 //! the project's long-file budget — this half is a self-contained concern
 //! `AssetGridView.draw`'s main loop only touches through `drawExpandToggle`/
 //! `isExpanded`/`drawInlineSubAssets`.
@@ -87,8 +87,8 @@ pub fn drawExpandToggle(asset_path: []const u8, id_extra: usize) void {
 /// (Unity-style), rather than a separate boxed block that would break the grid
 /// flow. They are ordinary tiles — same size, same wrapping — just drawn on a
 /// distinct background (see `drawSubAssetTile`) so the run of them reads as a
-/// group belonging to the model, continuing onto the next line when it wraps
-/// (issue #19/#25). Called from the main tile loop after the model tile closes.
+/// group belonging to the model, continuing onto the next line when it wraps.
+/// Called from the main tile loop after the model tile closes.
 pub fn drawInlineSubAssets(proj_path: []const u8, model_path: []const u8, entry_idx: usize) void {
     var meta_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer meta_arena.deinit();

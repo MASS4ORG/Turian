@@ -85,7 +85,7 @@ pub fn build(b: *std.Build) void {
     } else null;
 
     // ── UI-render module ──────────────────────────────────────────────────────
-    // Single node-tree -> dvui draw walk (#47 in-game GUI epic), shared by the
+    // Single node-tree -> dvui draw walk, shared by the
     // studio viewport overlay and the shipped game. Depends on engine (for
     // engine.UiDocument) + gui (dvui) — never pulled into the headless CLI.
     const ui_render_mod = if (!cli_only) blk: {
@@ -294,7 +294,7 @@ pub fn build(b: *std.Build) void {
     });
     studio_tests.root_module.addOptions("turian_build_options", turian_opts);
 
-    // Pure CPU-side raster/audio math behind the asset preview system (#19/#25)
+    // Pure CPU-side raster/audio math behind the asset preview system
     // — no gui/render/gpu imports, so it's cheap to test standalone rather than
     // dragging in the full studio build graph.
     const preview_raster_tests = b.addTest(.{
@@ -315,7 +315,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // asset_type -> editor draw-fn registry (issue #40, in-game GUI epic M0)
+    // asset_type -> editor draw-fn registry
     // — only needs `editor` for AssetType, no gui/render/gpu graph.
     const editor_registry_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -376,7 +376,7 @@ pub fn build(b: *std.Build) void {
         const preview_camera_tests = b.addTest(.{ .root_module = preview_camera_test_mod });
         test_step.dependOn(&b.addRunArtifact(preview_camera_tests).step);
 
-        // UI node-tree -> dvui draw walk (#47 in-game GUI epic, M2). Tested
+        // UI node-tree -> dvui draw walk. Tested
         // against dvui's own headless `.testing` backend so the composition
         // rule, stable IDs, and image/ninepatch styling run through real
         // dvui frames without a GPU/window.

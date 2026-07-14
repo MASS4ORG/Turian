@@ -1,7 +1,7 @@
 const std = @import("std");
 const engine = @import("engine");
 
-/// GUI-affects-world demo (#47 showcase): the "Jump!" button in `ui.uidoc`
+/// GUI-affects-world demo: the "Jump!" button in `ui.uidoc`
 /// fires this typed event; `JumpOnClick.update` drives a simple parabolic hop
 /// on `target`'s Transform in response — the mirror direction of
 /// `WorldMarker`/`HealthHud` (world -> GUI).

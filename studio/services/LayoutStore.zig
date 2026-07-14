@@ -1,4 +1,4 @@
-//! Persists the dockable panel layout (#90) as `layout.json` next to
+//! Persists the dockable panel layout as `layout.json` next to
 //! `editor.Settings`'s global settings file (`<global_dir>/.turian/`) — a
 //! window arrangement is a per-machine preference, not per-project data.
 //! Also owns user-saved layout *presets* as

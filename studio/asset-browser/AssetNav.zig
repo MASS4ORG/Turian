@@ -71,7 +71,7 @@ pub fn revealTo(assets_path: []const u8, full_path: []const u8) void {
     setCurrentSubdir(sub);
 }
 
-/// Draw the current folder as clickable breadcrumb segments (issues #68/#81):
+/// Draw the current folder as clickable breadcrumb segments:
 /// "assets" (root) followed by one button per path component, each jumping
 /// straight to that ancestor folder. Replaces the old static path label.
 pub fn drawBreadcrumb() void {

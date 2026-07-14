@@ -1,5 +1,5 @@
 /// The **central package store**: a machine-wide, version-keyed cache of
-/// installed Turian packages, shared across all projects (issue #20, follow-up).
+/// installed Turian packages, shared across all projects.
 ///
 /// Layout: `<store-root>/<name>/<version>/` — e.g.
 /// `~/.cache/turian/packages/com.acme.kit/1.2.0/`. Multiple versions of the same

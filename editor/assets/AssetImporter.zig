@@ -13,6 +13,8 @@ const Progress = @import("../Progress.zig").Progress;
 
 const AssetDatabase = @import("AssetDatabase.zig").AssetDatabase;
 
+const log = std.log.scoped(.asset_importer);
+
 // ── Importer versions ────────────────────────────────────────────────────────
 // Bump the relevant constant to force a reimport of that asset class.
 
@@ -402,7 +404,7 @@ fn writeMaterialArtifact(
 
 /// Log a warning using a project-relative path (never the user's full path).
 fn warnRel(comptime msg: []const u8, model_path: []const u8, detail: []const u8) void {
-    std.debug.print("{s}: {s} ({s})\n", .{ msg, std.fs.path.basename(model_path), detail });
+    log.warn("{s}: {s} ({s})", .{ msg, std.fs.path.basename(model_path), detail });
 }
 
 fn collectAndPurge(

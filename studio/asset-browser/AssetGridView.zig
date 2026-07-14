@@ -1,6 +1,5 @@
 //! Tile-grid listing of the current folder — the asset browser's original
-//! view (issue #25's preview tiles, compound-model expansion, drag/drop),
-//! shared by `.grid` mode (fills the whole panel) and `.grid_tree` mode (the
+//! view, shared by `.grid` mode (fills the whole panel) and `.grid_tree` mode (the
 //! right pane of the Grid+Tree split). See `AssetBrowser.zig` for the
 //! panel-level orchestration that picks which view(s) to draw. Tile sizing
 //! and label truncation live in `AssetTileLayout.zig`; compound-model
@@ -40,7 +39,7 @@ fn entryLessThan(_: void, ia: usize, ib: usize) bool {
 
 /// Render a collapsible, read-only "Packages" section listing every installed
 /// package (name + version + types) and the asset directories it contributes
-/// (issue #59). Package assets are authored in the package, so they are shown
+/// . Package assets are authored in the package, so they are shown
 /// as read-only labels rather than editable tiles.
 fn drawPackagesSection(proj_path: []const u8) void {
     const arena = gui.currentWindow().arena();
@@ -89,7 +88,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
     defer scroll.deinit();
 
     // Read-only "Packages" section: assets contributed by installed packages
-    // (issue #59). Shown only at the assets root, and only when enabled in
+    // . Shown only at the assets root, and only when enabled in
     // the panel's settings menu (hidden by default). Editing happens in the
     // package, not the consuming project, so these are listed, never tiles.
     if (AssetNav.current_subdir_len == 0 and AssetBrowser.showPackages()) drawPackagesSection(proj_path);

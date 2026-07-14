@@ -30,6 +30,14 @@ fn addGameTab(l: *DockLayout, leaf: DockLayout.NodeIndex) !void {
     l.nodes.items[leaf].leaf.active = 0;
 }
 
+/// Groups the Output panel as a tab alongside Assets in `leaf`, with
+/// Assets active (same "just-inserted tab would otherwise become active"
+/// caveat as `addGameTab`).
+fn addOutputTab(l: *DockLayout, leaf: DockLayout.NodeIndex) !void {
+    try l.insertTab(leaf, 1, "output");
+    l.nodes.items[leaf].leaf.active = 0;
+}
+
 /// [hierarchy | scene+game] over assets, on the left; inspector on the right.
 pub fn buildDefault(allocator: std.mem.Allocator) !DockLayout {
     var l = try DockLayout.initSingleLeaf(allocator, "hierarchy");
@@ -39,6 +47,7 @@ pub fn buildDefault(allocator: std.mem.Allocator) !DockLayout {
 
     try l.splitRoot(.bottom, "assets");
     l.nodes.items[l.root].split.ratio = 0.75;
+    try addOutputTab(&l, l.findPanel("assets").?);
 
     try l.splitRoot(.right, "inspector");
     l.nodes.items[l.root].split.ratio = 0.7;
@@ -58,6 +67,7 @@ fn build4Split(allocator: std.mem.Allocator) !DockLayout {
     try addGameTab(&l, l.findPanel("scene").?);
 
     const bottom_leaf = l.findPanel("assets").?;
+    try addOutputTab(&l, bottom_leaf);
     try l.splitLeaf(bottom_leaf, .right, "inspector");
     l.nodes.items[bottom_leaf].split.ratio = 0.5;
 
@@ -70,6 +80,7 @@ fn build2x3(allocator: std.mem.Allocator) !DockLayout {
     var l = try DockLayout.initSingleLeaf(allocator, "hierarchy");
     try l.splitRoot(.bottom, "assets");
     l.nodes.items[l.root].split.ratio = 0.78;
+    try addOutputTab(&l, l.findPanel("assets").?);
 
     const top_leaf = l.findPanel("hierarchy").?;
     try l.splitLeaf(top_leaf, .right, "scene");
@@ -95,6 +106,7 @@ fn buildTall(allocator: std.mem.Allocator) !DockLayout {
     const bottom_leaf = l.findPanel("hierarchy").?;
     try l.splitLeaf(bottom_leaf, .right, "assets");
     l.nodes.items[bottom_leaf].split.ratio = 0.5;
+    try addOutputTab(&l, l.findPanel("assets").?);
 
     try l.splitRoot(.right, "inspector");
     l.nodes.items[l.root].split.ratio = 0.78;
@@ -116,6 +128,7 @@ fn buildWide(allocator: std.mem.Allocator) !DockLayout {
     l.nodes.items[right_leaf].split.ratio = 0.35;
 
     const assets_leaf = l.findPanel("assets").?;
+    try addOutputTab(&l, assets_leaf);
     try l.splitLeaf(assets_leaf, .bottom, "inspector");
     l.nodes.items[assets_leaf].split.ratio = 0.5;
 

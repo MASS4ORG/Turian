@@ -1,4 +1,4 @@
-//! Inspector panel for `.font` assets (#109): import settings
+//! Inspector panel for `.font` assets: import settings
 //! (`ImportSettingsEditor`, shared with image/model assets). The live text
 //! preview lives in `drawPreview` below, registered as `.font`'s
 //! `PreviewSystem.LiveDrawFn` rather than drawn inline here — see

@@ -19,7 +19,7 @@ pub const Material = @import("Material.zig").Material;
 /// Data-driven input binding asset (`.inputactions`), applied to `engine.Input`.
 pub const InputActions = @import("InputActions.zig").InputActions;
 
-// ── Event channels (#41 SOAP slice) ─────────────────────────────────────────
+// ── Event channels (SOAP slice) ─────────────────────────────────────────
 /// Inspector-wireable event channel: a publisher and any number of
 /// subscribers reference the same asset GUID and share one live instance
 /// (see `GameEventRegistry`), decoupled from each other.

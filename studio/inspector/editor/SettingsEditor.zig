@@ -1,4 +1,4 @@
-//! Studio Settings editor (issue #88): a category-organized, searchable
+//! Studio Settings editor : a category-organized, searchable
 //! editor for Studio-wide configuration (`editor.StudioSettings`), split into
 //! a "local" sidebar (`drawSidebar`, category list + search) and a "fields"
 //! panel (`drawFields`, drawn by the *global* `Inspector` panel like any

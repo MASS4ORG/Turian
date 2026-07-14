@@ -1,5 +1,5 @@
 //! In-editor performance profiler (Guinevere/Turian,). A dockable panel
-//! (#90 — see `Panels.zig`) with a Unity-style multi-track timeline, a
+//! with a Unity-style multi-track timeline, a
 //! recordable history you can scrub, and Perfetto trace export.
 //!
 //! Data source: **`engine.Profiler`** — the *game-side* profiler. It keeps a

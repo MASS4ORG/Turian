@@ -1,6 +1,6 @@
 # Scene Management Demo
 
-Demonstrates the **Scene Management API** (issue #22): asynchronous/additive/
+Demonstrates the **Scene Management API** : asynchronous/additive/
 persistent scene loading, an active-scene concept, and runtime scene switching
 driven from a script.
 

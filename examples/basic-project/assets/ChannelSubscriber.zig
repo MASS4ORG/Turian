@@ -1,7 +1,9 @@
 const std = @import("std");
 const engine = @import("engine");
 
-/// #41/#107 showcase: a GameEvent channel decouples a UI button ("Door" in
+const log = std.log.scoped(.channel_subscriber);
+
+/// showcase: a GameEvent channel decouples a UI button ("Door" in
 /// ui.uidoc, bound via `on_click: {"channel": "<door-channel.asset GUID>"}")
 /// from this subscriber — neither references the other, only the shared
 /// asset GUID. Compare to `JumpOnClick`/`MenuController`'s `named` events:
@@ -10,7 +12,7 @@ const engine = @import("engine");
 var g_ctx: u8 = 0;
 
 fn onDoorChannel(_: *u8) void {
-    std.debug.print("[ChannelSubscriber] door channel raised\n", .{});
+    log.info("door channel raised", .{});
 }
 
 pub const ChannelSubscriber = struct {

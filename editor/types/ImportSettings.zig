@@ -41,7 +41,7 @@ pub const ModelImportSettings = struct {
     scale_factor: f32 = 1.0,
 };
 
-/// Settings for font asset import (v1: theme fonts only — see #109; this
+/// Settings for font asset import (v1: theme fonts only; this
 /// governs the point size a font registers at when a future UI text
 /// component gains a typed font reference).
 pub const FontImportSettings = struct {

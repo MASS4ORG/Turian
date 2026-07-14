@@ -1,6 +1,8 @@
 const std = @import("std");
 const engine = @import("engine");
 
+const log = std.log.scoped(.translator);
+
 pub const Translator = struct {
     pub const is_component = true;
 
@@ -23,7 +25,7 @@ pub const Translator = struct {
         _ = offset_y;
 
         if (@mod(self._elapsed, 1.0) < time.delta) {
-            std.debug.print("[Translator] t={d:.1}s  offset_y={d:.3}m\n", .{
+            log.debug("t={d:.1}s  offset_y={d:.3}m", .{
                 self._elapsed, self.amplitude * @sin(2.0 * std.math.pi * self.frequency * self._elapsed),
             });
         }

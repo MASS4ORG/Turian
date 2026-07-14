@@ -10,7 +10,7 @@ pub const MAX_COMP_FILE = 256;
 pub const MAX_COMPONENTS = 64;
 /// Maximum number of reflected fields per component.
 pub const MAX_COMP_FIELDS = 16;
-/// Maximum length of a declared `menu_path` (issues #85/#72).
+/// Maximum length of a declared `menu_path`.
 pub const MAX_MENU_PATH = 128;
 
 /// Whether the marked type is a scene component or a standalone data asset.
@@ -27,7 +27,7 @@ pub const ComponentDef = struct {
     fields: [MAX_COMP_FIELDS]FieldDef = std.mem.zeroes([MAX_COMP_FIELDS]FieldDef),
     field_count: usize = 0,
     /// Optional cascaded Create-menu path declared via `pub const menu_path
-    /// = "Category/Name";` on the type (issues #85/#72) — e.g.
+    /// = "Category/Name";` on the type — e.g.
     /// `"Gameplay/Enemy Stats"`. Empty when not declared; callers building
     /// the Create menu fall back to a default path in that case.
     menu_path: [MAX_MENU_PATH]u8 = std.mem.zeroes([MAX_MENU_PATH]u8),

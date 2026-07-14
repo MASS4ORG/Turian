@@ -305,7 +305,7 @@ fn callErrors(allocator: std.mem.Allocator, req: *const Request, out: *std.Io.Wr
     var buf: std.Io.Writer.Allocating = .init(allocator);
     defer buf.deinit();
     var jw = std.json.Stringify{ .writer = &buf.writer, .options = .{} };
-    engine.DiagLog.writeJson(&jw) catch {
+    engine.DiagLog.writeJson(&jw, .warn) catch {
         errResponse(req, out, Protocol.ErrorCode.INTERNAL_ERROR, "Serialisation error");
         return;
     };

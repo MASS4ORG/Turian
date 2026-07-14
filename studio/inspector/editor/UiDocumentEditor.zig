@@ -451,7 +451,7 @@ pub fn drawInspector(asset_path: []const u8) void {
     }
 }
 
-/// The `EditorRegistry`-registered per-asset-type editor (#40): shown when a
+/// The `EditorRegistry`-registered per-asset-type editor: shown when a
 /// `.uidoc` is merely *selected* in the Asset Browser, not opened as a tab —
 /// document-level fields only (`reference_size`, `scale_mode`), same weight
 /// as any other asset type's single-click Inspector view.

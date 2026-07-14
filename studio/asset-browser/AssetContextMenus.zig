@@ -1,7 +1,5 @@
 //! Context-menu content shared by all three asset browser views (grid tiles,
-//! folder tree, full tree): the cascaded "Create" asset-creation menu
-//! (issues #85/#72, built at runtime from `editor.menu_tree` over each
-//! entry's declared path), and the per-asset
+//! folder tree, full tree): the cascaded "Create" asset-creation menu, and the per-asset
 //! Open/Instantiate/Reimport/Reveal/Copy-path/Copy-GUID items. Each view
 //! still draws its own Rename/Delete (the grid manages inline rename state
 //! itself; `TreeView` provides Rename/Delete generically for tree rows) —
@@ -155,7 +153,7 @@ fn runCreateAction(action: CreateAction, browse_path: []const u8) void {
     }
 }
 
-/// One entry in the "Create" cascaded menu (issues #85/#72): a runtime
+/// One entry in the "Create" cascaded menu: a runtime
 /// `menu_path` string (e.g. `"Material/Metal"`) grouped into a tree by
 /// `editor.menu_tree`, plus the action to run when picked.
 const CreateEntry = struct {
@@ -166,7 +164,7 @@ const CreateEntry = struct {
 /// Builtin entries plus the runtime-discovered material presets and
 /// data-asset component types, each declaring its own cascaded `menu_path`.
 /// This is the "registration" the issue asks for — adding a new builtin
-/// creatable type, or a plugin contributing one later (#4), is just another
+/// creatable type, or a plugin contributing one later, is just another
 /// entry with a path, no attribute/macro system required.
 ///
 /// Paths aren't hardcoded here: each *type* owns its own path at the
@@ -244,7 +242,7 @@ fn drawMenuNode(node: *const editor.menu_tree.Node, fw: *gui.FloatingMenuWidget,
     }
 }
 
-/// "Create" cascaded menu item (issues #85/#72), scoped to create inside
+/// "Create" cascaded menu item, scoped to create inside
 /// `browse_path`. Shared by the grid's empty-area menu, the folder tree's
 /// per-folder menu, and the full tree's per-folder menu. `id_base` keeps
 /// `id_extra` from colliding when a caller draws more than one of these in

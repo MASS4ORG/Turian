@@ -1,5 +1,5 @@
 //! Both asset-browser tree presentations in one file, since the Grid+Tree
-//! folder sidebar (issue #80) really is the full tree (issues #79/#83) with
+//! folder sidebar  really is the full tree with
 //! files filtered out — one comptime-parameterized `TreeView` model
 //! (`Model(files_included)`) backs both, differing only where folder-only
 //! and folder+file behavior genuinely diverge (selection target, activation,
@@ -79,8 +79,8 @@ fn Model(comptime files_included: bool) type {
         pub fn parentOf(i: usize) i32 {
             return if (files_included) AssetTree.parentOf(i) else AssetTree.folderParentOf(i);
         }
-        /// Respects the Settings-panel `hide_extensions` toggle (issue #84
-        /// follow-up), same as the grid tiles. `max_name_chars` doesn't apply
+        /// Respects the Settings-panel `hide_extensions` toggle,
+        /// same as the grid tiles. `max_name_chars` doesn't apply
         /// here — tree rows aren't fixed-size tiles, so there's nothing to
         /// protect from overflow by truncating.
         pub fn name(i: usize) []const u8 {
@@ -196,7 +196,7 @@ fn drawRootRow() void {
     gui.label(@src(), "assets", .{}, .{ .gravity_y = 0.5 });
 }
 
-/// Grid+Tree sidebar (issue #80): folders only, clicking navigates the grid
+/// Grid+Tree sidebar : folders only, clicking navigates the grid
 /// pane drawn alongside it.
 pub fn drawFolderSidebar() void {
     AssetTree.ensure(gui.io);
@@ -227,7 +227,7 @@ pub fn drawFolderSidebar() void {
     }
 }
 
-/// Tree Only mode (issues #79/#83): folders + files in one tree, replacing
+/// Tree Only mode: folders + files in one tree, replacing
 /// the grid entirely. Selecting a file routes through the same
 /// `EditorState.selected_asset_path` the grid uses, so the Inspector shows
 /// its preview exactly as it does for a grid tile, and rows show the same

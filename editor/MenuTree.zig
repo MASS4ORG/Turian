@@ -1,4 +1,4 @@
-//! Generic runtime path-based menu tree builder (issues #85/#72): turns a
+//! Generic runtime path-based menu tree builder: turns a
 //! flat list of slash-separated "category/subcategory/name" strings into a
 //! nested tree, so a cascaded (Unity-style) menu can be rendered without any
 //! attribute/macro system — callers just declare where an entry lives in the

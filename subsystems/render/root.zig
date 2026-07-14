@@ -18,6 +18,8 @@ const assets = @import("assets.zig");
 const shadow = @import("shadow.zig");
 const gizmos = @import("gizmos.zig");
 
+const log = std.log.scoped(.render);
+
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
 const Vector3 = engine.Vector3;
@@ -156,22 +158,22 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     state.pipeline = try pipeline.createPipeline(device);
     state.sampler = try pipeline.createSampler(device);
     state.shadow_sampler = pipeline.createShadowSampler(device) catch |err| s: {
-        std.debug.print("[render] shadow sampler failed: {any} — shadows disabled.\n", .{err});
+        log.warn("shadow sampler failed: {any} — shadows disabled.", .{err});
         break :s null;
     };
     state.shadow_pipeline = pipeline.createShadowPipeline(device) catch |err| p: {
-        std.debug.print("[render] shadow pipeline failed: {any} — shadows disabled.\n", .{err});
+        log.warn("shadow pipeline failed: {any} — shadows disabled.", .{err});
         break :p null;
     };
     state.gizmo_pipeline = gizmos.createGizmoPipeline(device, true) catch |err| g: {
-        std.debug.print("[render] gizmo pipeline failed: {any} — gizmos disabled.\n", .{err});
+        log.warn("gizmo pipeline failed: {any} — gizmos disabled.", .{err});
         break :g null;
     };
     state.gizmo_overlay_pipeline = gizmos.createGizmoPipeline(device, false) catch |err| g: {
-        std.debug.print("[render] gizmo overlay pipeline failed: {any} — handles disabled.\n", .{err});
+        log.warn("gizmo overlay pipeline failed: {any} — handles disabled.", .{err});
         break :g null;
     };
-    std.debug.print("[render] Ready (SPIRV).\n", .{});
+    log.info("Ready (SPIRV).", .{});
 }
 
 /// Depth texture for a `w`×`h` pass, cached by size (see `state.depth_targets`).
@@ -236,7 +238,7 @@ pub fn renderScene(
         state.shadow_map = pipeline.createShadowMap(dev) catch null;
 
     const depth_tex = depthFor(dev, w, h) orelse {
-        std.debug.print("[render] depth target failed\n", .{});
+        log.err("depth target failed", .{});
         return;
     };
 

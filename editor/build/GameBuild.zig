@@ -18,6 +18,8 @@ pub const RuntimeConfig = codegen.RuntimeConfig;
 pub const BuildConfig = codegen.BuildConfig;
 pub const appendKtx2Module = codegen.appendKtx2Module;
 
+const log = std.log.scoped(.game_build);
+
 /// Build the user game into <project>/.cache/zig-out/bin/game.
 /// Blocks until compilation finishes.  Returns true on success.
 pub fn buildGame(
@@ -35,7 +37,7 @@ pub fn buildGame(
     defer arena.deinit();
     const a = arena.allocator();
     buildGameInner(io, a, project_path, components, component_count, config, progress) catch |err| {
-        std.debug.print("[Turian] Build failed: {any}\n", .{err});
+        log.err("Build failed: {any}", .{err});
         progress.report(1, "Build failed");
         return false;
     };
@@ -91,12 +93,12 @@ fn buildGameInner(
     resolveRuntime(io, a, assets_dir, &runtime);
 
     // Third-party dependency names from project.json — emitted as b.dependency()
-    // calls in the generated build so Zig's PM resolves them (#57).
+    // calls in the generated build so Zig's PM resolves them.
     var project_cfg = ProjectConfig.load(io, a, project_path) catch try ProjectConfig.initDefault(a, "");
     defer project_cfg.deinit();
     const dep_names = project_cfg.dependencyNames(a) catch &.{};
 
-    // Native libs (#62), source modules (#61), and plugin entries (#64) from
+    // Native libs, source modules, and plugin entries from
     // installed packages. `pm_pkgs` must outlive codegen because the specs below
     // borrow its manifest strings.
     var pm_pkgs = PackageManager.discover(io, a, project_path, PackageManager.parseEngineVersion(config.engine_version), config.package_store);
@@ -206,12 +208,12 @@ fn buildGameInner(
     if (progress.cancelled()) return error.Cancelled;
 
     progress.report(0.4, "Compiling game");
-    std.debug.print("[Turian] Building game...\n", .{});
+    log.info("Building game...", .{});
     const argv = [_][]const u8{ "zig", "build", "-Doptimize=Debug" };
     try spawnAndWaitIn(io, a, &argv, cache_path);
 
     const game_out = try std.fmt.allocPrint(a, "{s}/zig-out/bin/game", .{cache_path});
-    std.debug.print("[Turian] Game built: {s}\n", .{game_out});
+    log.info("Game built: {s}", .{game_out});
 }
 
 /// Resolve runtime config from the project's `ProjectSettings` asset and the
@@ -243,11 +245,11 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
                             if (sinfo.asset_type == .scene)
                                 out.boot_scene_guid = a.dupe(u8, ps.first_scene) catch ""
                             else
-                                std.debug.print("[Turian] first_scene {s} is not a scene asset\n", .{ps.first_scene});
-                        } else std.debug.print("[Turian] Boot scene {s} not found in assets\n", .{ps.first_scene});
-                    } else |_| std.debug.print("[Turian] Invalid first_scene GUID '{s}'\n", .{ps.first_scene});
+                                log.warn("first_scene {s} is not a scene asset", .{ps.first_scene});
+                        } else log.warn("Boot scene {s} not found in assets", .{ps.first_scene});
+                    } else |_| log.warn("Invalid first_scene GUID '{s}'", .{ps.first_scene});
                 }
-            } else |err| std.debug.print("[Turian] Failed to parse {s}: {any}\n", .{ info.path, err });
+            } else |err| log.err("Failed to parse {s}: {any}", .{ info.path, err });
         }
     }
 
@@ -298,7 +300,7 @@ fn packageAssets(
     defer pm.deinit();
 
     for (pm.diagnostics.items) |d| {
-        std.debug.print("[Turian] Package {s}: {s}\n", .{ if (d.is_error) "error" else "warning", d.message });
+        if (d.is_error) log.err("Package: {s}", .{d.message}) else log.warn("Package: {s}", .{d.message});
     }
     // A package-graph error (duplicate name, etc.) fails the build (ADR-0001).
     if (pm.hasErrors()) return error.PackageError;
@@ -321,7 +323,7 @@ fn packageAssets(
     }
     for (pkg_roots) |r| {
         all_roots.append(a, r) catch {};
-        std.debug.print("[Turian] Package asset root: {s}\n", .{r});
+        log.info("Package asset root: {s}", .{r});
     }
 
     var db = AssetDatabase.init(a);
@@ -332,7 +334,7 @@ fn packageAssets(
     // keep GUIDs globally unique (ADR-0001).
     if (db.hasCollisions()) {
         for (db.collisions.items) |c| {
-            std.debug.print("[Turian] error: GUID collision {f} between '{s}' and '{s}'\n", .{
+            log.err("GUID collision {f} between '{s}' and '{s}'", .{
                 c.guid, c.path_a, c.path_b,
             });
         }
@@ -343,10 +345,10 @@ fn packageAssets(
 
     const oap_path = std.fmt.allocPrint(a, "{s}/.cache/game.oap", .{project_path}) catch return;
     const n = asset_packager.packageProject(io, a, project_path, &db, oap_path) catch |err| {
-        std.debug.print("[Turian] Asset packaging failed: {any}\n", .{err});
+        log.err("Asset packaging failed: {any}", .{err});
         return;
     };
-    std.debug.print("[Turian] Packaged {d} asset(s) into {s}\n", .{ n, oap_path });
+    log.info("Packaged {d} asset(s) into {s}", .{ n, oap_path });
 }
 
 /// Regenerate `build.zig.zon` from the project's `project.json` (the source of

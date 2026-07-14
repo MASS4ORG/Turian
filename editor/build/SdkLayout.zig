@@ -149,7 +149,7 @@ pub fn resolveBuildConfig(
     // `engine_version` is a build-time constant, not an SDK-layout path, so it is
     // never set by `configFromSdk`; carry it over from the baked config.
     cfg.engine_version = baked.engine_version;
-    // Resolve the central package store root from the environment (issue #20).
+    // Resolve the central package store root from the environment.
     cfg.package_store = package_store.resolveRoot(gpa, environ) catch "";
     applyEnvOverrides(&cfg, environ);
     return cfg;

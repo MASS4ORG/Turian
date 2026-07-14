@@ -31,8 +31,7 @@ pub const WorldMarker = struct {
 
     /// First active camera found in the scene — mirrors
     /// `subsystems/render/`'s own scene-camera search, independently,
-    /// since scripts don't link `render`/`gpu` (#40's shared-library
-    /// boundary).
+    /// since scripts don't link `render`/`gpu`.
     fn findCamera(frame: engine.Frame) ?CameraPose {
         for (frame.objects) |*obj| {
             if (!obj.active) continue;

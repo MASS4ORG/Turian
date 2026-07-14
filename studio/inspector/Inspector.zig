@@ -44,7 +44,7 @@ pub fn draw() void {
         }
     }
 
-    // The Settings tab (#88) has no scene-object/asset selection of its own —
+    // The Settings tab has no scene-object/asset selection of its own —
     // its category sidebar lives in the "local" panel (`Window.zig`), and its
     // fields are the Inspector's content whenever that tab is active, same
     // shape as the uidoc branch above.
@@ -575,9 +575,9 @@ fn drawAssetInspector(asset_path: []const u8) void {
     // `AssetBrowser.drawExpandedSubAssets`. Duplicating them as an Inspector
     // list only confused which surface "owns" them.
 
-    // Shared preview panel (issue #19), Unity-style: bottom of the panel,
+    // Shared preview panel , Unity-style: bottom of the panel,
     // with a Show/Hide toggle. Every asset type goes through the same panel
-    // now (#109 follow-up) — types needing more than a static raster
+    // now — types needing more than a static raster
     // (material's live unsaved-edits-aware render, model's orbit-drag, font's
     // live specimen text) register a `PreviewSystem.LiveDrawFn` instead of
     // the Inspector special-casing each one.

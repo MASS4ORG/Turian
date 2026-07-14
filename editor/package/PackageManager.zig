@@ -1,6 +1,6 @@
 /// Package discovery, manifest loading, and dependency graph.
 /// Scans `<project>/packages/` for installed packages and exposes
-/// typed accessors consumed by the build pipeline (#57–#60).
+/// typed accessors consumed by the build pipeline.
 const std = @import("std");
 const manifest_mod = @import("PackageManifest.zig");
 const PackageManifest = manifest_mod.PackageManifest;
@@ -122,7 +122,7 @@ pub const PackageManager = struct {
     };
 
     /// Source modules from every `source` package, for the generated-build seam
-    /// (#61). Caller owns the returned slice; strings borrow from manifests.
+    ///. Caller owns the returned slice; strings borrow from manifests.
     pub fn sourceModules(self: *const PackageManager, allocator: std.mem.Allocator) ![]SourceModule {
         var list: std.ArrayList(SourceModule) = .empty;
         errdefer list.deinit(allocator);
@@ -134,7 +134,7 @@ pub const PackageManager = struct {
         return list.toOwnedSlice(allocator);
     }
 
-    /// Native libraries from every `native` package, for the link seam (#62).
+    /// Native libraries from every `native` package, for the link seam.
     pub fn nativeLibs(self: *const PackageManager, allocator: std.mem.Allocator) ![]NativeLib {
         var list: std.ArrayList(NativeLib) = .empty;
         errdefer list.deinit(allocator);
@@ -147,7 +147,7 @@ pub const PackageManager = struct {
     }
 
     /// Plugin entry points from every package that declares one, for runtime
-    /// registration (#64). Caller owns the returned slice.
+    /// registration. Caller owns the returned slice.
     pub fn plugins(self: *const PackageManager, allocator: std.mem.Allocator) ![]Plugin {
         var list: std.ArrayList(Plugin) = .empty;
         errdefer list.deinit(allocator);

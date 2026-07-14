@@ -55,25 +55,25 @@ pub const BuildConfig = struct {
     render_root: []const u8,
     /// SDL3 headers include directory (for translating the GPU bindings).
     sdl3_include: []const u8,
-    /// Additional asset-root directories contributed by installed packages (#59).
+    /// Additional asset-root directories contributed by installed packages.
     /// Each entry is an absolute path to an asset directory.
     extra_asset_roots: []const []const u8 = &.{},
     /// Names of third-party dependencies declared in the project's
-    /// `project.json` / generated `build.zig.zon` (#57). The generated build
+    /// `project.json` / generated `build.zig.zon`. The generated build
     /// resolves each via `b.dependency()` so Zig's package manager fetches and
-    /// hash-pins them. Source/native packages (#61/#62) extend this seam to
+    /// hash-pins them. Source/native packages extend this seam to
     /// `addImport`/`linkLibrary` the resolved artifacts.
     extra_deps: []const []const u8 = &.{},
     /// Running engine/SDK version (e.g. "1.8.0"), used to validate installed
-    /// packages' `engine_compat` ranges (#58). Empty disables the check.
+    /// packages' `engine_compat` ranges. Empty disables the check.
     engine_version: []const u8 = "",
-    /// Central package store root (issue #20). Asset/hybrid packages recorded in
+    /// Central package store root . Asset/hybrid packages recorded in
     /// `project.json` are resolved from here. Empty = store discovery disabled.
     package_store: []const u8 = "",
-    /// Native libraries contributed by installed packages (#62), linked into the
+    /// Native libraries contributed by installed packages, linked into the
     /// game executable.
     extra_native: []const NativeLibSpec = &.{},
-    /// Zig source modules exported by installed packages (#61). Each becomes a
+    /// Zig source modules exported by installed packages. Each becomes a
     /// `b.addModule` importable from `main.zig` and from user scripts.
     extra_modules: []const ModuleSpec = &.{},
     /// Path to subsystems/ui_render/root.zig (in-game GUI tree-walk, shared
@@ -89,7 +89,7 @@ pub const BuildConfig = struct {
     dvui_hash: []const u8 = "",
 };
 
-/// A Zig source module exported by a source/hybrid package (#61).
+/// A Zig source module exported by a source/hybrid package.
 pub const ModuleSpec = struct {
     /// Module import name (e.g. "platformer").
     name: []const u8,
@@ -97,7 +97,7 @@ pub const ModuleSpec = struct {
     root_abs: []const u8,
 };
 
-/// A plugin runtime-registration entry point (#64): call `module.entry(&services)`
+/// A plugin runtime-registration entry point: call `module.entry(&services)`
 /// at startup so the package can register components/systems/services.
 pub const PluginSpec = struct {
     /// Name of the exported module that holds the entry function.
@@ -106,7 +106,7 @@ pub const PluginSpec = struct {
     entry: []const u8,
 };
 
-/// A precompiled native library contributed by a package (#62). `lib_template`
+/// A precompiled native library contributed by a package. `lib_template`
 /// is a package-root-relative path that may contain `{target}` (replaced with
 /// the build's Zig target triple at build time, e.g. `lib/{target}/libfoo.a`).
 pub const NativeLibSpec = struct {

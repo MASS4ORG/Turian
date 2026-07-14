@@ -64,10 +64,10 @@ pub const StyleBlock = struct {
     /// "caption"). Ignored when `font` below is set — a specific Font asset
     /// always wins over the theme name.
     font_style: ?[]const u8 = null,
-    /// Direct reference to a Font asset (#109 follow-up), for text that needs
+    /// Direct reference to a Font asset, for text that needs
     /// a specific imported typeface rather than the active theme's. Takes
     /// precedence over `font_style` when set. Independent of the future
-    /// Theme asset (#104) that will let a whole document set one in bulk —
+    /// Theme asset that will let a whole document set one in bulk —
     /// this is the per-node escape hatch that doesn't need it.
     font: TypedAssetRef(.font) = .{},
     /// Point size for `font`; ignored for `font_style` (theme fonts carry
@@ -82,7 +82,7 @@ pub const StyleBlock = struct {
 /// additive, not schema-breaking. JSON form: `{"named": "play_clicked"}` or
 /// `{"channel": "<game_event asset GUID>"}`.
 ///
-/// `channel` is #107 reframed around #41's event-channel DataAsset instead of
+/// `channel` is reframed around event-channel DataAsset instead of
 /// a Unity-`UnityEvent`-style node+method binding: the button raises a
 /// `GameEvent` asset by GUID (`ui_render.dispatchClicks` resolves it through
 /// `GameEventRegistry` and calls `raise()`), and any script anywhere

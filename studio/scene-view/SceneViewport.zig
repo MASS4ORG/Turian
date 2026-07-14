@@ -9,7 +9,7 @@ const EditorCamera = @import("EditorCamera.zig");
 const UiOverlay = @import("../main-window/UiOverlay.zig");
 const ui_render = @import("ui_render");
 
-/// "Show UI overlay" toggle (#47 M2, C3): draws the scene's referenced
+/// "Show UI overlay" toggle: draws the scene's referenced
 /// `.uidoc` documents (plus the one open in `UiDocumentEditor`) letterboxed
 /// over the 3D viewport, WYSIWYG with what the shipped game will render via
 /// the same `ui_render.drawTree` call (D9). See `UiOverlay.zig`.
@@ -216,7 +216,7 @@ pub fn drawGame() void {
             .gravity_x = 0.5,
             .gravity_y = 0.5,
         });
-        // Live GUI during Play/Paused (#47). Runs before `PlayMode.pump()`
+        // Live GUI during Play/Paused. Runs before `PlayMode.pump()`
         // (see Window.zig's per-frame order) so `bw.processEvents()` below
         // can claim the click first — the same input-priority ordering
         // `PlayMode.feedInput`'s `e.handled` check expects.
@@ -230,7 +230,7 @@ pub fn drawGame() void {
     }
 }
 
-/// Draw + dispatch the running game's live `.uidoc` instances (#47) during
+/// Draw + dispatch the running game's live `.uidoc` instances during
 /// Play/Paused, reading the play library's `UiRuntime`/`UiEvents` (same
 /// process, populated by `PlayMode.loadUiDocuments` at Play start).
 fn drawPlayModeUi(target: gui.Rect) void {

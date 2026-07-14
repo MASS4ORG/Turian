@@ -1,7 +1,9 @@
 const std = @import("std");
 const engine = @import("engine");
 
-/// Demonstrates the runtime prefab API (issue #32). On a fixed interval it
+const log = std.log.scoped(.prefab_spawner);
+
+/// Demonstrates the runtime prefab API . On a fixed interval it
 /// `Instantiate`s a prefab; once a cap of live instances is reached it `Destroy`s
 /// the oldest one. Every operation is logged to the console.
 ///
@@ -40,14 +42,14 @@ pub const PrefabSpawner = struct {
 
         if (alive >= self.max_alive) {
             if (oldest) |o| {
-                std.debug.print("[PrefabSpawner] Destroy \"{s}\" (alive {d})\n", .{ o.nameSlice(), alive });
+                log.info("Destroy \"{s}\" (alive {d})", .{ o.nameSlice(), alive });
                 frame.destroy(o); // Unity's Destroy(gameObject)
             }
         } else {
             // Spread spawns along X so they're easy to see.
             const lane: f32 = @floatFromInt(self._spawn_count % 5);
             const pos = engine.Vector3{ .x = lane - 2.0, .y = 1.0, .z = -2.0 };
-            std.debug.print("[PrefabSpawner] Instantiate #{d} at x={d:.1} (alive {d})\n", .{ self._spawn_count, pos.x, alive });
+            log.info("Instantiate #{d} at x={d:.1} (alive {d})", .{ self._spawn_count, pos.x, alive });
             frame.instantiate(guid, pos, null); // Unity's Instantiate(prefab, pos, rot)
             self._spawn_count += 1;
         }

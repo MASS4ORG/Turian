@@ -1,6 +1,6 @@
-//! Registers imported Font assets' raw TTF/OTF bytes with dvui (#109) so they
+//! Registers imported Font assets' raw TTF/OTF bytes with dvui so they
 //! actually render glyphs — today for the Inspector's live preview; later for
-//! `.uidoc` text components once #104's Theme-asset integration lands.
+//! `.uidoc` text components once Theme-asset integration lands.
 //!
 //! dvui has no "replace a registered font" API (`Window.addFont` only
 //! appends), so each GUID is registered at most once per Studio session under

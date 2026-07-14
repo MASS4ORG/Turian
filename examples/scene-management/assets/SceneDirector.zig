@@ -1,7 +1,9 @@
 const std = @import("std");
 const engine = @import("engine");
 
-/// Drives the Scene Management demo (issue #22). Lives in the persistent
+const log = std.log.scoped(.scene_director);
+
+/// Drives the Scene Management demo . Lives in the persistent
 /// bootstrap scene (camera + light) and streams the two level scenes in and out
 /// through the `engine.SceneManager` service:
 ///
@@ -14,7 +16,7 @@ const engine = @import("engine");
 /// survive every `single` transition (the SceneManager equivalent of keeping a
 /// DontDestroyOnLoad object across scene loads).
 ///
-/// The two levels are wired as `TypedAssetRef(.scene)` fields (issue #43): the
+/// The two levels are wired as `TypedAssetRef(.scene)` fields : the
 /// inspector shows a scene-asset picker for each, and the chosen GUID is
 /// serialised into the scene JSON and hydrated back into these fields at
 /// runtime. No hard-coded GUID constants.
@@ -32,7 +34,7 @@ pub const SceneDirector = struct {
 
     pub fn start(self: *SceneDirector, frame: engine.Frame) void {
         const mgr = frame.service(engine.SceneManager) orelse {
-            std.debug.print("[SceneDirector] SceneManager service unavailable\n", .{});
+            log.err("SceneManager service unavailable", .{});
             return;
         };
         // Keep this bootstrap scene (camera, light, director) alive across the
@@ -41,7 +43,7 @@ pub const SceneDirector = struct {
         // Stream the first level in additively so the bootstrap scene stays loaded.
         mgr.requestLoad(self.level_a.guid(), .additive);
         self.booted = true;
-        std.debug.print("[SceneDirector] Bootstrap ready — loading Level A (additive)\n", .{});
+        log.info("Bootstrap ready — loading Level A (additive)", .{});
     }
 
     pub fn update(self: *SceneDirector, frame: engine.Frame) void {
@@ -56,25 +58,25 @@ pub const SceneDirector = struct {
             self.reported = true;
             var buf: [engine.SCENE_MANAGER_MAX_SCENES]engine.SceneHandle = undefined;
             const loaded = mgr.getLoadedScenes(&buf);
-            std.debug.print("[SceneDirector] {d} scene(s) loaded; keys 1-4 switch/add/unload levels\n", .{loaded.len});
+            log.info("{d} scene(s) loaded; keys 1-4 switch/add/unload levels", .{loaded.len});
         }
 
         if (input.wasKeyPressed(.num_1)) {
             mgr.requestLoad(self.level_a.guid(), .single);
-            std.debug.print("[SceneDirector] Switch to Level A (single)\n", .{});
+            log.info("Switch to Level A (single)", .{});
         }
         if (input.wasKeyPressed(.num_2)) {
             mgr.requestLoad(self.level_b.guid(), .single);
-            std.debug.print("[SceneDirector] Switch to Level B (single)\n", .{});
+            log.info("Switch to Level B (single)", .{});
         }
         if (input.wasKeyPressed(.num_3)) {
             mgr.requestLoad(self.level_b.guid(), .additive);
-            std.debug.print("[SceneDirector] Add Level B (additive)\n", .{});
+            log.info("Add Level B (additive)", .{});
         }
         if (input.wasKeyPressed(.num_4)) {
             if (mgr.findById(self.level_b.guid())) |h| {
                 mgr.requestUnload(h);
-                std.debug.print("[SceneDirector] Unload Level B\n", .{});
+                log.info("Unload Level B", .{});
             }
         }
     }

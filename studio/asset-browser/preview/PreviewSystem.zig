@@ -1,4 +1,4 @@
-//! Shared asset preview API (issues #19, #25): a single registry of
+//! Shared asset preview API: a single registry of
 //! "asset type → thumbnail generator" used by both the Inspector's preview
 //! panel and the Asset Browser's tile grid, with an in-memory + on-disk raster
 //! cache keyed by the asset's GUID and its `.meta` `source_hash` (so a
@@ -10,8 +10,8 @@
 //! generator for an asset type — the same fn-pointer-registry idiom
 //! `GizmoSystem.registerGizmo` already uses for custom component gizmos. User
 //! script `.so`s can't call this directly (they don't link the GUI/render
-//! modules — see the #40 custom-editor plan), so today this is a Zig-source
-//! extension point; a future editor-plugin loader (issue #4) would register
+//! modules — so today this is a Zig-source
+//! extension point; a future editor-plugin loader  would register
 //! providers through the same call.
 //!
 //! Render-based previews (model, material) are intentionally NOT re-rendered

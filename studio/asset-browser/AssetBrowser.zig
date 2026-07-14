@@ -1,5 +1,5 @@
 //! Asset browser panel: top-level orchestration only. Picks which view(s) to
-//! draw for the current `NavMode` (issues #79/#80/#83), owns the panel-wide
+//! draw for the current `NavMode`, owns the panel-wide
 //! keyboard shortcuts, and the "..." settings menu content (zoom, view
 //! mode, Packages visibility). No header/toolbar of its own; the breadcrumb
 //! lives in `AssetGridView` instead. The views themselves live in dedicated
@@ -18,7 +18,7 @@ const AssetGridView = @import("AssetGridView.zig");
 const AssetTreeView = @import("AssetTreeView.zig");
 const AssetTileLayout = @import("AssetTileLayout.zig");
 
-/// How the browser lays out folder navigation (issues #79/#80/#83): the
+/// How the browser lays out folder navigation: the
 /// original tile grid, the grid with an added folder-only tree sidebar for
 /// navigation, or an exclusive tree (folders + files) replacing the grid
 /// entirely — Unity-style.
@@ -61,7 +61,7 @@ pub fn showPackages() bool {
 var prev_project_path_buf: [1024]u8 = undefined;
 var prev_project_path_len: usize = 0;
 
-/// Three-way icon toggle for `NavMode` (issues #79/#80/#83): plain grid,
+/// Three-way icon toggle for `NavMode`: plain grid,
 /// grid with a folder tree sidebar, or tree-only (folders + files).
 fn drawNavModeToggle() void {
     const modes = [_]struct { mode: NavMode, icon: []const u8 }{
@@ -223,7 +223,7 @@ pub fn draw() void {
             defer split.deinit();
             if (split.showFirst()) AssetTreeView.drawFolderSidebar();
             // `..` is redundant once folder navigation flows through the
-            // sidebar tree (issue #80).
+            // sidebar tree .
             if (split.showSecond()) AssetGridView.draw(proj_path, browse_path, outer.data(), false);
         },
     }

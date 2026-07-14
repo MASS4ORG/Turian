@@ -102,7 +102,7 @@ fn loadInto(e: *Entry, path: []const u8, mtime: i128) void {
 /// Resolves a texture GUID to file bytes for `ui_render`'s image content,
 /// reading into the current dvui frame's arena (freed automatically next
 /// frame — matches dvui's own per-frame allocation convention). Shared with
-/// `SceneViewport`'s Play-mode UI draw (#47) — same asset source, same
+/// `SceneViewport`'s Play-mode UI draw — same asset source, same
 /// per-frame-arena lifetime rule.
 pub fn resolveTextureBytes(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {
     _ = ctx;

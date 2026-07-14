@@ -72,7 +72,7 @@ pub const Texture = assets.Texture;
 pub const Material = assets.Material;
 /// Data-driven input binding asset (`.inputactions`).
 pub const InputActions = assets.InputActions;
-/// Inspector-wireable event channel (#41 SOAP slice) — see `engine.ui.EventBinding.channel`.
+/// Inspector-wireable event channel — see `engine.ui.EventBinding.channel`.
 pub const GameEvent = assets.GameEvent;
 pub const GameEventRegistry = assets.GameEventRegistry;
 /// Game/project configuration asset (`.projectsettings`): metadata, graphics,
@@ -94,7 +94,7 @@ pub const AssetServer = assets.AssetServer;
 /// Software rasterizer for game builds.
 pub const software_renderer = @import("SoftwareRenderer.zig");
 
-/// In-game GUI data + logic (#47): `.uidoc` document model, event registry.
+/// In-game GUI data + logic: `.uidoc` document model, event registry.
 /// Zero dvui imports — see `subsystems/ui_render/` for the draw walk.
 pub const ui = @import("ui/root.zig");
 /// UI document asset (`.uidoc`) — a flat, parent-indexed tree of `UiNode`s.
@@ -104,8 +104,7 @@ pub const UiEvents = ui.UiEvents;
 
 /// World->viewport projection (C5/C8): screen-anchored UI elements (enemy
 /// health bars, name plates) computed from a script without the `gpu`/
-/// `render` modules (#40's shared-library boundary keeps those out of user
-/// script `.so`s).
+/// `render` modules.
 pub const Projection = @import("Projection.zig");
 
 /// C-ABI types for user script reflection.

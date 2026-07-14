@@ -30,7 +30,7 @@ pub const AssetDescriptor = struct {
     open_mode: OpenMode = .none,
     /// Icon hint for the asset browser.
     icon_hint: IconHint = .document,
-    /// Cascaded Create-menu path (issues #85/#72), e.g. `"UI/Document"`.
+    /// Cascaded Create-menu path, e.g. `"UI/Document"`.
     /// Null for types that aren't creatable from the asset browser's Create
     /// menu (imported types like Image/Model/Script/Audio/Font). Declared
     /// here, next to the rest of the type's editor behaviour, rather than in

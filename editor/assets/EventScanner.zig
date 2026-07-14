@@ -1,4 +1,4 @@
-//! Scans user script source files for UI event type declarations (#112):
+//! Scans user script source files for UI event type declarations:
 //! `pub const SomeEvent = struct { pub const event_name = "some_name"; };`
 //! — the same declarative convention `engine.ui.UiEvents.register(T)` expects
 //! (see `engine/ui/UiEvents.zig`'s module doc). Feeds the Studio inspector's

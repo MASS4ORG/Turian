@@ -72,7 +72,7 @@ pub const Frame = struct {
         return rt.instanceFor(node.guidSlice());
     }
 
-    /// The shared `GameEvent` channel referenced by `ref` (#41/#107), or null
+    /// The shared `GameEvent` channel referenced by `ref`, or null
     /// when the runtime doesn't publish the registry (unit tests) or the
     /// channel table is full. A publisher and every subscriber referencing
     /// the same asset GUID resolve to the SAME instance, decoupled from each

@@ -1,7 +1,7 @@
 const std = @import("std");
 const engine = @import("engine");
 
-/// World-affects-GUI demo (#47 showcase): shows the `ui.uidoc` "ProximityDialog"
+/// World-affects-GUI demo: shows the `ui.uidoc` "ProximityDialog"
 /// node when the camera comes within `radius` of `target`'s world position,
 /// hides it otherwise. The reverse data-flow from `WorldMarker` (which turns a
 /// world position into a screen *position*); this turns a world distance into

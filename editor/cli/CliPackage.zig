@@ -14,7 +14,7 @@ pub fn printUsagePackage() void {
         \\  update  [name]      Update a package (or all packages)
         \\  list                List installed packages
         \\  info    <name>      Show full manifest for an installed package
-        \\  search  <query>     Search the package registry (not yet available — see #65)
+        \\  search  <query>     Search the package registry
         \\
         \\Flags:
         \\  --project <path>    Project root directory (default: current directory)
@@ -74,7 +74,7 @@ pub fn cmdPackage(
     } else if (std.mem.eql(u8, sub, "search")) {
         std.debug.print(
             \\Package registry search is not yet available.
-            \\A registry/repository API is planned in issue #65.
+            \\A registry/repository API is planned.
             \\In the meantime, install packages from a local path or git URL:
             \\  turian-cli package install /path/to/package
             \\  turian-cli package install git+https://example.com/my-package

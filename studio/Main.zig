@@ -19,9 +19,12 @@ const LayoutStore = @import("services/LayoutStore.zig");
 const build_options = @import("turian_build_options");
 const Icon = @import("Icon.zig");
 
+const log = std.log.scoped(.studio_main);
+
 /// Route std.log through the engine diagnostic ring so the Remote Debug
 /// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
-/// and errors. Still forwards to the default logger.
+/// and errors, and the Output panel can show them alongside everything
+/// else. Still prints to the terminal (`DiagLog.logFn`, colored/timestamped).
 pub const std_options: std.Options = .{ .logFn = engine.DiagLog.logFn };
 
 /// Default debug server port for the Studio.
@@ -213,8 +216,8 @@ fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
     if (gui.backend.initWindow(opts)) |backend| {
         return backend;
     } else |err| {
-        std.debug.print("[Turian] Vulkan GPU backend unavailable ({any}); " ++
-            "retrying with the platform default driver\n", .{err});
+        log.warn("Vulkan GPU backend unavailable ({any}); " ++
+            "retrying with the platform default driver", .{err});
     }
 
     // Fallback: reset the driver hint (an empty string is itself an invalid
@@ -248,7 +251,7 @@ fn run(main_init: std.process.Init) !void {
     defer win.deinit();
 
     GpuRenderer.init(&backend) catch |err|
-        std.debug.print("[GpuRenderer] init failed: {any}\n", .{err});
+        log.err("GpuRenderer init failed: {any}", .{err});
     PreviewSystem.init();
     // Live/interactive previews (need more than a static raster) — see
     // `PreviewSystem.registerLiveProvider`'s doc comment for why these are
@@ -268,7 +271,7 @@ fn run(main_init: std.process.Init) !void {
     // running game on the default 7777.
     var debug_srv = rdebug.Server.init(main_init.gpa, .{ .port = STUDIO_DEBUG_PORT, .allow_write = true });
     debug_srv.start(main_init.io) catch |err|
-        std.debug.print("[studio] debug server failed to start: {s}\n", .{@errorName(err)});
+        log.err("debug server failed to start: {s}", .{@errorName(err)});
     defer debug_srv.deinit(main_init.io);
     const studio_applier = rdebug.MutationApplier{ .ctx = null, .applyFn = studioMutationApplier };
 
@@ -354,7 +357,7 @@ fn run(main_init: std.process.Init) !void {
 
         try win.begin(nstime);
         if (do_capture) backend.beginFrameCapture() catch |err| {
-            std.debug.print("[Turian] beginFrameCapture failed: {any}\n", .{err});
+            log.err("beginFrameCapture failed: {any}", .{err});
             do_capture = false;
         };
 
@@ -504,10 +507,10 @@ fn run(main_init: std.process.Init) !void {
                 defer main_init.gpa.free(pixels);
                 const size = backend.pixelSize();
                 if (Screenshots.captureWindow(pixels, @intFromFloat(size.w), @intFromFloat(size.h))) |path| {
-                    std.debug.print("[Turian] Whole-window capture saved: {s}\n", .{path});
+                    log.info("Whole-window capture saved: {s}", .{path});
                 }
             } else |err| {
-                std.debug.print("[Turian] endFrameCapture failed: {any}\n", .{err});
+                log.err("endFrameCapture failed: {any}", .{err});
             }
             backend.renderPresent();
             if (capture_quit_after) quit = true;

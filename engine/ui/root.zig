@@ -1,4 +1,4 @@
-//! In-game GUI data + logic (#47). Zero dvui imports (D7) — the tree-walk
+//! In-game GUI data + logic. Zero dvui imports (D7) — the tree-walk
 //! that turns this data into dvui calls lives in `subsystems/ui_render/`.
 
 pub const UiDocument = @import("UiDocument.zig").UiDocument;

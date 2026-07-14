@@ -1,6 +1,6 @@
 /// com.example.spawner — sample source+plugin package.
 ///
-/// Demonstrates the source package (#61) and plugin runtime registration (#64)
+/// Demonstrates the source package and plugin runtime registration
 /// workflow:
 ///   1. The build system emits a `b.addModule("spawner", ...)` declaration for
 ///      this file so user scripts can `@import("spawner")`.
@@ -30,7 +30,7 @@ pub const SpawnerConfig = struct {
 var g_config: SpawnerConfig = .{};
 
 /// Plugin entry point called by the generated main.zig at startup, before the
-/// boot scene loads (issue #64). Registers `SpawnerConfig` into the engine
+/// boot scene loads . Registers `SpawnerConfig` into the engine
 /// service registry so user scripts can retrieve it via `frame.services.get`.
 pub fn register(services: *engine.Services) void {
     services.register(SpawnerConfig, &g_config);

@@ -1,6 +1,8 @@
 const std = @import("std");
 const engine = @import("engine");
 
+const log = std.log.scoped(.player);
+
 pub const Player = struct {
     pub const is_component = true;
 
@@ -11,17 +13,17 @@ pub const Player = struct {
 
     pub fn awake(self: *@This()) void {
         _ = self;
-        std.debug.print("[Player] awake\n", .{});
+        log.debug("awake", .{});
     }
 
     pub fn enable(self: *@This()) void {
         _ = self;
-        std.debug.print("[Player] enable\n", .{});
+        log.debug("enable", .{});
     }
 
     pub fn start(self: *@This()) void {
         _ = self;
-        std.debug.print("[Player] start\n", .{});
+        log.debug("start", .{});
     }
 
     pub fn update(self: *@This(), time: engine.Time) void {
@@ -29,17 +31,17 @@ pub const Player = struct {
         if (self._print_timer >= 1.0) {
             self._print_timer -= 1.0;
             const fps = if (time.delta > 0) 1.0 / time.delta else 0.0;
-            std.debug.print("[Player] fps={d:.1}  frame={d}\n", .{ fps, time.frame });
+            log.info("fps={d:.1}  frame={d}", .{ fps, time.frame });
         }
     }
 
     pub fn disable(self: *@This()) void {
         _ = self;
-        std.debug.print("[Player] disable\n", .{});
+        log.debug("disable", .{});
     }
 
     pub fn destroy(self: *@This()) void {
         _ = self;
-        std.debug.print("[Player] destroy\n", .{});
+        log.debug("destroy", .{});
     }
 };

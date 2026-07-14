@@ -15,6 +15,7 @@ const engine = @import("engine");
 const EditorState = @import("../services/EditorState.zig");
 
 const page = std.heap.page_allocator;
+const log = std.log.scoped(.profile_export);
 
 pub const Result = struct {
     ok: bool = false,
@@ -61,7 +62,7 @@ pub fn exportTrace() ?[]const u8 {
         return null;
     };
     std.Io.Dir.cwd().createDirPath(io, out_dir) catch |err| {
-        std.debug.print("[ProfileExport] cannot create {s}: {any}\n", .{ out_dir, err });
+        log.err("cannot create {s}: {any}", .{ out_dir, err });
         setLast(false, "mkdir failed");
         return null;
     };
@@ -89,16 +90,16 @@ pub fn exportTrace() ?[]const u8 {
     };
     defer out.deinit();
     engine.Profiler.writeChromeTrace(&out.writer) catch |err| {
-        std.debug.print("[ProfileExport] encode failed: {any}\n", .{err});
+        log.err("encode failed: {any}", .{err});
         setLast(false, "encode failed");
         return null;
     };
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = full, .data = out.written() }) catch |err| {
-        std.debug.print("[ProfileExport] write {s} failed: {any}\n", .{ rel, err });
+        log.err("write {s} failed: {any}", .{ rel, err });
         setLast(false, "write failed");
         return null;
     };
-    std.debug.print("[ProfileExport] saved {s} ({d} frames)\n", .{ rel, engine.Profiler.historyCount() });
+    log.info("saved {s} ({d} frames)", .{ rel, engine.Profiler.historyCount() });
     setLast(true, rel);
     return g_last.path();
 }

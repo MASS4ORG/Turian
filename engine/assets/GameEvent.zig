@@ -1,6 +1,5 @@
-//! GameEvent — an Inspector-wireable event-channel DataAsset (#41 SOAP slice;
-//! reframes #107's Unity-event-analogue as a channel asset rather than a
-//! node+method binding). A publisher (e.g. a UI button's `channel` binding)
+//! GameEvent — an Inspector-wireable event-channel DataAsset.
+//! A publisher (e.g. a UI button's `channel` binding)
 //! and any number of subscribers reference the SAME asset GUID — never each
 //! other directly — and share one live instance via `GameEventRegistry`.
 //! Mirrors `engine.ui.UiEvents`' typed dispatch, but per-instance (one
@@ -59,7 +58,7 @@ pub const GameEvent = struct {
 };
 
 /// Runtime registry holding one shared `GameEvent` instance per asset GUID
-/// (#41's "runtime registry" prerequisite) — a publisher and a subscriber
+/// — a publisher and a subscriber
 /// that both reference the same asset GUID resolve to the SAME instance,
 /// decoupled from each other. Fixed-capacity, linear-scan — mirrors
 /// `engine.ui.UiRuntime`'s shape (registered into `Services`/`Frame` the same

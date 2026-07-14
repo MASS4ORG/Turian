@@ -13,6 +13,8 @@
 const std = @import("std");
 const gui = @import("gui");
 const GpuRenderer = @import("../scene-view/GpuRenderer.zig");
+
+const log = std.log.scoped(.screenshots);
 const EditorState = @import("EditorState.zig");
 
 const page = std.heap.page_allocator;
@@ -62,7 +64,7 @@ fn nextShotPath(fullbuf: []u8, relbuf: []u8) ?struct { full: []const u8, rel: []
         return null;
     };
     std.Io.Dir.cwd().createDirPath(io, shots_dir) catch |err| {
-        std.debug.print("[Screenshots] cannot create {s}: {any}\n", .{ shots_dir, err });
+        log.err("cannot create {s}: {any}", .{ shots_dir, err });
         setLast(false, "mkdir failed");
         return null;
     };
@@ -101,16 +103,16 @@ fn writeShot(pixels: []u8, w: u32, h: u32) ?[]const u8 {
     // which needs a live dvui.current_window — gone by the time captureWindow's
     // caller (Main.zig, after win.end()) reaches this point.
     gui.PNGEncoder.writeWithResolution(&out.writer, pixels, w, h, 96) catch |err| {
-        std.debug.print("[Screenshots] PNG encode failed: {any}\n", .{err});
+        log.err("PNG encode failed: {any}", .{err});
         setLast(false, "encode failed");
         return null;
     };
     std.Io.Dir.cwd().writeFile(gui.io, .{ .sub_path = paths.full, .data = out.written() }) catch |err| {
-        std.debug.print("[Screenshots] write {s} failed: {any}\n", .{ paths.rel, err });
+        log.err("write {s} failed: {any}", .{ paths.rel, err });
         setLast(false, "write failed");
         return null;
     };
-    std.debug.print("[Screenshots] saved {s}\n", .{paths.rel});
+    log.info("saved {s}", .{paths.rel});
     setLast(true, paths.rel);
     return g_last.path();
 }

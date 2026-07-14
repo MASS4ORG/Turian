@@ -1,4 +1,4 @@
-//! Single node-tree -> dvui draw walk (#47 in-game GUI epic), shared by the
+//! Single node-tree -> dvui draw walk, shared by the
 //! studio viewport overlay and the shipped game — one draw function is the
 //! WYSIWYG enforcement (D7). Maps `engine.UiDocument` data onto dvui calls
 //! per the composition rule (D2): interaction wrapper -> box(layout) ->
@@ -82,9 +82,8 @@ pub const DrawOptions = struct {
 // ── Font resolution (GUID -> registered dvui family) ────────────────────────
 // Fonts must be registered with dvui exactly once (no per-draw-call
 // resolution like a texture — dvui has no "replace a registered font" API),
-// so this owns a small process-lifetime cache shared by every host (studio
-// viewport + shipped game, #109 follow-up) rather than each duplicating its
-// own bookkeeping.
+// so this owns a small process-lifetime cache shared by every host
+// rather than each duplicating its own bookkeeping.
 
 const MAX_REGISTERED_FONTS = 32;
 var registered_font_guids: [MAX_REGISTERED_FONTS][36]u8 = undefined;
@@ -236,7 +235,7 @@ fn outerOptions(node: *const ui.UiNode, id_extra: usize, draw_opts: DrawOptions)
     const style = node.style;
     if (style.style_class) |sc| opts.style = dvuiStyle(sc);
     // `font` (a specific Font asset) wins over `font_style` (a theme name)
-    // when set (#109 follow-up). Unresolved GUIDs/unknown theme names fall
+    // when set. Unresolved GUIDs/unknown theme names fall
     // back to the inherited font rather than warning per frame — load-time
     // validation is the place for that.
     if (style.font.slice().len != 0) {
@@ -294,7 +293,7 @@ fn dvuiTextAlign(a: ui.TextAlign) f32 {
     };
 }
 
-/// `font` is the node's resolved font (from `outerOptions`, D5/#109) — passed
+/// `font` is the node's resolved font — passed
 /// in rather than re-resolved here because a label is its own dvui widget
 /// with its own `Options`; it does NOT inherit `.font` from the wrapping
 /// box/button `outerOptions` builds (dvui has no such cascade). `.expand =
@@ -469,8 +468,8 @@ pub fn drawTree(doc: *const ui.UiDocument, lb: Letterbox, draw_opts: DrawOptions
     return result;
 }
 
-/// Fires every clicked node's `on_click` binding (M2.9 `.named`, #107/#41
-/// `.channel`). `.named` uses `resolved_ids`, the per-document cache from
+/// Fires every clicked node's `on_click` binding.
+/// `.named` uses `resolved_ids`, the per-document cache from
 /// `UiEvents.resolveDocument` (parallel to `doc.nodes`, built once at load
 /// time) — zero string work, just an index lookup + integer dispatch.
 /// `.channel` resolves its asset GUID through `channels` (a
