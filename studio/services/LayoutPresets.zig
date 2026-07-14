@@ -7,6 +7,7 @@
 //! layout trees.
 const std = @import("std");
 const gui = @import("gui");
+const editor = @import("editor");
 
 pub const DockLayout = gui.DockingWidget.Layout.DockLayout;
 
@@ -22,6 +23,47 @@ pub const builtins = [_]Preset{
     .{ .name = "Tall", .build = buildTall },
     .{ .name = "Wide", .build = buildWide },
 };
+
+/// A dock arrangement an asset type brings its own of, instead of borrowing
+/// the user's main scene layout. `LayoutStore` swaps to it whenever a tab of
+/// that type is the active document, and back out again when it isn't.
+pub const AssetLayout = struct {
+    build: *const fn (allocator: std.mem.Allocator) anyerror!DockLayout,
+    /// The only panels this layout may contain: anything else is dropped when
+    /// a saved copy is loaded, and hidden from the Add Panel menus. The first
+    /// entry is the layout's anchor — re-inserted if a saved copy somehow
+    /// lost it, so the layout can never come back empty.
+    allowed: []const []const u8,
+};
+
+/// The layout `asset_type` brings its own of, or null to keep using the main
+/// layout (every type but Studio Settings, today).
+pub fn forAssetType(asset_type: editor.AssetType) ?AssetLayout {
+    return switch (asset_type) {
+        .studio_settings => .{ .build = buildSettings, .allowed = &settings_panels },
+        else => null,
+    };
+}
+
+/// Studio Settings is not a scene: a 3D viewport, a Game view and a scene
+/// Hierarchy have nothing to show for it. Its own category sidebar takes the
+/// Hierarchy's place and the Inspector hosts the fields, leaving only the
+/// document-agnostic panels alongside.
+const settings_panels = [_][]const u8{ "settings", "inspector", "assets", "output" };
+
+/// Settings sidebar on the left, its fields (the Inspector) filling the
+/// middle, assets + log docked below.
+fn buildSettings(allocator: std.mem.Allocator) !DockLayout {
+    var l = try DockLayout.initSingleLeaf(allocator, "settings");
+    try l.splitLeaf(l.root, .right, "inspector");
+    l.nodes.items[l.root].split.ratio = 0.22;
+
+    try l.splitRoot(.bottom, "assets");
+    l.nodes.items[l.root].split.ratio = 0.72;
+    try addOutputTab(&l, l.findPanel("assets").?);
+
+    return l;
+}
 
 /// Groups "scene" and "game" as tabs in `leaf`, with Scene active (Unity's
 /// default — the just-inserted tab would otherwise become active).

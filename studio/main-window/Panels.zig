@@ -55,7 +55,8 @@ const builtin_panels = [_]PanelDesc{
     .{ .id = "inspector", .title = "Inspector", .icon = gui.entypo.list, .draw = Inspector.draw },
     .{ .id = "assets", .title = "Assets", .icon = gui.entypo.folder, .draw = AssetBrowser.draw, .settings = AssetBrowser.drawSettings },
     .{ .id = "profiler", .title = "Profiler", .icon = gui.entypo.gauge, .draw = ProfilerPanel.drawContent },
-    .{ .id = "output", .title = "Output", .icon = gui.entypo.text_document, .draw = LogPanel.draw, .settings = LogPanel.drawSettings },
+    .{ .id = "output", .title = "Log", .icon = gui.entypo.text_document, .draw = LogPanel.draw, .settings = LogPanel.drawSettings },
+    .{ .id = "settings", .title = "Settings", .icon = gui.entypo.cog, .draw = SettingsEditor.drawSidebar, .allow_multiple = false },
 };
 
 /// The registry backing `all()`: builtins first (fixed), then whatever
@@ -131,17 +132,26 @@ pub fn newInstanceId(base_id: []const u8, layout: *gui.DockingWidget.Layout.Dock
     }
 }
 
-/// Draws "Add <Panel>" menu items — every registered panel that either
-/// allows more than one open copy, or isn't open yet — inserting a fresh
-/// instance into `target_leaf` on click. Shared by the View ▸ menu (target =
-/// the first leaf) and the dock header's right-click context menu (target =
-/// whichever leaf was clicked). Returns true if an item was picked (already
-/// applied to `l`), so the caller knows to close its menu and persist —
-/// this function doesn't know or care what kind of menu/popup it's drawn
-/// inside.
-pub fn drawAddPanelMenuItems(l: *gui.DockingWidget.Layout.DockLayout, target_leaf: gui.DockingWidget.Layout.NodeIndex) bool {
+/// Draws "Add <Panel>" menu items — every registered panel that `allows` for
+/// the layout on screen and that either permits more than one open copy, or
+/// isn't open yet — inserting a fresh instance into `target_leaf` on click.
+/// Shared by the View ▸ menu (target = the first leaf) and the dock header's
+/// right-click context menu (target = whichever leaf was clicked). Returns
+/// true if an item was picked (already applied to `l`), so the caller knows
+/// to close its menu and persist — this function doesn't know or care what
+/// kind of menu/popup it's drawn inside.
+///
+/// `allows` is passed in rather than queried here because the answer depends
+/// on which layout is live, which is `LayoutStore`'s business — and
+/// `LayoutStore` already imports this module.
+pub fn drawAddPanelMenuItems(
+    l: *gui.DockingWidget.Layout.DockLayout,
+    target_leaf: gui.DockingWidget.Layout.NodeIndex,
+    allows: *const fn (id: []const u8) bool,
+) bool {
     var picked = false;
     for (all(), 0..) |p, i| {
+        if (!allows(p.id)) continue;
         if (!p.allow_multiple and l.contains(p.id)) continue;
         var buf: [64]u8 = undefined;
         const label = std.fmt.bufPrint(&buf, "Add {s}", .{p.title}) catch p.title;
@@ -156,15 +166,12 @@ pub fn drawAddPanelMenuItems(l: *gui.DockingWidget.Layout.DockLayout, target_lea
     return picked;
 }
 
-/// Hierarchy panel: the scene tree, except a `.studio_settings` or
-/// `.ui_document` tab takes it over with its own sidebar/hierarchy.
+/// Hierarchy panel: the scene tree, except a `.ui_document` tab takes it over
+/// with its own hierarchy. A `.studio_settings` tab needs no special case —
+/// it swaps to a layout of its own (`LayoutPresets.forAssetType`) in which
+/// the dedicated `settings` panel stands in for this one.
 fn drawHierarchy() void {
-    const is_settings = Documents.activeIsAsset() and Documents.activeAssetType() == .studio_settings;
-    const is_uidoc = Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document;
-
-    if (is_settings) {
-        SettingsEditor.drawSidebar();
-    } else if (is_uidoc) {
+    if (Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document) {
         UiDocumentEditor.drawHierarchyPanel(Documents.activePath());
     } else {
         SceneTree.draw();
@@ -177,9 +184,8 @@ fn drawHierarchy() void {
 /// old fixed-layout special case where the asset editor took over both the
 /// hierarchy and scene area is gone; this is an acceptable simplification).
 fn drawScene() void {
-    const is_settings = Documents.activeIsAsset() and Documents.activeAssetType() == .studio_settings;
     const is_uidoc = Documents.activeIsAsset() and Documents.activeAssetType() == .ui_document;
-    const is_other_asset = Documents.activeIsAsset() and !is_settings and !is_uidoc;
+    const is_other_asset = Documents.activeIsAsset() and !is_uidoc;
 
     if (is_other_asset) {
         Inspector.drawAssetDocument(Documents.activePath());

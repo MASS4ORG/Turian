@@ -12,6 +12,7 @@ pub const AssetType = enum(u8) {
     project_settings,
     ui_document,
     font,
+    ui_theme,
     /// Virtual asset backing the Studio Settings editor tab  — not
     /// a project asset; never resolved via `lookupByFilename`.
     studio_settings,

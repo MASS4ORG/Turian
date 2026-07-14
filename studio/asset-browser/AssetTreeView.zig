@@ -205,11 +205,11 @@ pub fn drawFolderSidebar() void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
 
-    var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+    var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .app1, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     drawRootRow();
@@ -236,7 +236,7 @@ pub fn drawFullTree(outer_wd: *gui.WidgetData) void {
     AssetTree.ensure(gui.io);
     Model(true).syncPrimary();
 
-    var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+    var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .style = .app1, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     FullTree.draw(outer_wd);

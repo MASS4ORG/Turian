@@ -42,6 +42,9 @@ pub const ProjectSettings = struct {
     /// GUID of the scene asset to load first at boot. Empty = let the build pick
     /// the conventional fallback scene.
     first_scene: []const u8 = "",
+    /// GUID of a `.uitheme` asset the shipped game boots its UI with. Empty =
+    /// keep today's behavior (OS light/dark preference, no override).
+    ui_theme: []const u8 = "",
 
     /// Serialized project metadata. The runtime form is `engine.core.Project`
     /// (fixed buffers, no allocation); this is its editable/ZON counterpart.
@@ -101,6 +104,7 @@ pub const ProjectSettings = struct {
         // We compare each string pointer to its known default to skip literals.
         const d = ProjectSettings{};
         freeOwnedSlice(allocator, self.first_scene, d.first_scene);
+        freeOwnedSlice(allocator, self.ui_theme, d.ui_theme);
         freeOwnedSlice(allocator, self.project.name, d.project.name);
         freeOwnedSlice(allocator, self.project.company, d.project.company);
         freeOwnedSlice(allocator, self.project.version, d.project.version);
@@ -156,6 +160,7 @@ test "serialize then load round-trips settings" {
         .graphics = .{ .width = 1920, .height = 1080, .vsync = false, .quality = .ultra },
         .platform = .{ .target = .linux, .optimize = .release_fast },
         .first_scene = "58a6a0db-f0e9-4d4c-b7b4-7ff001b81fd7",
+        .ui_theme = "00000000-0000-4000-8000-000000000300",
     };
 
     var buf: [4096]u8 = undefined;
@@ -173,6 +178,7 @@ test "serialize then load round-trips settings" {
     try std.testing.expectEqual(ProjectSettings.Platform.Target.linux, loaded.platform.target);
     try std.testing.expectEqualStrings("ReleaseFast", loaded.optimizeFlag());
     try std.testing.expectEqualStrings("58a6a0db-f0e9-4d4c-b7b4-7ff001b81fd7", loaded.first_scene);
+    try std.testing.expectEqualStrings("00000000-0000-4000-8000-000000000300", loaded.ui_theme);
 }
 
 test "toProject hydrates the runtime Project value" {

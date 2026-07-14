@@ -21,6 +21,10 @@ const gui = @import("gui");
 const engine = @import("engine");
 const ui = engine.ui;
 
+/// Converts an `engine.UiTheme` asset into a real `gui.Theme` — the shared
+/// conversion point used by both Studio and the shipped game's boot code.
+pub const theme = @import("theme.zig");
+
 // ── Reference-resolution letterboxing ───────────────────────────────────────
 
 pub const Letterbox = struct {

@@ -209,8 +209,9 @@ pub fn TreeView(comptime Model: type) type {
         /// Highlight the hovered drop target: a line at the row's top/bottom
         /// edge for a sibling drop, a translucent fill for a child drop.
         fn drawDropIndicator(row: gui.Rect.Physical, zone: DropZone) void {
-            const line = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
-            const fill = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 70 };
+            const accent = gui.currentWindow().theme.color(.highlight, .fill);
+            const line = gui.Color{ .r = accent.r, .g = accent.g, .b = accent.b, .a = 255 };
+            const fill = gui.Color{ .r = accent.r, .g = accent.g, .b = accent.b, .a = 70 };
             switch (zone) {
                 .before => {
                     var r = row;

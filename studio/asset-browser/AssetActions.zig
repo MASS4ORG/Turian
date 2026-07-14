@@ -194,6 +194,14 @@ pub fn createNewUiDocument(browse_path: []const u8) void {
     finishCreate(full_path);
 }
 
+pub fn createNewUiThemeFromPreset(browse_path: []const u8, preset: engine.UiTheme) void {
+    var name_buf: [192]u8 = undefined;
+    var path_buf: [1024]u8 = undefined;
+    const full_path = uniquePath(browse_path, "new_theme", "uitheme", &name_buf, &path_buf) orelse return;
+    preset.save(gui.io, full_path) catch return;
+    finishCreate(full_path);
+}
+
 pub fn createNewDataAsset(browse_path: []const u8, def: *const editor.ComponentDef) void {
     const type_name = def.typeName();
     var lc_buf: [128]u8 = undefined;

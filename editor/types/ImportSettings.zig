@@ -64,6 +64,7 @@ pub const ImportSettings = union(AssetType) {
     project_settings: void,
     ui_document: void,
     font: FontImportSettings,
+    ui_theme: void,
     // Not a project asset — never imported/cached.
     studio_settings: void,
 };
@@ -82,6 +83,7 @@ pub fn defaultFor(asset_type: AssetType) ImportSettings {
         .project_settings => .{ .project_settings = {} },
         .ui_document => .{ .ui_document = {} },
         .font => .{ .font = .{} },
+        .ui_theme => .{ .ui_theme = {} },
         .studio_settings => .{ .studio_settings = {} },
         .unknown => .{ .unknown = {} },
     };

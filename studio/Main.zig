@@ -11,6 +11,8 @@ const PreviewSystem = @import("asset-browser/preview/PreviewSystem.zig");
 const Preview3D = @import("asset-browser/preview/Preview3D.zig");
 const MaterialEditor = @import("inspector/editor/MaterialEditor.zig");
 const FontEditor = @import("inspector/editor/FontEditor.zig");
+const ThemeEditor = @import("inspector/editor/ThemeEditor.zig");
+const ActiveTheme = @import("services/ActiveTheme.zig");
 const AssetWatcher = @import("asset-browser/AssetWatcher.zig");
 const Documents = @import("main-window/Documents.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
@@ -228,6 +230,20 @@ fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
     return gui.backend.initWindow(opts);
 }
 
+/// Resolve the persisted `editor.ui` theme/font-size/zoom/system-font
+/// (falling back to whatever `win` already has if the theme isn't found —
+/// e.g. first run, or a deleted user theme) and apply them to the running
+/// window. Thin wrapper over `ActiveTheme.apply`, the same one
+/// `SettingsEditor.save()` and `ThemeMenu`'s hover-preview/commit use.
+fn applyPersistedUiSettings(win: *gui.Window, gpa: std.mem.Allocator, io: std.Io) void {
+    const model = editor.StudioSettings.fromSettings(&EditorState.settings);
+
+    const themes_dir = editor.ThemeManager.themesDir(gpa, EditorState.settings.global_path) catch return;
+    defer gpa.free(themes_dir);
+
+    ActiveTheme.apply(win, gpa, io, themes_dir, model.ui.theme_name, model.ui.font_size, model.ui.zoom, model.ui.system_font_path);
+}
+
 fn run(main_init: std.process.Init) !void {
     if (@import("builtin").os.tag == .windows) {
         gui.Backend.Common.windowsAttachConsole() catch {};
@@ -259,6 +275,7 @@ fn run(main_init: std.process.Init) !void {
     PreviewSystem.registerLiveProvider(.model, Preview3D.drawPreview);
     PreviewSystem.registerLiveProvider(.material, MaterialEditor.drawPreview);
     PreviewSystem.registerLiveProvider(.font, FontEditor.drawPreview);
+    PreviewSystem.registerLiveProvider(.ui_theme, ThemeEditor.drawPreview);
 
     EditorState.clearScene();
     EditorState.initUndo(main_init.gpa);
@@ -284,6 +301,11 @@ fn run(main_init: std.process.Init) !void {
     }
     defer EditorState.deinitSettings(main_init.io);
     defer LayoutStore.deinit(main_init.io);
+
+    // Apply the persisted Studio theme/font-size/zoom now that settings are
+    // loaded (the window itself had to be created earlier with a fallback
+    // OS-preference theme — dvui needs a `Theme` at `Window.init` time).
+    applyPersistedUiSettings(&win, main_init.gpa, main_init.io);
 
     var cli_project_buf: [1024]u8 = undefined;
     var cli_project_path: ?[]const u8 = null;

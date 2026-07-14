@@ -10,8 +10,10 @@ const Documents = @import("Documents.zig");
 const Panels = @import("Panels.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
 const LayoutPresets = @import("../services/LayoutPresets.zig");
+const ThemeMenu = @import("ThemeMenu.zig");
 const build_options = @import("turian_build_options");
 const Icon = @import("../Icon.zig");
+const MenuItems = @import("../MenuItems.zig");
 
 const AboutInfo = struct {
     const name = "Turian Studio";
@@ -204,12 +206,14 @@ pub fn draw(should_quit: *bool) void {
             }
         }
 
+        var view_open = false;
         if (gui.menuItemLabel(@src(), "View", .{ .submenu = true }, .{})) |r| {
+            view_open = true;
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
             const l = LayoutStore.get();
-            if (Panels.drawAddPanelMenuItems(l, l.firstLeaf(l.root))) {
+            if (Panels.drawAddPanelMenuItems(l, l.firstLeaf(l.root), LayoutStore.allows)) {
                 m.close();
                 LayoutStore.save(gui.io);
             }
@@ -229,7 +233,16 @@ pub fn draw(should_quit: *bool) void {
                 m.close();
                 _ = Screenshots.capture();
             }
+
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+
+            ThemeMenu.draw(m);
         }
+        // Runs every frame the View menu is NOT open this frame — the only
+        // way to catch "closed the Theme submenu without picking" (Escape,
+        // click elsewhere), which `ThemeMenu.draw` itself cannot detect since
+        // it simply doesn't run on that frame. See its doc comment.
+        if (!view_open) ThemeMenu.revertIfViewClosed();
 
         if (gui.menuItemLabel(@src(), "Turian", .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -283,7 +296,8 @@ pub fn draw(should_quit: *bool) void {
 /// not a modal text-entry dialog, and there's no persistent row here to
 /// rename in place the way a grid tile or tree row would offer.
 fn drawLayoutMenu(m: *gui.MenuWidget) void {
-    if (gui.menuItemLabel(@src(), "Layout", .{ .submenu = true }, .{ .expand = .horizontal })) |r| {
+    if (LayoutStore.hasAssetContext()) return;
+    if (MenuItems.submenu(@src(), "Layout", .{ .expand = .horizontal })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
 
@@ -407,26 +421,85 @@ fn drawPlayControls() void {
         .edit => {
             // Playing the *current* scene only makes sense when one is open.
             const can_play = EditorState.hasOpenScene();
-            if (gui.button(@src(), "Play", .{ .grayed = !can_play }, .{ .gravity_y = 0.5 }) and can_play)
-                PlayMode.play(gui.io);
-            if (gui.button(@src(), "Play Global", .{}, .{ .gravity_y = 0.5 }))
-                PlayMode.playFirstScene(gui.io);
+            if (transportButton(.play, !can_play) and can_play) PlayMode.play(gui.io);
+            if (transportButton(.play_global, false)) PlayMode.playFirstScene(gui.io);
         },
         .playing => {
-            if (gui.button(@src(), "Pause", .{}, .{ .gravity_y = 0.5 }))
-                PlayMode.pause();
-            if (gui.button(@src(), "Stop", .{}, .{ .gravity_y = 0.5 }))
-                PlayMode.stop();
+            if (transportButton(.pause, false)) PlayMode.pause();
+            if (transportButton(.stop, false)) PlayMode.stop();
         },
         .paused => {
-            if (gui.button(@src(), "Resume", .{}, .{ .style = .highlight, .gravity_y = 0.5 }))
-                PlayMode.play(gui.io);
-            if (gui.button(@src(), "Step", .{}, .{ .gravity_y = 0.5 }))
-                PlayMode.step();
-            if (gui.button(@src(), "Stop", .{}, .{ .gravity_y = 0.5, .id_extra = 1 }))
-                PlayMode.stop();
+            if (transportButton(.play, false)) PlayMode.play(gui.io);
+            if (transportButton(.step, false)) PlayMode.step();
+            if (transportButton(.stop, false)) PlayMode.stop();
         },
     }
+}
+
+/// One transport action. The bar is icon-only, so shape and tint are all a
+/// reader has to go on — hence a distinct color per action rather than five
+/// identical gray glyphs.
+///
+/// Play Global (run the project's configured first scene, whatever scene is
+/// open for editing) has no icon of its own in any icon set, and neither
+/// entypo nor dvui can compose one glyph over another — an icon is a single
+/// pre-baked TVG path, with no layering, badge or background slot. So the
+/// meaning is carried by a glyph that already says it: `jump_to_start` — start
+/// from the beginning, not from here.
+const Transport = enum {
+    play,
+    play_global,
+    pause,
+    step,
+    stop,
+
+    fn icon(self: Transport) []const u8 {
+        return switch (self) {
+            .play => gui.entypo.controller_play,
+            .play_global => gui.entypo.controller_jump_to_start,
+            .pause => gui.entypo.controller_pause,
+            .step => gui.entypo.controller_next,
+            .stop => gui.entypo.controller_stop,
+        };
+    }
+
+    fn tip(self: Transport) []const u8 {
+        return switch (self) {
+            .play => "Play the open scene  (Ctrl+P)",
+            .play_global => "Play from the project's first scene",
+            .pause => "Pause",
+            .step => "Step one frame",
+            .stop => "Stop  (Ctrl+P)",
+        };
+    }
+
+    fn color(self: Transport) gui.Color {
+        return switch (self) {
+            .play => .{ .r = 0x5c, .g = 0xc8, .b = 0x6b },
+            .play_global => .{ .r = 0x4a, .g = 0x9e, .b = 0xff },
+            .pause => .{ .r = 0xe0, .g = 0xb0, .b = 0x30 },
+            .step => .{ .r = 0xc8, .g = 0xc8, .b = 0xc8 },
+            .stop => .{ .r = 0xe0, .g = 0x50, .b = 0x50 },
+        };
+    }
+};
+
+fn transportButton(action: Transport, grayed: bool) bool {
+    const id: usize = @intFromEnum(action);
+    const tint = action.color();
+
+    var wd: gui.WidgetData = undefined;
+    const clicked = gui.buttonIcon(@src(), action.tip(), action.icon(), .{ .grayed = grayed }, .{}, .{
+        .id_extra = id,
+        .gravity_y = 0.5,
+        .min_size_content = .{ .w = 18, .h = 18 },
+        .padding = .all(4),
+        .margin = .{ .x = 2 },
+        .color_text = if (grayed) tint.opacity(0.35) else tint,
+        .data_out = &wd,
+    });
+    gui.tooltip(@src(), .{ .active_rect = wd.rectScale().r }, "{s}", .{action.tip()}, .{ .id_extra = id });
+    return clicked;
 }
 
 fn openProjectDialog() void {

@@ -249,6 +249,16 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
                         } else log.warn("Boot scene {s} not found in assets", .{ps.first_scene});
                     } else |_| log.warn("Invalid first_scene GUID '{s}'", .{ps.first_scene});
                 }
+                if (ps.ui_theme.len > 0) {
+                    if (Guid.parse(ps.ui_theme)) |gid| {
+                        if (db.findByGuid(gid)) |tinfo| {
+                            if (tinfo.asset_type == .ui_theme)
+                                out.ui_theme_guid = a.dupe(u8, ps.ui_theme) catch ""
+                            else
+                                log.warn("ui_theme {s} is not a UI theme asset", .{ps.ui_theme});
+                        } else log.warn("UI theme {s} not found in assets", .{ps.ui_theme});
+                    } else |_| log.warn("Invalid ui_theme GUID '{s}'", .{ps.ui_theme});
+                }
             } else |err| log.err("Failed to parse {s}: {any}", .{ info.path, err });
         }
     }

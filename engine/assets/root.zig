@@ -15,6 +15,12 @@ pub const ShaderParam = shader.ShaderParam;
 pub const ParamKind = shader.ParamKind;
 pub const Material = @import("Material.zig").Material;
 
+// ── UI theme ──────────────────────────────────────────────────────────────────
+/// Serializable UI theme asset (`.uitheme`): colors and corner rounding only.
+pub const UiTheme = @import("UiTheme.zig");
+/// Built-in theme presets (Dark, Light, Dark High Contrast, Darcula, Catppuccin).
+pub const ui_theme_presets = @import("ui_theme_presets.zig");
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 /// Data-driven input binding asset (`.inputactions`), applied to `engine.Input`.
 pub const InputActions = @import("InputActions.zig").InputActions;

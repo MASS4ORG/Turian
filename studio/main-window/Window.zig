@@ -13,6 +13,7 @@ const Panels = @import("Panels.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
 const ReflectJob = @import("../services/ReflectJob.zig");
+const ActiveTheme = @import("../services/ActiveTheme.zig");
 
 var should_quit: bool = false;
 var hooks_installed: bool = false;
@@ -54,7 +55,7 @@ fn panelDrawHeaderExtra(id: []const u8) void {
         if (cxt.activePoint()) |cp| {
             var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
             defer fw.deinit();
-            if (Panels.drawAddPanelMenuItems(l, leaf)) {
+            if (Panels.drawAddPanelMenuItems(l, leaf, LayoutStore.allows)) {
                 fw.close();
                 LayoutStore.save(gui.io);
             }
@@ -78,6 +79,44 @@ fn panelDrawHeaderExtra(id: []const u8) void {
     }
 }
 
+/// Dock tabs are flat: no visible fill, no border, square corners — the panel
+/// body they sit on already reads as its own surface, and stock dvui tabs (a
+/// filled pill with a three-sided border) fight that.
+///
+/// "No fill" is painted, not skipped: the tab fills itself with the very
+/// `app1` color of the panel chrome behind it. `.background = false` would be
+/// the obvious way to say this, but it also suppresses the hover fill, and it
+/// can't work for the selected tab at all — see `selectedTabOptions`.
+fn tabOptions(theme: *const gui.Theme) gui.Options {
+    return .{
+        .background = true,
+        .color_fill = theme.color(.app1, .fill),
+        .color_fill_hover = theme.color(.window, .fill_hover),
+        .color_fill_press = theme.color(.window, .fill_press),
+        .corners = .all(0),
+        .border = .{},
+    };
+}
+
+/// The selected tab is marked by an accent underline alone. That underline is
+/// a bottom-only border, and `WidgetData.borderAndBackground` paints a
+/// non-uniform border by flooding the *whole* border rect with the border
+/// color and letting the background rect cover all but the border's own edge.
+/// So the fill has to be opaque `app1` — a transparent one would leave the
+/// flood showing and turn the tab into a solid accent block.
+fn selectedTabOptions(theme: *const gui.Theme) gui.Options {
+    const fill = theme.color(.app1, .fill);
+    return .{
+        .background = true,
+        .color_fill = fill,
+        .color_fill_hover = fill,
+        .color_fill_press = fill,
+        .corners = .all(0),
+        .border = .{ .h = 2 },
+        .color_border = theme.focus,
+    };
+}
+
 /// `Dockspace.InitOptions.onTabContextMenu`: right-clicking an existing tab
 /// (as opposed to the empty header space `panelDrawHeaderExtra` already
 /// handles) opens the same Add-Panel list, targeting that tab's leaf.
@@ -87,7 +126,7 @@ fn panelTabContextMenu(id: []const u8, pt: gui.Point.Natural) void {
 
     var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(pt) }, .{});
     defer fw.deinit();
-    if (Panels.drawAddPanelMenuItems(l, leaf)) {
+    if (Panels.drawAddPanelMenuItems(l, leaf, LayoutStore.allows)) {
         fw.close();
         LayoutStore.save(gui.io);
     }
@@ -198,16 +237,49 @@ pub fn frame() bool {
     // Document tab strip. Drawn above the editing surface.
     Documents.drawTabBar(mouse_left_held);
 
+    // Follow the active document tab into its own dock arrangement, for asset
+    // types that declare one (`LayoutPresets.forAssetType`). A no-op for every
+    // type that doesn't, which keeps the user's main layout on screen.
+    LayoutStore.setAssetContext(
+        if (Documents.activeIsAsset()) Documents.activeAssetType() else null,
+        gui.io,
+    );
+
     // Main editor area. Scoped in a block so the dockspace is deinit'd
     // (popped from dvui's layout stack) *before* the bottom task bar is drawn;
     // otherwise the task bar would nest inside the still-open dockspace.
     {
+        // `panel_background` wraps each leaf's *whole* area — tab strip and
+        // content together — in one themed box (a small dvui patch,
+        // `DockingWidget.InitOptions.panel_background`, upstreamed to
+        // `../dvui`'s `MR5-dockable-panels` branch): the header itself is
+        // otherwise entirely internal to `DockingWidget`, so a wrapper
+        // placed only around `panel()`'s content (the original approach
+        // here) can never reach it, and dvui `Options` don't cascade to
+        // descendants anyway — an individual panel's own opaque content
+        // (e.g. a populated TreeView) always painted over a content-only
+        // wrapper's fill regardless. `.app1` is repurposed as dock-panel
+        // chrome (see `UiTheme`'s doc comment) so panels read as visually
+        // distinct from the root canvas, which is `.window`-styled.
+        // `ActiveTheme.panel_border_width` / `panel_corner_radius` are the
+        // active theme's chosen panel chrome; the shipped presets lean on the
+        // `app1`-vs-`window` fill contrast to delineate a panel and set the
+        // border to 0.
+        const theme = gui.themeGet();
         var dock = gui.dockspace(@src(), .{
             .layout = LayoutStore.get(),
             .panelInfo = panelInfo,
             .close_button_visibility = .hover,
             .drawHeaderExtra = panelDrawHeaderExtra,
             .onTabContextMenu = panelTabContextMenu,
+            .panel_background = .{
+                .background = true,
+                .style = .app1,
+                .border = .all(ActiveTheme.panel_border_width),
+                .corners = .all(ActiveTheme.panel_corner_radius),
+            },
+            .tab_options = tabOptions(&theme),
+            .tab_options_selected = selectedTabOptions(&theme),
         }, .{ .expand = .both });
         defer dock.deinit();
         while (dock.panel()) |p| {
@@ -278,6 +350,7 @@ fn drawDragGhost() void {
                 .material => gui.entypo.colours,
                 .data => gui.entypo.database,
                 .font => gui.entypo.text,
+                .theme => gui.entypo.palette,
             };
             gui.icon(@src(), "di", icon_bytes, .{}, .{
                 .min_size_content = .{ .w = 14, .h = 14 },

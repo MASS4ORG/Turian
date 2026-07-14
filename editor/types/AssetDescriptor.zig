@@ -18,6 +18,7 @@ pub const IconHint = enum {
     material,
     data,
     font,
+    theme,
 };
 
 /// Describes the editor behaviour and appearance for an asset type.

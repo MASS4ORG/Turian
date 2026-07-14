@@ -7,6 +7,7 @@ const EditorState = @import("../services/EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 const EditorCamera = @import("EditorCamera.zig");
 const UiOverlay = @import("../main-window/UiOverlay.zig");
+const MenuItems = @import("../MenuItems.zig");
 const ui_render = @import("ui_render");
 
 /// "Show UI overlay" toggle: draws the scene's referenced
@@ -76,7 +77,7 @@ pub fn draw() void {
     var vp = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer vp.deinit();
 
@@ -176,7 +177,7 @@ pub fn drawGame() void {
     var vp = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer vp.deinit();
 
@@ -328,7 +329,7 @@ fn drawGizmoToolbar() void {
 fn drawCameraMenu() void {
     var m = gui.menu(@src(), .horizontal, .{ .gravity_y = 0.5 });
     defer m.deinit();
-    if (gui.menuItemLabel(@src(), "Camera ▾", .{ .submenu = true }, .{})) |r| {
+    if (MenuItems.dropdown(@src(), "Camera", .{ .id_extra = 1 })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(.{ .x = r.x, .y = r.y + r.h }) }, .{});
         defer fw.deinit();
 
@@ -393,7 +394,7 @@ fn modeButton(text: []const u8, active: bool, id: usize) bool {
 fn drawVisibilityMenu() void {
     var m = gui.menu(@src(), .horizontal, .{ .gravity_y = 0.5 });
     defer m.deinit();
-    if (gui.menuItemLabel(@src(), "Gizmos ▾", .{ .submenu = true }, .{})) |r| {
+    if (MenuItems.dropdown(@src(), "Gizmos", .{ .id_extra = 2 })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(.{ .x = r.x, .y = r.y + r.h }) }, .{});
         defer fw.deinit();
         const S = &GizmoSystem.show;

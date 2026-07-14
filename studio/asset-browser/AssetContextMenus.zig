@@ -26,6 +26,7 @@ pub fn iconForHint(hint: editor.asset_registry.IconHint) []const u8 {
         .material => gui.entypo.colours,
         .data => gui.entypo.database,
         .font => gui.entypo.text,
+        .theme => gui.entypo.palette,
     };
 }
 
@@ -138,6 +139,7 @@ const CreateAction = union(enum) {
     input_actions,
     ui_document,
     material_preset: engine.Material.Preset,
+    ui_theme_preset: engine.UiTheme,
     data_asset: *const editor.ComponentDef,
 };
 
@@ -149,6 +151,7 @@ fn runCreateAction(action: CreateAction, browse_path: []const u8) void {
         .input_actions => AssetActions.createNewInputActions(browse_path),
         .ui_document => AssetActions.createNewUiDocument(browse_path),
         .material_preset => |preset| AssetActions.createNewMaterialFromPreset(browse_path, preset),
+        .ui_theme_preset => |preset| AssetActions.createNewUiThemeFromPreset(browse_path, preset),
         .data_asset => |def| AssetActions.createNewDataAsset(browse_path, def),
     }
 }
@@ -198,6 +201,12 @@ fn collectCreateEntries(alloc: std.mem.Allocator) []const CreateEntry {
         entries.append(alloc, .{ .menu_path = path, .action = .{ .material_preset = preset } }) catch {};
     }
 
+    const ui_theme_category = editor.asset_registry.get(.ui_theme).create_menu_path orelse "UI/Theme";
+    for (engine.ui_theme_presets.all) |preset| {
+        const path = std.fmt.allocPrint(alloc, "{s}/{s}", .{ ui_theme_category, preset.name }) catch continue;
+        entries.append(alloc, .{ .menu_path = path, .action = .{ .ui_theme_preset = preset } }) catch {};
+    }
+
     for (EditorState.discovered_components[0..EditorState.discovered_count]) |*def| {
         if (def.kind != .data_asset) continue;
         const declared = def.menuPath();
@@ -211,6 +220,23 @@ fn collectCreateEntries(alloc: std.mem.Allocator) []const CreateEntry {
     return entries.items;
 }
 
+/// Like `gui.menuItemLabel`, but with a trailing cascade-indicator icon
+/// instead of a literal "▸" — Vera Sans (the default embedded font) has no
+/// glyph for it, so the character alone rendered as a tofu box.
+fn menuItemLabelCascade(src: std.builtin.SourceLocation, label_str: []const u8, id_extra: usize) ?gui.Rect.Natural {
+    var mi = gui.menuItem(src, .{ .submenu = true }, .{ .expand = .horizontal, .id_extra = id_extra });
+    defer mi.deinit();
+
+    const ret: ?gui.Rect.Natural = if (mi.activeRect()) |r| r else null;
+
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id_extra });
+    defer row.deinit();
+    gui.labelNoFmt(@src(), label_str, .{}, mi.style().strip().override(.{ .gravity_y = 0.5, .expand = .horizontal }));
+    gui.icon(@src(), "cascade_chevron", gui.entypo.chevron_small_right, .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 10, .h = 10 }, .id_extra = id_extra });
+
+    return ret;
+}
+
 /// Recursively render one level of the cascaded "Create" menu: categories
 /// (nodes with children) open a nested `floatingMenu`; leaves run their
 /// action and close the whole chain via the outermost `fw`. Reusing the same
@@ -221,12 +247,7 @@ fn collectCreateEntries(alloc: std.mem.Allocator) []const CreateEntry {
 fn drawMenuNode(node: *const editor.menu_tree.Node, fw: *gui.FloatingMenuWidget, entries: []const CreateEntry, browse_path: []const u8) void {
     for (node.children.items, 0..) |*child, i| {
         if (child.children.items.len > 0) {
-            // Trailing "▸" (issue: submenus need a visual has-children signal,
-            // same glyph `UiDocumentEditor`'s "Add Control ▸" already uses for
-            // "this opens another menu").
-            var cat_label_buf: [160]u8 = undefined;
-            const cat_label = std.fmt.bufPrint(&cat_label_buf, "{s} \u{25b8}", .{child.name}) catch child.name;
-            if (gui.menuItemLabel(@src(), cat_label, .{ .submenu = true }, .{ .expand = .horizontal, .id_extra = i })) |r| {
+            if (menuItemLabelCascade(@src(), child.name, i)) |r| {
                 var sub_fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
                 defer sub_fw.deinit();
                 drawMenuNode(child, sub_fw, entries, browse_path);
@@ -259,7 +280,7 @@ pub fn drawCreateAssetMenuItems(browse_path: []const u8, id_base: usize) void {
     var root = editor.menu_tree.build(alloc, paths) catch return;
     defer root.deinit(alloc);
 
-    if (gui.menuItemLabel(@src(), "Create \u{25b8}", .{ .submenu = true }, .{ .expand = .horizontal, .id_extra = id_base })) |r| {
+    if (menuItemLabelCascade(@src(), "Create", id_base)) |r| {
         var sub_fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer sub_fw.deinit();
         drawMenuNode(&root, sub_fw, entries, browse_path);

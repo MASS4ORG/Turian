@@ -326,7 +326,7 @@ pub fn drawHierarchyPanel(asset_path: []const u8) void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
 
@@ -355,7 +355,7 @@ pub fn drawViewPanel(asset_path: []const u8) void {
     var vp = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer vp.deinit();
 
@@ -439,6 +439,7 @@ pub fn drawInspector(asset_path: []const u8) void {
 
     var scroll = gui.scrollArea(@src(), .{}, .{
         .expand = .both,
+        .style = .app1,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),
     });
@@ -483,7 +484,13 @@ fn drawToolbar() void {
         cmd_add_node = if (selected_node) |s| @intCast(s) else -1;
     }
 
-    if (gui.button(@src(), "Add Control \u{25b8}", .{}, .{ .gravity_y = 0.5, .id_extra = 3 })) {
+    // Icon instead of a literal "▸": Vera Sans (the default embedded font)
+    // has no glyph for it, so the character alone rendered as a tofu box.
+    if (gui.buttonLabelAndIcon(@src(), .{
+        .button_opts = .{},
+        .label = "Add Control",
+        .tvg_bytes = gui.entypo.chevron_small_right,
+    }, .{ .gravity_y = 0.5, .id_extra = 3 })) {
         add_control_open = true;
     }
 

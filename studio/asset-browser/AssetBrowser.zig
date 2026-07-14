@@ -61,36 +61,42 @@ pub fn showPackages() bool {
 var prev_project_path_buf: [1024]u8 = undefined;
 var prev_project_path_len: usize = 0;
 
-/// Three-way icon toggle for `NavMode`: plain grid,
-/// grid with a folder tree sidebar, or tree-only (folders + files).
+/// Three-way icon toggle for `NavMode`: plain grid, grid with a folder tree
+/// sidebar, or tree-only (folders + files).
+///
+/// The buttons need a horizontal box of their own — the settings popup lays
+/// its children out vertically — and, inside it, no gravity on the layout
+/// axis: a `gravity_x` centers a box child across the box's *whole* width
+/// rather than packing it after its predecessor, which stacks all three at the
+/// same x and leaves only the last one visible. Centering is done with spacers
+/// instead.
 fn drawNavModeToggle() void {
-    const modes = [_]struct { mode: NavMode, icon: []const u8 }{
-        .{ .mode = .grid, .icon = gui.entypo.grid },
-        .{ .mode = .grid_tree, .icon = gui.entypo.flow_tree },
-        .{ .mode = .tree_only, .icon = gui.entypo.tree },
+    const modes = [_]struct { mode: NavMode, icon: []const u8, tip: []const u8 }{
+        .{ .mode = .grid, .icon = gui.entypo.grid, .tip = "Grid" },
+        .{ .mode = .grid_tree, .icon = gui.entypo.flow_tree, .tip = "Grid + Folder Tree" },
+        .{ .mode = .tree_only, .icon = gui.entypo.tree, .tip = "Tree" },
     };
+
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+    defer row.deinit();
+
+    _ = gui.spacer(@src(), .{ .expand = .horizontal });
     for (modes, 0..) |m, i| {
-        if (gui.buttonIcon(
-            @src(),
-            "nav_mode",
-            m.icon,
-            .{},
-            .{},
-            .{
-                .gravity_y = 0.5,
-                .min_size_content = .{ .w = 20, .h = 20 },
-                .padding = .all(4),
-                .margin = .{ .x = 2 },
-                .id_extra = i,
-                .style = if (g_nav_mode == m.mode) .highlight else .content,
-            },
-        )) {
+        if (gui.buttonIcon(@src(), m.tip, m.icon, .{}, .{}, .{
+            .gravity_y = 0.5,
+            .min_size_content = .{ .w = 20, .h = 20 },
+            .padding = .all(4),
+            .margin = .{ .x = 2 },
+            .id_extra = i,
+            .style = if (g_nav_mode == m.mode) .highlight else .control,
+        })) {
             g_nav_mode = m.mode;
             if (EditorState.settingsReady()) {
                 EditorState.settings.setString(NAV_MODE_SETTING_KEY, @tagName(m.mode)) catch {};
             }
         }
     }
+    _ = gui.spacer(@src(), .{ .expand = .horizontal });
 }
 
 /// Draws the dock header's "..." settings menu: the tile-size zoom slider,
@@ -126,7 +132,7 @@ pub fn draw() void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
 

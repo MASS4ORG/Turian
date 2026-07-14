@@ -341,7 +341,7 @@ fn drawTimeChart() void {
         };
     }
 
-    const idle_col = gui.Color{ .r = 0x3a, .g = 0x3a, .b = 0x44 }; // cap/vsync wait
+    const idle_col = gui.currentWindow().theme.color(.control, .fill); // cap/vsync wait
     const cols: usize = @intFromFloat(@max(1, area.w));
     for (0..cols) |c| {
         const f = engine.Profiler.frameAt(c * count / cols);

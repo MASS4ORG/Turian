@@ -611,11 +611,43 @@ pub fn generateMainZig(
                 // translate-c'd SDL3 types to `gpu`'s (two separate
                 // translate-c invocations of the same headers, so distinct
                 // Zig types for what's ABI-identical opaque C structs).
+                // Only the theme block below assigns to `dvui_theme_override`,
+                // so a project without a configured theme must declare it
+                // `const` — Zig rejects a `var` that is never mutated.
+                const theme_decl: []const u8 = if (runtime.ui_theme_guid.len > 0)
+                    "    var dvui_theme_override: ?gui.Theme = null;\n"
+                else
+                    "    const dvui_theme_override: ?gui.Theme = null;\n";
                 try out.appendSlice(
                     a,
                     "    var dvui_backend = gui.backend.init(io, @ptrCast(win.window), @ptrCast(win.device), gpa);\n" ++
                         "    defer dvui_backend.deinit();\n" ++
-                        "    var dvui_win = gui.Window.init(@src(), gpa, dvui_backend.backend(), .{}) catch {\n" ++
+                        "    // Project-configured default theme (ProjectSettings.ui_theme), or null to\n" ++
+                        "    // keep the OS light/dark preference — same conversion Studio uses.\n",
+                );
+                try out.appendSlice(a, theme_decl);
+                if (runtime.ui_theme_guid.len > 0) {
+                    var esc_guid: std.ArrayList(u8) = .empty;
+                    try zigEscapeInto(a, &esc_guid, runtime.ui_theme_guid);
+                    try out.appendSlice(a, try std.fmt.allocPrint(
+                        a,
+                        "    theme_blk: {{\n" ++
+                            "        const _theme_gid = (editor.Guid.parse(\"{s}\") catch break :theme_blk).bytes;\n" ++
+                            "        const _theme_r = g_assets.readById(gpa, _theme_gid) orelse break :theme_blk;\n" ++
+                            "        defer gpa.free(_theme_r.bytes);\n" ++
+                            "        var _ui_theme = engine.UiTheme.loadFromBytes(gpa, _theme_r.bytes) catch break :theme_blk;\n" ++
+                            "        defer _ui_theme.deinit(gpa);\n" ++
+                            "        dvui_theme_override = ui_render.theme.toDvuiTheme(_ui_theme, gui.Theme.builtin.adwaita_dark);\n" ++
+                            "    }}\n",
+                        .{esc_guid.items},
+                    ));
+                }
+                try out.appendSlice(
+                    a,
+                    "    var dvui_win = gui.Window.init(@src(), gpa, dvui_backend.backend(), .{ .theme = dvui_theme_override orelse switch (dvui_backend.preferredColorScheme() orelse .dark) {\n" ++
+                        "        .light => gui.Theme.builtin.adwaita_light,\n" ++
+                        "        .dark => gui.Theme.builtin.adwaita_dark,\n" ++
+                        "    } }) catch {\n" ++
                         "        std.log.err(\"dvui window init failed\", .{});\n" ++
                         "        return;\n" ++
                         "    };\n" ++

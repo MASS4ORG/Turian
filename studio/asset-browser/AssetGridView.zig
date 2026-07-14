@@ -84,7 +84,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         if (EditorState.project_path != null) AssetNav.drawBreadcrumb();
     }
 
-    var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+    var scroll = gui.scrollArea(@src(), .{ .vertical = .auto }, .{ .expand = .both, .style = .app1, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
     defer scroll.deinit();
 
     // Read-only "Packages" section: assets contributed by installed packages

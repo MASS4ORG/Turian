@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .dvui = .{
-            .url = "git+https://github.com/brmassa/dvui?ref=MR5-dockable-panels#150501bc75dbad2e705d2a3cc4a63054919edce6",
-            .hash = "dvui-0.5.0-dev-AQFJmdMb_QCO3Ye2pnRc10MS7oowvdtVhreqg2xeasBx",
+            .url = "git+https://github.com/brmassa/dvui?ref=MR5-dockable-panels#3cc5418c406e7803435c2093500f3950b303d79d",
+            .hash = "dvui-0.5.0-dev-AQFJmTwe_QBIDI88YgXN-FD_oyND5t1cFy-oo9yUvCSz",
         },
         .gpu = .{
             .url = "git+https://gitlab.com/mass4org/mega4/gpu#68963cc927252e15c5ca27330ae5d7fe837dd5e1",

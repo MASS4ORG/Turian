@@ -1,4 +1,4 @@
-//! Output/Log panel: a dockable console showing every captured
+//! Log panel: a dockable console showing every captured
 //! engine/editor log message, filterable by level/category/text, with
 //! full-history repeat-collapsing, a double-click-to-open source location,
 //! and lazy-symbolized stack traces for error entries.
@@ -29,6 +29,15 @@ const level_colors = [4]gui.Color{
     .{ .r = 0xe0, .g = 0xb0, .b = 0x30 }, // warn: amber
     .{ .r = 0xe0, .g = 0x50, .b = 0x50 }, // err: red
 };
+/// Icon tints. Same hues as `level_colors` except Info, which is blue rather
+/// than the near-white that keeps message *text* legible — a white icon on
+/// the toolbar would be indistinguishable from a disabled one.
+const level_icon_colors = [4]gui.Color{
+    .{ .r = 0x90, .g = 0x90, .b = 0x90 }, // debug: gray
+    .{ .r = 0x4a, .g = 0x9e, .b = 0xff }, // info: blue
+    .{ .r = 0xe0, .g = 0xb0, .b = 0x30 }, // warn: amber
+    .{ .r = 0xe0, .g = 0x50, .b = 0x50 }, // err: red
+};
 
 const MAX_CATEGORIES = 24;
 /// Display category every SDL/dvui internal scope collapses into — keeps the
@@ -45,7 +54,7 @@ var g_search_buf: [128]u8 = .{0} ** 128;
 /// category dropdown's index isn't stable as new categories appear. Sized to
 /// match `DiagLog`'s scope capacity.
 var g_category_buf: [32]u8 = .{0} ** 32;
-/// Panel setting (View ▸ Output ▸ "..."): hides `SYSTEM_CATEGORY` noise by
+/// Panel setting (the dock header's "..." menu): hides `SYSTEM_CATEGORY` noise by
 /// default so user-code and user-triggered-action (build/compile) logs lead.
 var g_show_system: bool = false;
 /// Unity-style "Collapse": merge *all* matching messages (not just
@@ -92,8 +101,9 @@ fn displayCategory(scope: []const u8) []const u8 {
     return if (isSystemScope(scope)) SYSTEM_CATEGORY else scope;
 }
 
-/// Draws the Output panel content. Registered as the `"output"` panel in
-/// `Panels.zig`.
+/// Draws the Log panel content. Registered as the `"output"` panel in
+/// `Panels.zig` (the slug stays `output` so layouts saved by older builds
+/// still resolve).
 pub fn draw() void {
     const n = DiagLog.snapshot(&g_entries);
     const entries = g_entries[0..n];
@@ -121,12 +131,19 @@ fn drawToolbar(entries: []const Entry) void {
     });
     defer row.deinit();
 
+    // Each toggle paints its icon in that level's own color (the same one the
+    // list rows use), so the row reads as a legend as well as a filter. The
+    // enabled/disabled state rides on the button's fill plus a dimmed icon,
+    // not on a `.highlight` fill, which would flatten all four to one accent.
     inline for (level_icons, 0..) |icon, i| {
+        const on = g_show[i];
         if (gui.buttonIcon(@src(), level_names[i], icon, .{}, .{}, .{
             .id_extra = i,
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 22, .h = 22 },
-            .style = if (g_show[i]) .highlight else .control,
+            .background = on,
+            .style = .control,
+            .color_text = if (on) level_icon_colors[i] else level_icon_colors[i].opacity(0.4),
         })) {
             g_show[i] = !g_show[i];
         }
@@ -275,6 +292,7 @@ fn drawList(entries: []const Entry) void {
     // task bar (which lives outside the dockspace entirely) off-window.
     var scroll = gui.scrollArea(@src(), .{ .scroll_info = &g_scroll_info }, .{
         .expand = .both,
+        .style = .app1,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),
     });
@@ -328,7 +346,7 @@ fn drawRow(e: *const Entry, total: u32) void {
     gui.icon(@src(), "level", level_icons[lvl], .{}, .{
         .min_size_content = .{ .w = 14, .h = 14 },
         .gravity_y = 0.5,
-        .color_text = level_colors[lvl],
+        .color_text = level_icon_colors[lvl],
     });
 
     const cat = displayCategory(e.scope());

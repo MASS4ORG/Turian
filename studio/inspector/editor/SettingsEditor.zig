@@ -22,6 +22,7 @@ const EditorCamera = @import("../../scene-view/EditorCamera.zig");
 const MenuBar = @import("../../main-window/MenuBar.zig");
 const AssetTileLayout = @import("../../asset-browser/AssetTileLayout.zig");
 const LayoutStore = @import("../../services/LayoutStore.zig");
+const ActiveTheme = @import("../../services/ActiveTheme.zig");
 
 var model: editor.StudioSettings = .{};
 /// Baseline for the per-field dirty marker (`*`) and revert button: the
@@ -52,6 +53,11 @@ pub fn load() void {
     loaded = true;
     dirty = false;
     Documents.setActiveDirty(false);
+    // Force `drawThemeRow` to reseed its buffer-backed fields (theme name,
+    // system font path) from the freshly-loaded `model` instead of keeping
+    // whatever a previous session/edit left in them.
+    setBuf(&ui_theme_name_buf, "");
+    setBuf(&system_font_path_buf, "");
 }
 
 /// Persist the in-memory model, push the live globals it mirrors — camera
@@ -72,9 +78,20 @@ pub fn save() void {
     MenuBar.show_editor_fps = model.general.show_editor_fps;
     AssetTileLayout.max_name_chars = model.asset_browser.name_char_length;
     AssetTileLayout.hide_extensions = model.asset_browser.hide_extensions;
+    applyUiTheme();
     saved = model;
     dirty = false;
     Documents.setActiveDirty(false);
+}
+
+/// Apply the just-saved theme/font-size/zoom/system-font to the running
+/// window — no restart needed. Thin wrapper over `ActiveTheme.apply`, the
+/// same one `Main.zig`'s boot-time `applyPersistedUiSettings` and
+/// `ThemeMenu`'s hover-preview/commit use.
+fn applyUiTheme() void {
+    const themes_dir = themesDirOrEmpty();
+    if (themes_dir.len == 0) return;
+    ActiveTheme.apply(gui.currentWindow(), gui.currentWindow().arena(), gui.io, themes_dir, model.ui.theme_name, model.ui.font_size, model.ui.zoom, model.ui.system_font_path);
 }
 
 /// Local panel (left column, in place of a Hierarchy panel): search box +
@@ -117,6 +134,7 @@ pub fn drawFields() void {
     {
         var scroll = gui.scrollArea(@src(), .{}, .{
             .expand = .both,
+            .style = .app1,
             .min_size_content = .{ .h = 0 },
             .max_size_content = .height(0),
         });
@@ -149,9 +167,13 @@ fn drawSelectedCategory() bool {
     var changed = false;
     inline for (std.meta.fields(editor.StudioSettings), 0..) |field, fi| {
         if (fi == selected_category) {
+            if (comptime std.mem.eql(u8, field.name, "ui")) {
+                if (drawThemeRow()) changed = true;
+            }
             const CatT = field.type;
             inline for (std.meta.fields(CatT), 0..) |f, fj| {
                 const hint = comptime fieldHintFor(CatT, f.name);
+                if (comptime hint.hidden) continue;
                 if (drawField(
                     f.type,
                     comptime PropDraw.displayLabel(f.name, hint),
@@ -165,6 +187,108 @@ fn drawSelectedCategory() bool {
         }
     }
     return changed;
+}
+
+var ui_theme_name_buf: [64]u8 = .{0} ** 64;
+
+/// Theme dropdown + Import/Export, drawn ahead of the reflected `ui` category
+/// fields (font size / zoom) — `theme_name` itself is `hidden` from the
+/// generic reflection loop since its choices are runtime-dynamic
+/// (`editor.ThemeManager.list`), not something `FieldHint` can express.
+fn drawThemeRow() bool {
+    ensureThemeNameBuf();
+    if (bufStr(&system_font_path_buf).len == 0 and model.ui.system_font_path.len > 0)
+        setBuf(&system_font_path_buf, model.ui.system_font_path);
+    var changed = false;
+
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 9000 });
+        defer row.deinit();
+        gui.label(@src(), "Theme", .{}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 } });
+
+        const themes_dir = themesDirOrEmpty();
+        const entries = if (EditorState.settingsReady())
+            editor.ThemeManager.list(gui.currentWindow().arena(), gui.io, themes_dir) catch &.{}
+        else
+            &.{};
+
+        var dd: gui.DropdownWidget = undefined;
+        dd.init(@src(), .{ .label = bufStr(&ui_theme_name_buf) }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 9000 });
+        if (dd.dropped()) {
+            for (entries) |entry| {
+                if (dd.addChoiceLabel(entry.name)) {
+                    setBuf(&ui_theme_name_buf, entry.name);
+                    model.ui.theme_name = bufStr(&ui_theme_name_buf);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        dd.deinit();
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 9001 });
+        defer row.deinit();
+        if (gui.button(@src(), "Import Theme...", .{}, .{ .gravity_y = 0.5, .id_extra = 9001 })) importTheme();
+        if (gui.button(@src(), "Export Theme...", .{}, .{ .gravity_y = 0.5, .id_extra = 9002 })) exportTheme();
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 9003 });
+        defer row.deinit();
+        gui.label(@src(), "System Font", .{}, .{ .gravity_y = 0.5, .margin = .{ .y = 4 } });
+        const path = model.ui.system_font_path;
+        gui.label(@src(), "{s}", .{if (path.len > 0) std.fs.path.basename(path) else "(theme default)"}, .{
+            .gravity_y = 0.5,
+            .expand = .horizontal,
+            .id_extra = 9003,
+        });
+        if (gui.button(@src(), "Browse...", .{}, .{ .gravity_y = 0.5, .id_extra = 9004 })) {
+            if (gui.dialogNativeFileOpen(gui.currentWindow().arena(), .{ .filters = &.{ "*.ttf", "*.otf" } }) catch null) |picked| {
+                setBuf(&system_font_path_buf, picked);
+                model.ui.system_font_path = bufStr(&system_font_path_buf);
+                changed = true;
+            }
+        }
+        if (path.len > 0 and gui.button(@src(), "Clear", .{}, .{ .gravity_y = 0.5, .id_extra = 9005 })) {
+            setBuf(&system_font_path_buf, "");
+            model.ui.system_font_path = bufStr(&system_font_path_buf);
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+var system_font_path_buf: [1024]u8 = .{0} ** 1024;
+
+fn ensureThemeNameBuf() void {
+    if (bufStr(&ui_theme_name_buf).len == 0) setBuf(&ui_theme_name_buf, model.ui.theme_name);
+}
+
+fn setBuf(dst: []u8, s: []const u8) void {
+    const n = @min(s.len, dst.len - 1);
+    @memcpy(dst[0..n], s[0..n]);
+    @memset(dst[n..], 0);
+}
+
+fn themesDirOrEmpty() []const u8 {
+    if (!EditorState.settingsReady()) return "";
+    return editor.ThemeManager.themesDir(gui.currentWindow().arena(), EditorState.settings.global_path) catch "";
+}
+
+fn importTheme() void {
+    if (!EditorState.settingsReady()) return;
+    const src = gui.dialogNativeFileOpen(gui.currentWindow().arena(), .{ .filters = &.{"*.uitheme"} }) catch return orelse return;
+    const themes_dir = themesDirOrEmpty();
+    if (themes_dir.len == 0) return;
+    editor.ThemeManager.importFile(gui.currentWindow().arena(), gui.io, themes_dir, src) catch return;
+}
+
+fn exportTheme() void {
+    if (!EditorState.settingsReady()) return;
+    const dest = gui.dialogNativeFileSave(gui.currentWindow().arena(), .{ .filters = &.{"*.uitheme"} }) catch return orelse return;
+    const themes_dir = themesDirOrEmpty();
+    if (themes_dir.len == 0) return;
+    editor.ThemeManager.exportTo(gui.currentWindow().arena(), gui.io, themes_dir, bufStr(&ui_theme_name_buf), dest) catch return;
 }
 
 /// Flatten every category's fields and draw only those whose name, tooltip
@@ -185,6 +309,7 @@ fn drawSearchResults(search: []const u8) bool {
         var header_drawn = false;
         inline for (std.meta.fields(CatT)) |f| {
             const hint = comptime fieldHintFor(CatT, f.name);
+            if (comptime hint.hidden) continue;
             if (fieldMatches(search, f.name, hint.tooltip, cat_meta.title)) {
                 any_match = true;
                 if (!header_drawn) {

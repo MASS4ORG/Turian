@@ -91,6 +91,13 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
             .open_mode = .external_editor,
             .icon_hint = .font,
         },
+        .ui_theme => .{
+            .name = "UI Theme",
+            .extensions = &.{".uitheme"},
+            .open_mode = .internal_editor,
+            .icon_hint = .theme,
+            .create_menu_path = "UI/Theme",
+        },
         .studio_settings => .{
             .name = "Studio Settings",
             // Opened programmatically (`Documents.openAsset`), never via

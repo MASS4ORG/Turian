@@ -178,12 +178,12 @@ pub fn draw() void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
 
     {
-        var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
+        var scroll = gui.scrollArea(@src(), .{}, .{ .expand = .both, .style = .app1, .min_size_content = .{ .h = 0 }, .max_size_content = .height(0) });
         defer scroll.deinit();
 
         handleDeleteDialog();

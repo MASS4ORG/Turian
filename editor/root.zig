@@ -81,6 +81,8 @@ pub const StudioSettingsCategoryMeta = studio_settings_types.CategoryMeta;
 pub const studio_settings_categories = studio_settings_types.categories;
 /// MRU recent-projects list persisted via the Settings API.
 pub const recent_projects = @import("project/RecentProjects.zig");
+/// Studio-wide `.uitheme` discovery (built-ins + global themes folder).
+pub const ThemeManager = @import("project/ThemeManager.zig");
 /// Package manifest parser for `turian-package.json`.
 pub const PackageManifest = @import("package/PackageManifest.zig").PackageManifest;
 pub const PackageType = @import("package/PackageManifest.zig").PackageType;

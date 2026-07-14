@@ -11,6 +11,7 @@ const ProjectSettingsEditor = @import("editor/ProjectSettingsEditor.zig");
 const ImportSettingsEditor = @import("editor/ImportSettingsEditor.zig");
 const FontEditor = @import("editor/FontEditor.zig");
 const UiDocumentEditor = @import("editor/UiDocumentEditor.zig");
+const ThemeEditor = @import("editor/ThemeEditor.zig");
 const EditorRegistry = @import("../services/EditorRegistry.zig");
 const Documents = @import("../main-window/Documents.zig");
 const PreviewSystem = @import("../asset-browser/preview/PreviewSystem.zig");
@@ -21,7 +22,7 @@ pub fn draw() void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
 
@@ -71,6 +72,7 @@ pub fn draw() void {
 
     var scroll = gui.scrollArea(@src(), .{}, .{
         .expand = .both,
+        .style = .app1,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),
     });
@@ -489,7 +491,7 @@ pub fn drawAssetDocument(asset_path: []const u8) void {
     var outer = gui.box(@src(), .{}, .{
         .expand = .both,
         .background = true,
-        .style = .window,
+        .style = .app1,
     });
     defer outer.deinit();
     drawAssetInspector(asset_path);
@@ -511,6 +513,11 @@ fn ensureRegistered() void {
     EditorRegistry.register(.model, ImportSettingsEditor.draw);
     EditorRegistry.register(.font, FontEditor.draw);
     EditorRegistry.register(.ui_document, drawUiDocument);
+    EditorRegistry.register(.ui_theme, drawUiTheme);
+}
+
+fn drawUiTheme(asset_path: []const u8, _: editor.AssetType) void {
+    ThemeEditor.draw(asset_path);
 }
 
 /// Merely-selected (not opened as a tab) `.uidoc`: document-level fields
@@ -546,6 +553,7 @@ fn drawAssetInspector(asset_path: []const u8) void {
         asset_path;
 
     var scroll = gui.scrollArea(@src(), .{}, .{
+        .style = .app1,
         .expand = .both,
         .min_size_content = .{ .h = 0 },
         .max_size_content = .height(0),

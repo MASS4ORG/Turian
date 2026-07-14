@@ -22,6 +22,7 @@ pub const categories = [_]CategoryMeta{
     .{ .field = "general", .title = "General", .description = "Editor-wide display and UI behavior." },
     .{ .field = "camera", .title = "Editor Camera", .description = "Free-look viewport camera movement and feel." },
     .{ .field = "asset_browser", .title = "Asset Browser", .description = "Grid tile filename display." },
+    .{ .field = "ui", .title = "UI", .description = "Studio theme, font size, and zoom." },
 };
 
 pub const General = struct {
@@ -65,10 +66,37 @@ pub const AssetBrowser = struct {
     };
 };
 
+pub const UI = struct {
+    /// Name of the active Studio theme (built-in or user-imported). Edited via
+    /// a dedicated dropdown in `SettingsEditor` (sourced from
+    /// `editor.ThemeManager.list`, not a fixed enum), not the generic
+    /// reflected text field — kept out of the reflection loop via `hidden`.
+    theme_name: []const u8 = "Dark",
+    /// Base point size for the Studio's own body/heading/title/mono fonts.
+    font_size: f32 = 9.0,
+    /// UI scale multiplier applied on top of the OS content scale — affects
+    /// button/tab/menu sizes only; font size stays pinned to `font_size`
+    /// regardless of zoom (see `ui_render.theme.withFontSize`).
+    zoom: f32 = 1.0,
+    /// Absolute path to a user-picked `.ttf`/`.otf` file overriding every
+    /// font family the active theme would otherwise use. Empty keeps the
+    /// theme's own (or suggested) fonts. Edited via a file-picker button in
+    /// `SettingsEditor`, not the generic reflected text field.
+    system_font_path: []const u8 = "",
+
+    pub const turian_hints = struct {
+        pub const theme_name = FieldHint{ .hidden = true };
+        pub const font_size = FieldHint{ .min = 8, .max = 20, .widget = .slider_entry, .tooltip = "Base font size for Studio text. Unaffected by Zoom." };
+        pub const zoom = FieldHint{ .min = 0.7, .max = 1.5, .step = 0.05, .widget = .slider_entry, .tooltip = "UI scale multiplier for buttons, tabs, and menus. Does not affect font size." };
+        pub const system_font_path = FieldHint{ .hidden = true };
+    };
+};
+
 pub const StudioSettings = struct {
     general: General = .{},
     camera: Camera = .{},
     asset_browser: AssetBrowser = .{},
+    ui: UI = .{},
 
     // Key strings match the pre-existing keys each panel already reads/writes
     // directly (`MenuBar.zig`'s `FPS_SETTING_KEY`, `Documents.zig`'s
@@ -82,6 +110,14 @@ pub const StudioSettings = struct {
     const KEY_CAM_ZOOM_SPEED = "editor.camera.zoom_speed";
     const KEY_NAME_CHAR_LENGTH = "asset_browser.name_char_length";
     const KEY_HIDE_EXTENSIONS = "asset_browser.hide_extensions";
+    // `pub` — reused verbatim by `studio/main-window/ThemeMenu.zig`, which
+    // writes these same keys directly (via `EditorState.settings`) for its
+    // instant-apply hover-preview/commit, bypassing this struct's `model`
+    // copy-on-load lifecycle since a menu has no separate Save step.
+    pub const KEY_UI_THEME_NAME = "editor.ui.theme_name";
+    pub const KEY_UI_FONT_SIZE = "editor.ui.font_size";
+    pub const KEY_UI_ZOOM = "editor.ui.zoom";
+    pub const KEY_UI_SYSTEM_FONT_PATH = "editor.ui.system_font_path";
 
     /// Populate from the on-disk/in-memory KV store, falling back to each
     /// field's default when the key is missing or malformed.
@@ -94,6 +130,10 @@ pub const StudioSettings = struct {
         self.camera.zoom_speed = @floatCast(s.getFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed));
         self.asset_browser.name_char_length = s.getInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
         self.asset_browser.hide_extensions = s.getBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
+        self.ui.theme_name = s.getString(KEY_UI_THEME_NAME, self.ui.theme_name);
+        self.ui.font_size = @floatCast(s.getFloat(KEY_UI_FONT_SIZE, self.ui.font_size));
+        self.ui.zoom = @floatCast(s.getFloat(KEY_UI_ZOOM, self.ui.zoom));
+        self.ui.system_font_path = s.getString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
         return self;
     }
 
@@ -107,5 +147,9 @@ pub const StudioSettings = struct {
         try s.setFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed);
         try s.setInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
         try s.setBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
+        try s.setString(KEY_UI_THEME_NAME, self.ui.theme_name);
+        try s.setFloat(KEY_UI_FONT_SIZE, self.ui.font_size);
+        try s.setFloat(KEY_UI_ZOOM, self.ui.zoom);
+        try s.setString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
     }
 };

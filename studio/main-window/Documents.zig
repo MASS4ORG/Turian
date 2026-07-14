@@ -63,10 +63,20 @@ pub const Document = struct {
         return self.path_buf[0..self.path_len];
     }
 
-    /// Tab title: the file name (final path component).
+    /// The file name (final path component), extension included.
     pub fn name(self: *const Document) []const u8 {
         const p = self.path();
         return if (std.mem.lastIndexOfScalar(u8, p, '/')) |i| p[i + 1 ..] else p;
+    }
+
+    /// Tab title: the file name without its extension. The tab already
+    /// carries the asset type in its icon, so the extension is redundant and
+    /// only eats into the title budget (`TITLE_MAX_KEY`). A leading-dot file
+    /// name keeps its whole name.
+    pub fn title(self: *const Document) []const u8 {
+        const n = self.name();
+        const dot = std.mem.lastIndexOfScalar(u8, n, '.') orelse return n;
+        return if (dot == 0) n else n[0..dot];
     }
 };
 
@@ -545,7 +555,7 @@ fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) 
     }
 
     var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "{s}", .{trimTitle(docs[i].name(), title_max_cache, &name_buf)}, .{
+    gui.label(@src(), "{s}", .{trimTitle(docs[i].title(), title_max_cache, &name_buf)}, .{
         .id_extra = i,
         .gravity_y = 0.5,
     });
@@ -612,7 +622,7 @@ fn drawDragGhost(mouse_held: bool) void {
     defer fw.deinit();
 
     var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "{s}", .{trimTitle(docs[di].name(), title_max_cache, &name_buf)}, .{ .gravity_y = 0.5 });
+    gui.label(@src(), "{s}", .{trimTitle(docs[di].title(), title_max_cache, &name_buf)}, .{ .gravity_y = 0.5 });
 }
 var g_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 

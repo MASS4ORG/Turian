@@ -27,6 +27,7 @@ var company_buf: [128]u8 = .{0} ** 128;
 var version_buf: [32]u8 = .{0} ** 32;
 var icon_buf: [40]u8 = .{0} ** 40;
 var scene_buf: [40]u8 = .{0} ** 40;
+var ui_theme_buf: [40]u8 = .{0} ** 40;
 var width_buf: [12]u8 = .{0} ** 12;
 var height_buf: [12]u8 = .{0} ** 12;
 var vsync: bool = true;
@@ -76,6 +77,7 @@ pub fn draw(asset_path: []const u8) void {
 
     section("Boot");
     textRow("First Scene (GUID)", &scene_buf, 12);
+    textRow("UI Theme (GUID)", &ui_theme_buf, 13);
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9100 });
 
@@ -165,6 +167,7 @@ fn load(asset_path: []const u8) void {
     setBuf(&version_buf, ps.project.version);
     setBuf(&icon_buf, ps.project.icon);
     setBuf(&scene_buf, ps.first_scene);
+    setBuf(&ui_theme_buf, ps.ui_theme);
 
     var wbuf: [12]u8 = undefined;
     setBuf(&width_buf, std.fmt.bufPrint(&wbuf, "{d}", .{ps.graphics.width}) catch "1280");
@@ -198,6 +201,7 @@ fn save() void {
         },
         .platform = .{ .target = target, .optimize = optimize },
         .first_scene = bufStr(&scene_buf),
+        .ui_theme = bufStr(&ui_theme_buf),
     };
 
     ps.save(gui.io, loadedPath()) catch return;

@@ -194,6 +194,7 @@ pub fn pickerAsset(
         .ui_document => .ui_document,
         .game_event => .data_asset,
         .font => .font,
+        .ui_theme => .ui_theme,
     };
     var any_shown = false;
 

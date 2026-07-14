@@ -82,6 +82,10 @@ pub const ProjectSettings = assets.ProjectSettings;
 pub const shader = assets.shader;
 /// Shader parameter metadata descriptor.
 pub const ShaderDef = assets.ShaderDef;
+/// Serializable UI theme asset (`.uitheme`): colors and corner rounding only.
+pub const UiTheme = assets.UiTheme;
+/// Built-in theme presets (Dark, Light, Dark High Contrast, Darcula, Catppuccin).
+pub const ui_theme_presets = assets.ui_theme_presets;
 
 /// Generic, swappable asset access interface (loose files vs `.oap` packages).
 pub const AssetProvider = assets.AssetProvider;

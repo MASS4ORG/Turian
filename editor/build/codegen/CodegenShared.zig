@@ -12,6 +12,9 @@ pub const RuntimeConfig = struct {
     /// GUID of the scene the game boots into (loaded through the SceneManager,
     ///). Empty if no scene could be resolved.
     boot_scene_guid: []const u8 = "",
+    /// GUID of the `.uitheme` asset the shipped game boots its UI with.
+    /// Empty keeps today's behavior: OS light/dark preference, no override.
+    ui_theme_guid: []const u8 = "",
     /// True when the project's asset database has at least one `.uidoc`
     /// asset (C10 pay-for-use): gates whether `gui`/`ui_render`/dvui are
     /// wired into the generated build at all. A project that never
