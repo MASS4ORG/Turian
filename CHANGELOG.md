@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.14.0] - 2026-07-14
+
+### Features
+- feat: Output/Log panel with levels, filtering, and stack traces #23
+- feat: Panel API
+
+### Other
+- chore: favicon to window and about dialog #89
+
 ## [1.13.0] - 2026-07-13
 
 ### Features
