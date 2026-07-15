@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.15.0] - 2026-07-15
+
+### Features
+- feat: .uitheme asset, Studio theme #87 #104 #122
+
 ## [1.14.0] - 2026-07-14
 
 ### Features
