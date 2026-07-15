@@ -20,6 +20,8 @@ const ProfileExport = @import("ProfileExport.zig");
 const GpuRenderer = @import("../scene-view/GpuRenderer.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
 const EditorFrameTiming = @import("../services/EditorFrameTiming.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const Frame = engine.Profiler.Frame;
 
@@ -153,24 +155,34 @@ pub fn drawContent() void {
 
     // --- render counters (the game's GPU scene renderer) — front and centre ---
     const ec = frame.counters;
-    gui.label(@src(), "Render (scene)", .{}, .{ .font = gui.Font.theme(.heading) });
-    gui.label(@src(), "draw calls    {d}", .{ec.draw_calls}, .{});
-    gui.label(@src(), "triangles     {d}", .{ec.triangles}, .{});
-    gui.label(@src(), "vertices      {d}", .{ec.vertices}, .{});
-    gui.label(@src(), "texture binds {d}", .{ec.texture_binds}, .{});
-    gui.label(@src(), "mat switches  {d}", .{ec.material_switches}, .{});
-    gui.label(@src(), "tex created   {d}", .{ec.textures_created}, .{});
+    gui.label(@src(), "{s}", .{tr("Render (scene)")}, .{ .font = gui.Font.theme(.heading) });
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("draw calls    {n}", &.{.{ .name = "n", .value = .{ .number = ec.draw_calls } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("triangles     {n}", &.{.{ .name = "n", .value = .{ .number = ec.triangles } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("vertices      {n}", &.{.{ .name = "n", .value = .{ .number = ec.vertices } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("texture binds {n}", &.{.{ .name = "n", .value = .{ .number = ec.texture_binds } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("mat switches  {n}", &.{.{ .name = "n", .value = .{ .number = ec.material_switches } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("tex created   {n}", &.{.{ .name = "n", .value = .{ .number = ec.textures_created } }})}, .{});
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
     // --- editor window phases (secondary; collapsed by default) ---
-    if (gui.expander(@src(), "Editor CPU (studio)", .{ .expanded = &g_show_editor_cpu }, .{ .expand = .horizontal })) {
+    if (gui.expander(@src(), tr("Editor CPU (studio)"), .{ .expanded = &g_show_editor_cpu }, .{ .expand = .horizontal })) {
         const ft = EditorFrameTiming.last();
-        gui.label(@src(), "fps           {d:.0}", .{cw.FPS()}, .{});
-        gui.label(@src(), "frame total   {d:.3} ms", .{ms(ft.total_ns)}, .{});
-        gui.label(@src(), "  events {d:.3}", .{ms(ft.events_ns)}, .{});
-        gui.label(@src(), "  build  {d:.3}", .{ms(ft.build_ns)}, .{});
-        gui.label(@src(), "  render {d:.3}", .{ms(ft.render_ns)}, .{});
+        var fps_buf: [32]u8 = undefined;
+        const fps_text = std.fmt.bufPrint(&fps_buf, "{d:.0}", .{cw.FPS()}) catch "0";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("fps           {n}", &.{.{ .name = "n", .value = .{ .text = fps_text } }})}, .{});
+        var total_buf: [32]u8 = undefined;
+        const total_text = std.fmt.bufPrint(&total_buf, "{d:.3}", .{ms(ft.total_ns)}) catch "0";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("frame total   {ms} ms", &.{.{ .name = "ms", .value = .{ .text = total_text } }})}, .{});
+        var events_buf: [32]u8 = undefined;
+        const events_text = std.fmt.bufPrint(&events_buf, "{d:.3}", .{ms(ft.events_ns)}) catch "0";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("  events {ms}", &.{.{ .name = "ms", .value = .{ .text = events_text } }})}, .{});
+        var build_buf: [32]u8 = undefined;
+        const build_text = std.fmt.bufPrint(&build_buf, "{d:.3}", .{ms(ft.build_ns)}) catch "0";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("  build  {ms}", &.{.{ .name = "ms", .value = .{ .text = build_text } }})}, .{});
+        var render_buf: [32]u8 = undefined;
+        const render_text = std.fmt.bufPrint(&render_buf, "{d:.3}", .{ms(ft.render_ns)}) catch "0";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("  render {ms}", &.{.{ .name = "ms", .value = .{ .text = render_text } }})}, .{});
     }
 }
 
@@ -183,12 +195,12 @@ fn drawControls(cw: *gui.Window) void {
         const green = gui.Color{ .r = 0x6c, .g = 0xb0, .b = 0x4f };
         const amber = gui.Color{ .r = 0xc0, .g = 0xa0, .b = 0x50 };
         var col: gui.Color = amber;
-        var txt: []const u8 = "■ idle — press Play to profile";
+        var txt: []const u8 = tr("■ idle — press Play to profile");
         if (active and g_record) {
             col = green;
-            txt = "● recording (Play)";
+            txt = tr("● recording (Play)");
         } else if (active) {
-            txt = "❚❚ paused (Play)";
+            txt = tr("❚❚ paused (Play)");
         }
         gui.label(@src(), "{s}", .{txt}, .{ .color_text = col });
     }
@@ -197,29 +209,29 @@ fn drawControls(cw: *gui.Window) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
-        if (gui.button(@src(), if (g_record) "❚❚ Pause" else "● Record", .{}, .{
+        if (gui.button(@src(), if (g_record) tr("❚❚ Pause") else tr("● Record"), .{}, .{
             .gravity_y = 0.5,
             .style = if (g_record) .highlight else .control,
         })) {
             g_record = !g_record;
         }
-        if (gui.button(@src(), if (g_selected == null) "● live" else "→ go live", .{}, .{
+        if (gui.button(@src(), if (g_selected == null) tr("● live") else tr("→ go live"), .{}, .{
             .gravity_y = 0.5,
             .id_extra = 1,
             .style = if (g_selected == null) .highlight else .control,
         })) {
             g_selected = null;
         }
-        _ = gui.checkbox(@src(), &g_auto_on_play, "auto-record on Play", .{ .gravity_y = 0.5 });
+        _ = gui.checkbox(@src(), &g_auto_on_play, tr("auto-record on Play"), .{ .gravity_y = 0.5 });
     }
 
     // vsync (independent) + fps cap
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
-        gui.label(@src(), "present", .{}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        gui.label(@src(), "{s}", .{tr("present")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
         const von = GpuRenderer.vsyncOn();
-        if (gui.button(@src(), if (von) "vsync: on" else "vsync: off", .{}, .{
+        if (gui.button(@src(), if (von) tr("vsync: on") else tr("vsync: off"), .{}, .{
             .gravity_y = 0.5,
             .style = if (von) .highlight else .control,
         })) {
@@ -229,8 +241,8 @@ fn drawControls(cw: *gui.Window) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
-        gui.label(@src(), "fps cap", .{}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
-        fpsBtn(cw, "unlimited", null, 0);
+        gui.label(@src(), "{s}", .{tr("fps cap")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        fpsBtn(cw, tr("unlimited"), null, 0);
         fpsBtn(cw, "30", 30, 1);
         fpsBtn(cw, "60", 60, 2);
         fpsBtn(cw, "90", 90, 3);
@@ -242,7 +254,7 @@ fn drawControls(cw: *gui.Window) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
-        gui.label(@src(), "history", .{}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        gui.label(@src(), "{s}", .{tr("history")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
         histBtn("2s", 128, 0);
         histBtn("4s", 256, 1);
         histBtn("8s", 512, 2);
@@ -252,10 +264,10 @@ fn drawControls(cw: *gui.Window) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
-        if (gui.button(@src(), "Capture Screenshot", .{}, .{ .gravity_y = 0.5 })) {
+        if (gui.button(@src(), tr("Capture Screenshot"), .{}, .{ .gravity_y = 0.5 })) {
             _ = Screenshots.capture();
         }
-        if (gui.button(@src(), "Export Trace", .{}, .{ .gravity_y = 0.5, .id_extra = 1 })) {
+        if (gui.button(@src(), tr("Export Trace"), .{}, .{ .gravity_y = 0.5, .id_extra = 1 })) {
             _ = ProfileExport.exportTrace();
         }
     }
@@ -266,7 +278,7 @@ fn drawControls(cw: *gui.Window) void {
 fn feedbackLabel(res: anytype) void {
     if (res.path_len == 0) return;
     const col: gui.Color = if (res.ok) .{ .r = 0x6c, .g = 0xb0, .b = 0x4f } else .{ .r = 0xc4, .g = 0x4f, .b = 0x6c };
-    const prefix = if (res.ok) "saved " else "error: ";
+    const prefix = if (res.ok) tr("saved ") else tr("error: ");
     gui.label(@src(), "{s}{s}", .{ prefix, res.path() }, .{ .color_text = col });
 }
 
@@ -300,9 +312,26 @@ fn drawTimeChart() void {
     }
 
     if (g_selected == null) {
-        gui.label(@src(), "frame — {d:.0} fps  ·  {d:.2} ms CPU / {d:.2} ms total  ·  {d:.1}s history", .{ fps, busy_ms, period_ms, span_s }, .{ .font = gui.Font.theme(.heading) });
+        var fps_buf: [24]u8 = undefined;
+        var cpu_buf: [24]u8 = undefined;
+        var total_buf: [24]u8 = undefined;
+        var hist_buf: [24]u8 = undefined;
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("frame — {fps} fps  \u{b7}  {cpu} ms CPU / {total} ms total  \u{b7}  {hist}s history", &.{
+            .{ .name = "fps", .value = .{ .text = std.fmt.bufPrint(&fps_buf, "{d:.0}", .{fps}) catch "0" } },
+            .{ .name = "cpu", .value = .{ .text = std.fmt.bufPrint(&cpu_buf, "{d:.2}", .{busy_ms}) catch "0" } },
+            .{ .name = "total", .value = .{ .text = std.fmt.bufPrint(&total_buf, "{d:.2}", .{period_ms}) catch "0" } },
+            .{ .name = "hist", .value = .{ .text = std.fmt.bufPrint(&hist_buf, "{d:.1}", .{span_s}) catch "0" } },
+        })}, .{ .font = gui.Font.theme(.heading) });
     } else {
-        gui.label(@src(), "frame #{d} pinned — {d:.0} fps  ·  {d:.2} ms CPU / {d:.2} ms total", .{ shown.index, fps, busy_ms, period_ms }, .{ .font = gui.Font.theme(.heading) });
+        var fps_buf: [24]u8 = undefined;
+        var cpu_buf: [24]u8 = undefined;
+        var total_buf: [24]u8 = undefined;
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("frame #{idx} pinned — {fps} fps  \u{b7}  {cpu} ms CPU / {total} ms total", &.{
+            .{ .name = "idx", .value = .{ .number = shown.index } },
+            .{ .name = "fps", .value = .{ .text = std.fmt.bufPrint(&fps_buf, "{d:.0}", .{fps}) catch "0" } },
+            .{ .name = "cpu", .value = .{ .text = std.fmt.bufPrint(&cpu_buf, "{d:.2}", .{busy_ms}) catch "0" } },
+            .{ .name = "total", .value = .{ .text = std.fmt.bufPrint(&total_buf, "{d:.2}", .{period_ms}) catch "0" } },
+        })}, .{ .font = gui.Font.theme(.heading) });
     }
 
     var box = gui.box(@src(), .{}, .{
@@ -397,12 +426,16 @@ fn drawTimeChart() void {
 fn drawTimeline(frame: *const Frame) void {
     const threads = frame.threadSlice();
 
-    gui.label(@src(), "Timeline — frame #{d}  ({d:.2} ms CPU)", .{ frame.index, ms(frame.total_ns) }, .{
+    var cpu_buf: [24]u8 = undefined;
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("Timeline — frame #{idx}  ({cpu} ms CPU)", &.{
+        .{ .name = "idx", .value = .{ .number = frame.index } },
+        .{ .name = "cpu", .value = .{ .text = std.fmt.bufPrint(&cpu_buf, "{d:.2}", .{ms(frame.total_ns)}) catch "0" } },
+    })}, .{
         .font = gui.Font.theme(.heading),
     });
 
     if (threads.len == 0 or frame.total_ns == 0) {
-        gui.label(@src(), "(press Play and Record to capture a frame)", .{}, .{ .color_text = .{ .r = 0x88, .g = 0x88, .b = 0x88 } });
+        gui.label(@src(), "{s}", .{tr("(press Play and Record to capture a frame)")}, .{ .color_text = .{ .r = 0x88, .g = 0x88, .b = 0x88 } });
         return;
     }
 
@@ -413,7 +446,10 @@ fn drawTimeline(frame: *const Frame) void {
         var lane = gui.box(@src(), .{ .dir = .vertical }, .{ .expand = .horizontal, .id_extra = ti });
         defer lane.deinit();
 
-        gui.label(@src(), "{s}  ({d} zones)", .{ t.name(), t.zone_count }, .{
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("{name}  ({n} zones)", &.{
+            .{ .name = "name", .value = .{ .text = t.name() } },
+            .{ .name = "n", .value = .{ .number = @intCast(t.zone_count) } },
+        })}, .{
             .font = bar_font,
             .color_text = .{ .r = 0xb0, .g = 0xb0, .b = 0xc0 },
         });

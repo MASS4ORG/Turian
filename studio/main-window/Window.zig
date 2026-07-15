@@ -14,6 +14,8 @@ const ProjectOps = @import("../services/ProjectOps.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
 const ReflectJob = @import("../services/ReflectJob.zig");
 const ActiveTheme = @import("../services/ActiveTheme.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 var should_quit: bool = false;
 var hooks_installed: bool = false;
@@ -29,10 +31,11 @@ var g_drag_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
 fn panelInfo(id: []const u8) gui.DockingWidget.PanelInfo {
     const p = Panels.find(id) orelse return .{ .title = id, .closable = true };
     const instance_n = Panels.instanceNumber(id);
+    const base_title = Panels.translatedTitle(p);
     const title = if (instance_n) |n|
-        std.fmt.allocPrint(gui.currentWindow().arena(), "{s} ({d})", .{ p.title, n }) catch p.title
+        std.fmt.allocPrint(gui.currentWindow().arena(), "{s} ({d})", .{ base_title, n }) catch base_title
     else
-        p.title;
+        base_title;
     const closable = p.closable or instance_n != null;
     return .{ .title = title, .icon = p.icon, .closable = closable };
 }
@@ -364,7 +367,7 @@ fn drawDragGhost() void {
             const name = if (idx < EditorState.object_count)
                 EditorState.objects[idx].nameSlice()
             else
-                "Object";
+                tr("Object");
             gui.icon(@src(), "di", gui.entypo.layers, .{}, .{
                 .min_size_content = .{ .w = 14, .h = 14 },
                 .gravity_y = 0.5,

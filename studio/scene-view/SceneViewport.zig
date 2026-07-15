@@ -9,6 +9,8 @@ const EditorCamera = @import("EditorCamera.zig");
 const UiOverlay = @import("../main-window/UiOverlay.zig");
 const MenuItems = @import("../MenuItems.zig");
 const ui_render = @import("ui_render");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 /// "Show UI overlay" toggle: draws the scene's referenced
 /// `.uidoc` documents (plus the one open in `UiDocumentEditor`) letterboxed
@@ -90,7 +92,7 @@ pub fn draw() void {
         });
         defer toolbar.deinit();
         drawGizmoToolbar();
-        _ = gui.checkbox(@src(), &show_ui_overlay, "Show UI overlay", .{ .gravity_y = 0.5 });
+        _ = gui.checkbox(@src(), &show_ui_overlay, tr("Show UI overlay"), .{ .gravity_y = 0.5 });
     }
 
     var content = gui.box(@src(), .{}, .{ .expand = .both });
@@ -161,7 +163,7 @@ pub fn draw() void {
             UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
         }
     } else {
-        gui.label(@src(), "3D viewport unavailable", .{}, .{
+        gui.label(@src(), "{s}", .{tr("3D viewport unavailable")}, .{
             .gravity_x = 0.5,
             .gravity_y = 0.5,
             .expand = .both,
@@ -198,8 +200,8 @@ pub fn drawGame() void {
     if (st == .edit) {
         var center = gui.box(@src(), .{}, .{ .expand = .both, .gravity_x = 0.5, .gravity_y = 0.5 });
         defer center.deinit();
-        gui.label(@src(), "Display 1", .{}, .{ .gravity_x = 0.5, .font = .theme(.heading) });
-        gui.label(@src(), "No cameras rendering", .{}, .{ .gravity_x = 0.5 });
+        gui.label(@src(), "{s}", .{tr("Display 1")}, .{ .gravity_x = 0.5, .font = .theme(.heading) });
+        gui.label(@src(), "{s}", .{tr("No cameras rendering")}, .{ .gravity_x = 0.5 });
         return;
     }
 
@@ -223,7 +225,7 @@ pub fn drawGame() void {
         // `PlayMode.feedInput`'s `e.handled` check expects.
         drawPlayModeUi(.{ .w = nat_rect.w, .h = nat_rect.h });
     } else {
-        gui.label(@src(), "3D viewport unavailable", .{}, .{
+        gui.label(@src(), "{s}", .{tr("3D viewport unavailable")}, .{
             .gravity_x = 0.5,
             .gravity_y = 0.5,
             .expand = .both,
@@ -309,12 +311,12 @@ fn drawGizmoToolbar() void {
     _ = gui.spacer(@src(), .{ .expand = .horizontal });
 
     const G = GizmoSystem;
-    if (modeButton("Move", G.mode == .translate, 1)) G.mode = .translate;
-    if (modeButton("Rotate", G.mode == .rotate, 2)) G.mode = .rotate;
-    if (modeButton("Scale", G.mode == .scale, 3)) G.mode = .scale;
+    if (modeButton(tr("Move"), G.mode == .translate, 1)) G.mode = .translate;
+    if (modeButton(tr("Rotate"), G.mode == .rotate, 2)) G.mode = .rotate;
+    if (modeButton(tr("Scale"), G.mode == .scale, 3)) G.mode = .scale;
 
     _ = gui.spacer(@src(), .{ .min_size_content = .{ .w = 8 } });
-    _ = gui.checkbox(@src(), &G.snap_enabled, "Snap", .{ .gravity_y = 0.5 });
+    _ = gui.checkbox(@src(), &G.snap_enabled, tr("Snap"), .{ .gravity_y = 0.5 });
 
     _ = gui.spacer(@src(), .{ .min_size_content = .{ .w = 8 } });
     drawVisibilityMenu();
@@ -329,14 +331,14 @@ fn drawGizmoToolbar() void {
 fn drawCameraMenu() void {
     var m = gui.menu(@src(), .horizontal, .{ .gravity_y = 0.5 });
     defer m.deinit();
-    if (MenuItems.dropdown(@src(), "Camera", .{ .id_extra = 1 })) |r| {
+    if (MenuItems.dropdown(@src(), tr("Camera"), .{ .id_extra = 1 })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(.{ .x = r.x, .y = r.y + r.h }) }, .{});
         defer fw.deinit();
 
         var changed = false;
-        if (speedRow("Move speed", &EditorCamera.move_speed, 0.5, 40, 0.5, "{d:0.1}", 1)) changed = true;
-        if (speedRow("Look sens.", &EditorCamera.look_sensitivity, 0.02, 1.0, 0.01, "{d:0.2}", 2)) changed = true;
-        if (speedRow("Zoom speed", &EditorCamera.zoom_speed, 0.05, 4.0, 0.05, "{d:0.2}", 3)) changed = true;
+        if (speedRow(tr("Move speed"), &EditorCamera.move_speed, 0.5, 40, 0.5, "{d:0.1}", 1)) changed = true;
+        if (speedRow(tr("Look sens."), &EditorCamera.look_sensitivity, 0.02, 1.0, 0.01, "{d:0.2}", 2)) changed = true;
+        if (speedRow(tr("Zoom speed"), &EditorCamera.zoom_speed, 0.05, 4.0, 0.05, "{d:0.2}", 3)) changed = true;
 
         if (changed) saveCameraSettings();
     }
@@ -394,18 +396,18 @@ fn modeButton(text: []const u8, active: bool, id: usize) bool {
 fn drawVisibilityMenu() void {
     var m = gui.menu(@src(), .horizontal, .{ .gravity_y = 0.5 });
     defer m.deinit();
-    if (MenuItems.dropdown(@src(), "Gizmos", .{ .id_extra = 2 })) |r| {
+    if (MenuItems.dropdown(@src(), tr("Gizmos"), .{ .id_extra = 2 })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(.{ .x = r.x, .y = r.y + r.h }) }, .{});
         defer fw.deinit();
         const S = &GizmoSystem.show;
-        _ = gui.checkbox(@src(), &S.transform_gizmo, "Transform handles", .{});
-        _ = gui.checkbox(@src(), &S.cameras, "Cameras", .{});
-        _ = gui.checkbox(@src(), &S.lights, "Lights", .{});
-        _ = gui.checkbox(@src(), &S.colliders, "Colliders", .{});
-        _ = gui.checkbox(@src(), &S.custom, "Custom", .{});
-        _ = gui.checkbox(@src(), &S.icons, "Icons", .{});
-        _ = gui.checkbox(@src(), &S.selection, "Selection outline", .{});
-        _ = gui.checkbox(@src(), &S.grid, "Grid", .{});
+        _ = gui.checkbox(@src(), &S.transform_gizmo, tr("Transform handles"), .{});
+        _ = gui.checkbox(@src(), &S.cameras, tr("Cameras"), .{});
+        _ = gui.checkbox(@src(), &S.lights, tr("Lights"), .{});
+        _ = gui.checkbox(@src(), &S.colliders, tr("Colliders"), .{});
+        _ = gui.checkbox(@src(), &S.custom, tr("Custom"), .{});
+        _ = gui.checkbox(@src(), &S.icons, tr("Icons"), .{});
+        _ = gui.checkbox(@src(), &S.selection, tr("Selection outline"), .{});
+        _ = gui.checkbox(@src(), &S.grid, tr("Grid"), .{});
     }
 }
 

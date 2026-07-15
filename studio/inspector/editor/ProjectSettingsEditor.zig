@@ -10,6 +10,8 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../../services/EditorState.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const ProjectSettings = engine.ProjectSettings;
 const Quality = ProjectSettings.Graphics.Quality;
@@ -58,26 +60,26 @@ fn setBuf(dst: []u8, s: []const u8) void {
 pub fn draw(asset_path: []const u8) void {
     if (!std.mem.eql(u8, asset_path, loadedPath())) load(asset_path);
 
-    section("Project");
-    textRow("Name", &name_buf, 1);
-    textRow("Company", &company_buf, 2);
-    textRow("Version", &version_buf, 3);
-    textRow("Icon (GUID)", &icon_buf, 4);
+    section(tr("Project"));
+    textRow(tr("Name"), &name_buf, 1);
+    textRow(tr("Company"), &company_buf, 2);
+    textRow(tr("Version"), &version_buf, 3);
+    textRow(tr("Icon (GUID)"), &icon_buf, 4);
 
-    section("Graphics");
-    textRow("Width", &width_buf, 5);
-    textRow("Height", &height_buf, 6);
-    checkRow("VSync", &vsync, 7);
-    checkRow("Fullscreen", &fullscreen, 8);
-    enumRow(Quality, "Quality", &quality, 9);
+    section(tr("Graphics"));
+    textRow(tr("Width"), &width_buf, 5);
+    textRow(tr("Height"), &height_buf, 6);
+    checkRow(tr("VSync"), &vsync, 7);
+    checkRow(tr("Fullscreen"), &fullscreen, 8);
+    enumRow(Quality, tr("Quality"), &quality, 9);
 
-    section("Platform");
-    enumRow(Target, "Target", &target, 10);
-    enumRow(Optimize, "Optimize", &optimize, 11);
+    section(tr("Platform"));
+    enumRow(Target, tr("Target"), &target, 10);
+    enumRow(Optimize, tr("Optimize"), &optimize, 11);
 
-    section("Boot");
-    textRow("First Scene (GUID)", &scene_buf, 12);
-    textRow("UI Theme (GUID)", &ui_theme_buf, 13);
+    section(tr("Boot"));
+    textRow(tr("First Scene (GUID)"), &scene_buf, 12);
+    textRow(tr("UI Theme (GUID)"), &ui_theme_buf, 13);
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9100 });
 
@@ -85,10 +87,10 @@ pub fn draw(asset_path: []const u8) void {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
         if (dirty)
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), tr("Save"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }

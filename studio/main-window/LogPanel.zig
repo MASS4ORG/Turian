@@ -12,6 +12,8 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const ExternalEditor = @import("../services/ExternalEditor.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const DiagLog = engine.DiagLog;
 const Entry = DiagLog.Entry;
@@ -23,6 +25,18 @@ const level_icons = [4][]const u8{
     gui.entypo.circle_with_cross, // err
 };
 const level_names = [4][]const u8{ "Debug", "Info", "Warning", "Error" };
+
+/// Translated display name for level index `lvl` (0..3). A helper rather than
+/// a translated array since `tr()` needs a comptime string per call.
+fn levelDisplayName(lvl: usize) []const u8 {
+    return switch (lvl) {
+        0 => tr("Debug"),
+        1 => tr("Info"),
+        2 => tr("Warning"),
+        3 => tr("Error"),
+        else => "?",
+    };
+}
 const level_colors = [4]gui.Color{
     .{ .r = 0x90, .g = 0x90, .b = 0x90 }, // debug: gray
     .{ .r = 0xd8, .g = 0xd8, .b = 0xd8 }, // info: near-white
@@ -119,7 +133,7 @@ pub fn draw() void {
 /// Dock header "..." menu content (`PanelDesc.settings`).
 pub fn drawSettings(instance_id: []const u8) void {
     _ = instance_id;
-    _ = gui.checkbox(@src(), &g_show_system, "Show system messages", .{ .expand = .horizontal });
+    _ = gui.checkbox(@src(), &g_show_system, tr("Show system messages"), .{ .expand = .horizontal });
 }
 
 /// Filter row: level toggles, category dropdown, search box, collapse,
@@ -137,7 +151,7 @@ fn drawToolbar(entries: []const Entry) void {
     // not on a `.highlight` fill, which would flatten all four to one accent.
     inline for (level_icons, 0..) |icon, i| {
         const on = g_show[i];
-        if (gui.buttonIcon(@src(), level_names[i], icon, .{}, .{}, .{
+        if (gui.buttonIcon(@src(), levelDisplayName(i), icon, .{}, .{}, .{
             .id_extra = i,
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 22, .h = 22 },
@@ -160,7 +174,7 @@ fn drawToolbar(entries: []const Entry) void {
     te.deinit();
 
     _ = gui.spacer(@src(), .{ .min_size_content = .{ .w = 8 } });
-    if (gui.button(@src(), "Collapse", .{}, .{
+    if (gui.button(@src(), tr("Collapse"), .{}, .{
         .gravity_y = 0.5,
         .style = if (g_collapse) .highlight else .control,
     })) {
@@ -168,12 +182,12 @@ fn drawToolbar(entries: []const Entry) void {
     }
 
     _ = gui.spacer(@src(), .{ .min_size_content = .{ .w = 8 } });
-    _ = gui.checkbox(@src(), &g_auto_scroll, "Auto-scroll", .{ .gravity_y = 0.5 });
+    _ = gui.checkbox(@src(), &g_auto_scroll, tr("Auto-scroll"), .{ .gravity_y = 0.5 });
 
     _ = gui.spacer(@src(), .{ .expand = .horizontal });
 
-    if (gui.button(@src(), "Copy", .{}, .{ .gravity_y = 0.5 })) copyAll(entries);
-    if (gui.button(@src(), "Clear", .{}, .{ .gravity_y = 0.5 })) DiagLog.reset();
+    if (gui.button(@src(), tr("Copy"), .{}, .{ .gravity_y = 0.5 })) copyAll(entries);
+    if (gui.button(@src(), tr("Clear"), .{}, .{ .gravity_y = 0.5 })) DiagLog.reset();
 }
 
 /// Builds the category list from the currently snapshotted entries (subject
@@ -181,7 +195,7 @@ fn drawToolbar(entries: []const Entry) void {
 /// "All"/category dropdown, updating `g_category_buf` on change.
 fn drawCategoryDropdown(entries: []const Entry) void {
     var cat_buf: [1 + MAX_CATEGORIES][]const u8 = undefined;
-    cat_buf[0] = "All";
+    cat_buf[0] = tr("All");
     var cat_n: usize = 1;
     for (entries) |*e| {
         if (isSystemScope(e.scope()) and !g_show_system) continue;
@@ -407,7 +421,7 @@ fn drawStackTrace(e: *const Entry) void {
     if (g_trace_seq != e.seq) {
         if (g_trace_text.len > 0) std.heap.page_allocator.free(g_trace_text);
         g_trace_text = DiagLog.symbolizeTrace(std.heap.page_allocator, e) catch
-            (std.heap.page_allocator.dupe(u8, "(failed to symbolize)") catch &.{});
+            (std.heap.page_allocator.dupe(u8, tr("(failed to symbolize)")) catch &.{});
         g_trace_seq = e.seq;
     }
     gui.label(@src(), "{s}", .{g_trace_text}, .{
@@ -436,9 +450,9 @@ fn copyAll(entries: []const Entry) void {
         const e = rows[i].entry;
         const total = rows[i].total;
         if (total > 1) {
-            out.writer.print("[{s}] {s}: {s} (x{d})\n", .{ level_names[@intFromEnum(e.level)], displayCategory(e.scope()), e.message(), total }) catch {};
+            out.writer.print("[{s}] {s}: {s} (x{d})\n", .{ levelDisplayName(@intFromEnum(e.level)), displayCategory(e.scope()), e.message(), total }) catch {};
         } else {
-            out.writer.print("[{s}] {s}: {s}\n", .{ level_names[@intFromEnum(e.level)], displayCategory(e.scope()), e.message() }) catch {};
+            out.writer.print("[{s}] {s}: {s}\n", .{ levelDisplayName(@intFromEnum(e.level)), displayCategory(e.scope()), e.message() }) catch {};
         }
     }
     gui.clipboardTextSet(out.written());

@@ -101,6 +101,13 @@ pub const menu_tree = @import("MenuTree.zig");
 /// `path:line` reference parser for the Studio Output panel.
 pub const log_location = @import("LogLocation.zig");
 
+/// Localization editor tooling (ADR 0011): `tr`/`trc`/`trn`/`trKey` call-site
+/// extraction and `.strings` -> `.strtab` compilation.
+pub const i18n = struct {
+    pub const Extractor = @import("i18n/Extractor.zig");
+    pub const Compiler = @import("i18n/Compiler.zig");
+};
+
 test {
     // Force every re-exported module to be analysed so their `test` blocks
     // are collected by the test runner. Without this, `addTest` on the

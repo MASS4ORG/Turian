@@ -21,6 +21,10 @@ pub const UiTheme = @import("UiTheme.zig");
 /// Built-in theme presets (Dark, Light, Dark High Contrast, Darcula, Catppuccin).
 pub const ui_theme_presets = @import("ui_theme_presets.zig");
 
+// ── Localization ──────────────────────────────────────────────────────────────
+/// Translation source-of-truth asset (`.strings`), one per locale (ADR 0011).
+pub const Strings = @import("Strings.zig");
+
 // ── Input ─────────────────────────────────────────────────────────────────────
 /// Data-driven input binding asset (`.inputactions`), applied to `engine.Input`.
 pub const InputActions = @import("InputActions.zig").InputActions;

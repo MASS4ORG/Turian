@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "locale": "pt-BR",
+  "units": [
+    {
+      "id": "Press L to switch language",
+      "source": "Press L to switch language",
+      "target": "Pressione L para mudar de idioma",
+      "note": "examples/basic-project/assets/LanguageSwitcher.zig",
+      "state": "translated"
+    }
+  ]
+}

@@ -8,6 +8,8 @@ const std = @import("std");
 const gui = @import("gui");
 const editor = @import("editor");
 const Tasks = @import("Tasks.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const Task = editor.Task;
 
@@ -75,21 +77,20 @@ fn drawStatusRow(tm: *editor.TaskManager, tasks: []Task) void {
             .gravity_y = 0.5,
             .margin = gui.Rect.all(6),
         });
-        if (gui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
+        if (gui.button(@src(), if (t.cancel_requested) tr("Cancelling...") else tr("Cancel"), .{}, .{ .gravity_y = 0.5 })) {
             tm.requestCancel(t.id);
         }
     } else {
-        gui.label(@src(), "Ready", .{}, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "{s}", .{tr("Ready")}, .{ .gravity_y = 0.5 });
     }
 
     _ = gui.spacer(@src(), .{ .expand = .horizontal });
 
     if (tasks.len > 0) {
-        if (gui.button(@src(), "Clear", .{}, .{ .gravity_y = 0.5 })) tm.clearFinished();
+        if (gui.button(@src(), tr("Clear"), .{}, .{ .gravity_y = 0.5 })) tm.clearFinished();
     }
 
-    var btn_buf: [32]u8 = undefined;
-    const btn = std.fmt.bufPrint(&btn_buf, "Tasks ({d})", .{active_count}) catch "Tasks";
+    const btn = StudioLocale.trArgs("Tasks ({count})", &.{.{ .name = "count", .value = .{ .number = @intCast(active_count) } }});
     if (gui.button(@src(), btn, .{}, .{ .gravity_y = 0.5 })) show_list = !show_list;
 }
 
@@ -116,7 +117,7 @@ fn drawRow(tm: *editor.TaskManager, t: *const Task, i: usize) void {
             .gravity_y = 0.5,
             .margin = gui.Rect.all(4),
         });
-        if (gui.button(@src(), if (t.cancel_requested) "Cancelling..." else "Cancel", .{}, .{ .gravity_y = 0.5 })) {
+        if (gui.button(@src(), if (t.cancel_requested) tr("Cancelling...") else tr("Cancel"), .{}, .{ .gravity_y = 0.5 })) {
             tm.requestCancel(t.id);
         }
     } else {
@@ -134,11 +135,10 @@ fn notifyCompletions(tasks: []Task) void {
         if (!t.isFinished() or t.id <= notified_id) continue;
         if (t.id > max_seen) max_seen = t.id;
 
-        var msg_buf: [editor.TaskManager.MAX_LABEL + 48]u8 = undefined;
         const msg = switch (t.status) {
-            .completed => std.fmt.bufPrint(&msg_buf, "{s}: done", .{t.label()}) catch t.label(),
-            .failed => std.fmt.bufPrint(&msg_buf, "{s}: failed", .{t.label()}) catch t.label(),
-            .cancelled => std.fmt.bufPrint(&msg_buf, "{s}: cancelled", .{t.label()}) catch t.label(),
+            .completed => StudioLocale.trArgs("{label}: done", &.{.{ .name = "label", .value = .{ .text = t.label() } }}),
+            .failed => StudioLocale.trArgs("{label}: failed", &.{.{ .name = "label", .value = .{ .text = t.label() } }}),
+            .cancelled => StudioLocale.trArgs("{label}: cancelled", &.{.{ .name = "label", .value = .{ .text = t.label() } }}),
             else => unreachable,
         };
         gui.toast(@src(), .{ .id_extra = @intCast(t.id), .message = msg });

@@ -10,6 +10,8 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../../services/EditorState.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const InputActions = engine.InputActions;
 
@@ -83,7 +85,7 @@ pub fn draw(asset_path: []const u8) void {
 
     for (actions[0..action_count], 0..) |*act, ai| drawAction(act, ai);
 
-    if (gui.button(@src(), "+ Add Action", .{}, .{ .expand = .horizontal, .padding = .all(6) })) {
+    if (gui.button(@src(), tr("+ Add Action"), .{}, .{ .expand = .horizontal, .padding = .all(6) })) {
         if (action_count < MAX_ACTIONS) {
             actions[action_count] = .{};
             setBuf(&actions[action_count].name, "new_action");
@@ -98,10 +100,10 @@ pub fn draw(asset_path: []const u8) void {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
         if (dirty)
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), tr("Save"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
@@ -132,22 +134,22 @@ fn drawAction(act: *EdAction, ai: usize) void {
             .min_size_content = .{ .w = 90 },
         })) dirty = true;
 
-        if (gui.button(@src(), "Remove", .{}, .{ .id_extra = ai, .gravity_y = 0.5 })) {
+        if (gui.button(@src(), tr("Remove"), .{}, .{ .id_extra = ai, .gravity_y = 0.5 })) {
             cmd_remove_action = ai;
         }
     }
 
     switch (act.kind) {
-        .button => drawRole(act, ai, .pos, "Buttons", 0),
+        .button => drawRole(act, ai, .pos, tr("Buttons"), 0),
         .axis => {
-            drawRole(act, ai, .pos, "Positive", 0);
-            drawRole(act, ai, .neg, "Negative", 1);
+            drawRole(act, ai, .pos, tr("Positive"), 0);
+            drawRole(act, ai, .neg, tr("Negative"), 1);
         },
         .vector => {
-            drawRole(act, ai, .pos, "Right", 0);
-            drawRole(act, ai, .neg, "Left", 1);
-            drawRole(act, ai, .up, "Up", 2);
-            drawRole(act, ai, .down, "Down", 3);
+            drawRole(act, ai, .pos, tr("Right"), 0);
+            drawRole(act, ai, .neg, tr("Left"), 1);
+            drawRole(act, ai, .up, tr("Up"), 2);
+            drawRole(act, ai, .down, tr("Down"), 3);
         },
     }
 }
@@ -194,7 +196,7 @@ fn drawRole(act: *EdAction, ai: usize, role_id: RoleId, label: []const u8, rextr
     }
 
     if (role.count < MAX_ROLE) {
-        if (gui.button(@src(), "+ binding", .{}, .{ .id_extra = id, .padding = .{ .x = 6, .y = 2 } })) {
+        if (gui.button(@src(), tr("+ binding"), .{}, .{ .id_extra = id, .padding = .{ .x = 6, .y = 2 } })) {
             cmd_add_binding = .{ .action = ai, .role = role_id };
         }
     }

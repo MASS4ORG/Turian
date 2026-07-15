@@ -9,6 +9,8 @@
 const std = @import("std");
 const gui = @import("gui");
 const EditorState = @import("../services/EditorState.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 // ── Double-click tracking (grid tiles, both real entries and the `..` tile) ─
 
@@ -242,13 +244,12 @@ pub fn handleDeleteDialog() void {
     else
         path;
 
-    var msg_buf: [512]u8 = undefined;
-    const msg = std.fmt.bufPrint(&msg_buf, "Delete '{s}' permanently?", .{file_name}) catch "Delete permanently?";
+    const msg = StudioLocale.trArgs("Delete '{name}' permanently?", &.{.{ .name = "name", .value = .{ .text = file_name } }});
     gui.dialog(@src(), .{}, .{
-        .title = "Delete Asset",
+        .title = tr("Delete Asset"),
         .message = msg,
-        .ok_label = "Delete",
-        .cancel_label = "Cancel",
+        .ok_label = tr("Delete"),
+        .cancel_label = tr("Cancel"),
         .default = .cancel,
         .callafterFn = struct {
             fn callafter(_: gui.Id, response: gui.enums.DialogResponse) !void {

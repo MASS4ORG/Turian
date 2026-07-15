@@ -5,6 +5,8 @@ const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
 const PropDrawMath = @import("PropDrawMath.zig");
 const PropDrawReflect = @import("PropDrawReflect.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const FieldHint = engine.FieldHint;
 const DrawCtx = PropDrawMath.DrawCtx;
@@ -169,7 +171,7 @@ pub fn pickerAsset(
     fw: *gui.FloatingMenuWidget,
 ) ?[]const u8 {
     if (filter == .material) {
-        gui.label(@src(), "Built-in", .{}, .{ .expand = .horizontal, .style = .content });
+        gui.label(@src(), "{s}", .{tr("Built-in")}, .{ .expand = .horizontal, .style = .content });
         for (engine.Material.presets, 0..) |preset, pi| {
             if (gui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = pi })) |_| {
                 fw.close();
@@ -180,7 +182,7 @@ pub fn pickerAsset(
     }
 
     if (!EditorState.assetDbReady()) {
-        gui.label(@src(), "(no project open)", .{}, .{});
+        gui.label(@src(), "{s}", .{tr("(no project open)")}, .{});
         return null;
     }
     const asset_type: editor.AssetType = switch (filter) {
@@ -217,7 +219,7 @@ pub fn pickerAsset(
         }
         idx += 1;
     }
-    if (!any_shown and filter != .any) gui.label(@src(), "(no project assets)", .{}, .{});
+    if (!any_shown and filter != .any) gui.label(@src(), "{s}", .{tr("(no project assets)")}, .{});
     return null;
 }
 
@@ -268,7 +270,7 @@ fn pickerSceneObject(
     _ = kind;
     var changed = false;
     if (EditorState.object_count == 0) {
-        gui.label(@src(), "(no scene objects)", .{}, .{});
+        gui.label(@src(), "{s}", .{tr("(no scene objects)")}, .{});
         return false;
     }
     for (EditorState.objects[0..EditorState.object_count], 0..) |*obj, oi| {

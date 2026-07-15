@@ -16,6 +16,8 @@ const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
 const build_options = @import("turian_build_options");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const ComponentDef = EditorState.ComponentDef;
 const Future = std.Io.Future(void);
@@ -87,7 +89,7 @@ pub fn launchBuild(io: std.Io) void {
         EditorState.discovered_components[0..EditorState.discovered_count],
     );
     job.config = buildConfig(a);
-    job.task_id = tm().begin(.build, "Build game");
+    job.task_id = tm().begin(.build, tr("Build game"));
 
     dispatch(io, job);
 }
@@ -110,7 +112,7 @@ pub fn launchReimport(io: std.Io) void {
         .project_path = "",
     };
     job.project_path = job.arena.allocator().dupe(u8, project) catch project;
-    job.task_id = tm().begin(.import, "Reimport assets");
+    job.task_id = tm().begin(.import, tr("Reimport assets"));
 
     dispatch(io, job);
 }
@@ -161,6 +163,8 @@ fn runJob(job: *Job) void {
                 job.config,
                 progress,
             );
+            // Not translated: runs on a worker thread, where `gui.currentWindow()`
+            // (and therefore `StudioLocale.tr`) is unsafe to call.
             finalize(job.task_id, ok, "Build failed");
         },
         .reimport => {
@@ -197,16 +201,16 @@ fn finishJob(job: *Job) void {
 fn rejectIfBusy() bool {
     if (active_job == null) return false;
     gui.dialog(@src(), .{}, .{
-        .title = "Task Running",
-        .message = "A task is already running. Wait for it to finish.",
+        .title = tr("Task Running"),
+        .message = tr("A task is already running. Wait for it to finish."),
     });
     return true;
 }
 
 fn noProjectDialog() void {
     gui.dialog(@src(), .{}, .{
-        .title = "No Project",
-        .message = "Open a project first.",
+        .title = tr("No Project"),
+        .message = tr("Open a project first."),
     });
 }
 

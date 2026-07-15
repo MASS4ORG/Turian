@@ -5,6 +5,9 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
+
 const FieldHint = engine.FieldHint;
 const math = engine.math;
 
@@ -48,15 +51,15 @@ pub fn drawVec3Row(src: std.builtin.SourceLocation, v: *engine.Vector3) bool {
     var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
     defer row.deinit();
 
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rx.changed) changed = true;
 
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (ry.changed) changed = true;
 
-    gui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rz.changed) changed = true;
 
@@ -70,11 +73,11 @@ pub fn drawVec2Row(src: std.builtin.SourceLocation, v: *engine.Vector2) bool {
     var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
     defer row.deinit();
 
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rx.changed) changed = true;
 
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (ry.changed) changed = true;
 
@@ -88,19 +91,19 @@ pub fn drawVec4Row(src: std.builtin.SourceLocation, v: *engine.Vector4) bool {
     var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
     defer row.deinit();
 
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rx.changed) changed = true;
 
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (ry.changed) changed = true;
 
-    gui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rz.changed) changed = true;
 
-    gui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("W")}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     const rw = gui.textEntryNumber(@src(), f32, .{ .value = &v.w }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
     if (rw.changed) changed = true;
 
@@ -126,9 +129,9 @@ pub fn drawVec2(label: []const u8, ptr: *math.Vector2, hint: FieldHint, ctx: *Dr
         return false;
     }
     var changed = false;
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 + 1 }).changed) changed = true;
     return changed;
 }
@@ -170,13 +173,13 @@ pub fn drawVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx: *Dr
         return false;
     }
     var changed = false;
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 }).changed) changed = true;
-    gui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 }).changed) changed = true;
-    gui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("W")}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &ptr.w }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 }).changed) changed = true;
     return changed;
 }
@@ -211,13 +214,13 @@ pub fn drawColorVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx
     swatch.deinit();
     if (!ro) {
         var changed = false;
-        gui.label(@src(), "R", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+        gui.label(@src(), "{s}", .{tr("R")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
         if (gui.sliderEntry(@src(), null, .{ .value = &ptr.x, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 })) changed = true;
-        gui.label(@src(), "G", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+        gui.label(@src(), "{s}", .{tr("G")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
         if (gui.sliderEntry(@src(), null, .{ .value = &ptr.y, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 })) changed = true;
-        gui.label(@src(), "B", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+        gui.label(@src(), "{s}", .{tr("B")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
         if (gui.sliderEntry(@src(), null, .{ .value = &ptr.z, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 })) changed = true;
-        gui.label(@src(), "A", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+        gui.label(@src(), "{s}", .{tr("A")}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
         if (gui.sliderEntry(@src(), null, .{ .value = &ptr.w, .min = 0, .max = 1, .interval = 0.01 }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 })) changed = true;
         return changed;
     }
@@ -241,9 +244,9 @@ pub fn drawVec2i(label: []const u8, ptr: *math.Vector2i, hint: FieldHint, ctx: *
         return false;
     }
     var changed = false;
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 + 1 }).changed) changed = true;
     return changed;
 }
@@ -265,11 +268,11 @@ pub fn drawVec3i(label: []const u8, ptr: *math.Vector3i, hint: FieldHint, ctx: *
         return false;
     }
     var changed = false;
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 1 }).changed) changed = true;
-    gui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 2 }).changed) changed = true;
     return changed;
 }
@@ -291,13 +294,13 @@ pub fn drawVec4i(label: []const u8, ptr: *math.Vector4i, hint: FieldHint, ctx: *
         return false;
     }
     var changed = false;
-    gui.label(@src(), "X", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.x }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.y }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 }).changed) changed = true;
-    gui.label(@src(), "Z", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.z }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 }).changed) changed = true;
-    gui.label(@src(), "W", .{}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("W")}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), i32, .{ .value = &ptr.w }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 }).changed) changed = true;
     return changed;
 }
@@ -320,7 +323,17 @@ pub fn drawQuaternion(label: []const u8, ptr: *math.Quaternion, hint: FieldHint,
 
     const ro = ctx.read_only or hint.read_only;
     if (ro) {
-        gui.label(@src(), "P:{d:.1} Y:{d:.1} R:{d:.1}", .{ euler[0], euler[1], euler[2] }, .{ .id_extra = id });
+        var pitch_buf: [16]u8 = undefined;
+        var yaw_buf: [16]u8 = undefined;
+        var roll_buf: [16]u8 = undefined;
+        const pitch_str = std.fmt.bufPrint(&pitch_buf, "{d:.1}", .{euler[0]}) catch "";
+        const yaw_str = std.fmt.bufPrint(&yaw_buf, "{d:.1}", .{euler[1]}) catch "";
+        const roll_str = std.fmt.bufPrint(&roll_buf, "{d:.1}", .{euler[2]}) catch "";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("P:{pitch} Y:{yaw} R:{roll}", &.{
+            .{ .name = "pitch", .value = .{ .text = pitch_str } },
+            .{ .name = "yaw", .value = .{ .text = yaw_str } },
+            .{ .name = "roll", .value = .{ .text = roll_str } },
+        })}, .{ .id_extra = id });
         return false;
     }
 
@@ -334,11 +347,11 @@ pub fn drawQuaternion(label: []const u8, ptr: *math.Quaternion, hint: FieldHint,
     }
 
     var changed = false;
-    gui.label(@src(), "P", .{}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("P")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &euler[0] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 }).changed) changed = true;
-    gui.label(@src(), "Y", .{}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &euler[1] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 1 }).changed) changed = true;
-    gui.label(@src(), "R", .{}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
+    gui.label(@src(), "{s}", .{tr("R")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
     if (gui.textEntryNumber(@src(), f32, .{ .value = &euler[2] }, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 2 }).changed) changed = true;
 
     if (changed) {

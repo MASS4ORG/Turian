@@ -13,6 +13,8 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const EditorState = @import("../services/EditorState.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const page = std.heap.page_allocator;
 const log = std.log.scoped(.profile_export);
@@ -51,19 +53,19 @@ fn fileExists(full: []const u8) bool {
 pub fn exportTrace() ?[]const u8 {
     const io = gui.io;
     if (engine.Profiler.historyCount() == 0) {
-        setLast(false, "nothing recorded yet");
+        setLast(false, tr("nothing recorded yet"));
         return null;
     }
 
     const dir = EditorState.project_path orelse ".";
     var dirbuf: [1024]u8 = undefined;
     const out_dir = std.fmt.bufPrint(&dirbuf, "{s}/profiles", .{dir}) catch {
-        setLast(false, "path too long");
+        setLast(false, tr("path too long"));
         return null;
     };
     std.Io.Dir.cwd().createDirPath(io, out_dir) catch |err| {
         log.err("cannot create {s}: {any}", .{ out_dir, err });
-        setLast(false, "mkdir failed");
+        setLast(false, tr("mkdir failed"));
         return null;
     };
 
@@ -72,7 +74,7 @@ pub fn exportTrace() ?[]const u8 {
     var n: u32 = 1;
     const full, const rel = while (n < 100_000) : (n += 1) {
         const full = std.fmt.bufPrint(&fullbuf, "{s}/trace_{d:0>4}.json", .{ out_dir, n }) catch {
-            setLast(false, "path too long");
+            setLast(false, tr("path too long"));
             return null;
         };
         if (!fileExists(full)) {
@@ -80,23 +82,23 @@ pub fn exportTrace() ?[]const u8 {
             break .{ full, rel };
         }
     } else {
-        setLast(false, "too many traces");
+        setLast(false, tr("too many traces"));
         return null;
     };
 
     var out: std.Io.Writer.Allocating = std.Io.Writer.Allocating.initCapacity(page, 256 * 1024) catch {
-        setLast(false, "out of memory");
+        setLast(false, tr("out of memory"));
         return null;
     };
     defer out.deinit();
     engine.Profiler.writeChromeTrace(&out.writer) catch |err| {
         log.err("encode failed: {any}", .{err});
-        setLast(false, "encode failed");
+        setLast(false, tr("encode failed"));
         return null;
     };
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = full, .data = out.written() }) catch |err| {
         log.err("write {s} failed: {any}", .{ rel, err });
-        setLast(false, "write failed");
+        setLast(false, tr("write failed"));
         return null;
     };
     log.info("saved {s} ({d} frames)", .{ rel, engine.Profiler.historyCount() });

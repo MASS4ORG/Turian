@@ -83,12 +83,18 @@ pub const UI = struct {
     /// theme's own (or suggested) fonts. Edited via a file-picker button in
     /// `SettingsEditor`, not the generic reflected text field.
     system_font_path: []const u8 = "",
+    /// BCP-47 tag of the active Studio display language (ADR 0011). Edited
+    /// via a dedicated dropdown in `SettingsEditor` (sourced from
+    /// `StudioLocale.available_languages`), not the generic reflected text
+    /// field — kept out of the reflection loop via `hidden`, like `theme_name`.
+    language: []const u8 = "en",
 
     pub const turian_hints = struct {
         pub const theme_name = FieldHint{ .hidden = true };
         pub const font_size = FieldHint{ .min = 8, .max = 20, .widget = .slider_entry, .tooltip = "Base font size for Studio text. Unaffected by Zoom." };
         pub const zoom = FieldHint{ .min = 0.7, .max = 1.5, .step = 0.05, .widget = .slider_entry, .tooltip = "UI scale multiplier for buttons, tabs, and menus. Does not affect font size." };
         pub const system_font_path = FieldHint{ .hidden = true };
+        pub const language = FieldHint{ .hidden = true };
     };
 };
 
@@ -118,6 +124,7 @@ pub const StudioSettings = struct {
     pub const KEY_UI_FONT_SIZE = "editor.ui.font_size";
     pub const KEY_UI_ZOOM = "editor.ui.zoom";
     pub const KEY_UI_SYSTEM_FONT_PATH = "editor.ui.system_font_path";
+    pub const KEY_UI_LANGUAGE = "editor.ui.language";
 
     /// Populate from the on-disk/in-memory KV store, falling back to each
     /// field's default when the key is missing or malformed.
@@ -134,6 +141,7 @@ pub const StudioSettings = struct {
         self.ui.font_size = @floatCast(s.getFloat(KEY_UI_FONT_SIZE, self.ui.font_size));
         self.ui.zoom = @floatCast(s.getFloat(KEY_UI_ZOOM, self.ui.zoom));
         self.ui.system_font_path = s.getString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
+        self.ui.language = s.getString(KEY_UI_LANGUAGE, self.ui.language);
         return self;
     }
 
@@ -151,5 +159,6 @@ pub const StudioSettings = struct {
         try s.setFloat(KEY_UI_FONT_SIZE, self.ui.font_size);
         try s.setFloat(KEY_UI_ZOOM, self.ui.zoom);
         try s.setString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
+        try s.setString(KEY_UI_LANGUAGE, self.ui.language);
     }
 };

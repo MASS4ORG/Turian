@@ -8,6 +8,8 @@ const gui = @import("gui");
 const editor = @import("editor");
 const FontRegistry = @import("FontRegistry.zig");
 const ImportSettingsEditor = @import("ImportSettingsEditor.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const PANGRAM = "The quick brown fox jumps over the lazy dog";
 const Specimen = struct { text: []const u8, size: f32 };
@@ -29,7 +31,7 @@ pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
     defer box.deinit();
 
     const family = FontRegistry.ensure(guid, asset_path) orelse {
-        gui.label(@src(), "(preview unavailable — could not read font file)", .{}, .{ .id_extra = 99 });
+        gui.label(@src(), "{s}", .{tr("(preview unavailable — could not read font file)")}, .{ .id_extra = 99 });
         return;
     };
 
@@ -42,6 +44,6 @@ pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 7150 });
-    gui.label(@src(), "dvui default (for comparison):", .{}, .{ .id_extra = 90, .style = .content });
+    gui.label(@src(), "{s}", .{tr("dvui default (for comparison):")}, .{ .id_extra = 90, .style = .content });
     gui.label(@src(), "{s}", .{PANGRAM}, .{ .font = .theme(.body), .id_extra = 91, .padding = .{ .y = 2 } });
 }

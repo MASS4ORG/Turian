@@ -30,6 +30,7 @@ const EditorState = @import("../services/EditorState.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const EditorCamera = @import("../scene-view/EditorCamera.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
 
 pub const MAX_DOCS = 32;
 
@@ -643,21 +644,21 @@ fn drawConfirmClose() void {
     defer win.deinit();
 
     var open_flag = true;
-    win.dragAreaSet(gui.windowHeader("Unsaved Changes", "", &open_flag));
+    win.dragAreaSet(gui.windowHeader(StudioLocale.tr("Unsaved Changes"), "", &open_flag));
     if (!open_flag) {
         g_confirm_close = null;
         return;
     }
 
     var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "Save changes to \"{s}\" before closing?", .{
-        trimTitle(docs[i].name(), 48, &name_buf),
-    }, .{ .padding = .all(8) });
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("Save changes to \"{title}\" before closing?", &.{
+        .{ .name = "title", .value = .{ .text = trimTitle(docs[i].name(), 48, &name_buf) } },
+    })}, .{ .padding = .all(8) });
 
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_x = 1.0, .padding = .all(4) });
     defer row.deinit();
 
-    if (gui.button(@src(), "Save", .{}, .{})) {
+    if (gui.button(@src(), StudioLocale.tr("Save"), .{}, .{})) {
         // Load the doc so EditorState holds its scene, then save + close.
         activate(i);
         if (docs[i].kind == .scene) {
@@ -668,12 +669,12 @@ fn drawConfirmClose() void {
         g_confirm_close = null;
         close(i);
     }
-    if (gui.button(@src(), "Don't Save", .{}, .{ .id_extra = 1 })) {
+    if (gui.button(@src(), StudioLocale.tr("Don't Save"), .{}, .{ .id_extra = 1 })) {
         const idx = i;
         g_confirm_close = null;
         close(idx);
     }
-    if (gui.button(@src(), "Cancel", .{}, .{ .id_extra = 2 })) {
+    if (gui.button(@src(), StudioLocale.tr("Cancel"), .{}, .{ .id_extra = 2 })) {
         g_confirm_close = null;
     }
 }

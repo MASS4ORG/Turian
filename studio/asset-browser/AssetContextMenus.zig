@@ -15,6 +15,8 @@ const AssetActions = @import("AssetActions.zig");
 const Documents = @import("../main-window/Documents.zig");
 const PreviewSystem = @import("preview/PreviewSystem.zig");
 const AssetNav = @import("AssetNav.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 pub fn iconForHint(hint: editor.asset_registry.IconHint) []const u8 {
     return switch (hint) {
@@ -280,7 +282,7 @@ pub fn drawCreateAssetMenuItems(browse_path: []const u8, id_base: usize) void {
     var root = editor.menu_tree.build(alloc, paths) catch return;
     defer root.deinit(alloc);
 
-    if (menuItemLabelCascade(@src(), "Create", id_base)) |r| {
+    if (menuItemLabelCascade(@src(), tr("Create"), id_base)) |r| {
         var sub_fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer sub_fw.deinit();
         drawMenuNode(&root, sub_fw, entries, browse_path);
@@ -302,8 +304,8 @@ pub fn drawAssetExtraMenuItems(
 
     if (!is_dir and desc.open_mode != .none) {
         const open_label = switch (desc.open_mode) {
-            .internal_editor => "Open",
-            .external_editor => "Open in External Editor",
+            .internal_editor => tr("Open"),
+            .external_editor => tr("Open in External Editor"),
             .none => unreachable,
         };
         if (gui.menuItemLabel(@src(), open_label, .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
@@ -315,7 +317,7 @@ pub fn drawAssetExtraMenuItems(
     // A scene asset can also be instantiated as a linked prefab instance in
     // the current scene.
     if (!is_dir and asset_type == .scene) {
-        if (gui.menuItemLabel(@src(), "Instantiate into Scene", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Instantiate into Scene"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
             fw.close();
             var full_buf: [1024]u8 = undefined;
             if (std.fmt.bufPrint(&full_buf, "{s}/{s}", .{ browse_path, file_name })) |full| {
@@ -327,20 +329,20 @@ pub fn drawAssetExtraMenuItems(
     if (!is_dir) {
         var reimport_path_buf: [1024]u8 = undefined;
         const reimport_path = std.fmt.bufPrint(&reimport_path_buf, "{s}/{s}", .{ browse_path, file_name }) catch "";
-        if (gui.menuItemLabel(@src(), "Reimport Asset", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Reimport Asset"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
             fw.close();
             editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj_path, reimport_path);
             invalidatePreviewAndSubAssets(reimport_path);
         }
     }
 
-    if (gui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+    if (gui.menuItemLabel(@src(), tr("Reveal in file manager"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
         fw.close();
         AssetActions.revealInFileManager(browse_path, file_name);
     }
 
     if (!is_dir) {
-        if (gui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Copy Absolute Path"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
             fw.close();
             var raw_buf: [1024]u8 = undefined;
             const raw = std.fmt.bufPrint(&raw_buf, "{s}/{s}", .{ browse_path, file_name }) catch "";
@@ -349,7 +351,7 @@ pub fn drawAssetExtraMenuItems(
             const resolved = if (resolved_len > 0) resolved_buf[0..resolved_len] else raw;
             gui.clipboardTextSet(resolved);
         }
-        if (gui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Copy Relative Path"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
             fw.close();
             var assets_buf: [1024]u8 = undefined;
             const assets_path = std.fmt.bufPrint(&assets_buf, "{s}/assets", .{proj_path}) catch "";
@@ -375,7 +377,7 @@ pub fn drawAssetExtraMenuItems(
         } else "";
 
         if (maybe_guid_str.len > 0) {
-            if (gui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Copy GUID"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
                 fw.close();
                 gui.clipboardTextSet(maybe_guid_str);
             }

@@ -7,6 +7,8 @@
 const gui = @import("gui");
 const EditorState = @import("../services/EditorState.zig");
 const tree_view = @import("../TreeView.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 var g_show_delete_dialog: bool = false;
 var g_delete_dialog_result: ?bool = null;
@@ -113,7 +115,7 @@ const SceneModel = struct {
     }
 
     pub fn contextItems(idx: usize, fw: *gui.FloatingMenuWidget) void {
-        if (gui.menuItemLabel(@src(), "Duplicate", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Duplicate"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             if (EditorState.selectedCount() > 1 and EditorState.isObjectSelected(idx)) {
                 EditorState.duplicateSelectedObjects(gui.frameTimeNS(), gui.io);
@@ -124,14 +126,14 @@ const SceneModel = struct {
 
         // Scene-wide creation, reachable from any node's menu (so it's
         // available even when the hierarchy is full and has no empty space).
-        if (gui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Create Empty Child"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             const ni = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", @intCast(idx));
             EditorState.clearSelectedObjects();
             EditorState.selected_object = ni;
             EditorState.selectObject(ni);
         }
-        if (gui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Create Empty"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             const ni = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", EditorState.objects[idx].parent);
             EditorState.clearSelectedObjects();
@@ -141,20 +143,20 @@ const SceneModel = struct {
 
         _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 200 + idx });
 
-        if (gui.menuItemLabel(@src(), "Create Prefab", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Create Prefab"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             _ = EditorState.createPrefabFromObject(gui.frameTimeNS(), gui.io, idx);
         }
 
         _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4), .id_extra = 100 + idx });
 
-        if (gui.menuItemLabel(@src(), "Copy GUID", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Copy GUID"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             const gs = EditorState.objects[idx].guidSlice();
             if (gs.len > 0) gui.clipboardTextSet(gs);
         }
 
-        if (gui.menuItemLabel(@src(), "Frame Object", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Frame Object"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             EditorState.focusOnObject(idx);
         }
@@ -205,7 +207,7 @@ fn drawBackgroundMenu(wd: *gui.WidgetData) void {
         var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
         defer fw.deinit();
 
-        if (gui.menuItemLabel(@src(), "Create Empty", .{}, .{ .expand = .horizontal }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Create Empty"), .{}, .{ .expand = .horizontal }) != null) {
             fw.close();
             const idx = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", -1);
             EditorState.clearSelectedObjects();
@@ -214,7 +216,7 @@ fn drawBackgroundMenu(wd: *gui.WidgetData) void {
         }
 
         if (EditorState.selected_object) |sel| {
-            if (gui.menuItemLabel(@src(), "Create Empty Child", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Create Empty Child"), .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 const idx = EditorState.addObjectWithUndo(gui.frameTimeNS(), gui.io, "New Object", @intCast(sel));
                 EditorState.clearSelectedObjects();
@@ -244,10 +246,10 @@ fn handleDeleteDialog() void {
     };
 
     gui.dialog(@src(), .{}, .{
-        .title = "Delete Object",
-        .message = "Delete selected object and all its children?",
-        .ok_label = "Delete",
-        .cancel_label = "Cancel",
+        .title = tr("Delete Object"),
+        .message = tr("Delete selected object and all its children?"),
+        .ok_label = tr("Delete"),
+        .cancel_label = tr("Cancel"),
         .default = .cancel,
         .callafterFn = struct {
             fn callafter(_: gui.Id, response: gui.enums.DialogResponse) !void {

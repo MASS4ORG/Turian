@@ -896,6 +896,35 @@
         },
         {
           "user_script": {
+            "type_name": "LanguageSwitcher",
+            "source_file": "assets/LanguageSwitcher.zig",
+            "fields": [
+              {
+                "name": "hud",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "25b21610-6255-40a6-98d4-c9f9858ac972",
+                "as_string": ""
+              }
+            ]
+          }
+        },
+        {
+          "user_script": {
             "type_name": "JumpOnClick",
             "source_file": "assets/JumpOnClick.zig",
             "fields": [

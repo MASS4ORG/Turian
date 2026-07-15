@@ -8,6 +8,8 @@ const PropDrawScalars = @import("PropDrawScalars.zig");
 const PropDrawCollections = @import("PropDrawCollections.zig");
 const PropDrawRef = @import("PropDrawRef.zig");
 const PropDrawReflect = @import("PropDrawReflect.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const FieldHint = engine.FieldHint;
 const math = engine.math;
@@ -118,7 +120,7 @@ fn drawStructFields(comptime T: type, ptr: *T, ctx: *DrawCtx) bool {
     }
 
     inline for (groups, 0..) |g, gi| {
-        if (gui.expander(@src(), g, .{ .default_expanded = true }, .{
+        if (gui.expander(@src(), tr(g), .{ .default_expanded = true }, .{
             .expand = .horizontal,
             .padding = .all(2),
             .id_extra = gi,
@@ -215,7 +217,7 @@ fn drawOptional(
                 changed = true;
             }
         } else {
-            gui.label(@src(), "{s}", .{if (has_val) "set" else "null"}, .{ .gravity_y = 0.5, .id_extra = id });
+            gui.label(@src(), "{s}", .{if (has_val) tr("set") else tr("null")}, .{ .gravity_y = 0.5, .id_extra = id });
         }
     }
 
@@ -267,6 +269,6 @@ fn drawFallback(label: []const u8, ctx: *DrawCtx, id: usize) bool {
     _ = ctx;
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
-    gui.label(@src(), "{s}: (unsupported type)", .{label}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("{field}: (unsupported type)", &.{.{ .name = "field", .value = .{ .text = label } }})}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = id });
     return false;
 }

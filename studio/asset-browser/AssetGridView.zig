@@ -17,6 +17,8 @@ const AssetContextMenus = @import("AssetContextMenus.zig");
 const AssetTileLayout = @import("AssetTileLayout.zig");
 const AssetSubAssetTiles = @import("AssetSubAssetTiles.zig");
 const AssetBrowser = @import("AssetBrowser.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var drag_hover_idx: ?usize = null;
@@ -48,14 +50,13 @@ fn drawPackagesSection(proj_path: []const u8) void {
     defer pm.deinit();
     if (pm.packageCount() == 0) return;
 
-    var label_buf: [128]u8 = undefined;
-    const header = std.fmt.bufPrint(&label_buf, "Packages ({d})", .{pm.packageCount()}) catch "Packages";
+    const header = StudioLocale.trArgs("Packages ({count})", &.{.{ .name = "count", .value = .{ .number = @as(u64, @intCast(pm.packageCount())) } }});
     if (gui.expander(@src(), header, .{ .default_expanded = false }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) {
         // Labels are drawn directly into the (vertical) scroll area, mirroring
         // the ProfilerPanel pattern — one row per package, then its asset dirs.
         for (pm.packages.items, 0..) |*pkg, i| {
             const m = &pkg.manifest;
-            gui.label(@src(), "  {s}  v{s}  (read-only)", .{ m.name, m.version }, .{ .id_extra = i, .expand = .horizontal });
+            gui.label(@src(), "{s}", .{StudioLocale.trArgs("  {name}  v{version}  (read-only)", &.{ .{ .name = "name", .value = .{ .text = m.name } }, .{ .name = "version", .value = .{ .text = m.version } } })}, .{ .id_extra = i, .expand = .horizontal });
             for (m.asset_dirs, 0..) |adir, j| {
                 gui.label(@src(), "      Packages/{s}/{s}", .{ m.name, adir }, .{ .id_extra = i * 64 + j, .expand = .horizontal });
             }
@@ -94,7 +95,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
     if (AssetNav.current_subdir_len == 0 and AssetBrowser.showPackages()) drawPackagesSection(proj_path);
 
     var dir = std.Io.Dir.cwd().openDir(gui.io, browse_path, .{ .iterate = true }) catch {
-        gui.label(@src(), "No assets folder found. Create {s}/assets.", .{proj_path}, .{ .padding = .all(8) });
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("No assets folder found. Create {project}/assets.", &.{.{ .name = "project", .value = .{ .text = proj_path } }})}, .{ .padding = .all(8) });
         return;
     };
     defer dir.close(gui.io);
@@ -247,7 +248,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
                 AssetContextMenus.drawAssetExtraMenuItems(fw, proj_path, browse_path, entry.name, is_dir, asset_type, entry_idx);
 
                 // Rename option for files and directories
-                if (gui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                if (gui.menuItemLabel(@src(), tr("Rename"), .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
                     var asset_path: [1024]u8 = undefined;
                     const ap = AssetNav.fullPathFor(entry.name, browse_path, &asset_path);
@@ -255,7 +256,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
                 }
 
                 // Delete option for files and directories
-                if (gui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
+                if (gui.menuItemLabel(@src(), tr("Delete"), .{}, .{ .expand = .horizontal, .id_extra = entry_idx }) != null) {
                     fw.close();
                     var asset_path: [1024]u8 = undefined;
                     AssetNav.requestDelete(AssetNav.fullPathFor(entry.name, browse_path, &asset_path));
@@ -340,7 +341,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
         if (is_renaming_this) {
             var te = gui.textEntry(@src(), .{
                 .text = .{ .buffer = EditorState.g_rename.buf[0..] },
-                .placeholder = "Filename",
+                .placeholder = tr("Filename"),
             }, .{
                 .gravity_x = 0.5,
                 .min_size_content = .{ .w = 64, .h = 22 },
@@ -446,18 +447,18 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
             var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{});
             defer fw.deinit();
 
-            if (gui.menuItemLabel(@src(), "Reveal in file manager", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Reveal in file manager"), .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 AssetActions.revealInFileManager(browse_path, "");
             }
-            if (gui.menuItemLabel(@src(), "Copy Absolute Path", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Copy Absolute Path"), .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 var resolve_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
                 const resolve_len = std.Io.Dir.realPathFile(std.Io.Dir.cwd(), gui.io, browse_path, &resolve_buf) catch 0;
                 const resolved_path = if (resolve_len > 0) resolve_buf[0..resolve_len] else browse_path;
                 gui.clipboardTextSet(resolved_path);
             }
-            if (gui.menuItemLabel(@src(), "Copy Relative Path", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Copy Relative Path"), .{}, .{ .expand = .horizontal }) != null) {
                 fw.close();
                 const sub = AssetNav.currentSubdir();
                 var copy_rel_buf: [1024]u8 = undefined;

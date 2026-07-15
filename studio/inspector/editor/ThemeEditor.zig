@@ -7,6 +7,8 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const ui_render = @import("ui_render");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const UiTheme = engine.UiTheme;
 const Style = UiTheme.Style;
@@ -60,7 +62,7 @@ pub fn draw(asset_path: []const u8) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 } });
         defer row.deinit();
-        gui.label(@src(), "Name", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
+        gui.label(@src(), "{s}", .{tr("Name")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
         var te = gui.textEntry(@src(), .{ .text = .{ .buffer = &name_buf } }, .{ .gravity_y = 0.5, .expand = .horizontal });
         const changed = te.text_changed;
         te.deinit();
@@ -69,25 +71,25 @@ pub fn draw(asset_path: []const u8) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = 1 });
         defer row.deinit();
-        gui.label(@src(), "Dark", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
+        gui.label(@src(), "{s}", .{tr("Dark")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
         const before = dark;
         _ = gui.checkbox(@src(), &dark, "", .{ .gravity_y = 0.5 });
         if (dark != before) dirty = true;
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 100 });
-    if (drawColor("Focus", &focus, 101)) dirty = true;
-    if (drawColor("Fill", &fill, 102)) dirty = true;
-    if (drawOptionalColor("Fill Hover", &fill_hover, fill, 103)) dirty = true;
-    if (drawOptionalColor("Fill Press", &fill_press, fill, 104)) dirty = true;
-    if (drawColor("Text", &text, 105)) dirty = true;
-    if (drawOptionalColor("Text Hover", &text_hover, text, 106)) dirty = true;
-    if (drawOptionalColor("Text Press", &text_press, text, 107)) dirty = true;
-    if (drawColor("Border", &border, 108)) dirty = true;
+    if (drawColor(tr("Focus"), &focus, 101)) dirty = true;
+    if (drawColor(tr("Fill"), &fill, 102)) dirty = true;
+    if (drawOptionalColor(tr("Fill Hover"), &fill_hover, fill, 103)) dirty = true;
+    if (drawOptionalColor(tr("Fill Press"), &fill_press, fill, 104)) dirty = true;
+    if (drawColor(tr("Text"), &text, 105)) dirty = true;
+    if (drawOptionalColor(tr("Text Hover"), &text_hover, text, 106)) dirty = true;
+    if (drawOptionalColor(tr("Text Press"), &text_press, text, 107)) dirty = true;
+    if (drawColor(tr("Border"), &border, 108)) dirty = true;
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 200 });
-    for (&groups, 0..) |*g, gi| {
-        if (drawStyleGroup(GROUP_NAMES[gi], g, 300 + gi * 10)) dirty = true;
+    inline for (&groups, 0..) |*g, gi| {
+        if (drawStyleGroup(tr(GROUP_NAMES[gi]), g, 300 + gi * 10)) dirty = true;
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 500 });
@@ -100,10 +102,10 @@ pub fn draw(asset_path: []const u8) void {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6), .id_extra = 601 });
         defer row.deinit();
         if (dirty)
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), tr("Save"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
@@ -114,13 +116,13 @@ fn drawStyleGroup(title: []const u8, s: *Style, id: usize) bool {
     if (gui.expander(@src(), title, .{}, .{ .expand = .horizontal, .id_extra = id })) {
         var body = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12 }, .id_extra = id });
         defer body.deinit();
-        if (drawOptionalColor("Fill", &s.fill, fill, id + 1)) changed = true;
-        if (drawOptionalColor("Fill Hover", &s.fill_hover, s.fill orelse fill, id + 2)) changed = true;
-        if (drawOptionalColor("Fill Press", &s.fill_press, s.fill orelse fill, id + 3)) changed = true;
-        if (drawOptionalColor("Text", &s.text, text, id + 4)) changed = true;
-        if (drawOptionalColor("Text Hover", &s.text_hover, s.text orelse text, id + 5)) changed = true;
-        if (drawOptionalColor("Text Press", &s.text_press, s.text orelse text, id + 6)) changed = true;
-        if (drawOptionalColor("Border", &s.border, border, id + 7)) changed = true;
+        if (drawOptionalColor(tr("Fill"), &s.fill, fill, id + 1)) changed = true;
+        if (drawOptionalColor(tr("Fill Hover"), &s.fill_hover, s.fill orelse fill, id + 2)) changed = true;
+        if (drawOptionalColor(tr("Fill Press"), &s.fill_press, s.fill orelse fill, id + 3)) changed = true;
+        if (drawOptionalColor(tr("Text"), &s.text, text, id + 4)) changed = true;
+        if (drawOptionalColor(tr("Text Hover"), &s.text_hover, s.text orelse text, id + 5)) changed = true;
+        if (drawOptionalColor(tr("Text Press"), &s.text_press, s.text orelse text, id + 6)) changed = true;
+        if (drawOptionalColor(tr("Border"), &s.border, border, id + 7)) changed = true;
     }
     return changed;
 }
@@ -168,7 +170,7 @@ fn drawCorner() bool {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = 501 });
         defer row.deinit();
-        gui.label(@src(), "Corner", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
+        gui.label(@src(), "{s}", .{tr("Corner")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
         if (gui.dropdownEnum(@src(), UiTheme.Corner.Kind, .{ .choice = &corner_kind }, .{}, .{
             .gravity_y = 0.5,
             .min_size_content = .{ .w = 120 },
@@ -178,7 +180,7 @@ fn drawCorner() bool {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = 502 });
         defer row.deinit();
-        gui.label(@src(), "Radius", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
+        gui.label(@src(), "{s}", .{tr("Radius")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 100 } });
         if (gui.sliderEntry(@src(), "{d:0.0}", .{ .value = &corner_rx, .min = 0, .max = 24 }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 502 })) changed = true;
     }
     return changed;
@@ -188,7 +190,7 @@ fn drawPanelBorderWidth() bool {
     var changed = false;
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = 503 });
     defer row.deinit();
-    gui.label(@src(), "Panel Border Width", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 } });
+    gui.label(@src(), "{s}", .{tr("Panel Border Width")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 } });
     if (gui.sliderEntry(@src(), "{d:0.0}", .{ .value = &panel_border_width, .min = 0, .max = 8 }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 503 })) changed = true;
     return changed;
 }
@@ -196,7 +198,7 @@ fn drawPanelBorderWidth() bool {
 fn drawFontFamily() bool {
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = 504 });
     defer row.deinit();
-    gui.label(@src(), "Font Family", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 } });
+    gui.label(@src(), "{s}", .{tr("Font Family")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 } });
     var te = gui.textEntry(@src(), .{ .text = .{ .buffer = &font_family_buf } }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 504 });
     const changed = te.text_changed;
     te.deinit();
@@ -300,14 +302,14 @@ pub fn drawPreview(asset_path: []const u8, _: []const u8) void {
     var box = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .all(8), .theme = &preview_theme, .background = true });
     defer box.deinit();
 
-    gui.label(@src(), "{s}", .{if (bufStr(&name_buf).len > 0) bufStr(&name_buf) else "Preview"}, .{ .font = .theme(.heading), .theme = &preview_theme, .id_extra = 1 });
-    gui.label(@src(), "The quick brown fox jumps over the lazy dog", .{}, .{ .font = .theme(.body), .theme = &preview_theme, .id_extra = 2, .padding = .{ .y = 4 } });
+    gui.label(@src(), "{s}", .{if (bufStr(&name_buf).len > 0) bufStr(&name_buf) else tr("Preview")}, .{ .font = .theme(.heading), .theme = &preview_theme, .id_extra = 1 });
+    gui.label(@src(), "{s}", .{tr("The quick brown fox jumps over the lazy dog")}, .{ .font = .theme(.body), .theme = &preview_theme, .id_extra = 2, .padding = .{ .y = 4 } });
 
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .theme = &preview_theme, .id_extra = 3 });
         defer row.deinit();
-        _ = gui.button(@src(), "Control", .{}, .{ .theme = &preview_theme, .id_extra = 4 });
-        _ = gui.button(@src(), "Highlight", .{}, .{ .theme = &preview_theme, .style = .highlight, .id_extra = 5 });
-        _ = gui.button(@src(), "Error", .{}, .{ .theme = &preview_theme, .style = .err, .id_extra = 6 });
+        _ = gui.button(@src(), tr("Control"), .{}, .{ .theme = &preview_theme, .id_extra = 4 });
+        _ = gui.button(@src(), tr("Highlight"), .{}, .{ .theme = &preview_theme, .style = .highlight, .id_extra = 5 });
+        _ = gui.button(@src(), tr("Error"), .{}, .{ .theme = &preview_theme, .style = .err, .id_extra = 6 });
     }
 }

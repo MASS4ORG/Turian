@@ -18,6 +18,8 @@ const EditorState = @import("../../services/EditorState.zig");
 const PropDraw = @import("../PropDraw.zig");
 const Preview3D = @import("../../asset-browser/preview/Preview3D.zig");
 const PreviewSystem = @import("../../asset-browser/preview/PreviewSystem.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const shader = engine.shader;
 const Material = engine.Material;
@@ -77,7 +79,7 @@ pub fn draw(asset_path: []const u8) void {
     {
         var info = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer info.deinit();
-        gui.label(@src(), "Shader:  {s}", .{sh.name}, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("Shader:  {name}", &.{.{ .name = "name", .value = .{ .text = sh.name } }})}, .{ .gravity_y = 0.5 });
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
@@ -101,12 +103,12 @@ pub fn draw(asset_path: []const u8) void {
         defer row.deinit();
 
         if (dirty) {
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal });
         } else {
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
         }
 
-        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+        if (gui.button(@src(), tr("Save"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             save();
         }
     }
@@ -130,10 +132,10 @@ pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer row.deinit();
-        if (gui.button(@src(), "Sphere", .{}, .{ .gravity_y = 0.5, .style = if (preview_shape == .sphere) .highlight else .control })) {
+        if (gui.button(@src(), tr("Sphere"), .{}, .{ .gravity_y = 0.5, .style = if (preview_shape == .sphere) .highlight else .control })) {
             preview_shape = .sphere;
         }
-        if (gui.button(@src(), "Cube", .{}, .{ .gravity_y = 0.5, .id_extra = 1, .style = if (preview_shape == .cube) .highlight else .control })) {
+        if (gui.button(@src(), tr("Cube"), .{}, .{ .gravity_y = 0.5, .id_extra = 1, .style = if (preview_shape == .cube) .highlight else .control })) {
             preview_shape = .cube;
         }
     }
@@ -276,14 +278,14 @@ fn drawTexture(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
 }
 
 fn pickerTexture(v: *ParamValue, fw: *gui.FloatingMenuWidget) bool {
-    if (gui.menuItemLabel(@src(), "(none)", .{}, .{ .expand = .horizontal }) != null) {
+    if (gui.menuItemLabel(@src(), tr("(none)"), .{}, .{ .expand = .horizontal }) != null) {
         v.setTex("");
         fw.close();
         return true;
     }
 
     if (!EditorState.assetDbReady()) {
-        gui.label(@src(), "(no project open)", .{}, .{});
+        gui.label(@src(), "{s}", .{tr("(no project open)")}, .{});
         return false;
     }
 
@@ -306,12 +308,12 @@ fn pickerTexture(v: *ParamValue, fw: *gui.FloatingMenuWidget) bool {
         }
         idx += 1;
     }
-    if (!any_shown) gui.label(@src(), "(no textures in project)", .{}, .{});
+    if (!any_shown) gui.label(@src(), "{s}", .{tr("(no textures in project)")}, .{});
     return false;
 }
 
 fn drawRenderState() void {
-    if (!gui.expander(@src(), "Render State", .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) return;
+    if (!gui.expander(@src(), tr("Render State"), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } })) return;
 
     var body = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 12, .y = 2 } });
     defer body.deinit();
@@ -319,27 +321,27 @@ fn drawRenderState() void {
     {
         var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer r.deinit();
-        gui.label(@src(), "Blend", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
+        gui.label(@src(), "{s}", .{tr("Blend")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
         if (gui.dropdownEnum(@src(), Material.BlendMode, .{ .choice = &render_state.blend }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5 })) dirty = true;
     }
     {
         var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 1 });
         defer r.deinit();
-        gui.label(@src(), "Cull", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 }, .id_extra = 1 });
+        gui.label(@src(), "{s}", .{tr("Cull")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 }, .id_extra = 1 });
         if (gui.dropdownEnum(@src(), Material.CullMode, .{ .choice = &render_state.cull }, .{}, .{ .expand = .horizontal, .gravity_y = 0.5, .id_extra = 1 })) dirty = true;
     }
     {
         var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 2 });
         defer r.deinit();
         const before_w = render_state.depth_write;
-        _ = gui.checkbox(@src(), &render_state.depth_write, "Depth Write", .{ .gravity_y = 0.5, .id_extra = 2 });
+        _ = gui.checkbox(@src(), &render_state.depth_write, tr("Depth Write"), .{ .gravity_y = 0.5, .id_extra = 2 });
         if (render_state.depth_write != before_w) dirty = true;
     }
     {
         var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 3 });
         defer r.deinit();
         const before_t = render_state.depth_test;
-        _ = gui.checkbox(@src(), &render_state.depth_test, "Depth Test", .{ .gravity_y = 0.5, .id_extra = 3 });
+        _ = gui.checkbox(@src(), &render_state.depth_test, tr("Depth Test"), .{ .gravity_y = 0.5, .id_extra = 3 });
         if (render_state.depth_test != before_t) dirty = true;
     }
 }

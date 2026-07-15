@@ -5,6 +5,7 @@ const cli_debug = @import("CliDebug.zig");
 const cli_mcp = @import("CliMcp.zig");
 const cli_docs = @import("CliDocs.zig");
 const cli_package = @import("CliPackage.zig");
+const cli_i18n = @import("CliI18n.zig");
 
 fn printUsage() void {
     std.debug.print(
@@ -20,6 +21,7 @@ fn printUsage() void {
         \\  mcp                         Start an MCP server (stdio) backed by the debug server
         \\  docs        <subcommand>    Generate AI context or documentation
         \\  package     <subcommand>    Manage project packages
+        \\  i18n        <subcommand>    Extract translatable strings / compile .strings -> .strtab
         \\
         \\Env-var overrides for 'build' (optional; build-time paths used by default):
         \\  TURIAN_ENGINE_ROOT    Path to engine/root.zig
@@ -70,6 +72,9 @@ pub fn main(init: std.process.Init) !void {
     } else if (std.mem.eql(u8, cmd, "package")) {
         const sub = args.next() orelse return cli_package.printUsagePackage();
         return cli_package.cmdPackage(io, gpa, sub, &args, init.environ_map);
+    } else if (std.mem.eql(u8, cmd, "i18n")) {
+        const sub = args.next() orelse return cli_i18n.printUsageI18n();
+        return cli_i18n.cmdI18n(io, gpa, sub, &args);
     } else {
         printUsage();
         return error.UnknownCommand;

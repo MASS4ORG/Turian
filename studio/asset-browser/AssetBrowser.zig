@@ -17,6 +17,8 @@ const AssetNav = @import("AssetNav.zig");
 const AssetGridView = @import("AssetGridView.zig");
 const AssetTreeView = @import("AssetTreeView.zig");
 const AssetTileLayout = @import("AssetTileLayout.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 /// How the browser lays out folder navigation: the
 /// original tile grid, the grid with an added folder-only tree sidebar for
@@ -111,14 +113,14 @@ pub fn drawSettings(instance_id: []const u8) void {
         .min = AssetTileLayout.TILE_CONTENT_MIN,
         .max = AssetTileLayout.TILE_CONTENT_MAX,
         .interval = 1,
-        .label = "Size",
+        .label = tr("Size"),
     }, .{ .expand = .horizontal, .min_size_content = .{ .w = 150 } });
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
     drawNavModeToggle();
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-    if (gui.checkbox(@src(), &g_show_packages, "Show Packages", .{ .expand = .horizontal })) {
+    if (gui.checkbox(@src(), &g_show_packages, tr("Show Packages"), .{ .expand = .horizontal })) {
         if (EditorState.settingsReady()) {
             EditorState.settings.setBool(SHOW_PACKAGES_SETTING_KEY, g_show_packages) catch {};
         }
@@ -157,7 +159,7 @@ pub fn draw() void {
 
     var assets_path_buf: [1024]u8 = undefined;
     const assets_path = std.fmt.bufPrint(&assets_path_buf, "{s}/assets", .{proj_path}) catch {
-        gui.label(@src(), "Path too long.", .{}, .{});
+        gui.label(@src(), "{s}", .{tr("Path too long.")}, .{});
         return;
     };
 

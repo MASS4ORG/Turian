@@ -22,6 +22,8 @@ const ProfilerPanel = @import("ProfilerPanel.zig");
 const LogPanel = @import("LogPanel.zig");
 const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 pub const PanelDesc = struct {
     id: []const u8,
@@ -90,6 +92,22 @@ pub fn registerCustom(descs: []const PanelDesc) void {
     g_registry.appendSlice(std.heap.page_allocator, descs) catch {};
 }
 
+/// Localized display title for a panel. Builtin titles are translated by id
+/// (the `PanelDesc.title` field itself stays English, since `tr()` needs a
+/// comptime string and the registry is a runtime-built list); any other
+/// (custom) panel falls back to its own `title` field untranslated.
+pub fn translatedTitle(p: *const PanelDesc) []const u8 {
+    if (std.mem.eql(u8, p.id, "hierarchy")) return tr("Hierarchy");
+    if (std.mem.eql(u8, p.id, "scene")) return tr("Scene");
+    if (std.mem.eql(u8, p.id, "game")) return tr("Game");
+    if (std.mem.eql(u8, p.id, "inspector")) return tr("Inspector");
+    if (std.mem.eql(u8, p.id, "assets")) return tr("Assets");
+    if (std.mem.eql(u8, p.id, "profiler")) return tr("Profiler");
+    if (std.mem.eql(u8, p.id, "output")) return tr("Log");
+    if (std.mem.eql(u8, p.id, "settings")) return tr("Settings");
+    return p.title;
+}
+
 /// Strips a `"#N"` instance suffix (see `newInstanceId`) to get back the
 /// registry id a dock tab's slug was generated from.
 pub fn baseId(instance_id: []const u8) []const u8 {
@@ -153,8 +171,7 @@ pub fn drawAddPanelMenuItems(
     for (all(), 0..) |p, i| {
         if (!allows(p.id)) continue;
         if (!p.allow_multiple and l.contains(p.id)) continue;
-        var buf: [64]u8 = undefined;
-        const label = std.fmt.bufPrint(&buf, "Add {s}", .{p.title}) catch p.title;
+        const label = StudioLocale.trArgs("Add {title}", &.{.{ .name = "title", .value = .{ .text = translatedTitle(&p) } }});
         if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
             const id = newInstanceId(p.id, l, std.heap.page_allocator) catch null;
             if (id) |instance_id| {

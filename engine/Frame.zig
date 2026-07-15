@@ -26,6 +26,8 @@ const Vector3 = @import("root.zig").Vector3;
 const ui = @import("ui/root.zig");
 const assets = @import("assets/root.zig");
 const TypedAssetRef = @import("api/AssetRef.zig").TypedAssetRef;
+const i18n = @import("i18n/root.zig");
+const Locale = i18n.Locale;
 
 /// Services made available to a script's lifecycle hooks.
 pub const Frame = struct {
@@ -42,6 +44,11 @@ pub const Frame = struct {
     /// Runtime prefab spawner, or null in contexts without one (e.g. unit tests).
     /// Use `instantiate` / `destroy` rather than touching this directly.
     spawn: ?*Spawner = null,
+    /// Scratch allocator backing `tr`/`trc`/`trn`/`key` below (typically an
+    /// arena reset once per frame by the host loop). Null in contexts that
+    /// don't need localized text (unit tests, non-UI systems) — the
+    /// convenience accessors degrade to the untranslated source in that case.
+    arena: ?std.mem.Allocator = null,
 
     /// Convenience: fetch a registered service by type (null if unregistered).
     pub fn service(self: Frame, comptime T: type) ?*T {
@@ -80,6 +87,43 @@ pub const Frame = struct {
     pub fn gameEvent(self: Frame, ref: TypedAssetRef(.game_event)) ?*assets.GameEvent {
         const reg = self.service(assets.GameEventRegistry) orelse return null;
         return reg.getOrCreate(ref.slice());
+    }
+
+    /// Source-keyed localized text (`engine.i18n.Locale.tr`) formatted into
+    /// `arena`. Degrades to the untranslated `msg` if `arena` is null or no
+    /// `Locale` service is registered — always safe to call.
+    pub fn tr(self: Frame, comptime msg: []const u8) []const u8 {
+        return self.trArgs(msg, &.{});
+    }
+
+    pub fn trArgs(self: Frame, comptime msg: []const u8, args: []const i18n.Arg) []const u8 {
+        const arena = self.arena orelse return msg;
+        const loc = self.service(Locale) orelse return msg;
+        return loc.tr(arena, msg, args) catch msg;
+    }
+
+    /// Context-disambiguated localized text (`engine.i18n.Locale.trc`).
+    pub fn trc(self: Frame, comptime ctx: []const u8, comptime msg: []const u8, args: []const i18n.Arg) []const u8 {
+        const arena = self.arena orelse return msg;
+        const loc = self.service(Locale) orelse return msg;
+        return loc.trc(arena, ctx, msg, args) catch msg;
+    }
+
+    /// Pluralized localized text (`engine.i18n.Locale.trn`). Degrades to
+    /// English CLDR pluralization of `one`/`other` if `arena` is null or no
+    /// `Locale` service is registered.
+    pub fn trn(self: Frame, comptime one: []const u8, comptime other: []const u8, n: u64, args: []const i18n.Arg) []const u8 {
+        const arena = self.arena orelse return if (n == 1) one else other;
+        const loc = self.service(Locale) orelse return if (n == 1) one else other;
+        return loc.trn(arena, one, other, n, args) catch (if (n == 1) one else other);
+    }
+
+    /// Id-keyed localized game content (`engine.i18n.Locale.key`). Returns
+    /// `id` itself if `arena` is null or no `Locale` service is registered.
+    pub fn trKey(self: Frame, id: []const u8, args: []const i18n.Arg) []const u8 {
+        const arena = self.arena orelse return id;
+        const loc = self.service(Locale) orelse return id;
+        return loc.key(arena, id, args) catch id;
     }
 };
 

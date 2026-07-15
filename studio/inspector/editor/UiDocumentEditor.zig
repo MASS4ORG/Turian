@@ -28,6 +28,8 @@ const ui_render = @import("ui_render");
 const EditorState = @import("../../services/EditorState.zig");
 const PropDraw = @import("../PropDraw.zig");
 const tree_view = @import("../../TreeView.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const ui = engine.ui;
 
@@ -462,7 +464,7 @@ pub fn drawGlobalSettings(asset_path: []const u8) void {
 }
 
 fn drawGlobalSettingsBody() void {
-    if (gui.button(@src(), if (dirty) "Save*" else "Save", .{}, .{ .gravity_y = 0.5 })) save();
+    if (gui.button(@src(), if (dirty) tr("Save*") else tr("Save"), .{}, .{ .gravity_y = 0.5 })) save();
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 20 });
     var al = gui.Alignment.init(@src(), 21);
@@ -478,9 +480,9 @@ fn drawToolbar() void {
     var toolbar = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
     defer toolbar.deinit();
 
-    if (gui.button(@src(), if (dirty) "Save*" else "Save", .{}, .{ .gravity_y = 0.5 })) save();
+    if (gui.button(@src(), if (dirty) tr("Save*") else tr("Save"), .{}, .{ .gravity_y = 0.5 })) save();
 
-    if (gui.button(@src(), "+ Node", .{}, .{ .gravity_y = 0.5, .id_extra = 1 })) {
+    if (gui.button(@src(), tr("+ Node"), .{}, .{ .gravity_y = 0.5, .id_extra = 1 })) {
         cmd_add_node = if (selected_node) |s| @intCast(s) else -1;
     }
 
@@ -488,7 +490,7 @@ fn drawToolbar() void {
     // has no glyph for it, so the character alone rendered as a tofu box.
     if (gui.buttonLabelAndIcon(@src(), .{
         .button_opts = .{},
-        .label = "Add Control",
+        .label = tr("Add Control"),
         .tvg_bytes = gui.entypo.chevron_small_right,
     }, .{ .gravity_y = 0.5, .id_extra = 3 })) {
         add_control_open = true;
@@ -507,7 +509,7 @@ fn drawToolbar() void {
 fn drawTemplateMenu(fw: *gui.FloatingMenuWidget) void {
     const parent: i32 = if (selected_node) |s| @intCast(s) else -1;
     inline for (.{ "Panel", "Label", "Image", "Button" }, 0..) |label, i| {
-        if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
+        if (gui.menuItemLabel(@src(), tr(label), .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
             fw.close();
             add_control_open = false;
             cmd_add_template = .{ .parent = parent, .template = @enumFromInt(i) };
@@ -528,7 +530,7 @@ const UiDocModel = struct {
     }
 
     pub fn name(i: usize) []const u8 {
-        return if (doc.nodes[i].name.len > 0) doc.nodes[i].name else "(node)";
+        return if (doc.nodes[i].name.len > 0) doc.nodes[i].name else tr("(node)");
     }
 
     pub fn isSelected(i: usize) bool {
@@ -573,13 +575,13 @@ const UiDocModel = struct {
     }
 
     pub fn contextItems(idx: usize, fw: *gui.FloatingMenuWidget) void {
-        if (gui.menuItemLabel(@src(), "Add Child Node", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Add Child Node"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
             fw.close();
             cmd_add_node = @intCast(idx);
         }
         // Control templates (D8), instantiable as children of this node.
         inline for (.{ "Add Panel", "Add Label", "Add Image", "Add Button" }, 0..) |label, ti| {
-            if (gui.menuItemLabel(@src(), label, .{}, .{ .expand = .horizontal, .id_extra = idx * 8 + ti }) != null) {
+            if (gui.menuItemLabel(@src(), tr(label), .{}, .{ .expand = .horizontal, .id_extra = idx * 8 + ti }) != null) {
                 fw.close();
                 cmd_add_template = .{ .parent = @intCast(idx), .template = @enumFromInt(ti) };
             }
@@ -662,28 +664,32 @@ fn drawSelectedNode() void {
         var al0 = gui.Alignment.init(@src(), 9);
         defer al0.deinit();
         var ctx0 = PropDraw.DrawCtx{ .al = &al0, .allocator = arena.allocator() };
-        if (PropDraw.drawStringEdit("Name", &node.name, .{}, &ctx0, 9)) dirty = true;
+        if (PropDraw.drawStringEdit(tr("Name"), &node.name, .{}, &ctx0, 9)) dirty = true;
     }
 
-    if (gui.checkbox(@src(), &node.active, "Active", .{})) dirty = true;
-    gui.label(@src(), "Parent index: {d}", .{node.parent}, .{});
+    if (gui.checkbox(@src(), &node.active, tr("Active"), .{})) dirty = true;
+    {
+        var pbuf: [16]u8 = undefined;
+        const pstr = std.fmt.bufPrint(&pbuf, "{d}", .{node.parent}) catch "";
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("Parent index: {n}", &.{.{ .name = "n", .value = .{ .text = pstr } }})}, .{});
+    }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 10 });
-    gui.label(@src(), "Layout item", .{}, .{ .font = .theme(.heading) });
+    gui.label(@src(), "{s}", .{tr("Layout item")}, .{ .font = .theme(.heading) });
     var al1 = gui.Alignment.init(@src(), 11);
     defer al1.deinit();
     var ctx = PropDraw.DrawCtx{ .al = &al1, .allocator = arena.allocator() };
     if (PropDraw.drawValue(ui.LayoutItem, "item", &node.item, .{}, &ctx, 11)) dirty = true;
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 12 });
-    gui.label(@src(), "Style", .{}, .{ .font = .theme(.heading) });
+    gui.label(@src(), "{s}", .{tr("Style")}, .{ .font = .theme(.heading) });
     var al2 = gui.Alignment.init(@src(), 13);
     defer al2.deinit();
     var ctx2 = PropDraw.DrawCtx{ .al = &al2, .allocator = arena.allocator() };
     if (PropDraw.drawValue(ui.StyleBlock, "style", &node.style, .{}, &ctx2, 13)) dirty = true;
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 14 });
-    gui.label(@src(), "Components", .{}, .{ .font = .theme(.heading) });
+    gui.label(@src(), "{s}", .{tr("Components")}, .{ .font = .theme(.heading) });
     for (node.components, 0..) |*c, ci| {
         drawComponentRow(index, c, ci);
     }
@@ -705,7 +711,7 @@ fn drawComponentRow(node_index: usize, c: *ui.UiComponent, ci: usize) void {
         var head = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = ci });
         defer head.deinit();
         gui.label(@src(), "{s}", .{@tagName(c.*)}, .{ .expand = .horizontal, .gravity_y = 0.5, .font = .theme(.heading) });
-        if (gui.button(@src(), "Remove", .{}, .{ .gravity_y = 0.5, .id_extra = ci })) {
+        if (gui.button(@src(), tr("Remove"), .{}, .{ .gravity_y = 0.5, .id_extra = ci })) {
             cmd_remove_component = .{ .node = node_index, .comp = ci };
         }
     }
@@ -730,11 +736,11 @@ fn drawAddComponentMenu(node_index: usize) void {
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 9000 });
     defer row.deinit();
     inline for (.{ "+Image", "+Text", "+Layout", "+Button" }, 0..) |label, i| {
-        if (gui.button(@src(), label, .{}, .{ .id_extra = i })) {
+        if (gui.button(@src(), tr(label), .{}, .{ .id_extra = i })) {
             cmd_add_component = .{ .node = node_index, .kind = @enumFromInt(i) };
         }
     }
-    if (gui.button(@src(), "Delete Node", .{}, .{ .id_extra = 4, .style = .err })) {
+    if (gui.button(@src(), tr("Delete Node"), .{}, .{ .id_extra = 4, .style = .err })) {
         cmd_remove_node = node_index;
     }
 }

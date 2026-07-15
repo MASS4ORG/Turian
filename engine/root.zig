@@ -59,6 +59,12 @@ pub const Profiler = @import("Profiler.zig");
 /// Debug Protocol's `errors` method / MCP `list_errors` tool.
 pub const DiagLog = @import("DiagLog.zig");
 
+/// Localization (i18n): `tr`/`trc`/`trn`/`key`, string tables, CLDR plurals,
+/// ICU-subset message formatting (ADR 0011).
+pub const i18n = @import("i18n/root.zig");
+/// Localization service — see `engine.i18n` for the message/table types.
+pub const Locale = i18n.Locale;
+
 /// Asset loading subsystem (meshes, textures).
 pub const assets = @import("assets/root.zig");
 /// Triangle mesh type.
@@ -84,6 +90,8 @@ pub const shader = assets.shader;
 pub const ShaderDef = assets.ShaderDef;
 /// Serializable UI theme asset (`.uitheme`): colors and corner rounding only.
 pub const UiTheme = assets.UiTheme;
+/// Translation source-of-truth asset (`.strings`), one per locale (ADR 0011).
+pub const Strings = assets.Strings;
 /// Built-in theme presets (Dark, Light, Dark High Contrast, Darcula, Catppuccin).
 pub const ui_theme_presets = assets.ui_theme_presets;
 

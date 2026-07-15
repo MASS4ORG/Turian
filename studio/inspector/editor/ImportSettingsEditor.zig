@@ -6,6 +6,8 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../../services/EditorState.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 // ── Loaded state ───────────────────────────────────────────────────────────────
 
@@ -52,25 +54,25 @@ pub fn draw(asset_path: []const u8, asset_type: editor.AssetType) void {
     if (!std.mem.eql(u8, asset_path, loadedPath()) or asset_type != loaded_type)
         load(asset_path, asset_type);
 
-    section("Import Settings");
+    section(tr("Import Settings"));
 
     switch (loaded_type) {
         .image => {
-            enumRow(editor.TextureType, "Texture Type", &img.texture_type, 1);
-            enumRow(editor.ColorSpace, "Color Space", &img.color_space, 2);
-            checkRow("Generate Mipmaps", &img.generate_mipmaps, 3);
-            enumRow(editor.TextureCompression, "Compression", &img.compression, 4);
-            enumRow(editor.ImageFilter, "Filter", &img.filter, 5);
-            enumRow(editor.ImageWrap, "Wrap", &img.wrap, 6);
-            textRow("Max Size", &max_size_buf, 7);
+            enumRow(editor.TextureType, tr("Texture Type"), &img.texture_type, 1);
+            enumRow(editor.ColorSpace, tr("Color Space"), &img.color_space, 2);
+            checkRow(tr("Generate Mipmaps"), &img.generate_mipmaps, 3);
+            enumRow(editor.TextureCompression, tr("Compression"), &img.compression, 4);
+            enumRow(editor.ImageFilter, tr("Filter"), &img.filter, 5);
+            enumRow(editor.ImageWrap, tr("Wrap"), &img.wrap, 6);
+            textRow(tr("Max Size"), &max_size_buf, 7);
         },
         .model => {
-            checkRow("Import Materials", &model.import_materials, 1);
-            checkRow("Import Animations", &model.import_animations, 2);
-            textRow("Scale Factor", &scale_buf, 3);
+            checkRow(tr("Import Materials"), &model.import_materials, 1);
+            checkRow(tr("Import Animations"), &model.import_animations, 2);
+            textRow(tr("Scale Factor"), &scale_buf, 3);
         },
         .font => {
-            textRow("Default Size", &default_size_buf, 1);
+            textRow(tr("Default Size"), &default_size_buf, 1);
         },
         else => return,
     }
@@ -80,10 +82,10 @@ pub fn draw(asset_path: []const u8, asset_type: editor.AssetType) void {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .all(6) });
         defer row.deinit();
         if (dirty)
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal })
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal })
         else
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
-        if (gui.button(@src(), "Apply", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control }))
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        if (gui.button(@src(), tr("Apply"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control }))
             save();
     }
 }

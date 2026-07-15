@@ -8,6 +8,8 @@ const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
 const ActiveTheme = @import("../services/ActiveTheme.zig");
 const MenuItems = @import("../MenuItems.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const StudioSettings = editor.StudioSettings;
 
@@ -70,13 +72,13 @@ fn commit(name: []const u8) void {
 pub fn draw(m: *gui.MenuWidget) void {
     theme_submenu_open = false;
 
-    if (MenuItems.submenu(@src(), "Theme", .{ .expand = .horizontal })) |r| {
+    if (MenuItems.submenu(@src(), tr("Theme"), .{ .expand = .horizontal })) |r| {
         theme_submenu_open = true;
         var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
 
         if (!EditorState.settingsReady()) {
-            gui.label(@src(), "Settings not ready", .{}, .{ .padding = .all(8) });
+            gui.label(@src(), "{s}", .{tr("Settings not ready")}, .{ .padding = .all(8) });
         } else {
             const themes_dir = themesDirOrEmpty();
             const entries = editor.ThemeManager.list(gui.currentWindow().arena(), gui.io, themes_dir) catch &.{};
@@ -156,14 +158,14 @@ fn drawFontSizeZoom() void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = 9101 });
         defer row.deinit();
-        gui.label(@src(), "Font Size", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 90 } });
+        gui.label(@src(), "{s}", .{tr("Font Size")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 90 } });
         const r = gui.textEntryNumber(@src(), f32, .{ .value = &font_size_value, .min = 8, .max = 20 }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 9101 });
         if (r.changed) font_size_last_change_ns = gui.frameTimeNS();
     }
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 }, .id_extra = 9102 });
         defer row.deinit();
-        gui.label(@src(), "Zoom", .{}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 90 } });
+        gui.label(@src(), "{s}", .{tr("Zoom")}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 90 } });
         const r = gui.textEntryNumber(@src(), f32, .{ .value = &zoom_value, .min = 0.7, .max = 1.5 }, .{ .gravity_y = 0.5, .expand = .horizontal, .id_extra = 9102 });
         if (r.changed) zoom_last_change_ns = gui.frameTimeNS();
     }

@@ -26,6 +26,8 @@ const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
 const DynLib = @import("DynLib.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 const build_options = @import("turian_build_options");
 
 const log = std.log.scoped(.play_mode);
@@ -158,13 +160,13 @@ pub fn playFirstScene(io: std.Io) void {
     defer arena.deinit();
 
     const scene_path = EditorState.firstScenePath(io, arena.allocator()) orelse {
-        gui.toast(@src(), .{ .message = "No first scene found. Set one in Project Settings." });
+        gui.toast(@src(), .{ .message = tr("No first scene found. Set one in Project Settings.") });
         return;
     };
 
     var count: usize = 0;
     if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, &g_first_scene_nodes, &count)) {
-        gui.toast(@src(), .{ .message = "Failed to load the first scene." });
+        gui.toast(@src(), .{ .message = tr("Failed to load the first scene.") });
         return;
     }
 
@@ -177,16 +179,16 @@ pub fn playFirstScene(io: std.Io) void {
 /// what the editor is showing.
 fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     const project = EditorState.project_path orelse {
-        gui.toast(@src(), .{ .message = "Open a project before entering Play mode." });
+        gui.toast(@src(), .{ .message = tr("Open a project before entering Play mode.") });
         return false;
     };
 
     const hash = sourceHash(io);
     if (!g_lib_valid or hash != g_lib_hash) {
         unloadLibrary();
-        gui.toast(@src(), .{ .message = "Compiling play library..." });
+        gui.toast(@src(), .{ .message = tr("Compiling play library...") });
         if (!loadLibrary(io, project)) {
-            gui.toast(@src(), .{ .message = "Play build failed — see console." });
+            gui.toast(@src(), .{ .message = tr("Play build failed — see console.") });
             return false;
         }
         g_lib_hash = hash;
@@ -200,7 +202,7 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     // library share the same SceneNode layout, and the library memcpy's its own
     // copy, so play-time mutations never touch EditorState.
     if (!g_fns.start(nodes.ptr, nodes.len)) {
-        gui.toast(@src(), .{ .message = "Play start failed." });
+        gui.toast(@src(), .{ .message = tr("Play start failed.") });
         return false;
     }
 
@@ -287,7 +289,7 @@ pub fn pump(io: std.Io) void {
         // shipped build's generated `main` instead breaks its loop, see
         // `GameCodegen`).
         if (g_fns.quit_requested()) {
-            gui.toast(@src(), .{ .message = "Application.quit() called — stopping Play mode" });
+            gui.toast(@src(), .{ .message = tr("Application.quit() called — stopping Play mode") });
             stop();
             return;
         }

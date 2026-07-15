@@ -13,6 +13,7 @@ const MaterialEditor = @import("inspector/editor/MaterialEditor.zig");
 const FontEditor = @import("inspector/editor/FontEditor.zig");
 const ThemeEditor = @import("inspector/editor/ThemeEditor.zig");
 const ActiveTheme = @import("services/ActiveTheme.zig");
+const StudioLocale = @import("services/StudioLocale.zig");
 const AssetWatcher = @import("asset-browser/AssetWatcher.zig");
 const Documents = @import("main-window/Documents.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
@@ -242,6 +243,9 @@ fn applyPersistedUiSettings(win: *gui.Window, gpa: std.mem.Allocator, io: std.Io
     defer gpa.free(themes_dir);
 
     ActiveTheme.apply(win, gpa, io, themes_dir, model.ui.theme_name, model.ui.font_size, model.ui.zoom, model.ui.system_font_path);
+
+    StudioLocale.init();
+    StudioLocale.setLanguage(model.ui.language);
 }
 
 fn run(main_init: std.process.Init) !void {

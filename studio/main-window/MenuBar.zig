@@ -14,18 +14,28 @@ const ThemeMenu = @import("ThemeMenu.zig");
 const build_options = @import("turian_build_options");
 const Icon = @import("../Icon.zig");
 const MenuItems = @import("../MenuItems.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const AboutInfo = struct {
     const name = "Turian Studio";
     const version = build_options.version;
     const authors = "Bruno Massa";
     const license = "MPL v2";
-    const description = "A Zig game engine editor.";
 
-    const dialog_message = std.fmt.comptimePrint(
-        "{s}\nv{s}\n\n{s}\n\nAuthors: {s}\nLicense: {s}",
-        .{ name, version, description, authors, license },
-    );
+    /// Built at click time (not comptime) so `tr()` can localize the prose.
+    fn dialogMessage() []const u8 {
+        const arena = gui.currentWindow().arena();
+        return std.fmt.allocPrint(arena, "{s}\nv{s}\n\n{s}\n\n{s} {s}\n{s} {s}", .{
+            name,
+            version,
+            tr("A Zig game engine editor."),
+            tr("Authors:"),
+            authors,
+            tr("License:"),
+            license,
+        }) catch name;
+    }
 };
 
 /// Custom About-dialog display, mirroring `gui.dialogDisplay` but with the
@@ -132,42 +142,40 @@ pub fn draw(should_quit: *bool) void {
     }
 
     if (hamburger_open) {
-        if (gui.menuItemLabel(@src(), "File", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), tr("File"), .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            if (gui.menuItemLabel(@src(), "New Project...", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("New Project..."), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 newProjectDialog();
             }
 
-            if (gui.menuItemLabel(@src(), "Open Project...", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Open Project..."), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 openProjectDialog();
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "Exit", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Exit"), .{}, .{ .expand = .horizontal }) != null) {
                 should_quit.* = true;
             }
         }
 
-        if (gui.menuItemLabel(@src(), "Edit", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), tr("Edit"), .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            var undo_buf: [128]u8 = undefined;
             const undo_str = if (EditorState.canUndo())
-                std.fmt.bufPrint(&undo_buf, "Undo  {s}    Ctrl+Z", .{EditorState.undoLabel().?}) catch "Undo    Ctrl+Z"
+                StudioLocale.trArgs("Undo  {label}    Ctrl+Z", &.{.{ .name = "label", .value = .{ .text = EditorState.undoLabel().? } }})
             else
-                "Undo    Ctrl+Z";
+                tr("Undo    Ctrl+Z");
 
-            var redo_buf: [128]u8 = undefined;
             const redo_str = if (EditorState.canRedo())
-                std.fmt.bufPrint(&redo_buf, "Redo  {s}    Ctrl+Shift+Z", .{EditorState.redoLabel().?}) catch "Redo    Ctrl+Shift+Z"
+                StudioLocale.trArgs("Redo  {label}    Ctrl+Shift+Z", &.{.{ .name = "label", .value = .{ .text = EditorState.redoLabel().? } }})
             else
-                "Redo    Ctrl+Shift+Z";
+                tr("Redo    Ctrl+Shift+Z");
 
             const do_undo = gui.menuItemLabel(@src(), undo_str, .{}, .{ .expand = .horizontal });
             if (do_undo != null and EditorState.canUndo()) {
@@ -182,23 +190,23 @@ pub fn draw(should_quit: *bool) void {
             }
         }
 
-        if (gui.menuItemLabel(@src(), "Project", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), tr("Project"), .{ .submenu = true }, .{})) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            if (gui.menuItemLabel(@src(), "Build Game", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Build Game"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 Tasks.launchBuild(gui.io);
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "Reimport All", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Reimport All"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 Tasks.launchReimport(gui.io);
             }
 
-            if (gui.menuItemLabel(@src(), "Clear Asset Cache", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Clear Asset Cache"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 if (EditorState.project_path) |p| {
                     editor.asset_cache.clearAll(gui.io, p);
@@ -207,7 +215,7 @@ pub fn draw(should_quit: *bool) void {
         }
 
         var view_open = false;
-        if (gui.menuItemLabel(@src(), "View", .{ .submenu = true }, .{})) |r| {
+        if (gui.menuItemLabel(@src(), tr("View"), .{ .submenu = true }, .{})) |r| {
             view_open = true;
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
@@ -222,14 +230,14 @@ pub fn draw(should_quit: *bool) void {
 
             drawLayoutMenu(m);
 
-            if (gui.menuItemLabel(@src(), "Reset Layout", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Reset Layout"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 LayoutStore.reset(gui.io);
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "Capture Screenshot", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Capture Screenshot"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 _ = Screenshots.capture();
             }
@@ -249,19 +257,19 @@ pub fn draw(should_quit: *bool) void {
             defer fw.deinit();
 
             if (!EditorState.settingsReady()) {
-                gui.label(@src(), "Settings not ready", .{}, .{ .expand = .horizontal, .padding = .all(8) });
-            } else if (gui.menuItemLabel(@src(), "Settings", .{}, .{ .expand = .horizontal }) != null) {
+                gui.label(@src(), "{s}", .{tr("Settings not ready")}, .{ .expand = .horizontal, .padding = .all(8) });
+            } else if (gui.menuItemLabel(@src(), tr("Settings"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 Documents.openAsset(EditorState.settings.global_path, .studio_settings);
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "About", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("About"), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 gui.dialog(@src(), .{}, .{
                     .title = AboutInfo.name,
-                    .message = AboutInfo.dialog_message,
+                    .message = AboutInfo.dialogMessage(),
                     .displayFn = aboutDialogDisplay,
                 });
             }
@@ -297,7 +305,7 @@ pub fn draw(should_quit: *bool) void {
 /// rename in place the way a grid tile or tree row would offer.
 fn drawLayoutMenu(m: *gui.MenuWidget) void {
     if (LayoutStore.hasAssetContext()) return;
-    if (MenuItems.submenu(@src(), "Layout", .{ .expand = .horizontal })) |r| {
+    if (MenuItems.submenu(@src(), tr("Layout"), .{ .expand = .horizontal })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
 
@@ -305,7 +313,7 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
             if (gui.menuItemLabel(@src(), preset.name, .{}, .{ .expand = .horizontal, .id_extra = i }) != null) {
                 m.close();
                 const built = preset.build(std.heap.page_allocator) catch {
-                    gui.toast(@src(), .{ .message = "Failed to build layout preset" });
+                    gui.toast(@src(), .{ .message = tr("Failed to build layout preset") });
                     return;
                 };
                 LayoutStore.replace(built, gui.io);
@@ -322,7 +330,7 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
                     if (LayoutStore.loadPreset(name, std.heap.page_allocator, gui.io)) |loaded| {
                         LayoutStore.replace(loaded, gui.io);
                     } else {
-                        gui.toast(@src(), .{ .message = "Failed to load layout preset" });
+                        gui.toast(@src(), .{ .message = tr("Failed to load layout preset") });
                     }
                 }
             }
@@ -330,11 +338,11 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
 
         _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-        if (gui.menuItemLabel(@src(), "Save Current as Preset", .{}, .{ .expand = .horizontal }) != null) {
+        if (gui.menuItemLabel(@src(), tr("Save Current as Preset"), .{}, .{ .expand = .horizontal }) != null) {
             m.close();
             const name = LayoutStore.uniquePresetName(arena, gui.io);
             LayoutStore.savePreset(name, gui.io);
-            const msg = std.fmt.allocPrint(arena, "Saved layout as '{s}'", .{name}) catch "Saved layout preset";
+            const msg = StudioLocale.trArgs("Saved layout as '{name}'", &.{.{ .name = "name", .value = .{ .text = name } }});
             gui.toast(@src(), .{ .message = msg });
         }
     }
@@ -342,19 +350,19 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
 
 // Current project dropdown — shows recent projects and allows quick switching.
 fn drawProjectDropdown(m: *gui.MenuWidget) void {
-    const proj_name = if (EditorState.project_path) |p| std.fs.path.basename(p) else "No Project";
+    const proj_name = if (EditorState.project_path) |p| std.fs.path.basename(p) else tr("No Project");
     if (gui.menuItemLabel(@src(), proj_name, .{ .submenu = true }, .{ .font = .theme(.heading) })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
 
         if (!EditorState.settingsReady()) {
-            gui.label(@src(), "Settings not ready", .{}, .{ .expand = .horizontal, .padding = .all(8) });
+            gui.label(@src(), "{s}", .{tr("Settings not ready")}, .{ .expand = .horizontal, .padding = .all(8) });
         } else {
             const arena = gui.currentWindow().arena();
             const recent = editor.recent_projects.list(&EditorState.settings, arena);
 
             if (recent.len == 0) {
-                gui.label(@src(), "No recent projects", .{}, .{ .expand = .horizontal, .padding = .all(8) });
+                gui.label(@src(), "{s}", .{tr("No recent projects")}, .{ .expand = .horizontal, .padding = .all(8) });
             } else {
                 for (recent, 0..) |path, i| {
                     const is_current = if (EditorState.project_path) |cur|
@@ -390,7 +398,7 @@ fn drawProjectDropdown(m: *gui.MenuWidget) void {
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), "Open Project...", .{}, .{ .expand = .horizontal }) != null) {
+            if (gui.menuItemLabel(@src(), tr("Open Project..."), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
                 openProjectDialog();
             }
@@ -465,11 +473,11 @@ const Transport = enum {
 
     fn tip(self: Transport) []const u8 {
         return switch (self) {
-            .play => "Play the open scene  (Ctrl+P)",
-            .play_global => "Play from the project's first scene",
-            .pause => "Pause",
-            .step => "Step one frame",
-            .stop => "Stop  (Ctrl+P)",
+            .play => tr("Play the open scene  (Ctrl+P)"),
+            .play_global => tr("Play from the project's first scene"),
+            .pause => tr("Pause"),
+            .step => tr("Step one frame"),
+            .stop => tr("Stop  (Ctrl+P)"),
         };
     }
 
@@ -505,14 +513,14 @@ fn transportButton(action: Transport, grayed: bool) bool {
 fn openProjectDialog() void {
     if (!gui.useTinyFileDialogs) {
         gui.dialog(@src(), .{}, .{
-            .title = "Not Available",
-            .message = "Native file dialogs are not enabled in this build.",
+            .title = tr("Not Available"),
+            .message = tr("Native file dialogs are not enabled in this build."),
         });
         return;
     }
 
     const path = gui.dialogNativeFolderSelect(gui.currentWindow().arena(), .{
-        .title = "Open Project Folder",
+        .title = tr("Open Project Folder"),
     }) catch |err| blk: {
         gui.log.debug("Could not open folder dialog: {any}", .{err});
         break :blk null;
@@ -526,14 +534,14 @@ fn openProjectDialog() void {
 fn newProjectDialog() void {
     if (!gui.useTinyFileDialogs) {
         gui.dialog(@src(), .{}, .{
-            .title = "Not Available",
-            .message = "Native file dialogs are not enabled in this build.",
+            .title = tr("Not Available"),
+            .message = tr("Native file dialogs are not enabled in this build."),
         });
         return;
     }
 
     const path = gui.dialogNativeFolderSelect(gui.currentWindow().arena(), .{
-        .title = "Choose New Project Folder",
+        .title = tr("Choose New Project Folder"),
     }) catch |err| blk: {
         gui.log.debug("Could not open folder dialog: {any}", .{err});
         break :blk null;
@@ -541,7 +549,7 @@ fn newProjectDialog() void {
 
     if (path) |p| {
         const proj_name = std.fs.path.basename(p);
-        ProjectOps.newProject(p, if (proj_name.len > 0) proj_name else "New Project");
+        ProjectOps.newProject(p, if (proj_name.len > 0) proj_name else tr("New Project"));
         EditorState.initDefaultScene(gui.io);
     }
 }

@@ -9,6 +9,8 @@ const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../../services/EditorState.zig");
 const Inspector = @import("../Inspector.zig");
+const StudioLocale = @import("../../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const ComponentDef = editor.ComponentDef;
 const DataAssetFile = editor.DataAssetFile;
@@ -47,16 +49,16 @@ pub fn draw(asset_path: []const u8) void {
         var info = gui.box(@src(), .{}, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer info.deinit();
         if (def) |d| {
-            gui.label(@src(), "Type:  {s}", .{d.displayName()}, .{});
+            gui.label(@src(), "{s}", .{StudioLocale.trArgs("Type:  {name}", &.{.{ .name = "name", .value = .{ .text = d.displayName() } }})}, .{});
         } else {
-            gui.label(@src(), "Type:  {s} (definition not found)", .{loadedTypeName()}, .{});
+            gui.label(@src(), "{s}", .{StudioLocale.trArgs("Type:  {name} (definition not found)", &.{.{ .name = "name", .value = .{ .text = loadedTypeName() } }})}, .{});
         }
     }
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     if (field_count == 0) {
-        gui.label(@src(), "(no fields)", .{}, .{ .expand = .horizontal, .padding = .all(8) });
+        gui.label(@src(), "{s}", .{tr("(no fields)")}, .{ .expand = .horizontal, .padding = .all(8) });
     } else {
         drawFields();
     }
@@ -67,12 +69,12 @@ pub fn draw(asset_path: []const u8) void {
         defer row.deinit();
 
         if (dirty) {
-            gui.label(@src(), "Unsaved changes", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "{s}", .{tr("Unsaved changes")}, .{ .gravity_y = 0.5, .expand = .horizontal });
         } else {
-            gui.label(@src(), "Saved", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
+            gui.label(@src(), "{s}", .{tr("Saved")}, .{ .gravity_y = 0.5, .expand = .horizontal });
         }
 
-        if (gui.button(@src(), "Save", .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
+        if (gui.button(@src(), tr("Save"), .{}, .{ .gravity_y = 0.5, .style = if (dirty) .highlight else .control })) {
             saveCurrent();
         }
     }

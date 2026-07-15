@@ -14,6 +14,8 @@ const engine = @import("engine");
 const ui_render = @import("ui_render");
 const EditorState = @import("../services/EditorState.zig");
 const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 const ui = engine.ui;
 
@@ -116,7 +118,7 @@ pub fn resolveTextureBytes(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {
 fn toastButtonClick(doc: *const ui.UiDocument, node_index: usize) void {
     if (node_index >= doc.nodes.len) return;
     const node = doc.nodes[node_index];
-    var name: []const u8 = "(no on_click binding)";
+    var name: []const u8 = tr("(no on_click binding)");
     for (node.components) |c| {
         if (c != .button) continue;
         switch (c.button.on_click) {
@@ -128,11 +130,11 @@ fn toastButtonClick(doc: *const ui.UiDocument, node_index: usize) void {
             },
         }
     }
-    var buf: [160]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "UI click: {s} -> {s}", .{
-        if (node.name.len != 0) node.name else "(node)",
-        name,
-    }) catch return;
+    const node_name = if (node.name.len != 0) node.name else tr("(node)");
+    const msg = StudioLocale.trArgs("UI click: {node} -> {action}", &.{
+        .{ .name = "node", .value = .{ .text = node_name } },
+        .{ .name = "action", .value = .{ .text = name } },
+    });
     gui.toast(@src(), .{ .message = msg });
 }
 

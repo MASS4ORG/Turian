@@ -408,6 +408,51 @@
       ]
     },
     {
+      "guid": "b6a7c8d9-9d0e-4fab-c13d-d3e4f5a6b7c8",
+      "name": "LanguageLabel",
+      "parent": 0,
+      "active": true,
+      "item": {
+        "expand": "none",
+        "gravity": [
+          0,
+          0
+        ],
+        "margin": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "min_size": [
+          0,
+          0
+        ],
+        "rect": [
+          1580,
+          12,
+          320,
+          40
+        ]
+      },
+      "style": {
+        "style_class": null,
+        "tint": null,
+        "corner_radius": null,
+        "font_style": null,
+        "font": "",
+        "font_size": null
+      },
+      "components": [
+        {
+          "text": {
+            "text": "Press L to switch language",
+            "text_align": "start"
+          }
+        }
+      ]
+    },
+    {
       "guid": "a5f6a7b8-8c9d-4eaf-b02c-c2d3e4f5a6b7",
       "name": "EnemyMarker",
       "parent": 0,

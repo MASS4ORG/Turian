@@ -16,6 +16,8 @@ const EditorRegistry = @import("../services/EditorRegistry.zig");
 const Documents = @import("../main-window/Documents.zig");
 const PreviewSystem = @import("../asset-browser/preview/PreviewSystem.zig");
 const SettingsEditor = @import("editor/SettingsEditor.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 /// Draw the inspector panel for the selected object or asset.
 pub fn draw() void {
@@ -97,7 +99,7 @@ pub fn draw() void {
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
-    if (gui.expander(@src(), if (obj.hasOverride(.transform)) "Transform  (overridden)" else "Transform", .{ .default_expanded = true }, .{
+    if (gui.expander(@src(), if (obj.hasOverride(.transform)) tr("Transform  (overridden)") else tr("Transform"), .{ .default_expanded = true }, .{
         .expand = .horizontal,
         .padding = .all(4),
     })) {
@@ -145,7 +147,7 @@ pub fn draw() void {
             switch (comp.*) {
                 .user_script => |*s| {
                     if (s.field_count == 0) {
-                        gui.label(@src(), "(no fields)", .{}, .{
+                        gui.label(@src(), "{s}", .{tr("(no fields)")}, .{
                             .expand = .horizontal,
                             .id_extra = ci,
                         });
@@ -191,7 +193,7 @@ pub fn draw() void {
                     // C3: editing always happens in the `.uidoc` tab (like
                     // prefab isolation editing) — "Open" jumps there.
                     if (EditorState.resolveAssetGuid(ud.document.slice())) |path| {
-                        if (gui.button(@src(), "Open", .{}, .{ .id_extra = ci })) {
+                        if (gui.button(@src(), tr("Open"), .{}, .{ .id_extra = ci })) {
                             Documents.openAsset(path, .ui_document);
                         }
                     }
@@ -209,7 +211,7 @@ pub fn draw() void {
                 },
             }
 
-            if (gui.button(@src(), "Remove", .{}, .{
+            if (gui.button(@src(), tr("Remove"), .{}, .{
                 .gravity_y = 0.5,
                 .gravity_x = 1.0,
                 .id_extra = ci,
@@ -239,7 +241,7 @@ pub fn draw() void {
         });
         defer add_menu.deinit();
 
-        if (gui.menuItemLabel(@src(), "Add Component...", .{ .submenu = true }, .{
+        if (gui.menuItemLabel(@src(), tr("Add Component..."), .{ .submenu = true }, .{
             .expand = .horizontal,
         })) |r| {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
@@ -287,17 +289,17 @@ fn drawPrefabBanner(obj: *EditorState.SceneNode, root: usize) void {
             any = true;
         }
     }
-    gui.label(@src(), "Prefab Instance", .{}, .{ .gravity_y = 0.5, .font = .theme(.body) });
+    gui.label(@src(), "{s}", .{tr("Prefab Instance")}, .{ .gravity_y = 0.5, .font = .theme(.body) });
     if (any) {
-        gui.label(@src(), "  overrides: {s}", .{w.buffered()}, .{ .gravity_y = 0.5, .expand = .horizontal });
+        gui.label(@src(), "{s}", .{StudioLocale.trArgs("  overrides: {list}", &.{.{ .name = "list", .value = .{ .text = w.buffered() } }})}, .{ .gravity_y = 0.5, .expand = .horizontal });
     } else {
         gui.label(@src(), "", .{}, .{ .gravity_y = 0.5, .expand = .horizontal });
     }
 
-    if (gui.button(@src(), "Revert", .{}, .{ .gravity_y = 0.5 })) {
+    if (gui.button(@src(), tr("Revert"), .{}, .{ .gravity_y = 0.5 })) {
         _ = EditorState.revertPrefabInstance(gui.frameTimeNS(), gui.io, root);
     }
-    if (gui.button(@src(), "Apply", .{}, .{ .gravity_y = 0.5 })) {
+    if (gui.button(@src(), tr("Apply"), .{}, .{ .gravity_y = 0.5 })) {
         _ = EditorState.applyPrefabInstance(gui.frameTimeNS(), gui.io, root);
     }
 }
@@ -601,8 +603,8 @@ fn drawPreviewPanel(asset_path: []const u8, asset_type: editor.AssetType) void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 8, .y = 2 } });
         defer row.deinit();
-        gui.label(@src(), "Preview", .{}, .{ .gravity_y = 0.5, .expand = .horizontal, .font = .theme(.heading) });
-        _ = gui.checkbox(@src(), &preview_enabled, "Show", .{ .gravity_y = 0.5 });
+        gui.label(@src(), "{s}", .{tr("Preview")}, .{ .gravity_y = 0.5, .expand = .horizontal, .font = .theme(.heading) });
+        _ = gui.checkbox(@src(), &preview_enabled, tr("Show"), .{ .gravity_y = 0.5 });
     }
     if (!preview_enabled) return;
 
@@ -629,13 +631,13 @@ fn addComponentMenu(obj: *EditorState.SceneNode, fw: *gui.FloatingMenuWidget) bo
         if (prev_is_builtin) |prev| {
             if (prev and !def.is_builtin) {
                 _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-                gui.label(@src(), "Scripts", .{}, .{
+                gui.label(@src(), "{s}", .{tr("Scripts")}, .{
                     .padding = .{ .x = 8, .y = 4 },
                     .font = .theme(.body),
                 });
             }
         } else {
-            gui.label(@src(), "Components", .{}, .{
+            gui.label(@src(), "{s}", .{tr("Components")}, .{
                 .padding = .{ .x = 8, .y = 4 },
                 .font = .theme(.body),
             });

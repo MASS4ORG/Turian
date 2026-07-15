@@ -27,6 +27,8 @@
 
 const std = @import("std");
 const gui = @import("gui");
+const StudioLocale = @import("services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 /// Where a dragged node lands relative to the hovered target row.
 pub const DropZone = enum { before, into, after };
@@ -331,7 +333,7 @@ pub fn TreeView(comptime Model: type) type {
             if (is_renaming_this) {
                 var te = gui.textEntry(@src(), .{
                     .text = .{ .buffer = rename_buf[0..] },
-                    .placeholder = "Name",
+                    .placeholder = tr("Name"),
                 }, .{
                     .expand = .horizontal,
                     .gravity_y = 0.5,
@@ -369,12 +371,12 @@ pub fn TreeView(comptime Model: type) type {
                     var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = idx });
                     defer fw.deinit();
 
-                    if (gui.menuItemLabel(@src(), "Rename", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+                    if (gui.menuItemLabel(@src(), tr("Rename"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                         fw.close();
                         startRename(idx);
                     }
 
-                    if (gui.menuItemLabel(@src(), "Delete", .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
+                    if (gui.menuItemLabel(@src(), tr("Delete"), .{}, .{ .expand = .horizontal, .id_extra = idx }) != null) {
                         fw.close();
                         // Deleting a row that's part of the current selection
                         // acts on the whole selection; otherwise select it
