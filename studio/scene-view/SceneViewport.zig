@@ -6,6 +6,7 @@ const PlayMode = @import("PlayMode.zig");
 const EditorState = @import("../services/EditorState.zig");
 const GizmoSystem = @import("GizmoSystem.zig");
 const EditorCamera = @import("EditorCamera.zig");
+const AxisGizmo = @import("AxisGizmo.zig");
 const UiOverlay = @import("../main-window/UiOverlay.zig");
 const MenuItems = @import("../MenuItems.zig");
 const ui_render = @import("ui_render");
@@ -51,6 +52,8 @@ const InstanceState = struct {
     nav_up: bool = false,
     nav_down: bool = false,
     nav_fast: bool = false,
+    /// Snap animation driven by clicking the axis-orientation gizmo.
+    axis_anim: AxisGizmo.Anim = .{},
 };
 
 /// Camera navigation speeds are loaded from Settings once they are ready.
@@ -135,13 +138,23 @@ pub fn draw() void {
     loadCameraSettings();
     const nav = gatherNav(inst, content, phys);
     _ = EditorCamera.navigate(nav);
-    GpuRenderer.setEditorCamera(EditorCamera.pose());
     handleHotkeys(inst);
 
     const m = gatherMouse(inst, content, phys);
+
+    // The axis gizmo sits on top of the rendered scene, so a click landing on
+    // it must not also fall through to scene click-to-select below. Applying
+    // the snap (if any) here, before the scene renders, keeps the gizmo dots
+    // and the 3D view in lockstep instead of lagging a frame apart.
+    const axis_hit = AxisGizmo.pick(nat_rect, phys, scale, m.pos.x, m.pos.y);
+    AxisGizmo.applySnap(axis_hit, m.left_pressed, &EditorState.objects, EditorState.object_count, &inst.axis_anim);
+    GpuRenderer.setEditorCamera(EditorCamera.pose());
+
+    var scene_m = m;
+    if (axis_hit != null) scene_m.left_pressed = false;
     const cam = GpuRenderer.cameraFor(vp_w, vp_h);
     const grect = GizmoSystem.Rect{ .x = phys.x, .y = phys.y, .w = phys.w, .h = phys.h };
-    GizmoSystem.update(cam, grect, &EditorState.objects, EditorState.object_count, m);
+    GizmoSystem.update(cam, grect, &EditorState.objects, EditorState.object_count, scene_m);
     GpuRenderer.setGizmosEnabled(true);
 
     // The image and the billboard-icon overlay share an overlay container so the
@@ -159,6 +172,7 @@ pub fn draw() void {
             .gravity_y = 0.5,
         });
         drawIcons(vp_w, vp_h, nat_rect);
+        AxisGizmo.draw(nat_rect, phys, scale, axis_hit);
         if (show_ui_overlay) {
             UiOverlay.drawSceneOverlay(.{ .w = nat_rect.w, .h = nat_rect.h });
         }

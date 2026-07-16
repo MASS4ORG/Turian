@@ -146,3 +146,13 @@ pub fn focusOn(target: Vector3, dist: f32) void {
     const b = basis();
     pos = target.subtract(b.fwd.scale(@max(dist, 1.0)));
 }
+
+/// Sets yaw/pitch directly and repositions the camera to keep `focus` at
+/// `dist` along the new view direction. Used by the axis-orientation gizmo to
+/// snap to a world axis without losing the current focus point.
+pub fn snapTo(new_yaw: f32, new_pitch: f32, focus: Vector3, dist: f32) void {
+    initialized = true;
+    yaw = new_yaw;
+    pitch = new_pitch;
+    pos = focus.subtract(basis().fwd.scale(@max(dist, 0.01)));
+}

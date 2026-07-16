@@ -247,27 +247,10 @@ fn pickObject(cam: Camera, rect: Rect, objects: []engine.SceneNode, count: usize
     const ORIGIN_PICK_PX2: f32 = 16.0 * 16.0;
     for (objects[0..count], 0..) |*obj, i| {
         if (!obj.active) continue;
-        var mesh_guid: []const u8 = "";
-        for (obj.components[0..obj.component_count]) |*comp| {
-            if (comp.* == .mesh_renderer) {
-                mesh_guid = comp.mesh_renderer.mesh.slice();
-                break;
-            }
-        }
+        const mesh_guid = meshGuidOf(obj);
         const t = &obj.transform;
         if (mesh_guid.len > 0) {
-            // Prefer the cooked mesh's real bounds, transformed by the full
-            // model matrix; fall back to a scale-sized box if not cooked yet.
-            const wb = if (MeshBounds.local(mesh_guid)) |lb|
-                transformAabb(modelMatrix(t), lb.min, lb.max)
-            else box: {
-                const half = Vector3{
-                    .x = @max(@abs(t.scale.x) * 0.5, 0.05),
-                    .y = @max(@abs(t.scale.y) * 0.5, 0.05),
-                    .z = @max(@abs(t.scale.z) * 0.5, 0.05),
-                };
-                break :box MeshBounds.Bounds{ .min = t.position.subtract(half), .max = t.position.add(half) };
-            };
+            const wb = meshBoundsWorld(mesh_guid, t);
             if (rayAabb(ray, wb.min, wb.max)) |th| {
                 if (th < best_t) {
                     best_t = th;
@@ -287,6 +270,50 @@ fn pickObject(cam: Camera, rect: Rect, objects: []engine.SceneNode, count: usize
         }
     }
     return best;
+}
+
+/// Mesh asset GUID referenced by `obj`'s `mesh_renderer` component, or "" if none.
+fn meshGuidOf(obj: *const engine.SceneNode) []const u8 {
+    for (obj.components[0..obj.component_count]) |*comp| {
+        if (comp.* == .mesh_renderer) return comp.mesh_renderer.mesh.slice();
+    }
+    return "";
+}
+
+/// World-space bounds for a mesh object: the cooked mesh's real bounds
+/// transformed by the full model matrix, or a scale-sized box fallback if the
+/// mesh hasn't been cooked yet.
+fn meshBoundsWorld(mesh_guid: []const u8, t: *const engine.Transform) MeshBounds.Bounds {
+    if (MeshBounds.local(mesh_guid)) |lb| return transformAabb(modelMatrix(t), lb.min, lb.max);
+    const half = Vector3{
+        .x = @max(@abs(t.scale.x) * 0.5, 0.05),
+        .y = @max(@abs(t.scale.y) * 0.5, 0.05),
+        .z = @max(@abs(t.scale.z) * 0.5, 0.05),
+    };
+    return .{ .min = t.position.subtract(half), .max = t.position.add(half) };
+}
+
+/// Cast a world-space ray against scene mesh bounds only (ignoring lights,
+/// cameras and other non-mesh objects) and return the nearest hit distance
+/// along the ray, if any. Used by the axis-orientation gizmo to find the
+/// point the camera is currently focused on before snapping to an axis.
+pub fn raycastNearest(ray_o: Vector3, ray_d: Vector3, objects: []engine.SceneNode, count: usize) ?f32 {
+    const ray = Ray{ .o = ray_o, .d = ray_d };
+    var best_t: f32 = 1e30;
+    var found = false;
+    for (objects[0..count]) |*obj| {
+        if (!obj.active) continue;
+        const mesh_guid = meshGuidOf(obj);
+        if (mesh_guid.len == 0) continue;
+        const wb = meshBoundsWorld(mesh_guid, &obj.transform);
+        if (rayAabb(ray, wb.min, wb.max)) |th| {
+            if (th < best_t) {
+                best_t = th;
+                found = true;
+            }
+        }
+    }
+    return if (found) best_t else null;
 }
 
 /// Full local-to-world transform for a node (translate · rotate · scale).
