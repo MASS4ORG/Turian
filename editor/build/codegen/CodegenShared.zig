@@ -20,6 +20,13 @@ pub const RuntimeConfig = struct {
     /// wired into the generated build at all. A project that never
     /// references Guinevere ships with zero dvui linkage.
     uses_ui: bool = false,
+    /// GUID of an image asset used as the OS window/taskbar icon. Empty =
+    /// no icon override.
+    icon_guid: []const u8 = "",
+    /// Where the built executable + packaged assets are copied after a
+    /// successful build (`ProjectSettings.platform.build_output_path`).
+    /// Not baked into the generated game — read by `GameBuild` itself.
+    output_path: []const u8 = ".public",
 };
 
 /// Paths required to generate a game build. Most values come from

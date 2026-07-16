@@ -4,6 +4,8 @@ const EditorState = @import("EditorState.zig");
 const AssetWatcher = @import("../asset-browser/AssetWatcher.zig");
 const Documents = @import("../main-window/Documents.zig");
 const editor = @import("editor");
+const StudioLocale = @import("StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 /// Open an existing project at the given filesystem path.
 pub fn openProject(path: []const u8) void {
@@ -23,6 +25,29 @@ pub fn openProject(path: []const u8) void {
     // for this project when it was last closed.
     EditorState.clearScene();
     Documents.restore();
+}
+
+/// Prompt for a project folder via a native dialog and open it. Shared by
+/// the File menu and the project selector dropdown.
+pub fn openProjectDialog() void {
+    if (!gui.useTinyFileDialogs) {
+        gui.dialog(@src(), .{}, .{
+            .title = tr("Not Available"),
+            .message = tr("Native file dialogs are not enabled in this build."),
+        });
+        return;
+    }
+
+    const path = gui.dialogNativeFolderSelect(gui.currentWindow().arena(), .{
+        .title = tr("Open Project Folder"),
+    }) catch |err| blk: {
+        gui.log.debug("Could not open folder dialog: {any}", .{err});
+        break :blk null;
+    };
+
+    if (path) |p| {
+        openProject(p);
+    }
 }
 
 /// Create a new project at the given path with the given name.

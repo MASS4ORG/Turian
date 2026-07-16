@@ -604,6 +604,26 @@ pub fn generateMainZig(
                     "    render.setSources(gpuSource, gpuSource, gpuSource);\n\n",
                 .{ esc.items, runtime.width, runtime.height, if (runtime.vsync) "true" else "false" },
             ));
+            if (runtime.icon_guid.len > 0) {
+                // Window/taskbar icon (ProjectSettings.project.icon): decoded
+                // from the packaged asset at startup, not baked as literal
+                // bytes, so it goes through the same by-GUID package read as
+                // every other runtime asset.
+                var esc_icon: std.ArrayList(u8) = .empty;
+                try zigEscapeInto(a, &esc_icon, runtime.icon_guid);
+                try out.appendSlice(a, try std.fmt.allocPrint(
+                    a,
+                    "    icon_blk: {{\n" ++
+                        "        const _icon_gid = (editor.Guid.parse(\"{s}\") catch break :icon_blk).bytes;\n" ++
+                        "        const _icon_r = g_assets.readById(gpa, _icon_gid) orelse break :icon_blk;\n" ++
+                        "        defer gpa.free(_icon_r.bytes);\n" ++
+                        "        var _icon_tex = engine.assets.ImageLoader.loadFromMemory(gpa, _icon_r.bytes) catch break :icon_blk;\n" ++
+                        "        defer _icon_tex.deinit();\n" ++
+                        "        if (!_icon_tex.isCompressed()) win.setIcon(_icon_tex.data, _icon_tex.width, _icon_tex.height);\n" ++
+                        "    }}\n\n",
+                    .{esc_icon.items},
+                ));
+            }
             if (uses_ui) {
                 // dvui draws "ontop" of the already-rendered scene, sharing
                 // the SAME SDL3 window/device `gpu.Window` owns (D9's

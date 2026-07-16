@@ -55,7 +55,7 @@ pub fn remove(settings: *Settings, io: std.Io, allocator: std.mem.Allocator, pat
 
 /// Resolve `path` to its canonical absolute path. Falls back to `path`
 /// unchanged if it cannot be opened (e.g. the directory no longer exists).
-fn canonical(io: std.Io, path: []const u8, buf: []u8) []const u8 {
+pub fn canonical(io: std.Io, path: []const u8, buf: []u8) []const u8 {
     var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return path;
     defer dir.close(io);
     const n = dir.realPath(io, buf) catch return path;

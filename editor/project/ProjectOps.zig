@@ -74,4 +74,15 @@ pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
             .data = settings_writer.buffered(),
         }) catch {};
     } else |_| {}
+
+    dir.writeFile(io, .{ .sub_path = ".gitignore", .data = GITIGNORE_TEMPLATE }) catch {};
 }
+
+/// Build artifacts that don't belong in version control: the editor's
+/// scratch build directory and the default build output folder
+/// (`ProjectSettings.platform.build_output_path`).
+const GITIGNORE_TEMPLATE =
+    \\.cache/
+    \\.public/
+    \\
+;

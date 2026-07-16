@@ -82,6 +82,10 @@ pub const ProjectSettings = struct {
     pub const Platform = struct {
         target: Target = .auto,
         optimize: Optimize = .debug,
+        /// Where `editor.GameBuild` copies the built executable + packaged
+        /// assets. Relative paths resolve against the project root; absolute
+        /// paths are used as-is.
+        build_output_path: []const u8 = ".public",
 
         /// Build target. `auto` = host platform.
         pub const Target = enum { auto, windows, linux, macos };
@@ -109,6 +113,7 @@ pub const ProjectSettings = struct {
         freeOwnedSlice(allocator, self.project.company, d.project.company);
         freeOwnedSlice(allocator, self.project.version, d.project.version);
         freeOwnedSlice(allocator, self.project.icon, d.project.icon);
+        freeOwnedSlice(allocator, self.platform.build_output_path, d.platform.build_output_path);
     }
 
     fn freeOwnedSlice(allocator: std.mem.Allocator, s: []const u8, default: []const u8) void {
@@ -150,6 +155,7 @@ test "defaults are sane" {
     try std.testing.expect(ps.graphics.vsync);
     try std.testing.expectEqual(ProjectSettings.Graphics.Quality.high, ps.graphics.quality);
     try std.testing.expectEqualStrings("Debug", ps.optimizeFlag());
+    try std.testing.expectEqualStrings(".public", ps.platform.build_output_path);
 }
 
 test "serialize then load round-trips settings" {

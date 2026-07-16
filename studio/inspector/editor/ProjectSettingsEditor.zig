@@ -10,6 +10,7 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../../services/EditorState.zig");
+const PropDraw = @import("../PropDraw.zig");
 const StudioLocale = @import("../../services/StudioLocale.zig");
 const tr = StudioLocale.tr;
 
@@ -37,6 +38,7 @@ var fullscreen: bool = false;
 var quality: Quality = .high;
 var target: Target = .auto;
 var optimize: Optimize = .debug;
+var output_path_buf: [128]u8 = .{0} ** 128;
 
 fn loadedPath() []const u8 {
     return loaded_path_buf[0..loaded_path_len];
@@ -64,7 +66,7 @@ pub fn draw(asset_path: []const u8) void {
     textRow(tr("Name"), &name_buf, 1);
     textRow(tr("Company"), &company_buf, 2);
     textRow(tr("Version"), &version_buf, 3);
-    textRow(tr("Icon (GUID)"), &icon_buf, 4);
+    assetRefRow(tr("Icon"), &icon_buf, .texture, 4);
 
     section(tr("Graphics"));
     textRow(tr("Width"), &width_buf, 5);
@@ -76,9 +78,10 @@ pub fn draw(asset_path: []const u8) void {
     section(tr("Platform"));
     enumRow(Target, tr("Target"), &target, 10);
     enumRow(Optimize, tr("Optimize"), &optimize, 11);
+    textRow(tr("Build Output Path"), &output_path_buf, 14);
 
     section(tr("Boot"));
-    textRow(tr("First Scene (GUID)"), &scene_buf, 12);
+    assetRefRow(tr("First Scene"), &scene_buf, .scene, 12);
     textRow(tr("UI Theme (GUID)"), &ui_theme_buf, 13);
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .id_extra = 9100 });
@@ -118,6 +121,20 @@ fn textRow(label: []const u8, buf: []u8, id: usize) void {
     const changed = te.text_changed;
     te.deinit();
     if (changed) dirty = true;
+}
+
+/// A labelled row backed by an asset picker (drop zone + "..." browser)
+/// instead of a hand-typed GUID, writing the picked GUID back into `buf`.
+fn assetRefRow(label: []const u8, buf: []u8, filter: engine.AssetFilter, id: usize) void {
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .padding = .{ .x = 10, .y = 2 }, .id_extra = id });
+    defer row.deinit();
+
+    gui.label(@src(), "{s}", .{label}, .{ .id_extra = id, .gravity_y = 0.5, .min_size_content = .{ .w = 140 } });
+
+    if (PropDraw.drawScriptAssetRef(@src(), bufStr(buf), filter, id)) |new_guid| {
+        setBuf(buf, new_guid);
+        dirty = true;
+    }
 }
 
 fn checkRow(label: []const u8, value: *bool, id: usize) void {
@@ -180,6 +197,7 @@ fn load(asset_path: []const u8) void {
     quality = ps.graphics.quality;
     target = ps.platform.target;
     optimize = ps.platform.optimize;
+    setBuf(&output_path_buf, ps.platform.build_output_path);
 }
 
 fn save() void {
@@ -201,7 +219,11 @@ fn save() void {
             .fullscreen = fullscreen,
             .quality = quality,
         },
-        .platform = .{ .target = target, .optimize = optimize },
+        .platform = .{
+            .target = target,
+            .optimize = optimize,
+            .build_output_path = bufStr(&output_path_buf),
+        },
         .first_scene = bufStr(&scene_buf),
         .ui_theme = bufStr(&ui_theme_buf),
     };
@@ -213,4 +235,8 @@ fn save() void {
     if (EditorState.project_path) |proj| {
         editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, loadedPath());
     }
+
+    // Refresh the live project value so the menu bar's project selector
+    // (name + icon) reflects the edit immediately, without reopening.
+    EditorState.current_project = ps.toProject();
 }

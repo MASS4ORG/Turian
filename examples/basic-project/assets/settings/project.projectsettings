@@ -4,7 +4,7 @@
         .name = "Turian Basic Project",
         .company = "Turian",
         .version = "0.1.0",
-        .icon = "",
+        .icon = "0f7ade1d-d86f-436f-b927-2a6a11249da0",
     },
     .graphics = .{
         .width = 1280,
@@ -16,7 +16,8 @@
     .platform = .{
         .target = .auto,
         .optimize = .debug,
+        .build_output_path = ".public",
     },
-    // Boot into scene-01 (its GUID, from scene-01.json.meta).
     .first_scene = "5ffea51a-788f-40cf-9f75-bcab9e439034",
+    .ui_theme = "",
 }

@@ -7,6 +7,7 @@ const Tasks = @import("Tasks.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
 const Screenshots = @import("../services/Screenshots.zig");
 const Documents = @import("Documents.zig");
+const ProjectDropdown = @import("ProjectDropdown.zig");
 const Panels = @import("Panels.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
 const LayoutPresets = @import("../services/LayoutPresets.zig");
@@ -122,12 +123,6 @@ fn syncFpsFromSettings() void {
     fps_setting_loaded = true;
 }
 
-fn projectDirExists(path: []const u8) bool {
-    var d = std.Io.Dir.cwd().openDir(gui.io, path, .{}) catch return false;
-    d.close(gui.io);
-    return true;
-}
-
 /// Draw the main menu bar.  A hamburger icon toggles the main menu items
 /// (File, Edit, Project, View, Turian) in the bar horizontally; clicking
 /// outside the menu area collapses them back.
@@ -153,7 +148,7 @@ pub fn draw(should_quit: *bool) void {
 
             if (gui.menuItemLabel(@src(), tr("Open Project..."), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
-                openProjectDialog();
+                ProjectOps.openProjectDialog();
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
@@ -276,7 +271,7 @@ pub fn draw(should_quit: *bool) void {
         }
     }
 
-    drawProjectDropdown(m);
+    ProjectDropdown.draw(m);
 
     _ = gui.spacer(@src(), .{ .expand = .horizontal });
     drawPlayControls();
@@ -344,64 +339,6 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
             LayoutStore.savePreset(name, gui.io);
             const msg = StudioLocale.trArgs("Saved layout as '{name}'", &.{.{ .name = "name", .value = .{ .text = name } }});
             gui.toast(@src(), .{ .message = msg });
-        }
-    }
-}
-
-// Current project dropdown — shows recent projects and allows quick switching.
-fn drawProjectDropdown(m: *gui.MenuWidget) void {
-    const proj_name = if (EditorState.project_path) |p| std.fs.path.basename(p) else tr("No Project");
-    if (gui.menuItemLabel(@src(), proj_name, .{ .submenu = true }, .{ .font = .theme(.heading) })) |r| {
-        var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
-        defer fw.deinit();
-
-        if (!EditorState.settingsReady()) {
-            gui.label(@src(), "{s}", .{tr("Settings not ready")}, .{ .expand = .horizontal, .padding = .all(8) });
-        } else {
-            const arena = gui.currentWindow().arena();
-            const recent = editor.recent_projects.list(&EditorState.settings, arena);
-
-            if (recent.len == 0) {
-                gui.label(@src(), "{s}", .{tr("No recent projects")}, .{ .expand = .horizontal, .padding = .all(8) });
-            } else {
-                for (recent, 0..) |path, i| {
-                    const is_current = if (EditorState.project_path) |cur|
-                        std.mem.eql(u8, cur, path)
-                    else
-                        false;
-
-                    const exists = projectDirExists(path);
-
-                    const base = std.fs.path.basename(path);
-                    var lbuf: [300]u8 = undefined;
-                    const label = if (!exists)
-                        std.fmt.bufPrint(&lbuf, "[!] {s}", .{base}) catch base
-                    else if (is_current)
-                        std.fmt.bufPrint(&lbuf, "* {s}", .{base}) catch base
-                    else
-                        base;
-
-                    if (gui.menuItemLabel(@src(), label, .{}, .{
-                        .expand = .horizontal,
-                        .id_extra = i,
-                    }) != null) {
-                        if (exists and !is_current) {
-                            m.close();
-                            ProjectOps.openProject(path);
-                        } else if (!exists) {
-                            editor.recent_projects.remove(&EditorState.settings, gui.io, arena, path);
-                            EditorState.settings.save(gui.io);
-                        }
-                    }
-                }
-            }
-
-            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
-
-            if (gui.menuItemLabel(@src(), tr("Open Project..."), .{}, .{ .expand = .horizontal }) != null) {
-                m.close();
-                openProjectDialog();
-            }
         }
     }
 }
@@ -508,27 +445,6 @@ fn transportButton(action: Transport, grayed: bool) bool {
     });
     gui.tooltip(@src(), .{ .active_rect = wd.rectScale().r }, "{s}", .{action.tip()}, .{ .id_extra = id });
     return clicked;
-}
-
-fn openProjectDialog() void {
-    if (!gui.useTinyFileDialogs) {
-        gui.dialog(@src(), .{}, .{
-            .title = tr("Not Available"),
-            .message = tr("Native file dialogs are not enabled in this build."),
-        });
-        return;
-    }
-
-    const path = gui.dialogNativeFolderSelect(gui.currentWindow().arena(), .{
-        .title = tr("Open Project Folder"),
-    }) catch |err| blk: {
-        gui.log.debug("Could not open folder dialog: {any}", .{err});
-        break :blk null;
-    };
-
-    if (path) |p| {
-        ProjectOps.openProject(p);
-    }
 }
 
 fn newProjectDialog() void {

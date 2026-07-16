@@ -9,8 +9,8 @@
             .hash = "dvui-0.5.0-dev-AQFJmTwe_QBIDI88YgXN-FD_oyND5t1cFy-oo9yUvCSz",
         },
         .gpu = .{
-            .url = "git+https://gitlab.com/mass4org/mega4/gpu#68963cc927252e15c5ca27330ae5d7fe837dd5e1",
-            .hash = "gpu-1.0.1-B3kvdSFFAADXQP_G_2tgmI5u_2mY_YZ_TaspkOWLc2uK",
+            .url = "git+https://gitlab.com/mass4org/mega4/gpu#a75ee28c6a9d7308dacee6b840a330f820e984b8",
+            .hash = "gpu-1.1.0-B3kvdX9HAABxxavs32FQDMH1YyKMo2MoY0c7SDKmf0lM",
         },
         .guid = .{
             .url = "git+https://gitlab.com/mass4org/mega4/guid#82a98833e35452ec458b06e0e9765278e012026a",

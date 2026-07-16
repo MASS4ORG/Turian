@@ -1,6 +1,7 @@
 /// Game build system — generates and compiles a standalone game executable
 /// from the current scene and user scripts.  Pure logic with no GUI dependency.
 const std = @import("std");
+const builtin = @import("builtin");
 const engine = @import("engine");
 const Guid = @import("guid").Guid;
 const ComponentDef = @import("../assets/Scanner.zig").ComponentDef;
@@ -20,8 +21,10 @@ pub const appendKtx2Module = codegen.appendKtx2Module;
 
 const log = std.log.scoped(.game_build);
 
-/// Build the user game into <project>/.cache/zig-out/bin/game.
-/// Blocks until compilation finishes.  Returns true on success.
+/// Build the user game, then copy the executable and packaged assets into
+/// the project's configured build output folder (`ProjectSettings.platform
+/// .build_output_path`, default `<project>/.public`). Blocks until
+/// compilation finishes.  Returns true on success.
 pub fn buildGame(
     io: std.Io,
     project_path: []const u8,
@@ -212,15 +215,36 @@ fn buildGameInner(
     const argv = [_][]const u8{ "zig", "build", "-Doptimize=Debug" };
     try spawnAndWaitIn(io, a, &argv, cache_path);
 
-    const game_out = try std.fmt.allocPrint(a, "{s}/zig-out/bin/game", .{cache_path});
-    log.info("Game built: {s}", .{game_out});
+    progress.report(0.9, "Copying build output");
+    const exe_name = if (builtin.target.os.tag == .windows) "game.exe" else "game";
+    const built_exe = try std.fmt.allocPrint(a, "{s}/zig-out/bin/{s}", .{ cache_path, exe_name });
+    const output_dir = if (std.fs.path.isAbsolute(runtime.output_path))
+        try a.dupe(u8, runtime.output_path)
+    else
+        try std.fmt.allocPrint(a, "{s}/{s}", .{ abs_project, runtime.output_path });
+    std.Io.Dir.cwd().createDirPath(io, output_dir) catch |err|
+        log.err("Could not create build output folder {s}: {any}", .{ output_dir, err });
+
+    copyFile(io, built_exe, try std.fmt.allocPrint(a, "{s}/{s}", .{ output_dir, exe_name }));
+    copyFile(io, try std.fmt.allocPrint(a, "{s}/.cache/game.oap", .{project_path}), try std.fmt.allocPrint(a, "{s}/game.oap", .{output_dir}));
+
+    log.info("Game built: {s}", .{output_dir});
+}
+
+/// Copy a single file from `src` to `dst`, preserving permissions (so the
+/// copied executable keeps its executable bit). Logs (doesn't fail) on
+/// error — a stale/missing output copy shouldn't fail a build that already
+/// compiled.
+fn copyFile(io: std.Io, src: []const u8, dst: []const u8) void {
+    std.Io.Dir.cwd().copyFile(src, std.Io.Dir.cwd(), dst, io, .{}) catch |err|
+        log.err("Could not copy {s} to {s}: {any}", .{ src, dst, err });
 }
 
 /// Resolve runtime config from the project's `ProjectSettings` asset and the
-/// asset database: window title/size/vsync and the boot scene GUID
-/// the game loads through the SceneManager. Falls back to the
-/// conventional `scene-01.json` (or the first scene asset) when no settings
-/// asset selects a boot scene. All strings are allocated in `a`.
+/// asset database: window title/size/vsync/icon, the build output folder,
+/// and the boot scene GUID the game loads through the SceneManager. Falls
+/// back to the conventional `scene-01.json` (or the first scene asset) when
+/// no settings asset selects a boot scene. All strings are allocated in `a`.
 fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out: *RuntimeConfig) void {
     var db = AssetDatabase.init(a);
     defer db.deinit();
@@ -239,6 +263,18 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
                 out.width = ps.graphics.width;
                 out.height = ps.graphics.height;
                 out.vsync = ps.graphics.vsync;
+                if (ps.platform.build_output_path.len > 0)
+                    out.output_path = a.dupe(u8, ps.platform.build_output_path) catch out.output_path;
+                if (ps.project.icon.len > 0) {
+                    if (Guid.parse(ps.project.icon)) |gid| {
+                        if (db.findByGuid(gid)) |iinfo| {
+                            if (iinfo.asset_type == .image)
+                                out.icon_guid = a.dupe(u8, ps.project.icon) catch ""
+                            else
+                                log.warn("icon {s} is not an image asset", .{ps.project.icon});
+                        } else log.warn("Icon {s} not found in assets", .{ps.project.icon});
+                    } else |_| log.warn("Invalid icon GUID '{s}'", .{ps.project.icon});
+                }
                 if (ps.first_scene.len > 0) {
                     if (Guid.parse(ps.first_scene)) |gid| {
                         if (db.findByGuid(gid)) |sinfo| {
