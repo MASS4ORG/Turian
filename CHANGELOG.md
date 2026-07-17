@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.16.0] - 2026-07-17
+
+### Features
+- feat: build output folder (.public), asset-ref project settings, project icon #131 #86
+- feat: localization #36 #123
+
 ## [1.15.0] - 2026-07-15
 
 ### Features
