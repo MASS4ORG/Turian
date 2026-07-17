@@ -8,6 +8,7 @@ pub const ObjLoader = @import("ObjLoader.zig");
 pub const GltfLoader = @import("GltfLoader.zig");
 pub const FbxLoader = @import("FbxLoader.zig");
 pub const ImageLoader = @import("ImageLoader.zig");
+pub const DdsLoader = @import("DdsLoader.zig");
 
 // ── Model info (materials/images shared by glTF/FBX loaders) ─────────────────
 const model_info = @import("ModelInfo.zig");

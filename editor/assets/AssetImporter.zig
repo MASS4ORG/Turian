@@ -18,7 +18,9 @@ const log = std.log.scoped(.asset_importer);
 // ── Importer versions ────────────────────────────────────────────────────────
 // Bump the relevant constant to force a reimport of that asset class.
 
-const VERSION_IMAGE: u32 = 1;
+// v2: DDS textures are cooked (sRGB tagging + optional normal-map green-channel
+// flip) instead of copied verbatim; other image formats are still verbatim.
+const VERSION_IMAGE: u32 = 2;
 // v2: generate materials + extract textures from glTF/GLB into sub-assets.
 // v3: cook geometry into the canonical binary mesh format.
 // v4: cook every mesh/primitive (submesh table) instead of only the first.
@@ -167,9 +169,13 @@ fn writeArtifact(
 
     // Models are cooked into the canonical binary mesh format so the runtime
     // loads geometry with one fast loader (no OBJ/glTF parsing at run time).
-    // Other asset types are copied verbatim for now.
+    // DDS textures are cooked to bake in sRGB tagging and (for normal maps)
+    // the DirectX-to-engine green-channel flip. Other asset types are copied
+    // verbatim for now.
     const artifact_bytes: []const u8 = if (meta.asset_type == .model)
         cookModelMesh(io, allocator, asset_path) orelse data
+    else if (meta.asset_type == .image and std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".dds"))
+        cookDdsTexture(allocator, data, meta.import_settings) orelse data
     else
         data;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = art_path, .data = artifact_bytes }) catch return;
@@ -194,6 +200,24 @@ fn cookModelMesh(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u
     var mesh = engine.assets.loadMesh(allocator, io, asset_path) catch return null;
     defer mesh.deinit();
     return mesh.encode(allocator) catch null;
+}
+
+// ── DDS texture cooking ──────────────────────────────────────────────────────
+
+/// Rewrite a source DDS's container per its `ImageImportSettings`: bake in
+/// sRGB tagging for color data (legacy FourCC has no sRGB bit, so this may
+/// upgrade the container to a DX10 header) and, for normal maps, invert the
+/// BC5 green channel to match the engine's Y convention. Returns null on
+/// parse failure so the caller falls back to a verbatim copy.
+fn cookDdsTexture(allocator: std.mem.Allocator, data: []const u8, import_settings: @import("../types/ImportSettings.zig").ImportSettings) ?[]const u8 {
+    const settings = switch (import_settings) {
+        .image => |s| s,
+        else => return null,
+    };
+    return engine.assets.DdsLoader.cook(allocator, data, .{
+        .srgb = settings.color_space == .srgb,
+        .flip_green_channel = settings.texture_type == .normal_map and settings.flip_green_channel,
+    }) catch null;
 }
 
 // ── Model → materials + textures (one-to-many) ────────────────────────────────

@@ -1,7 +1,9 @@
-/// Image loader. Decodes KTX2 containers (BCn / Basis-transcoded, via the `ktx2`
-/// module) or, for everything stb_image understands (PNG/JPEG/…), RGBA8 pixels.
+/// Image loader. Decodes KTX2 or DDS containers (BCn / Basis-transcoded, via
+/// the `ktx2` module and `DdsLoader`) or, for everything stb_image understands
+/// (PNG/JPEG/…), RGBA8 pixels.
 const std = @import("std");
 const ktx2 = @import("ktx2");
+const dds = @import("DdsLoader.zig");
 const Texture = @import("Texture.zig").Texture;
 
 extern fn stbi_load_from_memory(
@@ -19,6 +21,7 @@ extern fn stbi_image_free(data: ?*anyopaque) void;
 /// format, so no extension is required.
 pub fn loadFromMemory(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
     if (ktx2.isKtx2(bytes)) return fromKtx2(allocator, bytes);
+    if (dds.isDds(bytes)) return fromDds(allocator, bytes);
 
     var w: c_int = 0;
     var h: c_int = 0;
@@ -44,6 +47,21 @@ pub fn loadFromMemory(allocator: std.mem.Allocator, bytes: []const u8) !Texture 
 fn fromKtx2(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
     const img = try ktx2.decode(allocator, bytes);
     // Move the decoded buffers into the Texture; do not deinit `img`.
+    return Texture{
+        .data = img.data,
+        .width = img.width,
+        .height = img.height,
+        .format = img.format,
+        .mips = img.levels,
+        .allocator = allocator,
+        .owns_mips = true,
+    };
+}
+
+/// Decode a DDS container into a (possibly block-compressed, multi-mip)
+/// Texture. Ownership of the decoded buffers is moved into the Texture.
+fn fromDds(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
+    const img = try dds.decode(allocator, bytes);
     return Texture{
         .data = img.data,
         .width = img.width,

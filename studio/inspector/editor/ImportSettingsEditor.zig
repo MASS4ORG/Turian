@@ -65,6 +65,7 @@ pub fn draw(asset_path: []const u8, asset_type: editor.AssetType) void {
             enumRow(editor.ImageFilter, tr("Filter"), &img.filter, 5);
             enumRow(editor.ImageWrap, tr("Wrap"), &img.wrap, 6);
             textRow(tr("Max Size"), &max_size_buf, 7);
+            checkRow(tr("Flip Green Channel (DDS)"), &img.flip_green_channel, 8);
         },
         .model => {
             checkRow(tr("Import Materials"), &model.import_materials, 1);

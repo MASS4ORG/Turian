@@ -26,6 +26,9 @@ pub const ImageImportSettings = struct {
     filter: ImageFilter = .linear,
     wrap: ImageWrap = .repeat,
     max_size: u32 = 2048,
+    /// DDS only: invert the green (Y) channel of BC5-compressed normal maps,
+    /// for sources authored in DirectX's normal-map convention.
+    flip_green_channel: bool = false,
 };
 
 /// Settings for audio asset import.
