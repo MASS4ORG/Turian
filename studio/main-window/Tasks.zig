@@ -68,9 +68,11 @@ pub fn launchBuild(io: std.Io) void {
         return;
     };
 
-    // Script reflection may still be compiling in the background (see
-    // `EditorState.launchReflect`); block until it lands so the build doesn't
-    // snapshot components with stale/zeroed field defaults.
+    // Asset import and script reflection may still be running in the
+    // background (see `EditorState.launchImport`/`launchReflect`); block
+    // until both land so the build doesn't snapshot a half-cooked cache or
+    // components with stale/zeroed field defaults.
+    EditorState.waitForImport(io);
     EditorState.waitForReflect(io);
 
     const job = std.heap.page_allocator.create(Job) catch return;

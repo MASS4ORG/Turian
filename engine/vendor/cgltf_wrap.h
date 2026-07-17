@@ -13,15 +13,23 @@ typedef struct {
     int       material_index;   /* index into the model's materials, or -1 */
 } CgltfMeshData;
 
-/* Load first mesh, first primitive from a .gltf or .glb file.
-   Returns 0 on success. Call cgltf_wrap_free() when done. */
-int cgltf_wrap_load(const char* path, CgltfMeshData* out);
-void cgltf_wrap_free(CgltfMeshData* data);
+/* One CgltfMeshData per primitive, across every mesh in the file. */
+typedef struct {
+    CgltfMeshData* primitives;
+    uint32_t       primitive_count;
+} CgltfMultiMeshData;
+
+/* Load every mesh/primitive from a .gltf or .glb file. Primitives without a
+   POSITION attribute are skipped. Returns 0 on success (at least one
+   primitive loaded), nonzero on parse failure or if no primitive could be
+   loaded. Call cgltf_wrap_free_all() when done. */
+int cgltf_wrap_load_all(const char* path, CgltfMultiMeshData* out);
+void cgltf_wrap_free_all(CgltfMultiMeshData* out);
 
 /* ── Materials & images ──────────────────────────────────────────────────────
    A separate "model info" pass exposes a glTF file's materials and images so an
    importer can convert a single source model into multiple engine assets
-   (materials + textures). Geometry is loaded separately via cgltf_wrap_load. */
+   (materials + textures). Geometry is loaded separately via cgltf_wrap_load_all. */
 
 /* Reference from a material slot to one of the model's images. */
 typedef struct {

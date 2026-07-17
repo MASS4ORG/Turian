@@ -13,7 +13,6 @@ pub fn openProject(path: []const u8) void {
     AssetWatcher.reset();
     const result = editor.project_ops.openProject(gui.io, gui.currentWindow().arena(), path);
     EditorState.current_project = result.project;
-    EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
 
     if (EditorState.settingsReady()) {
         const arena = gui.currentWindow().arena();
@@ -21,10 +20,14 @@ pub fn openProject(path: []const u8) void {
         EditorState.settings.save(gui.io);
     }
 
-    // Start from a clean scene, then restore the document tabs that were open
-    // for this project when it was last closed.
+    // Start from a clean scene now; the asset scan/cook pass runs in the
+    // background (see `refreshComponentsAsync`) so this window can present
+    // instead of blocking on a full project import. Previously-open document
+    // tabs restore once that import lands (their assets need to be resolvable
+    // first — restoring a scene tab with an unimported mesh would fail to
+    // load it and never retry).
     EditorState.clearScene();
-    Documents.restore();
+    EditorState.refreshComponentsAsync(gui.io, gui.currentWindow().arena(), Documents.restore);
 }
 
 /// Prompt for a project folder via a native dialog and open it. Shared by

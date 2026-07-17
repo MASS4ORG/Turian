@@ -1,4 +1,5 @@
 const std = @import("std");
+const engine = @import("engine");
 const editor = @import("editor");
 const scanner = editor.scanner;
 const asset_meta = editor.asset_meta;
@@ -185,6 +186,49 @@ pub fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     editor.asset_importer.importAll(io, gpa, path, &db, task.progress());
     tm.complete(task.id);
     task.printStatus();
+}
+
+/// Re-save every scene asset still using the deprecated single-material
+/// `"material_guid"` mesh_renderer field, converting it to `"material_guids"`.
+/// Scenes already in the current format are left untouched. Loading a scene
+/// migrates the field in memory regardless (see `SceneIo.sceneCompToEngine`);
+/// this command is for batch-persisting that migration across a project.
+/// Currently covers only this one legacy field — the general project-version
+/// migration entry point will grow into this same `migrate` verb.
+pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
+    const result = project_ops.openProject(io, gpa, path);
+    if (!result.valid) {
+        std.debug.print("Not a Turian project (no project.json): {s}\n", .{path});
+        return error.ProjectNotFound;
+    }
+
+    var assets_buf: [1024]u8 = undefined;
+    const assets = std.fmt.bufPrint(&assets_buf, "{s}/assets", .{path}) catch path;
+    asset_meta.scanAndEnsureMetas(io, gpa, assets);
+
+    var db = editor.AssetDatabase.init(gpa);
+    defer db.deinit();
+    db.scan(io, assets);
+
+    var objects: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;
+    var scanned: usize = 0;
+    var migrated: usize = 0;
+
+    var it = db.enumerate(.scene);
+    while (it.next()) |info| {
+        scanned += 1;
+        const bytes = std.Io.Dir.cwd().readFileAlloc(io, info.path, gpa, .unlimited) catch continue;
+        defer gpa.free(bytes);
+        if (std.mem.indexOf(u8, bytes, "\"material_guid\":") == null) continue;
+
+        var count: usize = 0;
+        if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, &objects, &count)) continue;
+        editor.scene_io.saveScene(io, info.path, &objects, count, gpa);
+        migrated += 1;
+        std.debug.print("Migrated: {s}\n", .{info.path});
+    }
+
+    std.debug.print("Scanned {d} scene(s), migrated {d}.\n", .{ scanned, migrated });
 }
 
 fn builtinCount(components: []const scanner.ComponentDef) usize {

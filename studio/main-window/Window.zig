@@ -300,6 +300,7 @@ pub fn frame() bool {
     // Reap finished background jobs and keep frames flowing while one runs.
     Tasks.pump(gui.io);
     EditorState.pumpReflect(gui.io);
+    EditorState.pumpImport(gui.io);
 
     // Step the in-editor game simulation. Keeps frames flowing
     // while a scene is playing so the viewport animates continuously.

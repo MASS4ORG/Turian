@@ -2,6 +2,7 @@
 //! process). Other render files read/write this; the public API lives in
 //! `root.zig`.
 const gpu = @import("gpu");
+const engine = @import("engine");
 const types = @import("types.zig");
 
 const c = gpu.c;
@@ -81,12 +82,21 @@ pub var material_override_bytes: []const u8 = &.{};
 pub const KEY_CAP = 64;
 
 pub const MAX_MESHES = 64;
+/// Matches `MeshRendererComponent.MAX_SUBMESH_MATERIALS` — a GPU mesh never
+/// needs more drawable ranges than a mesh renderer can bind materials.
+pub const MAX_SUBMESHES = engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS;
+pub const GpuSubmesh = struct {
+    index_offset: u32 = 0,
+    index_count: u32 = 0,
+};
 pub const GpuMesh = struct {
     key: [KEY_CAP]u8 = undefined,
     key_len: usize = 0,
     vtx_buf: *c.SDL_GPUBuffer = undefined,
     idx_buf: *c.SDL_GPUBuffer = undefined,
     idx_count: u32 = 0,
+    submeshes: [MAX_SUBMESHES]GpuSubmesh = undefined,
+    submesh_count: u32 = 0,
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);

@@ -9,7 +9,9 @@ const SceneComponent = @import("../types/SceneComponent.zig").SceneComponent;
 const SceneObject = @import("../types/SceneObject.zig").SceneObject;
 const SceneFile = @import("../types/SceneFile.zig").SceneFile;
 
-fn engineCompToScene(c: *const engine.Component) SceneComponent {
+const log = std.log.scoped(.scene_io);
+
+fn engineCompToScene(c: *const engine.Component, material_guids: []const []const u8) SceneComponent {
     return switch (c.*) {
         .camera => |v| .{ .camera = v },
         .light => |v| .{ .light = v },
@@ -17,7 +19,7 @@ fn engineCompToScene(c: *const engine.Component) SceneComponent {
             .cast_shadows = v.cast_shadows,
             .receive_shadows = v.receive_shadows,
             .mesh_guid = v.mesh.slice(),
-            .material_guid = v.material.slice(),
+            .material_guids = material_guids,
         } },
         .rigid_body => |v| .{ .rigid_body = v },
         .collider => |v| .{ .collider = v },
@@ -43,7 +45,15 @@ fn sceneCompToEngine(sc: SceneComponent) engine.Component {
                 .receive_shadows = v.receive_shadows,
             };
             mr.mesh.set(v.mesh_guid);
-            mr.material.set(v.material_guid);
+            if (v.material_guids.len > 0) {
+                const n = @min(v.material_guids.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                for (0..n) |i| mr.materials[i].set(v.material_guids[i]);
+                mr.material_count = @intCast(n);
+            } else if (v.material_guid.len > 0) {
+                log.warn("mesh_renderer uses deprecated \"material_guid\" — migrated to \"material_guids\" in memory; re-save the scene to persist", .{});
+                mr.materials[0].set(v.material_guid);
+                mr.material_count = 1;
+            }
             break :blk .{ .mesh_renderer = mr };
         },
         .rigid_body => |v| .{ .rigid_body = v },
@@ -101,12 +111,14 @@ pub fn serializeScene(
 
     var total_comps: usize = 0;
     var total_script_fields: usize = 0;
+    var total_material_refs: usize = 0;
     var total_overrides: usize = 0;
     for (objects[0..count]) |*obj| {
         total_comps += obj.component_count;
         total_overrides += obj.override_count;
         for (obj.components[0..obj.component_count]) |*c| {
             if (c.* == .user_script) total_script_fields += c.user_script.field_count;
+            if (c.* == .mesh_renderer) total_material_refs += @min(c.mesh_renderer.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
         }
     }
 
@@ -114,6 +126,8 @@ pub fn serializeScene(
     defer allocator.free(all_comps);
     const all_script_fields = allocator.alloc(SceneScriptField, total_script_fields) catch return null;
     defer allocator.free(all_script_fields);
+    const all_material_guids = allocator.alloc([]const u8, total_material_refs) catch return null;
+    defer allocator.free(all_material_guids);
     // Override group keys point straight into the node buffers (objects outlives us).
     const all_overrides = allocator.alloc([]const u8, total_overrides) catch return null;
     defer allocator.free(all_overrides);
@@ -121,6 +135,7 @@ pub fn serializeScene(
 
     var comp_offset: usize = 0;
     var sf_offset: usize = 0;
+    var mg_offset: usize = 0;
     for (objects[0..count], 0..) |*obj, i| {
         const t = obj.transform;
         const cc = obj.component_count;
@@ -159,8 +174,15 @@ pub fn serializeScene(
                     .source_file = s.sourceFile(),
                     .fields = sf_slice,
                 } };
+            } else if (c.* == .mesh_renderer) {
+                const mr = &c.mesh_renderer;
+                const n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                const mg_slice = all_material_guids[mg_offset .. mg_offset + n];
+                for (0..n) |mi| mg_slice[mi] = mr.materials[mi].slice();
+                mg_offset += n;
+                comp_slice[ci] = engineCompToScene(c, mg_slice);
             } else {
-                comp_slice[ci] = engineCompToScene(c);
+                comp_slice[ci] = engineCompToScene(c, &.{});
             }
         }
         comp_offset += cc;

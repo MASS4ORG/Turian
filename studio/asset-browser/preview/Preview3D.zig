@@ -38,7 +38,22 @@ pub fn meshNode(mesh_guid: []const u8, mat_guid: []const u8) engine.SceneNode {
     var n = engine.SceneNode{};
     var mr: engine.MeshRendererComponent = .{};
     mr.mesh.set(mesh_guid);
-    mr.material.set(mat_guid);
+    mr.materials[0].set(mat_guid);
+    mr.material_count = 1;
+    n.components[0] = .{ .mesh_renderer = mr };
+    n.component_count = 1;
+    return n;
+}
+
+/// Like `meshNode`, but binds one material per submesh — used for previewing
+/// multi-submesh models, where each primitive needs its own material.
+pub fn meshNodeMulti(mesh_guid: []const u8, mat_guids: []const []const u8) engine.SceneNode {
+    var n = engine.SceneNode{};
+    var mr: engine.MeshRendererComponent = .{};
+    mr.mesh.set(mesh_guid);
+    const count = @min(mat_guids.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+    for (mat_guids[0..count], 0..) |g, i| mr.materials[i].set(g);
+    mr.material_count = @intCast(count);
     n.components[0] = .{ .mesh_renderer = mr };
     n.component_count = 1;
     return n;
@@ -121,10 +136,11 @@ pub const Panel = struct {
 
 var model_panel: Panel = .{};
 
-/// Interactive model preview: the mesh with its resolved default material
-/// (mirrors the auto-assign logic in the mesh_renderer inspector field),
-/// auto-framed to its bounds, orbit-drag-to-look. Matches `LiveDrawFn`
-/// (`asset_path`, `guid`) so `PreviewSystem.drawLive` can call it directly.
+/// Interactive model preview: the mesh with its resolved default materials,
+/// one per submesh (mirrors the auto-assign logic in the mesh_renderer
+/// inspector field), auto-framed to its bounds, orbit-drag-to-look. Matches
+/// `LiveDrawFn` (`asset_path`, `guid`) so `PreviewSystem.drawLive` can call
+/// it directly.
 pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
     _ = asset_path;
     const bounds = MeshBounds.local(guid) orelse return;
@@ -136,11 +152,13 @@ pub fn drawPreview(asset_path: []const u8, guid: []const u8) void {
     const ext = engine.Vector3{ .x = bounds.max.x - bounds.min.x, .y = bounds.max.y - bounds.min.y, .z = bounds.max.z - bounds.min.z };
     const radius = @sqrt(ext.x * ext.x + ext.y * ext.y + ext.z * ext.z) * 0.5;
 
-    var mat_buf: [36]u8 = undefined;
-    const mat_guid = EditorState.modelPrimaryMaterial(gui.io, guid, &mat_buf) orelse engine.Material.presets[0].guid;
+    var mat_buf: [engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][36]u8 = undefined;
+    var mat_guids: [engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][]const u8 = undefined;
+    const n = EditorState.modelSubmeshMaterials(gui.io, guid, &mat_buf, &mat_guids);
 
     model_panel.ensureFramed(guid, center, if (radius > 0.001) radius else 0.5);
     const lights = keyFillLights();
-    const nodes = [_]engine.SceneNode{ lights[0], lights[1], meshNode(guid, mat_guid) };
+    const mesh_node = if (n > 0) meshNodeMulti(guid, mat_guids[0..n]) else meshNode(guid, engine.Material.presets[0].guid);
+    const nodes = [_]engine.SceneNode{ lights[0], lights[1], mesh_node };
     model_panel.draw(&nodes, 220);
 }

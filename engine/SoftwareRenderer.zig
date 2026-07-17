@@ -290,8 +290,20 @@ pub fn renderScene(io: std.Io, objects: []const engine.SceneNode) void {
                     break :path_blk getMesh(io, mp);
                 };
                 if (mesh_opt) |mesh| {
-                    const mat = resolveMaterial(comp.mesh_renderer.material.slice());
-                    renderMesh(mesh, obj, cam_pos, axes, f_val, aspect, lights[0..light_count], mat);
+                    const mr = &comp.mesh_renderer;
+                    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                    if (mesh.submeshes.len == 0) {
+                        const mat = resolveMaterial(if (mat_n > 0) mr.materials[0].slice() else "");
+                        renderMesh(mesh, obj, cam_pos, axes, f_val, aspect, lights[0..light_count], mat, 0, mesh.indices.len);
+                    } else {
+                        for (mesh.submeshes, 0..) |sm, si| {
+                            const mat_guid = if (si < mat_n) mr.materials[si].slice() else "";
+                            const mat = resolveMaterial(mat_guid);
+                            const start = sm.index_offset;
+                            const end = start + sm.index_count;
+                            renderMesh(mesh, obj, cam_pos, axes, f_val, aspect, lights[0..light_count], mat, start, end);
+                        }
+                    }
                 }
             }
         }
@@ -359,6 +371,8 @@ fn renderMesh(
     aspect: f32,
     lights: []const LightInfo,
     mat: ResolvedMaterial,
+    start: usize,
+    end: usize,
 ) void {
     const t = &obj.transform;
     const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
@@ -366,8 +380,8 @@ fn renderMesh(
         .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
     const rot_only = Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z);
 
-    var ii: usize = 0;
-    while (ii + 2 < mesh.indices.len) : (ii += 3) {
+    var ii: usize = start;
+    while (ii + 2 < end) : (ii += 3) {
         const ia = mesh.indices[ii];
         const ib = mesh.indices[ii + 1];
         const ic = mesh.indices[ii + 2];

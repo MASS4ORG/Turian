@@ -65,42 +65,50 @@ fn readFileArena(io: std.Io, arena: std.mem.Allocator, path: []const u8) ?[]u8 {
     return reader.interface.allocRemaining(arena, .unlimited) catch null;
 }
 
-/// Resolve the GUID of the material a model mesh should use by default — the
-/// material generated for the primitive's glTF material (falling back to the
-/// model's first generated material). Returns null for non-model meshes or
+/// Resolve the default material GUID for every submesh of a model mesh — the
+/// material generated for each primitive's glTF material — and write them
+/// positionally into `out` (backed by `buf` for the actual GUID string
+/// bytes; unset slots are empty slices). Returns the number of submeshes
+/// filled — 0 for non-model meshes, meshes with no cooked submesh table, or
 /// models without generated materials. Used to auto-assign a MeshRenderer's
-/// material when its mesh is set to a model.
-pub fn modelPrimaryMaterial(io: std.Io, mesh_guid_str: []const u8, buf: *[36]u8) ?[]const u8 {
-    if (mesh_guid_str.len == 0 or !State.assetDbReady()) return null;
-    const guid = editor.Guid.parse(mesh_guid_str) catch return null;
-    const info = EditorState.asset_db.findByGuid(guid) orelse return null;
-    if (info.asset_type != .model) return null;
+/// per-submesh materials when its mesh is set to a model.
+pub fn modelSubmeshMaterials(
+    io: std.Io,
+    mesh_guid_str: []const u8,
+    buf: *[engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][36]u8,
+    out: *[engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][]const u8,
+) usize {
+    if (mesh_guid_str.len == 0 or !State.assetDbReady()) return 0;
+    const guid = editor.Guid.parse(mesh_guid_str) catch return 0;
+    const info = EditorState.asset_db.findByGuid(guid) orelse return 0;
+    if (info.asset_type != .model) return 0;
+    const proj = EditorState.project_path orelse return 0;
 
     const meta = editor.asset_meta.readMeta(io, std.heap.page_allocator, info.path);
-    if (meta.sub_assets.len == 0) return null;
+    if (meta.sub_assets.len == 0) return 0;
 
-    // Prefer the material the first primitive references; else the first one.
-    var chosen: ?editor.Guid = null;
-    if (engine.assets.GltfLoader.firstMaterialIndex(info.path)) |idx| {
+    var art_buf: [1024]u8 = undefined;
+    const art_path = editor.asset_cache.artifactPath(proj, guid, .model, &art_buf) orelse return 0;
+    const bytes = std.Io.Dir.cwd().readFileAlloc(io, art_path, std.heap.page_allocator, .unlimited) catch return 0;
+    defer std.heap.page_allocator.free(bytes);
+
+    var mesh = engine.assets.Mesh.fromBytes(std.heap.page_allocator, bytes) catch return 0;
+    defer mesh.deinit();
+
+    const n = @min(mesh.submeshes.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+    for (mesh.submeshes[0..n], 0..) |sm, i| {
+        out[i] = &.{};
+        if (sm.material_slot < 0) continue;
         var key_buf: [32]u8 = undefined;
-        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{idx}) catch return null;
+        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{sm.material_slot}) catch continue;
         for (meta.sub_assets) |s| {
             if (s.asset_type == .material and std.mem.eql(u8, s.key, key)) {
-                chosen = s.guid;
+                out[i] = s.guid.toString(&buf[i]);
                 break;
             }
         }
     }
-    if (chosen == null) {
-        for (meta.sub_assets) |s| {
-            if (s.asset_type == .material) {
-                chosen = s.guid;
-                break;
-            }
-        }
-    }
-    const g = chosen orelse return null;
-    return g.toString(buf);
+    return n;
 }
 
 pub fn resolveObjectGuid(guid_str: []const u8) ?[]const u8 {
@@ -129,22 +137,33 @@ pub fn setProjectPath(path: []const u8) void {
     EditorState.project_path = EditorState.project_path_buf[0..len];
 }
 
-pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
+/// Rescan builtins/user-script components and event names, then return the
+/// project's `assets` dir path (written into `buf`), or null with no project
+/// open. Cheap — just parsing source files and directory entries, no asset
+/// hashing/cooking.
+fn scanComponentsAndEvents(io: std.Io, allocator: std.mem.Allocator, buf: []u8) ?[]const u8 {
     EditorState.asset_refresh_generation += 1;
     EditorState.discovered_count = 0;
     editor.scanner.populateBuiltins(&EditorState.discovered_components, &EditorState.discovered_count);
     EditorState.discovered_event_count = 0;
 
-    if (EditorState.project_path) |p| {
-        var path_buf: [1024]u8 = undefined;
-        const assets = std.fmt.bufPrint(&path_buf, "{s}/assets", .{p}) catch return;
-        editor.scanner.scanAssetsDir(io, allocator, assets, &EditorState.discovered_components, &EditorState.discovered_count);
-        editor.event_scanner.scanEventNames(io, allocator, assets, &EditorState.discovered_events, &EditorState.discovered_event_count);
+    const p = EditorState.project_path orelse return null;
+    const assets = std.fmt.bufPrint(buf, "{s}/assets", .{p}) catch return null;
+    editor.scanner.scanAssetsDir(io, allocator, assets, &EditorState.discovered_components, &EditorState.discovered_count);
+    editor.event_scanner.scanEventNames(io, allocator, assets, &EditorState.discovered_events, &EditorState.discovered_event_count);
+    return assets;
+}
 
+pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
+    var path_buf: [1024]u8 = undefined;
+    const assets = scanComponentsAndEvents(io, allocator, &path_buf);
+
+    if (EditorState.project_path) |p| {
+        const a = assets orelse return;
         if (EditorState.asset_db_initialized) EditorState.asset_db.deinit();
         EditorState.asset_db = editor.AssetDatabase.init(std.heap.page_allocator);
         EditorState.asset_db_initialized = true;
-        EditorState.asset_db.scan(io, assets);
+        EditorState.asset_db.scan(io, a);
 
         editor.asset_importer.importAll(io, std.heap.page_allocator, p, &EditorState.asset_db, editor.Progress.none);
 
@@ -159,6 +178,26 @@ pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
         // compiling, so the scene can be re-synced immediately.
         syncSceneWithDefinitions();
     }
+}
+
+/// Like `refreshComponents`, but defers the (slow) asset scan+cook pass to a
+/// background job instead of blocking, so the caller can present a frame
+/// immediately instead of a black window. `on_import_done` runs once the
+/// import lands in `EditorState.asset_db` — e.g. to restore scene tabs only
+/// once their assets are actually resolvable. Used only for the initial
+/// project-open path; every other caller of `refreshComponents` (asset
+/// rename/move/delete, hot-reload) still needs the fully up-to-date result
+/// before continuing, so they keep the synchronous version.
+pub fn refreshComponentsAsync(io: std.Io, allocator: std.mem.Allocator, on_import_done: ?*const fn () void) void {
+    var path_buf: [1024]u8 = undefined;
+    const assets = scanComponentsAndEvents(io, allocator, &path_buf) orelse return;
+    const p = EditorState.project_path orelse return;
+
+    const ImportJob = @import("ImportJob.zig");
+    ImportJob.launchImport(io, p, assets, on_import_done);
+
+    const ReflectJob = @import("ReflectJob.zig");
+    ReflectJob.launchReflect(io);
 }
 
 pub fn makeComponent(def: *const ComponentDef) ?Component {

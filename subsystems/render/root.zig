@@ -341,13 +341,7 @@ pub fn renderScene(
             const guid_str = comp.mesh_renderer.mesh.slice();
             if (guid_str.len == 0) continue;
             const gm = assets.findGpuMesh(guid_str) orelse continue;
-            if (gm.idx_count == 0) continue;
-
-            const mat_guid = comp.mesh_renderer.material.slice();
-            if (!std.mem.eql(u8, mat_guid, prev_mat)) {
-                engine.Profiler.countMaterialSwitch();
-                prev_mat = mat_guid;
-            }
+            if (gm.submesh_count == 0) continue;
 
             const t = &obj.transform;
             const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
@@ -358,47 +352,60 @@ pub fn renderScene(
             const vub = types.VertexUB{ .mvp = mvp.m, .model = mdl.m };
             c.SDL_PushGPUVertexUniformData(cmd, 0, &vub, @sizeOf(types.VertexUB));
 
-            const mat_res = assets.resolveMaterial(comp.mesh_renderer.material.slice());
-
-            const white = state.white_tex orelse continue;
-            const flat_n = state.flat_normal_tex orelse white;
-            const albedo_t = assets.pickTexture(mat_res.map(.albedo), white);
-            const mr_t = assets.pickTexture(mat_res.map(.mr), white);
-            const normal_t = assets.pickTexture(mat_res.map(.normal), flat_n);
-            const emis_t = assets.pickTexture(mat_res.map(.emissive), white);
-            const occ_t = assets.pickTexture(mat_res.map(.occlusion), white);
-
-            const receives = comp.mesh_renderer.receive_shadows and shadows_on;
-            const fub = types.FragUB{
-                .ambient_color = ambient,
-                .camera_pos = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
-                .base_color = mat_res.base_color,
-                .mr_ns_oc = .{ mat_res.metallic, mat_res.roughness, mat_res.normal_scale, mat_res.occlusion_strength },
-                .emissive = .{ mat_res.emissive[0], mat_res.emissive[1], mat_res.emissive[2], mat_res.emissive_strength },
-                .flags = .{ assets.present(albedo_t.found), assets.present(mr_t.found), assets.present(normal_t.found), assets.present(emis_t.found) },
-                .flags2 = .{ assets.present(occ_t.found), mat_res.alpha_cutoff, 0.0, assets.present(receives) },
-                .light_vp = light_vp.m,
-                .lights = lights,
-            };
-            c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-
-            const shadow_tex = state.shadow_map orelse white;
-            const shadow_smp = state.shadow_sampler orelse sampler;
-            const bindings = [_]c.SDL_GPUTextureSamplerBinding{
-                .{ .texture = albedo_t.tex, .sampler = sampler },
-                .{ .texture = mr_t.tex, .sampler = sampler },
-                .{ .texture = normal_t.tex, .sampler = sampler },
-                .{ .texture = emis_t.tex, .sampler = sampler },
-                .{ .texture = occ_t.tex, .sampler = sampler },
-                .{ .texture = shadow_tex, .sampler = shadow_smp },
-            };
-            c.SDL_BindGPUFragmentSamplers(pass, 0, &bindings, 6);
-
             c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
             c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
-            c.SDL_DrawGPUIndexedPrimitives(pass, gm.idx_count, 1, 0, 0, 0);
-            // Every mesh binds samplers, so this draw always counts as textured.
-            engine.Profiler.countDraw(gm.idx_count / 3, gm.idx_count, true);
+
+            const mr = &comp.mesh_renderer;
+            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+            const receives = mr.receive_shadows and shadows_on;
+
+            for (gm.submeshes[0..gm.submesh_count], 0..) |sm, si| {
+                if (sm.index_count == 0) continue;
+                const mat_guid = if (si < mat_n) mr.materials[si].slice() else "";
+                if (!std.mem.eql(u8, mat_guid, prev_mat)) {
+                    engine.Profiler.countMaterialSwitch();
+                    prev_mat = mat_guid;
+                }
+
+                const mat_res = assets.resolveMaterial(mat_guid);
+
+                const white = state.white_tex orelse continue;
+                const flat_n = state.flat_normal_tex orelse white;
+                const albedo_t = assets.pickTexture(mat_res.map(.albedo), white);
+                const mr_t = assets.pickTexture(mat_res.map(.mr), white);
+                const normal_t = assets.pickTexture(mat_res.map(.normal), flat_n);
+                const emis_t = assets.pickTexture(mat_res.map(.emissive), white);
+                const occ_t = assets.pickTexture(mat_res.map(.occlusion), white);
+
+                const fub = types.FragUB{
+                    .ambient_color = ambient,
+                    .camera_pos = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
+                    .base_color = mat_res.base_color,
+                    .mr_ns_oc = .{ mat_res.metallic, mat_res.roughness, mat_res.normal_scale, mat_res.occlusion_strength },
+                    .emissive = .{ mat_res.emissive[0], mat_res.emissive[1], mat_res.emissive[2], mat_res.emissive_strength },
+                    .flags = .{ assets.present(albedo_t.found), assets.present(mr_t.found), assets.present(normal_t.found), assets.present(emis_t.found) },
+                    .flags2 = .{ assets.present(occ_t.found), mat_res.alpha_cutoff, 0.0, assets.present(receives) },
+                    .light_vp = light_vp.m,
+                    .lights = lights,
+                };
+                c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
+
+                const shadow_tex = state.shadow_map orelse white;
+                const shadow_smp = state.shadow_sampler orelse sampler;
+                const bindings = [_]c.SDL_GPUTextureSamplerBinding{
+                    .{ .texture = albedo_t.tex, .sampler = sampler },
+                    .{ .texture = mr_t.tex, .sampler = sampler },
+                    .{ .texture = normal_t.tex, .sampler = sampler },
+                    .{ .texture = emis_t.tex, .sampler = sampler },
+                    .{ .texture = occ_t.tex, .sampler = sampler },
+                    .{ .texture = shadow_tex, .sampler = shadow_smp },
+                };
+                c.SDL_BindGPUFragmentSamplers(pass, 0, &bindings, 6);
+
+                c.SDL_DrawGPUIndexedPrimitives(pass, sm.index_count, 1, sm.index_offset, 0, 0);
+                // Every mesh binds samplers, so this draw always counts as textured.
+                engine.Profiler.countDraw(sm.index_count / 3, sm.index_count, true);
+            }
         }
     }
 

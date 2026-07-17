@@ -21,7 +21,8 @@ const log = std.log.scoped(.asset_importer);
 const VERSION_IMAGE: u32 = 1;
 // v2: generate materials + extract textures from glTF/GLB into sub-assets.
 // v3: cook geometry into the canonical binary mesh format.
-const VERSION_MODEL: u32 = 3;
+// v4: cook every mesh/primitive (submesh table) instead of only the first.
+const VERSION_MODEL: u32 = 4;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 

@@ -1,8 +1,11 @@
 /// glTF 2.0 / GLB loader backed by cgltf (single-header C library).
-/// Loads the first mesh's first primitive: positions, normals, UVs, indices.
+/// Cooks every mesh/primitive in the file into one combined mesh: vertices
+/// and indices from all primitives are concatenated, and each primitive
+/// becomes a `Submesh` range bound to its glTF material index.
 const std = @import("std");
 const Mesh = @import("Mesh.zig").Mesh;
 const Vertex = @import("Mesh.zig").Vertex;
+const Submesh = @import("Mesh.zig").Submesh;
 
 const CgltfMeshData = extern struct {
     positions: [*]f32,
@@ -16,11 +19,17 @@ const CgltfMeshData = extern struct {
     material_index: c_int,
 };
 
-extern fn cgltf_wrap_load(path: [*:0]const u8, out: *CgltfMeshData) c_int;
-extern fn cgltf_wrap_free(data: *CgltfMeshData) void;
+const CgltfMultiMeshData = extern struct {
+    primitives: ?[*]CgltfMeshData,
+    primitive_count: u32,
+};
 
-/// Load the first mesh primitive from a glTF 2.0 / GLB file.
-/// Allocates vertex and index storage via `allocator`; the caller owns the Mesh.
+extern fn cgltf_wrap_load_all(path: [*:0]const u8, out: *CgltfMultiMeshData) c_int;
+extern fn cgltf_wrap_free_all(data: *CgltfMultiMeshData) void;
+
+/// Load every mesh/primitive from a glTF 2.0 / GLB file into one combined
+/// mesh with a submesh table. Allocates vertex, index, and submesh storage
+/// via `allocator`; the caller owns the Mesh.
 pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     _ = io;
 
@@ -29,72 +38,83 @@ pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     @memcpy(path_buf[0..path.len], path);
     path_buf[path.len] = 0;
 
-    var raw: CgltfMeshData = undefined;
-    if (cgltf_wrap_load(@ptrCast(&path_buf), &raw) != 0)
+    var raw: CgltfMultiMeshData = undefined;
+    if (cgltf_wrap_load_all(@ptrCast(&path_buf), &raw) != 0)
         return error.GltfLoadFailed;
-    defer cgltf_wrap_free(&raw);
+    defer cgltf_wrap_free_all(&raw);
 
-    const vcount = raw.vertex_count;
-    const icount = raw.index_count;
+    const prims = raw.primitives.?[0..raw.primitive_count];
 
-    var verts = try allocator.alloc(Vertex, vcount);
-    errdefer allocator.free(verts);
-
-    for (0..vcount) |i| {
-        const p = raw.positions;
-        var nx: f32 = 0;
-        var ny: f32 = 1;
-        var nz: f32 = 0;
-        if (raw.has_normals != 0) {
-            const n = raw.normals.?;
-            nx = n[i * 3 + 0];
-            ny = n[i * 3 + 1];
-            nz = n[i * 3 + 2];
-        }
-        var u: f32 = 0;
-        var v: f32 = 0;
-        if (raw.has_uvs != 0) {
-            const uv = raw.uvs.?;
-            u = uv[i * 2 + 0];
-            v = uv[i * 2 + 1];
-        }
-        verts[i] = .{
-            .px = p[i * 3 + 0],
-            .py = p[i * 3 + 1],
-            .pz = p[i * 3 + 2],
-            .nx = nx,
-            .ny = ny,
-            .nz = nz,
-            .u = u,
-            .v = v,
-        };
+    var total_v: usize = 0;
+    var total_i: usize = 0;
+    for (prims) |p| {
+        total_v += p.vertex_count;
+        total_i += p.index_count;
     }
 
-    const indices = try allocator.alloc(u32, icount);
+    var verts = try allocator.alloc(Vertex, total_v);
+    errdefer allocator.free(verts);
+    var indices = try allocator.alloc(u32, total_i);
     errdefer allocator.free(indices);
-    @memcpy(indices, raw.indices[0..icount]);
+    var subs = try allocator.alloc(Submesh, prims.len);
+    errdefer allocator.free(subs);
 
-    if (raw.has_normals == 0) computeFlatNormals(verts, indices);
+    var vbase: usize = 0;
+    var ibase: usize = 0;
+    for (prims, 0..) |p, si| {
+        const vcount = p.vertex_count;
+        const icount = p.index_count;
 
-    var mesh = Mesh{ .vertices = verts, .indices = indices, .allocator = allocator };
+        for (0..vcount) |i| {
+            const pos = p.positions;
+            var nx: f32 = 0;
+            var ny: f32 = 1;
+            var nz: f32 = 0;
+            if (p.has_normals != 0) {
+                const n = p.normals.?;
+                nx = n[i * 3 + 0];
+                ny = n[i * 3 + 1];
+                nz = n[i * 3 + 2];
+            }
+            var u: f32 = 0;
+            var v: f32 = 0;
+            if (p.has_uvs != 0) {
+                const uv = p.uvs.?;
+                u = uv[i * 2 + 0];
+                v = uv[i * 2 + 1];
+            }
+            verts[vbase + i] = .{
+                .px = pos[i * 3 + 0],
+                .py = pos[i * 3 + 1],
+                .pz = pos[i * 3 + 2],
+                .nx = nx,
+                .ny = ny,
+                .nz = nz,
+                .u = u,
+                .v = v,
+            };
+        }
+
+        const prim_verts = verts[vbase .. vbase + vcount];
+        const local_indices = p.indices[0..icount];
+        if (p.has_normals == 0) computeFlatNormals(prim_verts, local_indices);
+
+        const prim_indices = indices[ibase .. ibase + icount];
+        for (0..icount) |i| prim_indices[i] = local_indices[i] + @as(u32, @intCast(vbase));
+
+        subs[si] = .{
+            .index_offset = @intCast(ibase),
+            .index_count = icount,
+            .material_slot = p.material_index,
+        };
+
+        vbase += vcount;
+        ibase += icount;
+    }
+
+    var mesh = Mesh{ .vertices = verts, .indices = indices, .submeshes = subs, .allocator = allocator };
     mesh.computeBounds();
     return mesh;
-}
-
-/// Index of the material the first mesh/primitive references, or null if the
-/// model assigns no material. Used by the importer to bind an imported mesh to
-/// its generated material.
-pub fn firstMaterialIndex(path: []const u8) ?u32 {
-    var path_buf: [512]u8 = undefined;
-    if (path.len >= path_buf.len) return null;
-    @memcpy(path_buf[0..path.len], path);
-    path_buf[path.len] = 0;
-
-    var raw: CgltfMeshData = undefined;
-    if (cgltf_wrap_load(@ptrCast(&path_buf), &raw) != 0) return null;
-    defer cgltf_wrap_free(&raw);
-    if (raw.material_index < 0) return null;
-    return @intCast(raw.material_index);
 }
 
 // ── Material / image extraction ────────────────────────────────────────────────

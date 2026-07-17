@@ -4,23 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-int cgltf_wrap_load(const char* path, CgltfMeshData* out) {
-    cgltf_options opts;
-    memset(&opts, 0, sizeof(opts));
-    cgltf_data* data = NULL;
-
-    if (cgltf_parse_file(&opts, path, &data) != cgltf_result_success) return 1;
-    if (cgltf_load_buffers(&opts, data, path) != cgltf_result_success) {
-        cgltf_free(data);
-        return 2;
-    }
-    if (data->meshes_count == 0 || data->meshes[0].primitives_count == 0) {
-        cgltf_free(data);
-        return 3;
-    }
-
-    cgltf_primitive* prim = &data->meshes[0].primitives[0];
-
+/* Extracts one primitive's geometry into `out`. Returns 0 on success, nonzero
+   if the primitive has no POSITION attribute or an allocation fails. */
+static int load_primitive(cgltf_data* data, cgltf_primitive* prim, CgltfMeshData* out) {
     cgltf_accessor* pos_acc  = NULL;
     cgltf_accessor* norm_acc = NULL;
     cgltf_accessor* uv_acc   = NULL;
@@ -35,7 +21,7 @@ int cgltf_wrap_load(const char* path, CgltfMeshData* out) {
             uv_acc = attr->data;
     }
 
-    if (!pos_acc) { cgltf_free(data); return 4; }
+    if (!pos_acc) return 4;
 
     uint32_t vcount = (uint32_t)pos_acc->count;
     uint32_t icount = prim->indices ? (uint32_t)prim->indices->count : vcount;
@@ -47,7 +33,6 @@ int cgltf_wrap_load(const char* path, CgltfMeshData* out) {
 
     if (!positions || !indices) {
         free(positions); free(normals); free(uvs); free(indices);
-        cgltf_free(data);
         return 5;
     }
 
@@ -71,8 +56,6 @@ int cgltf_wrap_load(const char* path, CgltfMeshData* out) {
     if (prim->material && data->materials_count > 0)
         material_index = (int)(prim->material - data->materials);
 
-    cgltf_free(data);
-
     out->positions      = positions;
     out->normals        = normals;
     out->uvs            = uvs;
@@ -85,16 +68,68 @@ int cgltf_wrap_load(const char* path, CgltfMeshData* out) {
     return 0;
 }
 
-void cgltf_wrap_free(CgltfMeshData* data) {
-    if (!data) return;
+static void free_primitive(CgltfMeshData* data) {
     free(data->positions);
     free(data->normals);
     free(data->uvs);
     free(data->indices);
-    data->positions = NULL;
-    data->normals   = NULL;
-    data->uvs       = NULL;
-    data->indices   = NULL;
+}
+
+int cgltf_wrap_load_all(const char* path, CgltfMultiMeshData* out) {
+    memset(out, 0, sizeof(*out));
+
+    cgltf_options opts;
+    memset(&opts, 0, sizeof(opts));
+    cgltf_data* data = NULL;
+
+    if (cgltf_parse_file(&opts, path, &data) != cgltf_result_success) return 1;
+    if (cgltf_load_buffers(&opts, data, path) != cgltf_result_success) {
+        cgltf_free(data);
+        return 2;
+    }
+
+    uint32_t total = 0;
+    for (cgltf_size mi = 0; mi < data->meshes_count; mi++)
+        total += (uint32_t)data->meshes[mi].primitives_count;
+    if (total == 0) {
+        cgltf_free(data);
+        return 3;
+    }
+
+    CgltfMeshData* prims = (CgltfMeshData*)calloc(total, sizeof(CgltfMeshData));
+    if (!prims) {
+        cgltf_free(data);
+        return 5;
+    }
+
+    uint32_t count = 0;
+    for (cgltf_size mi = 0; mi < data->meshes_count; mi++) {
+        cgltf_mesh* mesh = &data->meshes[mi];
+        for (cgltf_size pi = 0; pi < mesh->primitives_count; pi++) {
+            if (load_primitive(data, &mesh->primitives[pi], &prims[count]) == 0)
+                count++;
+        }
+    }
+
+    cgltf_free(data);
+
+    if (count == 0) {
+        free(prims);
+        return 4;
+    }
+
+    out->primitives = prims;
+    out->primitive_count = count;
+    return 0;
+}
+
+void cgltf_wrap_free_all(CgltfMultiMeshData* out) {
+    if (!out || !out->primitives) return;
+    for (uint32_t i = 0; i < out->primitive_count; i++)
+        free_primitive(&out->primitives[i]);
+    free(out->primitives);
+    out->primitives = NULL;
+    out->primitive_count = 0;
 }
 
 /* ── Materials & images ──────────────────────────────────────────────────── */

@@ -30,6 +30,7 @@ pub const SceneTreeOps = @import("SceneTreeOps.zig");
 pub const DebugMutations = @import("DebugMutations.zig");
 pub const AssetResolution = @import("AssetResolution.zig");
 pub const ReflectJob = @import("ReflectJob.zig");
+pub const ImportJob = @import("ImportJob.zig");
 pub const PrefabOps = @import("PrefabOps.zig");
 pub const State = @import("State.zig");
 
@@ -76,6 +77,10 @@ pub var reflect_generation: usize = 0;
 pub var reflect_job: ?*ReflectJob.ReflectJob = null;
 pub var reflect_future: std.Io.Future(void) = undefined;
 pub var reflect_pending: ?*ReflectJob.ReflectJob = null;
+pub var import_generation: usize = 0;
+pub var import_job: ?*ImportJob.ImportJob = null;
+pub var import_future: std.Io.Future(void) = undefined;
+pub var import_pending: ?*ImportJob.ImportJob = null;
 pub var active_browse_dir_buf: [1024]u8 = undefined;
 pub var active_browse_dir_len: usize = 0;
 pub var asset_db_initialized: bool = false;
@@ -163,11 +168,12 @@ pub const debugSetTransform = DebugMutations.debugSetTransform;
 
 pub const resolveAssetGuid = AssetResolution.resolveAssetGuid;
 pub const firstScenePath = AssetResolution.firstScenePath;
-pub const modelPrimaryMaterial = AssetResolution.modelPrimaryMaterial;
+pub const modelSubmeshMaterials = AssetResolution.modelSubmeshMaterials;
 pub const resolveObjectGuid = AssetResolution.resolveObjectGuid;
 pub const dragAssetGuidStr = AssetResolution.dragAssetGuidStr;
 pub const setProjectPath = AssetResolution.setProjectPath;
 pub const refreshComponents = AssetResolution.refreshComponents;
+pub const refreshComponentsAsync = AssetResolution.refreshComponentsAsync;
 pub const makeComponent = AssetResolution.makeComponent;
 pub const syncSceneWithDefinitions = AssetResolution.syncSceneWithDefinitions;
 
@@ -179,6 +185,15 @@ pub const runReflectJob = ReflectJob.runReflectJob;
 pub const finishReflect = ReflectJob.finishReflect;
 pub const pumpReflect = ReflectJob.pumpReflect;
 pub const waitForReflect = ReflectJob.waitForReflect;
+
+// ── Import job operations ─────────────────────────────────────────────────
+
+pub const launchImport = ImportJob.launchImport;
+pub const dispatchImport = ImportJob.dispatchImport;
+pub const runImportJob = ImportJob.runImportJob;
+pub const finishImport = ImportJob.finishImport;
+pub const pumpImport = ImportJob.pumpImport;
+pub const waitForImport = ImportJob.waitForImport;
 
 // ── Prefab operations ──────────────────────────────────────────────────────
 

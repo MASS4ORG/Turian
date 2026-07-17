@@ -280,7 +280,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "00000000-0000-4000-8000-000000000104"
+            "material_guids": ["00000000-0000-4000-8000-000000000104"]
           }
         }
       ],
@@ -316,7 +316,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "51029215-952f-466e-ae31-65d167bc85a6"
+            "material_guids": ["51029215-952f-466e-ae31-65d167bc85a6"]
           }
         },
         {
@@ -359,7 +359,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "00495134-ce8a-406d-bdcc-71310b6e5830"
+            "material_guids": ["00495134-ce8a-406d-bdcc-71310b6e5830"]
           }
         },
         {
@@ -558,7 +558,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "00000000-0000-4000-8000-000000000103"
+            "material_guids": ["00000000-0000-4000-8000-000000000103"]
           }
         }
       ],
@@ -594,7 +594,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "00000000-0000-4000-8000-000000000103"
+            "material_guids": ["00000000-0000-4000-8000-000000000103"]
           }
         },
         {
@@ -672,7 +672,7 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guid": "51029215-952f-466e-ae31-65d167bc85a6"
+            "material_guids": ["51029215-952f-466e-ae31-65d167bc85a6"]
           }
         },
         {

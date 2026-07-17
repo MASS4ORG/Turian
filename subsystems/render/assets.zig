@@ -113,7 +113,9 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
             if (comp.* != .mesh_renderer) continue;
             const guid = comp.mesh_renderer.mesh.slice();
             if (guid.len == 0) continue;
-            uploadMaterialTextures(cmd, dev, comp.mesh_renderer.material.slice());
+            const mr = &comp.mesh_renderer;
+            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+            for (mr.materials[0..mat_n]) |*mat_ref| uploadMaterialTextures(cmd, dev, mat_ref.slice());
 
             if (findGpuMesh(guid) != null or state.mesh_count >= state.MAX_MESHES) continue;
             uploadMesh(cmd, dev, guid) catch {
@@ -122,6 +124,7 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
                 state.mesh_count += 1;
                 gm.key_len = setKey(&gm.key, guid);
                 gm.idx_count = 0;
+                gm.submesh_count = 0;
             };
         }
     }
@@ -206,6 +209,16 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.vtx_buf = vtx_buf;
     gm.idx_buf = idx_buf;
     gm.idx_count = @intCast(cpu.indices.len);
+
+    if (cpu.submeshes.len == 0) {
+        gm.submeshes[0] = .{ .index_offset = 0, .index_count = gm.idx_count };
+        gm.submesh_count = 1;
+    } else {
+        const n = @min(cpu.submeshes.len, state.MAX_SUBMESHES);
+        for (cpu.submeshes[0..n], 0..) |sm, i|
+            gm.submeshes[i] = .{ .index_offset = sm.index_offset, .index_count = sm.index_count };
+        gm.submesh_count = @intCast(n);
+    }
 }
 
 /// Upload a texture (RGBA8 or block-compressed, with mips) and cache it by GUID.

@@ -443,10 +443,12 @@ fn run(main_init: std.process.Init) !void {
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
                     defer cfg_arena.deinit();
                     const config = editor.sdk_layout.resolveBuildConfig(gui.io, cfg_arena.allocator(), main_init.environ_map, baked);
-                    // openProject above kicked off the script-reflection
-                    // compile in the background; this CLI path needs fully
-                    // populated component fields before building, so wait
-                    // for it here instead of racing it.
+                    // openProject above kicked off asset import and
+                    // script-reflection compile in the background; this CLI
+                    // path needs a fully-cooked cache and populated component
+                    // fields before building, so wait for both here instead
+                    // of racing them.
+                    EditorState.waitForImport(gui.io);
                     EditorState.waitForReflect(gui.io);
                     _ = editor.GameBuild.buildGame(
                         gui.io,

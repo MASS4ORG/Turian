@@ -12,7 +12,7 @@
         "scale": { "x": 1, "y": 1, "z": 1 }
       },
       "components": [
-        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guid": "00000000-0000-4000-8000-000000000103" } }
+        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guids": ["00000000-0000-4000-8000-000000000103"] } }
       ]
     },
     {
@@ -26,7 +26,7 @@
         "scale": { "x": 8, "y": 0.1, "z": 8 }
       },
       "components": [
-        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guid": "00000000-0000-4000-8000-000000000104" } }
+        { "mesh_renderer": { "cast_shadows": true, "receive_shadows": true, "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa", "material_guids": ["00000000-0000-4000-8000-000000000104"] } }
       ]
     }
   ]
