@@ -57,6 +57,7 @@ fn configFromSdk(io: std.Io, gpa: std.mem.Allocator, sdk_root: []const u8) GameB
         .engine_root = p.join(gpa, sdk_root, "engine/root.zig"),
         .editor_root = p.join(gpa, sdk_root, "editor/root.zig"),
         .cgltf_wrap_c = p.join(gpa, sdk_root, "engine/vendor/cgltf_wrap.c"),
+        .fbx_wrap_c = p.join(gpa, sdk_root, "engine/vendor/fbx_wrap.c"),
         .vendor_include = p.join(gpa, sdk_root, "engine/vendor"),
         .build_root = gpa.dupe(u8, sdk_root) catch sdk_root,
         .sdl3_lib = sdl3_lib,
@@ -87,6 +88,7 @@ fn applyEnvOverrides(cfg: *GameBuild.BuildConfig, environ: *const std.process.En
     if (environ.get("TURIAN_ENGINE_ROOT")) |v| cfg.engine_root = v;
     if (environ.get("TURIAN_EDITOR_ROOT")) |v| cfg.editor_root = v;
     if (environ.get("TURIAN_CGLTF_WRAP_C")) |v| cfg.cgltf_wrap_c = v;
+    if (environ.get("TURIAN_FBX_WRAP_C")) |v| cfg.fbx_wrap_c = v;
     if (environ.get("TURIAN_VENDOR_INCLUDE")) |v| cfg.vendor_include = v;
     if (environ.get("TURIAN_BUILD_ROOT")) |v| cfg.build_root = v;
     if (environ.get("TURIAN_SDL3_LIB")) |v| cfg.sdl3_lib = v;

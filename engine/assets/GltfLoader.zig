@@ -6,6 +6,12 @@ const std = @import("std");
 const Mesh = @import("Mesh.zig").Mesh;
 const Vertex = @import("Mesh.zig").Vertex;
 const Submesh = @import("Mesh.zig").Submesh;
+const model_info = @import("ModelInfo.zig");
+pub const ModelInfo = model_info.ModelInfo;
+pub const MaterialInfo = model_info.MaterialInfo;
+pub const ImageInfo = model_info.ImageInfo;
+pub const TexRef = model_info.TexRef;
+pub const AlphaMode = model_info.AlphaMode;
 
 const CgltfMeshData = extern struct {
     positions: [*]f32,
@@ -97,7 +103,7 @@ pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
 
         const prim_verts = verts[vbase .. vbase + vcount];
         const local_indices = p.indices[0..icount];
-        if (p.has_normals == 0) computeFlatNormals(prim_verts, local_indices);
+        if (p.has_normals == 0) Mesh.computeFlatNormals(prim_verts, local_indices);
 
         const prim_indices = indices[ibase .. ibase + icount];
         for (0..icount) |i| prim_indices[i] = local_indices[i] + @as(u32, @intCast(vbase));
@@ -165,68 +171,6 @@ const CgltfModelData = extern struct {
 
 extern fn cgltf_wrap_load_model(path: [*:0]const u8, out: *CgltfModelData) c_int;
 extern fn cgltf_wrap_free_model(out: *CgltfModelData) void;
-
-/// glTF alpha rendering mode (matches the metallic-roughness model).
-pub const AlphaMode = enum { @"opaque", mask, blend };
-
-/// A reference from a material slot to one of the model's images.
-pub const TexRef = struct {
-    /// Index into `ModelInfo.images`, or null when this slot binds no texture.
-    image_index: ?u32 = null,
-    /// Texcoord set (TEXCOORD_n) the slot samples; usually 0.
-    uv_set: u32 = 0,
-};
-
-/// A glTF material flattened to the metallic-roughness model. Strings/refs are
-/// owned by the parent `ModelInfo`.
-pub const MaterialInfo = struct {
-    name: []const u8,
-    base_color: [4]f32,
-    metallic: f32,
-    roughness: f32,
-    emissive: [3]f32,
-    emissive_strength: f32,
-    normal_scale: f32,
-    occlusion_strength: f32,
-    alpha_mode: AlphaMode,
-    alpha_cutoff: f32,
-    double_sided: bool,
-    albedo: TexRef,
-    metallic_roughness: TexRef,
-    normal: TexRef,
-    /// Emissive texture (distinct from the `emissive` colour factor above).
-    emissive_map: TexRef,
-    occlusion: TexRef,
-};
-
-/// A glTF image: either an external file (`uri` non-empty) or embedded bytes
-/// (`data` non-empty). Owned by the parent `ModelInfo`.
-pub const ImageInfo = struct {
-    name: []const u8,
-    /// External relative path; empty when the image is embedded.
-    uri: []const u8,
-    /// MIME type (e.g. "image/png"); set for embedded images.
-    mime_type: []const u8,
-    /// Embedded image bytes; empty when the image is external.
-    data: []const u8,
-
-    /// True when the image is embedded (carries its own bytes).
-    pub fn isEmbedded(self: ImageInfo) bool {
-        return self.data.len > 0;
-    }
-};
-
-/// A glTF model's materials and images. All strings and byte buffers are owned
-/// by `arena`; call `deinit` to release them.
-pub const ModelInfo = struct {
-    materials: []MaterialInfo,
-    images: []ImageInfo,
-    arena: std.heap.ArenaAllocator,
-
-    pub fn deinit(self: *ModelInfo) void {
-        self.arena.deinit();
-    }
-};
 
 fn cStr(buf: []const u8) []const u8 {
     const end = std.mem.indexOfScalar(u8, buf, 0) orelse buf.len;
@@ -354,34 +298,4 @@ test "loadModelInfo extracts metallic-roughness material and external image" {
     const img = info.images[0];
     try std.testing.expectEqualStrings("albedo.png", img.uri);
     try std.testing.expect(!img.isEmbedded());
-}
-
-fn computeFlatNormals(verts: []Vertex, idxs: []const u32) void {
-    var i: usize = 0;
-    while (i + 2 < idxs.len) : (i += 3) {
-        const a = idxs[i];
-        const b = idxs[i + 1];
-        const c = idxs[i + 2];
-        if (a >= verts.len or b >= verts.len or c >= verts.len) continue;
-        const va = verts[a];
-        const vb = verts[b];
-        const vc = verts[c];
-        const e1 = [3]f32{ vb.px - va.px, vb.py - va.py, vb.pz - va.pz };
-        const e2 = [3]f32{ vc.px - va.px, vc.py - va.py, vc.pz - va.pz };
-        const nx = e1[1] * e2[2] - e1[2] * e2[1];
-        const ny = e1[2] * e2[0] - e1[0] * e2[2];
-        const nz = e1[0] * e2[1] - e1[1] * e2[0];
-        const len = @sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1e-9) continue;
-        const nn = [3]f32{ nx / len, ny / len, nz / len };
-        verts[a].nx = nn[0];
-        verts[a].ny = nn[1];
-        verts[a].nz = nn[2];
-        verts[b].nx = nn[0];
-        verts[b].ny = nn[1];
-        verts[b].nz = nn[2];
-        verts[c].nx = nn[0];
-        verts[c].ny = nn[1];
-        verts[c].nz = nn[2];
-    }
 }

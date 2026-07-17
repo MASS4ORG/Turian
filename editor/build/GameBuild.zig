@@ -144,6 +144,7 @@ fn buildGameInner(
         .engine_root = try codegen.normPath(a, config.engine_root),
         .editor_root = try codegen.normPath(a, config.editor_root),
         .cgltf_wrap_c = try codegen.normPath(a, config.cgltf_wrap_c),
+        .fbx_wrap_c = try codegen.normPath(a, config.fbx_wrap_c),
         .vendor_include = try codegen.normPath(a, config.vendor_include),
         .build_root = try codegen.normPath(a, config.build_root),
         .sdl3_lib = try codegen.normPath(a, config.sdl3_lib),

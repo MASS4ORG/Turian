@@ -38,6 +38,7 @@ pub fn build(b: *std.Build) void {
     engine_mod.link_libc = true;
     engine_mod.addIncludePath(b.path("engine/vendor"));
     engine_mod.addCSourceFile(.{ .file = b.path("engine/vendor/cgltf_wrap.c"), .flags = &.{"-std=c99"} });
+    engine_mod.addCSourceFile(.{ .file = b.path("engine/vendor/fbx_wrap.c"), .flags = &.{"-std=c99"} });
     engine_mod.addImport("math", math3d_mod);
     engine_mod.addImport("open_asset_package", oap_mod);
     engine_mod.addImport("serde", serde_mod);
@@ -129,6 +130,7 @@ pub fn build(b: *std.Build) void {
     turian_opts.addOption([]const u8, "engine_root_path", b.pathJoin(&.{ build_root, "engine", "root.zig" }));
     turian_opts.addOption([]const u8, "editor_root_path", b.pathJoin(&.{ build_root, "editor", "root.zig" }));
     turian_opts.addOption([]const u8, "cgltf_wrap_c_path", b.pathJoin(&.{ build_root, "engine", "vendor", "cgltf_wrap.c" }));
+    turian_opts.addOption([]const u8, "fbx_wrap_c_path", b.pathJoin(&.{ build_root, "engine", "vendor", "fbx_wrap.c" }));
     turian_opts.addOption([]const u8, "vendor_include_path", b.pathJoin(&.{ build_root, "engine", "vendor" }));
     turian_opts.addOption([]const u8, "build_root_path", build_root);
     turian_opts.addOption([]const u8, "version", version_str);
@@ -257,6 +259,7 @@ pub fn build(b: *std.Build) void {
     engine_test_mod.addIncludePath(b.path("engine/vendor"));
     engine_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/stb_image.c"), .flags = &.{"-std=c99"} });
     engine_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/cgltf_wrap.c"), .flags = &.{"-std=c99"} });
+    engine_test_mod.addCSourceFile(.{ .file = b.path("engine/vendor/fbx_wrap.c"), .flags = &.{"-std=c99"} });
     const engine_tests = b.addTest(.{ .root_module = engine_test_mod });
     const editor_tests = b.addTest(.{ .root_module = editor_mod });
 

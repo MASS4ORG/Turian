@@ -64,9 +64,10 @@ pub fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []
             "    engine_mod.link_libc = true;\n" ++
             "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addImport(\"math\", math_mod);\n" ++
             "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
-        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c },
+        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.fbx_wrap_c },
     ));
     if (!uses_ui) {
         // stb_image implementation — needed for material texture decoding.
@@ -367,6 +368,7 @@ test "generateBuildZig emits native lib linking" {
         .engine_root = "/e/root.zig",
         .editor_root = "/ed/root.zig",
         .cgltf_wrap_c = "/v/cgltf.c",
+        .fbx_wrap_c = "/v/fbx.c",
         .vendor_include = "/v",
         .build_root = "/r",
         .sdl3_lib = "",
@@ -403,6 +405,7 @@ test "generateBuildZig emits source package modules and wires them into scripts"
         .engine_root = "/e/root.zig",
         .editor_root = "/ed/root.zig",
         .cgltf_wrap_c = "/v/cgltf.c",
+        .fbx_wrap_c = "/v/fbx.c",
         .vendor_include = "/v",
         .build_root = "/r",
         .sdl3_lib = "",
@@ -445,6 +448,7 @@ test "generateBuildZig emits shared lib link by name" {
         .engine_root = "/e/root.zig",
         .editor_root = "/ed/root.zig",
         .cgltf_wrap_c = "/v/cgltf.c",
+        .fbx_wrap_c = "/v/fbx.c",
         .vendor_include = "/v",
         .build_root = "/r",
         .sdl3_lib = "",

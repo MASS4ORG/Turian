@@ -6,7 +6,16 @@ pub const TextureFormat = @import("Texture.zig").Format;
 pub const TextureMip = @import("Texture.zig").Mip;
 pub const ObjLoader = @import("ObjLoader.zig");
 pub const GltfLoader = @import("GltfLoader.zig");
+pub const FbxLoader = @import("FbxLoader.zig");
 pub const ImageLoader = @import("ImageLoader.zig");
+
+// ── Model info (materials/images shared by glTF/FBX loaders) ─────────────────
+const model_info = @import("ModelInfo.zig");
+pub const ModelInfo = model_info.ModelInfo;
+pub const MaterialInfo = model_info.MaterialInfo;
+pub const ImageInfo = model_info.ImageInfo;
+pub const TexRef = model_info.TexRef;
+pub const AlphaMode = model_info.AlphaMode;
 
 // ── Materials & shaders ───────────────────────────────────────────────────────
 pub const shader = @import("Shader.zig");
@@ -50,11 +59,12 @@ pub const LooseFileProvider = @import("LooseFileProvider.zig");
 pub const OapProvider = @import("OapProvider.zig");
 pub const AssetServer = @import("AssetServer.zig");
 
-/// Load a mesh from a file path. Supports .obj, .gltf, and .glb formats.
+/// Load a mesh from a file path. Supports .obj, .gltf, .glb, and .fbx formats.
 pub fn loadMesh(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     const ext = std.fs.path.extension(path);
     if (ascii_ieql(ext, ".obj")) return ObjLoader.load(allocator, io, path);
     if (ascii_ieql(ext, ".gltf") or ascii_ieql(ext, ".glb")) return GltfLoader.load(allocator, io, path);
+    if (ascii_ieql(ext, ".fbx")) return FbxLoader.load(allocator, io, path);
     return error.UnsupportedMeshFormat;
 }
 
@@ -88,3 +98,7 @@ fn ascii_ieql(a: []const u8, b: []const u8) bool {
 }
 
 const std = @import("std");
+
+test {
+    std.testing.refAllDecls(@This());
+}

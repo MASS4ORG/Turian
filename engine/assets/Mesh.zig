@@ -161,6 +161,39 @@ pub const Mesh = struct {
         return mesh;
     }
 
+    /// Fills in per-vertex flat (face) normals for a source mesh chunk that
+    /// has none, by averaging each triangle's face normal into its vertices.
+    /// Shared by loaders (glTF/FBX) whose source data may omit normals.
+    pub fn computeFlatNormals(verts: []Vertex, idxs: []const u32) void {
+        var i: usize = 0;
+        while (i + 2 < idxs.len) : (i += 3) {
+            const a = idxs[i];
+            const b = idxs[i + 1];
+            const c = idxs[i + 2];
+            if (a >= verts.len or b >= verts.len or c >= verts.len) continue;
+            const va = verts[a];
+            const vb = verts[b];
+            const vc = verts[c];
+            const e1 = [3]f32{ vb.px - va.px, vb.py - va.py, vb.pz - va.pz };
+            const e2 = [3]f32{ vc.px - va.px, vc.py - va.py, vc.pz - va.pz };
+            const nx = e1[1] * e2[2] - e1[2] * e2[1];
+            const ny = e1[2] * e2[0] - e1[0] * e2[2];
+            const nz = e1[0] * e2[1] - e1[1] * e2[0];
+            const len = @sqrt(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-9) continue;
+            const nn = [3]f32{ nx / len, ny / len, nz / len };
+            verts[a].nx = nn[0];
+            verts[a].ny = nn[1];
+            verts[a].nz = nn[2];
+            verts[b].nx = nn[0];
+            verts[b].ny = nn[1];
+            verts[b].nz = nn[2];
+            verts[c].nx = nn[0];
+            verts[c].ny = nn[1];
+            verts[c].nz = nn[2];
+        }
+    }
+
     /// Computes the axis-aligned bounding box from vertex positions.
     pub fn computeBounds(self: *@This()) void {
         if (self.vertices.len == 0) return;

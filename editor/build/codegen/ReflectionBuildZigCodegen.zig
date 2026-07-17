@@ -60,6 +60,7 @@ pub fn generateReflectionBuildZig(
             "    engine_mod.link_libc = true;\n" ++
             "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addImport(\"math\", math_mod);\n" ++
             "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n\n",
@@ -67,6 +68,7 @@ pub fn generateReflectionBuildZig(
             try normPath(a, config.engine_root),
             try normPath(a, config.vendor_include),
             try normPath(a, config.cgltf_wrap_c),
+            try normPath(a, config.fbx_wrap_c),
             try normPath(a, config.vendor_include),
         },
     ));

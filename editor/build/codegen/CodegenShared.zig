@@ -38,6 +38,8 @@ pub const BuildConfig = struct {
     editor_root: []const u8,
     /// Path to engine/vendor/cgltf_wrap.c.
     cgltf_wrap_c: []const u8,
+    /// Path to engine/vendor/fbx_wrap.c.
+    fbx_wrap_c: []const u8,
     /// Path to engine/vendor/ include directory.
     vendor_include: []const u8,
     /// Repository root path.

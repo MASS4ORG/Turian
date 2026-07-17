@@ -133,6 +133,7 @@ fn buildInner(
         .engine_root = try normPath(a, config.engine_root),
         .editor_root = try normPath(a, config.editor_root),
         .cgltf_wrap_c = try normPath(a, config.cgltf_wrap_c),
+        .fbx_wrap_c = try normPath(a, config.fbx_wrap_c),
         .vendor_include = try normPath(a, config.vendor_include),
         .build_root = try normPath(a, config.build_root),
         .sdl3_lib = config.sdl3_lib,
@@ -228,11 +229,12 @@ fn generateBuildZig(a: std.mem.Allocator, config: BuildConfig, src_files: []cons
             "    engine_mod.link_libc = true;\n" ++
             "    engine_mod.addIncludePath(.{{ .cwd_relative = \"{s}\" }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
+            "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addCSourceFile(.{{ .file = .{{ .cwd_relative = \"{s}/stb_image.c\" }}, .flags = &.{{\"-std=c99\"}} }});\n" ++
             "    engine_mod.addImport(\"math\", math_mod);\n" ++
             "    engine_mod.addImport(\"open_asset_package\", oap_mod);\n" ++
             "    engine_mod.addImport(\"serde\", serde_mod);\n\n",
-        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.vendor_include },
+        .{ config.engine_root, config.vendor_include, config.cgltf_wrap_c, config.fbx_wrap_c, config.vendor_include },
     ));
 
     try GameBuild.appendKtx2Module(a, &out, config);

@@ -65,6 +65,7 @@ pub fn launchReflect(io: std.Io) void {
         .engine_root = build_options.engine_root_path,
         .editor_root = build_options.editor_root_path,
         .cgltf_wrap_c = build_options.cgltf_wrap_c_path,
+        .fbx_wrap_c = build_options.fbx_wrap_c_path,
         .vendor_include = build_options.vendor_include_path,
         .build_root = build_options.build_root_path,
         .sdl3_lib = build_options.sdl3_lib_path,

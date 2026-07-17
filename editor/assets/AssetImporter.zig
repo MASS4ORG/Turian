@@ -199,10 +199,12 @@ fn cookModelMesh(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u
 // ── Model → materials + textures (one-to-many) ────────────────────────────────
 
 const GltfLoader = engine.assets.GltfLoader;
+const FbxLoader = engine.assets.FbxLoader;
+const ModelInfo = engine.assets.ModelInfo;
 const Material = engine.Material;
 
 /// Generate engine assets from a model's embedded materials and images:
-///   * one `.material` per glTF material (metallic-roughness → built-in PBR),
+///   * one `.material` per source material (metallic-roughness → built-in PBR),
 ///   * one `.texture` per *embedded* image (external images already have their
 ///     own source asset and are referenced by GUID, so they stay swappable).
 /// Writes the artifacts to the cache and records each as a `SubAsset` in `meta`
@@ -221,10 +223,13 @@ fn generateModelDerived(
         else => {},
     }
 
-    var info = GltfLoader.loadModelInfo(allocator, asset_path) catch {
-        // Not glTF (e.g. .obj) or a parse error — nothing to generate.
-        return;
-    };
+    const ext = std.fs.path.extension(asset_path);
+    var info: ModelInfo = if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb"))
+        GltfLoader.loadModelInfo(allocator, asset_path) catch return
+    else if (std.ascii.eqlIgnoreCase(ext, ".fbx"))
+        FbxLoader.loadModelInfo(allocator, asset_path) catch return
+    else
+        return; // e.g. .obj — no material/image data to extract.
     defer info.deinit();
     if (info.materials.len == 0) return;
 
@@ -304,14 +309,14 @@ fn guidString(arena: std.mem.Allocator, guid: Guid) ![]const u8 {
     return arena.dupe(u8, guid.toString(&buf));
 }
 
-fn imageName(arena: std.mem.Allocator, im: GltfLoader.ImageInfo, index: usize) []const u8 {
+fn imageName(arena: std.mem.Allocator, im: engine.assets.ImageInfo, index: usize) []const u8 {
     const ext = extForMime(im.mime_type);
     if (im.name.len > 0)
         return std.fmt.allocPrint(arena, "{s}{s}", .{ im.name, ext }) catch "image";
     return std.fmt.allocPrint(arena, "image_{d}{s}", .{ index, ext }) catch "image";
 }
 
-fn materialName(arena: std.mem.Allocator, m: GltfLoader.MaterialInfo, index: usize) []const u8 {
+fn materialName(arena: std.mem.Allocator, m: engine.assets.MaterialInfo, index: usize) []const u8 {
     if (m.name.len > 0)
         return std.fmt.allocPrint(arena, "{s}.material", .{m.name}) catch "material.material";
     return std.fmt.allocPrint(arena, "material_{d}.material", .{index}) catch "material.material";
@@ -344,7 +349,7 @@ fn writeMaterialArtifact(
     io: std.Io,
     project_path: []const u8,
     guid: Guid,
-    m: GltfLoader.MaterialInfo,
+    m: engine.assets.MaterialInfo,
     img_guids: []const ?[]const u8,
 ) bool {
     // Generate-if-missing: a material already in the cache may carry user edits
@@ -353,7 +358,7 @@ fn writeMaterialArtifact(
     if (asset_cache.artifactExists(io, project_path, guid, .material)) return true;
 
     const slot = struct {
-        fn texGuid(refs: []const ?[]const u8, r: GltfLoader.TexRef) []const u8 {
+        fn texGuid(refs: []const ?[]const u8, r: engine.assets.TexRef) []const u8 {
             const idx = r.image_index orelse return "";
             if (idx >= refs.len) return "";
             return refs[idx] orelse "";
@@ -553,4 +558,45 @@ test "model import extracts an embedded image into a texture sub-asset" {
     const mat = try Material.loadFromBytes(a, mat_bytes);
     var ig_buf: [36]u8 = undefined;
     try std.testing.expectEqualStrings(img_guid.?.toString(&ig_buf), mat.texture("albedo_map"));
+}
+
+test "FBX model import generates a best-effort PBR material sub-asset" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/model.fbx", .data = engine.assets.FbxLoader.test_fbx });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/model.fbx", .{project_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAssetForce(io, a, project_path, asset_path);
+
+    // Same dispatch path as glTF: exactly one material sub-asset, no image
+    // (the fixture's Phong material has no texture reference).
+    const model_meta = asset_meta.readMeta(io, a, asset_path);
+    var mat_guid: ?Guid = null;
+    for (model_meta.sub_assets) |s| {
+        if (s.asset_type == .material) mat_guid = s.guid;
+    }
+    try std.testing.expect(mat_guid != null);
+
+    var art_buf: [1024]u8 = undefined;
+    const art_path = asset_cache.artifactPath(project_path, mat_guid.?, .material, &art_buf).?;
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    const mat = try Material.loadFromBytes(a, bytes);
+
+    // Classic Phong DiffuseColor maps to base_color; ufbx approximates
+    // metallic/roughness from ShininessExponent (best-effort, no exact value
+    // to assert beyond "produced a material at all").
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), mat.vector("base_color", .{ 0, 0, 0, 0 })[0], 1e-5);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.25), mat.vector("base_color", .{ 0, 0, 0, 0 })[1], 1e-5);
 }
