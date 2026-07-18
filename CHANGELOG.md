@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0] - 2026-07-18
+
+### Breaking Changes
+- feat!: per-submesh materials break TMSH v1 mesh assets #45
+
+### Features
+- feat!: per-submesh materials break TMSH v1 mesh assets #45
+
+### Other
+- refactor(ci): move pipeline logic into Zig release tool subcommands
+
 ## [1.17.0] - 2026-07-18
 
 ### Features
