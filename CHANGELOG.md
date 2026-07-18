@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.0] - 2026-07-18
+
+### Features
+- feat: DDS texture import (BC1-BC7, sRGB tagging, normal-map Y-flip) #134
+- feat: FBX mesh and "scene hierarchy" import #133
+
 ## [1.16.0] - 2026-07-17
 
 ### Features
