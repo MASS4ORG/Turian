@@ -444,13 +444,13 @@ pub fn build(b: *std.Build) void {
     rel_cli.root_module.addOptions("turian_build_options", turian_opts);
     ci_step.dependOn(&b.addInstallArtifact(rel_cli, .{}).step);
 
-    // ── Release tooling (tools/release.zig, always compiled for host) ────────
+    // ── Release tooling (tools/ci/Release.zig, always compiled for host) ────────
     // Three separate build steps share one compiled binary; each step injects
     // its subcommand as the first argument, then appends any `-- <user args>`.
     const release_tool = b.addExecutable(.{
         .name = "release",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("tools/Release.zig"),
+            .root_source_file = b.path("tools/ci/Release.zig"),
             .target = b.graph.host,
             .optimize = .Debug,
         }),
@@ -481,6 +481,45 @@ pub fn build(b: *std.Build) void {
         run.addArg("publish");
         step.dependOn(&run.step);
         if (b.args) |args| run.addArgs(args);
+    }
+
+    // zig build release-verify -- [--examples] [--sdk]
+    {
+        const step = b.step("release-verify", "Build every example with turian-cli and smoke-test the assembled SDK");
+        const run = b.addRunArtifact(release_tool);
+        run.addArg("verify");
+        step.dependOn(&run.step);
+        if (b.args) |args| run.addArgs(args);
+    }
+
+    // zig build release-cut -- --provider gitlab [--dry-run]
+    {
+        const step = b.step("release-cut", "Full release: collect commits, bump version, CHANGELOG, tag, push, publish");
+        const run = b.addRunArtifact(release_tool);
+        run.addArg("cut");
+        step.dependOn(&run.step);
+        if (b.args) |args| run.addArgs(args);
+    }
+
+    // zig build release-prune-cache -- [--days <n>] [--dir <path>]
+    {
+        const step = b.step("release-prune-cache", "Age out stale entries from Zig's global object cache");
+        const run = b.addRunArtifact(release_tool);
+        run.addArg("prune-cache");
+        step.dependOn(&run.step);
+        if (b.args) |args| run.addArgs(args);
+    }
+
+    // Release-tool unit tests (host-only pure logic: commit classification,
+    // version bumping).
+    {
+        const release_test_mod = b.createModule(.{
+            .root_source_file = b.path("tools/ci/Release.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        });
+        const release_tests = b.addTest(.{ .root_module = release_test_mod });
+        test_step.dependOn(&b.addRunArtifact(release_tests).step);
     }
 
     // ── SDK assembly (zig build sdk) ──────────────────────────────────────────

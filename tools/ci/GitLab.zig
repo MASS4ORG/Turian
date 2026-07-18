@@ -9,6 +9,21 @@
 /// `pub fn run(io, gpa, environ)` entry point.
 const std = @import("std");
 const common = @import("Common.zig");
+const Proc = @import("Proc.zig");
+
+/// Authenticated push URL for `git remote set-url origin`, built from CI
+/// variables. Returns null when host, project path, or token are missing.
+pub fn pushUrl(gpa: std.mem.Allocator, environ: *const std.process.Environ.Map) !?[]u8 {
+    const host = environ.get("CI_SERVER_HOST") orelse return null;
+    const path = environ.get("CI_PROJECT_PATH") orelse return null;
+    if (environ.get("CI_PUSH_TOKEN")) |t| {
+        if (t.len > 0) return try std.fmt.allocPrint(gpa, "https://project_access_token:{s}@{s}/{s}.git", .{ t, host, path });
+    }
+    if (environ.get("CI_JOB_TOKEN")) |t| {
+        if (t.len > 0) return try std.fmt.allocPrint(gpa, "https://gitlab-ci-token:{s}@{s}/{s}.git", .{ t, host, path });
+    }
+    return null;
+}
 
 // ── JSON payload types (serialised with std.json.stringify, no jq needed) ────
 
@@ -55,7 +70,7 @@ pub fn run(
         if (commit_tag) |tag| {
             break :blk if (tag.len > 0 and tag[0] == 'v') tag[1..] else tag;
         }
-        const raw = readFile(io, gpa, ".release-version") catch {
+        const raw = Proc.readFile(io, gpa, ".release-version") catch {
             std.debug.print("error: neither CI_COMMIT_TAG nor .release-version found\n", .{});
             return error.MissingVersion;
         };
@@ -109,7 +124,7 @@ pub fn run(
             const auth = try std.fmt.allocPrint(gpa, "{s}: {s}", .{ auth_header, token });
             defer gpa.free(auth);
 
-            try spawnAndWait(io, gpa, &.{
+            try Proc.spawnAndWait(io, &.{
                 "curl",     "--fail-with-body", "--silent",      "--show-error",
                 "--header", auth,               "--upload-file", art.local_path,
                 url,
@@ -122,7 +137,7 @@ pub fn run(
             defer gpa.free(link_payload);
 
             std.debug.print("[gitlab] linking {s} to release …\n", .{art.file_name});
-            try spawnAndWait(io, gpa, &.{
+            try Proc.spawnAndWait(io, &.{
                 "curl",     "--fail-with-body", "--silent",  "--show-error",
                 "--header", auth,               "--header",  "Content-Type: application/json",
                 "--data",   link_payload,       "--request", "POST",
@@ -133,7 +148,7 @@ pub fn run(
     }
 
     // Mode: Create Release
-    const changelog = readFile(io, gpa, "CHANGELOG.md") catch "";
+    const changelog = Proc.readFile(io, gpa, "CHANGELOG.md") catch "";
     defer if (changelog.len > 0) gpa.free(changelog);
     const notes = extractEntry(changelog, version);
 
@@ -153,7 +168,7 @@ pub fn run(
     try stringify.write(payload);
 
     std.Io.Dir.cwd().createDirPath(io, ".public") catch {};
-    try writeCwd(io, ".public/.release-payload.json", out.written());
+    try Proc.writeCwd(io, ".public/.release-payload.json", out.written());
 
     const release_url = try std.fmt.allocPrint(gpa, "{s}/projects/{s}/releases", .{ api_url, project_id });
     defer gpa.free(release_url);
@@ -161,7 +176,7 @@ pub fn run(
     defer gpa.free(auth);
 
     std.debug.print("[gitlab] creating release {s} …\n", .{tag_name});
-    try spawnAndWait(io, gpa, &.{
+    try Proc.spawnAndWait(io, &.{
         "curl",     "--fail-with-body",               "--silent",  "--show-error",
         "--header", auth,                             "--header",  "Content-Type: application/json",
         "--data",   "@.public/.release-payload.json", release_url,
@@ -180,25 +195,4 @@ fn extractEntry(changelog: []const u8, version: []const u8) []const u8 {
     const body = nl + 1;
     const next = std.mem.indexOfPos(u8, changelog, body, "\n## [") orelse changelog.len;
     return std.mem.trim(u8, changelog[body..next], "\n ");
-}
-
-fn spawnAndWait(io: std.Io, _: std.mem.Allocator, argv: []const []const u8) !void {
-    var child = try std.process.spawn(io, .{ .argv = argv });
-    const term = try child.wait(io);
-    switch (term) {
-        .exited => |code| if (code != 0) return error.ProcessFailed,
-        else => return error.ProcessKilled,
-    }
-}
-
-fn readFile(io: std.Io, gpa: std.mem.Allocator, path: []const u8) ![]u8 {
-    var file = try std.Io.Dir.cwd().openFile(io, path, .{});
-    defer file.close(io);
-    var fbuf: [4096]u8 = undefined;
-    var reader = file.reader(io, &fbuf);
-    return reader.interface.allocRemaining(gpa, .unlimited);
-}
-
-fn writeCwd(io: std.Io, path: []const u8, data: []const u8) !void {
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = data });
 }

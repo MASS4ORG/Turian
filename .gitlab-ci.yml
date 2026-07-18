@@ -2,10 +2,16 @@
 #
 # Provider split
 # ─────────────────────────────────────────────────────────────────────────────
-# tools/release.zig              Provider-agnostic logic (version bump,
-#   └─ release/ci/common.zig       CHANGELOG, packaging, types)
-#   └─ release/ci/gitlab.zig     GitLab plugin (Package Registry upload,
-#                                  Release API — JSON built in Zig, no jq)
+# Job scripts stay thin so the pipeline ports to other CI providers (GitHub
+# Actions, Forgejo, Gitea, local runs); the logic lives in the release tool:
+#
+# tools/ci/Release.zig              Subcommand dispatcher
+#   └─ ci/*.zig             Provider-agnostic logic (verify, version bump,
+#                                  CHANGELOG, cut/tag/push, packaging, cache
+#                                  pruning)
+#   └─ ci/GitLab.zig     GitLab plugin (push URL, Package Registry
+#                                  upload, Release API — JSON built in Zig,
+#                                  no jq)
 #
 # Stages
 # ─────────────────────────────────────────────────────────────────────────────
@@ -107,46 +113,22 @@ test:
     # the GUI/GPU/render stack is caught here. -Dno-test: the Linux runner
     # can't execute the Windows binaries.
     - zig build -Dtarget=x86_64-windows-gnu -Dno-test --summary all
+    - echo "==> example project regression"
+    - zig build release-verify -- --examples
     - |
-      for dir in examples/*/; do
-        [ -d "$dir" ] || continue
-        echo "==> $dir"
-        ./zig-out/bin/turian-cli build "$dir" || { echo "FAILED: $dir"; exit 1; }
-      done
-    - |
-      # SDK smoke-test: verify the CLI in the SDK can build a project using only
-      # SDK-resident sources (paths resolved by SdkLayout.zig, not baked paths).
-      # Uses the full SDK (with SDL3) so the game binary can link.
-      echo "==> SDK smoke-test"
       # Free disk space before the SDK build: the debug bins and .zig-cache from
       # previous steps are no longer needed (examples already tested the CLI).
+      # This does mean the saved zig-cache-* cache is empty from this job — it's
+      # kept warm by check_release/build_artifacts runs instead.
       rm -rf .zig-cache zig-out/bin/turian-studio zig-out/bin/turian-cli
       find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
       df -h / || true
-      zig build sdk --summary all
-      # The SDK is already in zig-out/sdk/; object files in .zig-cache and
-      # example .cache dirs are no longer needed. This does mean the saved
-      # zig-cache-* cache is empty from this job — it's kept warm by
-      # check_release/build_artifacts runs instead (they don't do this).
-      TMP_PROJ=$(mktemp -d)
-      cp -r examples/basic-project/. "$TMP_PROJ/"
-      ./zig-out/sdk/turian-cli build "$TMP_PROJ" || { echo "SDK build FAILED"; rm -rf "$TMP_PROJ"; exit 1; }
-      [ -f "$TMP_PROJ/.cache/zig-out/bin/game" ] || { echo "game binary not found"; rm -rf "$TMP_PROJ"; exit 1; }
-      [ -f "$TMP_PROJ/.cache/game.oap" ] || { echo "game.oap not found"; rm -rf "$TMP_PROJ"; exit 1; }
-      rm -rf "$TMP_PROJ"
-      echo "SDK smoke-test PASSED"
-    - |
-      # Zig has no built-in cache GC (0.16): every distinct set of inputs gets
-      # a new entry under .../o/<hash>/ and old ones are never evicted, so the
-      # global cache we share across every branch (zig-global-cache-v1) grows
-      # without bound. Age out entries untouched in the last 14 days before
-      # the cache is saved, to keep future restores fast — each is a
-      # self-contained, content-addressed unit, so pruning one only costs a
-      # recompile if it's ever needed again, never correctness.
-      echo "==> Pruning global zig cache entries older than 14 days"
-      du -sh ~/.cache/zig 2>/dev/null || true
-      find ~/.cache/zig/o -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + 2>/dev/null || true
-      du -sh ~/.cache/zig 2>/dev/null || true
+    # SDK smoke-test: verify the CLI in the SDK can build a project using only
+    # SDK-resident sources. Uses the full SDK (with SDL3) so the game can link.
+    - zig build sdk --summary all
+    - zig build release-verify -- --sdk
+    # Bounds the shared global cache's growth (Zig has no built-in cache GC).
+    - zig build release-prune-cache -- --days 14
   cache:
     # Zig's global cache (fetched build.zig.zon dependencies, the compiler's
     # own cache) isn't branch-specific, so it's shared by every branch under
@@ -171,54 +153,11 @@ check_release:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: "$CHECK_RELEASE"
   script:
-    - |
-      git config user.email "ci@turian.engine"
-      git config user.name "Turian CI"
-      if [ -n "$CI_PUSH_TOKEN" ]; then
-        git remote set-url origin "https://project_access_token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      else
-        # Falls back to the job's own (auto-rotated, never-expiring-to-maintain) token.
-        # Requires the pipeline-schedule owner to have push rights on protected
-        # branch `main` and protected tag pattern `v*.*.*`.
-        git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-      fi
-    # 0. This runner reuses a persistent checkout across jobs (GIT_STRATEGY=fetch),
-    #    so a tag created locally by a previous run that then failed before its
-    #    `git push` (e.g. expired token) lingers forever — `git fetch` never
-    #    deletes local-only tags on its own. Prune to match the remote exactly
-    #    before computing/creating anything, so this job is safe to retry.
-    - git fetch origin --tags --prune --prune-tags
-    # 1. Collect commits since last tag
-    - |
-      LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-      if [ -z "$LAST" ]; then
-        echo "No prior tags — initial release."
-        git log --format="%s" > .release-commits 2>/dev/null || true
-        EXTRA="--initial"
-      else
-        echo "Last tag: $LAST"
-        git log --format="%s" "$LAST"..HEAD > .release-commits 2>/dev/null || true
-        EXTRA=""
-      fi
-
-    # 2. Version bump + CHANGELOG
-    - zig build release-check -- --commits .release-commits $EXTRA
-
-    # 3. Commit + tag + push
-    - |
-      [ -f .release-version ] || { echo "Nothing to release. Skipping."; exit 0; }
-      NEW_VERSION=$(cat .release-version)
-      echo "Releasing v${NEW_VERSION}"
-      git add build.zig.zon CHANGELOG.md
-      git commit -m "chore(release): v${NEW_VERSION}"
-      # Defense-in-depth on top of the prune above: drop any same-named local
-      # tag left by an interrupted prior run before (re-)creating it.
-      git tag -d "v${NEW_VERSION}" 2>/dev/null || true
-      git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
-      git push origin HEAD:${CI_COMMIT_REF_NAME} --tags
-
-    # 4. Create GitLab release (now that tag is pushed)
-    - zig build release-publish -- --provider gitlab
+    # Whole flow (git identity + authenticated remote, tag prune, collect
+    # commits since last tag, version bump + CHANGELOG, commit, tag, push,
+    # create release) lives in tools/ci/Cut.zig. Push auth:
+    # CI_PUSH_TOKEN > CI_JOB_TOKEN (see Requirements above).
+    - zig build release-cut -- --provider gitlab
   cache:
     - key: zig-global-cache-v1
       paths: [~/.cache/zig/]
@@ -251,8 +190,8 @@ build_artifacts:
     - zig build release-package -- --platform $PLATFORM --version $CI_COMMIT_TAG
     # 4. Upload and link to release
     - zig build release-publish -- --provider gitlab
-    # See the `test` job for why: bounds the shared global cache's growth.
-    - find ~/.cache/zig/o -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + 2>/dev/null || true
+    # Bounds the shared global cache's growth.
+    - zig build release-prune-cache -- --days 14
   cache:
     - key: zig-global-cache-v1
       paths: [~/.cache/zig/]

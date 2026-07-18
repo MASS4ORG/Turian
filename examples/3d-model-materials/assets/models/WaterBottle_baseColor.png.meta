@@ -1,7 +1,7 @@
 {
   "guid": "10000000-0000-4000-8000-0000000000a2",
   "asset_type": "image",
-  "importer_version": 1,
+  "importer_version": 2,
   "source_hash": 16406270569855259326,
   "import_settings": {
     "image": {
@@ -11,7 +11,8 @@
       "compression": "none",
       "filter": "linear",
       "wrap": "repeat",
-      "max_size": 2048
+      "max_size": 2048,
+      "flip_green_channel": false
     }
   },
   "source_deps": [
