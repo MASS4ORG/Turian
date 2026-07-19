@@ -20,7 +20,9 @@ const log = std.log.scoped(.asset_importer);
 
 // v2: DDS textures are cooked (sRGB tagging + optional normal-map green-channel
 // flip) instead of copied verbatim; other image formats are still verbatim.
-const VERSION_IMAGE: u32 = 2;
+// v3: non-DDS/KTX2 images (PNG/JPEG/…) also cook in an sRGB tag when authored
+// as color data, via a small envelope `ImageLoader` strips at load time.
+const VERSION_IMAGE: u32 = 3;
 // v2: generate materials + extract textures from glTF/GLB into sub-assets.
 // v3: cook geometry into the canonical binary mesh format.
 // v4: cook every mesh/primitive (submesh table) instead of only the first.
@@ -169,13 +171,13 @@ fn writeArtifact(
 
     // Models are cooked into the canonical binary mesh format so the runtime
     // loads geometry with one fast loader (no OBJ/glTF parsing at run time).
-    // DDS textures are cooked to bake in sRGB tagging and (for normal maps)
-    // the DirectX-to-engine green-channel flip. Other asset types are copied
+    // Images are cooked to bake in sRGB tagging (and, for DDS normal maps, the
+    // DirectX-to-engine green-channel flip). Other asset types are copied
     // verbatim for now.
     const artifact_bytes: []const u8 = if (meta.asset_type == .model)
         cookModelMesh(io, allocator, asset_path) orelse data
-    else if (meta.asset_type == .image and std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".dds"))
-        cookDdsTexture(allocator, data, meta.import_settings) orelse data
+    else if (meta.asset_type == .image)
+        cookImage(allocator, asset_path, data, meta.import_settings) orelse data
     else
         data;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = art_path, .data = artifact_bytes }) catch return;
@@ -202,22 +204,31 @@ fn cookModelMesh(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u
     return mesh.encode(allocator) catch null;
 }
 
-// ── DDS texture cooking ──────────────────────────────────────────────────────
+// ── Image cooking ────────────────────────────────────────────────────────────
 
-/// Rewrite a source DDS's container per its `ImageImportSettings`: bake in
-/// sRGB tagging for color data (legacy FourCC has no sRGB bit, so this may
-/// upgrade the container to a DX10 header) and, for normal maps, invert the
-/// BC5 green channel to match the engine's Y convention. Returns null on
-/// parse failure so the caller falls back to a verbatim copy.
-fn cookDdsTexture(allocator: std.mem.Allocator, data: []const u8, import_settings: @import("../types/ImportSettings.zig").ImportSettings) ?[]const u8 {
+/// Cook an image per its `ImageImportSettings` color space (and, for DDS
+/// normal maps, the DirectX-to-engine green-channel flip). Returns null on
+/// parse failure or when no rewrite is needed, so the caller falls back to a
+/// verbatim copy.
+fn cookImage(allocator: std.mem.Allocator, asset_path: []const u8, data: []const u8, import_settings: @import("../types/ImportSettings.zig").ImportSettings) ?[]const u8 {
     const settings = switch (import_settings) {
         .image => |s| s,
         else => return null,
     };
-    return engine.assets.DdsLoader.cook(allocator, data, .{
-        .srgb = settings.color_space == .srgb,
-        .flip_green_channel = settings.texture_type == .normal_map and settings.flip_green_channel,
-    }) catch null;
+    if (std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".dds")) {
+        return engine.assets.DdsLoader.cook(allocator, data, .{
+            .srgb = settings.color_space == .srgb,
+            .flip_green_channel = settings.texture_type == .normal_map and settings.flip_green_channel,
+        }) catch null;
+    }
+
+    // Non-DDS/KTX2 (PNG/JPEG/…): stb_image always decodes to linear
+    // `.rgba8_unorm`, which already matches a `.linear` setting, so only the
+    // sRGB case needs a tag baked in. KTX2 already carries its own format
+    // field and needs no cooking.
+    if (settings.color_space != .srgb) return null;
+    if (std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".ktx2")) return null;
+    return engine.assets.ImageLoader.wrapColorTag(allocator, data, true) catch null;
 }
 
 // ── Model → materials + textures (one-to-many) ────────────────────────────────
@@ -271,6 +282,8 @@ fn generateModelDerived(
     const img_guids = arena.alloc(?[]const u8, info.images.len) catch return;
     @memset(img_guids, null);
 
+    const image_roles = classifyImageRoles(arena, info.materials, info.images.len);
+
     for (info.images, 0..) |im, i| {
         var key_buf: [32]u8 = undefined;
         const key = std.fmt.bufPrint(&key_buf, "image:{d}", .{i}) catch continue;
@@ -279,7 +292,8 @@ fn generateModelDerived(
             // External file: it is (or becomes) a normal source asset. Bind by
             // its own GUID so the user can swap it later.
             const sibling = siblingPath(arena, asset_path, im.uri) orelse continue;
-            const sm = asset_meta.ensureMeta(io, arena, sibling);
+            const role = if (i < image_roles.len) image_roles[i] else .color;
+            const sm = ensureImageMeta(io, arena, sibling, role);
             if (sm.guid.isNil()) {
                 warnRel("[import] glTF references missing image", asset_path, im.uri);
                 continue;
@@ -326,6 +340,53 @@ fn reuseOrNewGuid(prev: []const SubAsset, key: []const u8, io: std.Io) Guid {
 fn siblingPath(arena: std.mem.Allocator, model_path: []const u8, uri: []const u8) ?[]const u8 {
     const dir = std.fs.path.dirname(model_path) orelse ".";
     return std.fmt.allocPrint(arena, "{s}/{s}", .{ dir, uri }) catch null;
+}
+
+/// Texture role inferred from which material slots reference an image —
+/// drives the default color space a newly-created sibling image asset gets.
+const ImageRole = enum { color, normal, data };
+
+/// Classify every image index by the role its materials use it in. Defaults
+/// to `.color` (sRGB); a use as a normal/metallic-roughness/occlusion map
+/// downgrades it to linear. `.normal` always wins over `.data` since the
+/// green-channel-flip default (texture_type) only applies to normal maps.
+fn classifyImageRoles(arena: std.mem.Allocator, materials: []const engine.assets.MaterialInfo, image_count: usize) []ImageRole {
+    const roles = arena.alloc(ImageRole, image_count) catch return &.{};
+    @memset(roles, .color);
+    for (materials) |m| {
+        if (m.normal.image_index) |idx| if (idx < roles.len) {
+            roles[idx] = .normal;
+        };
+        if (m.metallic_roughness.image_index) |idx| if (idx < roles.len and roles[idx] == .color) {
+            roles[idx] = .data;
+        };
+        if (m.occlusion.image_index) |idx| if (idx < roles.len and roles[idx] == .color) {
+            roles[idx] = .data;
+        };
+    }
+    return roles;
+}
+
+/// Like `asset_meta.ensureMeta`, but a brand-new meta for an image used only
+/// as a data map (`role != .color`) defaults to a linear color space (and,
+/// for normal maps, `texture_type = .normal_map`) instead of the general sRGB
+/// default. Never touches an already-existing meta, so user edits always win.
+fn ensureImageMeta(io: std.Io, arena: std.mem.Allocator, path: []const u8, role: ImageRole) MetaFile {
+    const is_new = asset_meta.readMeta(io, arena, path).guid.isNil();
+    const sm = asset_meta.ensureMeta(io, arena, path);
+    if (!is_new or role == .color) return sm;
+
+    var settings = switch (sm.import_settings) {
+        .image => |s| s,
+        else => return sm,
+    };
+    settings.color_space = .linear;
+    if (role == .normal) settings.texture_type = .normal_map;
+
+    var fixed = sm;
+    fixed.import_settings = .{ .image = settings };
+    asset_meta.writeMeta(io, arena, path, fixed);
+    return fixed;
 }
 
 fn guidString(arena: std.mem.Allocator, guid: Guid) ![]const u8 {
@@ -522,6 +583,54 @@ test "model import generates a PBR material bound to its external texture" {
     try std.testing.expectApproxEqAbs(@as(f32, 0.5), mat.vector("base_color", .{ 0, 0, 0, 0 })[0], 1e-5);
     try std.testing.expectEqualStrings(tex_guid_str, mat.texture("albedo_map"));
     try std.testing.expectEqualStrings("", mat.texture("normal_map"));
+}
+
+test "model import defaults a normal map's sibling image to linear color space" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+
+    const gltf =
+        \\{
+        \\  "asset": {"version": "2.0"},
+        \\  "images": [{"uri": "base_color.png"}, {"uri": "normal.png"}],
+        \\  "samplers": [{}],
+        \\  "textures": [{"source": 0, "sampler": 0}, {"source": 1, "sampler": 0}],
+        \\  "materials": [{
+        \\    "name": "Mat",
+        \\    "pbrMetallicRoughness": {"baseColorTexture": {"index": 0}},
+        \\    "normalTexture": {"index": 1}
+        \\  }]
+        \\}
+    ;
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/model.gltf", .data = gltf });
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/base_color.png", .data = "not-a-real-png" });
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/normal.png", .data = "not-a-real-png" });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/model.gltf", .{project_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAssetForce(io, a, project_path, asset_path);
+
+    var albedo_ap_buf: [300]u8 = undefined;
+    const albedo_path = try std.fmt.bufPrint(&albedo_ap_buf, "{s}/assets/base_color.png", .{project_path});
+    const albedo_meta = asset_meta.readMeta(io, a, albedo_path);
+    try std.testing.expectEqual(@import("../types/ImportSettings.zig").ColorSpace.srgb, albedo_meta.import_settings.image.color_space);
+
+    var normal_ap_buf: [300]u8 = undefined;
+    const normal_path = try std.fmt.bufPrint(&normal_ap_buf, "{s}/assets/normal.png", .{project_path});
+    const normal_meta = asset_meta.readMeta(io, a, normal_path);
+    try std.testing.expectEqual(@import("../types/ImportSettings.zig").ColorSpace.linear, normal_meta.import_settings.image.color_space);
+    try std.testing.expectEqual(@import("../types/ImportSettings.zig").TextureType.normal_map, normal_meta.import_settings.image.texture_type);
 }
 
 test "model import extracts an embedded image into a texture sub-asset" {

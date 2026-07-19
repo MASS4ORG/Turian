@@ -91,6 +91,16 @@ vec3 fresnelSchlick(float ct, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
 }
 
+// Narkowicz ACES filmic fit: maps linear HDR color to a displayable 0..1 range.
+vec3 acesFilm(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
 // Roughness-aware Fresnel for the ambient term, so metals (which have no diffuse)
 // still pick up an ambient specular tint instead of rendering black in the
 // absence of an environment/IBL probe.
@@ -211,6 +221,12 @@ void main() {
     vec3 emis = ubo.emissive.rgb * ubo.emissive.w;
     if (ubo.flags.w > 0.5) emis *= texture(emissive_tex, in_uv).rgb;
     color += emis;
+
+    // Lighting above is computed in linear space (sRGB-tagged textures are
+    // linearized on sample by the GPU sampler); tonemap then gamma-encode for
+    // the UNORM (non-sRGB) swapchain, which expects pre-encoded bytes.
+    color = acesFilm(color);
+    color = pow(color, vec3(1.0 / 2.2));
 
     out_color = vec4(color, albedo_s.a);
 }

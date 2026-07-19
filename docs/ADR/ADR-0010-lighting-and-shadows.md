@@ -11,9 +11,10 @@ Engine needs multi-light support (directional, point, spot) and shadow mapping. 
 - **Shadow mapping** (GPU viewport only): 2048² D16_UNORM, PCF 3×3 via `sampler2DShadow`, depth bias 1.25/1.75, cull NONE. Ortho light VP fit to scene bounds. Runs as separate render pass before main pass in same command buffer.
 - **Single shadow-casting light**: only light[0] (directional) casts shadows. Point/spot shadows deferred. Graceful: if shadow resources fail, `shadows_enabled=0`, multi-light remains.
 - **Software renderer**: `shadePixel` implements directional/point/spot same math as GLSL. No shadows (documented gap).
+- **sRGB/linear color management** (#27): albedo/emissive sample as sRGB (GPU hardware decode for DDS/KTX2; a small envelope tag baked in at import for stb_image sources) and lighting runs in linear space; `scene.frag.glsl` and the software renderer both apply an ACES filmic tonemap + gamma-2.2 encode at output, since render targets/swapchain stay UNORM. Normal/metallic-roughness/occlusion maps referenced by a glTF/FBX material default to linear on first import.
 
 ## Consequences
 - SPIR-V std140 offsets must match Zig extern FragUB exactly (verified manually — Light stride 64).
 - Shaders NOT built by zig — recompile via `glslc`.
 - Editor viewport lighting visuals not eyeball-checked (shadow acne, orientation).
-- IBL/environment, skybox, point/spot shadows, sRGB/linear deferred.
+- IBL/environment, skybox, point/spot shadows deferred.

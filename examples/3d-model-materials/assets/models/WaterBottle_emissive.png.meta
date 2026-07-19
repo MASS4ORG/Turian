@@ -1,7 +1,7 @@
 {
   "guid": "10000000-0000-4000-8000-0000000000a5",
   "asset_type": "image",
-  "importer_version": 2,
+  "importer_version": 3,
   "source_hash": 12607988389704804873,
   "import_settings": {
     "image": {

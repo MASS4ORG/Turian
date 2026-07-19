@@ -16,10 +16,34 @@ extern fn stbi_load_from_memory(
 ) ?[*]u8;
 extern fn stbi_image_free(data: ?*anyopaque) void;
 
+/// Prefix marking a color-space tag baked in at import time (see `wrapColorTag`).
+/// Only stb_image containers (PNG/JPEG/…) need it: KTX2/DDS already carry their
+/// own format field, and the stb_image path otherwise always decodes to the
+/// default linear `.rgba8_unorm`.
+const color_tag_magic = "TCS1";
+
+/// Prefix `bytes` with a tiny envelope tagging the color space the image
+/// should decode as. `loadFromMemory` strips it and upgrades the resulting
+/// `Texture.format` to `.rgba8_srgb` when `srgb` is set. Caller owns the
+/// returned slice.
+pub fn wrapColorTag(allocator: std.mem.Allocator, bytes: []const u8, srgb: bool) ![]u8 {
+    const out = try allocator.alloc(u8, 5 + bytes.len);
+    @memcpy(out[0..4], color_tag_magic);
+    out[4] = @intFromBool(srgb);
+    @memcpy(out[5..], bytes);
+    return out;
+}
+
 /// Decode an image from an in-memory byte buffer (e.g. supplied by an asset
 /// package). KTX2 is detected by its identifier; otherwise stb_image sniffs the
 /// format, so no extension is required.
 pub fn loadFromMemory(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
+    if (bytes.len >= 5 and std.mem.eql(u8, bytes[0..4], color_tag_magic)) {
+        const srgb = bytes[4] != 0;
+        var tex = try loadFromMemory(allocator, bytes[5..]);
+        if (srgb and tex.format == .rgba8_unorm) tex.format = .rgba8_srgb;
+        return tex;
+    }
     if (ktx2.isKtx2(bytes)) return fromKtx2(allocator, bytes);
     if (dds.isDds(bytes)) return fromDds(allocator, bytes);
 
@@ -71,6 +95,31 @@ fn fromDds(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
         .allocator = allocator,
         .owns_mips = true,
     };
+}
+
+test "wrapColorTag upgrades an uncompressed source to rgba8_srgb" {
+    // Minimal legacy-header DDS, uncompressed RGBA8 (R8G8B8A8 bitmasks), 2x2, no mips.
+    var dds_bytes: [128 + 2 * 2 * 4]u8 = @splat(0);
+    @memcpy(dds_bytes[0..4], "DDS ");
+    std.mem.writeInt(u32, dds_bytes[4..8], 124, .little); // dwSize
+    std.mem.writeInt(u32, dds_bytes[8..12], 0x1007, .little); // CAPS|WIDTH|HEIGHT|PIXELFORMAT
+    std.mem.writeInt(u32, dds_bytes[12..16], 2, .little); // height
+    std.mem.writeInt(u32, dds_bytes[16..20], 2, .little); // width
+    std.mem.writeInt(u32, dds_bytes[76..80], 32, .little); // ddspf.dwSize
+    std.mem.writeInt(u32, dds_bytes[80..84], 0x41, .little); // ddspf.dwFlags: RGB|ALPHAPIXELS
+    std.mem.writeInt(u32, dds_bytes[88..92], 32, .little); // ddspf.dwRGBBitCount
+    std.mem.writeInt(u32, dds_bytes[92..96], 0x000000ff, .little); // dwRBitMask
+    std.mem.writeInt(u32, dds_bytes[96..100], 0x0000ff00, .little); // dwGBitMask
+    std.mem.writeInt(u32, dds_bytes[100..104], 0x00ff0000, .little); // dwBBitMask
+    @memset(dds_bytes[128..], 0x42);
+
+    const wrapped = try wrapColorTag(std.testing.allocator, &dds_bytes, true);
+    defer std.testing.allocator.free(wrapped);
+
+    var tex = try loadFromMemory(std.testing.allocator, wrapped);
+    defer tex.deinit();
+    try std.testing.expectEqual(ktx2.Format.rgba8_srgb, tex.format);
+    try std.testing.expectEqual(@as(u32, 2), tex.width);
 }
 
 test "decodes a Basis KTX2 into a compressed texture" {

@@ -110,7 +110,9 @@ const CachedTexture = struct {
         return self.guid_buf[0..self.guid_len];
     }
 
-    /// Nearest-neighbour sample with repeat wrap. Returns RGBA in 0..1.
+    /// Nearest-neighbour sample with repeat wrap. Returns RGBA in 0..1, with
+    /// RGB linearized when the source texture is sRGB-tagged (color data
+    /// decodes to linear on GPU hardware; this mirrors that for parity).
     fn sample(self: *const @This(), u: f32, v: f32) [4]f32 {
         const w = self.tex.width;
         const h = self.tex.height;
@@ -123,14 +125,35 @@ const CachedTexture = struct {
         if (yi >= h) yi = h - 1;
         const idx = (yi * w + xi) * 4;
         const d = self.tex.data;
-        return .{
-            @as(f32, @floatFromInt(d[idx + 0])) / 255.0,
-            @as(f32, @floatFromInt(d[idx + 1])) / 255.0,
-            @as(f32, @floatFromInt(d[idx + 2])) / 255.0,
-            @as(f32, @floatFromInt(d[idx + 3])) / 255.0,
-        };
+        var r = @as(f32, @floatFromInt(d[idx + 0])) / 255.0;
+        var g = @as(f32, @floatFromInt(d[idx + 1])) / 255.0;
+        var b = @as(f32, @floatFromInt(d[idx + 2])) / 255.0;
+        const a = @as(f32, @floatFromInt(d[idx + 3])) / 255.0;
+        if (self.tex.format.isSrgb()) {
+            r = srgbToLinear(r);
+            g = srgbToLinear(g);
+            b = srgbToLinear(b);
+        }
+        return .{ r, g, b, a };
     }
 };
+
+/// Decode one sRGB-encoded channel (0..1) to linear.
+fn srgbToLinear(c: f32) f32 {
+    return if (c <= 0.04045) c / 12.92 else std.math.pow(f32, (c + 0.055) / 1.055, 2.4);
+}
+
+/// Narkowicz ACES filmic fit, mirroring `scene.frag.glsl`'s `acesFilm`.
+fn acesFilm(c: [3]f32) [3]f32 {
+    const a: f32 = 2.51;
+    const b: f32 = 0.03;
+    const cc: f32 = 2.43;
+    const d: f32 = 0.59;
+    const e: f32 = 0.14;
+    var out: [3]f32 = undefined;
+    for (c, 0..) |x, i| out[i] = std.math.clamp((x * (a * x + b)) / (x * (cc * x + d) + e), 0.0, 1.0);
+    return out;
+}
 var g_tex_cache: [MAX_TEXTURES]CachedTexture = undefined;
 var g_tex_cache_len: usize = 0;
 
@@ -479,6 +502,16 @@ fn shadePixel(normal: [3]f32, world_pos: [3]f32, uv: [2]f32, mat: ResolvedMateri
         emis = .{ emis[0] * s[0], emis[1] * s[1], emis[2] * s[2] };
     }
     col = .{ col[0] + emis[0], col[1] + emis[1], col[2] + emis[2] };
+
+    // Lighting above is in linear space (sampled textures are decoded per
+    // `CachedTexture.sample`); tonemap then gamma-encode before packing to
+    // display bytes, mirroring `scene.frag.glsl`'s output stage.
+    col = acesFilm(col);
+    col = .{
+        std.math.pow(f32, col[0], 1.0 / 2.2),
+        std.math.pow(f32, col[1], 1.0 / 2.2),
+        std.math.pow(f32, col[2], 1.0 / 2.2),
+    };
 
     return .{
         @intFromFloat(@min(255.0, @max(0.0, col[0]) * 255.0)),
