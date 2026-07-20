@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.1.0] - 2026-07-20
+
+### Features
+- feat: sRGB/linear color management with ACES tonemap #27
+
 ## [2.0.0] - 2026-07-18
 
 ### Breaking Changes
