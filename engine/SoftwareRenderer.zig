@@ -190,6 +190,11 @@ const ResolvedMaterial = struct {
     emissive_strength: f32 = 0,
     albedo: ?*CachedTexture = null,
     emissive_tex: ?*CachedTexture = null,
+    cull: engine.Material.CullMode = .back,
+    blend: engine.Material.BlendMode = .disabled,
+    depth_write: bool = true,
+    alpha_mask: bool = false,
+    alpha_cutoff: f32 = 0.5,
 };
 
 const MAX_MATERIALS = 32;
@@ -227,6 +232,11 @@ fn resolveMaterial(guid_str: []const u8) ResolvedMaterial {
         .emissive_strength = mat.scalar("emissive_strength", 0),
         .albedo = resolveTexture(mat.texture("albedo_map")),
         .emissive_tex = resolveTexture(mat.texture("emissive_map")),
+        .cull = mat.render.cull,
+        .blend = mat.render.blend,
+        .depth_write = mat.render.depth_write,
+        .alpha_mask = mat.render.alpha_mask,
+        .alpha_cutoff = mat.scalar("alpha_cutoff", 0.5),
     };
 
     const e = &g_mat_cache[g_mat_cache_len];
@@ -421,14 +431,19 @@ fn renderMesh(
         const nb = rot_only.transformDirection(.{ .x = vb.nx, .y = vb.ny, .z = vb.nz });
         const nc = rot_only.transformDirection(.{ .x = vc.nx, .y = vc.ny, .z = vc.nz });
 
-        // Backface cull using the geometric face normal.
+        // Cull using the geometric face normal (skipped entirely for `.none`).
         var wn = [3]f32{ (na.x + nb.x + nc.x) / 3.0, (na.y + nb.y + nc.y) / 3.0, (na.z + nb.z + nc.z) / 3.0 };
         const nl = vlen(wn);
         if (nl > 1e-6) wn = .{ wn[0] / nl, wn[1] / nl, wn[2] / nl };
         const cx = (wa.x + wb.x + wc.x) / 3.0;
         const cy = (wa.y + wb.y + wc.y) / 3.0;
         const cz = (wa.z + wb.z + wc.z) / 3.0;
-        if (dot3(wn, .{ cam_pos.x - cx, cam_pos.y - cy, cam_pos.z - cz }) < 0) continue;
+        const facing_camera = dot3(wn, .{ cam_pos.x - cx, cam_pos.y - cy, cam_pos.z - cz }) >= 0;
+        switch (mat.cull) {
+            .back => if (!facing_camera) continue,
+            .front => if (facing_camera) continue,
+            .none => {},
+        }
 
         const sa = project(worldToView(.{ wa.x, wa.y, wa.z }, cam_pos, axes), f, aspect) orelse continue;
         const sb = project(worldToView(.{ wb.x, wb.y, wb.z }, cam_pos, axes), f, aspect) orelse continue;
@@ -457,9 +472,11 @@ fn shadePixel(normal: [3]f32, world_pos: [3]f32, uv: [2]f32, mat: ResolvedMateri
     if (len > 1e-6) n = .{ n[0] / len, n[1] / len, n[2] / len };
 
     var albedo = [3]f32{ mat.base_color[0], mat.base_color[1], mat.base_color[2] };
+    var alpha = mat.base_color[3];
     if (mat.albedo) |tex| {
         const s = tex.sample(uv[0], uv[1]);
         albedo = .{ albedo[0] * s[0], albedo[1] * s[1], albedo[2] * s[2] };
+        alpha *= s[3];
     }
 
     var lit = [3]f32{ 0.08, 0.08, 0.08 };
@@ -517,7 +534,7 @@ fn shadePixel(normal: [3]f32, world_pos: [3]f32, uv: [2]f32, mat: ResolvedMateri
         @intFromFloat(@min(255.0, @max(0.0, col[0]) * 255.0)),
         @intFromFloat(@min(255.0, @max(0.0, col[1]) * 255.0)),
         @intFromFloat(@min(255.0, @max(0.0, col[2]) * 255.0)),
-        255,
+        @intFromFloat(std.math.clamp(alpha, 0.0, 1.0) * 255.0),
     };
 }
 
@@ -567,7 +584,6 @@ fn rasterizeTriangle(
 
             const idx = @as(usize, @intCast(y)) * VP_W + @as(usize, @intCast(x));
             if (z >= g_zbuf[idx]) continue;
-            g_zbuf[idx] = z;
 
             const pa = l0 * inv_za;
             const pb = l1 * inv_zb;
@@ -588,10 +604,36 @@ fn rasterizeTriangle(
             };
 
             const color = shadePixel(nrm, wp, uv, mat, lights);
-            g_pixels[idx * 4 + 0] = color[0];
-            g_pixels[idx * 4 + 1] = color[1];
-            g_pixels[idx * 4 + 2] = color[2];
-            g_pixels[idx * 4 + 3] = color[3];
+            if (mat.alpha_mask and @as(f32, @floatFromInt(color[3])) / 255.0 < mat.alpha_cutoff) continue;
+
+            if (mat.blend == .disabled) {
+                g_zbuf[idx] = z;
+                g_pixels[idx * 4 + 0] = color[0];
+                g_pixels[idx * 4 + 1] = color[1];
+                g_pixels[idx * 4 + 2] = color[2];
+                g_pixels[idx * 4 + 3] = 255;
+            } else {
+                // No draw-order sort in this single-pass rasterizer, so
+                // overlapping transparent triangles blend in scene-graph order
+                // rather than strict back-to-front (acceptable for the
+                // lightweight shipped-game fallback; the GPU viewport sorts).
+                if (mat.depth_write) g_zbuf[idx] = z;
+                const src_a = @as(f32, @floatFromInt(color[3])) / 255.0;
+                const dst = [3]f32{
+                    @floatFromInt(g_pixels[idx * 4 + 0]),
+                    @floatFromInt(g_pixels[idx * 4 + 1]),
+                    @floatFromInt(g_pixels[idx * 4 + 2]),
+                };
+                const src = [3]f32{ @floatFromInt(color[0]), @floatFromInt(color[1]), @floatFromInt(color[2]) };
+                const blended = if (mat.blend == .additive)
+                    [3]f32{ dst[0] + src[0] * src_a, dst[1] + src[1] * src_a, dst[2] + src[2] * src_a }
+                else
+                    [3]f32{ src[0] * src_a + dst[0] * (1 - src_a), src[1] * src_a + dst[1] * (1 - src_a), src[2] * src_a + dst[2] * (1 - src_a) };
+                g_pixels[idx * 4 + 0] = @intFromFloat(std.math.clamp(blended[0], 0.0, 255.0));
+                g_pixels[idx * 4 + 1] = @intFromFloat(std.math.clamp(blended[1], 0.0, 255.0));
+                g_pixels[idx * 4 + 2] = @intFromFloat(std.math.clamp(blended[2], 0.0, 255.0));
+                g_pixels[idx * 4 + 3] = 255;
+            }
         }
     }
 }

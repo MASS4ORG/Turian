@@ -480,6 +480,7 @@ fn writeMaterialArtifact(
             .cull = if (m.double_sided) .none else .back,
             .depth_write = m.alpha_mode != .blend,
             .depth_test = true,
+            .alpha_mask = m.alpha_mode == .mask,
         },
     };
 

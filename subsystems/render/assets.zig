@@ -80,6 +80,7 @@ pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     out.occlusion_strength = mat.scalar("occlusion_strength", out.occlusion_strength);
     out.alpha_cutoff = mat.scalar("alpha_cutoff", out.alpha_cutoff);
     out.emissive_strength = mat.scalar("emissive_strength", out.emissive_strength);
+    out.render = mat.render;
     const em = mat.vector("emissive", .{ 0, 0, 0, 1 });
     out.emissive = .{ em[0], em[1], em[2] };
 

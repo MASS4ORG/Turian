@@ -1,6 +1,7 @@
 //! GPU pipeline, sampler, and helper-texture creation (SDL3 GPU + SPIR-V).
 const std = @import("std");
 const gpu = @import("gpu");
+const engine = @import("engine");
 const types = @import("types.zig");
 const state = @import("state.zig");
 
@@ -99,6 +100,47 @@ pub fn createShadowSampler(dev: *c.SDL_GPUDevice) !*c.SDL_GPUSampler {
     }) orelse error.SamplerCreate;
 }
 
+/// Fixed-function blend equation for a material's `BlendMode`.
+fn blendStateFor(mode: engine.Material.BlendMode) c.SDL_GPUColorTargetBlendState {
+    return switch (mode) {
+        .disabled => std.mem.zeroes(c.SDL_GPUColorTargetBlendState),
+        .alpha => .{
+            .src_color_blendfactor = c.SDL_GPU_BLENDFACTOR_SRC_ALPHA,
+            .dst_color_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+            .color_blend_op = c.SDL_GPU_BLENDOP_ADD,
+            .src_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE,
+            .dst_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+            .alpha_blend_op = c.SDL_GPU_BLENDOP_ADD,
+            .color_write_mask = 0xf,
+            .enable_blend = true,
+            .enable_color_write_mask = false,
+            .padding1 = 0,
+            .padding2 = 0,
+        },
+        .additive => .{
+            .src_color_blendfactor = c.SDL_GPU_BLENDFACTOR_SRC_ALPHA,
+            .dst_color_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE,
+            .color_blend_op = c.SDL_GPU_BLENDOP_ADD,
+            .src_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE,
+            .dst_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE,
+            .alpha_blend_op = c.SDL_GPU_BLENDOP_ADD,
+            .color_write_mask = 0xf,
+            .enable_blend = true,
+            .enable_color_write_mask = false,
+            .padding1 = 0,
+            .padding2 = 0,
+        },
+    };
+}
+
+fn cullModeFor(mode: engine.Material.CullMode) c.SDL_GPUCullMode {
+    return switch (mode) {
+        .back => c.SDL_GPU_CULLMODE_BACK,
+        .front => c.SDL_GPU_CULLMODE_FRONT,
+        .none => c.SDL_GPU_CULLMODE_NONE,
+    };
+}
+
 const vtx_attrs = [_]c.SDL_GPUVertexAttribute{
     .{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, .location = 0, .offset = 0 },
     .{ .buffer_slot = 0, .format = c.SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, .location = 1, .offset = 12 },
@@ -111,7 +153,9 @@ const vtx_bufs = [_]c.SDL_GPUVertexBufferDescription{.{
     .instance_step_rate = 0,
 }};
 
-pub fn createPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
+/// Create a scene pipeline for one fixed-function state permutation (blend
+/// equation, cull mode, depth write/test) — see `state.ScenePipelineState`.
+pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState) !*c.SDL_GPUGraphicsPipeline {
     const vert_spv = @embedFile("shaders/compiled/scene.vert.spv");
     const frag_spv = @embedFile("shaders/compiled/scene.frag.spv");
 
@@ -145,7 +189,7 @@ pub fn createPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
 
     const color_desc = c.SDL_GPUColorTargetDescription{
         .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-        .blend_state = std.mem.zeroes(c.SDL_GPUColorTargetBlendState),
+        .blend_state = blendStateFor(key.blend),
     };
 
     var info = std.mem.zeroes(c.SDL_GPUGraphicsPipelineCreateInfo);
@@ -160,7 +204,7 @@ pub fn createPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
     };
     info.rasterizer_state = .{
         .fill_mode = c.SDL_GPU_FILLMODE_FILL,
-        .cull_mode = c.SDL_GPU_CULLMODE_BACK,
+        .cull_mode = cullModeFor(key.cull),
         // Meshes wind counter-clockwise for their outward faces.
         .front_face = c.SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
         .depth_bias_constant_factor = 0,
@@ -177,8 +221,8 @@ pub fn createPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
         .front_stencil_state = std.mem.zeroes(c.SDL_GPUStencilOpState),
         .compare_mask = 0xff,
         .write_mask = 0xff,
-        .enable_depth_test = true,
-        .enable_depth_write = true,
+        .enable_depth_test = key.depth_test,
+        .enable_depth_write = key.depth_write,
         .enable_stencil_test = false,
         .padding1 = 0,
         .padding2 = 0,

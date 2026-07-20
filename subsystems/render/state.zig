@@ -10,8 +10,28 @@ const c = gpu.c;
 pub const SHADOW_FORMAT = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
 pub var device: ?*c.SDL_GPUDevice = null;
-pub var pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var sampler: ?*c.SDL_GPUSampler = null;
+
+/// Fixed-function state baked into a scene pipeline permutation. SDL3 GPU (like
+/// Vulkan) has no dynamic blend-equation or cull-mode state, so each distinct
+/// combination a material asks for needs its own pipeline object.
+pub const ScenePipelineState = struct {
+    blend: engine.Material.BlendMode = .disabled,
+    cull: engine.Material.CullMode = .back,
+    depth_write: bool = true,
+    depth_test: bool = true,
+};
+
+/// Scene pipelines are created lazily and cached by state combo — capped and
+/// linearly searched, mirroring `depth_targets` below (the handful of distinct
+/// combos a scene's materials use stays well under the cap).
+pub const MAX_SCENE_PIPELINES = 16;
+pub const ScenePipelineEntry = struct {
+    key: ScenePipelineState = .{},
+    pipeline: ?*c.SDL_GPUGraphicsPipeline = null,
+};
+pub var scene_pipelines: [MAX_SCENE_PIPELINES]ScenePipelineEntry = .{ScenePipelineEntry{}} ** MAX_SCENE_PIPELINES;
+pub var scene_pipeline_count: usize = 0;
 
 pub var shadow_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var shadow_map: ?*c.SDL_GPUTexture = null;

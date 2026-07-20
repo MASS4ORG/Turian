@@ -344,6 +344,13 @@ fn drawRenderState() void {
         _ = gui.checkbox(@src(), &render_state.depth_test, tr("Depth Test"), .{ .gravity_y = 0.5, .id_extra = 3 });
         if (render_state.depth_test != before_t) dirty = true;
     }
+    {
+        var r = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = 4 });
+        defer r.deinit();
+        const before_m = render_state.alpha_mask;
+        _ = gui.checkbox(@src(), &render_state.alpha_mask, tr("Alpha Mask"), .{ .gravity_y = 0.5, .id_extra = 4 });
+        if (render_state.alpha_mask != before_m) dirty = true;
+    }
 }
 
 // ── Load / Save ────────────────────────────────────────────────────────────────

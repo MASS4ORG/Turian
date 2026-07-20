@@ -82,6 +82,8 @@ pub const ResolvedMaterial = struct {
     emissive_strength: f32 = 0,
     alpha_cutoff: f32 = 0.5,
     maps: [5]GuidBuf = .{ .{}, .{}, .{}, .{}, .{} },
+    /// Fixed-function state (blend/cull/depth/alpha-mask) from the material asset.
+    render: engine.Material.RenderState = .{},
 
     pub fn map(self: *const ResolvedMaterial, slot: MapSlot) []const u8 {
         return self.maps[@intFromEnum(slot)].slice();

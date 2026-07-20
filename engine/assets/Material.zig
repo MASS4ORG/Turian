@@ -40,6 +40,9 @@ pub const Material = struct {
         cull: CullMode = .back,
         depth_write: bool = true,
         depth_test: bool = true,
+        /// Alpha-cutoff (mask) test against `alpha_cutoff`, independent of `blend` —
+        /// mirrors glTF's MASK alpha mode (foliage cutouts, chain-link fences).
+        alpha_mask: bool = false,
     };
 
     /// A named scalar parameter value.
@@ -272,6 +275,14 @@ pub const Material = struct {
             },
             .render = .{ .blend = .alpha, .cull = .none, .depth_write = false, .depth_test = true },
         },
+        .{
+            .name = "Foliage",
+            .guid = "00000000-0000-4000-8000-000000000105",
+            .scalars = &.{
+                .{ .name = "roughness", .value = 0.6 },
+            },
+            .render = .{ .cull = .none, .alpha_mask = true },
+        },
     };
 
     /// Serialize a built-in preset identified by `guid` into `buf`.
@@ -453,4 +464,36 @@ test "preset Glass has alpha blend and no depth write" {
     try std.testing.expectEqual(Material.BlendMode.alpha, mat.render.blend);
     try std.testing.expectEqual(false, mat.render.depth_write);
     try std.testing.expectEqual(Material.CullMode.none, mat.render.cull);
+}
+
+test "preset Foliage has alpha mask and no culling" {
+    const a = std.testing.allocator;
+    const foliage = for (Material.presets) |p| {
+        if (std.mem.eql(u8, p.name, "Foliage")) break p;
+    } else return error.SkipZigTest;
+
+    var buf: [1024 * 8]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buf);
+    try Material.serializePreset(foliage, shader.pbr, &writer);
+
+    var mat = try Material.loadFromBytes(a, writer.buffered());
+    defer mat.deinit(a);
+    try std.testing.expectEqual(true, mat.render.alpha_mask);
+    try std.testing.expectEqual(Material.BlendMode.disabled, mat.render.blend);
+    try std.testing.expectEqual(Material.CullMode.none, mat.render.cull);
+}
+
+test "RenderState.alpha_mask round-trips through serialize/load" {
+    const a = std.testing.allocator;
+    const src = Material{
+        .render = .{ .alpha_mask = true },
+    };
+
+    var buf: [1024 * 8]u8 = undefined;
+    var writer = std.Io.Writer.fixed(&buf);
+    try src.serialize(&writer);
+
+    var mat = try Material.loadFromBytes(a, writer.buffered());
+    defer mat.deinit(a);
+    try std.testing.expectEqual(true, mat.render.alpha_mask);
 }
