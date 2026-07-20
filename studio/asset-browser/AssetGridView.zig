@@ -23,6 +23,18 @@ const tr = StudioLocale.tr;
 // Drag-hover tracking: which tile index the cursor is over during an asset drag
 var drag_hover_idx: ?usize = null;
 
+/// True when a tile drawn last frame held dvui keyboard focus — recomputed
+/// every `draw()` call, read by `AssetBrowser.zig`'s key-handling block
+/// (which runs before this frame's `draw()`). Mirrors `TreeView.zig`'s
+/// `has_focus`.
+var g_grid_focused: bool = false;
+
+/// Whether a tile is actually focused, not just visible — gates
+/// `AssetBrowser.zig`'s keyboard shortcuts.
+pub fn hasFocus() bool {
+    return g_grid_focused;
+}
+
 // Directory listing, collected and sorted each frame (folders first, then files,
 // each alphabetical) before tiles are rendered.
 const MAX_ENTRIES = 2048;
@@ -73,6 +85,7 @@ fn drawPackagesSection(proj_path: []const u8) void {
 /// up alongside the grid, never in tree-only mode.
 pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.WidgetData, show_up_button: bool) void {
     AssetTileLayout.syncFromSettings();
+    g_grid_focused = false;
 
     {
         var toolbar = gui.box(@src(), .{ .dir = .horizontal }, .{
@@ -291,6 +304,7 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
                     .mouse => |me| {
                         if (me.action == .press and me.button == .left) {
                             e.handle(@src(), tile.data());
+                            gui.focusWidget(tile.data().id, null, null);
                             const now = gui.frameTimeNS();
                             const same_name = std.mem.eql(u8, AssetNav.last_click_name_buf[0..AssetNav.last_click_name_len], entry.name);
                             if (same_name and now - AssetNav.last_click_ns < 500 * std.time.ns_per_ms) {
@@ -321,6 +335,8 @@ pub fn draw(proj_path: []const u8, browse_path: []const u8, outer_wd: *gui.Widge
                 }
             }
         }
+
+        if (gui.focusedWidgetIdInCurrentSubwindow() == tile.data().id) g_grid_focused = true;
 
         const preview_source = if (is_dir) null else PreviewSystem.imageSourceFor(asset_full_path);
         if (preview_source) |source| {

@@ -14,23 +14,14 @@
 *.exe
 *.out
 
-# ...but Wavefront .obj meshes under an assets/ folder are real project
-# assets, not C/C++ build artifacts — keep them tracked.
-!**/assets/**/*.obj
-
 # Any generated IDE/project files
 *.log
 *.tmp
 *.bak
 *.swp
 
-# Optional user-specific local overrides
-local.zig
-
-# macOS
+# OSes
 .DS_Store
-
-# Linux
 *~
 
 # LLMs
@@ -42,7 +33,14 @@ local.zig
 .idea/
 .zed/
 
-# Release packaging output (release-package writes archives here)
+# ...but Wavefront .obj meshes under an assets/ folder are real project
+# assets, not C/C++ build artifacts — keep them tracked.
+!**/assets/**/*.obj
+
+# Turian stuff
 .public/
 **/.cache
 docs/decisions/
+local.zig
+turian.sh
+turian.py

@@ -234,6 +234,24 @@ pub const Settings = struct {
         self.notifySubscribers(key);
     }
 
+    /// Delete `key` from whichever layer currently holds writes (project
+    /// layer when a project is open, global otherwise). A no-op if the key
+    /// isn't present. Distinct from writing an empty/false/zero value: this
+    /// makes a subsequent read fall through to the caller's default again —
+    /// e.g. resetting a shortcut override back to its code-defined default.
+    pub fn remove(self: *Settings, key: []const u8) void {
+        const target = if (self.project_path != null) &self.project_map else &self.global_map;
+        const kv = target.fetchRemove(key) orelse return;
+        self.allocator.free(kv.key);
+        self.allocator.free(kv.value);
+        if (self.project_path != null) {
+            self.dirty_project = true;
+        } else {
+            self.dirty_global = true;
+        }
+        self.notifySubscribers(key);
+    }
+
     // ── Subscriptions ─────────────────────────────────────────────────────────
 
     /// Register a callback for changes to any key with the given prefix.
@@ -392,4 +410,23 @@ fn valueToJsonAlloc(allocator: std.mem.Allocator, value: std.json.Value) ![]u8 {
     var stringify: std.json.Stringify = .{ .writer = &out.writer, .options = .{} };
     try stringify.write(value);
     return allocator.dupe(u8, out.written());
+}
+
+test "remove falls back to default, set/get round-trip unaffected by no-op remove" {
+    var s = try Settings.init(std.testing.allocator, "/tmp/turian-settings-remove-test", null);
+    defer s.deinit();
+
+    try s.setString("editor.ui.theme_name", "Midnight");
+    try std.testing.expectEqualStrings("Midnight", s.getString("editor.ui.theme_name", "Dark"));
+
+    s.remove("editor.ui.theme_name");
+    try std.testing.expectEqualStrings("Dark", s.getString("editor.ui.theme_name", "Dark"));
+
+    // Removing an absent key is a no-op, not an error.
+    s.remove("editor.ui.theme_name");
+    s.remove("never.set");
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }

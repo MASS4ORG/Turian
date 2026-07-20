@@ -58,7 +58,7 @@ const builtin_panels = [_]PanelDesc{
     .{ .id = "assets", .title = "Assets", .icon = gui.entypo.folder, .draw = AssetBrowser.draw, .settings = AssetBrowser.drawSettings },
     .{ .id = "profiler", .title = "Profiler", .icon = gui.entypo.gauge, .draw = ProfilerPanel.drawContent },
     .{ .id = "output", .title = "Log", .icon = gui.entypo.text_document, .draw = LogPanel.draw, .settings = LogPanel.drawSettings },
-    .{ .id = "settings", .title = "Settings", .icon = gui.entypo.cog, .draw = SettingsEditor.drawSidebar, .allow_multiple = false },
+    .{ .id = "settings", .title = "Settings", .icon = gui.entypo.cog, .draw = SettingsEditor.drawSidebar, .settings = SettingsEditor.drawDockMenu, .allow_multiple = false },
 };
 
 /// The registry backing `all()`: builtins first (fixed), then whatever

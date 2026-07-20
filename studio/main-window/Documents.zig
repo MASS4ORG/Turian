@@ -1,27 +1,21 @@
-//! Multi-Document Interface (MDI) — open assets in tabs.
+//! Multi-Document Interface (MDI) — open assets in tabs, layered on top of
+//! `EditorState`'s single-scene singleton state without duplicating every
+//! panel per tab.
 //!
-//! The editor historically edited a single scene at a time, backed by the
-//! singleton state in `EditorState` (`objects`, `selected_object`, …). This
-//! module layers a tabbed document interface on top of that singleton without
-//! duplicating every panel:
+//! Each open asset is a `Document`. `.scene` tabs share the Scene
+//! Tree/Viewport/Inspector surface; the *active* one IS `EditorState`'s live
+//! scene, parked into a heap snapshot on tab switch and restored on return,
+//! so panel state (hierarchy, selection, dirty flag) survives navigation.
+//! `.asset` tabs are hosted full-area by their own dedicated editor.
 //!
-//!   * Each open asset is a `Document` (a tab). Two kinds exist:
-//!       - `.scene`  — a scene/prefab edited in the Scene Tree + Viewport +
-//!                     object Inspector (the existing 3-pane surface).
-//!       - `.asset`  — a material / input-actions / project-settings / data
-//!                     asset edited by its dedicated editor, hosted full-area.
-//!   * The *active* scene tab IS `EditorState`'s live scene. Switching tabs
-//!     parks the outgoing scene into a heap snapshot and restores the incoming
-//!     one, so panel state (hierarchy, selection, dirty flag) survives tab
-//!     navigation. This is the "reuse the panels, preserve their state"
-//!     alternative called out in the issue — chosen over duplicating every
-//!     panel per tab, which would multiply the dvui widget tree and the
-//!     renderer/gizmo/play wiring for little gain.
+//! Undo history is per-session and resets on tab switch (a single global
+//! stack); the dirty indicator persists across switches.
 //!
-//! Undo history is intentionally per-session and reset on tab switch (the undo
-//! stack is a single global); the dirty indicator is preserved across switches.
-//! Drag-and-drop *between* separate tab areas (docking / split views) is left as
-//! future work — reordering within the one tab strip is supported.
+//! This file owns the document model only (open/close/activate/save/dirty) —
+//! no drawing. The tab strip UI lives in `DocumentsTabBar.zig` and JSON
+//! persistence in `DocumentsPersistence.zig`, both built on this file's
+//! `pub` API; `drawTabBar`/`persist`/`restore` below re-export them so
+//! callers don't need to know the module is split three ways.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -30,7 +24,9 @@ const EditorState = @import("../services/EditorState.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const EditorCamera = @import("../scene-view/EditorCamera.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
-const StudioLocale = @import("../services/StudioLocale.zig");
+const ShortcutsEditor = @import("../inspector/editor/ShortcutsEditor.zig");
+const DocumentsTabBar = @import("DocumentsTabBar.zig");
+const DocumentsPersistence = @import("DocumentsPersistence.zig");
 
 pub const MAX_DOCS = 32;
 
@@ -85,43 +81,28 @@ var docs: [MAX_DOCS]Document = undefined;
 var doc_count: usize = 0;
 var active: ?usize = null;
 
-/// Index of the tab currently being dragged for reorder, if any.
-var g_drag_tab: ?usize = null;
-/// Per-frame cache of each tab's physical rect, used for reorder hit-testing.
-var tab_rects: [MAX_DOCS]gui.Rect.Physical = undefined;
-
-/// Index of the leftmost tab currently shown; the strip pages by this when more
-/// tabs are open than fit the window (the ‹ › nav buttons adjust it).
-var first_tab: usize = 0;
-/// Per-tab physical width measured last frame, used to decide how many tabs fit.
-var tab_w: [MAX_DOCS]f32 = .{0} ** MAX_DOCS;
 /// Tab whose close is pending a save/discard confirmation (it was dirty).
+/// Mutated only here (`requestClose`/`close`); `DocumentsTabBar`'s confirm
+/// dialog reads/clears it through `confirmCloseIndex`/`cancelConfirmClose`.
 var g_confirm_close: ?usize = null;
-
-/// Assumed physical width for a tab whose real width isn't known yet (never
-/// drawn). Conservative so paging never overpacks the strip on the first frame.
-const DEFAULT_TAB_W: f32 = 140;
-
-/// Fixed height of the tab strip — reserved even when no tabs are open so the
-/// editor layout below it never jumps as the last tab closes.
-const TAB_STRIP_H: f32 = 30;
-/// Size of the per-tab close button (always laid out — only its paint toggles —
-/// so the tab width doesn't change on hover).
-const CLOSE_SLOT: f32 = 18;
-
-/// Settings key + bounds for the max displayed tab-title length.
-const TITLE_MAX_KEY = "editor.tab_title_max";
-const TITLE_MAX_DEFAULT: i64 = 18;
-const TITLE_MIN: i64 = 6;
 
 // ── Queries ─────────────────────────────────────────────────────────────────
 
+/// Number of open documents.
 pub fn count() usize {
     return doc_count;
 }
 
+/// Index of the active document, or null if none are open.
 pub fn activeIndex() ?usize {
     return active;
+}
+
+/// Read-only access to document `i`'s fields/methods, for `DocumentsTabBar`
+/// and `DocumentsPersistence` — out-of-range is a programmer error in either
+/// of those (both bound their loops by `count()` first).
+pub fn docAt(i: usize) *const Document {
+    return &docs[i];
 }
 
 /// True when the active document is hosted by a dedicated asset editor (so the
@@ -206,6 +187,7 @@ pub fn openAsset(full_path: []const u8, asset_type: editor.AssetType) void {
 
 // ── Activate / close / reorder ────────────────────────────────────────────────
 
+/// Makes `i` the active document, parking the outgoing scene tab first.
 pub fn activate(i: usize) void {
     if (i >= doc_count) return;
     if (active) |a| {
@@ -304,17 +286,18 @@ pub fn close(i: usize) void {
     persist();
 }
 
+/// Closes every document without prompting, discarding unsaved changes.
 pub fn closeAll() void {
     for (0..doc_count) |i| {
         if (docs[i].snapshot) |snap| EditorState.gpa.destroy(snap);
     }
     doc_count = 0;
     active = null;
-    g_drag_tab = null;
 }
 
-/// Move the tab at `from` to position `to`, fixing the active index.
-fn move(from: usize, to: usize) void {
+/// Move the tab at `from` to position `to`, fixing the active index. Used by
+/// `DocumentsTabBar`'s drag-reorder.
+pub fn moveTab(from: usize, to: usize) void {
     if (from == to or from >= doc_count or to >= doc_count) return;
     const tmp = docs[from];
     if (from < to) {
@@ -334,26 +317,7 @@ fn move(from: usize, to: usize) void {
             active = a + 1;
         }
     }
-    g_drag_tab = to;
     persist();
-}
-
-/// Last-measured physical width of tab `k`, or a conservative default if it
-/// hasn't been drawn yet.
-fn widthOf(k: usize) f32 {
-    return if (tab_w[k] > 0) tab_w[k] else DEFAULT_TAB_W;
-}
-
-/// First tab index (exclusive) past those that fit in `avail` physical pixels
-/// starting at `start`. Always shows at least the `start` tab.
-fn fitEnd(start: usize, avail: f32) usize {
-    var used: f32 = 0;
-    var k = start;
-    while (k < doc_count) : (k += 1) {
-        used += widthOf(k);
-        if (used > avail and k > start) return k;
-    }
-    return doc_count;
 }
 
 fn ensureSnapshot(i: usize) *SceneSnapshot {
@@ -368,6 +332,33 @@ fn ensureSnapshot(i: usize) *SceneSnapshot {
     return s;
 }
 var fallback_snapshot: SceneSnapshot = .{};
+
+// ── Close-confirmation state ──────────────────────────────────────────────────
+// Owned here (mutated by `requestClose`/`close` above); drawn by
+// `DocumentsTabBar.drawConfirmClose` through these accessors.
+
+/// Index of the document awaiting a save/discard/cancel decision, if any.
+pub fn confirmCloseIndex() ?usize {
+    return g_confirm_close;
+}
+
+/// Cancels the pending close confirmation without closing the document.
+pub fn cancelConfirmClose() void {
+    g_confirm_close = null;
+}
+
+/// Saves then closes the document pending confirmation.
+pub fn confirmCloseAndSave(i: usize) void {
+    saveOne(i);
+    g_confirm_close = null;
+    close(i);
+}
+
+/// Closes the document pending confirmation, discarding its changes.
+pub fn confirmCloseWithoutSaving(i: usize) void {
+    g_confirm_close = null;
+    close(i);
+}
 
 // ── Dirty tracking ────────────────────────────────────────────────────────────
 
@@ -384,402 +375,64 @@ pub fn setActiveDirty(dirty: bool) void {
     docs[a].dirty = dirty;
 }
 
-fn isDocDirty(i: usize) bool {
-    return docs[i].dirty;
-}
-
-// ── Tab bar UI ────────────────────────────────────────────────────────────────
-
-/// Draw the document tab strip. `mouse_held` is whether the left mouse button is
-/// currently down (used to drive drag-reordering). The strip keeps a fixed
-/// height even with no tabs open, so the editor below it never shifts.
-pub fn drawTabBar(mouse_held: bool) void {
-    syncActiveDirty();
-
-    // When empty the bar is an invisible placeholder: it still reserves
-    // TAB_STRIP_H so the editor below never shifts as the last tab closes.
-    const has_docs = doc_count > 0;
-    var bar = gui.box(@src(), .{ .dir = .horizontal }, .{
-        .expand = .horizontal,
-        .background = has_docs,
-        .style = .window,
-        .min_size_content = .{ .h = TAB_STRIP_H },
-        .padding = .{ .x = 4, .y = 2, .w = 4, .h = 0 },
-    });
-    defer bar.deinit();
-
-    if (!has_docs) return;
-
-    const cfg_max = if (EditorState.settingsReady())
-        EditorState.settings.getInt(TITLE_MAX_KEY, TITLE_MAX_DEFAULT)
-    else
-        TITLE_MAX_DEFAULT;
-    title_max_cache = @intCast(@max(TITLE_MIN, cfg_max));
-
-    var to_close: ?usize = null;
-    var to_activate: ?usize = null;
-
-    // ── Paging: decide which tabs are visible ─────────────────────────────────
-    // Work in physical pixels (tab widths are measured from physical rects).
-    const scale = gui.windowNaturalScale();
-    const content_w = bar.data().contentRectScale().r.w;
-
-    var total_w: f32 = 0;
-    for (0..doc_count) |k| total_w += widthOf(k);
-
-    // Overflow only matters once we know the bar's width (content_w > 0). Until
-    // then (first frame) treat space as unlimited so every tab is drawn.
-    const known_w = content_w > 1;
-    const needs_nav = known_w and total_w > content_w + 1;
-    const nav_reserve: f32 = if (needs_nav) 64 * scale else 0;
-    const avail_tabs: f32 = if (known_w) @max(0, content_w - nav_reserve) else 1e9;
-
-    if (first_tab >= doc_count) first_tab = if (doc_count > 0) doc_count - 1 else 0;
-    // Keep the active tab on screen.
-    if (active) |a| {
-        if (a < first_tab) first_tab = a;
-        while (first_tab < a and fitEnd(first_tab, avail_tabs) <= a) first_tab += 1;
-    }
-
-    const end = fitEnd(first_tab, avail_tabs);
-    const show_left = first_tab > 0;
-    const show_right = end < doc_count;
-
-    if (show_left) {
-        if (gui.buttonIcon(@src(), "tabs_left", gui.entypo.chevron_left, .{}, .{}, .{
-            .gravity_y = 0.5,
-            .min_size_content = .{ .w = 14, .h = 14 },
-            .padding = .all(2),
-        })) {
-            if (first_tab > 0) first_tab -= 1;
-        }
-    }
-
-    {
-        var strip = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_y = 1.0, .expand = .horizontal });
-        defer strip.deinit();
-
-        var i: usize = first_tab;
-        while (i < end) : (i += 1) {
-            drawTab(i, mouse_held, &to_activate, &to_close);
-        }
-    }
-
-    if (show_right) {
-        if (gui.buttonIcon(@src(), "tabs_right", gui.entypo.chevron_right, .{}, .{}, .{
-            .gravity_y = 0.5,
-            .min_size_content = .{ .w = 14, .h = 14 },
-            .padding = .all(2),
-        })) {
-            if (first_tab + 1 < doc_count) first_tab += 1;
-        }
-    }
-
-    // Drag-reorder: while a tab is held, step it one slot toward the cursor when
-    // the cursor crosses the neighbour's midpoint. Stepping (rather than jumping
-    // to the cursor's tab) avoids oscillation when tab widths differ. Only swap
-    // between currently-visible tabs.
-    if (!mouse_held) {
-        g_drag_tab = null;
-    } else if (g_drag_tab) |di| if (di >= first_tab and di < end) {
-        const mx = gui.currentWindow().mouse_pt.x;
-        if (di + 1 < end and mx > tab_rects[di + 1].x + tab_rects[di + 1].w / 2) {
-            move(di, di + 1);
-        } else if (di > first_tab and mx < tab_rects[di - 1].x + tab_rects[di - 1].w / 2) {
-            move(di, di - 1);
-        }
-    };
-
-    // Apply activation only if it wasn't actually a close-button click.
-    if (to_activate) |ci| {
-        if (to_close == null) activate(ci);
-    }
-    if (to_close) |ci| requestClose(ci);
-
-    // Floating ghost + the save/discard/cancel modal are drawn last so they
-    // layer above the strip.
-    drawDragGhost(mouse_held);
-    drawConfirmClose();
-}
-
-/// Draw a single tab. Sets `*to_activate` / `*to_close` for the caller to apply
-/// after the strip is laid out.
-fn drawTab(i: usize, mouse_held: bool, to_activate: *?usize, to_close: *?usize) void {
-    const is_active = (active != null and active.? == i);
-    const is_dragged = (g_drag_tab != null and g_drag_tab.? == i and mouse_held);
-
-    var tab = gui.box(@src(), .{ .dir = .horizontal }, .{
-        .id_extra = i,
-        .background = true,
-        // A dragged tab lifts to the highlight style as a drag affordance.
-        .style = if (is_active or is_dragged) .highlight else .window,
-        .border = .all(1),
-        .corners = .{ .tl = .theme(4), .tr = .theme(4), .bl = .square, .br = .square },
-        .padding = .{ .x = 8, .y = 4, .w = 4, .h = 4 },
-        .margin = .{ .w = 2 },
-        .gravity_y = 1.0,
-        .min_size_content = .{ .w = 60 },
-    });
-    defer tab.deinit();
-
-    const tr = tab.data().rectScale().r;
-    tab_rects[i] = tr;
-    // Record width (incl. the inter-tab margin) for next frame's paging maths.
-    tab_w[i] = tr.w + 4 * gui.windowNaturalScale();
-    const hovered = tr.contains(gui.currentWindow().mouse_pt);
-
-    // Left-press activates + starts a reorder drag; middle-press closes the tab.
-    // Neither is `e.handle`d so the close button can still receive its clicks.
-    for (gui.events()) |*e| {
-        if (!gui.eventMatchSimple(e, tab.data())) continue;
-        switch (e.evt) {
-            .mouse => |me| {
-                if (me.action == .press and me.button == .left) {
-                    to_activate.* = i;
-                    g_drag_tab = i;
-                } else if (me.action == .press and me.button == .middle) {
-                    to_close.* = i;
-                }
-            },
-            else => {},
-        }
-    }
-
-    // Unsaved-changes indicator.
-    if (isDocDirty(i)) {
-        gui.label(@src(), "*", .{}, .{
-            .id_extra = i,
-            .gravity_y = 0.5,
-            .padding = .{ .w = 4 },
-            .font = .theme(.body),
-        });
-    }
-
-    var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "{s}", .{trimTitle(docs[i].title(), title_max_cache, &name_buf)}, .{
-        .id_extra = i,
-        .gravity_y = 0.5,
-    });
-
-    // The close button is *always* laid out (so the tab width never changes),
-    // but is made invisible unless the tab is hovered or active. It stays
-    // clickable — if you're clicking it you're hovering, so it's visible.
-    const show_close = hovered or is_active;
-    if (gui.buttonIcon(@src(), "close", gui.entypo.cross, .{}, .{}, .{
-        .id_extra = i,
-        .gravity_y = 0.5,
-        .min_size_content = .{ .w = CLOSE_SLOT, .h = CLOSE_SLOT },
-        .margin = .{ .x = 4 },
-        .padding = .all(2),
-        .background = show_close,
-        .color_text = if (show_close) null else gui.Color.transparent,
-    })) {
-        to_close.* = i;
+/// Saves document `i` in place (does not close it), activating it first so
+/// `ProjectOps`/`SettingsEditor` operate on its data. Most asset kinds have
+/// no defined save path yet and are silently skipped. `.studio_settings`
+/// saves both editors sharing that tab (`SettingsEditor` and
+/// `ShortcutsEditor`), since a rebind alone doesn't touch a settings field.
+pub fn saveOne(i: usize) void {
+    if (i >= doc_count) return;
+    activate(i);
+    if (docs[i].kind == .scene) {
+        ProjectOps.saveScene(docs[i].path());
+        docs[i].dirty = false;
+    } else if (docs[i].asset_type == .studio_settings) {
+        SettingsEditor.save();
+        ShortcutsEditor.save();
     }
 }
 
-/// `title_max` resolved once per frame in drawTabBar and read by `drawTab`.
-var title_max_cache: usize = @intCast(TITLE_MAX_DEFAULT);
-
-/// Trim `name` to at most `max` characters, appending an ellipsis when cut.
-fn trimTitle(name: []const u8, max: usize, buf: []u8) []const u8 {
-    if (name.len <= max or max < 2) return name;
-    const keep = max - 1;
-    const n = @min(keep, buf.len - 3);
-    @memcpy(buf[0..n], name[0..n]);
-    // U+2026 HORIZONTAL ELLIPSIS
-    buf[n] = 0xE2;
-    buf[n + 1] = 0x80;
-    buf[n + 2] = 0xA6;
-    return buf[0 .. n + 3];
+/// Saves the active document unconditionally, matching the visible Save
+/// button rather than gating on the tracked `dirty` flag, which can lag an
+/// editor's own state by up to a frame.
+pub fn saveActive() void {
+    const i = active orelse return;
+    saveOne(i);
 }
 
-/// Small label that follows the cursor while a tab is being dragged, so the user
-/// can see the drag is active.
-fn drawDragGhost(mouse_held: bool) void {
-    if (!mouse_held) return;
-    const di = g_drag_tab orelse return;
-    if (di >= doc_count) return;
-
-    gui.cursorSet(.arrow_all);
-
-    const mp = gui.currentWindow().mouse_pt;
-    const scale = gui.windowNaturalScale();
-    g_ghost_rect.x = mp.x / scale + 12;
-    g_ghost_rect.y = mp.y / scale + 12;
-
-    var fw = gui.floatingWindow(@src(), .{
-        .rect = &g_ghost_rect,
-        .resize = .none,
-        .stay_above_parent_window = true,
-        .window_avoid = .none,
-    }, .{
-        .background = true,
-        .style = .highlight,
-        .border = .all(1),
-        .corners = .all(4),
-        .padding = .all(4),
-    });
-    defer fw.deinit();
-
-    var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "{s}", .{trimTitle(docs[di].title(), title_max_cache, &name_buf)}, .{ .gravity_y = 0.5 });
-}
-var g_ghost_rect: gui.Rect = .{ .x = 0, .y = 0, .w = 0, .h = 0 };
-
-/// Modal save/discard/cancel prompt shown when closing a document with unsaved
-/// changes.
-fn drawConfirmClose() void {
-    const i = g_confirm_close orelse return;
-    if (i >= doc_count) {
-        g_confirm_close = null;
-        return;
-    }
-
-    var win = gui.floatingWindow(@src(), .{
-        .modal = true,
-        .center_on = gui.currentWindow().subwindows.current_rect,
-        .window_avoid = .nudge,
-    }, .{ .role = .dialog, .min_size_content = .{ .w = 320 } });
-    defer win.deinit();
-
-    var open_flag = true;
-    win.dragAreaSet(gui.windowHeader(StudioLocale.tr("Unsaved Changes"), "", &open_flag));
-    if (!open_flag) {
-        g_confirm_close = null;
-        return;
-    }
-
-    var name_buf: [256]u8 = undefined;
-    gui.label(@src(), "{s}", .{StudioLocale.trArgs("Save changes to \"{title}\" before closing?", &.{
-        .{ .name = "title", .value = .{ .text = trimTitle(docs[i].name(), 48, &name_buf) } },
-    })}, .{ .padding = .all(8) });
-
-    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_x = 1.0, .padding = .all(4) });
-    defer row.deinit();
-
-    if (gui.button(@src(), StudioLocale.tr("Save"), .{}, .{})) {
-        // Load the doc so EditorState holds its scene, then save + close.
-        activate(i);
-        if (docs[i].kind == .scene) {
-            ProjectOps.saveScene(docs[i].path());
-        } else if (docs[i].asset_type == .studio_settings) {
-            SettingsEditor.save();
-        }
-        g_confirm_close = null;
-        close(i);
-    }
-    if (gui.button(@src(), StudioLocale.tr("Don't Save"), .{}, .{ .id_extra = 1 })) {
-        const idx = i;
-        g_confirm_close = null;
-        close(idx);
-    }
-    if (gui.button(@src(), StudioLocale.tr("Cancel"), .{}, .{ .id_extra = 2 })) {
-        g_confirm_close = null;
-    }
-}
-
-// ── Persistence ──────────────────────
-
-const OPEN_KEY = "editor.open_documents";
-
-/// Persist the open-document list (project-relative paths) + active index into
-/// settings, scoped to the current project. Saved to disk on editor shutdown.
-/// True while `restore` is replaying tabs, so the per-open `persist` calls don't
-/// clobber the settings value we're still reading from.
-var restoring: bool = false;
-
-pub fn persist() void {
-    if (restoring) return;
-    if (!EditorState.settingsReady()) return;
-    const proj = EditorState.project_path orelse return;
-
-    const a = EditorState.gpa;
-    var out: std.ArrayList(u8) = .empty;
-    defer out.deinit(a);
-
-    out.appendSlice(a, "{\"project\":") catch return;
-    writeJsonString(a, &out, proj) catch return;
-    var num_buf: [32]u8 = undefined;
-    const num = std.fmt.bufPrint(&num_buf, ",\"active\":{d},\"docs\":[", .{active orelse 0}) catch return;
-    out.appendSlice(a, num) catch return;
+/// Saves every open document with unsaved changes, restoring whichever tab
+/// was active beforehand. Ctrl+Shift+S. Unlike `saveActive`, gates on
+/// `dirty` — saving every open tab unconditionally would be needless I/O.
+pub fn saveAll() void {
+    const restore_active = active;
     for (0..doc_count) |i| {
-        if (i > 0) out.appendSlice(a, ",") catch return;
-        writeJsonString(a, &out, relativeTo(proj, docs[i].path())) catch return;
+        if (docs[i].dirty) saveOne(i);
     }
-    out.appendSlice(a, "]}") catch return;
-
-    EditorState.settings.set(OPEN_KEY, out.items) catch {};
+    if (restore_active) |a| activate(a);
 }
 
-/// Restore the previously-open tabs for the just-opened project. Called from
-/// `ProjectOps.openProject` after the project's component registry is ready.
-pub fn restore() void {
-    closeAll();
-    if (!EditorState.settingsReady()) return;
-    const proj = EditorState.project_path orelse return;
-
-    const raw_ref = EditorState.settings.get(OPEN_KEY) orelse return;
-    const arena = gui.currentWindow().arena();
-    // Copy out of settings memory: opening tabs below triggers settings writes
-    // that can invalidate `raw_ref` (and JSON strings reference their source).
-    const raw = arena.dupe(u8, raw_ref) catch return;
-    const parsed = std.json.parseFromSlice(std.json.Value, arena, raw, .{}) catch return;
-
-    restoring = true;
-    defer {
-        restoring = false;
-        persist();
-    }
-    if (parsed.value != .object) return;
-    const obj = parsed.value.object;
-
-    // Only restore tabs that belong to the project being opened.
-    const saved_proj = obj.get("project") orelse return;
-    if (saved_proj != .string or !std.mem.eql(u8, saved_proj.string, proj)) return;
-
-    const docs_val = obj.get("docs") orelse return;
-    if (docs_val != .array) return;
-
-    for (docs_val.array.items) |item| {
-        if (item != .string) continue;
-        var path_buf: [1024]u8 = undefined;
-        const full = std.fmt.bufPrint(&path_buf, "{s}/{s}", .{ proj, item.string }) catch continue;
-        if (!fileExists(full)) continue;
-        const at = editor.asset_registry.lookupByFilename(full);
-        if (at == .scene) openScene(full) else openAsset(full, at);
-    }
-
-    if (obj.get("active")) |av| {
-        if (av == .integer) {
-            const ai: usize = @intCast(@max(0, av.integer));
-            if (ai < doc_count) activate(ai);
-        }
-    }
+/// Closes the active document (prompting to save first if dirty). Ctrl+W.
+pub fn requestCloseActive() void {
+    const a = active orelse return;
+    requestClose(a);
 }
 
-fn fileExists(full: []const u8) bool {
-    var f = std.Io.Dir.cwd().openFile(gui.io, full, .{}) catch return false;
-    f.close(gui.io);
-    return true;
+/// Activates the next/previous tab, wrapping around. Ctrl+Tab / Ctrl+Shift+Tab.
+pub fn activateAdjacent(forward: bool) void {
+    if (doc_count == 0) return;
+    const a = active orelse 0;
+    const next = if (forward)
+        (a + 1) % doc_count
+    else
+        (a + doc_count - 1) % doc_count;
+    activate(next);
 }
 
-/// Strip the `<proj>/` prefix from `full`, yielding a project-relative path.
-fn relativeTo(proj: []const u8, full: []const u8) []const u8 {
-    if (full.len > proj.len + 1 and std.mem.startsWith(u8, full, proj) and full[proj.len] == '/') {
-        return full[proj.len + 1 ..];
-    }
-    return full;
-}
+// ── Re-exports: tab strip UI (`DocumentsTabBar.zig`) ──────────────────────────
 
-fn writeJsonString(a: std.mem.Allocator, out: *std.ArrayList(u8), s: []const u8) !void {
-    try out.append(a, '"');
-    for (s) |c| switch (c) {
-        '"' => try out.appendSlice(a, "\\\""),
-        '\\' => try out.appendSlice(a, "\\\\"),
-        '\n' => try out.appendSlice(a, "\\n"),
-        '\r' => try out.appendSlice(a, "\\r"),
-        else => try out.append(a, c),
-    };
-    try out.append(a, '"');
-}
+pub const drawTabBar = DocumentsTabBar.drawTabBar;
+
+// ── Re-exports: open-document JSON persistence (`DocumentsPersistence.zig`) ──
+
+pub const persist = DocumentsPersistence.persist;
+pub const restore = DocumentsPersistence.restore;

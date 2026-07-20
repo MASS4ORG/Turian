@@ -10,11 +10,13 @@ const PlayMode = @import("../scene-view/PlayMode.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
 const Panels = @import("Panels.zig");
-const ProjectOps = @import("../services/ProjectOps.zig");
 const LayoutStore = @import("../services/LayoutStore.zig");
+const ProjectOps = @import("../services/ProjectOps.zig");
+const Screenshots = @import("../services/Screenshots.zig");
 const ReflectJob = @import("../services/ReflectJob.zig");
 const ActiveTheme = @import("../services/ActiveTheme.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
+const Shortcuts = @import("../services/Shortcuts.zig");
 const tr = StudioLocale.tr;
 
 var should_quit: bool = false;
@@ -142,12 +144,114 @@ fn rescanCustomPanels() void {
     Panels.registerCustom(&.{});
 }
 
+fn cmdUndo() void {
+    EditorState.undo();
+}
+fn cmdRedo() void {
+    EditorState.redo();
+}
+fn cmdCopy() void {
+    if (EditorState.selectedCount() > 0) EditorState.copySelectedObjects();
+}
+fn cmdCut() void {
+    if (EditorState.selectedCount() > 0) {
+        EditorState.copySelectedObjects();
+        EditorState.deleteSelectedObjects(gui.frameTimeNS());
+    }
+}
+fn cmdPaste() void {
+    if (EditorState.hasClipboard()) EditorState.pasteObjects(gui.frameTimeNS(), gui.io);
+}
+fn cmdPlayToggle() void {
+    PlayMode.toggle(gui.io);
+}
+fn cmdSave() void {
+    Documents.saveActive();
+}
+fn cmdSaveAll() void {
+    Documents.saveAll();
+}
+fn cmdCloseTab() void {
+    Documents.requestCloseActive();
+}
+fn cmdNextTab() void {
+    Documents.activateAdjacent(true);
+}
+fn cmdPrevTab() void {
+    Documents.activateAdjacent(false);
+}
+fn cmdOpenSettings() void {
+    if (EditorState.settingsReady()) Documents.openAsset(EditorState.settings.global_path, .studio_settings);
+}
+fn cmdExit() void {
+    should_quit = true;
+}
+fn cmdBuildGame() void {
+    Tasks.launchBuild(gui.io);
+}
+fn cmdOpenProject() void {
+    ProjectOps.openProjectDialog();
+}
+fn cmdReimportAll() void {
+    Tasks.launchReimport(gui.io);
+}
+fn cmdCaptureScreenshot() void {
+    _ = Screenshots.capture();
+}
+fn cmdAddInspector() void {
+    LayoutStore.addPanel("inspector", gui.io);
+}
+fn cmdAddAssets() void {
+    LayoutStore.addPanel("assets", gui.io);
+}
+fn cmdAddOutput() void {
+    LayoutStore.addPanel("output", gui.io);
+}
+fn cmdPlayFirstScene() void {
+    PlayMode.playFirstScene(gui.io);
+}
+
+const global_commands = [_]Shortcuts.CommandDesc{
+    .{ .id = "edit.undo", .title = "Undo", .defaults = &.{Shortcuts.Binding.single(.{ .key = .z, .ctrl = true })} },
+    .{ .id = "edit.redo", .title = "Redo", .defaults = &.{Shortcuts.Binding.single(.{ .key = .y, .ctrl = true })} },
+    .{ .id = "edit.copy", .title = "Copy", .defaults = &.{Shortcuts.Binding.single(.{ .key = .c, .ctrl = true })} },
+    .{ .id = "edit.cut", .title = "Cut", .defaults = &.{Shortcuts.Binding.single(.{ .key = .x, .ctrl = true })} },
+    .{ .id = "edit.paste", .title = "Paste", .defaults = &.{Shortcuts.Binding.single(.{ .key = .v, .ctrl = true })} },
+    .{ .id = "play.toggle", .title = "Play / Stop", .defaults = &.{Shortcuts.Binding.single(.{ .key = .p, .ctrl = true })} },
+    .{ .id = "file.save", .title = "Save", .defaults = &.{Shortcuts.Binding.single(.{ .key = .s, .ctrl = true })} },
+    .{ .id = "file.saveAll", .title = "Save All", .defaults = &.{Shortcuts.Binding.single(.{ .key = .s, .ctrl = true, .shift = true })} },
+    .{ .id = "document.close", .title = "Close Tab", .defaults = &.{Shortcuts.Binding.single(.{ .key = .w, .ctrl = true })} },
+    .{ .id = "document.nextTab", .title = "Next Tab", .defaults = &.{Shortcuts.Binding.single(.{ .key = .tab, .ctrl = true })} },
+    .{ .id = "document.prevTab", .title = "Previous Tab", .defaults = &.{Shortcuts.Binding.single(.{ .key = .tab, .ctrl = true, .shift = true })} },
+    .{ .id = "file.openSettings", .title = "Settings", .defaults = &.{Shortcuts.Binding.single(.{ .key = .comma, .ctrl = true })} },
+    // No default: an accidental quit keystroke is worse than requiring an
+    // explicit rebind. Still registered so a user can set one.
+    .{ .id = "file.exit", .title = "Exit" },
+    .{ .id = "project.buildGame", .title = "Build Game", .defaults = &.{Shortcuts.Binding.single(.{ .key = .b, .ctrl = true, .shift = true })} },
+    .{ .id = "project.openProject", .title = "Open Project", .defaults = &.{Shortcuts.Binding.single(.{ .key = .o, .ctrl = true, .shift = true })} },
+    .{ .id = "project.reimportAll", .title = "Reimport All" },
+    .{ .id = "view.captureScreenshot", .title = "Capture Screenshot" },
+    .{ .id = "view.addInspector", .title = "Add Inspector Panel" },
+    .{ .id = "view.addAssets", .title = "Add Assets Panel" },
+    .{ .id = "view.addOutput", .title = "Add Log Panel" },
+    .{ .id = "play.firstScene", .title = "Play First Scene", .defaults = &.{Shortcuts.Binding.single(.{ .key = .p, .ctrl = true, .alt = true })} },
+};
+const global_handlers = [_]?Shortcuts.Handler{
+    cmdUndo,           cmdRedo,              cmdCopy,         cmdCut,       cmdPaste,
+    cmdPlayToggle,     cmdSave,              cmdSaveAll,      cmdCloseTab,  cmdNextTab,
+    cmdPrevTab,        cmdOpenSettings,      cmdExit,         cmdBuildGame, cmdOpenProject,
+    cmdReimportAll,    cmdCaptureScreenshot, cmdAddInspector, cmdAddAssets, cmdAddOutput,
+    cmdPlayFirstScene,
+};
+
 /// Draw one frame of the editor UI. Returns true to continue, false to quit.
 pub fn frame() bool {
     if (!hooks_installed) {
         hooks_installed = true;
         ReflectJob.onRescan = rescanCustomPanels;
+        Shortcuts.register(&global_commands, &global_handlers);
     }
+    if (EditorState.settingsReady()) Shortcuts.ensureOverridesLoaded(&EditorState.settings);
 
     // Recording is tied to Play and controlled from the panel (Record/Pause +
     // auto-on-Play). `tickRecording` arms `engine.Profiler.enabled` for this
@@ -188,50 +292,6 @@ pub fn frame() bool {
     // Times the editor's CPU build + viewport render work for the timeline.
     var ui_zone = engine.Profiler.zone("studio.ui");
     defer ui_zone.end();
-
-    // Handle global keyboard shortcuts after root is created
-    for (gui.events()) |*e| {
-        if (e.evt != .key) continue;
-        const ke = e.evt.key;
-        if (ke.action != .down or !ke.mod.control()) continue;
-
-        if (ke.code == .z and !ke.mod.shift()) {
-            e.handle(@src(), root.data());
-            EditorState.undo();
-        } else if (ke.code == .z and ke.mod.shift()) {
-            e.handle(@src(), root.data());
-            EditorState.redo();
-        } else if (ke.code == .y) {
-            e.handle(@src(), root.data());
-            EditorState.redo();
-        } else if (ke.code == .c and !ke.mod.shift()) {
-            if (EditorState.selectedCount() > 0) {
-                e.handle(@src(), root.data());
-                EditorState.copySelectedObjects();
-            }
-        } else if (ke.code == .x and !ke.mod.shift()) {
-            if (EditorState.selectedCount() > 0) {
-                e.handle(@src(), root.data());
-                EditorState.copySelectedObjects();
-                EditorState.deleteSelectedObjects(gui.frameTimeNS());
-            }
-        } else if (ke.code == .v and !ke.mod.shift()) {
-            if (EditorState.hasClipboard()) {
-                e.handle(@src(), root.data());
-                EditorState.pasteObjects(gui.frameTimeNS(), gui.io);
-            }
-        } else if (ke.code == .p and !ke.mod.shift()) {
-            // Ctrl+P toggles Play / Stop.
-            e.handle(@src(), root.data());
-            PlayMode.toggle(gui.io);
-        } else if (ke.code == .s and !ke.mod.shift()) {
-            // Ctrl+S saves the active scene (replaces the old File ▸ Save Scene item).
-            if (EditorState.current_scene_path) |path| {
-                e.handle(@src(), root.data());
-                ProjectOps.saveScene(path);
-            }
-        }
-    }
 
     MenuBar.draw(&should_quit);
 
@@ -305,6 +365,12 @@ pub fn frame() bool {
     // Step the in-editor game simulation. Keeps frames flowing
     // while a scene is playing so the viewport animates continuously.
     PlayMode.pump(gui.io);
+
+    // Dispatched last, after every panel has drawn and had a chance to
+    // consume its own contextual shortcuts (rename, delete, transform mode,
+    // ...) via `Shortcuts.eventMatches` — an identically-bound global command
+    // only fires on whatever key events are still unhandled at this point.
+    Shortcuts.dispatchGlobal(root.data());
 
     return true;
 }

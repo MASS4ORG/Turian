@@ -11,7 +11,20 @@ const UiOverlay = @import("../main-window/UiOverlay.zig");
 const MenuItems = @import("../MenuItems.zig");
 const ui_render = @import("ui_render");
 const StudioLocale = @import("../services/StudioLocale.zig");
+const Shortcuts = @import("../services/Shortcuts.zig");
 const tr = StudioLocale.tr;
+
+var hooks_installed = false;
+
+// Matched locally via `Shortcuts.eventMatches` in `handleHotkeys` (contextual,
+// not `dispatchGlobal`-routed), so these carry no registered `Handler`.
+const viewport_commands = [_]Shortcuts.CommandDesc{
+    .{ .id = "sceneView.translateMode", .title = "Move Tool", .context = .scene_viewport, .requires_focus = true, .defaults = &.{Shortcuts.Binding.single(.{ .key = .w })} },
+    .{ .id = "sceneView.rotateMode", .title = "Rotate Tool", .context = .scene_viewport, .requires_focus = true, .defaults = &.{Shortcuts.Binding.single(.{ .key = .e })} },
+    .{ .id = "sceneView.scaleMode", .title = "Scale Tool", .context = .scene_viewport, .requires_focus = true, .defaults = &.{Shortcuts.Binding.single(.{ .key = .r })} },
+    .{ .id = "sceneView.focusSelection", .title = "Focus Selection", .context = .scene_viewport, .requires_focus = true, .defaults = &.{Shortcuts.Binding.single(.{ .key = .f })} },
+};
+const viewport_handlers = [_]?Shortcuts.Handler{null} ** viewport_commands.len;
 
 /// "Show UI overlay" toggle: draws the scene's referenced
 /// `.uidoc` documents (plus the one open in `UiDocumentEditor`) letterboxed
@@ -71,6 +84,11 @@ const CAM_ZOOM_KEY = "editor.camera.zoom_speed";
 /// navigable during Play" behavior, not live gameplay state. The running
 /// game's own camera lives in the separate `drawGame` panel.
 pub fn draw() void {
+    if (!hooks_installed) {
+        hooks_installed = true;
+        Shortcuts.register(&viewport_commands, &viewport_handlers);
+    }
+
     // Must be captured before creating any widget below (which would
     // become the new "current parent") — this is the dockspace's per-tab
     // content box, unique per Scene *instance*.
@@ -138,7 +156,7 @@ pub fn draw() void {
     loadCameraSettings();
     const nav = gatherNav(inst, content, phys);
     _ = EditorCamera.navigate(nav);
-    handleHotkeys(inst);
+    handleHotkeys(inst, content, phys);
 
     const m = gatherMouse(inst, content, phys);
 
@@ -445,7 +463,6 @@ fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physi
                     .e => inst.nav_up = pressed,
                     .q => inst.nav_down = pressed,
                     .left_shift, .right_shift => inst.nav_fast = pressed,
-                    .f => if (pressed) focusSelection(),
                     else => {},
                 }
             },
@@ -495,20 +512,35 @@ fn focusSelection() void {
     EditorCamera.focusOn(t.position, extent * 3.0 + 2.0);
 }
 
-/// W = move, E = rotate, R = scale (Unity convention). Suppressed while the
-/// right mouse button is held, when W/E act as free-look movement keys instead.
-fn handleHotkeys(inst: *InstanceState) void {
-    if (inst.rmb_down) return;
+/// W = move, E = rotate, R = scale (Unity convention), F = focus selection.
+/// Mode-switch keys are suppressed while the right mouse button is held,
+/// when W/E act as free-look movement instead (see `gatherNav`); F is not,
+/// since focusing while orbiting is still useful. All four require the
+/// mouse hovering *this* viewport instance (`Shortcuts.eventMatches`'s
+/// `requires_focus`) and no text field mid-edit.
+fn handleHotkeys(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physical) void {
+    const hovered = phys.contains(inst.last_mouse);
     for (gui.events()) |*e| {
-        if (e.evt != .key) continue;
-        const ke = e.evt.key;
-        if (ke.action == .up) continue;
-        if (ke.mod.control() or ke.mod.command() or ke.mod.alt()) continue;
-        switch (ke.code) {
-            .w => GizmoSystem.mode = .translate,
-            .e => GizmoSystem.mode = .rotate,
-            .r => GizmoSystem.mode = .scale,
-            else => {},
+        if (!inst.rmb_down) {
+            if (Shortcuts.eventMatches(e, "sceneView.translateMode", hovered)) {
+                e.handle(@src(), content.data());
+                GizmoSystem.mode = .translate;
+                continue;
+            }
+            if (Shortcuts.eventMatches(e, "sceneView.rotateMode", hovered)) {
+                e.handle(@src(), content.data());
+                GizmoSystem.mode = .rotate;
+                continue;
+            }
+            if (Shortcuts.eventMatches(e, "sceneView.scaleMode", hovered)) {
+                e.handle(@src(), content.data());
+                GizmoSystem.mode = .scale;
+                continue;
+            }
+        }
+        if (Shortcuts.eventMatches(e, "sceneView.focusSelection", hovered)) {
+            e.handle(@src(), content.data());
+            focusSelection();
         }
     }
 }

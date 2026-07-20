@@ -16,6 +16,7 @@ const build_options = @import("turian_build_options");
 const Icon = @import("../Icon.zig");
 const MenuItems = @import("../MenuItems.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
+const Shortcuts = @import("../services/Shortcuts.zig");
 const tr = StudioLocale.tr;
 
 const AboutInfo = struct {
@@ -146,14 +147,25 @@ pub fn draw(should_quit: *bool) void {
                 newProjectDialog();
             }
 
-            if (gui.menuItemLabel(@src(), tr("Open Project..."), .{}, .{ .expand = .horizontal }) != null) {
+            if (MenuItems.command(@src(), tr("Open Project..."), "project.openProject", .{ .expand = .horizontal })) {
                 m.close();
                 ProjectOps.openProjectDialog();
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), tr("Exit"), .{}, .{ .expand = .horizontal }) != null) {
+            if (MenuItems.command(@src(), tr("Save"), "file.save", .{ .expand = .horizontal })) {
+                m.close();
+                Documents.saveActive();
+            }
+            if (MenuItems.command(@src(), tr("Save All"), "file.saveAll", .{ .expand = .horizontal })) {
+                m.close();
+                Documents.saveAll();
+            }
+
+            _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+
+            if (MenuItems.command(@src(), tr("Exit"), "file.exit", .{ .expand = .horizontal })) {
                 should_quit.* = true;
             }
         }
@@ -163,23 +175,21 @@ pub fn draw(should_quit: *bool) void {
             defer fw.deinit();
 
             const undo_str = if (EditorState.canUndo())
-                StudioLocale.trArgs("Undo  {label}    Ctrl+Z", &.{.{ .name = "label", .value = .{ .text = EditorState.undoLabel().? } }})
+                StudioLocale.trArgs("Undo  {label}", &.{.{ .name = "label", .value = .{ .text = EditorState.undoLabel().? } }})
             else
-                tr("Undo    Ctrl+Z");
+                tr("Undo");
 
             const redo_str = if (EditorState.canRedo())
-                StudioLocale.trArgs("Redo  {label}    Ctrl+Shift+Z", &.{.{ .name = "label", .value = .{ .text = EditorState.redoLabel().? } }})
+                StudioLocale.trArgs("Redo  {label}", &.{.{ .name = "label", .value = .{ .text = EditorState.redoLabel().? } }})
             else
-                tr("Redo    Ctrl+Shift+Z");
+                tr("Redo");
 
-            const do_undo = gui.menuItemLabel(@src(), undo_str, .{}, .{ .expand = .horizontal });
-            if (do_undo != null and EditorState.canUndo()) {
+            if (MenuItems.command(@src(), undo_str, "edit.undo", .{ .expand = .horizontal }) and EditorState.canUndo()) {
                 m.close();
                 EditorState.undo();
             }
 
-            const do_redo = gui.menuItemLabel(@src(), redo_str, .{}, .{ .expand = .horizontal });
-            if (do_redo != null and EditorState.canRedo()) {
+            if (MenuItems.command(@src(), redo_str, "edit.redo", .{ .expand = .horizontal }) and EditorState.canRedo()) {
                 m.close();
                 EditorState.redo();
             }
@@ -189,14 +199,14 @@ pub fn draw(should_quit: *bool) void {
             var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
             defer fw.deinit();
 
-            if (gui.menuItemLabel(@src(), tr("Build Game"), .{}, .{ .expand = .horizontal }) != null) {
+            if (MenuItems.command(@src(), tr("Build Game"), "project.buildGame", .{ .expand = .horizontal })) {
                 m.close();
                 Tasks.launchBuild(gui.io);
             }
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), tr("Reimport All"), .{}, .{ .expand = .horizontal }) != null) {
+            if (MenuItems.command(@src(), tr("Reimport All"), "project.reimportAll", .{ .expand = .horizontal })) {
                 m.close();
                 Tasks.launchReimport(gui.io);
             }
@@ -232,7 +242,7 @@ pub fn draw(should_quit: *bool) void {
 
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
-            if (gui.menuItemLabel(@src(), tr("Capture Screenshot"), .{}, .{ .expand = .horizontal }) != null) {
+            if (MenuItems.command(@src(), tr("Capture Screenshot"), "view.captureScreenshot", .{ .expand = .horizontal })) {
                 m.close();
                 _ = Screenshots.capture();
             }
@@ -253,7 +263,7 @@ pub fn draw(should_quit: *bool) void {
 
             if (!EditorState.settingsReady()) {
                 gui.label(@src(), "{s}", .{tr("Settings not ready")}, .{ .expand = .horizontal, .padding = .all(8) });
-            } else if (gui.menuItemLabel(@src(), tr("Settings"), .{}, .{ .expand = .horizontal }) != null) {
+            } else if (MenuItems.command(@src(), tr("Settings"), "file.openSettings", .{ .expand = .horizontal })) {
                 m.close();
                 Documents.openAsset(EditorState.settings.global_path, .studio_settings);
             }
@@ -410,12 +420,28 @@ const Transport = enum {
 
     fn tip(self: Transport) []const u8 {
         return switch (self) {
-            .play => tr("Play the open scene  (Ctrl+P)"),
-            .play_global => tr("Play from the project's first scene"),
+            .play => playStopTip(tr("Play the open scene")),
+            .play_global => playFirstSceneTip(),
             .pause => tr("Pause"),
             .step => tr("Step one frame"),
-            .stop => tr("Stop  (Ctrl+P)"),
+            .stop => playStopTip(tr("Stop")),
         };
+    }
+
+    fn playStopTip(base: []const u8) []const u8 {
+        return withShortcutSuffix(base, "play.toggle");
+    }
+
+    fn playFirstSceneTip() []const u8 {
+        return withShortcutSuffix(tr("Play from the project's first scene"), "play.firstScene");
+    }
+
+    /// Appends `command_id`'s live shortcut label, e.g. "Play the open
+    /// scene  (Ctrl+P)".
+    fn withShortcutSuffix(base: []const u8, command_id: []const u8) []const u8 {
+        const shortcut = Shortcuts.label(command_id);
+        if (shortcut.len == 0) return base;
+        return std.fmt.allocPrint(gui.currentWindow().arena(), "{s}  ({s})", .{ base, shortcut }) catch base;
     }
 
     fn color(self: Transport) gui.Color {

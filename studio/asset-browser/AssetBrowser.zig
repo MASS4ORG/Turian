@@ -179,7 +179,10 @@ pub fn draw() void {
 
     // Handle keyboard events. Only meaningful while grid tiles are on screen —
     // in tree-only mode the tree itself owns arrow/F2/Delete via `TreeView`.
-    if (g_nav_mode != .tree_only) {
+    // Gated on `AssetGridView.hasFocus()` (last frame's result) so a tile
+    // only responds once the user has actually clicked one, not merely
+    // because the grid is the visible tab.
+    if (g_nav_mode != .tree_only and AssetGridView.hasFocus()) {
         for (gui.events()) |*e| {
             if (e.handled) continue;
             if (e.evt != .key) continue;

@@ -4,6 +4,36 @@
 //! the indicator is drawn as an entypo icon instead.
 const std = @import("std");
 const gui = @import("gui");
+const Shortcuts = @import("services/Shortcuts.zig");
+
+/// A regular (non-submenu) menu entry that shows `command_id`'s live
+/// shortcut label right-aligned and dimmed next to the title. Returns true
+/// on click, exactly like `gui.menuItemLabel`.
+pub fn command(src: std.builtin.SourceLocation, title: []const u8, command_id: []const u8, opts: gui.Options) bool {
+    var mi = gui.menuItem(src, .{}, opts);
+    defer mi.deinit();
+
+    const clicked = mi.activeRect() != null;
+    const id_extra = opts.id_extra orelse 0;
+
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id_extra });
+    defer row.deinit();
+
+    gui.labelNoFmt(@src(), title, .{}, mi.style().strip().override(.{ .gravity_y = 0.5 }));
+
+    const shortcut_label = Shortcuts.label(command_id);
+    if (shortcut_label.len > 0) {
+        _ = gui.spacer(@src(), .{ .expand = .horizontal, .min_size_content = .{ .w = 16 } });
+        const dim = gui.themeGet().color(.window, .text).opacity(0.55);
+        gui.labelNoFmt(@src(), shortcut_label, .{}, mi.style().strip().override(.{
+            .gravity_y = 0.5,
+            .color_text = dim,
+            .id_extra = id_extra,
+        }));
+    }
+
+    return clicked;
+}
 
 /// Submenu entry inside a *vertical* menu (a main-menu drop-down): label on
 /// the left, right-pointing chevron pushed to the trailing edge.

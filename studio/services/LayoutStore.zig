@@ -88,6 +88,19 @@ pub fn allows(id: []const u8) bool {
     return false;
 }
 
+/// Adds a fresh instance of panel `id` to the current layout's first leaf.
+/// No-op if `id` isn't allowed here, or is already open and doesn't permit
+/// multiple instances.
+pub fn addPanel(id: []const u8, io: std.Io) void {
+    if (!allows(id)) return;
+    const p = Panels.find(id) orelse return;
+    const l = get();
+    if (!p.allow_multiple and l.contains(id)) return;
+    const instance_id = Panels.newInstanceId(id, l, std.heap.page_allocator) catch return;
+    l.insertTabOwned(l.firstLeaf(l.root), 0, instance_id) catch return;
+    save(io);
+}
+
 /// True while the active document's own layout stands in for the main one.
 /// Layout *presets*, built-in and user-saved alike, are arrangements of the
 /// scene panels — so the View ▸ Layout menu hides itself in this state rather

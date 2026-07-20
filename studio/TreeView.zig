@@ -64,6 +64,13 @@ pub fn TreeView(comptime Model: type) type {
         var rename_just_started: bool = false;
         var rename_buf: [256]u8 = undefined;
 
+        /// True when a row (or the rename field) of *this* `TreeView(Model)`
+        /// instantiation holds dvui keyboard focus, per the current frame's
+        /// `renderLevel` pass (`draw` calls it before `handleKeyboard`).
+        /// Without this every instance reacts to arrow/F2/Delete regardless
+        /// of which panel is actually focused.
+        var has_focus: bool = false;
+
         pub fn isRenaming() bool {
             return rename_idx != null;
         }
@@ -101,10 +108,9 @@ pub fn TreeView(comptime Model: type) type {
         pub fn draw(root_wd: *gui.WidgetData) void {
             if (Model.count() == 0) {
                 if (isRenaming()) cancelRename();
+                has_focus = false;
                 return;
             }
-
-            handleKeyboard(root_wd);
 
             var tree = gui.TreeWidget.tree(@src(), .{ .enable_reordering = true }, .{ .expand = .horizontal });
             defer tree.deinit();
@@ -113,6 +119,7 @@ pub fn TreeView(comptime Model: type) type {
 
             // Recomputed each frame while a node is dragged (see renderNode).
             drop_target = null;
+            has_focus = false; // recomputed by renderLevel below
             renderLevel(tree, -1, 0, &had_removed);
 
             // On drop, hand the drag/target/zone triple to the model — drop
@@ -125,9 +132,12 @@ pub fn TreeView(comptime Model: type) type {
                 dragging_idx = null;
                 drop_target = null;
             }
+
+            handleKeyboard(root_wd);
         }
 
         fn handleKeyboard(root_wd: *gui.WidgetData) void {
+            if (!has_focus) return;
             for (gui.events()) |*e| {
                 if (e.handled) continue;
                 if (e.evt != .key) continue;
@@ -297,6 +307,8 @@ pub fn TreeView(comptime Model: type) type {
                     }
                 }
 
+                gui.focusWidget(branch.button.data().id, null, null);
+
                 const same_idx = last_click_idx == idx;
                 if (comptime @hasDecl(Model, "activate")) {
                     if (same_idx and now - last_click_ns < 500 * std.time.ns_per_ms) {
@@ -313,6 +325,8 @@ pub fn TreeView(comptime Model: type) type {
                     last_click_ns = now;
                 }
             }
+
+            if (gui.focusedWidgetIdInCurrentSubwindow() == branch.button.data().id) has_focus = true;
 
             const icon = Model.rowIcon(idx, has_children);
             if (icon.image) |source| {
@@ -342,12 +356,14 @@ pub fn TreeView(comptime Model: type) type {
                 });
                 defer te.deinit();
 
-                // Grab keyboard focus on the first frame so the field is
-                // editable without an extra click.
+                // Grab focus on the first frame (before the check below) so
+                // the field is both editable and counted as focused already.
                 if (rename_just_started) {
                     gui.focusWidget(te.data().id, null, null);
                     rename_just_started = false;
                 }
+
+                if (gui.focusedWidgetIdInCurrentSubwindow() == te.data().id) has_focus = true;
 
                 if (te.enter_pressed) {
                     Model.applyRename(idx, te.textGet());

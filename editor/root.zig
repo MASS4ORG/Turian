@@ -101,11 +101,39 @@ pub const menu_tree = @import("MenuTree.zig");
 /// `path:line` reference parser for the Studio Output panel.
 pub const log_location = @import("LogLocation.zig");
 
+// Imported at root scope (not just re-exported from within `shortcuts`
+// below) so `refAllDecls` in this file's own `test` block reaches their
+// `test` blocks — see the identical concern noted on that block.
+pub const shortcuts_binding = @import("shortcuts/Binding.zig");
+pub const shortcuts_registry = @import("shortcuts/Registry.zig");
+
+/// Studio shortcut binding model + command registry (parse/format/conflict
+/// detection, persisted through `Settings`). GUI-free; `studio/services/Shortcuts.zig`
+/// bridges it to dvui key events.
+pub const shortcuts = struct {
+    pub const Binding = shortcuts_binding.Binding;
+    pub const Stroke = shortcuts_binding.Stroke;
+    pub const Key = shortcuts_binding.Key;
+    pub const Registry = shortcuts_registry.Registry;
+    pub const Context = shortcuts_registry.Context;
+    pub const CommandDesc = shortcuts_registry.CommandDesc;
+    pub const Override = shortcuts_registry.Override;
+    pub const BoundOverride = shortcuts_registry.BoundOverride;
+    pub const MAX_OVERRIDE_BINDINGS = shortcuts_registry.MAX_OVERRIDE_BINDINGS;
+    pub const Entry = shortcuts_registry.Entry;
+    pub const Conflict = shortcuts_registry.Conflict;
+};
+
+// Top-level (not nested inside `i18n` below) so this file's own `test`
+// block reaches their `test` blocks — see the note above `shortcuts_binding`.
+pub const i18n_extractor = @import("i18n/Extractor.zig");
+pub const i18n_compiler = @import("i18n/Compiler.zig");
+
 /// Localization editor tooling (ADR 0011): `tr`/`trc`/`trn`/`trKey` call-site
 /// extraction and `.strings` -> `.strtab` compilation.
 pub const i18n = struct {
-    pub const Extractor = @import("i18n/Extractor.zig");
-    pub const Compiler = @import("i18n/Compiler.zig");
+    pub const Extractor = i18n_extractor;
+    pub const Compiler = i18n_compiler;
 };
 
 test {
