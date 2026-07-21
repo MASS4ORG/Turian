@@ -377,6 +377,134 @@ test "load triangulates a single-triangle FBX into one submesh" {
     try std.testing.expectApproxEqAbs(@as(f32, 1.0), mesh.vertices[0].nz, 1e-5);
 }
 
+// Two triangles sharing an edge (a quad split diagonally): v0=(0,0,0),
+// v1=(1,0,0), v2=(1,1,0), v3=(0,1,0), faces [v0,v1,v2] and [v0,v2,v3]. ufbx
+// de-indexes this into 6 triangle-corner vertices; the weld pass in
+// `fbx_wrap.c` should collapse the shared v0/v2 corners back down to 4.
+const test_fbx_quad =
+    \\; FBX 7.3.0 project file
+    \\FBXHeaderExtension:  {
+    \\  FBXHeaderVersion: 1003
+    \\  FBXVersion: 7300
+    \\}
+    \\GlobalSettings:  {
+    \\  Version: 1000
+    \\  Properties70:  {
+    \\    P: "UpAxis", "int", "Integer", "",1
+    \\    P: "UpAxisSign", "int", "Integer", "",1
+    \\    P: "FrontAxis", "int", "Integer", "",2
+    \\    P: "FrontAxisSign", "int", "Integer", "",1
+    \\    P: "CoordAxis", "int", "Integer", "",0
+    \\    P: "CoordAxisSign", "int", "Integer", "",1
+    \\    P: "OriginalUpAxis", "int", "Integer", "",1
+    \\    P: "OriginalUpAxisSign", "int", "Integer", "",1
+    \\    P: "UnitScaleFactor", "double", "Number", "",1
+    \\  }
+    \\}
+    \\Objects:  {
+    \\  Geometry: 1000000, "Geometry::Quad", "Mesh" {
+    \\    Vertices: *12 {
+    \\      a: 0,0,0,1,0,0,1,1,0,0,1,0
+    \\    }
+    \\    PolygonVertexIndex: *6 {
+    \\      a: 0,1,-3,0,2,-4
+    \\    }
+    \\    GeometryVersion: 124
+    \\    LayerElementNormal: 0 {
+    \\      Version: 101
+    \\      Name: ""
+    \\      MappingInformationType: "ByPolygonVertex"
+    \\      ReferenceInformationType: "Direct"
+    \\      Normals: *18 {
+    \\        a: 0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1
+    \\      }
+    \\    }
+    \\    LayerElementUV: 0 {
+    \\      Version: 101
+    \\      Name: "UVMap"
+    \\      MappingInformationType: "ByPolygonVertex"
+    \\      ReferenceInformationType: "IndexToDirect"
+    \\      UV: *8 {
+    \\        a: 0,0,1,0,1,1,0,1
+    \\      }
+    \\      UVIndex: *6 {
+    \\        a: 0,1,2,0,2,3
+    \\      }
+    \\    }
+    \\    LayerElementMaterial: 0 {
+    \\      Version: 101
+    \\      Name: ""
+    \\      MappingInformationType: "AllSame"
+    \\      ReferenceInformationType: "IndexToDirect"
+    \\      Materials: *1 {
+    \\        a: 0
+    \\      }
+    \\    }
+    \\    Layer: 0 {
+    \\      Version: 100
+    \\      LayerElement:  {
+    \\        Type: "LayerElementNormal"
+    \\        TypedIndex: 0
+    \\      }
+    \\      LayerElement:  {
+    \\        Type: "LayerElementUV"
+    \\        TypedIndex: 0
+    \\      }
+    \\      LayerElement:  {
+    \\        Type: "LayerElementMaterial"
+    \\        TypedIndex: 0
+    \\      }
+    \\    }
+    \\  }
+    \\  Model: 2000000, "Model::Quad", "Mesh" {
+    \\    Version: 232
+    \\    Properties70:  {
+    \\    }
+    \\    Shading: T
+    \\    Culling: "CullingOff"
+    \\  }
+    \\  Material: 3000000, "Material::TestMat", "" {
+    \\    Version: 102
+    \\    ShadingModel: "Phong"
+    \\    MultiLayer: 0
+    \\    Properties70:  {
+    \\      P: "DiffuseColor", "Color", "", "A",0.5,0.25,0.1
+    \\      P: "SpecularColor", "Color", "", "A",0,0,0
+    \\      P: "ShininessExponent", "Number", "", "A",10
+    \\    }
+    \\  }
+    \\}
+    \\Connections:  {
+    \\  C: "OO",1000000,2000000
+    \\  C: "OO",3000000,2000000
+    \\}
+    \\
+;
+
+test "load welds shared vertices between adjoining triangles" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "m.fbx", .data = test_fbx_quad });
+
+    var path_buf: [256]u8 = undefined;
+    const path = try std.fmt.bufPrint(&path_buf, ".zig-cache/tmp/{s}/m.fbx", .{tmp.sub_path});
+
+    var mesh = try load(std.testing.allocator, io, path);
+    defer mesh.deinit();
+
+    // 6 triangle corners de-indexed by ufbx, welded down to the 4 unique
+    // (pos, normal, uv) vertices shared by the two triangles.
+    try std.testing.expectEqual(@as(usize, 4), mesh.vertices.len);
+    try std.testing.expectEqual(@as(usize, 6), mesh.indices.len);
+    try std.testing.expectEqual(@as(usize, 1), mesh.submeshes.len);
+
+    // Corner 0 (v0 of triangle 1) and corner 3 (v0 of triangle 2) must weld
+    // to the same vertex; likewise corner 2 and corner 4 (both v2).
+    try std.testing.expectEqual(mesh.indices[0], mesh.indices[3]);
+    try std.testing.expectEqual(mesh.indices[2], mesh.indices[4]);
+}
+
 test "loadModelInfo extracts a best-effort PBR material from a classic Phong FBX material" {
     const io = std.testing.io;
     var tmp = std.testing.tmpDir(.{});

@@ -28,7 +28,9 @@ const VERSION_IMAGE: u32 = 3;
 // v4: cook every mesh/primitive (submesh table) instead of only the first.
 // v5: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
 // sub-assets for glTF/GLB (additive — the main artifact is unchanged).
-const VERSION_MODEL: u32 = 5;
+// v6: FBX cook welds shared (pos, normal, uv) vertices into a real index
+// buffer instead of emitting fully de-indexed geometry.
+const VERSION_MODEL: u32 = 6;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 

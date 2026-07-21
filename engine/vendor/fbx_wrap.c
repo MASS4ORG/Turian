@@ -52,6 +52,33 @@ static void free_chunk(FbxMeshData* c) {
     free(c->indices);
 }
 
+/* ufbx emits fully de-indexed geometry (one vertex per triangle corner); weld
+   matching (pos, normal, uv) corners back into a real index buffer via ufbx's
+   own hashing pass. Rewrites `c->indices` and shrinks `c->vertex_count` in
+   place; leaves the chunk untouched if welding fails for any reason (still a
+   valid, merely unwelded, chunk). */
+static void weld_chunk(FbxMeshData* c) {
+    uint32_t* welded = (uint32_t*)malloc((size_t)c->index_count * sizeof(uint32_t));
+    if (!welded) return;
+
+    ufbx_vertex_stream streams[3];
+    size_t num_streams = 0;
+    streams[num_streams++] = (ufbx_vertex_stream){ c->positions, c->vertex_count, 3 * sizeof(float) };
+    if (c->normals) streams[num_streams++] = (ufbx_vertex_stream){ c->normals, c->vertex_count, 3 * sizeof(float) };
+    if (c->uvs) streams[num_streams++] = (ufbx_vertex_stream){ c->uvs, c->vertex_count, 2 * sizeof(float) };
+
+    ufbx_error error;
+    size_t unique = ufbx_generate_indices(streams, num_streams, welded, c->index_count, NULL, &error);
+    if (unique == 0 || unique > c->vertex_count) {
+        free(welded);
+        return;
+    }
+
+    free(c->indices);
+    c->indices = welded;
+    c->vertex_count = (uint32_t)unique;
+}
+
 int fbx_wrap_load_all(const char* path, FbxMultiMeshData* out) {
     memset(out, 0, sizeof(*out));
 
@@ -158,6 +185,8 @@ int fbx_wrap_load_all(const char* path, FbxMultiMeshData* out) {
             c->has_normals = normals ? 1 : 0;
             c->has_uvs = uvs ? 1 : 0;
             c->material_index = mat ? (int)mat->typed_id : -1;
+
+            weld_chunk(c);
         }
     }
 
