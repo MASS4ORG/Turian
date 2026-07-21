@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0] - 2026-07-21
+
+### Features
+- feat: import glTF/GLB node hierarchy as mesh + prefab sub-assets #8
+- feat: alpha/additive blend modes, cull mode, and alpha-mask cutout for materials #26
+- feat(editor): shortcut binding model and command registry #14
+
 ## [2.1.0] - 2026-07-20
 
 ### Features
