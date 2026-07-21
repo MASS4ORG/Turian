@@ -317,12 +317,15 @@ test "register, instantiate with transform, and destroy" {
     sp.registerPrefab("11111111-1111-4111-8111-111111111111", &tmpl);
     try testing.expect(sp.hasPrefab("11111111-1111-4111-8111-111111111111"));
 
-    var objects: [MAX_OBJECTS]SceneNode = undefined;
+    // Heap-allocated: a `[MAX_OBJECTS]SceneNode` stack local overflows now that
+    // the per-slot material table enlarged each node.
+    const objects = try testing.allocator.alloc(SceneNode, MAX_OBJECTS);
+    defer testing.allocator.free(objects);
     var count: usize = 0;
 
     sp.instantiate("11111111-1111-4111-8111-111111111111", .{ .x = 5, .y = 0, .z = 0 }, null);
     try testing.expectEqual(@as(usize, 1), sp.pending());
-    try testing.expect(sp.flush(io, &objects, &count));
+    try testing.expect(sp.flush(io, objects, &count));
 
     try testing.expectEqual(@as(usize, 2), count);
     try testing.expectEqualStrings("Coin", objects[0].nameSlice());
@@ -340,7 +343,7 @@ test "register, instantiate with transform, and destroy" {
 
     // Spawn a second instance under a different start index.
     sp.instantiate("11111111-1111-4111-8111-111111111111", null, null);
-    _ = sp.flush(io, &objects, &count);
+    _ = sp.flush(io, objects, &count);
     try testing.expectEqual(@as(usize, 4), count);
     try testing.expectEqual(@as(i32, 2), objects[3].parent); // child reparented by offset
     // Distinct instance identities.
@@ -351,7 +354,7 @@ test "register, instantiate with transform, and destroy" {
     var gbuf: [GUID_LEN]u8 = undefined;
     @memcpy(gbuf[0..root_guid.len], root_guid);
     sp.destroy(gbuf[0..root_guid.len]);
-    try testing.expect(sp.flush(io, &objects, &count));
+    try testing.expect(sp.flush(io, objects, &count));
     try testing.expectEqual(@as(usize, 2), count); // 4 - 2 removed
     // The surviving instance remains, with a valid parent chain.
     try testing.expectEqualStrings("Coin", objects[0].nameSlice());
@@ -361,9 +364,10 @@ test "register, instantiate with transform, and destroy" {
 test "instantiate unknown prefab is a no-op" {
     var sp = Spawner.init(testing.allocator);
     defer sp.deinit();
-    var objects: [MAX_OBJECTS]SceneNode = undefined;
+    const objects = try testing.allocator.alloc(SceneNode, MAX_OBJECTS);
+    defer testing.allocator.free(objects);
     var count: usize = 0;
     sp.instantiate("ffffffff-ffff-4fff-8fff-ffffffffffff", null, null);
-    try testing.expect(!sp.flush(testing.io, &objects, &count));
+    try testing.expect(!sp.flush(testing.io, objects, &count));
     try testing.expectEqual(@as(usize, 0), count);
 }

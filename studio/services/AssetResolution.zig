@@ -65,50 +65,29 @@ fn readFileArena(io: std.Io, arena: std.mem.Allocator, path: []const u8) ?[]u8 {
     return reader.interface.allocRemaining(arena, .unlimited) catch null;
 }
 
-/// Resolve the default material GUID for every submesh of a model mesh — the
-/// material generated for each primitive's glTF material — and write them
-/// positionally into `out` (backed by `buf` for the actual GUID string
-/// bytes; unset slots are empty slices). Returns the number of submeshes
-/// filled — 0 for non-model meshes, meshes with no cooked submesh table, or
-/// models without generated materials. Used to auto-assign a MeshRenderer's
-/// per-submesh materials when its mesh is set to a model.
-pub fn modelSubmeshMaterials(
+/// Resolve the default material GUID for every material slot of a model mesh,
+/// writing them into `out` indexed by slot (backed by `buf` for the GUID string
+/// bytes; unset slots are empty slices). Returns the slot count — 0 for
+/// non-model meshes, meshes with no cooked submesh table, or models without
+/// generated materials. Used to auto-assign a MeshRenderer's materials when its
+/// mesh is set to a model.
+pub fn modelSlotMaterials(
     io: std.Io,
     mesh_guid_str: []const u8,
-    buf: *[engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][36]u8,
-    out: *[engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][]const u8,
+    buf: *[engine.MeshRendererComponent.MAX_MATERIALS][36]u8,
+    out: *[engine.MeshRendererComponent.MAX_MATERIALS][]const u8,
 ) usize {
-    if (mesh_guid_str.len == 0 or !State.assetDbReady()) return 0;
-    const guid = editor.Guid.parse(mesh_guid_str) catch return 0;
-    const info = EditorState.asset_db.findByGuid(guid) orelse return 0;
-    if (info.asset_type != .model) return 0;
+    if (!State.assetDbReady()) return 0;
     const proj = EditorState.project_path orelse return 0;
-
-    const meta = editor.asset_meta.readMeta(io, std.heap.page_allocator, info.path);
-    if (meta.sub_assets.len == 0) return 0;
-
-    var art_buf: [1024]u8 = undefined;
-    const art_path = editor.asset_cache.artifactPath(proj, guid, .model, &art_buf) orelse return 0;
-    const bytes = std.Io.Dir.cwd().readFileAlloc(io, art_path, std.heap.page_allocator, .unlimited) catch return 0;
-    defer std.heap.page_allocator.free(bytes);
-
-    var mesh = engine.assets.Mesh.fromBytes(std.heap.page_allocator, bytes) catch return 0;
-    defer mesh.deinit();
-
-    const n = @min(mesh.submeshes.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
-    for (mesh.submeshes[0..n], 0..) |sm, i| {
-        out[i] = &.{};
-        if (sm.material_slot < 0) continue;
-        var key_buf: [32]u8 = undefined;
-        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{sm.material_slot}) catch continue;
-        for (meta.sub_assets) |s| {
-            if (s.asset_type == .material and std.mem.eql(u8, s.key, key)) {
-                out[i] = s.guid.toString(&buf[i]);
-                break;
-            }
-        }
-    }
-    return n;
+    return editor.model_materials.slotMaterials(
+        io,
+        std.heap.page_allocator,
+        &EditorState.asset_db,
+        proj,
+        mesh_guid_str,
+        buf,
+        out,
+    );
 }
 
 pub fn resolveObjectGuid(guid_str: []const u8) ?[]const u8 {

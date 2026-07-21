@@ -168,7 +168,7 @@ pub const debugSetTransform = DebugMutations.debugSetTransform;
 
 pub const resolveAssetGuid = AssetResolution.resolveAssetGuid;
 pub const firstScenePath = AssetResolution.firstScenePath;
-pub const modelSubmeshMaterials = AssetResolution.modelSubmeshMaterials;
+pub const modelSlotMaterials = AssetResolution.modelSlotMaterials;
 pub const resolveObjectGuid = AssetResolution.resolveObjectGuid;
 pub const dragAssetGuidStr = AssetResolution.dragAssetGuidStr;
 pub const setProjectPath = AssetResolution.setProjectPath;

@@ -22,6 +22,8 @@ pub const asset_meta = @import("assets/AssetMeta.zig");
 pub const asset_cache = @import("assets/AssetCache.zig");
 /// Asset import pipeline (source → cached artifact).
 pub const asset_importer = @import("assets/AssetImporter.zig");
+
+pub const model_materials = @import("assets/ModelMaterials.zig");
 /// Asset packaging (cooked artifacts → .oap package).
 pub const asset_packager = @import("assets/AssetPackager.zig");
 /// Asset type registry and lookup.

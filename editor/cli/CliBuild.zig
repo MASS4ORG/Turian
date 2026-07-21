@@ -212,7 +212,11 @@ pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     defer db.deinit();
     db.scan(io, assets);
 
-    var objects: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;
+    // Heap-allocated (not `[MAX_OBJECTS]SceneNode` on the stack — that overflows
+    // with the larger per-slot material table).
+    const objects = gpa.alloc(engine.SceneNode, engine.scene.MAX_OBJECTS) catch return;
+    defer gpa.free(objects);
+    const current_version = editor.scene_io.CURRENT_VERSION;
     var scanned: usize = 0;
     var migrated: usize = 0;
 
@@ -221,11 +225,19 @@ pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
         scanned += 1;
         const bytes = std.Io.Dir.cwd().readFileAlloc(io, info.path, gpa, .unlimited) catch continue;
         defer gpa.free(bytes);
-        if (std.mem.indexOf(u8, bytes, "\"material_guid\":") == null) continue;
+
+        // The scene `version` is the migration trigger: v1 (or the pre-version
+        // default) needs rewriting; a current-version scene is already migrated.
+        // Loading converts the legacy single `material_guid` field in memory, so
+        // no separate check for it is needed.
+        const version = editor.scene_io.parseSceneVersion(bytes);
+        if (version >= current_version) continue;
 
         var count: usize = 0;
-        if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, &objects, &count)) continue;
-        editor.scene_io.saveScene(io, info.path, &objects, count, gpa);
+        if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, objects, &count)) continue;
+        // v1 bound materials per submesh; rebuild the per-slot table from the model.
+        _ = editor.model_materials.migrateSceneMaterials(io, gpa, &db, path, objects, count);
+        editor.scene_io.saveScene(io, info.path, objects, count, gpa);
         migrated += 1;
         std.debug.print("Migrated: {s}\n", .{info.path});
     }

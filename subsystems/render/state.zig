@@ -102,12 +102,13 @@ pub var material_override_bytes: []const u8 = &.{};
 pub const KEY_CAP = 64;
 
 pub const MAX_MESHES = 64;
-/// Matches `MeshRendererComponent.MAX_SUBMESH_MATERIALS` — a GPU mesh never
-/// needs more drawable ranges than a mesh renderer can bind materials.
-pub const MAX_SUBMESHES = engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS;
+/// One drawable range of a GPU mesh's index buffer, bound to a material slot.
+/// `material_slot` keys into the mesh renderer's `materials` table (or -1 for no
+/// material). A GPU mesh holds one per cooked submesh, with no fixed ceiling.
 pub const GpuSubmesh = struct {
     index_offset: u32 = 0,
     index_count: u32 = 0,
+    material_slot: i32 = 0,
 };
 pub const GpuMesh = struct {
     key: [KEY_CAP]u8 = undefined,
@@ -115,8 +116,10 @@ pub const GpuMesh = struct {
     vtx_buf: *c.SDL_GPUBuffer = undefined,
     idx_buf: *c.SDL_GPUBuffer = undefined,
     idx_count: u32 = 0,
-    submeshes: [MAX_SUBMESHES]GpuSubmesh = undefined,
-    submesh_count: u32 = 0,
+    /// Heap-owned draw ranges (page allocator), one per cooked submesh. A large
+    /// flattened model can carry thousands, so this is a slice rather than a
+    /// fixed array. Empty when the mesh failed to upload.
+    submeshes: []GpuSubmesh = &.{},
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);

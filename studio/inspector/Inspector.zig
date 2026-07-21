@@ -165,9 +165,9 @@ pub fn draw() void {
                     const prev_mesh = obj_before_field.components[ci].mesh_renderer.mesh.slice();
                     const mesh_changed = !std.mem.eql(u8, prev_mesh, mr.mesh.slice());
                     if (mesh_changed and mr.material_count == 0) {
-                        var mat_buf: [engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][36]u8 = undefined;
-                        var mat_guids: [engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS][]const u8 = undefined;
-                        const n = EditorState.modelSubmeshMaterials(gui.io, mr.mesh.slice(), &mat_buf, &mat_guids);
+                        var mat_buf: [engine.MeshRendererComponent.MAX_MATERIALS][36]u8 = undefined;
+                        var mat_guids: [engine.MeshRendererComponent.MAX_MATERIALS][]const u8 = undefined;
+                        const n = EditorState.modelSlotMaterials(gui.io, mr.mesh.slice(), &mat_buf, &mat_guids);
                         if (n > 0) {
                             for (0..n) |i| mr.materials[i].set(mat_guids[i]);
                             mr.material_count = @intCast(n);
@@ -176,15 +176,16 @@ pub fn draw() void {
                     }
 
                     // Hand-drawn (bounded by material_count) since `materials`
-                    // is hidden from the generic reflection walker, which
-                    // would otherwise render all MAX_SUBMESH_MATERIALS slots.
+                    // is hidden from the generic reflection walker, which would
+                    // otherwise render all MAX_MATERIALS slots. Each row is one
+                    // material slot (keyed by `Submesh.material_slot`).
                     if (mr.material_count > 0) {
                         var mat_al = gui.Alignment.init(@src(), ci + 1);
                         defer mat_al.deinit();
                         var mat_ctx = PropDraw.DrawCtx{ .al = &mat_al, .allocator = std.heap.page_allocator };
                         for (0..mr.material_count) |mi| {
                             var name_buf: [32]u8 = undefined;
-                            const name = std.fmt.bufPrint(&name_buf, "{s} [{d}]", .{ tr("Material"), mi }) catch "Material";
+                            const name = std.fmt.bufPrint(&name_buf, "{s} {d}", .{ tr("Slot"), mi }) catch "Slot";
                             if (PropDraw.drawValue(engine.TypedAssetRef(.material), name, &mr.materials[mi], .{}, &mat_ctx, (ci + 1) * 1000 + mi))
                                 changed = true;
                         }

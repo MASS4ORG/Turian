@@ -15,7 +15,7 @@ fn printUsage() void {
         \\  new-project <path> [name]   Create a new project at the given path
         \\  info        <project-path>  Print project metadata and component list
         \\  import      <project-path>  Import all assets (reports task progress)
-        \\  migrate     <project-path>  Re-save assets still using deprecated fields
+        \\  migrate     <project-path>  Upgrade scenes to the current format (per-slot materials)
         \\  build       <project-path>  Compile the project into a game executable
         \\  play-build  <project-path>  Compile the in-editor Play-mode library
         \\  debug       <subcommand>    Connect to a running Turian debug server

@@ -1,5 +1,6 @@
 pub const Mesh = @import("Mesh.zig").Mesh;
 pub const Vertex = @import("Mesh.zig").Vertex;
+pub const Submesh = @import("Mesh.zig").Submesh;
 pub const PrimitiveMesh = @import("PrimitiveMesh.zig");
 pub const Texture = @import("Texture.zig").Texture;
 pub const TextureFormat = @import("Texture.zig").Format;

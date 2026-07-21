@@ -324,13 +324,17 @@ pub fn renderScene(io: std.Io, objects: []const engine.SceneNode) void {
                 };
                 if (mesh_opt) |mesh| {
                     const mr = &comp.mesh_renderer;
-                    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
                     if (mesh.submeshes.len == 0) {
                         const mat = resolveMaterial(if (mat_n > 0) mr.materials[0].slice() else "");
                         renderMesh(mesh, obj, cam_pos, axes, f_val, aspect, lights[0..light_count], mat, 0, mesh.indices.len);
                     } else {
-                        for (mesh.submeshes, 0..) |sm, si| {
-                            const mat_guid = if (si < mat_n) mr.materials[si].slice() else "";
+                        for (mesh.submeshes) |sm| {
+                            const slot = sm.material_slot;
+                            const mat_guid = if (slot >= 0 and @as(u32, @intCast(slot)) < mat_n)
+                                mr.materials[@intCast(slot)].slice()
+                            else
+                                "";
                             const mat = resolveMaterial(mat_guid);
                             const start = sm.index_offset;
                             const end = start + sm.index_count;
@@ -785,4 +789,92 @@ test "shadePixel lights a surface by light type" {
     }};
     const dark = shadePixel(up, origin, uv, white, &spot_off);
     try std.testing.expectEqual(dark[0], shadePixel(up, origin, uv, white, &[_]LightInfo{})[0]);
+}
+
+test "draws a submesh past the old 32-cap, bound by material slot" {
+    // A 40-submesh mesh whose only geometry sits in submesh 39 → material slot
+    // 39, past the former 32 ceiling. The renderer must key the material by
+    // `material_slot` and draw it; the old positional/capped path would have
+    // dropped it to the default (white) material.
+    g_cache_len = 0;
+    g_mat_cache_len = 0;
+    g_tex_cache_len = 0;
+
+    // Double-sided fullscreen quad at z=0, facing the default camera (0,2,-5).
+    var verts = [_]engine.assets.Vertex{
+        .{ .px = -10, .py = -10, .pz = 0, .nx = 0, .ny = 0, .nz = -1, .u = 0, .v = 0 },
+        .{ .px = 10, .py = -10, .pz = 0, .nx = 0, .ny = 0, .nz = -1, .u = 1, .v = 0 },
+        .{ .px = 10, .py = 10, .pz = 0, .nx = 0, .ny = 0, .nz = -1, .u = 1, .v = 1 },
+        .{ .px = -10, .py = 10, .pz = 0, .nx = 0, .ny = 0, .nz = -1, .u = 0, .v = 1 },
+    };
+    var idx = [_]u32{ 0, 1, 2, 0, 2, 3, 0, 2, 1, 0, 3, 2 }; // both windings
+
+    const slot = 39;
+    var subs: [slot + 1]engine.assets.Submesh = undefined;
+    for (0..slot) |i| subs[i] = .{ .index_offset = 0, .index_count = 0, .material_slot = @intCast(i) };
+    subs[slot] = .{ .index_offset = 0, .index_count = @intCast(idx.len), .material_slot = slot };
+
+    const mesh = engine.assets.Mesh{
+        .vertices = &verts,
+        .indices = &idx,
+        .submeshes = &subs,
+        .allocator = std.testing.allocator,
+    };
+    const mesh_bytes = try mesh.encode(std.testing.allocator);
+    defer std.testing.allocator.free(mesh_bytes);
+
+    const MeshSrc = struct {
+        var bytes: []const u8 = &.{};
+        fn get(guid: []const u8) ?MeshSource {
+            if (!std.mem.eql(u8, guid, "mesh40")) return null;
+            return .{ .bytes = bytes, .ext = "", .owned = false };
+        }
+    };
+    MeshSrc.bytes = mesh_bytes;
+    setMeshSource(&MeshSrc.get);
+
+    // A red material for slot 39.
+    var sbuf: [1024]u8 = undefined;
+    var w = std.Io.Writer.fixed(&sbuf);
+    var vectors = [_]engine.Material.VectorParam{.{ .name = "base_color", .value = .{ 1, 0, 0, 1 } }};
+    try (engine.Material{ .vectors = &vectors }).serialize(&w);
+    const MatSrc = struct {
+        var bytes: [1024]u8 = undefined;
+        var len: usize = 0;
+        fn get(guid: []const u8) ?MaterialSource {
+            if (!std.mem.eql(u8, guid, "red")) return null;
+            return .{ .bytes = bytes[0..len], .owned = false };
+        }
+    };
+    @memcpy(MatSrc.bytes[0..w.buffered().len], w.buffered());
+    MatSrc.len = w.buffered().len;
+    setMaterialSource(&MatSrc.get);
+
+    var mesh_node = engine.SceneNode{};
+    var mr = engine.MeshRendererComponent{};
+    mr.mesh.set("mesh40");
+    mr.materials[slot].set("red");
+    mr.material_count = slot + 1;
+    mesh_node.components[0] = .{ .mesh_renderer = mr };
+    mesh_node.component_count = 1;
+
+    var light_node = engine.SceneNode{};
+    light_node.components[0] = .{ .light = .{ .kind = .directional, .intensity = 3 } };
+    light_node.component_count = 1;
+
+    const nodes = [_]engine.SceneNode{ light_node, mesh_node };
+    renderScene(std.testing.io, &nodes);
+
+    // Center pixel is the slot-39 red material — red-dominant, not the gray
+    // background and not a white default.
+    const px = pixelsSlice();
+    const ci = ((VP_H / 2) * VP_W + (VP_W / 2)) * 4;
+    try std.testing.expect(px[ci + 0] > px[ci + 1] + 30); // R > G
+    try std.testing.expect(px[ci + 0] > px[ci + 2] + 30); // R > B
+
+    g_cache_len = 0;
+    g_mat_cache_len = 0;
+    g_tex_cache_len = 0;
+    g_material_source = null;
+    g_mesh_source = null;
 }

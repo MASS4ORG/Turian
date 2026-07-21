@@ -9,6 +9,9 @@ const SceneComponent = @import("../types/SceneComponent.zig").SceneComponent;
 const SceneObject = @import("../types/SceneObject.zig").SceneObject;
 const SceneFile = @import("../types/SceneFile.zig").SceneFile;
 
+/// Current scene format version written by `serializeScene`.
+pub const CURRENT_VERSION = @import("../types/SceneFile.zig").CURRENT_VERSION;
+
 const log = std.log.scoped(.scene_io);
 
 fn engineCompToScene(c: *const engine.Component, material_guids: []const []const u8) SceneComponent {
@@ -46,7 +49,7 @@ fn sceneCompToEngine(sc: SceneComponent) engine.Component {
             };
             mr.mesh.set(v.mesh_guid);
             if (v.material_guids.len > 0) {
-                const n = @min(v.material_guids.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                const n = @min(v.material_guids.len, engine.MeshRendererComponent.MAX_MATERIALS);
                 for (0..n) |i| mr.materials[i].set(v.material_guids[i]);
                 mr.material_count = @intCast(n);
             } else if (v.material_guid.len > 0) {
@@ -118,7 +121,7 @@ pub fn serializeScene(
         total_overrides += obj.override_count;
         for (obj.components[0..obj.component_count]) |*c| {
             if (c.* == .user_script) total_script_fields += c.user_script.field_count;
-            if (c.* == .mesh_renderer) total_material_refs += @min(c.mesh_renderer.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+            if (c.* == .mesh_renderer) total_material_refs += @min(c.mesh_renderer.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
         }
     }
 
@@ -176,7 +179,7 @@ pub fn serializeScene(
                 } };
             } else if (c.* == .mesh_renderer) {
                 const mr = &c.mesh_renderer;
-                const n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+                const n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
                 const mg_slice = all_material_guids[mg_offset .. mg_offset + n];
                 for (0..n) |mi| mg_slice[mi] = mr.materials[mi].slice();
                 mg_offset += n;
@@ -210,7 +213,7 @@ pub fn serializeScene(
         };
     }
 
-    const scene_data = SceneFile{ .version = 1, .objects = scene_objects };
+    const scene_data = SceneFile{ .version = @import("../types/SceneFile.zig").CURRENT_VERSION, .objects = scene_objects };
     return serde.json.toSliceWith(allocator, scene_data, .{ .pretty = true }) catch null;
 }
 
@@ -246,6 +249,19 @@ pub fn loadScene(
     defer allocator.free(content);
 
     return loadSceneFromBytes(allocator, content, out_objects, out_count);
+}
+
+/// Read just the `version` field from raw scene JSON without a full parse.
+/// Returns 1 (the pre-versioned default) when the field is absent or malformed.
+/// Used to decide whether a scene needs material-slot migration before saving.
+pub fn parseSceneVersion(content: []const u8) u32 {
+    const key = "\"version\":";
+    const at = std.mem.indexOf(u8, content, key) orelse return 1;
+    var i = at + key.len;
+    while (i < content.len and (content[i] == ' ' or content[i] == '\t')) i += 1;
+    var end = i;
+    while (end < content.len and content[end] >= '0' and content[end] <= '9') end += 1;
+    return std.fmt.parseInt(u32, content[i..end], 10) catch 1;
 }
 
 /// Parse a scene from in-memory JSON bytes (e.g. supplied by an asset package

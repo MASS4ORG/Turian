@@ -467,7 +467,7 @@ pub fn renderScene(
             const guid_str = comp.mesh_renderer.mesh.slice();
             if (guid_str.len == 0) continue;
             const gm = assets.findGpuMesh(guid_str) orelse continue;
-            if (gm.submesh_count == 0) continue;
+            if (gm.submeshes.len == 0) continue;
 
             const t = &obj.transform;
             const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
@@ -477,12 +477,16 @@ pub fn renderScene(
             const vub = types.VertexUB{ .mvp = mvp.m, .model = mdl.m };
 
             const mr = &comp.mesh_renderer;
-            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             const receives = mr.receive_shadows and shadows_on;
 
-            for (gm.submeshes[0..gm.submesh_count], 0..) |sm, si| {
+            for (gm.submeshes) |sm| {
                 if (sm.index_count == 0) continue;
-                const mat_guid = if (si < mat_n) mr.materials[si].slice() else "";
+                const slot = sm.material_slot;
+                const mat_guid = if (slot >= 0 and @as(u32, @intCast(slot)) < mat_n)
+                    mr.materials[@intCast(slot)].slice()
+                else
+                    "";
                 if (!std.mem.eql(u8, mat_guid, prev_mat)) {
                     engine.Profiler.countMaterialSwitch();
                     prev_mat = mat_guid;
@@ -560,6 +564,7 @@ pub fn deinit() void {
     for (state.meshes[0..state.mesh_count]) |*gm| {
         c.SDL_ReleaseGPUBuffer(dev, gm.vtx_buf);
         c.SDL_ReleaseGPUBuffer(dev, gm.idx_buf);
+        std.heap.page_allocator.free(gm.submeshes);
     }
     state.mesh_count = 0;
     if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);

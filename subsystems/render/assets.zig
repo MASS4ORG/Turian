@@ -115,7 +115,7 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
             const guid = comp.mesh_renderer.mesh.slice();
             if (guid.len == 0) continue;
             const mr = &comp.mesh_renderer;
-            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
+            const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             for (mr.materials[0..mat_n]) |*mat_ref| uploadMaterialTextures(cmd, dev, mat_ref.slice());
 
             if (findGpuMesh(guid) != null or state.mesh_count >= state.MAX_MESHES) continue;
@@ -125,7 +125,7 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
                 state.mesh_count += 1;
                 gm.key_len = setKey(&gm.key, guid);
                 gm.idx_count = 0;
-                gm.submesh_count = 0;
+                gm.submeshes = &.{};
             };
         }
     }
@@ -204,22 +204,25 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = idx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = idx_buf, .offset = 0, .size = idx_bytes }, false);
     c.SDL_EndGPUCopyPass(cp);
 
+    // One GPU submesh per cooked submesh (no ceiling); meshes with no submesh
+    // table draw as a single implicit range bound to material slot 0.
+    const sm_count = @max(cpu.submeshes.len, 1);
+    const submeshes = try page.alloc(state.GpuSubmesh, sm_count);
+    errdefer page.free(submeshes);
+    if (cpu.submeshes.len == 0) {
+        submeshes[0] = .{ .index_offset = 0, .index_count = @intCast(cpu.indices.len), .material_slot = 0 };
+    } else {
+        for (cpu.submeshes, 0..) |sm, i|
+            submeshes[i] = .{ .index_offset = sm.index_offset, .index_count = sm.index_count, .material_slot = sm.material_slot };
+    }
+
     var gm = &state.meshes[state.mesh_count];
     state.mesh_count += 1;
     gm.key_len = setKey(&gm.key, guid);
     gm.vtx_buf = vtx_buf;
     gm.idx_buf = idx_buf;
     gm.idx_count = @intCast(cpu.indices.len);
-
-    if (cpu.submeshes.len == 0) {
-        gm.submeshes[0] = .{ .index_offset = 0, .index_count = gm.idx_count };
-        gm.submesh_count = 1;
-    } else {
-        const n = @min(cpu.submeshes.len, state.MAX_SUBMESHES);
-        for (cpu.submeshes[0..n], 0..) |sm, i|
-            gm.submeshes[i] = .{ .index_offset = sm.index_offset, .index_count = sm.index_count };
-        gm.submesh_count = @intCast(n);
-    }
+    gm.submeshes = submeshes;
 }
 
 /// Upload a texture (RGBA8 or block-compressed, with mips) and cache it by GUID.

@@ -80,18 +80,21 @@ pub fn saveScene(path: []const u8) void {
 }
 
 /// Load a scene from a .zon file and replace the current scene.
+// Load scratch, kept out of the stack: a `[MAX_OBJECTS]SceneNode` local
+// overflows now that the per-slot material table enlarged each node.
+var load_scratch: [EditorState.MAX_OBJECTS]EditorState.SceneNode = undefined;
+
 pub fn loadScene(path: []const u8) bool {
-    var tmp_objects: [EditorState.MAX_OBJECTS]EditorState.SceneNode = undefined;
     var tmp_count: usize = 0;
 
-    if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, &tmp_objects, &tmp_count)) {
+    if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, &load_scratch, &tmp_count)) {
         return false;
     }
 
     EditorState.object_count = 0;
     EditorState.selected_object = null;
     EditorState.clearUndoStack();
-    for (tmp_objects[0..tmp_count], 0..) |obj, i| {
+    for (load_scratch[0..tmp_count], 0..) |obj, i| {
         EditorState.objects[i] = obj;
     }
     EditorState.object_count = tmp_count;
@@ -100,5 +103,35 @@ pub fn loadScene(path: []const u8) bool {
     EditorState.resyncPrefabInstances(gui.io);
     EditorState.setCurrentScenePath(path);
     EditorState.markSceneSaved();
+
+    // Auto-migrate pre-v2 scenes: rebuild model material tables by slot (v1
+    // bound them per submesh). Leaves the scene dirty so a save persists v2.
+    if (EditorState.assetDbReady()) {
+        if (EditorState.project_path) |proj| {
+            if (sceneFileVersion(path) < 2) {
+                const migrated = editor.model_materials.migrateSceneMaterials(
+                    gui.io,
+                    std.heap.page_allocator,
+                    &EditorState.asset_db,
+                    proj,
+                    &EditorState.objects,
+                    EditorState.object_count,
+                );
+                if (migrated > 0) EditorState.scene_dirty = true;
+            }
+        }
+    }
     return true;
+}
+
+/// Scene-file format version, or the current version on any read error (so a
+/// failed read never triggers a spurious migration).
+fn sceneFileVersion(path: []const u8) u32 {
+    const current = editor.scene_io.CURRENT_VERSION;
+    var file = std.Io.Dir.cwd().openFile(gui.io, path, .{}) catch return current;
+    defer file.close(gui.io);
+    var fbuf: [4096]u8 = undefined;
+    var reader = file.reader(gui.io, &fbuf);
+    const bytes = reader.interface.allocRemaining(gui.currentWindow().arena(), .unlimited) catch return current;
+    return editor.scene_io.parseSceneVersion(bytes);
 }

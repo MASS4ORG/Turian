@@ -117,19 +117,24 @@ fn attachMeshRenderer(
     comp.mesh.set(mesh_guids[mi].toString(&guid_buf));
 
     const submeshes = groups[mi].mesh.submeshes;
-    const n = @min(submeshes.len, engine.MeshRendererComponent.MAX_SUBMESH_MATERIALS);
-    for (submeshes[0..n], 0..) |sm, si| {
-        if (sm.material_slot < 0) continue;
-        var key_buf: [32]u8 = undefined;
-        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{sm.material_slot}) catch continue;
-        for (materials_so_far) |s| {
-            if (s.asset_type != .material or !std.mem.eql(u8, s.key, key)) continue;
-            var mat_guid_buf: [36]u8 = undefined;
-            comp.materials[si].set(s.guid.toString(&mat_guid_buf));
-            break;
-        }
+    var max_slot: i32 = -1;
+    for (submeshes) |sm| {
+        if (sm.material_slot > max_slot) max_slot = sm.material_slot;
     }
-    comp.material_count = @intCast(n);
+    if (max_slot >= 0) {
+        const n = @min(@as(usize, @intCast(max_slot + 1)), engine.MeshRendererComponent.MAX_MATERIALS);
+        for (0..n) |slot| {
+            var key_buf: [32]u8 = undefined;
+            const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{slot}) catch continue;
+            for (materials_so_far) |s| {
+                if (s.asset_type != .material or !std.mem.eql(u8, s.key, key)) continue;
+                var mat_guid_buf: [36]u8 = undefined;
+                comp.materials[slot].set(s.guid.toString(&mat_guid_buf));
+                break;
+            }
+        }
+        comp.material_count = @intCast(n);
+    }
     _ = node.addComponent(.{ .mesh_renderer = comp });
 }
 
