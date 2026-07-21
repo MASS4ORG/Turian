@@ -1,7 +1,9 @@
 /// glTF 2.0 / GLB loader backed by cgltf (single-header C library).
-/// Cooks every mesh/primitive in the file into one combined mesh: vertices
-/// and indices from all primitives are concatenated, and each primitive
-/// becomes a `Submesh` range bound to its glTF material index.
+/// `load` cooks every mesh/primitive in the file into one combined mesh:
+/// vertices and indices from all primitives are concatenated, and each
+/// primitive becomes a `Submesh` range bound to its glTF material index.
+/// `loadMeshes`/`loadHierarchy` (`GltfHierarchy.zig`) instead expose the
+/// file's per-mesh grouping and node graph, for hierarchy-preserving import.
 const std = @import("std");
 const Mesh = @import("Mesh.zig").Mesh;
 const Vertex = @import("Mesh.zig").Vertex;
@@ -13,7 +15,9 @@ pub const ImageInfo = model_info.ImageInfo;
 pub const TexRef = model_info.TexRef;
 pub const AlphaMode = model_info.AlphaMode;
 
-const CgltfMeshData = extern struct {
+/// Mirrors `CgltfMeshData` in `cgltf_wrap.h`. Shared with `GltfHierarchy.zig`,
+/// whose `loadMeshes` groups these by `mesh_index` instead of flattening them.
+pub const CgltfMeshData = extern struct {
     positions: [*]f32,
     normals: ?[*]f32,
     uvs: ?[*]f32,
@@ -23,22 +27,31 @@ const CgltfMeshData = extern struct {
     has_normals: c_int,
     has_uvs: c_int,
     material_index: c_int,
+    mesh_index: c_int,
 };
 
-const CgltfMultiMeshData = extern struct {
+/// Mirrors `CgltfMeshName` in `cgltf_wrap.h`.
+pub const CgltfMeshName = extern struct {
+    name: [128]u8,
+};
+
+/// Mirrors `CgltfMultiMeshData` in `cgltf_wrap.h`.
+pub const CgltfMultiMeshData = extern struct {
     primitives: ?[*]CgltfMeshData,
     primitive_count: u32,
+    mesh_names: ?[*]CgltfMeshName,
+    mesh_count: u32,
 };
 
 extern fn cgltf_wrap_load_all(path: [*:0]const u8, out: *CgltfMultiMeshData) c_int;
 extern fn cgltf_wrap_free_all(data: *CgltfMultiMeshData) void;
 
-/// Load every mesh/primitive from a glTF 2.0 / GLB file into one combined
-/// mesh with a submesh table. Allocates vertex, index, and submesh storage
-/// via `allocator`; the caller owns the Mesh.
-pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
-    _ = io;
-
+/// Parses `path` and returns its full flattened primitive list (every
+/// primitive of every mesh in the file, in mesh-major order). Shared by
+/// `load` (flattens everything into one combined `Mesh`) and
+/// `GltfHierarchy.loadMeshes` (groups by `mesh_index` instead). Caller must
+/// call `freeRawAll`.
+pub fn loadRawAll(path: []const u8) !CgltfMultiMeshData {
     var path_buf: [512]u8 = undefined;
     if (path.len >= path_buf.len) return error.PathTooLong;
     @memcpy(path_buf[0..path.len], path);
@@ -47,10 +60,17 @@ pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     var raw: CgltfMultiMeshData = undefined;
     if (cgltf_wrap_load_all(@ptrCast(&path_buf), &raw) != 0)
         return error.GltfLoadFailed;
-    defer cgltf_wrap_free_all(&raw);
+    return raw;
+}
 
-    const prims = raw.primitives.?[0..raw.primitive_count];
+pub fn freeRawAll(raw: *CgltfMultiMeshData) void {
+    cgltf_wrap_free_all(raw);
+}
 
+/// Assembles a combined `Mesh` from a slice of primitives: vertex/index data
+/// concatenated, one `Submesh` per primitive bound to its glTF material index.
+/// Allocates via `allocator`; the caller owns the returned `Mesh`.
+pub fn assemblePrimitives(allocator: std.mem.Allocator, prims: []const CgltfMeshData) !Mesh {
     var total_v: usize = 0;
     var total_i: usize = 0;
     for (prims) |p| {
@@ -122,6 +142,29 @@ pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
     mesh.computeBounds();
     return mesh;
 }
+
+/// Load every mesh/primitive from a glTF 2.0 / GLB file into one combined
+/// mesh with a submesh table. Allocates vertex, index, and submesh storage
+/// via `allocator`; the caller owns the Mesh.
+pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
+    _ = io;
+
+    var raw = try loadRawAll(path);
+    defer freeRawAll(&raw);
+
+    const prims = raw.primitives.?[0..raw.primitive_count];
+    return assemblePrimitives(allocator, prims);
+}
+
+/// Per-glTF-mesh (not per-primitive) geometry grouping and node-hierarchy
+/// import, kept in a separate file to keep this one focused on the
+/// whole-file-combined-mesh path.
+const gltf_hierarchy = @import("GltfHierarchy.zig");
+pub const MeshGroup = gltf_hierarchy.MeshGroup;
+pub const loadMeshes = gltf_hierarchy.loadMeshes;
+pub const GltfNode = gltf_hierarchy.GltfNode;
+pub const GltfHierarchy = gltf_hierarchy.GltfHierarchy;
+pub const loadHierarchy = gltf_hierarchy.loadHierarchy;
 
 // ── Material / image extraction ────────────────────────────────────────────────
 // A glTF file is one source that can produce many engine assets (materials,

@@ -14,6 +14,8 @@ const EditorState = @import("../services/EditorState.zig");
 const PreviewSystem = @import("preview/PreviewSystem.zig");
 const AssetContextMenus = @import("AssetContextMenus.zig");
 const AssetTileLayout = @import("AssetTileLayout.zig");
+const StudioLocale = @import("../services/StudioLocale.zig");
+const tr = StudioLocale.tr;
 
 // Expand/collapse state for model tiles with sub-assets. Keyed by full asset
 // path; not persisted (resets each session).
@@ -133,6 +135,27 @@ fn drawSubAssetTile(proj_path: []const u8, sub: editor.SubAsset, id_extra: usize
     });
     defer tile.deinit();
 
+    // "Instantiate into Scene" for a hierarchy sub-asset (`asset_type ==
+    // .scene`, e.g. a glTF import's node-graph prefab — see
+    // `ModelHierarchy.zig`). `instantiatePrefab` resolves by the exact
+    // registered path, which for a sub-asset is this cache artifact path
+    // (`AssetDatabase.registerDerived`), so no browse_path/file_name
+    // reconstruction is needed here unlike the top-level tile's version.
+    if (sub.asset_type == .scene) {
+        const cxt = gui.context(@src(), .{ .rect = tile.data().borderRectScale().r }, .{ .id_extra = id_extra });
+        defer cxt.deinit();
+
+        if (cxt.activePoint()) |cp| {
+            var fw = gui.floatingMenu(@src(), .{ .from = gui.Rect.Natural.fromPoint(cp) }, .{ .id_extra = id_extra });
+            defer fw.deinit();
+
+            if (gui.menuItemLabel(@src(), tr("Instantiate into Scene"), .{}, .{ .expand = .horizontal, .id_extra = id_extra }) != null) {
+                fw.close();
+                _ = EditorState.instantiatePrefab(gui.frameTimeNS(), gui.io, cache_path);
+            }
+        }
+    }
+
     for (gui.events()) |*e| {
         if (!gui.eventMatchSimple(e, tile.data())) continue;
         if (e.evt == .mouse) {
@@ -140,6 +163,7 @@ fn drawSubAssetTile(proj_path: []const u8, sub: editor.SubAsset, id_extra: usize
             if (me.action == .press and me.button == .left) {
                 e.handle(@src(), tile.data());
                 EditorState.selectAsset(cache_path);
+                EditorState.startDragAsset(cache_path);
             }
         }
     }

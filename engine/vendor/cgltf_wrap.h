@@ -11,12 +11,20 @@ typedef struct {
     int       has_normals;
     int       has_uvs;
     int       material_index;   /* index into the model's materials, or -1 */
+    int       mesh_index;       /* index into the file's meshes (CgltfMultiMeshData.mesh_names) */
 } CgltfMeshData;
+
+/* Name of one glTF mesh (a mesh can own several primitives / CgltfMeshData). */
+typedef struct {
+    char name[128];
+} CgltfMeshName;
 
 /* One CgltfMeshData per primitive, across every mesh in the file. */
 typedef struct {
-    CgltfMeshData* primitives;
-    uint32_t       primitive_count;
+    CgltfMeshData*  primitives;
+    uint32_t        primitive_count;
+    CgltfMeshName*  mesh_names;   /* one per glTF mesh, indexed by mesh_index */
+    uint32_t        mesh_count;
 } CgltfMultiMeshData;
 
 /* Load every mesh/primitive from a .gltf or .glb file. Primitives without a
@@ -25,6 +33,31 @@ typedef struct {
    loaded. Call cgltf_wrap_free_all() when done. */
 int cgltf_wrap_load_all(const char* path, CgltfMultiMeshData* out);
 void cgltf_wrap_free_all(CgltfMultiMeshData* out);
+
+/* ── Node hierarchy ───────────────────────────────────────────────────────── */
+
+/* One glTF node: local transform (already resolved to TRS, decomposing the
+   rare has_matrix case) plus its parent and mesh, both as flat-array indices. */
+typedef struct {
+    char    name[128];
+    int32_t parent_index;   /* index into CgltfNodeHierarchy.nodes, or -1 for a root */
+    int32_t mesh_index;     /* index into the file's meshes, or -1 (no mesh) */
+    float   translation[3];
+    float   rotation[4];    /* quaternion, xyzw */
+    float   scale[3];
+} CgltfNodeData;
+
+typedef struct {
+    CgltfNodeData* nodes;
+    uint32_t       node_count;
+} CgltfNodeHierarchy;
+
+/* Load every node in a .gltf or .glb file's flat node array (not just those
+   reachable from the default scene) with its local TRS transform, parent, and
+   mesh index. Returns 0 on success (at least one node), nonzero on parse
+   failure or an empty node array. Call cgltf_wrap_free_hierarchy() when done. */
+int cgltf_wrap_load_hierarchy(const char* path, CgltfNodeHierarchy* out);
+void cgltf_wrap_free_hierarchy(CgltfNodeHierarchy* out);
 
 /* ── Materials & images ──────────────────────────────────────────────────────
    A separate "model info" pass exposes a glTF file's materials and images so an

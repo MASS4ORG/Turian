@@ -26,7 +26,9 @@ const VERSION_IMAGE: u32 = 3;
 // v2: generate materials + extract textures from glTF/GLB into sub-assets.
 // v3: cook geometry into the canonical binary mesh format.
 // v4: cook every mesh/primitive (submesh table) instead of only the first.
-const VERSION_MODEL: u32 = 4;
+// v5: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
+// sub-assets for glTF/GLB (additive — the main artifact is unchanged).
+const VERSION_MODEL: u32 = 5;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 
@@ -231,19 +233,19 @@ fn cookImage(allocator: std.mem.Allocator, asset_path: []const u8, data: []const
     return engine.assets.ImageLoader.wrapColorTag(allocator, data, true) catch null;
 }
 
-// ── Model → materials + textures (one-to-many) ────────────────────────────────
+// ── Model → derived sub-assets (one-to-many) ────────────────────────────────
+// Materials/images (`ModelDerivedAssets.zig`) and, for glTF/GLB, per-mesh
+// geometry + node hierarchy (`ModelHierarchy.zig`) are generated as separate
+// concerns but share one manifest: hierarchy generation needs to resolve the
+// material sub-assets the first pass just produced.
 
-const GltfLoader = engine.assets.GltfLoader;
-const FbxLoader = engine.assets.FbxLoader;
-const ModelInfo = engine.assets.ModelInfo;
-const Material = engine.Material;
+const model_derived_assets = @import("ModelDerivedAssets.zig");
+const model_hierarchy = @import("ModelHierarchy.zig");
 
-/// Generate engine assets from a model's embedded materials and images:
-///   * one `.material` per source material (metallic-roughness → built-in PBR),
-///   * one `.texture` per *embedded* image (external images already have their
-///     own source asset and are referenced by GUID, so they stay swappable).
-/// Writes the artifacts to the cache and records each as a `SubAsset` in `meta`
-/// with a stable GUID reused across reimports. Best-effort: parse failures and
+/// Generate every derived sub-asset for a model source (materials, images,
+/// and — glTF/GLB only — per-mesh geometry and node hierarchy). Writes the
+/// artifacts to the cache and records each as a `SubAsset` in `meta` with a
+/// stable GUID reused across reimports. Best-effort: parse failures and
 /// unsupported features are warned about, never fatal.
 fn generateModelDerived(
     io: std.Io,
@@ -252,251 +254,20 @@ fn generateModelDerived(
     asset_path: []const u8,
     meta: *MetaFile,
 ) void {
-    // Respect the "import materials" toggle.
-    switch (meta.import_settings) {
-        .model => |m| if (!m.import_materials) return,
-        else => {},
-    }
-
-    const ext = std.fs.path.extension(asset_path);
-    var info: ModelInfo = if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb"))
-        GltfLoader.loadModelInfo(allocator, asset_path) catch return
-    else if (std.ascii.eqlIgnoreCase(ext, ".fbx"))
-        FbxLoader.loadModelInfo(allocator, asset_path) catch return
-    else
-        return; // e.g. .obj — no material/image data to extract.
-    defer info.deinit();
-    if (info.materials.len == 0) return;
-
-    // `allocator` is the import arena (see `importAsset`): everything allocated
-    // here — including the persisted sub-asset manifest — lives until the caller
-    // has written the meta, then is freed with the arena.
-    const arena = allocator;
-
     // Snapshot the previous manifest so GUIDs are reused by key across reimports.
     const prev = meta.sub_assets;
-
     var subs: std.ArrayList(SubAsset) = .empty;
 
-    // Resolve every image to a referenceable texture GUID string (or null).
-    const img_guids = arena.alloc(?[]const u8, info.images.len) catch return;
-    @memset(img_guids, null);
+    model_derived_assets.generate(io, allocator, project_path, asset_path, meta.import_settings, prev, &subs);
 
-    const image_roles = classifyImageRoles(arena, info.materials, info.images.len);
+    const ext = std.fs.path.extension(asset_path);
+    if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb"))
+        model_hierarchy.generate(io, allocator, project_path, asset_path, prev, subs.items, &subs);
 
-    for (info.images, 0..) |im, i| {
-        var key_buf: [32]u8 = undefined;
-        const key = std.fmt.bufPrint(&key_buf, "image:{d}", .{i}) catch continue;
-
-        if (im.uri.len > 0) {
-            // External file: it is (or becomes) a normal source asset. Bind by
-            // its own GUID so the user can swap it later.
-            const sibling = siblingPath(arena, asset_path, im.uri) orelse continue;
-            const role = if (i < image_roles.len) image_roles[i] else .color;
-            const sm = ensureImageMeta(io, arena, sibling, role);
-            if (sm.guid.isNil()) {
-                warnRel("[import] glTF references missing image", asset_path, im.uri);
-                continue;
-            }
-            img_guids[i] = guidString(arena, sm.guid) catch null;
-        } else if (im.data.len > 0) {
-            // Embedded (GLB / data URI): extract into a cache-only texture asset.
-            const guid = reuseOrNewGuid(prev, key, io);
-            if (!writeBytesArtifact(io, project_path, guid, .image, im.data)) continue;
-            img_guids[i] = guidString(arena, guid) catch null;
-            const name = imageName(arena, im, i);
-            subs.append(arena, .{ .guid = guid, .asset_type = .image, .key = arena.dupe(u8, key) catch key, .name = name }) catch {};
-        } else {
-            warnRel("[import] glTF image has no data (unsupported)", asset_path, im.name);
-        }
-    }
-
-    // Generate one material asset per glTF material.
-    for (info.materials, 0..) |m, i| {
-        var key_buf: [32]u8 = undefined;
-        const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{i}) catch continue;
-        const guid = reuseOrNewGuid(prev, key, io);
-
-        if (!writeMaterialArtifact(io, project_path, guid, m, img_guids)) continue;
-
-        const name = materialName(arena, m, i);
-        subs.append(arena, .{ .guid = guid, .asset_type = .material, .key = arena.dupe(u8, key) catch key, .name = name }) catch {};
-    }
-
-    meta.sub_assets = subs.toOwnedSlice(arena) catch &.{};
-    // meta.sub_assets points into `arena`; it is written by the caller's
-    // writeMeta before this function returns, so the arena outlives that use.
-}
-
-/// Reuse the GUID previously assigned to `key`, or mint a fresh one.
-fn reuseOrNewGuid(prev: []const SubAsset, key: []const u8, io: std.Io) Guid {
-    for (prev) |s| {
-        if (std.mem.eql(u8, s.key, key) and !s.guid.isNil()) return s.guid;
-    }
-    return Guid.v4(io);
-}
-
-/// Resolve a glTF image URI (relative to the model file) to a sibling path.
-fn siblingPath(arena: std.mem.Allocator, model_path: []const u8, uri: []const u8) ?[]const u8 {
-    const dir = std.fs.path.dirname(model_path) orelse ".";
-    return std.fmt.allocPrint(arena, "{s}/{s}", .{ dir, uri }) catch null;
-}
-
-/// Texture role inferred from which material slots reference an image —
-/// drives the default color space a newly-created sibling image asset gets.
-const ImageRole = enum { color, normal, data };
-
-/// Classify every image index by the role its materials use it in. Defaults
-/// to `.color` (sRGB); a use as a normal/metallic-roughness/occlusion map
-/// downgrades it to linear. `.normal` always wins over `.data` since the
-/// green-channel-flip default (texture_type) only applies to normal maps.
-fn classifyImageRoles(arena: std.mem.Allocator, materials: []const engine.assets.MaterialInfo, image_count: usize) []ImageRole {
-    const roles = arena.alloc(ImageRole, image_count) catch return &.{};
-    @memset(roles, .color);
-    for (materials) |m| {
-        if (m.normal.image_index) |idx| if (idx < roles.len) {
-            roles[idx] = .normal;
-        };
-        if (m.metallic_roughness.image_index) |idx| if (idx < roles.len and roles[idx] == .color) {
-            roles[idx] = .data;
-        };
-        if (m.occlusion.image_index) |idx| if (idx < roles.len and roles[idx] == .color) {
-            roles[idx] = .data;
-        };
-    }
-    return roles;
-}
-
-/// Like `asset_meta.ensureMeta`, but a brand-new meta for an image used only
-/// as a data map (`role != .color`) defaults to a linear color space (and,
-/// for normal maps, `texture_type = .normal_map`) instead of the general sRGB
-/// default. Never touches an already-existing meta, so user edits always win.
-fn ensureImageMeta(io: std.Io, arena: std.mem.Allocator, path: []const u8, role: ImageRole) MetaFile {
-    const is_new = asset_meta.readMeta(io, arena, path).guid.isNil();
-    const sm = asset_meta.ensureMeta(io, arena, path);
-    if (!is_new or role == .color) return sm;
-
-    var settings = switch (sm.import_settings) {
-        .image => |s| s,
-        else => return sm,
-    };
-    settings.color_space = .linear;
-    if (role == .normal) settings.texture_type = .normal_map;
-
-    var fixed = sm;
-    fixed.import_settings = .{ .image = settings };
-    asset_meta.writeMeta(io, arena, path, fixed);
-    return fixed;
-}
-
-fn guidString(arena: std.mem.Allocator, guid: Guid) ![]const u8 {
-    var buf: [36]u8 = undefined;
-    return arena.dupe(u8, guid.toString(&buf));
-}
-
-fn imageName(arena: std.mem.Allocator, im: engine.assets.ImageInfo, index: usize) []const u8 {
-    const ext = extForMime(im.mime_type);
-    if (im.name.len > 0)
-        return std.fmt.allocPrint(arena, "{s}{s}", .{ im.name, ext }) catch "image";
-    return std.fmt.allocPrint(arena, "image_{d}{s}", .{ index, ext }) catch "image";
-}
-
-fn materialName(arena: std.mem.Allocator, m: engine.assets.MaterialInfo, index: usize) []const u8 {
-    if (m.name.len > 0)
-        return std.fmt.allocPrint(arena, "{s}.material", .{m.name}) catch "material.material";
-    return std.fmt.allocPrint(arena, "material_{d}.material", .{index}) catch "material.material";
-}
-
-fn extForMime(mime: []const u8) []const u8 {
-    if (std.mem.eql(u8, mime, "image/png")) return ".png";
-    if (std.mem.eql(u8, mime, "image/jpeg")) return ".jpg";
-    if (std.mem.eql(u8, mime, "image/webp")) return ".webp";
-    return ".png";
-}
-
-/// Write raw bytes to the cache artifact for `guid`. Returns success.
-fn writeBytesArtifact(
-    io: std.Io,
-    project_path: []const u8,
-    guid: Guid,
-    asset_type: AssetType,
-    bytes: []const u8,
-) bool {
-    var buf: [1024]u8 = undefined;
-    const path = asset_cache.artifactPath(project_path, guid, asset_type, &buf) orelse return false;
-    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = bytes }) catch return false;
-    return true;
-}
-
-/// Build a metallic-roughness PBR material from `m` and serialize it to the
-/// cache artifact for `guid`. Texture slots are bound to resolved image GUIDs.
-fn writeMaterialArtifact(
-    io: std.Io,
-    project_path: []const u8,
-    guid: Guid,
-    m: engine.assets.MaterialInfo,
-    img_guids: []const ?[]const u8,
-) bool {
-    // Generate-if-missing: a material already in the cache may carry user edits
-    // (e.g. a tweaked base color via the sub-asset inspector), so don't clobber
-    // it. A full "Reimport All" clears the cache to regenerate from source.
-    if (asset_cache.artifactExists(io, project_path, guid, .material)) return true;
-
-    const slot = struct {
-        fn texGuid(refs: []const ?[]const u8, r: engine.assets.TexRef) []const u8 {
-            const idx = r.image_index orelse return "";
-            if (idx >= refs.len) return "";
-            return refs[idx] orelse "";
-        }
-    };
-
-    var scalars = [_]Material.ScalarParam{
-        .{ .name = "metallic", .value = m.metallic },
-        .{ .name = "roughness", .value = m.roughness },
-        .{ .name = "emissive_strength", .value = m.emissive_strength },
-        .{ .name = "normal_scale", .value = m.normal_scale },
-        .{ .name = "occlusion_strength", .value = m.occlusion_strength },
-        .{ .name = "alpha_cutoff", .value = m.alpha_cutoff },
-    };
-    var vectors = [_]Material.VectorParam{
-        .{ .name = "base_color", .value = m.base_color },
-        .{ .name = "emissive", .value = .{ m.emissive[0], m.emissive[1], m.emissive[2], 1 } },
-    };
-    var textures = [_]Material.TextureParam{
-        .{ .name = "albedo_map", .texture = slot.texGuid(img_guids, m.albedo) },
-        .{ .name = "metallic_roughness_map", .texture = slot.texGuid(img_guids, m.metallic_roughness) },
-        .{ .name = "normal_map", .texture = slot.texGuid(img_guids, m.normal) },
-        .{ .name = "emissive_map", .texture = slot.texGuid(img_guids, m.emissive_map) },
-        .{ .name = "occlusion_map", .texture = slot.texGuid(img_guids, m.occlusion) },
-    };
-
-    const mat = Material{
-        .shader = engine.shader.pbr_guid,
-        .scalars = &scalars,
-        .vectors = &vectors,
-        .textures = &textures,
-        .render = .{
-            .blend = if (m.alpha_mode == .blend) .alpha else .disabled,
-            .cull = if (m.double_sided) .none else .back,
-            .depth_write = m.alpha_mode != .blend,
-            .depth_test = true,
-            .alpha_mask = m.alpha_mode == .mask,
-        },
-    };
-
-    var buf: [16 * 1024]u8 = undefined;
-    var writer = std.Io.Writer.fixed(&buf);
-    mat.serialize(&writer) catch return false;
-
-    var path_buf: [1024]u8 = undefined;
-    const path = asset_cache.artifactPath(project_path, guid, .material, &path_buf) orelse return false;
-    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = writer.buffered() }) catch return false;
-    return true;
-}
-
-/// Log a warning using a project-relative path (never the user's full path).
-fn warnRel(comptime msg: []const u8, model_path: []const u8, detail: []const u8) void {
-    log.warn("{s}: {s} ({s})", .{ msg, std.fs.path.basename(model_path), detail });
+    // `subs` points into `allocator` (the import arena, see `importAsset`); it
+    // is written by the caller's `writeMeta` before this function returns, so
+    // the arena outlives that use.
+    meta.sub_assets = subs.toOwnedSlice(allocator) catch &.{};
 }
 
 fn collectAndPurge(
@@ -515,6 +286,8 @@ fn collectAndPurge(
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+const Material = engine.Material;
 
 test "model import generates a PBR material bound to its external texture" {
     const io = std.testing.io;
@@ -733,4 +506,105 @@ test "FBX model import generates a best-effort PBR material sub-asset" {
     // to assert beyond "produced a material at all").
     try std.testing.expectApproxEqAbs(@as(f32, 0.5), mat.vector("base_color", .{ 0, 0, 0, 0 })[0], 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 0.25), mat.vector("base_color", .{ 0, 0, 0, 0 })[1], 1e-5);
+}
+
+test "glTF model import generates per-mesh and hierarchy sub-assets with stable GUIDs" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+
+    // 3 vertices (VEC3 f32 positions) + 3 indices (u16), shared by both meshes.
+    var bytes: [42]u8 = undefined;
+    const positions = [_]f32{ 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+    @memcpy(bytes[0..36], std.mem.sliceAsBytes(&positions));
+    const idx = [_]u16{ 0, 1, 2 };
+    @memcpy(bytes[36..42], std.mem.sliceAsBytes(&idx));
+    var b64buf: [64]u8 = undefined;
+    const b64 = std.base64.standard.Encoder.encode(&b64buf, &bytes);
+
+    const gltf = try std.fmt.allocPrint(a,
+        \\{{
+        \\  "asset": {{"version": "2.0"}},
+        \\  "buffers": [{{"uri": "data:application/octet-stream;base64,{s}", "byteLength": 42}}],
+        \\  "bufferViews": [
+        \\    {{"buffer": 0, "byteOffset": 0, "byteLength": 36}},
+        \\    {{"buffer": 0, "byteOffset": 36, "byteLength": 6}}
+        \\  ],
+        \\  "accessors": [
+        \\    {{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"}},
+        \\    {{"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"}}
+        \\  ],
+        \\  "meshes": [
+        \\    {{"name": "MeshA", "primitives": [{{"attributes": {{"POSITION": 0}}, "indices": 1}}]}},
+        \\    {{"name": "MeshB", "primitives": [{{"attributes": {{"POSITION": 0}}, "indices": 1}}]}}
+        \\  ],
+        \\  "nodes": [
+        \\    {{"name": "Root", "children": [1, 2]}},
+        \\    {{"name": "NodeA", "mesh": 0, "translation": [1, 0, 0]}},
+        \\    {{"name": "NodeB", "mesh": 1, "translation": [2, 0, 0]}}
+        \\  ],
+        \\  "scenes": [{{"nodes": [0]}}],
+        \\  "scene": 0
+        \\}}
+    , .{b64});
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/model.gltf", .data = gltf });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/model.gltf", .{project_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAssetForce(io, a, project_path, asset_path);
+
+    const meta1 = asset_meta.readMeta(io, a, asset_path);
+    var mesh0: ?Guid = null;
+    var mesh1: ?Guid = null;
+    var hierarchy: ?Guid = null;
+    for (meta1.sub_assets) |s| {
+        if (std.mem.eql(u8, s.key, "mesh:0")) mesh0 = s.guid;
+        if (std.mem.eql(u8, s.key, "mesh:1")) mesh1 = s.guid;
+        if (std.mem.eql(u8, s.key, "hierarchy")) hierarchy = s.guid;
+    }
+    try std.testing.expect(mesh0 != null);
+    try std.testing.expect(mesh1 != null);
+    try std.testing.expect(hierarchy != null);
+
+    // The hierarchy sub-asset is a 3-node scene: Root + 2 mesh-bearing children.
+    var art_buf: [1024]u8 = undefined;
+    const art_path = asset_cache.artifactPath(project_path, hierarchy.?, .scene, &art_buf).?;
+    const scene_bytes = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    var nodes: [8]engine.SceneNode = undefined;
+    var count: usize = 0;
+    try std.testing.expect(@import("../project/SceneIo.zig").loadSceneFromBytes(a, scene_bytes, &nodes, &count));
+    try std.testing.expectEqual(@as(usize, 3), count);
+
+    var root_idx: ?usize = null;
+    for (nodes[0..count], 0..) |*n, i| {
+        if (std.mem.eql(u8, n.nameSlice(), "Root")) root_idx = i;
+    }
+    try std.testing.expect(root_idx != null);
+    var child_count: usize = 0;
+    for (nodes[0..count]) |*n| {
+        if (n.parent == @as(i32, @intCast(root_idx.?))) {
+            child_count += 1;
+            try std.testing.expectEqual(@as(usize, 1), n.component_count);
+            try std.testing.expect(n.components[0] == .mesh_renderer);
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), child_count);
+
+    // Reimport is idempotent: same GUIDs reused by key.
+    importAssetForce(io, a, project_path, asset_path);
+    const meta2 = asset_meta.readMeta(io, a, asset_path);
+    for (meta2.sub_assets) |s| {
+        if (std.mem.eql(u8, s.key, "mesh:0")) try std.testing.expect(s.guid.eql(mesh0.?));
+        if (std.mem.eql(u8, s.key, "hierarchy")) try std.testing.expect(s.guid.eql(hierarchy.?));
+    }
 }
