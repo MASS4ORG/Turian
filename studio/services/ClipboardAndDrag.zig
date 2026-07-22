@@ -5,8 +5,22 @@ const EditorState = @import("EditorState.zig");
 const UndoRedo = @import("UndoRedo.zig");
 const Selection = @import("Selection.zig");
 
-var object_clipboard: [State.MAX_OBJECTS]State.SceneNode = undefined;
+// Grown (from `MAX_OBJECTS`, doubling) via `EditorState.gpa` — a persistent
+// allocator, not a fixed `[MAX_OBJECTS]SceneNode`, since copy/paste of a
+// Bistro-scale FBX-hierarchy subtree can exceed the old 128-node cap.
+var object_clipboard: []State.SceneNode = &.{};
 var clipboard_count: usize = 0;
+
+fn ensureClipboardCapacity(min_count: usize) void {
+    if (object_clipboard.len >= min_count) return;
+    var new_cap: usize = if (object_clipboard.len == 0) State.MAX_OBJECTS else object_clipboard.len;
+    while (new_cap < min_count) new_cap *|= 2;
+    const grown = if (object_clipboard.len == 0)
+        EditorState.gpa.alloc(State.SceneNode, new_cap) catch return
+    else
+        EditorState.gpa.realloc(object_clipboard, new_cap) catch return;
+    object_clipboard = grown;
+}
 
 pub fn hasClipboard() bool {
     return clipboard_count > 0;
@@ -14,30 +28,42 @@ pub fn hasClipboard() bool {
 
 pub fn copySelectedObjects() void {
     if (Selection.selectedCount() == 0) return;
+    const n = EditorState.object_count;
 
-    var in_copy = [_]bool{false} ** State.MAX_OBJECTS;
-    for (0..EditorState.object_count) |i| {
+    // Sized to `n`, not `MAX_OBJECTS` — a fixed array here would index out of
+    // bounds once a scene exceeds 128 nodes (e.g. a Bistro-scale FBX
+    // hierarchy).
+    const in_copy = EditorState.gpa.alloc(bool, n) catch return;
+    defer EditorState.gpa.free(in_copy);
+    @memset(in_copy, false);
+    for (0..n) |i| {
         if (Selection.isObjectSelected(i)) in_copy[i] = true;
     }
-    for (0..EditorState.object_count) |i| {
+    for (0..n) |i| {
         if (!in_copy[i] and EditorState.objects[i].parent >= 0) {
             if (in_copy[@intCast(EditorState.objects[i].parent)]) in_copy[i] = true;
         }
     }
 
-    var orig_to_clip: [State.MAX_OBJECTS]i32 = undefined;
-    @memset(&orig_to_clip, -1);
+    const orig_to_clip = EditorState.gpa.alloc(i32, n) catch return;
+    defer EditorState.gpa.free(orig_to_clip);
+    @memset(orig_to_clip, -1);
     var ci: usize = 0;
-    for (0..EditorState.object_count) |i| {
+    for (0..n) |i| {
         if (in_copy[i]) {
             orig_to_clip[i] = @intCast(ci);
             ci += 1;
         }
     }
     clipboard_count = ci;
+    ensureClipboardCapacity(clipboard_count);
+    if (clipboard_count > object_clipboard.len) {
+        clipboard_count = 0; // hit the growth ceiling
+        return;
+    }
 
     ci = 0;
-    for (0..EditorState.object_count) |i| {
+    for (0..n) |i| {
         if (!in_copy[i]) continue;
         var node = EditorState.objects[i];
         node.parent = if (node.parent >= 0) orig_to_clip[@intCast(node.parent)] else -1;
@@ -62,7 +88,8 @@ fn captureSnapshot() UndoRedo.Snapshot {
 
 pub fn pasteObjects(now: i128, io: std.Io) void {
     if (clipboard_count == 0) return;
-    if (EditorState.object_count + clipboard_count > State.MAX_OBJECTS) return;
+    EditorState.ensureObjectCapacity(EditorState.object_count + clipboard_count);
+    if (EditorState.object_count + clipboard_count > EditorState.objects.len) return; // hit the growth ceiling
 
     const before = captureSnapshot();
 

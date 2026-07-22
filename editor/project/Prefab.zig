@@ -78,13 +78,19 @@ pub fn serializeSubtree(
     count: usize,
     root_idx: usize,
 ) ?[]u8 {
-    var indices: [MAX_OBJECTS]usize = undefined;
-    const n = collectSubtree(objects, count, root_idx, &indices);
+    // Heap, sized to `count` — not `[MAX_OBJECTS]usize`/`[MAX_OBJECTS]i32`,
+    // which silently mis-scoped a subtree collected from a larger scene (e.g.
+    // a Bistro-scale FBX hierarchy) and, at large enough `count`, risked
+    // overflowing the thread stack (same class of bug as the Spawner.zig fix).
+    const indices = allocator.alloc(usize, count) catch return null;
+    defer allocator.free(indices);
+    const n = collectSubtree(objects, count, root_idx, indices);
     if (n == 0) return null;
 
     // old scene index → new subtree-relative index
-    var remap: [MAX_OBJECTS]i32 = undefined;
-    @memset(remap[0..count], -1);
+    const remap = allocator.alloc(i32, count) catch return null;
+    defer allocator.free(remap);
+    @memset(remap, -1);
     for (indices[0..n], 0..) |orig, new_i| remap[orig] = @intCast(new_i);
 
     // Heap/arena-allocated, not `[MAX_OBJECTS]SceneNode` on the stack — that
@@ -114,12 +120,14 @@ pub fn serializeInstanceAsTemplate(
     count: usize,
     root_idx: usize,
 ) ?[]u8 {
-    var indices: [MAX_OBJECTS]usize = undefined;
-    const n = collectSubtree(objects, count, root_idx, &indices);
+    const indices = allocator.alloc(usize, count) catch return null;
+    defer allocator.free(indices);
+    const n = collectSubtree(objects, count, root_idx, indices);
     if (n == 0) return null;
 
-    var remap: [MAX_OBJECTS]i32 = undefined;
-    @memset(remap[0..count], -1);
+    const remap = allocator.alloc(i32, count) catch return null;
+    defer allocator.free(remap);
+    @memset(remap, -1);
     for (indices[0..n], 0..) |orig, new_i| remap[orig] = @intCast(new_i);
 
     const tmpl = allocator.alloc(SceneNode, n) catch return null;
@@ -154,14 +162,25 @@ pub fn instantiate(
     out_count: *usize,
     parent: i32,
 ) ?usize {
-    // Upper-bound sized (the parsed count isn't known until after the call),
-    // so this can't shrink to an exact-fit allocation like the other
-    // functions here — still heap, not `[MAX_OBJECTS]SceneNode` on the stack.
-    const tmpl = allocator.alloc(SceneNode, MAX_OBJECTS) catch return null;
+    // `loadSceneFromBytes` reports the prefab's *true* node count in `tn`
+    // even when `tmpl` is too small to hold it (see its doc comment) — grow
+    // and re-parse rather than silently dropping nodes, so a Bistro-scale FBX
+    // hierarchy prefab (thousands of nodes) instantiates completely instead
+    // of truncating at the old fixed `MAX_OBJECTS` template cap.
+    var cap: usize = MAX_OBJECTS;
+    var tmpl = allocator.alloc(SceneNode, cap) catch return null;
     defer allocator.free(tmpl);
     var tn: usize = 0;
-    if (!scene_io.loadSceneFromBytes(allocator, prefab_bytes, tmpl, &tn)) return null;
+    while (true) {
+        if (!scene_io.loadSceneFromBytes(allocator, prefab_bytes, tmpl, &tn)) return null;
+        if (tn <= cap or cap >= engine.scene.GROWTH_CEILING) break;
+        cap = @min(tn, engine.scene.GROWTH_CEILING);
+        const grown = allocator.alloc(SceneNode, cap) catch break;
+        allocator.free(tmpl);
+        tmpl = grown;
+    }
     if (tn == 0) return null;
+    if (tn > tmpl.len) return null; // hit the growth ceiling
 
     const base = out_count.*;
     if (base + tn > out_objects.len) return null;

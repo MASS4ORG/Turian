@@ -1,5 +1,6 @@
 const std = @import("std");
 const gui = @import("gui");
+const engine = @import("engine");
 const EditorState = @import("EditorState.zig");
 const AssetWatcher = @import("../asset-browser/AssetWatcher.zig");
 const Documents = @import("../main-window/Documents.zig");
@@ -72,7 +73,7 @@ pub fn saveScene(path: []const u8) void {
     editor.scene_io.saveScene(
         gui.io,
         path,
-        &EditorState.objects,
+        EditorState.objects,
         EditorState.object_count,
         gui.currentWindow().arena(),
     );
@@ -81,19 +82,36 @@ pub fn saveScene(path: []const u8) void {
 
 /// Load a scene from a .zon file and replace the current scene.
 // Load scratch, kept out of the stack: a `[MAX_OBJECTS]SceneNode` local
-// overflows now that the per-slot material table enlarged each node.
-var load_scratch: [EditorState.MAX_OBJECTS]EditorState.SceneNode = undefined;
+// overflows now that the per-slot material table enlarged each node. Grown
+// (from `MAX_OBJECTS`, doubling) on demand via `EditorState.gpa` — a
+// persistent allocator, not the per-frame GUI arena, since this buffer is
+// cached across calls in a module-level var. `editor.scene_io.loadScene`
+// reports the scene's *true* node count in `tmp_count` even when this buffer
+// is too small (see its doc comment), so a Bistro-scale FBX hierarchy scene
+// loads completely instead of silently truncating at the old fixed cap.
+var load_scratch: []EditorState.SceneNode = &.{};
 
 pub fn loadScene(path: []const u8) bool {
-    var tmp_count: usize = 0;
-
-    if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, &load_scratch, &tmp_count)) {
-        return false;
+    if (load_scratch.len == 0) {
+        load_scratch = EditorState.gpa.alloc(EditorState.SceneNode, EditorState.MAX_OBJECTS) catch return false;
     }
+    var tmp_count: usize = 0;
+    while (true) {
+        if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, load_scratch, &tmp_count)) {
+            return false;
+        }
+        if (tmp_count <= load_scratch.len or load_scratch.len >= engine.scene.GROWTH_CEILING) break;
+        const new_cap = @min(tmp_count, engine.scene.GROWTH_CEILING);
+        const grown = EditorState.gpa.realloc(load_scratch, new_cap) catch break;
+        load_scratch = grown;
+    }
+    if (tmp_count > load_scratch.len) return false; // hit the growth ceiling
 
     EditorState.object_count = 0;
     EditorState.selected_object = null;
     EditorState.clearUndoStack();
+    EditorState.ensureObjectCapacity(tmp_count);
+    if (tmp_count > EditorState.objects.len) return false; // hit the growth ceiling
     for (load_scratch[0..tmp_count], 0..) |obj, i| {
         EditorState.objects[i] = obj;
     }
@@ -114,7 +132,7 @@ pub fn loadScene(path: []const u8) bool {
                     std.heap.page_allocator,
                     &EditorState.asset_db,
                     proj,
-                    &EditorState.objects,
+                    EditorState.objects,
                     EditorState.object_count,
                 );
                 if (migrated > 0) EditorState.scene_dirty = true;

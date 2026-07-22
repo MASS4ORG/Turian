@@ -118,7 +118,9 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             for (mr.materials[0..mat_n]) |*mat_ref| uploadMaterialTextures(cmd, dev, mat_ref.slice());
 
-            if (findGpuMesh(guid) != null or state.mesh_count >= state.MAX_MESHES) continue;
+            if (findGpuMesh(guid) != null) continue;
+            state.ensureMeshCapacity();
+            if (state.mesh_count >= state.meshes.len) continue; // OOM growing the cache
             uploadMesh(cmd, dev, guid) catch {
                 // Register as failed so we don't retry every frame.
                 var gm = &state.meshes[state.mesh_count];
@@ -137,7 +139,9 @@ fn uploadMaterialTextures(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, m
     const rm = resolveMaterial(mat_guid);
     for (&rm.maps) |*m| {
         const guid = m.slice();
-        if (guid.len == 0 or findGpuTexture(guid) != null or state.texture_count >= state.MAX_TEXTURES) continue;
+        if (guid.len == 0 or findGpuTexture(guid) != null) continue;
+        state.ensureTextureCapacity();
+        if (state.texture_count >= state.textures.len) continue; // OOM growing the cache
         if (uploadTexture(cmd, dev, guid)) |_| {} else |_| {}
     }
 }
@@ -216,6 +220,8 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
             submeshes[i] = .{ .index_offset = sm.index_offset, .index_count = sm.index_count, .material_slot = sm.material_slot };
     }
 
+    state.ensureMeshCapacity();
+    if (state.mesh_count >= state.meshes.len) return error.MeshCacheFull;
     var gm = &state.meshes[state.mesh_count];
     state.mesh_count += 1;
     gm.key_len = setKey(&gm.key, guid);
@@ -228,7 +234,8 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
 /// Upload a texture (RGBA8 or block-compressed, with mips) and cache it by GUID.
 pub fn uploadTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const u8) !*c.SDL_GPUTexture {
     if (findGpuTexture(guid)) |gt| return gt.texture;
-    if (state.texture_count >= state.MAX_TEXTURES) return error.TextureCacheFull;
+    state.ensureTextureCapacity();
+    if (state.texture_count >= state.textures.len) return error.TextureCacheFull;
 
     const src = state.texture_src orelse return error.NoTextureSource;
     const b = src(guid) orelse return error.TextureNotFound;

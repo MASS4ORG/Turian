@@ -58,12 +58,32 @@ fn collectInstanceIndices(root: usize, out: []usize) usize {
     return n;
 }
 
-/// Read the prefab template referenced by `guid_str` into `out`, returning the
-/// node count or null. Uses `arena` for the file bytes + parse.
-fn readPrefabTemplate(io: std.Io, arena: std.mem.Allocator, guid_str: []const u8, out: []SceneNode) ?usize {
+/// Parse `bytes` into a freshly `arena`-allocated template buffer, growing
+/// (from `MAX_OBJECTS`, doubling) until the whole template fits — a Bistro-
+/// scale FBX hierarchy prefab can carry thousands of nodes, well past the old
+/// fixed `MAX_OBJECTS` template cap. Relies on `editor.scene_io.loadSceneFromBytes`
+/// (which `editor.prefab.parse` wraps) always reporting the template's *true*
+/// node count, even when the buffer it was given was too small.
+fn parseTemplateGrown(arena: std.mem.Allocator, bytes: []const u8) ?[]SceneNode {
+    var cap: usize = MAX_OBJECTS;
+    var buf = arena.alloc(SceneNode, cap) catch return null;
+    var tn: usize = 0;
+    while (true) {
+        tn = editor.prefab.parse(arena, bytes, buf) orelse return null;
+        if (tn <= cap or cap >= engine.scene.GROWTH_CEILING) break;
+        cap = @min(tn, engine.scene.GROWTH_CEILING);
+        buf = arena.alloc(SceneNode, cap) catch return null;
+    }
+    if (tn > buf.len) return null; // hit the growth ceiling
+    return buf[0..tn];
+}
+
+/// Read the prefab template referenced by `guid_str`, returning its nodes
+/// (arena-owned) or null. Uses `arena` for the file bytes + parse.
+fn readPrefabTemplate(io: std.Io, arena: std.mem.Allocator, guid_str: []const u8) ?[]SceneNode {
     const path = AssetResolution.resolveAssetGuid(guid_str) orelse return null;
     const bytes = readFileArena(io, arena, path) orelse return null;
-    return editor.prefab.parse(arena, bytes, out);
+    return parseTemplateGrown(arena, bytes);
 }
 
 fn readFileArena(io: std.Io, arena: std.mem.Allocator, path: []const u8) ?[]u8 {
@@ -117,7 +137,7 @@ pub fn createPrefabFromObject(now: i128, io: std.Io, idx: usize) bool {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const bytes = editor.prefab.serializeSubtree(arena, &EditorState.objects, EditorState.object_count, idx) orelse return false;
+    const bytes = editor.prefab.serializeSubtree(arena, EditorState.objects, EditorState.object_count, idx) orelse return false;
 
     var stem_buf: [NAME_MAX]u8 = undefined;
     const stem = sanitizeStem(EditorState.objects[idx].nameSlice(), &stem_buf);
@@ -134,9 +154,12 @@ pub fn createPrefabFromObject(now: i128, io: std.Io, idx: usize) bool {
 
     const before = UndoRedo.captureSnapshot();
 
-    // Link the selected subtree as the first instance.
-    var indices: [MAX_OBJECTS]usize = undefined;
-    const n = collectInstanceIndices(idx, &indices);
+    // Link the selected subtree as the first instance. Sized to
+    // `object_count`, not `MAX_OBJECTS` — `collectInstanceIndices` bounds
+    // itself to `out.len`, so a fixed 128-cap here would silently drop nodes
+    // of a larger subtree (e.g. from a Bistro-scale FBX hierarchy).
+    const indices = arena.alloc(usize, EditorState.object_count) catch return false;
+    const n = collectInstanceIndices(idx, indices);
     for (indices[0..n]) |i| {
         EditorState.objects[i].setPrefabNode(EditorState.objects[i].guidSlice());
         EditorState.objects[i].clearOverrides();
@@ -169,8 +192,16 @@ pub fn instantiatePrefab(now: i128, io: std.Io, prefab_path: []const u8) ?usize 
 
     const parent: i32 = if (EditorState.selected_object) |s| @intCast(s) else -1;
 
+    // Probe the template's true node count (a zero-length output buffer just
+    // asks `loadSceneFromBytes` to report the count, per its doc comment)
+    // before growing the destination scene — `instantiate` itself only
+    // checks capacity, it doesn't grow the caller's storage.
+    var probe_count: usize = 0;
+    _ = editor.scene_io.loadSceneFromBytes(arena, bytes, &.{}, &probe_count);
+    EditorState.ensureObjectCapacity(EditorState.object_count + probe_count);
+
     const before = UndoRedo.captureSnapshot();
-    const root = editor.prefab.instantiate(arena, io, bytes, guid_str, &EditorState.objects, &EditorState.object_count, parent) orelse return null;
+    const root = editor.prefab.instantiate(arena, io, bytes, guid_str, EditorState.objects, &EditorState.object_count, parent) orelse return null;
 
     AssetResolution.syncSceneWithDefinitions();
     Selection.clearSelectedObjects();
@@ -194,15 +225,12 @@ pub fn recomputePrefabOverrides(io: std.Io, root: usize) void {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    // Arena-allocated, not `[MAX_OBJECTS]SceneNode` on the stack — that
-    // overflowed the thread stack (same class of bug as the Spawner.zig fix).
-    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return;
-    const tn = readPrefabTemplate(io, arena, EditorState.objects[root].prefabSourceSlice(), tmpl) orelse return;
+    const tmpl = readPrefabTemplate(io, arena, EditorState.objects[root].prefabSourceSlice()) orelse return;
 
-    var indices: [MAX_OBJECTS]usize = undefined;
-    const n = collectInstanceIndices(root, &indices);
+    const indices = arena.alloc(usize, EditorState.object_count) catch return;
+    const n = collectInstanceIndices(root, indices);
     for (indices[0..n]) |i| {
-        if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl[0..tn])) |t| {
+        if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl)) |t| {
             editor.prefab.recomputeOverrides(&EditorState.objects[i], t);
         }
     }
@@ -221,13 +249,12 @@ pub fn resyncPrefabInstances(io: std.Io) void {
     while (r < EditorState.object_count) : (r += 1) {
         if (!EditorState.objects[r].isPrefabInstanceRoot()) continue;
 
-        const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch continue;
-        const tn = readPrefabTemplate(io, arena, EditorState.objects[r].prefabSourceSlice(), tmpl) orelse continue;
+        const tmpl = readPrefabTemplate(io, arena, EditorState.objects[r].prefabSourceSlice()) orelse continue;
 
-        var indices: [MAX_OBJECTS]usize = undefined;
-        const n = collectInstanceIndices(r, &indices);
+        const indices = arena.alloc(usize, EditorState.object_count) catch continue;
+        const n = collectInstanceIndices(r, indices);
         for (indices[0..n]) |i| {
-            if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl[0..tn])) |t| {
+            if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl)) |t| {
                 editor.prefab.applyTemplate(&EditorState.objects[i], t, true);
             }
         }
@@ -244,14 +271,13 @@ pub fn revertPrefabInstance(now: i128, io: std.Io, root: usize) bool {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return false;
-    const tn = readPrefabTemplate(io, arena, EditorState.objects[root].prefabSourceSlice(), tmpl) orelse return false;
+    const tmpl = readPrefabTemplate(io, arena, EditorState.objects[root].prefabSourceSlice()) orelse return false;
 
     const before = UndoRedo.captureSnapshot();
-    var indices: [MAX_OBJECTS]usize = undefined;
-    const n = collectInstanceIndices(root, &indices);
+    const indices = arena.alloc(usize, EditorState.object_count) catch return false;
+    const n = collectInstanceIndices(root, indices);
     for (indices[0..n]) |i| {
-        if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl[0..tn])) |t| {
+        if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl)) |t| {
             editor.prefab.applyTemplate(&EditorState.objects[i], t, false);
             EditorState.objects[i].clearOverrides();
         }
@@ -275,11 +301,10 @@ pub fn applyPrefabInstance(now: i128, io: std.Io, root: usize) bool {
     const arena = arena_state.allocator();
 
     // Rewrite the source template from this instance (preserving identities).
-    const bytes = editor.prefab.serializeInstanceAsTemplate(arena, &EditorState.objects, EditorState.object_count, root) orelse return false;
+    const bytes = editor.prefab.serializeInstanceAsTemplate(arena, EditorState.objects, EditorState.object_count, root) orelse return false;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = bytes }) catch return false;
 
-    const tmpl = arena.alloc(SceneNode, MAX_OBJECTS) catch return false;
-    const tn = editor.prefab.parse(arena, bytes, tmpl) orelse return false;
+    const tmpl = parseTemplateGrown(arena, bytes) orelse return false;
 
     const before = UndoRedo.captureSnapshot();
 
@@ -290,11 +315,11 @@ pub fn applyPrefabInstance(now: i128, io: std.Io, root: usize) bool {
         if (!EditorState.objects[r].isPrefabInstanceRoot()) continue;
         if (!std.mem.eql(u8, EditorState.objects[r].prefabSourceSlice(), src_guid)) continue;
 
-        var indices: [MAX_OBJECTS]usize = undefined;
-        const n = collectInstanceIndices(r, &indices);
+        const indices = arena.alloc(usize, EditorState.object_count) catch continue;
+        const n = collectInstanceIndices(r, indices);
         const is_source = (r == root);
         for (indices[0..n]) |i| {
-            if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl[0..tn])) |t| {
+            if (editor.prefab.findTemplate(&EditorState.objects[i], tmpl)) |t| {
                 if (is_source) {
                     EditorState.objects[i].clearOverrides();
                 } else {

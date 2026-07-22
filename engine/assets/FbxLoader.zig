@@ -249,6 +249,16 @@ pub fn loadModelInfo(allocator: std.mem.Allocator, path: []const u8) !ModelInfo 
     return .{ .materials = mats, .images = imgs, .arena = arena };
 }
 
+/// Per-FBX-mesh (not per-node-instance) geometry grouping and node-hierarchy
+/// import, kept in a separate file to keep this one focused on the
+/// whole-file-flattened-mesh path.
+const fbx_hierarchy = @import("FbxHierarchy.zig");
+pub const MeshGroup = fbx_hierarchy.MeshGroup;
+pub const loadMeshes = fbx_hierarchy.loadMeshes;
+pub const FbxNode = fbx_hierarchy.FbxNode;
+pub const FbxHierarchy = fbx_hierarchy.FbxHierarchy;
+pub const loadHierarchy = fbx_hierarchy.loadHierarchy;
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 // A minimal hand-authored ASCII FBX: one triangle (positions in the FBX default
 // of centimeters, so `load`'s baked axis/unit conversion halves... scales them

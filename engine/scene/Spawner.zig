@@ -18,6 +18,7 @@
 const std = @import("std");
 const SceneNode = @import("SceneNode.zig").SceneNode;
 const MAX_OBJECTS = @import("SceneNode.zig").MAX_OBJECTS;
+const GROWTH_CEILING = @import("SceneNode.zig").GROWTH_CEILING;
 const Vector3 = @import("../root.zig").Vector3;
 
 const GUID_LEN = 36;
@@ -122,14 +123,29 @@ pub const Spawner = struct {
     }
 
     /// Find a registered template, or resolve+register it on demand. Null if the
-    /// prefab is unknown and unresolvable.
+    /// prefab is unknown and unresolvable. `Resolver`'s contract is "fill up to
+    /// out.len, report the true count" (mirrors `SceneManager.Loader`) — if the
+    /// scratch buffer fills exactly (ambiguous with truncation), it's grown and
+    /// the resolver re-run, up to `GROWTH_CEILING`, so a large prefab (a
+    /// Bistro-scale FBX hierarchy dragged into a scene) resolves correctly
+    /// instead of silently truncating at `MAX_OBJECTS`.
     fn resolveTemplate(self: *Spawner, guid: []const u8) ?*const Template {
         if (self.findTemplate(guid)) |t| return t;
         const rf = self.resolve_fn orelse return null;
-        const scratch = self.allocator.alloc(SceneNode, MAX_OBJECTS) catch return null;
+
+        var cap: usize = MAX_OBJECTS;
+        var scratch = self.allocator.alloc(SceneNode, cap) catch return null;
         defer self.allocator.free(scratch);
         var c: usize = 0;
-        if (!rf(self.resolve_ctx, guid, scratch, &c) or c == 0) return null;
+        while (true) {
+            if (!rf(self.resolve_ctx, guid, scratch, &c)) return null;
+            if (c < scratch.len or cap >= GROWTH_CEILING) break;
+            cap = @min(cap *| 2, GROWTH_CEILING);
+            const grown = self.allocator.alloc(SceneNode, cap) catch break;
+            self.allocator.free(scratch);
+            scratch = grown;
+        }
+        if (c == 0) return null;
         self.registerPrefab(guid, scratch[0..c]);
         return self.findTemplate(guid);
     }
@@ -193,7 +209,7 @@ pub const Spawner = struct {
                     if (self.applyInstantiate(io, c, objects, count)) changed = true;
                 },
                 .destroy => |*c| {
-                    if (applyDestroy(c.target[0..c.target_len], objects, count)) changed = true;
+                    if (self.applyDestroy(c.target[0..c.target_len], objects, count)) changed = true;
                 },
             }
         }
@@ -231,7 +247,7 @@ pub const Spawner = struct {
 
     /// Remove the node with `guid` and all its descendants, compacting the array
     /// and remapping parent indices. Returns true if something was removed.
-    fn applyDestroy(guid: []const u8, objects: []SceneNode, count: *usize) bool {
+    fn applyDestroy(self: *Spawner, guid: []const u8, objects: []SceneNode, count: *usize) bool {
         const n = count.*;
         var target: ?usize = null;
         for (objects[0..n], 0..) |*o, i| {
@@ -242,8 +258,13 @@ pub const Spawner = struct {
         }
         const idx = target orelse return false;
 
-        // Mark the subtree (idx + descendants) for removal.
-        var remove = [_]bool{false} ** MAX_OBJECTS;
+        // Sized to `n` (the live count), not the `MAX_OBJECTS` default — a
+        // fixed `[MAX_OBJECTS]bool`/`[MAX_OBJECTS]i32` here would index out of
+        // bounds once a scene (e.g. a Bistro-scale FBX hierarchy) exceeds 128
+        // live nodes. Cheap: bool/i32 arrays, not `SceneNode`-sized.
+        const remove = self.allocator.alloc(bool, n) catch return false;
+        defer self.allocator.free(remove);
+        @memset(remove, false);
         remove[idx] = true;
         // Parents precede children in scene order; a forward pass propagates.
         var i: usize = 0;
@@ -251,15 +272,15 @@ pub const Spawner = struct {
             if (objects[i].parent >= 0 and remove[@intCast(objects[i].parent)]) remove[i] = true;
         }
 
-        // Build old→new index map and compact IN PLACE — no `[MAX_OBJECTS]SceneNode`
-        // scratch buffer (that stack allocation overflowed the thread stack:
-        // SceneNode embeds MAX_COMPONENTS UserScriptRef-sized slots, so
-        // MAX_OBJECTS of them is several MB). Safe without a temp buffer
+        // Build old→new index map and compact IN PLACE (never touches
+        // `objects` beyond `[0..n)`). Safe without a temp `SceneNode` buffer
         // because `map[k] <= k` always (compaction only ever shifts entries
         // toward index 0), so scanning `k` forward and writing
         // `objects[map[k]] = objects[k]` never clobbers a source index the
         // loop hasn't read yet.
-        var map = [_]i32{-1} ** MAX_OBJECTS;
+        const map = self.allocator.alloc(i32, n) catch return false;
+        defer self.allocator.free(map);
+        @memset(map, -1);
         var next: usize = 0;
         for (0..n) |k| {
             if (!remove[k]) {

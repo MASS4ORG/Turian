@@ -35,10 +35,15 @@ pub const Kind = enum { scene, asset };
 /// Heap snapshot of the singleton scene-editing state for an *inactive* scene
 /// tab. Allocated lazily the first time a scene tab is switched away from.
 const SceneSnapshot = struct {
-    objects: [EditorState.MAX_OBJECTS]EditorState.SceneNode = undefined,
+    /// Owned copy, grown (via `EditorState.gpa`) to fit `object_count` at park
+    /// time rather than fixed at `MAX_OBJECTS` — a `SceneNode` is ~124 KB, so
+    /// a fixed-size copy per open tab (`MAX_DOCS` = 32) would be hundreds of
+    /// MB regardless of how many nodes each scene actually has. Freed
+    /// alongside the snapshot itself (`close`/`closeAll`).
+    objects: []EditorState.SceneNode = &.{},
     object_count: usize = 0,
     selected_object: ?usize = null,
-    selected_set: [EditorState.MAX_OBJECTS]bool = .{false} ** EditorState.MAX_OBJECTS,
+    selected_set: []bool = &.{},
     last_select_idx: ?usize = null,
     dirty: bool = false,
     /// Free-look viewport pose, so each scene tab keeps its own camera.
@@ -198,16 +203,35 @@ pub fn activate(i: usize) void {
     persist();
 }
 
+fn growSnapshotSlice(comptime T: type, cur: []T, min_len: usize) []T {
+    if (cur.len >= min_len) return cur;
+    return if (cur.len == 0)
+        EditorState.gpa.alloc(T, min_len) catch cur
+    else
+        EditorState.gpa.realloc(cur, min_len) catch cur;
+}
+
 /// Capture the live scene into the active scene tab's snapshot before its state
 /// is clobbered by switching to another document.
 fn parkActiveScene() void {
     const a = active orelse return;
     if (docs[a].kind != .scene) return;
     const snap = ensureSnapshot(a);
-    snap.objects = EditorState.objects;
-    snap.object_count = EditorState.object_count;
+
+    const n = EditorState.object_count;
+    snap.objects = growSnapshotSlice(EditorState.SceneNode, snap.objects, n);
+    if (snap.objects.len >= n) {
+        @memcpy(snap.objects[0..n], EditorState.objects[0..n]);
+        snap.object_count = n;
+    } else {
+        snap.object_count = 0; // allocation failed — lose this park, don't crash
+    }
+
     snap.selected_object = EditorState.selected_object;
-    snap.selected_set = EditorState.selected_set;
+    snap.selected_set = growSnapshotSlice(bool, snap.selected_set, EditorState.selected_set.len);
+    if (snap.selected_set.len >= EditorState.selected_set.len) {
+        @memcpy(snap.selected_set[0..EditorState.selected_set.len], EditorState.selected_set);
+    }
     snap.last_select_idx = EditorState.last_select_idx;
     snap.dirty = EditorState.scene_dirty;
     snap.cam = EditorCamera.getState();
@@ -227,10 +251,17 @@ fn loadDoc(i: usize) void {
 }
 
 fn restoreScene(snap: *const SceneSnapshot, scene_path: []const u8) void {
-    EditorState.objects = snap.objects;
-    EditorState.object_count = snap.object_count;
+    EditorState.ensureObjectCapacity(snap.object_count);
+    if (snap.object_count <= EditorState.objects.len) {
+        @memcpy(EditorState.objects[0..snap.object_count], snap.objects[0..snap.object_count]);
+        EditorState.object_count = snap.object_count;
+    } else {
+        EditorState.object_count = 0; // hit the growth ceiling — extremely unlikely
+    }
     EditorState.selected_object = snap.selected_object;
-    EditorState.selected_set = snap.selected_set;
+    const sel_n = @min(snap.selected_set.len, EditorState.selected_set.len);
+    @memcpy(EditorState.selected_set[0..sel_n], snap.selected_set[0..sel_n]);
+    if (EditorState.selected_set.len > sel_n) @memset(EditorState.selected_set[sel_n..], false);
     EditorState.last_select_idx = snap.last_select_idx;
     EditorState.clearUndoStack();
     EditorState.scene_dirty = snap.dirty;
@@ -258,7 +289,7 @@ pub fn close(i: usize) void {
     if (i >= doc_count) return;
 
     // Fully discard the document: free its snapshot and drop it from the array.
-    if (docs[i].snapshot) |snap| EditorState.gpa.destroy(snap);
+    if (docs[i].snapshot) |snap| freeSnapshot(snap);
 
     const was_active = (active != null and active.? == i);
 
@@ -289,10 +320,19 @@ pub fn close(i: usize) void {
 /// Closes every document without prompting, discarding unsaved changes.
 pub fn closeAll() void {
     for (0..doc_count) |i| {
-        if (docs[i].snapshot) |snap| EditorState.gpa.destroy(snap);
+        if (docs[i].snapshot) |snap| freeSnapshot(snap);
     }
     doc_count = 0;
     active = null;
+}
+
+/// Frees a snapshot's owned `objects`/`selected_set` slices (grown separately
+/// from the struct itself, unlike the old fixed-size fields) before the
+/// struct itself.
+fn freeSnapshot(snap: *SceneSnapshot) void {
+    if (snap.objects.len != 0) EditorState.gpa.free(snap.objects);
+    if (snap.selected_set.len != 0) EditorState.gpa.free(snap.selected_set);
+    EditorState.gpa.destroy(snap);
 }
 
 /// Move the tab at `from` to position `to`, fixing the active index. Used by

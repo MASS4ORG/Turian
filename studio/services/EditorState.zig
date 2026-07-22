@@ -41,7 +41,13 @@ pub var environ_map: *const std.process.Environ.Map = undefined;
 pub var settings: editor.Settings = undefined;
 pub var asset_db: editor.AssetDatabase = undefined;
 pub var asset_refresh_generation: u64 = 0;
-pub var objects: [MAX_OBJECTS]SceneNode = undefined;
+/// Live scene node storage. Grown on demand by `ensureObjectCapacity` (starts
+/// empty, first grows to `MAX_OBJECTS`) rather than preallocated at a fixed
+/// size — a `SceneNode` is large (~124 KB, dominated by
+/// `MeshRendererComponent`'s 160-slot material table), so a scene doesn't pay
+/// for capacity it never uses. Capacity (`objects.len`) and live count
+/// (`object_count`) are distinct, exactly like `SceneManager.Slot`.
+pub var objects: []SceneNode = &.{};
 pub var object_count: usize = 0;
 pub var selected_object: ?usize = null;
 pub var project_path_buf: [1024]u8 = undefined;
@@ -67,7 +73,9 @@ pub var drag_asset_path_buf: [512]u8 = undefined;
 pub var drag_asset_path_len: usize = 0;
 pub var scene_open: bool = false;
 pub var debug_metrics: engine.introspect.Metrics = .{};
-pub var selected_set: [MAX_OBJECTS]bool = .{false} ** MAX_OBJECTS;
+/// Selection bitset, grown alongside `objects` by `ensureObjectCapacity` (same
+/// capacity as `objects` at all times).
+pub var selected_set: []bool = &.{};
 pub var last_select_idx: ?usize = null;
 pub var g_rename: RenameOps.RenameState = .{};
 pub var undo_alloc: std.mem.Allocator = std.heap.page_allocator;
@@ -84,6 +92,33 @@ pub var import_pending: ?*ImportJob.ImportJob = null;
 pub var active_browse_dir_buf: [1024]u8 = undefined;
 pub var active_browse_dir_len: usize = 0;
 pub var asset_db_initialized: bool = false;
+
+/// Ensures `objects` (and `selected_set`, kept at the same capacity) has room
+/// for at least `min_count` nodes, growing (doubling from `MAX_OBJECTS`) via
+/// `gpa` if needed. No-op if already large enough. Silently stops at
+/// `engine.scene.GROWTH_CEILING` — callers must still check `objects.len`
+/// before writing past current capacity.
+pub fn ensureObjectCapacity(min_count: usize) void {
+    if (objects.len >= min_count) return;
+    var new_cap: usize = if (objects.len == 0) MAX_OBJECTS else objects.len;
+    while (new_cap < min_count and new_cap < engine.scene.GROWTH_CEILING) {
+        new_cap = @min(new_cap *| 2, engine.scene.GROWTH_CEILING);
+    }
+    if (new_cap < min_count) return;
+    const grown = if (objects.len == 0)
+        gpa.alloc(SceneNode, new_cap) catch return
+    else
+        gpa.realloc(objects, new_cap) catch return;
+    objects = grown;
+
+    const old_sel_len = selected_set.len;
+    const grown_sel = if (old_sel_len == 0)
+        gpa.alloc(bool, new_cap) catch return
+    else
+        gpa.realloc(selected_set, new_cap) catch return;
+    @memset(grown_sel[old_sel_len..], false);
+    selected_set = grown_sel;
+}
 
 // ── Settings and initialization functions ──────────────────────────────────
 

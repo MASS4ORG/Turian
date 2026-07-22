@@ -212,6 +212,257 @@ void fbx_wrap_free_all(FbxMultiMeshData* out) {
     out->primitive_count = 0;
 }
 
+/* ── Node hierarchy ───────────────────────────────────────────────────────── */
+
+typedef struct {
+    FbxMeshLocalData* data;
+    uint32_t count;
+    uint32_t cap;
+} LocalChunkArray;
+
+static int local_chunk_reserve(LocalChunkArray* arr) {
+    if (arr->count < arr->cap) return 1;
+    uint32_t new_cap = arr->cap ? arr->cap * 2 : 16;
+    FbxMeshLocalData* p = (FbxMeshLocalData*)realloc(arr->data, (size_t)new_cap * sizeof(FbxMeshLocalData));
+    if (!p) return 0;
+    arr->data = p;
+    arr->cap = new_cap;
+    return 1;
+}
+
+static void free_local_chunk(FbxMeshLocalData* c) {
+    free(c->positions);
+    free(c->normals);
+    free(c->uvs);
+    free(c->indices);
+}
+
+/* weld_chunk operates on FbxMeshData; FbxMeshLocalData has the identical
+   vertex/index layout (only the trailing mesh_index differs), so reuse it via
+   a same-layout cast rather than duplicating the welding pass. */
+static void weld_local_chunk(FbxMeshLocalData* c) {
+    weld_chunk((FbxMeshData*)c);
+}
+
+int fbx_wrap_load_meshes(const char* path, FbxMultiMeshLocalData* out) {
+    memset(out, 0, sizeof(*out));
+
+    ufbx_load_opts opts;
+    fbx_wrap_opts(&opts);
+    ufbx_error error;
+    ufbx_scene* scene = ufbx_load_file(path, &opts, &error);
+    if (!scene) return 1;
+
+    LocalChunkArray chunks;
+    memset(&chunks, 0, sizeof(chunks));
+    uint32_t tri_cap = 0;
+    uint32_t* tri_buf = NULL;
+
+    uint32_t mesh_count = (uint32_t)scene->meshes.count;
+    FbxMeshName* mesh_names = mesh_count ? (FbxMeshName*)calloc(mesh_count, sizeof(FbxMeshName)) : NULL;
+    if (mesh_count && !mesh_names) {
+        ufbx_free_scene(scene);
+        return 5;
+    }
+    for (uint32_t mi = 0; mi < mesh_count; mi++) {
+        ufbx_mesh* mesh = scene->meshes.data[mi];
+        copy_str(mesh_names[mi].name, sizeof(mesh_names[mi].name), mesh->name.data, mesh->name.length);
+    }
+
+    for (size_t mi = 0; mi < scene->meshes.count; mi++) {
+        ufbx_mesh* mesh = scene->meshes.data[mi];
+        if (mesh->num_indices == 0) continue;
+
+        /* The mesh's own geometric offset (FBX's separate, non-inherited
+           "geometric transform"), taken from its first instance -- shared by
+           construction across every node referencing this mesh in practice
+           (ufbx models it per-node, but authoring tools never vary it per
+           instance). Never the node's placement in the scene. */
+        ufbx_matrix geo_mat;
+        if (mesh->instances.count > 0) {
+            geo_mat = mesh->instances.data[0]->geometry_to_node;
+        } else {
+            geo_mat = ufbx_identity_matrix;
+        }
+        ufbx_matrix normal_mat = ufbx_matrix_for_normals(&geo_mat);
+
+        if ((uint32_t)mesh->max_face_triangles > tri_cap) {
+            uint32_t need = (uint32_t)mesh->max_face_triangles;
+            uint32_t* p = (uint32_t*)realloc(tri_buf, (size_t)need * 3 * sizeof(uint32_t));
+            if (!p) continue;
+            tri_buf = p;
+            tri_cap = need;
+        }
+
+        for (size_t pi = 0; pi < mesh->material_parts.count; pi++) {
+            ufbx_mesh_part* part = &mesh->material_parts.data[pi];
+            if (part->num_triangles == 0) continue;
+
+            uint32_t vcount = (uint32_t)(part->num_triangles * 3);
+
+            float* positions = (float*)malloc((size_t)vcount * 3 * sizeof(float));
+            float* normals = mesh->vertex_normal.exists ? (float*)malloc((size_t)vcount * 3 * sizeof(float)) : NULL;
+            float* uvs = mesh->vertex_uv.exists ? (float*)malloc((size_t)vcount * 2 * sizeof(float)) : NULL;
+            uint32_t* indices = (uint32_t*)malloc((size_t)vcount * sizeof(uint32_t));
+            if (!positions || !indices) {
+                free(positions); free(normals); free(uvs); free(indices);
+                continue;
+            }
+
+            uint32_t vi = 0;
+            for (size_t fj = 0; fj < part->face_indices.count && vi < vcount; fj++) {
+                uint32_t face_idx = part->face_indices.data[fj];
+                ufbx_face face = mesh->faces.data[face_idx];
+                uint32_t ntri = ufbx_triangulate_face(tri_buf, (size_t)tri_cap * 3, mesh, face);
+                if (vi + ntri * 3 > vcount) ntri = (vcount - vi) / 3;
+
+                for (uint32_t t = 0; t < ntri; t++) {
+                    for (uint32_t k = 0; k < 3; k++) {
+                        uint32_t ci = tri_buf[t * 3 + k];
+
+                        ufbx_vec3 p = ufbx_get_vertex_vec3(&mesh->vertex_position, ci);
+                        p = ufbx_transform_position(&geo_mat, p);
+                        positions[vi * 3 + 0] = (float)p.x;
+                        positions[vi * 3 + 1] = (float)p.y;
+                        positions[vi * 3 + 2] = (float)p.z;
+
+                        if (normals) {
+                            ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, ci);
+                            n = ufbx_transform_direction(&normal_mat, n);
+                            double len = sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+                            if (len > 1e-9) {
+                                n.x = (ufbx_real)(n.x / len);
+                                n.y = (ufbx_real)(n.y / len);
+                                n.z = (ufbx_real)(n.z / len);
+                            }
+                            normals[vi * 3 + 0] = (float)n.x;
+                            normals[vi * 3 + 1] = (float)n.y;
+                            normals[vi * 3 + 2] = (float)n.z;
+                        }
+
+                        if (uvs) {
+                            ufbx_vec2 uv = ufbx_get_vertex_vec2(&mesh->vertex_uv, ci);
+                            uvs[vi * 2 + 0] = (float)uv.x;
+                            uvs[vi * 2 + 1] = (float)uv.y;
+                        }
+
+                        indices[vi] = vi;
+                        vi++;
+                    }
+                }
+            }
+
+            if (vi == 0 || !local_chunk_reserve(&chunks)) {
+                free(positions); free(normals); free(uvs); free(indices);
+                continue;
+            }
+
+            /* Mesh's own default material assignment (ufbx_mesh.materials),
+               not any per-node override -- see FbxMultiMeshLocalData's doc
+               comment in fbx_wrap.h. */
+            ufbx_material* mat = part->index < mesh->materials.count ? mesh->materials.data[part->index] : NULL;
+
+            FbxMeshLocalData* c = &chunks.data[chunks.count++];
+            c->positions = positions;
+            c->normals = normals;
+            c->uvs = uvs;
+            c->indices = indices;
+            c->vertex_count = vi;
+            c->index_count = vi;
+            c->has_normals = normals ? 1 : 0;
+            c->has_uvs = uvs ? 1 : 0;
+            c->material_index = mat ? (int)mat->typed_id : -1;
+            c->mesh_index = (int)mi;
+
+            weld_local_chunk(c);
+        }
+    }
+
+    free(tri_buf);
+    ufbx_free_scene(scene);
+
+    if (chunks.count == 0) {
+        free(chunks.data);
+        free(mesh_names);
+        return 2;
+    }
+
+    out->primitives = chunks.data;
+    out->primitive_count = chunks.count;
+    out->mesh_names = mesh_names;
+    out->mesh_count = mesh_count;
+    return 0;
+}
+
+void fbx_wrap_free_meshes(FbxMultiMeshLocalData* out) {
+    if (!out) return;
+    if (out->primitives) {
+        for (uint32_t i = 0; i < out->primitive_count; i++)
+            free_local_chunk(&out->primitives[i]);
+        free(out->primitives);
+    }
+    free(out->mesh_names);
+    out->primitives = NULL;
+    out->primitive_count = 0;
+    out->mesh_names = NULL;
+    out->mesh_count = 0;
+}
+
+int fbx_wrap_load_hierarchy(const char* path, FbxNodeHierarchy* out) {
+    memset(out, 0, sizeof(*out));
+
+    ufbx_load_opts opts;
+    fbx_wrap_opts(&opts);
+    ufbx_error error;
+    ufbx_scene* scene = ufbx_load_file(path, &opts, &error);
+    if (!scene) return 1;
+
+    if (scene->nodes.count == 0) {
+        ufbx_free_scene(scene);
+        return 3;
+    }
+
+    FbxNodeData* nodes = (FbxNodeData*)calloc(scene->nodes.count, sizeof(FbxNodeData));
+    if (!nodes) {
+        ufbx_free_scene(scene);
+        return 5;
+    }
+
+    for (size_t ni = 0; ni < scene->nodes.count; ni++) {
+        ufbx_node* node = scene->nodes.data[ni];
+        FbxNodeData* o = &nodes[ni];
+
+        copy_str(o->name, sizeof(o->name), node->name.data, node->name.length);
+        o->parent_index = node->parent ? (int32_t)node->parent->typed_id : -1;
+        o->mesh_index = node->mesh ? (int32_t)node->mesh->typed_id : -1;
+
+        o->translation[0] = (float)node->local_transform.translation.x;
+        o->translation[1] = (float)node->local_transform.translation.y;
+        o->translation[2] = (float)node->local_transform.translation.z;
+        o->rotation[0] = (float)node->local_transform.rotation.x;
+        o->rotation[1] = (float)node->local_transform.rotation.y;
+        o->rotation[2] = (float)node->local_transform.rotation.z;
+        o->rotation[3] = (float)node->local_transform.rotation.w;
+        o->scale[0] = (float)node->local_transform.scale.x;
+        o->scale[1] = (float)node->local_transform.scale.y;
+        o->scale[2] = (float)node->local_transform.scale.z;
+    }
+
+    uint32_t node_count = (uint32_t)scene->nodes.count;
+    ufbx_free_scene(scene);
+
+    out->nodes = nodes;
+    out->node_count = node_count;
+    return 0;
+}
+
+void fbx_wrap_free_hierarchy(FbxNodeHierarchy* out) {
+    if (!out || !out->nodes) return;
+    free(out->nodes);
+    out->nodes = NULL;
+    out->node_count = 0;
+}
+
 /* ── Materials & images ──────────────────────────────────────────────────── */
 
 static int str_ends_with_ci(const char* data, size_t len, const char* suffix_lower) {

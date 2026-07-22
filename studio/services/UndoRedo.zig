@@ -31,7 +31,8 @@ pub fn captureSnapshot() Snapshot {
 }
 
 pub fn restoreSnapshot(s: Snapshot) void {
-    if (s.object_count > State.MAX_OBJECTS) return;
+    EditorState.ensureObjectCapacity(s.object_count);
+    if (s.object_count > EditorState.objects.len) return; // hit the growth ceiling
     @memcpy(EditorState.objects[0..s.object_count], s.objects);
     EditorState.object_count = s.object_count;
     EditorState.selected_object = s.selected_object;

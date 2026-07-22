@@ -31,20 +31,27 @@ pub fn deleteSelectedObjects(now: i128) void {
     }
 
     const before = UndoRedo.captureSnapshot();
+    const n = EditorState.object_count;
 
-    // Mark selected objects and all their descendants
-    var to_remove_set = [_]bool{false} ** MAX_OBJECTS;
-    for (0..EditorState.object_count) |i| {
+    // Mark selected objects and all their descendants. Sized to `n` (the
+    // live count), not `MAX_OBJECTS` — a fixed array here would index out of
+    // bounds once a scene exceeds 128 nodes (e.g. a Bistro-scale FBX
+    // hierarchy).
+    const to_remove_set = EditorState.gpa.alloc(bool, n) catch return;
+    defer EditorState.gpa.free(to_remove_set);
+    @memset(to_remove_set, false);
+    for (0..n) |i| {
         if (Selection.isObjectSelected(i)) to_remove_set[i] = true;
     }
     // Expand to descendants (forward pass; parents always precede children)
-    for (0..EditorState.object_count) |i| {
+    for (0..n) |i| {
         if (!to_remove_set[i] and EditorState.objects[i].parent >= 0) {
             if (to_remove_set[@intCast(EditorState.objects[i].parent)]) to_remove_set[i] = true;
         }
     }
 
-    var index_map: [MAX_OBJECTS]i32 = undefined;
+    const index_map = EditorState.gpa.alloc(i32, n) catch return;
+    defer EditorState.gpa.free(index_map);
     var next_idx: usize = 0;
     for (0..EditorState.object_count) |i| {
         index_map[i] = if (to_remove_set[i]) -1 else blk: {
@@ -104,11 +111,18 @@ pub fn deleteObject(now: i128, idx: usize) void {
     if (idx >= EditorState.object_count) return;
 
     const before = UndoRedo.captureSnapshot();
+    const n = EditorState.object_count;
 
-    // 1. Identify subtree to remove
-    var to_remove_set = [_]bool{false} ** MAX_OBJECTS;
+    // 1. Identify subtree to remove. Sized to `n`, not `MAX_OBJECTS` — every
+    // node has exactly one parent, so each index is pushed onto `scan_stack`
+    // at most once (when its actual parent is processed), so `n` is always
+    // enough capacity.
+    const to_remove_set = EditorState.gpa.alloc(bool, n) catch return;
+    defer EditorState.gpa.free(to_remove_set);
+    @memset(to_remove_set, false);
     var remove_count: usize = 0;
-    var scan_stack: [MAX_OBJECTS]usize = undefined;
+    const scan_stack = EditorState.gpa.alloc(usize, n) catch return;
+    defer EditorState.gpa.free(scan_stack);
     var stack_len: usize = 0;
     scan_stack[stack_len] = idx;
     stack_len += 1;
@@ -120,7 +134,7 @@ pub fn deleteObject(now: i128, idx: usize) void {
         to_remove_set[cur] = true;
         remove_count += 1;
 
-        for (0..EditorState.object_count) |child_idx| {
+        for (0..n) |child_idx| {
             if (EditorState.objects[child_idx].parent == @as(i32, @intCast(cur))) {
                 scan_stack[stack_len] = child_idx;
                 stack_len += 1;
@@ -129,7 +143,8 @@ pub fn deleteObject(now: i128, idx: usize) void {
     }
 
     // 2. Build index mapping
-    var index_map: [MAX_OBJECTS]i32 = undefined;
+    const index_map = EditorState.gpa.alloc(i32, n) catch return;
+    defer EditorState.gpa.free(index_map);
     var next_new_idx: usize = 0;
     for (0..EditorState.object_count) |i| {
         if (to_remove_set[i]) {
@@ -170,7 +185,8 @@ pub fn deleteObject(now: i128, idx: usize) void {
 
 pub fn duplicateObject(now: i128, io: std.Io, idx: usize) void {
     if (idx >= EditorState.object_count) return;
-    if (EditorState.object_count >= MAX_OBJECTS) return;
+    EditorState.ensureObjectCapacity(EditorState.object_count + 1);
+    if (EditorState.object_count >= EditorState.objects.len) return;
 
     const before = UndoRedo.captureSnapshot();
 
@@ -324,62 +340,113 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
     // Reparenting under one's own descendant would orphan the subtree.
     if (new_parent >= 0 and isAncestorOrSelf(@intCast(new_parent), @intCast(drag))) return;
 
-    // Children lists keyed by (parent + 1) so root (-1) lives at index 0.
-    const KEYS = MAX_OBJECTS + 1;
-    var children: [KEYS][MAX_OBJECTS]i32 = undefined;
-    var child_count: [KEYS]usize = .{0} ** KEYS;
-    for (0..EditorState.object_count) |i| {
+    const n = EditorState.object_count;
+    const gpa = EditorState.gpa;
+
+    // Children lists as a linked list, O(n) total (not the O(n^2) dense
+    // `[MAX_OBJECTS][MAX_OBJECTS]i32` this used to be — at Bistro scale
+    // (thousands of nodes) that would have meant a multi-MB-to-GB allocation
+    // on every drag-reparent). `first_child`/`last_child` are keyed by
+    // (parent + 1) so root (-1) lives at key 0; `next_sibling`/`prev_sibling`
+    // thread each parent's children in original relative order.
+    const KEYS = n + 1;
+    const first_child = gpa.alloc(i32, KEYS) catch return;
+    defer gpa.free(first_child);
+    const last_child = gpa.alloc(i32, KEYS) catch return;
+    defer gpa.free(last_child);
+    const next_sibling = gpa.alloc(i32, n) catch return;
+    defer gpa.free(next_sibling);
+    const prev_sibling = gpa.alloc(i32, n) catch return;
+    defer gpa.free(prev_sibling);
+    @memset(first_child, -1);
+    @memset(last_child, -1);
+    @memset(next_sibling, -1);
+    @memset(prev_sibling, -1);
+
+    for (0..n) |i| {
         if (i == drag) continue; // re-inserted at the target below
         const key: usize = @intCast(EditorState.objects[i].parent + 1);
-        children[key][child_count[key]] = @intCast(i);
-        child_count[key] += 1;
+        const node: i32 = @intCast(i);
+        prev_sibling[i] = last_child[key];
+        if (last_child[key] == -1) {
+            first_child[key] = node;
+        } else {
+            next_sibling[@intCast(last_child[key])] = node;
+        }
+        last_child[key] = node;
     }
 
-    // Insert `drag` into the new parent's child list before `before_sibling`.
+    // Insert `drag` into the new parent's child list, before `before_sibling`
+    // if it's found there, else appended at the tail (matches the old
+    // dense-array search-or-append semantics).
     const pkey: usize = @intCast(new_parent + 1);
-    var pos: usize = child_count[pkey];
+    const drag_node: i32 = @intCast(drag);
+    var inserted = false;
     if (before_sibling >= 0) {
-        for (0..child_count[pkey]) |k| {
-            if (children[pkey][k] == before_sibling) {
-                pos = k;
-                break;
+        var cur = first_child[pkey];
+        while (cur != -1) : (cur = next_sibling[@intCast(cur)]) {
+            if (cur != before_sibling) continue;
+            const p = prev_sibling[@intCast(cur)];
+            next_sibling[drag] = cur;
+            prev_sibling[drag] = p;
+            prev_sibling[@intCast(cur)] = drag_node;
+            if (p == -1) {
+                first_child[pkey] = drag_node;
+            } else {
+                next_sibling[@intCast(p)] = drag_node;
             }
+            inserted = true;
+            break;
         }
     }
-    var k = child_count[pkey];
-    while (k > pos) : (k -= 1) children[pkey][k] = children[pkey][k - 1];
-    children[pkey][pos] = @intCast(drag);
-    child_count[pkey] += 1;
+    if (!inserted) {
+        prev_sibling[drag] = last_child[pkey];
+        next_sibling[drag] = -1;
+        if (last_child[pkey] == -1) {
+            first_child[pkey] = drag_node;
+        } else {
+            next_sibling[@intCast(last_child[pkey])] = drag_node;
+        }
+        last_child[pkey] = drag_node;
+    }
 
     const before = UndoRedo.captureSnapshot();
 
-    // DFS from the root to produce the new linear order of old indices.
-    var order: [MAX_OBJECTS]usize = undefined;
+    // Iterative DFS from the root to produce the new linear order of old
+    // indices. Pushing each parent's children tail-to-head (via
+    // `prev_sibling`) means they pop head-to-tail, preserving order, without
+    // needing a temporary reversal buffer. Each node is pushed and popped
+    // exactly once, so `stack` sized to `n` is always enough.
+    const order = gpa.alloc(usize, n) catch return;
+    defer gpa.free(order);
     var order_n: usize = 0;
-    var stack: [MAX_OBJECTS]i32 = undefined; // old indices pending emit (parent already emitted)
+    const stack = gpa.alloc(i32, n) catch return;
+    defer gpa.free(stack);
     var sp: usize = 0;
-    // Seed with root children in reverse (so they pop in order).
-    var ri = child_count[0];
-    while (ri > 0) : (ri -= 1) {
-        stack[sp] = children[0][ri - 1];
-        sp += 1;
+    {
+        var c = last_child[0];
+        while (c != -1) : (c = prev_sibling[@intCast(c)]) {
+            stack[sp] = c;
+            sp += 1;
+        }
     }
     while (sp > 0) {
         sp -= 1;
         const old: usize = @intCast(stack[sp]);
         order[order_n] = old;
         order_n += 1;
-        const ckey: usize = @intCast(old + 1);
-        var ci = child_count[ckey];
-        while (ci > 0) : (ci -= 1) {
-            stack[sp] = children[ckey][ci - 1];
+        const ckey: usize = old + 1;
+        var c = last_child[ckey];
+        while (c != -1) : (c = prev_sibling[@intCast(c)]) {
+            stack[sp] = c;
             sp += 1;
         }
     }
-    if (order_n != EditorState.object_count) return; // safety: malformed tree, abort
+    if (order_n != n) return; // safety: malformed tree, abort
 
     // old index -> new index
-    var new_of_old: [MAX_OBJECTS]i32 = undefined;
+    const new_of_old = gpa.alloc(i32, n) catch return;
+    defer gpa.free(new_of_old);
     for (order[0..order_n], 0..) |old, ni| new_of_old[old] = @intCast(ni);
 
     // Heap, not `[MAX_OBJECTS]SceneNode` on the stack — that overflowed the
@@ -387,8 +454,8 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
     // delete-path compaction above, this reorder is an arbitrary DFS-order
     // permutation (`new_of_old[old]` isn't monotonic in `old`), so it can't
     // be proven safe to apply in place — a real scratch buffer is needed.
-    const rebuilt = EditorState.gpa.alloc(SceneNode, order_n) catch return;
-    defer EditorState.gpa.free(rebuilt);
+    const rebuilt = gpa.alloc(SceneNode, order_n) catch return;
+    defer gpa.free(rebuilt);
     for (order[0..order_n], 0..) |old, ni| {
         var node = EditorState.objects[old];
         if (old == drag) {
@@ -402,11 +469,13 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
 
     // Remap selection.
     if (EditorState.selected_object) |s| EditorState.selected_object = @intCast(new_of_old[s]);
-    var new_set: [MAX_OBJECTS]bool = .{false} ** MAX_OBJECTS;
+    const new_set = gpa.alloc(bool, n) catch return;
+    defer gpa.free(new_set);
+    @memset(new_set, false);
     for (0..order_n) |old| {
         if (Selection.isObjectSelected(old)) new_set[@intCast(new_of_old[old])] = true;
     }
-    for (0..MAX_OBJECTS) |i| {
+    for (0..n) |i| {
         if (new_set[i]) Selection.selectObject(i) else Selection.deselectObject(i);
     }
     if (EditorState.last_select_idx) |l| EditorState.last_select_idx = @intCast(new_of_old[l]);
@@ -418,6 +487,8 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
 
 pub fn addObject(io: std.Io, n: []const u8, parent: i32) usize {
     const idx = EditorState.object_count;
+    EditorState.ensureObjectCapacity(idx + 1);
+    if (idx >= EditorState.objects.len) return idx; // hit the growth ceiling
     EditorState.object_count += 1;
     EditorState.objects[idx] = .{};
     EditorState.objects[idx].setName(n);

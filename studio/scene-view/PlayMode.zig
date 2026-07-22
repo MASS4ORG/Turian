@@ -68,8 +68,22 @@ var g_fns: Fns = undefined;
 var g_lib_hash: u64 = 0;
 var g_lib_valid: bool = false;
 
+/// Grows `buf` (from empty, doubling) to at least `min_len` via
+/// `std.heap.page_allocator`. Shared by every module-level scratch/snapshot
+/// buffer below — sized to the live scene at the point of use rather than a
+/// fixed `MAX_OBJECTS`, since a Bistro-scale FBX hierarchy can exceed it.
+fn growNodeBuf(buf: []engine.SceneNode, min_len: usize) []engine.SceneNode {
+    if (buf.len >= min_len) return buf;
+    var new_len: usize = if (buf.len == 0) EditorState.MAX_OBJECTS else buf.len;
+    while (new_len < min_len) new_len *|= 2;
+    return if (buf.len == 0)
+        std.heap.page_allocator.alloc(engine.SceneNode, new_len) catch buf
+    else
+        std.heap.page_allocator.realloc(buf, new_len) catch buf;
+}
+
 // Edit-time scene snapshot, restored on Stop.
-var g_snapshot: [EditorState.objects.len]engine.SceneNode = undefined;
+var g_snapshot: []engine.SceneNode = &.{};
 var g_snapshot_count: usize = 0;
 
 // Timing.
@@ -129,7 +143,7 @@ pub fn gameEvents() ?*engine.GameEventRegistry {
 
 /// Buffer for the "Play First Scene" nodes (loaded independently of the
 /// currently-edited scene).
-var g_first_scene_nodes: [EditorState.objects.len]engine.SceneNode = undefined;
+var g_first_scene_nodes: []engine.SceneNode = &.{};
 
 /// Enter Play (from edit) or resume (from paused), using the currently-edited
 /// scene.
@@ -164,9 +178,21 @@ pub fn playFirstScene(io: std.Io) void {
         return;
     };
 
+    // `loadScene` reports the scene's true node count even when the buffer is
+    // too small (see its doc comment) — grow and retry rather than truncating
+    // a Bistro-scale FBX hierarchy scene.
+    if (g_first_scene_nodes.len == 0) g_first_scene_nodes = growNodeBuf(g_first_scene_nodes, EditorState.MAX_OBJECTS);
     var count: usize = 0;
-    if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, &g_first_scene_nodes, &count)) {
-        gui.toast(@src(), .{ .message = tr("Failed to load the first scene.") });
+    while (true) {
+        if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, g_first_scene_nodes, &count)) {
+            gui.toast(@src(), .{ .message = tr("Failed to load the first scene.") });
+            return;
+        }
+        if (count <= g_first_scene_nodes.len or g_first_scene_nodes.len >= engine.scene.GROWTH_CEILING) break;
+        g_first_scene_nodes = growNodeBuf(g_first_scene_nodes, count);
+    }
+    if (count > g_first_scene_nodes.len) {
+        gui.toast(@src(), .{ .message = tr("First scene is too large to play.") });
         return;
     }
 
@@ -194,7 +220,14 @@ fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
         g_lib_hash = hash;
     }
 
-    // Snapshot the edit-time scene so Stop restores it exactly.
+    // Snapshot the edit-time scene so Stop restores it exactly. Abort rather
+    // than proceed with a truncated snapshot — Stop's "restores it exactly"
+    // contract must hold even for a Bistro-scale scene.
+    g_snapshot = growNodeBuf(g_snapshot, EditorState.object_count);
+    if (g_snapshot.len < EditorState.object_count) {
+        gui.toast(@src(), .{ .message = tr("Scene is too large to snapshot for Play mode.") });
+        return false;
+    }
     g_snapshot_count = EditorState.object_count;
     @memcpy(g_snapshot[0..g_snapshot_count], EditorState.objects[0..g_snapshot_count]);
 
@@ -240,8 +273,11 @@ pub fn stop() void {
 
     // Restore the snapshot taken on Play (no play edit ever touched EditorState,
     // but restoring is the contract and guards against future edits-during-play).
-    @memcpy(EditorState.objects[0..g_snapshot_count], g_snapshot[0..g_snapshot_count]);
-    EditorState.object_count = g_snapshot_count;
+    EditorState.ensureObjectCapacity(g_snapshot_count);
+    if (g_snapshot_count <= EditorState.objects.len) {
+        @memcpy(EditorState.objects[0..g_snapshot_count], g_snapshot[0..g_snapshot_count]);
+        EditorState.object_count = g_snapshot_count;
+    }
 
     g_state = .edit;
 }
@@ -431,7 +467,7 @@ fn mapKey(code: gui.enums.Key) ?u16 {
 }
 
 /// Scratch buffer for parsing each prefab/scene asset before registering it.
-var g_prefab_buf: [EditorState.objects.len]engine.SceneNode = undefined;
+var g_prefab_buf: []engine.SceneNode = &.{};
 
 /// Register every scene/prefab asset's template nodes with the play library so
 /// scripts can `Instantiate` them by GUID at runtime.
@@ -439,13 +475,22 @@ fn registerPrefabs(io: std.Io) void {
     if (!EditorState.assetDbReady()) return;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
+    if (g_prefab_buf.len == 0) g_prefab_buf = growNodeBuf(g_prefab_buf, EditorState.MAX_OBJECTS);
     var it = EditorState.asset_db.enumerate(.scene);
     while (it.next()) |info| {
         var count: usize = 0;
-        if (!editor.scene_io.loadScene(io, arena.allocator(), info.path, &g_prefab_buf, &count)) continue;
+        while (true) {
+            if (!editor.scene_io.loadScene(io, arena.allocator(), info.path, g_prefab_buf, &count)) break;
+            if (count <= g_prefab_buf.len or g_prefab_buf.len >= engine.scene.GROWTH_CEILING) break;
+            g_prefab_buf = growNodeBuf(g_prefab_buf, count);
+        }
+        if (count == 0 or count > g_prefab_buf.len) {
+            _ = arena.reset(.retain_capacity);
+            continue;
+        }
         var gbuf: [36]u8 = undefined;
         const guid = info.guid.toString(&gbuf);
-        g_fns.register_prefab(guid.ptr, guid.len, &g_prefab_buf, count);
+        g_fns.register_prefab(guid.ptr, guid.len, g_prefab_buf.ptr, count);
         _ = arena.reset(.retain_capacity);
     }
 }

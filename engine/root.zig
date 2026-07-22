@@ -175,8 +175,11 @@ pub const SCENE_MANAGER_MAX_SCENES = @import("scene/SceneManager.zig").MAX_SCENE
 
 /// Scene-wide constants.
 pub const scene = struct {
-    /// Maximum number of scene nodes per scene.
+    /// Default/initial scene node storage capacity — not a hard ceiling; see
+    /// `GROWTH_CEILING` and `SceneNode.zig`'s doc comment.
     pub const MAX_OBJECTS = @import("scene/SceneNode.zig").MAX_OBJECTS;
+    /// Hard ceiling on scene node count regardless of growth.
+    pub const GROWTH_CEILING = @import("scene/SceneNode.zig").GROWTH_CEILING;
     /// Maximum number of components per scene node.
     pub const MAX_COMPONENTS = @import("scene/SceneNode.zig").MAX_COMPONENTS;
     /// Maximum length of a scene node name.

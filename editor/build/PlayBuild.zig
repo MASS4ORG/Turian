@@ -356,8 +356,23 @@ fn generatePlayMainZig(
             "const gpa = std.heap.page_allocator;\n\n" ++
             "// The library owns the live scene: node storage, the input snapshot and\n" ++
             "// (when there are user scripts) the instantiated component values.\n" ++
-            "var g_nodes: [engine.scene.MAX_OBJECTS]engine.SceneNode = undefined;\n" ++
-            "var g_node_count: usize = 0;\n" ++
+            "// Grown on demand (see ensureNodeCapacity below), not fixed at\n" ++
+            "// MAX_OBJECTS -- a Bistro-scale FBX hierarchy scene can exceed it.\n" ++
+            "var g_nodes: []engine.SceneNode = &.{};\n" ++
+            "var g_node_count: usize = 0;\n\n" ++
+            "fn ensureNodeCapacity(min_count: usize) void {\n" ++
+            "    if (g_nodes.len >= min_count) return;\n" ++
+            "    var new_cap: usize = if (g_nodes.len == 0) engine.scene.MAX_OBJECTS else g_nodes.len;\n" ++
+            "    while (new_cap < min_count and new_cap < engine.scene.GROWTH_CEILING) {\n" ++
+            "        new_cap = @min(new_cap *| 2, engine.scene.GROWTH_CEILING);\n" ++
+            "    }\n" ++
+            "    if (new_cap < min_count) return;\n" ++
+            "    const grown = if (g_nodes.len == 0)\n" ++
+            "        gpa.alloc(engine.SceneNode, new_cap) catch return\n" ++
+            "    else\n" ++
+            "        gpa.realloc(g_nodes, new_cap) catch return;\n" ++
+            "    g_nodes = grown;\n" ++
+            "}\n" ++
             "var g_input: engine.Input = engine.Input.init();\n" ++
             "var g_services: engine.Services = engine.Services.init();\n" ++
             "var g_spawner: engine.Spawner = engine.Spawner.init(gpa);\n\n" ++
@@ -584,6 +599,7 @@ fn generatePlayMainZig(
     try out.appendSlice(
         a,
         "export fn turianPlayStart(nodes: [*]const engine.SceneNode, count: usize) callconv(.c) bool {\n" ++
+            "    ensureNodeCapacity(count);\n" ++
             "    const n = @min(count, g_nodes.len);\n" ++
             "    @memcpy(g_nodes[0..n], nodes[0..n]);\n" ++
             "    g_node_count = n;\n" ++
@@ -618,8 +634,14 @@ fn generatePlayMainZig(
                 "    for (0..g_live_count) |i| call_update(&g_live[i], g_live_transform[i], g_nodes[0..g_node_count], time);\n" ++
                 // Apply any prefab spawns/destroys queued by scripts this frame,
                 // then reconcile the live component set with the new node buffer.
+                // `flush` only checks capacity, it doesn't grow `g_nodes` itself
+                // (mirrors the studio's own PrefabOps.instantiatePrefab pattern) --
+                // grow with headroom for a batch of Instantiate calls this frame
+                // before flushing, rather than trying to predict the exact total
+                // (template sizes aren't cheaply summable here).\n" ++
                 "    if (g_spawner.pending() > 0) {\n" ++
-                "        if (g_spawner.flush(std.Io.Threaded.global_single_threaded.io(), &g_nodes, &g_node_count)) reconcileLive();\n" ++
+                "        ensureNodeCapacity(g_node_count + engine.scene.MAX_OBJECTS);\n" ++
+                "        if (g_spawner.flush(std.Io.Threaded.global_single_threaded.io(), g_nodes, &g_node_count)) reconcileLive();\n" ++
                 "    }\n",
         );
     } else {
@@ -650,7 +672,7 @@ fn generatePlayMainZig(
     try out.appendSlice(
         a,
         "export fn turianPlayNodesPtr() callconv(.c) [*]engine.SceneNode {\n" ++
-            "    return &g_nodes;\n" ++
+            "    return g_nodes.ptr;\n" ++
             "}\n\n" ++
             "export fn turianPlayNodesCount() callconv(.c) usize {\n" ++
             "    return g_node_count;\n" ++

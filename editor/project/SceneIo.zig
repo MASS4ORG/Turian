@@ -265,7 +265,12 @@ pub fn parseSceneVersion(content: []const u8) u32 {
 }
 
 /// Parse a scene from in-memory JSON bytes (e.g. supplied by an asset package
-/// instead of a loose file).
+/// instead of a loose file). `out_count` always reports the scene's *true*
+/// object count, even when it exceeds `out_objects.len` — only `min(true
+/// count, out_objects.len)` objects are actually written into `out_objects`.
+/// This lets a caller detect truncation unambiguously (`out_count.* >
+/// out_objects.len`) and retry with a bigger buffer, unlike a contract that
+/// only reports the written count (indistinguishable from an exact fit).
 pub fn loadSceneFromBytes(
     allocator: std.mem.Allocator,
     content: []const u8,
@@ -299,6 +304,6 @@ pub fn loadSceneFromBytes(
         for (so.overrides) |key| obj.addOverrideKey(key);
         out_objects[i] = obj;
     }
-    out_count.* = max;
+    out_count.* = parsed.objects.len;
     return true;
 }

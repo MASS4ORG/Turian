@@ -24,6 +24,7 @@
 const std = @import("std");
 const SceneNode = @import("SceneNode.zig").SceneNode;
 const MAX_OBJECTS = @import("SceneNode.zig").MAX_OBJECTS;
+const GROWTH_CEILING = @import("SceneNode.zig").GROWTH_CEILING;
 
 /// Maximum number of concurrently loaded scenes (including the persistent one).
 pub const MAX_SCENES = 16;
@@ -105,7 +106,8 @@ const Slot = struct {
     err: LoadError = .none,
     /// True for the persistent (DontDestroyOnLoad) scene; never auto-unloaded.
     persistent: bool = false,
-    /// Owned node storage (capacity == MAX_OBJECTS while in use).
+    /// Owned node storage, grown on demand by `runLoad` (starts at
+    /// `MAX_OBJECTS`, up to `GROWTH_CEILING`) — capacity is not fixed.
     nodes: []SceneNode = &.{},
     node_count: usize = 0,
     /// If this scene was pulled in as a dependency, the slot index of its parent.
@@ -290,7 +292,13 @@ pub const SceneManager = struct {
 
     /// Core load step shared by sync and async paths. Fills the slot's nodes via
     /// the loader and sets state/err. Does not fire events or touch the active
-    /// scene (callers do that on the owning thread).
+    /// scene (callers do that on the owning thread). `Loader`'s contract is
+    /// "fill up to out.len, report the true count in out_count" — if the
+    /// loader reports having filled the buffer exactly (ambiguous with a
+    /// truncated result), storage is grown and the loader re-run, up to
+    /// `GROWTH_CEILING`. Safe because loaders are stateless per call (parse
+    /// scene id → nodes), so retrying is just redoing the same parse into a
+    /// bigger buffer.
     fn runLoad(self: *SceneManager, handle: SceneHandle) void {
         const slot = self.slotPtr(handle) orelse return;
         const loader = self.loader orelse {
@@ -299,16 +307,31 @@ pub const SceneManager = struct {
             return;
         };
         var count: usize = 0;
-        const ok = loader(self.loader_ctx, slot.idSlice(), slot.nodes[0..MAX_OBJECTS], &count);
-        if (!ok) {
-            slot.state = .failed;
-            slot.err = .load_failed;
-            slot.node_count = 0;
-            return;
+        while (true) {
+            const ok = loader(self.loader_ctx, slot.idSlice(), slot.nodes, &count);
+            if (!ok) {
+                slot.state = .failed;
+                slot.err = .load_failed;
+                slot.node_count = 0;
+                return;
+            }
+            if (count < slot.nodes.len or slot.nodes.len >= GROWTH_CEILING) break;
+            if (!self.growSlotNodes(slot)) break;
         }
-        slot.node_count = @min(count, MAX_OBJECTS);
+        slot.node_count = @min(count, slot.nodes.len);
         slot.state = .loaded;
         slot.err = .none;
+    }
+
+    /// Doubles `slot.nodes`' capacity (capped at `GROWTH_CEILING`), preserving
+    /// existing contents. Returns false if already at the ceiling or on
+    /// allocation failure (caller falls back to truncating at current capacity).
+    fn growSlotNodes(self: *SceneManager, slot: *Slot) bool {
+        if (slot.nodes.len >= GROWTH_CEILING) return false;
+        const new_cap = @min(slot.nodes.len *| 2, GROWTH_CEILING);
+        const grown = self.allocator.realloc(slot.nodes, new_cap) catch return false;
+        slot.nodes = grown;
+        return true;
     }
 
     // ── Deferred requests ───────────────────────────────────────────────────
@@ -473,7 +496,7 @@ pub const SceneManager = struct {
 
         const ph = self.persistentScene() catch return false;
         const dst = self.slotPtr(ph).?;
-        if (dst.node_count >= MAX_OBJECTS) return false;
+        if (dst.node_count >= dst.nodes.len and !self.growSlotNodes(dst)) return false;
 
         dst.nodes[dst.node_count] = src.nodes[node_index];
         dst.node_count += 1;
@@ -531,8 +554,9 @@ pub const SceneManager = struct {
         return slot.nodes[0..slot.node_count];
     }
 
-    /// Full-capacity node buffer for a loaded scene (length == MAX_OBJECTS while
-    /// loaded), for runtime spawning into the scene. Empty if stale.
+    /// Full-capacity node buffer for a loaded scene (length is the slot's
+    /// current storage capacity, grown on demand — not a fixed size), for
+    /// runtime spawning into the scene. Empty if stale.
     pub fn nodeBuffer(self: *SceneManager, handle: SceneHandle) []SceneNode {
         const slot = self.slotPtr(handle) orelse return &.{};
         return slot.nodes;
@@ -783,6 +807,22 @@ test "stale handle after unload is detected" {
     try testing.expect(!mgr.isLoaded(a));
     try testing.expectEqual(@as(usize, 0), mgr.nodes(a).len);
     try testing.expectEqual(LoadState.unloaded, mgr.getState(a));
+}
+
+test "loading more nodes than MAX_OBJECTS grows storage instead of truncating" {
+    var mgr = SceneManager.init(testing.allocator);
+    defer mgr.deinit();
+    mgr.setLoader(fakeLoader, null);
+
+    // Bistro-scale: comfortably past the MAX_OBJECTS=128 default capacity.
+    const want: usize = 500;
+    var buf: [16]u8 = undefined;
+    const id = try std.fmt.bufPrint(&buf, "ok:{d}:big", .{want});
+    const h = try mgr.loadScene(id, .single);
+
+    try testing.expect(mgr.isLoaded(h));
+    try testing.expectEqual(want, mgr.nodes(h).len);
+    try testing.expect(mgr.nodeBuffer(h).len >= want);
 }
 
 test "async load completes and is reapable" {

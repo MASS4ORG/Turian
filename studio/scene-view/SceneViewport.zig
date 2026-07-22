@@ -152,7 +152,7 @@ pub fn draw() void {
 
     // Free-look navigation drives the editor camera, independent of any
     // scene Camera component.
-    EditorCamera.ensureInit(&EditorState.objects, EditorState.object_count);
+    EditorCamera.ensureInit(EditorState.objects, EditorState.object_count);
     loadCameraSettings();
     const nav = gatherNav(inst, content, phys);
     _ = EditorCamera.navigate(nav);
@@ -165,14 +165,14 @@ pub fn draw() void {
     // the snap (if any) here, before the scene renders, keeps the gizmo dots
     // and the 3D view in lockstep instead of lagging a frame apart.
     const axis_hit = AxisGizmo.pick(nat_rect, phys, scale, m.pos.x, m.pos.y);
-    AxisGizmo.applySnap(axis_hit, m.left_pressed, &EditorState.objects, EditorState.object_count, &inst.axis_anim);
+    AxisGizmo.applySnap(axis_hit, m.left_pressed, EditorState.objects, EditorState.object_count, &inst.axis_anim);
     GpuRenderer.setEditorCamera(EditorCamera.pose());
 
     var scene_m = m;
     if (axis_hit != null) scene_m.left_pressed = false;
     const cam = GpuRenderer.cameraFor(vp_w, vp_h);
     const grect = GizmoSystem.Rect{ .x = phys.x, .y = phys.y, .w = phys.w, .h = phys.h };
-    GizmoSystem.update(cam, grect, &EditorState.objects, EditorState.object_count, scene_m);
+    GizmoSystem.update(cam, grect, EditorState.objects, EditorState.object_count, scene_m);
     GpuRenderer.setGizmosEnabled(true);
 
     // The image and the billboard-icon overlay share an overlay container so the
@@ -290,7 +290,7 @@ fn drawIcons(vp_w: u32, vp_h: u32, nat_rect: gui.Rect) void {
     const cam = GpuRenderer.cameraFor(vp_w, vp_h);
     const grect = GizmoSystem.Rect{ .x = 0, .y = 0, .w = nat_rect.w, .h = nat_rect.h };
     var buf: [128]GizmoSystem.IconPlacement = undefined;
-    const n = GizmoSystem.collectIcons(cam, grect, &EditorState.objects, EditorState.object_count, &buf);
+    const n = GizmoSystem.collectIcons(cam, grect, EditorState.objects, EditorState.object_count, &buf);
     for (buf[0..n], 0..) |ic, i| {
         const col = gui.Color{
             .r = @intFromFloat(@max(0, @min(1, ic.color.r)) * 255),

@@ -30,7 +30,9 @@ const VERSION_IMAGE: u32 = 3;
 // sub-assets for glTF/GLB (additive — the main artifact is unchanged).
 // v6: FBX cook welds shared (pos, normal, uv) vertices into a real index
 // buffer instead of emitting fully de-indexed geometry.
-const VERSION_MODEL: u32 = 6;
+// v7: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
+// sub-assets for FBX too (additive — the main artifact is unchanged).
+const VERSION_MODEL: u32 = 7;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 
@@ -236,7 +238,7 @@ fn cookImage(allocator: std.mem.Allocator, asset_path: []const u8, data: []const
 }
 
 // ── Model → derived sub-assets (one-to-many) ────────────────────────────────
-// Materials/images (`ModelDerivedAssets.zig`) and, for glTF/GLB, per-mesh
+// Materials/images (`ModelDerivedAssets.zig`) and, for glTF/GLB/FBX, per-mesh
 // geometry + node hierarchy (`ModelHierarchy.zig`) are generated as separate
 // concerns but share one manifest: hierarchy generation needs to resolve the
 // material sub-assets the first pass just produced.
@@ -245,7 +247,7 @@ const model_derived_assets = @import("ModelDerivedAssets.zig");
 const model_hierarchy = @import("ModelHierarchy.zig");
 
 /// Generate every derived sub-asset for a model source (materials, images,
-/// and — glTF/GLB only — per-mesh geometry and node hierarchy). Writes the
+/// and — glTF/GLB/FBX — per-mesh geometry and node hierarchy). Writes the
 /// artifacts to the cache and records each as a `SubAsset` in `meta` with a
 /// stable GUID reused across reimports. Best-effort: parse failures and
 /// unsupported features are warned about, never fatal.
@@ -263,7 +265,7 @@ fn generateModelDerived(
     model_derived_assets.generate(io, allocator, project_path, asset_path, meta.import_settings, prev, &subs);
 
     const ext = std.fs.path.extension(asset_path);
-    if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb"))
+    if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb") or std.ascii.eqlIgnoreCase(ext, ".fbx"))
         model_hierarchy.generate(io, allocator, project_path, asset_path, prev, subs.items, &subs);
 
     // `subs` points into `allocator` (the import arena, see `importAsset`); it
@@ -595,6 +597,246 @@ test "glTF model import generates per-mesh and hierarchy sub-assets with stable 
     var child_count: usize = 0;
     for (nodes[0..count]) |*n| {
         if (n.parent == @as(i32, @intCast(root_idx.?))) {
+            child_count += 1;
+            try std.testing.expectEqual(@as(usize, 1), n.component_count);
+            try std.testing.expect(n.components[0] == .mesh_renderer);
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), child_count);
+
+    // Reimport is idempotent: same GUIDs reused by key.
+    importAssetForce(io, a, project_path, asset_path);
+    const meta2 = asset_meta.readMeta(io, a, asset_path);
+    for (meta2.sub_assets) |s| {
+        if (std.mem.eql(u8, s.key, "mesh:0")) try std.testing.expect(s.guid.eql(mesh0.?));
+        if (std.mem.eql(u8, s.key, "hierarchy")) try std.testing.expect(s.guid.eql(hierarchy.?));
+    }
+}
+
+test "FBX model import generates per-mesh and hierarchy sub-assets with stable GUIDs" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+
+    // Two triangle meshes ("MeshA"/"MeshB") each with their own Model node,
+    // both parented under an explicit "Group" null -- exercises hierarchy
+    // grouping the same way the glTF test above does with its "Root".
+    const fbx =
+        \\; FBX 7.3.0 project file
+        \\FBXHeaderExtension:  {
+        \\  FBXHeaderVersion: 1003
+        \\  FBXVersion: 7300
+        \\}
+        \\GlobalSettings:  {
+        \\  Version: 1000
+        \\  Properties70:  {
+        \\    P: "UpAxis", "int", "Integer", "",1
+        \\    P: "UpAxisSign", "int", "Integer", "",1
+        \\    P: "FrontAxis", "int", "Integer", "",2
+        \\    P: "FrontAxisSign", "int", "Integer", "",1
+        \\    P: "CoordAxis", "int", "Integer", "",0
+        \\    P: "CoordAxisSign", "int", "Integer", "",1
+        \\    P: "OriginalUpAxis", "int", "Integer", "",1
+        \\    P: "OriginalUpAxisSign", "int", "Integer", "",1
+        \\    P: "UnitScaleFactor", "double", "Number", "",1
+        \\  }
+        \\}
+        \\Objects:  {
+        \\  Geometry: 1000000, "Geometry::MeshA", "Mesh" {
+        \\    Vertices: *9 {
+        \\      a: 0,0,0,1,0,0,0,1,0
+        \\    }
+        \\    PolygonVertexIndex: *3 {
+        \\      a: 0,1,-3
+        \\    }
+        \\    GeometryVersion: 124
+        \\    LayerElementNormal: 0 {
+        \\      Version: 101
+        \\      Name: ""
+        \\      MappingInformationType: "ByPolygonVertex"
+        \\      ReferenceInformationType: "Direct"
+        \\      Normals: *9 {
+        \\        a: 0,0,1,0,0,1,0,0,1
+        \\      }
+        \\    }
+        \\    LayerElementUV: 0 {
+        \\      Version: 101
+        \\      Name: "UVMap"
+        \\      MappingInformationType: "ByPolygonVertex"
+        \\      ReferenceInformationType: "IndexToDirect"
+        \\      UV: *6 {
+        \\        a: 0,0,1,0,0,1
+        \\      }
+        \\      UVIndex: *3 {
+        \\        a: 0,1,2
+        \\      }
+        \\    }
+        \\    LayerElementMaterial: 0 {
+        \\      Version: 101
+        \\      Name: ""
+        \\      MappingInformationType: "AllSame"
+        \\      ReferenceInformationType: "IndexToDirect"
+        \\      Materials: *1 {
+        \\        a: 0
+        \\      }
+        \\    }
+        \\    Layer: 0 {
+        \\      Version: 100
+        \\      LayerElement:  {
+        \\        Type: "LayerElementNormal"
+        \\        TypedIndex: 0
+        \\      }
+        \\      LayerElement:  {
+        \\        Type: "LayerElementUV"
+        \\        TypedIndex: 0
+        \\      }
+        \\      LayerElement:  {
+        \\        Type: "LayerElementMaterial"
+        \\        TypedIndex: 0
+        \\      }
+        \\    }
+        \\  }
+        \\  Geometry: 1000001, "Geometry::MeshB", "Mesh" {
+        \\    Vertices: *9 {
+        \\      a: 5,0,0,6,0,0,5,1,0
+        \\    }
+        \\    PolygonVertexIndex: *3 {
+        \\      a: 0,1,-3
+        \\    }
+        \\    GeometryVersion: 124
+        \\    LayerElementNormal: 0 {
+        \\      Version: 101
+        \\      Name: ""
+        \\      MappingInformationType: "ByPolygonVertex"
+        \\      ReferenceInformationType: "Direct"
+        \\      Normals: *9 {
+        \\        a: 0,0,1,0,0,1,0,0,1
+        \\      }
+        \\    }
+        \\    LayerElementUV: 0 {
+        \\      Version: 101
+        \\      Name: "UVMap"
+        \\      MappingInformationType: "ByPolygonVertex"
+        \\      ReferenceInformationType: "IndexToDirect"
+        \\      UV: *6 {
+        \\        a: 0,0,1,0,0,1
+        \\      }
+        \\      UVIndex: *3 {
+        \\        a: 0,1,2
+        \\      }
+        \\    }
+        \\    LayerElementMaterial: 0 {
+        \\      Version: 101
+        \\      Name: ""
+        \\      MappingInformationType: "AllSame"
+        \\      ReferenceInformationType: "IndexToDirect"
+        \\      Materials: *1 {
+        \\        a: 0
+        \\      }
+        \\    }
+        \\    Layer: 0 {
+        \\      Version: 100
+        \\      LayerElement:  {
+        \\        Type: "LayerElementNormal"
+        \\        TypedIndex: 0
+        \\      }
+        \\      LayerElement:  {
+        \\        Type: "LayerElementUV"
+        \\        TypedIndex: 0
+        \\      }
+        \\      LayerElement:  {
+        \\        Type: "LayerElementMaterial"
+        \\        TypedIndex: 0
+        \\      }
+        \\    }
+        \\  }
+        \\  Model: 2000000, "Model::Group", "Null" {
+        \\    Version: 232
+        \\    Properties70:  {
+        \\    }
+        \\  }
+        \\  Model: 2000001, "Model::NodeA", "Mesh" {
+        \\    Version: 232
+        \\    Properties70:  {
+        \\    }
+        \\    Shading: T
+        \\    Culling: "CullingOff"
+        \\  }
+        \\  Model: 2000002, "Model::NodeB", "Mesh" {
+        \\    Version: 232
+        \\    Properties70:  {
+        \\    }
+        \\    Shading: T
+        \\    Culling: "CullingOff"
+        \\  }
+        \\  Material: 3000000, "Material::TestMat", "" {
+        \\    Version: 102
+        \\    ShadingModel: "Phong"
+        \\    MultiLayer: 0
+        \\    Properties70:  {
+        \\      P: "DiffuseColor", "Color", "", "A",0.5,0.25,0.1
+        \\      P: "SpecularColor", "Color", "", "A",0,0,0
+        \\      P: "ShininessExponent", "Number", "", "A",10
+        \\    }
+        \\  }
+        \\}
+        \\Connections:  {
+        \\  C: "OO",2000001,2000000
+        \\  C: "OO",2000002,2000000
+        \\  C: "OO",1000000,2000001
+        \\  C: "OO",1000001,2000002
+        \\  C: "OO",3000000,2000001
+        \\  C: "OO",3000000,2000002
+        \\}
+        \\
+    ;
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/model.fbx", .data = fbx });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/model.fbx", .{project_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAssetForce(io, a, project_path, asset_path);
+
+    const meta1 = asset_meta.readMeta(io, a, asset_path);
+    var mesh0: ?Guid = null;
+    var mesh1: ?Guid = null;
+    var hierarchy: ?Guid = null;
+    for (meta1.sub_assets) |s| {
+        if (std.mem.eql(u8, s.key, "mesh:0")) mesh0 = s.guid;
+        if (std.mem.eql(u8, s.key, "mesh:1")) mesh1 = s.guid;
+        if (std.mem.eql(u8, s.key, "hierarchy")) hierarchy = s.guid;
+    }
+    try std.testing.expect(mesh0 != null);
+    try std.testing.expect(mesh1 != null);
+    try std.testing.expect(hierarchy != null);
+
+    // The hierarchy is: ufbx's synthetic root + "Group" + its 2 mesh-bearing
+    // children -- 4 nodes total.
+    var art_buf: [1024]u8 = undefined;
+    const art_path = asset_cache.artifactPath(project_path, hierarchy.?, .scene, &art_buf).?;
+    const scene_bytes = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    var nodes: [8]engine.SceneNode = undefined;
+    var count: usize = 0;
+    try std.testing.expect(@import("../project/SceneIo.zig").loadSceneFromBytes(a, scene_bytes, &nodes, &count));
+    try std.testing.expectEqual(@as(usize, 4), count);
+
+    var group_idx: ?usize = null;
+    for (nodes[0..count], 0..) |*n, i| {
+        if (std.mem.eql(u8, n.nameSlice(), "Group")) group_idx = i;
+    }
+    try std.testing.expect(group_idx != null);
+    var child_count: usize = 0;
+    for (nodes[0..count]) |*n| {
+        if (n.parent == @as(i32, @intCast(group_idx.?))) {
             child_count += 1;
             try std.testing.expectEqual(@as(usize, 1), n.component_count);
             try std.testing.expect(n.components[0] == .mesh_renderer);

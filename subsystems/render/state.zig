@@ -101,6 +101,9 @@ pub var material_override_bytes: []const u8 = &.{};
 // GPU resource caches keyed by asset GUID (≤36 chars).
 pub const KEY_CAP = 64;
 
+/// Default/initial GPU mesh cache capacity — not a hard ceiling; `meshes`
+/// grows on demand (see `ensureMeshCapacity`). A Bistro-scale FBX hierarchy's
+/// unique-mesh count (after instance dedup, see #142) can exceed this.
 pub const MAX_MESHES = 64;
 /// One drawable range of a GPU mesh's index buffer, bound to a material slot.
 /// `material_slot` keys into the mesh renderer's `materials` table (or -1 for no
@@ -125,9 +128,11 @@ pub const GpuMesh = struct {
         return std.mem.eql(u8, self.key[0..self.key_len], k);
     }
 };
-pub var meshes: [MAX_MESHES]GpuMesh = undefined;
+pub var meshes: []GpuMesh = &.{};
 pub var mesh_count: usize = 0;
 
+/// Default/initial GPU texture cache capacity — not a hard ceiling; see
+/// `MAX_MESHES`/`ensureMeshCapacity`'s doc comment (same reasoning).
 pub const MAX_TEXTURES = 64;
 pub const GpuTexture = struct {
     key: [KEY_CAP]u8 = undefined,
@@ -138,7 +143,32 @@ pub const GpuTexture = struct {
         return std.mem.eql(u8, self.key[0..self.key_len], k);
     }
 };
-pub var textures: [MAX_TEXTURES]GpuTexture = undefined;
+pub var textures: []GpuTexture = &.{};
 pub var texture_count: usize = 0;
+
+fn growCache(comptime T: type, cur: []T, default_cap: usize) []T {
+    var new_cap: usize = if (cur.len == 0) default_cap else cur.len * 2;
+    if (new_cap == 0) new_cap = default_cap;
+    return if (cur.len == 0)
+        std.heap.page_allocator.alloc(T, new_cap) catch cur
+    else
+        std.heap.page_allocator.realloc(cur, new_cap) catch cur;
+}
+
+/// Ensures `meshes` has room for at least one more entry (at `mesh_count`),
+/// growing (doubling from `MAX_MESHES`) if needed. No-op if already large
+/// enough. Callers must still check `mesh_count < meshes.len` before writing
+/// — growth can fail under memory pressure.
+pub fn ensureMeshCapacity() void {
+    if (mesh_count < meshes.len) return;
+    meshes = growCache(GpuMesh, meshes, MAX_MESHES);
+}
+
+/// Ensures `textures` has room for at least one more entry, mirroring
+/// `ensureMeshCapacity`.
+pub fn ensureTextureCapacity() void {
+    if (texture_count < textures.len) return;
+    textures = growCache(GpuTexture, textures, MAX_TEXTURES);
+}
 
 const std = @import("std");

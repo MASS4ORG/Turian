@@ -213,8 +213,11 @@ pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     db.scan(io, assets);
 
     // Heap-allocated (not `[MAX_OBJECTS]SceneNode` on the stack — that overflows
-    // with the larger per-slot material table).
-    const objects = gpa.alloc(engine.SceneNode, engine.scene.MAX_OBJECTS) catch return;
+    // with the larger per-slot material table). Grown (doubling) per scene
+    // below when `loadSceneFromBytes` reports a true node count past capacity
+    // (see its doc comment) — a Bistro-scale FBX hierarchy scene can exceed
+    // the initial `MAX_OBJECTS` default.
+    var objects = gpa.alloc(engine.SceneNode, engine.scene.MAX_OBJECTS) catch return;
     defer gpa.free(objects);
     const current_version = editor.scene_io.CURRENT_VERSION;
     var scanned: usize = 0;
@@ -234,7 +237,14 @@ pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
         if (version >= current_version) continue;
 
         var count: usize = 0;
-        if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, objects, &count)) continue;
+        while (true) {
+            if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, objects, &count)) break;
+            if (count <= objects.len or objects.len >= engine.scene.GROWTH_CEILING) break;
+            const new_cap = @min(count, engine.scene.GROWTH_CEILING);
+            const grown = gpa.realloc(objects, new_cap) catch break;
+            objects = grown;
+        }
+        if (count == 0 or count > objects.len) continue;
         // v1 bound materials per submesh; rebuild the per-slot table from the model.
         _ = editor.model_materials.migrateSceneMaterials(io, gpa, &db, path, objects, count);
         editor.scene_io.saveScene(io, info.path, objects, count, gpa);

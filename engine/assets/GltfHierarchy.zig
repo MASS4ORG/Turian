@@ -146,35 +146,7 @@ pub fn loadHierarchy(allocator: std.mem.Allocator, path: []const u8) !GltfHierar
     return .{ .nodes = nodes, .arena = arena };
 }
 
-/// Converts a quaternion (xyzw) to Euler degrees matching the engine's
-/// rotation convention. Deliberately duplicated from
-/// `studio/inspector/PropDrawMath.zig`'s `quatToEulerDeg` (identical formula)
-/// rather than shared via `math-3d`: `editor`/`engine` cannot depend on the
-/// `studio` GUI layer, and `math-3d` is pulled by a pinned commit hash in
-/// `build.zig.zon` rather than a local path, so sharing it would require a
-/// separate commit+hash-bump cycle for one helper.
-fn quatToEulerDeg(q: [4]f32) [3]f32 {
-    const x = q[0];
-    const y = q[1];
-    const z = q[2];
-    const w = q[3];
-
-    const sinr = 2.0 * (w * x + y * z);
-    const cosr = 1.0 - 2.0 * (x * x + y * y);
-    const pitch = std.math.atan2(sinr, cosr) * (180.0 / std.math.pi);
-
-    const sinp = 2.0 * (w * y - z * x);
-    const yaw = if (@abs(sinp) >= 1.0)
-        std.math.copysign(@as(f32, 90.0), sinp)
-    else
-        std.math.asin(sinp) * (180.0 / std.math.pi);
-
-    const siny = 2.0 * (w * z + x * y);
-    const cosy = 1.0 - 2.0 * (y * y + z * z);
-    const roll = std.math.atan2(siny, cosy) * (180.0 / std.math.pi);
-
-    return .{ pitch, yaw, roll };
-}
+const quatToEulerDeg = @import("QuatEuler.zig").quatToEulerDeg;
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
