@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.0.0] - 2026-07-22
+
+### Breaking Changes
+- feat!: render full multi-material meshes via per-material-slot binding #140
+
+### Features
+- feat: import FBX node hierarchy as mesh + prefab sub-assets #142
+- feat: weld shared vertices during FBX cook to cut mesh size #141
+- feat!: render full multi-material meshes via per-material-slot binding #140
+
 ## [2.2.0] - 2026-07-21
 
 ### Features
