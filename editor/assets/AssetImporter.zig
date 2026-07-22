@@ -32,7 +32,17 @@ const VERSION_IMAGE: u32 = 3;
 // buffer instead of emitting fully de-indexed geometry.
 // v7: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
 // sub-assets for FBX too (additive — the main artifact is unchanged).
-const VERSION_MODEL: u32 = 7;
+// v8: FBX materials with no explicit metalness value (classic Phong/Lambert
+// shading, the common case) default to non-metal instead of glTF's raw 1.0
+// spec default, which made every converted classic material a textureless
+// mirror (see fbx_wrap.c's fill_material). Material sub-assets only; GUIDs
+// are unaffected, so this is a plain recook, not a reimport.
+// v9: FBX/glTF texture URIs with Windows-style backslash separators (common
+// in FBX content) now resolve to the real nested file instead of a bogus
+// literal-backslash sibling path (`ModelDerivedAssets.siblingPath`) — the
+// actual cause of albedo/normal/etc. textures never binding. Material
+// sub-assets only; GUIDs are unaffected.
+const VERSION_MODEL: u32 = 9;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 
@@ -227,6 +237,12 @@ fn cookImage(allocator: std.mem.Allocator, asset_path: []const u8, data: []const
             .flip_green_channel = settings.texture_type == .normal_map and settings.flip_green_channel,
         }) catch null;
     }
+
+    // Radiance HDR (equirect environment maps): always linear (already a float
+    // format), cooked to a compact flat-RGBE envelope (`HdrLoader.EnvelopeView`)
+    // instead of copying the RLE-compressed source verbatim.
+    if (std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".hdr"))
+        return engine.assets.HdrLoader.encodeEnvelope(allocator, data) catch null;
 
     // Non-DDS/KTX2 (PNG/JPEG/…): stb_image always decodes to linear
     // `.rgba8_unorm`, which already matches a `.linear` setting, so only the

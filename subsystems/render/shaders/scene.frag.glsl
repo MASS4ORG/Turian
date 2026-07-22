@@ -5,7 +5,9 @@
 // occlusion_strength, emissive(+strength), alpha_cutoff, and the five glTF maps.
 //
 // Supports up to MAX_LIGHTS lights of directional / point / spot type, plus a
-// shadow map for the primary directional light (3x3 PCF).
+// shadow map for the primary directional light (3x3 PCF), and optional
+// image-based lighting (diffuse SH irradiance + roughness-mipped specular)
+// sampled from an equirectangular HDR environment map.
 
 #define MAX_LIGHTS 8
 
@@ -21,6 +23,7 @@ layout(set = 2, binding = 2) uniform sampler2D normal_tex;    // tangent-space
 layout(set = 2, binding = 3) uniform sampler2D emissive_tex;
 layout(set = 2, binding = 4) uniform sampler2D occlusion_tex; // R channel
 layout(set = 2, binding = 5) uniform sampler2DShadow shadow_map;
+layout(set = 2, binding = 6) uniform sampler2D env_equirect;  // equirect HDR environment
 
 // One scene light. type: 0=directional, 1=point, 2=spot.
 struct Light {
@@ -32,13 +35,14 @@ struct Light {
 
 // SDL3GPU SPIR-V fragment uniforms: set=3, binding=slot_index.
 layout(set = 3, binding = 0) uniform FragUB {
-    vec4 ambient_color;   // rgb
     vec4 camera_pos;      // xyz, w = light_count
     vec4 base_color;      // rgba
     vec4 mr_ns_oc;        // x=metallic, y=roughness, z=normal_scale, w=occlusion_strength
     vec4 emissive;        // rgb, w=strength
     vec4 flags;           // x=has_albedo, y=has_mr, z=has_normal, w=has_emissive
     vec4 flags2;          // x=has_occlusion, y=alpha_cutoff, z=alpha_mask_on, w=shadows_enabled
+    vec4 env_params;      // x=intensity, y=mip_count, z=has_env, w unused
+    vec4 env_sh[9];       // diffuse irradiance SH coefficients (rgb in xyz)
     mat4 light_vp;        // shadow light view-projection (primary directional)
     Light lights[MAX_LIGHTS];
 } ubo;
@@ -101,12 +105,43 @@ vec3 acesFilm(vec3 x) {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
 
-// Roughness-aware Fresnel for the ambient term, so metals (which have no diffuse)
-// still pick up an ambient specular tint instead of rendering black in the
-// absence of an environment/IBL probe.
-vec3 fresnelSchlickRoughness(float ct, vec3 F0, float rough) {
-    vec3 Fr = max(vec3(1.0 - rough), F0);
-    return F0 + (Fr - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
+// Maps a world-space direction to an equirectangular UV. Must match the CPU-side
+// convention used when projecting the environment onto SH (see
+// `subsystems/render/assets.zig`'s `computeIrradianceSh`) and the skybox shader.
+vec2 dirToEquirectUv(vec3 d) {
+    float u = atan(d.x, -d.z) / (2.0 * PI) + 0.5;
+    float v = acos(clamp(d.y, -1.0, 1.0)) / PI;
+    return vec2(u, v);
+}
+
+// Order-2 spherical-harmonics irradiance evaluation (Ramamoorthi & Hanrahan):
+// `sh` holds the raw radiance projection coefficients computed on the CPU;
+// this applies the per-band cosine-lobe convolution constants (A0=pi,
+// A1=2*pi/3, A2=pi/4) and evaluates the same basis functions at `n`.
+vec3 evalSH(vec3 n, vec4 sh[9]) {
+    vec3 result = sh[0].rgb * (0.282095 * PI);
+    const float a1 = 0.488603 * (2.0 * PI / 3.0);
+    result += sh[1].rgb * (a1 * n.y);
+    result += sh[2].rgb * (a1 * n.z);
+    result += sh[3].rgb * (a1 * n.x);
+    const float a2 = PI / 4.0;
+    result += sh[4].rgb * (1.092548 * a2 * n.x * n.y);
+    result += sh[5].rgb * (1.092548 * a2 * n.y * n.z);
+    result += sh[6].rgb * (0.315392 * a2 * (3.0 * n.z * n.z - 1.0));
+    result += sh[7].rgb * (1.092548 * a2 * n.x * n.z);
+    result += sh[8].rgb * (0.546274 * a2 * (n.x * n.x - n.y * n.y));
+    return max(result, vec3(0.0));
+}
+
+// Karis' analytic environment-BRDF approximation (split-sum second term),
+// avoiding a baked 2D LUT texture. Returns (scale, bias) applied to F0:
+// specular = prefilteredColor * (F0 * result.x + result.y).
+vec2 envBRDFApprox(float roughness, float ndv) {
+    const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    const vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    vec4 r = roughness * c0 + c1;
+    float a004 = min(r.x * r.x, exp2(-9.28 * ndv)) * r.x + r.y;
+    return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
 // Shadow visibility (1 = lit, 0 = fully shadowed) for the primary directional
@@ -177,10 +212,16 @@ void main() {
             float dist = length(to_light);
             L = to_light / max(dist, 1e-4);
             float range = max(lt.direction.w, 1e-4);
-            // Smooth inverse-square falloff clamped to range.
-            float d2 = dist * dist;
-            attenuation = clamp(1.0 - (d2 / (range * range)), 0.0, 1.0);
-            attenuation *= attenuation / (1.0 + d2);
+            // Windowed inverse-square falloff (glTF KHR_lights_punctual / UE4
+            // style): true 1/d^2 near the source, smoothly windowed to zero at
+            // `range`. The naive `1/(1+d^2)` this replaced over-attenuates at
+            // any real-world distance beyond ~1 unit — a light several meters
+            // from a large scene (e.g. Bistro) read as completely black no
+            // matter how high its intensity was pushed.
+            float d2 = max(dist * dist, 1e-4);
+            float range2 = range * range;
+            float win = clamp(1.0 - (d2 * d2) / (range2 * range2), 0.0, 1.0);
+            attenuation = (win * win) / d2;
             if (type == 2) {
                 // Spot cone: cos between spot dir and fragment direction.
                 float cos_a = dot(normalize(lt.direction.xyz), -L);
@@ -210,12 +251,26 @@ void main() {
         Lo += (kD * albedo / PI + specular) * radiance * ndl * shadow;
     }
 
-    // Ambient: a diffuse term plus a Fresnel-weighted specular term. Without the
-    // specular part, metallic surfaces (kD ~ 0) would render black when no light
-    // hits them directly. F0 tints the ambient specular with the metal's colour.
-    vec3 F_amb = fresnelSchlickRoughness(ndv, F0, roughness);
-    vec3 kD_amb = (vec3(1.0) - F_amb) * (1.0 - metallic);
-    vec3 ambient = ubo.ambient_color.rgb * (kD_amb * albedo + F_amb) * occlusion;
+    // Ambient: image-based lighting sampled from the scene's environment map
+    // (diffuse SH irradiance + roughness-mipped specular), or nothing at all
+    // when no environment is bound — an unlit scene should render dark, not a
+    // free flat-gray "fill light".
+    vec3 ambient = vec3(0.0);
+    if (ubo.env_params.z > 0.5) {
+        float intensity = ubo.env_params.x;
+        float max_lod = max(ubo.env_params.y - 1.0, 0.0);
+
+        vec3 irradiance = evalSH(N, ubo.env_sh) * intensity;
+        vec3 diffuse_ibl = irradiance * albedo / PI * (1.0 - metallic);
+
+        vec3 R = reflect(-V, N);
+        vec2 env_uv = dirToEquirectUv(R);
+        vec3 prefiltered = textureLod(env_equirect, env_uv, roughness * max_lod).rgb * intensity;
+        vec2 env_brdf = envBRDFApprox(roughness, ndv);
+        vec3 specular_ibl = prefiltered * (F0 * env_brdf.x + env_brdf.y);
+
+        ambient = (diffuse_ibl + specular_ibl) * occlusion;
+    }
     vec3 color = ambient + Lo * occlusion;
 
     vec3 emis = ubo.emissive.rgb * ubo.emissive.w;

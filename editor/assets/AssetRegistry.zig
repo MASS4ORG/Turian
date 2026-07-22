@@ -23,7 +23,7 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
         },
         .image => .{
             .name = "Image",
-            .extensions = &.{ ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".webp", ".ktx2", ".dds" },
+            .extensions = &.{ ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".webp", ".ktx2", ".dds", ".hdr" },
             .open_mode = .external_editor,
             .icon_hint = .image,
         },

@@ -13,5 +13,6 @@ pub const SceneComponent = union(enum) {
     audio_source: engine.AudioSourceComponent,
     animator: engine.AnimatorComponent,
     ui_document: SceneUiDocument,
+    environment: engine.EnvironmentComponent,
     user_script: SceneUserScript,
 };

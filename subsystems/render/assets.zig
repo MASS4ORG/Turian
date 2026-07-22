@@ -9,6 +9,7 @@ const state = @import("state.zig");
 
 const c = gpu.c;
 const page = std.heap.page_allocator;
+const log = std.log.scoped(.render_assets);
 
 pub fn findGpuMesh(guid: []const u8) ?*state.GpuMesh {
     for (state.meshes[0..state.mesh_count]) |*gm|
@@ -111,7 +112,20 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
     for (objects) |*obj| {
         if (!obj.active) continue;
         for (obj.components[0..obj.component_count]) |*comp| {
-            if (comp.* != .mesh_renderer) continue;
+            switch (comp.*) {
+                .mesh_renderer => {},
+                .environment => {
+                    const guid = comp.environment.env_map.slice();
+                    if (guid.len > 0 and findGpuTexture(guid) == null) {
+                        state.ensureTextureCapacity();
+                        if (state.texture_count < state.textures.len)
+                            uploadEnvironment(cmd, dev, guid) catch |err|
+                                log.warn("environment upload failed: {any}", .{err});
+                    }
+                    continue;
+                },
+                else => continue,
+            }
             const guid = comp.mesh_renderer.mesh.slice();
             if (guid.len == 0) continue;
             const mr = &comp.mesh_renderer;
@@ -293,5 +307,186 @@ pub fn uploadTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: 
     state.texture_count += 1;
     gt.key_len = setKey(&gt.key, guid);
     gt.texture = gpu_tex;
+    gt.env = null;
     return gpu_tex;
+}
+
+/// Full mip chain length for a 2D texture of size `w`×`h` (down to a 1×1 top level).
+fn mipCountFor(w: u32, h: u32) u32 {
+    return std.math.log2_int(u32, @max(@max(w, h), 1)) + 1;
+}
+
+/// Order-2 (9-coefficient) spherical-harmonics projection of an equirect
+/// environment's radiance, for diffuse irradiance IBL (Ramamoorthi & Hanrahan).
+/// Sampled on a coarse lat-long grid — order-2 SH is a very low-frequency
+/// approximation, so a few thousand samples already saturate its accuracy;
+/// walking every texel of a multi-megapixel HDRI would cost far more for no
+/// visible gain.
+const SH_SAMPLES_X = 128;
+const SH_SAMPLES_Y = 64;
+
+fn computeIrradianceSh(img: engine.assets.HdrLoader.HdrImage) [9][3]f32 {
+    var sh: [9][3]f32 = @splat(@splat(0));
+    const nx = @min(SH_SAMPLES_X, img.width);
+    const ny = @min(SH_SAMPLES_Y, img.height);
+    const nx_f: f32 = @floatFromInt(nx);
+    const ny_f: f32 = @floatFromInt(ny);
+    const dtheta = std.math.pi / ny_f;
+    const dphi = 2.0 * std.math.pi / nx_f;
+
+    for (0..ny) |sy| {
+        const v = (@as(f32, @floatFromInt(sy)) + 0.5) / ny_f;
+        const theta = v * std.math.pi;
+        const sin_theta = @sin(theta);
+        const cos_theta = @cos(theta);
+        const weight = sin_theta * dtheta * dphi;
+        const py: usize = @min(img.height - 1, (sy * img.height) / ny);
+
+        for (0..nx) |sx| {
+            const u = (@as(f32, @floatFromInt(sx)) + 0.5) / nx_f;
+            const phi = (u - 0.5) * 2.0 * std.math.pi;
+            const dx = sin_theta * @sin(phi);
+            const dy = cos_theta;
+            const dz = -sin_theta * @cos(phi);
+
+            const px: usize = @min(img.width - 1, (sx * img.width) / nx);
+            const rgb = img.pixels[(py * img.width + px) * 3 ..][0..3];
+
+            const y_basis = [9]f32{
+                0.282095,
+                0.488603 * dy,
+                0.488603 * dz,
+                0.488603 * dx,
+                1.092548 * dx * dy,
+                1.092548 * dy * dz,
+                0.315392 * (3.0 * dz * dz - 1.0),
+                1.092548 * dx * dz,
+                0.546274 * (dx * dx - dy * dy),
+            };
+            for (0..9) |i| {
+                sh[i][0] += rgb[0] * y_basis[i] * weight;
+                sh[i][1] += rgb[1] * y_basis[i] * weight;
+                sh[i][2] += rgb[2] * y_basis[i] * weight;
+            }
+        }
+    }
+    return sh;
+}
+
+/// Upload an equirectangular HDR environment map as a float texture with a
+/// full mip chain (specular IBL picks a mip by roughness) and cache it by GUID
+/// alongside its precomputed diffuse-irradiance SH coefficients. Accepts either
+/// a cooked `HdrLoader` envelope (the built/shipped-game asset source) or a raw
+/// `.hdr` container (Studio's editor viewport reads source bytes directly,
+/// without going through the import cook step). No-op if already cached.
+pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const u8) !void {
+    if (findGpuTexture(guid)) |_| return;
+    state.ensureTextureCapacity();
+    if (state.texture_count >= state.textures.len) return error.TextureCacheFull;
+
+    const src = state.texture_src orelse return error.NoTextureSource;
+    const b = src(guid) orelse return error.TextureNotFound;
+    defer if (b.owned) page.free(b.data);
+
+    var img = if (engine.assets.HdrLoader.isEnvelope(b.data))
+        try engine.assets.HdrLoader.decodeEnvelopeToImage(page, b.data)
+    else
+        try engine.assets.HdrLoader.decode(page, b.data);
+    defer img.deinit();
+    const w = img.width;
+    const h = img.height;
+
+    const sh = computeIrradianceSh(img);
+
+    const pixel_count = @as(usize, w) * h;
+    const half_pixels = try page.alloc(f16, pixel_count * 4);
+    defer page.free(half_pixels);
+    for (0..pixel_count) |i| {
+        half_pixels[i * 4 + 0] = @floatCast(img.pixels[i * 3 + 0]);
+        half_pixels[i * 4 + 1] = @floatCast(img.pixels[i * 3 + 1]);
+        half_pixels[i * 4 + 2] = @floatCast(img.pixels[i * 3 + 2]);
+        half_pixels[i * 4 + 3] = 1.0;
+    }
+
+    const total_bytes: u32 = @intCast(half_pixels.len * @sizeOf(f16));
+    const tb = c.SDL_CreateGPUTransferBuffer(dev, &c.SDL_GPUTransferBufferCreateInfo{
+        .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = total_bytes,
+        .props = 0,
+    }) orelse return error.TransferCreate;
+    defer c.SDL_ReleaseGPUTransferBuffer(dev, tb);
+
+    {
+        const p: [*]f16 = @ptrCast(@alignCast(
+            c.SDL_MapGPUTransferBuffer(dev, tb, false) orelse return error.MapFailed,
+        ));
+        @memcpy(p[0..half_pixels.len], half_pixels);
+        c.SDL_UnmapGPUTransferBuffer(dev, tb);
+    }
+
+    const num_levels = mipCountFor(w, h);
+    const gpu_tex = c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
+        .type = c.SDL_GPU_TEXTURETYPE_2D,
+        .format = c.SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT,
+        .usage = c.SDL_GPU_TEXTUREUSAGE_SAMPLER | c.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+        .width = w,
+        .height = h,
+        .layer_count_or_depth = 1,
+        .num_levels = num_levels,
+        .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
+        .props = 0,
+    }) orelse return error.TextureCreate;
+    errdefer c.SDL_ReleaseGPUTexture(dev, gpu_tex);
+
+    const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return error.CopyPassFailed;
+    c.SDL_UploadToGPUTexture(cp, &c.SDL_GPUTextureTransferInfo{ .transfer_buffer = tb, .offset = 0, .pixels_per_row = w, .rows_per_layer = h }, &c.SDL_GPUTextureRegion{ .texture = gpu_tex, .mip_level = 0, .layer = 0, .x = 0, .y = 0, .z = 0, .w = w, .h = h, .d = 1 }, false);
+    c.SDL_EndGPUCopyPass(cp);
+
+    if (num_levels > 1) c.SDL_GenerateMipmapsForGPUTexture(cmd, gpu_tex);
+
+    var gt = &state.textures[state.texture_count];
+    state.texture_count += 1;
+    gt.key_len = setKey(&gt.key, guid);
+    gt.texture = gpu_tex;
+    gt.env = .{ .mip_count = num_levels, .sh = sh };
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "mipCountFor spans full chains down to 1x1" {
+    try std.testing.expectEqual(@as(u32, 1), mipCountFor(1, 1));
+    try std.testing.expectEqual(@as(u32, 9), mipCountFor(256, 256));
+    try std.testing.expectEqual(@as(u32, 13), mipCountFor(4096, 2048));
+}
+
+test "computeIrradianceSh reduces to a DC term for a uniform environment" {
+    // A constant-radiance environment has zero higher-order SH components —
+    // all directional information cancels out — so only sh[0] (the DC/average
+    // term) should be non-zero.
+    const w: u32 = 64;
+    const h: u32 = 32;
+    var pixels: [w * h * 3]f32 = undefined;
+    for (0..w * h) |i| {
+        // Constant linear color (arbitrary value picked to match a 128/128/128/128 RGBE quad).
+        pixels[i * 3 + 0] = 0.5;
+        pixels[i * 3 + 1] = 0.5;
+        pixels[i * 3 + 2] = 0.5;
+    }
+    const img = engine.assets.HdrLoader.HdrImage{ .pixels = &pixels, .width = w, .height = h, .allocator = std.testing.allocator };
+
+    const sh = computeIrradianceSh(img);
+
+    // sh[0] integrates color * Y0 over the full sphere (solid angle 4*pi).
+    const expect_dc = img.pixels[0] * 0.282095 * 4.0 * std.math.pi;
+    try std.testing.expectApproxEqRel(expect_dc, sh[0][0], 0.01);
+
+    for (1..9) |i| {
+        try std.testing.expectApproxEqAbs(@as(f32, 0), sh[i][0], expect_dc * 0.01);
+        try std.testing.expectApproxEqAbs(@as(f32, 0), sh[i][1], expect_dc * 0.01);
+        try std.testing.expectApproxEqAbs(@as(f32, 0), sh[i][2], expect_dc * 0.01);
+    }
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }

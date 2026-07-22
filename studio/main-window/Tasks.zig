@@ -53,6 +53,16 @@ const Job = struct {
     components: [EditorState.MAX_DISCOVERED]ComponentDef = undefined,
     component_count: usize = 0,
     config: editor.GameBuild.BuildConfig = undefined,
+
+    // Reimport: a private database, scanned and reimported on the worker,
+    // swapped into `EditorState.asset_db` only once finished (mirrors
+    // `ImportJob.zig` — operating on the live shared database directly would
+    // race the UI thread's per-frame reads of it, e.g. the Asset Browser
+    // grid, and `reimportAll`'s own `registerDerived` call structurally
+    // mutates the map, not just reads it).
+    db: editor.AssetDatabase = undefined,
+    /// Owned in `arena`.
+    assets_path: []const u8 = "",
 };
 
 var active_job: ?*Job = null;
@@ -112,8 +122,11 @@ pub fn launchReimport(io: std.Io) void {
         .kind = .reimport,
         .task_id = 0,
         .project_path = "",
+        .db = editor.AssetDatabase.init(std.heap.page_allocator),
     };
-    job.project_path = job.arena.allocator().dupe(u8, project) catch project;
+    const a = job.arena.allocator();
+    job.project_path = a.dupe(u8, project) catch project;
+    job.assets_path = std.fmt.allocPrint(a, "{s}/assets", .{project}) catch "";
     job.task_id = tm().begin(.import, tr("Reimport assets"));
 
     dispatch(io, job);
@@ -170,13 +183,18 @@ fn runJob(job: *Job) void {
             finalize(job.task_id, ok, "Build failed");
         },
         .reimport => {
-            // The asset database is iterated read-only here and on the UI
-            // thread, so concurrent access is safe (no structural mutation).
+            // Scan into the job's own private database (not the shared
+            // `EditorState.asset_db`) and reimport that — swapped in by
+            // `finishJob` only once this finishes. `reimportAll` itself
+            // structurally mutates the database (`registerDerived`), so
+            // running it against the live one the UI thread reads every
+            // frame (Asset Browser, Inspector pickers, ...) is a data race.
+            job.db.scan(job.io, job.assets_path);
             editor.asset_importer.reimportAll(
                 job.io,
-                job.arena.allocator(),
+                std.heap.page_allocator,
                 job.project_path,
-                &EditorState.asset_db,
+                &job.db,
                 progress,
             );
             finalize(job.task_id, true, "");
@@ -196,6 +214,13 @@ fn finalize(task_id: u64, ok: bool, fail_msg: []const u8) void {
 }
 
 fn finishJob(job: *Job) void {
+    if (job.kind == .reimport) {
+        // Swap the freshly reimported private database in now that the
+        // background worker is done with it — see the comment on `Job.db`.
+        if (EditorState.asset_db_initialized) EditorState.asset_db.deinit();
+        EditorState.asset_db = job.db;
+        EditorState.asset_db_initialized = true;
+    }
     job.arena.deinit();
     std.heap.page_allocator.destroy(job);
 }

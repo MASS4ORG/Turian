@@ -533,4 +533,37 @@ test "loadModelInfo extracts a best-effort PBR material from a classic Phong FBX
     try std.testing.expectApproxEqAbs(@as(f32, 0.5), m.base_color[0], 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 0.25), m.base_color[1], 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 0.1), m.base_color[2], 1e-5);
+    // Classic Phong has no metalness concept — ufbx's pbr.metalness carries no
+    // value for it, so this must fall back to non-metal (0.0), not glTF's raw
+    // spec default of 1.0 (which would turn every converted Phong/Lambert
+    // material into a textureless mirror — see fbx_wrap.c's fill_material).
+    try std.testing.expectApproxEqAbs(@as(f32, 0.0), m.metallic, 1e-5);
+}
+
+test "loadModelInfo: every real Bistro texture reference resolves to a file on disk" {
+    // Regression test for the `ModelDerivedAssets.siblingPath` backslash-
+    // normalization fix: every one of Bistro's 405 image references uses a
+    // Windows-style URI (`Textures\Foo.dds`), and after normalizing `\` to
+    // `/`, all of them must resolve to a real sibling file. If this ever
+    // regresses, materials silently lose their texture bindings again (see
+    // docs/decisions/bistro.md for the full incident writeup).
+    const path = "/media/work/dev/mega4/turian-samples/bistro/assets/BistroExterior.fbx";
+    var info = loadModelInfo(std.testing.allocator, path) catch return error.SkipZigTest;
+    defer info.deinit();
+
+    try std.testing.expect(info.images.len > 0);
+    for (info.images) |im| {
+        if (im.uri.len == 0) continue;
+        var norm_buf: [512]u8 = undefined;
+        const n = @min(im.uri.len, norm_buf.len);
+        @memcpy(norm_buf[0..n], im.uri[0..n]);
+        const normalized = norm_buf[0..n];
+        std.mem.replaceScalar(u8, normalized, '\\', '/');
+        var full_buf: [1024]u8 = undefined;
+        const full = std.fmt.bufPrint(&full_buf, "/media/work/dev/mega4/turian-samples/bistro/assets/{s}", .{normalized}) catch continue;
+        std.Io.Dir.cwd().access(std.testing.io, full, .{}) catch {
+            std.debug.print("missing sibling file for URI '{s}': {s}\n", .{ im.uri, full });
+            return error.MissingTextureSibling;
+        };
+    }
 }

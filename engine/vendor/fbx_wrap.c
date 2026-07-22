@@ -510,7 +510,17 @@ static void fill_material(FbxMaterial* o, const ufbx_material* m) {
     copy_str(o->name, sizeof(o->name), m->name.data, m->name.length);
 
     o->base_color[0] = o->base_color[1] = o->base_color[2] = o->base_color[3] = 1.0f;
-    o->metallic = 1.0f;
+    /* Classic (non-PBR) shading models -- Phong/Lambert, the overwhelming
+       majority of real-world FBX content -- have no metalness concept at all,
+       so ufbx's pbr.metalness never carries a value for them and this default
+       is what every such material actually renders with. 1.0 (glTF's raw
+       spec default, intended for an authored PBR workflow) makes every
+       surface a pure mirror: F0 becomes the albedo texture and the diffuse
+       term vanishes entirely, so converted classic materials show only a
+       tinted specular reflection and look completely textureless. 0.0
+       (dielectric) is the correct assumption for content that never declared
+       a metalness value in the first place. */
+    o->metallic = 0.0f;
     o->roughness = 1.0f;
     o->normal_scale = 1.0f;
     o->occlusion_strength = 1.0f;

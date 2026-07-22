@@ -112,10 +112,18 @@ pub fn reuseOrNewGuid(prev: []const SubAsset, key: []const u8, io: std.Io) Guid 
     return Guid.v4(io);
 }
 
-/// Resolve a glTF image URI (relative to the model file) to a sibling path.
+/// Resolve a glTF/FBX image URI (relative to the model file) to a sibling
+/// path. FBX texture references are frequently Windows-style
+/// (`Textures\Foo.dds`, baked in by whatever DCC tool exported the file) —
+/// normalize `\` to `/` first, or the literal backslash becomes part of the
+/// filename instead of a path separator, silently missing the real nested
+/// file and leaving the material's albedo/normal/etc. slot unbound (renders
+/// with its flat fallback color, no visible texture).
 fn siblingPath(arena: std.mem.Allocator, model_path: []const u8, uri: []const u8) ?[]const u8 {
     const dir = std.fs.path.dirname(model_path) orelse ".";
-    return std.fmt.allocPrint(arena, "{s}/{s}", .{ dir, uri }) catch null;
+    const normalized = arena.dupe(u8, uri) catch return null;
+    std.mem.replaceScalar(u8, normalized, '\\', '/');
+    return std.fmt.allocPrint(arena, "{s}/{s}", .{ dir, normalized }) catch null;
 }
 
 /// Texture role inferred from which material slots reference an image —
@@ -274,4 +282,24 @@ fn writeMaterialArtifact(
 /// Log a warning using a project-relative path (never the user's full path).
 fn warnRel(comptime msg: []const u8, model_path: []const u8, detail: []const u8) void {
     log.warn("{s}: {s} ({s})", .{ msg, std.fs.path.basename(model_path), detail });
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "siblingPath normalizes Windows-style backslash separators in the URI" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    const path = siblingPath(a, "assets/BistroExterior.fbx", "Textures\\Foo.dds").?;
+    try std.testing.expectEqualStrings("assets/Textures/Foo.dds", path);
+}
+
+test "siblingPath passes forward-slash URIs through unchanged" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    const path = siblingPath(a, "assets/model.gltf", "textures/base.png").?;
+    try std.testing.expectEqualStrings("assets/textures/base.png", path);
 }

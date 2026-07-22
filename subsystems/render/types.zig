@@ -30,15 +30,23 @@ pub const GpuLight = extern struct {
 /// Fragment uniforms — layout must match FragUB in scene.frag.glsl exactly.
 /// All members are vec4 (or vec4 arrays) to keep std140 16-byte alignment trivial.
 pub const FragUB = extern struct {
-    ambient_color: [4]f32, // rgb
     camera_pos: [4]f32, // xyz, w = light_count
     base_color: [4]f32, // rgba
     mr_ns_oc: [4]f32, // metallic, roughness, normal_scale, occlusion_strength
     emissive: [4]f32, // rgb, w strength
     flags: [4]f32, // has_albedo, has_mr, has_normal, has_emissive
     flags2: [4]f32, // has_occlusion, alpha_cutoff, alpha_mask_on, shadows_enabled
+    env_params: [4]f32, // x=intensity, y=mip_count, z=has_env, w unused
+    env_sh: [9][4]f32, // diffuse irradiance SH coefficients (rgb in xyz)
     light_vp: [16]f32, // shadow light view-projection (primary directional)
     lights: [MAX_LIGHTS]GpuLight,
+};
+
+/// Fragment uniforms for the skybox pass — layout must match FragUB in
+/// skybox.frag.glsl exactly.
+pub const SkyboxFragUB = extern struct {
+    inv_view_proj: [16]f32,
+    camera_pos_intensity: [4]f32, // xyz = camera world position, w = intensity
 };
 
 /// Vertex layout uploaded to the GPU (matches the pipeline's attributes).

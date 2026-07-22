@@ -147,6 +147,8 @@ pub const AudioSourceComponent = components.AudioSourceComponent;
 pub const AnimatorComponent = components.AnimatorComponent;
 /// UI document component type — instantiates a `.uidoc` asset into the scene.
 pub const UiDocumentComponent = components.UiDocumentComponent;
+/// Image-based environment lighting (skybox + ambient) component type.
+pub const EnvironmentComponent = components.EnvironmentComponent;
 /// List of builtin component metadata entries.
 pub const BUILTIN_COMPONENTS = components.BUILTIN_COMPONENTS;
 

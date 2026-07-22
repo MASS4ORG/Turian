@@ -495,9 +495,12 @@ fn shadePixel(normal: [3]f32, world_pos: [3]f32, uv: [2]f32, mat: ResolvedMateri
             if (dist > 1e-4) to_light = .{ to_light[0] / dist, to_light[1] / dist, to_light[2] / dist };
             l_dir = to_light;
             const range = @max(l.range, 1e-4);
-            const d2 = dist * dist;
-            atten = @max(0.0, 1.0 - (d2 / (range * range)));
-            atten = atten * atten / (1.0 + d2);
+            // Windowed inverse-square falloff — see the matching comment in
+            // scene.frag.glsl; must stay in lockstep with the GPU path.
+            const d2 = @max(dist * dist, 1e-4);
+            const range2 = range * range;
+            const win = std.math.clamp(1.0 - (d2 * d2) / (range2 * range2), 0.0, 1.0);
+            atten = (win * win) / d2;
             if (l.kind == .spot) {
                 const cos_a = dot3(l.dir, .{ -l_dir[0], -l_dir[1], -l_dir[2] });
                 const cone = std.math.clamp((cos_a - l.cos_outer) / @max(l.cos_inner - l.cos_outer, 1e-4), 0.0, 1.0);

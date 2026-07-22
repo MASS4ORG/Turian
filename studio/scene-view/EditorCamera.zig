@@ -3,9 +3,10 @@
 //! The editor viewport renders from this camera, not from a scene `Camera`
 //! component, so you can fly around to inspect the scene without disturbing the
 //! game's cameras. Hold the right mouse button to look; while held, WASD moves,
-//! Q/E (or Space) drop/raise, and Shift accelerates. The mouse wheel dollies in
-//! and out at any time. The pose is pushed to the `render` module each edit
-//! frame via `render.setEditorCamera`.
+//! Q/E (or Space) drop/raise, and Shift accelerates. Hold the middle mouse
+//! button to pan (matches Unity/Godot). The mouse wheel dollies in and out at
+//! any time. The pose is pushed to the `render` module each edit frame via
+//! `render.setEditorCamera`.
 const std = @import("std");
 const engine = @import("engine");
 const render = @import("render");
@@ -24,7 +25,8 @@ var initialized = false;
 /// of the free-look camera; the defaults match the original hard-coded values.
 pub var move_speed: f32 = 4.0; // world units / second (WASDQE)
 pub var look_sensitivity: f32 = 0.18; // degrees / pixel (RMB look)
-pub var zoom_speed: f32 = 0.6; // world units / wheel notch (dolly)
+pub var zoom_speed: f32 = 0.05; // world units / wheel notch (dolly)
+pub var pan_speed: f32 = 0.015; // world units / pixel (MMB pan)
 
 /// Shift multiplier applied to `move_speed` for fast travel.
 const FAST_MULTIPLIER: f32 = 3.5;
@@ -34,6 +36,10 @@ pub const Nav = struct {
     rmb_down: bool = false,
     look_dx: f32 = 0,
     look_dy: f32 = 0,
+    /// Middle-mouse-drag pan deltas, in screen pixels (see `EditorCamera`'s doc
+    /// comment). Applied regardless of `rmb_down`.
+    pan_dx: f32 = 0,
+    pan_dy: f32 = 0,
     wheel: f32 = 0,
     forward: bool = false,
     back: bool = false,
@@ -97,11 +103,12 @@ pub fn pose() render.EditorCam {
     return .{ .pos = pos, .rot = .{ .x = pitch, .y = yaw, .z = 0 }, .fov = fov };
 }
 
-fn basis() struct { fwd: Vector3, right: Vector3 } {
+fn basis() struct { fwd: Vector3, right: Vector3, up: Vector3 } {
     const rm = Matrix4.rotationEuler(pitch, yaw, 0);
     return .{
         .fwd = rm.transformDirection(.{ .x = 0, .y = 0, .z = 1 }),
         .right = rm.transformDirection(.{ .x = 1, .y = 0, .z = 0 }),
+        .up = rm.transformDirection(.{ .x = 0, .y = 1, .z = 0 }),
     };
 }
 
@@ -130,6 +137,14 @@ pub fn navigate(nav: Nav) bool {
             pos = pos.add(dir.normalize().scale(speed * nav.dt));
             active = true;
         }
+    }
+
+    if (nav.pan_dx != 0 or nav.pan_dy != 0) {
+        // Screen-space drag pan: dragging right/down moves the view (and so the
+        // camera) right/down, i.e. the camera translates opposite the drag.
+        pos = pos.subtract(b.right.scale(nav.pan_dx * pan_speed));
+        pos = pos.add(b.up.scale(nav.pan_dy * pan_speed));
+        active = true;
     }
 
     if (nav.wheel != 0) {

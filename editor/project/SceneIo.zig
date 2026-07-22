@@ -31,6 +31,7 @@ fn engineCompToScene(c: *const engine.Component, material_guids: []const []const
         .ui_document => |*v| .{ .ui_document = .{
             .document_guid = v.document.slice(),
         } },
+        .environment => |v| .{ .environment = v },
         .user_script => |*s| .{ .user_script = .{
             .type_name = s.typeName(),
             .source_file = s.sourceFile(),
@@ -68,6 +69,7 @@ fn sceneCompToEngine(sc: SceneComponent) engine.Component {
             ud.document.set(v.document_guid);
             break :blk .{ .ui_document = ud };
         },
+        .environment => |v| .{ .environment = v },
         .user_script => |s| blk: {
             var ref = engine.UserScriptRef{};
             ref.setTypeName(s.type_name);

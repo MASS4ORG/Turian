@@ -172,6 +172,10 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
         log.warn("gizmo overlay pipeline failed: {any} — handles disabled.", .{err});
         break :g null;
     };
+    state.skybox_pipeline = pipeline.createSkyboxPipeline(device) catch |err| p: {
+        log.warn("skybox pipeline failed: {any} — environment background disabled.", .{err});
+        break :p null;
+    };
     log.info("Ready (SPIRV).", .{});
 }
 
@@ -241,10 +245,11 @@ fn destroyScenePipelines(dev: *c.SDL_GPUDevice) void {
 /// Per-frame values a draw's fragment uniforms need but that don't vary
 /// per-draw (lighting is scene-wide, not per-material).
 const FrameUniforms = struct {
-    ambient: [4]f32,
     cam_pos4: [4]f32,
     light_vp: [16]f32,
     lights: [types.MAX_LIGHTS]types.GpuLight,
+    env_params: [4]f32,
+    env_sh: [9][4]f32,
 };
 
 /// Everything one submesh draw needs: which pipeline permutation, geometry
@@ -261,7 +266,7 @@ const DrawParams = struct {
     emissive: [4]f32,
     flags: [4]f32,
     flags2: [4]f32,
-    bindings: [6]c.SDL_GPUTextureSamplerBinding,
+    bindings: [7]c.SDL_GPUTextureSamplerBinding,
 };
 
 /// A blended/additive draw deferred until every opaque draw has landed, so it
@@ -305,18 +310,19 @@ fn submitDraw(
     c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = dp.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
     const fub = types.FragUB{
-        .ambient_color = fu.ambient,
         .camera_pos = fu.cam_pos4,
         .base_color = dp.base_color,
         .mr_ns_oc = dp.mr_ns_oc,
         .emissive = dp.emissive,
         .flags = dp.flags,
         .flags2 = dp.flags2,
+        .env_params = fu.env_params,
+        .env_sh = fu.env_sh,
         .light_vp = fu.light_vp,
         .lights = fu.lights,
     };
     c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 6);
+    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 7);
 
     c.SDL_DrawGPUIndexedPrimitives(pass, dp.index_count, 1, dp.index_offset, 0, 0);
     // Every mesh binds samplers, so this draw always counts as textured.
@@ -365,7 +371,34 @@ pub fn renderScene(
     const cam_pos = cam.pos;
     const vp = cam.view_proj;
 
-    const ambient = [4]f32{ 0.15, 0.15, 0.18, 0.0 };
+    // ── Environment (IBL + skybox) ───────────────────────────────────────────
+    // At most one active EnvironmentComponent is used per scene (first found).
+    var env_tex: ?*state.GpuTexture = null;
+    var env_intensity: f32 = 1.0;
+    var env_show_skybox: bool = true;
+    env_scan: for (objects) |*obj| {
+        if (!obj.active) continue;
+        for (obj.components[0..obj.component_count]) |*comp| {
+            if (comp.* != .environment) continue;
+            const guid = comp.environment.env_map.slice();
+            if (guid.len == 0) continue;
+            if (assets.findGpuTexture(guid)) |gt| {
+                env_tex = gt;
+                env_intensity = comp.environment.intensity;
+                env_show_skybox = comp.environment.show_skybox;
+            }
+            break :env_scan;
+        }
+    }
+
+    var env_params = [4]f32{ 0, 0, 0, 0 };
+    var env_sh = [_][4]f32{.{ 0, 0, 0, 0 }} ** 9;
+    if (env_tex) |gt| {
+        if (gt.env) |ed| {
+            env_params = .{ env_intensity, @floatFromInt(ed.mip_count), 1.0, 0.0 };
+            for (0..9) |i| env_sh[i] = .{ ed.sh[i][0], ed.sh[i][1], ed.sh[i][2], 0.0 };
+        }
+    }
 
     // ── Lights ──────────────────────────────────────────────────────────────
     // The first shadow-casting directional light (kept at slot 0) drives shadows.
@@ -447,12 +480,33 @@ pub fn renderScene(
     const flat_n = state.flat_normal_tex orelse white;
     const shadow_tex = state.shadow_map orelse white;
     const shadow_smp = state.shadow_sampler orelse sampler;
+    const env_gpu_tex = if (env_tex) |gt| gt.texture else white;
     const fu = FrameUniforms{
-        .ambient = ambient,
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
         .light_vp = light_vp.m,
         .lights = lights,
+        .env_params = env_params,
+        .env_sh = env_sh,
     };
+
+    // Draw the environment background first (if bound and enabled) so opaque
+    // geometry simply overwrites sky pixels as it renders — see
+    // `pipeline.createSkyboxPipeline`. IBL lighting still applies even when
+    // the skybox itself is hidden (`show_skybox = false`).
+    if (env_tex != null and env_show_skybox) {
+        if (state.skybox_pipeline) |skybox_pl| {
+            c.SDL_BindGPUGraphicsPipeline(pass, skybox_pl);
+            const skybox_fub = types.SkyboxFragUB{
+                .inv_view_proj = vp.inverse().m,
+                .camera_pos_intensity = .{ cam_pos.x, cam_pos.y, cam_pos.z, env_intensity },
+            };
+            c.SDL_PushGPUFragmentUniformData(cmd, 0, &skybox_fub, @sizeOf(types.SkyboxFragUB));
+            c.SDL_BindGPUFragmentSamplers(pass, 0, &[_]c.SDL_GPUTextureSamplerBinding{
+                .{ .texture = env_gpu_tex, .sampler = sampler },
+            }, 1);
+            c.SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+        }
+    }
 
     var bound_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
     g_transparent_count = 0;
@@ -523,6 +577,7 @@ pub fn renderScene(
                         .{ .texture = emis_t.tex, .sampler = sampler },
                         .{ .texture = occ_t.tex, .sampler = sampler },
                         .{ .texture = shadow_tex, .sampler = shadow_smp },
+                        .{ .texture = env_gpu_tex, .sampler = sampler },
                     },
                 };
 
@@ -573,6 +628,8 @@ pub fn deinit() void {
     state.shadow_map = null;
     state.shadow_sampler = null;
     state.shadow_pipeline = null;
+    if (state.skybox_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    state.skybox_pipeline = null;
     if (state.sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
     destroyScenePipelines(dev);
     state.sampler = null;

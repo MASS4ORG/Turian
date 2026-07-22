@@ -327,10 +327,30 @@ fn meshBytes(guid: []const u8) ?render.Bytes {
 }
 
 /// Textures come from the asset path the database resolved (source image, or a
-/// cooked `.texture` for embedded/derived images).
+/// cooked `.texture` for embedded/derived images). Regular top-level texture
+/// assets resolve to their *uncooked* source file (no reimport dependency for
+/// live preview), so a DDS is cooked in memory here the same way
+/// `AssetImporter.cookImage` does at import time — otherwise an sRGB
+/// albedo/emissive DDS (legacy FourCC, no sRGB bit of its own) uploads as a
+/// plain linear format, and the GPU sampler skips gamma decode entirely,
+/// washing every texture toward white.
 fn textureBytes(guid: []const u8) ?render.Bytes {
     const path = EditorState.resolveAssetGuid(guid) orelse return null;
-    return readOwned(path);
+    const raw = readOwned(path) orelse return null;
+    if (!std.ascii.eqlIgnoreCase(std.fs.path.extension(path), ".dds")) return raw;
+
+    var arena = std.heap.ArenaAllocator.init(page);
+    defer arena.deinit();
+    const meta = editor.asset_meta.readMeta(gui.io, arena.allocator(), path);
+    if (meta.import_settings != .image) return raw;
+    const s = meta.import_settings.image;
+
+    const cooked = engine.assets.DdsLoader.cook(page, raw.data, .{
+        .srgb = s.color_space == .srgb,
+        .flip_green_channel = s.texture_type == .normal_map and s.flip_green_channel,
+    }) catch return raw;
+    if (raw.owned) page.free(raw.data);
+    return .{ .data = cooked, .owned = true };
 }
 
 /// Materials: built-in presets are serialized on the fly; others read from disk.

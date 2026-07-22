@@ -37,6 +37,8 @@ pub var shadow_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var shadow_map: ?*c.SDL_GPUTexture = null;
 pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 
+pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+
 pub var white_tex: ?*c.SDL_GPUTexture = null;
 /// Default tangent-space "flat" normal (points straight out): rgb (128,128,255).
 pub var flat_normal_tex: ?*c.SDL_GPUTexture = null;
@@ -134,10 +136,22 @@ pub var mesh_count: usize = 0;
 /// Default/initial GPU texture cache capacity — not a hard ceiling; see
 /// `MAX_MESHES`/`ensureMeshCapacity`'s doc comment (same reasoning).
 pub const MAX_TEXTURES = 64;
+
+/// Extra data uploaded alongside an equirectangular HDR environment texture
+/// (see `assets.uploadEnvironment`): its mip count (for roughness-based
+/// `textureLod` specular sampling) and precomputed order-2 spherical harmonics
+/// diffuse-irradiance coefficients (9 RGB triplets).
+pub const EnvironmentData = struct {
+    mip_count: u32 = 1,
+    sh: [9][3]f32 = @splat(@splat(0)),
+};
+
 pub const GpuTexture = struct {
     key: [KEY_CAP]u8 = undefined,
     key_len: usize = 0,
     texture: *c.SDL_GPUTexture = undefined,
+    /// Non-null only for environment maps uploaded via `assets.uploadEnvironment`.
+    env: ?EnvironmentData = null,
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);

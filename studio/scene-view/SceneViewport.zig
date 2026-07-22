@@ -58,6 +58,8 @@ const InstanceState = struct {
     last_mouse: gui.Point.Physical = .{ .x = 0, .y = 0 },
     /// Persistent free-look navigation state (held across frames).
     rmb_down: bool = false,
+    /// Persistent middle-button pan state (held across frames).
+    mmb_down: bool = false,
     nav_fwd: bool = false,
     nav_back: bool = false,
     nav_left: bool = false,
@@ -75,6 +77,7 @@ var cam_settings_loaded = false;
 const CAM_MOVE_KEY = "editor.camera.move_speed";
 const CAM_LOOK_KEY = "editor.camera.look_sensitivity";
 const CAM_ZOOM_KEY = "editor.camera.zoom_speed";
+const CAM_PAN_KEY = "editor.camera.pan_speed";
 
 /// Draw the Scene panel — the edit-time 3D viewport: editor-camera
 /// free-look, gizmo interaction, billboard icons. Always shows the editor
@@ -370,7 +373,12 @@ fn drawCameraMenu() void {
         var changed = false;
         if (speedRow(tr("Move speed"), &EditorCamera.move_speed, 0.5, 40, 0.5, "{d:0.1}", 1)) changed = true;
         if (speedRow(tr("Look sens."), &EditorCamera.look_sensitivity, 0.02, 1.0, 0.01, "{d:0.2}", 2)) changed = true;
-        if (speedRow(tr("Zoom speed"), &EditorCamera.zoom_speed, 0.05, 4.0, 0.05, "{d:0.2}", 3)) changed = true;
+        // Plain number field, not a slider: the useful range spans two orders
+        // of magnitude (a single wheel notch should stay a small nudge even at
+        // close range), which a slider's fixed drag distance can't resolve
+        // precisely — dragging it barely moves the value at the low end.
+        if (numberRow(tr("Zoom speed"), &EditorCamera.zoom_speed, 0.001, 4.0, 3)) changed = true;
+        if (speedRow(tr("Pan speed"), &EditorCamera.pan_speed, 0.002, 0.1, 0.001, "{d:0.3}", 4)) changed = true;
 
         if (changed) saveCameraSettings();
     }
@@ -397,6 +405,20 @@ fn speedRow(
     }, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
 }
 
+/// One labeled plain-number-entry row (no slider) inside the Camera menu —
+/// for values where precise small entries matter more than drag-friendliness.
+fn numberRow(name: []const u8, value: *f32, min: f32, max: f32, id: usize) bool {
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .id_extra = id, .expand = .horizontal });
+    defer row.deinit();
+    gui.label(@src(), "{s}", .{name}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 80 } });
+    const result = gui.textEntryNumber(@src(), f32, .{
+        .value = value,
+        .min = min,
+        .max = max,
+    }, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 110 } });
+    return result.changed;
+}
+
 /// Load camera navigation speeds from Settings once the store is ready (it is
 /// not during the very first frames before a project/global load completes).
 fn loadCameraSettings() void {
@@ -406,6 +428,7 @@ fn loadCameraSettings() void {
     EditorCamera.move_speed = @floatCast(s.getFloat(CAM_MOVE_KEY, EditorCamera.move_speed));
     EditorCamera.look_sensitivity = @floatCast(s.getFloat(CAM_LOOK_KEY, EditorCamera.look_sensitivity));
     EditorCamera.zoom_speed = @floatCast(s.getFloat(CAM_ZOOM_KEY, EditorCamera.zoom_speed));
+    EditorCamera.pan_speed = @floatCast(s.getFloat(CAM_PAN_KEY, EditorCamera.pan_speed));
 }
 
 fn saveCameraSettings() void {
@@ -414,6 +437,7 @@ fn saveCameraSettings() void {
     s.setFloat(CAM_MOVE_KEY, EditorCamera.move_speed) catch {};
     s.setFloat(CAM_LOOK_KEY, EditorCamera.look_sensitivity) catch {};
     s.setFloat(CAM_ZOOM_KEY, EditorCamera.zoom_speed) catch {};
+    s.setFloat(CAM_PAN_KEY, EditorCamera.pan_speed) catch {};
     s.save(gui.io);
 }
 
@@ -449,6 +473,8 @@ fn drawVisibilityMenu() void {
 fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physical) EditorCamera.Nav {
     var look_dx: f32 = 0;
     var look_dy: f32 = 0;
+    var pan_dx: f32 = 0;
+    var pan_dy: f32 = 0;
     var wheel: f32 = 0;
     for (gui.events()) |*e| {
         switch (e.evt) {
@@ -467,15 +493,27 @@ fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physi
                 }
             },
             .mouse => |me| switch (me.action) {
-                .press => if (me.button == .right and gui.eventMatchSimple(e, content.data())) {
-                    inst.rmb_down = true;
+                .press => {
+                    if (me.button == .right and gui.eventMatchSimple(e, content.data())) {
+                        inst.rmb_down = true;
+                    }
+                    if (me.button == .middle and gui.eventMatchSimple(e, content.data())) {
+                        inst.mmb_down = true;
+                    }
                 },
-                .release => if (me.button == .right) {
-                    inst.rmb_down = false;
+                .release => {
+                    if (me.button == .right) inst.rmb_down = false;
+                    if (me.button == .middle) inst.mmb_down = false;
                 },
-                .motion => |delta| if (inst.rmb_down) {
-                    look_dx += delta.x;
-                    look_dy += delta.y;
+                .motion => |delta| {
+                    if (inst.rmb_down) {
+                        look_dx += delta.x;
+                        look_dy += delta.y;
+                    }
+                    if (inst.mmb_down) {
+                        pan_dx += delta.x;
+                        pan_dy += delta.y;
+                    }
                 },
                 .wheel_y => |amt| if (phys.contains(inst.last_mouse)) {
                     wheel += amt;
@@ -489,6 +527,8 @@ fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physi
         .rmb_down = inst.rmb_down,
         .look_dx = look_dx,
         .look_dy = look_dy,
+        .pan_dx = pan_dx,
+        .pan_dy = pan_dy,
         .wheel = wheel,
         .forward = inst.nav_fwd,
         .back = inst.nav_back,

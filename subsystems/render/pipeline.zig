@@ -179,7 +179,7 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
         .entrypoint = "main",
         .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = c.SDL_GPU_SHADERSTAGE_FRAGMENT,
-        .num_samplers = 6,
+        .num_samplers = 7,
         .num_storage_textures = 0,
         .num_storage_buffers = 0,
         .num_uniform_buffers = 1,
@@ -314,6 +314,95 @@ pub fn createShadowPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
         .num_color_targets = 0,
         .color_target_descriptions = null,
         .depth_stencil_format = state.SHADOW_FORMAT,
+        .has_depth_stencil_target = true,
+        .padding1 = 0,
+        .padding2 = 0,
+        .padding3 = 0,
+    };
+
+    return c.SDL_CreateGPUGraphicsPipeline(dev, &info) orelse error.Pipeline;
+}
+
+/// Fullscreen-triangle pipeline that renders the scene's equirect HDR
+/// environment map as a background. Drawn first in the main pass (see
+/// `root.zig`), before any opaque geometry, so depth test/write are disabled —
+/// opaque draws simply overwrite sky pixels as they render.
+pub fn createSkyboxPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
+    const vert_spv = @embedFile("shaders/compiled/skybox.vert.spv");
+    const frag_spv = @embedFile("shaders/compiled/skybox.frag.spv");
+
+    const vert = c.SDL_CreateGPUShader(dev, &c.SDL_GPUShaderCreateInfo{
+        .code_size = vert_spv.len,
+        .code = vert_spv,
+        .entrypoint = "main",
+        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
+        .stage = c.SDL_GPU_SHADERSTAGE_VERTEX,
+        .num_samplers = 0,
+        .num_storage_textures = 0,
+        .num_storage_buffers = 0,
+        .num_uniform_buffers = 0,
+        .props = 0,
+    }) orelse return error.VertShader;
+    defer c.SDL_ReleaseGPUShader(dev, vert);
+
+    const frag = c.SDL_CreateGPUShader(dev, &c.SDL_GPUShaderCreateInfo{
+        .code_size = frag_spv.len,
+        .code = frag_spv,
+        .entrypoint = "main",
+        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
+        .stage = c.SDL_GPU_SHADERSTAGE_FRAGMENT,
+        .num_samplers = 1,
+        .num_storage_textures = 0,
+        .num_storage_buffers = 0,
+        .num_uniform_buffers = 1,
+        .props = 0,
+    }) orelse return error.FragShader;
+    defer c.SDL_ReleaseGPUShader(dev, frag);
+
+    const color_desc = c.SDL_GPUColorTargetDescription{
+        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .blend_state = std.mem.zeroes(c.SDL_GPUColorTargetBlendState),
+    };
+
+    var info = std.mem.zeroes(c.SDL_GPUGraphicsPipelineCreateInfo);
+    info.vertex_shader = vert;
+    info.fragment_shader = frag;
+    info.primitive_type = c.SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    info.vertex_input_state = .{
+        .num_vertex_buffers = 0,
+        .vertex_buffer_descriptions = null,
+        .num_vertex_attributes = 0,
+        .vertex_attributes = null,
+    };
+    info.rasterizer_state = .{
+        .fill_mode = c.SDL_GPU_FILLMODE_FILL,
+        .cull_mode = c.SDL_GPU_CULLMODE_NONE,
+        .front_face = c.SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
+        .depth_bias_constant_factor = 0,
+        .depth_bias_clamp = 0,
+        .depth_bias_slope_factor = 0,
+        .enable_depth_bias = false,
+        .enable_depth_clip = true,
+        .padding1 = 0,
+        .padding2 = 0,
+    };
+    info.depth_stencil_state = .{
+        .compare_op = c.SDL_GPU_COMPAREOP_ALWAYS,
+        .back_stencil_state = std.mem.zeroes(c.SDL_GPUStencilOpState),
+        .front_stencil_state = std.mem.zeroes(c.SDL_GPUStencilOpState),
+        .compare_mask = 0xff,
+        .write_mask = 0xff,
+        .enable_depth_test = false,
+        .enable_depth_write = false,
+        .enable_stencil_test = false,
+        .padding1 = 0,
+        .padding2 = 0,
+        .padding3 = 0,
+    };
+    info.target_info = .{
+        .num_color_targets = 1,
+        .color_target_descriptions = &color_desc,
+        .depth_stencil_format = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM,
         .has_depth_stencil_target = true,
         .padding1 = 0,
         .padding2 = 0,

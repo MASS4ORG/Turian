@@ -32,8 +32,13 @@ pub const LightComponent = struct {
         pub const color_r = FieldHint{ .min = 0.0, .max = 1.0, .widget = .slider };
         pub const color_g = FieldHint{ .min = 0.0, .max = 1.0, .widget = .slider };
         pub const color_b = FieldHint{ .min = 0.0, .max = 1.0, .widget = .slider };
-        pub const intensity = FieldHint{ .min = 0.0, .max = 10.0, .widget = .slider_entry };
-        pub const range = FieldHint{ .min = 0.0, .max = 100.0, .widget = .slider_entry };
+        // Windowed inverse-square falloff means a light needs an intensity in
+        // the hundreds/thousands to read as bright at real-world "meters"-scale
+        // distances (tens of units) — a max of 10 silently clamped every
+        // attempt to compensate for a large scene (e.g. Bistro, ~170 units
+        // across) by cranking intensity up via the slider-entry widget.
+        pub const intensity = FieldHint{ .min = 0.0, .max = 5000.0, .widget = .slider_entry };
+        pub const range = FieldHint{ .min = 0.0, .max = 2000.0, .widget = .slider_entry };
         pub const spot_angle = FieldHint{ .min = 1.0, .max = 89.0, .widget = .slider_entry };
         pub const spot_softness = FieldHint{ .min = 0.0, .max = 1.0, .widget = .slider };
     };

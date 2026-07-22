@@ -70,9 +70,13 @@ pub fn hashFile(io: std.Io, allocator: std.mem.Allocator, file_path: []const u8)
 
 // ── Ensure / update ───────────────────────────────────────────────────────────
 
-/// Ensure a .meta file exists for `asset_path`.
-/// Creates or upgrades it with a fresh GUID when the existing meta has a nil GUID
-/// (missing file, legacy format, or parse failure). Returns the up-to-date meta.
+/// Ensure a .meta file exists for `asset_path` and is correctly classified.
+/// Assigns a fresh GUID when missing (missing file, legacy format, or parse
+/// failure) and reclassifies `asset_type`/`import_settings` whenever they're
+/// still `.unknown` — even for a meta that already has a real GUID, which
+/// happens when an earlier scan bug wrote a placeholder stub (real GUID,
+/// `asset_type: "unknown"`) that was never healed since this used to only
+/// fire on a nil GUID. Returns the up-to-date meta.
 pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u8) MetaFile {
     // Parse in a scratch arena so the meta's heap slices (manifests) don't leak;
     // the returned value carries only the scalar fields (see clearing below).
@@ -81,17 +85,24 @@ pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const 
     const a = arena.allocator();
 
     var meta = readMeta(io, a, asset_path);
+    var dirty = false;
     if (meta.guid.isNil()) {
         meta.guid = Guid.v4(io);
-        if (meta.asset_type == .unknown)
-            meta.asset_type = classifyByName(asset_path);
-        if (std.meta.activeTag(meta.import_settings) == .unknown and meta.asset_type != .unknown)
-            meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
-        if (meta.source_hash == 0)
-            meta.source_hash = hashFile(io, a, asset_path);
-
-        writeMeta(io, a, asset_path, meta);
+        dirty = true;
     }
+    if (meta.asset_type == .unknown) {
+        meta.asset_type = classifyByName(asset_path);
+        dirty = true;
+    }
+    if (std.meta.activeTag(meta.import_settings) == .unknown and meta.asset_type != .unknown) {
+        meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
+        dirty = true;
+    }
+    if (meta.source_hash == 0) {
+        meta.source_hash = hashFile(io, a, asset_path);
+        dirty = true;
+    }
+    if (dirty) writeMeta(io, a, asset_path, meta);
 
     // The slice fields live in the arena and would dangle after return. Callers
     // of ensureMeta use only the GUID/type/version, so clear the manifests.
@@ -142,23 +153,24 @@ fn scanDirForMetas(
     dir: *std.Io.Dir,
     dir_path: []const u8,
 ) void {
-    // Pass 1: collect exact-case asset filenames in this directory.
+    // Pass 1: collect exact-case asset filenames in this directory (unbounded —
+    // a fixed-size cap here previously truncated silently past 64 entries,
+    // making Pass 2 below treat every asset past the cap as "orphaned" and
+    // delete its otherwise-valid .meta file; a texture-heavy import (e.g.
+    // hundreds of DDS files in one folder) hit this on every scan).
     // Used to detect and delete wrong-case .meta files (Windows tolerates
     // case mismatches; Linux does not, so we enforce correctness here).
-    const MAX_NAMES = 64;
-    const NAME_LEN = 128;
-    var names: [MAX_NAMES][NAME_LEN]u8 = undefined;
-    var name_lens: [MAX_NAMES]u8 = .{0} ** MAX_NAMES;
-    var name_count: usize = 0;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var names: std.ArrayList([]const u8) = .empty;
     {
         var it = dir.iterate();
         while (it.next(io) catch null) |e| {
             if (e.kind != .file or std.mem.endsWith(u8, e.name, ".meta")) continue;
-            if (name_count >= MAX_NAMES) break;
-            const l: u8 = @intCast(@min(e.name.len, NAME_LEN));
-            @memcpy(names[name_count][0..l], e.name[0..l]);
-            name_lens[name_count] = l;
-            name_count += 1;
+            const owned = a.dupe(u8, e.name) catch continue;
+            names.append(a, owned) catch continue;
         }
     }
 
@@ -170,8 +182,8 @@ fn scanDirForMetas(
             if (e.kind != .file or !std.mem.endsWith(u8, e.name, ".meta")) continue;
             const stem = e.name[0 .. e.name.len - ".meta".len];
             var exact = false;
-            for (0..name_count) |i| {
-                if (std.mem.eql(u8, stem, names[i][0..name_lens[i]])) {
+            for (names.items) |n| {
+                if (std.mem.eql(u8, stem, n)) {
                     exact = true;
                     break;
                 }
@@ -199,4 +211,63 @@ fn scanDirForMetas(
             _ = ensureMeta(io, allocator, asset_path);
         }
     }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "scanAndEnsureMetas keeps every .meta in a directory with more than 64 assets" {
+    // Regression test: scanDirForMetas' orphan/wrong-case cleanup pass used to
+    // collect filenames into a fixed 64-entry array, silently dropping any past
+    // the cap — so a texture-heavy directory (e.g. hundreds of DDS files, one
+    // real project hit this with 633) had most of its valid .meta files deleted
+    // and replaced with fresh GUIDs on every scan.
+    const io = std.testing.io;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets/Textures");
+
+    const file_count = 70;
+    var guids: [file_count]Guid = undefined;
+    var name_buf: [file_count][32]u8 = undefined;
+    var names: [file_count][]const u8 = undefined;
+    for (0..file_count) |i| {
+        const name = std.fmt.bufPrint(&name_buf[i], "tex_{d}.dds", .{i}) catch unreachable;
+        names[i] = name;
+        var path_buf: [64]u8 = undefined;
+        const sub_path = std.fmt.bufPrint(&path_buf, "assets/Textures/{s}", .{name}) catch unreachable;
+        try tmp.dir.writeFile(io, .{ .sub_path = sub_path, .data = "dds bytes" });
+    }
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var assets_path_buf: [300]u8 = undefined;
+    const assets_path = try std.fmt.bufPrint(&assets_path_buf, "{s}/assets", .{project_path});
+
+    scanAndEnsureMetas(io, a, assets_path);
+    for (0..file_count) |i| {
+        var ap_buf: [300]u8 = undefined;
+        const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/Textures/{s}", .{ assets_path, names[i] });
+        const meta = readMeta(io, a, asset_path);
+        try std.testing.expect(!meta.guid.isNil());
+        guids[i] = meta.guid;
+    }
+
+    // Rescan (mirrors a second Studio/editor session opening the project) —
+    // every GUID must be stable, not reassigned.
+    scanAndEnsureMetas(io, a, assets_path);
+    for (0..file_count) |i| {
+        var ap_buf: [300]u8 = undefined;
+        const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/Textures/{s}", .{ assets_path, names[i] });
+        const meta = readMeta(io, a, asset_path);
+        try std.testing.expect(!meta.guid.isNil());
+        try std.testing.expect(meta.guid.eql(guids[i]));
+    }
+}
+
+test {
+    std.testing.refAllDecls(@This());
 }
