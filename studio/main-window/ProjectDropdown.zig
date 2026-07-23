@@ -1,12 +1,6 @@
-//! Project selector dropdown in the main menu bar: the current project
-//! (icon + configured Project Name) and a "recent projects" list (icon +
-//! name, absolute-path tooltip), plus "Open Project...".
-//!
-//! The current project's name/icon come straight from `EditorState
-//! .current_project` (already loaded in memory, kept live by
-//! `ProjectSettingsEditor.save()`). Recent, unopened projects have no live
-//! asset database, so their name/icon are read directly from disk once and
-//! cached for the session (`recentInfo`).
+//! Project selector dropdown in the main menu bar: current project,
+//! recent projects list, and "Open Project...". Recent projects' name/icon
+//! are read from disk once and cached for the session.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -28,8 +22,8 @@ pub fn draw(m: *gui.MenuWidget) void {
         if (currentProjectIconSource()) |src| drawIcon(src);
         gui.labelNoFmt(@src(), cur_name, .{}, mi.style().strip().override(.{ .label = .{ .for_id = mi.data().id } }));
     }
-    // Full absolute project path on hover (issue #86) — helps confirm which
-    // project is active when juggling several with similar names.
+    // Full absolute project path on hover — helps confirm which project is
+    // active when juggling several with similar names.
     if (EditorState.project_path) |p| {
         var abs_buf: [1024]u8 = undefined;
         const abs = editor.recent_projects.canonical(gui.io, p, &abs_buf);

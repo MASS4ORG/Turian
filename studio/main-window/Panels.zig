@@ -1,16 +1,6 @@
-//! Registry of dockable panels: one entry per panel slug, each with a draw
-//! function taking over context-aware dispatch that used to be hardcoded in
-//! Window.zig (uidoc/settings tabs swapping what Hierarchy and Scene show;
-//! dedicated asset editors taking over Scene).
-//!
-//! `all()` is a runtime registry (builtins + `registerCustom`), not a
-//! comptime list, so it can be re-scanned after user code compiles. Studio
-//! itself is a plain native binary, though — unlike Play mode, which
-//! dlopen()s a hot-compiled library through a C ABI, it has no mechanism to
-//! execute arbitrary third-party dvui-drawing code. So `registerCustom` is
-//! wired up (called after every `ReflectJob` rescan) but nothing feeds it
-//! real descriptors yet; that needs either reflection-driven generic panel
-//! content or a native dlopen'd Studio-side plugin.
+//! Registry of dockable panels: one entry per slug with a draw function.
+//! `all()` is a runtime registry (builtins + `registerCustom`) so it can be
+//! re-scanned after user code compiles.
 const std = @import("std");
 const gui = @import("gui");
 const SceneTree = @import("../scene-hierarchy/SceneTree.zig");

@@ -54,6 +54,24 @@ pub fn writeMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = json }) catch {};
 }
 
+// ── Source file staleness ─────────────────────────────────────────────────────
+
+/// Cheap staleness signal for a source file: size and modification time.
+/// Compared against the values stamped in `.meta` at last import, as a fast
+/// path checked before falling back to a full content hash.
+pub const Stat = struct {
+    size: u64,
+    mtime_ns: i96,
+};
+
+/// Stat a source file for the fast staleness check. Returns null on any error
+/// (missing file, permission, etc.), in which case callers should fall back
+/// to a full content hash.
+pub fn statFile(io: std.Io, file_path: []const u8) ?Stat {
+    const st = std.Io.Dir.cwd().statFile(io, file_path, .{}) catch return null;
+    return .{ .size = st.size, .mtime_ns = st.mtime.nanoseconds };
+}
+
 // ── Source file hashing ───────────────────────────────────────────────────────
 
 /// Compute an FNV-1a hash of a file's contents for change detection.
@@ -71,12 +89,7 @@ pub fn hashFile(io: std.Io, allocator: std.mem.Allocator, file_path: []const u8)
 // ── Ensure / update ───────────────────────────────────────────────────────────
 
 /// Ensure a .meta file exists for `asset_path` and is correctly classified.
-/// Assigns a fresh GUID when missing (missing file, legacy format, or parse
-/// failure) and reclassifies `asset_type`/`import_settings` whenever they're
-/// still `.unknown` — even for a meta that already has a real GUID, which
-/// happens when an earlier scan bug wrote a placeholder stub (real GUID,
-/// `asset_type: "unknown"`) that was never healed since this used to only
-/// fire on a nil GUID. Returns the up-to-date meta.
+/// Assigns a fresh GUID when missing and reclassifies unknown types.
 pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u8) MetaFile {
     // Parse in a scratch arena so the meta's heap slices (manifests) don't leak;
     // the returned value carries only the scalar fields (see clearing below).
@@ -91,8 +104,11 @@ pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const 
         dirty = true;
     }
     if (meta.asset_type == .unknown) {
-        meta.asset_type = classifyByName(asset_path);
-        dirty = true;
+        const reclassified = classifyByName(asset_path);
+        if (reclassified != .unknown) {
+            meta.asset_type = reclassified;
+            dirty = true;
+        }
     }
     if (std.meta.activeTag(meta.import_settings) == .unknown and meta.asset_type != .unknown) {
         meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
@@ -104,16 +120,15 @@ pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const 
     }
     if (dirty) writeMeta(io, a, asset_path, meta);
 
-    // The slice fields live in the arena and would dangle after return. Callers
-    // of ensureMeta use only the GUID/type/version, so clear the manifests.
+    // Arena slices would dangle; callers only use GUID/type/version.
     meta.source_deps = &.{};
     meta.artifact_deps = &.{};
     meta.sub_assets = &.{};
     return meta;
 }
 
-/// Returns true when the asset has changed since its last recorded hash, the
-/// importer version has been incremented, or no valid .meta exists yet.
+/// Returns true when the asset has changed since its last recorded hash or
+/// importer version bump. Cheap size+mtime check before full content hash.
 pub fn needsReimport(
     io: std.Io,
     allocator: std.mem.Allocator,
@@ -123,13 +138,20 @@ pub fn needsReimport(
     const meta = readMeta(io, allocator, asset_path);
     if (meta.guid.isNil()) return true;
     if (meta.importer_version != current_importer_version) return true;
+    if (statFile(io, asset_path)) |st| {
+        if (st.size == meta.source_size and st.mtime_ns == meta.source_mtime_ns) return false;
+    }
     return hashFile(io, allocator, asset_path) != meta.source_hash;
 }
 
-/// Stamp the source hash into the .meta after a successful import.
+/// Stamp the source hash and size+mtime into the .meta after a successful import.
 pub fn updateHash(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u8) void {
     var meta = readMeta(io, allocator, asset_path);
     meta.source_hash = hashFile(io, allocator, asset_path);
+    if (statFile(io, asset_path)) |st| {
+        meta.source_size = st.size;
+        meta.source_mtime_ns = st.mtime_ns;
+    }
     writeMeta(io, allocator, asset_path, meta);
 }
 
@@ -153,13 +175,9 @@ fn scanDirForMetas(
     dir: *std.Io.Dir,
     dir_path: []const u8,
 ) void {
-    // Pass 1: collect exact-case asset filenames in this directory (unbounded —
-    // a fixed-size cap here previously truncated silently past 64 entries,
-    // making Pass 2 below treat every asset past the cap as "orphaned" and
-    // delete its otherwise-valid .meta file; a texture-heavy import (e.g.
-    // hundreds of DDS files in one folder) hit this on every scan).
-    // Used to detect and delete wrong-case .meta files (Windows tolerates
-    // case mismatches; Linux does not, so we enforce correctness here).
+    // Pass 1: collect exact-case asset filenames (unbounded) to detect and
+    // delete wrong-case .meta files (Windows tolerates case mismatches; Linux
+    // does not, so we enforce correctness here).
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -216,11 +234,8 @@ fn scanDirForMetas(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test "scanAndEnsureMetas keeps every .meta in a directory with more than 64 assets" {
-    // Regression test: scanDirForMetas' orphan/wrong-case cleanup pass used to
-    // collect filenames into a fixed 64-entry array, silently dropping any past
-    // the cap — so a texture-heavy directory (e.g. hundreds of DDS files, one
-    // real project hit this with 633) had most of its valid .meta files deleted
-    // and replaced with fresh GUIDs on every scan.
+    // Regression: the cleanup pass used a fixed 64-entry array, silently
+    // dropping entries past the cap and deleting valid .meta files.
     const io = std.testing.io;
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

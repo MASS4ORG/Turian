@@ -1,29 +1,6 @@
-//! Shared tree-view machinery (C1): one implementation of row rendering,
-//! click selection, inline rename, keyboard navigation, right-click context
-//! menus and drag-reparenting with before/into/after drop zones — used by
-//! both the scene hierarchy (`SceneTree.zig` over `EditorState`) and the UI
-//! document hierarchy (`UiDocumentEditor.zig` over its loaded `.uidoc`).
-//!
-//! `TreeView(Model)` is comptime duck-typed. A model provides:
-//!
-//!   count() usize                          — number of rows (flat storage)
-//!   parentOf(i: usize) i32                 — parent index, -1 = root
-//!   name(i: usize) []const u8              — display name
-//!   isSelected(i: usize) bool              — row is in the selection set
-//!   isPrimary(i: usize) bool               — row is the primary selection
-//!   primarySelection() ?usize              — for F2 / Delete keyboard paths
-//!   select(i: usize, mods: Mods) void      — click selection (mods for multi)
-//!   applyRename(i: usize, name: []const u8) void
-//!   reparent(drag: usize, target: usize, zone: DropZone) void
-//!   removeRequested() void                 — Delete key / context "Delete"
-//!   rowIcon(i: usize, has_children: bool) RowIcon
-//!
-//! Optional (checked with @hasDecl):
-//!   activate(i: usize) void                — double-click
-//!   onDragStart(i: usize) void             — e.g. cross-panel drag payloads
-//!   contextItems(i: usize, fw: *gui.FloatingMenuWidget) void
-//!                                          — extra menu items below the
-//!                                            shared Rename/Delete pair
+//! Shared tree-view machinery: row rendering, click selection, inline rename,
+//! keyboard navigation, context menus, and drag-reparenting. `TreeView(Model)`
+//! is comptime duck-typed; see the model interface below.
 
 const std = @import("std");
 const gui = @import("gui");

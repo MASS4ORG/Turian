@@ -1,27 +1,7 @@
-//! Compiled `.strtab` binary format: a sorted id array plus a string blob,
-//! baked from a `.strings` asset at bake time (`editor/i18n/Compiler.zig`,
-//! P2) and packed into `game.oap` (`editor/assets/AssetPackager.zig`).
-//!
-//! Lookup is a binary search that compares full id bytes on every step —
-//! there is no hash column. Binary search already touches the full id at the
-//! decision point, so a hash would only add a redundant pre-filter; it would
-//! never be load-bearing for correctness. This matters because a silent hash
-//! collision in a shipped game's compiled string table is not something a
-//! player-side bug report can diagnose.
-//!
-//! `get()` returns a slice pointing directly into the caller-owned `bytes`
-//! backing store — zero allocation, no copy. The reader borrows `bytes` and
-//! never frees it; the owning `Locale` service is responsible for keeping
-//! loaded blobs alive for the session (see `Locale.zig`).
-//!
-//! Layout (little-endian):
-//! ```
-//! Header   { magic: "STRT", version: u32, count: u32, locale_len: u32 }
-//! locale   [locale_len]u8                          // BCP-47 tag, not NUL-terminated
-//! entries  [count]Entry                             // sorted by id, ascending byte order
-//!   Entry  { id_offset: u32, id_len: u32, value_offset: u32, value_len: u32 } // offsets into blob
-//! blob     [..]u8                                   // concatenated id/value bytes
-//! ```
+//! Compiled `.strtab` binary format: sorted id array + string blob, baked
+//! from a `.strings` asset. Lookup is a binary search (no hash column — a
+//! collision in a shipped game's string table would be undiagnosable).
+//! `get()` returns a zero-copy slice into the caller-owned backing store.
 
 const std = @import("std");
 

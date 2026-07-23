@@ -1,40 +1,6 @@
-//! In-engine performance profiler — the *game-side* foundation.
-//!
-//! This is the engine's own profiler, independent of the GUI toolkit. It powers
-//! the Studio timeline panel and the built-game overlay, and is the engine
-//! counterpart to the GUI-side primitives staged on the Guinevere dvui fork
-//! (Window.renderStats, Window.frameTiming). Where dvui measures the
-//! editor's *own* widget frame, this measures the *game*: script/system update
-//! time, the GPU scene renderer's draw work, and arbitrary user scopes.
-//!
-//! ## Model
-//! - **Zones**: nested, scoped CPU timers (`PROFILE_SCOPE`). Each thread keeps
-//!   its own stack + recorded-zone buffer, so the hot path is lock-free; the
-//!   only lock is a one-time slot registration per thread.
-//! - **Frame**: `beginFrame`/`endFrame` bracket one game frame. `endFrame`
-//!   snapshots every thread's zones + the counters into a `Frame` the UI reads.
-//! - **Counters**: per-frame render stats (draw calls, triangles, …) the
-//!   renderer bumps as it submits work.
-//!
-//! ## Usage
-//! ```zig
-//! engine.Profiler.setIo(io);        // once, at startup (for the clock)
-//! // per frame:
-//! engine.Profiler.beginFrame();
-//! {
-//!     var z = engine.Profiler.zone("update"); defer z.end();
-//!     ... game update ...
-//! }
-//! ... render ...                    // the renderer bumps counters/zones
-//! engine.Profiler.endFrame();
-//! const frame = engine.Profiler.captured();   // for the UI
-//! ```
-//!
-//! ## Cost when disabled
-//! Every entry point early-outs on the `enabled` flag (a single predictable
-//! branch). Release builds that want literally zero cost can leave it `false`
-//! (the default outside Debug). Comptime elision and Tracy export are tracked as
-//! follow-ups.
+//! In-engine performance profiler: nested CPU zones and per-frame render
+//! counters. Each thread keeps its own lock-free zone buffer; `endFrame`
+//! snapshots everything into a `Frame` the UI reads.
 
 const std = @import("std");
 const builtin = @import("builtin");

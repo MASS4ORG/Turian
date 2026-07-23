@@ -1,21 +1,8 @@
-//! Multi-Document Interface (MDI) — open assets in tabs, layered on top of
-//! `EditorState`'s single-scene singleton state without duplicating every
-//! panel per tab.
-//!
-//! Each open asset is a `Document`. `.scene` tabs share the Scene
-//! Tree/Viewport/Inspector surface; the *active* one IS `EditorState`'s live
-//! scene, parked into a heap snapshot on tab switch and restored on return,
-//! so panel state (hierarchy, selection, dirty flag) survives navigation.
-//! `.asset` tabs are hosted full-area by their own dedicated editor.
-//!
-//! Undo history is per-session and resets on tab switch (a single global
-//! stack); the dirty indicator persists across switches.
-//!
-//! This file owns the document model only (open/close/activate/save/dirty) —
-//! no drawing. The tab strip UI lives in `DocumentsTabBar.zig` and JSON
-//! persistence in `DocumentsPersistence.zig`, both built on this file's
-//! `pub` API; `drawTabBar`/`persist`/`restore` below re-export them so
-//! callers don't need to know the module is split three ways.
+//! Multi-Document Interface (MDI) — open assets in tabs. `.scene` tabs share
+//! the Scene Tree/Viewport/Inspector surface, parking the active scene into a
+//! heap snapshot on tab switch. `.asset` tabs host their own editor. This file
+//! owns the document model only; tab strip UI is in `DocumentsTabBar.zig` and
+//! persistence in `DocumentsPersistence.zig` (re-exported below).
 
 const std = @import("std");
 const gui = @import("gui");

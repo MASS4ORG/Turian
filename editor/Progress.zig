@@ -1,13 +1,6 @@
-//! Lightweight progress + cancellation interface for long-running editor
-//! operations (asset import, script compilation, game build).
-//!
-//! An operation accepts a `Progress` value and calls `report` to publish a
-//! 0..1 completion fraction plus a short status note, and `cancelled` to poll
-//! whether the caller has requested an early abort. The default `none` value is
-//! a no-op, so operations run unobserved without any special-casing.
-//!
-//! Implementations (e.g. `TaskManager.progressFor`) provide the vtable; the
-//! `ctx`/`id` pair lets one backing store fan out to many concurrent tasks.
+//! Progress + cancellation interface for long-running editor operations.
+//! `report` publishes a 0..1 fraction; `cancelled` polls for early abort.
+//! The default `none` is a no-op so operations run unobserved by default.
 const std = @import("std");
 
 pub const Progress = struct {

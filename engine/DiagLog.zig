@@ -1,19 +1,7 @@
-//! Diagnostic log ring buffer.
-//!
-//! Captures every `std.log` message (debug/info/warn/err) into a fixed ring so
-//! external tools (the Remote Debug Protocol's `errors` method, the MCP
-//! `list_errors` tool, the Studio Output panel) can read what happened
-//! without scraping stderr. Install `logFn` as the process `std_options.logFn`
-//! to feed it; it still forwards everything to the default logger.
-//!
-//! Consecutive identical (level, scope, message) records collapse into one
-//! entry with an incrementing `repeat` count, matching Unity/Unreal/Godot
-//! console behavior. `.err` entries additionally capture the call-site stack
-//! trace's return addresses (cheap — no symbolization) so a viewer can
-//! symbolize it lazily via `symbolizeTrace`.
-//!
-//! Logging can happen on any thread, so the ring is guarded by a tiny atomic
-//! spinlock (no `Io` handle is available inside a `logFn`).
+//! Diagnostic log ring buffer. Captures `std.log` messages into a fixed ring
+//! for external tools (Remote Debug Protocol, MCP, Studio Output panel).
+//! Consecutive identical records collapse with a `repeat` count; `.err`
+//! entries capture call-site stack traces. Thread-safe via atomic spinlock.
 
 const std = @import("std");
 const builtin = @import("builtin");

@@ -1,11 +1,6 @@
-/// Model → materials + textures (one-to-many import). Generates:
-///   * one `.material` per source material (metallic-roughness → built-in PBR),
-///   * one `.texture` per *embedded* image (external images already have their
-///     own source asset and are referenced by GUID, so they stay swappable).
-/// Appends each as a `SubAsset` to the caller's manifest with a stable GUID
-/// reused across reimports (`reuseOrNewGuid`, keyed against the manifest
-/// snapshotted before this import). Best-effort: parse failures and
-/// unsupported features are warned about, never fatal.
+/// Model → materials + textures (one-to-many import). Generates `.material`
+/// and `.texture` sub-assets with stable GUIDs reused across reimports.
+/// Best-effort: parse failures warned, never fatal.
 const std = @import("std");
 const engine = @import("engine");
 const Guid = @import("guid").Guid;
@@ -102,9 +97,7 @@ pub fn generate(
     }
 }
 
-/// Reuse the GUID previously assigned to `key`, or mint a fresh one. Shared
-/// with `ModelHierarchy.zig`'s `"mesh:{d}"`/`"hierarchy"` sub-assets, which
-/// follow the same stable-GUID-by-key convention.
+/// Reuse the GUID previously assigned to `key`, or mint a fresh one.
 pub fn reuseOrNewGuid(prev: []const SubAsset, key: []const u8, io: std.Io) Guid {
     for (prev) |s| {
         if (std.mem.eql(u8, s.key, key) and !s.guid.isNil()) return s.guid;
@@ -112,13 +105,8 @@ pub fn reuseOrNewGuid(prev: []const SubAsset, key: []const u8, io: std.Io) Guid 
     return Guid.v4(io);
 }
 
-/// Resolve a glTF/FBX image URI (relative to the model file) to a sibling
-/// path. FBX texture references are frequently Windows-style
-/// (`Textures\Foo.dds`, baked in by whatever DCC tool exported the file) —
-/// normalize `\` to `/` first, or the literal backslash becomes part of the
-/// filename instead of a path separator, silently missing the real nested
-/// file and leaving the material's albedo/normal/etc. slot unbound (renders
-/// with its flat fallback color, no visible texture).
+/// Resolve a glTF/FBX image URI to a sibling path. Normalizes Windows-style
+/// backslashes to `/` so the path resolves correctly.
 fn siblingPath(arena: std.mem.Allocator, model_path: []const u8, uri: []const u8) ?[]const u8 {
     const dir = std.fs.path.dirname(model_path) orelse ".";
     const normalized = arena.dupe(u8, uri) catch return null;
@@ -151,10 +139,9 @@ fn classifyImageRoles(arena: std.mem.Allocator, materials: []const engine.assets
     return roles;
 }
 
-/// Like `asset_meta.ensureMeta`, but a brand-new meta for an image used only
-/// as a data map (`role != .color`) defaults to a linear color space (and,
-/// for normal maps, `texture_type = .normal_map`) instead of the general sRGB
-/// default. Never touches an already-existing meta, so user edits always win.
+/// Like `asset_meta.ensureMeta`, but new data-map images default to linear
+/// color space (and `texture_type = .normal_map` for normal maps). Never
+/// touches an existing meta, so user edits always win.
 fn ensureImageMeta(io: std.Io, arena: std.mem.Allocator, path: []const u8, role: ImageRole) MetaFile {
     const is_new = asset_meta.readMeta(io, arena, path).guid.isNil();
     const sm = asset_meta.ensureMeta(io, arena, path);

@@ -1,25 +1,8 @@
-//! SceneManager — a formal scene-management API.
-//!
-//! Where a Turian *scene* (like a Godot scene or a Unity prefab) can be
-//! instantiated as a node tree, the SceneManager treats scenes the way Unity's
-//! SceneManager does: named, addressable units that are **loaded** and
-//! **unloaded** as a whole, can be **additive** (several active at once), can
-//! carry **persistent** objects that survive transitions (DontDestroyOnLoad),
-//! and that fire **lifecycle events** (loaded / unloaded / activated /
-//! deactivated).
-//!
-//! ## Decoupling from scene parsing
-//! The engine does not know how to turn a scene *asset id* into nodes — that
-//! lives in the editor/runtime (JSON via `editor.scene_io`, bytes via the `.oap`
-//! package). So the manager is handed a **`Loader`** callback (mirroring the
-//! `software_renderer` source callbacks): given a scene id, fill a node buffer.
-//! This keeps the manager pure engine logic and unit-testable with a fake
-//! loader, while the generated game wires in the real package-backed loader.
-//!
-//! ## Storage
-//! Each loaded scene owns an allocator-backed node array. Handles are
-//! generational so a stale handle to an unloaded scene is detected rather than
-//! aliasing a freshly loaded one.
+//! SceneManager — formal scene loading/unloading API. Scenes are named,
+//! addressable units that load additively and fire lifecycle events. A
+//! `Loader` callback decouples scene parsing from engine logic (the engine
+//! does not know how to turn an asset id into nodes). Each scene owns an
+//! allocator-backed node array with generational handles.
 
 const std = @import("std");
 const SceneNode = @import("SceneNode.zig").SceneNode;

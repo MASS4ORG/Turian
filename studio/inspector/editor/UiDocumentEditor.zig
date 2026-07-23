@@ -1,24 +1,7 @@
-//! `.uidoc` document editing state + the three panels that present it,
-//! Unity/Godot-style: opening a `.uidoc` tab swaps the scene's Hierarchy and
-//! Viewport panels for `drawHierarchyPanel`/`drawViewPanel` (wired in
-//! `Window.zig`), and the Inspector shows the selected node's properties via
-//! `drawInspector` (wired in `Inspector.zig`). Merely *selecting* a `.uidoc`
-//! in the Asset Browser (not opening a tab) shows only `drawGlobalSettings`
-//! through the ordinary `EditorRegistry` per-asset-type path — same as any
-//! other asset type gets when clicked without being opened.
-//!
-//! Editing mutates an in-memory copy of the document, arena-owned and
-//! reloaded when the active asset path changes (mirrors `MaterialEditor`'s
-//! "loaded lazily when selection path changes"). Structural edits (add/
-//! remove node or component) are recorded as `cmd_*` values and applied
-//! once per frame, after `drawHierarchyPanel`'s tree (mirrors
-//! `InputActionsEditor`'s "mutations recorded as cmd_* vars + applied AFTER
-//! draw loop — never mutate while iterating").
-//! Every component body goes through `PropDraw.drawComponentAlloc`'s generic
-//! reflection dispatch (C2) — strings via `drawStringEdit`, texture refs via
-//! the `TypedAssetRef` drag-drop/picker drawer, event bindings via the
-//! `EventBinding` drawer. Adding a field to a `UiComponent` variant shows up
-//! here with zero `studio/` changes.
+//! `.uidoc` document editing state + the three panels (Hierarchy, Viewport,
+//! Inspector) that present it. Editing mutates an arena-owned in-memory copy,
+//! reloaded on active asset change. Structural edits are recorded as `cmd_*`
+//! values and applied after the draw loop.
 
 const std = @import("std");
 const gui = @import("gui");

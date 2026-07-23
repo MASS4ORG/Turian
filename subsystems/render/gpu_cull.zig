@@ -1,11 +1,5 @@
-//! GPU-driven frustum culling: dispatches a compute pass that tests every
-//! submesh of a mesh against the camera frustum and writes one indexed
-//! indirect draw command per submesh (`num_instances` 0 or 1). The render
-//! pass then issues one `SDL_DrawGPUIndexedPrimitivesIndirect` per material
-//! group instead of one draw per submesh — see `root.zig`'s `renderScene`.
-//!
-//! Must run entirely before the main render pass begins: SDL_GPU compute
-//! passes and render passes cannot overlap on the same command buffer.
+//! GPU-driven frustum culling: a compute pass that writes per-submesh indirect
+//! draw commands, then the render pass issues one `DrawIndirect` per material group.
 const gpu = @import("gpu");
 const engine = @import("engine");
 const types = @import("types.zig");
@@ -15,10 +9,7 @@ const culling = @import("culling.zig");
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
 
-/// Dispatches the cull compute pass for `gm`, given one mesh renderer
-/// instance's model matrix and the frame's frustum, writing `gm.indirect_buf`
-/// in place. No-op if the cull pipeline or this mesh's GPU buffers aren't
-/// ready (falls back to the CPU per-submesh path in that case — see caller).
+/// Dispatches the cull compute pass for `gm`, writing `gm.indirect_buf` in place.
 pub fn dispatchCull(cmd: *c.SDL_GPUCommandBuffer, gm: *const state.GpuMesh, model: Matrix4, frustum: culling.Frustum) void {
     const cull_pl = state.cull_pipeline orelse return;
     const bounds_buf = gm.bounds_buf orelse return;

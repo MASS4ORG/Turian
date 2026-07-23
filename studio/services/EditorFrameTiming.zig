@@ -1,17 +1,7 @@
-//! Editor-CPU frame phase timing (events/build/render/total), replacing the
-//! dvui fork's `Window.frameTiming()`. Turian is back on upstream dvui (M0 of
-//! the in-game GUI epic); `endRendering` is already public upstream, so the
-//! same four-field breakdown is reproduced with `nanoTime` brackets around
-//! Studio's own call sites in `Main.zig` instead of a dvui patch. The caller
-//! supplies each timestamp (from `backend.nanoTime()`, the same clock dvui
-//! itself uses internally) so this module stays clock-source-agnostic.
-//!
-//! Usage (see Main.zig's main loop):
-//!   beginFrame(now)                  -- right before win.begin()
-//!   markEventsEnd(now)               -- right after backend.addAllEvents()
-//!   markBuildEnd(now)                -- right before win.endRendering(.{})
-//!   endFrame(now)                    -- right after win.end(.{})
-//! `last()` returns the most recently completed frame's timing.
+//! Editor-CPU frame phase timing (events/build/render/total). The caller
+//! supplies timestamps from `backend.nanoTime()` so this module stays
+//! clock-source-agnostic. Call sequence in `Main.zig`'s main loop:
+//!   `beginFrame(markEventsEnd(markBuildEnd(endFrame(`
 
 const std = @import("std");
 

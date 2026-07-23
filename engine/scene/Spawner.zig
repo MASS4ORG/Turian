@@ -1,19 +1,7 @@
-//! Runtime prefab spawning — the engine-side `Instantiate`/`Destroy`
-//! API, the bread-and-butter of gameplay code.
-//!
-//! Scripts don't touch scene storage directly; they **queue** commands through
-//! `Frame` (`frame.instantiate(prefab, pos, rot)`, `frame.destroy(node)`), which
-//! the host **flushes** at a safe point (after the update loop, never mid-
-//! iteration). This mirrors `SceneManager`'s deferred request queue and keeps
-//! spawns from invalidating the node slice a script is iterating.
-//!
-//! A prefab is identified by its asset GUID. The host registers each prefab's
-//! template nodes once (`registerPrefab`); `flush` then stamps copies into the
-//! live node buffer with fresh scene GUIDs, the prefab linkage that the editor
-//! uses (`prefab_source` / `prefab_node`), and an optional spawn transform.
-//! Keeping templates as `SceneNode` arrays (not JSON) means the whole runtime
-//! path needs only the engine — no editor/serde dependency in the shipped game's
-//! play library.
+//! Runtime prefab spawning — `Instantiate`/`Destroy` API. Scripts queue
+//! commands through `Frame`; the host flushes them after the update loop to
+//! avoid invalidating the node slice mid-iteration. Template nodes are
+//! `SceneNode` arrays (no editor/serde dependency in the shipped game).
 
 const std = @import("std");
 const SceneNode = @import("SceneNode.zig").SceneNode;

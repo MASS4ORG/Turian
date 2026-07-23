@@ -1,22 +1,7 @@
-//! Persists the dockable panel layout as `layout.json` next to
-//! `editor.Settings`'s global settings file (`<global_dir>/.turian/`) — a
-//! window arrangement is a per-machine preference, not per-project data.
-//! Also owns user-saved layout *presets* as
-//! `<global_dir>/.turian/layouts/<name>.json`, alongside the built-in ones
-//! in `LayoutPresets.zig`.
-//!
-//! Some asset types don't fit the main scene layout at all (Studio Settings
-//! has no use for a 3D viewport). Those bring their own arrangement, declared
-//! by `LayoutPresets.forAssetType`; `setAssetContext` swaps to it while such a
-//! document tab is active and back out again when it isn't. A context layout
-//! persists separately, as `<global_dir>/.turian/layout-<asset_type>.json`, so
-//! rearranging it sticks without disturbing the main one.
-//!
-//! Layouts persist as JSON: `dvui.DockLayout.Snapshot` is the plain,
-//! serializable shape, and this module (de)serializes it with `std.json`. It
-//! also owns the live instances, their file paths, and reconciling a loaded
-//! file against the current `Panels.all` registry (unknown slugs dropped,
-//! non-closable panels re-added if missing).
+//! Persists the dockable panel layout as `layout.json` in the global settings
+//! directory. Also owns user-saved layout presets and per-asset-type context
+//! layouts (swapped via `setAssetContext`). (De)serializes `DockLayout.Snapshot`
+//! with `std.json` and reconciles against the `Panels.all` registry.
 const std = @import("std");
 const gui = @import("gui");
 const editor = @import("editor");

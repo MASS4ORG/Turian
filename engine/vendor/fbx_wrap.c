@@ -1,15 +1,11 @@
-/* Single translation unit: pulls in the vendored ufbx implementation, same
-   pattern as cgltf_wrap.c's `CGLTF_IMPLEMENTATION` — one C source file to
-   wire into build.zig instead of two. */
+/* Single translation unit wrapping vendored ufbx. */
 #include "ufbx.c"
 #include "fbx_wrap.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
-/* Normalize axes/units to the engine convention (right-handed, Y-up, meters,
-   matching glTF) so no manual axis math is needed downstream, and bake the
-   conversion straight into geometry rather than adding a root transform. */
+/* Normalize to right-handed Y-up meters (matching glTF), baked into geometry. */
 static void fbx_wrap_opts(ufbx_load_opts* opts) {
     memset(opts, 0, sizeof(*opts));
     opts->target_axes = ufbx_axes_right_handed_y_up;
@@ -52,11 +48,7 @@ static void free_chunk(FbxMeshData* c) {
     free(c->indices);
 }
 
-/* ufbx emits fully de-indexed geometry (one vertex per triangle corner); weld
-   matching (pos, normal, uv) corners back into a real index buffer via ufbx's
-   own hashing pass. Rewrites `c->indices` and shrinks `c->vertex_count` in
-   place; leaves the chunk untouched if welding fails for any reason (still a
-   valid, merely unwelded, chunk). */
+/* Weld (pos, normal, uv) corners into a real index buffer; leaves chunk untouched on failure. */
 static void weld_chunk(FbxMeshData* c) {
     uint32_t* welded = (uint32_t*)malloc((size_t)c->index_count * sizeof(uint32_t));
     if (!welded) return;
@@ -237,9 +229,7 @@ static void free_local_chunk(FbxMeshLocalData* c) {
     free(c->indices);
 }
 
-/* weld_chunk operates on FbxMeshData; FbxMeshLocalData has the identical
-   vertex/index layout (only the trailing mesh_index differs), so reuse it via
-   a same-layout cast rather than duplicating the welding pass. */
+/* FbxMeshLocalData shares the same layout prefix, so reuse weld_chunk via cast. */
 static void weld_local_chunk(FbxMeshLocalData* c) {
     weld_chunk((FbxMeshData*)c);
 }
@@ -273,11 +263,7 @@ int fbx_wrap_load_meshes(const char* path, FbxMultiMeshLocalData* out) {
         ufbx_mesh* mesh = scene->meshes.data[mi];
         if (mesh->num_indices == 0) continue;
 
-        /* The mesh's own geometric offset (FBX's separate, non-inherited
-           "geometric transform"), taken from its first instance -- shared by
-           construction across every node referencing this mesh in practice
-           (ufbx models it per-node, but authoring tools never vary it per
-           instance). Never the node's placement in the scene. */
+        /* The mesh's own geometric offset, taken from its first instance. */
         ufbx_matrix geo_mat;
         if (mesh->instances.count > 0) {
             geo_mat = mesh->instances.data[0]->geometry_to_node;
@@ -357,9 +343,7 @@ int fbx_wrap_load_meshes(const char* path, FbxMultiMeshLocalData* out) {
                 continue;
             }
 
-            /* Mesh's own default material assignment (ufbx_mesh.materials),
-               not any per-node override -- see FbxMultiMeshLocalData's doc
-               comment in fbx_wrap.h. */
+            /* Mesh's own material assignment, not per-node override. */
             ufbx_material* mat = part->index < mesh->materials.count ? mesh->materials.data[part->index] : NULL;
 
             FbxMeshLocalData* c = &chunks.data[chunks.count++];
@@ -500,26 +484,13 @@ static FbxTexRef texref_from_map(const ufbx_material_map* map) {
     return r;
 }
 
-/* ufbx normalizes every shading model (Lambert/Phong/StingrayPBS/PBR/glTF-in-
-   FBX) into `material->pbr`, so this one mapping covers them all. FBX has no
-   single packed metallic-roughness texture like glTF, so that slot (and
-   occlusion, which FBX's pbr maps don't expose) only ever carries a scalar
-   factor -- never a texture binding. */
+/* ufbx normalizes all shading models into `material->pbr`, so one mapping covers them all. */
 static void fill_material(FbxMaterial* o, const ufbx_material* m) {
     memset(o, 0, sizeof(*o));
     copy_str(o->name, sizeof(o->name), m->name.data, m->name.length);
 
     o->base_color[0] = o->base_color[1] = o->base_color[2] = o->base_color[3] = 1.0f;
-    /* Classic (non-PBR) shading models -- Phong/Lambert, the overwhelming
-       majority of real-world FBX content -- have no metalness concept at all,
-       so ufbx's pbr.metalness never carries a value for them and this default
-       is what every such material actually renders with. 1.0 (glTF's raw
-       spec default, intended for an authored PBR workflow) makes every
-       surface a pure mirror: F0 becomes the albedo texture and the diffuse
-       term vanishes entirely, so converted classic materials show only a
-       tinted specular reflection and look completely textureless. 0.0
-       (dielectric) is the correct assumption for content that never declared
-       a metalness value in the first place. */
+    /* Non-PBR materials default to dielectric (0.0) since they carry no metalness. */
     o->metallic = 0.0f;
     o->roughness = 1.0f;
     o->normal_scale = 1.0f;

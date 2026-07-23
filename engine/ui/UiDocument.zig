@@ -1,20 +1,6 @@
-//! UI document asset (`.uidoc`) — the UI-Toolkit-shaped analogue of a
-//! `VisualTreeAsset`: a flat, parent-indexed tree of generic `UiNode`s
-//! serialized as JSON. Instantiated into a scene via the `ui_document`
-//! `Component` (`TypedAssetRef(.ui_document)`); UI nodes are NOT `SceneNode`s
-//! and never touch `engine/scene/Transform.zig`
-//! (see `docs/decisions/PLAN_GUI_IMPLEMENTATION.md` D1).
-//!
-//! Full component model (D2): a node is always an implicit container
-//! (`gui.box`); behavior is acquired through `UiComponent`s. v1 ships
-//! `image`/`text`/`layout`/`button`. The composition rule for the draw walk
-//! (interaction wraps -> box(layout) -> content in declaration order ->
-//! children) lives in `subsystems/ui_render/` (M2), not here — this module is
-//! pure data + validation, zero dvui imports (D7).
-//!
-//! Ownership: a `UiDocument` produced by `load`/`loadFromBytes` owns its
-//! slices via the parse allocator; release them with `deinit`. Values
-//! assembled by a caller (e.g. the editor) must NOT be passed to `deinit`.
+//! UI document asset (`.uidoc`): a flat, parent-indexed tree of `UiNode`s
+//! serialized as JSON. Instantiated via the `ui_document` component; UI nodes
+//! are not `SceneNode`s. This module is pure data + validation — no dvui imports.
 const std = @import("std");
 const serde = @import("serde");
 const TypedAssetRef = @import("../api/AssetRef.zig").TypedAssetRef;
@@ -78,16 +64,9 @@ pub const StyleBlock = struct {
 
 // ── Events (D4): strings at rest, handles at runtime, types in user code ───
 
-/// Serialized binding is a union from day one so future binding kinds are
-/// additive, not schema-breaking. JSON form: `{"named": "play_clicked"}` or
-/// `{"channel": "<game_event asset GUID>"}`.
-///
-/// `channel` is reframed around event-channel DataAsset instead of
-/// a Unity-`UnityEvent`-style node+method binding: the button raises a
-/// `GameEvent` asset by GUID (`ui_render.dispatchClicks` resolves it through
-/// `GameEventRegistry` and calls `raise()`), and any script anywhere
-/// subscribes via `frame.gameEvent(ref).?.on(...)` — decoupled, Inspector-wired,
-/// no scene-node coupling and no runtime method-name dispatch to build.
+/// Serialized binding: `{"named": "play_clicked"}` or
+/// `{"channel": "<game_event GUID>"}`. Channel bindings raise a GameEvent
+/// asset by GUID — decoupled, Inspector-wired, no method-name dispatch.
 pub const EventBinding = union(enum) {
     named: []const u8,
     channel: TypedAssetRef(.game_event),
@@ -159,8 +138,6 @@ pub const Warning = struct {
 // ── Document ─────────────────────────────────────────────────────────────────
 
 /// How the authored `reference_size` maps onto the actual viewport (C7).
-/// Per-element scaling rules are intentionally absent: split content across
-/// multiple documents with different modes instead.
 pub const ScaleMode = enum {
     /// Aspect-fit rect + uniformly zoom ALL content (fonts, margins, rects)
     /// by the reference->target factor. What a designed game HUD wants.
@@ -251,17 +228,8 @@ pub const UiDocument = struct {
     // ── Validation (D2) ────────────────────────────────────────────────────
 
     /// Structural, load-time validation: parent index cycles/out-of-range,
-    /// and more-than-one layout/interaction component on a single node.
-    /// Never fails the load — collects warnings into a caller-owned slice.
-    ///
-    /// NOTE: two D2 checks live elsewhere by design, not here: unresolved
-    /// event names need the `UiEvents` registry (`engine/ui/UiEvents.zig`,
-    /// resolved once at load time by the *caller*, not this module); unknown
-    /// enum values (component kind / layout mode) currently hard-fail JSON
-    /// parsing rather than being warned-and-skipped, because that requires
-    /// bypassing this project's shared `serde.json` convention with a
-    /// hand-rolled parser — flagged as a known gap vs. the plan's literal
-    /// wording rather than silently implemented differently.
+    /// and duplicate layout/interaction components on a single node.
+    /// Collects warnings into a caller-owned slice; never fails the load.
     pub fn validate(self: UiDocument, allocator: std.mem.Allocator) ![]Warning {
         var warnings: std.ArrayList(Warning) = .empty;
         errdefer warnings.deinit(allocator);

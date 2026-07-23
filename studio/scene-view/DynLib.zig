@@ -1,14 +1,7 @@
-//! Cross-platform dynamic-library loader used by Play mode to `dlopen` the
-//! hot-compiled play library (`libturian_play.{so,dll,dylib}`) and resolve its
-//! C-ABI entry points.
-//!
-//! `std.DynLib` (Zig 0.16) supports POSIX targets but `@compileError`s on
-//! Windows (its `InnerType` falls through to the unsupported-platform branch),
-//! which broke the whole Studio build for `x86_64-windows-*`. This thin wrapper
-//! delegates to `std.DynLib` everywhere it exists and provides a
-//! `LoadLibraryW`/`GetProcAddress`/`FreeLibrary` implementation on Windows, so
-//! Play mode keeps working across platforms with one API (`open`/`lookup`/
-//! `close`) matching the subset `PlayMode.zig` relies on.
+//! Cross-platform dynamic-library loader for `dlopen`-ing the hot-compiled
+//! play library. Delegates to `std.DynLib` on POSIX and provides a
+//! `LoadLibraryW`/`GetProcAddress`/`FreeLibrary` implementation on Windows,
+//! exposing a uniform `open`/`lookup`/`close` API.
 
 const std = @import("std");
 const builtin = @import("builtin");

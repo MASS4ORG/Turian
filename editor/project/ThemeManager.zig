@@ -1,14 +1,5 @@
-//! Studio-wide theme discovery: built-in presets (`engine.ui_theme_presets`)
-//! plus user `.uitheme` files imported into the global themes folder
-//! (`<global settings dir>/.turian/themes/`, mirroring `Settings.SETTINGS_DIR`'s
-//! own convention) — independent of any open project, per the editor-theme
-//! system issue.
-//!
-//! Pure data/IO logic only: converting a resolved `UiTheme` into a real
-//! `gui.Theme` and applying it to the running window is a Studio (GUI)
-//! concern and lives in `studio/`, calling `subsystems/ui_render/theme.zig`'s
-//! `toDvuiTheme` — this module has no GUI dependency, matching `editor/`'s
-//! module boundary.
+//! Studio-wide theme discovery: built-in presets plus user `.uitheme` files.
+//! Pure data/IO logic only — no GUI dependency (matching `editor/`'s boundary).
 const std = @import("std");
 const engine = @import("engine");
 

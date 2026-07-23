@@ -1,32 +1,7 @@
-//! Remote Debug Server — TCP listener that serves JSON-RPC 2.0 requests backed
-//! by the Runtime Introspection Layer.
-//!
-//! ## Threading model — the main-thread pump
-//!
-//! Requests are parsed off the socket on per-connection reader threads, but they
-//! are *executed* on the host's main thread, once per frame, in `pump`:
-//!
-//! ```
-//! [conn reader thread] -- line --> [inbound queue] -- drained by --> [pump]
-//! [conn writer thread] <- bytes -- [per-conn outbound queue] <-------/ (main)
-//! ```
-//!
-//! Because reads (`Handler.dispatch`) and writes (`MutationApplier.applyFn`) all
-//! run on the main thread against live engine state, no locking of engine data
-//! is required — the single-threaded execution is the synchronisation. Reads
-//! gain at most one frame of latency, which is acceptable for a debugger.
-//!
-//! Multi-client falls out for free (N reader threads feed one inbound queue) and
-//! events (`emit`) are fanned out to subscribed connections' outbound queues.
-//!
-//! Usage (host side):
-//!
-//!   var srv = Server.init(allocator, .{ .allow_write = true });
-//!   defer srv.deinit(io);
-//!   try srv.start(io);
-//!   // ... each frame, on the main thread ...
-//!   srv.pump(world, applier);
-//!   srv.stop(io);
+//! Remote Debug Server — TCP JSON-RPC 2.0 listener backed by the Runtime
+//! Introspection Layer. Requests execute on the host's main thread in `pump`;
+//! no engine data locking required. Multi-client via N readers + one inbound
+//! queue; events fanned out to subscribed connections.
 
 const std = @import("std");
 const engine = @import("engine");
@@ -256,16 +231,8 @@ pub const Server = struct {
         if (self.accept_thread == null) return;
         self.stop_flag.store(true, .release);
 
-        // Wake a blocked `accept()` with a throwaway self-connection. On Linux,
-        // closing/shutting down the listening socket from another thread does
-        // NOT reliably unblock a thread already blocked in accept(); making a
-        // local connection does — the accept returns, then the loop sees
-        // stop_flag and exits.
-        //
-        // Skip this when the listener never came up (e.g. `listen()` failed):
-        // the accept loop has already returned, so there's nothing to wake, and
-        // the connect attempt would just fail — noisily so on some platforms
-        // (Wine's ws2_32 rejects a socket option std sets and dumps a trace).
+        // Wake a blocked `accept()` with a throwaway self-connection.
+        // Skip when the listener never came up (e.g. `listen()` failed).
         self.listener_mutex.lockUncancelable(io);
         const has_listener = self.listener != null;
         self.listener_mutex.unlock(io);

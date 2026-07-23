@@ -1,16 +1,7 @@
-//! Shader metadata system.
-//!
-//! A shader exposes a set of named parameters. This metadata is the single
-//! source of truth that drives three things at once:
-//!   * the default values stored in a freshly created material,
-//!   * the inspector UI generated for a material (widget per parameter kind),
-//!   * the contract a future shader-node-builder output must satisfy.
-//!
-//! The engine ships built-in shaders (currently a metallic-roughness PBR shader)
-//! identified by stable GUIDs. Custom shader assets authored on disk will be
-//! looked up by the editor; the engine itself only knows about its builtins and
-//! falls back to PBR for anything it cannot resolve. Storing the shader as a
-//! GUID keeps material references stable across renames and moves.
+//! Shader metadata system. A shader exposes named parameters, driving
+//! default material values, inspector UI, and the shader-node contract.
+//! Built-in shaders use stable GUIDs; the engine falls back to PBR for
+//! unresolvable shaders.
 const std = @import("std");
 
 /// Value category of a shader parameter. Determines how the value is stored in

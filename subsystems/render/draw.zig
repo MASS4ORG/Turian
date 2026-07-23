@@ -67,8 +67,7 @@ pub const DrawParams = struct {
     bindings: [7]c.SDL_GPUTextureSamplerBinding,
 };
 
-/// A blended/additive draw deferred until every opaque draw has landed, so it
-/// can be sorted back-to-front first.
+/// A blended/additive draw deferred for back-to-front sorting.
 pub const TransparentDraw = struct {
     params: DrawParams,
     /// Squared camera distance to the drawing node's origin — cheap proxy for
@@ -76,9 +75,7 @@ pub const TransparentDraw = struct {
     sort_depth: f32,
 };
 
-/// Static scratch space for one frame's deferred transparent draws. Rebuilt
-/// (via `transparent_count`) on every `renderScene` call; single-threaded
-/// renderer, so nothing else touches it between calls.
+/// Static scratch space for one frame's deferred transparent draws.
 pub const MAX_TRANSPARENT_DRAWS = 1024;
 pub var transparent_draws: [MAX_TRANSPARENT_DRAWS]TransparentDraw = undefined;
 pub var transparent_count: usize = 0;
@@ -135,18 +132,11 @@ pub fn submitDraw(
 ) void {
     bindDrawState(cmd, pass, dev, bound_pipeline, fu, dp);
     c.SDL_DrawGPUIndexedPrimitives(pass, dp.index_count, 1, dp.index_offset, 0, 0);
-    // Every mesh binds samplers, so this draw always counts as textured.
+    // Every mesh binds samplers.
     engine.Profiler.countDraw(dp.index_count / 3, dp.index_count, true);
 }
 
-/// Bind one material group's state and issue a single indirect multi-draw
-/// call spanning `draw_count` commands at `byte_offset` into `indirect_buf` —
-/// `dp.index_offset`/`index_count` are unused (each command carries its own).
-/// `draw_count` submeshes were dispatched to the cull compute pass, but the
-/// GPU may have zeroed some out (`num_instances = 0`, invisible this frame);
-/// exact visible-vs-culled counts aren't cheaply observable back on the CPU
-/// once culling moves to the GPU, so the profiler counts are an upper bound —
-/// see docs/decisions/frustum-culling-143.md.
+/// Bind one material group and issue an indirect multi-draw call into `indirect_buf`.
 pub fn submitIndirectDraw(
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
@@ -175,8 +165,7 @@ pub const DrawCtx = struct {
     sampler: *c.SDL_GPUSampler,
 };
 
-/// Resolves a mesh renderer's material slot to a GUID, or `""` for an
-/// out-of-range/absent slot (draws with the default/fallback material).
+/// Material-slot GUID, or empty for out-of-range/absent slots.
 pub fn materialGuidForSlot(mr: *const engine.MeshRendererComponent, mat_n: u32, slot: i32) []const u8 {
     return if (slot >= 0 and @as(u32, @intCast(slot)) < mat_n)
         mr.materials[@intCast(slot)].slice()
@@ -184,8 +173,7 @@ pub fn materialGuidForSlot(mr: *const engine.MeshRendererComponent, mat_n: u32, 
         "";
 }
 
-/// Resolves a material's textures and flattens it into `DrawParams`, shared by
-/// the per-submesh (CPU-cull) and per-material-group (indirect) draw paths.
+/// Flatten a material into `DrawParams` for either the CPU or indirect draw path.
 pub fn buildDrawParams(
     mat_res: *const types.ResolvedMaterial,
     gm: *const state.GpuMesh,

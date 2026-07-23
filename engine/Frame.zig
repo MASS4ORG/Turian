@@ -1,20 +1,7 @@
-//! Per-update context object (ADR 0001 — dependency injection).
-//!
-//! Gameplay code receives a single `Frame` bundling the dependencies the engine
-//! offers, instead of reaching for globals. The host loop (game `main` / studio)
-//! is the single composition root that constructs the services and threads them in.
-//!
-//! Two tiers, by design (answering "what about a fixed list of services?"):
-//!   - **Built-in, high-traffic services are direct fields** (`input`, `time`) —
-//!     ergonomic and zero lookup cost.
-//!   - **Everything else lives in `services`**, a type-keyed registry: engine
-//!     subsystems added later, and any **user-defined service** (translation,
-//!     networking, save system, …). Fetch with `frame.service(MyService)`.
-//!
-//! `Frame` is passed to *every* script lifecycle hook that can meaningfully use it
-//! (`awake`/`enable`/`start`/`update`/`disable`/`destroy`), not just `update`, so a
-//! provider component can `frame.services.register(...)` in `awake` and consumers can
-//! resolve it from `start`/`update`.
+//! Per-update context object (ADR 0001). Bundles engine dependencies — high-
+//! traffic services as direct fields (`input`, `time`), everything else via
+//! a type-keyed `services` registry. Passed to every script lifecycle hook
+//! that can meaningfully use it.
 
 const Time = @import("core/Time.zig").Time;
 const Input = @import("Input.zig").Input;

@@ -7,8 +7,6 @@ const Matrix4 = engine.Matrix4;
 const Vector3 = engine.Vector3;
 
 /// A frustum half-space plane, `a*x + b*y + c*z + d`: positive on the inside.
-/// Deliberately left un-normalized (see `extract`) — the AABB test below is
-/// scale-invariant, so skipping the normalize saves 6 sqrts per frame.
 const Plane = struct {
     a: f32,
     b: f32,

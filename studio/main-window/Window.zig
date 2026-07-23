@@ -42,13 +42,8 @@ fn panelInfo(id: []const u8) gui.DockingWidget.PanelInfo {
     return .{ .title = title, .icon = p.icon, .closable = closable };
 }
 
-/// `Dockspace.InitOptions.drawHeaderExtra`: draws into the leaf header's
-/// trailing space, which dvui hands us claiming the whole leftover width —
-/// see `DockingWidget.zig`'s `tw_expand` note. Used for a
-/// right-click-anywhere-in-here "Add Panel" context menu targeting this
-/// dock zone, and, right-aligned, the "..." settings button (dvui knows
-/// nothing about settings menus, dots icons, or floating menus — that all
-/// lives here).
+/// Draws the right-click "Add Panel" menu and "..." settings button into the
+/// dock leaf's trailing header space.
 fn panelDrawHeaderExtra(id: []const u8) void {
     var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .both });
     defer row.deinit();
@@ -84,14 +79,9 @@ fn panelDrawHeaderExtra(id: []const u8) void {
     }
 }
 
-/// Dock tabs are flat: no visible fill, no border, square corners — the panel
-/// body they sit on already reads as its own surface, and stock dvui tabs (a
-/// filled pill with a three-sided border) fight that.
-///
-/// "No fill" is painted, not skipped: the tab fills itself with the very
-/// `app1` color of the panel chrome behind it. `.background = false` would be
-/// the obvious way to say this, but it also suppresses the hover fill, and it
-/// can't work for the selected tab at all — see `selectedTabOptions`.
+/// Flat dock tabs with no visible fill or border — the panel chrome provides
+/// the surface distinction. The fill is `app1` (not `.background = false`) so
+/// hover fill still renders.
 fn tabOptions(theme: *const gui.Theme) gui.Options {
     return .{
         .background = true,
@@ -103,12 +93,9 @@ fn tabOptions(theme: *const gui.Theme) gui.Options {
     };
 }
 
-/// The selected tab is marked by an accent underline alone. That underline is
-/// a bottom-only border, and `WidgetData.borderAndBackground` paints a
-/// non-uniform border by flooding the *whole* border rect with the border
-/// color and letting the background rect cover all but the border's own edge.
-/// So the fill has to be opaque `app1` — a transparent one would leave the
-/// flood showing and turn the tab into a solid accent block.
+/// The selected tab is marked by an accent underline (bottom-only border).
+/// Needs an opaque `app1` fill so the border-flood technique doesn't turn
+/// the tab into a solid accent block.
 fn selectedTabOptions(theme: *const gui.Theme) gui.Options {
     const fill = theme.color(.app1, .fill);
     return .{
@@ -122,9 +109,7 @@ fn selectedTabOptions(theme: *const gui.Theme) gui.Options {
     };
 }
 
-/// `Dockspace.InitOptions.onTabContextMenu`: right-clicking an existing tab
-/// (as opposed to the empty header space `panelDrawHeaderExtra` already
-/// handles) opens the same Add-Panel list, targeting that tab's leaf.
+/// Right-click an existing tab — opens the same Add-Panel list as the header.
 fn panelTabContextMenu(id: []const u8, pt: gui.Point.Natural) void {
     const l = LayoutStore.get();
     const leaf = l.findPanel(id) orelse return;
@@ -308,26 +293,12 @@ pub fn frame() bool {
         gui.io,
     );
 
-    // Main editor area. Scoped in a block so the dockspace is deinit'd
-    // (popped from dvui's layout stack) *before* the bottom task bar is drawn;
-    // otherwise the task bar would nest inside the still-open dockspace.
+    // Main editor area. Scoped so the dockspace is deinit'd before the
+    // bottom task bar (otherwise the task bar nests inside the dockspace).
     {
-        // `panel_background` wraps each leaf's *whole* area — tab strip and
-        // content together — in one themed box (a small dvui patch,
-        // `DockingWidget.InitOptions.panel_background`, upstreamed to
-        // `../dvui`'s `MR5-dockable-panels` branch): the header itself is
-        // otherwise entirely internal to `DockingWidget`, so a wrapper
-        // placed only around `panel()`'s content (the original approach
-        // here) can never reach it, and dvui `Options` don't cascade to
-        // descendants anyway — an individual panel's own opaque content
-        // (e.g. a populated TreeView) always painted over a content-only
-        // wrapper's fill regardless. `.app1` is repurposed as dock-panel
-        // chrome (see `UiTheme`'s doc comment) so panels read as visually
-        // distinct from the root canvas, which is `.window`-styled.
-        // `ActiveTheme.panel_border_width` / `panel_corner_radius` are the
-        // active theme's chosen panel chrome; the shipped presets lean on the
-        // `app1`-vs-`window` fill contrast to delineate a panel and set the
-        // border to 0.
+        // `panel_background` wraps leaf + header in one themed box via
+        // `DockingWidget.InitOptions.panel_background`. `.app1` is dock-panel
+        // chrome, visually distinct from the `.window`-styled root canvas.
         const theme = gui.themeGet();
         var dock = gui.dockspace(@src(), .{
             .layout = LayoutStore.get(),

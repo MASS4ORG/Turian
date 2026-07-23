@@ -1,23 +1,7 @@
-//! The localization service (ADR 0011). Register an instance with
-//! `frame.services.register(Locale, &locale)`; consumers fetch it with
-//! `frame.service(Locale)` or use the `Frame.tr`/`trc`/`trn`/`key`
-//! convenience wrappers.
-//!
-//! Two entry points, one table:
-//!   - `tr`/`trc`/`trn` — source-keyed, for UI chrome. The lookup id is the
-//!     literal English source text (`trc` disambiguates same-text-different-
-//!     meaning strings by prefixing a context). Never fails visibly: a
-//!     missing translation formats and returns the English source itself.
-//!   - `key` — id-keyed, for designer-authored game content. A missing
-//!     translation returns `⟦id⟧` in debug builds (visible, so it's never
-//!     mistaken for real text) and the bare `id` in release.
-//!
-//! `Locale` never allocates persistent storage for loaded tables and never
-//! frees one on locale switch (D4): the caller (`loadTable`) owns the bytes
-//! and must keep them alive for the session; `Locale` only borrows pointers.
-//! This is what makes "switch locale, no scene reload" free of dangling
-//! slices — text already handed out from the old table stays valid, it's
-//! just stale until the caller re-fetches it.
+//! Localization service (ADR 0011). Two entry points: `tr`/`trc`/`trn`
+//! (source-keyed, for UI chrome) and `key` (id-keyed, for game content).
+//! `Locale` borrows pointers to caller-owned table bytes, so text handed
+//! out from the old table stays valid across locale switches.
 
 const std = @import("std");
 const builtin = @import("builtin");

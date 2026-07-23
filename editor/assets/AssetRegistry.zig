@@ -110,14 +110,16 @@ pub fn get(asset_type: AssetType) AssetDescriptor {
 }
 
 /// Returns the AssetType matching the filename extension, or .unknown.
-/// Checks all registered asset type extensions.
+/// Checks all registered asset type extensions, case-insensitively (source
+/// packs commonly ship mixed-case extensions, e.g. `.TGA`).
 pub fn lookupByFilename(filename: []const u8) AssetType {
+    const ext = std.fs.path.extension(filename);
     inline for (@typeInfo(AssetType).@"enum".fields) |field| {
         const at: AssetType = @enumFromInt(field.value);
         if (at == .unknown) continue;
         const desc = get(at);
-        for (desc.extensions) |ext| {
-            if (std.mem.endsWith(u8, filename, ext)) return at;
+        for (desc.extensions) |e| {
+            if (std.ascii.eqlIgnoreCase(ext, e)) return at;
         }
     }
     return .unknown;

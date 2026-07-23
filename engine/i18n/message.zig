@@ -1,20 +1,7 @@
-//! ICU MessageFormat, subset. Parses and formats in a single pass — there is
-//! no separate compile step, so this works uniformly for both `comptime`
-//! source strings (`tr`/`trc`/`trn` — a non-literal message there is already
-//! a compile error, see `Locale.zig`) and translations loaded at runtime
-//! from a `.strtab` (`Locale.key`).
-//!
-//! Supported syntax:
-//!   `Hello, {name}!`                                      — simple substitution
-//!   `{count, plural, one {# file} other {# files}}`       — CLDR cardinal plural, `#` = the number
-//!   `{count, plural, =0 {no files} other {# files}}`      — exact-value branch (checked before the category)
-//!   `{gender, select, male {He} female {She} other {They}} joined` — keyword select
-//!   `''`                                                  — literal `'`
-//!   `'{literal braces}'`                                  — quoted literal span (escapes `{`, `}`, `#`, `'`)
-//!
-//! Not supported: nested argument types beyond plural/select, `selectordinal`,
-//! `ordinal`/`spellout`/`duration`/date-time formatters — none of the plan's
-//! call sites need them.
+//! ICU MessageFormat subset. Parses and formats in a single pass, supporting
+//! simple substitution, CLDR cardinal plurals, exact-value branches, select,
+//! and escaped literals. No nested argument types beyond plural/select,
+//! `selectordinal`, or date-time formatters.
 
 const std = @import("std");
 const plurals = @import("plurals.zig");

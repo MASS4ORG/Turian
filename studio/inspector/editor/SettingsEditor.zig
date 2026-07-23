@@ -16,7 +16,6 @@ const EditorState = @import("../../services/EditorState.zig");
 const Documents = @import("../../main-window/Documents.zig");
 const AssetActions = @import("../../asset-browser/AssetActions.zig");
 const EditorCamera = @import("../../scene-view/EditorCamera.zig");
-const MenuBar = @import("../../main-window/MenuBar.zig");
 const AssetTileLayout = @import("../../asset-browser/AssetTileLayout.zig");
 const LayoutStore = @import("../../services/LayoutStore.zig");
 const ActiveTheme = @import("../../services/ActiveTheme.zig");
@@ -79,8 +78,7 @@ pub fn load() void {
 
 /// Persists the in-memory model, pushes the live globals it mirrors — camera
 /// speeds (`SceneViewport.zig`'s "Camera ▾" quick menu edits the same
-/// `EditorCamera` vars directly), the editor-FPS overlay toggle
-/// (`MenuBar.show_editor_fps`), and the asset browser's name-truncation
+/// `EditorCamera` vars directly), and the asset browser's name-truncation
 /// length + hide-extensions toggle (`AssetTileLayout`).
 pub fn save() void {
     if (!EditorState.settingsReady()) return;
@@ -89,7 +87,6 @@ pub fn save() void {
     EditorCamera.move_speed = model.camera.move_speed;
     EditorCamera.look_sensitivity = model.camera.look_sensitivity;
     EditorCamera.zoom_speed = model.camera.zoom_speed;
-    MenuBar.show_editor_fps = model.general.show_editor_fps;
     AssetTileLayout.max_name_chars = model.asset_browser.name_char_length;
     AssetTileLayout.hide_extensions = model.asset_browser.hide_extensions;
     applyUiTheme();

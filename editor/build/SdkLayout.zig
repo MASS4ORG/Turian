@@ -1,11 +1,6 @@
-/// SDK layout resolution — three-layer priority for GameBuild.BuildConfig:
-///   1. TURIAN_* env var overrides  (highest)
-///   2. SDK-relative paths          (when running from an installed SDK bundle)
-///   3. baked-in build_options      (in-tree dev builds)
-///
-/// SDK detection: the executable lives at <sdk>/bin/turian-cli[.exe].
-/// If <sdk>/turian-sdk.json exists, we're in SDK mode and all paths are
-/// resolved relative to <sdk>/.
+/// SDK layout resolution — three-layer priority: env var overrides, SDK-
+/// relative paths, or baked-in build_options. SDK mode is detected by the
+/// presence of `<exe_dir>/turian-sdk.json`.
 const std = @import("std");
 const GameBuild = @import("GameBuild.zig");
 const package_store = @import("../package/PackageStore.zig");
@@ -71,11 +66,8 @@ fn configFromSdk(io: std.Io, gpa: std.mem.Allocator, sdk_root: []const u8) GameB
         .gpu_sdl3_c = p.join(gpa, sdk_root, "deps/gpu/src/sdl3-c.h"),
         .render_root = p.join(gpa, sdk_root, "render/root.zig"),
         .sdl3_include = p.join(gpa, sdk_root, "sdl3-include"),
-        // SDK bundles don't currently vendor dvui/ui_render — a `.uidoc`
-        // referenced by an SDK-built project won't render (C10's "no dvui
-        // by default" extended to a known, explicit gap rather than a
-        // regression). `TURIAN_DVUI_URL`/`_HASH`/`_UI_RENDER_ROOT` env
-        // overrides remain available for an SDK that does vendor them.
+        // SDK bundles don't vendor dvui/ui_render (C10 — pay-for-use);
+        // `.uidoc` won't render. Env overrides remain available.
         .ui_render_root = "",
         .dvui_url = "",
         .dvui_hash = "",

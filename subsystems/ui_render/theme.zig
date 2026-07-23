@@ -1,12 +1,6 @@
-//! Converts an `engine.UiTheme` asset (pure data, no GUI dependency) into a
-//! real `gui.Theme`. This is the single conversion point shared by Studio
-//! (`editor/project/ThemeManager.zig`) and the shipped game's generated boot
-//! code (`editor/build/codegen/MainZigCodegen.zig`) — the "close solution for
-//! both" this module already provides for the runtime UI draw walk.
-//!
-//! `UiTheme` deliberately carries no font data (see its doc comment), so
-//! conversion overlays its colors/corner onto `base`'s fonts/embedded_fonts/
-//! ninepatches unchanged — no font (re)loading happens on a theme switch.
+//! Converts an `engine.UiTheme` asset into a `gui.Theme`. Single conversion
+//! point shared by Studio and the shipped game. Overlays colors/corner onto
+//! `base`'s fonts unchanged — no font reloading on theme switch.
 const gui = @import("gui");
 const engine = @import("engine");
 const UiTheme = engine.UiTheme;
@@ -46,14 +40,9 @@ fn corner(c: UiTheme.Corner) gui.Corner {
     };
 }
 
-/// Returns `t` with all 4 fonts (body/heading/title/mono) resized so, once
-/// rendered through `zoom` (dvui's `Window.content_scale`, which uniformly
-/// scales every logical pixel including font rasterization — see
-/// `Window.zig`'s `natural_scale` computation), the *physical* on-screen
-/// `font_body` size lands exactly at `size` regardless of `zoom`. This is
-/// what lets "Zoom" grow/shrink buttons, tabs, and menus without also
-/// growing/shrinking legible text — pre-dividing here cancels the multiply
-/// `content_scale` applies at render time (`render.zig`: `font.size * rs.s`).
+/// Returns `t` with all fonts resized so the physical on-screen font size
+/// lands exactly at `size` regardless of `zoom`. Pre-dividing by `zoom`
+/// cancels the `content_scale` multiply applied at render time.
 pub fn withFontSize(t: gui.Theme, size: f32, zoom: f32) gui.Theme {
     var out = t;
     const z = if (zoom > 0.01) zoom else 1.0;
@@ -82,15 +71,10 @@ pub fn toDvuiTheme(t: UiTheme, base: gui.Theme) gui.Theme {
     out.app2 = style(t.app2);
     out.app3 = style(t.app3);
     out.corner = corner(t.corner);
-    // `allocated_strings` must stay false: `out.name` aliases `t.name`, which
-    // this function does not own, so `Theme.deinit` must never free it.
+    // `allocated_strings` must stay false — `out.name` aliases unowned bytes.
     out.allocated_strings = false;
 
-    // Suggested family, best-effort: only takes effect if that family is
-    // already loaded (base's embedded fonts, or a user-registered system
-    // font) — otherwise dvui logs and falls back, no crash. Preserves each
-    // font's existing size/weight/style/etc, set by `withFontSize` before
-    // this call.
+    // Best-effort family suggestion — only takes effect if already loaded.
     if (t.font_family.len > 0) {
         const fam = gui.Font.array(t.font_family);
         out.font_body.family = fam;

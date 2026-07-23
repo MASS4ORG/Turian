@@ -128,11 +128,7 @@ pub const AssetDatabase = struct {
     }
 
     /// Rescan multiple asset root directories into one unified database.
-    /// `project_path` is the main project root used to locate `.cache/` for
-    /// derived sub-assets. All roots are indexed into the same GUID map. A GUID
-    /// that appears in two *different* roots is recorded in `collisions` — the
-    /// package build treats this as a hard error (ADR-0001). After this call,
-    /// inspect `collisions` via `hasCollisions`.
+    /// Cross-root GUID collisions are recorded in `collisions`.
     pub fn scanRoots(self: *AssetDatabase, io: std.Io, project_path: []const u8, asset_roots: []const []const u8) void {
         self.clearEntries();
         for (asset_roots, 0..) |root, i| {

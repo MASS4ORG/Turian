@@ -1,6 +1,4 @@
 /// Asset import pipeline — validates and writes runtime artifacts to the cache.
-/// For each asset, "import" currently copies the source bytes verbatim;
-/// type-specific format conversion is deferred to future work.
 const std = @import("std");
 const engine = @import("engine");
 const Guid = @import("guid").Guid;
@@ -18,30 +16,7 @@ const log = std.log.scoped(.asset_importer);
 // ── Importer versions ────────────────────────────────────────────────────────
 // Bump the relevant constant to force a reimport of that asset class.
 
-// v2: DDS textures are cooked (sRGB tagging + optional normal-map green-channel
-// flip) instead of copied verbatim; other image formats are still verbatim.
-// v3: non-DDS/KTX2 images (PNG/JPEG/…) also cook in an sRGB tag when authored
-// as color data, via a small envelope `ImageLoader` strips at load time.
 const VERSION_IMAGE: u32 = 3;
-// v2: generate materials + extract textures from glTF/GLB into sub-assets.
-// v3: cook geometry into the canonical binary mesh format.
-// v4: cook every mesh/primitive (submesh table) instead of only the first.
-// v5: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
-// sub-assets for glTF/GLB (additive — the main artifact is unchanged).
-// v6: FBX cook welds shared (pos, normal, uv) vertices into a real index
-// buffer instead of emitting fully de-indexed geometry.
-// v7: generate per-mesh ("mesh:{d}") and node-hierarchy ("hierarchy")
-// sub-assets for FBX too (additive — the main artifact is unchanged).
-// v8: FBX materials with no explicit metalness value (classic Phong/Lambert
-// shading, the common case) default to non-metal instead of glTF's raw 1.0
-// spec default, which made every converted classic material a textureless
-// mirror (see fbx_wrap.c's fill_material). Material sub-assets only; GUIDs
-// are unaffected, so this is a plain recook, not a reimport.
-// v9: FBX/glTF texture URIs with Windows-style backslash separators (common
-// in FBX content) now resolve to the real nested file instead of a bogus
-// literal-backslash sibling path (`ModelDerivedAssets.siblingPath`) — the
-// actual cause of albedo/normal/etc. textures never binding. Material
-// sub-assets only; GUIDs are unaffected.
 const VERSION_MODEL: u32 = 9;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
@@ -66,9 +41,7 @@ pub fn importAsset(
     project_path: []const u8,
     asset_path: []const u8,
 ) void {
-    // One arena for the whole import of this asset: the parsed meta and any
-    // generated sub-asset manifest live in it and must outlive `writeArtifact`'s
-    // final meta write. Freed together here, so nothing leaks.
+    // One arena per import: the parsed meta and sub-asset manifest outlive the final meta write.
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -78,11 +51,22 @@ pub fn importAsset(
 
     const current_version = importerVersion(meta.asset_type);
 
-    // Cheapest check first: if artifact exists and version matches, verify hash.
     if (asset_cache.artifactExists(io, project_path, meta.guid, meta.asset_type) and
         meta.importer_version == current_version)
     {
-        if (asset_meta.hashFile(io, a, asset_path) == meta.source_hash) return;
+        // Size + mtime unchanged means content is unchanged; skip the full-content hash.
+        if (asset_meta.statFile(io, asset_path)) |st| {
+            if (st.size == meta.source_size and st.mtime_ns == meta.source_mtime_ns) return;
+        }
+        if (asset_meta.hashFile(io, a, asset_path) == meta.source_hash) {
+            // Hash matches despite stat mismatch; stamp current stat for next fast-path.
+            if (asset_meta.statFile(io, asset_path)) |st| {
+                meta.source_size = st.size;
+                meta.source_mtime_ns = st.mtime_ns;
+                asset_meta.writeMeta(io, a, asset_path, meta);
+            }
+            return;
+        }
     }
 
     writeArtifact(io, a, project_path, asset_path, &meta, current_version);
@@ -185,11 +169,7 @@ fn writeArtifact(
     var artifact_buf: [1024]u8 = undefined;
     const art_path = asset_cache.artifactPath(project_path, meta.guid, meta.asset_type, &artifact_buf) orelse return;
 
-    // Models are cooked into the canonical binary mesh format so the runtime
-    // loads geometry with one fast loader (no OBJ/glTF parsing at run time).
-    // Images are cooked to bake in sRGB tagging (and, for DDS normal maps, the
-    // DirectX-to-engine green-channel flip). Other asset types are copied
-    // verbatim for now.
+    // Models are cooked to the canonical binary mesh format; images bake in sRGB tagging.
     const artifact_bytes: []const u8 = if (meta.asset_type == .model)
         cookModelMesh(io, allocator, asset_path) orelse data
     else if (meta.asset_type == .image)
@@ -200,9 +180,12 @@ fn writeArtifact(
 
     meta.source_hash = std.hash.Fnv1a_64.hash(data);
     meta.importer_version = current_version;
+    if (asset_meta.statFile(io, asset_path)) |st| {
+        meta.source_size = st.size;
+        meta.source_mtime_ns = st.mtime_ns;
+    }
 
-    // One-to-many: a model can yield materials + textures as sub-assets. This
-    // updates meta.sub_assets, so run it before the meta is written.
+    // A model can yield materials + textures as sub-assets; update meta before writing.
     if (meta.asset_type == .model)
         generateModelDerived(io, allocator, project_path, asset_path, meta);
 
@@ -238,35 +221,23 @@ fn cookImage(allocator: std.mem.Allocator, asset_path: []const u8, data: []const
         }) catch null;
     }
 
-    // Radiance HDR (equirect environment maps): always linear (already a float
-    // format), cooked to a compact flat-RGBE envelope (`HdrLoader.EnvelopeView`)
-    // instead of copying the RLE-compressed source verbatim.
+    // Radiance HDR: cooked to a compact flat-RGBE envelope instead of copying the RLE source verbatim.
     if (std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".hdr"))
         return engine.assets.HdrLoader.encodeEnvelope(allocator, data) catch null;
 
-    // Non-DDS/KTX2 (PNG/JPEG/…): stb_image always decodes to linear
-    // `.rgba8_unorm`, which already matches a `.linear` setting, so only the
-    // sRGB case needs a tag baked in. KTX2 already carries its own format
-    // field and needs no cooking.
+    // Non-DDS/KTX2: stb_image decodes to linear rgba8_unorm, so only sRGB needs a tag.
     if (settings.color_space != .srgb) return null;
     if (std.ascii.eqlIgnoreCase(std.fs.path.extension(asset_path), ".ktx2")) return null;
     return engine.assets.ImageLoader.wrapColorTag(allocator, data, true) catch null;
 }
 
 // ── Model → derived sub-assets (one-to-many) ────────────────────────────────
-// Materials/images (`ModelDerivedAssets.zig`) and, for glTF/GLB/FBX, per-mesh
-// geometry + node hierarchy (`ModelHierarchy.zig`) are generated as separate
-// concerns but share one manifest: hierarchy generation needs to resolve the
-// material sub-assets the first pass just produced.
+// Materials/images and per-mesh geometry + hierarchy share one manifest.
 
 const model_derived_assets = @import("ModelDerivedAssets.zig");
 const model_hierarchy = @import("ModelHierarchy.zig");
 
-/// Generate every derived sub-asset for a model source (materials, images,
-/// and — glTF/GLB/FBX — per-mesh geometry and node hierarchy). Writes the
-/// artifacts to the cache and records each as a `SubAsset` in `meta` with a
-/// stable GUID reused across reimports. Best-effort: parse failures and
-/// unsupported features are warned about, never fatal.
+/// Generate derived sub-assets (materials, images, meshes, hierarchy) from a model source.
 fn generateModelDerived(
     io: std.Io,
     allocator: std.mem.Allocator,
@@ -274,7 +245,7 @@ fn generateModelDerived(
     asset_path: []const u8,
     meta: *MetaFile,
 ) void {
-    // Snapshot the previous manifest so GUIDs are reused by key across reimports.
+    // Snapshot the previous manifest for stable GUID reuse.
     const prev = meta.sub_assets;
     var subs: std.ArrayList(SubAsset) = .empty;
 
@@ -284,9 +255,7 @@ fn generateModelDerived(
     if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb") or std.ascii.eqlIgnoreCase(ext, ".fbx"))
         model_hierarchy.generate(io, allocator, project_path, asset_path, prev, subs.items, &subs);
 
-    // `subs` points into `allocator` (the import arena, see `importAsset`); it
-    // is written by the caller's `writeMeta` before this function returns, so
-    // the arena outlives that use.
+    // The arena outlives the caller's `writeMeta`.
     meta.sub_assets = subs.toOwnedSlice(allocator) catch &.{};
 }
 
@@ -308,6 +277,55 @@ fn collectAndPurge(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 const Material = engine.Material;
+
+test "importAsset skips content hashing when size and mtime are unchanged, but still detects real edits" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "hello world" });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/data.bin", .{project_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAsset(io, a, project_path, asset_path);
+
+    const meta1 = asset_meta.readMeta(io, a, asset_path);
+    var art_buf: [1024]u8 = undefined;
+    const art_path = asset_cache.artifactPath(project_path, meta1.guid, meta1.asset_type, &art_buf).?;
+    const bytes1 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    try std.testing.expectEqualStrings("hello world", bytes1);
+
+    // Rewrite with identical content: mtime changes (a fresh write), size
+    // doesn't. The stat fast path may or may not trip depending on mtime
+    // resolution, but either way the hash fallback agrees nothing changed —
+    // the artifact must stay untouched and the recorded hash must be stable.
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "hello world" });
+    importAsset(io, a, project_path, asset_path);
+
+    const meta2 = asset_meta.readMeta(io, a, asset_path);
+    try std.testing.expectEqual(meta1.source_hash, meta2.source_hash);
+    const bytes2 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    try std.testing.expectEqualStrings("hello world", bytes2);
+
+    // A genuine content edit (different size, so the fast path always misses)
+    // must still trigger a reimport.
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "goodbye, world!" });
+    importAsset(io, a, project_path, asset_path);
+
+    const meta3 = asset_meta.readMeta(io, a, asset_path);
+    try std.testing.expect(meta3.source_hash != meta1.source_hash);
+    const bytes3 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
+    try std.testing.expectEqualStrings("goodbye, world!", bytes3);
+}
 
 test "model import generates a PBR material bound to its external texture" {
     const io = std.testing.io;

@@ -1,16 +1,6 @@
-//! In-editor performance profiler (Guinevere/Turian,). A dockable panel
-//! with a Unity-style multi-track timeline, a
-//! recordable history you can scrub, and Perfetto trace export.
-//!
-//! Data source: **`engine.Profiler`** — the *game-side* profiler. It keeps a
-//! ring of recent frames; each holds per-thread CPU zones (`render.scene` & co.,
-//! `scripts.update`) and render counters (draw calls, triangles, …) straight
-//! from the GPU scene renderer. Recording is tied to Play mode and controllable
-//! (Record/Pause + auto-on-Play). The `gui` (DVUI) frame timing is shown as a
-//! secondary, collapsible "Editor CPU" readout.
-//!
-//! Toggle from View ▸ Show/Hide Profiler, or drag it around like any other
-//! dock panel. Capture a screenshot or export a trace from the panel.
+//! In-editor performance profiler: Unity-style multi-track timeline with
+//! recordable history, scrubbing, and Perfetto trace export. Data from
+//! `engine.Profiler` (game-side) plus a secondary "Editor CPU" readout.
 
 const std = @import("std");
 const gui = @import("gui");
@@ -18,6 +8,7 @@ const engine = @import("engine");
 const Screenshots = @import("../services/Screenshots.zig");
 const ProfileExport = @import("ProfileExport.zig");
 const GpuRenderer = @import("../scene-view/GpuRenderer.zig");
+const render = @import("render");
 const PlayMode = @import("../scene-view/PlayMode.zig");
 const EditorFrameTiming = @import("../services/EditorFrameTiming.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
@@ -249,6 +240,19 @@ fn drawControls(cw: *gui.Window) void {
         fpsBtn(cw, "60", 60, 2);
         fpsBtn(cw, "90", 90, 3);
         fpsBtn(cw, "120", 120, 4);
+    }
+
+    // Detailed GPU timing (#147): fence-bracketed per-pass real GPU time for
+    // the shadow pass + cull compute phase (`gpu.shadow`/`gpu.cull` zones in
+    // the timeline below). Off by default — forces a pipeline stall between
+    // passes, so only enable while actively investigating frame time.
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        var on = render.detailedGpuTiming();
+        if (gui.checkbox(@src(), &on, tr("detailed GPU timing (forces per-pass sync — perf impact)"), .{ .gravity_y = 0.5 })) {
+            render.setDetailedGpuTiming(on);
+        }
     }
 
     // history length: how many recent frames to keep for scrubbing (changing it

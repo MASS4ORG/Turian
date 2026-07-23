@@ -58,12 +58,7 @@ fn collectInstanceIndices(root: usize, out: []usize) usize {
     return n;
 }
 
-/// Parse `bytes` into a freshly `arena`-allocated template buffer, growing
-/// (from `MAX_OBJECTS`, doubling) until the whole template fits — a Bistro-
-/// scale FBX hierarchy prefab can carry thousands of nodes, well past the old
-/// fixed `MAX_OBJECTS` template cap. Relies on `editor.scene_io.loadSceneFromBytes`
-/// (which `editor.prefab.parse` wraps) always reporting the template's *true*
-/// node count, even when the buffer it was given was too small.
+/// Parse `bytes` into an arena-allocated template buffer, growing from `MAX_OBJECTS` until the whole template fits.
 fn parseTemplateGrown(arena: std.mem.Allocator, bytes: []const u8) ?[]SceneNode {
     var cap: usize = MAX_OBJECTS;
     var buf = arena.alloc(SceneNode, cap) catch return null;
@@ -154,10 +149,7 @@ pub fn createPrefabFromObject(now: i128, io: std.Io, idx: usize) bool {
 
     const before = UndoRedo.captureSnapshot();
 
-    // Link the selected subtree as the first instance. Sized to
-    // `object_count`, not `MAX_OBJECTS` — `collectInstanceIndices` bounds
-    // itself to `out.len`, so a fixed 128-cap here would silently drop nodes
-    // of a larger subtree (e.g. from a Bistro-scale FBX hierarchy).
+    // Link the selected subtree as the first instance.
     const indices = arena.alloc(usize, EditorState.object_count) catch return false;
     const n = collectInstanceIndices(idx, indices);
     for (indices[0..n]) |i| {
@@ -192,10 +184,7 @@ pub fn instantiatePrefab(now: i128, io: std.Io, prefab_path: []const u8) ?usize 
 
     const parent: i32 = if (EditorState.selected_object) |s| @intCast(s) else -1;
 
-    // Probe the template's true node count (a zero-length output buffer just
-    // asks `loadSceneFromBytes` to report the count, per its doc comment)
-    // before growing the destination scene — `instantiate` itself only
-    // checks capacity, it doesn't grow the caller's storage.
+    // Probe the template's node count before growing the destination scene.
     var probe_count: usize = 0;
     _ = editor.scene_io.loadSceneFromBytes(arena, bytes, &.{}, &probe_count);
     EditorState.ensureObjectCapacity(EditorState.object_count + probe_count);

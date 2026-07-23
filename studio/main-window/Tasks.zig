@@ -1,16 +1,4 @@
-//! Studio task runner — owns the editor `TaskManager` and runs long-running
-//! operations (game build, asset reimport) off the UI thread so the bottom task
-//! bar can animate progress and offer cancellation while the editor stays
-//! responsive.
-//!
-//! Work is dispatched via `io.concurrent`, which runs the operation on one of
-//! the Io implementation's worker threads. The `TaskManager` mutex makes the
-//! UI thread's per-frame reads safe against the worker's writes. If the Io
-//! implementation does not support concurrency, the job runs synchronously
-//! (the UI blocks for its duration but the task system still works).
-//!
-//! At most one background job runs at a time; build is an exclusive operation
-//! and serialising reimport with it keeps the asset database access simple.
+//! Studio task runner — runs long-running operations (build, reimport) off the UI thread.
 const std = @import("std");
 const gui = @import("gui");
 const editor = @import("editor");
@@ -38,9 +26,7 @@ pub fn isBusy() bool {
 
 const JobKind = enum { build, reimport };
 
-/// A self-contained unit of background work. All inputs the worker needs are
-/// copied in (or, for the asset DB, accessed read-only) so the worker never
-/// races the UI thread's mutable state.
+/// A self-contained unit of background work.
 const Job = struct {
     arena: std.heap.ArenaAllocator,
     io: std.Io,
@@ -54,12 +40,7 @@ const Job = struct {
     component_count: usize = 0,
     config: editor.GameBuild.BuildConfig = undefined,
 
-    // Reimport: a private database, scanned and reimported on the worker,
-    // swapped into `EditorState.asset_db` only once finished (mirrors
-    // `ImportJob.zig` — operating on the live shared database directly would
-    // race the UI thread's per-frame reads of it, e.g. the Asset Browser
-    // grid, and `reimportAll`'s own `registerDerived` call structurally
-    // mutates the map, not just reads it).
+    // Reimport: private database swapped in once finished (avoids racing the UI thread).
     db: editor.AssetDatabase = undefined,
     /// Owned in `arena`.
     assets_path: []const u8 = "",
@@ -183,12 +164,7 @@ fn runJob(job: *Job) void {
             finalize(job.task_id, ok, "Build failed");
         },
         .reimport => {
-            // Scan into the job's own private database (not the shared
-            // `EditorState.asset_db`) and reimport that — swapped in by
-            // `finishJob` only once this finishes. `reimportAll` itself
-            // structurally mutates the database (`registerDerived`), so
-            // running it against the live one the UI thread reads every
-            // frame (Asset Browser, Inspector pickers, ...) is a data race.
+            // Scan into the job's own private database to avoid racing the UI thread.
             job.db.scan(job.io, job.assets_path);
             editor.asset_importer.reimportAll(
                 job.io,
@@ -215,8 +191,7 @@ fn finalize(task_id: u64, ok: bool, fail_msg: []const u8) void {
 
 fn finishJob(job: *Job) void {
     if (job.kind == .reimport) {
-        // Swap the freshly reimported private database in now that the
-        // background worker is done with it — see the comment on `Job.db`.
+        // Swap the reimported private database in now that the worker is done.
         if (EditorState.asset_db_initialized) EditorState.asset_db.deinit();
         EditorState.asset_db = job.db;
         EditorState.asset_db_initialized = true;

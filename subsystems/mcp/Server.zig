@@ -1,12 +1,6 @@
-//! MCP server — stdio transport adapter over the Turian Remote Debug Protocol.
-//!
-//! Reads JSON-RPC 2.0 from stdin, translates MCP tool calls into debug
-//! protocol calls (via a live TCP connection to the debug server), and writes
-//! MCP responses to stdout.
-//!
-//! Usage:
-//!   var srv: Server = .{};
-//!   try srv.run(io, allocator, "127.0.0.1", 7777, "");
+//! MCP server — stdio transport adapter over the Remote Debug Protocol.
+//! Translates MCP tool calls into debug protocol calls via a live TCP
+//! connection to the debug server.
 
 const std = @import("std");
 const Protocol = @import("Protocol.zig");
@@ -186,9 +180,7 @@ fn handleToolCall(
         return;
     };
 
-    // Confirmation gate: mutating tools must be called twice —
-    // first returns a preview, then `confirm:true` actually forwards the call.
-    // Defense-in-depth on top of the MCP client's own approval prompt.
+    // Confirmation gate: mutating tools must be called twice for preview then apply.
     if (tool.mutates and !argConfirmed(parsed.value.object)) {
         const preview = buildPreview(allocator, tool.*, parsed.value.object) catch {
             Protocol.writeToolResult(out, req, "This action mutates engine state. Call again with confirm:true to apply.", false) catch {};

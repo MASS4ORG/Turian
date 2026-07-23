@@ -2,14 +2,9 @@ const std = @import("std");
 const Transform = @import("Transform.zig").Transform;
 const Component = @import("Component.zig").Component;
 
-/// Default/initial scene node storage capacity. Storage that needs more than
-/// this grows on demand (see `SceneManager`/`studio/services/EditorState.zig`)
-/// rather than treating this as a hard ceiling — a `SceneNode` is large
-/// (`MeshRendererComponent`'s 160-slot material table dominates: ~124 KB per
-/// node), so preallocating thousands of them up front (Bistro-scale FBX
-/// hierarchies, see #142) would waste hundreds of MB on scenes that don't
-/// need it. `GROWTH_CEILING` is the actual hard cap, guarding against
-/// unbounded growth from a corrupt/malicious scene.
+/// Default/initial scene node storage capacity. Storage grows on demand
+/// (`SceneNode` is ~124 KB per node) up to `GROWTH_CEILING`, which guards
+/// against unbounded growth from corrupt/malicious scenes.
 pub const MAX_OBJECTS = 128;
 /// Hard ceiling on scene node count regardless of growth — sized generously
 /// above any real scene (Bistro-scale FBX hierarchies are in the thousands),

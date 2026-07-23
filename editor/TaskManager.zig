@@ -1,15 +1,6 @@
-//! Editor task manager — a thread-safe registry of long-running operations
-//! (asset import, script compilation, game build) with progress reporting and
-//! cooperative cancellation.
-//!
-//! The studio runs heavy operations on worker threads that update task state
-//! while the UI thread reads snapshots each frame; a single mutex guards all
-//! access. Headless callers (the CLI) use the same API synchronously.
-//!
-//! Tasks are stored in a fixed array (no allocation). Each task carries a
-//! monotonically increasing id, a kind, a status, a 0..1 progress value, a
-//! short label and note, and a cancel-requested flag that operations poll via
-//! the `Progress` interface returned by `progressFor`.
+//! Thread-safe registry of long-running operations (asset import, script
+//! compilation, game build) with progress reporting and cancellation.
+//! Tasks stored in a fixed array; a mutex guards all access.
 const std = @import("std");
 const Progress = @import("Progress.zig").Progress;
 

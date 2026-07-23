@@ -41,12 +41,7 @@ pub var environ_map: *const std.process.Environ.Map = undefined;
 pub var settings: editor.Settings = undefined;
 pub var asset_db: editor.AssetDatabase = undefined;
 pub var asset_refresh_generation: u64 = 0;
-/// Live scene node storage. Grown on demand by `ensureObjectCapacity` (starts
-/// empty, first grows to `MAX_OBJECTS`) rather than preallocated at a fixed
-/// size — a `SceneNode` is large (~124 KB, dominated by
-/// `MeshRendererComponent`'s 160-slot material table), so a scene doesn't pay
-/// for capacity it never uses. Capacity (`objects.len`) and live count
-/// (`object_count`) are distinct, exactly like `SceneManager.Slot`.
+/// Live scene node storage, grown on demand by `ensureObjectCapacity`.
 pub var objects: []SceneNode = &.{};
 pub var object_count: usize = 0;
 pub var selected_object: ?usize = null;
@@ -73,8 +68,7 @@ pub var drag_asset_path_buf: [512]u8 = undefined;
 pub var drag_asset_path_len: usize = 0;
 pub var scene_open: bool = false;
 pub var debug_metrics: engine.introspect.Metrics = .{};
-/// Selection bitset, grown alongside `objects` by `ensureObjectCapacity` (same
-/// capacity as `objects` at all times).
+/// Selection bitset, same capacity as `objects`.
 pub var selected_set: []bool = &.{};
 pub var last_select_idx: ?usize = null;
 pub var g_rename: RenameOps.RenameState = .{};
@@ -93,11 +87,7 @@ pub var active_browse_dir_buf: [1024]u8 = undefined;
 pub var active_browse_dir_len: usize = 0;
 pub var asset_db_initialized: bool = false;
 
-/// Ensures `objects` (and `selected_set`, kept at the same capacity) has room
-/// for at least `min_count` nodes, growing (doubling from `MAX_OBJECTS`) via
-/// `gpa` if needed. No-op if already large enough. Silently stops at
-/// `engine.scene.GROWTH_CEILING` — callers must still check `objects.len`
-/// before writing past current capacity.
+/// Ensures `objects` has room for at least `min_count` nodes, growing if needed.
 pub fn ensureObjectCapacity(min_count: usize) void {
     if (objects.len >= min_count) return;
     var new_cap: usize = if (objects.len == 0) MAX_OBJECTS else objects.len;

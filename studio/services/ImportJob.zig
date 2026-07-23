@@ -6,13 +6,9 @@ const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
 
 // ── Background asset import (project open) ──────────────────────────────────
-// `asset_importer.importAll` reads and hashes every source asset's full bytes
-// on every project open, and (re)cooks changed/version-bumped ones — for a
-// large project this can take seconds. Running that inline used to block the
-// very first frame from presenting (a black window until it returned). It now
-// scans+imports into a private `AssetDatabase` on a worker via `io.concurrent`,
-// swapped into `EditorState.asset_db` only once finished — avoids any other
-// thread observing (or racing) a half-imported database.
+// `asset_importer.importAll` reads and hashes every asset's bytes on project
+// open, which can take seconds. Runs on a worker via `io.concurrent`, swapping
+// the result into `EditorState.asset_db` atomically on completion.
 
 pub const ImportJob = struct {
     io: std.Io,

@@ -1,20 +1,7 @@
-//! Material asset — a collection of shader parameter values and resource
-//! bindings, serialized to a `.material` file as JSON (same on-disk family as
-//! scenes).
-//!
-//! A material references a shader by GUID and stores values for the parameters
-//! that shader exposes. Colours and vectors share one `[4]f32` storage form;
-//! the shader's `ParamKind` decides how each is interpreted and edited. Shader
-//! and texture references are stored as stable asset GUIDs so they survive
-//! renames and moves.
-//!
-//! A material deliberately does NOT contain mesh data, compiled shader
-//! binaries, or renderer pipeline objects — only authoring data.
-//!
-//! Ownership: a `Material` produced by `load`/`loadFromBytes` owns its slices
-//! via the parse allocator; release them with `deinit`. Values assembled by a
-//! caller (e.g. the editor, pointing slices at its own buffers) must NOT be
-//! passed to `deinit`; just serialize them with `save`/`serialize`.
+//! Material asset — shader parameter values and resource bindings serialized
+//! to `.material` JSON. References a shader by GUID; stores authoring data
+//! only (no mesh/compiled-shader/pipeline objects). Ownership via
+//! `load`/`loadFromBytes`/`deinit`.
 const std = @import("std");
 const serde = @import("serde");
 const shader = @import("Shader.zig");
@@ -358,10 +345,8 @@ pub const Material = struct {
     }
 };
 
-/// Upgrade a just-parsed material in place to `CURRENT_VERSION`. New versions
-/// add cases here so old assets keep loading. Currently a no-op stamp.
+/// Upgrade a just-parsed material in place to `CURRENT_VERSION`.
 fn migrate(mat: *Material) void {
-    // v0 / unset → v1: nothing structural changed; just stamp the version.
     if (mat.version < Material.CURRENT_VERSION) mat.version = Material.CURRENT_VERSION;
 }
 

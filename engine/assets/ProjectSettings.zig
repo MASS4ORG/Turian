@@ -1,28 +1,6 @@
-//! ProjectSettings — game/project configuration as a DataAsset.
-//!
-//! Where the editor `Settings` store (editor/Settings.zig) holds *editor*
-//! preferences, this asset holds *game/project* configuration that ships with the
-//! built game: project metadata, graphics options, per-target platform options,
-//! and which scene boots first. It is a single ZON asset (Unity-style — one
-//! "Project Settings" window with several sections) rather than several files, so
-//! there is exactly one place to edit and one place to consume.
-//!
-//! It is consumed in two places:
-//!   * the **build** (`editor.GameBuild`) — selects the boot scene and bakes the
-//!     window title / resolution into the generated game;
-//!   * the **runtime** — the generated game boots into `first_scene` with the
-//!     configured graphics options.
-//!
-//! File format (`.projectsettings`, ZON):
-//! ```zon
-//! .{
-//!     .version = 1,
-//!     .project = .{ .name = "My Game", .company = "Acme", .version = "1.0.0" },
-//!     .graphics = .{ .width = 1280, .height = 720, .vsync = true, .quality = .high },
-//!     .platform = .{ .target = .auto, .optimize = .debug },
-//!     .first_scene = "00000000-0000-4000-8000-000000000000", // scene asset GUID
-//! }
-//! ```
+//! ProjectSettings — game/project configuration as a single ZON
+//! `.projectsettings` DataAsset: project metadata, graphics options, platform
+//! targets, and boot scene. Consumed by both `editor.GameBuild` and the runtime.
 
 const std = @import("std");
 const Project = @import("../core/Project.zig").Project;

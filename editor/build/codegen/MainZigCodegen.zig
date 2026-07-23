@@ -199,8 +199,7 @@ pub fn generateMainZig(
         );
     }
 
-    // Platform layer (windowing + input + gamepad). Split into a dedicated
-    // backend module so other platforms can be added later.
+    // Platform layer (windowing + input + gamepad).
     try out.appendSlice(a, sdl3.bindings);
     try out.appendSlice(a, sdl3.input);
     try out.appendSlice(a, sdl3.gamepad);
@@ -328,8 +327,8 @@ pub fn generateMainZig(
                 "    switch (comp.*) { inline else => |*c| if (comptime @hasDecl(@TypeOf(c.*), \"configureInput\")) c.configureInput(input) }\n" ++
                 "}\n\n",
         );
-        // update() dispatch: support `update(frame)` (ADR 0001), `update(transform, objects, time)`,
-        // and the legacy `update(time)` form. Distinguish the Frame form by parameter type, not count.
+        // update() dispatch: `update(frame)`, `update(transform, objects, time)`,
+        // or the legacy `update(time)` — distinguished by parameter type.
         try out.appendSlice(
             a,
             "fn call_update(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {\n" ++
@@ -348,9 +347,7 @@ pub fn generateMainZig(
                 "    } }\n" ++
                 "}\n\n",
         );
-        // Reconcile live components against the set of loaded scenes:
-        // destroy components whose scene unloaded, instantiate components for newly
-        // loaded scenes. Persistent scenes stay loaded, so their components persist.
+        // Reconcile live components against the set of loaded scenes.
         try out.appendSlice(
             a,
             "fn slotInstantiated(h: engine.SceneHandle) bool {\n" ++
@@ -403,9 +400,7 @@ pub fn generateMainZig(
                 "}\n\n",
         );
 
-        // Within-scene reconcile after a runtime spawn/destroy flush:
-        // re-point transforms (node storage compacts on destroy), drop components
-        // whose node is gone, and bring freshly spawned nodes to life.
+        // Within-scene reconcile after a runtime spawn/destroy flush.
         try out.appendSlice(
             a,
             "fn sceneNodeIndex(objs: []engine.SceneNode, guid: []const u8) ?usize {\n" ++
@@ -581,8 +576,7 @@ pub fn generateMainZig(
             "    defer SDL_Quit();\n\n",
     );
 
-    // Window + renderer options come from ProjectSettings:
-    // title, resolution, and vsync are baked in from the project's settings asset.
+    // Window + renderer options from ProjectSettings.
     {
         var esc: std.ArrayList(u8) = .empty;
         try zigEscapeInto(a, &esc, runtime.title);

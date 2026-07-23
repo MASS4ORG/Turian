@@ -1,25 +1,8 @@
-//! Extracts translatable strings from Zig source by walking `std.zig.Ast`,
-//! mirroring `editor/assets/Scanner.zig`'s discovery approach (robust to
-//! formatting/comments, unlike regex scanning). Unlike `Scanner.zig` (which
-//! only looks at top-level container decls), this walks *every* node — the
-//! calls it looks for (`tr`/`trArgs`/`trc`/`trn`/`trKey`) live inside function
-//! bodies at arbitrary nesting depth.
-//!
-//! Recognizes calls by their callee's last identifier segment, so it works
-//! whether the call site is a bare `tr(...)`, a qualified `StudioLocale.tr(...)`,
-//! or `frame.tr(...)` — see `engine.i18n.Locale` / `engine.Frame` for the
-//! call shapes and their id schemes:
-//!   - `tr(msg)` / `trArgs(msg, args)` -> id = msg (`trArgs` is `tr` with
-//!     interpolation args; same id scheme, since the message pattern is
-//!     always the first argument)
-//!   - `trc(ctx, msg)`      -> id = ctx ++ "\x04" ++ msg
-//!   - `trn(one, other, n)` -> id = the synthesized ICU plural pattern
-//!   - `trKey(id)` / `key(id)` -> id = the literal id itself (designer content)
-//!
-//! Non-literal arguments (a runtime `key(id)` computed at runtime) can't be
-//! extracted statically and are silently skipped — `Locale.key`'s ids are
-//! expected to be authored directly in a `.strings` file for that case, not
-//! discovered from call sites.
+//! Extracts translatable strings from Zig source by walking `std.zig.Ast`
+//! (robust to formatting/comments, unlike regex scanning). Recognizes
+//! `tr`/`trArgs`/`trc`/`trn`/`trKey`/`key` calls by callee identifier, so
+//! it works for bare, qualified, or `frame.*` call sites. Non-literal
+//! arguments are silently skipped.
 
 const std = @import("std");
 

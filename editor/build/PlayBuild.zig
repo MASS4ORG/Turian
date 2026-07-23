@@ -1,20 +1,6 @@
-/// Play-mode build system — generates and compiles a *play shared library*
-/// from the current scene's user scripts so the studio can run the game's
-/// update loop **in-process** inside the editor viewport.
-///
-/// This mirrors `GameBuild` (which produces a standalone executable), but the
-/// product here is a `libturian_play.{so,dll,dylib}` exposing a small C ABI the
-/// studio dlopen()s. The studio owns the window, rendering and the main loop;
-/// the library only owns the scene node storage, the live user-script component
-/// instances and the input snapshot, and steps them on demand.
-///
-/// Execution-model rationale (see docs/decisions/0002-play-mode.md): user
-/// scripts are arbitrary `.zig` files compiled at project-build time, so they
-/// cannot be linked into the studio binary up front. The reflection library
-/// (UserReflection.zig) already proves the dlopen pattern works for metadata;
-/// Play reuses it to actually *run* the scripts. The alternative — launching
-/// the built game as a subprocess — cannot render inside the editor viewport,
-/// which is the whole point of Play mode.
+/// Play-mode build system — generates and compiles a `libturian_play`
+/// shared library from user scripts, dlopen'd by the studio for in-process
+/// game simulation inside the editor viewport.
 const std = @import("std");
 const engine = @import("engine");
 const ComponentDef = @import("../assets/Scanner.zig").ComponentDef;
@@ -531,10 +517,7 @@ fn generatePlayMainZig(
                 "}\n\n",
         );
 
-        // Runtime spawn/destroy support: instantiate live components
-        // for a node, and reconcile the live set with the node buffer after a
-        // spawn/destroy flush (re-pointing transforms by GUID, dropping comps for
-        // destroyed nodes, and bringing freshly spawned nodes to life).
+        // Runtime spawn/destroy support: reconcile live components after flush.
         try out.appendSlice(
             a,
             "fn liveAddNode(ni: usize) void {\n" ++
@@ -591,11 +574,8 @@ fn generatePlayMainZig(
     }
 
     // ── Exported C ABI ──────────────────────────────────────────────────────
-    // The scene nodes are handed over directly from the studio: studio and
-    // library share the exact same `engine.SceneNode` layout (same engine
-    // source, same target), and SceneNode is self-contained POD (fixed buffers,
-    // no heap pointers), so a memcpy fully transfers ownership of a copy. This
-    // deliberately avoids running the JSON/serde parser inside the library.
+    // Scene nodes are memcpy'd directly (same process, same `engine.SceneNode`
+    // layout) — no JSON/serde parser inside the library.
     try out.appendSlice(
         a,
         "export fn turianPlayStart(nodes: [*]const engine.SceneNode, count: usize) callconv(.c) bool {\n" ++
@@ -707,14 +687,9 @@ fn generatePlayMainZig(
             "export fn turianPlayRegisterPrefab(guid_ptr: [*]const u8, guid_len: usize, nodes_ptr: [*]const engine.SceneNode, nodes_count: usize) callconv(.c) void {\n" ++
             "    g_spawner.registerPrefab(guid_ptr[0..guid_len], nodes_ptr[0..nodes_count]);\n" ++
             "}\n\n" ++
-            // Loads one `.uidoc`'s bytes (read by the studio, which owns asset
-            // access — the library never touches the asset database) into a
-            // `UiInstance` owned by `node_guid`. The studio draws + dispatches
-            // clicks against the *same* instance/events via the two pointer
-            // accessors below (same process — dlopen, not a subprocess — so a
-            // raw pointer to this pure-data struct is safe to alias from the
-            // studio's own independently-compiled `engine.ui` code, exactly
-            // like `turianPlayNodesPtr`'s `engine.SceneNode` pointer already is).\n" ++
+            // Loads a `.uidoc`'s bytes into a `UiInstance` owned by `node_guid`.
+            // The studio draws + dispatches against the same instance via pointer
+            // accessors (safe because dlopen, not a subprocess).\n" ++
             "export fn turianPlayLoadUiDocument(node_guid_ptr: [*]const u8, node_guid_len: usize, bytes_ptr: [*]const u8, bytes_len: usize) callconv(.c) void {\n" ++
             "    const node_guid = node_guid_ptr[0..node_guid_len];\n" ++
             "    if (g_ui_runtime.instanceFor(node_guid) != null) return;\n" ++
@@ -733,10 +708,7 @@ fn generatePlayMainZig(
             "export fn turianPlayQuitRequested() callconv(.c) bool {\n" ++
             "    return g_application.quit_requested;\n" ++
             "}\n\n" ++
-            // Refreshes `g_diag_buf` from this library's own `DiagLog` ring
-            // (fed by every `std.log.*` call in this compilation, per the
-            // `std_options` above); the studio calls this once per frame,
-            // then reads the result via the two accessors below.
+            // Refreshes `g_diag_buf` from the library's `DiagLog` ring.
             "export fn turianPlayDiagLogPump() callconv(.c) void {\n" ++
             "    g_diag_count = engine.DiagLog.snapshot(&g_diag_buf);\n" ++
             "}\n\n" ++

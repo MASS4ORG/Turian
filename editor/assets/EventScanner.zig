@@ -1,16 +1,7 @@
-//! Scans user script source files for UI event type declarations:
-//! `pub const SomeEvent = struct { pub const event_name = "some_name"; };`
-//! — the same declarative convention `engine.ui.UiEvents.register(T)` expects
-//! (see `engine/ui/UiEvents.zig`'s module doc). Feeds the Studio inspector's
-//! event dropdown (`PropDraw.drawEventBinding`) so authors pick from a name
-//! the game actually declares instead of hand-typing one that might not
-//! resolve.
-//!
-//! Discovery parses each file with `std.zig.Ast`, mirroring `Scanner.zig`'s
-//! component discovery — robust to formatting/comments/conditional
-//! compilation, unlike regex scanning. Kept separate from `Scanner.zig`
-//! (rather than folding into its `ComponentDef` walk) since this is
-//! Studio-only edit-time tooling, not something `GameBuild`/`PlayBuild` need.
+//! Scans user script source files for UI event type declarations
+//! (`pub const event_name = "..."` in a struct) — feeds the inspector's
+//! event dropdown. Uses `std.zig.Ast` like `Scanner.zig`; kept separate
+//! since this is Studio-only edit-time tooling.
 
 const std = @import("std");
 

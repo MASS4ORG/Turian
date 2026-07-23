@@ -1,19 +1,6 @@
-//! Turian MCP server: Model Context Protocol adapter over the
-//! Remote Debug Protocol. Exposes engine runtime state as MCP tools
-//! so Claude Code, Cursor, and other MCP clients can inspect live games.
-//!
-//! Wire: JSON-RPC 2.0 over stdio (newline-delimited), MCP version 2024-11-05.
-//!
-//! To connect from Claude Code, add to your MCP settings:
-//! ```json
-//! {
-//!   "turian": {
-//!     "command": "turian-cli",
-//!     "args": ["mcp"]
-//!   }
-//! }
-//! ```
-//! The game must be running with the debug server enabled (port 7777).
+//! Turian MCP server: Model Context Protocol adapter over the Remote Debug
+//! Protocol. Exposes engine runtime state as MCP tools for Claude Code, Cursor,
+//! and other MCP clients. JSON-RPC 2.0 over stdio.
 
 /// Protocol framing: request parsing + response writers.
 pub const Protocol = @import("Protocol.zig");

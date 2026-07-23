@@ -129,21 +129,12 @@ pub fn revertIfViewClosed() void {
     applyByName(persistedThemeName());
 }
 
-/// How long to wait after the last keystroke before actually applying a
-/// typed Font Size / Zoom value. A live-dragging slider was rejected here:
-/// applying `zoom` instantly relayouts the whole (still-open) menu, moving
-/// it out from under the cursor mid-drag. A plain debounced number field
-/// has no such feedback loop — nothing moves until well after the user
-/// stops typing.
+/// Debounce interval for Font Size / Zoom text fields — avoids relayout
+/// feedback-loop from a live-dragging slider.
 const DEBOUNCE_NS: i128 = 500_000_000;
 
 /// 0 = no pending edit (display tracks the persisted value every frame).
-/// Non-zero = a keystroke landed a valid, in-range number in `*_value`
-/// this many ns ago (`gui.frameTimeNS()`); committed once `DEBOUNCE_NS`
-/// have elapsed with no further change. Deleting the field to empty, or
-/// typing something out of range, does not update `*_value` at all
-/// (`textEntryNumber` only writes back a valid in-range result) — so the
-/// last valid typed number is always what eventually gets applied.
+/// A debounced keystroke applies the last valid typed number.
 var font_size_value: f32 = 9.0;
 var font_size_last_change_ns: i128 = 0;
 var zoom_value: f32 = 1.0;

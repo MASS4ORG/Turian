@@ -1,18 +1,6 @@
-//! Prefab system — reusable SceneNode subtrees with per-instance
-//! overrides and source-edit propagation.
-//!
-//! A prefab is simply a **scene asset** reused as an instantiable template —
-//! same on-disk structure (`version` + an `objects` array, root at index 0),
-//! just a `.prefab` extension signalling intent. This module is the pure,
-//! file-free core: it serialises a subtree into scene bytes, instantiates those
-//! bytes into a scene's node array (linking each instance node back to its
-//! template by GUID), and reconciles instances with their source via
-//! revert / propagate. The studio layer wires these into the editor, handling
-//! file IO and locating the instance subtree inside `EditorState.objects`.
-//!
-//! Override granularity is the **group** (`name`, `active`, `transform`,
-//! `components`) — coarse enough for the fixed-size value-type SceneNode, and
-//! correct for propagation: a group is inherited or overridden wholesale.
+//! Prefab system — reusable SceneNode subtrees with per-instance overrides
+//! and source-edit propagation. Core serialisation/instantiation logic;
+//! the studio layer wires this into the editor.
 
 const std = @import("std");
 const engine = @import("engine");
@@ -78,10 +66,8 @@ pub fn serializeSubtree(
     count: usize,
     root_idx: usize,
 ) ?[]u8 {
-    // Heap, sized to `count` — not `[MAX_OBJECTS]usize`/`[MAX_OBJECTS]i32`,
-    // which silently mis-scoped a subtree collected from a larger scene (e.g.
-    // a Bistro-scale FBX hierarchy) and, at large enough `count`, risked
-    // overflowing the thread stack (same class of bug as the Spawner.zig fix).
+    // Heap, sized to `count` (not fixed at `MAX_OBJECTS`), to avoid stack
+    // overflow and silent mis-scoping for large subtrees.
     const indices = allocator.alloc(usize, count) catch return null;
     defer allocator.free(indices);
     const n = collectSubtree(objects, count, root_idx, indices);
@@ -93,10 +79,8 @@ pub fn serializeSubtree(
     @memset(remap, -1);
     for (indices[0..n], 0..) |orig, new_i| remap[orig] = @intCast(new_i);
 
-    // Heap/arena-allocated, not `[MAX_OBJECTS]SceneNode` on the stack — that
-    // temp buffer overflowed the thread stack (SceneNode is large enough that
-    // MAX_OBJECTS of them is several MB; see the Spawner.zig fix for the same
-    // class of bug).
+    // Heap/arena-allocated (a MAX_OBJECTS SceneNode array on the stack is
+    // several MB and overflows the thread stack).
     const tmpl = allocator.alloc(SceneNode, n) catch return null;
     defer allocator.free(tmpl);
     for (indices[0..n], 0..) |orig, new_i| {
@@ -162,11 +146,8 @@ pub fn instantiate(
     out_count: *usize,
     parent: i32,
 ) ?usize {
-    // `loadSceneFromBytes` reports the prefab's *true* node count in `tn`
-    // even when `tmpl` is too small to hold it (see its doc comment) — grow
-    // and re-parse rather than silently dropping nodes, so a Bistro-scale FBX
-    // hierarchy prefab (thousands of nodes) instantiates completely instead
-    // of truncating at the old fixed `MAX_OBJECTS` template cap.
+    // Grow and re-parse rather than silently dropping nodes when the prefab
+    // exceeds the initial `MAX_OBJECTS` template cap.
     var cap: usize = MAX_OBJECTS;
     var tmpl = allocator.alloc(SceneNode, cap) catch return null;
     defer allocator.free(tmpl);

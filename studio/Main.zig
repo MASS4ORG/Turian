@@ -17,6 +17,8 @@ const StudioLocale = @import("services/StudioLocale.zig");
 const AssetWatcher = @import("asset-browser/AssetWatcher.zig");
 const Documents = @import("main-window/Documents.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
+const FpsCounter = @import("services/FpsCounter.zig");
+const StudioSettings = editor.StudioSettings;
 const Screenshots = @import("services/Screenshots.zig");
 const LayoutStore = @import("services/LayoutStore.zig");
 const build_options = @import("turian_build_options");
@@ -166,9 +168,7 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
     const name = if (id.len > 0) std.fs.path.basename(id) else "(unsaved)";
     var buf: [1400]u8 = undefined;
     var w = std.Io.Writer.fixed(&buf);
-    // One Stringify document: mixing raw writes with multiple top-level
-    // `jw.write` values trips its "document already complete" assert. Use the
-    // object API so the whole payload is a single JSON value.
+    // Use the object API so the whole payload is a single JSON value.
     var jw = std.json.Stringify{ .writer = &w, .options = .{} };
     jw.beginObject() catch return;
     jw.objectField("scene") catch return;
@@ -182,27 +182,13 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
 pub fn main(main_init: std.process.Init) !void {
     try run(main_init);
-    // Hard-exit rather than returning normally. By this point our own state
-    // (documents, GPU renderer, debug server, dvui window/backend) is already
-    // torn down cleanly — see the log lines above this call. What's left is
-    // the Zig runtime's post-main cleanup (io thread pool, debug allocator
-    // leak scan) and then libc's exit(), which runs atexit handlers
-    // registered by the statically-linked SDL3/Vulkan loader. That teardown
-    // segfaults on this machine's Vulkan/RADV stack; `_exit` skips it
-    // entirely (the OS reclaims everything anyway).
+    // Hard-exit to skip libc atexit handlers that segfault on this machine's
+    // Vulkan/RADV stack (the OS reclaims everything anyway).
     std.c._exit(0);
 }
 
-/// Create the SDL3-GPU window/device, preferring a Vulkan device so the 3D
-/// viewport's SPIRV shaders work, but falling back to whatever SDL picks by
-/// default (D3D12 on Windows, Metal on macOS) when Vulkan is unavailable.
-///
-/// dvui's backend requests SPIRV+DXIL+MSL shader formats, so the editor UI
-/// renders on any of these backends; only the 3D viewport (`GpuRenderer`,
-/// SPIRV-only) degrades to "unavailable" on a non-Vulkan device. Without this
-/// fallback the whole editor fails to start on machines with no Vulkan driver
-/// (e.g. a stock Windows install or bare Wine) because forcing the
-/// `SDL_GPU_DRIVER=vulkan` hint makes SDL error out instead of trying D3D12.
+/// Create the SDL3-GPU window/device, preferring Vulkan (needed by the 3D
+/// viewport's SPIRV shaders), falling back to the platform default otherwise.
 fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
     const opts: gui.backend.InitOptions = .{
         .io = main_init.io,
@@ -223,19 +209,14 @@ fn initBackend(main_init: std.process.Init) !gui.backend.SDLBackend {
             "retrying with the platform default driver", .{err});
     }
 
-    // Fallback: reset the driver hint (an empty string is itself an invalid
-    // driver name — SDL must pick from its own default priority list: D3D12 on
-    // Windows, Metal on macOS, Vulkan on Linux). The 3D viewport will show
-    // "unavailable" on a non-SPIRV backend but the rest of the editor works.
+    // Fallback: let SDL pick its platform default driver.
+    // The 3D viewport shows "unavailable" on non-SPIRV backends.
     _ = gui.backend.c.SDL_ResetHint("SDL_GPU_DRIVER");
     return gui.backend.initWindow(opts);
 }
 
-/// Resolve the persisted `editor.ui` theme/font-size/zoom/system-font
-/// (falling back to whatever `win` already has if the theme isn't found —
-/// e.g. first run, or a deleted user theme) and apply them to the running
-/// window. Thin wrapper over `ActiveTheme.apply`, the same one
-/// `SettingsEditor.save()` and `ThemeMenu`'s hover-preview/commit use.
+/// Resolve the persisted UI settings (theme/font-size/zoom/system-font) and
+/// apply them to the running window.
 fn applyPersistedUiSettings(win: *gui.Window, gpa: std.mem.Allocator, io: std.Io) void {
     const model = editor.StudioSettings.fromSettings(&EditorState.settings);
 
@@ -343,14 +324,9 @@ fn run(main_init: std.process.Init) !void {
     var last_scene_id_buf: [1024]u8 = undefined;
     var last_scene_id_len: usize = 0;
 
-    // Self-verifiable whole-window screenshots (no external tool, no GUI
-    // automation needed): set TURIAN_CAPTURE_AFTER_MS to capture the entire
-    // composited window (menu bar, panels, inspector, 3D viewport, gizmos,
-    // in-game GUI overlay — everything, unlike the viewport-only
-    // `Screenshots.capture()`) that many milliseconds after startup, written
-    // to the open project's `screenshots/shot_NNNN.png` (path printed to
-    // stdout). TURIAN_CAPTURE_QUIT additionally quits right after, for
-    // one-shot scripted verification.
+    // Self-verifiable whole-window screenshots for scripted verification.
+    // Set TURIAN_CAPTURE_AFTER_MS to capture the composited window that many
+    // ms after startup; TURIAN_CAPTURE_QUIT additionally quits right after.
     const capture_after_ms: u64 = if (main_init.environ_map.get("TURIAN_CAPTURE_AFTER_MS")) |s|
         std.fmt.parseInt(u64, s, 10) catch 0
     else
@@ -366,6 +342,13 @@ fn run(main_init: std.process.Init) !void {
 
         const nstime = win.beginWait(interrupted);
         EditorFrameTiming.beginFrame(nstime);
+        // Counts every loop iteration regardless of what woke it, so the
+        // status bar's FPS reading doesn't freeze during idle.
+        const fps_sample_ms = if (EditorState.settingsReady())
+            EditorState.settings.getInt(StudioSettings.KEY_PERF_FPS_SAMPLE_MS, 500)
+        else
+            500;
+        FpsCounter.tick(nstime, fps_sample_ms);
 
         var do_capture = false;
         if (capture_pending) {
@@ -466,7 +449,14 @@ fn run(main_init: std.process.Init) !void {
 
         // Auto-detect external asset changes (replaces the manual Refresh
         // button): poll the assets tree and hot-reload when it changes.
-        if (AssetWatcher.poll(gui.io, nstime)) {
+        // Always poll (keeps its baseline tracking disk state even while
+        // suppressed below) but ignore a detected change while a background
+        // import/reflect job is already in flight — that job is the one
+        // writing the .meta/cache files the poll would otherwise see as an
+        // external edit, and re-entering the synchronous refresh here would
+        // race its own asset_db swap and spawn a redundant reflect compile.
+        const watcher_changed = AssetWatcher.poll(gui.io, nstime);
+        if (watcher_changed and EditorState.import_job == null and EditorState.reflect_job == null) {
             EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
             PreviewSystem.bumpGeneration();
             gui.refresh(null, @src(), null);

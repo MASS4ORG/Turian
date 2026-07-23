@@ -1,28 +1,6 @@
-//! Type-keyed service registry (ADR 0001).
-//!
-//! The `Frame` context exposes a *fixed* set of high-traffic engine services as
-//! direct fields (`input`, `time`, …) for ergonomics and zero lookup cost. Every
-//! *other* service — engine subsystems added later, and **user-defined services**
-//! (a translation service, a web client, a save system, …) — lives here, keyed by
-//! its Zig type.
-//!
-//! This is a *scoped* locator, not a global: the host (game `main`, or a scene/world)
-//! owns one `Services` and threads `&services` into every `Frame`. Nothing reaches
-//! for it statically, so it stays testable and free of init-order hazards.
-//!
-//! Typical use: a "provider" component constructs its service and registers it in
-//! `awake` (which now receives a `Frame`, see lifecycle injection); consumers fetch
-//! it by type from `start`/`update`:
-//!
-//! ```zig
-//! pub fn awake(self: *@This(), frame: engine.Frame) void {
-//!     frame.services.register(TranslationService, &self.translation);
-//! }
-//! pub fn update(self: *@This(), frame: engine.Frame) void {
-//!     const tr = frame.service(TranslationService) orelse return;
-//!     ...
-//! }
-//! ```
+//! Type-keyed service registry (ADR 0001). Engine subsystems and user-defined
+//! services are registered by Zig type on a scoped `Services` instance owned
+//! by the host (game `main`), avoiding globals and init-order hazards.
 
 const std = @import("std");
 

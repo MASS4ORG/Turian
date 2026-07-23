@@ -125,10 +125,7 @@ pub fn load(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !Mesh {
 }
 
 // ── Material / image extraction ────────────────────────────────────────────────
-// An FBX file is one source that can produce many engine assets (materials,
-// textures). These map onto the same `ModelInfo` shape `GltfLoader` uses so
-// `AssetImporter` doesn't need to special-case the source format. Geometry is
-// loaded separately via `load`.
+// FBX materials and images map onto the same `ModelInfo` shape as glTF.
 
 const FbxTexRef = extern struct {
     has_texture: c_int,
@@ -249,9 +246,7 @@ pub fn loadModelInfo(allocator: std.mem.Allocator, path: []const u8) !ModelInfo 
     return .{ .materials = mats, .images = imgs, .arena = arena };
 }
 
-/// Per-FBX-mesh (not per-node-instance) geometry grouping and node-hierarchy
-/// import, kept in a separate file to keep this one focused on the
-/// whole-file-flattened-mesh path.
+/// Per-mesh geometry grouping and node-hierarchy import.
 const fbx_hierarchy = @import("FbxHierarchy.zig");
 pub const MeshGroup = fbx_hierarchy.MeshGroup;
 pub const loadMeshes = fbx_hierarchy.loadMeshes;
@@ -260,11 +255,7 @@ pub const FbxHierarchy = fbx_hierarchy.FbxHierarchy;
 pub const loadHierarchy = fbx_hierarchy.loadHierarchy;
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
-// A minimal hand-authored ASCII FBX: one triangle (positions in the FBX default
-// of centimeters, so `load`'s baked axis/unit conversion halves... scales them
-// by 0.01 into the engine's meters convention) with a classic Phong material
-// (no explicit PBR roughness/metalness — ufbx approximates them from
-// ShininessExponent, exercising the best-effort Phong→PBR mapping).
+// A minimal ASCII FBX: one triangle with a classic Phong material.
 pub const test_fbx =
     \\; FBX 7.3.0 project file
     \\FBXHeaderExtension:  {
@@ -387,10 +378,7 @@ test "load triangulates a single-triangle FBX into one submesh" {
     try std.testing.expectApproxEqAbs(@as(f32, 1.0), mesh.vertices[0].nz, 1e-5);
 }
 
-// Two triangles sharing an edge (a quad split diagonally): v0=(0,0,0),
-// v1=(1,0,0), v2=(1,1,0), v3=(0,1,0), faces [v0,v1,v2] and [v0,v2,v3]. ufbx
-// de-indexes this into 6 triangle-corner vertices; the weld pass in
-// `fbx_wrap.c` should collapse the shared v0/v2 corners back down to 4.
+// Two triangles forming a quad: ufbx de-indexes to 6 corners; weld collapses shared v0/v2 to 4.
 const test_fbx_quad =
     \\; FBX 7.3.0 project file
     \\FBXHeaderExtension:  {
@@ -533,20 +521,12 @@ test "loadModelInfo extracts a best-effort PBR material from a classic Phong FBX
     try std.testing.expectApproxEqAbs(@as(f32, 0.5), m.base_color[0], 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 0.25), m.base_color[1], 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 0.1), m.base_color[2], 1e-5);
-    // Classic Phong has no metalness concept — ufbx's pbr.metalness carries no
-    // value for it, so this must fall back to non-metal (0.0), not glTF's raw
-    // spec default of 1.0 (which would turn every converted Phong/Lambert
-    // material into a textureless mirror — see fbx_wrap.c's fill_material).
+    // Phong has no metalness; defaults to non-metal (0.0), not glTF's 1.0.
     try std.testing.expectApproxEqAbs(@as(f32, 0.0), m.metallic, 1e-5);
 }
 
 test "loadModelInfo: every real Bistro texture reference resolves to a file on disk" {
-    // Regression test for the `ModelDerivedAssets.siblingPath` backslash-
-    // normalization fix: every one of Bistro's 405 image references uses a
-    // Windows-style URI (`Textures\Foo.dds`), and after normalizing `\` to
-    // `/`, all of them must resolve to a real sibling file. If this ever
-    // regresses, materials silently lose their texture bindings again (see
-    // docs/decisions/bistro.md for the full incident writeup).
+    // Backslash-to-forward-slash normalization: every texture URI must resolve to a real sibling file.
     const path = "/media/work/dev/mega4/turian-samples/bistro/assets/BistroExterior.fbx";
     var info = loadModelInfo(std.testing.allocator, path) catch return error.SkipZigTest;
     defer info.deinit();

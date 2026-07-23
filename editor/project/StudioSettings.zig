@@ -23,11 +23,10 @@ pub const categories = [_]CategoryMeta{
     .{ .field = "camera", .title = "Editor Camera", .description = "Free-look viewport camera movement and feel." },
     .{ .field = "asset_browser", .title = "Asset Browser", .description = "Grid tile filename display." },
     .{ .field = "ui", .title = "UI", .description = "Studio theme, font size, and zoom." },
+    .{ .field = "performance", .title = "Performance", .description = "Status bar FPS indicator thresholds and sampling." },
 };
 
 pub const General = struct {
-    /// Show the Studio UI's own frame rate next to the play controls.
-    show_editor_fps: bool = false,
     /// Max characters shown in a document tab title before truncating with an ellipsis.
     tab_title_max: i64 = 18,
 
@@ -98,18 +97,34 @@ pub const UI = struct {
     };
 };
 
+pub const Performance = struct {
+    /// Status bar FPS at/above this shows the green (smooth) semaphore state.
+    fps_green_threshold: f32 = 60.0,
+    /// Status bar FPS at/above this (but below green) shows yellow
+    /// (acceptable); below it shows red (stuttering).
+    fps_yellow_threshold: f32 = 30.0,
+    /// How often the status bar's rolling FPS average is recomputed.
+    fps_sample_interval_ms: i64 = 500,
+
+    pub const turian_hints = struct {
+        pub const fps_green_threshold = FieldHint{ .min = 10, .max = 240, .widget = .slider_entry, .label = "Green threshold", .tooltip = "FPS at or above this shows the green (smooth) status bar indicator." };
+        pub const fps_yellow_threshold = FieldHint{ .min = 5, .max = 120, .widget = .slider_entry, .label = "Yellow threshold", .tooltip = "FPS at or above this (below green) shows yellow (acceptable); below it shows red (stuttering)." };
+        pub const fps_sample_interval_ms = FieldHint{ .min = 100, .max = 5000, .widget = .slider_entry, .label = "Sample interval (ms)", .tooltip = "How often the status bar's rolling FPS average is recomputed." };
+    };
+};
+
 pub const StudioSettings = struct {
     general: General = .{},
     camera: Camera = .{},
     asset_browser: AssetBrowser = .{},
     ui: UI = .{},
+    performance: Performance = .{},
 
     // Key strings match the pre-existing keys each panel already reads/writes
-    // directly (`MenuBar.zig`'s `FPS_SETTING_KEY`, `Documents.zig`'s
-    // `TITLE_MAX_KEY`, `SceneViewport.zig`'s `CAM_*_KEY`,
-    // `AssetGridView.zig`'s `HIDE_EXT_SETTING_KEY`) so this editor becomes
-    // another reader/writer of the same values rather than a competing copy.
-    const KEY_SHOW_FPS = "editor.show_fps";
+    // directly (`Documents.zig`'s `TITLE_MAX_KEY`, `SceneViewport.zig`'s
+    // `CAM_*_KEY`, `AssetGridView.zig`'s `HIDE_EXT_SETTING_KEY`) so this
+    // editor becomes another reader/writer of the same values rather than a
+    // competing copy.
     const KEY_TAB_TITLE_MAX = "editor.tab_title_max";
     const KEY_CAM_MOVE_SPEED = "editor.camera.move_speed";
     const KEY_CAM_LOOK_SENSITIVITY = "editor.camera.look_sensitivity";
@@ -125,12 +140,19 @@ pub const StudioSettings = struct {
     pub const KEY_UI_ZOOM = "editor.ui.zoom";
     pub const KEY_UI_SYSTEM_FONT_PATH = "editor.ui.system_font_path";
     pub const KEY_UI_LANGUAGE = "editor.ui.language";
+    // `pub` — read directly by `studio/main-window/MenuBar.zig`'s merged FPS
+    // indicator and `studio/Main.zig`'s main loop (sample cadence), bypassing
+    // this struct's `model` copy-on-load lifecycle the same way
+    // `KEY_UI_THEME_NAME` is, since neither has a natural "Save" step to wait
+    // for.
+    pub const KEY_PERF_FPS_GREEN = "editor.performance.fps_green_threshold";
+    pub const KEY_PERF_FPS_YELLOW = "editor.performance.fps_yellow_threshold";
+    pub const KEY_PERF_FPS_SAMPLE_MS = "editor.performance.fps_sample_interval_ms";
 
     /// Populate from the on-disk/in-memory KV store, falling back to each
     /// field's default when the key is missing or malformed.
     pub fn fromSettings(s: *const Settings) StudioSettings {
         var self = StudioSettings{};
-        self.general.show_editor_fps = s.getBool(KEY_SHOW_FPS, self.general.show_editor_fps);
         self.general.tab_title_max = s.getInt(KEY_TAB_TITLE_MAX, self.general.tab_title_max);
         self.camera.move_speed = @floatCast(s.getFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed));
         self.camera.look_sensitivity = @floatCast(s.getFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity));
@@ -142,13 +164,15 @@ pub const StudioSettings = struct {
         self.ui.zoom = @floatCast(s.getFloat(KEY_UI_ZOOM, self.ui.zoom));
         self.ui.system_font_path = s.getString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
         self.ui.language = s.getString(KEY_UI_LANGUAGE, self.ui.language);
+        self.performance.fps_green_threshold = @floatCast(s.getFloat(KEY_PERF_FPS_GREEN, self.performance.fps_green_threshold));
+        self.performance.fps_yellow_threshold = @floatCast(s.getFloat(KEY_PERF_FPS_YELLOW, self.performance.fps_yellow_threshold));
+        self.performance.fps_sample_interval_ms = s.getInt(KEY_PERF_FPS_SAMPLE_MS, self.performance.fps_sample_interval_ms);
         return self;
     }
 
     /// Write every field back to the KV store. Does not call `Settings.save`
     /// — callers persist to disk explicitly (see `SettingsEditor.save`).
     pub fn applyToSettings(self: *const StudioSettings, s: *Settings) !void {
-        try s.setBool(KEY_SHOW_FPS, self.general.show_editor_fps);
         try s.setInt(KEY_TAB_TITLE_MAX, self.general.tab_title_max);
         try s.setFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed);
         try s.setFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity);
@@ -160,5 +184,8 @@ pub const StudioSettings = struct {
         try s.setFloat(KEY_UI_ZOOM, self.ui.zoom);
         try s.setString(KEY_UI_SYSTEM_FONT_PATH, self.ui.system_font_path);
         try s.setString(KEY_UI_LANGUAGE, self.ui.language);
+        try s.setFloat(KEY_PERF_FPS_GREEN, self.performance.fps_green_threshold);
+        try s.setFloat(KEY_PERF_FPS_YELLOW, self.performance.fps_yellow_threshold);
+        try s.setInt(KEY_PERF_FPS_SAMPLE_MS, self.performance.fps_sample_interval_ms);
     }
 };

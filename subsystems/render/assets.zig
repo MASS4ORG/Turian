@@ -53,9 +53,7 @@ pub fn sdlTextureFormat(fmt: engine.assets.TextureFormat) c.SDL_GPUTextureFormat
     };
 }
 
-/// Resolve a mesh renderer's material GUID into scalar values and the GUIDs of
-/// its texture maps. The `.material` bytes come from the material source; small,
-/// so re-parsed each frame to keep the viewport live while editing.
+/// Resolve a material GUID into scalar values and texture-map GUIDs.
 pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     var out = types.ResolvedMaterial{};
     if (mat_guid.len == 0) return out;
@@ -105,9 +103,7 @@ fn setKey(dst: []u8, s: []const u8) usize {
     return l;
 }
 
-/// Upload every mesh + material texture referenced by `objects` that isn't
-/// cached yet. Must run before the render pass (copy passes can't be nested in
-/// a render pass).
+/// Upload uncached meshes and textures referenced by `objects`; must run before the render pass.
 pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, objects: []const engine.SceneNode) void {
     for (objects) |*obj| {
         if (!obj.active) continue;
@@ -172,12 +168,8 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     const vtx_bytes: u32 = @intCast(cpu.vertices.len * @sizeOf(types.GpuVertex));
     const idx_bytes: u32 = @intCast(cpu.indices.len * @sizeOf(u32));
 
-    // Build the (sorted) submesh + material-group tables first — pure CPU
-    // work, no GPU calls — so the per-submesh bounds buffer below can be
-    // filled and uploaded in the same copy pass as the vertex/index buffers.
-    //
-    // One GPU submesh per cooked submesh (no ceiling); meshes with no submesh
-    // table draw as a single implicit range bound to material slot 0.
+    // Build (sorted) submesh + material-group tables, then upload everything in one copy pass.
+    // Meshes with no submesh table draw as a single implicit range at material slot 0.
     const sm_count = @max(cpu.submeshes.len, 1);
     const submeshes = try page.alloc(state.GpuSubmesh, sm_count);
     errdefer page.free(submeshes);
@@ -200,10 +192,7 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
             };
     }
 
-    // Sort by material slot so same-material submeshes end up contiguous —
-    // lets the renderer issue one indirect multi-draw call per material
-    // instead of one draw per submesh. Draw order within a mesh doesn't
-    // matter (each submesh is an independent opaque range), so this is safe.
+    // Sort by material slot so same-material submeshes are contiguous for indirect multi-draw.
     std.sort.pdq(state.GpuSubmesh, submeshes, {}, struct {
         fn lessThan(_: void, x: state.GpuSubmesh, y: state.GpuSubmesh) bool {
             return x.material_slot < y.material_slot;
@@ -339,7 +328,7 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.indirect_buf = indirect_buf;
 }
 
-/// Upload a texture (RGBA8 or block-compressed, with mips) and cache it by GUID.
+/// Upload a texture and cache it by GUID.
 pub fn uploadTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const u8) !*c.SDL_GPUTexture {
     if (findGpuTexture(guid)) |gt| return gt.texture;
     state.ensureTextureCapacity();
@@ -410,12 +399,7 @@ fn mipCountFor(w: u32, h: u32) u32 {
     return std.math.log2_int(u32, @max(@max(w, h), 1)) + 1;
 }
 
-/// Order-2 (9-coefficient) spherical-harmonics projection of an equirect
-/// environment's radiance, for diffuse irradiance IBL (Ramamoorthi & Hanrahan).
-/// Sampled on a coarse lat-long grid — order-2 SH is a very low-frequency
-/// approximation, so a few thousand samples already saturate its accuracy;
-/// walking every texel of a multi-megapixel HDRI would cost far more for no
-/// visible gain.
+/// Order-2 SH projection of an equirect environment for diffuse IBL.
 const SH_SAMPLES_X = 128;
 const SH_SAMPLES_Y = 64;
 
@@ -467,12 +451,7 @@ fn computeIrradianceSh(img: engine.assets.HdrLoader.HdrImage) [9][3]f32 {
     return sh;
 }
 
-/// Upload an equirectangular HDR environment map as a float texture with a
-/// full mip chain (specular IBL picks a mip by roughness) and cache it by GUID
-/// alongside its precomputed diffuse-irradiance SH coefficients. Accepts either
-/// a cooked `HdrLoader` envelope (the built/shipped-game asset source) or a raw
-/// `.hdr` container (Studio's editor viewport reads source bytes directly,
-/// without going through the import cook step). No-op if already cached.
+/// Upload an equirect HDR env map as a float texture with mips + SH coefficients; no-op if already cached.
 pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const u8) !void {
     if (findGpuTexture(guid)) |_| return;
     state.ensureTextureCapacity();
@@ -554,9 +533,7 @@ test "mipCountFor spans full chains down to 1x1" {
 }
 
 test "computeIrradianceSh reduces to a DC term for a uniform environment" {
-    // A constant-radiance environment has zero higher-order SH components —
-    // all directional information cancels out — so only sh[0] (the DC/average
-    // term) should be non-zero.
+    // A constant-radiance environment has zero higher-order SH components.
     const w: u32 = 64;
     const h: u32 = 32;
     var pixels: [w * h * 3]f32 = undefined;

@@ -1,28 +1,8 @@
-//! Typed UI event registry (D4): strings at rest in a serialized `.uidoc`
-//! binding, dense integer handles at runtime (zero string compares per
-//! frame), types in user code — no central enum to edit when adding an
-//! event. Mirrors the type-keyed registry idiom already established by
-//! `engine/Services.zig` (`register(T)`/`get(T)`).
-//!
-//! ```zig
-//! pub const PlayClicked = struct {
-//!     pub const event_name = "play_clicked"; // ties the type to the serialized name
-//! };
-//!
-//! // in a user_script awake(frame):
-//! const ev = frame.service(engine.ui.UiEvents).?;
-//! ev.register(PlayClicked);      // name -> EventId interning
-//! ev.on(PlayClicked, self, onPlay); // comptime type-keyed, like Services
-//!
-//! fn onPlay(self: *Self, _: PlayClicked) void { ... }
-//! ```
-//!
-//! Load-time resolution: when a `.uidoc` (or the game) loads, each `named`
-//! `EventBinding` resolves once through `resolveOrWarn` to a dense `EventId`;
-//! dispatch after that is `fireId(id)` — an integer compare per subscriber,
-//! no string work. v1 events are payload-less (`fireId`); `on`'s handler
-//! signature already takes the event type as a payload parameter so adding
-//! fields to an event later isn't an API break.
+//! Typed UI event registry (D4): string names at rest in `.uidoc`, dense
+//! integer handles at runtime. Events are registered by Zig type
+//! (`register(T)`/`on(T, ...)`) mirroring `Services.zig`'s type-keyed idiom;
+//! load-time resolution maps `named` bindings to `EventId`s once, so dispatch
+//! is a simple integer compare per subscriber.
 
 const std = @import("std");
 const document = @import("UiDocument.zig");

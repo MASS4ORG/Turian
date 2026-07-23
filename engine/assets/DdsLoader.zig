@@ -1,12 +1,7 @@
-//! DDS texture container reader/cooker. Parses the classic DirectDraw Surface
-//! format (legacy FourCC pixel formats and the DX10 extended header) and
-//! decodes BC1/BC3/BC4/BC5/BC7 (plus uncompressed RGBA8) payloads directly
-//! into a `ktx2.Image` — the same GPU-ready shape the KTX2 reader produces —
-//! so the rest of the engine treats DDS as just another source format.
-//!
-//! `cook` rewrites a container to bake in sRGB tagging (legacy FourCC has no
-//! sRGB bit, so this upgrades to a DX10 header when needed) and to invert the
-//! green channel of BC5 blocks for DirectX-convention normal maps.
+//! DDS texture container reader/cooker. Parses FourCC and DX10 extended
+//! headers, decodes BC1/BC3/BC4/BC5/BC7 and uncompressed RGBA8 into
+//! `ktx2.Image`. `cook` bakes in sRGB tagging and DirectX-convention
+//! normal map green-channel inversion.
 const std = @import("std");
 const ktx2 = @import("ktx2");
 

@@ -33,10 +33,7 @@ pub fn deleteSelectedObjects(now: i128) void {
     const before = UndoRedo.captureSnapshot();
     const n = EditorState.object_count;
 
-    // Mark selected objects and all their descendants. Sized to `n` (the
-    // live count), not `MAX_OBJECTS` — a fixed array here would index out of
-    // bounds once a scene exceeds 128 nodes (e.g. a Bistro-scale FBX
-    // hierarchy).
+    // Mark selected objects and all their descendants.
     const to_remove_set = EditorState.gpa.alloc(bool, n) catch return;
     defer EditorState.gpa.free(to_remove_set);
     @memset(to_remove_set, false);
@@ -61,12 +58,7 @@ pub fn deleteSelectedObjects(now: i128) void {
         };
     }
 
-    // Compact in place — no `[MAX_OBJECTS]SceneNode` scratch buffer (that
-    // stack allocation overflowed the thread stack; same class of bug as the
-    // Spawner.zig fix). Safe without a temp buffer because `index_map[i] <=
-    // i` always (compaction only ever shifts entries toward index 0), so
-    // scanning `i` forward and writing `objects[index_map[i]] = objects[i]`
-    // never clobbers a source index the loop hasn't read yet.
+    // Compact in place: `index_map[i] <= i` guarantees forward-scan safety.
     for (0..EditorState.object_count) |i| {
         const ni = index_map[i];
         if (ni != -1) {
@@ -113,10 +105,7 @@ pub fn deleteObject(now: i128, idx: usize) void {
     const before = UndoRedo.captureSnapshot();
     const n = EditorState.object_count;
 
-    // 1. Identify subtree to remove. Sized to `n`, not `MAX_OBJECTS` — every
-    // node has exactly one parent, so each index is pushed onto `scan_stack`
-    // at most once (when its actual parent is processed), so `n` is always
-    // enough capacity.
+    // 1. Identify subtree to remove.
     const to_remove_set = EditorState.gpa.alloc(bool, n) catch return;
     defer EditorState.gpa.free(to_remove_set);
     @memset(to_remove_set, false);
@@ -155,13 +144,7 @@ pub fn deleteObject(now: i128, idx: usize) void {
         }
     }
 
-    // 3. Rebuild the objects array in place — no `[MAX_OBJECTS]SceneNode`
-    // scratch buffer (that stack allocation overflowed the thread stack;
-    // same class of bug as the Spawner.zig fix). Safe without a temp buffer
-    // because `index_map[i] <= i` always (compaction only ever shifts
-    // entries toward index 0), so scanning `i` forward and writing
-    // `objects[index_map[i]] = objects[i]` never clobbers a source index the
-    // loop hasn't read yet.
+    // Rebuild in place: `index_map[i] <= i` guarantees forward-scan safety.
     for (0..EditorState.object_count) |i| {
         const new_idx = index_map[i];
         if (new_idx != -1) {
@@ -343,12 +326,7 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
     const n = EditorState.object_count;
     const gpa = EditorState.gpa;
 
-    // Children lists as a linked list, O(n) total (not the O(n^2) dense
-    // `[MAX_OBJECTS][MAX_OBJECTS]i32` this used to be — at Bistro scale
-    // (thousands of nodes) that would have meant a multi-MB-to-GB allocation
-    // on every drag-reparent). `first_child`/`last_child` are keyed by
-    // (parent + 1) so root (-1) lives at key 0; `next_sibling`/`prev_sibling`
-    // thread each parent's children in original relative order.
+    // Children lists as a linked list keyed by (parent + 1) so root (-1) is key 0.
     const KEYS = n + 1;
     const first_child = gpa.alloc(i32, KEYS) catch return;
     defer gpa.free(first_child);
@@ -412,11 +390,7 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
 
     const before = UndoRedo.captureSnapshot();
 
-    // Iterative DFS from the root to produce the new linear order of old
-    // indices. Pushing each parent's children tail-to-head (via
-    // `prev_sibling`) means they pop head-to-tail, preserving order, without
-    // needing a temporary reversal buffer. Each node is pushed and popped
-    // exactly once, so `stack` sized to `n` is always enough.
+    // Iterative DFS from root to produce the new linear order.
     const order = gpa.alloc(usize, n) catch return;
     defer gpa.free(order);
     var order_n: usize = 0;
@@ -449,11 +423,7 @@ pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i
     defer gpa.free(new_of_old);
     for (order[0..order_n], 0..) |old, ni| new_of_old[old] = @intCast(ni);
 
-    // Heap, not `[MAX_OBJECTS]SceneNode` on the stack — that overflowed the
-    // thread stack (same class of bug as the Spawner.zig fix). Unlike the
-    // delete-path compaction above, this reorder is an arbitrary DFS-order
-    // permutation (`new_of_old[old]` isn't monotonic in `old`), so it can't
-    // be proven safe to apply in place — a real scratch buffer is needed.
+    // Heap scratch buffer needed because the DFS permutation is not monotonic.
     const rebuilt = gpa.alloc(SceneNode, order_n) catch return;
     defer gpa.free(rebuilt);
     for (order[0..order_n], 0..) |old, ni| {

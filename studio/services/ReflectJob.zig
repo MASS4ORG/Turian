@@ -28,11 +28,8 @@ pub const ComponentDef = editor.ComponentDef;
 pub const MAX_DISCOVERED = editor.scanner.MAX_COMPONENTS;
 
 // ── Background component reflection (script compile) ────────────────────────
-// `refreshComponents` scans quickly (just parsing source files), but compiling
-// user script reflection spawns a `zig build` per source file and can take
-// seconds. Running that inline used to freeze the whole editor on project
-// open/switch and on every hot-reload; it now runs on a worker via
-// `io.concurrent`, tracked in `task_manager` so the task bar shows progress.
+// Compiling user script reflection spawns `zig build` per source file. Runs on
+// a worker via `io.concurrent`, tracked in `task_manager` for progress.
 
 pub const ReflectJob = struct {
     arena: std.heap.ArenaAllocator,

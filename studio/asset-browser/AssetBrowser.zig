@@ -30,7 +30,7 @@ var g_browser_split_ratio: f32 = 0.22;
 
 /// Settings key for `g_nav_mode`. Lazily synced on first ready frame
 /// (`syncNavModeFromSettings`) because settings aren't loaded when this
-/// module's globals initialize — same pattern as `MenuBar.show_editor_fps`.
+/// module's globals initialize.
 const NAV_MODE_SETTING_KEY = "asset_browser.nav_mode";
 var nav_mode_loaded: bool = false;
 

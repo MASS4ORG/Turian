@@ -3,26 +3,10 @@ const math = @import("math");
 const Vector3 = math.Vector3;
 const Matrix4 = math.Matrix4;
 
-/// Immediate-mode debug-draw command buffer.
-///
-/// `Gizmos` is **pure data** — it records colored line segments and text labels
-/// into fixed-capacity buffers and does no rendering itself. The editor's GPU
-/// renderer consumes the recorded primitives each frame. Because the type has no
-/// dependency on the GUI/GPU layers, user script components (which link only the
-/// engine) can fill a `Gizmos` buffer in their own `drawGizmos` method, giving
-/// components and extensions a way to register custom gizmos.
-///
-/// Every higher-level shape (`box`, `wireSphere`, `cone`, …) decomposes into the
-/// same colored line primitive, so the renderer only ever needs to draw a flat
-/// list of `Vertex` pairs as a line list, plus the labels.
-///
-/// Typical use (per frame):
-/// ```zig
-/// gizmos.clear();
-/// gizmos.setColor(.green);
-/// gizmos.wireSphere(node.transform.position, 0.5);
-/// gizmos.label(node.transform.position, node.nameSlice());
-/// ```
+/// Immediate-mode debug-draw command buffer. Records colored line segments and
+/// text labels into fixed-capacity buffers with no GPU dependency — the editor's
+/// renderer consumes them each frame. User scripts can fill a buffer in
+/// `drawGizmos` without linking the GUI/GPU layers.
 pub const Gizmos = struct {
     /// Maximum number of line endpoints (each line uses two). Sized generously so
     /// a full scene of wire shapes plus the transform gizmo fits comfortably.

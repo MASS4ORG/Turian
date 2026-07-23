@@ -1,25 +1,6 @@
-/// Turian-owned project configuration (`project.json`).
-///
-/// `project.json` is the **single source of truth** for a project's identity and
-/// its declared dependencies. The project's `build.zig.zon` is a *generated
-/// artifact* derived from this file (see `toBuildZon`) — like Unity/Flax
-/// regenerate their `.csproj`/`.sln`. Users never hand-edit `build.zig.zon`,
-/// so they cannot introduce ZON syntax bugs; the CLI/Studio mutate the JSON
-/// (easy and safe) and regenerate the ZON deterministically.
-///
-/// Schema (all fields optional except `turian_version`, for backward
-/// compatibility with the original one-line sentinel):
-/// ```json
-/// {
-///   "turian_version": "0.16",
-///   "name": "My Game",
-///   "version": "0.0.0",
-///   "dependencies": {
-///     "some_dep":  { "url": "git+https://example.com/pkg#<ref>", "hash": "..." },
-///     "local_dep": { "path": "../local-pkg" }
-///   }
-/// }
-/// ```
+/// Turian-owned project configuration (`project.json`). Single source of truth
+/// for project identity and dependencies; `build.zig.zon` is a generated
+/// artifact derived from this file (see `toBuildZon`).
 const std = @import("std");
 
 pub const PROJECT_FILE = "project.json";
@@ -257,13 +238,8 @@ pub const ProjectConfig = struct {
         return self.toBuildZonExtra(allocator, fallback_name, path_prefix, &.{});
     }
 
-    /// Like `toBuildZon`, plus `extra_deps` appended to the dependency table —
-    /// used to inject the `dvui` entry (C10 pay-for-use) for projects that
-    /// reference a `.uidoc` asset, without polluting `self.dependencies`
-    /// (which stays the user-authored `project.json` source of truth and
-    /// feeds the separate `b.dependency()` no-op resolution loop in
-    /// `GameCodegen` — `dvui` is wired specially there instead, with its own
-    /// backend option, so it must NOT also appear in that generic loop).
+    /// Like `toBuildZon`, plus `extra_deps` appended to the dependency table
+    /// (used to inject `dvui` without polluting `self.dependencies`).
     pub fn toBuildZonExtra(
         self: ProjectConfig,
         allocator: std.mem.Allocator,

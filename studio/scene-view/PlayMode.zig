@@ -1,24 +1,9 @@
-//! Play mode — runs the current scene's game simulation in-process,
-//! inside the editor viewport, with clean enter/exit and exact state restore.
+//! Play mode — runs the current scene's game simulation in-process inside the
+//! editor viewport, with clean enter/exit and exact state restore.
 //!
-//! ## State machine
-//!   edit ──Play──▶ playing ──Pause──▶ paused ──Play──▶ playing
-//!     ▲                │                  │
-//!     └──────Stop──────┴────────Stop──────┘
-//! `Step` advances exactly one update frame while paused.
-//!
-//! ## Execution model — in-process, hot-compiled shared library
-//! User scripts are arbitrary `.zig` files not linked into the studio binary,
-//! so they are compiled on Play into a *play library* (`editor.PlayBuild`) which
-//! the studio dlopen()s and drives through a small C ABI. The library owns the
-//! live scene nodes, the input snapshot and the script instances; the studio
-//! owns the window, the renderer and the loop. See
-//! `docs/decisions/0002-play-mode.md` for the in-process vs subprocess analysis.
-//!
-//! ## State restore
-//! The edit-time scene is snapshotted on Play and restored verbatim on Stop, so
-//! nothing the simulation does can leak into the saved scene. (Play edits live
-//! only inside the library's own node copy, seeded from a serialized snapshot.)
+//! State machine: edit → playing ↔ paused → edit. `Step` advances one frame
+//! while paused. User scripts compile into a dlopen'd play library; the
+//! edit-time scene is snapshotted on Play and restored verbatim on Stop.
 const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");

@@ -1,22 +1,8 @@
-//! Built-in `.uitheme` presets shipped with the engine: Dark, Light, Dark
-//! High Contrast, Darcula, and Catppuccin. Mirrors `Material.presets` — named,
-//! comptime-constructed values rather than files on disk, so they're always
-//! available even with no project open.
-//!
-//! `dark`/`light` deliberately soften the border contrast and narrow the gap
-//! between panel-header and body fill colors versus dvui's stock Adwaita
-//! theme (`zig-pkg/dvui-.../src/themes/Adwaita.zig`) — Adwaita's dark border
-//! is `dark_fill_hsl.lighten(39)`, visually dominant against the 0x1e1e1e
-//! body fill; ours is a fixed, much closer gray.
-//!
-//! Each preset also sets `app1` — repurposed by Studio as dock panel body
-//! chrome (`studio/main-window/Window.zig`) — to a fill clearly distinct from
-//! `window.fill` (used by the root canvas and tab strip), so a panel's
-//! boundary is identifiable at a glance instead of blending into the rest of
-//! the chrome. That fill contrast is what delineates a panel, so the presets
-//! round the panel corners and draw no panel border at all; Dark High
-//! Contrast is the exception, where a hard border *is* the accessibility
-//! affordance.
+//! Built-in `.uitheme` presets: Dark, Light, Dark High Contrast, Darcula,
+//! and Catppuccin. Comptime-constructed values always available even with no
+//! project open. Dark/Light use `app1` for dock panel chrome (visually
+//! distinct from `window` canvas), with softened borders and no panel border;
+//! Dark High Contrast adds a hard border for accessibility.
 const UiTheme = @import("UiTheme.zig");
 const Style = UiTheme.Style;
 const Color = UiTheme.Color;

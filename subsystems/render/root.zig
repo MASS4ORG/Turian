@@ -1,12 +1,7 @@
 //! Hardware 3D scene renderer (SDL3 GPU: Vulkan/Metal/D3D12), shared by the
-//! editor viewport and the shipped game. UI-toolkit independent: the caller
-//! supplies a GPU device, a color-target texture, the scene nodes, and asset
-//! bytes via the source callbacks. The editor draws into an offscreen target;
-//! the game draws into the swapchain.
-//!
-//! Code is split by theme: `types` (plain data), `state` (GPU singletons),
-//! `pipeline` (device resource creation), `assets` (GUID→GPU upload + material
-//! resolution), `shadow` (shadow mapping). This file is the orchestration.
+//! editor viewport and the shipped game. Caller supplies GPU device, target
+//! texture, scene nodes, and asset bytes via source callbacks. Split across
+//! `types`, `state`, `pipeline`, `assets`, `shadow`; this file orchestrates.
 const std = @import("std");
 const gpu = @import("gpu");
 const engine = @import("engine");
@@ -18,7 +13,7 @@ const assets = @import("assets.zig");
 const shadow = @import("shadow.zig");
 const gizmos = @import("gizmos.zig");
 const culling = @import("culling.zig");
-const gpu_cull = @import("gpu_cull.zig");
+const gpu_timing = @import("gpu_timing.zig");
 const draw = @import("draw.zig");
 
 const log = std.log.scoped(.render);
@@ -65,6 +60,16 @@ pub fn editorCamera() ?EditorCam {
     return state.editor_cam;
 }
 
+/// Enable/disable fence-bracketed per-pass GPU timing; off by default (pipeline stall).
+pub fn setDetailedGpuTiming(on: bool) void {
+    state.detailed_gpu_timing = on;
+}
+
+/// Whether detailed GPU timing is currently enabled.
+pub fn detailedGpuTiming() bool {
+    return state.detailed_gpu_timing;
+}
+
 /// Serve `bytes` for `guid` from `resolveMaterial` instead of `material_src`,
 /// until cleared. Used by live-editing panels (e.g. the material inspector) to
 /// preview unsaved edits without writing to disk every frame.
@@ -80,9 +85,7 @@ pub fn clearMaterialOverride() void {
     state.material_override_bytes = &.{};
 }
 
-/// Compute the camera used to render `objects` at `w`×`h`. Uses the editor
-/// free-look override if set, otherwise the first active camera component (or a
-/// default if none). Mirrors the camera setup in `renderScene`.
+/// Compute the camera used for rendering; editor override or first active camera component.
 pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     var cam_pos = Vector3{ .x = 0, .y = 2, .z = -5 };
     var cam_rot = Vector3{};
@@ -182,12 +185,7 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     log.info("Ready (SPIRV).", .{});
 }
 
-/// Depth texture for a `w`×`h` pass, cached by size (see `state.depth_targets`).
-/// Reuses a same-size texture, fills an empty slot, or evicts the round-robin
-/// slot when full. Eviction only frees a size not requested in the current
-/// frame — the distinct sizes rendered per frame (viewport + previews) stay well
-/// under `MAX_DEPTH_TARGETS` — so it never releases a depth attachment an
-/// in-flight command buffer still references.
+/// Depth texture for a `w`x`h` pass, cached by size.
 fn depthFor(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?*c.SDL_GPUTexture {
     if (state.findDepth(w, h)) |t| return t;
 
@@ -218,9 +216,7 @@ fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
     state.depth_evict_cursor = 0;
 }
 
-/// Render `objects` into `color_tex` (a `w`×`h` target) using `cmd`. The caller
-/// owns the command buffer and the color target (an editor offscreen texture or
-/// the game swapchain) and submits the command buffer itself.
+/// Render `objects` into `color_tex` using `cmd`.
 pub fn renderScene(
     cmd: *c.SDL_GPUCommandBuffer,
     color_tex: *c.SDL_GPUTexture,
@@ -338,41 +334,12 @@ pub fn renderScene(
     const shadows_on = shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
 
     if (shadows_on) {
-        var shadow_zone = engine.Profiler.zone("render.shadow");
-        defer shadow_zone.end();
-        shadow.renderShadowPass(cmd, light_vp, objects);
+        gpu_timing.runShadowPass(dev, cmd, light_vp, objects);
     }
 
     // ── GPU-driven cull compute phase ────────────────────────────────────────
-    // Must finish before the main render pass opens below — SDL_GPU compute
-    // passes and render passes can't overlap on the same command buffer. Each
-    // mesh gets at most one dispatch per frame (see `GpuMesh.cull_dispatched_frame`);
-    // a second mesh renderer instancing the same mesh this frame is left
-    // undispatched and falls back to the CPU per-submesh path in the main pass.
-    {
-        var cull_zone = engine.Profiler.zone("render.cull");
-        defer cull_zone.end();
-        for (objects) |*obj| {
-            if (!obj.active) continue;
-            for (obj.components[0..obj.component_count]) |*comp| {
-                if (comp.* != .mesh_renderer) continue;
-                const guid_str = comp.mesh_renderer.mesh.slice();
-                if (guid_str.len == 0) continue;
-                const gm = assets.findGpuMesh(guid_str) orelse continue;
-                if (gm.submeshes.len == 0 or gm.indirect_buf == null) continue;
-                if (gm.cull_dispatched_frame == state.frame_seq) continue;
-
-                const t = &obj.transform;
-                const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
-                    .multiply(Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z))
-                    .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
-                if (culling.aabbOutsideFrustum(gm.bounds_min, gm.bounds_max, mdl, frustum)) continue;
-
-                gpu_cull.dispatchCull(cmd, gm, mdl, frustum);
-                gm.cull_dispatched_frame = state.frame_seq;
-            }
-        }
-    }
+    // Must finish before the main render pass (compute and render passes can't overlap on the same command buffer).
+    gpu_timing.runCullPhase(dev, cmd, objects, frustum);
 
     // ── Main pass ───────────────────────────────────────────────────────────
     var main_zone = engine.Profiler.zone("render.main");
@@ -386,7 +353,7 @@ pub fn renderScene(
     var depth_info = std.mem.zeroes(c.SDL_GPUDepthStencilTargetInfo);
     depth_info.texture = depth_tex;
     depth_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
-    // Preserve depth so the gizmo overlay pass can depth-test against the scene.
+    // Preserve depth for the gizmo overlay pass.
     depth_info.store_op = c.SDL_GPU_STOREOP_STORE;
     depth_info.clear_depth = 1.0;
 
@@ -416,10 +383,7 @@ pub fn renderScene(
         .env_sh = env_sh,
     };
 
-    // Draw the environment background first (if bound and enabled) so opaque
-    // geometry simply overwrites sky pixels as it renders — see
-    // `pipeline.createSkyboxPipeline`. IBL lighting still applies even when
-    // the skybox itself is hidden (`show_skybox = false`).
+    // Draw the environment background first so opaque geometry overwrites sky pixels.
     if (env_tex != null and env_show_skybox) {
         if (state.skybox_pipeline) |skybox_pl| {
             c.SDL_BindGPUGraphicsPipeline(pass, skybox_pl);
@@ -468,10 +432,7 @@ pub fn renderScene(
             const receives = mr.receive_shadows and shadows_on;
             const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_gpu_tex = env_gpu_tex, .white = white, .flat_n = flat_n, .sampler = sampler };
 
-            // GPU-driven indirect path only for the instance the cull compute
-            // phase above actually dispatched for this mesh this frame — see
-            // `GpuMesh.cull_dispatched_frame`'s doc comment for why a second
-            // instance sharing the mesh can't safely use it too.
+            // GPU-driven indirect path (cull compute dispatched this frame).
             if (gm.indirect_buf != null and gm.cull_dispatched_frame == state.frame_seq) {
                 for (gm.material_groups) |group| {
                     const mat_guid = draw.materialGuidForSlot(mr, mat_n, group.material_slot);
@@ -482,10 +443,7 @@ pub fn renderScene(
                     const mat_res = assets.resolveMaterial(mat_guid);
                     const dp = draw.buildDrawParams(&mat_res, gm, 0, 0, vub, receives, dctx);
 
-                    // Opaque groups draw as one indirect multi-draw call — GPU-decided
-                    // per-submesh visibility, no CPU loop. Transparent groups still
-                    // need back-to-front depth sort, which indirect multi-draw can't
-                    // do, so those fall back to the per-submesh CPU path.
+                    // Opaque groups draw as one indirect multi-draw; transparent groups fall back to per-submesh CPU path for depth sort.
                     if (mat_res.render.blend == .disabled) {
                         draw.submitIndirectDraw(cmd, pass, dev, &bound_pipeline, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
                     } else {
@@ -509,9 +467,7 @@ pub fn renderScene(
                 continue;
             }
 
-            // CPU fallback: per-submesh cull + individual draws. Used when the
-            // cull compute pipeline/this mesh's GPU buffers aren't available, or
-            // this mesh was already dispatched by another instance this frame.
+            // CPU fallback: per-submesh cull + draw.
             for (gm.submeshes) |sm| {
                 if (sm.index_count == 0) continue;
                 if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
@@ -529,8 +485,7 @@ pub fn renderScene(
                 const mat_res = assets.resolveMaterial(mat_guid);
                 const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, receives, dctx);
 
-                // Opaque draws right away; blended/additive draws are deferred so
-                // they can be sorted back-to-front after every opaque draw lands.
+                // Opaque draws right away; blended/additive draws are deferred for back-to-front sort.
                 if (mat_res.render.blend == .disabled) {
                     draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, dp);
                 } else if (draw.transparent_count < draw.transparent_draws.len) {
@@ -545,9 +500,13 @@ pub fn renderScene(
     }
 
     // Back-to-front so alpha compositing reads correctly (farthest drawn first).
-    std.sort.pdq(draw.TransparentDraw, draw.transparent_draws[0..draw.transparent_count], {}, draw.transparentFartherFirst);
-    for (draw.transparent_draws[0..draw.transparent_count]) |td|
-        draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, td.params);
+    {
+        var transparent_zone = engine.Profiler.zone("render.transparent");
+        defer transparent_zone.end();
+        std.sort.pdq(draw.TransparentDraw, draw.transparent_draws[0..draw.transparent_count], {}, draw.transparentFartherFirst);
+        for (draw.transparent_draws[0..draw.transparent_count]) |td|
+            draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, td.params);
+    }
 
     c.SDL_EndGPURenderPass(pass);
 }

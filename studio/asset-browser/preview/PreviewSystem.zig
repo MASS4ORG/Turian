@@ -1,25 +1,7 @@
-//! Shared asset preview API: a single registry of
-//! "asset type → thumbnail generator" used by both the Inspector's preview
-//! panel and the Asset Browser's tile grid, with an in-memory + on-disk raster
-//! cache keyed by the asset's GUID and its `.meta` `source_hash` (so a
-//! thumbnail is regenerated only when its source actually changes — the same
-//! change-detection the reimport pipeline already uses).
-//!
-//! Custom previewers: call `registerProvider(asset_type, yourFn)` (e.g. from
-//! `studio/Main.zig` after `PreviewSystem.init()`) to replace or add a
-//! generator for an asset type — the same fn-pointer-registry idiom
-//! `GizmoSystem.registerGizmo` already uses for custom component gizmos. User
-//! script `.so`s can't call this directly (they don't link the GUI/render
-//! modules — so today this is a Zig-source
-//! extension point; a future editor-plugin loader  would register
-//! providers through the same call.
-//!
-//! Render-based previews (model, material) are intentionally NOT re-rendered
-//! every frame: they're generated once into a fixed-size raster (see
-//! `THUMB_SIZE`) on a cache miss, capped at a few generations per frame
-//! (`g_frame_budget`) so opening a folder full of uncached meshes doesn't
-//! stall a frame. Texture previews skip the raster pipeline for compressed
-//! (KTX2/BCn) source images — those fall back to the type icon.
+//! Shared asset preview API: registry of "asset type → thumbnail generator"
+//! with in-memory + on-disk cache keyed by GUID and source hash. Custom
+//! previewers via `registerProvider`. Renders are generated once on cache miss,
+//! capped per frame to avoid stalls.
 const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");

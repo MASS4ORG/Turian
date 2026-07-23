@@ -36,6 +36,14 @@ pub const MetaFile = struct {
     /// FNV-1a hash of the source file at last import; used for change detection.
     source_hash: u64 = 0,
 
+    /// Size in bytes of the source file at last successful import. A cheap
+    /// staleness signal checked before falling back to a full content hash.
+    source_size: u64 = 0,
+
+    /// Modification time (nanoseconds since epoch) of the source file at last
+    /// successful import; paired with `source_size` for the fast staleness check.
+    source_mtime_ns: i96 = 0,
+
     /// Asset-type-specific import configuration.
     import_settings: ImportSettings = .{ .unknown = {} },
 

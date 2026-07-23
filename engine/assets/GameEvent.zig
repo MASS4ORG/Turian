@@ -1,21 +1,7 @@
-//! GameEvent — an Inspector-wireable event-channel DataAsset.
-//! A publisher (e.g. a UI button's `channel` binding)
-//! and any number of subscribers reference the SAME asset GUID — never each
-//! other directly — and share one live instance via `GameEventRegistry`.
-//! Mirrors `engine.ui.UiEvents`' typed dispatch, but per-instance (one
-//! channel = one asset) rather than per-name.
-//!
-//! ```zig
-//! // in a subscriber's awake(frame):
-//! const door = frame.gameEvent(self.open_channel) orelse return;
-//! door.on(self, onDoorOpen);
-//!
-//! fn onDoorOpen(self: *Self) void { ... }
-//!
-//! // in a publisher (e.g. a button's on_click: {channel: "<guid>"} fires
-//! // this automatically via ui_render.dispatchClicks — no script needed):
-//! frame.gameEvent(self.open_channel).?.raise();
-//! ```
+//! Inspector-wireable event-channel DataAsset. Publishers and subscribers
+//! reference the same asset GUID and share one live instance via
+//! `GameEventRegistry`. Per-instance analogue of `engine.ui.UiEvents`' typed
+//! dispatch.
 
 const std = @import("std");
 

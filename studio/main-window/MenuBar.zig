@@ -5,6 +5,7 @@ const EditorState = @import("../services/EditorState.zig");
 const ProjectOps = @import("../services/ProjectOps.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
+const FpsCounter = @import("../services/FpsCounter.zig");
 const Screenshots = @import("../services/Screenshots.zig");
 const Documents = @import("Documents.zig");
 const ProjectDropdown = @import("ProjectDropdown.zig");
@@ -101,35 +102,47 @@ fn aboutDialogDisplay(id: gui.Id) anyerror!void {
 
 var hamburger_open: bool = false;
 
-/// Editor-FPS display toggle (Turian ▸ Settings ▸ General). Distinct from the
-/// FPS shown while Play Mode is running (`PlayMode.fps()`, the *game's* FPS)
-/// — this is the Studio UI's own frame rate, useful when diagnosing an editor
-/// slowdown (e.g. a heavy asset folder) independent of whether the game is
-/// playing. Persisted across sessions via the editor Settings store; `pub`
-/// so `SettingsEditor.save()` can push a live change immediately (otherwise
-/// the toggle wouldn't take effect until restart, since this var is only
-/// ever synced *from* settings once, at startup).
-pub var show_editor_fps: bool = false;
-/// Settings key for `show_editor_fps`. Lazily synced on first ready frame
-/// (`syncFpsFromSettings`) because settings aren't loaded when this module's
-/// globals initialize.
-const FPS_SETTING_KEY = "editor.show_fps";
-var fps_setting_loaded: bool = false;
+const GREEN = gui.Color{ .r = 0x6c, .g = 0xb0, .b = 0x4f };
+const YELLOW = gui.Color{ .r = 0xbf, .g = 0xb0, .b = 0x4f };
+const RED = gui.Color{ .r = 0xc4, .g = 0x4f, .b = 0x4f };
 
-/// Load the persisted FPS-toggle state once settings are available. A no-op
-/// after the first successful sync (and until then the default `false` shows).
-fn syncFpsFromSettings() void {
-    if (fps_setting_loaded or !EditorState.settingsReady()) return;
-    show_editor_fps = EditorState.settings.getBool(FPS_SETTING_KEY, false);
-    fps_setting_loaded = true;
+/// FPS + semaphore indicator, always visible in edit and Play mode alike.
+/// Backed by `FpsCounter` (`studio/services/FpsCounter.zig`): a persistent
+/// counter that ticks once per Studio main-loop iteration regardless of what
+/// ran that frame, so it reflects the Scene/Game viewport render and Play
+/// simulation cost — both run synchronously inside the same timed loop
+/// iteration — not just idle UI redraws, and it doesn't freeze when the loop
+/// goes quiet.
+fn drawFpsIndicator() void {
+    const ready = EditorState.settingsReady();
+    const green: f32 = if (ready) @floatCast(EditorState.settings.getFloat(editor.StudioSettings.KEY_PERF_FPS_GREEN, 60.0)) else 60.0;
+    const yellow: f32 = if (ready) @floatCast(EditorState.settings.getFloat(editor.StudioSettings.KEY_PERF_FPS_YELLOW, 30.0)) else 30.0;
+
+    const value = FpsCounter.fps();
+    const dot_col: gui.Color = if (value >= green) GREEN else if (value >= yellow) YELLOW else RED;
+
+    var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .gravity_y = 0.5, .padding = .{ .x = 8, .y = 2, .w = 4, .h = 2 } });
+    defer row.deinit();
+
+    // A filled rounded box instead of a Unicode "●": the embedded Vera Sans
+    // font (dvui's default, used cross-platform including the Windows port)
+    // has no glyph for U+25CF, so a text-based dot renders as a tofu box.
+    var dot = gui.box(@src(), .{}, .{
+        .min_size_content = .{ .w = 8, .h = 8 },
+        .gravity_y = 0.5,
+        .background = true,
+        .color_fill = dot_col,
+        .corners = .all(4),
+        .margin = .{ .x = 2, .w = 6 },
+    });
+    dot.deinit();
+    gui.label(@src(), "{d:.0} FPS", .{value}, .{ .gravity_y = 0.5, .font = .theme(.heading) });
 }
 
 /// Draw the main menu bar.  A hamburger icon toggles the main menu items
 /// (File, Edit, Project, View, Turian) in the bar horizontally; clicking
 /// outside the menu area collapses them back.
 pub fn draw(should_quit: *bool) void {
-    syncFpsFromSettings();
-
     var m = gui.menu(@src(), .horizontal, .{ .expand = .horizontal });
     defer m.deinit();
 
@@ -357,21 +370,7 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
 /// Stop, plus "Play First Scene" (runs the project's configured first scene
 /// regardless of which scene is open), and a live FPS readout while running.
 fn drawPlayControls() void {
-    if (PlayMode.state() != .edit) {
-        gui.label(@src(), "{d:.0} FPS", .{PlayMode.fps()}, .{
-            .gravity_y = 0.5,
-            .padding = .{ .x = 8, .y = 2, .w = 8, .h = 2 },
-            .font = .theme(.heading),
-        });
-    } else if (show_editor_fps) {
-        // The Studio UI's own frame rate (not the game's) — see
-        // `show_editor_fps`'s doc comment.
-        gui.label(@src(), "{d:.0} FPS", .{EditorState.debug_metrics.fps}, .{
-            .gravity_y = 0.5,
-            .padding = .{ .x = 8, .y = 2, .w = 8, .h = 2 },
-            .font = .theme(.heading),
-        });
-    }
+    drawFpsIndicator();
     switch (PlayMode.state()) {
         .edit => {
             // Playing the *current* scene only makes sense when one is open.
