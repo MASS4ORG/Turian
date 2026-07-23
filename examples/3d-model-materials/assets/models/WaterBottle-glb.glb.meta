@@ -1,8 +1,6 @@
 {
   "guid": "10000000-0000-4000-8000-0000000000d0",
   "asset_type": "model",
-  "importer_version": 4,
-  "source_hash": 15404368991504354982,
   "import_settings": {
     "model": {
       "import_animations": true,
@@ -44,6 +42,18 @@
       "asset_type": "material",
       "key": "material:0",
       "name": "BottleMat.material"
+    },
+    {
+      "guid": "371c6625-80bd-43d6-9271-c2d6034b6acf",
+      "asset_type": "model",
+      "key": "mesh:0",
+      "name": "WaterBottle.mesh"
+    },
+    {
+      "guid": "6116ef0c-9c14-4b33-b33b-af3037ad5d0f",
+      "asset_type": "scene",
+      "key": "hierarchy",
+      "name": "WaterBottle-glb.prefab"
     }
   ]
 }

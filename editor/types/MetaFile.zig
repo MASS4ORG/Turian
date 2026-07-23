@@ -20,8 +20,11 @@ pub const SubAsset = struct {
     name: []const u8 = "",
 };
 
-/// Persistent metadata file stored alongside every asset as `<path>.meta`.
-/// Serialized to / from JSON via serde.zig.
+/// Persistent, git-tracked metadata file stored alongside every asset as
+/// `<path>.meta`. Serialized to / from JSON via serde.zig. Holds only
+/// authored/durable identity and settings — recomputable import staleness
+/// bookkeeping (content hash, stat, importer version) lives separately in
+/// `AssetStamp.ImportStamp`, under the gitignored `.cache/`.
 pub const MetaFile = struct {
     /// Stable asset identity — survives renames and moves.
     /// Serialized as a UUID string "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx".
@@ -29,20 +32,6 @@ pub const MetaFile = struct {
 
     /// Broad asset category, derived from file extension on creation.
     asset_type: AssetType = .unknown,
-
-    /// Incremented when the importer logic changes; triggers a forced reimport.
-    importer_version: u32 = 0,
-
-    /// FNV-1a hash of the source file at last import; used for change detection.
-    source_hash: u64 = 0,
-
-    /// Size in bytes of the source file at last successful import. A cheap
-    /// staleness signal checked before falling back to a full content hash.
-    source_size: u64 = 0,
-
-    /// Modification time (nanoseconds since epoch) of the source file at last
-    /// successful import; paired with `source_size` for the fast staleness check.
-    source_mtime_ns: i96 = 0,
 
     /// Asset-type-specific import configuration.
     import_settings: ImportSettings = .{ .unknown = {} },

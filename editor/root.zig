@@ -16,10 +16,14 @@ pub const scene_io = @import("project/SceneIo.zig");
 /// Prefab system: instantiate scene assets as linked, overridable subtrees
 /// with source-edit propagation. A prefab is just a scene asset.
 pub const prefab = @import("project/Prefab.zig");
+/// GUID-keyed three-way scene merge, backing `turian-cli mergedriver`.
+pub const scene_merge = @import("project/SceneMerge.zig");
 /// Asset .meta file management.
 pub const asset_meta = @import("assets/AssetMeta.zig");
 /// Asset cache path management and maintenance.
 pub const asset_cache = @import("assets/AssetCache.zig");
+/// Per-asset import staleness cache (hash/stat/importer version), gitignored.
+pub const asset_stamp = @import("assets/AssetStamp.zig");
 /// Asset import pipeline (source → cached artifact).
 pub const asset_importer = @import("assets/AssetImporter.zig");
 

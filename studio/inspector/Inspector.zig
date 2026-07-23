@@ -87,7 +87,9 @@ pub fn draw() void {
         });
         defer row.deinit();
 
-        _ = gui.checkbox(@src(), &obj.active, null, .{ .gravity_y = 0.5 });
+        if (gui.checkbox(@src(), &obj.active, null, .{ .gravity_y = 0.5 })) {
+            EditorState.scene_dirty = true;
+        }
         gui.label(@src(), "{s}", .{obj.nameSlice()}, .{
             .font = .theme(.heading),
             .gravity_y = 0.5,

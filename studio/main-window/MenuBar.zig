@@ -367,23 +367,32 @@ fn drawLayoutMenu(m: *gui.MenuWidget) void {
 }
 
 /// Play transport embedded in the menu bar: Play / Pause / Resume / Step /
-/// Stop, plus "Play First Scene" (runs the project's configured first scene
-/// regardless of which scene is open), and a live FPS readout while running.
+/// Stop, plus "Play First Scene" (opens the project's configured first scene
+/// as a normal tab, then plays it), and a live FPS readout while running.
 fn drawPlayControls() void {
     drawFpsIndicator();
     switch (PlayMode.state()) {
         .edit => {
             // Playing the *current* scene only makes sense when one is open.
             const can_play = EditorState.hasOpenScene();
-            if (transportButton(.play, !can_play) and can_play) PlayMode.play(gui.io);
-            if (transportButton(.play_global, false)) PlayMode.playFirstScene(gui.io);
+            if (transportButton(.play, !can_play) and can_play) {
+                PlayMode.play(gui.io);
+                LayoutStore.focusPanel("game", gui.io);
+            }
+            if (transportButton(.play_global, false)) {
+                PlayMode.playFirstScene(gui.io);
+                LayoutStore.focusPanel("game", gui.io);
+            }
         },
         .playing => {
             if (transportButton(.pause, false)) PlayMode.pause();
             if (transportButton(.stop, false)) PlayMode.stop();
         },
         .paused => {
-            if (transportButton(.play, false)) PlayMode.play(gui.io);
+            if (transportButton(.play, false)) {
+                PlayMode.play(gui.io);
+                LayoutStore.focusPanel("game", gui.io);
+            }
             if (transportButton(.step, false)) PlayMode.step();
             if (transportButton(.stop, false)) PlayMode.stop();
         },
@@ -394,8 +403,9 @@ fn drawPlayControls() void {
 /// reader has to go on — hence a distinct color per action rather than five
 /// identical gray glyphs.
 ///
-/// Play Global (run the project's configured first scene, whatever scene is
-/// open for editing) has no icon of its own in any icon set, and neither
+/// Play Global (open and run the project's configured first scene, switching
+/// away from whatever scene is open for editing) has no icon of its own in
+/// any icon set, and neither
 /// entypo nor dvui can compose one glyph over another — an icon is a single
 /// pre-baked TVG path, with no layering, badge or background slot. So the
 /// meaning is carried by a glyph that already says it: `jump_to_start` — start

@@ -1,8 +1,6 @@
 {
   "guid": "f7694eb7-b850-4494-ba4a-6b18086b865f",
   "asset_type": "script",
-  "importer_version": 1,
-  "source_hash": 4517101601087490357,
   "import_settings": "script",
   "source_deps": [
   ],

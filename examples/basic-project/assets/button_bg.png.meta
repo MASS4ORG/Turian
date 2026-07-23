@@ -1,8 +1,6 @@
 {
   "guid": "0f7ade1d-d86f-436f-b927-2a6a11249da0",
   "asset_type": "image",
-  "importer_version": 2,
-  "source_hash": 1628612668245709253,
   "import_settings": {
     "image": {
       "texture_type": "default",

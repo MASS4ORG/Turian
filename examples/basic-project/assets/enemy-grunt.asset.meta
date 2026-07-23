@@ -1,8 +1,6 @@
 {
   "guid": "58a6a0db-f0e9-4d4c-b7b4-7ff001b81fd7",
   "asset_type": "data_asset",
-  "importer_version": 1,
-  "source_hash": 15668787172615530961,
   "import_settings": "data_asset",
   "source_deps": [
   ],

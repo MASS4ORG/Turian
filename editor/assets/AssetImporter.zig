@@ -7,6 +7,8 @@ const MetaFile = @import("../types/MetaFile.zig").MetaFile;
 const SubAsset = @import("../types/MetaFile.zig").SubAsset;
 const asset_meta = @import("AssetMeta.zig");
 const asset_cache = @import("AssetCache.zig");
+const asset_stamp = @import("AssetStamp.zig");
+const ImportStamp = asset_stamp.ImportStamp;
 const Progress = @import("../Progress.zig").Progress;
 
 const AssetDatabase = @import("AssetDatabase.zig").AssetDatabase;
@@ -50,20 +52,21 @@ pub fn importAsset(
     if (meta.guid.isNil()) return;
 
     const current_version = importerVersion(meta.asset_type);
+    var stamp = asset_stamp.readStamp(io, a, project_path, meta.guid);
 
     if (asset_cache.artifactExists(io, project_path, meta.guid, meta.asset_type) and
-        meta.importer_version == current_version)
+        stamp.importer_version == current_version)
     {
         // Size + mtime unchanged means content is unchanged; skip the full-content hash.
         if (asset_meta.statFile(io, asset_path)) |st| {
-            if (st.size == meta.source_size and st.mtime_ns == meta.source_mtime_ns) return;
+            if (st.size == stamp.source_size and st.mtime_ns == stamp.source_mtime_ns) return;
         }
-        if (asset_meta.hashFile(io, a, asset_path) == meta.source_hash) {
+        if (asset_meta.hashFile(io, a, asset_path) == stamp.source_hash) {
             // Hash matches despite stat mismatch; stamp current stat for next fast-path.
             if (asset_meta.statFile(io, asset_path)) |st| {
-                meta.source_size = st.size;
-                meta.source_mtime_ns = st.mtime_ns;
-                asset_meta.writeMeta(io, a, asset_path, meta);
+                stamp.source_size = st.size;
+                stamp.source_mtime_ns = st.mtime_ns;
+                asset_stamp.writeStamp(io, a, project_path, meta.guid, stamp);
             }
             return;
         }
@@ -178,12 +181,15 @@ fn writeArtifact(
         data;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = art_path, .data = artifact_bytes }) catch return;
 
-    meta.source_hash = std.hash.Fnv1a_64.hash(data);
-    meta.importer_version = current_version;
+    var stamp = ImportStamp{
+        .source_hash = std.hash.Fnv1a_64.hash(data),
+        .importer_version = current_version,
+    };
     if (asset_meta.statFile(io, asset_path)) |st| {
-        meta.source_size = st.size;
-        meta.source_mtime_ns = st.mtime_ns;
+        stamp.source_size = st.size;
+        stamp.source_mtime_ns = st.mtime_ns;
     }
+    asset_stamp.writeStamp(io, allocator, project_path, meta.guid, stamp);
 
     // A model can yield materials + textures as sub-assets; update meta before writing.
     if (meta.asset_type == .model)
@@ -303,6 +309,7 @@ test "importAsset skips content hashing when size and mtime are unchanged, but s
     const art_path = asset_cache.artifactPath(project_path, meta1.guid, meta1.asset_type, &art_buf).?;
     const bytes1 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
     try std.testing.expectEqualStrings("hello world", bytes1);
+    const stamp1 = asset_stamp.readStamp(io, a, project_path, meta1.guid);
 
     // Rewrite with identical content: mtime changes (a fresh write), size
     // doesn't. The stat fast path may or may not trip depending on mtime
@@ -311,8 +318,8 @@ test "importAsset skips content hashing when size and mtime are unchanged, but s
     try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "hello world" });
     importAsset(io, a, project_path, asset_path);
 
-    const meta2 = asset_meta.readMeta(io, a, asset_path);
-    try std.testing.expectEqual(meta1.source_hash, meta2.source_hash);
+    const stamp2 = asset_stamp.readStamp(io, a, project_path, meta1.guid);
+    try std.testing.expectEqual(stamp1.source_hash, stamp2.source_hash);
     const bytes2 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
     try std.testing.expectEqualStrings("hello world", bytes2);
 
@@ -321,10 +328,45 @@ test "importAsset skips content hashing when size and mtime are unchanged, but s
     try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "goodbye, world!" });
     importAsset(io, a, project_path, asset_path);
 
-    const meta3 = asset_meta.readMeta(io, a, asset_path);
-    try std.testing.expect(meta3.source_hash != meta1.source_hash);
+    const stamp3 = asset_stamp.readStamp(io, a, project_path, meta1.guid);
+    try std.testing.expect(stamp3.source_hash != stamp1.source_hash);
     const bytes3 = try std.Io.Dir.cwd().readFileAlloc(io, art_path, a, .unlimited);
     try std.testing.expectEqualStrings("goodbye, world!", bytes3);
+}
+
+test "reimporting an unchanged asset never rewrites the committed .meta bytes" {
+    const io = std.testing.io;
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "assets");
+    try tmp.dir.writeFile(io, .{ .sub_path = "assets/data.bin", .data = "hello world" });
+
+    var pp_buf: [256]u8 = undefined;
+    const project_path = try std.fmt.bufPrint(&pp_buf, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    var ap_buf: [300]u8 = undefined;
+    const asset_path = try std.fmt.bufPrint(&ap_buf, "{s}/assets/data.bin", .{project_path});
+    var meta_ap_buf: [300]u8 = undefined;
+    const meta_path = try std.fmt.bufPrint(&meta_ap_buf, "{s}.meta", .{asset_path});
+
+    asset_cache.ensureDir(io, project_path);
+    _ = asset_meta.ensureMeta(io, a, asset_path);
+    importAsset(io, a, project_path, asset_path);
+    const meta_bytes1 = try std.Io.Dir.cwd().readFileAlloc(io, meta_path, a, .unlimited);
+
+    // Cache-only fields (hash/size/mtime/importer version) must never appear
+    // in the committed .meta — they live in the gitignored stamp store instead.
+    try std.testing.expect(std.mem.indexOf(u8, meta_bytes1, "source_hash") == null);
+    try std.testing.expect(std.mem.indexOf(u8, meta_bytes1, "importer_version") == null);
+
+    // Reimporting with no source change must not touch the committed .meta
+    // at all, even byte-for-byte — this is what keeps `git status` clean.
+    importAsset(io, a, project_path, asset_path);
+    const meta_bytes2 = try std.Io.Dir.cwd().readFileAlloc(io, meta_path, a, .unlimited);
+    try std.testing.expectEqualStrings(meta_bytes1, meta_bytes2);
 }
 
 test "model import generates a PBR material bound to its external texture" {

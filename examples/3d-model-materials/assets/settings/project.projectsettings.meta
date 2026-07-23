@@ -1,8 +1,6 @@
 {
   "guid": "10000000-0000-4000-8000-0000000000c1",
   "asset_type": "project_settings",
-  "importer_version": 1,
-  "source_hash": 8084603431894334309,
   "import_settings": "project_settings",
   "source_deps": [
   ],

@@ -86,6 +86,22 @@ pub fn addPanel(id: []const u8, io: std.Io) void {
     save(io);
 }
 
+/// Brings `id`'s dock tab to the front of its leaf (e.g. so Play surfaces the
+/// Game panel over whatever tab it's sharing a dock with). No-op if `id`
+/// isn't open in the current layout.
+pub fn focusPanel(id: []const u8, io: std.Io) void {
+    const l = get();
+    const leaf_idx = l.findPanel(id) orelse return;
+    const tabs = l.nodes.items[leaf_idx].leaf.tabs.items;
+    for (tabs, 0..) |t, i| {
+        if (std.mem.eql(u8, t, id)) {
+            l.setActive(leaf_idx, i);
+            break;
+        }
+    }
+    save(io);
+}
+
 /// True while the active document's own layout stands in for the main one.
 /// Layout *presets*, built-in and user-saved alike, are arrangements of the
 /// scene panels — so the View ▸ Layout menu hides itself in this state rather

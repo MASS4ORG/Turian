@@ -114,10 +114,6 @@ pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const 
         meta.import_settings = ImportSettings.defaultFor(meta.asset_type);
         dirty = true;
     }
-    if (meta.source_hash == 0) {
-        meta.source_hash = hashFile(io, a, asset_path);
-        dirty = true;
-    }
     if (dirty) writeMeta(io, a, asset_path, meta);
 
     // Arena slices would dangle; callers only use GUID/type/version.
@@ -125,34 +121,6 @@ pub fn ensureMeta(io: std.Io, allocator: std.mem.Allocator, asset_path: []const 
     meta.artifact_deps = &.{};
     meta.sub_assets = &.{};
     return meta;
-}
-
-/// Returns true when the asset has changed since its last recorded hash or
-/// importer version bump. Cheap size+mtime check before full content hash.
-pub fn needsReimport(
-    io: std.Io,
-    allocator: std.mem.Allocator,
-    asset_path: []const u8,
-    current_importer_version: u32,
-) bool {
-    const meta = readMeta(io, allocator, asset_path);
-    if (meta.guid.isNil()) return true;
-    if (meta.importer_version != current_importer_version) return true;
-    if (statFile(io, asset_path)) |st| {
-        if (st.size == meta.source_size and st.mtime_ns == meta.source_mtime_ns) return false;
-    }
-    return hashFile(io, allocator, asset_path) != meta.source_hash;
-}
-
-/// Stamp the source hash and size+mtime into the .meta after a successful import.
-pub fn updateHash(io: std.Io, allocator: std.mem.Allocator, asset_path: []const u8) void {
-    var meta = readMeta(io, allocator, asset_path);
-    meta.source_hash = hashFile(io, allocator, asset_path);
-    if (statFile(io, asset_path)) |st| {
-        meta.source_size = st.size;
-        meta.source_mtime_ns = st.mtime_ns;
-    }
-    writeMeta(io, allocator, asset_path, meta);
 }
 
 // ── Directory scanning ────────────────────────────────────────────────────────

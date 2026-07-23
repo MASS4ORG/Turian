@@ -150,11 +150,11 @@ var g_frame_budget: u32 = FRAME_BUDGET;
 
 /// Bumped whenever something *might* have invalidated cached previews in bulk
 /// (currently: `AssetWatcher` detecting an external change anywhere under
-/// `assets/`). A cache hit only pays for a `.meta` re-read (to compare
+/// `assets/`). A cache hit only pays for a stamp re-read (to compare
 /// `source_hash`) when its `checked_gen` is stale relative to this — i.e. at
 /// most once per detected-change event, and only for entries actually
 /// requested since then. This is what keeps a browser full of thumbnails fast:
-/// re-reading every visible asset's `.meta` file every frame (the original,
+/// re-reading every visible asset's stamp every frame (the original,
 /// much slower implementation) turned into O(visible tiles × 60/sec) file I/O.
 var g_generation: u32 = 0;
 
@@ -179,13 +179,13 @@ pub fn imageSourceFor(asset_path: []const u8) ?gui.ImageSource {
     if (find(guid)) |e| {
         if (e.checked_gen == g_generation) return sourceOrNull(e);
         // Something changed somewhere since this entry was last validated —
-        // pay for one `.meta` read to check THIS asset specifically, not the
+        // pay for one stamp read to check THIS asset specifically, not the
         // whole cache.
         e.checked_gen = g_generation;
-        if (readSourceHash(asset_path) == e.source_hash) return sourceOrNull(e);
+        if (readSourceHash(info.guid) == e.source_hash) return sourceOrNull(e);
     }
 
-    const hash = readSourceHash(asset_path);
+    const hash = readSourceHash(info.guid);
 
     if (loadDisk(guid, hash)) |r| {
         return pixelsSource(put(guid, hash, r.pixels, r.w, r.h));
@@ -213,10 +213,11 @@ fn sourceOrNull(e: *const CacheEntry) ?gui.ImageSource {
     return if (e.pixels.len > 0) pixelsSource(e) else null;
 }
 
-fn readSourceHash(asset_path: []const u8) u64 {
+fn readSourceHash(guid: editor.Guid) u64 {
+    const project_path = EditorState.project_path orelse return 0;
     var arena_state = std.heap.ArenaAllocator.init(page);
     defer arena_state.deinit();
-    return editor.asset_meta.readMeta(gui.io, arena_state.allocator(), asset_path).source_hash;
+    return editor.asset_stamp.readStamp(gui.io, arena_state.allocator(), project_path, guid).source_hash;
 }
 
 /// The preview image for a *sub-asset* (a material/texture/etc. generated
@@ -269,7 +270,7 @@ const CacheEntry = struct {
     guid_len: usize = 0,
     source_hash: u64 = 0,
     /// `g_generation` value this entry was last validated against — lets a
-    /// cache hit skip the `.meta` read entirely most frames (see
+    /// cache hit skip the stamp read entirely most frames (see
     /// `g_generation`'s doc comment).
     checked_gen: u32 = 0,
     pixels: []u8 = &.{},

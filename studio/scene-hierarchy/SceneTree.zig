@@ -14,6 +14,7 @@ var g_show_delete_dialog: bool = false;
 var g_delete_dialog_result: ?bool = null;
 
 const prefab_tint = gui.Color{ .r = 90, .g = 165, .b = 245, .a = 255 };
+const disabled_tint = gui.Color{ .r = 140, .g = 140, .b = 140, .a = 255 };
 
 /// `TreeView` model over `EditorState`'s flat parent-indexed scene objects.
 const SceneModel = struct {
@@ -108,9 +109,17 @@ const SceneModel = struct {
             gui.entypo.folder
         else
             gui.entypo.text_document;
+        // Disabled state takes priority over the prefab tint — losing track
+        // of an off object matters more than losing the prefab hint.
+        const tint: ?gui.Color = if (!obj.active)
+            disabled_tint
+        else if (obj.isPartOfPrefab())
+            prefab_tint
+        else
+            null;
         return .{
             .bytes = bytes,
-            .tint = if (obj.isPartOfPrefab()) prefab_tint else null,
+            .tint = tint,
         };
     }
 

@@ -1,8 +1,6 @@
 {
   "guid": "10000000-0000-4000-8000-0000000000a4",
   "asset_type": "image",
-  "importer_version": 3,
-  "source_hash": 9323068734981368831,
   "import_settings": {
     "image": {
       "texture_type": "normal_map",

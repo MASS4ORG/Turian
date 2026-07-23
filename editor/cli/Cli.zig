@@ -6,6 +6,7 @@ const cli_mcp = @import("CliMcp.zig");
 const cli_docs = @import("CliDocs.zig");
 const cli_package = @import("CliPackage.zig");
 const cli_i18n = @import("CliI18n.zig");
+const cli_git = @import("CliGit.zig");
 
 fn printUsage() void {
     std.debug.print(
@@ -23,6 +24,8 @@ fn printUsage() void {
         \\  docs        <subcommand>    Generate AI context or documentation
         \\  package     <subcommand>    Manage project packages
         \\  i18n        <subcommand>    Extract translatable strings / compile .strings -> .strtab
+        \\  mergedriver <base> <ours> <theirs> <output>
+        \\                              Git merge driver: semantic (GUID-based) scene/prefab merge
         \\
         \\Env-var overrides for 'build' (optional; build-time paths used by default):
         \\  TURIAN_ENGINE_ROOT    Path to engine/root.zig
@@ -79,6 +82,8 @@ pub fn main(init: std.process.Init) !void {
     } else if (std.mem.eql(u8, cmd, "i18n")) {
         const sub = args.next() orelse return cli_i18n.printUsageI18n();
         return cli_i18n.cmdI18n(io, gpa, sub, &args);
+    } else if (std.mem.eql(u8, cmd, "mergedriver")) {
+        return cli_git.cmdMergeDriver(io, gpa, &args);
     } else {
         printUsage();
         return error.UnknownCommand;

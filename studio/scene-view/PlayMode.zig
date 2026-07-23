@@ -9,6 +9,7 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const EditorState = @import("../services/EditorState.zig");
+const Documents = @import("../main-window/Documents.zig");
 const GpuRenderer = @import("GpuRenderer.zig");
 const DynLib = @import("DynLib.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
@@ -126,10 +127,6 @@ pub fn gameEvents() ?*engine.GameEventRegistry {
 
 // ── Public controls ────────────────────────────────────────────────────────
 
-/// Buffer for the "Play First Scene" nodes (loaded independently of the
-/// currently-edited scene).
-var g_first_scene_nodes: []engine.SceneNode = &.{};
-
 /// Enter Play (from edit) or resume (from paused), using the currently-edited
 /// scene.
 pub fn play(io: std.Io) void {
@@ -146,9 +143,7 @@ pub fn play(io: std.Io) void {
 }
 
 /// Enter Play running the project's *first scene* (from ProjectSettings),
-/// independent of whichever scene is currently open in the editor. Useful to
-/// test the real game entry point without switching scenes. The editor's own
-/// scene is untouched and shown again on Stop.
+/// opening it as a normal editor tab first.
 pub fn playFirstScene(io: std.Io) void {
     switch (g_state) {
         .playing, .paused => return,
@@ -163,31 +158,14 @@ pub fn playFirstScene(io: std.Io) void {
         return;
     };
 
-    // `loadScene` reports the scene's true node count even when the buffer is
-    // too small (see its doc comment) — grow and retry rather than truncating
-    // a Bistro-scale FBX hierarchy scene.
-    if (g_first_scene_nodes.len == 0) g_first_scene_nodes = growNodeBuf(g_first_scene_nodes, EditorState.MAX_OBJECTS);
-    var count: usize = 0;
-    while (true) {
-        if (!editor.scene_io.loadScene(io, arena.allocator(), scene_path, g_first_scene_nodes, &count)) {
-            gui.toast(@src(), .{ .message = tr("Failed to load the first scene.") });
-            return;
-        }
-        if (count <= g_first_scene_nodes.len or g_first_scene_nodes.len >= engine.scene.GROWTH_CEILING) break;
-        g_first_scene_nodes = growNodeBuf(g_first_scene_nodes, count);
-    }
-    if (count > g_first_scene_nodes.len) {
-        gui.toast(@src(), .{ .message = tr("First scene is too large to play.") });
-        return;
-    }
-
-    _ = startFromNodes(io, g_first_scene_nodes[0..count]);
+    Documents.openScene(scene_path);
+    play(io);
 }
 
 /// Build (if needed), start the play library on `nodes`, and enter the playing
-/// state. The edit-time editor scene is always snapshotted so Stop restores it
-/// verbatim — so playing an off-screen scene (Play First Scene) never disturbs
-/// what the editor is showing.
+/// state. The edit-time editor scene (whichever scene is the active tab —
+/// `playFirstScene` switches to the first scene before calling this) is always
+/// snapshotted so Stop restores it verbatim.
 fn startFromNodes(io: std.Io, nodes: []const engine.SceneNode) bool {
     const project = EditorState.project_path orelse {
         gui.toast(@src(), .{ .message = tr("Open a project before entering Play mode.") });

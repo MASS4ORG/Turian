@@ -76,6 +76,7 @@ pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
     } else |_| {}
 
     dir.writeFile(io, .{ .sub_path = ".gitignore", .data = GITIGNORE_TEMPLATE }) catch {};
+    dir.writeFile(io, .{ .sub_path = ".gitattributes", .data = GITATTRIBUTES_TEMPLATE }) catch {};
 }
 
 /// Build artifacts that don't belong in version control: the editor's
@@ -84,5 +85,14 @@ pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
 const GITIGNORE_TEMPLATE =
     \\.cache/
     \\.public/
+    \\
+;
+
+/// Attributes to route scene/prefab JSON through the GUID-based merge driver.
+const GITATTRIBUTES_TEMPLATE =
+    \\# Semantic merge for Turian scenes/prefabs (GUID-based, not line-based).
+    \\# Register once per clone:
+    \\#   git config merge.turian-scene.driver "turian-cli mergedriver %O %A %B %A"
+    \\*.prefab merge=turian-scene
     \\
 ;
