@@ -50,6 +50,25 @@ test "multi-submesh mesh round-trips through encode/fromBytes" {
     try std.testing.expectEqual(@as(u32, 3), mesh.submeshes[1].index_offset);
     try std.testing.expectEqual(@as(i32, 1), mesh.submeshes[1].material_slot);
     try std.testing.expectEqual(@as(f32, 3), mesh.max[0]);
+
+    // Per-submesh bounds are derived on load, not stored in the file, so each
+    // submesh's box tracks only the vertices its own index range touches.
+    try std.testing.expectEqual(@as(usize, 2), mesh.submesh_bounds.len);
+    try std.testing.expectEqual([3]f32{ 0, 0, 0 }, mesh.submesh_bounds[0].min);
+    try std.testing.expectEqual([3]f32{ 1, 1, 0 }, mesh.submesh_bounds[0].max);
+    try std.testing.expectEqual([3]f32{ 2, 0, 0 }, mesh.submesh_bounds[1].min);
+    try std.testing.expectEqual([3]f32{ 3, 1, 0 }, mesh.submesh_bounds[1].max);
+}
+
+test "computeSubmeshBounds leaves submesh_bounds empty for the implicit single-submesh case" {
+    const a = std.testing.allocator;
+    var verts = [_]Vertex{
+        .{ .px = 0, .py = 0, .pz = 0, .nx = 0, .ny = 1, .nz = 0, .u = 0, .v = 0 },
+    };
+    var idx = [_]u32{0};
+    var mesh = Mesh{ .vertices = &verts, .indices = &idx, .allocator = a };
+    try mesh.computeSubmeshBounds(a);
+    try std.testing.expectEqual(@as(usize, 0), mesh.submesh_bounds.len);
 }
 
 /// A single vertex with position, normal, and UV data.
@@ -73,6 +92,12 @@ pub const Submesh = extern struct {
     material_slot: i32,
 };
 
+/// A local-space axis-aligned bounding box.
+pub const AABB = struct {
+    min: [3]f32 = .{ 0, 0, 0 },
+    max: [3]f32 = .{ 0, 0, 0 },
+};
+
 /// Mesh loaded from OBJ/GLTF. Owned by the caller; call deinit() to free.
 pub const Mesh = struct {
     /// Vertex array.
@@ -93,11 +118,17 @@ pub const Mesh = struct {
     /// Axis-aligned bounding box maximum corner.
     max: [3]f32 = .{ 0, 0, 0 },
 
-    /// Frees the vertex, index, and submesh arrays.
+    /// Per-submesh local-space AABBs, parallel to `submeshes` (same length, or
+    /// empty for the implicit single-submesh case — see `computeSubmeshBounds`).
+    /// Derived from vertex data on load, not part of the serialized format.
+    submesh_bounds: []AABB = &.{},
+
+    /// Frees the vertex, index, submesh, and submesh-bounds arrays.
     pub fn deinit(self: *@This()) void {
         self.allocator.free(self.vertices);
         self.allocator.free(self.indices);
         self.allocator.free(self.submeshes);
+        self.allocator.free(self.submesh_bounds);
     }
 
     /// Magic identifying the canonical cooked-mesh format written below.
@@ -158,6 +189,7 @@ pub const Mesh = struct {
 
         var mesh = Mesh{ .vertices = verts, .indices = idx, .submeshes = subs, .allocator = allocator };
         mesh.computeBounds();
+        try mesh.computeSubmeshBounds(allocator);
         return mesh;
     }
 
@@ -209,5 +241,40 @@ pub const Mesh = struct {
         }
         self.min = mn;
         self.max = mx;
+    }
+
+    /// Computes a local-space AABB for each submesh from the vertex positions
+    /// its index range touches, into a freshly allocated `submesh_bounds`
+    /// (freed by `deinit`). Leaves `submesh_bounds` empty for the implicit
+    /// single-submesh case (`submeshes.len == 0`) — callers should fall back
+    /// to the whole-mesh `min`/`max` then.
+    pub fn computeSubmeshBounds(self: *@This(), allocator: std.mem.Allocator) !void {
+        if (self.submeshes.len == 0) return;
+        const bounds = try allocator.alloc(AABB, self.submeshes.len);
+        for (self.submeshes, bounds) |sm, *b| {
+            const end = @min(sm.index_offset +| sm.index_count, self.indices.len);
+            const start = @min(sm.index_offset, end);
+            var mn: [3]f32 = undefined;
+            var mx: [3]f32 = undefined;
+            var found = false;
+            for (self.indices[start..end]) |vi| {
+                if (vi >= self.vertices.len) continue;
+                const v = self.vertices[vi];
+                if (!found) {
+                    mn = .{ v.px, v.py, v.pz };
+                    mx = mn;
+                    found = true;
+                } else {
+                    mn[0] = @min(mn[0], v.px);
+                    mn[1] = @min(mn[1], v.py);
+                    mn[2] = @min(mn[2], v.pz);
+                    mx[0] = @max(mx[0], v.px);
+                    mx[1] = @max(mx[1], v.py);
+                    mx[2] = @max(mx[2], v.pz);
+                }
+            }
+            b.* = if (found) .{ .min = mn, .max = mx } else .{};
+        }
+        self.submesh_bounds = bounds;
     }
 };

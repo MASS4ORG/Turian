@@ -172,6 +172,75 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     const vtx_bytes: u32 = @intCast(cpu.vertices.len * @sizeOf(types.GpuVertex));
     const idx_bytes: u32 = @intCast(cpu.indices.len * @sizeOf(u32));
 
+    // Build the (sorted) submesh + material-group tables first — pure CPU
+    // work, no GPU calls — so the per-submesh bounds buffer below can be
+    // filled and uploaded in the same copy pass as the vertex/index buffers.
+    //
+    // One GPU submesh per cooked submesh (no ceiling); meshes with no submesh
+    // table draw as a single implicit range bound to material slot 0.
+    const sm_count = @max(cpu.submeshes.len, 1);
+    const submeshes = try page.alloc(state.GpuSubmesh, sm_count);
+    errdefer page.free(submeshes);
+    if (cpu.submeshes.len == 0) {
+        submeshes[0] = .{
+            .index_offset = 0,
+            .index_count = @intCast(cpu.indices.len),
+            .material_slot = 0,
+            .bounds_min = cpu.min,
+            .bounds_max = cpu.max,
+        };
+    } else {
+        for (cpu.submeshes, cpu.submesh_bounds, 0..) |sm, sb, i|
+            submeshes[i] = .{
+                .index_offset = sm.index_offset,
+                .index_count = sm.index_count,
+                .material_slot = sm.material_slot,
+                .bounds_min = sb.min,
+                .bounds_max = sb.max,
+            };
+    }
+
+    // Sort by material slot so same-material submeshes end up contiguous —
+    // lets the renderer issue one indirect multi-draw call per material
+    // instead of one draw per submesh. Draw order within a mesh doesn't
+    // matter (each submesh is an independent opaque range), so this is safe.
+    std.sort.pdq(state.GpuSubmesh, submeshes, {}, struct {
+        fn lessThan(_: void, x: state.GpuSubmesh, y: state.GpuSubmesh) bool {
+            return x.material_slot < y.material_slot;
+        }
+    }.lessThan);
+
+    var group_count: usize = 1;
+    for (submeshes[1..], 1..) |sm, i|
+        if (sm.material_slot != submeshes[i - 1].material_slot) {
+            group_count += 1;
+        };
+    const groups = try page.alloc(state.MaterialGroup, group_count);
+    errdefer page.free(groups);
+    {
+        var gi: usize = 0;
+        var i: usize = 0;
+        while (i < submeshes.len) {
+            const slot = submeshes[i].material_slot;
+            var j = i + 1;
+            while (j < submeshes.len and submeshes[j].material_slot == slot) j += 1;
+            groups[gi] = .{ .material_slot = slot, .start = @intCast(i), .count = @intCast(j - i) };
+            gi += 1;
+            i = j;
+        }
+    }
+
+    const bounds_data = try page.alloc(types.SubmeshBoundsGpu, submeshes.len);
+    defer page.free(bounds_data);
+    for (submeshes, bounds_data) |sm, *bd|
+        bd.* = .{
+            .min = .{ sm.bounds_min[0], sm.bounds_min[1], sm.bounds_min[2], 0 },
+            .max = .{ sm.bounds_max[0], sm.bounds_max[1], sm.bounds_max[2], 0 },
+            .range = .{ sm.index_offset, sm.index_count, 0, 0 },
+        };
+    const bounds_bytes: u32 = @intCast(bounds_data.len * @sizeOf(types.SubmeshBoundsGpu));
+    const indirect_bytes: u32 = @intCast(submeshes.len * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand));
+
     const vtx_tb = c.SDL_CreateGPUTransferBuffer(dev, &c.SDL_GPUTransferBufferCreateInfo{
         .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
         .size = vtx_bytes,
@@ -203,6 +272,21 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
         c.SDL_UnmapGPUTransferBuffer(dev, idx_tb);
     }
 
+    const bounds_tb = c.SDL_CreateGPUTransferBuffer(dev, &c.SDL_GPUTransferBufferCreateInfo{
+        .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = bounds_bytes,
+        .props = 0,
+    }) orelse return error.BoundsTransferCreate;
+    defer c.SDL_ReleaseGPUTransferBuffer(dev, bounds_tb);
+
+    {
+        const p: [*]types.SubmeshBoundsGpu = @ptrCast(@alignCast(
+            c.SDL_MapGPUTransferBuffer(dev, bounds_tb, false) orelse return error.MapFailed,
+        ));
+        @memcpy(p[0..bounds_data.len], bounds_data);
+        c.SDL_UnmapGPUTransferBuffer(dev, bounds_tb);
+    }
+
     const vtx_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
         .usage = c.SDL_GPU_BUFFERUSAGE_VERTEX,
         .size = vtx_bytes,
@@ -217,22 +301,27 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     }) orelse return error.IdxBufCreate;
     errdefer c.SDL_ReleaseGPUBuffer(dev, idx_buf);
 
+    const bounds_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
+        .usage = c.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ,
+        .size = bounds_bytes,
+        .props = 0,
+    }) orelse return error.BoundsBufCreate;
+    errdefer c.SDL_ReleaseGPUBuffer(dev, bounds_buf);
+
+    // No initial data: the cull compute pass fully overwrites every entry
+    // before the first indirect draw reads it, every frame.
+    const indirect_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
+        .usage = c.SDL_GPU_BUFFERUSAGE_INDIRECT | c.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE,
+        .size = indirect_bytes,
+        .props = 0,
+    }) orelse return error.IndirectBufCreate;
+    errdefer c.SDL_ReleaseGPUBuffer(dev, indirect_buf);
+
     const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return error.CopyPassFailed;
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = vtx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = vtx_buf, .offset = 0, .size = vtx_bytes }, false);
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = idx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = idx_buf, .offset = 0, .size = idx_bytes }, false);
+    c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = bounds_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = bounds_buf, .offset = 0, .size = bounds_bytes }, false);
     c.SDL_EndGPUCopyPass(cp);
-
-    // One GPU submesh per cooked submesh (no ceiling); meshes with no submesh
-    // table draw as a single implicit range bound to material slot 0.
-    const sm_count = @max(cpu.submeshes.len, 1);
-    const submeshes = try page.alloc(state.GpuSubmesh, sm_count);
-    errdefer page.free(submeshes);
-    if (cpu.submeshes.len == 0) {
-        submeshes[0] = .{ .index_offset = 0, .index_count = @intCast(cpu.indices.len), .material_slot = 0 };
-    } else {
-        for (cpu.submeshes, 0..) |sm, i|
-            submeshes[i] = .{ .index_offset = sm.index_offset, .index_count = sm.index_count, .material_slot = sm.material_slot };
-    }
 
     state.ensureMeshCapacity();
     if (state.mesh_count >= state.meshes.len) return error.MeshCacheFull;
@@ -243,6 +332,11 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.idx_buf = idx_buf;
     gm.idx_count = @intCast(cpu.indices.len);
     gm.submeshes = submeshes;
+    gm.material_groups = groups;
+    gm.bounds_min = cpu.min;
+    gm.bounds_max = cpu.max;
+    gm.bounds_buf = bounds_buf;
+    gm.indirect_buf = indirect_buf;
 }
 
 /// Upload a texture (RGBA8 or block-compressed, with mips) and cache it by GUID.

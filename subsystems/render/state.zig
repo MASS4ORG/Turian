@@ -39,6 +39,9 @@ pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 
 pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 
+/// GPU-driven frustum-culling compute pipeline (see `pipeline.createCullComputePipeline`).
+pub var cull_pipeline: ?*c.SDL_GPUComputePipeline = null;
+
 pub var white_tex: ?*c.SDL_GPUTexture = null;
 /// Default tangent-space "flat" normal (points straight out): rgb (128,128,255).
 pub var flat_normal_tex: ?*c.SDL_GPUTexture = null;
@@ -114,17 +117,57 @@ pub const GpuSubmesh = struct {
     index_offset: u32 = 0,
     index_count: u32 = 0,
     material_slot: i32 = 0,
+    /// Local-space AABB for just this submesh's index range, for per-submesh
+    /// frustum culling. Falls back to the whole mesh's bounds when the source
+    /// mesh had no explicit submesh table (see `Mesh.computeSubmeshBounds`).
+    bounds_min: [3]f32 = .{ 0, 0, 0 },
+    bounds_max: [3]f32 = .{ 0, 0, 0 },
 };
+/// A contiguous run of `GpuMesh.submeshes` (after material-sort at upload)
+/// sharing one material slot — the unit of one indirect multi-draw call.
+pub const MaterialGroup = struct {
+    material_slot: i32 = 0,
+    start: u32 = 0,
+    count: u32 = 0,
+};
+
 pub const GpuMesh = struct {
     key: [KEY_CAP]u8 = undefined,
     key_len: usize = 0,
     vtx_buf: *c.SDL_GPUBuffer = undefined,
     idx_buf: *c.SDL_GPUBuffer = undefined,
     idx_count: u32 = 0,
-    /// Heap-owned draw ranges (page allocator), one per cooked submesh. A large
+    /// Heap-owned draw ranges (page allocator), sorted by `material_slot` at
+    /// upload so `material_groups` below can address contiguous runs. A large
     /// flattened model can carry thousands, so this is a slice rather than a
     /// fixed array. Empty when the mesh failed to upload.
     submeshes: []GpuSubmesh = &.{},
+    /// Contiguous same-material runs of `submeshes`, one indirect multi-draw
+    /// call per entry.
+    material_groups: []MaterialGroup = &.{},
+    /// Local-space AABB corners (whole mesh, all submeshes combined), carried
+    /// over from the cooked mesh for frustum culling.
+    bounds_min: [3]f32 = .{ 0, 0, 0 },
+    bounds_max: [3]f32 = .{ 0, 0, 0 },
+
+    /// Compute-readable per-submesh bounds (one `types.SubmeshBoundsGpu` per
+    /// entry in `submeshes`, same order), read-only input to the cull compute
+    /// pass. Null when the mesh failed to upload.
+    bounds_buf: ?*c.SDL_GPUBuffer = null,
+    /// GPU-driven indirect draw command buffer, one `SDL_GPUIndexedIndirectDrawCommand`
+    /// per entry in `submeshes` (same order). Written fresh each frame by the
+    /// cull compute pass (`num_instances` 0 or 1), then read by
+    /// `SDL_DrawGPUIndexedPrimitivesIndirect` — one call per `material_groups`
+    /// entry. Null when the mesh failed to upload.
+    indirect_buf: ?*c.SDL_GPUBuffer = null,
+    /// `frame_seq` value as of this mesh's last cull compute dispatch this
+    /// frame. `bounds_buf`/`indirect_buf` are per-mesh (not per-instance), so
+    /// only the *first* mesh renderer instance referencing this mesh in a
+    /// given frame can safely use the GPU-driven path — a second instance
+    /// sharing the same mesh this frame would overwrite the first's indirect
+    /// commands before they're drawn. Later instances fall back to the CPU
+    /// per-submesh path (see `renderScene`) instead of racing the buffer.
+    cull_dispatched_frame: u64 = 0,
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);
@@ -132,6 +175,10 @@ pub const GpuMesh = struct {
 };
 pub var meshes: []GpuMesh = &.{};
 pub var mesh_count: usize = 0;
+/// Monotonic per-`renderScene`-call counter, compared against
+/// `GpuMesh.cull_dispatched_frame` to detect a mesh instanced more than once
+/// in the same frame.
+pub var frame_seq: u64 = 0;
 
 /// Default/initial GPU texture cache capacity — not a hard ceiling; see
 /// `MAX_MESHES`/`ensureMeshCapacity`'s doc comment (same reasoning).

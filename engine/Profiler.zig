@@ -104,6 +104,8 @@ pub const Counters = struct {
     texture_binds: u32 = 0,
     textures_created: u32 = 0,
     material_switches: u32 = 0,
+    submeshes_drawn: u32 = 0,
+    submeshes_culled: u32 = 0,
 };
 
 /// One thread's recorded zones for a captured frame.
@@ -497,6 +499,18 @@ pub fn countTexturesCreated(n: u32) void {
     g_counters.textures_created += n;
 }
 
+/// Record `n` submeshes that passed frustum culling and were drawn.
+pub fn countSubmeshesDrawn(n: u32) void {
+    if (!enabled or !g_capturing) return;
+    g_counters.submeshes_drawn += n;
+}
+
+/// Record `n` submeshes skipped by frustum culling (outside the camera view).
+pub fn countSubmeshesCulled(n: u32) void {
+    if (!enabled or !g_capturing) return;
+    g_counters.submeshes_culled += n;
+}
+
 /// Live counters for the in-progress frame (the captured snapshot lags by one
 /// `endFrame`). Handy for an overlay HUD that wants the current numbers.
 pub fn liveCounters() Counters {
@@ -617,6 +631,8 @@ test "counters accumulate within a frame and reset across frames" {
     countDraw(4, 12, false);
     countMaterialSwitch();
     countTexturesCreated(3);
+    countSubmeshesDrawn(2);
+    countSubmeshesCulled(5);
     endFrame();
 
     var c = captured().counters;
@@ -626,6 +642,8 @@ test "counters accumulate within a frame and reset across frames" {
     try testing.expectEqual(@as(u32, 1), c.texture_binds);
     try testing.expectEqual(@as(u32, 1), c.material_switches);
     try testing.expectEqual(@as(u32, 3), c.textures_created);
+    try testing.expectEqual(@as(u32, 2), c.submeshes_drawn);
+    try testing.expectEqual(@as(u32, 5), c.submeshes_culled);
 
     beginFrame();
     countDraw(1, 3, false);

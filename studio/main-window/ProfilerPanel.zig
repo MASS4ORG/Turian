@@ -162,6 +162,8 @@ pub fn drawContent() void {
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("texture binds {n}", &.{.{ .name = "n", .value = .{ .number = ec.texture_binds } }})}, .{});
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("mat switches  {n}", &.{.{ .name = "n", .value = .{ .number = ec.material_switches } }})}, .{});
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("tex created   {n}", &.{.{ .name = "n", .value = .{ .number = ec.textures_created } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("submeshes drawn  {n}", &.{.{ .name = "n", .value = .{ .number = ec.submeshes_drawn } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("submeshes culled {n}", &.{.{ .name = "n", .value = .{ .number = ec.submeshes_culled } }})}, .{});
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 

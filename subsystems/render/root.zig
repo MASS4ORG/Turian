@@ -17,6 +17,9 @@ const pipeline = @import("pipeline.zig");
 const assets = @import("assets.zig");
 const shadow = @import("shadow.zig");
 const gizmos = @import("gizmos.zig");
+const culling = @import("culling.zig");
+const gpu_cull = @import("gpu_cull.zig");
+const draw = @import("draw.zig");
 
 const log = std.log.scoped(.render);
 
@@ -215,120 +218,6 @@ fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
     state.depth_evict_cursor = 0;
 }
 
-/// The scene pipeline matching `key`, creating and caching it on first use.
-/// Returns the cache's first entry (built lazily, so only once real draws start)
-/// if the cache is full — better a wrong blend/cull than a dropped draw.
-fn scenePipelineFor(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState) ?*c.SDL_GPUGraphicsPipeline {
-    for (state.scene_pipelines[0..state.scene_pipeline_count]) |*e| {
-        if (std.meta.eql(e.key, key)) return e.pipeline;
-    }
-    if (state.scene_pipeline_count >= state.MAX_SCENE_PIPELINES) {
-        log.warn("scene pipeline cache full ({d}) — reusing an existing pipeline for {any}", .{ state.MAX_SCENE_PIPELINES, key });
-        return if (state.scene_pipeline_count > 0) state.scene_pipelines[0].pipeline else null;
-    }
-    const p = pipeline.createScenePipeline(dev, key) catch |err| {
-        log.err("scene pipeline create failed: {any}", .{err});
-        return null;
-    };
-    state.scene_pipelines[state.scene_pipeline_count] = .{ .key = key, .pipeline = p };
-    state.scene_pipeline_count += 1;
-    return p;
-}
-
-fn destroyScenePipelines(dev: *c.SDL_GPUDevice) void {
-    for (state.scene_pipelines[0..state.scene_pipeline_count]) |*e| {
-        if (e.pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
-    }
-    state.scene_pipeline_count = 0;
-}
-
-/// Per-frame values a draw's fragment uniforms need but that don't vary
-/// per-draw (lighting is scene-wide, not per-material).
-const FrameUniforms = struct {
-    cam_pos4: [4]f32,
-    light_vp: [16]f32,
-    lights: [types.MAX_LIGHTS]types.GpuLight,
-    env_params: [4]f32,
-    env_sh: [9][4]f32,
-};
-
-/// Everything one submesh draw needs: which pipeline permutation, geometry
-/// range, and the material's uniform/sampler values.
-const DrawParams = struct {
-    pl_key: state.ScenePipelineState,
-    vtx_buf: *c.SDL_GPUBuffer,
-    idx_buf: *c.SDL_GPUBuffer,
-    index_offset: u32,
-    index_count: u32,
-    vub: types.VertexUB,
-    base_color: [4]f32,
-    mr_ns_oc: [4]f32,
-    emissive: [4]f32,
-    flags: [4]f32,
-    flags2: [4]f32,
-    bindings: [7]c.SDL_GPUTextureSamplerBinding,
-};
-
-/// A blended/additive draw deferred until every opaque draw has landed, so it
-/// can be sorted back-to-front first.
-const TransparentDraw = struct {
-    params: DrawParams,
-    /// Squared camera distance to the drawing node's origin — cheap proxy for
-    /// per-node (not per-triangle) back-to-front ordering.
-    sort_depth: f32,
-};
-
-/// Static scratch space for one frame's deferred transparent draws. Rebuilt
-/// (via `g_transparent_count`) on every `renderScene` call; single-threaded
-/// renderer, so nothing else touches it between calls.
-const MAX_TRANSPARENT_DRAWS = 1024;
-var g_transparent_draws: [MAX_TRANSPARENT_DRAWS]TransparentDraw = undefined;
-var g_transparent_count: usize = 0;
-
-fn transparentFartherFirst(_: void, a: TransparentDraw, b: TransparentDraw) bool {
-    return a.sort_depth > b.sort_depth;
-}
-
-/// Bind the draw's pipeline (if it isn't already bound), push its uniforms and
-/// texture bindings, and issue the indexed draw call.
-fn submitDraw(
-    cmd: *c.SDL_GPUCommandBuffer,
-    pass: *c.SDL_GPURenderPass,
-    dev: *c.SDL_GPUDevice,
-    bound_pipeline: *?*c.SDL_GPUGraphicsPipeline,
-    fu: FrameUniforms,
-    dp: DrawParams,
-) void {
-    const pl = scenePipelineFor(dev, dp.pl_key) orelse return;
-    if (bound_pipeline.* != pl) {
-        c.SDL_BindGPUGraphicsPipeline(pass, pl);
-        bound_pipeline.* = pl;
-    }
-
-    c.SDL_PushGPUVertexUniformData(cmd, 0, &dp.vub, @sizeOf(types.VertexUB));
-    c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = dp.vtx_buf, .offset = 0 }, 1);
-    c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = dp.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
-
-    const fub = types.FragUB{
-        .camera_pos = fu.cam_pos4,
-        .base_color = dp.base_color,
-        .mr_ns_oc = dp.mr_ns_oc,
-        .emissive = dp.emissive,
-        .flags = dp.flags,
-        .flags2 = dp.flags2,
-        .env_params = fu.env_params,
-        .env_sh = fu.env_sh,
-        .light_vp = fu.light_vp,
-        .lights = fu.lights,
-    };
-    c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 7);
-
-    c.SDL_DrawGPUIndexedPrimitives(pass, dp.index_count, 1, dp.index_offset, 0, 0);
-    // Every mesh binds samplers, so this draw always counts as textured.
-    engine.Profiler.countDraw(dp.index_count / 3, dp.index_count, true);
-}
-
 /// Render `objects` into `color_tex` (a `w`×`h` target) using `cmd`. The caller
 /// owns the command buffer and the color target (an editor offscreen texture or
 /// the game swapchain) and submits the command buffer itself.
@@ -345,6 +234,7 @@ pub fn renderScene(
     const dev = state.device orelse return;
     const sampler = state.sampler orelse return;
     if (w == 0 or h == 0) return;
+    state.frame_seq += 1;
 
     if (state.white_tex == null)
         state.white_tex = pipeline.createSolidTexture(cmd, dev, .{ 255, 255, 255, 255 }) catch null;
@@ -352,6 +242,11 @@ pub fn renderScene(
         state.flat_normal_tex = pipeline.createSolidTexture(cmd, dev, .{ 128, 128, 255, 255 }) catch null;
     if (state.shadow_map == null)
         state.shadow_map = pipeline.createShadowMap(dev) catch null;
+    if (state.cull_pipeline == null)
+        state.cull_pipeline = pipeline.createCullComputePipeline(dev) catch |err| p: {
+            log.warn("cull compute pipeline failed: {any} — falling back to per-submesh CPU culling.", .{err});
+            break :p null;
+        };
 
     const depth_tex = depthFor(dev, w, h) orelse {
         log.err("depth target failed", .{});
@@ -370,6 +265,7 @@ pub fn renderScene(
     const cam = sceneCamera(w, h, objects);
     const cam_pos = cam.pos;
     const vp = cam.view_proj;
+    const frustum = culling.Frustum.extract(vp);
 
     // ── Environment (IBL + skybox) ───────────────────────────────────────────
     // At most one active EnvironmentComponent is used per scene (first found).
@@ -447,6 +343,37 @@ pub fn renderScene(
         shadow.renderShadowPass(cmd, light_vp, objects);
     }
 
+    // ── GPU-driven cull compute phase ────────────────────────────────────────
+    // Must finish before the main render pass opens below — SDL_GPU compute
+    // passes and render passes can't overlap on the same command buffer. Each
+    // mesh gets at most one dispatch per frame (see `GpuMesh.cull_dispatched_frame`);
+    // a second mesh renderer instancing the same mesh this frame is left
+    // undispatched and falls back to the CPU per-submesh path in the main pass.
+    {
+        var cull_zone = engine.Profiler.zone("render.cull");
+        defer cull_zone.end();
+        for (objects) |*obj| {
+            if (!obj.active) continue;
+            for (obj.components[0..obj.component_count]) |*comp| {
+                if (comp.* != .mesh_renderer) continue;
+                const guid_str = comp.mesh_renderer.mesh.slice();
+                if (guid_str.len == 0) continue;
+                const gm = assets.findGpuMesh(guid_str) orelse continue;
+                if (gm.submeshes.len == 0 or gm.indirect_buf == null) continue;
+                if (gm.cull_dispatched_frame == state.frame_seq) continue;
+
+                const t = &obj.transform;
+                const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
+                    .multiply(Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z))
+                    .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
+                if (culling.aabbOutsideFrustum(gm.bounds_min, gm.bounds_max, mdl, frustum)) continue;
+
+                gpu_cull.dispatchCull(cmd, gm, mdl, frustum);
+                gm.cull_dispatched_frame = state.frame_seq;
+            }
+        }
+    }
+
     // ── Main pass ───────────────────────────────────────────────────────────
     var main_zone = engine.Profiler.zone("render.main");
     defer main_zone.end();
@@ -481,7 +408,7 @@ pub fn renderScene(
     const shadow_tex = state.shadow_map orelse white;
     const shadow_smp = state.shadow_sampler orelse sampler;
     const env_gpu_tex = if (env_tex) |gt| gt.texture else white;
-    const fu = FrameUniforms{
+    const fu = draw.FrameUniforms{
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
         .light_vp = light_vp.m,
         .lights = lights,
@@ -509,7 +436,7 @@ pub fn renderScene(
     }
 
     var bound_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
-    g_transparent_count = 0;
+    draw.transparent_count = 0;
 
     // Track the previously bound material GUID so we can count pipeline/material
     // switches for the profiler (a draw with the same material is "free").
@@ -527,79 +454,100 @@ pub fn renderScene(
             const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
                 .multiply(Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z))
                 .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
+
+            if (culling.aabbOutsideFrustum(gm.bounds_min, gm.bounds_max, mdl, frustum)) {
+                engine.Profiler.countSubmeshesCulled(@intCast(gm.submeshes.len));
+                continue;
+            }
+
             const mvp = vp.multiply(mdl);
             const vub = types.VertexUB{ .mvp = mvp.m, .model = mdl.m };
 
             const mr = &comp.mesh_renderer;
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             const receives = mr.receive_shadows and shadows_on;
+            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_gpu_tex = env_gpu_tex, .white = white, .flat_n = flat_n, .sampler = sampler };
 
+            // GPU-driven indirect path only for the instance the cull compute
+            // phase above actually dispatched for this mesh this frame — see
+            // `GpuMesh.cull_dispatched_frame`'s doc comment for why a second
+            // instance sharing the mesh can't safely use it too.
+            if (gm.indirect_buf != null and gm.cull_dispatched_frame == state.frame_seq) {
+                for (gm.material_groups) |group| {
+                    const mat_guid = draw.materialGuidForSlot(mr, mat_n, group.material_slot);
+                    if (!std.mem.eql(u8, mat_guid, prev_mat)) {
+                        engine.Profiler.countMaterialSwitch();
+                        prev_mat = mat_guid;
+                    }
+                    const mat_res = assets.resolveMaterial(mat_guid);
+                    const dp = draw.buildDrawParams(&mat_res, gm, 0, 0, vub, receives, dctx);
+
+                    // Opaque groups draw as one indirect multi-draw call — GPU-decided
+                    // per-submesh visibility, no CPU loop. Transparent groups still
+                    // need back-to-front depth sort, which indirect multi-draw can't
+                    // do, so those fall back to the per-submesh CPU path.
+                    if (mat_res.render.blend == .disabled) {
+                        draw.submitIndirectDraw(cmd, pass, dev, &bound_pipeline, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
+                    } else {
+                        for (gm.submeshes[group.start..][0..group.count]) |sm| {
+                            if (sm.index_count == 0) continue;
+                            if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
+                                engine.Profiler.countSubmeshesCulled(1);
+                                continue;
+                            }
+                            engine.Profiler.countSubmeshesDrawn(1);
+                            var tdp = dp;
+                            tdp.index_offset = sm.index_offset;
+                            tdp.index_count = sm.index_count;
+                            if (draw.transparent_count < draw.transparent_draws.len) {
+                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = Vector3.distanceSquared(cam_pos, t.position) };
+                                draw.transparent_count += 1;
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // CPU fallback: per-submesh cull + individual draws. Used when the
+            // cull compute pipeline/this mesh's GPU buffers aren't available, or
+            // this mesh was already dispatched by another instance this frame.
             for (gm.submeshes) |sm| {
                 if (sm.index_count == 0) continue;
-                const slot = sm.material_slot;
-                const mat_guid = if (slot >= 0 and @as(u32, @intCast(slot)) < mat_n)
-                    mr.materials[@intCast(slot)].slice()
-                else
-                    "";
+                if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
+                    engine.Profiler.countSubmeshesCulled(1);
+                    continue;
+                }
+                engine.Profiler.countSubmeshesDrawn(1);
+
+                const mat_guid = draw.materialGuidForSlot(mr, mat_n, sm.material_slot);
                 if (!std.mem.eql(u8, mat_guid, prev_mat)) {
                     engine.Profiler.countMaterialSwitch();
                     prev_mat = mat_guid;
                 }
 
                 const mat_res = assets.resolveMaterial(mat_guid);
-                const albedo_t = assets.pickTexture(mat_res.map(.albedo), white);
-                const mr_t = assets.pickTexture(mat_res.map(.mr), white);
-                const normal_t = assets.pickTexture(mat_res.map(.normal), flat_n);
-                const emis_t = assets.pickTexture(mat_res.map(.emissive), white);
-                const occ_t = assets.pickTexture(mat_res.map(.occlusion), white);
-
-                const dp = DrawParams{
-                    .pl_key = .{
-                        .blend = mat_res.render.blend,
-                        .cull = mat_res.render.cull,
-                        .depth_write = mat_res.render.depth_write,
-                        .depth_test = mat_res.render.depth_test,
-                    },
-                    .vtx_buf = gm.vtx_buf,
-                    .idx_buf = gm.idx_buf,
-                    .index_offset = sm.index_offset,
-                    .index_count = sm.index_count,
-                    .vub = vub,
-                    .base_color = mat_res.base_color,
-                    .mr_ns_oc = .{ mat_res.metallic, mat_res.roughness, mat_res.normal_scale, mat_res.occlusion_strength },
-                    .emissive = .{ mat_res.emissive[0], mat_res.emissive[1], mat_res.emissive[2], mat_res.emissive_strength },
-                    .flags = .{ assets.present(albedo_t.found), assets.present(mr_t.found), assets.present(normal_t.found), assets.present(emis_t.found) },
-                    .flags2 = .{ assets.present(occ_t.found), mat_res.alpha_cutoff, assets.present(mat_res.render.alpha_mask), assets.present(receives) },
-                    .bindings = .{
-                        .{ .texture = albedo_t.tex, .sampler = sampler },
-                        .{ .texture = mr_t.tex, .sampler = sampler },
-                        .{ .texture = normal_t.tex, .sampler = sampler },
-                        .{ .texture = emis_t.tex, .sampler = sampler },
-                        .{ .texture = occ_t.tex, .sampler = sampler },
-                        .{ .texture = shadow_tex, .sampler = shadow_smp },
-                        .{ .texture = env_gpu_tex, .sampler = sampler },
-                    },
-                };
+                const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, receives, dctx);
 
                 // Opaque draws right away; blended/additive draws are deferred so
                 // they can be sorted back-to-front after every opaque draw lands.
                 if (mat_res.render.blend == .disabled) {
-                    submitDraw(cmd, pass, dev, &bound_pipeline, fu, dp);
-                } else if (g_transparent_count < g_transparent_draws.len) {
-                    g_transparent_draws[g_transparent_count] = .{
+                    draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, dp);
+                } else if (draw.transparent_count < draw.transparent_draws.len) {
+                    draw.transparent_draws[draw.transparent_count] = .{
                         .params = dp,
                         .sort_depth = Vector3.distanceSquared(cam_pos, t.position),
                     };
-                    g_transparent_count += 1;
+                    draw.transparent_count += 1;
                 }
             }
         }
     }
 
     // Back-to-front so alpha compositing reads correctly (farthest drawn first).
-    std.sort.pdq(TransparentDraw, g_transparent_draws[0..g_transparent_count], {}, transparentFartherFirst);
-    for (g_transparent_draws[0..g_transparent_count]) |td|
-        submitDraw(cmd, pass, dev, &bound_pipeline, fu, td.params);
+    std.sort.pdq(draw.TransparentDraw, draw.transparent_draws[0..draw.transparent_count], {}, draw.transparentFartherFirst);
+    for (draw.transparent_draws[0..draw.transparent_count]) |td|
+        draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, td.params);
 
     c.SDL_EndGPURenderPass(pass);
 }
@@ -619,7 +567,10 @@ pub fn deinit() void {
     for (state.meshes[0..state.mesh_count]) |*gm| {
         c.SDL_ReleaseGPUBuffer(dev, gm.vtx_buf);
         c.SDL_ReleaseGPUBuffer(dev, gm.idx_buf);
+        if (gm.bounds_buf) |bb| c.SDL_ReleaseGPUBuffer(dev, bb);
+        if (gm.indirect_buf) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
         std.heap.page_allocator.free(gm.submeshes);
+        std.heap.page_allocator.free(gm.material_groups);
     }
     state.mesh_count = 0;
     if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);
@@ -630,8 +581,10 @@ pub fn deinit() void {
     state.shadow_pipeline = null;
     if (state.skybox_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.skybox_pipeline = null;
+    if (state.cull_pipeline) |p| c.SDL_ReleaseGPUComputePipeline(dev, p);
+    state.cull_pipeline = null;
     if (state.sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
-    destroyScenePipelines(dev);
+    draw.destroyScenePipelines(dev);
     state.sampler = null;
 }
 

@@ -49,6 +49,24 @@ pub const SkyboxFragUB = extern struct {
     camera_pos_intensity: [4]f32, // xyz = camera world position, w = intensity
 };
 
+/// One compute-readable submesh bounds entry for GPU-driven frustum culling.
+/// Layout must match `SubmeshBounds` in cull.comp exactly — three vec4-sized
+/// blocks, so std140 vs std430 alignment differences don't matter here.
+pub const SubmeshBoundsGpu = extern struct {
+    min: [4]f32 = .{ 0, 0, 0, 0 }, // xyz local-space min, w unused
+    max: [4]f32 = .{ 0, 0, 0, 0 }, // xyz local-space max, w unused
+    range: [4]u32 = .{ 0, 0, 0, 0 }, // x = first_index, y = num_indices, zw unused
+};
+
+/// Cull compute-shader uniforms — layout must match CullUB in cull.comp
+/// exactly (std140: mat4 + vec4 array + uvec4 are all naturally 16-byte
+/// aligned, so no hidden padding to account for).
+pub const CullUB = extern struct {
+    model: [16]f32,
+    planes: [6][4]f32,
+    submesh_count: [4]u32, // x = count, yzw unused
+};
+
 /// Vertex layout uploaded to the GPU (matches the pipeline's attributes).
 pub const GpuVertex = extern struct {
     px: f32,

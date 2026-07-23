@@ -1928,6 +1928,20 @@
       "state": "translated"
     },
     {
+      "id": "submeshes culled {n}",
+      "source": "submeshes culled {n}",
+      "target": "",
+      "note": "studio/main-window/ProfilerPanel.zig:166",
+      "state": "new"
+    },
+    {
+      "id": "submeshes drawn  {n}",
+      "source": "submeshes drawn  {n}",
+      "target": "",
+      "note": "studio/main-window/ProfilerPanel.zig:165",
+      "state": "new"
+    },
+    {
       "id": "tex created   {n}",
       "source": "tex created   {n}",
       "target": "texturas criadas {n}",

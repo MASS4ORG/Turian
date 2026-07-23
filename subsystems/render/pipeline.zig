@@ -412,6 +412,30 @@ pub fn createSkyboxPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
     return c.SDL_CreateGPUGraphicsPipeline(dev, &info) orelse error.Pipeline;
 }
 
+/// Compute pipeline for GPU-driven frustum culling: reads a mesh's per-submesh
+/// bounds storage buffer and writes one indexed indirect draw command per
+/// submesh (visible or zero-instance) — see `cull.comp.glsl`.
+pub fn createCullComputePipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUComputePipeline {
+    const comp_spv = @embedFile("shaders/compiled/cull.comp.spv");
+
+    return c.SDL_CreateGPUComputePipeline(dev, &c.SDL_GPUComputePipelineCreateInfo{
+        .code_size = comp_spv.len,
+        .code = comp_spv,
+        .entrypoint = "main",
+        .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
+        .num_samplers = 0,
+        .num_readonly_storage_textures = 0,
+        .num_readonly_storage_buffers = 1,
+        .num_readwrite_storage_textures = 0,
+        .num_readwrite_storage_buffers = 1,
+        .num_uniform_buffers = 1,
+        .threadcount_x = 64,
+        .threadcount_y = 1,
+        .threadcount_z = 1,
+        .props = 0,
+    }) orelse error.ComputePipeline;
+}
+
 /// Create the offscreen depth target for the main pass at `w`×`h`.
 pub fn createDepth(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
     return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
