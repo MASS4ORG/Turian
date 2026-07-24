@@ -53,16 +53,40 @@ pub fn sdlTextureFormat(fmt: engine.assets.TextureFormat) c.SDL_GPUTextureFormat
     };
 }
 
-/// Resolve a material GUID into scalar values and texture-map GUIDs.
+/// Drop a single material's cached resolution (call after its source changes,
+/// e.g. a save/reimport) so the next `resolveMaterial` re-reads it from disk.
+pub fn invalidateMaterial(guid: []const u8) void {
+    for (state.resolved_materials[0..state.resolved_material_count], 0..) |*e, i| {
+        if (e.matchesKey(guid)) {
+            state.resolved_material_count -= 1;
+            state.resolved_materials[i] = state.resolved_materials[state.resolved_material_count];
+            return;
+        }
+    }
+}
+
+/// Drop every cached material resolution (e.g. on project reload).
+pub fn invalidateAllMaterials() void {
+    state.resolved_material_count = 0;
+}
+
+/// Resolve a material GUID into scalar values and texture-map GUIDs. Parsed
+/// results are cached by GUID; the live-edit override path bypasses the cache.
 pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     var out = types.ResolvedMaterial{};
     if (mat_guid.len == 0) return out;
 
+    const is_override = mat_guid.len == state.material_override_key_len and
+        std.mem.eql(u8, mat_guid, state.material_override_key[0..state.material_override_key_len]);
+
+    if (!is_override) {
+        for (state.resolved_materials[0..state.resolved_material_count]) |*e|
+            if (e.matchesKey(mat_guid)) return e.value;
+    }
+
     var arena = std.heap.ArenaAllocator.init(page);
     defer arena.deinit();
 
-    const is_override = mat_guid.len == state.material_override_key_len and
-        std.mem.eql(u8, mat_guid, state.material_override_key[0..state.material_override_key_len]);
     const mat = if (is_override)
         engine.Material.loadFromBytes(arena.allocator(), state.material_override_bytes) catch return out
     else blk: {
@@ -93,6 +117,18 @@ pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     for (names) |n| {
         const tex_guid = mat.texture(n.key);
         if (tex_guid.len > 0) out.maps[@intFromEnum(n.slot)].set(tex_guid);
+    }
+
+    // Cache the parsed result so subsequent frames skip the disk read + JSON
+    // parse. The override path is never cached (its bytes change each frame).
+    if (!is_override) {
+        state.ensureResolvedMaterialCapacity();
+        if (state.resolved_material_count < state.resolved_materials.len) {
+            var e = &state.resolved_materials[state.resolved_material_count];
+            state.resolved_material_count += 1;
+            e.key_len = setKey(&e.key, mat_guid);
+            e.value = out;
+        }
     }
     return out;
 }
@@ -306,6 +342,15 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     }) orelse return error.IndirectBufCreate;
     errdefer c.SDL_ReleaseGPUBuffer(dev, indirect_buf);
 
+    // A parallel indirect buffer for the shadow pass, culled against the light
+    // frustum each frame by a second cull dispatch.
+    const shadow_indirect_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
+        .usage = c.SDL_GPU_BUFFERUSAGE_INDIRECT | c.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE,
+        .size = indirect_bytes,
+        .props = 0,
+    }) orelse return error.IndirectBufCreate;
+    errdefer c.SDL_ReleaseGPUBuffer(dev, shadow_indirect_buf);
+
     const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return error.CopyPassFailed;
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = vtx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = vtx_buf, .offset = 0, .size = vtx_bytes }, false);
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = idx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = idx_buf, .offset = 0, .size = idx_bytes }, false);
@@ -326,6 +371,7 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.bounds_max = cpu.max;
     gm.bounds_buf = bounds_buf;
     gm.indirect_buf = indirect_buf;
+    gm.shadow_indirect_buf = shadow_indirect_buf;
 }
 
 /// Upload a texture and cache it by GUID.
@@ -397,6 +443,19 @@ pub fn uploadTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: 
 /// Full mip chain length for a 2D texture of size `w`×`h` (down to a 1×1 top level).
 fn mipCountFor(w: u32, h: u32) u32 {
     return std.math.log2_int(u32, @max(@max(w, h), 1)) + 1;
+}
+
+/// Largest finite value representable in `f16`.
+const F16_MAX: f32 = 65504.0;
+
+/// Clamp an HDR radiance sample into `f16` range before conversion. Real HDRIs
+/// routinely store suns far above `f16`'s max (Bistro's peaks at ~98304), and a
+/// plain `@floatCast` turns those into `+Inf`; mip generation then spreads the
+/// `Inf` as `NaN` across the chain, which surfaces as garbage (saturated) pixels
+/// wherever the roughness-mipped specular IBL samples it.
+fn toHalfRadiance(v: f32) f16 {
+    if (std.math.isNan(v)) return 0;
+    return @floatCast(@min(@max(v, 0.0), F16_MAX));
 }
 
 /// Order-2 SH projection of an equirect environment for diffuse IBL.
@@ -475,9 +534,9 @@ pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, gu
     const half_pixels = try page.alloc(f16, pixel_count * 4);
     defer page.free(half_pixels);
     for (0..pixel_count) |i| {
-        half_pixels[i * 4 + 0] = @floatCast(img.pixels[i * 3 + 0]);
-        half_pixels[i * 4 + 1] = @floatCast(img.pixels[i * 3 + 1]);
-        half_pixels[i * 4 + 2] = @floatCast(img.pixels[i * 3 + 2]);
+        half_pixels[i * 4 + 0] = toHalfRadiance(img.pixels[i * 3 + 0]);
+        half_pixels[i * 4 + 1] = toHalfRadiance(img.pixels[i * 3 + 1]);
+        half_pixels[i * 4 + 2] = toHalfRadiance(img.pixels[i * 3 + 2]);
         half_pixels[i * 4 + 3] = 1.0;
     }
 
@@ -525,6 +584,17 @@ pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, gu
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "toHalfRadiance keeps out-of-range HDR samples finite" {
+    // A real HDRI sun (Bistro's peaks near 98304) exceeds f16 range; a plain
+    // cast yields +Inf, which mip filtering then spreads as NaN.
+    try std.testing.expect(!std.math.isInf(toHalfRadiance(98304.0)));
+    try std.testing.expectEqual(@as(f16, @floatCast(F16_MAX)), toHalfRadiance(98304.0));
+    try std.testing.expectEqual(@as(f16, 0), toHalfRadiance(std.math.nan(f32)));
+    try std.testing.expectEqual(@as(f16, 0), toHalfRadiance(-3.0));
+    // Ordinary values pass through unchanged.
+    try std.testing.expectEqual(@as(f16, 1.5), toHalfRadiance(1.5));
+}
 
 test "mipCountFor spans full chains down to 1x1" {
     try std.testing.expectEqual(@as(u32, 1), mipCountFor(1, 1));

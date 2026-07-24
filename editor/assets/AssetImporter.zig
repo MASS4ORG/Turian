@@ -19,7 +19,7 @@ const log = std.log.scoped(.asset_importer);
 // Bump the relevant constant to force a reimport of that asset class.
 
 const VERSION_IMAGE: u32 = 3;
-const VERSION_MODEL: u32 = 9;
+const VERSION_MODEL: u32 = 10;
 const VERSION_AUDIO: u32 = 1;
 const VERSION_OTHER: u32 = 1;
 

@@ -218,7 +218,14 @@ pub fn loadModelInfo(allocator: std.mem.Allocator, path: []const u8) !ModelInfo 
                     else => .@"opaque",
                 },
                 .alpha_cutoff = m.alpha_cutoff,
-                .double_sided = m.double_sided != 0,
+                // FBX/DCC content is overwhelmingly authored assuming two-sided
+                // rendering, and ufbx's per-material double-sided flag is
+                // unreliable (reports false even for geometry whose winding needs
+                // two-sided, e.g. all of Bistro) — so default FBX materials to
+                // two-sided. Back-face culling on such meshes drops faces, making
+                // walls invisible / lit from the wrong side. glTF keeps its
+                // spec-compliant `doubleSided` (default single-sided) in GltfLoader.
+                .double_sided = true,
                 .albedo = texRef(m.albedo),
                 .metallic_roughness = texRef(m.metallic_roughness),
                 .normal = texRef(m.normal),
@@ -373,9 +380,17 @@ test "load triangulates a single-triangle FBX into one submesh" {
     try std.testing.expectEqual(@as(usize, 1), mesh.submeshes.len);
     try std.testing.expectEqual(@as(i32, 0), mesh.submeshes[0].material_slot);
 
-    // FBX default unit is centimeters; `load` bakes conversion to meters.
-    try std.testing.expectApproxEqAbs(@as(f32, 0.01), mesh.vertices[1].px, 1e-5);
-    try std.testing.expectApproxEqAbs(@as(f32, 1.0), mesh.vertices[0].nz, 1e-5);
+    // FBX default unit is centimeters; `load` bakes conversion to meters. Which
+    // slot holds which corner depends on winding, so assert the converted extent
+    // rather than a fixed index.
+    var max_px: f32 = 0;
+    for (mesh.vertices) |v| max_px = @max(max_px, v.px);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.01), max_px, 1e-5);
+
+    // Z is mirrored on import (right-handed source into the engine's left-handed
+    // world), so the source's +Z face normal arrives pointing along -Z.
+    for (mesh.vertices) |v|
+        try std.testing.expectApproxEqAbs(@as(f32, -1.0), v.nz, 1e-5);
 }
 
 // Two triangles forming a quad: ufbx de-indexes to 6 corners; weld collapses shared v0/v2 to 4.
@@ -497,10 +512,20 @@ test "load welds shared vertices between adjoining triangles" {
     try std.testing.expectEqual(@as(usize, 6), mesh.indices.len);
     try std.testing.expectEqual(@as(usize, 1), mesh.submeshes.len);
 
-    // Corner 0 (v0 of triangle 1) and corner 3 (v0 of triangle 2) must weld
-    // to the same vertex; likewise corner 2 and corner 4 (both v2).
-    try std.testing.expectEqual(mesh.indices[0], mesh.indices[3]);
-    try std.testing.expectEqual(mesh.indices[2], mesh.indices[4]);
+    // Which corner sits in which slot depends on winding, so assert the sharing
+    // pattern rather than fixed slots: 6 corners over 4 unique vertices means
+    // the two vertices along the shared edge are each referenced twice.
+    var refs = [_]u32{0} ** 4;
+    for (mesh.indices) |i| {
+        try std.testing.expect(i < refs.len);
+        refs[i] += 1;
+    }
+    var shared: u32 = 0;
+    for (refs) |n| {
+        try std.testing.expect(n == 1 or n == 2);
+        if (n == 2) shared += 1;
+    }
+    try std.testing.expectEqual(@as(u32, 2), shared);
 }
 
 test "loadModelInfo extracts a best-effort PBR material from a classic Phong FBX material" {

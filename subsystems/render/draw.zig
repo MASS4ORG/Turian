@@ -40,12 +40,51 @@ pub fn destroyScenePipelines(dev: *c.SDL_GPUDevice) void {
     state.scene_pipeline_count = 0;
 }
 
+/// Create the scene-lights storage buffer and its reusable upload staging buffer
+/// (once). Sized for `types.MAX_LIGHTS`.
+pub fn ensureLightsBuffer(dev: *c.SDL_GPUDevice) void {
+    const bytes: u32 = @intCast(types.MAX_LIGHTS * @sizeOf(types.GpuLight));
+    if (state.lights_buf == null)
+        state.lights_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
+            .usage = c.SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
+            .size = bytes,
+            .props = 0,
+        });
+    if (state.lights_transfer == null)
+        state.lights_transfer = c.SDL_CreateGPUTransferBuffer(dev, &c.SDL_GPUTransferBufferCreateInfo{
+            .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+            .size = bytes,
+            .props = 0,
+        });
+}
+
+/// Stage `lights` and record a copy pass into `state.lights_buf`. Must run
+/// outside any render pass. A zero-length slice still leaves the buffer bindable
+/// (the shader reads no entries when the active count is 0).
+pub fn uploadLights(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, lights: []const types.GpuLight) void {
+    ensureLightsBuffer(dev);
+    const buf = state.lights_buf orelse return;
+    const tb = state.lights_transfer orelse return;
+    const n = @min(lights.len, types.MAX_LIGHTS);
+    if (n == 0) return;
+    const bytes: u32 = @intCast(n * @sizeOf(types.GpuLight));
+
+    const p: [*]types.GpuLight = @ptrCast(@alignCast(
+        c.SDL_MapGPUTransferBuffer(dev, tb, false) orelse return,
+    ));
+    @memcpy(p[0..n], lights[0..n]);
+    c.SDL_UnmapGPUTransferBuffer(dev, tb);
+
+    const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return;
+    c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = buf, .offset = 0, .size = bytes }, true);
+    c.SDL_EndGPUCopyPass(cp);
+}
+
 /// Per-frame values a draw's fragment uniforms need but that don't vary
 /// per-draw (lighting is scene-wide, not per-material).
 pub const FrameUniforms = struct {
     cam_pos4: [4]f32,
     light_vp: [16]f32,
-    lights: [types.MAX_LIGHTS]types.GpuLight,
     env_params: [4]f32,
     env_sh: [9][4]f32,
 };
@@ -115,7 +154,6 @@ fn bindDrawState(
         .env_params = fu.env_params,
         .env_sh = fu.env_sh,
         .light_vp = fu.light_vp,
-        .lights = fu.lights,
     };
     c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
     c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 7);

@@ -11,23 +11,29 @@ const culling = @import("culling.zig");
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
 
-/// Runs the shadow pass; fence-waits its own command buffer in detailed mode.
-pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, light_vp: Matrix4, objects: []const engine.SceneNode) void {
+/// Culls shadow casters against the light frustum, then runs the shadow pass;
+/// fence-waits its own command buffer in detailed mode. The cull dispatch and
+/// draw share one command buffer so the shadow indirect buffer is written before
+/// the pass reads it even under per-pass fencing.
+pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, light_vp: Matrix4, light_frustum: culling.Frustum, objects: []const engine.SceneNode) void {
     if (!state.detailed_gpu_timing) {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
+        gpu_cull.dispatchShadowCulls(cmd, objects, light_frustum);
         shadow.renderShadowPass(cmd, light_vp, objects);
         return;
     }
     const own = c.SDL_AcquireGPUCommandBuffer(dev) orelse {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
+        gpu_cull.dispatchShadowCulls(cmd, objects, light_frustum);
         shadow.renderShadowPass(cmd, light_vp, objects);
         return;
     };
     {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
+        gpu_cull.dispatchShadowCulls(own, objects, light_frustum);
         shadow.renderShadowPass(own, light_vp, objects);
     }
     var gz = engine.Profiler.zone("gpu.shadow");

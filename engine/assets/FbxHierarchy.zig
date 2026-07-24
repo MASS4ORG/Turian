@@ -193,6 +193,12 @@ const FbxNodeData = extern struct {
     translation: [3]f32,
     rotation: [4]f32,
     scale: [3]f32,
+    light_type: i32,
+    light_color: [3]f32,
+    light_intensity: f32,
+    light_inner_deg: f32,
+    light_outer_deg: f32,
+    light_cast_shadows: i32,
 };
 
 const FbxNodeHierarchy = extern struct {
@@ -215,6 +221,14 @@ pub const FbxNode = struct {
     position: [3]f32,
     rotation_euler_deg: [3]f32,
     scale: [3]f32,
+    /// Light on this node: -1 none, 0 point, 1 directional, 2 spot. When set,
+    /// the aim is already baked into `rotation_euler_deg` (node +Z = light aim).
+    light_type: i32 = -1,
+    light_color: [3]f32 = .{ 1, 1, 1 },
+    light_intensity: f32 = 1,
+    light_inner_deg: f32 = 0,
+    light_outer_deg: f32 = 35,
+    light_cast_shadows: bool = false,
 };
 
 /// Owns the memory backing a `loadHierarchy` result.
@@ -254,6 +268,12 @@ pub fn loadHierarchy(allocator: std.mem.Allocator, path: []const u8) !FbxHierarc
             .position = n.translation,
             .rotation_euler_deg = quatToEulerDeg(n.rotation),
             .scale = n.scale,
+            .light_type = n.light_type,
+            .light_color = n.light_color,
+            .light_intensity = n.light_intensity,
+            .light_inner_deg = n.light_inner_deg,
+            .light_outer_deg = n.light_outer_deg,
+            .light_cast_shadows = n.light_cast_shadows != 0,
         };
     }
 

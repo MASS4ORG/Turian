@@ -9,8 +9,6 @@
 // image-based lighting (diffuse SH irradiance + roughness-mipped specular)
 // sampled from an equirectangular HDR environment map.
 
-#define MAX_LIGHTS 8
-
 layout(location = 0) in vec3 in_world_normal;
 layout(location = 1) in vec2 in_uv;
 layout(location = 2) in vec3 in_world_pos;
@@ -44,8 +42,15 @@ layout(set = 3, binding = 0) uniform FragUB {
     vec4 env_params;      // x=intensity, y=mip_count, z=has_env, w unused
     vec4 env_sh[9];       // diffuse irradiance SH coefficients (rgb in xyz)
     mat4 light_vp;        // shadow light view-projection (primary directional)
-    Light lights[MAX_LIGHTS];
 } ubo;
+
+// Scene lights. Storage buffer (not a fixed uniform array) so the light count is
+// bounded only by GPU memory, not a per-draw uniform size. SDL3 SPIR-V places
+// fragment storage buffers in set=2 after the sampled textures (7 here), so this
+// is binding 7. Only `camera_pos.w` entries are read.
+layout(std430, set = 2, binding = 7) readonly buffer LightBuffer {
+    Light lights[];
+} light_buf;
 
 layout(location = 0) out vec4 out_color;
 
@@ -57,8 +62,15 @@ vec3 getNormal() {
     vec3 N = normalize(in_world_normal);
     if (ubo.flags.z < 0.5) return N;
 
-    vec3 tn = texture(normal_tex, in_uv).xyz * 2.0 - 1.0;
+    // Reconstruct Z from XY rather than reading the blue channel: two-channel
+    // BC5/ATI2 normal maps (the usual cooked form, and what all of Bistro uses)
+    // carry no blue channel, so sampling .z yields 0 → a normal pointing into
+    // the surface. Reconstruction is equally valid for three-channel maps, since
+    // a tangent-space normal is unit length.
+    vec3 tn;
+    tn.xy = texture(normal_tex, in_uv).xy * 2.0 - 1.0;
     tn.xy *= ubo.mr_ns_oc.z; // normal_scale
+    tn.z = sqrt(max(1.0 - dot(tn.xy, tn.xy), 0.0));
 
     vec3 dp1 = dFdx(in_world_pos);
     vec3 dp2 = dFdy(in_world_pos);
@@ -192,14 +204,18 @@ void main() {
 
     vec3 albedo = albedo_s.rgb;
     vec3 N = getNormal();
+    // Two-sided shading: a back-facing fragment (e.g. the inner side of a
+    // single-sided wall on a two-sided material) must light from the side the
+    // camera actually sees, so flip the normal to face the viewer.
+    if (!gl_FrontFacing) N = -N;
     vec3 V = normalize(ubo.camera_pos.xyz - in_world_pos);
     float ndv = max(dot(N, V), 0.0);
     vec3 F0 = mix(vec3(0.04), albedo, metallic);
 
     int light_count = int(ubo.camera_pos.w);
     vec3 Lo = vec3(0.0);
-    for (int i = 0; i < light_count && i < MAX_LIGHTS; i++) {
-        Light lt = ubo.lights[i];
+    for (int i = 0; i < light_count; i++) {
+        Light lt = light_buf.lights[i];
         int type = int(lt.position.w);
 
         // Direction to the light and distance attenuation.

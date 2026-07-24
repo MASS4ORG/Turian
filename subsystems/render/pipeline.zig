@@ -181,7 +181,8 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
         .stage = c.SDL_GPU_SHADERSTAGE_FRAGMENT,
         .num_samplers = 7,
         .num_storage_textures = 0,
-        .num_storage_buffers = 0,
+        // The scene lights storage buffer (set=2, binding=7, after the 7 samplers).
+        .num_storage_buffers = 1,
         .num_uniform_buffers = 1,
         .props = 0,
     }) orelse return error.FragShader;
@@ -228,6 +229,7 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
         .padding2 = 0,
         .padding3 = 0,
     };
+    info.multisample_state.sample_count = state.sample_count;
     info.target_info = .{
         .num_color_targets = 1,
         .color_target_descriptions = &color_desc,
@@ -399,6 +401,7 @@ pub fn createSkyboxPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
         .padding2 = 0,
         .padding3 = 0,
     };
+    info.multisample_state.sample_count = state.sample_count;
     info.target_info = .{
         .num_color_targets = 1,
         .color_target_descriptions = &color_desc,
@@ -436,7 +439,8 @@ pub fn createCullComputePipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUComputePipeli
     }) orelse error.ComputePipeline;
 }
 
-/// Create the offscreen depth target for the main pass at `w`×`h`.
+/// Create the offscreen depth target for the main pass at `w`×`h`, matching the
+/// scene's current MSAA sample count.
 pub fn createDepth(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
     return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
         .type = c.SDL_GPU_TEXTURETYPE_2D,
@@ -446,7 +450,34 @@ pub fn createDepth(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
         .height = h,
         .layer_count_or_depth = 1,
         .num_levels = 1,
-        .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
+        .sample_count = state.sample_count,
         .props = 0,
     }) orelse error.DepthTextureCreate;
+}
+
+/// Create the multisampled color target the scene pass renders into before
+/// resolving to the caller's single-sample texture. Only used when MSAA is on.
+pub fn createMsaaColor(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
+    return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
+        .type = c.SDL_GPU_TEXTURETYPE_2D,
+        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .usage = c.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+        .width = w,
+        .height = h,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = state.sample_count,
+        .props = 0,
+    }) orelse error.MsaaColorCreate;
+}
+
+/// The highest sample count (up to 4x) the device supports for both the scene
+/// color and depth formats, or `SAMPLECOUNT_1` if MSAA isn't supported.
+pub fn pickSampleCount(dev: *c.SDL_GPUDevice) c.SDL_GPUSampleCount {
+    const color_fmt = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    const depth_fmt = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
+    if (c.SDL_GPUTextureSupportsSampleCount(dev, color_fmt, c.SDL_GPU_SAMPLECOUNT_4) and
+        c.SDL_GPUTextureSupportsSampleCount(dev, depth_fmt, c.SDL_GPU_SAMPLECOUNT_4))
+        return c.SDL_GPU_SAMPLECOUNT_4;
+    return c.SDL_GPU_SAMPLECOUNT_1;
 }

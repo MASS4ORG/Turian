@@ -437,7 +437,11 @@ fn save() void {
     if (EditorState.assetDbReady()) {
         if (EditorState.asset_db.findByPath(path)) |info| {
             var guid_buf: [36]u8 = undefined;
-            PreviewSystem.invalidate(info.guid.toString(&guid_buf));
+            const guid = info.guid.toString(&guid_buf);
+            PreviewSystem.invalidate(guid);
+            // Drop the renderer's cached resolution so the viewport reflects the
+            // save on the next frame instead of serving the pre-edit values.
+            render.invalidateMaterial(guid);
         }
     }
 }

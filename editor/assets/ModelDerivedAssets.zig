@@ -139,20 +139,33 @@ fn classifyImageRoles(arena: std.mem.Allocator, materials: []const engine.assets
     return roles;
 }
 
-/// Like `asset_meta.ensureMeta`, but new data-map images default to linear
-/// color space (and `texture_type = .normal_map` for normal maps). Never
-/// touches an existing meta, so user edits always win.
+/// Like `asset_meta.ensureMeta`, but images used as data maps are forced to
+/// linear color space (and `texture_type = .normal_map` for normal maps).
+///
+/// This also *corrects* an existing meta rather than only seeding a new one: a
+/// texture's meta is usually created by the plain directory scan (which has no
+/// material context and so defaults everything to sRGB) before any model
+/// classifies its role, leaving normal/ORM maps permanently mis-tagged. sRGB is
+/// never a valid encoding for a normal or metallic-roughness map — the gamma
+/// curve badly distorts the values (a 0.22 roughness decodes to 0.04, turning a
+/// semi-gloss surface into a mirror) — so correcting it is safe. Only the
+/// role-derived fields are touched, and only when they actually differ, so no
+/// other user edit is disturbed and unchanged metas aren't rewritten.
 fn ensureImageMeta(io: std.Io, arena: std.mem.Allocator, path: []const u8, role: ImageRole) MetaFile {
-    const is_new = asset_meta.readMeta(io, arena, path).guid.isNil();
     const sm = asset_meta.ensureMeta(io, arena, path);
-    if (!is_new or role == .color) return sm;
+    if (role == .color) return sm;
 
     var settings = switch (sm.import_settings) {
         .image => |s| s,
         else => return sm,
     };
+    const want_normal_type = role == .normal;
+    const fix_space = settings.color_space != .linear;
+    const fix_type = want_normal_type and settings.texture_type != .normal_map;
+    if (!fix_space and !fix_type) return sm;
+
     settings.color_space = .linear;
-    if (role == .normal) settings.texture_type = .normal_map;
+    if (want_normal_type) settings.texture_type = .normal_map;
 
     var fixed = sm;
     fixed.import_settings = .{ .image = settings };

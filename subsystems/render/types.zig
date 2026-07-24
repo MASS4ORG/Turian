@@ -1,7 +1,10 @@
 //! Plain data types and constants shared across the renderer (no GPU state).
 const engine = @import("engine");
 
-pub const MAX_LIGHTS = 8;
+/// Capacity of the per-frame lights storage buffer. Lights live in a storage
+/// buffer (not the per-draw uniform), so this can be large without inflating
+/// per-draw uniform pushes; the fragment shader loops only over the active count.
+pub const MAX_LIGHTS = 256;
 
 // Shadow mapping (primary directional light).
 pub const SHADOW_DIM: u32 = 2048;
@@ -29,6 +32,8 @@ pub const GpuLight = extern struct {
 
 /// Fragment uniforms — layout must match FragUB in scene.frag.glsl exactly.
 /// All members are vec4 (or vec4 arrays) to keep std140 16-byte alignment trivial.
+/// Scene lights are NOT here — they live in a separate storage buffer bound once
+/// per frame (see `state.lights_buf`), so this stays small per draw.
 pub const FragUB = extern struct {
     camera_pos: [4]f32, // xyz, w = light_count
     base_color: [4]f32, // rgba
@@ -39,7 +44,6 @@ pub const FragUB = extern struct {
     env_params: [4]f32, // x=intensity, y=mip_count, z=has_env, w unused
     env_sh: [9][4]f32, // diffuse irradiance SH coefficients (rgb in xyz)
     light_vp: [16]f32, // shadow light view-projection (primary directional)
-    lights: [MAX_LIGHTS]GpuLight,
 };
 
 /// Fragment uniforms for the skybox pass — layout must match FragUB in

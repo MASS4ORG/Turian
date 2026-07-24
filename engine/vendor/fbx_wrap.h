@@ -87,8 +87,17 @@ typedef struct {
     int32_t parent_index; /* index into FbxNodeHierarchy.nodes, or -1 for a root */
     int32_t mesh_index;   /* index into FbxMultiMeshLocalData's unique meshes, or -1 */
     float   translation[3];
-    float   rotation[4];  /* quaternion, xyzw */
+    float   rotation[4];  /* quaternion, xyzw (already mirrored to left-handed) */
     float   scale[3];
+    /* Light attached to this node, if any. light_type: -1 none, 0 point,
+       1 directional, 2 spot. For spot/directional the aim is baked into
+       `rotation` so the node's +Z forward points where the light shines. */
+    int32_t light_type;
+    float   light_color[3];
+    float   light_intensity;
+    float   light_inner_deg;  /* spot inner cone half-angle, degrees */
+    float   light_outer_deg;  /* spot outer cone half-angle, degrees */
+    int32_t light_cast_shadows;
 } FbxNodeData;
 
 typedef struct {

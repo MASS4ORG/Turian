@@ -138,6 +138,8 @@ pub fn createGizmoPipeline(dev: *c.SDL_GPUDevice, depth_test: bool) !*c.SDL_GPUG
         .padding2 = 0,
         .padding3 = 0,
     };
+    // Match the scene pass's MSAA so the overlay can share its depth buffer.
+    info.multisample_state.sample_count = state.sample_count;
     info.target_info = .{
         .num_color_targets = 1,
         .color_target_descriptions = &color_desc,
@@ -191,7 +193,8 @@ pub fn renderGizmos(
     if (segments == 0) return;
     const dev = state.device orelse return;
     // Depth-test against the depth `renderScene` produced for this same size.
-    const depth_tex = state.findDepth(w, h) orelse return;
+    const target = state.findTarget(w, h) orelse return;
+    const depth_tex = target.tex orelse return;
     const pl = (if (overlay) state.gizmo_overlay_pipeline else state.gizmo_pipeline) orelse return;
 
     const expanded_count = segments * CORNERS_PER_SEGMENT;
@@ -240,11 +243,19 @@ pub fn renderGizmos(
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = vbuf, .offset = 0, .size = bytes }, false);
     c.SDL_EndGPUCopyPass(cp);
 
-    // Load the existing color (the rendered scene) and depth; never clear.
+    // Load the existing color (the rendered scene) and depth; never clear. Under
+    // MSAA the scene lives in the multisampled color; draw there (sharing the
+    // MSAA depth) and re-resolve into the single-sample `color_tex`.
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
-    color_info.texture = color_tex;
     color_info.load_op = c.SDL_GPU_LOADOP_LOAD;
-    color_info.store_op = c.SDL_GPU_STOREOP_STORE;
+    if (target.msaa_color) |mc| {
+        color_info.texture = mc;
+        color_info.store_op = c.SDL_GPU_STOREOP_RESOLVE_AND_STORE;
+        color_info.resolve_texture = color_tex;
+    } else {
+        color_info.texture = color_tex;
+        color_info.store_op = c.SDL_GPU_STOREOP_STORE;
+    }
 
     var depth_info = std.mem.zeroes(c.SDL_GPUDepthStencilTargetInfo);
     depth_info.texture = depth_tex;

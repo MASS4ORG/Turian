@@ -113,6 +113,9 @@ fn buildSceneNodes(
         if (n.mesh_index >= 0 and @as(usize, @intCast(n.mesh_index)) < groups.len) {
             attachMeshRenderer(&node, n.mesh_index, groups, mesh_guids, materials_so_far);
         }
+        if (@hasField(@TypeOf(n), "light_type") and n.light_type >= 0) {
+            attachLight(&node, n);
+        }
         scene_nodes[new_i] = node;
     }
     return scene_nodes;
@@ -150,6 +153,29 @@ fn attachMeshRenderer(
         comp.material_count = @intCast(n);
     }
     _ = node.addComponent(.{ .mesh_renderer = comp });
+}
+
+/// Attach a `LightComponent` from an imported node's light fields. The node's
+/// rotation already aims the light along +Z (baked at import). `range` has no
+/// FBX equivalent, so a scene-scale default is used; intensity is passed through
+/// and typically needs tuning per project.
+fn attachLight(node: *SceneNode, n: anytype) void {
+    var comp = engine.LightComponent{};
+    comp.kind = switch (n.light_type) {
+        1 => .directional,
+        2 => .spot,
+        else => .point,
+    };
+    comp.color_r = n.light_color[0];
+    comp.color_g = n.light_color[1];
+    comp.color_b = n.light_color[2];
+    comp.intensity = n.light_intensity;
+    comp.range = 15.0;
+    comp.spot_angle = if (n.light_outer_deg > 0) n.light_outer_deg else 35.0;
+    const inner = if (n.light_outer_deg > 0) n.light_inner_deg / n.light_outer_deg else 0.85;
+    comp.spot_softness = std.math.clamp(1.0 - inner, 0.0, 1.0);
+    comp.cast_shadows = n.light_cast_shadows;
+    _ = node.addComponent(.{ .light = comp });
 }
 
 /// Kahn's-algorithm topological order (parents before children). Any node

@@ -85,6 +85,17 @@ pub fn clearMaterialOverride() void {
     state.material_override_bytes = &.{};
 }
 
+/// Drop `guid`'s cached resolved material so the next draw re-reads it from
+/// disk. Call after a material's source bytes change (save/reimport).
+pub fn invalidateMaterial(guid: []const u8) void {
+    assets.invalidateMaterial(guid);
+}
+
+/// Drop every cached resolved material (e.g. a bulk reimport or project reload).
+pub fn invalidateAllMaterials() void {
+    assets.invalidateAllMaterials();
+}
+
 /// Compute the camera used for rendering; editor override or first active camera component.
 pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     var cam_pos = Vector3{ .x = 0, .y = 2, .z = -5 };
@@ -161,6 +172,9 @@ pub fn setSources(mesh: SourceFn, texture: SourceFn, material: SourceFn) void {
 /// Initialize the renderer on a GPU device (must accept SPIR-V shaders).
 pub fn init(device: *c.SDL_GPUDevice) !void {
     state.device = device;
+    // Decide MSAA before any pipeline is built — pipelines bake in the sample count.
+    state.sample_count = pipeline.pickSampleCount(device);
+    log.info("MSAA sample count: {d}x", .{@as(u32, if (state.msaa()) 4 else 1)});
     state.sampler = try pipeline.createSampler(device);
     state.shadow_sampler = pipeline.createShadowSampler(device) catch |err| s: {
         log.warn("shadow sampler failed: {any} — shadows disabled.", .{err});
@@ -185,34 +199,45 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     log.info("Ready (SPIRV).", .{});
 }
 
-/// Depth texture for a `w`x`h` pass, cached by size.
-fn depthFor(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?*c.SDL_GPUTexture {
-    if (state.findDepth(w, h)) |t| return t;
+/// Build a render-target entry (depth + MSAA color) for `w`x`h`, or null on failure.
+fn makeTarget(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?state.DepthTarget {
+    const depth = pipeline.createDepth(dev, w, h) catch return null;
+    var mc: ?*c.SDL_GPUTexture = null;
+    if (state.msaa()) {
+        mc = pipeline.createMsaaColor(dev, w, h) catch {
+            c.SDL_ReleaseGPUTexture(dev, depth);
+            return null;
+        };
+    }
+    return .{ .tex = depth, .msaa_color = mc, .w = w, .h = h };
+}
+
+fn releaseTarget(dev: *c.SDL_GPUDevice, d: *state.DepthTarget) void {
+    if (d.tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    if (d.msaa_color) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    d.* = .{};
+}
+
+/// Cached render target (depth + MSAA color) for a `w`x`h` pass, keyed by size.
+fn targetFor(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?*state.DepthTarget {
+    if (state.findTarget(w, h)) |d| return d;
 
     for (&state.depth_targets) |*d| {
         if (d.tex == null) {
-            d.tex = pipeline.createDepth(dev, w, h) catch return null;
-            d.w = w;
-            d.h = h;
-            return d.tex;
+            d.* = makeTarget(dev, w, h) orelse return null;
+            return d;
         }
     }
 
     const d = &state.depth_targets[state.depth_evict_cursor];
     state.depth_evict_cursor = (state.depth_evict_cursor + 1) % state.depth_targets.len;
-    if (d.tex) |old| c.SDL_ReleaseGPUTexture(dev, old);
-    d.* = .{ .tex = pipeline.createDepth(dev, w, h) catch {
-        d.* = .{};
-        return null;
-    }, .w = w, .h = h };
-    return d.tex;
+    releaseTarget(dev, d);
+    d.* = makeTarget(dev, w, h) orelse return null;
+    return d;
 }
 
 fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
-    for (&state.depth_targets) |*d| {
-        if (d.tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
-        d.* = .{};
-    }
+    for (&state.depth_targets) |*d| releaseTarget(dev, d);
     state.depth_evict_cursor = 0;
 }
 
@@ -244,10 +269,11 @@ pub fn renderScene(
             break :p null;
         };
 
-    const depth_tex = depthFor(dev, w, h) orelse {
+    const target = targetFor(dev, w, h) orelse {
         log.err("depth target failed", .{});
         return;
     };
+    const depth_tex = target.tex.?;
 
     {
         var upload_zone = engine.Profiler.zone("render.upload");
@@ -334,21 +360,35 @@ pub fn renderScene(
     const shadows_on = shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
 
     if (shadows_on) {
-        gpu_timing.runShadowPass(dev, cmd, light_vp, objects);
+        const light_frustum = culling.Frustum.extract(light_vp);
+        gpu_timing.runShadowPass(dev, cmd, light_vp, light_frustum, objects);
     }
 
     // ── GPU-driven cull compute phase ────────────────────────────────────────
     // Must finish before the main render pass (compute and render passes can't overlap on the same command buffer).
     gpu_timing.runCullPhase(dev, cmd, objects, frustum);
 
+    // Upload this frame's lights to the storage buffer the scene shader reads
+    // (outside any render pass — a copy pass can't overlap one).
+    draw.uploadLights(cmd, dev, lights[0..light_count]);
+
     // ── Main pass ───────────────────────────────────────────────────────────
     var main_zone = engine.Profiler.zone("render.main");
     defer main_zone.end();
+    // Under MSAA, render into the multisampled color and resolve into the
+    // caller's single-sample `color_tex` (kept via RESOLVE_AND_STORE so the
+    // gizmo overlay pass can re-resolve on top of the same MSAA buffer).
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
-    color_info.texture = color_tex;
     color_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
-    color_info.store_op = c.SDL_GPU_STOREOP_STORE;
     color_info.clear_color = .{ .r = 0.14, .g = 0.14, .b = 0.16, .a = 1.0 };
+    if (target.msaa_color) |mc| {
+        color_info.texture = mc;
+        color_info.store_op = c.SDL_GPU_STOREOP_RESOLVE_AND_STORE;
+        color_info.resolve_texture = color_tex;
+    } else {
+        color_info.texture = color_tex;
+        color_info.store_op = c.SDL_GPU_STOREOP_STORE;
+    }
 
     var depth_info = std.mem.zeroes(c.SDL_GPUDepthStencilTargetInfo);
     depth_info.texture = depth_tex;
@@ -378,7 +418,6 @@ pub fn renderScene(
     const fu = draw.FrameUniforms{
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
         .light_vp = light_vp.m,
-        .lights = lights,
         .env_params = env_params,
         .env_sh = env_sh,
     };
@@ -398,6 +437,12 @@ pub fn renderScene(
             c.SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
         }
     }
+
+    // Bind the scene lights storage buffer once for the whole pass (slot 0 =
+    // set=2 binding 7, after the 7 fragment samplers). Every scene pipeline
+    // declares it, so it must be bound even when the scene has no lights.
+    if (state.lights_buf) |lb|
+        c.SDL_BindGPUFragmentStorageBuffers(pass, 0, &[_]?*c.SDL_GPUBuffer{lb}, 1);
 
     var bound_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
     draw.transparent_count = 0;
@@ -523,11 +568,13 @@ pub fn deinit() void {
     for (state.textures[0..state.texture_count]) |*gt|
         c.SDL_ReleaseGPUTexture(dev, gt.texture);
     state.texture_count = 0;
+    state.resolved_material_count = 0;
     for (state.meshes[0..state.mesh_count]) |*gm| {
         c.SDL_ReleaseGPUBuffer(dev, gm.vtx_buf);
         c.SDL_ReleaseGPUBuffer(dev, gm.idx_buf);
         if (gm.bounds_buf) |bb| c.SDL_ReleaseGPUBuffer(dev, bb);
         if (gm.indirect_buf) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
+        if (gm.shadow_indirect_buf) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
         std.heap.page_allocator.free(gm.submeshes);
         std.heap.page_allocator.free(gm.material_groups);
     }
@@ -542,6 +589,10 @@ pub fn deinit() void {
     state.skybox_pipeline = null;
     if (state.cull_pipeline) |p| c.SDL_ReleaseGPUComputePipeline(dev, p);
     state.cull_pipeline = null;
+    if (state.lights_buf) |b| c.SDL_ReleaseGPUBuffer(dev, b);
+    if (state.lights_transfer) |t| c.SDL_ReleaseGPUTransferBuffer(dev, t);
+    state.lights_buf = null;
+    state.lights_transfer = null;
     if (state.sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
     draw.destroyScenePipelines(dev);
     state.sampler = null;

@@ -96,6 +96,16 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, light_vp: Matrix4, objects
 
             c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
             c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+            // Draw only the submeshes the light-frustum cull marked visible (one
+            // indirect multi-draw); fall back to the whole mesh if that cull
+            // didn't run for this mesh (e.g. its compute buffers failed to create).
+            if (gm.shadow_indirect_buf) |sib| {
+                if (gm.shadow_cull_dispatched_frame == state.frame_seq) {
+                    c.SDL_DrawGPUIndexedPrimitivesIndirect(pass, sib, 0, @intCast(gm.submeshes.len));
+                    continue;
+                }
+            }
             c.SDL_DrawGPUIndexedPrimitives(pass, gm.idx_count, 1, 0, 0, 0);
         }
     }

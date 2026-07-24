@@ -12,6 +12,17 @@ pub const SHADOW_FORMAT = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 pub var device: ?*c.SDL_GPUDevice = null;
 pub var sampler: ?*c.SDL_GPUSampler = null;
 
+/// Multisample count for the scene pass (`SDL_GPU_SAMPLECOUNT_*`). Chosen at
+/// init from device support; `SAMPLECOUNT_1` disables MSAA (direct render, no
+/// resolve). Read by pipeline creation and the main/gizmo render passes.
+pub var sample_count: c.SDL_GPUSampleCount = c.SDL_GPU_SAMPLECOUNT_1;
+
+/// Whether MSAA is active (sample count > 1), i.e. the scene renders into a
+/// multisampled target and resolves into the caller's single-sample texture.
+pub fn msaa() bool {
+    return sample_count != c.SDL_GPU_SAMPLECOUNT_1;
+}
+
 /// Fixed-function state for a scene pipeline permutation.
 pub const ScenePipelineState = struct {
     blend: engine.Material.BlendMode = .disabled,
@@ -38,14 +49,25 @@ pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 /// GPU-driven frustum-culling compute pipeline.
 pub var cull_pipeline: ?*c.SDL_GPUComputePipeline = null;
 
+/// Per-frame scene lights, uploaded to a graphics storage buffer the scene
+/// fragment shader reads (bound once per frame, not pushed per draw). Sized for
+/// `types.MAX_LIGHTS`; the active count travels in the frag uniform's
+/// `camera_pos.w`. `lights_transfer` is the reused upload staging buffer.
+pub var lights_buf: ?*c.SDL_GPUBuffer = null;
+pub var lights_transfer: ?*c.SDL_GPUTransferBuffer = null;
+
 pub var white_tex: ?*c.SDL_GPUTexture = null;
 /// Default tangent-space "flat" normal (points straight out): rgb (128,128,255).
 pub var flat_normal_tex: ?*c.SDL_GPUTexture = null;
 
-/// Depth targets cached by (w,h) so no attachment is released while a pass in the current frame still references it.
+/// Render targets cached by (w,h) so no attachment is released while a pass in
+/// the current frame still references it. `tex` is the depth target (MSAA when
+/// `sample_count > 1`); `msaa_color` is the multisampled color the scene pass
+/// resolves from (null in the single-sample path).
 pub const MAX_DEPTH_TARGETS = 6;
 pub const DepthTarget = struct {
     tex: ?*c.SDL_GPUTexture = null,
+    msaa_color: ?*c.SDL_GPUTexture = null,
     w: u32 = 0,
     h: u32 = 0,
 };
@@ -57,6 +79,14 @@ pub var depth_evict_cursor: usize = 0;
 pub fn findDepth(w: u32, h: u32) ?*c.SDL_GPUTexture {
     for (&depth_targets) |*d| {
         if (d.tex != null and d.w == w and d.h == h) return d.tex;
+    }
+    return null;
+}
+
+/// The cached render-target entry matching `w`x`h` (depth + MSAA color), or null.
+pub fn findTarget(w: u32, h: u32) ?*DepthTarget {
+    for (&depth_targets) |*d| {
+        if (d.tex != null and d.w == w and d.h == h) return d;
     }
     return null;
 }
@@ -123,9 +153,13 @@ pub const GpuMesh = struct {
     bounds_buf: ?*c.SDL_GPUBuffer = null,
     /// Indirect draw command buffer written by the cull compute pass each frame.
     indirect_buf: ?*c.SDL_GPUBuffer = null,
+    /// Indirect draw commands for the shadow pass, culled against the light frustum.
+    shadow_indirect_buf: ?*c.SDL_GPUBuffer = null,
     /// Monotonic frame counter: only the first mesh renderer instance referencing
     /// this mesh per frame uses the GPU-driven path; later instances fall back to CPU.
     cull_dispatched_frame: u64 = 0,
+    /// As `cull_dispatched_frame`, but for the light-frustum shadow cull dispatch.
+    shadow_cull_dispatched_frame: u64 = 0,
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);
@@ -159,6 +193,24 @@ pub const GpuTexture = struct {
 pub var textures: []GpuTexture = &.{};
 pub var texture_count: usize = 0;
 
+/// Default resolved-material cache capacity; grows on demand.
+pub const MAX_RESOLVED_MATERIALS = 128;
+
+/// A material GUID resolved (JSON parsed once) into ready-to-bind values, cached
+/// so `resolveMaterial` need not re-read the `.material` file and re-parse it
+/// every frame for every draw.
+pub const ResolvedMaterialEntry = struct {
+    key: [KEY_CAP]u8 = undefined,
+    key_len: usize = 0,
+    value: types.ResolvedMaterial = .{},
+
+    pub fn matchesKey(self: *const @This(), k: []const u8) bool {
+        return std.mem.eql(u8, self.key[0..self.key_len], k);
+    }
+};
+pub var resolved_materials: []ResolvedMaterialEntry = &.{};
+pub var resolved_material_count: usize = 0;
+
 fn growCache(comptime T: type, cur: []T, default_cap: usize) []T {
     var new_cap: usize = if (cur.len == 0) default_cap else cur.len * 2;
     if (new_cap == 0) new_cap = default_cap;
@@ -178,6 +230,12 @@ pub fn ensureMeshCapacity() void {
 pub fn ensureTextureCapacity() void {
     if (texture_count < textures.len) return;
     textures = growCache(GpuTexture, textures, MAX_TEXTURES);
+}
+
+/// Ensures `resolved_materials` has room for at least one more entry.
+pub fn ensureResolvedMaterialCapacity() void {
+    if (resolved_material_count < resolved_materials.len) return;
+    resolved_materials = growCache(ResolvedMaterialEntry, resolved_materials, MAX_RESOLVED_MATERIALS);
 }
 
 const std = @import("std");

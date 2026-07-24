@@ -10,6 +10,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
+const render = @import("render");
 const EditorState = @import("../services/EditorState.zig");
 const AssetActions = @import("AssetActions.zig");
 const Documents = @import("../main-window/Documents.zig");
@@ -127,6 +128,9 @@ pub fn invalidatePreviewAndSubAssets(asset_path: []const u8) void {
         var sub_guid_buf: [36]u8 = undefined;
         PreviewSystem.invalidate(sub.guid.toString(&sub_guid_buf));
     }
+    // A reimport can regenerate any of this asset's cooked materials; drop the
+    // renderer's resolved-material cache so the viewport picks up the new bytes.
+    render.invalidateAllMaterials();
     invalidateSubAssetCount(asset_path);
 }
 

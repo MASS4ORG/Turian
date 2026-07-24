@@ -5,12 +5,26 @@
 #include <string.h>
 #include <math.h>
 
-/* Normalize to right-handed Y-up meters (matching glTF), baked into geometry. */
+/* Normalize to right-handed Y-up meters, baked into geometry, then mirror Z at
+ * extraction to reach the engine's left-handed world.
+ *
+ * The engine is left-handed with +Z forward (`Matrix4.lookAt` takes right as
+ * `cross(up, forward)`, so looking down +Z with +Y up puts +X on the right).
+ * Importing right-handed content unmirrored makes every model a mirror image —
+ * text reads backwards and asymmetric props face the wrong way.
+ *
+ * The conversion is *not* done via `ufbx_axes_left_handed_y_up`: changing
+ * handedness needs a reflection, and ufbx's space conversion only rotates, so
+ * asking for a -Z front yields a 180-degree rotation about X (the scene arrives
+ * upside down) rather than a mirror. Z is therefore negated per-vertex where
+ * positions and normals are read, and the winding reversed here to compensate
+ * for the reflection flipping triangle orientation. */
 static void fbx_wrap_opts(ufbx_load_opts* opts) {
     memset(opts, 0, sizeof(*opts));
     opts->target_axes = ufbx_axes_right_handed_y_up;
     opts->target_unit_meters = 1.0f;
     opts->space_conversion = UFBX_SPACE_CONVERSION_MODIFY_GEOMETRY;
+    opts->reverse_winding = true;
     opts->generate_missing_normals = true;
     opts->ignore_missing_external_files = true;
 }
@@ -130,7 +144,10 @@ int fbx_wrap_load_all(const char* path, FbxMultiMeshData* out) {
                         p = ufbx_transform_position(&node->geometry_to_world, p);
                         positions[vi * 3 + 0] = (float)p.x;
                         positions[vi * 3 + 1] = (float)p.y;
-                        positions[vi * 3 + 2] = (float)p.z;
+                        /* RH (-Z forward) -> the engine's LH (+Z forward). See
+                           `fbx_wrap_opts`: ufbx can only rotate, so the reflection
+                           is applied here. */
+                        positions[vi * 3 + 2] = -(float)p.z;
 
                         if (normals) {
                             ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, ci);
@@ -143,13 +160,16 @@ int fbx_wrap_load_all(const char* path, FbxMultiMeshData* out) {
                             }
                             normals[vi * 3 + 0] = (float)n.x;
                             normals[vi * 3 + 1] = (float)n.y;
-                            normals[vi * 3 + 2] = (float)n.z;
+                            normals[vi * 3 + 2] = -(float)n.z;
                         }
 
                         if (uvs) {
                             ufbx_vec2 uv = ufbx_get_vertex_vec2(&mesh->vertex_uv, ci);
                             uvs[vi * 2 + 0] = (float)uv.x;
-                            uvs[vi * 2 + 1] = (float)uv.y;
+                            /* FBX puts the UV origin at the bottom-left; glTF and
+                               our samplers use top-left, so V is flipped here
+                               (the glTF path needs no such flip). */
+                            uvs[vi * 2 + 1] = 1.0f - (float)uv.y;
                         }
 
                         indices[vi] = vi;
@@ -310,7 +330,10 @@ int fbx_wrap_load_meshes(const char* path, FbxMultiMeshLocalData* out) {
                         p = ufbx_transform_position(&geo_mat, p);
                         positions[vi * 3 + 0] = (float)p.x;
                         positions[vi * 3 + 1] = (float)p.y;
-                        positions[vi * 3 + 2] = (float)p.z;
+                        /* RH (-Z forward) -> the engine's LH (+Z forward). See
+                           `fbx_wrap_opts`: ufbx can only rotate, so the reflection
+                           is applied here. */
+                        positions[vi * 3 + 2] = -(float)p.z;
 
                         if (normals) {
                             ufbx_vec3 n = ufbx_get_vertex_vec3(&mesh->vertex_normal, ci);
@@ -323,13 +346,16 @@ int fbx_wrap_load_meshes(const char* path, FbxMultiMeshLocalData* out) {
                             }
                             normals[vi * 3 + 0] = (float)n.x;
                             normals[vi * 3 + 1] = (float)n.y;
-                            normals[vi * 3 + 2] = (float)n.z;
+                            normals[vi * 3 + 2] = -(float)n.z;
                         }
 
                         if (uvs) {
                             ufbx_vec2 uv = ufbx_get_vertex_vec2(&mesh->vertex_uv, ci);
                             uvs[vi * 2 + 0] = (float)uv.x;
-                            uvs[vi * 2 + 1] = (float)uv.y;
+                            /* FBX puts the UV origin at the bottom-left; glTF and
+                               our samplers use top-left, so V is flipped here
+                               (the glTF path needs no such flip). */
+                            uvs[vi * 2 + 1] = 1.0f - (float)uv.y;
                         }
 
                         indices[vi] = vi;
@@ -392,6 +418,32 @@ void fbx_wrap_free_meshes(FbxMultiMeshLocalData* out) {
     out->mesh_count = 0;
 }
 
+/* Hamilton product a*b (xyzw quaternions). */
+static ufbx_quat quat_mul(ufbx_quat a, ufbx_quat b) {
+    ufbx_quat r;
+    r.w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
+    r.x = a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y;
+    r.y = a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x;
+    r.z = a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w;
+    return r;
+}
+
+/* Shortest-arc rotation taking local +Z to unit direction `d`. */
+static ufbx_quat quat_from_to_z(ufbx_vec3 d) {
+    double len = sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+    ufbx_quat q = { 0, 0, 0, 1 };
+    if (len < 1e-9) return q;
+    double dx = d.x / len, dy = d.y / len, dz = d.z / len;
+    double dot = dz; /* dot((0,0,1), d) */
+    if (dot > 0.99999) return q;                 /* already +Z */
+    if (dot < -0.99999) { q.x = 1; q.w = 0; return q; } /* 180deg about X */
+    /* axis = cross((0,0,1), d) = (-dy, dx, 0) */
+    q.x = -dy; q.y = dx; q.z = 0; q.w = 1.0 + dot;
+    double n = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    q.x /= n; q.y /= n; q.z /= n; q.w /= n;
+    return q;
+}
+
 int fbx_wrap_load_hierarchy(const char* path, FbxNodeHierarchy* out) {
     memset(out, 0, sizeof(*out));
 
@@ -420,13 +472,40 @@ int fbx_wrap_load_hierarchy(const char* path, FbxNodeHierarchy* out) {
         o->parent_index = node->parent ? (int32_t)node->parent->typed_id : -1;
         o->mesh_index = node->mesh ? (int32_t)node->mesh->typed_id : -1;
 
+        ufbx_quat qr = node->local_transform.rotation;
+
+        o->light_type = -1;
+        if (node->light) {
+            const ufbx_light* L = node->light;
+            switch (L->type) {
+                case UFBX_LIGHT_DIRECTIONAL: o->light_type = 1; break;
+                case UFBX_LIGHT_SPOT:        o->light_type = 2; break;
+                default:                     o->light_type = 0; break; /* point/area/volume -> point */
+            }
+            o->light_color[0] = (float)L->color.x;
+            o->light_color[1] = (float)L->color.y;
+            o->light_color[2] = (float)L->color.z;
+            o->light_intensity = (float)L->intensity;
+            o->light_inner_deg = (float)(L->inner_angle * 0.5);
+            o->light_outer_deg = (float)(L->outer_angle * 0.5);
+            o->light_cast_shadows = L->cast_shadows ? 1 : 0;
+            /* Aim: our lights shine along the node's local +Z, but FBX lights
+               shine along `local_direction`; fold that rotation into the node
+               rotation so +Z ends up pointing where the light shines. */
+            ufbx_quat aim = quat_from_to_z(L->local_direction);
+            qr = quat_mul(qr, aim);
+        }
+
+        /* Mirror the local transform into the engine's left-handed world
+           (negate Z, conjugated so the parent chain still composes correctly),
+           matching the per-vertex Z mirror applied to geometry. */
         o->translation[0] = (float)node->local_transform.translation.x;
         o->translation[1] = (float)node->local_transform.translation.y;
-        o->translation[2] = (float)node->local_transform.translation.z;
-        o->rotation[0] = (float)node->local_transform.rotation.x;
-        o->rotation[1] = (float)node->local_transform.rotation.y;
-        o->rotation[2] = (float)node->local_transform.rotation.z;
-        o->rotation[3] = (float)node->local_transform.rotation.w;
+        o->translation[2] = -(float)node->local_transform.translation.z;
+        o->rotation[0] = -(float)qr.x;
+        o->rotation[1] = -(float)qr.y;
+        o->rotation[2] = (float)qr.z;
+        o->rotation[3] = (float)qr.w;
         o->scale[0] = (float)node->local_transform.scale.x;
         o->scale[1] = (float)node->local_transform.scale.y;
         o->scale[2] = (float)node->local_transform.scale.z;
@@ -520,6 +599,29 @@ static void fill_material(FbxMaterial* o, const ufbx_material* m) {
     o->emissive_tex = texref_from_map(&pbr->emission_color);
 
     o->normal = texref_from_map(&pbr->normal_map);
+
+    /* Combined metallic-roughness (glTF ORM layout: G = roughness, B = metallic).
+       ufbx surfaces the same image under whichever channel the file bound it to,
+       so take the first slot that actually carries a texture. Classic FBX content
+       often ships this map in the specular slot (Bistro names them "_Specular"
+       while the pixels are ORM), which is why that is included as a fallback. */
+    o->metallic_roughness = texref_from_map(&pbr->roughness);
+    if (!o->metallic_roughness.has_texture)
+        o->metallic_roughness = texref_from_map(&pbr->metalness);
+    if (!o->metallic_roughness.has_texture)
+        o->metallic_roughness = texref_from_map(&pbr->specular_color);
+
+    /* The shader multiplies factor by texture channel (glTF semantics), so with a
+       map bound the factors must be 1.0 or they cancel it out — in particular the
+       dielectric 0.0 metallic default above would erase the map's metal channel.
+       ufbx also synthesizes a roughness from legacy Phong shininess, which would
+       otherwise double-apply on top of an authored map. */
+    if (o->metallic_roughness.has_texture) {
+        o->metallic = 1.0f;
+        o->roughness = 1.0f;
+    }
+
+    o->occlusion = texref_from_map(&pbr->ambient_occlusion);
 
     int opacity_textured = pbr->opacity.texture != NULL;
     int opacity_transparent = pbr->opacity.has_value && pbr->opacity.value_real < 0.999;
