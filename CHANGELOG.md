@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.1.0] - 2026-07-24
+
+### Features
+- feat: opt-in fence-bracketed GPU pass timing + CPU zone coverage #147 new FPS semaphore #124 and asset import #146
+- feat: frustum culling #143
+- feat: add image-based lighting (IBL) + skybox #135
+
+### Other
+- refactor: move import staleness cache out of .meta #148 git-friendly #37 fix dirty scene #145
+
 ## [3.0.0] - 2026-07-22
 
 ### Breaking Changes
