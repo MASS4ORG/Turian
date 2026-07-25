@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.1.1] - 2026-07-25
+
+### Performance
+- perf: cache resolved materials + 4x MSAA + shadow-pass culling #143 #147
+
 ## [3.1.0] - 2026-07-24
 
 ### Features
