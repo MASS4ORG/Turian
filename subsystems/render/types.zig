@@ -70,6 +70,18 @@ pub const PostBloomUB = extern struct {
     params: [4]f32, // x=threshold, y=knee, z=radius (upsample only), w unused
 };
 
+/// Equirect->cubemap conversion pass uniforms — layout must match FragUB in
+/// equirect_to_cubemap.frag.glsl exactly.
+pub const EquirectToCubemapUB = extern struct {
+    face: [4]f32, // x = face index (0..5), yzw unused
+};
+
+/// GGX-importance-sampled specular prefilter pass uniforms — layout must
+/// match FragUB in prefilter_specular.frag.glsl exactly.
+pub const PrefilterUB = extern struct {
+    face_roughness: [4]f32, // x = face index (0..5), y = roughness, zw unused
+};
+
 /// One compute-readable submesh bounds entry for GPU-driven frustum culling.
 /// Layout must match `SubmeshBounds` in cull.comp exactly — three vec4-sized
 /// blocks, so std140 vs std430 alignment differences don't matter here.

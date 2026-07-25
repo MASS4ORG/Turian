@@ -6,8 +6,8 @@
 //
 // Supports up to MAX_LIGHTS lights of directional / point / spot type, plus a
 // shadow map for the primary directional light (3x3 PCF), and optional
-// image-based lighting (diffuse SH irradiance + roughness-mipped specular)
-// sampled from an equirectangular HDR environment map.
+// image-based lighting (diffuse SH irradiance + GGX-prefiltered specular
+// cubemap, #144) derived from the scene's equirectangular HDR environment map.
 
 layout(location = 0) in vec3 in_world_normal;
 layout(location = 1) in vec2 in_uv;
@@ -21,7 +21,7 @@ layout(set = 2, binding = 2) uniform sampler2D normal_tex;    // tangent-space
 layout(set = 2, binding = 3) uniform sampler2D emissive_tex;
 layout(set = 2, binding = 4) uniform sampler2D occlusion_tex; // R channel
 layout(set = 2, binding = 5) uniform sampler2DShadow shadow_map;
-layout(set = 2, binding = 6) uniform sampler2D env_equirect;  // equirect HDR environment
+layout(set = 2, binding = 6) uniform samplerCube env_prefiltered; // GGX-prefiltered specular cubemap (#144)
 
 // One scene light. type: 0=directional, 1=point, 2=spot.
 struct Light {
@@ -107,15 +107,6 @@ vec3 fresnelSchlick(float ct, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
 }
 
-
-// Maps a world-space direction to an equirectangular UV. Must match the CPU-side
-// convention used when projecting the environment onto SH (see
-// `subsystems/render/assets.zig`'s `computeIrradianceSh`) and the skybox shader.
-vec2 dirToEquirectUv(vec3 d) {
-    float u = atan(d.x, -d.z) / (2.0 * PI) + 0.5;
-    float v = acos(clamp(d.y, -1.0, 1.0)) / PI;
-    return vec2(u, v);
-}
 
 // Order-2 spherical-harmonics irradiance evaluation (Ramamoorthi & Hanrahan):
 // `sh` holds the raw radiance projection coefficients computed on the CPU;
@@ -271,8 +262,7 @@ void main() {
         vec3 diffuse_ibl = irradiance * albedo / PI * (1.0 - metallic);
 
         vec3 R = reflect(-V, N);
-        vec2 env_uv = dirToEquirectUv(R);
-        vec3 prefiltered = textureLod(env_equirect, env_uv, roughness * max_lod).rgb * intensity;
+        vec3 prefiltered = textureLod(env_prefiltered, R, roughness * max_lod).rgb * intensity;
         vec2 env_brdf = envBRDFApprox(roughness, ndv);
         vec3 specular_ibl = prefiltered * (F0 * env_brdf.x + env_brdf.y);
 

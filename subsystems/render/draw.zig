@@ -197,7 +197,11 @@ pub fn submitIndirectDraw(
 pub const DrawCtx = struct {
     shadow_tex: *c.SDL_GPUTexture,
     shadow_smp: *c.SDL_GPUSampler,
-    env_gpu_tex: *c.SDL_GPUTexture,
+    /// GGX-prefiltered specular cubemap (or the black fallback) — see
+    /// `ibl_prefilter.zig`. The raw equirect texture itself is only needed by
+    /// the separate skybox pass, not the per-material scene draw.
+    env_prefiltered_tex: *c.SDL_GPUTexture,
+    cubemap_smp: *c.SDL_GPUSampler,
     white: *c.SDL_GPUTexture,
     flat_n: *c.SDL_GPUTexture,
     sampler: *c.SDL_GPUSampler,
@@ -250,7 +254,7 @@ pub fn buildDrawParams(
             .{ .texture = emis_t.tex, .sampler = ctx.sampler },
             .{ .texture = occ_t.tex, .sampler = ctx.sampler },
             .{ .texture = ctx.shadow_tex, .sampler = ctx.shadow_smp },
-            .{ .texture = ctx.env_gpu_tex, .sampler = ctx.sampler },
+            .{ .texture = ctx.env_prefiltered_tex, .sampler = ctx.cubemap_smp },
         },
     };
 }

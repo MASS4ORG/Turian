@@ -64,6 +64,42 @@ pub fn createSolidTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, r
     return tex;
 }
 
+/// Create a 1x1-per-face RGBA cubemap used as a sampler default when no
+/// environment (or no prefiltered specular cubemap yet) is bound.
+pub fn createSolidCubemap(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, rgba: [4]u8) !*c.SDL_GPUTexture {
+    const tb = c.SDL_CreateGPUTransferBuffer(dev, &c.SDL_GPUTransferBufferCreateInfo{
+        .usage = c.SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = 4 * 6,
+        .props = 0,
+    }) orelse return error.TransferCreate;
+    defer c.SDL_ReleaseGPUTransferBuffer(dev, tb);
+
+    const p: [*]u8 = @ptrCast(@alignCast(
+        c.SDL_MapGPUTransferBuffer(dev, tb, false) orelse return error.MapFailed,
+    ));
+    for (0..6) |i| @memcpy(p[i * 4 ..][0..4], &rgba);
+    c.SDL_UnmapGPUTransferBuffer(dev, tb);
+
+    const tex = c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
+        .type = c.SDL_GPU_TEXTURETYPE_CUBE,
+        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .usage = c.SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = 1,
+        .height = 1,
+        .layer_count_or_depth = 6,
+        .num_levels = 1,
+        .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
+        .props = 0,
+    }) orelse return error.TextureCreate;
+
+    const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return error.CopyPassFailed;
+    for (0..6) |face| {
+        c.SDL_UploadToGPUTexture(cp, &c.SDL_GPUTextureTransferInfo{ .transfer_buffer = tb, .offset = @intCast(face * 4), .pixels_per_row = 1, .rows_per_layer = 1 }, &c.SDL_GPUTextureRegion{ .texture = tex, .mip_level = 0, .layer = @intCast(face), .x = 0, .y = 0, .z = 0, .w = 1, .h = 1, .d = 1 }, false);
+    }
+    c.SDL_EndGPUCopyPass(cp);
+    return tex;
+}
+
 pub fn createShadowMap(dev: *c.SDL_GPUDevice) !*c.SDL_GPUTexture {
     return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
         .type = c.SDL_GPU_TEXTURETYPE_2D,
@@ -76,6 +112,47 @@ pub fn createShadowMap(dev: *c.SDL_GPUDevice) !*c.SDL_GPUTexture {
         .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
         .props = 0,
     }) orelse error.ShadowMapCreate;
+}
+
+/// Cubemap sampler: linear filtering, clamp-to-edge. Clamping (rather than
+/// `createSampler`'s repeat) avoids bleed across cube-face borders.
+pub fn createCubemapSampler(dev: *c.SDL_GPUDevice) !*c.SDL_GPUSampler {
+    return c.SDL_CreateGPUSampler(dev, &c.SDL_GPUSamplerCreateInfo{
+        .min_filter = c.SDL_GPU_FILTER_LINEAR,
+        .mag_filter = c.SDL_GPU_FILTER_LINEAR,
+        .mipmap_mode = c.SDL_GPU_SAMPLERMIPMAPMODE_LINEAR,
+        .address_mode_u = c.SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+        .address_mode_v = c.SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+        .address_mode_w = c.SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+        .mip_lod_bias = 0,
+        .max_anisotropy = 1,
+        .compare_op = c.SDL_GPU_COMPAREOP_NEVER,
+        .min_lod = 0,
+        .max_lod = 1000,
+        .enable_anisotropy = false,
+        .enable_compare = false,
+        .padding1 = 0,
+        .padding2 = 0,
+        .props = 0,
+    }) orelse error.SamplerCreate;
+}
+
+/// Create an N-mip HDR cubemap render target (sampler + color-target usage),
+/// `size`x`size` per face. Used for both the equirect->cubemap conversion
+/// target (1 mip) and the GGX-prefiltered specular cubemap (N mips) — see
+/// `ibl_prefilter.zig`.
+pub fn createCubemapTexture(dev: *c.SDL_GPUDevice, size: u32, num_levels: u32) !*c.SDL_GPUTexture {
+    return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
+        .type = c.SDL_GPU_TEXTURETYPE_CUBE,
+        .format = c.SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT,
+        .usage = c.SDL_GPU_TEXTUREUSAGE_SAMPLER | c.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
+        .width = size,
+        .height = size,
+        .layer_count_or_depth = 6,
+        .num_levels = num_levels,
+        .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
+        .props = 0,
+    }) orelse error.TextureCreate;
 }
 
 /// Depth-comparison sampler for PCF shadow lookups (sampler2DShadow).

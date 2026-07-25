@@ -337,6 +337,8 @@ pub fn renderScene(
         state.white_tex = pipeline.createSolidTexture(cmd, dev, .{ 255, 255, 255, 255 }) catch null;
     if (state.flat_normal_tex == null)
         state.flat_normal_tex = pipeline.createSolidTexture(cmd, dev, .{ 128, 128, 255, 255 }) catch null;
+    if (state.black_cubemap == null)
+        state.black_cubemap = pipeline.createSolidCubemap(cmd, dev, .{ 0, 0, 0, 255 }) catch null;
     if (state.shadow_map == null)
         state.shadow_map = pipeline.createShadowMap(dev) catch null;
     if (state.cull_pipeline == null)
@@ -496,7 +498,16 @@ pub fn renderScene(
     const flat_n = state.flat_normal_tex orelse white;
     const shadow_tex = state.shadow_map orelse white;
     const shadow_smp = state.shadow_sampler orelse sampler;
+    const cube_smp = state.cubemap_sampler orelse sampler;
     const env_gpu_tex = if (env_tex) |gt| gt.texture else white;
+    const black_cube = state.black_cubemap orelse {
+        c.SDL_EndGPURenderPass(pass);
+        return;
+    };
+    const env_prefiltered_tex = if (env_tex) |gt|
+        (if (gt.env) |ed| (ed.prefiltered_cubemap orelse black_cube) else black_cube)
+    else
+        black_cube;
     const fu = draw.FrameUniforms{
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
         .light_vp = light_vp.m,
@@ -557,7 +568,7 @@ pub fn renderScene(
             const mr = &comp.mesh_renderer;
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             const receives = mr.receive_shadows and shadows_on;
-            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_gpu_tex = env_gpu_tex, .white = white, .flat_n = flat_n, .sampler = sampler };
+            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_prefiltered_tex = env_prefiltered_tex, .cubemap_smp = cube_smp, .white = white, .flat_n = flat_n, .sampler = sampler };
 
             // GPU-driven indirect path (cull compute dispatched this frame).
             if (gm.indirect_buf != null and gm.cull_dispatched_frame == state.frame_seq) {
@@ -645,10 +656,17 @@ pub fn deinit() void {
     destroyDepthTargets(dev);
     if (state.white_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.flat_normal_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    if (state.black_cubemap) |t| c.SDL_ReleaseGPUTexture(dev, t);
     state.white_tex = null;
     state.flat_normal_tex = null;
-    for (state.textures[0..state.texture_count]) |*gt|
+    state.black_cubemap = null;
+    for (state.textures[0..state.texture_count]) |*gt| {
         c.SDL_ReleaseGPUTexture(dev, gt.texture);
+        if (gt.env) |ed| {
+            if (ed.base_cubemap) |t| c.SDL_ReleaseGPUTexture(dev, t);
+            if (ed.prefiltered_cubemap) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        }
+    }
     state.texture_count = 0;
     state.resolved_material_count = 0;
     for (state.meshes[0..state.mesh_count]) |*gm| {
@@ -669,6 +687,12 @@ pub fn deinit() void {
     state.shadow_pipeline = null;
     if (state.skybox_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.skybox_pipeline = null;
+    if (state.ibl_equirect_to_cubemap_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.ibl_prefilter_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.cubemap_sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
+    state.ibl_equirect_to_cubemap_pipeline = null;
+    state.ibl_prefilter_pipeline = null;
+    state.cubemap_sampler = null;
     if (state.cull_pipeline) |p| c.SDL_ReleaseGPUComputePipeline(dev, p);
     state.cull_pipeline = null;
     if (state.post_threshold_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);

@@ -51,6 +51,13 @@ pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 
 pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 
+/// One-time IBL specular-prefilter pipelines (see `ibl_prefilter.zig`):
+/// equirect->cubemap conversion, then GGX-importance-sampled mip prefiltering.
+/// Only run when a new environment texture uploads, not per frame.
+pub var ibl_equirect_to_cubemap_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var ibl_prefilter_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var cubemap_sampler: ?*c.SDL_GPUSampler = null;
+
 /// GPU-driven frustum-culling compute pipeline.
 pub var cull_pipeline: ?*c.SDL_GPUComputePipeline = null;
 
@@ -64,6 +71,10 @@ pub var lights_transfer: ?*c.SDL_GPUTransferBuffer = null;
 pub var white_tex: ?*c.SDL_GPUTexture = null;
 /// Default tangent-space "flat" normal (points straight out): rgb (128,128,255).
 pub var flat_normal_tex: ?*c.SDL_GPUTexture = null;
+/// Fallback prefiltered-specular-cubemap binding for scenes with no
+/// environment (or before its prefiltering has run) — black, so unlit specular
+/// IBL reads as "off" rather than a stray flat reflection.
+pub var black_cubemap: ?*c.SDL_GPUTexture = null;
 
 /// Render targets cached by (w,h) so no attachment is released while a pass in
 /// the current frame still references it. `tex` is the depth target (MSAA when
@@ -240,6 +251,13 @@ pub const MAX_TEXTURES = 64;
 pub const EnvironmentData = struct {
     mip_count: u32 = 1,
     sh: [9][3]f32 = @splat(@splat(0)),
+    /// Un-prefiltered equirect->cubemap conversion (1 mip) — the sampling
+    /// source for `prefiltered_cubemap`; kept around for that reason, never
+    /// sampled directly by the scene shader.
+    base_cubemap: ?*c.SDL_GPUTexture = null,
+    /// GGX-importance-sampled specular cubemap (`ibl_prefilter.zig`), sampled
+    /// by `scene.frag.glsl` in place of the old equirect-mip approximation.
+    prefiltered_cubemap: ?*c.SDL_GPUTexture = null,
 };
 
 pub const GpuTexture = struct {

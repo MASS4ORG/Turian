@@ -6,6 +6,7 @@ const gpu = @import("gpu");
 const engine = @import("engine");
 const types = @import("types.zig");
 const state = @import("state.zig");
+const ibl_prefilter = @import("ibl_prefilter.zig");
 
 const c = gpu.c;
 const page = std.heap.page_allocator;
@@ -576,11 +577,26 @@ pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, gu
 
     if (num_levels > 1) c.SDL_GenerateMipmapsForGPUTexture(cmd, gpu_tex);
 
+    // `mip_count` here feeds `env_params.y` in scene.frag.glsl, which scales
+    // `roughness` into a specular LOD — it must match the *prefiltered
+    // cubemap's* mip count (below), not the equirect's own mip chain
+    // (`num_levels`, only relevant to the diffuse SH projection above).
+    var env_data: state.EnvironmentData = .{ .mip_count = 1, .sh = sh };
+    if (state.sampler) |smp| {
+        if (ibl_prefilter.prefilterEnvironment(cmd, dev, gpu_tex, smp)) |pf| {
+            env_data.base_cubemap = pf.base_cubemap;
+            env_data.prefiltered_cubemap = pf.prefiltered_cubemap;
+            env_data.mip_count = pf.mip_count;
+        } else |err| {
+            log.warn("IBL specular prefiltering failed, falling back to no specular IBL: {any}", .{err});
+        }
+    }
+
     var gt = &state.textures[state.texture_count];
     state.texture_count += 1;
     gt.key_len = setKey(&gt.key, guid);
     gt.texture = gpu_tex;
-    gt.env = .{ .mip_count = num_levels, .sh = sh };
+    gt.env = env_data;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
