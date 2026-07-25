@@ -167,7 +167,7 @@ fn installToStore(
         };
     }
 
-    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "");
+    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "", build_options.version);
     defer cfg.deinit();
     cfg.addPackage(io, project_path, name, version, source, is_git) catch |err| {
         std.debug.print("[Turian] Failed to record package in project.json: {s}\n", .{@errorName(err)});
@@ -232,7 +232,7 @@ fn cmdPackageRemove(io: std.Io, gpa: std.mem.Allocator, project_path: []const u8
     _ = store_root;
     var removed = false;
 
-    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "");
+    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "", build_options.version);
     defer cfg.deinit();
     if (cfg.removePackage(io, project_path, name) catch false) {
         removed = true;
@@ -258,7 +258,7 @@ fn cmdPackageRemove(io: std.Io, gpa: std.mem.Allocator, project_path: []const u8
 }
 
 fn cmdPackageUpdate(io: std.Io, gpa: std.mem.Allocator, project_path: []const u8, name: []const u8, store_root: []const u8) !void {
-    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "");
+    var cfg = editor.ProjectConfig.load(io, gpa, project_path) catch try editor.ProjectConfig.initDefault(gpa, "", build_options.version);
     defer cfg.deinit();
 
     var n: usize = 0;

@@ -99,6 +99,8 @@ pub const checkEngineCompat = @import("package/PackageManager.zig").checkEngineC
 /// identity and dependencies; generates `build.zig.zon` .
 pub const project_config = @import("project/ProjectConfig.zig");
 pub const ProjectConfig = project_config.ProjectConfig;
+/// Project version-check + migration runner (ADR-0012, #137).
+pub const project_migrations = @import("project/migrations/root.zig");
 /// Central, machine-wide package store shared across projects .
 pub const package_store = @import("package/PackageStore.zig");
 /// Runtime path-based menu tree builder for cascaded menus.

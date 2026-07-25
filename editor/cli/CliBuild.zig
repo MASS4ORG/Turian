@@ -1,5 +1,4 @@
 const std = @import("std");
-const engine = @import("engine");
 const editor = @import("editor");
 const scanner = editor.scanner;
 const asset_meta = editor.asset_meta;
@@ -45,7 +44,7 @@ const CliTask = struct {
 };
 
 pub fn cmdNewProject(io: std.Io, path: []const u8, proj_name: []const u8) !void {
-    project_ops.newProject(io, path, proj_name);
+    project_ops.newProject(io, path, proj_name, build_options.version);
     std.debug.print("[Turian] Project '{s}' created at: {s}\n", .{ proj_name, path });
 }
 
@@ -190,69 +189,103 @@ pub fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     task.printStatus();
 }
 
-/// Re-save every scene asset still using the deprecated single-material
-/// `"material_guid"` mesh_renderer field, converting it to `"material_guids"`.
-/// Scenes already in the current format are left untouched. Loading a scene
-/// migrates the field in memory regardless (see `SceneIo.sceneCompToEngine`);
-/// this command is for batch-persisting that migration across a project.
-/// Currently covers only this one legacy field — the general project-version
-/// migration entry point will grow into this same `migrate` verb.
-pub fn cmdMigrate(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
+/// Runs the ADR-0012 project version-check + migration flow: compares
+/// `project.json`'s `turian_version` against this engine build, lists every
+/// pending migration (`editor.project_migrations.all`) between the two, and
+/// applies them in order. `--yes` runs unattended (CI-friendly); `--no` aborts
+/// without changes; `--dry-run` only prints the pending list. With none of
+/// the three flags, the pre-flight list is printed and nothing is applied.
+pub fn cmdMigrate(
+    io: std.Io,
+    gpa: std.mem.Allocator,
+    path: []const u8,
+    args: *std.process.Args.Iterator,
+    environ: *const std.process.Environ.Map,
+) !void {
+    var yes = false;
+    var no = false;
+    var dry_run = false;
+    while (args.next()) |a| {
+        if (std.mem.eql(u8, a, "--yes")) {
+            yes = true;
+        } else if (std.mem.eql(u8, a, "--no")) {
+            no = true;
+        } else if (std.mem.eql(u8, a, "--dry-run")) {
+            dry_run = true;
+        }
+    }
+
     const result = project_ops.openProject(io, gpa, path);
     if (!result.valid) {
         std.debug.print("Not a Turian project (no project.json): {s}\n", .{path});
         return error.ProjectNotFound;
     }
 
-    var assets_buf: [1024]u8 = undefined;
-    const assets = std.fmt.bufPrint(&assets_buf, "{s}/assets", .{path}) catch path;
-    asset_meta.scanAndEnsureMetas(io, gpa, assets);
+    var cfg = editor.ProjectConfig.load(io, gpa, path) catch
+        try editor.ProjectConfig.initDefault(gpa, "", build_options.version);
+    defer cfg.deinit();
 
-    var db = editor.AssetDatabase.init(gpa);
-    defer db.deinit();
-    db.scan(io, assets);
+    const project_version = std.SemanticVersion.parse(cfg.turian_version) catch std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
+    const engine_version = editor.PackageManager.parseEngineVersion(build_options.version);
 
-    // Heap-allocated (not `[MAX_OBJECTS]SceneNode` on the stack — that overflows
-    // with the larger per-slot material table). Grown (doubling) per scene
-    // below when `loadSceneFromBytes` reports a true node count past capacity
-    // (see its doc comment) — a Bistro-scale FBX hierarchy scene can exceed
-    // the initial `MAX_OBJECTS` default.
-    var objects = gpa.alloc(engine.SceneNode, engine.scene.MAX_OBJECTS) catch return;
-    defer gpa.free(objects);
-    const current_version = editor.scene_io.CURRENT_VERSION;
-    var scanned: usize = 0;
-    var migrated: usize = 0;
+    const home_dir = environ.get("HOME") orelse "";
+    var settings = try editor.settings.Settings.init(gpa, home_dir, path);
+    defer settings.deinit();
+    settings.load(io);
+    const check_minor = settings.getBool("project.version_check_minor", true);
 
-    var it = db.enumerate(.scene);
-    while (it.next()) |info| {
-        scanned += 1;
-        const bytes = std.Io.Dir.cwd().readFileAlloc(io, info.path, gpa, .unlimited) catch continue;
-        defer gpa.free(bytes);
+    const migrations = editor.project_migrations;
+    const direction = migrations.classify(project_version, engine_version, check_minor);
 
-        // The scene `version` is the migration trigger: v1 (or the pre-version
-        // default) needs rewriting; a current-version scene is already migrated.
-        // Loading converts the legacy single `material_guid` field in memory, so
-        // no separate check for it is needed.
-        const version = editor.scene_io.parseSceneVersion(bytes);
-        if (version >= current_version) continue;
-
-        var count: usize = 0;
-        while (true) {
-            if (!editor.scene_io.loadSceneFromBytes(gpa, bytes, objects, &count)) break;
-            if (count <= objects.len or objects.len >= engine.scene.GROWTH_CEILING) break;
-            const new_cap = @min(count, engine.scene.GROWTH_CEILING);
-            const grown = gpa.realloc(objects, new_cap) catch break;
-            objects = grown;
-        }
-        if (count == 0 or count > objects.len) continue;
-        // v1 bound materials per submesh; rebuild the per-slot table from the model.
-        _ = editor.model_materials.migrateSceneMaterials(io, gpa, &db, path, objects, count);
-        editor.scene_io.saveScene(io, info.path, objects, count, gpa);
-        migrated += 1;
-        std.debug.print("Migrated: {s}\n", .{info.path});
+    switch (direction) {
+        .up_to_date => {
+            std.debug.print("Project is up to date (turian_version {s}).\n", .{cfg.turian_version});
+            return;
+        },
+        .newer => {
+            std.debug.print(
+                "Warning: project's turian_version ({s}) is newer than this engine ({s})" ++
+                    " — this build may be older than the one the project was last saved with.\n",
+                .{ cfg.turian_version, build_options.version },
+            );
+            if (yes) {
+                std.debug.print("Continuing (--yes).\n", .{});
+            } else {
+                std.debug.print("Nothing to migrate going backward. Re-run with --yes to proceed anyway.\n", .{});
+            }
+            return;
+        },
+        .older_minor, .older_major => {},
     }
 
-    std.debug.print("Scanned {d} scene(s), migrated {d}.\n", .{ scanned, migrated });
+    const pending = migrations.pendingFor(&migrations.all, project_version, engine_version);
+    std.debug.print(
+        "Project turian_version {s} is behind engine {s} — {d} pending migration(s):\n",
+        .{ cfg.turian_version, build_options.version, pending.len },
+    );
+    for (pending, 0..) |m, i| {
+        std.debug.print("  {d}. [{d}.{d}.{d}] {s}\n", .{ i + 1, m.to_version.major, m.to_version.minor, m.to_version.patch, m.summary });
+        if (m.manual_steps.len > 0) std.debug.print("     Manual step: {s}\n", .{m.manual_steps});
+    }
+
+    if (dry_run) return;
+    if (no or !yes) {
+        std.debug.print("Re-run with --yes to apply, or --no to acknowledge and skip.\n", .{});
+        return;
+    }
+
+    const ctx = migrations.Context{ .io = io, .allocator = gpa, .project_path = path };
+    const run_result = migrations.run(pending, project_version, ctx);
+    if (run_result.failed_at) |idx| {
+        std.debug.print("Migration {d}/{d} failed: {s}\n", .{ idx + 1, pending.len, @errorName(run_result.err.?) });
+        return run_result.err.?;
+    }
+
+    const a = gpa;
+    a.free(cfg.turian_version);
+    cfg.turian_version = try a.dupe(u8, build_options.version);
+    try cfg.save(io, path);
+    std.debug.print("Ran {d} migration(s). Project updated to turian_version {s}.\n", .{ run_result.ran, build_options.version });
 }
 
 fn builtinCount(components: []const scanner.ComponentDef) usize {

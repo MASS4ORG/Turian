@@ -4,7 +4,6 @@
 const std = @import("std");
 
 pub const PROJECT_FILE = "project.json";
-const DEFAULT_TURIAN_VERSION = "0.16";
 const MIN_ZIG_VERSION = "0.16.0";
 
 /// One declared Zig **code** dependency (source/native package). Either a remote
@@ -58,10 +57,13 @@ pub const ProjectConfig = struct {
     }
 
     /// An empty config with sensible defaults. `name` is taken verbatim.
-    pub fn initDefault(allocator: std.mem.Allocator, name: []const u8) !ProjectConfig {
+    /// `engine_version` is the running engine's version (e.g. `build_options.version`)
+    /// — stamped as-is so a freshly created project starts in sync with the engine
+    /// that created it, rather than a version-check mismatch on first open.
+    pub fn initDefault(allocator: std.mem.Allocator, name: []const u8, engine_version: []const u8) !ProjectConfig {
         return .{
             .allocator = allocator,
-            .turian_version = try allocator.dupe(u8, DEFAULT_TURIAN_VERSION),
+            .turian_version = try allocator.dupe(u8, engine_version),
             .name = try allocator.dupe(u8, name),
             .version = try allocator.dupe(u8, "0.0.0"),
             .dependencies = try allocator.alloc(Dependency, 0),
@@ -71,13 +73,16 @@ pub const ProjectConfig = struct {
 
     /// Parse a `project.json` byte buffer. Tolerant of the legacy sentinel
     /// (`{"turian_version":"0.16"}`) — missing fields fall back to defaults.
+    /// A missing/unparseable `turian_version` falls back to `"0.0.0"`, which the
+    /// ADR-0012 version check treats as maximally behind — triggering the
+    /// migration flow rather than silently skipping it.
     pub fn parse(allocator: std.mem.Allocator, json_bytes: []const u8) !ProjectConfig {
         const parsed = std.json.parseFromSlice(std.json.Value, allocator, json_bytes, .{}) catch
             return error.InvalidProjectJson;
         defer parsed.deinit();
         const obj = if (parsed.value == .object) parsed.value.object else return error.InvalidProjectJson;
 
-        const turian_version = try dupeStr(allocator, getStr(obj, "turian_version") orelse DEFAULT_TURIAN_VERSION);
+        const turian_version = try dupeStr(allocator, getStr(obj, "turian_version") orelse "0.0.0");
         errdefer allocator.free(turian_version);
         const name = try dupeStr(allocator, getStr(obj, "name") orelse "");
         errdefer allocator.free(name);
@@ -170,7 +175,7 @@ pub const ProjectConfig = struct {
         const path = std.fmt.bufPrint(&buf, "{s}/{s}", .{ project_path, PROJECT_FILE }) catch
             return error.PathTooLong;
         const bytes = std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(256 * 1024)) catch
-            return initDefault(allocator, "");
+            return initDefault(allocator, "", "0.0.0");
         defer allocator.free(bytes);
         return parse(allocator, bytes);
     }
@@ -484,6 +489,18 @@ pub fn sanitizeId(name: []const u8, buf: []u8) []const u8 {
 
 // ── tests ───────────────────────────────────────────────────────────────────
 
+test "initDefault stamps turian_version from the given engine version" {
+    const c = try ProjectConfig.initDefault(std.testing.allocator, "New Game", "3.1.1");
+    defer c.deinit();
+    try std.testing.expectEqualStrings("3.1.1", c.turian_version);
+}
+
+test "parse falls back to 0.0.0 when turian_version is missing" {
+    const c = try ProjectConfig.parse(std.testing.allocator, "{}");
+    defer c.deinit();
+    try std.testing.expectEqualStrings("0.0.0", c.turian_version);
+}
+
 test "parse legacy sentinel" {
     const json = "{\"turian_version\":\"0.16\"}";
     const c = try ProjectConfig.parse(std.testing.allocator, json);
@@ -528,7 +545,7 @@ test "toBuildZon round-trips name and deps" {
 }
 
 test "toBuildZon makes leading-digit names valid bare identifiers" {
-    const c = try ProjectConfig.initDefault(std.testing.allocator, "3d-model-materials");
+    const c = try ProjectConfig.initDefault(std.testing.allocator, "3d-model-materials", "3.1.1");
     defer c.deinit();
     const zon = try c.toBuildZon(std.testing.allocator, "fallback", "");
     defer std.testing.allocator.free(zon);
@@ -538,7 +555,7 @@ test "toBuildZon makes leading-digit names valid bare identifiers" {
 }
 
 test "toBuildZon empty deps uses fallback name" {
-    const c = try ProjectConfig.initDefault(std.testing.allocator, "");
+    const c = try ProjectConfig.initDefault(std.testing.allocator, "", "3.1.1");
     defer c.deinit();
     const zon = try c.toBuildZon(std.testing.allocator, "Cool Project", "");
     defer std.testing.allocator.free(zon);

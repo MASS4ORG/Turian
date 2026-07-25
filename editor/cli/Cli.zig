@@ -16,7 +16,9 @@ fn printUsage() void {
         \\  new-project <path> [name]   Create a new project at the given path
         \\  info        <project-path>  Print project metadata and component list
         \\  import      <project-path>  Import all assets (reports task progress)
-        \\  migrate     <project-path>  Upgrade scenes to the current format (per-slot materials)
+        \\  migrate     <project-path> [--yes|--no] [--dry-run]
+        \\                              Check turian_version against this engine and run
+        \\                              any pending project migrations
         \\  build       <project-path>  Compile the project into a game executable
         \\  play-build  <project-path>  Compile the in-editor Play-mode library
         \\  debug       <subcommand>    Connect to a running Turian debug server
@@ -61,7 +63,7 @@ pub fn main(init: std.process.Init) !void {
         return cli_build.cmdImport(io, gpa, path);
     } else if (std.mem.eql(u8, cmd, "migrate")) {
         const path = args.next() orelse return printUsage();
-        return cli_build.cmdMigrate(io, gpa, path);
+        return cli_build.cmdMigrate(io, gpa, path, &args, init.environ_map);
     } else if (std.mem.eql(u8, cmd, "build")) {
         const path = args.next() orelse return printUsage();
         return cli_build.cmdBuild(io, gpa, path, init.environ_map);

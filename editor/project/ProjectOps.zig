@@ -40,7 +40,10 @@ pub fn openProject(io: std.Io, allocator: std.mem.Allocator, path: []const u8) O
 }
 
 /// Create a new project directory with the standard asset layout.
-pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
+/// `engine_version` (e.g. `build_options.version`) is stamped into the new
+/// project's `turian_version` so it starts in sync with the engine that
+/// created it (ADR-0012 version check).
+pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8, engine_version: []const u8) void {
     std.Io.Dir.cwd().createDirPath(io, path) catch {};
 
     var dir = std.Io.Dir.cwd().openDir(io, path, .{}) catch return;
@@ -56,7 +59,7 @@ pub fn newProject(io: std.Io, path: []const u8, proj_name: []const u8) void {
     var fba_buf: [8192]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
     const a = fba.allocator();
-    if (ProjectConfig.initDefault(a, proj_name)) |cfg| {
+    if (ProjectConfig.initDefault(a, proj_name, engine_version)) |cfg| {
         if (cfg.toJson(a)) |json| {
             dir.writeFile(io, .{ .sub_path = PROJECT_FILE, .data = json }) catch {};
         } else |_| {}

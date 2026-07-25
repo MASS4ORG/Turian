@@ -97,7 +97,7 @@ fn buildGameInner(
 
     // Third-party dependency names from project.json — emitted as b.dependency()
     // calls in the generated build so Zig's PM resolves them.
-    var project_cfg = ProjectConfig.load(io, a, project_path) catch try ProjectConfig.initDefault(a, "");
+    var project_cfg = ProjectConfig.load(io, a, project_path) catch try ProjectConfig.initDefault(a, "", config.engine_version);
     defer project_cfg.deinit();
     const dep_names = project_cfg.dependencyNames(a) catch &.{};
 

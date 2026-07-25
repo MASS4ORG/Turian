@@ -1,6 +1,7 @@
 # ADR 0012: Project Versioning & Migration API
 
-**Status**: Proposed — #137
+**Status**: Partially implemented — #137. Phase 1 (migration runner + registry +
+`turian-cli migrate`) shipped; the Studio open-project dialog (Phase 2) is not yet built.
 
 ## Context
 

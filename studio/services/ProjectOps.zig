@@ -7,6 +7,7 @@ const Documents = @import("../main-window/Documents.zig");
 const editor = @import("editor");
 const StudioLocale = @import("StudioLocale.zig");
 const tr = StudioLocale.tr;
+const build_options = @import("turian_build_options");
 
 /// Open an existing project at the given filesystem path.
 pub fn openProject(path: []const u8) void {
@@ -56,7 +57,7 @@ pub fn openProjectDialog() void {
 
 /// Create a new project at the given path with the given name.
 pub fn newProject(path: []const u8, proj_name: []const u8) void {
-    editor.project_ops.newProject(gui.io, path, proj_name);
+    editor.project_ops.newProject(gui.io, path, proj_name, build_options.version);
     openProject(path);
 
     if (EditorState.current_project) |*p| {
