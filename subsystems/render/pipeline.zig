@@ -100,8 +100,9 @@ pub fn createShadowSampler(dev: *c.SDL_GPUDevice) !*c.SDL_GPUSampler {
     }) orelse error.SamplerCreate;
 }
 
-/// Fixed-function blend equation for a material's `BlendMode`.
-fn blendStateFor(mode: engine.Material.BlendMode) c.SDL_GPUColorTargetBlendState {
+/// Fixed-function blend equation for a material's `BlendMode`. Also reused by
+/// `postprocess_pipeline.zig` (`.additive`) for the bloom upsample-combine step.
+pub fn blendStateFor(mode: engine.Material.BlendMode) c.SDL_GPUColorTargetBlendState {
     return switch (mode) {
         .disabled => std.mem.zeroes(c.SDL_GPUColorTargetBlendState),
         .alpha => .{
@@ -189,7 +190,7 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
     defer c.SDL_ReleaseGPUShader(dev, frag);
 
     const color_desc = c.SDL_GPUColorTargetDescription{
-        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .format = state.HDR_COLOR_FORMAT,
         .blend_state = blendStateFor(key.blend),
     };
 
@@ -362,7 +363,7 @@ pub fn createSkyboxPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
     defer c.SDL_ReleaseGPUShader(dev, frag);
 
     const color_desc = c.SDL_GPUColorTargetDescription{
-        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .format = state.HDR_COLOR_FORMAT,
         .blend_state = std.mem.zeroes(c.SDL_GPUColorTargetBlendState),
     };
 
@@ -460,7 +461,7 @@ pub fn createDepth(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
 pub fn createMsaaColor(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture {
     return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
         .type = c.SDL_GPU_TEXTURETYPE_2D,
-        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .format = state.HDR_COLOR_FORMAT,
         .usage = c.SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,
         .width = w,
         .height = h,
@@ -474,7 +475,7 @@ pub fn createMsaaColor(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture
 /// The highest sample count (up to 4x) the device supports for both the scene
 /// color and depth formats, or `SAMPLECOUNT_1` if MSAA isn't supported.
 pub fn pickSampleCount(dev: *c.SDL_GPUDevice) c.SDL_GPUSampleCount {
-    const color_fmt = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    const color_fmt = state.HDR_COLOR_FORMAT;
     const depth_fmt = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
     if (c.SDL_GPUTextureSupportsSampleCount(dev, color_fmt, c.SDL_GPU_SAMPLECOUNT_4) and
         c.SDL_GPUTextureSupportsSampleCount(dev, depth_fmt, c.SDL_GPU_SAMPLECOUNT_4))

@@ -824,7 +824,9 @@ pub fn generateMainZig(
         try out.appendSlice(
             a,
             "        if (_frame) |fr| {\n" ++
-                "            render.renderScene(fr.cmd, fr.swapchain, fr.width, fr.height, gatherRenderNodes());\n" ++
+                "            const _render_nodes = gatherRenderNodes();\n" ++
+                "            render.renderScene(fr.cmd, fr.width, fr.height, _render_nodes);\n" ++
+                "            render.runPostProcess(fr.cmd, fr.swapchain, fr.width, fr.height, _render_nodes);\n" ++
                 "            _ = try dvui_win.end(.{ .manage_backend = false });\n" ++
                 "            fr.submit();\n" ++
                 "        }\n" ++
@@ -836,7 +838,9 @@ pub fn generateMainZig(
         try out.appendSlice(
             a,
             "        if (win.beginFrame()) |fr| {\n" ++
-                "            render.renderScene(fr.cmd, fr.swapchain, fr.width, fr.height, gatherRenderNodes());\n" ++
+                "            const _render_nodes = gatherRenderNodes();\n" ++
+                "            render.renderScene(fr.cmd, fr.width, fr.height, _render_nodes);\n" ++
+                "            render.runPostProcess(fr.cmd, fr.swapchain, fr.width, fr.height, _render_nodes);\n" ++
                 "            fr.submit();\n" ++
                 "        }\n" ++
                 "        engine.Profiler.endFrame();\n" ++

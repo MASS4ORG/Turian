@@ -9,8 +9,14 @@ const std = @import("std");
 const engine = @import("engine");
 const Protocol = @import("Protocol.zig");
 const Server = @import("Server.zig");
+const MutationBuilder = @import("MutationBuilder.zig");
 const introspect = engine.introspect;
 const SceneNode = engine.SceneNode;
+
+/// Wire names of the methods that mutate live engine state.
+pub const isMutation = MutationBuilder.isMutation;
+/// Parses a mutating request into a `Server.Mutation`.
+pub const buildMutation = MutationBuilder.buildMutation;
 
 const Request = Protocol.Request;
 const World = introspect.World;
@@ -43,6 +49,8 @@ pub fn dispatch(
     if (std.mem.eql(u8, m, "memory")) return callMemory(allocator, req, world, out);
     if (std.mem.eql(u8, m, "errors")) return callErrors(allocator, req, out);
     if (std.mem.eql(u8, m, "ping")) return callPing(req, out);
+    if (std.mem.eql(u8, m, "camera.get")) return callCameraGet(allocator, req, world, out);
+    if (std.mem.eql(u8, m, "viewport.getTab")) return callViewportGetTab(allocator, req, world, out);
 
     errResponse(req, out, Protocol.ErrorCode.METHOD_NOT_FOUND, "Method not found");
 }
@@ -120,6 +128,48 @@ fn activeScene(world: World) ?introspect.SceneView {
 
 fn callPing(req: *const Request, out: *std.Io.Writer) void {
     okJson(req, out, "\"pong\"");
+}
+
+/// The Studio editor viewport camera's current pose, or NOT_FOUND.
+fn callCameraGet(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
+    const cam = world.editor_camera orelse {
+        errResponse(req, out, Protocol.ErrorCode.NOT_FOUND, "No editor camera");
+        return;
+    };
+    var buf: std.Io.Writer.Allocating = .init(allocator);
+    defer buf.deinit();
+    var jw = std.json.Stringify{ .writer = &buf.writer, .options = .{} };
+    jw.beginObject() catch return;
+    jw.objectField("pos") catch return;
+    jw.write(cam.pos) catch return;
+    jw.objectField("yaw") catch return;
+    jw.write(cam.yaw) catch return;
+    jw.objectField("pitch") catch return;
+    jw.write(cam.pitch) catch return;
+    jw.objectField("fov") catch return;
+    jw.write(cam.fov) catch return;
+    jw.endObject() catch return;
+    const json = allocator.dupe(u8, buf.written()) catch return;
+    defer allocator.free(json);
+    okJson(req, out, json);
+}
+
+/// Which of the "scene"/"game" viewport tabs is currently active, or NOT_FOUND.
+fn callViewportGetTab(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
+    const tab = world.active_viewport_tab orelse {
+        errResponse(req, out, Protocol.ErrorCode.NOT_FOUND, "No active viewport tab");
+        return;
+    };
+    var buf: std.Io.Writer.Allocating = .init(allocator);
+    defer buf.deinit();
+    var jw = std.json.Stringify{ .writer = &buf.writer, .options = .{} };
+    jw.beginObject() catch return;
+    jw.objectField("tab") catch return;
+    jw.write(tab) catch return;
+    jw.endObject() catch return;
+    const json = allocator.dupe(u8, buf.written()) catch return;
+    defer allocator.free(json);
+    okJson(req, out, json);
 }
 
 fn sceneListWriter(jw: *Stringify, world: World) anyerror!void {
@@ -314,140 +364,6 @@ fn callErrors(allocator: std.mem.Allocator, req: *const Request, out: *std.Io.Wr
     okJson(req, out, json);
 }
 
-// ── Mutating methods (validated here, applied by the host MutationApplier) ────
-
-/// Wire names of the methods that mutate live engine state. The server routes
-/// these through `buildMutation` + the host applier instead of `dispatch`.
-const mutating_methods = [_][]const u8{
-    "component.set",
-    "transform.set",
-    "entity.spawn",
-    "entity.destroy",
-    "asset.reload",
-    "input.mouseMove",
-    "input.click",
-    "input.key",
-    "input.text",
-    "screenshot.capture",
-};
-
-/// True if `method` is a mutating method (handled via the applier, not dispatch).
-pub fn isMutation(method: []const u8) bool {
-    for (mutating_methods) |mm| {
-        if (std.mem.eql(u8, method, mm)) return true;
-    }
-    return false;
-}
-
-const MutationError = error{ InvalidParams, OutOfMemory };
-
-/// Parses and validates a mutating request into a `Server.Mutation`. Every
-/// borrowed string is duped into `arena`, so the result is valid for as long as
-/// `arena` lives (the caller frees it after the applier returns).
-pub fn buildMutation(arena: std.mem.Allocator, req: *const Request) MutationError!Server.Mutation {
-    const parsed = std.json.parseFromSlice(std.json.Value, arena, req.params(), .{}) catch
-        return error.InvalidParams;
-    defer parsed.deinit();
-    const obj = if (parsed.value == .object) parsed.value.object else return error.InvalidParams;
-    const m = req.method();
-
-    if (std.mem.eql(u8, m, "component.set")) {
-        const value = try jsonToValue(arena, obj.get("value") orelse return error.InvalidParams);
-        return .{ .set_component = .{
-            .entity = try dupField(arena, obj, "entity"),
-            .component = try dupField(arena, obj, "component"),
-            .field = try dupField(arena, obj, "field"),
-            .value = value,
-        } };
-    }
-    if (std.mem.eql(u8, m, "transform.set")) {
-        return .{ .set_transform = .{
-            .channel = try dupField(arena, obj, "channel"),
-            .value = try jsonToVec3(obj.get("value") orelse return error.InvalidParams),
-            .entity = try dupField(arena, obj, "entity"),
-        } };
-    }
-    if (std.mem.eql(u8, m, "entity.spawn")) {
-        return .{ .spawn = .{ .name = try dupField(arena, obj, "name") } };
-    }
-    if (std.mem.eql(u8, m, "entity.destroy")) {
-        return .{ .destroy = .{ .entity = try dupField(arena, obj, "entity") } };
-    }
-    if (std.mem.eql(u8, m, "asset.reload")) {
-        return .{ .reload_asset = .{ .guid = try dupField(arena, obj, "guid") } };
-    }
-    if (std.mem.eql(u8, m, "input.mouseMove")) {
-        return .{ .input_mouse_move = .{
-            .x = try numField(obj, "x"),
-            .y = try numField(obj, "y"),
-        } };
-    }
-    if (std.mem.eql(u8, m, "input.click")) {
-        return .{ .input_click = .{
-            .x = try numField(obj, "x"),
-            .y = try numField(obj, "y"),
-            .button = if (obj.get("button")) |v| (if (v == .string) try arena.dupe(u8, v.string) else "left") else "left",
-        } };
-    }
-    if (std.mem.eql(u8, m, "input.key")) {
-        return .{ .input_key = .{
-            .code = try dupField(arena, obj, "code"),
-            .down = if (obj.get("down")) |v| (v == .bool and v.bool) else true,
-        } };
-    }
-    if (std.mem.eql(u8, m, "input.text")) {
-        return .{ .input_text = .{ .text = try dupField(arena, obj, "text") } };
-    }
-    if (std.mem.eql(u8, m, "screenshot.capture")) {
-        return .{ .capture_window = .{} };
-    }
-    return error.InvalidParams;
-}
-
-fn dupField(arena: std.mem.Allocator, obj: std.json.ObjectMap, key: []const u8) MutationError![]const u8 {
-    const v = obj.get(key) orelse return error.InvalidParams;
-    if (v != .string) return error.InvalidParams;
-    return try arena.dupe(u8, v.string);
-}
-
-fn numField(obj: std.json.ObjectMap, key: []const u8) MutationError!f32 {
-    const v = obj.get(key) orelse return error.InvalidParams;
-    return switch (v) {
-        .integer => |n| @floatFromInt(n),
-        .float => |f| @floatCast(f),
-        .number_string => |s| std.fmt.parseFloat(f32, s) catch return error.InvalidParams,
-        else => error.InvalidParams,
-    };
-}
-
-/// Maps a JSON value to an `introspect.Value`. Numbers → number, bools →
-/// boolean, strings → text (duped), 3-element numeric arrays → vec3.
-fn jsonToValue(arena: std.mem.Allocator, v: std.json.Value) MutationError!introspect.Value {
-    return switch (v) {
-        .integer => |n| .{ .number = @floatFromInt(n) },
-        .float => |f| .{ .number = f },
-        .number_string => |s| .{ .number = std.fmt.parseFloat(f64, s) catch return error.InvalidParams },
-        .bool => |b| .{ .boolean = b },
-        .string => |s| .{ .text = try arena.dupe(u8, s) },
-        .array => .{ .vec3 = try jsonToVec3(v) },
-        else => error.InvalidParams,
-    };
-}
-
-fn jsonToVec3(v: std.json.Value) MutationError![3]f32 {
-    if (v != .array or v.array.items.len != 3) return error.InvalidParams;
-    var out: [3]f32 = undefined;
-    for (v.array.items, 0..) |item, i| {
-        out[i] = switch (item) {
-            .integer => |n| @floatFromInt(n),
-            .float => |f| @floatCast(f),
-            .number_string => |s| std.fmt.parseFloat(f32, s) catch return error.InvalidParams,
-            else => return error.InvalidParams,
-        };
-    }
-    return out;
-}
-
 fn assetListWriter(jw: *Stringify, world: World) anyerror!void {
     try introspect.writeAssetList(jw, world);
 }
@@ -510,8 +426,7 @@ fn callMetrics(allocator: std.mem.Allocator, req: *const Request, world: World, 
     okJson(req, out, json);
 }
 
-/// Poll after `screenshot.capture` (the actual capture completes on a later
-/// frame, not synchronously with that mutation) to get the resulting path.
+/// Poll after `screenshot.capture` to get the resulting path (async, completes a frame later).
 fn callScreenshotLast(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
     var buf: std.Io.Writer.Allocating = .init(allocator);
     defer buf.deinit();

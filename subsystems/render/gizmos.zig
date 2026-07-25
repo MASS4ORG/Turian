@@ -98,8 +98,11 @@ pub fn createGizmoPipeline(dev: *c.SDL_GPUDevice, depth_test: bool) !*c.SDL_GPUG
     blend.src_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE;
     blend.dst_alpha_blendfactor = c.SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
     blend.alpha_blend_op = c.SDL_GPU_BLENDOP_ADD;
+    // Draws into the scene's HDR resolve target (shares its multisampled
+    // color+depth, same as before HDR post-processing existed) — not the
+    // final UNORM `color_tex`, which `postprocess.run` writes afterward.
     const color_desc = c.SDL_GPUColorTargetDescription{
-        .format = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .format = state.HDR_COLOR_FORMAT,
         .blend_state = blend,
     };
 
@@ -173,14 +176,15 @@ fn ensureCapacity(dev: *c.SDL_GPUDevice, i: usize, count: usize) ?*c.SDL_GPUBuff
     return buf;
 }
 
-/// Draw the recorded gizmo `verts` (line-list pairs) over `color_tex` using the
-/// supplied `view_proj`. `overlay` selects the always-on-top pipeline (for
+/// Draw the recorded gizmo `verts` (line-list pairs) over `hdr_color` (the
+/// scene's HDR resolve target, from `root.hdrColorFor`) using the supplied
+/// `view_proj`. `overlay` selects the always-on-top pipeline (for
 /// manipulation handles); otherwise gizmos are depth-tested against the scene.
 /// Must be called after `renderScene` (which stores the depth buffer) and
 /// outside any open render pass.
 pub fn renderGizmos(
     cmd: *c.SDL_GPUCommandBuffer,
-    color_tex: *c.SDL_GPUTexture,
+    hdr_color: *c.SDL_GPUTexture,
     w: u32,
     h: u32,
     view_proj: [16]f32,
@@ -245,15 +249,15 @@ pub fn renderGizmos(
 
     // Load the existing color (the rendered scene) and depth; never clear. Under
     // MSAA the scene lives in the multisampled color; draw there (sharing the
-    // MSAA depth) and re-resolve into the single-sample `color_tex`.
+    // MSAA depth) and re-resolve into the single-sample `hdr_color`.
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
     color_info.load_op = c.SDL_GPU_LOADOP_LOAD;
     if (target.msaa_color) |mc| {
         color_info.texture = mc;
         color_info.store_op = c.SDL_GPU_STOREOP_RESOLVE_AND_STORE;
-        color_info.resolve_texture = color_tex;
+        color_info.resolve_texture = hdr_color;
     } else {
-        color_info.texture = color_tex;
+        color_info.texture = hdr_color;
         color_info.store_op = c.SDL_GPU_STOREOP_STORE;
     }
 

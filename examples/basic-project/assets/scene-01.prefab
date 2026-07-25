@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "objects": [
     {
       "name": "Main Camera",
@@ -29,7 +29,22 @@
             "fov": 60,
             "near": 0.01,
             "far": 1000,
-            "orthographic": false
+            "orthographic": false,
+            "vignette_intensity": 0,
+            "vignette_radius": 0.75,
+            "vignette_smoothness": 0.35,
+            "grading_lift_r": 0,
+            "grading_lift_g": 0,
+            "grading_lift_b": 0,
+            "grading_gamma_r": 1,
+            "grading_gamma_g": 1,
+            "grading_gamma_b": 1,
+            "grading_gain_r": 1,
+            "grading_gain_g": 1,
+            "grading_gain_b": 1,
+            "bloom_threshold": 1,
+            "bloom_intensity": 0,
+            "bloom_radius": 1
           }
         },
         {
@@ -120,6 +135,153 @@
                 "as_vec4_w": 0,
                 "as_ref_guid": "",
                 "as_string": ""
+              },
+              {
+                "name": "_look",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_look_axis",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_move",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_ascend",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_descend",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_boost",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 4294967295,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_resolved",
+                "kind": "bool",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
               }
             ]
           }
@@ -127,7 +289,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Directional Light",
@@ -168,7 +331,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Point Light",
@@ -209,7 +373,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Spot Light",
@@ -250,7 +415,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Ground",
@@ -280,13 +446,17 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["00000000-0000-4000-8000-000000000104"]
+            "material_guids": [
+              "00000000-0000-4000-8000-000000000104"
+            ],
+            "material_guid": ""
           }
         }
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Spinning Cube",
@@ -316,20 +486,25 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["51029215-952f-466e-ae31-65d167bc85a6"]
+            "material_guids": [
+              "51029215-952f-466e-ae31-65d167bc85a6"
+            ],
+            "material_guid": ""
           }
         },
         {
           "user_script": {
             "type_name": "Rotator",
             "source_file": "assets/Rotator.zig",
-            "fields": []
+            "fields": [
+            ]
           }
         }
       ],
       "prefab_source": "f4522f15-1258-4742-8590-89513eac3523",
       "prefab_node": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Moving Platform",
@@ -359,7 +534,10 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["00495134-ce8a-406d-bdcc-71310b6e5830"]
+            "material_guids": [
+              "00495134-ce8a-406d-bdcc-71310b6e5830"
+            ],
+            "material_guid": ""
           }
         },
         {
@@ -528,7 +706,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Remote Cube",
@@ -558,13 +737,17 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["00000000-0000-4000-8000-000000000103"]
+            "material_guids": [
+              "00000000-0000-4000-8000-000000000103"
+            ],
+            "material_guid": ""
           }
         }
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Remote Cube 2",
@@ -594,20 +777,67 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["00000000-0000-4000-8000-000000000103"]
+            "material_guids": [
+              "00000000-0000-4000-8000-000000000103"
+            ],
+            "material_guid": ""
           }
         },
         {
           "user_script": {
             "type_name": "Rotator",
             "source_file": "./examples/basic-project/assets/Rotator.zig",
-            "fields": []
+            "fields": [
+              {
+                "name": "speed",
+                "kind": "f32",
+                "as_f32": 45,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "axis",
+                "kind": "vec3",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 1,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              }
+            ]
           }
         }
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Operator",
@@ -636,13 +866,78 @@
           "user_script": {
             "type_name": "RotateOther",
             "source_file": "assets/RotateOther.zig",
-            "fields": []
+            "fields": [
+              {
+                "name": "target",
+                "kind": "game_object_ref",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "speed",
+                "kind": "f32",
+                "as_f32": 90,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "axis",
+                "kind": "vec3",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 1,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              }
+            ]
           }
         }
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "Spinning Cube",
@@ -672,14 +967,18 @@
             "cast_shadows": true,
             "receive_shadows": true,
             "mesh_guid": "61307f17-3e2b-4a70-b440-f0c096136afa",
-            "material_guids": ["51029215-952f-466e-ae31-65d167bc85a6"]
+            "material_guids": [
+              "51029215-952f-466e-ae31-65d167bc85a6"
+            ],
+            "material_guid": ""
           }
         },
         {
           "user_script": {
             "type_name": "Rotator",
             "source_file": "assets/Rotator.zig",
-            "fields": []
+            "fields": [
+            ]
           }
         }
       ],
@@ -779,6 +1078,48 @@
                 "as_vec4_w": 0,
                 "as_ref_guid": "",
                 "as_string": ""
+              },
+              {
+                "name": "_timer",
+                "kind": "f32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_spawn_count",
+                "kind": "u32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
               }
             ]
           }
@@ -786,7 +1127,8 @@
       ],
       "prefab_source": "",
       "prefab_node": "",
-      "overrides": []
+      "overrides": [
+      ]
     },
     {
       "name": "UI",
@@ -891,7 +1233,8 @@
           "user_script": {
             "type_name": "MenuController",
             "source_file": "assets/MenuController.zig",
-            "fields": []
+            "fields": [
+            ]
           }
         },
         {
@@ -918,6 +1261,27 @@
                 "as_vec4_z": 0,
                 "as_vec4_w": 0,
                 "as_ref_guid": "25b21610-6255-40a6-98d4-c9f9858ac972",
+                "as_string": ""
+              },
+              {
+                "name": "_buf",
+                "kind": "string",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
                 "as_string": ""
               }
             ]
@@ -947,6 +1311,111 @@
                 "as_vec4_z": 0,
                 "as_vec4_w": 0,
                 "as_ref_guid": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
+                "as_string": ""
+              },
+              {
+                "name": "height",
+                "kind": "f32",
+                "as_f32": 1.5,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "duration",
+                "kind": "f32",
+                "as_f32": 0.6,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_jumping",
+                "kind": "bool",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_t",
+                "kind": "f32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
+              },
+              {
+                "name": "_base_y",
+                "kind": "f32",
+                "as_f32": 0,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
                 "as_string": ""
               }
             ]
@@ -998,6 +1467,27 @@
                 "as_vec4_w": 0,
                 "as_ref_guid": "461f5277-9d42-466b-ba96-2ec5e4bf65b5",
                 "as_string": ""
+              },
+              {
+                "name": "radius",
+                "kind": "f32",
+                "as_f32": 3,
+                "as_f64": 0,
+                "as_i32": 0,
+                "as_i64": 0,
+                "as_u32": 0,
+                "as_bool": false,
+                "as_vec2_x": 0,
+                "as_vec2_y": 0,
+                "as_vec3_x": 0,
+                "as_vec3_y": 0,
+                "as_vec3_z": 0,
+                "as_vec4_x": 0,
+                "as_vec4_y": 0,
+                "as_vec4_z": 0,
+                "as_vec4_w": 0,
+                "as_ref_guid": "",
+                "as_string": ""
               }
             ]
           }
@@ -1031,6 +1521,10 @@
             ]
           }
         }
+      ],
+      "prefab_source": "",
+      "prefab_node": "",
+      "overrides": [
       ]
     }
   ]

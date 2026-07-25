@@ -42,15 +42,20 @@ pub const AssetView = struct {
     type: []const u8 = "",
 };
 
-/// Everything the inspector can see at one instant. All views are borrowed;
-/// the inspector never frees them.
-/// Result of the last whole-window screenshot capture (see
-/// `studio/Screenshots.captureWindow`), for the `screenshot.last` debug-RPC
-/// query — polled after a `screenshot.capture` mutation since the actual
-/// capture completes on a later frame, not synchronously with the RPC call.
+/// Everything the inspector can see at one instant. All views are borrowed.
+/// Result of the last whole-window screenshot capture, for the
+/// `screenshot.last` debug-RPC query (async, completes a frame later).
 pub const ScreenshotView = struct {
     ok: bool = false,
     path: []const u8 = "",
+};
+
+/// The Studio editor viewport's free-look camera pose, for `camera.get`/`camera.set`.
+pub const EditorCameraView = struct {
+    pos: [3]f32 = .{ 0, 0, 0 },
+    yaw: f32 = 0,
+    pitch: f32 = 0,
+    fov: f32 = 60,
 };
 
 pub const World = struct {
@@ -58,6 +63,10 @@ pub const World = struct {
     metrics: ?*const Metrics = null,
     assets: []const AssetView = &.{},
     last_screenshot: ?ScreenshotView = null,
+    /// See `EditorCameraView`.
+    editor_camera: ?EditorCameraView = null,
+    /// Which of the "scene"/"game" viewport tabs is active (Studio only).
+    active_viewport_tab: ?[]const u8 = null,
 };
 
 /// A typed value used when mutating a field by name (see `setComponentField`).
@@ -335,6 +344,14 @@ fn writeComponentSchema(jw: *Stringify, tag_name: []const u8, comptime T: type) 
     try jw.objectField("type_name");
     try jw.write(@typeName(T));
     try jw.objectField("fields");
+    try writeFieldSchemas(jw, T);
+    try jw.endObject();
+}
+
+/// Writes one component/struct's field list. Recurses into plain struct-typed
+/// fields (skipping ref-types and vec3-shaped structs) so nested settings are
+/// addressable with a dot-separated path (e.g. `"vignette.intensity"`).
+fn writeFieldSchemas(jw: *Stringify, comptime T: type) Error!void {
     try jw.beginArray();
     inline for (std.meta.fields(T)) |f| {
         if (f.is_comptime) continue;
@@ -349,12 +366,15 @@ fn writeComponentSchema(jw: *Stringify, tag_name: []const u8, comptime T: type) 
             inline for (std.meta.fields(f.type)) |ef| try jw.write(ef.name);
             try jw.endArray();
         }
+        if (comptime !isRefType(f.type) and !isVec3(f.type) and @typeInfo(f.type) == .@"struct") {
+            try jw.objectField("fields");
+            try writeFieldSchemas(jw, f.type);
+        }
         try jw.objectField("mutable");
         try jw.write(true);
         try jw.endObject();
     }
     try jw.endArray();
-    try jw.endObject();
 }
 
 /// Writes the component-type catalog: every built-in component, its fields,
@@ -533,10 +553,17 @@ fn assignField(comptime F: type, dst: *F, v: Value) bool {
     return false;
 }
 
+/// Sets a field by name, or by a dot-separated path that recurses into a
+/// struct-typed field (skipping ref-types and vec3-shaped structs).
 fn setBuiltinField(comptime T: type, payload: *T, name: []const u8, v: Value) bool {
+    const dot = std.mem.indexOfScalar(u8, name, '.');
+    const head = if (dot) |d| name[0..d] else name;
     inline for (std.meta.fields(T)) |f| {
-        if (f.is_comptime) continue;
-        if (std.mem.eql(u8, f.name, name)) {
+        if (!f.is_comptime and std.mem.eql(u8, f.name, head)) {
+            if (dot) |d| {
+                if (comptime isRefType(f.type) or isVec3(f.type) or @typeInfo(f.type) != .@"struct") return false;
+                return setBuiltinField(f.type, &@field(payload.*, f.name), name[d + 1 ..], v);
+            }
             return assignField(f.type, &@field(payload.*, f.name), v);
         }
     }

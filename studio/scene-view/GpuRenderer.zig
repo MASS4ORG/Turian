@@ -97,13 +97,16 @@ pub fn renderViewport(w: u32, h: u32) ?gui.TextureTarget {
     const bt: *BackendTex = @ptrCast(@alignCast(ct.ptr));
 
     const objects = g_render_override orelse EditorState.objects[0..EditorState.object_count];
-    render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.renderScene(@ptrCast(cmd), w, h, objects);
 
     if (g_gizmos_enabled) {
-        const vp = render.sceneCamera(w, h, objects).view_proj.m;
-        render.renderGizmos(@ptrCast(cmd), @ptrCast(bt.texture), w, h, vp, GizmoSystem.worldVertices(), false);
-        render.renderGizmos(@ptrCast(cmd), @ptrCast(bt.texture), w, h, vp, GizmoSystem.overlayVertices(), true);
+        if (render.hdrColorFor(w, h)) |hdr| {
+            const vp = render.sceneCamera(w, h, objects).view_proj.m;
+            render.renderGizmos(@ptrCast(cmd), @ptrCast(hdr), w, h, vp, GizmoSystem.worldVertices(), false);
+            render.renderGizmos(@ptrCast(cmd), @ptrCast(hdr), w, h, vp, GizmoSystem.overlayVertices(), true);
+        }
     }
+    render.runPostProcess(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
     return ct;
 }
 
@@ -139,7 +142,8 @@ pub fn renderGameViewport(objects: []const engine.SceneNode, w: u32, h: u32) ?gu
 
     const saved_cam = render.editorCamera();
     render.setEditorCamera(null);
-    render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.renderScene(@ptrCast(cmd), w, h, objects);
+    render.runPostProcess(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
     render.setEditorCamera(saved_cam);
     return target;
 }
@@ -183,7 +187,8 @@ pub fn renderPreview(objects: []const engine.SceneNode, cam: render.EditorCam, w
 
     const saved_cam = render.editorCamera();
     render.setEditorCamera(cam);
-    render.renderScene(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.renderScene(@ptrCast(cmd), w, h, objects);
+    render.runPostProcess(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
     render.setEditorCamera(saved_cam);
     return target;
 }
@@ -208,7 +213,8 @@ pub fn renderAndCapture(allocator: std.mem.Allocator, objects: []const engine.Sc
 
     const saved_cam = render.editorCamera();
     render.setEditorCamera(cam);
-    render.renderScene(own_cmd, @ptrCast(bt.texture), w, h, objects);
+    render.renderScene(own_cmd, w, h, objects);
+    render.runPostProcess(own_cmd, @ptrCast(bt.texture), w, h, objects);
     render.setEditorCamera(saved_cam);
 
     const fence = gpu.c.SDL_SubmitGPUCommandBufferAndAcquireFence(own_cmd) orelse return null;

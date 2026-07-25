@@ -7,6 +7,11 @@ pub const AudioSourceComponent = @import("AudioSourceComponent.zig").AudioSource
 pub const AnimatorComponent = @import("AnimatorComponent.zig").AnimatorComponent;
 pub const UiDocumentComponent = @import("UiDocumentComponent.zig").UiDocumentComponent;
 pub const EnvironmentComponent = @import("EnvironmentComponent.zig").EnvironmentComponent;
+pub const PostProcessVolumeComponent = @import("PostProcessVolumeComponent.zig").PostProcessVolumeComponent;
+pub const VolumeShape = @import("PostProcessVolumeComponent.zig").VolumeShape;
+pub const VignetteSettings = @import("PostProcessVolumeComponent.zig").VignetteSettings;
+pub const ColorGradingSettings = @import("PostProcessVolumeComponent.zig").ColorGradingSettings;
+pub const BloomSettings = @import("PostProcessVolumeComponent.zig").BloomSettings;
 pub const BuiltinEntry = @import("BuiltinEntry.zig").BuiltinEntry;
 
 pub const BUILTIN_COMPONENTS = [_]BuiltinEntry{
@@ -19,4 +24,5 @@ pub const BUILTIN_COMPONENTS = [_]BuiltinEntry{
     .{ .type_name = "AnimatorComponent", .display_name = "Animator" },
     .{ .type_name = "UiDocumentComponent", .display_name = "UI Document" },
     .{ .type_name = "EnvironmentComponent", .display_name = "Environment" },
+    .{ .type_name = "PostProcessVolumeComponent", .display_name = "Post-Process Volume" },
 };

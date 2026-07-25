@@ -7,9 +7,9 @@ const std = @import("std");
 const engine = @import("engine");
 const Protocol = @import("Protocol.zig");
 const Handler = @import("Handler.zig");
+const Connection = @import("Connection.zig");
 const introspect = engine.introspect;
 const net = std.Io.net;
-const log = std.log.scoped(.debug_server);
 
 const World = introspect.World;
 
@@ -50,6 +50,14 @@ pub const Mutation = union(enum) {
     /// `Screenshots.captureWindow`); poll the `screenshot.last` query for the
     /// resulting path.
     capture_window: struct {},
+    /// Studio only. Every field is optional — only the supplied ones change.
+    /// The applier must queue this for the next frame rather than applying it
+    /// directly (the editor's free-look camera pose is swapped per-viewport-
+    /// instance once per frame; applying mid-`pump` would be silently
+    /// overwritten before the next render).
+    camera_set: struct { pos: ?[3]f32, yaw: ?f32, pitch: ?f32, fov: ?f32 },
+    /// Studio only. `tab` is `"scene"` or `"game"`.
+    viewport_set_tab: struct { tab: []const u8 },
 };
 
 pub const MutationResult = struct {
@@ -105,80 +113,6 @@ pub const Options = struct {
 /// Hard cap on simultaneous connections (sizes the connection slot array).
 pub const MAX_CONNS = 16;
 
-// ── Per-connection state ─────────────────────────────────────────────────────
-
-/// One queued outbound line. `is_event` marks lossy notifications, which the
-/// outbound-cap policy may drop under backpressure; responses are never dropped.
-const OutItem = struct { line: []u8, is_event: bool };
-const OutQueue = std.ArrayList(OutItem);
-
-const Conn = struct {
-    server: *Server,
-    io: std.Io,
-    id: u32,
-    stream: net.Stream,
-    authenticated: bool,
-    /// Per-session read-only flag (a client may drop its own write rights).
-    readonly: bool = false,
-
-    read_buf: [Protocol.MAX_MESSAGE_BYTES]u8 = undefined,
-    write_buf: [Protocol.MAX_MESSAGE_BYTES]u8 = undefined,
-
-    out_mutex: std.Io.Mutex = .init,
-    out_cond: std.Io.Condition = .init,
-    out_queue: OutQueue = .empty,
-    /// Sum of `line.len` for everything currently in `out_queue` (guarded by
-    /// `out_mutex`). Drives the byte-based outbound cap.
-    out_bytes: usize = 0,
-    closing: std.atomic.Value(bool) = .{ .raw = false },
-
-    reader_thread: ?std.Thread = null,
-    writer_thread: ?std.Thread = null,
-
-    /// Subscription bitset over `introspect.Event` ordinals (Phase 3).
-    subs: u32 = 0,
-
-    /// Token-bucket rate limiter (Phase 4).
-    tokens: f64 = 0,
-    last_refill_ns: i128 = 0,
-
-    fn pushOut(self: *Conn, line: []u8, is_event: bool) void {
-        self.out_mutex.lockUncancelable(self.io);
-        defer self.out_mutex.unlock(self.io);
-        self.enforceOutboundCap(line.len);
-        self.out_queue.append(self.server.allocator, .{ .line = line, .is_event = is_event }) catch {
-            self.server.allocator.free(line);
-            return;
-        };
-        self.out_bytes += line.len;
-        self.out_cond.signal(self.io);
-    }
-
-    /// Bounds the outbound backlog of a slow / non-reading client. Drops the
-    /// oldest queued *events* (lossy by nature) to make room; if the head of the
-    /// queue is a response we cannot drop, the client is hopelessly behind, so
-    /// mark the connection for disconnect. Must hold `out_mutex`.
-    fn enforceOutboundCap(self: *Conn, incoming_len: usize) void {
-        const max_count = self.server.options.max_outbound_queue;
-        const max_bytes = self.server.options.max_outbound_bytes;
-        while (self.out_queue.items.len > 0 and
-            (self.out_queue.items.len >= max_count or self.out_bytes + incoming_len > max_bytes))
-        {
-            const oldest = self.out_queue.items[0];
-            if (!oldest.is_event) {
-                self.closing.store(true, .release);
-                return;
-            }
-            const n = oldest.line.len;
-            self.server.allocator.free(oldest.line);
-            self.out_bytes -= n;
-            _ = self.out_queue.orderedRemove(0);
-        }
-    }
-};
-
-const InboundNode = struct { conn: *Conn, line: []u8 };
-
 // ── Server ───────────────────────────────────────────────────────────────────
 
 pub const Server = struct {
@@ -192,11 +126,11 @@ pub const Server = struct {
     listener: ?net.Server = null,
     listener_mutex: std.Io.Mutex = .init,
 
-    conns: [MAX_CONNS]?*Conn = .{null} ** MAX_CONNS,
+    conns: [MAX_CONNS]?*Connection.Conn = .{null} ** MAX_CONNS,
     conns_mutex: std.Io.Mutex = .init,
     next_id: std.atomic.Value(u32) = .{ .raw = 1 },
 
-    inbound: std.ArrayList(InboundNode) = .empty,
+    inbound: std.ArrayList(Connection.InboundNode) = .empty,
     inbound_mutex: std.Io.Mutex = .init,
 
     const Self = @This();
@@ -215,7 +149,7 @@ pub const Server = struct {
         if (self.accept_thread != null) return error.AlreadyRunning;
         self.io = io;
         self.stop_flag.store(false, .release);
-        self.accept_thread = try std.Thread.spawn(.{}, acceptLoop, .{self});
+        self.accept_thread = try std.Thread.spawn(.{}, Connection.acceptLoop, .{self});
     }
 
     /// Legacy entry point: the provider is ignored (the pump takes the world
@@ -258,7 +192,7 @@ pub const Server = struct {
         self.conns_mutex.lockUncancelable(io);
         for (&self.conns) |*slot| {
             if (slot.*) |conn| {
-                self.shutdownConn(conn);
+                Connection.shutdownConn(self, conn);
                 slot.* = null;
             }
         }
@@ -297,7 +231,7 @@ pub const Server = struct {
         }
 
         // Reap connections whose reader has finished.
-        self.reapClosed();
+        Connection.reapClosed(self);
     }
 
     /// Serialises a JSON-RPC notification and fans it out to every connection
@@ -322,7 +256,7 @@ pub const Server = struct {
 
     // ── Request execution ────────────────────────────────────────────────────
 
-    fn process(self: *Self, conn: *Conn, line: []u8, world: World, applier: ?MutationApplier) void {
+    fn process(self: *Self, conn: *Connection.Conn, line: []u8, world: World, applier: ?MutationApplier) void {
         if (conn.closing.load(.acquire)) return;
 
         var out: std.Io.Writer.Allocating = .init(self.allocator);
@@ -394,7 +328,7 @@ pub const Server = struct {
         self.sendOut(conn, out.written());
     }
 
-    fn processMutation(self: *Self, conn: *Conn, req: *const Protocol.Request, w: *std.Io.Writer, applier: ?MutationApplier) void {
+    fn processMutation(self: *Self, conn: *Connection.Conn, req: *const Protocol.Request, w: *std.Io.Writer, applier: ?MutationApplier) void {
         if (!self.options.allow_write or conn.readonly) {
             Protocol.writeError(w, req, Protocol.ErrorCode.READONLY, "Mutation requires a read-write session; start the server with --rw") catch {};
             return;
@@ -454,7 +388,7 @@ pub const Server = struct {
             Protocol.writeError(w, req, Protocol.ErrorCode.INTERNAL_ERROR, if (res.message.len > 0) res.message else "Mutation failed") catch {};
     }
 
-    fn handleSubscription(self: *Self, conn: *Conn, req: *const Protocol.Request, w: *std.Io.Writer) void {
+    fn handleSubscription(self: *Self, conn: *Connection.Conn, req: *const Protocol.Request, w: *std.Io.Writer) void {
         _ = self;
         const subscribe = std.mem.eql(u8, req.method(), "subscribe");
         var name_buf: [64]u8 = undefined;
@@ -475,7 +409,7 @@ pub const Server = struct {
     }
 
     /// Token-bucket check: refill based on elapsed monotonic time, consume one.
-    fn allowRequest(self: *Self, conn: *Conn) bool {
+    fn allowRequest(self: *Self, conn: *Connection.Conn) bool {
         const rate: f64 = @floatFromInt(self.options.rate_limit_per_sec);
         const now: i128 = std.Io.Timestamp.now(self.io, .awake).nanoseconds;
         if (conn.last_refill_ns == 0) {
@@ -490,7 +424,7 @@ pub const Server = struct {
         return true;
     }
 
-    fn sendOut(self: *Self, conn: *Conn, bytes: []const u8) void {
+    fn sendOut(self: *Self, conn: *Connection.Conn, bytes: []const u8) void {
         if (bytes.len == 0) return;
         const owned = self.allocator.dupe(u8, bytes) catch return;
         conn.pushOut(owned, false);
@@ -499,7 +433,7 @@ pub const Server = struct {
     /// Enqueues a standalone JSON-RPC error (id = null) to a connection. Used for
     /// transport-level failures the request pump never sees — an oversized
     /// request line, or a full inbound queue.
-    fn enqueueError(self: *Self, conn: *Conn, code: i32, msg: []const u8) void {
+    pub fn enqueueError(self: *Self, conn: *Connection.Conn, code: i32, msg: []const u8) void {
         var line: std.Io.Writer.Allocating = .init(self.allocator);
         defer line.deinit();
         const dummy = Protocol.Request{};
@@ -510,7 +444,7 @@ pub const Server = struct {
 
     // ── Connection lifecycle ─────────────────────────────────────────────────
 
-    fn pushInbound(self: *Self, conn: *Conn, line: []u8) void {
+    pub fn pushInbound(self: *Self, conn: *Connection.Conn, line: []u8) void {
         self.inbound_mutex.lockUncancelable(self.io);
         const full = self.inbound.items.len >= self.options.max_inbound_queue;
         if (full) {
@@ -527,40 +461,6 @@ pub const Server = struct {
         };
     }
 
-    fn reapClosed(self: *Self) void {
-        self.conns_mutex.lockUncancelable(self.io);
-        defer self.conns_mutex.unlock(self.io);
-        for (&self.conns) |*slot| {
-            if (slot.*) |conn| {
-                if (conn.closing.load(.acquire)) {
-                    self.shutdownConn(conn);
-                    slot.* = null;
-                }
-            }
-        }
-    }
-
-    /// Joins both threads, closes the socket, frees the connection.
-    fn shutdownConn(self: *Self, conn: *Conn) void {
-        conn.closing.store(true, .release);
-        // Wake the writer in case it is waiting on an empty queue.
-        conn.out_mutex.lockUncancelable(self.io);
-        conn.out_cond.signal(self.io);
-        conn.out_mutex.unlock(self.io);
-        // Shutting down the socket unblocks a reader stuck in a blocking recv
-        // (a plain close does not reliably wake it).
-        conn.stream.shutdown(conn.io, .both) catch {};
-        if (conn.reader_thread) |t| t.join();
-        if (conn.writer_thread) |t| t.join();
-        conn.stream.close(conn.io);
-        conn.out_mutex.lockUncancelable(self.io);
-        for (conn.out_queue.items) |item| self.allocator.free(item.line);
-        conn.out_queue.deinit(self.allocator);
-        conn.out_bytes = 0;
-        conn.out_mutex.unlock(self.io);
-        self.allocator.destroy(conn);
-    }
-
     fn countConns(self: *Self) usize {
         var n: usize = 0;
         for (self.conns) |c| {
@@ -569,13 +469,13 @@ pub const Server = struct {
         return n;
     }
 
-    fn onAccept(self: *Self, stream: net.Stream) void {
+    pub fn onAccept(self: *Self, stream: net.Stream) void {
         self.conns_mutex.lockUncancelable(self.io);
         defer self.conns_mutex.unlock(self.io);
 
         const cap = @min(self.options.max_clients, MAX_CONNS);
         if (self.countConns() >= cap) {
-            rejectStream(self.io, stream, "Too many clients");
+            Connection.rejectStream(self.io, stream, "Too many clients");
             stream.close(self.io);
             return;
         }
@@ -587,12 +487,12 @@ pub const Server = struct {
             }
         }
         const idx = slot_idx orelse {
-            rejectStream(self.io, stream, "Too many clients");
+            Connection.rejectStream(self.io, stream, "Too many clients");
             stream.close(self.io);
             return;
         };
 
-        const conn = self.allocator.create(Conn) catch {
+        const conn = self.allocator.create(Connection.Conn) catch {
             stream.close(self.io);
             return;
         };
@@ -603,12 +503,12 @@ pub const Server = struct {
             .stream = stream,
             .authenticated = self.options.auth_token.len == 0,
         };
-        conn.reader_thread = std.Thread.spawn(.{}, connReader, .{conn}) catch {
+        conn.reader_thread = std.Thread.spawn(.{}, Connection.connReader, .{conn}) catch {
             stream.close(self.io);
             self.allocator.destroy(conn);
             return;
         };
-        conn.writer_thread = std.Thread.spawn(.{}, connWriter, .{conn}) catch {
+        conn.writer_thread = std.Thread.spawn(.{}, Connection.connWriter, .{conn}) catch {
             // Reader already running; mark closing so it unwinds, then bail.
             conn.closing.store(true, .release);
             conn.stream.close(self.io);
@@ -621,103 +521,7 @@ pub const Server = struct {
     }
 };
 
-// ── Background threads ───────────────────────────────────────────────────────
-
-fn acceptLoop(srv: *Server) void {
-    const addr: net.IpAddress = if (srv.options.localhost_only)
-        .{ .ip4 = net.Ip4Address.loopback(srv.options.port) }
-    else
-        .{ .ip4 = net.Ip4Address.unspecified(srv.options.port) };
-
-    var listener = net.IpAddress.listen(&addr, srv.io, .{ .reuse_address = true }) catch |err| {
-        log.warn("listen failed on port {d}: {s}", .{ srv.options.port, @errorName(err) });
-        return;
-    };
-
-    srv.listener_mutex.lockUncancelable(srv.io);
-    srv.listener = listener;
-    srv.listener_mutex.unlock(srv.io);
-
-    log.info("listening on 127.0.0.1:{d} ({s})", .{ srv.options.port, if (srv.options.allow_write) "read-write" else "read-only" });
-
-    while (!srv.stop_flag.load(.acquire)) {
-        const stream = listener.accept(srv.io) catch break;
-        srv.onAccept(stream);
-    }
-
-    log.info("stopped (port {d})", .{srv.options.port});
-}
-
-fn connReader(conn: *Conn) void {
-    var reader = conn.stream.reader(conn.io, &conn.read_buf);
-    const alloc = conn.server.allocator;
-    while (!conn.closing.load(.acquire)) {
-        // Heap-growing read: a big `component.set` value can exceed the 64 KiB
-        // buffer. readLine owns the returned line, which pushInbound takes over.
-        const line = Protocol.readLine(&reader.interface, alloc, Protocol.MAX_LINE_BYTES) catch |err| {
-            if (err == error.StreamTooLong)
-                conn.server.enqueueError(conn, Protocol.ErrorCode.INVALID_REQUEST, "Request line exceeds maximum size");
-            break;
-        };
-        if (line.len == 0) {
-            alloc.free(line);
-            continue;
-        }
-        conn.server.pushInbound(conn, line);
-    }
-    conn.closing.store(true, .release);
-    // Wake the writer so it can observe the close and exit.
-    conn.out_mutex.lockUncancelable(conn.io);
-    conn.out_cond.signal(conn.io);
-    conn.out_mutex.unlock(conn.io);
-}
-
-fn connWriter(conn: *Conn) void {
-    var writer = conn.stream.writer(conn.io, &conn.write_buf);
-    while (true) {
-        conn.out_mutex.lockUncancelable(conn.io);
-        while (conn.out_queue.items.len == 0 and !conn.closing.load(.acquire)) {
-            conn.out_cond.waitUncancelable(conn.io, &conn.out_mutex);
-        }
-        if (conn.out_queue.items.len == 0 and conn.closing.load(.acquire)) {
-            conn.out_mutex.unlock(conn.io);
-            return;
-        }
-        const batch = conn.out_queue.toOwnedSlice(conn.server.allocator) catch {
-            conn.out_mutex.unlock(conn.io);
-            continue;
-        };
-        conn.out_bytes = 0;
-        conn.out_mutex.unlock(conn.io);
-
-        var failed = false;
-        for (batch) |item| {
-            if (!failed) {
-                writer.interface.writeAll(item.line) catch {
-                    failed = true;
-                };
-            }
-            conn.server.allocator.free(item.line);
-        }
-        conn.server.allocator.free(batch);
-        if (failed) {
-            conn.closing.store(true, .release);
-            return;
-        }
-        writer.interface.flush() catch {
-            conn.closing.store(true, .release);
-            return;
-        };
-    }
-}
-
-fn rejectStream(io: std.Io, stream: net.Stream, msg: []const u8) void {
-    var buf: [256]u8 = undefined;
-    var writer = stream.writer(io, &buf);
-    const dummy = Protocol.Request{};
-    Protocol.writeError(&writer.interface, &dummy, Protocol.ErrorCode.INTERNAL_ERROR, msg) catch return;
-    writer.interface.flush() catch {};
-}
+// ── Background threads (accept/reader/writer) ─────────────────────────────────
 
 fn paramString(params_json: []const u8, key: []const u8, dst: []u8) ?[]u8 {
     if (params_json.len == 0) return null;

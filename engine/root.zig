@@ -149,6 +149,16 @@ pub const AnimatorComponent = components.AnimatorComponent;
 pub const UiDocumentComponent = components.UiDocumentComponent;
 /// Image-based environment lighting (skybox + ambient) component type.
 pub const EnvironmentComponent = components.EnvironmentComponent;
+/// Camera post-process volume component type (global or area-driven).
+pub const PostProcessVolumeComponent = components.PostProcessVolumeComponent;
+/// Post-process volume region shape (box or sphere).
+pub const VolumeShape = components.VolumeShape;
+/// Post-process volume vignette settings.
+pub const VignetteSettings = components.VignetteSettings;
+/// Post-process volume color grading settings.
+pub const ColorGradingSettings = components.ColorGradingSettings;
+/// Post-process volume bloom settings.
+pub const BloomSettings = components.BloomSettings;
 /// List of builtin component metadata entries.
 pub const BUILTIN_COMPONENTS = components.BUILTIN_COMPONENTS;
 

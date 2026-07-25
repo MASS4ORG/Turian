@@ -39,6 +39,14 @@ pub fn printUsageDebug() void {
         \\  capture                      Schedule a whole-window screenshot (see `screenshot`)
         \\  screenshot                   Poll the last whole-window screenshot's result/path
         \\
+        \\Studio viewport control (Studio only, read-write mode; camera.set is
+        \\applied the frame after the call, same latency as the input.* commands):
+        \\  camera-get                   Print the editor viewport camera's pose
+        \\  camera-set [--pos x,y,z] [--yaw d] [--pitch d] [--fov d]
+        \\                               Set the editor viewport camera pose (every flag optional)
+        \\  viewport-get-tab             Which of "scene"/"game" is the active viewport tab
+        \\  viewport-set-tab <scene|game>  Switch the active viewport tab
+        \\
     , .{});
 }
 
@@ -94,6 +102,10 @@ pub fn cmdDebug(
     var extra2: []const u8 = "";
     var extra3: []const u8 = "";
     var extra4: []const u8 = "";
+    var pos_str: []const u8 = "";
+    var yaw_str: []const u8 = "";
+    var pitch_str: []const u8 = "";
+    var fov_str: []const u8 = "";
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--host")) {
@@ -105,6 +117,14 @@ pub fn cmdDebug(
             if (args.next()) |ps| port = std.fmt.parseInt(u16, ps, 10) catch port;
         } else if (std.mem.eql(u8, arg, "--token")) {
             token = args.next() orelse "";
+        } else if (std.mem.eql(u8, arg, "--pos")) {
+            pos_str = args.next() orelse "";
+        } else if (std.mem.eql(u8, arg, "--yaw")) {
+            yaw_str = args.next() orelse "";
+        } else if (std.mem.eql(u8, arg, "--pitch")) {
+            pitch_str = args.next() orelse "";
+        } else if (std.mem.eql(u8, arg, "--fov")) {
+            fov_str = args.next() orelse "";
         } else if (extra1.len == 0) {
             extra1 = arg;
         } else if (extra2.len == 0) {
@@ -254,6 +274,53 @@ pub fn cmdDebug(
         try printResponseStderr(gpa, resp);
     } else if (std.mem.eql(u8, sub, "screenshot")) {
         const resp = try client.call(gpa, "screenshot.last", null);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "camera-get")) {
+        const resp = try client.call(gpa, "camera.get", null);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "camera-set")) {
+        if (pos_str.len == 0 and yaw_str.len == 0 and pitch_str.len == 0 and fov_str.len == 0) return printUsageDebug();
+        var buf: std.Io.Writer.Allocating = .init(gpa);
+        defer buf.deinit();
+        try buf.writer.writeAll("{");
+        var wrote = false;
+        if (pos_str.len > 0) {
+            var it = std.mem.splitScalar(u8, pos_str, ',');
+            const x = it.next() orelse "0";
+            const y = it.next() orelse "0";
+            const z = it.next() orelse "0";
+            try buf.writer.print("\"pos\":[{s},{s},{s}]", .{ x, y, z });
+            wrote = true;
+        }
+        if (yaw_str.len > 0) {
+            if (wrote) try buf.writer.writeAll(",");
+            try buf.writer.print("\"yaw\":{s}", .{yaw_str});
+            wrote = true;
+        }
+        if (pitch_str.len > 0) {
+            if (wrote) try buf.writer.writeAll(",");
+            try buf.writer.print("\"pitch\":{s}", .{pitch_str});
+            wrote = true;
+        }
+        if (fov_str.len > 0) {
+            if (wrote) try buf.writer.writeAll(",");
+            try buf.writer.print("\"fov\":{s}", .{fov_str});
+        }
+        try buf.writer.writeAll("}");
+        const resp = try client.call(gpa, "camera.set", buf.written());
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "viewport-get-tab")) {
+        const resp = try client.call(gpa, "viewport.getTab", null);
+        defer gpa.free(resp);
+        try printResponseStderr(gpa, resp);
+    } else if (std.mem.eql(u8, sub, "viewport-set-tab")) {
+        if (extra1.len == 0) return printUsageDebug();
+        const params = try std.fmt.allocPrint(gpa, "{{\"tab\":\"{s}\"}}", .{extra1});
+        defer gpa.free(params);
+        const resp = try client.call(gpa, "viewport.setTab", params);
         defer gpa.free(resp);
         try printResponseStderr(gpa, resp);
     } else if (std.mem.eql(u8, sub, "watch")) {

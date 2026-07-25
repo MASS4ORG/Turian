@@ -222,7 +222,7 @@ fn drawVector(param: shader.ShaderParam, v: *ParamValue, i: usize) void {
     gui.label(@src(), "{s}", .{param.label}, .{ .gravity_y = 0.5, .min_size_content = .{ .w = 130 }, .id_extra = i });
 
     var vec3 = engine.Vector3{ .x = v.vec[0], .y = v.vec[1], .z = v.vec[2] };
-    if (PropDraw.drawVec3Row(@src(), &vec3)) {
+    if (PropDraw.drawVec3Row(@src(), &vec3, i)) {
         v.vec[0] = vec3.x;
         v.vec[1] = vec3.y;
         v.vec[2] = vec3.z;

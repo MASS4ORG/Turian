@@ -411,7 +411,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
         },
         .vec3 => {
             var v = engine.Vector3{ .x = fv.as_vec3_x, .y = fv.as_vec3_y, .z = fv.as_vec3_z };
-            if (PropDraw.drawVec3Row(@src(), &v)) {
+            if (PropDraw.drawVec3Row(@src(), &v, id)) {
                 fv.as_vec3_x = v.x;
                 fv.as_vec3_y = v.y;
                 fv.as_vec3_z = v.z;
@@ -444,7 +444,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
         },
         .vec2 => {
             var v = engine.Vector2{ .x = fv.as_vec2_x, .y = fv.as_vec2_y };
-            if (PropDraw.drawVec2Row(@src(), &v)) {
+            if (PropDraw.drawVec2Row(@src(), &v, id)) {
                 fv.as_vec2_x = v.x;
                 fv.as_vec2_y = v.y;
                 changed = true;
@@ -452,7 +452,7 @@ pub fn drawScriptFieldValue(fv: *engine.ScriptFieldValue, id: usize) bool {
         },
         .vec4 => {
             var v = engine.Vector4{ .x = fv.as_vec4_x, .y = fv.as_vec4_y, .z = fv.as_vec4_z, .w = fv.as_vec4_w };
-            if (PropDraw.drawVec4Row(@src(), &v)) {
+            if (PropDraw.drawVec4Row(@src(), &v, id)) {
                 fv.as_vec4_x = v.x;
                 fv.as_vec4_y = v.y;
                 fv.as_vec4_z = v.z;

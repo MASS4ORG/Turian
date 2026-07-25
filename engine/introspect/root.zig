@@ -16,6 +16,8 @@ pub const AssetView = Inspector.AssetView;
 pub const World = Inspector.World;
 /// Result of the last whole-window screenshot capture, for `screenshot.last`.
 pub const ScreenshotView = Inspector.ScreenshotView;
+/// The Studio editor viewport camera's pose, for `camera.get`/`camera.set`.
+pub const EditorCameraView = Inspector.EditorCameraView;
 /// A typed value used when mutating a field by name.
 pub const Value = Inspector.Value;
 

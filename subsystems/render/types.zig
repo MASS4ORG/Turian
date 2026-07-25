@@ -53,6 +53,23 @@ pub const SkyboxFragUB = extern struct {
     camera_pos_intensity: [4]f32, // xyz = camera world position, w = intensity
 };
 
+/// Post-process composite pass uniforms — layout must match FragUB in
+/// composite.frag.glsl exactly. Grading is per-channel (RGB Lift/Gamma/Gain,
+/// ASC CDL slope/offset/power form), matching Unity's own grading wheels.
+pub const PostCompositeUB = extern struct {
+    vignette: [4]f32, // x=intensity, y=radius, z=smoothness, w=aspect
+    lift: [4]f32, // rgb, w unused
+    gamma: [4]f32, // rgb, w unused
+    gain: [4]f32, // rgb, w unused
+    bloom: [4]f32, // x=bloom_intensity, yzw unused
+};
+
+/// Bloom threshold/downsample/upsample pass uniforms — layout must match
+/// FragUB in the respective bloom_*.frag.glsl shaders.
+pub const PostBloomUB = extern struct {
+    params: [4]f32, // x=threshold, y=knee, z=radius (upsample only), w unused
+};
+
 /// One compute-readable submesh bounds entry for GPU-driven frustum culling.
 /// Layout must match `SubmeshBounds` in cull.comp exactly — three vec4-sized
 /// blocks, so std140 vs std430 alignment differences don't matter here.

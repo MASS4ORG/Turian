@@ -102,6 +102,20 @@ pub fn focusPanel(id: []const u8, io: std.Io) void {
     save(io);
 }
 
+/// Which of "scene"/"game" is the currently active tab in its dock leaf, if
+/// either is open — for the debug protocol's `viewport.getTab`. "scene" wins
+/// if (unusually) both are simultaneously visible in separate leaves rather
+/// than sharing one tab strip.
+pub fn activeViewportTab() ?[]const u8 {
+    const l = get();
+    for ([_][]const u8{ "scene", "game" }) |id| {
+        const leaf_idx = l.findPanel(id) orelse continue;
+        const leaf = l.nodes.items[leaf_idx].leaf;
+        if (leaf.active < leaf.tabs.items.len and std.mem.eql(u8, leaf.tabs.items[leaf.active], id)) return id;
+    }
+    return null;
+}
+
 /// True while the active document's own layout stands in for the main one.
 /// Layout *presets*, built-in and user-saved alike, are arrangements of the
 /// scene panels — so the View ▸ Layout menu hides itself in this state rather

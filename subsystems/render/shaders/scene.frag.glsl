@@ -107,15 +107,6 @@ vec3 fresnelSchlick(float ct, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - ct, 0.0, 1.0), 5.0);
 }
 
-// Narkowicz ACES filmic fit: maps linear HDR color to a displayable 0..1 range.
-vec3 acesFilm(vec3 x) {
-    const float a = 2.51;
-    const float b = 0.03;
-    const float c = 2.43;
-    const float d = 0.59;
-    const float e = 0.14;
-    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
-}
 
 // Maps a world-space direction to an equirectangular UV. Must match the CPU-side
 // convention used when projecting the environment onto SH (see
@@ -294,10 +285,8 @@ void main() {
     color += emis;
 
     // Lighting above is computed in linear space (sRGB-tagged textures are
-    // linearized on sample by the GPU sampler); tonemap then gamma-encode for
-    // the UNORM (non-sRGB) swapchain, which expects pre-encoded bytes.
-    color = acesFilm(color);
-    color = pow(color, vec3(1.0 / 2.2));
-
+    // linearized on sample by the GPU sampler). Raw linear HDR out — tonemap
+    // and gamma encode happen once in the post-process composite pass instead
+    // (`composite.frag.glsl`), since this now renders into an HDR target.
     out_color = vec4(color, albedo_s.a);
 }

@@ -1,6 +1,5 @@
-/// Extracted from PropDraw.zig: DrawCtx, axis-colour palette, legacy vec-row
-/// helpers, and all math-type inspector drawers.  PropDraw.zig imports these
-/// and re-exports the public surface so callers see no change.
+/// DrawCtx, axis-colour palette, vec-row helpers, and math-type inspector
+/// drawers. PropDraw.zig re-exports these so callers see no change.
 const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
@@ -42,69 +41,73 @@ pub fn tooltipIfAny(
     }
 }
 
-// ─── Legacy row helpers (kept for Inspector.drawScriptField) ──────────────────
+// ─── Row helpers (for Inspector.drawScriptField) ──────────────────────────────
 
-/// Draw a row of X / Y / Z number inputs for a Vector3 value.
+/// Draw a row of X / Y / Z number inputs for a Vector3 value. `id` must be
+/// unique per call site and per invocation because every inner widget's
+/// `@src()` is otherwise identical, causing widget-id collisions.
 /// Returns true if any component changed.
-pub fn drawVec3Row(src: std.builtin.SourceLocation, v: *engine.Vector3) bool {
+pub fn drawVec3Row(src: std.builtin.SourceLocation, v: *engine.Vector3, id: usize) bool {
     var changed = false;
-    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
+    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
     gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 });
     if (rx.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 1 });
     if (ry.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 3 + 2 });
     if (rz.changed) changed = true;
 
     return changed;
 }
 
-/// Draw a row of X / Y number inputs for a Vector2 value.
+/// Draw a row of X / Y number inputs for a Vector2 value. `id` must uniquely
+/// identify this call (see `drawVec3Row`).
 /// Returns true if any component changed.
-pub fn drawVec2Row(src: std.builtin.SourceLocation, v: *engine.Vector2) bool {
+pub fn drawVec2Row(src: std.builtin.SourceLocation, v: *engine.Vector2, id: usize) bool {
     var changed = false;
-    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
+    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
     gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 });
     if (rx.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 52, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 2 + 1 });
     if (ry.changed) changed = true;
 
     return changed;
 }
 
-/// Draw a row of X / Y / Z / W number inputs for a Vector4 value.
+/// Draw a row of X / Y / Z / W number inputs for a Vector4 value. `id` must
+/// uniquely identify this call (see `drawVec3Row`).
 /// Returns true if any component changed.
-pub fn drawVec4Row(src: std.builtin.SourceLocation, v: *engine.Vector4) bool {
+pub fn drawVec4Row(src: std.builtin.SourceLocation, v: *engine.Vector4, id: usize) bool {
     var changed = false;
-    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal });
+    var row = gui.box(src, .{ .dir = .horizontal }, .{ .expand = .horizontal, .id_extra = id });
     defer row.deinit();
 
     gui.label(@src(), "{s}", .{tr("X")}, .{ .color_text = col_x, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rx = gui.textEntryNumber(@src(), f32, .{ .value = &v.x }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 });
     if (rx.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("Y")}, .{ .color_text = col_y, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const ry = gui.textEntryNumber(@src(), f32, .{ .value = &v.y }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 1 });
     if (ry.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("Z")}, .{ .color_text = col_z, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rz = gui.textEntryNumber(@src(), f32, .{ .value = &v.z }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 2 });
     if (rz.changed) changed = true;
 
     gui.label(@src(), "{s}", .{tr("W")}, .{ .color_text = col_w, .gravity_y = 0.5, .padding = .{ .x = 4 } });
-    const rw = gui.textEntryNumber(@src(), f32, .{ .value = &v.w }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5 });
+    const rw = gui.textEntryNumber(@src(), f32, .{ .value = &v.w }, .{ .min_size_content = .{ .w = 44, .h = 20 }, .expand = .horizontal, .gravity_y = 0.5, .id_extra = id * 4 + 3 });
     if (rw.changed) changed = true;
 
     return changed;
@@ -153,7 +156,7 @@ pub fn drawVec3(label: []const u8, ptr: *math.Vector3, hint: FieldHint, ctx: *Dr
         gui.label(@src(), "({d:.3}, {d:.3}, {d:.3})", .{ ptr.x, ptr.y, ptr.z }, .{ .id_extra = id });
         return false;
     }
-    return drawVec3Row(@src(), ptr);
+    return drawVec3Row(@src(), ptr, id);
 }
 
 pub fn drawVec4(label: []const u8, ptr: *math.Vector4, hint: FieldHint, ctx: *DrawCtx, id: usize) bool {

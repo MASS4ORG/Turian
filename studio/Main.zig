@@ -21,6 +21,7 @@ const FpsCounter = @import("services/FpsCounter.zig");
 const StudioSettings = editor.StudioSettings;
 const Screenshots = @import("services/Screenshots.zig");
 const LayoutStore = @import("services/LayoutStore.zig");
+const EditorCamera = @import("scene-view/EditorCamera.zig");
 const build_options = @import("turian_build_options");
 const Icon = @import("Icon.zig");
 
@@ -47,14 +48,22 @@ fn studioWorld(views: *[1]engine.introspect.SceneView) engine.introspect.World {
         if (p.path().len == 0) break :last_shot null;
         break :last_shot .{ .ok = p.ok, .path = p.path() };
     };
-    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot };
+    const cam_state = EditorCamera.getState();
+    const cam_view: engine.introspect.EditorCameraView = .{
+        .pos = .{ cam_state.pos.x, cam_state.pos.y, cam_state.pos.z },
+        .yaw = cam_state.yaw,
+        .pitch = cam_state.pitch,
+        .fov = cam_state.fov,
+    };
+    const active_tab = LayoutStore.activeViewportTab();
+    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab };
     views[0] = .{
         .name = if (EditorState.current_scene_path) |p| std.fs.path.basename(p) else "(unsaved)",
         .id = if (EditorState.current_scene_path) |p| p else "",
         .active = true,
         .nodes = EditorState.objects[0..EditorState.object_count],
     };
-    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot };
+    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab };
 }
 
 // ── Machine-driven UI interaction (remote-debug input injection) ────────────
@@ -76,6 +85,14 @@ const SynthEvent = union(enum) {
 var synth_queue: [64]SynthEvent = undefined;
 var synth_count: usize = 0;
 var capture_pending_remote: bool = false;
+
+/// A `camera.set` mutation queued for the next frame (same queue-before-frame
+/// treatment as `synth_queue` — applying it directly inside `pump` would be
+/// silently overwritten, since `SceneViewport.draw()` swaps `EditorCamera`'s
+/// module-level pose into/out of a per-instance struct once per frame, at a
+/// point that runs *before* `pump`, not after). Every field is optional — only
+/// what's supplied changes.
+var pending_camera_set: ?struct { pos: ?[3]f32, yaw: ?f32, pitch: ?f32, fov: ?f32 } = null;
 
 fn queueSynth(e: SynthEvent) void {
     if (synth_count >= synth_queue.len) return;
@@ -157,6 +174,16 @@ fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResu
             capture_pending_remote = true;
             return .{ .ok = true, .message = "capture scheduled for next frame" };
         },
+        .camera_set => |cs| {
+            pending_camera_set = .{ .pos = cs.pos, .yaw = cs.yaw, .pitch = cs.pitch, .fov = cs.fov };
+            return .{ .ok = true, .message = "queued for next frame" };
+        },
+        .viewport_set_tab => |vt| {
+            if (!std.mem.eql(u8, vt.tab, "scene") and !std.mem.eql(u8, vt.tab, "game"))
+                return .{ .ok = false, .message = "tab must be 'scene' or 'game'" };
+            LayoutStore.focusPanel(vt.tab, gui.io);
+            return .{ .ok = true, .message = "tab focused" };
+        },
     }
 }
 
@@ -179,8 +206,25 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
     srv.emit(ev, w.buffered());
 }
 
+/// Raises the soft stack-size limit toward the hard limit, if there's room —
+/// Linux lets the main thread's stack keep growing on page faults up to
+/// whatever `RLIMIT_STACK` currently is (not just its value at process
+/// start), so this takes effect immediately. Headroom for `SceneNode`'s
+/// ~124 KB size (`engine/scene/SceneNode.zig`) being copied multiple times by
+/// `UndoRedo.pushCommand`'s `modify_object` snapshot, inside dvui's already
+/// non-trivial widget-tree recursion — a debug build's per-frame stack usage
+/// is large enough that this combination can exhaust the default 8 MiB.
+fn raiseStackLimit() void {
+    if (comptime @import("builtin").os.tag == .windows) return;
+    const cur = std.posix.getrlimit(.STACK) catch return;
+    const wanted: std.posix.rlim_t = 64 * 1024 * 1024;
+    if (cur.cur >= wanted) return;
+    std.posix.setrlimit(.STACK, .{ .cur = @min(wanted, cur.max), .max = cur.max }) catch {};
+}
+
 /// GUI editor entry point. Initialises dvui, loads the optional project, and runs the event loop.
 pub fn main(main_init: std.process.Init) !void {
+    raiseStackLimit();
     try run(main_init);
     // Hard-exit to skip libc atexit handlers that segfault on this machine's
     // Vulkan/RADV stack (the OS reclaims everything anyway).
@@ -382,6 +426,19 @@ fn run(main_init: std.process.Init) !void {
             }
         }
         synth_count = 0;
+
+        // Apply any `camera.set` queued last frame — must also happen before
+        // `Window.frame()` draws the Scene viewport (see `pending_camera_set`'s doc comment).
+        if (pending_camera_set) |cs| {
+            var s = EditorCamera.getState();
+            if (cs.pos) |p| s.pos = .{ .x = p[0], .y = p[1], .z = p[2] };
+            if (cs.yaw) |y| s.yaw = y;
+            if (cs.pitch) |p| s.pitch = p;
+            if (cs.fov) |f| s.fov = f;
+            s.initialized = true;
+            EditorCamera.setState(s);
+            pending_camera_set = null;
+        }
 
         _ = try backend.addAllEvents(&win);
         EditorFrameTiming.markEventsEnd(backend.nanoTime());

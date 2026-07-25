@@ -15,6 +15,8 @@ const gizmos = @import("gizmos.zig");
 const culling = @import("culling.zig");
 const gpu_timing = @import("gpu_timing.zig");
 const draw = @import("draw.zig");
+const postprocess = @import("postprocess.zig");
+const postprocess_pipeline = @import("postprocess_pipeline.zig");
 
 const log = std.log.scoped(.render);
 
@@ -41,6 +43,9 @@ pub const Camera = struct {
     proj: Matrix4,
     /// proj * view.
     view_proj: Matrix4,
+    /// Post-process settings from the scene camera component, resolved
+    /// regardless of whether `editor_cam` overrides the pose (see `sceneCamera`).
+    post: postprocess.PostProcessSettings = .{},
 };
 
 /// A free-look camera pose the editor can impose on the viewport, independent of
@@ -104,17 +109,13 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     var cam_near: f32 = 0.01;
     var cam_far: f32 = 1000.0;
     var ortho_half_height: f32 = 0;
-    if (state.editor_cam) |ec| {
-        cam_pos = ec.pos;
-        cam_rot = ec.rot;
-        cam_fov = ec.fov;
-        cam_near = ec.near;
-        cam_far = ec.far;
-        ortho_half_height = ec.ortho_half_height;
-    } else cam_search: for (objects) |*obj| {
-        if (!obj.active) continue;
-        for (obj.components[0..obj.component_count]) |*comp| {
-            if (comp.* == .camera) {
+
+    // The first active camera component's pose, unless `editor_cam` overrides it.
+    if (state.editor_cam == null) {
+        cam_search: for (objects) |*obj| {
+            if (!obj.active) continue;
+            for (obj.components[0..obj.component_count]) |*comp| {
+                if (comp.* != .camera) continue;
                 cam_pos = obj.transform.position;
                 cam_rot = obj.transform.rotation;
                 cam_fov = comp.camera.fov;
@@ -124,6 +125,21 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
             }
         }
     }
+    if (state.editor_cam) |ec| {
+        cam_pos = ec.pos;
+        cam_rot = ec.rot;
+        cam_fov = ec.fov;
+        cam_near = ec.near;
+        cam_far = ec.far;
+        ortho_half_height = ec.ortho_half_height;
+    }
+
+    // Post-process settings come from scene volumes, not the camera — resolved
+    // against the FINAL camera position (so the editor's free-look camera
+    // correctly previews volume blending as you fly through them, matching
+    // Unity's Scene-view behavior).
+    const post = postprocess.resolveVolumes(cam_pos, objects);
+
     const rm = Matrix4.rotationEuler(cam_rot.x, cam_rot.y, cam_rot.z);
     const fwd_v = rm.transformDirection(.{ .x = 0, .y = 0, .z = 1 });
     const look_at = Vector3{ .x = cam_pos.x + fwd_v.x, .y = cam_pos.y + fwd_v.y, .z = cam_pos.z + fwd_v.z };
@@ -143,22 +159,59 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
         .view = view,
         .proj = proj,
         .view_proj = proj.multiply(view),
+        .post = post,
     };
 }
 
-/// Draw recorded gizmo line vertices over the already-rendered scene. `overlay`
-/// selects the always-on-top pipeline (manipulation handles) vs. depth-tested
-/// world gizmos. Call after `renderScene`, outside any render pass.
+/// The HDR resolve target for a `w`x`h` pass rendered this frame (via
+/// `renderScene`), or null if none exists yet. Gizmo overlays must draw into
+/// this — not the final `color_tex` — so post-processing (tonemap, grading,
+/// vignette, bloom) applies to the combined scene+gizmo image; there's no
+/// cheap way to depth-test gizmos against a resolved single-sample copy of the
+/// scene's MSAA depth otherwise (SDL3 GPU has no depth-resolve), so gizmos
+/// keep sharing the same multisampled depth/color path they always have —
+/// only the color format (now HDR) and the final destination (now
+/// `runPostProcess`, not this call) changed. See `runPostProcess`.
+pub fn hdrColorFor(w: u32, h: u32) ?*c.SDL_GPUTexture {
+    const target = state.findTarget(w, h) orelse return null;
+    return target.hdr_color;
+}
+
+/// Draw recorded gizmo line vertices over the already-rendered HDR scene.
+/// `overlay` selects the always-on-top pipeline (manipulation handles) vs.
+/// depth-tested world gizmos. Call after `renderScene`, passing
+/// `hdrColorFor(w, h)` (not the final `color_tex`), outside any render pass.
+/// Call `runPostProcess` once after every gizmo call for this frame.
 pub fn renderGizmos(
     cmd: *c.SDL_GPUCommandBuffer,
-    color_tex: *c.SDL_GPUTexture,
+    hdr_color: *c.SDL_GPUTexture,
     w: u32,
     h: u32,
     view_proj: [16]f32,
     verts: []const GizmoVertex,
     overlay: bool,
 ) void {
-    gizmos.renderGizmos(cmd, color_tex, w, h, view_proj, verts, overlay);
+    gizmos.renderGizmos(cmd, hdr_color, w, h, view_proj, verts, overlay);
+}
+
+/// Composite the HDR scene (and any gizmos drawn into `hdrColorFor(w, h)`
+/// first) into `color_tex`: bloom, per-channel Lift/Gamma/Gain grading,
+/// vignette, ACES tonemap. Call once per frame for a given target, after
+/// `renderScene` and any `renderGizmos` calls for the same `w`x`h`. `objects`
+/// must be the same scene passed to `renderScene`, so the active camera's
+/// post-process settings resolve identically.
+pub fn runPostProcess(
+    cmd: *c.SDL_GPUCommandBuffer,
+    color_tex: *c.SDL_GPUTexture,
+    w: u32,
+    h: u32,
+    objects: []const engine.SceneNode,
+) void {
+    const dev = state.device orelse return;
+    const sampler = state.sampler orelse return;
+    const hdr_color = hdrColorFor(w, h) orelse return;
+    const cam = sceneCamera(w, h, objects);
+    postprocess.run(cmd, dev, sampler, hdr_color, color_tex, w, h, cam.post);
 }
 
 /// Register the GUID→bytes callbacks (mesh / texture / material). Call once
@@ -196,10 +249,26 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
         log.warn("skybox pipeline failed: {any} — environment background disabled.", .{err});
         break :p null;
     };
+    state.post_threshold_pipeline = postprocess_pipeline.createThresholdPipeline(device) catch |err| p: {
+        log.warn("bloom threshold pipeline failed: {any} — bloom disabled.", .{err});
+        break :p null;
+    };
+    state.post_downsample_pipeline = postprocess_pipeline.createDownsamplePipeline(device) catch |err| p: {
+        log.warn("bloom downsample pipeline failed: {any} — bloom disabled.", .{err});
+        break :p null;
+    };
+    state.post_upsample_pipeline = postprocess_pipeline.createUpsamplePipeline(device) catch |err| p: {
+        log.warn("bloom upsample pipeline failed: {any} — bloom disabled.", .{err});
+        break :p null;
+    };
+    state.post_composite_pipeline = postprocess_pipeline.createCompositePipeline(device) catch |err| p: {
+        log.warn("post-process composite pipeline failed: {any} — vignette/grading/bloom disabled.", .{err});
+        break :p null;
+    };
     log.info("Ready (SPIRV).", .{});
 }
 
-/// Build a render-target entry (depth + MSAA color) for `w`x`h`, or null on failure.
+/// Build a render-target entry (depth + MSAA color + HDR resolve) for `w`x`h`, or null on failure.
 fn makeTarget(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?state.DepthTarget {
     const depth = pipeline.createDepth(dev, w, h) catch return null;
     var mc: ?*c.SDL_GPUTexture = null;
@@ -209,12 +278,18 @@ fn makeTarget(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?state.DepthTarget {
             return null;
         };
     }
-    return .{ .tex = depth, .msaa_color = mc, .w = w, .h = h };
+    const hdr = postprocess_pipeline.createHdrColor(dev, w, h) catch {
+        if (mc) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        c.SDL_ReleaseGPUTexture(dev, depth);
+        return null;
+    };
+    return .{ .tex = depth, .msaa_color = mc, .hdr_color = hdr, .w = w, .h = h };
 }
 
 fn releaseTarget(dev: *c.SDL_GPUDevice, d: *state.DepthTarget) void {
     if (d.tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (d.msaa_color) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    if (d.hdr_color) |t| c.SDL_ReleaseGPUTexture(dev, t);
     d.* = .{};
 }
 
@@ -241,10 +316,11 @@ fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
     state.depth_evict_cursor = 0;
 }
 
-/// Render `objects` into `color_tex` using `cmd`.
+/// Render `objects` into this size's internal HDR target. Call `runPostProcess`
+/// afterward (after any `renderGizmos` calls) to composite the result into a
+/// final destination texture — `renderScene` no longer writes one directly.
 pub fn renderScene(
     cmd: *c.SDL_GPUCommandBuffer,
-    color_tex: *c.SDL_GPUTexture,
     w: u32,
     h: u32,
     objects: []const engine.SceneNode,
@@ -268,6 +344,8 @@ pub fn renderScene(
             log.warn("cull compute pipeline failed: {any} — falling back to per-submesh CPU culling.", .{err});
             break :p null;
         };
+    if (state.black_tex == null)
+        state.black_tex = postprocess_pipeline.createBlackTex(cmd, dev) catch null;
 
     const target = targetFor(dev, w, h) orelse {
         log.err("depth target failed", .{});
@@ -375,18 +453,22 @@ pub fn renderScene(
     // ── Main pass ───────────────────────────────────────────────────────────
     var main_zone = engine.Profiler.zone("render.main");
     defer main_zone.end();
+    const hdr_color = target.hdr_color.?;
     // Under MSAA, render into the multisampled color and resolve into the
-    // caller's single-sample `color_tex` (kept via RESOLVE_AND_STORE so the
-    // gizmo overlay pass can re-resolve on top of the same MSAA buffer).
+    // single-sample HDR target (kept via RESOLVE_AND_STORE so the gizmo
+    // overlay pass can re-resolve on top of the same MSAA buffer). The
+    // post-process composite pass below reads `hdr_color` and writes the
+    // caller's `color_tex`; scene/skybox shaders emit raw linear HDR now
+    // (tonemap moved to `composite.frag.glsl`).
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
     color_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
     color_info.clear_color = .{ .r = 0.14, .g = 0.14, .b = 0.16, .a = 1.0 };
     if (target.msaa_color) |mc| {
         color_info.texture = mc;
         color_info.store_op = c.SDL_GPU_STOREOP_RESOLVE_AND_STORE;
-        color_info.resolve_texture = color_tex;
+        color_info.resolve_texture = hdr_color;
     } else {
-        color_info.texture = color_tex;
+        color_info.texture = hdr_color;
         color_info.store_op = c.SDL_GPU_STOREOP_STORE;
     }
 
@@ -589,6 +671,29 @@ pub fn deinit() void {
     state.skybox_pipeline = null;
     if (state.cull_pipeline) |p| c.SDL_ReleaseGPUComputePipeline(dev, p);
     state.cull_pipeline = null;
+    if (state.post_threshold_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.post_downsample_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.post_upsample_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.post_composite_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    state.post_threshold_pipeline = null;
+    state.post_downsample_pipeline = null;
+    state.post_upsample_pipeline = null;
+    state.post_composite_pipeline = null;
+    if (state.black_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    state.black_tex = null;
+    for (&state.bloom_targets) |*bc| {
+        for (bc.mips[0..bc.mip_count]) |mip| {
+            if (mip) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        }
+        bc.* = .{};
+    }
+    state.bloom_evict_cursor = 0;
+    for (&state.scratch_targets) |*sp| {
+        if (sp.a) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        if (sp.b) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        sp.* = .{};
+    }
+    state.scratch_evict_cursor = 0;
     if (state.lights_buf) |b| c.SDL_ReleaseGPUBuffer(dev, b);
     if (state.lights_transfer) |t| c.SDL_ReleaseGPUTransferBuffer(dev, t);
     state.lights_buf = null;

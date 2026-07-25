@@ -9,6 +9,11 @@ const c = gpu.c;
 
 pub const SHADOW_FORMAT = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
+/// HDR intermediate color format the main scene pass renders into, letting the
+/// post-process composite pass work with unclamped linear values before
+/// tonemapping (moved out of the lit shaders, see `postprocess.zig`).
+pub const HDR_COLOR_FORMAT = c.SDL_GPU_TEXTUREFORMAT_R16G16B16A16_FLOAT;
+
 pub var device: ?*c.SDL_GPUDevice = null;
 pub var sampler: ?*c.SDL_GPUSampler = null;
 
@@ -68,6 +73,10 @@ pub const MAX_DEPTH_TARGETS = 6;
 pub const DepthTarget = struct {
     tex: ?*c.SDL_GPUTexture = null,
     msaa_color: ?*c.SDL_GPUTexture = null,
+    /// Single-sample HDR resolve target the main pass renders into (or
+    /// resolves into, under MSAA); the post-process composite pass reads this
+    /// and writes the caller's UNORM `color_tex`.
+    hdr_color: ?*c.SDL_GPUTexture = null,
     w: u32 = 0,
     h: u32 = 0,
 };
@@ -93,6 +102,60 @@ pub fn findTarget(w: u32, h: u32) ?*DepthTarget {
 
 /// Editor free-look camera override (null = use a scene camera component).
 pub var editor_cam: ?types.EditorCam = null;
+
+/// Bloom mip chain cached per-(w,h). Each mip halves resolution from the
+/// previous; `mip_count` is however many fit before a dimension drops below ~16px.
+pub const MAX_BLOOM_MIPS = 6;
+pub const MAX_BLOOM_TARGETS = 3;
+pub const BloomChain = struct {
+    mips: [MAX_BLOOM_MIPS]?*c.SDL_GPUTexture = .{null} ** MAX_BLOOM_MIPS,
+    mip_w: [MAX_BLOOM_MIPS]u32 = .{0} ** MAX_BLOOM_MIPS,
+    mip_h: [MAX_BLOOM_MIPS]u32 = .{0} ** MAX_BLOOM_MIPS,
+    mip_count: usize = 0,
+    w: u32 = 0,
+    h: u32 = 0,
+};
+pub var bloom_targets: [MAX_BLOOM_TARGETS]BloomChain = .{BloomChain{}} ** MAX_BLOOM_TARGETS;
+pub var bloom_evict_cursor: usize = 0;
+
+/// The cached bloom chain matching `w`x`h`, or null if none is allocated yet.
+pub fn findBloomChain(w: u32, h: u32) ?*BloomChain {
+    for (&bloom_targets) |*b| {
+        if (b.mip_count != 0 and b.w == w and b.h == h) return b;
+    }
+    return null;
+}
+
+/// A pair of same-size HDR scratch textures, used to ping-pong custom
+/// post-process effects (each effect's src/dst must be distinct textures).
+/// Cached per-(w,h) with round-robin eviction.
+pub const MAX_SCRATCH_TARGETS = 3;
+pub const ScratchPair = struct {
+    a: ?*c.SDL_GPUTexture = null,
+    b: ?*c.SDL_GPUTexture = null,
+    w: u32 = 0,
+    h: u32 = 0,
+};
+pub var scratch_targets: [MAX_SCRATCH_TARGETS]ScratchPair = .{ScratchPair{}} ** MAX_SCRATCH_TARGETS;
+pub var scratch_evict_cursor: usize = 0;
+
+/// The cached scratch pair matching `w`x`h`, or null if none is allocated yet.
+pub fn findScratchPair(w: u32, h: u32) ?*ScratchPair {
+    for (&scratch_targets) |*s| {
+        if (s.a != null and s.w == w and s.h == h) return s;
+    }
+    return null;
+}
+
+/// Post-process graphics pipelines, created lazily and shared across every
+/// viewport resolution (pipelines bake in format + sample count, not size).
+pub var post_threshold_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var post_downsample_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var post_upsample_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var post_composite_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+
+/// 1x1 black texture substituted for the bloom source when bloom is disabled.
+pub var black_tex: ?*c.SDL_GPUTexture = null;
 
 /// Fence-bracketed per-pass GPU timing; off by default (introduces a pipeline stall).
 pub var detailed_gpu_timing: bool = false;
