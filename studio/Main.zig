@@ -86,14 +86,6 @@ var synth_queue: [64]SynthEvent = undefined;
 var synth_count: usize = 0;
 var capture_pending_remote: bool = false;
 
-/// A `camera.set` mutation queued for the next frame (same queue-before-frame
-/// treatment as `synth_queue` — applying it directly inside `pump` would be
-/// silently overwritten, since `SceneViewport.draw()` swaps `EditorCamera`'s
-/// module-level pose into/out of a per-instance struct once per frame, at a
-/// point that runs *before* `pump`, not after). Every field is optional — only
-/// what's supplied changes.
-var pending_camera_set: ?struct { pos: ?[3]f32, yaw: ?f32, pitch: ?f32, fov: ?f32 } = null;
-
 fn queueSynth(e: SynthEvent) void {
     if (synth_count >= synth_queue.len) return;
     synth_queue[synth_count] = e;
@@ -175,7 +167,12 @@ fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResu
             return .{ .ok = true, .message = "capture scheduled for next frame" };
         },
         .camera_set => |cs| {
-            pending_camera_set = .{ .pos = cs.pos, .yaw = cs.yaw, .pitch = cs.pitch, .fov = cs.fov };
+            EditorCamera.queueOverride(.{
+                .pos = if (cs.pos) |p| .{ .x = p[0], .y = p[1], .z = p[2] } else null,
+                .yaw = cs.yaw,
+                .pitch = cs.pitch,
+                .fov = cs.fov,
+            });
             return .{ .ok = true, .message = "queued for next frame" };
         },
         .viewport_set_tab => |vt| {
@@ -426,19 +423,6 @@ fn run(main_init: std.process.Init) !void {
             }
         }
         synth_count = 0;
-
-        // Apply any `camera.set` queued last frame — must also happen before
-        // `Window.frame()` draws the Scene viewport (see `pending_camera_set`'s doc comment).
-        if (pending_camera_set) |cs| {
-            var s = EditorCamera.getState();
-            if (cs.pos) |p| s.pos = .{ .x = p[0], .y = p[1], .z = p[2] };
-            if (cs.yaw) |y| s.yaw = y;
-            if (cs.pitch) |p| s.pitch = p;
-            if (cs.fov) |f| s.fov = f;
-            s.initialized = true;
-            EditorCamera.setState(s);
-            pending_camera_set = null;
-        }
 
         _ = try backend.addAllEvents(&win);
         EditorFrameTiming.markEventsEnd(backend.nanoTime());

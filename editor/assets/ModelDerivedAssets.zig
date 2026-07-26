@@ -8,6 +8,7 @@ const AssetType = @import("../types/AssetType.zig").AssetType;
 const MetaFile = @import("../types/MetaFile.zig").MetaFile;
 const SubAsset = @import("../types/MetaFile.zig").SubAsset;
 const ImportSettings = @import("../types/ImportSettings.zig").ImportSettings;
+const MaterialOverride = @import("../types/ImportSettings.zig").MaterialOverride;
 const asset_meta = @import("AssetMeta.zig");
 const asset_cache = @import("AssetCache.zig");
 
@@ -17,6 +18,7 @@ const GltfLoader = engine.assets.GltfLoader;
 const FbxLoader = engine.assets.FbxLoader;
 const ModelInfo = engine.assets.ModelInfo;
 const Material = engine.Material;
+const DdsLoader = engine.assets.DdsLoader;
 
 /// Generate material/image sub-assets for `asset_path` (glTF/GLB/FBX only —
 /// a no-op for other model formats, e.g. OBJ). Appends new entries to `subs`;
@@ -31,10 +33,13 @@ pub fn generate(
     prev: []const SubAsset,
     subs: *std.ArrayList(SubAsset),
 ) void {
-    switch (import_settings) {
-        .model => |m| if (!m.import_materials) return,
-        else => {},
-    }
+    const overrides: []const MaterialOverride = switch (import_settings) {
+        .model => |m| blk: {
+            if (!m.import_materials) return;
+            break :blk m.material_overrides;
+        },
+        else => &.{},
+    };
 
     const ext = std.fs.path.extension(asset_path);
     var info: ModelInfo = if (std.ascii.eqlIgnoreCase(ext, ".gltf") or std.ascii.eqlIgnoreCase(ext, ".glb"))
@@ -85,12 +90,17 @@ pub fn generate(
     }
 
     // Generate one material asset per glTF material.
-    for (info.materials, 0..) |m, i| {
+    for (info.materials, 0..) |src_m, i| {
         var key_buf: [32]u8 = undefined;
         const key = std.fmt.bufPrint(&key_buf, "material:{d}", .{i}) catch continue;
         const guid = reuseOrNewGuid(prev, key, io);
 
-        if (!writeMaterialArtifact(io, project_path, guid, m, img_guids)) continue;
+        var m = src_m;
+        m.alpha_mode = deriveAlphaMode(io, arena, asset_path, info.images, m.albedo, m.alpha_mode);
+        const override = findOverride(overrides, src_m.name);
+        applyOverride(&m, override);
+
+        if (!writeMaterialArtifact(io, project_path, guid, m, img_guids, override != null)) continue;
 
         const name = materialName(arena, m, i);
         subs.append(arena, .{ .guid = guid, .asset_type = .material, .key = arena.dupe(u8, key) catch key, .name = name }) catch {};
@@ -112,6 +122,73 @@ fn siblingPath(arena: std.mem.Allocator, model_path: []const u8, uri: []const u8
     const normalized = arena.dupe(u8, uri) catch return null;
     std.mem.replaceScalar(u8, normalized, '\\', '/');
     return std.fmt.allocPrint(arena, "{s}/{s}", .{ dir, normalized }) catch null;
+}
+
+/// Fraction of transparent texels above which a material is considered to
+/// have real transparency at all — small enough to catch Bistro's sparsest
+/// cutout (~13%), large enough to ignore stray compression-artifact texels.
+const ALPHA_SIGNAL_MIN: f32 = 0.01;
+/// Below this fraction of texels sitting strictly between transparent and
+/// opaque, a texture reads as a hard-edged cutout mask rather than a soft
+/// blend (foliage vs. e.g. a sheer curtain or frosted glass gradient).
+const ALPHA_PARTIAL_MAX: f32 = 0.10;
+
+/// Best-effort transparency classification for a material the model format
+/// gave no opacity signal for. FBX content such as Bistro carries no opacity
+/// property at all (verified against every material in the sample — ufbx
+/// reports `pbr.opacity.has_value = false` throughout), and a glTF material
+/// can equally be authored with an opaque `alpha_mode` while its base-colour
+/// texture still carries a real alpha channel. Classifies by sampling the
+/// albedo texture's alpha coverage (`DdsLoader.alphaCoverage`): near-binary
+/// coverage becomes a cutout mask, a soft gradient becomes an alpha blend.
+/// Never downgrades an alpha mode the format already committed to.
+fn deriveAlphaMode(
+    io: std.Io,
+    arena: std.mem.Allocator,
+    asset_path: []const u8,
+    images: []const engine.assets.ImageInfo,
+    albedo: engine.assets.TexRef,
+    current: engine.assets.AlphaMode,
+) engine.assets.AlphaMode {
+    if (current != .@"opaque") return current;
+    const idx = albedo.image_index orelse return current;
+    if (idx >= images.len) return current;
+    const im = images[idx];
+
+    const bytes: []const u8 = blk: {
+        if (im.data.len > 0) break :blk im.data;
+        if (im.uri.len == 0) return current;
+        const sibling = siblingPath(arena, asset_path, im.uri) orelse return current;
+        break :blk std.Io.Dir.cwd().readFileAlloc(io, sibling, arena, .limited(32 * 1024 * 1024)) catch return current;
+    };
+
+    const cov = DdsLoader.alphaCoverage(bytes) orelse return current;
+    if (cov.non_opaque < ALPHA_SIGNAL_MIN) return current;
+    return if (cov.partial < ALPHA_PARTIAL_MAX) .mask else .blend;
+}
+
+/// Find the hand-authored override for a source material by name, if any.
+fn findOverride(overrides: []const MaterialOverride, name: []const u8) ?MaterialOverride {
+    for (overrides) |o| {
+        if (std.mem.eql(u8, o.material_name, name)) return o;
+    }
+    return null;
+}
+
+/// Merge a `.meta`-authored override onto a derived material. A no-op when
+/// `override` is null or a field within it is unset.
+fn applyOverride(m: *engine.assets.MaterialInfo, override: ?MaterialOverride) void {
+    const o = override orelse return;
+    if (o.base_color) |v| m.base_color = v;
+    if (o.metallic) |v| m.metallic = v;
+    if (o.roughness) |v| m.roughness = v;
+    if (o.emissive) |v| m.emissive = v;
+    if (o.emissive_strength) |v| m.emissive_strength = v;
+    if (o.normal_scale) |v| m.normal_scale = v;
+    if (o.occlusion_strength) |v| m.occlusion_strength = v;
+    if (o.alpha_mode) |v| m.alpha_mode = v;
+    if (o.alpha_cutoff) |v| m.alpha_cutoff = v;
+    if (o.double_sided) |v| m.double_sided = v;
 }
 
 /// Texture role inferred from which material slots reference an image —
@@ -221,11 +298,14 @@ fn writeMaterialArtifact(
     guid: Guid,
     m: engine.assets.MaterialInfo,
     img_guids: []const ?[]const u8,
+    has_override: bool,
 ) bool {
     // Generate-if-missing: a material already in the cache may carry user edits
     // (e.g. a tweaked base color via the sub-asset inspector), so don't clobber
-    // it. A full "Reimport All" clears the cache to regenerate from source.
-    if (asset_cache.artifactExists(io, project_path, guid, .material)) return true;
+    // it. A full "Reimport All" clears the cache to regenerate from source. A
+    // material with a `.meta`-authored override is the exception — the override
+    // *is* the durable edit now, so it always wins and the cache is re-derived.
+    if (!has_override and asset_cache.artifactExists(io, project_path, guid, .material)) return true;
 
     const slot = struct {
         fn texGuid(refs: []const ?[]const u8, r: engine.assets.TexRef) []const u8 {

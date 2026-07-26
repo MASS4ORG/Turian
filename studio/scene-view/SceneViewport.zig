@@ -98,6 +98,7 @@ pub fn draw() void {
     const inst_id = gui.parentGet().data().id;
     const inst = gui.dataGetPtrDefault(null, inst_id, "_scene_inst", InstanceState, .{});
     EditorCamera.setState(inst.cam);
+    EditorCamera.takeOverride();
     defer inst.cam = EditorCamera.getState();
 
     var vp = gui.box(@src(), .{}, .{

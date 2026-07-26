@@ -65,6 +65,38 @@ pub fn getState() State {
     return .{ .pos = pos, .yaw = yaw, .pitch = pitch, .fov = fov, .initialized = initialized };
 }
 
+/// A partial pose queued from outside the draw loop, by the debug protocol's
+/// `camera.set`. Each field is optional so a caller can move the camera without
+/// also having to restate the fields it doesn't care about.
+pub const Override = struct {
+    pos: ?Vector3 = null,
+    yaw: ?f32 = null,
+    pitch: ?f32 = null,
+    fov: ?f32 = null,
+};
+
+var pending_override: ?Override = null;
+
+pub fn queueOverride(o: Override) void {
+    pending_override = o;
+}
+
+/// Apply and clear a queued `Override`. The Scene viewport calls this *after*
+/// swapping in its per-instance pose, since applying it any earlier would be
+/// undone by that swap — each Scene dock tab owns its own camera and restores it
+/// at the top of every draw.
+pub fn takeOverride() void {
+    const o = pending_override orelse return;
+    pending_override = null;
+    if (o.pos) |v| pos = v;
+    if (o.yaw) |v| yaw = v;
+    if (o.pitch) |v| pitch = v;
+    if (o.fov) |v| fov = v;
+    // Suppress `ensureInit`'s seed-from-scene-camera, which would otherwise
+    // overwrite an override applied to a tab that hasn't drawn yet.
+    initialized = true;
+}
+
 pub fn setState(s: State) void {
     pos = s.pos;
     yaw = s.yaw;

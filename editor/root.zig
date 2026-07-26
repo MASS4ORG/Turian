@@ -28,6 +28,8 @@ pub const asset_stamp = @import("assets/AssetStamp.zig");
 pub const asset_importer = @import("assets/AssetImporter.zig");
 
 pub const model_materials = @import("assets/ModelMaterials.zig");
+/// Reverse lookup + `.meta` write path for per-material import overrides.
+pub const material_overrides = @import("assets/MaterialOverrides.zig");
 /// Asset packaging (cooked artifacts → .oap package).
 pub const asset_packager = @import("assets/AssetPackager.zig");
 /// Asset type registry and lookup.
@@ -57,6 +59,7 @@ const import_settings_types = @import("types/ImportSettings.zig");
 pub const ImportSettings = import_settings_types.ImportSettings;
 pub const ImageImportSettings = import_settings_types.ImageImportSettings;
 pub const ModelImportSettings = import_settings_types.ModelImportSettings;
+pub const MaterialOverride = import_settings_types.MaterialOverride;
 pub const FontImportSettings = import_settings_types.FontImportSettings;
 pub const TextureType = import_settings_types.TextureType;
 pub const ColorSpace = import_settings_types.ColorSpace;

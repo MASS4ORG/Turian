@@ -5,9 +5,12 @@
 // occlusion_strength, emissive(+strength), alpha_cutoff, and the five glTF maps.
 //
 // Supports up to MAX_LIGHTS lights of directional / point / spot type, plus a
-// shadow map for the primary directional light (3x3 PCF), and optional
-// image-based lighting (diffuse SH irradiance + GGX-prefiltered specular
-// cubemap, #144) derived from the scene's equirectangular HDR environment map.
+// cascaded shadow map for the primary directional light (3x3 PCF per
+// cascade), and optional image-based lighting (diffuse SH irradiance +
+// GGX-prefiltered specular cubemap) derived from the scene's equirectangular
+// HDR environment map.
+
+#define NUM_CASCADES 4
 
 layout(location = 0) in vec3 in_world_normal;
 layout(location = 1) in vec2 in_uv;
@@ -20,8 +23,12 @@ layout(set = 2, binding = 1) uniform sampler2D mr_tex;        // glTF: G=roughne
 layout(set = 2, binding = 2) uniform sampler2D normal_tex;    // tangent-space
 layout(set = 2, binding = 3) uniform sampler2D emissive_tex;
 layout(set = 2, binding = 4) uniform sampler2D occlusion_tex; // R channel
+// One SHADOW_DIM x (SHADOW_DIM*NUM_CASCADES) atlas: cascade i occupies the
+// vertical strip [i/NUM_CASCADES, (i+1)/NUM_CASCADES) in V (see
+// pipeline.createShadowMap — array textures can't be depth-stencil targets).
 layout(set = 2, binding = 5) uniform sampler2DShadow shadow_map;
-layout(set = 2, binding = 6) uniform samplerCube env_prefiltered; // GGX-prefiltered specular cubemap (#144)
+layout(set = 2, binding = 6) uniform samplerCube env_prefiltered; // GGX-prefiltered specular cubemap
+layout(set = 2, binding = 7) uniform sampler2D ssao_tex; // blurred SSAO, 1.0 = unoccluded
 
 // One scene light. type: 0=directional, 1=point, 2=spot.
 struct Light {
@@ -40,15 +47,18 @@ layout(set = 3, binding = 0) uniform FragUB {
     vec4 flags;           // x=has_albedo, y=has_mr, z=has_normal, w=has_emissive
     vec4 flags2;          // x=has_occlusion, y=alpha_cutoff, z=alpha_mask_on, w=shadows_enabled
     vec4 env_params;      // x=intensity, y=mip_count, z=has_env, w unused
+    vec4 cam_forward;     // xyz camera forward (world space); picks the shadow cascade
     vec4 env_sh[9];       // diffuse irradiance SH coefficients (rgb in xyz)
-    mat4 light_vp;        // shadow light view-projection (primary directional)
+    mat4 cascade_vp[NUM_CASCADES]; // per-cascade shadow light view-projection
+    vec4 cascade_splits;      // per-cascade far distance along cam_forward (world units)
+    vec4 cascade_depth_scale; // per-cascade 1/(ortho far-near); converts a world-unit bias to NDC depth
 } ubo;
 
 // Scene lights. Storage buffer (not a fixed uniform array) so the light count is
 // bounded only by GPU memory, not a per-draw uniform size. SDL3 SPIR-V places
-// fragment storage buffers in set=2 after the sampled textures (7 here), so this
-// is binding 7. Only `camera_pos.w` entries are read.
-layout(std430, set = 2, binding = 7) readonly buffer LightBuffer {
+// fragment storage buffers in set=2 after the sampled textures (8 here), so this
+// is binding 8. Only `camera_pos.w` entries are read.
+layout(std430, set = 2, binding = 8) readonly buffer LightBuffer {
     Light lights[];
 } light_buf;
 
@@ -140,10 +150,24 @@ vec2 envBRDFApprox(float roughness, float ndv) {
 
 // Shadow visibility (1 = lit, 0 = fully shadowed) for the primary directional
 // light. Matches the clip-space conventions applied in shadow.vert.glsl.
+//
+// Picks a cascade by comparing the fragment's distance along the camera's
+// forward axis against `cascade_splits` (each cascade covers a slice of the
+// camera frustum — see `shadow.computeCascades`), then samples that
+// cascade's vertical strip of the shadow atlas.
 float shadowFactor(float ndl) {
     if (ubo.flags2.w < 0.5) return 1.0;
 
-    vec4 lp = ubo.light_vp * vec4(in_world_pos, 1.0);
+    float cam_dist = dot(in_world_pos - ubo.camera_pos.xyz, ubo.cam_forward.xyz);
+    int cascade = NUM_CASCADES - 1;
+    for (int i = 0; i < NUM_CASCADES - 1; i++) {
+        if (cam_dist < ubo.cascade_splits[i]) {
+            cascade = i;
+            break;
+        }
+    }
+
+    vec4 lp = ubo.cascade_vp[cascade] * vec4(in_world_pos, 1.0);
     // Same Z remap shadow.vert applies before depth write (see scene.vert.glsl).
     lp.z = (lp.z + lp.w) * 0.5;
     vec3 proj = lp.xyz / lp.w;
@@ -152,14 +176,30 @@ float shadowFactor(float ndl) {
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || proj.z > 1.0)
         return 1.0;
 
-    float bias = max(0.0025 * (1.0 - ndl), 0.0006);
+    // World-unit bias (5cm facing the light, up to 35cm at grazing angles),
+    // converted to this cascade's NDC depth range — cascades span wildly
+    // different world extents, so a single NDC bias either acnes the near
+    // cascade or peter-pans the far one.
+    float bias_world = mix(0.05, 0.35, 1.0 - ndl);
+    float bias = ubo.cascade_depth_scale[cascade] * bias_world;
     float depth = proj.z - bias;
+
+    // Remap into this cascade's strip of the atlas; PCF taps are clamped to
+    // the strip's V range so they can't sample a neighbouring cascade's data
+    // at the boundary rows.
+    float v_min = float(cascade) / float(NUM_CASCADES);
+    float v_max = float(cascade + 1) / float(NUM_CASCADES);
+    vec2 atlas_uv = vec2(uv.x, mix(v_min, v_max, uv.y));
 
     vec2 texel = 1.0 / vec2(textureSize(shadow_map, 0));
     float sum = 0.0;
-    for (int dx = -1; dx <= 1; dx++)
-        for (int dy = -1; dy <= 1; dy++)
-            sum += texture(shadow_map, vec3(uv + vec2(dx, dy) * texel, depth));
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            vec2 s = atlas_uv + vec2(dx, dy) * texel;
+            s.y = clamp(s.y, v_min, v_max);
+            sum += texture(shadow_map, vec3(s, depth));
+        }
+    }
     return sum / 9.0;
 }
 
@@ -212,10 +252,7 @@ void main() {
             float range = max(lt.direction.w, 1e-4);
             // Windowed inverse-square falloff (glTF KHR_lights_punctual / UE4
             // style): true 1/d^2 near the source, smoothly windowed to zero at
-            // `range`. The naive `1/(1+d^2)` this replaced over-attenuates at
-            // any real-world distance beyond ~1 unit — a light several meters
-            // from a large scene (e.g. Bistro) read as completely black no
-            // matter how high its intensity was pushed.
+            // `range`.
             float d2 = max(dist * dist, 1e-4);
             float range2 = range * range;
             float win = clamp(1.0 - (d2 * d2) / (range2 * range2), 0.0, 1.0);
@@ -266,7 +303,9 @@ void main() {
         vec2 env_brdf = envBRDFApprox(roughness, ndv);
         vec3 specular_ibl = prefiltered * (F0 * env_brdf.x + env_brdf.y);
 
-        ambient = (diffuse_ibl + specular_ibl) * occlusion;
+        // Screen-space AO modulates the distant-environment ambient term.
+        float ssao = texture(ssao_tex, gl_FragCoord.xy / vec2(textureSize(ssao_tex, 0))).r;
+        ambient = (diffuse_ibl + specular_ibl) * occlusion * ssao;
     }
     vec3 color = ambient + Lo * occlusion;
 
@@ -274,9 +313,8 @@ void main() {
     if (ubo.flags.w > 0.5) emis *= texture(emissive_tex, in_uv).rgb;
     color += emis;
 
-    // Lighting above is computed in linear space (sRGB-tagged textures are
-    // linearized on sample by the GPU sampler). Raw linear HDR out — tonemap
-    // and gamma encode happen once in the post-process composite pass instead
-    // (`composite.frag.glsl`), since this now renders into an HDR target.
+    // Lighting in linear space (sRGB textures linearized by the GPU sampler).
+    // Raw linear HDR out — tonemap and gamma encode in the post-process
+    // composite pass (`composite.frag.glsl`) which reads the HDR target.
     out_color = vec4(color, albedo_s.a);
 }

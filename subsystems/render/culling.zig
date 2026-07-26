@@ -50,11 +50,13 @@ pub const Frustum = struct {
     }
 };
 
-/// True if the world-space AABB of `[local_min, local_max]` transformed by
-/// `model` is entirely outside `frustum` (safe to skip drawing). Uses the
-/// standard center/extents + "positive vertex" test, so rotated/scaled
-/// bounds stay a conservative (never-too-small) box.
-pub fn aabbOutsideFrustum(local_min: [3]f32, local_max: [3]f32, model: Matrix4, frustum: Frustum) bool {
+/// A world-space axis-aligned box, as center + half-extents.
+pub const WorldAabb = struct { center: Vector3, extent: Vector3 };
+
+/// The world-space AABB of the local box `[local_min, local_max]` under `model`.
+/// Uses the standard center/extents transform, so rotated/scaled bounds stay a
+/// conservative (never-too-small) box.
+pub fn worldAabb(local_min: [3]f32, local_max: [3]f32, model: Matrix4) WorldAabb {
     const center_local = Vector3{
         .x = (local_min[0] + local_max[0]) * 0.5,
         .y = (local_min[1] + local_max[1]) * 0.5,
@@ -66,13 +68,24 @@ pub fn aabbOutsideFrustum(local_min: [3]f32, local_max: [3]f32, model: Matrix4, 
         .z = (local_max[2] - local_min[2]) * 0.5,
     };
 
-    const center = model.transformPoint(center_local);
     const m = model.m;
-    const extent = Vector3{
-        .x = @abs(m[0]) * extent_local.x + @abs(m[4]) * extent_local.y + @abs(m[8]) * extent_local.z,
-        .y = @abs(m[1]) * extent_local.x + @abs(m[5]) * extent_local.y + @abs(m[9]) * extent_local.z,
-        .z = @abs(m[2]) * extent_local.x + @abs(m[6]) * extent_local.y + @abs(m[10]) * extent_local.z,
+    return .{
+        .center = model.transformPoint(center_local),
+        .extent = .{
+            .x = @abs(m[0]) * extent_local.x + @abs(m[4]) * extent_local.y + @abs(m[8]) * extent_local.z,
+            .y = @abs(m[1]) * extent_local.x + @abs(m[5]) * extent_local.y + @abs(m[9]) * extent_local.z,
+            .z = @abs(m[2]) * extent_local.x + @abs(m[6]) * extent_local.y + @abs(m[10]) * extent_local.z,
+        },
     };
+}
+
+/// True if the world-space AABB of `[local_min, local_max]` transformed by
+/// `model` is entirely outside `frustum` (safe to skip drawing). Uses the
+/// "positive vertex" test against each plane.
+pub fn aabbOutsideFrustum(local_min: [3]f32, local_max: [3]f32, model: Matrix4, frustum: Frustum) bool {
+    const box = worldAabb(local_min, local_max, model);
+    const center = box.center;
+    const extent = box.extent;
 
     for (frustum.planes) |p| {
         const dist = p.a * center.x + p.b * center.y + p.c * center.z + p.d;
@@ -119,4 +132,39 @@ test "aabbOutsideFrustum: large object straddling the frustum boundary is inside
     // Centered far outside to the side, but large enough to still clip into view.
     const outside = aabbOutsideFrustum(.{ -1000, -1, -1 }, .{ 1000, 1, 1 }, Matrix4.translation(0, 0, 10), frustum);
     try std.testing.expect(!outside);
+}
+
+test "worldAabb: translation moves the center and leaves the extent alone" {
+    const box = worldAabb(.{ -1, -2, -3 }, .{ 1, 2, 3 }, Matrix4.translation(10, 20, 30));
+    try std.testing.expectApproxEqAbs(@as(f32, 10), box.center.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 20), box.center.y, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 30), box.center.z, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 1), box.extent.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 2), box.extent.y, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 3), box.extent.z, 1e-4);
+}
+
+test "worldAabb: an off-center local box keeps its offset after transform" {
+    // A mesh authored away from its origin — the case the shadow fit depends on,
+    // since one big mesh at the origin carries all its extent in these bounds.
+    const box = worldAabb(.{ 10, 0, 10 }, .{ 30, 4, 30 }, Matrix4.identity);
+    try std.testing.expectApproxEqAbs(@as(f32, 20), box.center.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 2), box.center.y, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 10), box.extent.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 2), box.extent.y, 1e-4);
+}
+
+test "worldAabb: scale multiplies the extent" {
+    const box = worldAabb(.{ -1, -1, -1 }, .{ 1, 1, 1 }, Matrix4.scaling(2, 3, 4));
+    try std.testing.expectApproxEqAbs(@as(f32, 2), box.extent.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 3), box.extent.y, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 4), box.extent.z, 1e-4);
+}
+
+test "worldAabb: rotating 45 degrees grows the axis-aligned extent" {
+    const box = worldAabb(.{ -1, -1, -1 }, .{ 1, 1, 1 }, Matrix4.rotationEuler(0, 45, 0));
+    // A unit cube spun 45 degrees about Y spans sqrt(2) on X and Z.
+    try std.testing.expectApproxEqAbs(@as(f32, @sqrt(2.0)), box.extent.x, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, 1), box.extent.y, 1e-4);
+    try std.testing.expectApproxEqAbs(@as(f32, @sqrt(2.0)), box.extent.z, 1e-4);
 }

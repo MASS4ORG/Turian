@@ -100,13 +100,17 @@ pub fn createSolidCubemap(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, r
     return tex;
 }
 
+/// Cascaded shadow map: a single `SHADOW_DIM`-wide, `SHADOW_DIM * NUM_CASCADES`-
+/// tall depth atlas — one `SHADOW_DIM`² strip per cascade, stacked vertically.
+/// Not a 2D array texture (SDL_GPU disallows `DEPTH_STENCIL_TARGET` usage on
+/// array textures); `renderShadowPass` scissors each cascade to its own strip instead.
 pub fn createShadowMap(dev: *c.SDL_GPUDevice) !*c.SDL_GPUTexture {
     return c.SDL_CreateGPUTexture(dev, &c.SDL_GPUTextureCreateInfo{
         .type = c.SDL_GPU_TEXTURETYPE_2D,
         .format = state.SHADOW_FORMAT,
         .usage = c.SDL_GPU_TEXTUREUSAGE_SAMPLER | c.SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
         .width = types.SHADOW_DIM,
-        .height = types.SHADOW_DIM,
+        .height = types.SHADOW_DIM * @as(u32, @intCast(types.NUM_CASCADES)),
         .layer_count_or_depth = 1,
         .num_levels = 1,
         .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
@@ -257,9 +261,9 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
         .entrypoint = "main",
         .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = c.SDL_GPU_SHADERSTAGE_FRAGMENT,
-        .num_samplers = 7,
+        .num_samplers = 8,
         .num_storage_textures = 0,
-        // The scene lights storage buffer (set=2, binding=7, after the 7 samplers).
+        // The scene lights storage buffer (set=2, binding=8, after the 8 samplers).
         .num_storage_buffers = 1,
         .num_uniform_buffers = 1,
         .props = 0,

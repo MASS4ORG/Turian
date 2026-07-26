@@ -18,8 +18,10 @@ pub fn dispatchCull(cmd: *c.SDL_GPUCommandBuffer, gm: *const state.GpuMesh, mode
 }
 
 /// One dispatch per shadow-casting mesh (first instance this frame), culling
-/// against the light frustum into `shadow_indirect_buf` for the shadow pass.
-pub fn dispatchShadowCulls(cmd: *c.SDL_GPUCommandBuffer, objects: []const engine.SceneNode, frustum: culling.Frustum) void {
+/// against cascade `cascade`'s own light frustum into its
+/// `shadow_indirect_bufs[cascade]` — each cascade gets its own tight cull
+/// rather than every cascade redrawing one whole-scene superset.
+pub fn dispatchShadowCulls(cmd: *c.SDL_GPUCommandBuffer, objects: []const engine.SceneNode, frustum: culling.Frustum, cascade: usize) void {
     for (objects) |*obj| {
         if (!obj.active) continue;
         for (obj.components[0..obj.component_count]) |*comp| {
@@ -28,9 +30,9 @@ pub fn dispatchShadowCulls(cmd: *c.SDL_GPUCommandBuffer, objects: []const engine
             const guid_str = comp.mesh_renderer.mesh.slice();
             if (guid_str.len == 0) continue;
             const gm = assets.findGpuMesh(guid_str) orelse continue;
-            const shadow_buf = gm.shadow_indirect_buf orelse continue;
+            const shadow_buf = gm.shadow_indirect_bufs[cascade] orelse continue;
             if (gm.submeshes.len == 0) continue;
-            if (gm.shadow_cull_dispatched_frame == state.frame_seq) continue;
+            if (gm.shadow_cull_dispatched_frame[cascade] == state.frame_seq) continue;
 
             const t = &obj.transform;
             const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
@@ -41,7 +43,7 @@ pub fn dispatchShadowCulls(cmd: *c.SDL_GPUCommandBuffer, objects: []const engine
             // draw), which is exactly the wanted cull — cleaner than skipping the
             // dispatch, which would leave the pass falling back to a full draw.
             dispatchCullTo(cmd, gm, mdl, frustum, shadow_buf);
-            gm.shadow_cull_dispatched_frame = state.frame_seq;
+            gm.shadow_cull_dispatched_frame[cascade] = state.frame_seq;
         }
     }
 }

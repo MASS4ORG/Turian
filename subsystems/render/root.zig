@@ -17,6 +17,8 @@ const gpu_timing = @import("gpu_timing.zig");
 const draw = @import("draw.zig");
 const postprocess = @import("postprocess.zig");
 const postprocess_pipeline = @import("postprocess_pipeline.zig");
+const prepass = @import("prepass.zig");
+const ssao = @import("ssao.zig");
 
 const log = std.log.scoped(.render);
 
@@ -36,6 +38,9 @@ pub const GizmoUB = gizmos.GizmoUB;
 pub const Camera = struct {
     pos: Vector3,
     rotation: Vector3,
+    /// World-space forward direction — the axis cascade selection measures
+    /// fragment depth against (see `sceneBounds`/`shadow.computeCascades`).
+    forward: Vector3,
     fov: f32,
     near: f32,
     far: f32,
@@ -153,6 +158,7 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     return .{
         .pos = cam_pos,
         .rotation = cam_rot,
+        .forward = fwd_v,
         .fov = cam_fov,
         .near = cam_near,
         .far = cam_far,
@@ -166,12 +172,7 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
 /// The HDR resolve target for a `w`x`h` pass rendered this frame (via
 /// `renderScene`), or null if none exists yet. Gizmo overlays must draw into
 /// this — not the final `color_tex` — so post-processing (tonemap, grading,
-/// vignette, bloom) applies to the combined scene+gizmo image; there's no
-/// cheap way to depth-test gizmos against a resolved single-sample copy of the
-/// scene's MSAA depth otherwise (SDL3 GPU has no depth-resolve), so gizmos
-/// keep sharing the same multisampled depth/color path they always have —
-/// only the color format (now HDR) and the final destination (now
-/// `runPostProcess`, not this call) changed. See `runPostProcess`.
+/// vignette, bloom) applies to the combined scene+gizmo image. See `runPostProcess`.
 pub fn hdrColorFor(w: u32, h: u32) ?*c.SDL_GPUTexture {
     const target = state.findTarget(w, h) orelse return null;
     return target.hdr_color;
@@ -180,8 +181,7 @@ pub fn hdrColorFor(w: u32, h: u32) ?*c.SDL_GPUTexture {
 /// Draw recorded gizmo line vertices over the already-rendered HDR scene.
 /// `overlay` selects the always-on-top pipeline (manipulation handles) vs.
 /// depth-tested world gizmos. Call after `renderScene`, passing
-/// `hdrColorFor(w, h)` (not the final `color_tex`), outside any render pass.
-/// Call `runPostProcess` once after every gizmo call for this frame.
+/// `hdrColorFor(w, h)` outside any render pass, then `runPostProcess` once.
 pub fn renderGizmos(
     cmd: *c.SDL_GPUCommandBuffer,
     hdr_color: *c.SDL_GPUTexture,
@@ -196,10 +196,8 @@ pub fn renderGizmos(
 
 /// Composite the HDR scene (and any gizmos drawn into `hdrColorFor(w, h)`
 /// first) into `color_tex`: bloom, per-channel Lift/Gamma/Gain grading,
-/// vignette, ACES tonemap. Call once per frame for a given target, after
-/// `renderScene` and any `renderGizmos` calls for the same `w`x`h`. `objects`
-/// must be the same scene passed to `renderScene`, so the active camera's
-/// post-process settings resolve identically.
+/// vignette, ACES tonemap. Call once per frame after `renderScene` and any
+/// `renderGizmos` calls, passing the same `objects` so the active camera's post-process settings resolve identically.
 pub fn runPostProcess(
     cmd: *c.SDL_GPUCommandBuffer,
     color_tex: *c.SDL_GPUTexture,
@@ -265,6 +263,18 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
         log.warn("post-process composite pipeline failed: {any} — vignette/grading/bloom disabled.", .{err});
         break :p null;
     };
+    state.prepass_pipeline = prepass.createPrepassPipeline(device) catch |err| p: {
+        log.warn("depth/normal prepass pipeline failed: {any} — SSAO disabled.", .{err});
+        break :p null;
+    };
+    state.ssao_pipeline = ssao.createSsaoPipeline(device) catch |err| p: {
+        log.warn("SSAO pipeline failed: {any} — SSAO disabled.", .{err});
+        break :p null;
+    };
+    state.ssao_blur_pipeline = ssao.createSsaoBlurPipeline(device) catch |err| p: {
+        log.warn("SSAO blur pipeline failed: {any} — SSAO disabled.", .{err});
+        break :p null;
+    };
     log.info("Ready (SPIRV).", .{});
 }
 
@@ -317,8 +327,8 @@ fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
 }
 
 /// Render `objects` into this size's internal HDR target. Call `runPostProcess`
-/// afterward (after any `renderGizmos` calls) to composite the result into a
-/// final destination texture — `renderScene` no longer writes one directly.
+/// afterward (after any `renderGizmos` calls) to composite the result into the
+/// final destination texture.
 pub fn renderScene(
     cmd: *c.SDL_GPUCommandBuffer,
     w: u32,
@@ -368,6 +378,15 @@ pub fn renderScene(
     const cam_pos = cam.pos;
     const vp = cam.view_proj;
     const frustum = culling.Frustum.extract(vp);
+
+    // ── Depth+normal prepass + SSAO ──────────────────────────────────────────
+    // Always single-sample, independent of the main pass's MSAA depth (which
+    // is never sampler-usable) — see prepass.zig / ssao.zig.
+    var ao_tex: *c.SDL_GPUTexture = state.white_tex orelse return;
+    if (prepass.run(cmd, dev, sampler, w, h, objects, frustum, cam.view, cam.proj)) |prepass_target| {
+        const clamp_smp = state.cubemap_sampler orelse sampler;
+        if (ssao.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.proj)) |ao| ao_tex = ao;
+    }
 
     // ── Environment (IBL + skybox) ───────────────────────────────────────────
     // At most one active EnvironmentComponent is used per scene (first found).
@@ -436,12 +455,14 @@ pub fn renderScene(
     }
 
     const bounds = shadow.sceneBounds(objects);
-    const light_vp = if (shadow_dir) |sd| shadow.shadowMatrix(sd, bounds) else Matrix4{};
     const shadows_on = shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
 
+    var cascades: [shadow.NUM_CASCADES]shadow.Cascade = std.mem.zeroes([shadow.NUM_CASCADES]shadow.Cascade);
     if (shadows_on) {
-        const light_frustum = culling.Frustum.extract(light_vp);
-        gpu_timing.runShadowPass(dev, cmd, light_vp, light_frustum, objects);
+        const sd = shadow_dir.?;
+        const aspect = @as(f32, @floatFromInt(w)) / @as(f32, @floatFromInt(@max(h, 1)));
+        cascades = shadow.computeCascades(cam.view, cam.fov, aspect, cam.near, cam.far, sd, bounds);
+        gpu_timing.runShadowPass(dev, cmd, cascades, objects);
     }
 
     // ── GPU-driven cull compute phase ────────────────────────────────────────
@@ -458,10 +479,8 @@ pub fn renderScene(
     const hdr_color = target.hdr_color.?;
     // Under MSAA, render into the multisampled color and resolve into the
     // single-sample HDR target (kept via RESOLVE_AND_STORE so the gizmo
-    // overlay pass can re-resolve on top of the same MSAA buffer). The
-    // post-process composite pass below reads `hdr_color` and writes the
-    // caller's `color_tex`; scene/skybox shaders emit raw linear HDR now
-    // (tonemap moved to `composite.frag.glsl`).
+    // overlay pass can re-resolve on top of the same MSAA buffer). Scene/skybox
+    // shaders emit raw linear HDR; tonemap happens in `composite.frag.glsl`.
     var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
     color_info.load_op = c.SDL_GPU_LOADOP_CLEAR;
     color_info.clear_color = .{ .r = 0.14, .g = 0.14, .b = 0.16, .a = 1.0 };
@@ -508,11 +527,22 @@ pub fn renderScene(
         (if (gt.env) |ed| (ed.prefiltered_cubemap orelse black_cube) else black_cube)
     else
         black_cube;
+    var cascade_vp: [shadow.NUM_CASCADES][16]f32 = undefined;
+    var cascade_splits: [4]f32 = .{ 0, 0, 0, 0 };
+    var cascade_depth_scale: [4]f32 = .{ 0, 0, 0, 0 };
+    for (cascades, 0..) |cs, i| {
+        cascade_vp[i] = cs.vp.m;
+        cascade_splits[i] = cs.far_distance;
+        cascade_depth_scale[i] = cs.depth_scale;
+    }
     const fu = draw.FrameUniforms{
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
-        .light_vp = light_vp.m,
+        .cam_forward4 = .{ cam.forward.x, cam.forward.y, cam.forward.z, 0 },
         .env_params = env_params,
         .env_sh = env_sh,
+        .cascade_vp = cascade_vp,
+        .cascade_splits = cascade_splits,
+        .cascade_depth_scale = cascade_depth_scale,
     };
 
     // Draw the environment background first so opaque geometry overwrites sky pixels.
@@ -568,7 +598,7 @@ pub fn renderScene(
             const mr = &comp.mesh_renderer;
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             const receives = mr.receive_shadows and shadows_on;
-            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_prefiltered_tex = env_prefiltered_tex, .cubemap_smp = cube_smp, .white = white, .flat_n = flat_n, .sampler = sampler };
+            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_prefiltered_tex = env_prefiltered_tex, .cubemap_smp = cube_smp, .white = white, .flat_n = flat_n, .sampler = sampler, .ssao_tex = ao_tex, .ssao_smp = cube_smp };
 
             // GPU-driven indirect path (cull compute dispatched this frame).
             if (gm.indirect_buf != null and gm.cull_dispatched_frame == state.frame_seq) {
@@ -674,7 +704,9 @@ pub fn deinit() void {
         c.SDL_ReleaseGPUBuffer(dev, gm.idx_buf);
         if (gm.bounds_buf) |bb| c.SDL_ReleaseGPUBuffer(dev, bb);
         if (gm.indirect_buf) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
-        if (gm.shadow_indirect_buf) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
+        for (gm.shadow_indirect_bufs) |maybe_ib| {
+            if (maybe_ib) |ib| c.SDL_ReleaseGPUBuffer(dev, ib);
+        }
         std.heap.page_allocator.free(gm.submeshes);
         std.heap.page_allocator.free(gm.material_groups);
     }
@@ -703,6 +735,14 @@ pub fn deinit() void {
     state.post_downsample_pipeline = null;
     state.post_upsample_pipeline = null;
     state.post_composite_pipeline = null;
+    if (state.prepass_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.ssao_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.ssao_blur_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    state.prepass_pipeline = null;
+    state.ssao_pipeline = null;
+    state.ssao_blur_pipeline = null;
+    prepass.destroyTargets(dev);
+    ssao.destroyTargets(dev);
     if (state.black_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     state.black_tex = null;
     for (&state.bloom_targets) |*bc| {

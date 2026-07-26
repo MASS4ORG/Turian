@@ -1,3 +1,4 @@
+const engine = @import("engine");
 const AssetType = @import("AssetType.zig").AssetType;
 
 /// Texture filtering mode.
@@ -37,11 +38,33 @@ pub const AudioImportSettings = struct {
     normalize: bool = false,
 };
 
+/// A hand-authored correction merged over one material of an imported model at
+/// cook time, keyed by the source material's own name (stable across reimport,
+/// unlike sub-asset GUIDs which are per-project). Every field is optional and
+/// only replaces the derived value when set — this is a patch, not a full
+/// material description. Exists because some DCC formats carry no signal at
+/// all for certain properties (e.g. plain FBX glass has no opacity anywhere),
+/// so the importer's best-effort derivation has nothing to derive from.
+pub const MaterialOverride = struct {
+    material_name: []const u8 = "",
+    base_color: ?[4]f32 = null,
+    metallic: ?f32 = null,
+    roughness: ?f32 = null,
+    emissive: ?[3]f32 = null,
+    emissive_strength: ?f32 = null,
+    normal_scale: ?f32 = null,
+    occlusion_strength: ?f32 = null,
+    alpha_mode: ?engine.assets.AlphaMode = null,
+    alpha_cutoff: ?f32 = null,
+    double_sided: ?bool = null,
+};
+
 /// Settings for model asset import.
 pub const ModelImportSettings = struct {
     import_animations: bool = true,
     import_materials: bool = true,
     scale_factor: f32 = 1.0,
+    material_overrides: []const MaterialOverride = &.{},
 };
 
 /// Settings for font asset import (v1: theme fonts only; this

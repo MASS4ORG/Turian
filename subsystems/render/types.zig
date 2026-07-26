@@ -9,6 +9,11 @@ pub const MAX_LIGHTS = 256;
 // Shadow mapping (primary directional light).
 pub const SHADOW_DIM: u32 = 2048;
 
+/// Cascaded shadow map split count. Each cascade is a vertical strip of the
+/// shadow atlas texture (see `pipeline.createShadowMap`), fit to a slice of
+/// the camera frustum.
+pub const NUM_CASCADES: usize = 4;
+
 /// Bytes for an asset resolved by GUID, plus whether the renderer frees them.
 pub const Bytes = struct { data: []const u8, owned: bool = true };
 
@@ -21,6 +26,26 @@ pub const VertexUB = extern struct { mvp: [16]f32, model: [16]f32 };
 
 /// Shadow-pass vertex uniforms — `light_vp * model`.
 pub const ShadowUB = extern struct { light_mvp: [16]f32 };
+
+/// Depth+normal prepass vertex uniforms — layout must match VertexUB in
+/// depth_normal.vert.glsl. `model_view = view * model`, composed on the CPU.
+pub const PrepassVertexUB = extern struct { mvp: [16]f32, model_view: [16]f32 };
+
+/// Depth+normal prepass fragment uniforms — layout must match FragUB in
+/// depth_normal.frag.glsl. Only enough of the material to replicate
+/// scene.frag.glsl's alpha-cutout discard for masked materials.
+pub const PrepassFragUB = extern struct {
+    flags: [4]f32, // x=has_albedo, y=alpha_cutoff, z=alpha_mask_on, w unused
+    base_color: [4]f32, // rgba
+};
+
+/// SSAO pass fragment uniforms — layout must match FragUB in ssao.frag.glsl.
+pub const SsaoUB = extern struct {
+    inv_proj: [16]f32,
+    proj: [16]f32,
+    kernel_samples: [24][4]f32,
+    params: [4]f32, // x=radius, y=bias, z=power, w unused
+};
 
 /// One scene light. Layout must match `struct Light` in scene.frag.glsl.
 pub const GpuLight = extern struct {
@@ -42,9 +67,17 @@ pub const FragUB = extern struct {
     flags: [4]f32, // has_albedo, has_mr, has_normal, has_emissive
     flags2: [4]f32, // has_occlusion, alpha_cutoff, alpha_mask_on, shadows_enabled
     env_params: [4]f32, // x=intensity, y=mip_count, z=has_env, w unused
+    cam_forward: [4]f32, // xyz camera forward (world space), w unused — picks the shadow cascade
     env_sh: [9][4]f32, // diffuse irradiance SH coefficients (rgb in xyz)
-    light_vp: [16]f32, // shadow light view-projection (primary directional)
+    cascade_vp: [NUM_CASCADES][16]f32, // per-cascade shadow light view-projection
+    // Packed as a single vec4 in the shader (std140 array-of-float would pad
+    // each element to 16 bytes) — one float per cascade, so NUM_CASCADES must stay 4.
+    cascade_splits: [4]f32, // per-cascade far distance along cam_forward (world units)
+    cascade_depth_scale: [4]f32, // per-cascade 1/(ortho far-near), converts a world-unit bias to NDC depth
 };
+comptime {
+    if (NUM_CASCADES < 1 or NUM_CASCADES > 4) @compileError("FragUB packs cascade_splits/cascade_depth_scale into one vec4 each (max 4)");
+}
 
 /// Fragment uniforms for the skybox pass — layout must match FragUB in
 /// skybox.frag.glsl exactly.

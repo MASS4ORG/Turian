@@ -9,6 +9,14 @@ const c = gpu.c;
 
 pub const SHADOW_FORMAT = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
+/// Depth+normal prepass formats. Depth reuses `SHADOW_FORMAT`
+/// (D16_UNORM), the same sampler-usable depth format `createShadowMap` already
+/// proves works on this device; the prepass is always single-sample regardless
+/// of the main pass's MSAA setting, so it never needs the MSAA depth's format.
+pub const PREPASS_DEPTH_FORMAT = SHADOW_FORMAT;
+pub const PREPASS_NORMAL_FORMAT = c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+pub const SSAO_FORMAT = c.SDL_GPU_TEXTUREFORMAT_R8_UNORM;
+
 /// HDR intermediate color format the main scene pass renders into, letting the
 /// post-process composite pass work with unclamped linear values before
 /// tonemapping (moved out of the lit shaders, see `postprocess.zig`).
@@ -50,6 +58,12 @@ pub var shadow_map: ?*c.SDL_GPUTexture = null;
 pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 
 pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+
+/// Depth+normal prepass and SSAO pipelines. Null if creation failed —
+/// `renderScene` falls back to `white_tex` for the AO input in that case.
+pub var prepass_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var ssao_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+pub var ssao_blur_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 
 /// One-time IBL specular-prefilter pipelines (see `ibl_prefilter.zig`):
 /// equirect->cubemap conversion, then GGX-importance-sampled mip prefiltering.
@@ -107,6 +121,46 @@ pub fn findDepth(w: u32, h: u32) ?*c.SDL_GPUTexture {
 pub fn findTarget(w: u32, h: u32) ?*DepthTarget {
     for (&depth_targets) |*d| {
         if (d.tex != null and d.w == w and d.h == h) return d;
+    }
+    return null;
+}
+
+/// Depth+normal prepass render targets, cached by (w,h) like `depth_targets`.
+/// Always single-sample regardless of the main pass's MSAA setting — SSAO
+/// reads these as plain sampled textures.
+pub const MAX_PREPASS_TARGETS = 6;
+pub const PrepassTarget = struct {
+    depth: ?*c.SDL_GPUTexture = null,
+    normal: ?*c.SDL_GPUTexture = null,
+    w: u32 = 0,
+    h: u32 = 0,
+};
+pub var prepass_targets: [MAX_PREPASS_TARGETS]PrepassTarget = .{PrepassTarget{}} ** MAX_PREPASS_TARGETS;
+pub var prepass_evict_cursor: usize = 0;
+
+/// The cached prepass target matching `w`x`h`, or null if none is allocated yet.
+pub fn findPrepassTarget(w: u32, h: u32) ?*PrepassTarget {
+    for (&prepass_targets) |*p| {
+        if (p.depth != null and p.w == w and p.h == h) return p;
+    }
+    return null;
+}
+
+/// Raw + blurred SSAO textures, cached by (w,h).
+pub const MAX_SSAO_TARGETS = 3;
+pub const SsaoTarget = struct {
+    raw: ?*c.SDL_GPUTexture = null,
+    blurred: ?*c.SDL_GPUTexture = null,
+    w: u32 = 0,
+    h: u32 = 0,
+};
+pub var ssao_targets: [MAX_SSAO_TARGETS]SsaoTarget = .{SsaoTarget{}} ** MAX_SSAO_TARGETS;
+pub var ssao_evict_cursor: usize = 0;
+
+/// The cached SSAO target matching `w`x`h`, or null if none is allocated yet.
+pub fn findSsaoTarget(w: u32, h: u32) ?*SsaoTarget {
+    for (&ssao_targets) |*s| {
+        if (s.raw != null and s.w == w and s.h == h) return s;
     }
     return null;
 }
@@ -227,13 +281,15 @@ pub const GpuMesh = struct {
     bounds_buf: ?*c.SDL_GPUBuffer = null,
     /// Indirect draw command buffer written by the cull compute pass each frame.
     indirect_buf: ?*c.SDL_GPUBuffer = null,
-    /// Indirect draw commands for the shadow pass, culled against the light frustum.
-    shadow_indirect_buf: ?*c.SDL_GPUBuffer = null,
+    /// Indirect draw commands for the shadow pass, one buffer per cascade —
+    /// each culled against that cascade's own (tighter) light frustum, not a
+    /// single whole-scene one, so cascades don't all redraw the same overdraw.
+    shadow_indirect_bufs: [types.NUM_CASCADES]?*c.SDL_GPUBuffer = .{null} ** types.NUM_CASCADES,
     /// Monotonic frame counter: only the first mesh renderer instance referencing
     /// this mesh per frame uses the GPU-driven path; later instances fall back to CPU.
     cull_dispatched_frame: u64 = 0,
-    /// As `cull_dispatched_frame`, but for the light-frustum shadow cull dispatch.
-    shadow_cull_dispatched_frame: u64 = 0,
+    /// As `cull_dispatched_frame`, but per-cascade for the shadow cull dispatch.
+    shadow_cull_dispatched_frame: [types.NUM_CASCADES]u64 = .{0} ** types.NUM_CASCADES,
 
     pub fn matchesKey(self: *const @This(), k: []const u8) bool {
         return std.mem.eql(u8, self.key[0..self.key_len], k);

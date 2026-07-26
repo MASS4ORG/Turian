@@ -305,6 +305,116 @@ fn flipBc5GreenChannel(data: []u8) void {
     while (off + 16 <= data.len) : (off += 16) flipBc4Channel(data[off + 8 ..][0..8]);
 }
 
+// ── Alpha coverage ────────────────────────────────────────────────────────────
+
+/// How much of a texture's alpha channel is transparent, and how sharply.
+/// Importers use this to tell a cutout mask (foliage, chain-link, decals) from a
+/// soft blend, for source formats that carry opacity in the base-colour alpha
+/// rather than in a material property.
+pub const AlphaCoverage = struct {
+    /// Fraction of sampled texels below `OPAQUE_MIN`.
+    non_opaque: f32,
+    /// Fraction of sampled texels that are neither near-transparent nor
+    /// near-opaque. A cutout mask has almost none; a soft gradient has many.
+    partial: f32,
+};
+
+const OPAQUE_MIN: u8 = 250;
+const PARTIAL_LO: u8 = 16;
+const PARTIAL_HI: u8 = 240;
+
+/// Blocks to sample from mip 0. Sampling the top mip (rather than averaging a
+/// small one) is what keeps a cutout mask's hard 0/255 edges intact — a reduced
+/// mip blurs them into partial values and reads as a soft gradient.
+const ALPHA_SAMPLE_BLOCKS: usize = 4096;
+
+/// Fraction of `bytes`' alpha channel that is transparent, or null when the
+/// texture carries no alpha this can read: an alpha-less format (BC1, BC4, BC5)
+/// or one needing a full transcode (BC7). Callers should treat null as opaque.
+pub fn alphaCoverage(bytes: []const u8) ?AlphaCoverage {
+    const h = parseHeader(bytes) catch return null;
+    const mip0 = h.format.levelSize(h.width, h.height);
+    if (h.data_offset + mip0 > bytes.len) return null;
+    const data = bytes[h.data_offset..][0..mip0];
+
+    var counts = Counts{};
+    switch (h.format) {
+        .bc3_unorm, .bc3_srgb => sampleBc3Alpha(data, &counts),
+        .rgba8_unorm => sampleRgba8Alpha(data, &counts),
+        else => return null,
+    }
+    if (counts.total == 0) return null;
+
+    const total: f32 = @floatFromInt(counts.total);
+    return .{
+        .non_opaque = @as(f32, @floatFromInt(counts.non_opaque)) / total,
+        .partial = @as(f32, @floatFromInt(counts.partial)) / total,
+    };
+}
+
+const Counts = struct {
+    total: usize = 0,
+    non_opaque: usize = 0,
+    partial: usize = 0,
+
+    fn add(self: *Counts, a: u8) void {
+        self.total += 1;
+        if (a < OPAQUE_MIN) self.non_opaque += 1;
+        if (a > PARTIAL_LO and a < PARTIAL_HI) self.partial += 1;
+    }
+};
+
+/// Decode the alpha sub-block of every `stride`-th BC3 block. BC3 alpha is an
+/// independent 8-byte BC4 block, so the colour half never has to be touched.
+fn sampleBc3Alpha(data: []const u8, counts: *Counts) void {
+    const block_count = data.len / 16;
+    if (block_count == 0) return;
+    const stride = @max(1, block_count / ALPHA_SAMPLE_BLOCKS);
+
+    var b: usize = 0;
+    while (b < block_count) : (b += stride) {
+        const block = data[b * 16 ..][0..8];
+        const e0 = block[0];
+        const e1 = block[1];
+
+        // Two endpoint modes, as in `flipBc4Channel`: an 8-value ramp, or a
+        // 6-value ramp plus fixed fully-transparent/fully-opaque entries.
+        var ramp: [8]u8 = undefined;
+        ramp[0] = e0;
+        ramp[1] = e1;
+        if (e0 > e1) {
+            for (2..8) |i| {
+                const n: u16 = @intCast(8 - i);
+                const m: u16 = @intCast(i - 1);
+                ramp[i] = @intCast((n * @as(u16, e0) + m * @as(u16, e1)) / 7);
+            }
+        } else {
+            for (2..6) |i| {
+                const n: u16 = @intCast(6 - i);
+                const m: u16 = @intCast(i - 1);
+                ramp[i] = @intCast((n * @as(u16, e0) + m * @as(u16, e1)) / 5);
+            }
+            ramp[6] = 0;
+            ramp[7] = 255;
+        }
+
+        var bits: u64 = 0;
+        for (0..6) |i| bits |= @as(u64, block[2 + i]) << @intCast(i * 8);
+        for (0..16) |t| {
+            const idx: u3 = @intCast((bits >> @intCast(t * 3)) & 0x7);
+            counts.add(ramp[idx]);
+        }
+    }
+}
+
+fn sampleRgba8Alpha(data: []const u8, counts: *Counts) void {
+    const texels = data.len / 4;
+    if (texels == 0) return;
+    const stride = @max(1, texels / (ALPHA_SAMPLE_BLOCKS * 16));
+    var t: usize = 0;
+    while (t < texels) : (t += stride) counts.add(data[t * 4 + 3]);
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 fn makeLegacyHeader(fourcc: [4]u8, width: u32, height: u32, mip_count: u32) [LEGACY_HEADER_LEN]u8 {
@@ -501,6 +611,106 @@ test "decodes a real BC5 (ATI2) Bistro normal map" {
     defer img.deinit();
     try std.testing.expectEqual(ktx2.Format.bc5_unorm, img.format);
     try std.testing.expect(img.levels.len >= 1);
+}
+
+/// Packs 16 3-bit indices little-endian across 6 bytes, matching the BC4/BC3
+/// alpha-block index layout `sampleBc3Alpha`/`flipBc4Channel` read.
+fn packBc4Indices(idxs: [16]u3) [6]u8 {
+    var bits: u64 = 0;
+    for (idxs, 0..) |v, t| bits |= @as(u64, v) << @intCast(t * 3);
+    var out: [6]u8 = undefined;
+    for (0..6) |i| out[i] = @intCast((bits >> @intCast(i * 8)) & 0xff);
+    return out;
+}
+
+/// One BC3 block: the 8-byte alpha half from `(e0, e1, idxs)`, plus an unused
+/// zeroed 8-byte BC1 colour half (alpha coverage never reads it).
+fn makeBc3Block(e0: u8, e1: u8, idxs: [16]u3) [16]u8 {
+    var b: [16]u8 = @splat(0);
+    b[0] = e0;
+    b[1] = e1;
+    @memcpy(b[2..8], &packBc4Indices(idxs));
+    return b;
+}
+
+/// A one-row-of-`blocks.len` BC3 (DXT5) DDS byte buffer, single mip.
+fn makeBc3Dds(allocator: std.mem.Allocator, blocks: []const [16]u8) ![]u8 {
+    const w: u32 = @intCast(blocks.len * 4);
+    const bytes = try allocator.alloc(u8, LEGACY_HEADER_LEN + blocks.len * 16);
+    @memcpy(bytes[0..LEGACY_HEADER_LEN], &makeLegacyHeader(.{ 'D', 'X', 'T', '5' }, w, 4, 1));
+    for (blocks, 0..) |blk, i| @memcpy(bytes[LEGACY_HEADER_LEN + i * 16 ..][0..16], &blk);
+    return bytes;
+}
+
+test "alphaCoverage: alpha-less format (BC1) returns null" {
+    const header = makeLegacyHeader(.{ 'D', 'X', 'T', '1' }, 4, 4, 1);
+    var bytes: [LEGACY_HEADER_LEN + 8]u8 = undefined;
+    @memcpy(bytes[0..LEGACY_HEADER_LEN], &header);
+    @memset(bytes[LEGACY_HEADER_LEN..], 0xFF);
+    try std.testing.expectEqual(@as(?AlphaCoverage, null), alphaCoverage(&bytes));
+}
+
+test "alphaCoverage: fully opaque BC3 reports no transparency" {
+    // e0 = e1 = 255; every index in {0, 1} maps back to 255 in both endpoint
+    // orderings, so this is opaque regardless of which ramp mode it decodes as.
+    const idxs: [16]u3 = @splat(0);
+    const blocks = [_][16]u8{makeBc3Block(255, 255, idxs)};
+    const bytes = try makeBc3Dds(std.testing.allocator, &blocks);
+    defer std.testing.allocator.free(bytes);
+
+    const cov = alphaCoverage(bytes).?;
+    try std.testing.expectApproxEqAbs(@as(f32, 0), cov.non_opaque, 1e-6);
+}
+
+test "alphaCoverage: binary cutout mask reports high non_opaque, near-zero partial" {
+    // e0=0, e1=255 (6-value mode since e0<=e1): index 0 -> fully transparent,
+    // index 1 -> fully opaque. Alternating the two never touches a partial value.
+    var idxs: [16]u3 = undefined;
+    for (0..16) |i| idxs[i] = if (i % 2 == 0) 0 else 1;
+    const blocks = [_][16]u8{makeBc3Block(0, 255, idxs)};
+    const bytes = try makeBc3Dds(std.testing.allocator, &blocks);
+    defer std.testing.allocator.free(bytes);
+
+    const cov = alphaCoverage(bytes).?;
+    try std.testing.expectApproxEqAbs(@as(f32, 0.5), cov.non_opaque, 1e-6);
+    try std.testing.expectApproxEqAbs(@as(f32, 0), cov.partial, 1e-6);
+}
+
+test "alphaCoverage: soft gradient reports high non_opaque and high partial" {
+    // e0=0, e1=255, every index in the interpolated (non-fixed-point) range —
+    // no texel is ever fully transparent or fully opaque.
+    const idxs: [16]u3 = @splat(3);
+    const blocks = [_][16]u8{makeBc3Block(0, 255, idxs)};
+    const bytes = try makeBc3Dds(std.testing.allocator, &blocks);
+    defer std.testing.allocator.free(bytes);
+
+    const cov = alphaCoverage(bytes).?;
+    try std.testing.expectApproxEqAbs(@as(f32, 1), cov.non_opaque, 1e-6);
+    try std.testing.expectApproxEqAbs(@as(f32, 1), cov.partial, 1e-6);
+}
+
+test "alphaCoverage: real Bistro foliage texture reads as a near-binary cutout" {
+    const path = "/media/work/dev/mega4/turian-samples/bistro/assets/Textures/Foliage_Leaves_BaseColor.dds";
+    const bytes = std.Io.Dir.cwd().readFileAlloc(std.testing.io, path, std.testing.allocator, .unlimited) catch
+        return error.SkipZigTest;
+    defer std.testing.allocator.free(bytes);
+
+    const cov = alphaCoverage(bytes).?;
+    try std.testing.expect(cov.non_opaque > 0.5); // measured ~82%
+    try std.testing.expect(cov.partial < 0.15); // measured ~9%
+}
+
+test "alphaCoverage: real Bistro plain-glass BaseColor has no transparency signal" {
+    // BC3/DXT5 (carries an alpha channel, unlike most of the glass set which is
+    // BC1) but opaque throughout — the case that must stay opaque, not become
+    // a false-positive cutout.
+    const path = "/media/work/dev/mega4/turian-samples/bistro/assets/Textures/MASTER_Frosted_Glass_BaseColor.dds";
+    const bytes = std.Io.Dir.cwd().readFileAlloc(std.testing.io, path, std.testing.allocator, .unlimited) catch
+        return error.SkipZigTest;
+    defer std.testing.allocator.free(bytes);
+
+    const cov = alphaCoverage(bytes).?;
+    try std.testing.expectApproxEqAbs(@as(f32, 0), cov.non_opaque, 1e-6);
 }
 
 test {

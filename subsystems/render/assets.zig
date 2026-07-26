@@ -343,14 +343,20 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     }) orelse return error.IndirectBufCreate;
     errdefer c.SDL_ReleaseGPUBuffer(dev, indirect_buf);
 
-    // A parallel indirect buffer for the shadow pass, culled against the light
-    // frustum each frame by a second cull dispatch.
-    const shadow_indirect_buf = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
-        .usage = c.SDL_GPU_BUFFERUSAGE_INDIRECT | c.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE,
-        .size = indirect_bytes,
-        .props = 0,
-    }) orelse return error.IndirectBufCreate;
-    errdefer c.SDL_ReleaseGPUBuffer(dev, shadow_indirect_buf);
+    // A parallel indirect buffer per shadow cascade, each culled against that
+    // cascade's own (tighter) light frustum by its own cull dispatch — see
+    // `gpu_cull.dispatchShadowCulls`.
+    var shadow_indirect_bufs: [types.NUM_CASCADES]?*c.SDL_GPUBuffer = .{null} ** types.NUM_CASCADES;
+    errdefer for (shadow_indirect_bufs) |maybe_buf| {
+        if (maybe_buf) |sib| c.SDL_ReleaseGPUBuffer(dev, sib);
+    };
+    for (&shadow_indirect_bufs) |*buf| {
+        buf.* = c.SDL_CreateGPUBuffer(dev, &c.SDL_GPUBufferCreateInfo{
+            .usage = c.SDL_GPU_BUFFERUSAGE_INDIRECT | c.SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE,
+            .size = indirect_bytes,
+            .props = 0,
+        }) orelse return error.IndirectBufCreate;
+    }
 
     const cp = c.SDL_BeginGPUCopyPass(cmd) orelse return error.CopyPassFailed;
     c.SDL_UploadToGPUBuffer(cp, &c.SDL_GPUTransferBufferLocation{ .transfer_buffer = vtx_tb, .offset = 0 }, &c.SDL_GPUBufferRegion{ .buffer = vtx_buf, .offset = 0, .size = vtx_bytes }, false);
@@ -372,7 +378,7 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.bounds_max = cpu.max;
     gm.bounds_buf = bounds_buf;
     gm.indirect_buf = indirect_buf;
-    gm.shadow_indirect_buf = shadow_indirect_buf;
+    gm.shadow_indirect_bufs = shadow_indirect_bufs;
 }
 
 /// Upload a texture and cache it by GUID.
@@ -450,10 +456,9 @@ fn mipCountFor(w: u32, h: u32) u32 {
 const F16_MAX: f32 = 65504.0;
 
 /// Clamp an HDR radiance sample into `f16` range before conversion. Real HDRIs
-/// routinely store suns far above `f16`'s max (Bistro's peaks at ~98304), and a
-/// plain `@floatCast` turns those into `+Inf`; mip generation then spreads the
-/// `Inf` as `NaN` across the chain, which surfaces as garbage (saturated) pixels
-/// wherever the roughness-mipped specular IBL samples it.
+/// routinely store suns far above `f16`'s max (Bistro's peaks at ~98304); a
+/// plain `@floatCast` turns those into `+Inf`, which mip generation spreads as
+/// `NaN`, surfacing as garbage pixels wherever specular IBL samples it.
 fn toHalfRadiance(v: f32) f16 {
     if (std.math.isNan(v)) return 0;
     return @floatCast(@min(@max(v, 0.0), F16_MAX));

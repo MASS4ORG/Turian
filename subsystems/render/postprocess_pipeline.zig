@@ -1,8 +1,7 @@
 //! One-time GPU resource creation for the post-process stack: the HDR resolve
 //! target, bloom mip textures, and the 4 fullscreen graphics pipelines
 //! (threshold, downsample, upsample, composite). Mirrors `pipeline.zig`'s
-//! role for the rest of the renderer; split into its own file since
-//! `pipeline.zig` is already near this repo's file-size convention.
+//! role for the rest of the renderer.
 const std = @import("std");
 const gpu = @import("gpu");
 const state = @import("state.zig");
@@ -52,7 +51,8 @@ pub fn createBlackTex(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice) !*c.S
 /// Shared fixed-function setup for every fullscreen post-process pipeline: no
 /// vertex buffers (the `gl_VertexIndex` trick), no depth attachment, sample
 /// count 1 (these passes never run under the scene's MSAA sample count).
-fn buildPipeline(
+/// Exported for reuse by other fullscreen-triangle passes (e.g. `ssao.zig`).
+pub fn buildPipeline(
     dev: *c.SDL_GPUDevice,
     vert_spv: []const u8,
     frag_spv: []const u8,

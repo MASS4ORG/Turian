@@ -423,13 +423,15 @@ fn save() void {
     };
 
     const path = loadedPath();
-    mat.save(gui.io, path) catch return;
-    dirty = false;
 
-    // Keep the cached artifact in sync with the freshly written source.
-    if (EditorState.project_path) |proj| {
-        editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, path);
+    if (!saveAsModelOverride(path)) {
+        mat.save(gui.io, path) catch return;
+        // Keep the cached artifact in sync with the freshly written source.
+        if (EditorState.project_path) |proj| {
+            editor.asset_importer.importAssetForce(gui.io, gui.currentWindow().arena(), proj, path);
+        }
     }
+    dirty = false;
 
     // Drop the cached static thumbnail so the Asset Browser/Inspector show the
     // new result immediately, instead of waiting for the next asset-watcher
@@ -444,6 +446,42 @@ fn save() void {
             render.invalidateMaterial(guid);
         }
     }
+}
+
+/// If `path` is a model's generated `.material` sub-asset, persist the current
+/// in-memory edit as a per-material override in the owning model's tracked
+/// `.meta` (instead of overwriting the gitignored cache artifact directly),
+/// then re-cook the model so the change takes effect. Only PBR-shaded
+/// sub-assets are representable this way — a material re-shaded to something
+/// else falls through to the direct-cache-write path. Returns true if handled.
+fn saveAsModelOverride(path: []const u8) bool {
+    if (!std.mem.eql(u8, sh.guid, shader.pbr_guid)) return false;
+    if (!EditorState.assetDbReady()) return false;
+    const proj = EditorState.project_path orelse return false;
+    const info = EditorState.asset_db.findByPath(path) orelse return false;
+
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const owner = editor.material_overrides.findOwner(gui.io, arena, &EditorState.asset_db, info.guid) orelse return false;
+
+    editor.material_overrides.writeOverride(gui.io, arena, owner.model_path, buildOverride(owner.material_name));
+    editor.asset_importer.importAssetForce(gui.io, arena, proj, owner.model_path);
+    return true;
+}
+
+/// Build a `MaterialOverride` from the current in-memory PBR param values and
+/// render state, keyed by `material_name`. Mirrors the field mapping
+/// `ModelDerivedAssets.writeMaterialArtifact` uses to go the other way.
+fn buildOverride(material_name: []const u8) editor.MaterialOverride {
+    var o = editor.MaterialOverride{ .material_name = material_name };
+    for (sh.params[0..val_count], 0..) |param, i| {
+        if (std.mem.eql(u8, param.name, "metallic")) o.metallic = vals[i].scalar else if (std.mem.eql(u8, param.name, "roughness")) o.roughness = vals[i].scalar else if (std.mem.eql(u8, param.name, "emissive_strength")) o.emissive_strength = vals[i].scalar else if (std.mem.eql(u8, param.name, "normal_scale")) o.normal_scale = vals[i].scalar else if (std.mem.eql(u8, param.name, "occlusion_strength")) o.occlusion_strength = vals[i].scalar else if (std.mem.eql(u8, param.name, "alpha_cutoff")) o.alpha_cutoff = vals[i].scalar else if (std.mem.eql(u8, param.name, "base_color")) o.base_color = vals[i].vec else if (std.mem.eql(u8, param.name, "emissive")) o.emissive = .{ vals[i].vec[0], vals[i].vec[1], vals[i].vec[2] };
+    }
+    o.double_sided = render_state.cull == .none;
+    o.alpha_mode = if (render_state.alpha_mask) .mask else if (render_state.blend == .alpha) .blend else .@"opaque";
+    return o;
 }
 
 // ── Colour conversion (material stores 0..1 floats; dvui uses 0..255 u8) ────────

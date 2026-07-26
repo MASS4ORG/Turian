@@ -11,30 +11,37 @@ const culling = @import("culling.zig");
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
 
-/// Culls shadow casters against the light frustum, then runs the shadow pass;
-/// fence-waits its own command buffer in detailed mode. The cull dispatch and
-/// draw share one command buffer so the shadow indirect buffer is written before
-/// the pass reads it even under per-pass fencing.
-pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, light_vp: Matrix4, light_frustum: culling.Frustum, objects: []const engine.SceneNode) void {
+/// Culls shadow casters against each cascade's own light frustum, then renders
+/// every cascade's shadow-atlas strip. Cull dispatches and draws share one
+/// command buffer, so each shadow indirect buffer is written before the pass
+/// reads it even under per-pass fencing.
+fn dispatchAllCascadeCulls(cmd: *c.SDL_GPUCommandBuffer, cascades: [shadow.NUM_CASCADES]shadow.Cascade, objects: []const engine.SceneNode) void {
+    for (cascades, 0..) |cs, i| {
+        const frustum = culling.Frustum.extract(cs.vp);
+        gpu_cull.dispatchShadowCulls(cmd, objects, frustum, i);
+    }
+}
+
+pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, cascades: [shadow.NUM_CASCADES]shadow.Cascade, objects: []const engine.SceneNode) void {
     if (!state.detailed_gpu_timing) {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
-        gpu_cull.dispatchShadowCulls(cmd, objects, light_frustum);
-        shadow.renderShadowPass(cmd, light_vp, objects);
+        dispatchAllCascadeCulls(cmd, cascades, objects);
+        shadow.renderShadowPass(cmd, cascades, objects);
         return;
     }
     const own = c.SDL_AcquireGPUCommandBuffer(dev) orelse {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
-        gpu_cull.dispatchShadowCulls(cmd, objects, light_frustum);
-        shadow.renderShadowPass(cmd, light_vp, objects);
+        dispatchAllCascadeCulls(cmd, cascades, objects);
+        shadow.renderShadowPass(cmd, cascades, objects);
         return;
     };
     {
         var z = engine.Profiler.zone("render.shadow");
         defer z.end();
-        gpu_cull.dispatchShadowCulls(own, objects, light_frustum);
-        shadow.renderShadowPass(own, light_vp, objects);
+        dispatchAllCascadeCulls(own, cascades, objects);
+        shadow.renderShadowPass(own, cascades, objects);
     }
     var gz = engine.Profiler.zone("gpu.shadow");
     defer gz.end();

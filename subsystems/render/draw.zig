@@ -84,9 +84,12 @@ pub fn uploadLights(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, lights:
 /// per-draw (lighting is scene-wide, not per-material).
 pub const FrameUniforms = struct {
     cam_pos4: [4]f32,
-    light_vp: [16]f32,
+    cam_forward4: [4]f32,
     env_params: [4]f32,
     env_sh: [9][4]f32,
+    cascade_vp: [types.NUM_CASCADES][16]f32,
+    cascade_splits: [4]f32,
+    cascade_depth_scale: [4]f32,
 };
 
 /// Everything one submesh draw needs: which pipeline permutation, geometry
@@ -103,7 +106,7 @@ pub const DrawParams = struct {
     emissive: [4]f32,
     flags: [4]f32,
     flags2: [4]f32,
-    bindings: [7]c.SDL_GPUTextureSamplerBinding,
+    bindings: [8]c.SDL_GPUTextureSamplerBinding,
 };
 
 /// A blended/additive draw deferred for back-to-front sorting.
@@ -152,11 +155,14 @@ fn bindDrawState(
         .flags = dp.flags,
         .flags2 = dp.flags2,
         .env_params = fu.env_params,
+        .cam_forward = fu.cam_forward4,
         .env_sh = fu.env_sh,
-        .light_vp = fu.light_vp,
+        .cascade_vp = fu.cascade_vp,
+        .cascade_splits = fu.cascade_splits,
+        .cascade_depth_scale = fu.cascade_depth_scale,
     };
     c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 7);
+    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 8);
 }
 
 /// Bind the draw's state and issue one indexed draw call for a single submesh.
@@ -205,6 +211,11 @@ pub const DrawCtx = struct {
     white: *c.SDL_GPUTexture,
     flat_n: *c.SDL_GPUTexture,
     sampler: *c.SDL_GPUSampler,
+    /// Blurred SSAO texture (or `white` when SSAO is unavailable) — see `ssao.zig`.
+    ssao_tex: *c.SDL_GPUTexture,
+    /// Clamp-to-edge sampler for screen-space reads (SSAO now, SSR later) —
+    /// reuses `state.cubemap_sampler`, which is clamp+linear regardless of name.
+    ssao_smp: *c.SDL_GPUSampler,
 };
 
 /// Material-slot GUID, or empty for out-of-range/absent slots.
@@ -255,6 +266,7 @@ pub fn buildDrawParams(
             .{ .texture = occ_t.tex, .sampler = ctx.sampler },
             .{ .texture = ctx.shadow_tex, .sampler = ctx.shadow_smp },
             .{ .texture = ctx.env_prefiltered_tex, .sampler = ctx.cubemap_smp },
+            .{ .texture = ctx.ssao_tex, .sampler = ctx.ssao_smp },
         },
     };
 }
