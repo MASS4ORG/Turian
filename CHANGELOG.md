@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.0] - 2026-07-27
+
+### Features
+- feat: project version-check + migration runner framework (CLI) #137
+- feat: prefiltered cubemap IBL for specular reflections #144
+- feat: HDR post-processing pipeline with bloom, color grading, vignette, and volumes #136
+
+### Performance
+- perf: enchancements for Bistro sample
+
 ## [3.1.1] - 2026-07-25
 
 ### Performance
