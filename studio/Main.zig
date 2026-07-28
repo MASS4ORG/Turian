@@ -3,7 +3,7 @@ const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
 const rdebug = @import("debug");
-const EditorState = @import("services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const Window = @import("main-window/Window.zig");
 const ProjectOps = @import("services/ProjectOps.zig");
 const GpuRenderer = @import("scene-view/GpuRenderer.zig");
@@ -14,7 +14,7 @@ const FontEditor = @import("inspector/editor/FontEditor.zig");
 const ThemeEditor = @import("inspector/editor/ThemeEditor.zig");
 const ActiveTheme = @import("services/ActiveTheme.zig");
 const StudioLocale = @import("services/StudioLocale.zig");
-const AssetWatcher = @import("asset-browser/AssetWatcher.zig");
+const AssetWatcher = editor.asset_watcher;
 const Documents = @import("main-window/Documents.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
 const FpsCounter = @import("services/FpsCounter.zig");
@@ -211,6 +211,12 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
 /// `UndoRedo.pushCommand`'s `modify_object` snapshot, inside dvui's already
 /// non-trivial widget-tree recursion — a debug build's per-frame stack usage
 /// is large enough that this combination can exhaust the default 8 MiB.
+/// Installed as `EditorState.on_redraw_request` so the GUI-free editor session
+/// can keep Studio redrawing while a background job is in flight.
+fn requestRedraw() void {
+    gui.refresh(null, @src(), null);
+}
+
 fn raiseStackLimit() void {
     if (comptime @import("builtin").os.tag == .windows) return;
     const cur = std.posix.getrlimit(.STACK) catch return;
@@ -308,6 +314,7 @@ fn run(main_init: std.process.Init) !void {
 
     EditorState.gpa = main_init.gpa;
     EditorState.environ_map = main_init.environ_map;
+    EditorState.on_redraw_request = requestRedraw;
 
     // Start the Studio debug server so LLM tools (MCP) can inspect the open
     // scene while the developer works. Runs on port 7778 to coexist with a

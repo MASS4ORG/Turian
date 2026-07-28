@@ -12,7 +12,7 @@
 
 const std = @import("std");
 const gui = @import("gui");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const AssetNav = @import("AssetNav.zig");
 const AssetGridView = @import("AssetGridView.zig");
 const AssetTreeView = @import("AssetTreeView.zig");

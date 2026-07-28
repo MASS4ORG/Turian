@@ -2,7 +2,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const PropDrawMath = @import("PropDrawMath.zig");
 const PropDrawReflect = @import("PropDrawReflect.zig");
 

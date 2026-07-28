@@ -31,6 +31,16 @@ from what games need, duplicating work and diverging over time.
   pipeline; `serde.json` is already the house serializer for assets, and this
   keeps the XML dependency confined to editor tooling so it never links into
   the shipped game.
+- **A third, id-keyed-with-fallback entry point (`Locale.keyFallback`) covers
+  dev-authored strings that only exist as a runtime value at their draw call**
+  (a title pulled from a runtime-registered list — `CommandDesc`/`PanelDesc`
+  — can't reach `tr()`'s comptime `msg` parameter, yet unlike `key()`'s
+  designer content there's always a known-safe English default). It behaves
+  like `tr()` (falls back to that default, not a bracket marker) but is keyed
+  by the list entry's own stable `id` instead of the message text. The
+  extractor's `.id`/`.title` struct-literal harvesting is the registration
+  side of the same pattern — no separate call site needed, so nothing can
+  drift out of sync by hand the way a bespoke id-lookup table would.
 - **Runtime table is compiled, read-only, and hot-swappable.** `.strings` bakes
   to a compact binary `.strtab` (header, sorted id array, offset array, blob),
   packed into `game.oap`. Lookup is binary search comparing full id strings —

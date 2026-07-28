@@ -1,8 +1,4 @@
-//! First registered migration (ADR-0012): rebuilds `mesh_renderer.material_guids`
-//! for per-material-slot binding, converting both the legacy single
-//! `material_guid` field and the pre-3.0 per-submesh-indexed array. Loading a
-//! scene already migrates the field in memory (see `SceneIo.sceneCompToEngine`);
-//! this persists that migration to disk across the whole project.
+//! Rebuilds `mesh_renderer.material_guids` for per-material-slot binding. Loading a scene already migrates the field in memory (`SceneIo.sceneCompToEngine`); this persists that migration to disk.
 const std = @import("std");
 const engine = @import("engine");
 const MigrationApi = @import("MigrationApi.zig");
@@ -13,7 +9,7 @@ const scene_io = @import("../SceneIo.zig");
 
 pub const migration = MigrationApi.Migration{
     .to_version = .{ .major = 3, .minor = 0, .patch = 0 },
-    .summary = "Rebuilds mesh_renderer material_guids for per-material-slot binding (from the legacy single-field or per-submesh-indexed forms).",
+    .summary = "Rebuilds mesh_renderer material_guids for per-material-slot binding (converts single-field and per-submesh-indexed forms).",
     .idempotent = true,
     .run = run,
 };

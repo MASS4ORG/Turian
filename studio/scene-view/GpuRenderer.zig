@@ -11,7 +11,7 @@ const gpu = @import("gpu");
 const engine = @import("engine");
 const editor = @import("editor");
 const render = @import("render");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const GizmoSystem = @import("GizmoSystem.zig");
 
 const dc = gui.backend.c;
@@ -332,14 +332,7 @@ fn meshBytes(guid: []const u8) ?render.Bytes {
     return readOwned(path);
 }
 
-/// Textures come from the asset path the database resolved (source image, or a
-/// cooked `.texture` for embedded/derived images). Regular top-level texture
-/// assets resolve to their *uncooked* source file (no reimport dependency for
-/// live preview), so a DDS is cooked in memory here the same way
-/// `AssetImporter.cookImage` does at import time — otherwise an sRGB
-/// albedo/emissive DDS (legacy FourCC, no sRGB bit of its own) uploads as a
-/// plain linear format, and the GPU sampler skips gamma decode entirely,
-/// washing every texture toward white.
+/// Textures resolve to their *uncooked* source file for live preview, so a DDS is cooked in memory here the same way `AssetImporter.cookImage` does at import time — otherwise an sRGB albedo/emissive DDS uploads as plain linear format, and the GPU sampler skips gamma decode.
 fn textureBytes(guid: []const u8) ?render.Bytes {
     const path = EditorState.resolveAssetGuid(guid) orelse return null;
     const raw = readOwned(path) orelse return null;

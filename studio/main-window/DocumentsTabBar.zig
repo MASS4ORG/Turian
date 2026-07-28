@@ -8,7 +8,7 @@
 
 const std = @import("std");
 const gui = @import("gui");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const Documents = @import("Documents.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
 

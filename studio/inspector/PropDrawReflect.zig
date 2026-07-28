@@ -1,6 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 
 const FieldHint = engine.FieldHint;
 

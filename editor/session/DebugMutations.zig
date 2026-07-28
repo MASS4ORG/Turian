@@ -1,6 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
@@ -18,11 +18,8 @@ pub const ComponentDef = editor.ComponentDef;
 
 pub const MAX_DISCOVERED = editor.scanner.MAX_COMPONENTS;
 
-// ── Remote-debug mutation helpers ────────────────────────────
-//
-// The Remote Debug Protocol's MutationApplier (see studio/Main.zig) routes LLM /
-// CLI edits through these, so AI edits go through the same undo stack as the UI
-// and stay consistent with it.
+// ── Remote-debug mutation helpers ─────
+// Routes LLM/CLI edits through the same undo stack as the UI for consistency.
 
 const introspect = engine.introspect;
 

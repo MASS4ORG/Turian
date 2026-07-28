@@ -4,10 +4,8 @@
 //  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const std = @import("std");
-const gui = @import("gui");
 const engine = @import("engine");
-const editor = @import("editor");
-const build_options = @import("turian_build_options");
+const editor = @import("../root.zig");
 
 pub const Vector3 = engine.Vector3;
 pub const Transform = engine.Transform;
@@ -86,6 +84,16 @@ pub var import_pending: ?*ImportJob.ImportJob = null;
 pub var active_browse_dir_buf: [1024]u8 = undefined;
 pub var active_browse_dir_len: usize = 0;
 pub var asset_db_initialized: bool = false;
+
+/// Host hook invoked when background session work changes state and the UI
+/// should redraw. Studio installs a `gui.refresh` wrapper; headless callers
+/// (CLI, tests) leave it null so this module stays GUI-free.
+pub var on_redraw_request: ?*const fn () void = null;
+
+/// Asks the host to redraw, if one is attached.
+pub fn requestRedraw() void {
+    if (on_redraw_request) |cb| cb();
+}
 
 /// Ensures `objects` has room for at least `min_count` nodes, growing if needed.
 pub fn ensureObjectCapacity(min_count: usize) void {

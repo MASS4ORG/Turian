@@ -1,6 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
@@ -311,12 +311,7 @@ pub fn isAncestorOrSelf(node: usize, maybe_ancestor: i32) bool {
     return false;
 }
 
-/// Move `drag` (and its whole subtree) to become a child of `new_parent`
-/// (-1 = scene root), inserted immediately before `before_sibling` among
-/// `new_parent`'s children, or appended last when `before_sibling` is -1.
-/// Indices are the *current* array indices. No-op if it would create a cycle.
-/// Rebuilds the array via a tree walk, so the parent-precedes-child invariant
-/// is preserved and all parent indices stay correct.
+/// Move `drag` (and its whole subtree) to become a child of `new_parent`, inserted immediately before `before_sibling` or appended last. No-op if it would create a cycle. Rebuilds the array via a tree walk to preserve the parent-precedes-child invariant.
 pub fn reparentObject(now: i128, drag: usize, new_parent: i32, before_sibling: i32) void {
     if (drag >= EditorState.object_count) return;
     if (new_parent == @as(i32, @intCast(drag))) return;

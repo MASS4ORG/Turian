@@ -176,6 +176,17 @@ pub fn build(b: *std.Build) void {
         turian_opts.addOption([]const u8, "sdl3_include_path", "");
     }
 
+    // Created once and shared by `addImport` rather than `addOptions` per
+    // consumer: `addOptions` would make a fresh module per call, and the
+    // editor module plus the executables that embed it would then hold two
+    // modules rooted at the same generated options file, which Zig rejects.
+    const turian_opts_mod = turian_opts.createModule();
+
+    // `editor/session/ReflectJob.zig` bakes the SDK paths above into the
+    // reflection BuildConfig, so the editor module itself needs these options
+    // (not just the executables that embed it).
+    editor_mod.addImport("turian_build_options", turian_opts_mod);
+
     // ── Studio (GUI editor) ──────────────────────────────────────────────────
     if (!cli_only) {
         const studio_exe = b.addExecutable(.{
@@ -203,7 +214,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         studio_exe.root_module.link_libc = true;
-        studio_exe.root_module.addOptions("turian_build_options", turian_opts);
+        studio_exe.root_module.addImport("turian_build_options", turian_opts_mod);
         b.installArtifact(studio_exe);
 
         const run_step = b.step("run", "Run Turian Studio");
@@ -230,7 +241,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     cli_exe.root_module.link_libc = true;
-    cli_exe.root_module.addOptions("turian_build_options", turian_opts);
+    cli_exe.root_module.addImport("turian_build_options", turian_opts_mod);
     b.installArtifact(cli_exe);
 
     const cli_run_step = b.step("cli", "Run turian-cli");
@@ -284,19 +295,6 @@ pub fn build(b: *std.Build) void {
     });
     const mcp_tests = b.addTest(.{ .root_module = mcp_test_mod });
 
-    const studio_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("studio/services/EditorState.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "engine", .module = engine_mod },
-                .{ .name = "editor", .module = editor_mod },
-            },
-        }),
-    });
-    studio_tests.root_module.addOptions("turian_build_options", turian_opts);
-
     // Pure CPU-side raster/audio math behind the asset preview system
     // — no gui/render/gpu imports, so it's cheap to test standalone rather than
     // dragging in the full studio build graph.
@@ -334,7 +332,6 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run engine + editor + studio + render + debug + mcp tests");
     test_step.dependOn(&b.addRunArtifact(engine_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_tests).step);
-    test_step.dependOn(&b.addRunArtifact(studio_tests).step);
     test_step.dependOn(&b.addRunArtifact(preview_raster_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_frame_timing_tests).step);
     test_step.dependOn(&b.addRunArtifact(editor_registry_tests).step);
@@ -422,7 +419,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         rel_studio.root_module.link_libc = true;
-        rel_studio.root_module.addOptions("turian_build_options", turian_opts);
+        rel_studio.root_module.addImport("turian_build_options", turian_opts_mod);
         ci_step.dependOn(&b.addInstallArtifact(rel_studio, .{}).step);
     }
     const rel_cli = b.addExecutable(.{
@@ -441,7 +438,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     rel_cli.root_module.link_libc = true;
-    rel_cli.root_module.addOptions("turian_build_options", turian_opts);
+    rel_cli.root_module.addImport("turian_build_options", turian_opts_mod);
     ci_step.dependOn(&b.addInstallArtifact(rel_cli, .{}).step);
 
     // ── Release tooling (tools/ci/Release.zig, always compiled for host) ────────
@@ -552,7 +549,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         sdk_cli.root_module.link_libc = true;
-        sdk_cli.root_module.addOptions("turian_build_options", turian_opts);
+        sdk_cli.root_module.addImport("turian_build_options", turian_opts_mod);
         sdk_step.dependOn(&b.addInstallArtifact(sdk_cli, .{
             .dest_dir = .{ .override = .{ .custom = "sdk" } },
         }).step);
@@ -577,7 +574,7 @@ pub fn build(b: *std.Build) void {
                 }),
             });
             sdk_studio.root_module.link_libc = true;
-            sdk_studio.root_module.addOptions("turian_build_options", turian_opts);
+            sdk_studio.root_module.addImport("turian_build_options", turian_opts_mod);
             sdk_step.dependOn(&b.addInstallArtifact(sdk_studio, .{
                 .dest_dir = .{ .override = .{ .custom = "sdk" } },
             }).step);

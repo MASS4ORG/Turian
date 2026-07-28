@@ -1,6 +1,5 @@
 const std = @import("std");
-const gui = @import("gui");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
@@ -105,7 +104,7 @@ pub fn pumpImport(io: std.Io) void {
     const job = EditorState.import_job orelse return;
     const finished = if (State.taskManager().get(job.task_id)) |t| t.isFinished() else true;
     if (!finished) {
-        gui.refresh(null, @src(), null);
+        EditorState.requestRedraw();
         return;
     }
     EditorState.import_future.await(io);
@@ -115,7 +114,7 @@ pub fn pumpImport(io: std.Io) void {
         EditorState.import_pending = null;
         dispatchImport(pending);
     }
-    gui.refresh(null, @src(), null);
+    EditorState.requestRedraw();
 }
 
 /// Block until any in-flight background import job (and anything queued

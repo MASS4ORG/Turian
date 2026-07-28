@@ -13,10 +13,12 @@ const LogPanel = @import("LogPanel.zig");
 const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
-const tr = StudioLocale.tr;
 
 pub const PanelDesc = struct {
+    /// Stable identifier ("hierarchy") — also the translation key
+    /// `editor/i18n/Extractor.zig` pairs with `title` below.
     id: []const u8,
+    /// Untranslated (English) label — see `translatedTitle`.
     title: []const u8,
     icon: []const u8,
     draw: *const fn () void,
@@ -82,20 +84,12 @@ pub fn registerCustom(descs: []const PanelDesc) void {
     g_registry.appendSlice(std.heap.page_allocator, descs) catch {};
 }
 
-/// Localized display title for a panel. Builtin titles are translated by id
-/// (the `PanelDesc.title` field itself stays English, since `tr()` needs a
-/// comptime string and the registry is a runtime-built list); any other
-/// (custom) panel falls back to its own `title` field untranslated.
+/// Localized display title for a panel, id-keyed off `p.id` with `p.title`
+/// itself as the fallback (`editor/i18n/Extractor.zig` harvests the
+/// `id`/`title` pair straight from each `PanelDesc` literal, static or
+/// custom alike — nothing to keep in sync by hand).
 pub fn translatedTitle(p: *const PanelDesc) []const u8 {
-    if (std.mem.eql(u8, p.id, "hierarchy")) return tr("Hierarchy");
-    if (std.mem.eql(u8, p.id, "scene")) return tr("Scene");
-    if (std.mem.eql(u8, p.id, "game")) return tr("Game");
-    if (std.mem.eql(u8, p.id, "inspector")) return tr("Inspector");
-    if (std.mem.eql(u8, p.id, "assets")) return tr("Assets");
-    if (std.mem.eql(u8, p.id, "profiler")) return tr("Profiler");
-    if (std.mem.eql(u8, p.id, "output")) return tr("Log");
-    if (std.mem.eql(u8, p.id, "settings")) return tr("Settings");
-    return p.title;
+    return StudioLocale.trKeyFallback(p.id, p.title, &.{});
 }
 
 /// Strips a `"#N"` instance suffix (see `newInstanceId`) to get back the

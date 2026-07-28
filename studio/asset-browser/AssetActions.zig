@@ -7,7 +7,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const ProjectOps = @import("../services/ProjectOps.zig");
 
 /// Open `file_name` (inside `browse_path`) in the OS-default external editor.

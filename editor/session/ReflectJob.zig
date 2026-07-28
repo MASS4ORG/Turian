@@ -1,18 +1,15 @@
 const std = @import("std");
-const gui = @import("gui");
 const engine = @import("engine");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 const build_options = @import("turian_build_options");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
 
 /// Called after a rescan's results land in `EditorState.discovered_components`,
-/// to re-sync a custom-panel registry with what was just discovered. A
-/// callback rather than a direct `main-window/Panels.zig` import: this file
-/// is reachable from the isolated `studio_tests` build module (root
-/// `EditorState.zig`, no `gui` dependency), and `Panels.zig` pulls in `gui`
-/// transitively — set once at startup by main-window code.
+/// to re-sync a host panel registry with what was just discovered. A callback
+/// rather than a direct import keeps this module GUI-free — set once at
+/// startup by the host (Studio's main-window code).
 pub var onRescan: ?*const fn () void = null;
 
 pub const Vector3 = engine.Vector3;
@@ -140,7 +137,7 @@ pub fn pumpReflect(io: std.Io) void {
     const job = EditorState.reflect_job orelse return;
     const finished = if (State.taskManager().get(job.task_id)) |t| t.isFinished() else true;
     if (!finished) {
-        gui.refresh(null, @src(), null);
+        EditorState.requestRedraw();
         return;
     }
     EditorState.reflect_future.await(io);
@@ -150,7 +147,7 @@ pub fn pumpReflect(io: std.Io) void {
         EditorState.reflect_pending = null;
         dispatchReflect(pending);
     }
-    gui.refresh(null, @src(), null);
+    EditorState.requestRedraw();
 }
 
 /// Block until any in-flight background reflect job (and anything queued

@@ -1,6 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");
@@ -24,11 +24,7 @@ pub fn resolveAssetGuid(guid_str: []const u8) ?[]const u8 {
     return if (EditorState.asset_db.findByGuid(guid)) |info| info.path else null;
 }
 
-/// Resolve the project's "first scene": the scene referenced by
-/// `ProjectSettings.first_scene`, falling back to `scene-01.json` or the first
-/// scene asset in the project. Returns the asset path (owned by `asset_db`, so
-/// it outlives `arena`) or null if no scene exists. Mirrors the build-time
-/// boot-scene resolution in `editor/GameBuild.zig`.
+/// Resolve the project's first scene: `ProjectSettings.first_scene`, falling back to `scene-01.json` or the first scene asset. Returns the asset path or null if no scene exists.
 pub fn firstScenePath(io: std.Io, arena: std.mem.Allocator) ?[]const u8 {
     if (!State.assetDbReady()) return null;
 
@@ -65,12 +61,7 @@ fn readFileArena(io: std.Io, arena: std.mem.Allocator, path: []const u8) ?[]u8 {
     return reader.interface.allocRemaining(arena, .unlimited) catch null;
 }
 
-/// Resolve the default material GUID for every material slot of a model mesh,
-/// writing them into `out` indexed by slot (backed by `buf` for the GUID string
-/// bytes; unset slots are empty slices). Returns the slot count — 0 for
-/// non-model meshes, meshes with no cooked submesh table, or models without
-/// generated materials. Used to auto-assign a MeshRenderer's materials when its
-/// mesh is set to a model.
+/// Resolve the default material GUID for every material slot of a model mesh, writing them into `out` indexed by slot (unset slots are empty slices). Returns the slot count — 0 for non-model meshes or meshes without generated materials.
 pub fn modelSlotMaterials(
     io: std.Io,
     mesh_guid_str: []const u8,
@@ -159,14 +150,7 @@ pub fn refreshComponents(io: std.Io, allocator: std.mem.Allocator) void {
     }
 }
 
-/// Like `refreshComponents`, but defers the (slow) asset scan+cook pass to a
-/// background job instead of blocking, so the caller can present a frame
-/// immediately instead of a black window. `on_import_done` runs once the
-/// import lands in `EditorState.asset_db` — e.g. to restore scene tabs only
-/// once their assets are actually resolvable. Used only for the initial
-/// project-open path; every other caller of `refreshComponents` (asset
-/// rename/move/delete, hot-reload) still needs the fully up-to-date result
-/// before continuing, so they keep the synchronous version.
+/// Defers the asset scan+cook pass to a background job so the caller can present a frame immediately; `on_import_done` runs once the import lands in `EditorState.asset_db`. Used only for the initial project-open path; synchronous callers use `refreshComponents`.
 pub fn refreshComponentsAsync(io: std.Io, allocator: std.mem.Allocator, on_import_done: ?*const fn () void) void {
     var path_buf: [1024]u8 = undefined;
     const assets = scanComponentsAndEvents(io, allocator, &path_buf) orelse return;
@@ -211,13 +195,7 @@ pub fn makeComponent(def: *const ComponentDef) ?Component {
     return c;
 }
 
-/// Merge each loaded user_script component's fields with the current component
-/// definition. The result matches definition order exactly:
-///   - Fields present in both: existing saved value is kept.
-///   - Fields only in definition: inserted with default values.
-///   - Fields only in scene (stale): dropped silently.
-/// Call after loadScene and after refreshComponents (hot-reload) to keep the
-/// inspector consistent with the source.
+/// Merge each loaded user_script component's fields with the current component definition, matching definition order exactly. Call after loadScene and after refreshComponents to keep the inspector consistent.
 pub fn syncSceneWithDefinitions() void {
     for (EditorState.objects[0..EditorState.object_count]) |*obj| {
         for (obj.components[0..obj.component_count]) |*comp| {

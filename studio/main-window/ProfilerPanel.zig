@@ -242,10 +242,7 @@ fn drawControls(cw: *gui.Window) void {
         fpsBtn(cw, "120", 120, 4);
     }
 
-    // Detailed GPU timing (#147): fence-bracketed per-pass real GPU time for
-    // the shadow pass + cull compute phase (`gpu.shadow`/`gpu.cull` zones in
-    // the timeline below). Off by default — forces a pipeline stall between
-    // passes, so only enable while actively investigating frame time.
+    // Fence-bracketed per-pass real GPU time for shadow and cull phases. Off by default — forces a pipeline stall between passes.
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();

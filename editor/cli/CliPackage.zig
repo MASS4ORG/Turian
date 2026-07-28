@@ -73,9 +73,7 @@ pub fn cmdPackage(
         return cmdPackageInfo(io, gpa, project_path, arg1, store_root);
     } else if (std.mem.eql(u8, sub, "search")) {
         std.debug.print(
-            \\Package registry search is not yet available.
-            \\A registry/repository API is planned.
-            \\In the meantime, install packages from a local path or git URL:
+            \\Package registry is not available. Install packages from a local path or git URL:
             \\  turian-cli package install /path/to/package
             \\  turian-cli package install git+https://example.com/my-package
             \\

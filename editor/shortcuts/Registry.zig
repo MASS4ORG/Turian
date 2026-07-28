@@ -27,9 +27,12 @@ pub const Context = enum {
 
 pub const CommandDesc = struct {
     /// Namespaced, stable identifier ("edit.undo") — also the settings key
-    /// suffix, so renaming it orphans any saved override.
+    /// suffix (renaming it orphans any saved override) and the translation
+    /// key `editor/i18n/Extractor.zig` pairs with `title` below.
     id: []const u8,
-    /// Untranslated label; UI callers run it through their own `tr()`.
+    /// Untranslated (English) label. UI callers translate it by id via
+    /// `StudioLocale.trKeyFallback(desc.id, desc.title, ...)`, since it only
+    /// reaches their draw call as a runtime value — see ADR 0011.
     title: []const u8,
     context: Context = .global,
     defaults: []const Binding = &.{},

@@ -1,16 +1,7 @@
-//! Lightweight polling file watcher for the project's `assets/` tree.
-//!
-//! The asset browser used to expose a manual "Refresh" button. Instead we poll
-//! the assets directory on a throttled interval and recompute a cheap signature
-//! (per-file size + mtime, folded into a hash). When the signature changes we
-//! report it so the caller can hot-reload via `EditorState.refreshComponents`.
-//!
-//! This is deliberately a poll rather than an OS-native watch (inotify/kqueue/
-//! ReadDirectoryChangesW): it is fully cross-platform, needs no extra threads,
-//! and a once-per-second walk of a project's assets tree is negligible.
+//! Lightweight polling file watcher for the project's `assets/` tree. Polls on a throttled interval, computing a cheap per-file size+mtime hash; when the signature changes, reports it to trigger hot-reload via `EditorState.refreshComponents`. Fully cross-platform with no extra threads.
 
 const std = @import("std");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("../session/EditorState.zig");
 
 /// How often to re-scan the assets tree.
 const POLL_INTERVAL_NS: i128 = 1 * std.time.ns_per_s;

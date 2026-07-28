@@ -1,15 +1,4 @@
-//! Desktop (SDL3) platform backend for the game-code generator.
-//!
-//! GameBuild.zig emits a standalone game `main.zig`. The platform-specific
-//! pieces — windowing, the event pump, input device bindings — were previously
-//! inlined as string literals inside GameBuild. They are collected here so the
-//! generator's platform layer lives in one place and so additional backends
-//! (Android, iOS, consoles — see item 8) can be added as sibling
-//! modules exposing the same `pub const` source-fragment interface.
-//!
-//! These fragments are SDL3-ABI exact (field offsets/enum values) and are not
-//! CPU-architecture specific despite the historical "x64-only" note — the real
-//! platform variance is the windowing/input API, which is what this abstracts.
+//! Desktop (SDL3) platform backend for the game-code generator. The platform-specific pieces — windowing, event pump, input bindings — are collected here so additional backends can be added as sibling modules exposing the same `pub const` source-fragment interface. Fragments are SDL3-ABI exact (field offsets/enum values).
 
 /// SDL3 windowing + 2D renderer bindings (software-blit present path).
 pub const bindings =

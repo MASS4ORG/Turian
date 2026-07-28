@@ -1,35 +1,20 @@
-const std = @import("std");
+//! Studio wiring for `editor.session.project`: supplies dvui's `io` and
+//! per-frame arena, resets the asset watcher, and hosts the native
+//! folder-picker dialog. All state mutation lives in the editor module.
+
 const gui = @import("gui");
-const engine = @import("engine");
-const EditorState = @import("EditorState.zig");
-const AssetWatcher = @import("../asset-browser/AssetWatcher.zig");
-const Documents = @import("../main-window/Documents.zig");
 const editor = @import("editor");
+const ProjectSession = editor.session.project;
+const AssetWatcher = editor.asset_watcher;
+const Documents = @import("../main-window/Documents.zig");
 const StudioLocale = @import("StudioLocale.zig");
 const tr = StudioLocale.tr;
 const build_options = @import("turian_build_options");
 
 /// Open an existing project at the given filesystem path.
 pub fn openProject(path: []const u8) void {
-    EditorState.setProjectPath(path);
     AssetWatcher.reset();
-    const result = editor.project_ops.openProject(gui.io, gui.currentWindow().arena(), path);
-    EditorState.current_project = result.project;
-
-    if (EditorState.settingsReady()) {
-        const arena = gui.currentWindow().arena();
-        editor.recent_projects.push(&EditorState.settings, gui.io, arena, path);
-        EditorState.settings.save(gui.io);
-    }
-
-    // Start from a clean scene now; the asset scan/cook pass runs in the
-    // background (see `refreshComponentsAsync`) so this window can present
-    // instead of blocking on a full project import. Previously-open document
-    // tabs restore once that import lands (their assets need to be resolvable
-    // first — restoring a scene tab with an unimported mesh would fail to
-    // load it and never retry).
-    EditorState.clearScene();
-    EditorState.refreshComponentsAsync(gui.io, gui.currentWindow().arena(), Documents.restore);
+    ProjectSession.openProject(gui.io, gui.currentWindow().arena(), path, Documents.restore);
 }
 
 /// Prompt for a project folder via a native dialog and open it. Shared by
@@ -57,100 +42,23 @@ pub fn openProjectDialog() void {
 
 /// Create a new project at the given path with the given name.
 pub fn newProject(path: []const u8, proj_name: []const u8) void {
-    editor.project_ops.newProject(gui.io, path, proj_name, build_options.version);
-    openProject(path);
-
-    if (EditorState.current_project) |*p| {
-        p.setName(proj_name);
-    } else {
-        var proj = EditorState.Project{};
-        proj.setName(proj_name);
-        EditorState.current_project = proj;
-    }
-}
-
-/// Save the current scene to a .zon file at the given path.
-pub fn saveScene(path: []const u8) void {
-    editor.scene_io.saveScene(
+    AssetWatcher.reset();
+    ProjectSession.newProject(
         gui.io,
-        path,
-        EditorState.objects,
-        EditorState.object_count,
         gui.currentWindow().arena(),
+        path,
+        proj_name,
+        build_options.version,
+        Documents.restore,
     );
-    EditorState.markSceneSaved();
 }
 
-/// Load a scene from a .zon file and replace the current scene.
-// Load scratch, kept out of the stack: a `[MAX_OBJECTS]SceneNode` local
-// overflows now that the per-slot material table enlarged each node. Grown
-// (from `MAX_OBJECTS`, doubling) on demand via `EditorState.gpa` — a
-// persistent allocator, not the per-frame GUI arena, since this buffer is
-// cached across calls in a module-level var. `editor.scene_io.loadScene`
-// reports the scene's *true* node count in `tmp_count` even when this buffer
-// is too small (see its doc comment), so a Bistro-scale FBX hierarchy scene
-// loads completely instead of silently truncating at the old fixed cap.
-var load_scratch: []EditorState.SceneNode = &.{};
+/// Save the current scene to a .json file at the given path.
+pub fn saveScene(path: []const u8) void {
+    ProjectSession.saveScene(gui.io, gui.currentWindow().arena(), path);
+}
 
+/// Load a scene from a .json file and replace the current scene.
 pub fn loadScene(path: []const u8) bool {
-    if (load_scratch.len == 0) {
-        load_scratch = EditorState.gpa.alloc(EditorState.SceneNode, EditorState.MAX_OBJECTS) catch return false;
-    }
-    var tmp_count: usize = 0;
-    while (true) {
-        if (!editor.scene_io.loadScene(gui.io, gui.currentWindow().arena(), path, load_scratch, &tmp_count)) {
-            return false;
-        }
-        if (tmp_count <= load_scratch.len or load_scratch.len >= engine.scene.GROWTH_CEILING) break;
-        const new_cap = @min(tmp_count, engine.scene.GROWTH_CEILING);
-        const grown = EditorState.gpa.realloc(load_scratch, new_cap) catch break;
-        load_scratch = grown;
-    }
-    if (tmp_count > load_scratch.len) return false; // hit the growth ceiling
-
-    EditorState.object_count = 0;
-    EditorState.selected_object = null;
-    EditorState.clearUndoStack();
-    EditorState.ensureObjectCapacity(tmp_count);
-    if (tmp_count > EditorState.objects.len) return false; // hit the growth ceiling
-    for (load_scratch[0..tmp_count], 0..) |obj, i| {
-        EditorState.objects[i] = obj;
-    }
-    EditorState.object_count = tmp_count;
-    EditorState.syncSceneWithDefinitions();
-    // Pull in any source-prefab edits made since this scene was saved.
-    EditorState.resyncPrefabInstances(gui.io);
-    EditorState.setCurrentScenePath(path);
-    EditorState.markSceneSaved();
-
-    // Auto-migrate pre-v2 scenes: rebuild model material tables by slot (v1
-    // bound them per submesh). Leaves the scene dirty so a save persists v2.
-    if (EditorState.assetDbReady()) {
-        if (EditorState.project_path) |proj| {
-            if (sceneFileVersion(path) < 2) {
-                const migrated = editor.model_materials.migrateSceneMaterials(
-                    gui.io,
-                    std.heap.page_allocator,
-                    &EditorState.asset_db,
-                    proj,
-                    EditorState.objects,
-                    EditorState.object_count,
-                );
-                if (migrated > 0) EditorState.scene_dirty = true;
-            }
-        }
-    }
-    return true;
-}
-
-/// Scene-file format version, or the current version on any read error (so a
-/// failed read never triggers a spurious migration).
-fn sceneFileVersion(path: []const u8) u32 {
-    const current = editor.scene_io.CURRENT_VERSION;
-    var file = std.Io.Dir.cwd().openFile(gui.io, path, .{}) catch return current;
-    defer file.close(gui.io);
-    var fbuf: [4096]u8 = undefined;
-    var reader = file.reader(gui.io, &fbuf);
-    const bytes = reader.interface.allocRemaining(gui.currentWindow().arena(), .unlimited) catch return current;
-    return editor.scene_io.parseSceneVersion(bytes);
+    return ProjectSession.loadScene(gui.io, gui.currentWindow().arena(), path);
 }

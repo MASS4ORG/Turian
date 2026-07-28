@@ -12,7 +12,7 @@
 
 const std = @import("std");
 const editor = @import("editor");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 
 /// Upper bound on total folder+file nodes tracked at once. Scanning stops
 /// silently once hit (same graceful-cap convention as `AssetBrowser`'s

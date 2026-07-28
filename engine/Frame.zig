@@ -112,6 +112,17 @@ pub const Frame = struct {
         const loc = self.service(Locale) orelse return id;
         return loc.key(arena, id, args) catch id;
     }
+
+    /// Id-keyed localized text with a known-safe fallback
+    /// (`engine.i18n.Locale.keyFallback`) — for dev-authored strings that
+    /// only exist as a runtime value where they're displayed (a registered
+    /// plugin/command's title pulled from a runtime list). Returns
+    /// `fallback` if `arena` is null or no `Locale` service is registered.
+    pub fn trKeyFallback(self: Frame, id: []const u8, fallback: []const u8, args: []const i18n.Arg) []const u8 {
+        const arena = self.arena orelse return fallback;
+        const loc = self.service(Locale) orelse return fallback;
+        return loc.keyFallback(arena, id, fallback, args) catch fallback;
+    }
 };
 
 // ---------------------------------------------------------------------------

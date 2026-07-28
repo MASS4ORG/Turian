@@ -136,6 +136,20 @@ pub fn key(self: *const Locale, allocator: std.mem.Allocator, id: []const u8, ar
     return allocator.dupe(u8, id);
 }
 
+/// Id-keyed UI text with a caller-supplied English fallback, for dev-authored
+/// strings that only exist as a runtime value by the time they reach a draw
+/// call (a registered command/panel title pulled from a runtime list — see
+/// ADR 0011) and so can never reach `tr()`'s comptime `msg` parameter. Unlike
+/// `key()`, `fallback` is always a safe known-English string (the caller's
+/// own default, not arbitrary designer content), so a miss degrades to it
+/// verbatim instead of a bracket marker — `fallback` is not run through the
+/// formatter since it's already-final caller-computed text, not an ICU
+/// template.
+pub fn keyFallback(self: *const Locale, allocator: std.mem.Allocator, id: []const u8, fallback: []const u8, args: []const Arg) ![]u8 {
+    if (try self.lookupOrFormat(allocator, id, args)) |s| return s;
+    return allocator.dupe(u8, fallback);
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -240,6 +254,25 @@ test "key resolves a designer-authored id" {
     const s = try loc.key(testing.allocator, "dlg.act1.intro", &.{});
     defer testing.allocator.free(s);
     try testing.expectEqualStrings("こんにちは", s);
+}
+
+test "keyFallback falls back to the caller's text, not a bracket marker" {
+    var loc = Locale.init("en");
+    const s = try loc.keyFallback(testing.allocator, "panel.inspector", "Inspector", &.{});
+    defer testing.allocator.free(s);
+    try testing.expectEqualStrings("Inspector", s);
+}
+
+test "keyFallback resolves a translation from the active locale table" {
+    var loc = Locale.init("en");
+    const pt = try tableBytes(testing.allocator, "pt", &.{.{ .id = "panel.inspector", .value = "Inspetor" }});
+    defer testing.allocator.free(pt);
+    try loc.loadTable(pt);
+    loc.setLocale("pt");
+
+    const s = try loc.keyFallback(testing.allocator, "panel.inspector", "Inspector", &.{});
+    defer testing.allocator.free(s);
+    try testing.expectEqualStrings("Inspetor", s);
 }
 
 test "setLocale bumps generation and does not free previously loaded tables" {

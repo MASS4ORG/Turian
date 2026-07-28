@@ -34,6 +34,8 @@ pub const material_overrides = @import("assets/MaterialOverrides.zig");
 pub const asset_packager = @import("assets/AssetPackager.zig");
 /// Asset type registry and lookup.
 pub const asset_registry = @import("assets/AssetRegistry.zig");
+/// Throttled polling watcher for the project's `assets/` tree.
+pub const asset_watcher = @import("assets/AssetWatcher.zig");
 /// Game build system (generates + compiles standalone game).
 pub const GameBuild = @import("build/GameBuild.zig");
 /// Play-mode build system (generates + compiles the in-editor play library).
@@ -41,7 +43,9 @@ pub const PlayBuild = @import("build/PlayBuild.zig");
 /// SDK layout detection and BuildConfig resolution.
 pub const sdk_layout = @import("build/SdkLayout.zig");
 /// User script reflection via dynamic library compilation.
-pub const user_reflection = @import("UserReflection.zig");
+pub const user_reflection = @import("build/UserReflection.zig");
+/// Cross-platform dynamic-library loader for the hot-compiled play library.
+pub const DynLib = @import("build/DynLib.zig");
 
 pub const ComponentDef = scanner.ComponentDef;
 pub const DefKind = scanner.DefKind;
@@ -72,9 +76,9 @@ pub const AssetDatabase = @import("assets/AssetDatabase.zig").AssetDatabase;
 pub const AssetInfo = @import("assets/AssetDatabase.zig").AssetInfo;
 pub const ChangeKind = @import("assets/AssetDatabase.zig").ChangeKind;
 /// Progress + cancellation interface for long-running operations.
-pub const Progress = @import("Progress.zig").Progress;
+pub const Progress = @import("tasks/Progress.zig").Progress;
 /// Thread-safe registry of running/queued/finished editor tasks.
-pub const TaskManager = @import("TaskManager.zig");
+pub const TaskManager = @import("tasks/TaskManager.zig");
 pub const Task = TaskManager.Task;
 pub const TaskStatus = TaskManager.Status;
 pub const TaskKind = TaskManager.Kind;
@@ -83,7 +87,7 @@ pub const TaskKind = TaskManager.Kind;
 pub const settings = @import("project/Settings.zig");
 pub const Settings = settings.Settings;
 /// Typed schema for Studio-wide configuration, drawn by
-/// `studio/SettingsEditor.zig` via the shared `PropDraw` reflection system.
+/// `studio/inspector/editor/SettingsEditor.zig` via the shared `PropDraw` reflection system.
 const studio_settings_types = @import("project/StudioSettings.zig");
 pub const StudioSettings = studio_settings_types.StudioSettings;
 pub const StudioSettingsCategoryMeta = studio_settings_types.CategoryMeta;
@@ -102,7 +106,7 @@ pub const checkEngineCompat = @import("package/PackageManager.zig").checkEngineC
 /// identity and dependencies; generates `build.zig.zon` .
 pub const project_config = @import("project/ProjectConfig.zig");
 pub const ProjectConfig = project_config.ProjectConfig;
-/// Project version-check + migration runner (ADR-0012, #137).
+/// Project version-check + migration runner.
 pub const project_migrations = @import("project/migrations/root.zig");
 /// Central, machine-wide package store shared across projects .
 pub const package_store = @import("package/PackageStore.zig");
@@ -111,6 +115,14 @@ pub const menu_tree = @import("MenuTree.zig");
 
 /// `path:line` reference parser for the Studio Output panel.
 pub const log_location = @import("LogLocation.zig");
+/// Opens a source file at a line in the user's external code editor.
+pub const external_editor = @import("ExternalEditor.zig");
+
+/// Live editing session: open project/scene, selection, undo, clipboard, and
+/// the operations that mutate them. GUI-free; hosts supply io + callbacks.
+pub const session = @import("session/root.zig");
+/// Unified session state facade, re-exported for the common `editor.EditorState` spelling.
+pub const EditorState = session.EditorState;
 
 // Imported at root scope (not just re-exported from within `shortcuts`
 // below) so `refAllDecls` in this file's own `test` block reaches their

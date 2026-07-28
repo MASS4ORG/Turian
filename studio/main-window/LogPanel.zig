@@ -11,7 +11,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const editor = @import("editor");
-const ExternalEditor = @import("../services/ExternalEditor.zig");
+const ExternalEditor = @import("editor").external_editor;
 const StudioLocale = @import("../services/StudioLocale.zig");
 const tr = StudioLocale.tr;
 
@@ -402,7 +402,7 @@ fn handleRowClick(wd: *gui.WidgetData, e: *const Entry) void {
                 const is_double = g_last_click_seq != null and g_last_click_seq.? == e.seq and now - g_last_click_ns < DOUBLE_CLICK_NS;
                 if (is_double) {
                     if (editor.log_location.find(e.message())) |loc| {
-                        ExternalEditor.openAtLocation(loc.path, loc.line);
+                        ExternalEditor.openAtLocation(gui.io, loc.path, loc.line);
                     }
                     g_last_click_seq = null;
                 } else {

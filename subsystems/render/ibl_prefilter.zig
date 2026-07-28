@@ -1,10 +1,4 @@
-//! One-time GPU work turning an uploaded equirect environment texture into a
-//! GGX-prefiltered specular cubemap (#144): convert equirect->cubemap, then
-//! importance-sample each mip/face pair from that cubemap. Runs once per
-//! environment texture upload (see `assets.uploadEnvironment`), not per
-//! frame. Split into its own file for the same reason as
-//! `postprocess_pipeline.zig` — `assets.zig`/`pipeline.zig` are already near
-//! this repo's file-size convention.
+//! One-time GPU work: converts an equirect environment texture into a GGX-prefiltered specular cubemap via importance-sampled mip/face pairs.
 const std = @import("std");
 const gpu = @import("gpu");
 const state = @import("state.zig");

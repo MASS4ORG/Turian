@@ -9,7 +9,7 @@ const engine = @import("engine");
 const GpuRenderer = @import("../../scene-view/GpuRenderer.zig");
 const PreviewCamera = @import("PreviewCamera.zig");
 const MeshBounds = @import("MeshBounds.zig");
-const EditorState = @import("../../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 
 /// Two-light rig (key + a softer, cooler fill from the opposite side) so a
 /// previewed object always reads clearly instead of half-vanishing into the

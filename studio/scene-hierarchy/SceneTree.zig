@@ -5,7 +5,7 @@
 //! menu, prefab visuals, multi-select semantics).
 
 const gui = @import("gui");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const tree_view = @import("../TreeView.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
 const tr = StudioLocale.tr;

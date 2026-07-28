@@ -10,7 +10,7 @@
 const std = @import("std");
 const gui = @import("gui");
 const editor = @import("editor");
-const EditorState = @import("../../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const Documents = @import("../../main-window/Documents.zig");
 const Shortcuts = @import("../../services/Shortcuts.zig");
 const SettingsEditor = @import("SettingsEditor.zig");
@@ -70,32 +70,13 @@ fn contextLabel(context: editor.shortcuts.Context) []const u8 {
     };
 }
 
-/// `entry.desc.title` is a runtime value, not a comptime literal `tr()` can
-/// accept — translated by explicit id lookup instead. Keep in sync with
-/// every `CommandDesc.title`; a missing id just shows untranslated English.
+/// `entry.desc.title` only reaches this draw call as a runtime value, so
+/// `tr()`'s comptime `msg` parameter can't accept it directly — translated
+/// by the command's own stable id instead (`editor/i18n/Extractor.zig`
+/// harvests the `id`/`title` pair straight from each `CommandDesc` literal,
+/// so there's nothing to keep in sync by hand).
 fn translatedTitle(entry: editor.shortcuts.Entry) []const u8 {
-    const id = entry.desc.id;
-    const table = [_]struct { id: []const u8, title: []const u8 }{
-        .{ .id = "edit.undo", .title = tr("Undo") },
-        .{ .id = "edit.redo", .title = tr("Redo") },
-        .{ .id = "edit.copy", .title = tr("Copy") },
-        .{ .id = "edit.cut", .title = tr("Cut") },
-        .{ .id = "edit.paste", .title = tr("Paste") },
-        .{ .id = "play.toggle", .title = tr("Play / Stop") },
-        .{ .id = "file.save", .title = tr("Save") },
-        .{ .id = "file.saveAll", .title = tr("Save All") },
-        .{ .id = "document.close", .title = tr("Close Tab") },
-        .{ .id = "document.nextTab", .title = tr("Next Tab") },
-        .{ .id = "document.prevTab", .title = tr("Previous Tab") },
-        .{ .id = "sceneView.translateMode", .title = tr("Move Tool") },
-        .{ .id = "sceneView.rotateMode", .title = tr("Rotate Tool") },
-        .{ .id = "sceneView.scaleMode", .title = tr("Scale Tool") },
-        .{ .id = "sceneView.focusSelection", .title = tr("Focus Selection") },
-    };
-    for (table) |row| {
-        if (std.mem.eql(u8, row.id, id)) return row.title;
-    }
-    return entry.desc.title;
+    return StudioLocale.trKeyFallback(entry.desc.id, entry.desc.title, &.{});
 }
 
 /// Drawn by `SettingsEditor.zig` when the Shortcuts category is selected and

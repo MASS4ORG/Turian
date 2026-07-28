@@ -13,7 +13,7 @@ const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
 const render = @import("render");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const MeshBounds = @import("../asset-browser/preview/MeshBounds.zig");
 
 const Vector3 = engine.Vector3;

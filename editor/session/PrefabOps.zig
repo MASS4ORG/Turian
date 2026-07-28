@@ -1,6 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
-const editor = @import("editor");
+const editor = @import("../root.zig");
 
 const State = @import("State.zig");
 const EditorState = @import("EditorState.zig");

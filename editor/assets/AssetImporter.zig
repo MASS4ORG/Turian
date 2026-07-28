@@ -9,7 +9,7 @@ const asset_meta = @import("AssetMeta.zig");
 const asset_cache = @import("AssetCache.zig");
 const asset_stamp = @import("AssetStamp.zig");
 const ImportStamp = asset_stamp.ImportStamp;
-const Progress = @import("../Progress.zig").Progress;
+const Progress = @import("../tasks/Progress.zig").Progress;
 
 const AssetDatabase = @import("AssetDatabase.zig").AssetDatabase;
 

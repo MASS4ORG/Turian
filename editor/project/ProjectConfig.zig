@@ -71,11 +71,7 @@ pub const ProjectConfig = struct {
         };
     }
 
-    /// Parse a `project.json` byte buffer. Tolerant of the legacy sentinel
-    /// (`{"turian_version":"0.16"}`) — missing fields fall back to defaults.
-    /// A missing/unparseable `turian_version` falls back to `"0.0.0"`, which the
-    /// ADR-0012 version check treats as maximally behind — triggering the
-    /// migration flow rather than silently skipping it.
+    /// Parse a `project.json` byte buffer. Missing fields fall back to defaults; unparseable `turian_version` falls back to `"0.0.0"`, treated as maximally behind to trigger migration.
     pub fn parse(allocator: std.mem.Allocator, json_bytes: []const u8) !ProjectConfig {
         const parsed = std.json.parseFromSlice(std.json.Value, allocator, json_bytes, .{}) catch
             return error.InvalidProjectJson;
@@ -226,14 +222,7 @@ pub const ProjectConfig = struct {
         return out.toOwnedSlice(allocator);
     }
 
-    /// Generate the project's `build.zig.zon` from this config. `fallback_name`
-    /// is used as the Zig package `.name` when the config has no `name`
-    /// (e.g. legacy projects).
-    ///
-    /// `path_prefix`, when non-empty, is prepended to relative `.path`
-    /// dependencies so the generated ZON works from a different working
-    /// directory (e.g. the project's `.cache/` build). Pass `""` for the
-    /// project-root `build.zig.zon`. Caller owns the result.
+    /// Generate the project's `build.zig.zon` from this config. `fallback_name` is used as the Zig package `.name` when the config has no `name`. `path_prefix`, when non-empty, is prepended to relative `.path` dependencies so the generated ZON works from a different working directory. Caller owns the result.
     pub fn toBuildZon(
         self: ProjectConfig,
         allocator: std.mem.Allocator,

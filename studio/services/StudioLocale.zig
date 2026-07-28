@@ -11,8 +11,12 @@
 //! through the AssetDatabase (see `docs/plans/localization.md` T3.3), so
 //! there is no load-time I/O to fail — only `pt-BR` ships today.
 //!
-//! Source-keyed only (`tr`/`trc`/`trn`): Studio's own UI has no designer
-//! content, so `Locale.key` has no Studio-side counterpart here.
+//! Mostly source-keyed (`tr`/`trc`/`trn`): Studio's own UI has no designer
+//! content, so `Locale.key` has no Studio-side counterpart here. The one
+//! exception is `trKeyFallback`, for text pulled from a runtime list (a
+//! registered panel/command title) where the string is dev-authored but
+//! only reaches its draw call as a runtime value — see ADR 0011 and
+//! `editor/i18n/Extractor.zig`'s `.id`/`.title` struct-literal extraction.
 const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
@@ -80,4 +84,13 @@ pub fn trc(comptime ctx: []const u8, comptime msg: []const u8, args: []const eng
 pub fn trn(comptime one: []const u8, comptime other: []const u8, n: u64, args: []const engine.i18n.Arg) []const u8 {
     const fallback = if (n == 1) one else other;
     return locale.trn(gui.currentWindow().arena(), one, other, n, args) catch fallback;
+}
+
+/// Id-keyed UI text with a caller-supplied English fallback
+/// (`engine.i18n.Locale.keyFallback`) — for a display string pulled from a
+/// runtime list (`PanelDesc.title`, `CommandDesc.title`) that can't reach
+/// `tr()`'s comptime `msg` parameter even though it's dev-authored English,
+/// not designer content. `id` is the list entry's own stable id.
+pub fn trKeyFallback(id: []const u8, fallback: []const u8, args: []const engine.i18n.Arg) []const u8 {
+    return locale.keyFallback(gui.currentWindow().arena(), id, fallback, args) catch fallback;
 }

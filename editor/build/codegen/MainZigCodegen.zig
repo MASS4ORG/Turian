@@ -327,8 +327,7 @@ pub fn generateMainZig(
                 "    switch (comp.*) { inline else => |*c| if (comptime @hasDecl(@TypeOf(c.*), \"configureInput\")) c.configureInput(input) }\n" ++
                 "}\n\n",
         );
-        // update() dispatch: `update(frame)`, `update(transform, objects, time)`,
-        // or the legacy `update(time)` — distinguished by parameter type.
+        // update() dispatch: `update(frame)`, `update(transform, objects, time)`, or `update(time)` — distinguished by parameter type.
         try out.appendSlice(
             a,
             "fn call_update(comp: *LiveComponent, transform: *engine.Transform, objects: []engine.SceneNode, time: engine.Time) void {\n" ++

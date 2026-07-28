@@ -111,7 +111,7 @@ pub fn resolveReflectionConfig(
     gpa: std.mem.Allocator,
     environ: *const std.process.Environ.Map,
     baked: GameBuild.BuildConfig,
-) @import("../UserReflection.zig").ReflectionConfig {
+) @import("UserReflection.zig").ReflectionConfig {
     const build_cfg = resolveBuildConfig(io, gpa, environ, baked);
     // Derive reflection_zig from the resolved engine_root:
     //   engine_root = {engine_dir}/root.zig  →  reflection_zig = {engine_dir}/Reflection.zig

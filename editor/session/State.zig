@@ -1,8 +1,6 @@
 const std = @import("std");
-const gui = @import("gui");
 const engine = @import("engine");
-const editor = @import("editor");
-const build_options = @import("turian_build_options");
+const editor = @import("../root.zig");
 const EditorState = @import("EditorState.zig");
 
 pub const Vector3 = engine.Vector3;
@@ -44,11 +42,8 @@ pub fn assetDbReady() bool {
     return EditorState.asset_db_initialized;
 }
 
-// ── Background task registry ─────────────────────────────────────────────────
-// Owned here (rather than in `studio/Tasks.zig`) so this file's own background
-// reflect job below can create/update tasks without a circular import — every
-// other studio file already depends on `EditorState`, never the reverse.
-// `Tasks.tm()` exposes this same instance to the task bar / menu.
+// ── Background task registry ────────────
+// Owned here rather than in `studio/Tasks.zig` to avoid a circular import: every other studio file depends on `EditorState`, never the reverse.
 var task_manager: editor.TaskManager = editor.TaskManager.init();
 
 pub fn taskManager() *editor.TaskManager {

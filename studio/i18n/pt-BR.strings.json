@@ -6,35 +6,35 @@
       "id": "  build  {ms}",
       "source": "  build  {ms}",
       "target": "  compilação  {ms}",
-      "note": "studio/main-window/ProfilerPanel.zig:182",
+      "note": "studio/main-window/ProfilerPanel.zig:175",
       "state": "translated"
     },
     {
       "id": "  events {ms}",
       "source": "  events {ms}",
       "target": "  eventos {ms}",
-      "note": "studio/main-window/ProfilerPanel.zig:179",
+      "note": "studio/main-window/ProfilerPanel.zig:172",
       "state": "translated"
     },
     {
       "id": "  overrides: {list}",
       "source": "  overrides: {list}",
       "target": "  substituições: {list}",
-      "note": "studio/inspector/Inspector.zig:294",
+      "note": "studio/inspector/Inspector.zig:316",
       "state": "translated"
     },
     {
       "id": "  render {ms}",
       "source": "  render {ms}",
       "target": "  renderização {ms}",
-      "note": "studio/main-window/ProfilerPanel.zig:185",
+      "note": "studio/main-window/ProfilerPanel.zig:178",
       "state": "translated"
     },
     {
       "id": "  {name}  v{version}  (read-only)",
       "source": "  {name}  v{version}  (read-only)",
       "target": "  {name}  v{version}  (somente leitura)",
-      "note": "studio/asset-browser/AssetGridView.zig:59",
+      "note": "studio/asset-browser/AssetGridView.zig:71",
       "state": "translated"
     },
     {
@@ -48,7 +48,7 @@
       "id": "(no fields)",
       "source": "(no fields)",
       "target": "(sem campos)",
-      "note": "studio/inspector/Inspector.zig:150",
+      "note": "studio/inspector/Inspector.zig:152",
       "state": "translated"
     },
     {
@@ -90,7 +90,7 @@
       "id": "(node)",
       "source": "(node)",
       "target": "(nó)",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:533",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:516",
       "state": "translated"
     },
     {
@@ -104,7 +104,7 @@
       "id": "(press Play and Record to capture a frame)",
       "source": "(press Play and Record to capture a frame)",
       "target": "(pressione Reproduzir e Gravar para capturar um quadro)",
-      "note": "studio/main-window/ProfilerPanel.zig:438",
+      "note": "studio/main-window/ProfilerPanel.zig:441",
       "state": "translated"
     },
     {
@@ -118,7 +118,7 @@
       "id": "(theme default)",
       "source": "(theme default)",
       "target": "(padrão do tema)",
-      "note": "studio/inspector/editor/SettingsEditor.zig:245",
+      "note": "studio/inspector/editor/SettingsFields.zig:104",
       "state": "translated"
     },
     {
@@ -132,7 +132,7 @@
       "id": "+ Node",
       "source": "+ Node",
       "target": "+ Nó",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:485",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:468",
       "state": "translated"
     },
     {
@@ -146,70 +146,77 @@
       "id": "3D viewport unavailable",
       "source": "3D viewport unavailable",
       "target": "Visualização 3D indisponível",
-      "note": "studio/scene-view/SceneViewport.zig:166",
+      "note": "studio/scene-view/SceneViewport.zig:202",
       "state": "translated"
     },
     {
       "id": "A",
       "source": "A",
       "target": "A",
-      "note": "studio/inspector/PropDrawMath.zig:223",
+      "note": "studio/inspector/PropDrawMath.zig:226",
       "state": "translated"
     },
     {
       "id": "A Zig game engine editor.",
       "source": "A Zig game engine editor.",
       "target": "Um editor de motor de jogo em Zig.",
-      "note": "studio/main-window/MenuBar.zig:32",
+      "note": "studio/main-window/MenuBar.zig:35",
       "state": "translated"
     },
     {
       "id": "A task is already running. Wait for it to finish.",
       "source": "A task is already running. Wait for it to finish.",
       "target": "Uma tarefa já está em execução. Aguarde a conclusão.",
-      "note": "studio/main-window/Tasks.zig:205",
+      "note": "studio/main-window/Tasks.zig:207",
       "state": "translated"
     },
     {
       "id": "About",
       "source": "About",
       "target": "Sobre",
-      "note": "studio/main-window/MenuBar.zig:268",
+      "note": "studio/main-window/MenuBar.zig:286",
       "state": "translated"
     },
     {
       "id": "Active",
       "source": "Active",
       "target": "Ativo",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:670",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:653",
       "state": "translated"
     },
     {
       "id": "Add Child Node",
       "source": "Add Child Node",
       "target": "Adicionar Nó Filho",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:578",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:561",
       "state": "translated"
     },
     {
       "id": "Add Component...",
       "source": "Add Component...",
       "target": "Adicionar Componente...",
-      "note": "studio/inspector/Inspector.zig:244",
+      "note": "studio/inspector/Inspector.zig:266",
       "state": "translated"
     },
     {
       "id": "Add Control",
       "source": "Add Control",
       "target": "Adicionar Controle",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:493",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:476",
       "state": "translated"
+    },
+    {
+      "id": "Add a binding",
+      "source": "Add a binding",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:167",
+      "state": "new"
     },
     {
       "id": "Add {title}",
       "source": "Add {title}",
       "target": "Adicionar {title}",
-      "note": "studio/main-window/Panels.zig:174",
+      "note": "studio/main-window/Panels.zig:158",
       "state": "translated"
     },
     {
@@ -220,31 +227,45 @@
       "state": "translated"
     },
     {
+      "id": "Alpha Mask",
+      "source": "Alpha Mask",
+      "target": "",
+      "note": "studio/inspector/editor/MaterialEditor.zig:351",
+      "state": "new"
+    },
+    {
+      "id": "Also bound to \"{other}\"",
+      "source": "Also bound to \"{other}\"",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:159",
+      "state": "new"
+    },
+    {
       "id": "Application.quit() called — stopping Play mode",
       "source": "Application.quit() called — stopping Play mode",
       "target": "Application.quit() chamado — encerrando o modo Reproduzir",
-      "note": "studio/scene-view/PlayMode.zig:292",
+      "note": "studio/scene-view/PlayMode.zig:291",
       "state": "translated"
     },
     {
       "id": "Apply",
       "source": "Apply",
       "target": "Aplicar",
-      "note": "studio/inspector/Inspector.zig:302",
+      "note": "studio/inspector/Inspector.zig:324",
       "state": "translated"
     },
     {
-      "id": "Assets",
-      "source": "Assets",
-      "target": "Ativos",
-      "note": "studio/main-window/Panels.zig:104",
-      "state": "translated"
+      "id": "Asset Browser",
+      "source": "Asset Browser",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:67",
+      "state": "new"
     },
     {
       "id": "Authors:",
       "source": "Authors:",
       "target": "Autores:",
-      "note": "studio/main-window/MenuBar.zig:33",
+      "note": "studio/main-window/MenuBar.zig:36",
       "state": "translated"
     },
     {
@@ -258,7 +279,7 @@
       "id": "B",
       "source": "B",
       "target": "B",
-      "note": "studio/inspector/PropDrawMath.zig:221",
+      "note": "studio/inspector/PropDrawMath.zig:224",
       "state": "translated"
     },
     {
@@ -272,7 +293,7 @@
       "id": "Boot",
       "source": "Boot",
       "target": "Inicialização",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:80",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:83",
       "state": "translated"
     },
     {
@@ -286,21 +307,28 @@
       "id": "Browse...",
       "source": "Browse...",
       "target": "Procurar...",
-      "note": "studio/inspector/editor/SettingsEditor.zig:250",
+      "note": "studio/inspector/editor/SettingsFields.zig:109",
       "state": "translated"
     },
     {
       "id": "Build Game",
       "source": "Build Game",
       "target": "Compilar Jogo",
-      "note": "studio/main-window/MenuBar.zig:197",
+      "note": "studio/main-window/MenuBar.zig:215",
       "state": "translated"
+    },
+    {
+      "id": "Build Output Path",
+      "source": "Build Output Path",
+      "target": "",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:81",
+      "state": "new"
     },
     {
       "id": "Build game",
       "source": "Build game",
       "target": "Compilar jogo",
-      "note": "studio/main-window/Tasks.zig:92",
+      "note": "studio/main-window/Tasks.zig:85",
       "state": "translated"
     },
     {
@@ -321,14 +349,14 @@
       "id": "Camera",
       "source": "Camera",
       "target": "Câmera",
-      "note": "studio/scene-view/SceneViewport.zig:334",
+      "note": "studio/scene-view/SceneViewport.zig:370",
       "state": "translated"
     },
     {
       "id": "Cameras",
       "source": "Cameras",
       "target": "Câmeras",
-      "note": "studio/scene-view/SceneViewport.zig:404",
+      "note": "studio/scene-view/SceneViewport.zig:461",
       "state": "translated"
     },
     {
@@ -349,28 +377,28 @@
       "id": "Capture Screenshot",
       "source": "Capture Screenshot",
       "target": "Capturar Screenshot",
-      "note": "studio/main-window/MenuBar.zig:240",
+      "note": "studio/main-window/MenuBar.zig:258",
       "state": "translated"
     },
     {
       "id": "Choose New Project Folder",
       "source": "Choose New Project Folder",
       "target": "Escolher Pasta do Novo Projeto",
-      "note": "studio/main-window/MenuBar.zig:544",
+      "note": "studio/main-window/MenuBar.zig:495",
       "state": "translated"
     },
     {
       "id": "Clear",
       "source": "Clear",
       "target": "Limpar",
-      "note": "studio/inspector/editor/SettingsEditor.zig:257",
+      "note": "studio/inspector/editor/SettingsFields.zig:116",
       "state": "translated"
     },
     {
       "id": "Clear Asset Cache",
       "source": "Clear Asset Cache",
       "target": "Limpar Cache de Ativos",
-      "note": "studio/main-window/MenuBar.zig:209",
+      "note": "studio/main-window/MenuBar.zig:227",
       "state": "translated"
     },
     {
@@ -384,7 +412,7 @@
       "id": "Colliders",
       "source": "Colliders",
       "target": "Colisores",
-      "note": "studio/scene-view/SceneViewport.zig:406",
+      "note": "studio/scene-view/SceneViewport.zig:463",
       "state": "translated"
     },
     {
@@ -398,21 +426,21 @@
       "id": "Company",
       "source": "Company",
       "target": "Empresa",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:65",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:67",
       "state": "translated"
     },
     {
       "id": "Compiling play library...",
       "source": "Compiling play library...",
       "target": "Compilando biblioteca de reprodução...",
-      "note": "studio/scene-view/PlayMode.zig:189",
+      "note": "studio/scene-view/PlayMode.zig:178",
       "state": "translated"
     },
     {
       "id": "Components",
       "source": "Components",
       "target": "Componentes",
-      "note": "studio/inspector/Inspector.zig:640",
+      "note": "studio/inspector/Inspector.zig:662",
       "state": "translated"
     },
     {
@@ -440,21 +468,21 @@
       "id": "Copy Absolute Path",
       "source": "Copy Absolute Path",
       "target": "Copiar Caminho Absoluto",
-      "note": "studio/asset-browser/AssetGridView.zig:454",
+      "note": "studio/asset-browser/AssetGridView.zig:470",
       "state": "translated"
     },
     {
       "id": "Copy GUID",
       "source": "Copy GUID",
       "target": "Copiar GUID",
-      "note": "studio/asset-browser/AssetContextMenus.zig:380",
+      "note": "studio/asset-browser/AssetContextMenus.zig:384",
       "state": "translated"
     },
     {
       "id": "Copy Relative Path",
       "source": "Copy Relative Path",
       "target": "Copiar Caminho Relativo",
-      "note": "studio/asset-browser/AssetGridView.zig:461",
+      "note": "studio/asset-browser/AssetGridView.zig:477",
       "state": "translated"
     },
     {
@@ -468,28 +496,28 @@
       "id": "Create",
       "source": "Create",
       "target": "Criar",
-      "note": "studio/asset-browser/AssetContextMenus.zig:285",
+      "note": "studio/asset-browser/AssetContextMenus.zig:289",
       "state": "translated"
     },
     {
       "id": "Create Empty",
       "source": "Create Empty",
       "target": "Criar Vazio",
-      "note": "studio/scene-hierarchy/SceneTree.zig:136",
+      "note": "studio/scene-hierarchy/SceneTree.zig:145",
       "state": "translated"
     },
     {
       "id": "Create Empty Child",
       "source": "Create Empty Child",
       "target": "Criar Filho Vazio",
-      "note": "studio/scene-hierarchy/SceneTree.zig:129",
+      "note": "studio/scene-hierarchy/SceneTree.zig:138",
       "state": "translated"
     },
     {
       "id": "Create Prefab",
       "source": "Create Prefab",
       "target": "Criar Prefab",
-      "note": "studio/scene-hierarchy/SceneTree.zig:146",
+      "note": "studio/scene-hierarchy/SceneTree.zig:155",
       "state": "translated"
     },
     {
@@ -510,7 +538,7 @@
       "id": "Custom",
       "source": "Custom",
       "target": "Personalizado",
-      "note": "studio/scene-view/SceneViewport.zig:407",
+      "note": "studio/scene-view/SceneViewport.zig:464",
       "state": "translated"
     },
     {
@@ -531,14 +559,14 @@
       "id": "Default Size",
       "source": "Default Size",
       "target": "Tamanho Padrão",
-      "note": "studio/inspector/editor/ImportSettingsEditor.zig:75",
+      "note": "studio/inspector/editor/ImportSettingsEditor.zig:76",
       "state": "translated"
     },
     {
       "id": "Delete",
       "source": "Delete",
       "target": "Excluir",
-      "note": "studio/TreeView.zig:379",
+      "note": "studio/TreeView.zig:372",
       "state": "translated"
     },
     {
@@ -559,21 +587,21 @@
       "id": "Delete Node",
       "source": "Delete Node",
       "target": "Excluir Nó",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:743",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:726",
       "state": "translated"
     },
     {
       "id": "Delete Object",
       "source": "Delete Object",
       "target": "Excluir Objeto",
-      "note": "studio/scene-hierarchy/SceneTree.zig:249",
+      "note": "studio/scene-hierarchy/SceneTree.zig:258",
       "state": "translated"
     },
     {
       "id": "Delete selected object and all its children?",
       "source": "Delete selected object and all its children?",
       "target": "Excluir o objeto selecionado e todos os seus filhos?",
-      "note": "studio/scene-hierarchy/SceneTree.zig:250",
+      "note": "studio/scene-hierarchy/SceneTree.zig:259",
       "state": "translated"
     },
     {
@@ -594,14 +622,14 @@
       "id": "Display 1",
       "source": "Display 1",
       "target": "Tela 1",
-      "note": "studio/scene-view/SceneViewport.zig:203",
+      "note": "studio/scene-view/SceneViewport.zig:239",
       "state": "translated"
     },
     {
       "id": "Don't Save",
       "source": "Don't Save",
       "target": "Não Salvar",
-      "note": "studio/main-window/Documents.zig:672",
+      "note": "studio/main-window/DocumentsTabBar.zig:336",
       "state": "translated"
     },
     {
@@ -615,21 +643,21 @@
       "id": "Duplicate",
       "source": "Duplicate",
       "target": "Duplicar",
-      "note": "studio/scene-hierarchy/SceneTree.zig:118",
+      "note": "studio/scene-hierarchy/SceneTree.zig:127",
       "state": "translated"
     },
     {
       "id": "Edit",
       "source": "Edit",
       "target": "Editar",
-      "note": "studio/main-window/MenuBar.zig:166",
+      "note": "studio/main-window/MenuBar.zig:186",
       "state": "translated"
     },
     {
       "id": "Editor CPU (studio)",
       "source": "Editor CPU (studio)",
       "target": "CPU do Editor (studio)",
-      "note": "studio/main-window/ProfilerPanel.zig:169",
+      "note": "studio/main-window/ProfilerPanel.zig:162",
       "state": "translated"
     },
     {
@@ -640,59 +668,59 @@
       "state": "translated"
     },
     {
+      "id": "Esc to cancel, Backspace to unbind.",
+      "source": "Esc to cancel, Backspace to unbind.",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:276",
+      "state": "new"
+    },
+    {
       "id": "Exit",
       "source": "Exit",
       "target": "Sair",
-      "note": "studio/main-window/MenuBar.zig:161",
+      "note": "studio/main-window/MenuBar.zig:181",
       "state": "translated"
     },
     {
       "id": "Export Theme...",
       "source": "Export Theme...",
       "target": "Exportar Tema...",
-      "note": "studio/inspector/editor/SettingsEditor.zig:238",
+      "note": "studio/inspector/editor/SettingsFields.zig:97",
       "state": "translated"
     },
     {
       "id": "Export Trace",
       "source": "Export Trace",
       "target": "Exportar Trace",
-      "note": "studio/main-window/ProfilerPanel.zig:270",
+      "note": "studio/main-window/ProfilerPanel.zig:273",
       "state": "translated"
     },
     {
       "id": "Failed to build layout preset",
       "source": "Failed to build layout preset",
       "target": "Falha ao criar predefinição de layout",
-      "note": "studio/main-window/MenuBar.zig:316",
+      "note": "studio/main-window/MenuBar.zig:334",
       "state": "translated"
     },
     {
       "id": "Failed to load layout preset",
       "source": "Failed to load layout preset",
       "target": "Falha ao carregar predefinição de layout",
-      "note": "studio/main-window/MenuBar.zig:333",
-      "state": "translated"
-    },
-    {
-      "id": "Failed to load the first scene.",
-      "source": "Failed to load the first scene.",
-      "target": "Falha ao carregar a primeira cena.",
-      "note": "studio/scene-view/PlayMode.zig:169",
+      "note": "studio/main-window/MenuBar.zig:351",
       "state": "translated"
     },
     {
       "id": "File",
       "source": "File",
       "target": "Arquivo",
-      "note": "studio/main-window/MenuBar.zig:145",
+      "note": "studio/main-window/MenuBar.zig:154",
       "state": "translated"
     },
     {
       "id": "Filename",
       "source": "Filename",
       "target": "Nome do Arquivo",
-      "note": "studio/asset-browser/AssetGridView.zig:344",
+      "note": "studio/asset-browser/AssetGridView.zig:360",
       "state": "translated"
     },
     {
@@ -724,11 +752,18 @@
       "state": "translated"
     },
     {
-      "id": "First Scene (GUID)",
-      "source": "First Scene (GUID)",
-      "target": "Primeira Cena (GUID)",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:81",
-      "state": "translated"
+      "id": "First Scene",
+      "source": "First Scene",
+      "target": "",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:84",
+      "state": "new"
+    },
+    {
+      "id": "Flip Green Channel (DDS)",
+      "source": "Flip Green Channel (DDS)",
+      "target": "",
+      "note": "studio/inspector/editor/ImportSettingsEditor.zig:68",
+      "state": "new"
     },
     {
       "id": "Focus",
@@ -748,35 +783,28 @@
       "id": "Font Size",
       "source": "Font Size",
       "target": "Tamanho da Fonte",
-      "note": "studio/main-window/ThemeMenu.zig:161",
+      "note": "studio/main-window/ThemeMenu.zig:152",
       "state": "translated"
     },
     {
       "id": "Frame Object",
       "source": "Frame Object",
       "target": "Enquadrar Objeto",
-      "note": "studio/scene-hierarchy/SceneTree.zig:159",
+      "note": "studio/scene-hierarchy/SceneTree.zig:168",
       "state": "translated"
     },
     {
       "id": "Fullscreen",
       "source": "Fullscreen",
       "target": "Tela Cheia",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:73",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:75",
       "state": "translated"
     },
     {
       "id": "G",
       "source": "G",
       "target": "G",
-      "note": "studio/inspector/PropDrawMath.zig:219",
-      "state": "translated"
-    },
-    {
-      "id": "Game",
-      "source": "Game",
-      "target": "Jogo",
-      "note": "studio/main-window/Panels.zig:102",
+      "note": "studio/inspector/PropDrawMath.zig:222",
       "state": "translated"
     },
     {
@@ -790,35 +818,42 @@
       "id": "Gizmos",
       "source": "Gizmos",
       "target": "Gizmos",
-      "note": "studio/scene-view/SceneViewport.zig:399",
+      "note": "studio/scene-view/SceneViewport.zig:456",
       "state": "translated"
+    },
+    {
+      "id": "Global",
+      "source": "Global",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:64",
+      "state": "new"
     },
     {
       "id": "Graphics",
       "source": "Graphics",
       "target": "Gráficos",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:69",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:71",
       "state": "translated"
     },
     {
       "id": "Grid",
       "source": "Grid",
       "target": "Grade",
-      "note": "studio/scene-view/SceneViewport.zig:410",
+      "note": "studio/scene-view/SceneViewport.zig:467",
       "state": "translated"
     },
     {
       "id": "Height",
       "source": "Height",
       "target": "Altura",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:71",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:73",
       "state": "translated"
     },
     {
       "id": "Hierarchy",
       "source": "Hierarchy",
       "target": "Hierarquia",
-      "note": "studio/main-window/Panels.zig:100",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:66",
       "state": "translated"
     },
     {
@@ -829,31 +864,31 @@
       "state": "translated"
     },
     {
-      "id": "Icon (GUID)",
-      "source": "Icon (GUID)",
-      "target": "Ícone (GUID)",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:67",
-      "state": "translated"
+      "id": "Icon",
+      "source": "Icon",
+      "target": "",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:69",
+      "state": "new"
     },
     {
       "id": "Icons",
       "source": "Icons",
       "target": "Ícones",
-      "note": "studio/scene-view/SceneViewport.zig:408",
+      "note": "studio/scene-view/SceneViewport.zig:465",
       "state": "translated"
     },
     {
       "id": "Import Animations",
       "source": "Import Animations",
       "target": "Importar Animações",
-      "note": "studio/inspector/editor/ImportSettingsEditor.zig:71",
+      "note": "studio/inspector/editor/ImportSettingsEditor.zig:72",
       "state": "translated"
     },
     {
       "id": "Import Materials",
       "source": "Import Materials",
       "target": "Importar Materiais",
-      "note": "studio/inspector/editor/ImportSettingsEditor.zig:70",
+      "note": "studio/inspector/editor/ImportSettingsEditor.zig:71",
       "state": "translated"
     },
     {
@@ -867,7 +902,7 @@
       "id": "Import Theme...",
       "source": "Import Theme...",
       "target": "Importar Tema...",
-      "note": "studio/inspector/editor/SettingsEditor.zig:237",
+      "note": "studio/inspector/editor/SettingsFields.zig:96",
       "state": "translated"
     },
     {
@@ -878,38 +913,31 @@
       "state": "translated"
     },
     {
-      "id": "Inspector",
-      "source": "Inspector",
-      "target": "Inspetor",
-      "note": "studio/main-window/Panels.zig:103",
-      "state": "translated"
-    },
-    {
       "id": "Instantiate into Scene",
       "source": "Instantiate into Scene",
       "target": "Instanciar na Cena",
-      "note": "studio/asset-browser/AssetContextMenus.zig:320",
+      "note": "studio/asset-browser/AssetSubAssetTiles.zig:152",
       "state": "translated"
     },
     {
       "id": "Language",
       "source": "Language",
       "target": "Idioma",
-      "note": "studio/inspector/editor/SettingsEditor.zig:278",
+      "note": "studio/inspector/editor/SettingsFields.zig:135",
       "state": "translated"
     },
     {
       "id": "Layout",
       "source": "Layout",
       "target": "Layout",
-      "note": "studio/main-window/MenuBar.zig:308",
+      "note": "studio/main-window/MenuBar.zig:326",
       "state": "translated"
     },
     {
       "id": "Layout item",
       "source": "Layout item",
       "target": "Item de layout",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:678",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:661",
       "state": "translated"
     },
     {
@@ -923,28 +951,21 @@
       "id": "License:",
       "source": "License:",
       "target": "Licença:",
-      "note": "studio/main-window/MenuBar.zig:35",
+      "note": "studio/main-window/MenuBar.zig:38",
       "state": "translated"
     },
     {
       "id": "Lights",
       "source": "Lights",
       "target": "Luzes",
-      "note": "studio/scene-view/SceneViewport.zig:405",
-      "state": "translated"
-    },
-    {
-      "id": "Log",
-      "source": "Log",
-      "target": "Log",
-      "note": "studio/main-window/Panels.zig:106",
+      "note": "studio/scene-view/SceneViewport.zig:462",
       "state": "translated"
     },
     {
       "id": "Look sens.",
       "source": "Look sens.",
       "target": "Sens. de olhar",
-      "note": "studio/scene-view/SceneViewport.zig:340",
+      "note": "studio/scene-view/SceneViewport.zig:376",
       "state": "translated"
     },
     {
@@ -958,14 +979,14 @@
       "id": "Move",
       "source": "Move",
       "target": "Mover",
-      "note": "studio/scene-view/SceneViewport.zig:314",
+      "note": "studio/scene-view/SceneViewport.zig:350",
       "state": "translated"
     },
     {
       "id": "Move speed",
       "source": "Move speed",
       "target": "Velocidade de movimento",
-      "note": "studio/scene-view/SceneViewport.zig:339",
+      "note": "studio/scene-view/SceneViewport.zig:375",
       "state": "translated"
     },
     {
@@ -979,7 +1000,7 @@
       "id": "Native file dialogs are not enabled in this build.",
       "source": "Native file dialogs are not enabled in this build.",
       "target": "Diálogos de arquivo nativos não estão habilitados nesta compilação.",
-      "note": "studio/main-window/MenuBar.zig:517",
+      "note": "studio/services/ProjectOps.zig:26",
       "state": "translated"
     },
     {
@@ -993,148 +1014,162 @@
       "id": "New Project",
       "source": "New Project",
       "target": "Novo Projeto",
-      "note": "studio/main-window/MenuBar.zig:552",
+      "note": "studio/main-window/MenuBar.zig:503",
       "state": "translated"
     },
     {
       "id": "New Project...",
       "source": "New Project...",
       "target": "Novo Projeto...",
-      "note": "studio/main-window/MenuBar.zig:149",
+      "note": "studio/main-window/MenuBar.zig:158",
       "state": "translated"
     },
     {
       "id": "No Project",
       "source": "No Project",
       "target": "Nenhum Projeto",
-      "note": "studio/main-window/Tasks.zig:212",
+      "note": "studio/main-window/Tasks.zig:214",
       "state": "translated"
     },
     {
       "id": "No assets folder found. Create {project}/assets.",
       "source": "No assets folder found. Create {project}/assets.",
       "target": "Pasta de ativos não encontrada. Crie {project}/assets.",
-      "note": "studio/asset-browser/AssetGridView.zig:98",
+      "note": "studio/asset-browser/AssetGridView.zig:111",
       "state": "translated"
     },
     {
       "id": "No cameras rendering",
       "source": "No cameras rendering",
       "target": "Nenhuma câmera renderizando",
-      "note": "studio/scene-view/SceneViewport.zig:204",
+      "note": "studio/scene-view/SceneViewport.zig:240",
       "state": "translated"
     },
     {
       "id": "No first scene found. Set one in Project Settings.",
       "source": "No first scene found. Set one in Project Settings.",
       "target": "Nenhuma primeira cena encontrada. Defina uma nas Configurações do Projeto.",
-      "note": "studio/scene-view/PlayMode.zig:163",
+      "note": "studio/scene-view/PlayMode.zig:157",
       "state": "translated"
     },
     {
       "id": "No recent projects",
       "source": "No recent projects",
       "target": "Nenhum projeto recente",
-      "note": "studio/main-window/MenuBar.zig:365",
+      "note": "studio/main-window/ProjectDropdown.zig:46",
       "state": "translated"
     },
     {
       "id": "No settings match \"{query}\".",
       "source": "No settings match \"{query}\".",
       "target": "Nenhuma configuração corresponde a \"{query}\".",
-      "note": "studio/inspector/editor/SettingsEditor.zig:381",
+      "note": "studio/inspector/editor/SettingsFields.zig:241",
       "state": "translated"
+    },
+    {
+      "id": "No shortcuts match \"{query}\".",
+      "source": "No shortcuts match \"{query}\".",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:127",
+      "state": "new"
     },
     {
       "id": "Not Available",
       "source": "Not Available",
       "target": "Não Disponível",
-      "note": "studio/main-window/MenuBar.zig:516",
+      "note": "studio/services/ProjectOps.zig:25",
       "state": "translated"
     },
     {
       "id": "Object",
       "source": "Object",
       "target": "Objeto",
-      "note": "studio/main-window/Window.zig:370",
+      "note": "studio/main-window/Window.zig:408",
       "state": "translated"
     },
     {
       "id": "Open",
       "source": "Open",
       "target": "Abrir",
-      "note": "studio/inspector/Inspector.zig:196",
-      "state": "translated"
-    },
-    {
-      "id": "Open JSON",
-      "source": "Open JSON",
-      "target": "Abrir JSON",
-      "note": "studio/inspector/editor/SettingsEditor.zig:448",
+      "note": "studio/inspector/Inspector.zig:218",
       "state": "translated"
     },
     {
       "id": "Open Project Folder",
       "source": "Open Project Folder",
       "target": "Abrir Pasta do Projeto",
-      "note": "studio/main-window/MenuBar.zig:523",
+      "note": "studio/services/ProjectOps.zig:32",
       "state": "translated"
     },
     {
       "id": "Open Project...",
       "source": "Open Project...",
       "target": "Abrir Projeto...",
-      "note": "studio/main-window/MenuBar.zig:154",
+      "note": "studio/main-window/MenuBar.zig:163",
       "state": "translated"
+    },
+    {
+      "id": "Open Settings JSON",
+      "source": "Open Settings JSON",
+      "target": "",
+      "note": "studio/inspector/editor/SettingsEditor.zig:225",
+      "state": "new"
     },
     {
       "id": "Open a project before entering Play mode.",
       "source": "Open a project before entering Play mode.",
       "target": "Abra um projeto antes de entrar no modo Reproduzir.",
-      "note": "studio/scene-view/PlayMode.zig:182",
+      "note": "studio/scene-view/PlayMode.zig:171",
       "state": "translated"
     },
     {
       "id": "Open a project first.",
       "source": "Open a project first.",
       "target": "Abra um projeto primeiro.",
-      "note": "studio/main-window/Tasks.zig:213",
+      "note": "studio/main-window/Tasks.zig:215",
       "state": "translated"
     },
     {
       "id": "Open in External Editor",
       "source": "Open in External Editor",
       "target": "Abrir no Editor Externo",
-      "note": "studio/asset-browser/AssetContextMenus.zig:308",
+      "note": "studio/asset-browser/AssetContextMenus.zig:312",
       "state": "translated"
     },
     {
       "id": "Optimize",
       "source": "Optimize",
       "target": "Otimizar",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:78",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:80",
       "state": "translated"
     },
     {
       "id": "P",
       "source": "P",
       "target": "P",
-      "note": "studio/inspector/PropDrawMath.zig:350",
+      "note": "studio/inspector/PropDrawMath.zig:353",
       "state": "translated"
     },
     {
       "id": "P:{pitch} Y:{yaw} R:{roll}",
       "source": "P:{pitch} Y:{yaw} R:{roll}",
       "target": "P:{pitch} Y:{yaw} R:{roll}",
-      "note": "studio/inspector/PropDrawMath.zig:332",
+      "note": "studio/inspector/PropDrawMath.zig:335",
       "state": "translated"
     },
     {
       "id": "Packages ({count})",
       "source": "Packages ({count})",
       "target": "Pacotes ({count})",
-      "note": "studio/asset-browser/AssetGridView.zig:53",
+      "note": "studio/asset-browser/AssetGridView.zig:65",
       "state": "translated"
+    },
+    {
+      "id": "Pan speed",
+      "source": "Pan speed",
+      "target": "",
+      "note": "studio/scene-view/SceneViewport.zig:382",
+      "state": "new"
     },
     {
       "id": "Panel Border Width",
@@ -1147,7 +1182,7 @@
       "id": "Parent index: {n}",
       "source": "Parent index: {n}",
       "target": "Índice do pai: {n}",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:674",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:657",
       "state": "translated"
     },
     {
@@ -1161,43 +1196,43 @@
       "id": "Pause",
       "source": "Pause",
       "target": "Pausar",
-      "note": "studio/main-window/MenuBar.zig:478",
+      "note": "studio/main-window/MenuBar.zig:434",
       "state": "translated"
     },
     {
       "id": "Platform",
       "source": "Platform",
       "target": "Plataforma",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:76",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:78",
       "state": "translated"
     },
     {
       "id": "Play build failed — see console.",
       "source": "Play build failed — see console.",
       "target": "Falha ao compilar para reprodução — veja o console.",
-      "note": "studio/scene-view/PlayMode.zig:191",
+      "note": "studio/scene-view/PlayMode.zig:180",
       "state": "translated"
     },
     {
       "id": "Play from the project's first scene",
       "source": "Play from the project's first scene",
       "target": "Reproduzir a partir da primeira cena do projeto",
-      "note": "studio/main-window/MenuBar.zig:477",
+      "note": "studio/main-window/MenuBar.zig:445",
       "state": "translated"
     },
     {
       "id": "Play start failed.",
       "source": "Play start failed.",
       "target": "Falha ao iniciar a reprodução.",
-      "note": "studio/scene-view/PlayMode.zig:205",
+      "note": "studio/scene-view/PlayMode.zig:201",
       "state": "translated"
     },
     {
-      "id": "Play the open scene  (Ctrl+P)",
-      "source": "Play the open scene  (Ctrl+P)",
-      "target": "Reproduzir a cena aberta  (Ctrl+P)",
-      "note": "studio/main-window/MenuBar.zig:476",
-      "state": "translated"
+      "id": "Play the open scene",
+      "source": "Play the open scene",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:432",
+      "state": "new"
     },
     {
       "id": "Positive",
@@ -1210,42 +1245,49 @@
       "id": "Prefab Instance",
       "source": "Prefab Instance",
       "target": "Instância de Prefab",
-      "note": "studio/inspector/Inspector.zig:292",
+      "note": "studio/inspector/Inspector.zig:314",
       "state": "translated"
+    },
+    {
+      "id": "Press a Key",
+      "source": "Press a Key",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:269",
+      "state": "new"
+    },
+    {
+      "id": "Press a key combination for this shortcut.",
+      "source": "Press a key combination for this shortcut.",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:275",
+      "state": "new"
     },
     {
       "id": "Preview",
       "source": "Preview",
       "target": "Pré-visualização",
-      "note": "studio/inspector/Inspector.zig:606",
-      "state": "translated"
-    },
-    {
-      "id": "Profiler",
-      "source": "Profiler",
-      "target": "Profiler",
-      "note": "studio/main-window/Panels.zig:105",
+      "note": "studio/inspector/Inspector.zig:628",
       "state": "translated"
     },
     {
       "id": "Project",
       "source": "Project",
       "target": "Projeto",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:63",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:65",
       "state": "translated"
     },
     {
       "id": "Quality",
       "source": "Quality",
       "target": "Qualidade",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:74",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:76",
       "state": "translated"
     },
     {
       "id": "R",
       "source": "R",
       "target": "R",
-      "note": "studio/inspector/PropDrawMath.zig:217",
+      "note": "studio/inspector/PropDrawMath.zig:220",
       "state": "translated"
     },
     {
@@ -1263,66 +1305,73 @@
       "state": "translated"
     },
     {
-      "id": "Redo    Ctrl+Shift+Z",
-      "source": "Redo    Ctrl+Shift+Z",
-      "target": "Refazer    Ctrl+Shift+Z",
-      "note": "studio/main-window/MenuBar.zig:178",
-      "state": "translated"
+      "id": "Redo",
+      "source": "Redo",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:198",
+      "state": "new"
     },
     {
-      "id": "Redo  {label}    Ctrl+Shift+Z",
-      "source": "Redo  {label}    Ctrl+Shift+Z",
-      "target": "Refazer  {label}    Ctrl+Shift+Z",
-      "note": "studio/main-window/MenuBar.zig:176",
-      "state": "translated"
+      "id": "Redo  {label}",
+      "source": "Redo  {label}",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:196",
+      "state": "new"
     },
     {
       "id": "Reimport All",
       "source": "Reimport All",
       "target": "Reimportar Tudo",
-      "note": "studio/main-window/MenuBar.zig:204",
+      "note": "studio/main-window/MenuBar.zig:222",
       "state": "translated"
     },
     {
       "id": "Reimport Asset",
       "source": "Reimport Asset",
       "target": "Reimportar Ativo",
-      "note": "studio/asset-browser/AssetContextMenus.zig:332",
+      "note": "studio/asset-browser/AssetContextMenus.zig:336",
       "state": "translated"
     },
     {
       "id": "Reimport assets",
       "source": "Reimport assets",
       "target": "Reimportar ativos",
-      "note": "studio/main-window/Tasks.zig:115",
+      "note": "studio/main-window/Tasks.zig:111",
       "state": "translated"
     },
     {
-      "id": "Reload",
-      "source": "Reload",
-      "target": "Recarregar",
-      "note": "studio/inspector/editor/SettingsEditor.zig:451",
-      "state": "translated"
+      "id": "Reload Settings",
+      "source": "Reload Settings",
+      "target": "",
+      "note": "studio/inspector/editor/SettingsEditor.zig:222",
+      "state": "new"
+    },
+    {
+      "id": "Reload Shortcuts",
+      "source": "Reload Shortcuts",
+      "target": "",
+      "note": "studio/inspector/editor/SettingsEditor.zig:234",
+      "state": "new"
     },
     {
       "id": "Remove",
       "source": "Remove",
       "target": "Remover",
-      "note": "studio/inspector/Inspector.zig:214",
+      "note": "studio/inspector/Inspector.zig:236",
       "state": "translated"
     },
     {
       "id": "Rename",
       "source": "Rename",
       "target": "Renomear",
-      "note": "studio/TreeView.zig:374",
+      "note": "studio/TreeView.zig:367",
       "state": "translated"
     },
     {
       "id": "Render (scene)",
       "source": "Render (scene)",
       "target": "Renderização (cena)",
-      "note": "studio/main-window/ProfilerPanel.zig:158",
+      "note": "studio/main-window/ProfilerPanel.zig:149",
       "state": "translated"
     },
     {
@@ -1333,24 +1382,38 @@
       "state": "translated"
     },
     {
+      "id": "Reset All Shortcuts",
+      "source": "Reset All Shortcuts",
+      "target": "",
+      "note": "studio/inspector/editor/SettingsEditor.zig:237",
+      "state": "new"
+    },
+    {
       "id": "Reset Layout",
       "source": "Reset Layout",
       "target": "Redefinir Layout",
-      "note": "studio/inspector/editor/SettingsEditor.zig:457",
+      "note": "studio/inspector/editor/SettingsEditor.zig:228",
       "state": "translated"
+    },
+    {
+      "id": "Reset to default",
+      "source": "Reset to default",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:177",
+      "state": "new"
     },
     {
       "id": "Reveal in file manager",
       "source": "Reveal in file manager",
       "target": "Mostrar no gerenciador de arquivos",
-      "note": "studio/asset-browser/AssetGridView.zig:450",
+      "note": "studio/asset-browser/AssetGridView.zig:466",
       "state": "translated"
     },
     {
       "id": "Revert",
       "source": "Revert",
       "target": "Reverter",
-      "note": "studio/inspector/Inspector.zig:299",
+      "note": "studio/inspector/Inspector.zig:321",
       "state": "translated"
     },
     {
@@ -1364,7 +1427,7 @@
       "id": "Rotate",
       "source": "Rotate",
       "target": "Rotacionar",
-      "note": "studio/scene-view/SceneViewport.zig:315",
+      "note": "studio/scene-view/SceneViewport.zig:351",
       "state": "translated"
     },
     {
@@ -1375,24 +1438,31 @@
       "state": "translated"
     },
     {
+      "id": "Save All",
+      "source": "Save All",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:174",
+      "state": "new"
+    },
+    {
       "id": "Save Current as Preset",
       "source": "Save Current as Preset",
       "target": "Salvar Atual como Predefinição",
-      "note": "studio/main-window/MenuBar.zig:341",
+      "note": "studio/main-window/MenuBar.zig:359",
       "state": "translated"
     },
     {
       "id": "Save changes to \"{title}\" before closing?",
       "source": "Save changes to \"{title}\" before closing?",
       "target": "Salvar alterações em \"{title}\" antes de fechar?",
-      "note": "studio/main-window/Documents.zig:654",
+      "note": "studio/main-window/DocumentsTabBar.zig:326",
       "state": "translated"
     },
     {
       "id": "Save*",
       "source": "Save*",
       "target": "Salvar*",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:467",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:450",
       "state": "translated"
     },
     {
@@ -1406,63 +1476,70 @@
       "id": "Saved layout as '{name}'",
       "source": "Saved layout as '{name}'",
       "target": "Layout salvo como '{name}'",
-      "note": "studio/main-window/MenuBar.zig:345",
+      "note": "studio/main-window/MenuBar.zig:363",
       "state": "translated"
     },
     {
       "id": "Scale",
       "source": "Scale",
       "target": "Escala",
-      "note": "studio/scene-view/SceneViewport.zig:316",
+      "note": "studio/scene-view/SceneViewport.zig:352",
       "state": "translated"
     },
     {
       "id": "Scale Factor",
       "source": "Scale Factor",
       "target": "Fator de Escala",
-      "note": "studio/inspector/editor/ImportSettingsEditor.zig:72",
+      "note": "studio/inspector/editor/ImportSettingsEditor.zig:73",
       "state": "translated"
     },
     {
-      "id": "Scene",
-      "source": "Scene",
-      "target": "Cena",
-      "note": "studio/main-window/Panels.zig:101",
-      "state": "translated"
+      "id": "Scene View",
+      "source": "Scene View",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:65",
+      "state": "new"
+    },
+    {
+      "id": "Scene is too large to snapshot for Play mode.",
+      "source": "Scene is too large to snapshot for Play mode.",
+      "target": "",
+      "note": "studio/scene-view/PlayMode.zig:191",
+      "state": "new"
     },
     {
       "id": "Scripts",
       "source": "Scripts",
       "target": "Scripts",
-      "note": "studio/inspector/Inspector.zig:634",
+      "note": "studio/inspector/Inspector.zig:656",
       "state": "translated"
     },
     {
       "id": "Search Results",
       "source": "Search Results",
       "target": "Resultados da Busca",
-      "note": "studio/inspector/editor/SettingsEditor.zig:126",
+      "note": "studio/inspector/editor/SettingsEditor.zig:159",
       "state": "translated"
     },
     {
       "id": "Selection outline",
       "source": "Selection outline",
       "target": "Contorno de seleção",
-      "note": "studio/scene-view/SceneViewport.zig:409",
+      "note": "studio/scene-view/SceneViewport.zig:466",
       "state": "translated"
     },
     {
       "id": "Settings",
       "source": "Settings",
       "target": "Configurações",
-      "note": "studio/main-window/Panels.zig:107",
+      "note": "studio/main-window/MenuBar.zig:279",
       "state": "translated"
     },
     {
       "id": "Settings not ready",
       "source": "Settings not ready",
       "target": "Configurações não prontas",
-      "note": "studio/main-window/MenuBar.zig:260",
+      "note": "studio/main-window/MenuBar.zig:278",
       "state": "translated"
     },
     {
@@ -1473,10 +1550,17 @@
       "state": "translated"
     },
     {
+      "id": "Shortcuts",
+      "source": "Shortcuts",
+      "target": "",
+      "note": "studio/inspector/editor/SettingsEditor.zig:148",
+      "state": "new"
+    },
+    {
       "id": "Show",
       "source": "Show",
       "target": "Mostrar",
-      "note": "studio/inspector/Inspector.zig:607",
+      "note": "studio/inspector/Inspector.zig:629",
       "state": "translated"
     },
     {
@@ -1490,7 +1574,7 @@
       "id": "Show UI overlay",
       "source": "Show UI overlay",
       "target": "Mostrar sobreposição de UI",
-      "note": "studio/scene-view/SceneViewport.zig:95",
+      "note": "studio/scene-view/SceneViewport.zig:120",
       "state": "translated"
     },
     {
@@ -1508,10 +1592,17 @@
       "state": "translated"
     },
     {
+      "id": "Slot",
+      "source": "Slot",
+      "target": "",
+      "note": "studio/inspector/Inspector.zig:190",
+      "state": "new"
+    },
+    {
       "id": "Snap",
       "source": "Snap",
       "target": "Encaixe",
-      "note": "studio/scene-view/SceneViewport.zig:319",
+      "note": "studio/scene-view/SceneViewport.zig:355",
       "state": "translated"
     },
     {
@@ -1525,42 +1616,42 @@
       "id": "Step one frame",
       "source": "Step one frame",
       "target": "Avançar um quadro",
-      "note": "studio/main-window/MenuBar.zig:479",
+      "note": "studio/main-window/MenuBar.zig:435",
       "state": "translated"
     },
     {
-      "id": "Stop  (Ctrl+P)",
-      "source": "Stop  (Ctrl+P)",
-      "target": "Parar  (Ctrl+P)",
-      "note": "studio/main-window/MenuBar.zig:480",
-      "state": "translated"
+      "id": "Stop",
+      "source": "Stop",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:436",
+      "state": "new"
     },
     {
       "id": "Style",
       "source": "Style",
       "target": "Estilo",
-      "note": "studio/inspector/editor/UiDocumentEditor.zig:685",
+      "note": "studio/inspector/editor/UiDocumentEditor.zig:668",
       "state": "translated"
     },
     {
       "id": "System Font",
       "source": "System Font",
       "target": "Fonte do Sistema",
-      "note": "studio/inspector/editor/SettingsEditor.zig:243",
+      "note": "studio/inspector/editor/SettingsFields.zig:102",
       "state": "translated"
     },
     {
       "id": "Target",
       "source": "Target",
       "target": "Alvo",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:77",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:79",
       "state": "translated"
     },
     {
       "id": "Task Running",
       "source": "Task Running",
       "target": "Tarefa em Execução",
-      "note": "studio/main-window/Tasks.zig:204",
+      "note": "studio/main-window/Tasks.zig:206",
       "state": "translated"
     },
     {
@@ -1583,6 +1674,13 @@
       "target": "Texto (Hover)",
       "note": "studio/inspector/editor/ThemeEditor.zig:86",
       "state": "translated"
+    },
+    {
+      "id": "Text Input",
+      "source": "Text Input",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:69",
+      "state": "new"
     },
     {
       "id": "Text Press",
@@ -1609,35 +1707,35 @@
       "id": "Theme",
       "source": "Theme",
       "target": "Tema",
-      "note": "studio/inspector/editor/SettingsEditor.zig:212",
+      "note": "studio/inspector/editor/SettingsFields.zig:71",
       "state": "translated"
     },
     {
       "id": "Timeline — frame #{idx}  ({cpu} ms CPU)",
       "source": "Timeline — frame #{idx}  ({cpu} ms CPU)",
       "target": "Linha do tempo — quadro #{idx}  ({cpu} ms de CPU)",
-      "note": "studio/main-window/ProfilerPanel.zig:430",
+      "note": "studio/main-window/ProfilerPanel.zig:433",
       "state": "translated"
     },
     {
       "id": "Transform",
       "source": "Transform",
       "target": "Transformação",
-      "note": "studio/inspector/Inspector.zig:102",
+      "note": "studio/inspector/Inspector.zig:104",
       "state": "translated"
     },
     {
       "id": "Transform  (overridden)",
       "source": "Transform  (overridden)",
       "target": "Transformação  (sobrescrita)",
-      "note": "studio/inspector/Inspector.zig:102",
+      "note": "studio/inspector/Inspector.zig:104",
       "state": "translated"
     },
     {
       "id": "Transform handles",
       "source": "Transform handles",
       "target": "Alças de transformação",
-      "note": "studio/scene-view/SceneViewport.zig:403",
+      "note": "studio/scene-view/SceneViewport.zig:460",
       "state": "translated"
     },
     {
@@ -1655,10 +1753,17 @@
       "state": "translated"
     },
     {
+      "id": "UI Editor",
+      "source": "UI Editor",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:68",
+      "state": "new"
+    },
+    {
       "id": "UI Theme (GUID)",
       "source": "UI Theme (GUID)",
       "target": "Tema de UI (GUID)",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:82",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:85",
       "state": "translated"
     },
     {
@@ -1669,24 +1774,31 @@
       "state": "translated"
     },
     {
-      "id": "Undo    Ctrl+Z",
-      "source": "Undo    Ctrl+Z",
-      "target": "Desfazer    Ctrl+Z",
-      "note": "studio/main-window/MenuBar.zig:173",
-      "state": "translated"
+      "id": "Unbound",
+      "source": "Unbound",
+      "target": "",
+      "note": "studio/inspector/editor/ShortcutsEditor.zig:163",
+      "state": "new"
     },
     {
-      "id": "Undo  {label}    Ctrl+Z",
-      "source": "Undo  {label}    Ctrl+Z",
-      "target": "Desfazer  {label}    Ctrl+Z",
-      "note": "studio/main-window/MenuBar.zig:171",
-      "state": "translated"
+      "id": "Undo",
+      "source": "Undo",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:193",
+      "state": "new"
+    },
+    {
+      "id": "Undo  {label}",
+      "source": "Undo  {label}",
+      "target": "",
+      "note": "studio/main-window/MenuBar.zig:191",
+      "state": "new"
     },
     {
       "id": "Unsaved Changes",
       "source": "Unsaved Changes",
       "target": "Alterações Não Salvas",
-      "note": "studio/main-window/Documents.zig:647",
+      "note": "studio/main-window/DocumentsTabBar.zig:319",
       "state": "translated"
     },
     {
@@ -1707,28 +1819,28 @@
       "id": "VSync",
       "source": "VSync",
       "target": "VSync",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:72",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:74",
       "state": "translated"
     },
     {
       "id": "Version",
       "source": "Version",
       "target": "Versão",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:66",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:68",
       "state": "translated"
     },
     {
       "id": "View",
       "source": "View",
       "target": "Exibir",
-      "note": "studio/main-window/MenuBar.zig:218",
+      "note": "studio/main-window/MenuBar.zig:236",
       "state": "translated"
     },
     {
       "id": "W",
       "source": "W",
       "target": "W",
-      "note": "studio/inspector/PropDrawMath.zig:106",
+      "note": "studio/inspector/PropDrawMath.zig:109",
       "state": "translated"
     },
     {
@@ -1742,7 +1854,7 @@
       "id": "Width",
       "source": "Width",
       "target": "Largura",
-      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:70",
+      "note": "studio/inspector/editor/ProjectSettingsEditor.zig:72",
       "state": "translated"
     },
     {
@@ -1756,49 +1868,84 @@
       "id": "X",
       "source": "X",
       "target": "X",
-      "note": "studio/inspector/PropDrawMath.zig:54",
+      "note": "studio/inspector/PropDrawMath.zig:55",
       "state": "translated"
     },
     {
       "id": "Y",
       "source": "Y",
       "target": "Y",
-      "note": "studio/inspector/PropDrawMath.zig:58",
+      "note": "studio/inspector/PropDrawMath.zig:59",
       "state": "translated"
     },
     {
       "id": "Z",
       "source": "Z",
       "target": "Z",
-      "note": "studio/inspector/PropDrawMath.zig:62",
+      "note": "studio/inspector/PropDrawMath.zig:63",
       "state": "translated"
     },
     {
       "id": "Zoom",
       "source": "Zoom",
       "target": "Zoom",
-      "note": "studio/main-window/ThemeMenu.zig:168",
+      "note": "studio/main-window/ThemeMenu.zig:159",
       "state": "translated"
     },
     {
       "id": "Zoom speed",
       "source": "Zoom speed",
       "target": "Velocidade de zoom",
-      "note": "studio/scene-view/SceneViewport.zig:341",
+      "note": "studio/scene-view/SceneViewport.zig:381",
+      "state": "translated"
+    },
+    {
+      "id": "assets",
+      "source": "Assets",
+      "target": "Ativos",
+      "note": "studio/main-window/Panels.zig:50",
       "state": "translated"
     },
     {
       "id": "auto-record on Play",
       "source": "auto-record on Play",
       "target": "gravar automaticamente ao reproduzir",
-      "note": "studio/main-window/ProfilerPanel.zig:225",
+      "note": "studio/main-window/ProfilerPanel.zig:218",
+      "state": "translated"
+    },
+    {
+      "id": "detailed GPU timing (forces per-pass sync — perf impact)",
+      "source": "detailed GPU timing (forces per-pass sync — perf impact)",
+      "target": "",
+      "note": "studio/main-window/ProfilerPanel.zig:250",
+      "state": "new"
+    },
+    {
+      "id": "document.close",
+      "source": "Close Tab",
+      "target": "Fechar Aba",
+      "note": "studio/main-window/Window.zig:208",
+      "state": "translated"
+    },
+    {
+      "id": "document.nextTab",
+      "source": "Next Tab",
+      "target": "Próxima Aba",
+      "note": "studio/main-window/Window.zig:209",
+      "state": "translated"
+    },
+    {
+      "id": "document.prevTab",
+      "source": "Previous Tab",
+      "target": "Aba Anterior",
+      "note": "studio/main-window/Window.zig:210",
       "state": "translated"
     },
     {
       "id": "draw calls    {n}",
       "source": "draw calls    {n}",
       "target": "chamadas de desenho {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:159",
+      "note": "studio/main-window/ProfilerPanel.zig:150",
       "state": "translated"
     },
     {
@@ -1806,6 +1953,41 @@
       "source": "dvui default (for comparison):",
       "target": "padrão do dvui (para comparação):",
       "note": "studio/inspector/editor/FontEditor.zig:47",
+      "state": "translated"
+    },
+    {
+      "id": "edit.copy",
+      "source": "Copy",
+      "target": "Copiar",
+      "note": "studio/main-window/Window.zig:202",
+      "state": "translated"
+    },
+    {
+      "id": "edit.cut",
+      "source": "Cut",
+      "target": "Recortar",
+      "note": "studio/main-window/Window.zig:203",
+      "state": "translated"
+    },
+    {
+      "id": "edit.paste",
+      "source": "Paste",
+      "target": "Colar",
+      "note": "studio/main-window/Window.zig:204",
+      "state": "translated"
+    },
+    {
+      "id": "edit.redo",
+      "source": "Redo",
+      "target": "Refazer",
+      "note": "studio/main-window/Window.zig:201",
+      "state": "translated"
+    },
+    {
+      "id": "edit.undo",
+      "source": "Undo",
+      "target": "Desfazer",
+      "note": "studio/main-window/Window.zig:200",
       "state": "translated"
     },
     {
@@ -1819,56 +2001,105 @@
       "id": "error: ",
       "source": "error: ",
       "target": "erro: ",
-      "note": "studio/main-window/ProfilerPanel.zig:281",
+      "note": "studio/main-window/ProfilerPanel.zig:284",
+      "state": "translated"
+    },
+    {
+      "id": "file.exit",
+      "source": "Exit",
+      "target": "Sair",
+      "note": "studio/main-window/Window.zig:214",
+      "state": "translated"
+    },
+    {
+      "id": "file.openSettings",
+      "source": "Settings",
+      "target": "Configurações",
+      "note": "studio/main-window/Window.zig:211",
+      "state": "translated"
+    },
+    {
+      "id": "file.save",
+      "source": "Save",
+      "target": "Salvar",
+      "note": "studio/main-window/Window.zig:206",
+      "state": "translated"
+    },
+    {
+      "id": "file.saveAll",
+      "source": "Save All",
+      "target": "Salvar Tudo",
+      "note": "studio/main-window/Window.zig:207",
       "state": "translated"
     },
     {
       "id": "fps           {n}",
       "source": "fps           {n}",
       "target": "fps           {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:173",
+      "note": "studio/main-window/ProfilerPanel.zig:166",
       "state": "translated"
     },
     {
       "id": "fps cap",
       "source": "fps cap",
       "target": "limite de fps",
-      "note": "studio/main-window/ProfilerPanel.zig:244",
+      "note": "studio/main-window/ProfilerPanel.zig:237",
       "state": "translated"
     },
     {
       "id": "frame #{idx} pinned — {fps} fps  ·  {cpu} ms CPU / {total} ms total",
       "source": "frame #{idx} pinned — {fps} fps  ·  {cpu} ms CPU / {total} ms total",
       "target": "quadro #{idx} fixado — {fps} fps  ·  {cpu} ms CPU / {total} ms total",
-      "note": "studio/main-window/ProfilerPanel.zig:329",
+      "note": "studio/main-window/ProfilerPanel.zig:332",
       "state": "translated"
     },
     {
       "id": "frame total   {ms} ms",
       "source": "frame total   {ms} ms",
       "target": "quadro total  {ms} ms",
-      "note": "studio/main-window/ProfilerPanel.zig:176",
+      "note": "studio/main-window/ProfilerPanel.zig:169",
       "state": "translated"
     },
     {
       "id": "frame — {fps} fps  ·  {cpu} ms CPU / {total} ms total  ·  {hist}s history",
       "source": "frame — {fps} fps  ·  {cpu} ms CPU / {total} ms total  ·  {hist}s history",
       "target": "quadro — {fps} fps  ·  {cpu} ms CPU / {total} ms total  ·  {hist}s histórico",
-      "note": "studio/main-window/ProfilerPanel.zig:319",
+      "note": "studio/main-window/ProfilerPanel.zig:322",
+      "state": "translated"
+    },
+    {
+      "id": "game",
+      "source": "Game",
+      "target": "Jogo",
+      "note": "studio/main-window/Panels.zig:48",
+      "state": "translated"
+    },
+    {
+      "id": "hierarchy",
+      "source": "Hierarchy",
+      "target": "Hierarquia",
+      "note": "studio/main-window/Panels.zig:46",
       "state": "translated"
     },
     {
       "id": "history",
       "source": "history",
       "target": "histórico",
-      "note": "studio/main-window/ProfilerPanel.zig:257",
+      "note": "studio/main-window/ProfilerPanel.zig:260",
+      "state": "translated"
+    },
+    {
+      "id": "inspector",
+      "source": "Inspector",
+      "target": "Inspetor",
+      "note": "studio/main-window/Panels.zig:49",
       "state": "translated"
     },
     {
       "id": "mat switches  {n}",
       "source": "mat switches  {n}",
       "target": "trocas de material {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:163",
+      "note": "studio/main-window/ProfilerPanel.zig:154",
       "state": "translated"
     },
     {
@@ -1900,6 +2131,13 @@
       "state": "translated"
     },
     {
+      "id": "output",
+      "source": "Log",
+      "target": "Log",
+      "note": "studio/main-window/Panels.zig:52",
+      "state": "translated"
+    },
+    {
       "id": "path too long",
       "source": "path too long",
       "target": "caminho muito longo",
@@ -1907,17 +2145,94 @@
       "state": "translated"
     },
     {
+      "id": "play.firstScene",
+      "source": "Play First Scene",
+      "target": "Reproduzir Primeira Cena",
+      "note": "studio/main-window/Window.zig:222",
+      "state": "translated"
+    },
+    {
+      "id": "play.toggle",
+      "source": "Play / Stop",
+      "target": "Reproduzir / Parar",
+      "note": "studio/main-window/Window.zig:205",
+      "state": "translated"
+    },
+    {
       "id": "present",
       "source": "present",
       "target": "presente",
-      "note": "studio/main-window/ProfilerPanel.zig:232",
+      "note": "studio/main-window/ProfilerPanel.zig:225",
+      "state": "translated"
+    },
+    {
+      "id": "profiler",
+      "source": "Profiler",
+      "target": "Profiler",
+      "note": "studio/main-window/Panels.zig:51",
+      "state": "translated"
+    },
+    {
+      "id": "project.buildGame",
+      "source": "Build Game",
+      "target": "Compilar Jogo",
+      "note": "studio/main-window/Window.zig:215",
+      "state": "translated"
+    },
+    {
+      "id": "project.openProject",
+      "source": "Open Project",
+      "target": "Abrir Projeto",
+      "note": "studio/main-window/Window.zig:216",
+      "state": "translated"
+    },
+    {
+      "id": "project.reimportAll",
+      "source": "Reimport All",
+      "target": "Reimportar Tudo",
+      "note": "studio/main-window/Window.zig:217",
       "state": "translated"
     },
     {
       "id": "saved ",
       "source": "saved ",
       "target": "salvo ",
-      "note": "studio/main-window/ProfilerPanel.zig:281",
+      "note": "studio/main-window/ProfilerPanel.zig:284",
+      "state": "translated"
+    },
+    {
+      "id": "scene",
+      "source": "Scene",
+      "target": "Cena",
+      "note": "studio/main-window/Panels.zig:47",
+      "state": "translated"
+    },
+    {
+      "id": "sceneView.focusSelection",
+      "source": "Focus Selection",
+      "target": "Focar Seleção",
+      "note": "studio/scene-view/SceneViewport.zig:25",
+      "state": "translated"
+    },
+    {
+      "id": "sceneView.rotateMode",
+      "source": "Rotate Tool",
+      "target": "Ferramenta de Rotação",
+      "note": "studio/scene-view/SceneViewport.zig:23",
+      "state": "translated"
+    },
+    {
+      "id": "sceneView.scaleMode",
+      "source": "Scale Tool",
+      "target": "Ferramenta de Escala",
+      "note": "studio/scene-view/SceneViewport.zig:24",
+      "state": "translated"
+    },
+    {
+      "id": "sceneView.translateMode",
+      "source": "Move Tool",
+      "target": "Ferramenta de Movimento",
+      "note": "studio/scene-view/SceneViewport.zig:22",
       "state": "translated"
     },
     {
@@ -1928,31 +2243,38 @@
       "state": "translated"
     },
     {
+      "id": "settings",
+      "source": "Settings",
+      "target": "Configurações",
+      "note": "studio/main-window/Panels.zig:53",
+      "state": "translated"
+    },
+    {
       "id": "submeshes culled {n}",
       "source": "submeshes culled {n}",
       "target": "",
-      "note": "studio/main-window/ProfilerPanel.zig:166",
+      "note": "studio/main-window/ProfilerPanel.zig:157",
       "state": "new"
     },
     {
       "id": "submeshes drawn  {n}",
       "source": "submeshes drawn  {n}",
       "target": "",
-      "note": "studio/main-window/ProfilerPanel.zig:165",
+      "note": "studio/main-window/ProfilerPanel.zig:156",
       "state": "new"
     },
     {
       "id": "tex created   {n}",
       "source": "tex created   {n}",
       "target": "texturas criadas {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:164",
+      "note": "studio/main-window/ProfilerPanel.zig:155",
       "state": "translated"
     },
     {
       "id": "texture binds {n}",
       "source": "texture binds {n}",
       "target": "vínculos de textura {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:162",
+      "note": "studio/main-window/ProfilerPanel.zig:153",
       "state": "translated"
     },
     {
@@ -1966,35 +2288,63 @@
       "id": "triangles     {n}",
       "source": "triangles     {n}",
       "target": "triângulos    {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:160",
+      "note": "studio/main-window/ProfilerPanel.zig:151",
       "state": "translated"
     },
     {
       "id": "unlimited",
       "source": "unlimited",
       "target": "ilimitado",
-      "note": "studio/main-window/ProfilerPanel.zig:245",
+      "note": "studio/main-window/ProfilerPanel.zig:238",
       "state": "translated"
     },
     {
       "id": "vertices      {n}",
       "source": "vertices      {n}",
       "target": "vértices      {n}",
-      "note": "studio/main-window/ProfilerPanel.zig:161",
+      "note": "studio/main-window/ProfilerPanel.zig:152",
+      "state": "translated"
+    },
+    {
+      "id": "view.addAssets",
+      "source": "Add Assets Panel",
+      "target": "Adicionar Painel de Ativos",
+      "note": "studio/main-window/Window.zig:220",
+      "state": "translated"
+    },
+    {
+      "id": "view.addInspector",
+      "source": "Add Inspector Panel",
+      "target": "Adicionar Painel de Inspetor",
+      "note": "studio/main-window/Window.zig:219",
+      "state": "translated"
+    },
+    {
+      "id": "view.addOutput",
+      "source": "Add Log Panel",
+      "target": "Adicionar Painel de Log",
+      "note": "studio/main-window/Window.zig:221",
+      "state": "translated"
+    },
+    {
+      "id": "view.captureScreenshot",
+      "source": "Capture Screenshot",
+      "target": "Capturar Screenshot",
+      "note": "studio/main-window/Window.zig:218",
       "state": "translated"
     },
     {
       "id": "vsync: off",
       "source": "vsync: off",
       "target": "vsync: desligado",
-      "note": "studio/main-window/ProfilerPanel.zig:234",
+      "note": "studio/main-window/ProfilerPanel.zig:227",
       "state": "translated"
     },
     {
       "id": "vsync: on",
       "source": "vsync: on",
       "target": "vsync: ligado",
-      "note": "studio/main-window/ProfilerPanel.zig:234",
+      "note": "studio/main-window/ProfilerPanel.zig:227",
       "state": "translated"
     },
     {
@@ -2036,56 +2386,56 @@
       "id": "{name}  ({n} zones)",
       "source": "{name}  ({n} zones)",
       "target": "{name}  ({n} zonas)",
-      "note": "studio/main-window/ProfilerPanel.zig:449",
+      "note": "studio/main-window/ProfilerPanel.zig:452",
       "state": "translated"
     },
     {
       "id": "→ go live",
       "source": "→ go live",
       "target": "→ ao vivo",
-      "note": "studio/main-window/ProfilerPanel.zig:218",
+      "note": "studio/main-window/ProfilerPanel.zig:211",
       "state": "translated"
     },
     {
       "id": "■ idle — press Play to profile",
       "source": "■ idle — press Play to profile",
       "target": "■ ocioso — pressione Reproduzir para analisar",
-      "note": "studio/main-window/ProfilerPanel.zig:198",
+      "note": "studio/main-window/ProfilerPanel.zig:191",
       "state": "translated"
     },
     {
       "id": "● Record",
       "source": "● Record",
       "target": "● Gravar",
-      "note": "studio/main-window/ProfilerPanel.zig:212",
+      "note": "studio/main-window/ProfilerPanel.zig:205",
       "state": "translated"
     },
     {
       "id": "● live",
       "source": "● live",
       "target": "● ao vivo",
-      "note": "studio/main-window/ProfilerPanel.zig:218",
+      "note": "studio/main-window/ProfilerPanel.zig:211",
       "state": "translated"
     },
     {
       "id": "● recording (Play)",
       "source": "● recording (Play)",
       "target": "● gravando (Reprodução)",
-      "note": "studio/main-window/ProfilerPanel.zig:201",
+      "note": "studio/main-window/ProfilerPanel.zig:194",
       "state": "translated"
     },
     {
       "id": "❚❚ Pause",
       "source": "❚❚ Pause",
       "target": "❚❚ Pausar",
-      "note": "studio/main-window/ProfilerPanel.zig:212",
+      "note": "studio/main-window/ProfilerPanel.zig:205",
       "state": "translated"
     },
     {
       "id": "❚❚ paused (Play)",
       "source": "❚❚ paused (Play)",
       "target": "❚❚ pausado (Reprodução)",
-      "note": "studio/main-window/ProfilerPanel.zig:203",
+      "note": "studio/main-window/ProfilerPanel.zig:196",
       "state": "translated"
     }
   ]

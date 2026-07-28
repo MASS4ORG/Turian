@@ -6,7 +6,7 @@
 const std = @import("std");
 const gui = @import("gui");
 const editor = @import("editor");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const Documents = @import("Documents.zig");
 
 const OPEN_KEY = "editor.open_documents";

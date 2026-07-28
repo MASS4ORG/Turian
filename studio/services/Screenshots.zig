@@ -15,7 +15,7 @@ const gui = @import("gui");
 const GpuRenderer = @import("../scene-view/GpuRenderer.zig");
 
 const log = std.log.scoped(.screenshots);
-const EditorState = @import("EditorState.zig");
+const EditorState = @import("editor").EditorState;
 
 const page = std.heap.page_allocator;
 

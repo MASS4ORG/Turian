@@ -12,7 +12,7 @@
 const std = @import("std");
 const gui = @import("gui");
 const engine = @import("engine");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 const StudioLocale = @import("../services/StudioLocale.zig");
 const tr = StudioLocale.tr;
 

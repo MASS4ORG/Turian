@@ -2,10 +2,10 @@
 /// metadata via dlopen/getRegistry.  Pure logic — no GUI dependency.
 const std = @import("std");
 const engine = @import("engine");
-const scanner = @import("assets/Scanner.zig");
-const GameBuild = @import("build/GameBuild.zig");
-const codegen = @import("build/GameCodegen.zig");
-const Progress = @import("Progress.zig").Progress;
+const scanner = @import("../assets/Scanner.zig");
+const GameBuild = @import("GameBuild.zig");
+const codegen = @import("GameCodegen.zig");
+const Progress = @import("../tasks/Progress.zig").Progress;
 
 const api = engine.api;
 const ComponentDef = scanner.ComponentDef;

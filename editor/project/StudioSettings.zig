@@ -1,6 +1,6 @@
 //! Typed schema for Studio-wide (not per-project) editor configuration
 //! . Bridges to the generic key/value `Settings` store
-//! (`editor/Settings.zig`) so existing scattered readers keep working
+//! (`editor/project/Settings.zig`) so existing scattered readers keep working
 //! unmodified while `studio/SettingsEditor.zig` gains a single reflected
 //! object to draw via `PropDraw` (mirrors `engine`'s component `turian_hints`
 //! convention, e.g. `engine/components/CameraComponent.zig`).

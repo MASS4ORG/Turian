@@ -8,7 +8,7 @@
 
 const std = @import("std");
 const gui = @import("gui");
-const EditorState = @import("../services/EditorState.zig");
+const EditorState = @import("editor").EditorState;
 
 /// Tile content size (icon or preview thumbnail), adjustable via the header's
 /// slider — real-time zoom, not
