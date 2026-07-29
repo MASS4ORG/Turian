@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.2.1] - 2026-07-29
+
+### Other
+- refactor: CICD 2 stages
+- refactor(editor): move GUI-free session logic from studio to editor/session #152
+
 ## [3.2.0] - 2026-07-27
 
 ### Features
