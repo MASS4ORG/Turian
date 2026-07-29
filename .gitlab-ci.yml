@@ -1,202 +1,95 @@
-# Turian Engine — GitLab CI/CD  (GitLab provider plugin)
+# Turian Engine — GitLab CI/CD, runner dispatch
 #
-# Provider split
+# Runner selection
 # ─────────────────────────────────────────────────────────────────────────────
-# Job scripts stay thin so the pipeline ports to other CI providers (GitHub
-# Actions, Forgejo, Gitea, local runs); the logic lives in the release tool:
+# The heavy jobs normally run on a self-hosted runner to avoid burning the
+# namespace's compute minutes. GitLab resolves `tags:` when the pipeline is
+# created and never re-routes a job, so a job pinned to an offline runner sits
+# pending forever rather than falling back. This pipeline therefore resolves the
+# runner tag *before* the real jobs exist:
 #
-# tools/ci/Release.zig              Subcommand dispatcher
-#   └─ ci/*.zig             Provider-agnostic logic (verify, version bump,
-#                                  CHANGELOG, cut/tag/push, packaging, cache
-#                                  pruning)
-#   └─ ci/GitLab.zig     GitLab plugin (push URL, Package Registry
-#                                  upload, Release API — JSON built in Zig,
-#                                  no jq)
+#   resolve_runner  — untagged, so either runner can take it; asks the API
+#                     whether the self-hosted runner is online and publishes
+#                     TURIAN_RUNNER_TAG as a dotenv artifact
+#   pipeline        — triggers tools/ci/main.yml as a child pipeline, passing
+#                     TURIAN_RUNNER_TAG in; every job there is tagged with it
 #
-# Stages
-# ─────────────────────────────────────────────────────────────────────────────
-#   .pre     — Dockerfile/version changes only: rebuild+push the CI image
-#   test     — every push/MR:  build + unit tests + example regression
-#   check    — schedule only:  version bump, CHANGELOG, git tag, create release
-#   build    — tag trigger:    parallel per-platform compilation + upload + link
+# Note: the `mass4org` group already defines an unrelated `RUNNER_TAG` variable
+# (legacy default for other, non-mega4 projects) — deliberately not reused here
+# to avoid depending on CI/CD variable precedence ordering to avoid a collision.
 #
-# CI image
-# ─────────────────────────────────────────────────────────────────────────────
-# Every job below runs on `$CI_REGISTRY_IMAGE/ci:$ZIG_VERSION` (built from the
-# root `Dockerfile` by `build_ci_image`) instead of installing Zig + apt packages
-# from scratch on every job. There's no ready-made image that both bundles Zig
-# and has a shell (e.g. kassany/ziglang has neither `sh` nor `bash`, which
-# GitLab's executor needs), so we build our own — it's still Ubuntu-based, just
-# with Zig preinstalled, and only rebuilds when the Dockerfile or ZIG_VERSION
-# actually changes.
+# Failure modes all fall back to the SaaS runner: the pipeline costs minutes but
+# never hangs. To force one side, run the pipeline with a TURIAN_RUNNER_TAG
+# variable.
 #
 # Requirements:
-#   1. Push credentials for `check_release` — pick one:
-#      a. CI_JOB_TOKEN (default, no setup): auto-issued per job, never needs
-#         rotation. Acts as the pipeline-schedule owner, so that user must be
-#         a Maintainer with push rights on branch `main` and tag `v*.*.*`
-#         (see #2 below). This is what runs unless CI_PUSH_TOKEN is set.
-#      b. CI_PUSH_TOKEN (Project Variable): project access token, scopes
-#         'write_repository' + 'api'. GitLab.com requires an expiry on all
-#         tokens (no "never expires" option) — max ~365 days — so this needs
-#         periodic rotation. Prefer (a) unless something needs a real PAT.
-#   2. Protected Branches/Tags (Settings -> Repository):
-#      - Branch 'main': Allowed to push = Maintainers (or the schedule owner)
-#      - Tag pattern 'v*.*.*' and 'v*.*.*-*' (pre-releases): same
-#   3. Container Registry enabled for this project (Settings -> General ->
-#      Visibility -> Container Registry), for the CI image above.
+#   1. GITLAB_TOKEN (already defined at the `mass4org` group level, inherited
+#      here): personal access token, `read_api` scope, unprotected so feature
+#      branches see it too. Used only to list this project's runners and read
+#      the self-hosted one's online status; CI_JOB_TOKEN has no access to the
+#      runners API.
+#   2. LOCAL_RUNNER_ID below must match the self-hosted runner registered on
+#      this project (Settings -> CI/CD -> Runners).
+#   3. Everything the child pipeline needs — see tools/ci/main.yml.
 
 variables:
-  ZIG_VERSION: "0.16.0"
-
-default:
-  image: "${CI_REGISTRY_IMAGE}/ci:${ZIG_VERSION}"
-  tags:
-    - local-runner
+  # Self-hosted runner: id + the tag its jobs are pinned to.
+  LOCAL_RUNNER_ID: "53858479"
+  LOCAL_RUNNER_TAG: "local-runner"
+  # GitLab.com SaaS runner used whenever the self-hosted one is unavailable.
+  SAAS_RUNNER_TAG: "saas-linux-medium-amd64"
 
 stages:
-  - test
-  - check
-  - build
+  - dispatch
+  - pipeline
 
-# ── build_ci_image ────────────────────────────────────────────────────────────
-# Rebuilds+pushes the shared CI image. Runs in `.pre` (always first, no need to
-# list it in `stages:`) so a Dockerfile/version bump is ready before any other
-# job tries to pull it. Kaniko builds from within a container with no Docker
-# daemon required (no dind, no privileged runner).
-build_ci_image:
-  stage: .pre
-  image:
-    name: gcr.io/kaniko-project/executor:v1.23.2-debug
-    entrypoint: [""]
-  rules:
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
-      changes:
-        - Dockerfile
-        - .gitlab-ci.yml
-    # Manual escape hatch: lets a feature branch build+push the image (e.g. to
-    # bootstrap it the very first time, before it exists in the registry, or
-    # to try out a Dockerfile change ahead of merging).
-    - when: manual
-      allow_failure: true
+# ── resolve_runner ────────────────────────────────────────────────────────────
+# Deliberately untagged: the self-hosted runner accepts untagged jobs, so this
+# costs nothing while it is up, and a SaaS runner picks it up when it is down.
+resolve_runner:
+  stage: dispatch
+  image: alpine
   script:
-    - mkdir -p /kaniko/.docker
     - |
-      echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf '%s:%s' "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
-    - >
-      /kaniko/executor
-      --context "${CI_PROJECT_DIR}"
-      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
-      --build-arg "ZIG_VERSION=${ZIG_VERSION}"
-      --destination "${CI_REGISTRY_IMAGE}/ci:${ZIG_VERSION}"
-      --cache=true
-
-# ── test ─────────────────────────────────────────────────────────────────────
-test:
-  stage: test
-  rules:
-    - if: "$CI_COMMIT_TAG"
-      when: never
-    - if: "$CHECK_RELEASE"
-      when: never
-    - if: '$CI_COMMIT_MESSAGE =~ /^chore\(release\):/'
-      when: never
-    - when: on_success
-  script:
-    - zig fmt --check .
-    - echo "==> zig build"
-    - zig build --summary all
-    - echo "==> zig build test"
-    - zig build test --summary all
-    - echo "==> zig build (windows cross-compile, full studio + cli)"
-    # Build the whole Studio (not just -Dcli-only) so a Windows regression in
-    # the GUI/GPU/render stack is caught here. -Dno-test: the Linux runner
-    # can't execute the Windows binaries.
-    - zig build -Dtarget=x86_64-windows-gnu -Dno-test --summary all
-    - echo "==> example project regression"
-    - zig build release-verify -- --examples
-    - |
-      # Free disk space before the SDK build: the debug bins and .zig-cache from
-      # previous steps are no longer needed (examples already tested the CLI).
-      # This does mean the saved zig-cache-* cache is empty from this job — it's
-      # kept warm by check_release/build_artifacts runs instead.
-      rm -rf .zig-cache zig-out/bin/turian-studio zig-out/bin/turian-cli
-      find examples/ -maxdepth 2 -name '.cache' -type d -exec rm -rf {} + 2>/dev/null || true
-      df -h / || true
-    # SDK smoke-test: verify the CLI in the SDK can build a project using only
-    # SDK-resident sources. Uses the full SDK (with SDL3) so the game can link.
-    - zig build sdk --summary all
-    - zig build release-verify -- --sdk
-    # Bounds the shared global cache's growth (Zig has no built-in cache GC).
-    - zig build release-prune-cache -- --days 14
-  cache:
-    # Zig's global cache (fetched build.zig.zon dependencies, the compiler's
-    # own cache) isn't branch-specific, so it's shared by every branch under
-    # one fixed key instead of being rebuilt per-ref.
-    - key: zig-global-cache-v1
-      paths: [~/.cache/zig/]
-    # The incremental project build cache is per-branch, but a branch/MR that
-    # doesn't have one yet (e.g. freshly created) falls back to the default
-    # branch's cache instead of starting fully cold.
-    - key: zig-cache-${CI_COMMIT_REF_SLUG}
-      fallback_keys: ["zig-cache-${CI_DEFAULT_BRANCH}"]
-      paths: [.zig-cache/]
+      if [ -n "$TURIAN_RUNNER_TAG" ]; then
+        echo "TURIAN_RUNNER_TAG pinned to '$TURIAN_RUNNER_TAG' by a pipeline variable."
+      elif [ -z "$GITLAB_TOKEN" ]; then
+        echo "WARNING: GITLAB_TOKEN is unset — cannot probe the self-hosted runner."
+        TURIAN_RUNNER_TAG="$SAAS_RUNNER_TAG"
+      elif wget -qO- --header="PRIVATE-TOKEN: $GITLAB_TOKEN" \
+             "$CI_API_V4_URL/projects/$CI_PROJECT_ID/runners?type=project_type&status=online&per_page=100" \
+           | grep -q "\"id\":$LOCAL_RUNNER_ID,"; then
+        echo "Self-hosted runner $LOCAL_RUNNER_ID is online."
+        TURIAN_RUNNER_TAG="$LOCAL_RUNNER_TAG"
+      else
+        echo "Self-hosted runner $LOCAL_RUNNER_ID is offline or unreachable."
+        TURIAN_RUNNER_TAG="$SAAS_RUNNER_TAG"
+      fi
+      echo "TURIAN_RUNNER_TAG=$TURIAN_RUNNER_TAG" > runner.env
+      cat runner.env
   artifacts:
-    paths: [zig-out/bin/turian-studio, zig-out/bin/turian-cli]
-    expire_in: 1 day
+    reports:
+      dotenv: runner.env
 
-# ── check_release ─────────────────────────────────────────────────────────────
-# Runs on schedule.  Bumps the version, updates CHANGELOG, commits, tags, and creates the GitLab release.
-check_release:
-  stage: check
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: "$CHECK_RELEASE"
-  script:
-    # Whole flow (git identity + authenticated remote, tag prune, collect
-    # commits since last tag, version bump + CHANGELOG, commit, tag, push,
-    # create release) lives in tools/ci/Cut.zig. Push auth:
-    # CI_PUSH_TOKEN > CI_JOB_TOKEN (see Requirements above).
-    - zig build release-cut -- --provider gitlab
-  cache:
-    - key: zig-global-cache-v1
-      paths: [~/.cache/zig/]
-    # Runs off the default branch, so it shares (and warms) the same project
-    # build cache as `test`'s default-branch runs.
-    - key: zig-cache-${CI_DEFAULT_BRANCH}
-      paths: [.zig-cache/]
-
-# ── build_artifacts ───────────────────────────────────────────────────────────
-# Runs in parallel for each platform when a tag is pushed.
-# Builds, packages, and UPLOADS the artifact directly to the release.
-build_artifacts:
-  stage: build
-  rules:
-    - if: "$CI_COMMIT_TAG"
-  parallel:
-    matrix:
-      - PLATFORM: linux-x86_64
-        BUILD_FLAGS: "-Doptimize=ReleaseFast"
-      - PLATFORM: windows-x86_64
-        BUILD_FLAGS: "-Dtarget=x86_64-windows-gnu -Dno-test -Doptimize=ReleaseFast"
-      - PLATFORM: macos-aarch64
-        BUILD_FLAGS: "-Dtarget=aarch64-macos -Dcli-only -Dno-test -Doptimize=ReleaseFast"
-  script:
-    # 1. Build binaries + tests
-    - zig build ci $BUILD_FLAGS
-    # 2. Assemble self-contained SDK in zig-out/sdk/
-    - zig build sdk $BUILD_FLAGS
-    # 3. Package SDK into .public/
-    - zig build release-package -- --platform $PLATFORM --version $CI_COMMIT_TAG
-    # 4. Upload and link to release
-    - zig build release-publish -- --provider gitlab
-    # Bounds the shared global cache's growth.
-    - zig build release-prune-cache -- --days 14
-  cache:
-    - key: zig-global-cache-v1
-      paths: [~/.cache/zig/]
-    # Keyed per platform: the 3 matrix jobs cross-compile different targets
-    # and must not share (and thrash) one another's build cache.
-    - key: zig-cache-release-${PLATFORM}
-      fallback_keys: ["zig-cache-${CI_DEFAULT_BRANCH}"]
-      paths: [.zig-cache/]
+# ── pipeline ─────────────────────────────────────────────────────────────────
+# `strategy: depend` mirrors the child's status onto this job, so the parent
+# pipeline (and any MR attached to it) reflects the real build result.
+pipeline:
+  stage: pipeline
+  needs: [resolve_runner]
+  variables:
+    TURIAN_RUNNER_TAG: $TURIAN_RUNNER_TAG
+    # A child pipeline's own CI_PIPELINE_SOURCE is always "parent_pipeline";
+    # forward the parent's so the release rules can still see "schedule".
+    PARENT_PIPELINE_SOURCE: $CI_PIPELINE_SOURCE
+  trigger:
+    include:
+      - local: tools/ci/main.yml
+    strategy: depend
+    forward:
+      # CHECK_RELEASE is only ever set as a manual "Run pipeline" override, never
+      # as a real variable — referencing it directly here (e.g. `CHECK_RELEASE:
+      # $CHECK_RELEASE`) would leave the literal unexpanded string `$CHECK_RELEASE`
+      # in the child when it's unset, which is truthy and forces check_release on
+      # every push. `forward:` only passes it through when it's actually set.
+      pipeline_variables: true
