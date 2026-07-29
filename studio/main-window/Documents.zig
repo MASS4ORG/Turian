@@ -402,6 +402,17 @@ pub fn setActiveDirty(dirty: bool) void {
     docs[a].dirty = dirty;
 }
 
+/// True if any open document has unsaved changes. Syncs the active scene
+/// tab's flag first so this is accurate even when called before this
+/// frame's `syncActiveDirty` (e.g. from a menu command drawn earlier).
+pub fn hasUnsavedChanges() bool {
+    syncActiveDirty();
+    for (0..doc_count) |i| {
+        if (docs[i].dirty) return true;
+    }
+    return false;
+}
+
 /// Saves document `i` in place (does not close it), activating it first so
 /// `ProjectOps`/`SettingsEditor` operate on its data. Most asset kinds have
 /// no defined save path yet and are silently skipped. `.studio_settings`

@@ -1,4 +1,4 @@
-//! Opens a source file at a given line in an external code editor for the Output panel's clickable `file:line` references. Tries `$VISUAL`/`$EDITOR` first, recognizing `--goto file:line` conventions (code, zed, subl, vim); falls back to the OS-default file handler.
+//! Opens a source file at a given line in an external code editor for the Output panel's clickable `file:line` references. Tries `$VISUAL`/`$EDITOR` first, recognizing `--goto file:line` conventions (code, zed, subl, vim); falls back to the OS-default file handler. Also exposes `openUrl` for opening web links (docs, community) in the default browser via the same OS-default handler.
 const std = @import("std");
 const EditorState = @import("session/EditorState.zig");
 
@@ -50,6 +50,11 @@ pub fn openAtLocation(io: std.Io, path: []const u8, line: u32) void {
         }
     }
     openExternalNoLine(io, path);
+}
+
+/// Opens `url` in the user's default browser via the OS-default URI handler.
+pub fn openUrl(io: std.Io, url: []const u8) void {
+    openExternalNoLine(io, url);
 }
 
 /// OS-default handler for `path` (no line jump support).

@@ -3,6 +3,7 @@ const gui = @import("gui");
 const editor = @import("editor");
 const EditorState = @import("editor").EditorState;
 const ProjectOps = @import("../services/ProjectOps.zig");
+const DirtyCheck = @import("../services/DirtyCheck.zig");
 const Tasks = @import("Tasks.zig");
 const PlayMode = @import("../scene-view/PlayMode.zig");
 const FpsCounter = @import("../services/FpsCounter.zig");
@@ -142,7 +143,7 @@ fn drawFpsIndicator() void {
 /// Draw the main menu bar.  A hamburger icon toggles the main menu items
 /// (File, Edit, Project, View, Turian) in the bar horizontally; clicking
 /// outside the menu area collapses them back.
-pub fn draw(should_quit: *bool) void {
+pub fn draw() void {
     var m = gui.menu(@src(), .horizontal, .{ .expand = .horizontal });
     defer m.deinit();
 
@@ -157,7 +158,7 @@ pub fn draw(should_quit: *bool) void {
 
             if (gui.menuItemLabel(@src(), tr("New Project..."), .{}, .{ .expand = .horizontal }) != null) {
                 m.close();
-                newProjectDialog();
+                ProjectOps.newProjectDialog();
             }
 
             if (MenuItems.command(@src(), tr("Open Project..."), "project.openProject", .{ .expand = .horizontal })) {
@@ -179,7 +180,7 @@ pub fn draw(should_quit: *bool) void {
             _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
             if (MenuItems.command(@src(), tr("Exit"), "file.exit", .{ .expand = .horizontal })) {
-                should_quit.* = true;
+                DirtyCheck.requestQuit();
             }
         }
 
@@ -322,7 +323,7 @@ pub fn draw(should_quit: *bool) void {
 /// not a modal text-entry dialog, and there's no persistent row here to
 /// rename in place the way a grid tile or tree row would offer.
 fn drawLayoutMenu(m: *gui.MenuWidget) void {
-    if (LayoutStore.hasAssetContext()) return;
+    if (LayoutStore.hasAssetContext() or LayoutStore.isWelcomeExclusive()) return;
     if (MenuItems.submenu(@src(), tr("Layout"), .{ .expand = .horizontal })) |r| {
         var fw = gui.floatingMenu(@src(), .{ .from = r }, .{});
         defer fw.deinit();
@@ -480,27 +481,4 @@ fn transportButton(action: Transport, grayed: bool) bool {
     });
     gui.tooltip(@src(), .{ .active_rect = wd.rectScale().r }, "{s}", .{action.tip()}, .{ .id_extra = id });
     return clicked;
-}
-
-fn newProjectDialog() void {
-    if (!gui.useTinyFileDialogs) {
-        gui.dialog(@src(), .{}, .{
-            .title = tr("Not Available"),
-            .message = tr("Native file dialogs are not enabled in this build."),
-        });
-        return;
-    }
-
-    const path = gui.dialogNativeFolderSelect(gui.currentWindow().arena(), .{
-        .title = tr("Choose New Project Folder"),
-    }) catch |err| blk: {
-        gui.log.debug("Could not open folder dialog: {any}", .{err});
-        break :blk null;
-    };
-
-    if (path) |p| {
-        const proj_name = std.fs.path.basename(p);
-        ProjectOps.newProject(p, if (proj_name.len > 0) proj_name else tr("New Project"));
-        EditorState.initDefaultScene(gui.io);
-    }
 }

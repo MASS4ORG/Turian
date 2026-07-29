@@ -447,7 +447,7 @@ fn run(main_init: std.process.Init) !void {
             project_opened_from_arg = true;
             EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
             if (cli_project_path) |p| {
-                ProjectOps.openProject(p);
+                ProjectOps.openProjectImmediate(p);
                 if (cli_build) {
                     const baked = editor.GameBuild.BuildConfig{
                         .engine_root = build_options.engine_root_path,

@@ -10,6 +10,7 @@ const SceneViewport = @import("../scene-view/SceneViewport.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
 const LogPanel = @import("LogPanel.zig");
+const WelcomePanel = @import("WelcomePanel.zig");
 const UiDocumentEditor = @import("../inspector/editor/UiDocumentEditor.zig");
 const SettingsEditor = @import("../inspector/editor/SettingsEditor.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
@@ -51,6 +52,7 @@ const builtin_panels = [_]PanelDesc{
     .{ .id = "profiler", .title = "Profiler", .icon = gui.entypo.gauge, .draw = ProfilerPanel.drawContent },
     .{ .id = "output", .title = "Log", .icon = gui.entypo.text_document, .draw = LogPanel.draw, .settings = LogPanel.drawSettings },
     .{ .id = "settings", .title = "Settings", .icon = gui.entypo.cog, .draw = SettingsEditor.drawSidebar, .settings = SettingsEditor.drawDockMenu, .allow_multiple = false },
+    .{ .id = "welcome", .title = "Welcome", .icon = gui.entypo.home, .draw = WelcomePanel.draw, .allow_multiple = false },
 };
 
 /// The registry backing `all()`: builtins first (fixed), then whatever

@@ -80,6 +80,12 @@ fn addOutputTab(l: *DockLayout, leaf: DockLayout.NodeIndex) !void {
     l.nodes.items[leaf].leaf.active = 0;
 }
 
+/// Single-leaf layout hosting only the Welcome panel — the exclusive view
+/// `LayoutStore.setProjectOpen` swaps to while no project is loaded.
+pub fn buildWelcome(allocator: std.mem.Allocator) !DockLayout {
+    return DockLayout.initSingleLeaf(allocator, "welcome");
+}
+
 /// [hierarchy | scene+game] over assets, on the left; inspector on the right.
 pub fn buildDefault(allocator: std.mem.Allocator) !DockLayout {
     var l = try DockLayout.initSingleLeaf(allocator, "hierarchy");

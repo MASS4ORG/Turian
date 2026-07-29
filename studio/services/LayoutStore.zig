@@ -20,6 +20,13 @@ var g_presets_dir: ?[]u8 = null;
 var g_global_dir: ?[]u8 = null;
 var g_allocator: std.mem.Allocator = undefined;
 
+/// Whether the live layout is the exclusive Welcome view — see
+/// `setProjectOpen`. Built once, in memory only (never persisted): there's
+/// nothing to remember between sessions, unlike the main layout or a saved
+/// asset-type context.
+var g_welcome_active = false;
+var g_welcome_layout: ?DockLayout = null;
+
 /// The asset-type layout currently standing in for the main one, if any.
 const Context = struct {
     asset_type: editor.AssetType,
@@ -44,6 +51,10 @@ pub fn init(allocator: std.mem.Allocator, io: std.Io, global_dir: []const u8) vo
 pub fn deinit(io: std.Io) void {
     save(io);
     clearContext();
+    if (g_welcome_layout) |*l| {
+        l.deinit();
+        g_welcome_layout = null;
+    }
     if (g_layout != null) {
         g_layout.?.deinit();
         g_layout = null;
@@ -54,23 +65,59 @@ pub fn deinit(io: std.Io) void {
     }
 }
 
-/// The live layout instance — pass to `dvui.dockspace`. This is the active
-/// document's own layout when it has one, else the main layout.
+/// The live layout instance — pass to `dvui.dockspace`. An active document's
+/// own layout wins over the exclusive Welcome view: the two are usually
+/// mutually exclusive (no document tabs exist before a project is open), but
+/// Studio Settings is the one document type that's open-able with no project
+/// at all (`file.openSettings` has no such gate) — so opening it while
+/// Welcome is exclusive must still show its layout, not hide it behind
+/// Welcome. Falls back to the main layout when neither is active.
 pub fn get() *DockLayout {
     if (g_context) |*c| return &c.layout;
+    if (g_welcome_active) return &g_welcome_layout.?;
     return &g_layout.?;
 }
 
 /// Whether a panel may appear in the layout `get()` currently returns. Always
 /// true for the main layout; a context layout admits only the panels its
-/// `LayoutPresets.AssetLayout` declares. Handles `"#N"` instance suffixes.
+/// `LayoutPresets.AssetLayout` declares; the exclusive Welcome view admits
+/// only itself. Handles `"#N"` instance suffixes.
 pub fn allows(id: []const u8) bool {
-    const c = g_context orelse return true;
-    const base = Panels.baseId(id);
-    for (c.spec.allowed) |a| {
-        if (std.mem.eql(u8, a, base)) return true;
+    if (g_context) |c| {
+        const base = Panels.baseId(id);
+        for (c.spec.allowed) |a| {
+            if (std.mem.eql(u8, a, base)) return true;
+        }
+        return false;
     }
-    return false;
+    if (g_welcome_active) return std.mem.eql(u8, Panels.baseId(id), "welcome");
+    return true;
+}
+
+/// True while the live layout (what `get()` actually returns) is the
+/// exclusive Welcome view — so the welcome tab can't be closed out from
+/// under itself, and layout-preset UI can hide like it does for an asset
+/// context. False while an asset context (e.g. Studio Settings, open-able
+/// with no project) is standing in for it instead, even though Welcome
+/// would otherwise be exclusive — those panels aren't Welcome and closing
+/// them is fine.
+pub fn isWelcomeExclusive() bool {
+    return g_welcome_active and g_context == null;
+}
+
+/// Swaps the live layout to the exclusive Welcome view while no project is
+/// loaded, and back to the main layout once one opens. Cheap and idempotent —
+/// safe to call every frame from the frame loop, same as `setAssetContext`.
+pub fn setProjectOpen(open: bool) void {
+    if (open) {
+        g_welcome_active = false;
+        return;
+    }
+    if (g_welcome_active) return;
+    if (g_welcome_layout == null) {
+        g_welcome_layout = LayoutPresets.buildWelcome(g_allocator) catch return;
+    }
+    g_welcome_active = true;
 }
 
 /// Adds a fresh instance of panel `id` to the current layout's first leaf.

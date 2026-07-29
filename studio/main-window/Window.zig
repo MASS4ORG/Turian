@@ -17,9 +17,9 @@ const ReflectJob = @import("editor").session.reflect_job;
 const ActiveTheme = @import("../services/ActiveTheme.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
 const Shortcuts = @import("../services/Shortcuts.zig");
+const DirtyCheck = @import("../services/DirtyCheck.zig");
 const tr = StudioLocale.tr;
 
-var should_quit: bool = false;
 var hooks_installed: bool = false;
 var mouse_left_held: bool = false;
 var g_mouse_x: f32 = 0;
@@ -38,7 +38,11 @@ fn panelInfo(id: []const u8) gui.DockingWidget.PanelInfo {
         std.fmt.allocPrint(gui.currentWindow().arena(), "{s} ({d})", .{ base_title, n }) catch base_title
     else
         base_title;
-    const closable = p.closable or instance_n != null;
+    // The Welcome tab can't be closed out from under itself while it's the
+    // exclusive pre-project view — there'd be nothing left to dock. Its
+    // normal `closable = true` applies once a project is open and it's just
+    // another tab in the main layout.
+    const closable = !LayoutStore.isWelcomeExclusive() and (p.closable or instance_n != null);
     return .{ .title = title, .icon = p.icon, .closable = closable };
 }
 
@@ -169,7 +173,7 @@ fn cmdOpenSettings() void {
     if (EditorState.settingsReady()) Documents.openAsset(EditorState.settings.global_path, .studio_settings);
 }
 fn cmdExit() void {
-    should_quit = true;
+    DirtyCheck.requestQuit();
 }
 fn cmdBuildGame() void {
     Tasks.launchBuild(gui.io);
@@ -246,8 +250,8 @@ pub fn frame() bool {
     defer engine.Profiler.endFrame();
 
     for (gui.events()) |*e| {
-        if (e.evt == .window and e.evt.window.action == .close) return false;
-        if (e.evt == .app and e.evt.app.action == .quit) return false;
+        if (e.evt == .window and e.evt.window.action == .close) DirtyCheck.requestQuit();
+        if (e.evt == .app and e.evt.app.action == .quit) DirtyCheck.requestQuit();
         switch (e.evt) {
             .mouse => |me| {
                 if (me.action == .position or me.action == .press or me.action == .release) {
@@ -265,7 +269,7 @@ pub fn frame() bool {
     }
     defer EditorState.endFrameDrag(mouse_left_held);
 
-    if (should_quit) return false;
+    if (DirtyCheck.quitConfirmed()) return false;
 
     var root = gui.box(@src(), .{}, .{
         .expand = .both,
@@ -278,12 +282,17 @@ pub fn frame() bool {
     var ui_zone = engine.Profiler.zone("studio.ui");
     defer ui_zone.end();
 
-    MenuBar.draw(&should_quit);
+    MenuBar.draw();
 
     _ = gui.separator(@src(), .{ .expand = .horizontal });
 
     // Document tab strip. Drawn above the editing surface.
     Documents.drawTabBar(mouse_left_held);
+    DirtyCheck.drawPendingDialog();
+
+    // Show the Welcome panel exclusively until a project is opened — the
+    // default layout has nothing to show before then.
+    LayoutStore.setProjectOpen(EditorState.project_path != null);
 
     // Follow the active document tab into its own dock arrangement, for asset
     // types that declare one (`LayoutPresets.forAssetType`). A no-op for every
