@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.3.0] - 2026-07-30
+
+### Features
+- feat(studio): welcome panel #153 + project dropdown enhancements #149
+
 ## [3.2.1] - 2026-07-29
 
 ### Other
