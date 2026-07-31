@@ -29,7 +29,7 @@ pub const Resolved = struct {
 /// inside the global `.turian` directory.
 pub fn themesDir(allocator: std.mem.Allocator, global_settings_path: []const u8) ![]u8 {
     const settings_dir = std.fs.path.dirname(global_settings_path) orelse ".";
-    return std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ settings_dir, std.fs.path.sep_str, THEMES_SUBDIR });
+    return std.fmt.allocPrint(allocator, "{s}/{s}", .{ settings_dir, THEMES_SUBDIR });
 }
 
 /// Built-ins, then user themes found directly under `themes_dir` (non-recursive),
@@ -88,7 +88,7 @@ pub fn importFile(allocator: std.mem.Allocator, io: std.Io, themes_dir: []const 
     try std.Io.Dir.cwd().createDirPath(io, themes_dir);
     const base = std.fs.path.basename(src_path);
     var dest_buf: [1024]u8 = undefined;
-    const dest = try std.fmt.bufPrint(&dest_buf, "{s}{s}{s}", .{ themes_dir, std.fs.path.sep_str, base });
+    const dest = try std.fmt.bufPrint(&dest_buf, "{s}/{s}", .{ themes_dir, base });
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = dest, .data = bytes });
 }
 

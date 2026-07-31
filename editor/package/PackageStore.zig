@@ -13,6 +13,7 @@
 ///   3. `$HOME/.cache/turian/packages`  (POSIX)  /  `$APPDATA/turian/packages` (Windows)
 ///   4. a temp-dir fallback (so headless/CI without HOME still works)
 const std = @import("std");
+const TempDir = @import("../TempDir.zig");
 
 const SUBDIR = "turian" ++ std.fs.path.sep_str ++ "packages";
 
@@ -31,7 +32,7 @@ pub fn resolveRoot(allocator: std.mem.Allocator, environ: *const std.process.Env
             return std.fmt.allocPrint(allocator, "{s}{s}{s}{s}", .{ v, std.fs.path.sep_str, mid, SUBDIR });
         }
     }
-    const tmp = if (@import("builtin").os.tag == .windows) "C:\\Windows\\Temp" else "/tmp";
+    const tmp = TempDir.resolve(environ);
     return std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ tmp, std.fs.path.sep_str, SUBDIR });
 }
 

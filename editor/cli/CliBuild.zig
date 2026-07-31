@@ -127,7 +127,7 @@ pub fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *
     std.debug.print("[Turian] Build complete.\n", .{});
 }
 
-pub fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *const std.process.Environ.Map) !void {
+pub fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *const std.process.Environ.Map, verify: bool) !void {
     const baked = GameBuild.BuildConfig{
         .engine_root = build_options.engine_root_path,
         .editor_root = build_options.editor_root_path,
@@ -165,6 +165,31 @@ pub fn cmdPlayBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, enviro
         return error.BuildFailed;
     };
     std.debug.print("[Turian] Play library: {s}\n", .{lib});
+    if (verify) try verifyPlayLibrary(lib);
+}
+
+/// Loads the freshly built play library and resolves every C-ABI symbol the
+/// studio needs, so the load path can be exercised without a GUI session.
+fn verifyPlayLibrary(lib_path: []const u8) !void {
+    var lib = editor.DynLib.open(lib_path) catch |err| {
+        std.debug.print("Play library failed to load: {t}\n", .{err});
+        return error.BuildFailed;
+    };
+    defer lib.close();
+
+    var missing: usize = 0;
+    inline for (@typeInfo(editor.PlayBuild.symbols).@"struct".decls) |decl| {
+        const name = @field(editor.PlayBuild.symbols, decl.name);
+        if (lib.lookup(*const anyopaque, name) == null) {
+            std.debug.print("  missing symbol: {s}\n", .{name});
+            missing += 1;
+        }
+    }
+    if (missing > 0) {
+        std.debug.print("Play library is missing {d} symbol(s)\n", .{missing});
+        return error.BuildFailed;
+    }
+    std.debug.print("[Turian] Play library verified: loaded, all symbols resolved.\n", .{});
 }
 
 pub fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
@@ -228,7 +253,8 @@ pub fn cmdMigrate(
     const project_version = std.SemanticVersion.parse(cfg.turian_version) catch std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
     const engine_version = editor.PackageManager.parseEngineVersion(build_options.version);
 
-    const home_dir = environ.get("HOME") orelse "";
+    const home_var = if (@import("builtin").os.tag == .windows) "USERPROFILE" else "HOME";
+    const home_dir = environ.get(home_var) orelse "";
     var settings = try editor.settings.Settings.init(gpa, home_dir, path);
     defer settings.deinit();
     settings.load(io);

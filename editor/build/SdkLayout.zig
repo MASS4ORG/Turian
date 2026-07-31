@@ -4,6 +4,7 @@
 const std = @import("std");
 const GameBuild = @import("GameBuild.zig");
 const package_store = @import("../package/PackageStore.zig");
+const TempDir = @import("../TempDir.zig");
 
 /// Detect the SDK root from the current executable's directory.
 /// Returns an owned slice (caller must free) or null if not in an SDK.
@@ -118,7 +119,11 @@ pub fn resolveReflectionConfig(
     // This works in both SDK mode and dev mode without an extra baked path.
     const engine_dir = std.fs.path.dirname(build_cfg.engine_root) orelse build_cfg.build_root;
     const reflection_zig = std.fmt.allocPrint(gpa, "{s}/Reflection.zig", .{engine_dir}) catch build_cfg.engine_root;
-    return .{ .reflection_zig = reflection_zig, .build_config = build_cfg };
+    return .{
+        .reflection_zig = reflection_zig,
+        .build_config = build_cfg,
+        .temp_dir = TempDir.resolve(environ),
+    };
 }
 
 /// Resolve a GameBuild.BuildConfig with three-layer priority:

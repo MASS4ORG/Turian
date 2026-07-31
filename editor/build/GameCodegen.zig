@@ -24,6 +24,7 @@ pub const NativeLibSpec = Shared.NativeLibSpec;
 // Re-export utility functions for backward compatibility
 pub const normPath = Shared.normPath;
 pub const absUnder = Shared.absUnder;
+pub const normConfig = Shared.normConfig;
 pub const sdl3LibPath = Shared.sdl3LibPath;
 pub const appendKtx2Module = Shared.appendKtx2Module;
 

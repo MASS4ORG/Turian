@@ -20,7 +20,9 @@ fn printUsage() void {
         \\                              Check turian_version against this engine and run
         \\                              any pending project migrations
         \\  build       <project-path>  Compile the project into a game executable
-        \\  play-build  <project-path>  Compile the in-editor Play-mode library
+        \\  play-build  <project-path> [--verify]
+        \\                              Compile the in-editor Play-mode library;
+        \\                              --verify also loads it and resolves its symbols
         \\  debug       <subcommand>    Connect to a running Turian debug server
         \\  mcp                         Start an MCP server (stdio) backed by the debug server
         \\  docs        <subcommand>    Generate AI context or documentation
@@ -69,7 +71,11 @@ pub fn main(init: std.process.Init) !void {
         return cli_build.cmdBuild(io, gpa, path, init.environ_map);
     } else if (std.mem.eql(u8, cmd, "play-build")) {
         const path = args.next() orelse return printUsage();
-        return cli_build.cmdPlayBuild(io, gpa, path, init.environ_map);
+        var verify = false;
+        while (args.next()) |arg| {
+            if (std.mem.eql(u8, arg, "--verify")) verify = true;
+        }
+        return cli_build.cmdPlayBuild(io, gpa, path, init.environ_map, verify);
     } else if (std.mem.eql(u8, cmd, "debug")) {
         const sub = args.next() orelse return cli_debug.printUsageDebug();
         return cli_debug.cmdDebug(io, gpa, sub, &args);

@@ -1,3 +1,8 @@
+# Normalize all text to LF in the index and the working tree, on every platform.
+# Without this, a Windows checkout with core.autocrlf=true reports every LF text
+# file as permanently modified.
+* text=auto eol=lf
+
 # Git LFS — track binary assets so they don't bloat the repo history.
 # Run `git lfs install` once per machine before cloning.
 
