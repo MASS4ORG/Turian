@@ -374,13 +374,16 @@ fn drawPlayControls() void {
     drawFpsIndicator();
     switch (PlayMode.state()) {
         .edit => {
-            // Playing the *current* scene only makes sense when one is open.
-            const can_play = EditorState.hasOpenScene();
+            // Playing the *current* scene only makes sense when one is open —
+            // and not while the script binaries it would run are being
+            // rebuilt, or the assets it would load are being rewritten.
+            const busy = Tasks.isLocked(.{ .scripts = true, .assets = true });
+            const can_play = EditorState.hasOpenScene() and !busy;
             if (transportButton(.play, !can_play) and can_play) {
                 PlayMode.play(gui.io);
                 LayoutStore.focusPanel("game", gui.io);
             }
-            if (transportButton(.play_global, false)) {
+            if (transportButton(.play_global, busy) and !busy) {
                 PlayMode.playFirstScene(gui.io);
                 LayoutStore.focusPanel("game", gui.io);
             }
@@ -430,12 +433,22 @@ const Transport = enum {
 
     fn tip(self: Transport) []const u8 {
         return switch (self) {
-            .play => playStopTip(tr("Play the open scene")),
-            .play_global => playFirstSceneTip(),
+            .play => playBlockedTip() orelse playStopTip(tr("Play the open scene")),
+            .play_global => playBlockedTip() orelse playFirstSceneTip(),
             .pause => tr("Pause"),
             .step => tr("Step one frame"),
             .stop => playStopTip(tr("Stop")),
         };
+    }
+
+    /// Why Play is unavailable, when a background task holds the compiled
+    /// scripts or the assets it would run against. A grayed button with no
+    /// explanation is the most common "is this broken?" moment.
+    fn playBlockedTip() ?[]const u8 {
+        var buf: [editor.TaskManager.MAX_LABEL]u8 = undefined;
+        const owner = Tasks.lockOwnerLabel(.{ .scripts = true, .assets = true }, &buf);
+        if (owner.len == 0) return null;
+        return StudioLocale.trArgs("Waiting for {task}", &.{.{ .name = "task", .value = .{ .text = owner } }});
     }
 
     fn playStopTip(base: []const u8) []const u8 {

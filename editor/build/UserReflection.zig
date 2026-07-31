@@ -48,6 +48,24 @@ pub fn loadFieldInfo(
     var processed = std.mem.zeroes([scanner.MAX_COMPONENTS]bool);
     const denom: f32 = @floatFromInt(@max(count, 1));
 
+    // Each distinct source file costs one `zig build`, so counting them up
+    // front turns the bar into an honest "3 / 7 scripts" rather than a fraction
+    // of components that jumps unevenly.
+    var total_groups: u64 = 0;
+    {
+        var seen = std.mem.zeroes([scanner.MAX_COMPONENTS]bool);
+        for (0..count) |i| {
+            if (components[i].is_builtin or seen[i]) continue;
+            const src = components[i].sourceFile();
+            for (i..count) |j| {
+                if (!components[j].is_builtin and std.mem.eql(u8, components[j].sourceFile(), src)) seen[j] = true;
+            }
+            total_groups += 1;
+        }
+    }
+    var done_groups: u64 = 0;
+    progress.units(0, total_groups);
+
     for (0..count) |i| {
         if (progress.cancelled()) return;
         if (components[i].is_builtin or processed[i]) continue;
@@ -71,8 +89,10 @@ pub fn loadFieldInfo(
         }
 
         if (type_count == 0) continue;
-        progress.report(@as(f32, @floatFromInt(i)) / denom, src_file);
+        progress.report(@as(f32, @floatFromInt(i)) / denom, std.fs.path.basename(src_file));
         compileAndPopulate(io, src_file, type_names[0..type_count], components, def_indices[0..type_count], config);
+        done_groups += 1;
+        progress.units(done_groups, total_groups);
     }
     progress.report(1, "");
 }

@@ -42,6 +42,29 @@ pub const AssetView = struct {
     type: []const u8 = "",
 };
 
+/// One background editor task. Mirrors the editor's task record without the
+/// engine depending on the editor module, so tools driving the editor over the
+/// debug protocol can tell whether an operation they triggered has landed.
+pub const TaskView = struct {
+    id: u64 = 0,
+    /// Owning task, or 0 for a root.
+    parent_id: u64 = 0,
+    /// Category: "import", "compile", "build", ...
+    kind: []const u8 = "",
+    /// Lifecycle: "blocked", "queued", "running", "completed", ...
+    status: []const u8 = "",
+    label: []const u8 = "",
+    note: []const u8 = "",
+    /// Aggregate completion in 0..1, including nested phases.
+    progress: f32 = 0,
+    units_done: u64 = 0,
+    units_total: u64 = 0,
+    elapsed_ms: i64 = 0,
+    /// Comma-separated capabilities held while active, e.g. "assets,scripts".
+    /// A tool seeing "scripts" knows Play would run stale code.
+    locks: []const u8 = "",
+};
+
 /// Everything the inspector can see at one instant. All views are borrowed.
 /// Result of the last whole-window screenshot capture, for the
 /// `screenshot.last` debug-RPC query (async, completes a frame later).
@@ -67,6 +90,8 @@ pub const World = struct {
     editor_camera: ?EditorCameraView = null,
     /// Which of the "scene"/"game" viewport tabs is active (Studio only).
     active_viewport_tab: ?[]const u8 = null,
+    /// Background editor tasks, roots and children (Studio only).
+    tasks: []const TaskView = &.{},
 };
 
 /// A typed value used when mutating a field by name (see `setComponentField`).
@@ -307,6 +332,41 @@ pub fn writeAsset(jw: *Stringify, view: AssetView) Error!void {
 pub fn writeAssetList(jw: *Stringify, world: World) Error!void {
     try jw.beginArray();
     for (world.assets) |view| try writeAsset(jw, view);
+    try jw.endArray();
+}
+
+/// Writes one background task record.
+pub fn writeTask(jw: *Stringify, view: TaskView) Error!void {
+    try jw.beginObject();
+    try jw.objectField("id");
+    try jw.write(view.id);
+    try jw.objectField("parent_id");
+    try jw.write(view.parent_id);
+    try jw.objectField("kind");
+    try jw.write(view.kind);
+    try jw.objectField("status");
+    try jw.write(view.status);
+    try jw.objectField("label");
+    try jw.write(view.label);
+    try jw.objectField("note");
+    try jw.write(view.note);
+    try jw.objectField("progress");
+    try jw.write(view.progress);
+    try jw.objectField("units_done");
+    try jw.write(view.units_done);
+    try jw.objectField("units_total");
+    try jw.write(view.units_total);
+    try jw.objectField("elapsed_ms");
+    try jw.write(view.elapsed_ms);
+    try jw.objectField("locks");
+    try jw.write(view.locks);
+    try jw.endObject();
+}
+
+/// Writes every background task the host exposed via `World.tasks`.
+pub fn writeTaskList(jw: *Stringify, world: World) Error!void {
+    try jw.beginArray();
+    for (world.tasks) |view| try writeTask(jw, view);
     try jw.endArray();
 }
 

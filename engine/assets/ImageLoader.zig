@@ -113,7 +113,7 @@ test "stripColorTag round-trips wrapColorTag and passes untagged bytes through" 
         defer std.testing.allocator.free(wrapped);
         try std.testing.expectEqualStrings(png, stripColorTag(wrapped));
     }
-    // Untagged input (a font, or a package written before tagging) is unchanged.
+    // Untagged input (a font, or a package with no tag) is unchanged.
     try std.testing.expectEqualStrings(png, stripColorTag(png));
     try std.testing.expectEqualStrings("", stripColorTag(""));
 }
