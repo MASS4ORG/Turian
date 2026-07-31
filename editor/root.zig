@@ -84,6 +84,16 @@ pub const TaskManager = @import("tasks/TaskManager.zig");
 pub const Task = TaskManager.Task;
 pub const TaskStatus = TaskManager.Status;
 pub const TaskKind = TaskManager.Kind;
+/// Editor capabilities a task holds while active, so callers can disable just
+/// the affected actions instead of freezing the whole editor.
+pub const TaskLocks = TaskManager.Locks;
+/// How a submission is resolved against an identical task already in flight.
+pub const TaskPolicy = TaskManager.Policy;
+pub const TaskSpec = TaskManager.Spec;
+/// Parent/child rollup and formatting over a task snapshot.
+pub const task_tree = @import("tasks/TaskTree.zig");
+/// Plain-text task rendering for CLI and headless callers.
+pub const TaskReporter = @import("tasks/TaskReporter.zig");
 
 /// Cascading JSON settings store (global + project layers).
 pub const settings = @import("project/Settings.zig");

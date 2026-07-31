@@ -59,7 +59,15 @@ pub fn launchImport(io: std.Io, project_path: []const u8, assets_path: []const u
 }
 
 pub fn dispatchImport(job: *ImportJob) void {
-    job.task_id = State.taskManager().begin(.import, "Import assets");
+    // Holds the asset lock for its whole run: anything that reads or rewrites
+    // the asset database (reimport, build, asset-settings edits) must wait
+    // rather than race the swap in `finishImport`.
+    job.task_id = State.taskManager().submit(.{
+        .kind = .import,
+        .label = "Import assets",
+        .key = "assets:import",
+        .locks = .{ .assets = true },
+    });
     EditorState.import_future = job.io.concurrent(runImportJob, .{job}) catch {
         // Concurrency unavailable: run synchronously (UI blocks, but the
         // import is still tracked and correct).

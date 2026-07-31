@@ -93,16 +93,57 @@ pub fn launchReflect(io: std.Io) void {
     dispatchReflect(job);
 }
 
+/// Register the job's task and start it as soon as its dependencies allow.
+/// Compiling user scripts reads the project's imported assets, so a reflect
+/// launched while an import is still in flight is declared blocked on it and
+/// spawned later by `pumpReflect`.
 pub fn dispatchReflect(job: *ReflectJob) void {
-    job.task_id = State.taskManager().begin(.compile, "Compile scripts");
+    var deps: [1]u64 = undefined;
+    var dep_count: usize = 0;
+    if (EditorState.import_job) |imp| {
+        deps[0] = imp.task_id;
+        dep_count = 1;
+    }
+
+    job.task_id = State.taskManager().submit(.{
+        .kind = .compile,
+        .label = "Compile scripts",
+        .key = "scripts:compile",
+        .status = .queued,
+        .locks = .{ .scripts = true },
+        .deps = deps[0..dep_count],
+    });
+    EditorState.reflect_job = job;
+    EditorState.reflect_spawned = false;
+    startReflectIfReady(job);
+}
+
+/// Spawn the worker once the task's dependencies have cleared. Called on
+/// dispatch and again every frame from `pumpReflect` while the job waits.
+fn startReflectIfReady(job: *ReflectJob) void {
+    if (EditorState.reflect_spawned) return;
+    const task = State.taskManager().get(job.task_id) orelse return;
+    switch (task.status) {
+        .queued => {},
+        // The dependency failed and took this task with it; drop the job.
+        .cancelled, .failed => {
+            finishReflect(job);
+            EditorState.reflect_job = null;
+            return;
+        },
+        else => return,
+    }
+
+    State.taskManager().start(job.task_id);
     EditorState.reflect_future = job.io.concurrent(runReflectJob, .{job}) catch {
         // Concurrency unavailable: run synchronously (UI blocks, but the
         // scan is still tracked and correct).
         runReflectJob(job);
         finishReflect(job);
+        EditorState.reflect_job = null;
         return;
     };
-    EditorState.reflect_job = job;
+    EditorState.reflect_spawned = true;
 }
 
 pub fn runReflectJob(job: *ReflectJob) void {
@@ -135,12 +176,18 @@ pub fn finishReflect(job: *ReflectJob) void {
 /// request that was queued behind it.
 pub fn pumpReflect(io: std.Io) void {
     const job = EditorState.reflect_job orelse return;
+    if (!EditorState.reflect_spawned) {
+        startReflectIfReady(job);
+        EditorState.requestRedraw();
+        return;
+    }
     const finished = if (State.taskManager().get(job.task_id)) |t| t.isFinished() else true;
     if (!finished) {
         EditorState.requestRedraw();
         return;
     }
     EditorState.reflect_future.await(io);
+    EditorState.reflect_spawned = false;
     finishReflect(job);
     EditorState.reflect_job = null;
     if (EditorState.reflect_pending) |pending| {
@@ -155,7 +202,18 @@ pub fn pumpReflect(io: std.Io) void {
 /// `--build` CLI path) that need fully-populated field data before proceeding.
 pub fn waitForReflect(io: std.Io) void {
     while (EditorState.reflect_job) |job| {
+        // A job still blocked on its import dependency has no worker to await;
+        // resolving the registry releases it so it can be spawned and drained.
+        if (!EditorState.reflect_spawned) {
+            State.taskManager().resolveDependencies();
+            startReflectIfReady(job);
+            // Still not runnable: the dependency has not landed, so there is
+            // nothing here to wait on.
+            if (!EditorState.reflect_spawned and EditorState.reflect_job != null) return;
+            continue;
+        }
         EditorState.reflect_future.await(io);
+        EditorState.reflect_spawned = false;
         finishReflect(job);
         EditorState.reflect_job = null;
         if (EditorState.reflect_pending) |pending| {

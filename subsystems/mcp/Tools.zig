@@ -172,6 +172,19 @@ pub const ALL: []const Tool = &[_]Tool{
         .debug_method = "asset.reload",
         .mutates = true,
     },
+    // ── Background tasks ─────────────────────────────────────────────────────
+    .{
+        .name = "list_tasks",
+        .description =
+        \\List the editor's background tasks (asset import, script compilation, game build) with status, aggregate progress, elapsed time, and the capabilities each holds while running.
+        \\Nested phases are returned alongside their parent, linked by parent_id (0 means a root task).
+        \\Call this before acting on editor state: a task holding "assets" is rewriting the asset database, and one holding "scripts" means compiled user code is stale, so results read now may be superseded.
+        ,
+        .input_schema =
+        \\{"type":"object","properties":{}}
+        ,
+        .debug_method = "tasks.list",
+    },
 };
 
 /// Find a tool by name. Returns null if not registered.
