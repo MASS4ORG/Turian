@@ -34,6 +34,15 @@ pub fn wrapColorTag(allocator: std.mem.Allocator, bytes: []const u8, srgb: bool)
     return out;
 }
 
+/// Drop the `wrapColorTag` envelope, if present, yielding the bare container
+/// bytes. For consumers that decode the image themselves instead of going
+/// through `loadFromMemory` — the in-game GUI hands package bytes straight to
+/// stb_image, which does not know the tag. A no-op on untagged input.
+pub fn stripColorTag(bytes: []const u8) []const u8 {
+    if (bytes.len >= 5 and std.mem.eql(u8, bytes[0..4], color_tag_magic)) return bytes[5..];
+    return bytes;
+}
+
 /// Decode an image from an in-memory byte buffer (e.g. supplied by an asset
 /// package). KTX2 is detected by its identifier; otherwise stb_image sniffs the
 /// format, so no extension is required.
@@ -95,6 +104,18 @@ fn fromDds(allocator: std.mem.Allocator, bytes: []const u8) !Texture {
         .allocator = allocator,
         .owns_mips = true,
     };
+}
+
+test "stripColorTag round-trips wrapColorTag and passes untagged bytes through" {
+    const png = "\x89PNG\r\n\x1a\n rest of the file";
+    for ([_]bool{ false, true }) |srgb| {
+        const wrapped = try wrapColorTag(std.testing.allocator, png, srgb);
+        defer std.testing.allocator.free(wrapped);
+        try std.testing.expectEqualStrings(png, stripColorTag(wrapped));
+    }
+    // Untagged input (a font, or a package written before tagging) is unchanged.
+    try std.testing.expectEqualStrings(png, stripColorTag(png));
+    try std.testing.expectEqualStrings("", stripColorTag(""));
 }
 
 test "wrapColorTag upgrades an uncompressed source to rgba8_srgb" {
