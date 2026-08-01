@@ -235,6 +235,10 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
         log.warn("shadow pipeline failed: {any} — shadows disabled.", .{err});
         break :p null;
     };
+    state.shadow_mask_pipeline = pipeline.createShadowMaskPipeline(device) catch |err| p: {
+        log.warn("shadow cutout pipeline failed: {any} — masked materials cast solid shadows.", .{err});
+        break :p null;
+    };
     state.gizmo_pipeline = gizmos.createGizmoPipeline(device, true) catch |err| g: {
         log.warn("gizmo pipeline failed: {any} — gizmos disabled.", .{err});
         break :g null;
@@ -324,6 +328,15 @@ fn targetFor(dev: *c.SDL_GPUDevice, w: u32, h: u32) ?*state.DepthTarget {
 fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
     for (&state.depth_targets) |*d| releaseTarget(dev, d);
     state.depth_evict_cursor = 0;
+}
+
+/// Squared camera distance to `sm`'s world-space bounds centre — the key the
+/// transparent draws are sorted back-to-front on. Measured per submesh rather
+/// than per node because a scene authored as one large mesh (a whole building,
+/// say) holds every one of its glass panes at a single node origin, which no
+/// per-node key could ever order.
+fn submeshDepth(cam_pos: Vector3, sm: state.GpuSubmesh, model: Matrix4) f32 {
+    return Vector3.distanceSquared(cam_pos, culling.worldAabb(sm.bounds_min, sm.bounds_max, model).center);
 }
 
 /// Render `objects` into this size's internal HDR target. Call `runPostProcess`
@@ -626,7 +639,7 @@ pub fn renderScene(
                             tdp.index_offset = sm.index_offset;
                             tdp.index_count = sm.index_count;
                             if (draw.transparent_count < draw.transparent_draws.len) {
-                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = Vector3.distanceSquared(cam_pos, t.position) };
+                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = submeshDepth(cam_pos, sm, mdl) };
                                 draw.transparent_count += 1;
                             }
                         }
@@ -659,7 +672,7 @@ pub fn renderScene(
                 } else if (draw.transparent_count < draw.transparent_draws.len) {
                     draw.transparent_draws[draw.transparent_count] = .{
                         .params = dp,
-                        .sort_depth = Vector3.distanceSquared(cam_pos, t.position),
+                        .sort_depth = submeshDepth(cam_pos, sm, mdl),
                     };
                     draw.transparent_count += 1;
                 }
@@ -714,9 +727,11 @@ pub fn deinit() void {
     if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.shadow_sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
     if (state.shadow_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.shadow_mask_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.shadow_map = null;
     state.shadow_sampler = null;
     state.shadow_pipeline = null;
+    state.shadow_mask_pipeline = null;
     if (state.skybox_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.skybox_pipeline = null;
     if (state.ibl_equirect_to_cubemap_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);

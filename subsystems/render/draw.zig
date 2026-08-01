@@ -112,8 +112,8 @@ pub const DrawParams = struct {
 /// A blended/additive draw deferred for back-to-front sorting.
 pub const TransparentDraw = struct {
     params: DrawParams,
-    /// Squared camera distance to the drawing node's origin — cheap proxy for
-    /// per-node (not per-triangle) back-to-front ordering.
+    /// Squared camera distance to the submesh's world bounds centre — cheap
+    /// proxy for per-submesh (not per-triangle) back-to-front ordering.
     sort_depth: f32,
 };
 

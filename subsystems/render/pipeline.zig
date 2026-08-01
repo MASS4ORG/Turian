@@ -327,12 +327,40 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
 
 /// Depth-only pipeline for rendering the directional-light shadow map.
 pub fn createShadowPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
-    const vert_spv = @embedFile("shaders/compiled/shadow.vert.spv");
-    const frag_spv = @embedFile("shaders/compiled/shadow.frag.spv");
+    return buildShadowPipeline(
+        dev,
+        @embedFile("shaders/compiled/shadow.vert.spv"),
+        @embedFile("shaders/compiled/shadow.frag.spv"),
+        0,
+        0,
+    );
+}
 
+/// Alpha-cutout variant of `createShadowPipeline`: the fragment stage samples
+/// the material's albedo and discards below its cutoff, so masked geometry
+/// (foliage, fences) casts the shape it actually shows rather than its quad.
+pub fn createShadowMaskPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
+    return buildShadowPipeline(
+        dev,
+        @embedFile("shaders/compiled/shadow_mask.vert.spv"),
+        @embedFile("shaders/compiled/shadow_mask.frag.spv"),
+        1,
+        1,
+    );
+}
+
+/// Shared depth-only shadow pipeline setup; the variants differ only in their
+/// shaders and how many fragment resources those declare.
+fn buildShadowPipeline(
+    dev: *c.SDL_GPUDevice,
+    vert_spv: []const u8,
+    frag_spv: []const u8,
+    frag_samplers: u32,
+    frag_uniform_buffers: u32,
+) !*c.SDL_GPUGraphicsPipeline {
     const vert = c.SDL_CreateGPUShader(dev, &c.SDL_GPUShaderCreateInfo{
         .code_size = vert_spv.len,
-        .code = vert_spv,
+        .code = vert_spv.ptr,
         .entrypoint = "main",
         .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = c.SDL_GPU_SHADERSTAGE_VERTEX,
@@ -346,14 +374,14 @@ pub fn createShadowPipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipeline {
 
     const frag = c.SDL_CreateGPUShader(dev, &c.SDL_GPUShaderCreateInfo{
         .code_size = frag_spv.len,
-        .code = frag_spv,
+        .code = frag_spv.ptr,
         .entrypoint = "main",
         .format = c.SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = c.SDL_GPU_SHADERSTAGE_FRAGMENT,
-        .num_samplers = 0,
+        .num_samplers = frag_samplers,
         .num_storage_textures = 0,
         .num_storage_buffers = 0,
-        .num_uniform_buffers = 0,
+        .num_uniform_buffers = frag_uniform_buffers,
         .props = 0,
     }) orelse return error.FragShader;
     defer c.SDL_ReleaseGPUShader(dev, frag);

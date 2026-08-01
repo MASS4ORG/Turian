@@ -27,6 +27,14 @@ pub const VertexUB = extern struct { mvp: [16]f32, model: [16]f32 };
 /// Shadow-pass vertex uniforms — `light_vp * model`.
 pub const ShadowUB = extern struct { light_mvp: [16]f32 };
 
+/// Alpha-cutout shadow-pass fragment uniforms — layout must match FragUB in
+/// shadow_mask.frag.glsl. Only enough of the material to replicate
+/// scene.frag.glsl's alpha-cutout discard.
+pub const ShadowMaskFragUB = extern struct {
+    flags: [4]f32, // x=has_albedo, y=alpha_cutoff, zw unused
+    base_color: [4]f32, // rgba
+};
+
 /// Depth+normal prepass vertex uniforms — layout must match VertexUB in
 /// depth_normal.vert.glsl. `model_view = view * model`, composed on the CPU.
 pub const PrepassVertexUB = extern struct { mvp: [16]f32, model_view: [16]f32 };

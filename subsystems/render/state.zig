@@ -54,6 +54,9 @@ pub var scene_pipelines: [MAX_SCENE_PIPELINES]ScenePipelineEntry = .{ScenePipeli
 pub var scene_pipeline_count: usize = 0;
 
 pub var shadow_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+/// Alpha-cutout variant of `shadow_pipeline`, used for masked materials. Null
+/// when its creation failed — such materials then cast a solid shadow.
+pub var shadow_mask_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var shadow_map: ?*c.SDL_GPUTexture = null;
 pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 

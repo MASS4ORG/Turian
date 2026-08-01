@@ -6,6 +6,7 @@ const types = @import("types.zig");
 const state = @import("state.zig");
 const assets = @import("assets.zig");
 const culling = @import("culling.zig");
+const draw = @import("draw.zig");
 
 const c = gpu.c;
 const Matrix4 = engine.Matrix4;
@@ -193,13 +194,110 @@ pub fn computeCascades(
     return out;
 }
 
+/// How a material occludes light, derived from its render state.
+const Occlusion = enum { solid, cutout, none };
+
+/// Blended surfaces (glass, water) transmit light, so they occlude nothing —
+/// casting a solid shadow from a shopfront window would black out the interior
+/// behind it. Masked surfaces occlude only where the cutout test keeps them.
+fn occlusionFor(render: engine.Material.RenderState) Occlusion {
+    if (render.blend != .disabled) return .none;
+    return if (render.alpha_mask) .cutout else .solid;
+}
+
+/// Per-cascade draw state: the atlas strip being filled and which pipeline is
+/// currently bound, so a run of same-occlusion material groups binds only once.
+const Strip = struct {
+    cmd: *c.SDL_GPUCommandBuffer,
+    pass: *c.SDL_GPURenderPass,
+    solid_pipeline: *c.SDL_GPUGraphicsPipeline,
+    index: usize,
+    bound: ?*c.SDL_GPUGraphicsPipeline = null,
+};
+
+fn bindPipeline(s: *Strip, pl: *c.SDL_GPUGraphicsPipeline) void {
+    if (s.bound == pl) return;
+    c.SDL_BindGPUGraphicsPipeline(s.pass, pl);
+    s.bound = pl;
+}
+
+/// Bind the cutout pipeline along with the albedo map and cutoff its discard
+/// reads. Returns false when the cutout pipeline is unavailable, leaving the
+/// caller to fall back to a solid (quad-shaped) shadow.
+fn bindCutout(s: *Strip, mat: *const types.ResolvedMaterial) bool {
+    const pl = state.shadow_mask_pipeline orelse return false;
+    const white = state.white_tex orelse return false;
+    const smp = state.sampler orelse return false;
+    bindPipeline(s, pl);
+
+    const albedo = assets.pickTexture(mat.map(.albedo), white);
+    const fub = types.ShadowMaskFragUB{
+        .flags = .{ assets.present(albedo.found), mat.alpha_cutoff, 0, 0 },
+        .base_color = mat.base_color,
+    };
+    c.SDL_PushGPUFragmentUniformData(s.cmd, 0, &fub, @sizeOf(types.ShadowMaskFragUB));
+    c.SDL_BindGPUFragmentSamplers(s.pass, 0, &[_]c.SDL_GPUTextureSamplerBinding{
+        .{ .texture = albedo.tex, .sampler = smp },
+    }, 1);
+    return true;
+}
+
+/// Draw one mesh renderer's shadow-casting geometry into `s`, one material
+/// group at a time so each group's occlusion mode picks its own pipeline.
+fn drawCaster(s: *Strip, cascade: Cascade, obj: *const engine.SceneNode, mr: *const engine.MeshRendererComponent) void {
+    const guid_str = mr.mesh.slice();
+    if (guid_str.len == 0) return;
+    const gm = assets.findGpuMesh(guid_str) orelse return;
+    if (gm.idx_count == 0 or gm.material_groups.len == 0) return;
+
+    const t = &obj.transform;
+    const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
+        .multiply(Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z))
+        .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
+    const lub = types.ShadowUB{ .light_mvp = cascade.vp.multiply(mdl).m };
+
+    c.SDL_BindGPUVertexBuffers(s.pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
+    c.SDL_BindGPUIndexBuffer(s.pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+    // Draw only the submeshes this cascade's own cull marked visible (one
+    // indirect multi-draw per group); fall back to plain per-submesh draws if
+    // that cull didn't run for this mesh (e.g. its compute buffers failed to
+    // create).
+    const indirect: ?*c.SDL_GPUBuffer = if (gm.shadow_cull_dispatched_frame[s.index] == state.frame_seq)
+        gm.shadow_indirect_bufs[s.index]
+    else
+        null;
+
+    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
+    for (gm.material_groups) |group| {
+        const mat_res = assets.resolveMaterial(draw.materialGuidForSlot(mr, mat_n, group.material_slot));
+        switch (occlusionFor(mat_res.render)) {
+            .none => continue,
+            .solid => bindPipeline(s, s.solid_pipeline),
+            .cutout => if (!bindCutout(s, &mat_res)) bindPipeline(s, s.solid_pipeline),
+        }
+        // Re-pushed per group: the push is per-command-buffer, and a group that
+        // switched pipeline must still see this mesh's light-space transform.
+        c.SDL_PushGPUVertexUniformData(s.cmd, 0, &lub, @sizeOf(types.ShadowUB));
+
+        if (indirect) |ib| {
+            c.SDL_DrawGPUIndexedPrimitivesIndirect(s.pass, ib, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
+            continue;
+        }
+        for (gm.submeshes[group.start..][0..group.count]) |sm| {
+            if (sm.index_count == 0) continue;
+            c.SDL_DrawGPUIndexedPrimitives(s.pass, sm.index_count, 1, sm.index_offset, 0, 0);
+        }
+    }
+}
+
 /// Render scene depth from the light's point of view into each cascade's
 /// strip of the shadow atlas (see `pipeline.createShadowMap`): one render
 /// pass over the whole atlas, each cascade's draws restricted to its own
 /// viewport/scissor strip and its own GPU-culled indirect buffer (see `gpu_cull.dispatchShadowCulls`).
 pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Cascade, objects: []const engine.SceneNode) void {
     const shadow_map = state.shadow_map orelse return;
-    const pipeline = state.shadow_pipeline orelse return;
+    const solid_pipeline = state.shadow_pipeline orelse return;
 
     var depth_info = std.mem.zeroes(c.SDL_GPUDepthStencilTargetInfo);
     depth_info.texture = shadow_map;
@@ -209,7 +307,6 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Ca
 
     const pass = c.SDL_BeginGPURenderPass(cmd, null, 0, &depth_info) orelse return;
     defer c.SDL_EndGPURenderPass(pass);
-    c.SDL_BindGPUGraphicsPipeline(pass, pipeline);
 
     for (cascades, 0..) |cascade, strip| {
         const y_off: i32 = @intCast(strip * @as(usize, types.SHADOW_DIM));
@@ -228,37 +325,13 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Ca
             .h = @intCast(types.SHADOW_DIM),
         });
 
+        var s = Strip{ .cmd = cmd, .pass = pass, .solid_pipeline = solid_pipeline, .index = strip };
         for (objects) |*obj| {
             if (!obj.active) continue;
             for (obj.components[0..obj.component_count]) |*comp| {
                 if (comp.* != .mesh_renderer) continue;
                 if (!comp.mesh_renderer.cast_shadows) continue;
-                const guid_str = comp.mesh_renderer.mesh.slice();
-                if (guid_str.len == 0) continue;
-                const gm = assets.findGpuMesh(guid_str) orelse continue;
-                if (gm.idx_count == 0) continue;
-
-                const t = &obj.transform;
-                const mdl = Matrix4.translation(t.position.x, t.position.y, t.position.z)
-                    .multiply(Matrix4.rotationEuler(t.rotation.x, t.rotation.y, t.rotation.z))
-                    .multiply(Matrix4.scaling(t.scale.x, t.scale.y, t.scale.z));
-                const lub = types.ShadowUB{ .light_mvp = cascade.vp.multiply(mdl).m };
-                c.SDL_PushGPUVertexUniformData(cmd, 0, &lub, @sizeOf(types.ShadowUB));
-
-                c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = gm.vtx_buf, .offset = 0 }, 1);
-                c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = gm.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
-
-                // Draw only the submeshes this cascade's own cull marked visible
-                // (one indirect multi-draw); fall back to the whole mesh if that
-                // cull didn't run for this mesh (e.g. its compute buffers failed
-                // to create).
-                if (gm.shadow_indirect_bufs[strip]) |sib| {
-                    if (gm.shadow_cull_dispatched_frame[strip] == state.frame_seq) {
-                        c.SDL_DrawGPUIndexedPrimitivesIndirect(pass, sib, 0, @intCast(gm.submeshes.len));
-                        continue;
-                    }
-                }
-                c.SDL_DrawGPUIndexedPrimitives(pass, gm.idx_count, 1, 0, 0, 0);
+                drawCaster(&s, cascade, obj, &comp.mesh_renderer);
             }
         }
     }
