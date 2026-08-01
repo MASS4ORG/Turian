@@ -76,6 +76,10 @@ pub var redo_len: usize = 0;
 pub var reflect_generation: usize = 0;
 pub var reflect_job: ?*ReflectJob.ReflectJob = null;
 pub var reflect_future: std.Io.Future(void) = undefined;
+/// True once `reflect_future` holds a live worker. A reflect job waiting on
+/// its import dependency is registered but not yet spawned, and awaiting an
+/// unstarted future would fault.
+pub var reflect_spawned: bool = false;
 pub var reflect_pending: ?*ReflectJob.ReflectJob = null;
 pub var import_generation: usize = 0;
 pub var import_job: ?*ImportJob.ImportJob = null;

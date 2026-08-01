@@ -132,7 +132,9 @@ pub fn reimportAll(
 }
 
 /// Import every asset in `db`, reporting progress and stopping early if the
-/// caller requests cancellation.
+/// caller requests cancellation. Reported as item counters rather than one
+/// child task per asset — a thousand-asset project would otherwise swamp the
+/// task registry with entries nobody reads.
 fn importEach(
     io: std.Io,
     allocator: std.mem.Allocator,
@@ -142,6 +144,7 @@ fn importEach(
 ) void {
     const total = db.by_guid.count();
     var done: usize = 0;
+    progress.units(0, total);
     var it = db.by_guid.valueIterator();
     while (it.next()) |info| {
         if (progress.cancelled()) break;
@@ -149,6 +152,7 @@ fn importEach(
         progress.report(frac, std.fs.path.basename(info.path));
         importAsset(io, allocator, project_path, info.path);
         done += 1;
+        progress.units(done, total);
     }
 }
 

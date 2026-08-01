@@ -6,42 +6,7 @@ const GameBuild = editor.GameBuild;
 const project_ops = editor.project_ops;
 const build_options = @import("turian_build_options");
 
-/// Task progress wrapper that echoes to stdout.
-const CliTask = struct {
-    tm: *editor.TaskManager,
-    id: u64,
-    last_pct: i32 = -1,
-
-    fn start(tm: *editor.TaskManager, kind: editor.TaskKind, label: []const u8) CliTask {
-        return .{ .tm = tm, .id = tm.begin(kind, label) };
-    }
-
-    fn report(ctx: ?*anyopaque, id: u64, fraction: f32, note: []const u8) void {
-        const self: *CliTask = @ptrCast(@alignCast(ctx.?));
-        self.tm.setProgress(id, fraction, note);
-        const pct: i32 = @intFromFloat(fraction * 100);
-        if (pct == self.last_pct) return;
-        self.last_pct = pct;
-        std.debug.print("[{d:>3}%] {s}\n", .{ @as(u32, @intCast(pct)), note });
-    }
-
-    fn cancelled(ctx: ?*anyopaque, id: u64) bool {
-        const self: *CliTask = @ptrCast(@alignCast(ctx.?));
-        return self.tm.isCancelRequested(id);
-    }
-
-    const vtable = editor.Progress.VTable{ .report = report, .cancelled = cancelled };
-
-    fn progress(self: *CliTask) editor.Progress {
-        return .{ .ctx = self, .id = self.id, .vtable = &vtable };
-    }
-
-    fn printStatus(self: *CliTask) void {
-        if (self.tm.get(self.id)) |t| {
-            std.debug.print("{s}: {s}\n", .{ t.kind.text(), t.status.text() });
-        }
-    }
-};
+const Reporter = editor.TaskReporter.Reporter;
 
 pub fn cmdNewProject(io: std.Io, path: []const u8, proj_name: []const u8) !void {
     project_ops.newProject(io, path, proj_name, build_options.version);
@@ -119,10 +84,9 @@ pub fn cmdBuild(io: std.Io, gpa: std.mem.Allocator, path: []const u8, environ: *
     asset_meta.scanAndEnsureMetas(io, gpa, assets);
 
     var tm = editor.TaskManager.init();
-    var task = CliTask.start(&tm, .build, "Build game");
+    var task = Reporter.start(&tm, .build, "Build game");
     const ok = GameBuild.buildGame(io, path, &components, count, config, task.progress());
-    if (ok) tm.complete(task.id) else tm.fail(task.id, "build failed");
-    task.printStatus();
+    task.finish(ok, "build failed");
     if (!ok) return error.BuildFailed;
     std.debug.print("[Turian] Build complete.\n", .{});
 }
@@ -208,10 +172,9 @@ pub fn cmdImport(io: std.Io, gpa: std.mem.Allocator, path: []const u8) !void {
     db.scan(io, assets);
 
     var tm = editor.TaskManager.init();
-    var task = CliTask.start(&tm, .import, "Import assets");
+    var task = Reporter.start(&tm, .import, "Import assets");
     editor.asset_importer.importAll(io, gpa, path, &db, task.progress());
-    tm.complete(task.id);
-    task.printStatus();
+    task.finish(true, "");
 }
 
 /// Runs the ADR-0012 project version-check + migration flow: compares

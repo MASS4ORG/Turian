@@ -42,6 +42,7 @@ pub fn dispatch(
     if (std.mem.eql(u8, m, "snapshot")) return callSnapshot(allocator, req, world, out);
     if (std.mem.eql(u8, m, "asset.list")) return callAssetList(allocator, req, world, out);
     if (std.mem.eql(u8, m, "asset.inspect")) return callAssetInspect(allocator, req, world, out);
+    if (std.mem.eql(u8, m, "tasks.list")) return callTaskList(allocator, req, world, out);
     if (std.mem.eql(u8, m, "schema")) return callSchema(allocator, req, out);
     if (std.mem.eql(u8, m, "metrics")) return callMetrics(allocator, req, world, out);
     if (std.mem.eql(u8, m, "screenshot.last")) return callScreenshotLast(allocator, req, world, out);
@@ -372,6 +373,14 @@ fn callAssetList(allocator: std.mem.Allocator, req: *const Request, world: World
     withResult(allocator, req, out, assetListWriter, world);
 }
 
+fn taskListWriter(jw: *Stringify, world: World) anyerror!void {
+    try introspect.writeTaskList(jw, world);
+}
+
+fn callTaskList(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
+    withResult(allocator, req, out, taskListWriter, world);
+}
+
 fn callAssetInspect(allocator: std.mem.Allocator, req: *const Request, world: World, out: *std.Io.Writer) void {
     var guid_buf: [128]u8 = undefined;
     const guid = getParamString(req.params(), "guid", &guid_buf) orelse {
@@ -543,6 +552,37 @@ test "asset.inspect returns one asset by guid" {
     , .{ .assets = &assets });
     defer testing.allocator.free(resp);
     try testing.expect(std.mem.indexOf(u8, resp, "wood.material") != null);
+}
+
+test "tasks.list serializes roots, nested phases and held capabilities" {
+    const tasks = [_]introspect.TaskView{
+        .{
+            .id = 1,
+            .kind = "build",
+            .status = "running",
+            .label = "Build game",
+            .progress = 0.25,
+            .elapsed_ms = 4200,
+            .locks = "assets,scripts,project",
+        },
+        .{
+            .id = 2,
+            .parent_id = 1,
+            .kind = "compile",
+            .status = "running",
+            .label = "Compiling game",
+            .units_done = 3,
+            .units_total = 7,
+        },
+    };
+    const resp = try dispatchStr(testing.allocator,
+        \\{"jsonrpc":"2.0","id":12,"method":"tasks.list"}
+    , .{ .tasks = &tasks });
+    defer testing.allocator.free(resp);
+    try testing.expect(std.mem.indexOf(u8, resp, "\"label\":\"Build game\"") != null);
+    try testing.expect(std.mem.indexOf(u8, resp, "\"locks\":\"assets,scripts,project\"") != null);
+    try testing.expect(std.mem.indexOf(u8, resp, "\"parent_id\":1") != null);
+    try testing.expect(std.mem.indexOf(u8, resp, "\"units_total\":7") != null);
 }
 
 test "errors method returns captured diagnostic log entries" {

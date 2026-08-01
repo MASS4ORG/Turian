@@ -21,6 +21,45 @@ pub const appendKtx2Module = codegen.appendKtx2Module;
 
 const log = std.log.scoped(.game_build);
 
+/// Relative wall-clock cost of each build phase. The compile dominates so
+/// heavily (minutes, against seconds for the rest) that equal weights would
+/// park the progress bar at 50% for almost the entire build.
+const PHASE_GENERATE: f32 = 1;
+const PHASE_PACKAGE: f32 = 3;
+const PHASE_COMPILE: f32 = 12;
+const PHASE_COPY: f32 = 1;
+
+/// Walks the build's sequential phases, reporting each as a weighted child of
+/// the build task.
+const PhaseTracker = struct {
+    parent: Progress,
+    current: Progress = .none,
+
+    fn init(parent: Progress) PhaseTracker {
+        parent.plan(PHASE_GENERATE + PHASE_PACKAGE + PHASE_COMPILE + PHASE_COPY);
+        return .{ .parent = parent };
+    }
+
+    /// Close the running phase as successful and open the next one. The new
+    /// phase opens first so the deepest running child is never momentarily
+    /// absent from the parent's summary line.
+    fn next(self: *PhaseTracker, kind: @import("../tasks/Task.zig").Kind, label: []const u8, weight: f32) void {
+        const opened = self.parent.child(kind, label, weight);
+        self.current.finish(true);
+        self.current = opened;
+    }
+
+    fn done(self: *PhaseTracker) void {
+        self.current.finish(true);
+        self.current = .none;
+    }
+
+    fn abort(self: *PhaseTracker) void {
+        self.current.finish(false);
+        self.current = .none;
+    }
+};
+
 /// Build the user game, then copy the executable and packaged assets into
 /// the project's configured build output folder (`ProjectSettings.platform
 /// .build_output_path`, default `<project>/.public`). Blocks until
@@ -34,16 +73,21 @@ pub fn buildGame(
     progress: Progress,
 ) bool {
     if (progress.cancelled()) return false;
-    progress.report(0.05, "Preparing build");
+    // Zero rather than a token 5%: once the first phase opens, the aggregate
+    // is 0%, and a bar that walks backwards reads as a bug.
+    progress.report(0, "Preparing build");
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const a = arena.allocator();
-    buildGameInner(io, a, project_path, components, component_count, config, progress) catch |err| {
+    var phases = PhaseTracker.init(progress);
+    buildGameInner(io, a, project_path, components, component_count, config, progress, &phases) catch |err| {
         log.err("Build failed: {any}", .{err});
+        phases.abort();
         progress.report(1, "Build failed");
         return false;
     };
+    phases.done();
     progress.report(1, "Build complete");
     return true;
 }
@@ -56,6 +100,7 @@ fn buildGameInner(
     component_count: usize,
     config: BuildConfig,
     progress: Progress,
+    phases: *PhaseTracker,
 ) !void {
     const cache_path = try std.fmt.allocPrint(a, "{s}/.cache", .{project_path});
     std.Io.Dir.cwd().createDirPath(io, cache_path) catch {};
@@ -173,6 +218,7 @@ fn buildGameInner(
         abs_files[i] = try codegen.normPath(a, abs_files[i]);
     }
 
+    phases.next(.generic, "Generating project", PHASE_GENERATE);
     progress.report(0.1, "Generating project");
     const gen_project = try codegen.normPath(a, project_path);
     const use_gpu = codegen.sdl3LibPath(a, config).len > 0 and config.sdl3_include.len > 0;
@@ -206,16 +252,19 @@ fn buildGameInner(
 
     // Cook all assets (project + installed packages) into game.oap *before*
     // compiling, so the shipped game loads from the package.
+    phases.next(.package, "Packaging assets", PHASE_PACKAGE);
     progress.report(0.25, "Packaging assets");
     try packageAssets(io, a, project_path, config.extra_asset_roots, PackageManager.parseEngineVersion(config.engine_version), config.package_store);
 
     if (progress.cancelled()) return error.Cancelled;
 
+    phases.next(.compile, "Compiling game", PHASE_COMPILE);
     progress.report(0.4, "Compiling game");
     log.info("Building game...", .{});
     const argv = [_][]const u8{ "zig", "build", "-Doptimize=Debug" };
     try spawnAndWaitIn(io, a, &argv, cache_path);
 
+    phases.next(.generic, "Copying build output", PHASE_COPY);
     progress.report(0.9, "Copying build output");
     const exe_name = if (builtin.target.os.tag == .windows) "game.exe" else "game";
     const built_exe = try std.fmt.allocPrint(a, "{s}/zig-out/bin/{s}", .{ cache_path, exe_name });

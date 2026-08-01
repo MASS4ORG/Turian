@@ -550,7 +550,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
     g_lib = lib;
     g_lib_valid = true;
     // A fresh library instance restarts its own `DiagLog` seq counter at 0, so
-    // last frame's high-water mark from a previous session would otherwise
+    // the high-water mark kept from the instance it replaced would otherwise
     // make every one of its (lower-numbered) entries look "already seen".
     g_diag_last_seq = 0;
     return true;

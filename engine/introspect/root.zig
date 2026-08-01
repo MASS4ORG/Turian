@@ -18,6 +18,8 @@ pub const World = Inspector.World;
 pub const ScreenshotView = Inspector.ScreenshotView;
 /// The Studio editor viewport camera's pose, for `camera.get`/`camera.set`.
 pub const EditorCameraView = Inspector.EditorCameraView;
+/// A read-only view of one background editor task, for `tasks.list`.
+pub const TaskView = Inspector.TaskView;
 /// A typed value used when mutating a field by name.
 pub const Value = Inspector.Value;
 
@@ -36,6 +38,8 @@ pub const writeScene = Inspector.writeScene;
 pub const writeSceneList = Inspector.writeSceneList;
 pub const writeAsset = Inspector.writeAsset;
 pub const writeAssetList = Inspector.writeAssetList;
+pub const writeTask = Inspector.writeTask;
+pub const writeTaskList = Inspector.writeTaskList;
 pub const writeSnapshot = Inspector.writeSnapshot;
 pub const writeSchema = Inspector.writeSchema;
 pub const componentTypeName = Inspector.componentTypeName;

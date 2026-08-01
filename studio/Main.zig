@@ -16,6 +16,7 @@ const ActiveTheme = @import("services/ActiveTheme.zig");
 const StudioLocale = @import("services/StudioLocale.zig");
 const AssetWatcher = editor.asset_watcher;
 const Documents = @import("main-window/Documents.zig");
+const Tasks = @import("main-window/Tasks.zig");
 const EditorFrameTiming = @import("services/EditorFrameTiming.zig");
 const FpsCounter = @import("services/FpsCounter.zig");
 const StudioSettings = editor.StudioSettings;
@@ -56,14 +57,15 @@ fn studioWorld(views: *[1]engine.introspect.SceneView) engine.introspect.World {
         .fov = cam_state.fov,
     };
     const active_tab = LayoutStore.activeViewportTab();
-    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab };
+    const tasks = Tasks.debugViews();
+    if (!EditorState.scene_open) return .{ .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab, .tasks = tasks };
     views[0] = .{
         .name = if (EditorState.current_scene_path) |p| std.fs.path.basename(p) else "(unsaved)",
         .id = if (EditorState.current_scene_path) |p| p else "",
         .active = true,
         .nodes = EditorState.objects[0..EditorState.object_count],
     };
-    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab };
+    return .{ .scenes = views[0..1], .metrics = &EditorState.debug_metrics, .assets = assets, .last_screenshot = last_shot, .editor_camera = cam_view, .active_viewport_tab = active_tab, .tasks = tasks };
 }
 
 // ── Machine-driven UI interaction (remote-debug input injection) ────────────
