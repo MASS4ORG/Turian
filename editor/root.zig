@@ -46,6 +46,8 @@ pub const sdk_layout = @import("build/SdkLayout.zig");
 pub const user_reflection = @import("build/UserReflection.zig");
 /// Cross-platform dynamic-library loader for the hot-compiled play library.
 pub const DynLib = @import("build/DynLib.zig");
+/// OS temporary-directory resolution.
+pub const temp_dir = @import("TempDir.zig");
 
 pub const ComponentDef = scanner.ComponentDef;
 pub const DefKind = scanner.DefKind;

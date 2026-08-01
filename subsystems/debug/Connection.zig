@@ -165,12 +165,19 @@ pub fn connWriter(conn: *Conn) void {
     }
 }
 
+/// Writes a JSON-RPC error to a connection that will not be served, then
+/// half-closes so the peer sees the message followed by a clean end-of-stream.
+///
+/// The caller must not close the socket straight after: Windows turns a close
+/// with unread inbound data into an RST, which discards the error line the
+/// client is still about to read. `Server.retire` defers the close instead.
 pub fn rejectStream(io: std.Io, stream: net.Stream, msg: []const u8) void {
     var buf: [256]u8 = undefined;
     var writer = stream.writer(io, &buf);
     const dummy = Protocol.Request{};
     Protocol.writeError(&writer.interface, &dummy, Protocol.ErrorCode.INTERNAL_ERROR, msg) catch return;
     writer.interface.flush() catch {};
+    stream.shutdown(io, .send) catch {};
 }
 
 /// Joins both threads, closes the socket, frees the connection.

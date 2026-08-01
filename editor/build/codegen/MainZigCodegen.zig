@@ -163,12 +163,14 @@ pub fn generateMainZig(
                 "var g_event_count: usize = 0;\n\n" ++
                 // Reads into the current dvui frame's arena (freed automatically
                 // next frame) — only ever called from within dvui_win.begin()/end().
+                // Packaged images carry an import-time color-space envelope that
+                // stb_image cannot sniff, so strip it before dvui decodes them.
                 "fn uiTextureSource(ctx: ?*anyopaque, guid: []const u8) ?[]const u8 {\n" ++
                 "    _ = ctx;\n" ++
                 "    if (!g_assets_ready) return null;\n" ++
                 "    const gid = (editor.Guid.parse(guid) catch return null).bytes;\n" ++
                 "    const r = g_assets.readById(gui.currentWindow().arena(), gid) orelse return null;\n" ++
-                "    return r.bytes;\n" ++
+                "    return engine.assets.ImageLoader.stripColorTag(r.bytes);\n" ++
                 "}\n\n" ++
                 "fn syncUi() void {\n" ++
                 "    var keep_buf: [engine.ui.UiRuntime.MAX_INSTANCES][]const u8 = undefined;\n" ++

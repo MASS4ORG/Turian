@@ -133,6 +133,10 @@ pub const Server = struct {
     inbound: std.ArrayList(Connection.InboundNode) = .empty,
     inbound_mutex: std.Io.Mutex = .init,
 
+    /// The most recently refused socket, held half-open so its peer can read
+    /// the rejection before the close lands. Guarded by `conns_mutex`.
+    retiring: ?net.Stream = null,
+
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, options: Options) Server {
@@ -196,6 +200,8 @@ pub const Server = struct {
                 slot.* = null;
             }
         }
+        if (self.retiring) |s| s.close(io);
+        self.retiring = null;
         self.conns_mutex.unlock(io);
 
         // Drain any unprocessed inbound lines.
@@ -461,6 +467,15 @@ pub const Server = struct {
         };
     }
 
+    /// Parks a refused socket instead of closing it immediately, closing the
+    /// previously parked one. The delay gives the peer time to read the
+    /// rejection, which an immediate close would discard on Windows.
+    /// Must hold `conns_mutex`.
+    fn retire(self: *Self, stream: net.Stream) void {
+        if (self.retiring) |prev| prev.close(self.io);
+        self.retiring = stream;
+    }
+
     fn countConns(self: *Self) usize {
         var n: usize = 0;
         for (self.conns) |c| {
@@ -476,7 +491,7 @@ pub const Server = struct {
         const cap = @min(self.options.max_clients, MAX_CONNS);
         if (self.countConns() >= cap) {
             Connection.rejectStream(self.io, stream, "Too many clients");
-            stream.close(self.io);
+            self.retire(stream);
             return;
         }
         var slot_idx: ?usize = null;
@@ -488,7 +503,7 @@ pub const Server = struct {
         }
         const idx = slot_idx orelse {
             Connection.rejectStream(self.io, stream, "Too many clients");
-            stream.close(self.io);
+            self.retire(stream);
             return;
         };
 

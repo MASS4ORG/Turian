@@ -14,6 +14,9 @@ const log = std.log.scoped(.play_build);
 
 const lib_ext = if (@import("builtin").os.tag == .windows) ".dll" else if (@import("builtin").os.tag == .macos) ".dylib" else ".so";
 const lib_prefix = if (@import("builtin").os.tag == .windows) "" else "lib";
+/// `zig build` installs a shared library's loadable image alongside executables
+/// on Windows, leaving only the import library under `zig-out/lib`.
+const lib_out_dir = if (@import("builtin").os.tag == .windows) "bin" else "lib";
 
 /// Names of the C-ABI symbols the studio looks up after dlopen.
 pub const symbols = struct {
@@ -48,8 +51,8 @@ fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
 /// user-script component definitions. On success returns the absolute path to
 /// the produced library (allocated in `a`); returns null on any failure.
 ///
-/// Blocks until compilation finishes. POSIX-only (needs dlopen on the studio
-/// side); returns null on Windows/WASI.
+/// Blocks until compilation finishes. Returns null on WASI, which cannot load
+/// the result.
 pub fn buildPlayLibrary(
     io: std.Io,
     a: std.mem.Allocator,
@@ -58,7 +61,7 @@ pub fn buildPlayLibrary(
     component_count: usize,
     config: BuildConfig,
 ) ?[]const u8 {
-    if (comptime @import("builtin").os.tag == .windows or @import("builtin").os.tag == .wasi) return null;
+    if (comptime @import("builtin").os.tag == .wasi) return null;
 
     return buildInner(io, a, project_path, components, component_count, config) catch |err| {
         log.err("Play build failed: {any}", .{err});
@@ -153,8 +156,8 @@ fn buildInner(
 
     const lib_out = try std.fmt.allocPrint(
         a,
-        "{s}/zig-out/lib/{s}turian_play{s}",
-        .{ cache_path, lib_prefix, lib_ext },
+        "{s}/zig-out/{s}/{s}turian_play{s}",
+        .{ cache_path, lib_out_dir, lib_prefix, lib_ext },
     );
     log.info("Play library built: {s}", .{lib_out});
     return lib_out;

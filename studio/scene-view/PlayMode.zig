@@ -87,7 +87,7 @@ var g_fps: f32 = 0;
 // have to be actively pulled into the studio's ring each frame to show up in
 // the Output panel. `g_diag_last_seq` is the library's own highest `seq`
 // already forwarded; it resets whenever a fresh library is loaded, since a
-// new `.so` instance restarts its own seq counter at 0.
+// new library instance restarts its own seq counter at 0.
 var g_diag_last_seq: u64 = 0;
 var g_diag_buf: [engine.DiagLog.capacity]engine.DiagLog.Entry = undefined;
 
@@ -549,7 +549,7 @@ fn loadLibrary(io: std.Io, project: []const u8) bool {
     };
     g_lib = lib;
     g_lib_valid = true;
-    // A fresh `.so` instance restarts its own `DiagLog` seq counter at 0, so
+    // A fresh library instance restarts its own `DiagLog` seq counter at 0, so
     // last frame's high-water mark from a previous session would otherwise
     // make every one of its (lower-numbered) entries look "already seen".
     g_diag_last_seq = 0;

@@ -1,10 +1,12 @@
 /// Compile user .zig component files to shared libraries and load field
-/// metadata via dlopen/getRegistry.  Pure logic — no GUI dependency.
+/// metadata via `DynLib`/getRegistry.  Pure logic — no GUI dependency.
 const std = @import("std");
 const engine = @import("engine");
 const scanner = @import("../assets/Scanner.zig");
 const GameBuild = @import("GameBuild.zig");
 const codegen = @import("GameCodegen.zig");
+const DynLib = @import("DynLib.zig");
+const TempDir = @import("../TempDir.zig");
 const Progress = @import("../tasks/Progress.zig").Progress;
 
 const api = engine.api;
@@ -18,10 +20,16 @@ pub const ReflectionConfig = struct {
     /// Full engine build config: carries all module paths needed to compile
     /// user scripts that @import("engine") (math, oap, serde, ktx2, …).
     build_config: GameBuild.BuildConfig,
+    /// Scratch directory holding each source file's generated wrapper and
+    /// build tree, resolved from the environment by `SdkLayout`.
+    temp_dir: []const u8 = TempDir.fallback,
 };
 
 const lib_ext = if (@import("builtin").os.tag == .windows) ".dll" else if (@import("builtin").os.tag == .macos) ".dylib" else ".so";
 const lib_prefix = if (@import("builtin").os.tag == .windows) "" else "lib";
+/// `zig build` installs a shared library's loadable image alongside executables
+/// on Windows, leaving only the import library under `zig-out/lib`.
+const lib_out_dir = if (@import("builtin").os.tag == .windows) "bin" else "lib";
 
 const GetRegistryFn = *const fn () callconv(.c) api.Registry;
 
@@ -69,14 +77,6 @@ pub fn loadFieldInfo(
     progress.report(1, "");
 }
 
-fn getTempDir(a: std.mem.Allocator) []const u8 {
-    _ = a;
-    return comptime switch (@import("builtin").os.tag) {
-        .windows => "C:\\Windows\\Temp",
-        else => "/tmp",
-    };
-}
-
 fn compileAndPopulate(
     io: std.Io,
     source_file: []const u8,
@@ -85,15 +85,14 @@ fn compileAndPopulate(
     def_indices: []const usize,
     config: ReflectionConfig,
 ) void {
-    // Dynamic library reflection requires dlopen (POSIX only).
-    if (comptime @import("builtin").os.tag == .windows or
-        @import("builtin").os.tag == .wasi) return;
+    // Reflection loads the compiled library at runtime, which wasi cannot do.
+    if (comptime @import("builtin").os.tag == .wasi) return;
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const a = arena.allocator();
 
-    const tmp_dir = getTempDir(a);
+    const tmp_dir = config.temp_dir;
     const sep = std.fs.path.sep_str;
 
     var h = std.hash.Wyhash.init(0);
@@ -106,7 +105,7 @@ fn compileAndPopulate(
     const wrapper_path = std.fmt.allocPrint(a, "{s}{s}turian_wrapper_{x}.zig", .{ tmp_dir, sep, hash }) catch return;
 
     // Absolutize source_file so paths embedded in the generated build.zig
-    // resolve correctly when `zig build` runs from build_dir (a /tmp subdir).
+    // resolve correctly when `zig build` runs from build_dir (a temp subdir).
     const abs_source = if (std.fs.path.isAbsolute(source_file))
         source_file
     else
@@ -116,13 +115,15 @@ fn compileAndPopulate(
     const wrapper_content = generateWrapper(a, type_names) catch return;
     std.Io.Dir.cwd().writeFile(io, .{ .sub_path = wrapper_path, .data = wrapper_content }) catch return;
 
+    // Normalise every path embedded into generated Zig source (backslashes are
+    // invalid escapes in a "..." literal).
     std.Io.Dir.cwd().createDirPath(io, build_dir) catch {};
     const build_src = codegen.generateReflectionBuildZig(
         a,
-        config.build_config,
-        config.reflection_zig,
-        abs_source,
-        wrapper_path,
+        codegen.normConfig(a, config.build_config) catch return,
+        codegen.normPath(a, config.reflection_zig) catch return,
+        codegen.normPath(a, abs_source) catch return,
+        codegen.normPath(a, wrapper_path) catch return,
         lib_name,
     ) catch return;
     const build_zig_path = std.fmt.allocPrint(a, "{s}{s}build.zig", .{ build_dir, sep }) catch return;
@@ -136,11 +137,11 @@ fn compileAndPopulate(
     // The produced library lands at the standard zig build output path.
     const lib_path = std.fmt.allocPrint(
         a,
-        "{s}{s}zig-out{s}lib{s}{s}{s}{s}",
-        .{ build_dir, sep, sep, sep, lib_prefix, lib_name, lib_ext },
+        "{s}{s}zig-out{s}{s}{s}{s}{s}{s}",
+        .{ build_dir, sep, sep, lib_out_dir, sep, lib_prefix, lib_name, lib_ext },
     ) catch return;
 
-    var lib = std.DynLib.open(lib_path) catch return;
+    var lib = DynLib.open(lib_path) catch return;
     defer lib.close();
 
     const getRegistry = lib.lookup(GetRegistryFn, "getRegistry") orelse return;

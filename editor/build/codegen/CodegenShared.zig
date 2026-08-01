@@ -142,6 +142,22 @@ pub fn normPath(a: std.mem.Allocator, path: []const u8) ![]const u8 {
     return std.mem.replaceOwned(u8, a, path, "\\", "/");
 }
 
+/// Return `config` with every path field `normPath`ed, ready to be embedded in
+/// generated Zig source. Non-path fields are carried over untouched.
+pub fn normConfig(a: std.mem.Allocator, config: BuildConfig) !BuildConfig {
+    var out = config;
+    inline for (.{
+        "engine_root",    "editor_root",    "cgltf_wrap_c", "fbx_wrap_c",
+        "vendor_include", "build_root",     "sdl3_lib",     "math_root",
+        "guid_root",      "oap_root",       "serde_root",   "serde_compat_root",
+        "ktx2_root",      "gpu_root",       "gpu_sdl3_c",   "render_root",
+        "sdl3_include",   "ui_render_root",
+    }) |field| {
+        @field(out, field) = try normPath(a, @field(config, field));
+    }
+    return out;
+}
+
 /// Normalize `path` and make it absolute (relative paths are taken under
 /// `root`). Generated build.zig files run from the project's `.cache` dir, so
 /// every embedded path must be absolute, not relative to the editor's cwd.
