@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.0] - 2026-08-02
+
+### Features
+- feat: background tasks overhaul #151
+- feat: Windows runtime hardening: PlayMode, script reflection, codegen #120
+
 ## [3.3.0] - 2026-07-30
 
 ### Features
