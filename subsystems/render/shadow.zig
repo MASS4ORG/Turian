@@ -336,3 +336,21 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Ca
         }
     }
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "opaque materials occlude solidly" {
+    try std.testing.expectEqual(Occlusion.solid, occlusionFor(.{}));
+    try std.testing.expectEqual(Occlusion.solid, occlusionFor(.{ .cull = .none, .depth_write = false }));
+}
+
+test "masked materials occlude through the cutout test" {
+    try std.testing.expectEqual(Occlusion.cutout, occlusionFor(.{ .alpha_mask = true }));
+}
+
+test "blended materials do not occlude" {
+    try std.testing.expectEqual(Occlusion.none, occlusionFor(.{ .blend = .alpha }));
+    try std.testing.expectEqual(Occlusion.none, occlusionFor(.{ .blend = .additive }));
+    // Blending wins over the mask: a blended surface transmits light everywhere.
+    try std.testing.expectEqual(Occlusion.none, occlusionFor(.{ .blend = .alpha, .alpha_mask = true }));
+}
