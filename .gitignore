@@ -40,6 +40,7 @@
 # Turian stuff
 .public/
 **/.cache
+.temp/
 docs/decisions/
 local.zig
 turian.sh

@@ -27,6 +27,14 @@ pub const VertexUB = extern struct { mvp: [16]f32, model: [16]f32 };
 /// Shadow-pass vertex uniforms — `light_vp * model`.
 pub const ShadowUB = extern struct { light_mvp: [16]f32 };
 
+/// Alpha-cutout shadow-pass fragment uniforms — layout must match FragUB in
+/// shadow_mask.frag.glsl. Only enough of the material to replicate
+/// scene.frag.glsl's alpha-cutout discard.
+pub const ShadowMaskFragUB = extern struct {
+    flags: [4]f32, // x=has_albedo, y=alpha_cutoff, zw unused
+    base_color: [4]f32, // rgba
+};
+
 /// Depth+normal prepass vertex uniforms — layout must match VertexUB in
 /// depth_normal.vert.glsl. `model_view = view * model`, composed on the CPU.
 pub const PrepassVertexUB = extern struct { mvp: [16]f32, model_view: [16]f32 };
@@ -45,6 +53,16 @@ pub const SsaoUB = extern struct {
     proj: [16]f32,
     kernel_samples: [24][4]f32,
     params: [4]f32, // x=radius, y=bias, z=power, w unused
+};
+
+/// SSR pass fragment uniforms — layout must match FragUB in ssr.frag.glsl.
+pub const SsrUB = extern struct {
+    inv_proj: [16]f32,
+    proj: [16]f32,
+    /// `prev_view_proj * inverse(current_view)` — takes a view-space hit
+    /// position directly to previous-frame clip space in one multiply.
+    reproject: [16]f32,
+    params: [4]f32, // x=thickness, y=step_scale, z=max_distance, w unused
 };
 
 /// One scene light. Layout must match `struct Light` in scene.frag.glsl.
@@ -74,6 +92,7 @@ pub const FragUB = extern struct {
     // each element to 16 bytes) — one float per cascade, so NUM_CASCADES must stay 4.
     cascade_splits: [4]f32, // per-cascade far distance along cam_forward (world units)
     cascade_depth_scale: [4]f32, // per-cascade 1/(ortho far-near), converts a world-unit bias to NDC depth
+    probe_params: [4]f32, // x=resolved reflection-probe weight, y=probe mip_count, zw unused
 };
 comptime {
     if (NUM_CASCADES < 1 or NUM_CASCADES > 4) @compileError("FragUB packs cascade_splits/cascade_depth_scale into one vec4 each (max 4)");

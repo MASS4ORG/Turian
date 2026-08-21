@@ -54,6 +54,9 @@ pub var scene_pipelines: [MAX_SCENE_PIPELINES]ScenePipelineEntry = .{ScenePipeli
 pub var scene_pipeline_count: usize = 0;
 
 pub var shadow_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+/// Alpha-cutout variant of `shadow_pipeline`, used for masked materials. Null
+/// when its creation failed — such materials then cast a solid shadow.
+pub var shadow_mask_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var shadow_map: ?*c.SDL_GPUTexture = null;
 pub var shadow_sampler: ?*c.SDL_GPUSampler = null;
 
@@ -64,6 +67,12 @@ pub var skybox_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var prepass_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var ssao_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var ssao_blur_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+
+/// Screen-space reflection pipeline. Null if creation failed — `renderScene`
+/// falls back to `ssr_fallback_tex` (fully transparent) in that case, which
+/// reads as "always miss" and leaves `scene.frag.glsl` on its `env_prefiltered`
+/// cubemap fallback.
+pub var ssr_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 
 /// One-time IBL specular-prefilter pipelines (see `ibl_prefilter.zig`):
 /// equirect->cubemap conversion, then GGX-importance-sampled mip prefiltering.
@@ -165,6 +174,98 @@ pub fn findSsaoTarget(w: u32, h: u32) ?*SsaoTarget {
     return null;
 }
 
+/// SSR result, cached by (w,h). One texture: RGB = reflected color sampled
+/// from last frame's composite, A = hit confidence. `HDR_COLOR_FORMAT` (not
+/// SSAO's R8_UNORM) since this carries actual scene radiance, not a scalar.
+pub const MAX_SSR_TARGETS = 3;
+pub const SsrTarget = struct {
+    tex: ?*c.SDL_GPUTexture = null,
+    w: u32 = 0,
+    h: u32 = 0,
+};
+pub var ssr_targets: [MAX_SSR_TARGETS]SsrTarget = .{SsrTarget{}} ** MAX_SSR_TARGETS;
+pub var ssr_evict_cursor: usize = 0;
+
+/// The cached SSR target matching `w`x`h`, or null if none is allocated yet.
+pub fn findSsrTarget(w: u32, h: u32) ?*SsrTarget {
+    for (&ssr_targets) |*s| {
+        if (s.tex != null and s.w == w and s.h == h) return s;
+    }
+    return null;
+}
+
+/// 1x1 fully-transparent (alpha=0) fallback bound as `ssr_tex` when SSR is
+/// unavailable or its temporal reprojection is invalid this frame. Distinct
+/// from `black_tex` (opaque, used by bloom) — an opaque-black SSR fallback
+/// would read as a confident black reflection and darken every rough surface.
+pub var ssr_fallback_tex: ?*c.SDL_GPUTexture = null;
+
+/// Temporal-reprojection bookkeeping for SSR, updated once at the end of
+/// `renderScene`. `prev_frame_seq == 0` is the "no previous frame" sentinel —
+/// `frame_seq` is always >= 1, so 0 can never be a legitimate previous value.
+pub var prev_view_proj: engine.Matrix4 = .{};
+pub var prev_frame_seq: u64 = 0;
+pub var prev_w: u32 = 0;
+pub var prev_h: u32 = 0;
+
+/// Persistent, per-placed-probe GPU resources for `reflection_probes.zig`.
+/// Unlike `SsrTarget`/`SsaoTarget` (transient, evicted, keyed by resolution),
+/// these are keyed by the owning `SceneNode`'s stable GUID and never evicted
+/// while that node exists — probes are baked once and read every frame.
+pub const MAX_REFLECTION_PROBES = 8;
+
+pub const ReflectionProbeSlot = struct {
+    key: [KEY_CAP]u8 = undefined,
+    key_len: usize = 0,
+    baked: bool = false,
+    prefiltered_cubemap: ?*c.SDL_GPUTexture = null,
+    mip_count: u32 = 0,
+    /// Cached bake inputs — if any differ from the live component next
+    /// frame, the slot is stale and eligible for a rebake in `bakeDirty`.
+    cached_pos: [3]f32 = .{ 0, 0, 0 },
+    cached_shape: u8 = 0,
+    cached_extents_or_radius: [3]f32 = .{ 0, 0, 0 },
+    cached_capture_size: u32 = 0,
+
+    pub fn matchesKey(self: *const @This(), k: []const u8) bool {
+        return std.mem.eql(u8, self.key[0..self.key_len], k);
+    }
+};
+pub var reflection_probes: [MAX_REFLECTION_PROBES]ReflectionProbeSlot = .{ReflectionProbeSlot{}} ** MAX_REFLECTION_PROBES;
+/// Bumped whenever any probe (re)bakes — invalidates `GpuSubmesh`'s cached
+/// probe assignment (`probe_gen`) without a full rescan every frame.
+pub var reflection_probes_generation: u32 = 0;
+
+/// The reflection-probe slot whose `key` matches `k`, or null if unbaked/unplaced.
+pub fn findReflectionProbe(k: []const u8) ?*ReflectionProbeSlot {
+    for (&reflection_probes) |*p| {
+        if (p.key_len != 0 and p.matchesKey(k)) return p;
+    }
+    return null;
+}
+
+/// Index into `reflection_probes` of the slot whose `key` matches `k`, or -1.
+/// Callers cache this (not a raw texture pointer) since a rebake releases and
+/// recreates the slot's GPU texture object — see `GpuSubmesh.probe_slot`.
+pub fn reflectionProbeIndex(k: []const u8) i32 {
+    for (&reflection_probes, 0..) |*p, i| {
+        if (p.key_len != 0 and p.matchesKey(k)) return @intCast(i);
+    }
+    return -1;
+}
+
+/// Scratch capture targets for probe baking, pooled by resolution — probes
+/// bake one face at a time, sequentially, so a single reusable pair bounds
+/// VRAM regardless of `MAX_REFLECTION_PROBES`. `probe_capture_depth` is
+/// deliberately a plain 2D texture, reused per-face within one probe's bake:
+/// SDL_GPU disallows `DEPTH_STENCIL_TARGET` on array textures (the same
+/// constraint the cascaded shadow atlas works around, see ADR-0010), so only
+/// the captured *color* cubemap may be a cube/array texture.
+pub var probe_capture_base: ?*c.SDL_GPUTexture = null;
+pub var probe_capture_base_size: u32 = 0;
+pub var probe_capture_depth: ?*c.SDL_GPUTexture = null;
+pub var probe_capture_depth_size: u32 = 0;
+
 /// Editor free-look camera override (null = use a scene camera component).
 pub var editor_cam: ?types.EditorCam = null;
 
@@ -255,6 +356,12 @@ pub const GpuSubmesh = struct {
     /// Per-submesh AABB for frustum culling; falls back to whole-mesh bounds when absent.
     bounds_min: [3]f32 = .{ 0, 0, 0 },
     bounds_max: [3]f32 = .{ 0, 0, 0 },
+    /// Cached result of `reflection_probes.resolveForSubmesh`, keyed against
+    /// `reflection_probes_generation` — a mismatch means the assignment is
+    /// stale and must be re-resolved. -1 = no probe (global env only).
+    probe_gen: u32 = 0xFFFF_FFFF,
+    probe_slot: i32 = -1,
+    probe_weight: f32 = 0,
 };
 /// A same-material run of `submeshes` that forms one indirect multi-draw call.
 pub const MaterialGroup = struct {

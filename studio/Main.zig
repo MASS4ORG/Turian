@@ -32,7 +32,24 @@ const log = std.log.scoped(.studio_main);
 /// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
 /// and errors, and the Output panel can show them alongside everything
 /// else. Still prints to the terminal (`DiagLog.logFn`, colored/timestamped).
-pub const std_options: std.Options = .{ .logFn = engine.DiagLog.logFn };
+pub const std_options: std.Options = .{ .logFn = filteredLogFn };
+
+/// Drops `dvui`'s own `.debug`-level spam (`LabelWidget.init` logs one line
+/// per label whose formatted output isn't valid UTF-8 before it falls back to
+/// `toUtf8`) before it ever reaches `DiagLog.logFn`. `std.options.log_scope_levels`
+/// would normally do this instead, but the pinned dvui fork's SDL3 backend
+/// iterates it at runtime, which fails to compile once it's non-empty (Zig
+/// 0.16 requires `ScopeLevel` values to be comptime-known there) — so this
+/// filters at the log call site instead.
+fn filteredLogFn(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    if (scope == .dvui and level == .debug) return;
+    engine.DiagLog.logFn(level, scope, format, args);
+}
 
 /// Default debug server port for the Studio.
 /// Games use 7777; Studio uses 7778 so both can run simultaneously.

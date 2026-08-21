@@ -48,6 +48,7 @@ pub const Visibility = struct {
     cameras: bool = true,
     lights: bool = true,
     colliders: bool = true,
+    probes: bool = true,
     custom: bool = true,
     icons: bool = true,
     labels: bool = false,
@@ -586,6 +587,7 @@ fn buildWorld(cam: Camera, rect: Rect, objects: []engine.SceneNode, count: usize
                 .camera => |*cc| if (show.cameras and selected) drawCameraGizmo(obj, cc, aspect),
                 .light => |*lc| if (show.lights and selected) drawLightGizmo(obj, lc),
                 .collider => if (show.colliders) drawColliderGizmo(obj),
+                .reflection_probe => |*rp| if (show.probes) drawReflectionProbeGizmo(obj, rp),
                 .user_script => |*us| if (show.custom) {
                     if (lookupDrawer(us.type_name[0..us.type_name_len])) |drawer|
                         drawer(&world, obj, comp);
@@ -664,6 +666,22 @@ fn drawColliderGizmo(obj: *const engine.SceneNode) void {
     const t = &obj.transform;
     world.setColor(Gizmos.Color.green.withAlpha(0.8));
     world.box(t.position, t.scale);
+}
+
+/// Draw a reflection probe's influence volume (box or sphere, matching
+/// `PostProcessVolumeComponent`'s gizmo-less precedent — this is the first
+/// volume component with one), plus a small filled marker at the capture
+/// origin so an unbaked probe (weight always 0 until its first bake) is
+/// still visible in the viewport.
+fn drawReflectionProbeGizmo(obj: *const engine.SceneNode, rp: *const engine.ReflectionProbeComponent) void {
+    const t = &obj.transform;
+    world.setColor(Gizmos.Color.cyan.withAlpha(0.8));
+    switch (rp.shape) {
+        .box => world.box(t.position, rp.extents.scale(2)),
+        .sphere => world.wireSphere(t.position, rp.radius),
+    }
+    world.setColor(Gizmos.Color.white);
+    world.box(t.position, Vector3.splat(0.15));
 }
 
 /// Outline the selected object's bounds. Only mesh nodes get a box — it wraps

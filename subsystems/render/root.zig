@@ -19,6 +19,8 @@ const postprocess = @import("postprocess.zig");
 const postprocess_pipeline = @import("postprocess_pipeline.zig");
 const prepass = @import("prepass.zig");
 const ssao = @import("ssao.zig");
+const ssr = @import("ssr.zig");
+const reflection_probes = @import("reflection_probes.zig");
 
 const log = std.log.scoped(.render);
 
@@ -104,6 +106,13 @@ pub fn invalidateMaterial(guid: []const u8) void {
 /// Drop every cached resolved material (e.g. a bulk reimport or project reload).
 pub fn invalidateAllMaterials() void {
     assets.invalidateAllMaterials();
+}
+
+/// Force the reflection probe on the scene node with GUID `guid` to rebake on
+/// the next frame, even though nothing about its placement changed — the
+/// Inspector's "Bake Now" action.
+pub fn forceRebakeReflectionProbe(guid: []const u8) void {
+    reflection_probes.invalidate(guid);
 }
 
 /// Compute the camera used for rendering; editor override or first active camera component.
@@ -235,6 +244,10 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
         log.warn("shadow pipeline failed: {any} — shadows disabled.", .{err});
         break :p null;
     };
+    state.shadow_mask_pipeline = pipeline.createShadowMaskPipeline(device) catch |err| p: {
+        log.warn("shadow cutout pipeline failed: {any} — masked materials cast solid shadows.", .{err});
+        break :p null;
+    };
     state.gizmo_pipeline = gizmos.createGizmoPipeline(device, true) catch |err| g: {
         log.warn("gizmo pipeline failed: {any} — gizmos disabled.", .{err});
         break :g null;
@@ -273,6 +286,10 @@ pub fn init(device: *c.SDL_GPUDevice) !void {
     };
     state.ssao_blur_pipeline = ssao.createSsaoBlurPipeline(device) catch |err| p: {
         log.warn("SSAO blur pipeline failed: {any} — SSAO disabled.", .{err});
+        break :p null;
+    };
+    state.ssr_pipeline = ssr.createSsrPipeline(device) catch |err| p: {
+        log.warn("SSR pipeline failed: {any} — SSR disabled, falls back to env_prefiltered.", .{err});
         break :p null;
     };
     log.info("Ready (SPIRV).", .{});
@@ -326,6 +343,15 @@ fn destroyDepthTargets(dev: *c.SDL_GPUDevice) void {
     state.depth_evict_cursor = 0;
 }
 
+/// Squared camera distance to `sm`'s world-space bounds centre — the key the
+/// transparent draws are sorted back-to-front on. Measured per submesh rather
+/// than per node because a scene authored as one large mesh (a whole building,
+/// say) holds every one of its glass panes at a single node origin, which no
+/// per-node key could ever order.
+fn submeshDepth(cam_pos: Vector3, sm: state.GpuSubmesh, model: Matrix4) f32 {
+    return Vector3.distanceSquared(cam_pos, culling.worldAabb(sm.bounds_min, sm.bounds_max, model).center);
+}
+
 /// Render `objects` into this size's internal HDR target. Call `runPostProcess`
 /// afterward (after any `renderGizmos` calls) to composite the result into the
 /// final destination texture.
@@ -358,6 +384,8 @@ pub fn renderScene(
         };
     if (state.black_tex == null)
         state.black_tex = postprocess_pipeline.createBlackTex(cmd, dev) catch null;
+    if (state.ssr_fallback_tex == null)
+        state.ssr_fallback_tex = pipeline.createSolidTexture(cmd, dev, .{ 0, 0, 0, 0 }) catch null;
 
     const target = targetFor(dev, w, h) orelse {
         log.err("depth target failed", .{});
@@ -379,13 +407,19 @@ pub fn renderScene(
     const vp = cam.view_proj;
     const frustum = culling.Frustum.extract(vp);
 
-    // ── Depth+normal prepass + SSAO ──────────────────────────────────────────
+    // ── Depth+normal prepass + SSAO + SSR ────────────────────────────────────
     // Always single-sample, independent of the main pass's MSAA depth (which
-    // is never sampler-usable) — see prepass.zig / ssao.zig.
+    // is never sampler-usable) — see prepass.zig / ssao.zig / ssr.zig. SSR reads
+    // `target.hdr_color` here, before the main pass's LOADOP_CLEAR overwrites
+    // it below — at this point it still holds last frame's composite.
     var ao_tex: *c.SDL_GPUTexture = state.white_tex orelse return;
+    var ssr_tex: *c.SDL_GPUTexture = state.ssr_fallback_tex orelse state.white_tex orelse return;
     if (prepass.run(cmd, dev, sampler, w, h, objects, frustum, cam.view, cam.proj)) |prepass_target| {
         const clamp_smp = state.cubemap_sampler orelse sampler;
         if (ssao.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.proj)) |ao| ao_tex = ao;
+        if (target.hdr_color) |history| {
+            if (ssr.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.view, cam.proj, history)) |refl| ssr_tex = refl;
+        }
     }
 
     // ── Environment (IBL + skybox) ───────────────────────────────────────────
@@ -473,6 +507,33 @@ pub fn renderScene(
     // (outside any render pass — a copy pass can't overlap one).
     draw.uploadLights(cmd, dev, lights[0..light_count]);
 
+    // Resolved once here (not inside the main pass below) since reflection
+    // probe baking also needs them, and none of this depends on a pass being open.
+    const white = state.white_tex orelse return;
+    const flat_n = state.flat_normal_tex orelse white;
+    const shadow_tex = state.shadow_map orelse white;
+    const shadow_smp = state.shadow_sampler orelse sampler;
+    const cube_smp = state.cubemap_sampler orelse sampler;
+    const env_gpu_tex = if (env_tex) |gt| gt.texture else white;
+    const black_cube = state.black_cubemap orelse return;
+    const env_prefiltered_tex = if (env_tex) |gt|
+        (if (gt.env) |ed| (ed.prefiltered_cubemap orelse black_cube) else black_cube)
+    else
+        black_cube;
+    const no_probe = draw.ProbeSample{ .tex = black_cube, .weight = 0, .mip_count = 1 };
+
+    // ── Reflection probes: bake at most one dirty probe this frame ──────────
+    // Static/bake-once (see reflection_probes.zig) — not part of the main
+    // pass below, but needs the same resolved env + this frame's uploaded lights.
+    reflection_probes.bakeDirty(cmd, dev, sampler, objects, .{
+        .prefiltered_tex = env_prefiltered_tex,
+        .raw_tex = if (env_tex) |gt| gt.texture else null,
+        .show_skybox = env_tex != null and env_show_skybox,
+        .params = env_params,
+        .sh = env_sh,
+        .light_count = light_count,
+    });
+
     // ── Main pass ───────────────────────────────────────────────────────────
     var main_zone = engine.Profiler.zone("render.main");
     defer main_zone.end();
@@ -510,23 +571,6 @@ pub fn renderScene(
         .max_depth = 1.0,
     });
 
-    const white = state.white_tex orelse {
-        c.SDL_EndGPURenderPass(pass);
-        return;
-    };
-    const flat_n = state.flat_normal_tex orelse white;
-    const shadow_tex = state.shadow_map orelse white;
-    const shadow_smp = state.shadow_sampler orelse sampler;
-    const cube_smp = state.cubemap_sampler orelse sampler;
-    const env_gpu_tex = if (env_tex) |gt| gt.texture else white;
-    const black_cube = state.black_cubemap orelse {
-        c.SDL_EndGPURenderPass(pass);
-        return;
-    };
-    const env_prefiltered_tex = if (env_tex) |gt|
-        (if (gt.env) |ed| (ed.prefiltered_cubemap orelse black_cube) else black_cube)
-    else
-        black_cube;
     var cascade_vp: [shadow.NUM_CASCADES][16]f32 = undefined;
     var cascade_splits: [4]f32 = .{ 0, 0, 0, 0 };
     var cascade_depth_scale: [4]f32 = .{ 0, 0, 0, 0 };
@@ -598,7 +642,7 @@ pub fn renderScene(
             const mr = &comp.mesh_renderer;
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
             const receives = mr.receive_shadows and shadows_on;
-            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_prefiltered_tex = env_prefiltered_tex, .cubemap_smp = cube_smp, .white = white, .flat_n = flat_n, .sampler = sampler, .ssao_tex = ao_tex, .ssao_smp = cube_smp };
+            const dctx = draw.DrawCtx{ .shadow_tex = shadow_tex, .shadow_smp = shadow_smp, .env_prefiltered_tex = env_prefiltered_tex, .cubemap_smp = cube_smp, .white = white, .flat_n = flat_n, .sampler = sampler, .ssao_tex = ao_tex, .ssao_smp = cube_smp, .ssr_tex = ssr_tex };
 
             // GPU-driven indirect path (cull compute dispatched this frame).
             if (gm.indirect_buf != null and gm.cull_dispatched_frame == state.frame_seq) {
@@ -609,24 +653,35 @@ pub fn renderScene(
                         prev_mat = mat_guid;
                     }
                     const mat_res = assets.resolveMaterial(mat_guid);
-                    const dp = draw.buildDrawParams(&mat_res, gm, 0, 0, vub, receives, dctx);
+                    // Indirect groups share one draw call, so probe resolution
+                    // can only vary per group, not per submesh — resolved
+                    // against the group's first submesh as a representative
+                    // point (indirect groups are already same-material runs).
+                    const group_probe = if (group.count > 0)
+                        reflection_probes.resolveForSubmesh(objects, &gm.submeshes[group.start], mdl, black_cube)
+                    else
+                        no_probe;
+                    const dp = draw.buildDrawParams(&mat_res, gm, 0, 0, vub, receives, dctx, group_probe);
 
                     // Opaque groups draw as one indirect multi-draw; transparent groups fall back to per-submesh CPU path for depth sort.
                     if (mat_res.render.blend == .disabled) {
                         draw.submitIndirectDraw(cmd, pass, dev, &bound_pipeline, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
                     } else {
-                        for (gm.submeshes[group.start..][0..group.count]) |sm| {
+                        for (gm.submeshes[group.start..][0..group.count]) |*sm| {
                             if (sm.index_count == 0) continue;
                             if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
                                 engine.Profiler.countSubmeshesCulled(1);
                                 continue;
                             }
                             engine.Profiler.countSubmeshesDrawn(1);
+                            const probe = reflection_probes.resolveForSubmesh(objects, sm, mdl, black_cube);
                             var tdp = dp;
                             tdp.index_offset = sm.index_offset;
                             tdp.index_count = sm.index_count;
+                            tdp.bindings[9] = .{ .texture = probe.tex, .sampler = cube_smp };
+                            tdp.probe_params = .{ probe.weight, probe.mip_count, 0, 0 };
                             if (draw.transparent_count < draw.transparent_draws.len) {
-                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = Vector3.distanceSquared(cam_pos, t.position) };
+                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = submeshDepth(cam_pos, sm.*, mdl) };
                                 draw.transparent_count += 1;
                             }
                         }
@@ -636,7 +691,7 @@ pub fn renderScene(
             }
 
             // CPU fallback: per-submesh cull + draw.
-            for (gm.submeshes) |sm| {
+            for (gm.submeshes) |*sm| {
                 if (sm.index_count == 0) continue;
                 if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
                     engine.Profiler.countSubmeshesCulled(1);
@@ -651,7 +706,8 @@ pub fn renderScene(
                 }
 
                 const mat_res = assets.resolveMaterial(mat_guid);
-                const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, receives, dctx);
+                const probe = reflection_probes.resolveForSubmesh(objects, sm, mdl, black_cube);
+                const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, receives, dctx, probe);
 
                 // Opaque draws right away; blended/additive draws are deferred for back-to-front sort.
                 if (mat_res.render.blend == .disabled) {
@@ -659,7 +715,7 @@ pub fn renderScene(
                 } else if (draw.transparent_count < draw.transparent_draws.len) {
                     draw.transparent_draws[draw.transparent_count] = .{
                         .params = dp,
-                        .sort_depth = Vector3.distanceSquared(cam_pos, t.position),
+                        .sort_depth = submeshDepth(cam_pos, sm.*, mdl),
                     };
                     draw.transparent_count += 1;
                 }
@@ -677,6 +733,13 @@ pub fn renderScene(
     }
 
     c.SDL_EndGPURenderPass(pass);
+
+    // Stash this frame's view-proj for next frame's SSR reprojection — after
+    // everything above that needed this frame's `vp`/`cam.view`.
+    state.prev_view_proj = vp;
+    state.prev_frame_seq = state.frame_seq;
+    state.prev_w = w;
+    state.prev_h = h;
 }
 
 /// Release all GPU resources.
@@ -714,9 +777,11 @@ pub fn deinit() void {
     if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.shadow_sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
     if (state.shadow_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.shadow_mask_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.shadow_map = null;
     state.shadow_sampler = null;
     state.shadow_pipeline = null;
+    state.shadow_mask_pipeline = null;
     if (state.skybox_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.skybox_pipeline = null;
     if (state.ibl_equirect_to_cubemap_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
@@ -738,13 +803,31 @@ pub fn deinit() void {
     if (state.prepass_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     if (state.ssao_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     if (state.ssao_blur_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
+    if (state.ssr_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);
     state.prepass_pipeline = null;
     state.ssao_pipeline = null;
     state.ssao_blur_pipeline = null;
+    state.ssr_pipeline = null;
     prepass.destroyTargets(dev);
     ssao.destroyTargets(dev);
+    ssr.destroyTargets(dev);
     if (state.black_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
     state.black_tex = null;
+    if (state.ssr_fallback_tex) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    state.ssr_fallback_tex = null;
+    for (&state.reflection_probes) |*p| {
+        if (p.prefiltered_cubemap) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        p.* = .{};
+    }
+    state.reflection_probes_generation = 0;
+    if (state.probe_capture_base) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    if (state.probe_capture_depth) |t| c.SDL_ReleaseGPUTexture(dev, t);
+    state.probe_capture_base = null;
+    state.probe_capture_base_size = 0;
+    state.probe_capture_depth = null;
+    state.probe_capture_depth_size = 0;
+    // Reset so a re-init doesn't inherit a stale-valid reprojection.
+    state.prev_frame_seq = 0;
     for (&state.bloom_targets) |*bc| {
         for (bc.mips[0..bc.mip_count]) |mip| {
             if (mip) |t| c.SDL_ReleaseGPUTexture(dev, t);

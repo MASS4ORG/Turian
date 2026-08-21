@@ -160,3 +160,38 @@ pub fn createCompositePipeline(dev: *c.SDL_GPUDevice) !*c.SDL_GPUGraphicsPipelin
     const frag_spv = @embedFile("shaders/compiled/composite.frag.spv");
     return buildPipeline(dev, vert_spv, frag_spv, 2, 1, c.SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, std.mem.zeroes(c.SDL_GPUColorTargetBlendState));
 }
+
+/// Draw one fullscreen triangle into `dst`, binding `bindings` at samplers
+/// 0..N and optionally pushing a fragment uniform. Shared by every
+/// screen-space fullscreen-triangle pass that reads more than one input
+/// texture (SSAO's raw + blur passes, SSR).
+pub fn fullscreenPass(
+    cmd: *c.SDL_GPUCommandBuffer,
+    pl: *c.SDL_GPUGraphicsPipeline,
+    dst: *c.SDL_GPUTexture,
+    w: u32,
+    h: u32,
+    bindings: []const c.SDL_GPUTextureSamplerBinding,
+    ub: ?*const anyopaque,
+    ub_size: u32,
+) void {
+    var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
+    color_info.texture = dst;
+    color_info.load_op = c.SDL_GPU_LOADOP_DONT_CARE;
+    color_info.store_op = c.SDL_GPU_STOREOP_STORE;
+
+    const pass = c.SDL_BeginGPURenderPass(cmd, &color_info, 1, null) orelse return;
+    c.SDL_SetGPUViewport(pass, &c.SDL_GPUViewport{
+        .x = 0,
+        .y = 0,
+        .w = @floatFromInt(w),
+        .h = @floatFromInt(h),
+        .min_depth = 0.0,
+        .max_depth = 1.0,
+    });
+    c.SDL_BindGPUGraphicsPipeline(pass, pl);
+    c.SDL_BindGPUFragmentSamplers(pass, 0, bindings.ptr, @intCast(bindings.len));
+    if (ub) |ptr| c.SDL_PushGPUFragmentUniformData(cmd, 0, ptr, ub_size);
+    c.SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
+    c.SDL_EndGPURenderPass(pass);
+}

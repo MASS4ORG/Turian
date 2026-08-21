@@ -106,14 +106,26 @@ pub const DrawParams = struct {
     emissive: [4]f32,
     flags: [4]f32,
     flags2: [4]f32,
-    bindings: [8]c.SDL_GPUTextureSamplerBinding,
+    probe_params: [4]f32,
+    bindings: [10]c.SDL_GPUTextureSamplerBinding,
+};
+
+/// A resolved reflection probe for one draw — the local cubemap to blend in
+/// ahead of the global `env_prefiltered` fallback (see `reflection_probes.zig`),
+/// or `weight = 0` (no local probe in range; `tex` is then a black/unused
+/// placeholder) when none applies. Not part of `DrawCtx` because it varies
+/// per submesh, not per frame.
+pub const ProbeSample = struct {
+    tex: *c.SDL_GPUTexture,
+    weight: f32 = 0,
+    mip_count: f32 = 1,
 };
 
 /// A blended/additive draw deferred for back-to-front sorting.
 pub const TransparentDraw = struct {
     params: DrawParams,
-    /// Squared camera distance to the drawing node's origin — cheap proxy for
-    /// per-node (not per-triangle) back-to-front ordering.
+    /// Squared camera distance to the submesh's world bounds centre — cheap
+    /// proxy for per-submesh (not per-triangle) back-to-front ordering.
     sort_depth: f32,
 };
 
@@ -160,9 +172,10 @@ fn bindDrawState(
         .cascade_vp = fu.cascade_vp,
         .cascade_splits = fu.cascade_splits,
         .cascade_depth_scale = fu.cascade_depth_scale,
+        .probe_params = dp.probe_params,
     };
     c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 8);
+    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 10);
 }
 
 /// Bind the draw's state and issue one indexed draw call for a single submesh.
@@ -213,9 +226,12 @@ pub const DrawCtx = struct {
     sampler: *c.SDL_GPUSampler,
     /// Blurred SSAO texture (or `white` when SSAO is unavailable) — see `ssao.zig`.
     ssao_tex: *c.SDL_GPUTexture,
-    /// Clamp-to-edge sampler for screen-space reads (SSAO now, SSR later) —
-    /// reuses `state.cubemap_sampler`, which is clamp+linear regardless of name.
+    /// Clamp-to-edge sampler for screen-space reads (SSAO, SSR) — reuses
+    /// `state.cubemap_sampler`, which is clamp+linear regardless of name.
     ssao_smp: *c.SDL_GPUSampler,
+    /// SSR result (rgb=reflected color, a=confidence), or the fully-transparent
+    /// fallback when SSR is unavailable — see `ssr.zig`. Shares `ssao_smp`.
+    ssr_tex: *c.SDL_GPUTexture,
 };
 
 /// Material-slot GUID, or empty for out-of-range/absent slots.
@@ -235,6 +251,7 @@ pub fn buildDrawParams(
     vub: types.VertexUB,
     receives: bool,
     ctx: DrawCtx,
+    probe: ProbeSample,
 ) DrawParams {
     const albedo_t = assets.pickTexture(mat_res.map(.albedo), ctx.white);
     const mr_t = assets.pickTexture(mat_res.map(.mr), ctx.white);
@@ -258,6 +275,7 @@ pub fn buildDrawParams(
         .emissive = .{ mat_res.emissive[0], mat_res.emissive[1], mat_res.emissive[2], mat_res.emissive_strength },
         .flags = .{ assets.present(albedo_t.found), assets.present(mr_t.found), assets.present(normal_t.found), assets.present(emis_t.found) },
         .flags2 = .{ assets.present(occ_t.found), mat_res.alpha_cutoff, assets.present(mat_res.render.alpha_mask), assets.present(receives) },
+        .probe_params = .{ probe.weight, probe.mip_count, 0, 0 },
         .bindings = .{
             .{ .texture = albedo_t.tex, .sampler = ctx.sampler },
             .{ .texture = mr_t.tex, .sampler = ctx.sampler },
@@ -267,6 +285,8 @@ pub fn buildDrawParams(
             .{ .texture = ctx.shadow_tex, .sampler = ctx.shadow_smp },
             .{ .texture = ctx.env_prefiltered_tex, .sampler = ctx.cubemap_smp },
             .{ .texture = ctx.ssao_tex, .sampler = ctx.ssao_smp },
+            .{ .texture = ctx.ssr_tex, .sampler = ctx.ssao_smp },
+            .{ .texture = probe.tex, .sampler = ctx.cubemap_smp },
         },
     };
 }

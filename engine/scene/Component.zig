@@ -10,6 +10,7 @@ const AnimatorComponent = @import("../components/AnimatorComponent.zig").Animato
 const UiDocumentComponent = @import("../components/UiDocumentComponent.zig").UiDocumentComponent;
 const EnvironmentComponent = @import("../components/EnvironmentComponent.zig").EnvironmentComponent;
 const PostProcessVolumeComponent = @import("../components/PostProcessVolumeComponent.zig").PostProcessVolumeComponent;
+const ReflectionProbeComponent = @import("../components/ReflectionProbeComponent.zig").ReflectionProbeComponent;
 
 /// Tagged union over all builtin and user script component types.
 pub const Component = union(enum) {
@@ -23,6 +24,7 @@ pub const Component = union(enum) {
     ui_document: UiDocumentComponent,
     environment: EnvironmentComponent,
     post_process_volume: PostProcessVolumeComponent,
+    reflection_probe: ReflectionProbeComponent,
     user_script: UserScriptRef,
 
     /// Returns the human-readable display name for this component.
@@ -40,6 +42,7 @@ pub const Component = union(enum) {
             .ui_document => "UI Document",
             .environment => "Environment",
             .post_process_volume => "Post-Process Volume",
+            .reflection_probe => "Reflection Probe",
             .user_script => self.user_script.type_name[0..self.user_script.type_name_len],
         };
     }
@@ -56,6 +59,7 @@ pub const Component = union(enum) {
         if (std.mem.eql(u8, name, "UiDocumentComponent")) return .{ .ui_document = .{} };
         if (std.mem.eql(u8, name, "EnvironmentComponent")) return .{ .environment = .{} };
         if (std.mem.eql(u8, name, "PostProcessVolumeComponent")) return .{ .post_process_volume = .{} };
+        if (std.mem.eql(u8, name, "ReflectionProbeComponent")) return .{ .reflection_probe = .{} };
         return null;
     }
 };

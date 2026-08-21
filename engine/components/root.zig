@@ -12,6 +12,7 @@ pub const VolumeShape = @import("PostProcessVolumeComponent.zig").VolumeShape;
 pub const VignetteSettings = @import("PostProcessVolumeComponent.zig").VignetteSettings;
 pub const ColorGradingSettings = @import("PostProcessVolumeComponent.zig").ColorGradingSettings;
 pub const BloomSettings = @import("PostProcessVolumeComponent.zig").BloomSettings;
+pub const ReflectionProbeComponent = @import("ReflectionProbeComponent.zig").ReflectionProbeComponent;
 pub const BuiltinEntry = @import("BuiltinEntry.zig").BuiltinEntry;
 
 pub const BUILTIN_COMPONENTS = [_]BuiltinEntry{
@@ -25,4 +26,5 @@ pub const BUILTIN_COMPONENTS = [_]BuiltinEntry{
     .{ .type_name = "UiDocumentComponent", .display_name = "UI Document" },
     .{ .type_name = "EnvironmentComponent", .display_name = "Environment" },
     .{ .type_name = "PostProcessVolumeComponent", .display_name = "Post-Process Volume" },
+    .{ .type_name = "ReflectionProbeComponent", .display_name = "Reflection Probe" },
 };

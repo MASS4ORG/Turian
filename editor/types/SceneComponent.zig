@@ -15,5 +15,6 @@ pub const SceneComponent = union(enum) {
     ui_document: SceneUiDocument,
     environment: engine.EnvironmentComponent,
     post_process_volume: engine.PostProcessVolumeComponent,
+    reflection_probe: engine.ReflectionProbeComponent,
     user_script: SceneUserScript,
 };

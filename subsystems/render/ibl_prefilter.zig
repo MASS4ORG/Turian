@@ -153,6 +153,34 @@ fn facePass(
     c.SDL_EndGPURenderPass(pass);
 }
 
+/// GGX-importance-sample `base_cubemap` (any 1-mip cube texture, whether
+/// produced by equirect conversion below or a direct scene capture — see
+/// `reflection_probes.zig`) into a `size`x`size`, `mip_count`-mip specular
+/// cubemap. Mip `m`'s roughness is `m / (mip_count - 1)`.
+pub fn prefilterCubemap(
+    cmd: *c.SDL_GPUCommandBuffer,
+    dev: *c.SDL_GPUDevice,
+    base_cubemap: *c.SDL_GPUTexture,
+    size: u32,
+    mip_count: u32,
+) !*c.SDL_GPUTexture {
+    try ensurePipelines(dev);
+    const filt_pl = state.ibl_prefilter_pipeline orelse return error.Pipeline;
+    const cube_smp = state.cubemap_sampler orelse return error.SamplerCreate;
+
+    const prefiltered = try pipeline.createCubemapTexture(dev, size, mip_count);
+    errdefer c.SDL_ReleaseGPUTexture(dev, prefiltered);
+    for (0..mip_count) |mip| {
+        const roughness: f32 = @as(f32, @floatFromInt(mip)) / @as(f32, @floatFromInt(mip_count - 1));
+        const mip_size = @max(size >> @intCast(mip), 1);
+        for (0..6) |face| {
+            const ub = types.PrefilterUB{ .face_roughness = .{ @floatFromInt(face), roughness, 0, 0 } };
+            facePass(cmd, filt_pl, prefiltered, @intCast(mip), @intCast(face), mip_size, base_cubemap, cube_smp, &ub, @sizeOf(types.PrefilterUB));
+        }
+    }
+    return prefiltered;
+}
+
 /// Convert `equirect_tex` to a base cubemap, then GGX-prefilter it into a
 /// mipped specular cubemap. Both textures are returned for the caller to
 /// cache (see `assets.uploadEnvironment` / `state.EnvironmentData`) — this
@@ -165,8 +193,6 @@ pub fn prefilterEnvironment(
 ) !Prefiltered {
     try ensurePipelines(dev);
     const conv_pl = state.ibl_equirect_to_cubemap_pipeline orelse return error.Pipeline;
-    const filt_pl = state.ibl_prefilter_pipeline orelse return error.Pipeline;
-    const cube_smp = state.cubemap_sampler orelse return error.SamplerCreate;
 
     const base = try pipeline.createCubemapTexture(dev, BASE_SIZE, 1);
     errdefer c.SDL_ReleaseGPUTexture(dev, base);
@@ -175,16 +201,6 @@ pub fn prefilterEnvironment(
         facePass(cmd, conv_pl, base, 0, @intCast(face), BASE_SIZE, equirect_tex, equirect_sampler, &ub, @sizeOf(types.EquirectToCubemapUB));
     }
 
-    const prefiltered = try pipeline.createCubemapTexture(dev, PREFILTER_SIZE, PREFILTER_MIP_COUNT);
-    errdefer c.SDL_ReleaseGPUTexture(dev, prefiltered);
-    for (0..PREFILTER_MIP_COUNT) |mip| {
-        const roughness: f32 = @as(f32, @floatFromInt(mip)) / @as(f32, @floatFromInt(PREFILTER_MIP_COUNT - 1));
-        const mip_size = @max(PREFILTER_SIZE >> @intCast(mip), 1);
-        for (0..6) |face| {
-            const ub = types.PrefilterUB{ .face_roughness = .{ @floatFromInt(face), roughness, 0, 0 } };
-            facePass(cmd, filt_pl, prefiltered, @intCast(mip), @intCast(face), mip_size, base, cube_smp, &ub, @sizeOf(types.PrefilterUB));
-        }
-    }
-
+    const prefiltered = try prefilterCubemap(cmd, dev, base, PREFILTER_SIZE, PREFILTER_MIP_COUNT);
     return .{ .base_cubemap = base, .prefiltered_cubemap = prefiltered, .mip_count = PREFILTER_MIP_COUNT };
 }

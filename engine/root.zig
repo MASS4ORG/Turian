@@ -159,6 +159,8 @@ pub const VignetteSettings = components.VignetteSettings;
 pub const ColorGradingSettings = components.ColorGradingSettings;
 /// Post-process volume bloom settings.
 pub const BloomSettings = components.BloomSettings;
+/// Baked local-cubemap reflection probe component type (box or sphere volume).
+pub const ReflectionProbeComponent = components.ReflectionProbeComponent;
 /// List of builtin component metadata entries.
 pub const BUILTIN_COMPONENTS = components.BUILTIN_COMPONENTS;
 

@@ -118,38 +118,6 @@ pub fn destroyTargets(dev: *c.SDL_GPUDevice) void {
     state.ssao_evict_cursor = 0;
 }
 
-/// Draw one fullscreen triangle into `dst`, binding `bindings` at samplers 0..N.
-fn fullscreenPass(
-    cmd: *c.SDL_GPUCommandBuffer,
-    pl: *c.SDL_GPUGraphicsPipeline,
-    dst: *c.SDL_GPUTexture,
-    w: u32,
-    h: u32,
-    bindings: []const c.SDL_GPUTextureSamplerBinding,
-    ub: ?*const anyopaque,
-    ub_size: u32,
-) void {
-    var color_info = std.mem.zeroes(c.SDL_GPUColorTargetInfo);
-    color_info.texture = dst;
-    color_info.load_op = c.SDL_GPU_LOADOP_DONT_CARE;
-    color_info.store_op = c.SDL_GPU_STOREOP_STORE;
-
-    const pass = c.SDL_BeginGPURenderPass(cmd, &color_info, 1, null) orelse return;
-    c.SDL_SetGPUViewport(pass, &c.SDL_GPUViewport{
-        .x = 0,
-        .y = 0,
-        .w = @floatFromInt(w),
-        .h = @floatFromInt(h),
-        .min_depth = 0.0,
-        .max_depth = 1.0,
-    });
-    c.SDL_BindGPUGraphicsPipeline(pass, pl);
-    c.SDL_BindGPUFragmentSamplers(pass, 0, bindings.ptr, @intCast(bindings.len));
-    if (ub) |ptr| c.SDL_PushGPUFragmentUniformData(cmd, 0, ptr, ub_size);
-    c.SDL_DrawGPUPrimitives(pass, 3, 1, 0, 0);
-    c.SDL_EndGPURenderPass(pass);
-}
-
 /// Run the raw SSAO pass then its denoise blur, reading `prepass_target`.
 /// `sampler` is a clamp-to-edge sampler (screen-space reads must not wrap at
 /// the viewport edge) — the renderer reuses `state.cubemap_sampler` for this.
@@ -177,12 +145,12 @@ pub fn run(
         .kernel_samples = ensureKernel().*,
         .params = .{ RADIUS, BIAS, POWER, 0 },
     };
-    fullscreenPass(cmd, raw_pl, target.raw.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
+    postprocess_pipeline.fullscreenPass(cmd, raw_pl, target.raw.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
         .{ .texture = depth_tex, .sampler = sampler },
         .{ .texture = normal_tex, .sampler = sampler },
     }, &ub, @sizeOf(types.SsaoUB));
 
-    fullscreenPass(cmd, blur_pl, target.blurred.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
+    postprocess_pipeline.fullscreenPass(cmd, blur_pl, target.blurred.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
         .{ .texture = target.raw.?, .sampler = sampler },
         .{ .texture = depth_tex, .sampler = sampler },
     }, null, 0);

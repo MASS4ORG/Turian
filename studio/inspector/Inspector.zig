@@ -17,6 +17,7 @@ const Documents = @import("../main-window/Documents.zig");
 const PreviewSystem = @import("../asset-browser/preview/PreviewSystem.zig");
 const SettingsEditor = @import("editor/SettingsEditor.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
+const render = @import("render");
 const tr = StudioLocale.tr;
 
 /// Draw the inspector panel for the selected object or asset.
@@ -218,6 +219,24 @@ pub fn draw() void {
                         if (gui.button(@src(), tr("Open"), .{}, .{ .id_extra = ci })) {
                             Documents.openAsset(path, .ui_document);
                         }
+                    }
+                },
+                .reflection_probe => |*rp| {
+                    const obj_before_field = obj.*;
+                    if (PropDraw.drawComponent(@TypeOf(rp.*), rp, ci + 1, false)) {
+                        EditorState.pushCommand(gui.frameTimeNS(), &.{ .modify_object = .{
+                            .idx = sel,
+                            .before = obj_before_field,
+                            .after = obj.*,
+                        } });
+                        EditorState.scene_dirty = true;
+                    }
+                    // Static/bake-once (reflection_probes.zig): re-authoring
+                    // fields above already invalidates the bake, but explicit
+                    // re-bake is still useful after the *scene* around a probe
+                    // changes (new/moved geometry) without the probe itself moving.
+                    if (gui.button(@src(), tr("Bake Now"), .{}, .{ .gravity_y = 0.5, .id_extra = ci })) {
+                        render.forceRebakeReflectionProbe(obj.guidSlice());
                     }
                 },
                 inline else => |*field_data| {

@@ -29,6 +29,8 @@ layout(set = 2, binding = 4) uniform sampler2D occlusion_tex; // R channel
 layout(set = 2, binding = 5) uniform sampler2DShadow shadow_map;
 layout(set = 2, binding = 6) uniform samplerCube env_prefiltered; // GGX-prefiltered specular cubemap
 layout(set = 2, binding = 7) uniform sampler2D ssao_tex; // blurred SSAO, 1.0 = unoccluded
+layout(set = 2, binding = 8) uniform sampler2D ssr_tex; // rgb=reflected color, a=hit confidence
+layout(set = 2, binding = 9) uniform samplerCube probe_prefiltered; // resolved local reflection probe (reflection_probes.zig), or a placeholder at weight 0
 
 // One scene light. type: 0=directional, 1=point, 2=spot.
 struct Light {
@@ -52,13 +54,14 @@ layout(set = 3, binding = 0) uniform FragUB {
     mat4 cascade_vp[NUM_CASCADES]; // per-cascade shadow light view-projection
     vec4 cascade_splits;      // per-cascade far distance along cam_forward (world units)
     vec4 cascade_depth_scale; // per-cascade 1/(ortho far-near); converts a world-unit bias to NDC depth
+    vec4 probe_params;        // x=resolved reflection-probe weight, y=probe mip_count, zw unused
 } ubo;
 
 // Scene lights. Storage buffer (not a fixed uniform array) so the light count is
 // bounded only by GPU memory, not a per-draw uniform size. SDL3 SPIR-V places
-// fragment storage buffers in set=2 after the sampled textures (8 here), so this
-// is binding 8. Only `camera_pos.w` entries are read.
-layout(std430, set = 2, binding = 8) readonly buffer LightBuffer {
+// fragment storage buffers in set=2 after the sampled textures (10 here), so this
+// is binding 10. Only `camera_pos.w` entries are read.
+layout(std430, set = 2, binding = 10) readonly buffer LightBuffer {
     Light lights[];
 } light_buf;
 
@@ -148,25 +151,9 @@ vec2 envBRDFApprox(float roughness, float ndv) {
     return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
-// Shadow visibility (1 = lit, 0 = fully shadowed) for the primary directional
-// light. Matches the clip-space conventions applied in shadow.vert.glsl.
-//
-// Picks a cascade by comparing the fragment's distance along the camera's
-// forward axis against `cascade_splits` (each cascade covers a slice of the
-// camera frustum — see `shadow.computeCascades`), then samples that
-// cascade's vertical strip of the shadow atlas.
-float shadowFactor(float ndl) {
-    if (ubo.flags2.w < 0.5) return 1.0;
-
-    float cam_dist = dot(in_world_pos - ubo.camera_pos.xyz, ubo.cam_forward.xyz);
-    int cascade = NUM_CASCADES - 1;
-    for (int i = 0; i < NUM_CASCADES - 1; i++) {
-        if (cam_dist < ubo.cascade_splits[i]) {
-            cascade = i;
-            break;
-        }
-    }
-
+// Samples one cascade's shadow-atlas strip at `in_world_pos`, 1 = lit. Returns
+// 1.0 outside this cascade's own frustum, so a boundary blend can lean on it.
+float sampleCascade(int cascade, float bias_world) {
     vec4 lp = ubo.cascade_vp[cascade] * vec4(in_world_pos, 1.0);
     // Same Z remap shadow.vert applies before depth write (see scene.vert.glsl).
     lp.z = (lp.z + lp.w) * 0.5;
@@ -180,7 +167,6 @@ float shadowFactor(float ndl) {
     // converted to this cascade's NDC depth range — cascades span wildly
     // different world extents, so a single NDC bias either acnes the near
     // cascade or peter-pans the far one.
-    float bias_world = mix(0.05, 0.35, 1.0 - ndl);
     float bias = ubo.cascade_depth_scale[cascade] * bias_world;
     float depth = proj.z - bias;
 
@@ -201,6 +187,39 @@ float shadowFactor(float ndl) {
         }
     }
     return sum / 9.0;
+}
+
+// Shadow visibility for the primary directional light, cascade picked by
+// distance along the camera's forward axis. Cascades refit every frame, so a
+// hard cutoff at the split would seam visibly as the camera rotates — blended
+// across the last 10% of each cascade's range instead.
+float shadowFactor(float ndl) {
+    if (ubo.flags2.w < 0.5) return 1.0;
+
+    float cam_dist = dot(in_world_pos - ubo.camera_pos.xyz, ubo.cam_forward.xyz);
+    int cascade = NUM_CASCADES - 1;
+    for (int i = 0; i < NUM_CASCADES - 1; i++) {
+        if (cam_dist < ubo.cascade_splits[i]) {
+            cascade = i;
+            break;
+        }
+    }
+
+    float bias_world = mix(0.05, 0.35, 1.0 - ndl);
+    float s = sampleCascade(cascade, bias_world);
+
+    if (cascade < NUM_CASCADES - 1) {
+        float far_split = ubo.cascade_splits[cascade];
+        float near_split = cascade == 0 ? 0.0 : ubo.cascade_splits[cascade - 1];
+        float margin = max(far_split - near_split, 1e-3) * 0.1;
+        float dist_to_far = far_split - cam_dist;
+        if (dist_to_far < margin) {
+            float s_next = sampleCascade(cascade + 1, bias_world);
+            float t = clamp(1.0 - dist_to_far / margin, 0.0, 1.0);
+            s = mix(s, s_next, t);
+        }
+    }
+    return s;
 }
 
 void main() {
@@ -300,8 +319,29 @@ void main() {
 
         vec3 R = reflect(-V, N);
         vec3 prefiltered = textureLod(env_prefiltered, R, roughness * max_lod).rgb * intensity;
+
+        // Local reflection probe (reflection_probes.zig): CPU-resolved per
+        // submesh, so "environment" here means the global HDRI locally
+        // overridden by the nearest baked probe in range — SSR still mixes
+        // on top below, preserving SSR > local probe > global env.
+        float probe_max_lod = max(ubo.probe_params.y - 1.0, 0.0);
+        vec3 probe_color = textureLod(probe_prefiltered, R, roughness * probe_max_lod).rgb * intensity;
+        prefiltered = mix(prefiltered, probe_color, ubo.probe_params.x);
+
+        vec4 ssr = texture(ssr_tex, gl_FragCoord.xy / vec2(textureSize(ssr_tex, 0)));
+        // Bistro's roughness is ~0.74 for nearly every material, ~0 for glass
+        // (measured, see bistro-visual-fidelity.md). A single-tap unblurred
+        // SSR sample only reads as correct near the mirror end of that range,
+        // so it's gated off well before the generic-surface cluster —
+        // hardcoded, consistent with this renderer's other renderer-internal
+        // tunables (SSAO's RADIUS/BIAS/POWER, shadow bias).
+        const float SSR_ROUGH_START = 0.15;
+        const float SSR_ROUGH_END = 0.35;
+        float ssr_fade = 1.0 - smoothstep(SSR_ROUGH_START, SSR_ROUGH_END, roughness);
+        vec3 reflection = mix(prefiltered, ssr.rgb, ssr.a * ssr_fade);
+
         vec2 env_brdf = envBRDFApprox(roughness, ndv);
-        vec3 specular_ibl = prefiltered * (F0 * env_brdf.x + env_brdf.y);
+        vec3 specular_ibl = reflection * (F0 * env_brdf.x + env_brdf.y);
 
         // Screen-space AO modulates the distant-environment ambient term.
         float ssao = texture(ssao_tex, gl_FragCoord.xy / vec2(textureSize(ssao_tex, 0))).r;
