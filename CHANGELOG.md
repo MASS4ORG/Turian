@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.5.0] - 2026-08-22
+
+### Features
+- feat: several enhancements and features for the Bistro visual fidelity initiative #132 #151
+
 ## [3.4.0] - 2026-08-02
 
 ### Features
