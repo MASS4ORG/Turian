@@ -80,20 +80,27 @@ pub fn beginFrame(cmd: ?*dc.SDL_GPUCommandBuffer) void {
     g_cmd = cmd;
 }
 
+/// Resize-or-create the offscreen target in `slot`, matching `w`×`h`. Shared
+/// by every render-to-texture entry point below so each only states what
+/// differs (the camera, the object list), not how to manage its target.
+fn ensureTarget(slot: *?gui.TextureTarget, cur_w: *u32, cur_h: *u32, w: u32, h: u32) ?gui.TextureTarget {
+    const backend = g_backend orelse return null;
+    if (w != cur_w.* or h != cur_h.*) {
+        if (slot.*) |t| backend.textureDestroyTarget(t);
+        slot.* = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
+        cur_w.* = w;
+        cur_h.* = h;
+    }
+    return slot.*;
+}
+
 /// Render the scene into the dvui offscreen target and return it for display.
 pub fn renderViewport(w: u32, h: u32) ?gui.TextureTarget {
     if (!g_ready) return null;
     const cmd = g_cmd orelse return null;
-    const backend = g_backend orelse return null;
     if (w == 0 or h == 0) return null;
 
-    if (w != g_target_w or h != g_target_h) {
-        if (g_color_target) |ct| backend.textureDestroyTarget(ct);
-        g_color_target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
-        g_target_w = w;
-        g_target_h = h;
-    }
-    const ct = g_color_target orelse return null;
+    const ct = ensureTarget(&g_color_target, &g_target_w, &g_target_h, w, h) orelse return null;
     const bt: *BackendTex = @ptrCast(@alignCast(ct.ptr));
 
     const objects = g_render_override orelse EditorState.objects[0..EditorState.object_count];
@@ -128,16 +135,9 @@ var g_game_h: u32 = 0;
 pub fn renderGameViewport(objects: []const engine.SceneNode, w: u32, h: u32) ?gui.TextureTarget {
     if (!g_ready) return null;
     const cmd = g_cmd orelse return null;
-    const backend = g_backend orelse return null;
     if (w == 0 or h == 0) return null;
 
-    if (w != g_game_w or h != g_game_h) {
-        if (g_game_target) |t| backend.textureDestroyTarget(t);
-        g_game_target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
-        g_game_w = w;
-        g_game_h = h;
-    }
-    const target = g_game_target orelse return null;
+    const target = ensureTarget(&g_game_target, &g_game_w, &g_game_h, w, h) orelse return null;
     const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
 
     const saved_cam = render.editorCamera();
@@ -173,16 +173,9 @@ var g_preview_h: u32 = 0;
 pub fn renderPreview(objects: []const engine.SceneNode, cam: render.EditorCam, w: u32, h: u32) ?gui.TextureTarget {
     if (!g_ready) return null;
     const cmd = g_cmd orelse return null;
-    const backend = g_backend orelse return null;
     if (w == 0 or h == 0) return null;
 
-    if (w != g_preview_w or h != g_preview_h) {
-        if (g_preview_target) |t| backend.textureDestroyTarget(t);
-        g_preview_target = backend.textureCreateTarget(.{ .width = w, .height = h }) catch null;
-        g_preview_w = w;
-        g_preview_h = h;
-    }
-    const target = g_preview_target orelse return null;
+    const target = ensureTarget(&g_preview_target, &g_preview_w, &g_preview_h, w, h) orelse return null;
     const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
 
     const saved_cam = render.editorCamera();
@@ -191,6 +184,49 @@ pub fn renderPreview(objects: []const engine.SceneNode, cam: render.EditorCam, w
     render.runPostProcess(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
     render.setEditorCamera(saved_cam);
     return target;
+}
+
+// ── Camera-node preview (Inspector "Camera Preview" overlay) ────────────────
+// A dedicated target, separate from `g_preview_target` above: that one is
+// already shared by the asset-thumbnail/MaterialEditor preview at whatever
+// size *they* need, and giving the camera-preview overlay its own slot avoids
+// two unrelated consumers thrashing each other's target size every frame.
+
+var g_cam_preview_target: ?gui.TextureTarget = null;
+var g_cam_preview_w: u32 = 0;
+var g_cam_preview_h: u32 = 0;
+
+/// Render `objects` under `cam` into the camera-preview target. Same
+/// save/restore-camera-override idiom as `renderPreview`, kept separate so
+/// callers can throttle how often this actually re-renders (see
+/// `CameraPreview.zig`) while still calling `cameraPreviewTarget` every frame
+/// to redisplay the last result.
+pub fn renderCameraPreview(objects: []const engine.SceneNode, cam: render.EditorCam, w: u32, h: u32) ?gui.TextureTarget {
+    if (!g_ready) return null;
+    const cmd = g_cmd orelse return null;
+    if (w == 0 or h == 0) return null;
+
+    const target = ensureTarget(&g_cam_preview_target, &g_cam_preview_w, &g_cam_preview_h, w, h) orelse return null;
+    const bt: *BackendTex = @ptrCast(@alignCast(target.ptr));
+
+    const saved_cam = render.editorCamera();
+    render.setEditorCamera(cam);
+    render.renderScene(@ptrCast(cmd), w, h, objects);
+    render.runPostProcess(@ptrCast(cmd), @ptrCast(bt.texture), w, h, objects);
+    render.setEditorCamera(saved_cam);
+    return target;
+}
+
+/// The camera-preview target as last rendered, without rendering again —
+/// lets a throttled caller redisplay the same image between refreshes.
+pub fn cameraPreviewTarget() ?gui.TextureTarget {
+    return g_cam_preview_target;
+}
+
+/// Objects the main viewport is currently drawing: the live Play-mode node
+/// slice while a simulation runs, otherwise the editor's scene objects.
+pub fn viewportObjects() []const engine.SceneNode {
+    return g_render_override orelse EditorState.objects[0..EditorState.object_count];
 }
 
 /// Render `objects` under `cam` into a fresh `w`×`h` offscreen target and read
@@ -307,6 +343,14 @@ pub fn deinit() void {
     if (g_game_target) |ct| {
         if (g_backend) |b| b.textureDestroyTarget(ct);
         g_game_target = null;
+    }
+    if (g_preview_target) |ct| {
+        if (g_backend) |b| b.textureDestroyTarget(ct);
+        g_preview_target = null;
+    }
+    if (g_cam_preview_target) |ct| {
+        if (g_backend) |b| b.textureDestroyTarget(ct);
+        g_cam_preview_target = null;
     }
     g_ready = false;
 }

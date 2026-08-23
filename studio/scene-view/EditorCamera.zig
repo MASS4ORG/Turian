@@ -97,6 +97,22 @@ pub fn takeOverride() void {
     initialized = true;
 }
 
+/// Snap the free-look camera onto `obj`'s Camera component pose, so the Scene
+/// view shows what that camera sees. Returns false if `obj` has no camera.
+pub fn alignToCameraNode(obj: *const engine.SceneNode) bool {
+    for (obj.components[0..obj.component_count]) |*comp| {
+        if (comp.* != .camera) continue;
+        queueOverride(.{
+            .pos = obj.transform.position,
+            .pitch = obj.transform.rotation.x,
+            .yaw = obj.transform.rotation.y,
+            .fov = comp.camera.fov,
+        });
+        return true;
+    }
+    return false;
+}
+
 pub fn setState(s: State) void {
     pos = s.pos;
     yaw = s.yaw;

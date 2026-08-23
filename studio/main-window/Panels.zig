@@ -7,6 +7,7 @@ const SceneTree = @import("../scene-hierarchy/SceneTree.zig");
 const Inspector = @import("../inspector/Inspector.zig");
 const AssetBrowser = @import("../asset-browser/AssetBrowser.zig");
 const SceneViewport = @import("../scene-view/SceneViewport.zig");
+const GameViewport = @import("../scene-view/GameViewport.zig");
 const Documents = @import("Documents.zig");
 const ProfilerPanel = @import("ProfilerPanel.zig");
 const LogPanel = @import("LogPanel.zig");
@@ -46,7 +47,7 @@ pub const PanelDesc = struct {
 const builtin_panels = [_]PanelDesc{
     .{ .id = "hierarchy", .title = "Hierarchy", .icon = gui.entypo.flow_tree, .draw = drawHierarchy, .closable = false },
     .{ .id = "scene", .title = "Scene", .icon = gui.entypo.image, .draw = drawScene, .closable = false },
-    .{ .id = "game", .title = "Game", .icon = gui.entypo.game_controller, .draw = SceneViewport.drawGame, .allow_multiple = false },
+    .{ .id = "game", .title = "Game", .icon = gui.entypo.game_controller, .draw = GameViewport.drawGame, .allow_multiple = false },
     .{ .id = "inspector", .title = "Inspector", .icon = gui.entypo.list, .draw = Inspector.draw },
     .{ .id = "assets", .title = "Assets", .icon = gui.entypo.folder, .draw = AssetBrowser.draw, .settings = AssetBrowser.drawSettings },
     .{ .id = "profiler", .title = "Profiler", .icon = gui.entypo.gauge, .draw = ProfilerPanel.drawContent },

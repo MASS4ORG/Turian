@@ -478,6 +478,7 @@ pub fn generateMainZig(
             "        return;\n" ++
             "    };\n" ++
             "    defer g_assets.deinit();\n" ++
+            "    g_assets.verify = false;\n" ++
             "    g_assets_ready = true;\n" ++
             "    engine.software_renderer.setMeshSource(&meshSource);\n" ++
             "    engine.software_renderer.setMaterialSource(&materialSource);\n" ++

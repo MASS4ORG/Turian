@@ -7,6 +7,7 @@
 const gui = @import("gui");
 const EditorState = @import("editor").EditorState;
 const tree_view = @import("../TreeView.zig");
+const EditorCamera = @import("../scene-view/EditorCamera.zig");
 const StudioLocale = @import("../services/StudioLocale.zig");
 const tr = StudioLocale.tr;
 
@@ -65,6 +66,11 @@ const SceneModel = struct {
     }
 
     pub fn activate(i: usize) void {
+        // A double-clicked camera node should align the Scene view to what
+        // that camera sees, not run `focusOnObject`'s generic "point some
+        // camera at this node" behavior (which would otherwise move the
+        // double-clicked camera itself).
+        if (EditorCamera.alignToCameraNode(&EditorState.objects[i])) return;
         EditorState.focusOnObject(i);
     }
 

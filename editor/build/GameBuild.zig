@@ -349,11 +349,12 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
         }
     }
 
-    // Fallback: pick scene-01.json if present, else the first scene asset.
+    // Pick first valid scene asset, skipping auto-generated hierarchy files.
     if (out.boot_scene_guid.len == 0) {
         var fallback: ?AssetInfo = null;
         var scenes = db.enumerate(.scene);
         while (scenes.next()) |sinfo| {
+            if (std.mem.indexOf(u8, sinfo.path, "/.cache/assets/") != null) continue;
             if (std.mem.endsWith(u8, sinfo.path, "scene-01.json")) {
                 fallback = sinfo;
                 break;
@@ -364,6 +365,9 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
             var gbuf: [64]u8 = undefined;
             const gstr = std.fmt.bufPrint(&gbuf, "{f}", .{sinfo.guid}) catch return;
             out.boot_scene_guid = a.dupe(u8, gstr) catch "";
+            log.warn("No first_scene set in ProjectSettings; falling back to {s} — set first_scene explicitly for a reliable boot scene.", .{sinfo.path});
+        } else {
+            log.err("No authored scene asset found and no first_scene set in ProjectSettings; the built game will have no scene to boot.", .{});
         }
     }
 }

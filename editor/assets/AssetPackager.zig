@@ -41,6 +41,7 @@ pub fn packageProject(
             .data = bytes,
             .vpath = projectRelative(project_path, info.path),
             .asset_type = @intFromEnum(info.asset_type),
+            .compression = .{ .fixed = .store },
         }) catch continue;
         added += 1;
     }

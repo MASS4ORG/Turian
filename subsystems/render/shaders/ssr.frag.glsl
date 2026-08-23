@@ -26,6 +26,11 @@ layout(location = 0) out vec4 out_ssr; // rgb = reflected color, a = confidence
 const int MAX_STEPS = 32;
 const float MIN_STEP = 0.02;  // view-space meters — floor so nearby geometry still marches
 const float EDGE_FADE = 0.1;  // fraction of screen width/height to fade near edges
+// A ray heading toward open sky never hits anything, so it always burns the
+// full MAX_STEPS budget — accelerating the step size only while over sky
+// (not while near candidate geometry) reaches max_distance in far fewer
+// iterations without touching hit accuracy for actual reflective surfaces.
+const float SKY_STEP_GROWTH = 1.5;
 
 // Identical to ssao.frag.glsl's reconstruction — see that file for the
 // V-flip/NDC-convention rationale.
@@ -71,7 +76,7 @@ void main() {
         if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
 
         float scene_depth_raw = texture(prepass_depth, uv).r;
-        if (scene_depth_raw >= 0.9999) continue; // marching over open sky
+        if (scene_depth_raw >= 0.9999) { step_len *= SKY_STEP_GROWTH; continue; } // marching over open sky
         vec3 scene_pos = viewPosFromDepth(uv, scene_depth_raw);
 
         // View-space z grows toward zero approaching the camera (see
