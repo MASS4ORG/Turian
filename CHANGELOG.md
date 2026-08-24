@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.0] - 2026-08-24
+
+### Features
+- Feat: Camera previewer
+
+### Performance
+- perf: per-pass profiler #159 index the caches by GUID hash #161, sort transparent draws
+
 ## [3.5.0] - 2026-08-22
 
 ### Features
