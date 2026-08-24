@@ -99,7 +99,7 @@ pub fn run(
 
     const target = targetFor(dev, w, h) orelse return null;
 
-    var zone = engine.Profiler.zone("render.ssr");
+    var zone = engine.Profiler.passZone("render.ssr");
     defer zone.end();
 
     const reproject = state.prev_view_proj.multiply(view.inverse());

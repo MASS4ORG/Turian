@@ -211,7 +211,7 @@ fn captureFace(
         .ssr_tex = ssr_fallback,
     };
 
-    var bound_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+    var bind_state = draw.BindState{};
     for (objects) |*obj| {
         if (!obj.active) continue;
         for (obj.components[0..obj.component_count]) |*comp| {
@@ -244,7 +244,7 @@ fn captureFace(
                 // circular bake dependency) — weight 0 leaves it unblended.
                 const no_probe = draw.ProbeSample{ .tex = env.prefiltered_tex, .weight = 0, .mip_count = 1 };
                 const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, false, dctx, no_probe);
-                draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, dp);
+                draw.submitDraw(cmd, pass, dev, &bind_state, fu, dp);
             }
         }
     }
@@ -357,6 +357,8 @@ pub fn bakeDirty(
                 }
             }
 
+            var z = engine.Profiler.passZone("render.probe_bake");
+            defer z.end();
             bakeOne(cmd, dev, sampler_default, objects, env, obj, rp, slot.?, key);
             return; // throttle: at most one dirty probe baked per call
         }

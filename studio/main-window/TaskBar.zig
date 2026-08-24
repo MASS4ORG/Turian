@@ -61,7 +61,7 @@ fn drawStatusRow(tm: *editor.TaskManager, tasks: []Task, now_ms: i64) void {
     if (task_tree.primary(tasks)) |t| {
         const roll = task_tree.rollup(tasks, t);
         var line_buf: [task_tree.DESCRIBE_CAP]u8 = undefined;
-        gui.label(@src(), "{s}", .{task_tree.describe(t, roll, &line_buf)}, .{ .gravity_y = 0.5 });
+        gui.label(@src(), "{s}", .{task_tree.describe(&t, roll, &line_buf)}, .{ .gravity_y = 0.5 });
 
         // Backgrounded so the *unfilled* part of the track reads as a bar too;
         // without it a task at 5% looks like a stray dot on the status row.

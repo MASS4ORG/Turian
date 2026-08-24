@@ -204,7 +204,7 @@ pub fn run(
     const white = state.white_tex orelse return null;
     const target = targetFor(dev, w, h) orelse return null;
 
-    var zone = engine.Profiler.zone("render.prepass");
+    var zone = engine.Profiler.passZone("render.prepass");
     defer zone.end();
 
     const vp = proj.multiply(view);
@@ -257,14 +257,20 @@ pub fn run(
             const mr = &comp.mesh_renderer;
             const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
 
-            for (gm.submeshes) |sm| {
-                if (sm.index_count == 0) continue;
-                if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) continue;
+            // One indirect multi-draw per material group when the cull compute
+            // pass ran for this mesh this frame, mirroring root.zig's main pass.
+            // Every submesh in a group shares one material, so the per-draw
+            // uniforms and the albedo binding are identical across the group.
+            const indirect: ?*c.SDL_GPUBuffer = if (gm.cull_dispatched_frame == state.frame_seq)
+                gm.indirect_buf
+            else
+                null;
 
-                const mat_guid = draw.materialGuidForSlot(mr, mat_n, sm.material_slot);
+            for (gm.material_groups) |group| {
+                const mat_guid = draw.materialGuidForSlot(mr, mat_n, group.material_slot);
                 const mat_res = assets.resolveMaterial(mat_guid);
-                // Only the immediate-draw (opaque) path contributes to AO —
-                // matches root.zig's `blend == .disabled` split exactly.
+                // Only the opaque path contributes to AO — matches root.zig's
+                // `blend == .disabled` split exactly.
                 if (mat_res.render.blend != .disabled) continue;
 
                 const albedo_t = assets.pickTexture(mat_res.map(.albedo), white);
@@ -272,13 +278,26 @@ pub fn run(
                     .flags = .{ assets.present(albedo_t.found), mat_res.alpha_cutoff, assets.present(mat_res.render.alpha_mask), 0 },
                     .base_color = mat_res.base_color,
                 };
-
                 c.SDL_PushGPUVertexUniformData(cmd, 0, &vub, @sizeOf(types.PrepassVertexUB));
                 c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.PrepassFragUB));
                 c.SDL_BindGPUFragmentSamplers(pass, 0, &[_]c.SDL_GPUTextureSamplerBinding{
                     .{ .texture = albedo_t.tex, .sampler = sampler },
                 }, 1);
-                c.SDL_DrawGPUIndexedPrimitives(pass, sm.index_count, 1, sm.index_offset, 0, 0);
+
+                if (indirect) |ib| {
+                    c.SDL_DrawGPUIndexedPrimitivesIndirect(pass, ib, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
+                    engine.Profiler.countDraw(group.index_count / 3, group.index_count, true);
+                    engine.Profiler.countIndirectCommands(group.count);
+                    engine.Profiler.countSubmeshesDrawn(group.count);
+                    continue;
+                }
+                for (gm.submeshes[group.start..][0..group.count]) |sm| {
+                    if (sm.index_count == 0) continue;
+                    if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) continue;
+                    c.SDL_DrawGPUIndexedPrimitives(pass, sm.index_count, 1, sm.index_offset, 0, 0);
+                    engine.Profiler.countDraw(sm.index_count / 3, sm.index_count, true);
+                    engine.Profiler.countSubmeshesDrawn(1);
+                }
             }
         }
     }

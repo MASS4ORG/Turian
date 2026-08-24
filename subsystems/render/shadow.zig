@@ -280,13 +280,19 @@ fn drawCaster(s: *Strip, cascade: Cascade, obj: *const engine.SceneNode, mr: *co
         // switched pipeline must still see this mesh's light-space transform.
         c.SDL_PushGPUVertexUniformData(s.cmd, 0, &lub, @sizeOf(types.ShadowUB));
 
+        const cutout = occlusionFor(mat_res.render) == .cutout;
         if (indirect) |ib| {
             c.SDL_DrawGPUIndexedPrimitivesIndirect(s.pass, ib, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
+            engine.Profiler.countDraw(group.index_count / 3, group.index_count, cutout);
+            engine.Profiler.countIndirectCommands(group.count);
+            engine.Profiler.countSubmeshesDrawn(group.count);
             continue;
         }
         for (gm.submeshes[group.start..][0..group.count]) |sm| {
             if (sm.index_count == 0) continue;
             c.SDL_DrawGPUIndexedPrimitives(s.pass, sm.index_count, 1, sm.index_offset, 0, 0);
+            engine.Profiler.countDraw(sm.index_count / 3, sm.index_count, cutout);
+            engine.Profiler.countSubmeshesDrawn(1);
         }
     }
 }

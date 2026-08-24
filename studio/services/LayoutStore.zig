@@ -137,16 +137,23 @@ pub fn addPanel(id: []const u8, io: std.Io) void {
 /// Game panel over whatever tab it's sharing a dock with). No-op if `id`
 /// isn't open in the current layout.
 pub fn focusPanel(id: []const u8, io: std.Io) void {
+    _ = focusPanelTransient(id);
+    save(io);
+}
+
+/// Focuses `id`'s tab without persisting the layout, for scripted runs that
+/// must not rearrange the user's saved layout. False if `id` isn't in it.
+pub fn focusPanelTransient(id: []const u8) bool {
     const l = get();
-    const leaf_idx = l.findPanel(id) orelse return;
+    const leaf_idx = l.findPanel(id) orelse return false;
     const tabs = l.nodes.items[leaf_idx].leaf.tabs.items;
     for (tabs, 0..) |t, i| {
         if (std.mem.eql(u8, t, id)) {
             l.setActive(leaf_idx, i);
-            break;
+            return true;
         }
     }
-    save(io);
+    return false;
 }
 
 /// Which of "scene"/"game" is the currently active tab in its dock leaf, if

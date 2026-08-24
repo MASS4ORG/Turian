@@ -17,10 +17,12 @@ const tr = StudioLocale.tr;
 const Frame = engine.Profiler.Frame;
 
 // ── Recording control ────────────────────────────────────────────
-/// Whether the profiler is actively recording (only effective during Play).
+/// Whether the profiler is actively recording.
 var g_record: bool = false;
 /// Setting: start recording the moment Play mode is entered.
 var g_auto_on_play: bool = true;
+/// Setting: keep recording outside Play, so the Scene viewport can be profiled.
+var g_record_in_edit: bool = false;
 /// Edge-detect Play transitions to arm/disarm recording.
 var g_prev_play: bool = false;
 
@@ -36,16 +38,28 @@ var g_show_editor_cpu: bool = false;
 /// pinned frame continuously (not just on click).
 var g_chart_drag: bool = false;
 
+/// Collapsed state of the per-pass counter breakdown.
+var g_show_passes: bool = true;
+
+/// Frame-rate target the renderer's cost is measured against.
+var g_budget_fps: f32 = 60;
+
 /// Update recording state and arm `engine.Profiler` for this frame. MUST run
 /// once per editor frame *before* `Profiler.beginFrame` (called from Window.zig).
-/// Recording only happens during Play; Record/Pause and auto-on-Play decide
-/// whether it's active.
+/// Record/Pause, auto-on-Play and "record in Edit mode" decide whether it's
+/// active; `Profiler.force_enabled` overrides all three.
 pub fn tickRecording() void {
     const active = PlayMode.isActive();
     if (active and !g_prev_play) g_record = g_auto_on_play; // entered Play
-    if (!active and g_prev_play) g_record = false; // left Play → freeze
+    if (!active and g_prev_play and !g_record_in_edit) g_record = false; // left Play → freeze
     g_prev_play = active;
-    engine.Profiler.enabled = active and g_record;
+    engine.Profiler.resolveEnabled(g_record and (active or g_record_in_edit));
+}
+
+/// Forces recording on regardless of the panel's own controls.
+pub fn forceRecording(on: bool) void {
+    engine.Profiler.force_enabled = on;
+    if (on) g_record = true;
 }
 
 fn ms(ns: u64) f64 {
@@ -132,6 +146,9 @@ pub fn drawContent() void {
 
     drawControls(cw);
 
+    // Summary before detail: on a short panel this is the line worth seeing.
+    drawFrameBudget(frame);
+
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
     // --- frame-time chart (the game frame period; click to scrub history) ---
@@ -155,6 +172,9 @@ pub fn drawContent() void {
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("tex created   {n}", &.{.{ .name = "n", .value = .{ .number = ec.textures_created } }})}, .{});
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("submeshes drawn  {n}", &.{.{ .name = "n", .value = .{ .number = ec.submeshes_drawn } }})}, .{});
     gui.label(@src(), "{s}", .{StudioLocale.trArgs("submeshes culled {n}", &.{.{ .name = "n", .value = .{ .number = ec.submeshes_culled } }})}, .{});
+    gui.label(@src(), "{s}", .{StudioLocale.trArgs("indirect cmds {n}", &.{.{ .name = "n", .value = .{ .number = ec.indirect_commands } }})}, .{});
+
+    drawPassBreakdown(frame);
 
     _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
 
@@ -179,6 +199,81 @@ pub fn drawContent() void {
     }
 }
 
+/// One budget-target button.
+fn budgetBtn(label: []const u8, fps: f32, id: usize) void {
+    if (gui.button(@src(), label, .{}, .{
+        .gravity_y = 0.5,
+        .id_extra = id,
+        .style = if (g_budget_fps == fps) .highlight else .control,
+    })) g_budget_fps = fps;
+}
+
+/// The renderer's share of a frame budget. Measures only the passes a shipped
+/// game also runs, so it stays meaningful despite the editor's own UI cost and
+/// its event-driven frame pacing — neither of which the game has.
+fn drawFrameBudget(frame: *const Frame) void {
+    const renderer_ns = frame.zoneTotalNs("render.scene") + frame.zoneTotalNs("render.postprocess");
+    if (renderer_ns == 0) return;
+
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+    gui.label(@src(), "{s}", .{tr("Renderer budget")}, .{ .font = gui.Font.theme(.heading) });
+
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("target")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        budgetBtn("30", 30, 0);
+        budgetBtn("60", 60, 1);
+        budgetBtn("120", 120, 2);
+    }
+
+    const used_ms = ms(renderer_ns);
+    const budget_ms = 1000.0 / @as(f64, g_budget_fps);
+    const frac = used_ms / budget_ms;
+
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.progress(@src(), .{ .percent = @floatCast(@min(frac, 1.0)) }, .{
+            .min_size_content = .{ .w = 160, .h = 12 },
+            .gravity_y = 0.5,
+            .margin = gui.Rect.all(6),
+            .background = true,
+            .style = .content,
+        });
+        var buf: [64]u8 = undefined;
+        const txt = std.fmt.bufPrint(&buf, "{d:.2} / {d:.2} ms  ({d:.0}%)", .{ used_ms, budget_ms, frac * 100 }) catch "";
+        gui.label(@src(), "{s}", .{txt}, .{ .gravity_y = 0.5 });
+    }
+
+    // CPU submission only: GPU execution, scripts and physics are not in here.
+    gui.label(@src(), "{s}", .{tr("renderer CPU only — excludes GPU time, scripts and physics")}, .{ .font = gui.Font.theme(.mono) });
+}
+
+/// Per-pass split of the frame's render counters. Hidden when no pass recorded.
+fn drawPassBreakdown(frame: *const Frame) void {
+    const passes = frame.passSlice();
+    if (passes.len == 0) return;
+
+    _ = gui.separator(@src(), .{ .expand = .horizontal, .margin = gui.Rect.all(4) });
+    if (!gui.expander(@src(), tr("Per-pass"), .{ .expanded = &g_show_passes }, .{ .expand = .horizontal })) return;
+
+    var grid = gui.box(@src(), .{}, .{ .expand = .horizontal });
+    defer grid.deinit();
+
+    gui.label(@src(), "{s}", .{tr("pass                draws    tris   ind.cmds")}, .{ .font = gui.Font.theme(.mono) });
+    for (passes, 0..) |*ps, i| {
+        var line: [96]u8 = undefined;
+        const txt = std.fmt.bufPrint(&line, "{s: <18} {d: >6} {d: >7} {d: >10}", .{
+            ps.name(),
+            ps.counters.draw_calls,
+            ps.counters.triangles,
+            ps.counters.indirect_commands,
+        }) catch continue;
+        gui.label(@src(), "{s}", .{txt}, .{ .id_extra = i, .font = gui.Font.theme(.mono) });
+    }
+}
+
 /// Recording transport, view controls, vsync/fps, screenshot, export.
 fn drawControls(cw: *gui.Window) void {
     const active = PlayMode.isActive();
@@ -189,11 +284,19 @@ fn drawControls(cw: *gui.Window) void {
         const amber = gui.Color{ .r = 0xc0, .g = 0xa0, .b = 0x50 };
         var col: gui.Color = amber;
         var txt: []const u8 = tr("■ idle — press Play to profile");
-        if (active and g_record) {
+        if (engine.Profiler.force_enabled orelse false) {
+            col = green;
+            txt = tr("● recording (forced)");
+        } else if (g_record and active) {
             col = green;
             txt = tr("● recording (Play)");
+        } else if (g_record and g_record_in_edit) {
+            col = green;
+            txt = tr("● recording (Edit)");
         } else if (active) {
             txt = tr("❚❚ paused (Play)");
+        } else if (g_record_in_edit) {
+            txt = tr("❚❚ paused (Edit)");
         }
         gui.label(@src(), "{s}", .{txt}, .{ .color_text = col });
     }
@@ -216,6 +319,12 @@ fn drawControls(cw: *gui.Window) void {
             g_selected = null;
         }
         _ = gui.checkbox(@src(), &g_auto_on_play, tr("auto-record on Play"), .{ .gravity_y = 0.5 });
+    }
+
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        _ = gui.checkbox(@src(), &g_record_in_edit, tr("also record in Edit mode"), .{ .gravity_y = 0.5 });
     }
 
     // vsync (independent) + fps cap

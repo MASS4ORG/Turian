@@ -124,40 +124,82 @@ pub const ProbeSample = struct {
 /// A blended/additive draw deferred for back-to-front sorting.
 pub const TransparentDraw = struct {
     params: DrawParams,
+};
+
+/// Sort key for one deferred draw. Ordering moves these rather than the
+/// ~420-byte `DrawParams` they point at.
+pub const TransparentKey = struct {
     /// Squared camera distance to the submesh's world bounds centre — cheap
     /// proxy for per-submesh (not per-triangle) back-to-front ordering.
     sort_depth: f32,
+    index: u32,
 };
 
 /// Static scratch space for one frame's deferred transparent draws.
 pub const MAX_TRANSPARENT_DRAWS = 1024;
 pub var transparent_draws: [MAX_TRANSPARENT_DRAWS]TransparentDraw = undefined;
+pub var transparent_keys: [MAX_TRANSPARENT_DRAWS]TransparentKey = undefined;
 pub var transparent_count: usize = 0;
 
-pub fn transparentFartherFirst(_: void, a: TransparentDraw, b: TransparentDraw) bool {
+/// Records one deferred draw, returning false when the frame's budget is full.
+pub fn pushTransparent(params: DrawParams, sort_depth: f32) bool {
+    if (transparent_count >= MAX_TRANSPARENT_DRAWS) return false;
+    transparent_draws[transparent_count] = .{ .params = params };
+    transparent_keys[transparent_count] = .{ .sort_depth = sort_depth, .index = @intCast(transparent_count) };
+    transparent_count += 1;
+    return true;
+}
+
+pub fn transparentFartherFirst(_: void, a: TransparentKey, b: TransparentKey) bool {
     return a.sort_depth > b.sort_depth;
 }
 
-/// Bind a draw's pipeline (if it isn't already bound) and push its uniforms
-/// and texture bindings — everything `submitDraw`/`submitIndirectDraw` share,
-/// short of the final draw call itself.
+/// Sorts back-to-front and submits, so alpha compositing reads correctly.
+pub fn submitTransparent(
+    cmd: *c.SDL_GPUCommandBuffer,
+    pass: *c.SDL_GPURenderPass,
+    dev: *c.SDL_GPUDevice,
+    bs: *BindState,
+    fu: FrameUniforms,
+) void {
+    const keys = transparent_keys[0..transparent_count];
+    std.sort.pdq(TransparentKey, keys, {}, transparentFartherFirst);
+    for (keys) |k| submitDraw(cmd, pass, dev, bs, fu, transparent_draws[k.index].params);
+}
+
+/// What a render pass already has bound, so consecutive draws sharing a
+/// pipeline or a mesh skip the redundant rebind.
+pub const BindState = struct {
+    pipeline: ?*c.SDL_GPUGraphicsPipeline = null,
+    vtx_buf: ?*c.SDL_GPUBuffer = null,
+    idx_buf: ?*c.SDL_GPUBuffer = null,
+};
+
+/// Bind a draw's pipeline, geometry and material state — everything
+/// `submitDraw`/`submitIndirectDraw` share, short of the draw call itself.
 fn bindDrawState(
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
     dev: *c.SDL_GPUDevice,
-    bound_pipeline: *?*c.SDL_GPUGraphicsPipeline,
+    bs: *BindState,
     fu: FrameUniforms,
     dp: DrawParams,
 ) void {
     const pl = scenePipelineFor(dev, dp.pl_key) orelse return;
-    if (bound_pipeline.* != pl) {
+    if (bs.pipeline != pl) {
         c.SDL_BindGPUGraphicsPipeline(pass, pl);
-        bound_pipeline.* = pl;
+        bs.pipeline = pl;
     }
 
     c.SDL_PushGPUVertexUniformData(cmd, 0, &dp.vub, @sizeOf(types.VertexUB));
-    c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = dp.vtx_buf, .offset = 0 }, 1);
-    c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = dp.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
+    if (bs.vtx_buf != dp.vtx_buf) {
+        c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = dp.vtx_buf, .offset = 0 }, 1);
+        bs.vtx_buf = dp.vtx_buf;
+    }
+    if (bs.idx_buf != dp.idx_buf) {
+        c.SDL_BindGPUIndexBuffer(pass, &c.SDL_GPUBufferBinding{ .buffer = dp.idx_buf, .offset = 0 }, c.SDL_GPU_INDEXELEMENTSIZE_32BIT);
+        bs.idx_buf = dp.idx_buf;
+    }
 
     const fub = types.FragUB{
         .camera_pos = fu.cam_pos4,
@@ -183,31 +225,34 @@ pub fn submitDraw(
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
     dev: *c.SDL_GPUDevice,
-    bound_pipeline: *?*c.SDL_GPUGraphicsPipeline,
+    bs: *BindState,
     fu: FrameUniforms,
     dp: DrawParams,
 ) void {
-    bindDrawState(cmd, pass, dev, bound_pipeline, fu, dp);
+    bindDrawState(cmd, pass, dev, bs, fu, dp);
     c.SDL_DrawGPUIndexedPrimitives(pass, dp.index_count, 1, dp.index_offset, 0, 0);
     // Every mesh binds samplers.
     engine.Profiler.countDraw(dp.index_count / 3, dp.index_count, true);
 }
 
-/// Bind one material group and issue an indirect multi-draw call into `indirect_buf`.
+/// Bind one material group and issue an indirect multi-draw call into
+/// `indirect_buf`. `index_count` is the group's summed index total.
 pub fn submitIndirectDraw(
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
     dev: *c.SDL_GPUDevice,
-    bound_pipeline: *?*c.SDL_GPUGraphicsPipeline,
+    bs: *BindState,
     fu: FrameUniforms,
     dp: DrawParams,
     indirect_buf: *c.SDL_GPUBuffer,
     byte_offset: u32,
     draw_count: u32,
+    index_count: u32,
 ) void {
-    bindDrawState(cmd, pass, dev, bound_pipeline, fu, dp);
+    bindDrawState(cmd, pass, dev, bs, fu, dp);
     c.SDL_DrawGPUIndexedPrimitivesIndirect(pass, indirect_buf, byte_offset, draw_count);
-    engine.Profiler.countDraw(draw_count, draw_count, true);
+    engine.Profiler.countDraw(index_count / 3, index_count, true);
+    engine.Profiler.countIndirectCommands(draw_count);
     engine.Profiler.countSubmeshesDrawn(draw_count);
 }
 

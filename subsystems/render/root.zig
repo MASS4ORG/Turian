@@ -394,7 +394,7 @@ pub fn renderScene(
     const depth_tex = target.tex.?;
 
     {
-        var upload_zone = engine.Profiler.zone("render.upload");
+        var upload_zone = engine.Profiler.passZone("render.upload");
         defer upload_zone.end();
         const tex_before = state.texture_count;
         assets.uploadNewAssets(cmd, dev, objects);
@@ -406,6 +406,12 @@ pub fn renderScene(
     const cam_pos = cam.pos;
     const vp = cam.view_proj;
     const frustum = culling.Frustum.extract(vp);
+
+    // ── GPU-driven cull compute phase ────────────────────────────────────────
+    // Ahead of every render pass that draws indirect: compute and render passes
+    // can't overlap on one command buffer, and both the prepass and the main
+    // pass read the indirect buffer this writes.
+    gpu_timing.runCullPhase(dev, cmd, objects, frustum);
 
     // ── Depth+normal prepass + SSAO + SSR ────────────────────────────────────
     // Always single-sample, independent of the main pass's MSAA depth (which
@@ -499,10 +505,6 @@ pub fn renderScene(
         gpu_timing.runShadowPass(dev, cmd, cascades, objects);
     }
 
-    // ── GPU-driven cull compute phase ────────────────────────────────────────
-    // Must finish before the main render pass (compute and render passes can't overlap on the same command buffer).
-    gpu_timing.runCullPhase(dev, cmd, objects, frustum);
-
     // Upload this frame's lights to the storage buffer the scene shader reads
     // (outside any render pass — a copy pass can't overlap one).
     draw.uploadLights(cmd, dev, lights[0..light_count]);
@@ -535,7 +537,7 @@ pub fn renderScene(
     });
 
     // ── Main pass ───────────────────────────────────────────────────────────
-    var main_zone = engine.Profiler.zone("render.main");
+    var main_zone = engine.Profiler.passZone("render.main");
     defer main_zone.end();
     const hdr_color = target.hdr_color.?;
     // Under MSAA, render into the multisampled color and resolve into the
@@ -611,7 +613,7 @@ pub fn renderScene(
     if (state.lights_buf) |lb|
         c.SDL_BindGPUFragmentStorageBuffers(pass, 0, &[_]?*c.SDL_GPUBuffer{lb}, 1);
 
-    var bound_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
+    var bind_state = draw.BindState{};
     draw.transparent_count = 0;
 
     // Track the previously bound material GUID so we can count pipeline/material
@@ -665,7 +667,7 @@ pub fn renderScene(
 
                     // Opaque groups draw as one indirect multi-draw; transparent groups fall back to per-submesh CPU path for depth sort.
                     if (mat_res.render.blend == .disabled) {
-                        draw.submitIndirectDraw(cmd, pass, dev, &bound_pipeline, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
+                        draw.submitIndirectDraw(cmd, pass, dev, &bind_state, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count, group.index_count);
                     } else {
                         for (gm.submeshes[group.start..][0..group.count]) |*sm| {
                             if (sm.index_count == 0) continue;
@@ -680,10 +682,7 @@ pub fn renderScene(
                             tdp.index_count = sm.index_count;
                             tdp.bindings[9] = .{ .texture = probe.tex, .sampler = cube_smp };
                             tdp.probe_params = .{ probe.weight, probe.mip_count, 0, 0 };
-                            if (draw.transparent_count < draw.transparent_draws.len) {
-                                draw.transparent_draws[draw.transparent_count] = .{ .params = tdp, .sort_depth = submeshDepth(cam_pos, sm.*, mdl) };
-                                draw.transparent_count += 1;
-                            }
+                            _ = draw.pushTransparent(tdp, submeshDepth(cam_pos, sm.*, mdl));
                         }
                     }
                 }
@@ -711,25 +710,18 @@ pub fn renderScene(
 
                 // Opaque draws right away; blended/additive draws are deferred for back-to-front sort.
                 if (mat_res.render.blend == .disabled) {
-                    draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, dp);
-                } else if (draw.transparent_count < draw.transparent_draws.len) {
-                    draw.transparent_draws[draw.transparent_count] = .{
-                        .params = dp,
-                        .sort_depth = submeshDepth(cam_pos, sm.*, mdl),
-                    };
-                    draw.transparent_count += 1;
+                    draw.submitDraw(cmd, pass, dev, &bind_state, fu, dp);
+                } else {
+                    _ = draw.pushTransparent(dp, submeshDepth(cam_pos, sm.*, mdl));
                 }
             }
         }
     }
 
-    // Back-to-front so alpha compositing reads correctly (farthest drawn first).
     {
-        var transparent_zone = engine.Profiler.zone("render.transparent");
+        var transparent_zone = engine.Profiler.passZone("render.transparent");
         defer transparent_zone.end();
-        std.sort.pdq(draw.TransparentDraw, draw.transparent_draws[0..draw.transparent_count], {}, draw.transparentFartherFirst);
-        for (draw.transparent_draws[0..draw.transparent_count]) |td|
-            draw.submitDraw(cmd, pass, dev, &bound_pipeline, fu, td.params);
+        draw.submitTransparent(cmd, pass, dev, &bind_state, fu);
     }
 
     c.SDL_EndGPURenderPass(pass);
@@ -762,6 +754,8 @@ pub fn deinit() void {
     }
     state.texture_count = 0;
     state.resolved_material_count = 0;
+    state.texture_index.clear();
+    state.material_index.clear();
     for (state.meshes[0..state.mesh_count]) |*gm| {
         c.SDL_ReleaseGPUBuffer(dev, gm.vtx_buf);
         c.SDL_ReleaseGPUBuffer(dev, gm.idx_buf);
@@ -774,6 +768,7 @@ pub fn deinit() void {
         std.heap.page_allocator.free(gm.material_groups);
     }
     state.mesh_count = 0;
+    state.mesh_index.clear();
     if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);
     if (state.shadow_sampler) |s| c.SDL_ReleaseGPUSampler(dev, s);
     if (state.shadow_pipeline) |p| c.SDL_ReleaseGPUGraphicsPipeline(dev, p);

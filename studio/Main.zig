@@ -23,24 +23,21 @@ const StudioSettings = editor.StudioSettings;
 const Screenshots = @import("services/Screenshots.zig");
 const LayoutStore = @import("services/LayoutStore.zig");
 const EditorCamera = @import("scene-view/EditorCamera.zig");
+const Benchmark = @import("services/Benchmark.zig");
+const ProfilerPanel = @import("main-window/ProfilerPanel.zig");
 const build_options = @import("turian_build_options");
 const Icon = @import("Icon.zig");
 
 const log = std.log.scoped(.studio_main);
 
-/// Route std.log through the engine diagnostic ring so the Remote Debug
-/// Protocol's `errors` method / MCP `list_errors` can surface recent warnings
-/// and errors, and the Output panel can show them alongside everything
-/// else. Still prints to the terminal (`DiagLog.logFn`, colored/timestamped).
+/// Routes std.log through the engine diagnostic ring, so the debug protocol's
+/// `errors` method and the Output panel can surface recent warnings.
 pub const std_options: std.Options = .{ .logFn = filteredLogFn };
 
-/// Drops `dvui`'s own `.debug`-level spam (`LabelWidget.init` logs one line
-/// per label whose formatted output isn't valid UTF-8 before it falls back to
-/// `toUtf8`) before it ever reaches `DiagLog.logFn`. `std.options.log_scope_levels`
-/// would normally do this instead, but the pinned dvui fork's SDL3 backend
-/// iterates it at runtime, which fails to compile once it's non-empty (Zig
-/// 0.16 requires `ScopeLevel` values to be comptime-known there) — so this
-/// filters at the log call site instead.
+/// Drops dvui's `.debug`-level output before it reaches `DiagLog.logFn`.
+/// Filtered here rather than through `std.options.log_scope_levels`, which the
+/// pinned dvui fork's SDL3 backend iterates at runtime and so cannot compile
+/// against a non-empty list.
 fn filteredLogFn(
     comptime level: std.log.Level,
     comptime scope: @TypeOf(.enum_literal),
@@ -86,13 +83,9 @@ fn studioWorld(views: *[1]engine.introspect.SceneView) engine.introspect.World {
 }
 
 // ── Machine-driven UI interaction (remote-debug input injection) ────────────
-// Synthetic input requested over the debug protocol is queued here (by
-// `studioMutationApplier`, called late in the frame it arrives) and injected
-// into dvui for real — `win.addEventMouseMotion`/etc — early in the NEXT
-// frame, before the widget tree is built (dvui events must be added before
-// `Window.frame()`, or no widget ever sees them). One frame of latency is
-// irrelevant for scripted verification. `capture_pending_remote` reuses the
-// same env-var-triggered whole-window capture machinery below.
+// Synthetic input from the debug protocol is queued here and injected into dvui
+// early in the next frame, since events must be added before `Window.frame()`
+// builds the widget tree.
 
 const SynthEvent = union(enum) {
     mouse_move: struct { x: f32, y: f32 },
@@ -203,10 +196,8 @@ fn studioMutationApplier(_: ?*anyopaque, m: rdebug.Mutation) rdebug.MutationResu
     }
 }
 
-/// Emits a `scene.loaded` / `scene.unloaded` notification over the debug server
-/// via the event catalog. `id` is the scene's project-relative path (or empty
-/// for an unsaved scene); the name is its basename. Strings are JSON-escaped so
-/// Windows paths and odd names stay well-formed.
+/// Emits a `scene.loaded` / `scene.unloaded` notification over the debug server.
+/// `id` is the scene's project-relative path, empty when unsaved.
 fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const u8) void {
     const name = if (id.len > 0) std.fs.path.basename(id) else "(unsaved)";
     var buf: [1400]u8 = undefined;
@@ -222,20 +213,15 @@ fn emitSceneEvent(srv: *rdebug.Server, ev: engine.introspect.Event, id: []const 
     srv.emit(ev, w.buffered());
 }
 
-/// Raises the soft stack-size limit toward the hard limit, if there's room —
-/// Linux lets the main thread's stack keep growing on page faults up to
-/// whatever `RLIMIT_STACK` currently is (not just its value at process
-/// start), so this takes effect immediately. Headroom for `SceneNode`'s
-/// ~124 KB size (`engine/scene/SceneNode.zig`) being copied multiple times by
-/// `UndoRedo.pushCommand`'s `modify_object` snapshot, inside dvui's already
-/// non-trivial widget-tree recursion — a debug build's per-frame stack usage
-/// is large enough that this combination can exhaust the default 8 MiB.
 /// Installed as `EditorState.on_redraw_request` so the GUI-free editor session
 /// can keep Studio redrawing while a background job is in flight.
 fn requestRedraw() void {
     gui.refresh(null, @src(), null);
 }
 
+/// Raises the soft stack-size limit toward the hard limit. Copying `SceneNode`
+/// (~124 KB) for undo snapshots inside dvui's widget-tree recursion can exhaust
+/// the default 8 MiB in a debug build.
 fn raiseStackLimit() void {
     if (comptime @import("builtin").os.tag == .windows) return;
     const cur = std.posix.getrlimit(.STACK) catch return;
@@ -362,6 +348,9 @@ fn run(main_init: std.process.Init) !void {
     var cli_project_buf: [1024]u8 = undefined;
     var cli_project_path: ?[]const u8 = null;
     var cli_build = false;
+    var bench_cfg = Benchmark.Config{};
+    var bench_scene_buf: [1024]u8 = undefined;
+    var bench_camera_buf: [256]u8 = undefined;
     {
         var args = try std.process.Args.Iterator.initAllocator(main_init.minimal.args, main_init.gpa);
         defer args.deinit();
@@ -375,8 +364,30 @@ fn run(main_init: std.process.Init) !void {
                 }
             } else if (std.mem.eql(u8, arg, "--build")) {
                 cli_build = true;
+            } else if (std.mem.eql(u8, arg, "--scene")) {
+                if (args.next()) |v| {
+                    const len = @min(v.len, bench_scene_buf.len);
+                    @memcpy(bench_scene_buf[0..len], v[0..len]);
+                    bench_cfg.scene = bench_scene_buf[0..len];
+                }
+            } else if (std.mem.eql(u8, arg, "--camera")) {
+                if (args.next()) |v| {
+                    const len = @min(v.len, bench_camera_buf.len);
+                    @memcpy(bench_camera_buf[0..len], v[0..len]);
+                    bench_cfg.camera = bench_camera_buf[0..len];
+                }
+            } else {
+                _ = Benchmark.parseArg(arg, &args, &bench_cfg);
             }
         }
+    }
+    if (bench_cfg.enabled) {
+        if (cli_project_path == null) {
+            log.err("--benchmark needs --project <path>", .{});
+            return;
+        }
+        Benchmark.configure(bench_cfg, cli_project_path.?);
+        ProfilerPanel.forceRecording(true);
     }
 
     var interrupted = false;
@@ -453,13 +464,15 @@ fn run(main_init: std.process.Init) !void {
         _ = try backend.addAllEvents(&win);
         EditorFrameTiming.markEventsEnd(backend.nanoTime());
 
+        // Must precede the Scene viewport's draw, where `takeOverride` applies it.
+        if (Benchmark.cameraPose()) |bp|
+            EditorCamera.queueOverride(.{ .pos = bp.pos, .yaw = bp.yaw, .pitch = bp.pitch, .fov = bp.fov });
+
         GpuRenderer.beginFrame(backend.cmd);
         PreviewSystem.beginFrame();
 
-        // Whether this frame is the last one. We must still call win.end()
-        // below so the frame's command buffer is submitted — breaking out
-        // early would leave an unsubmitted command buffer (with an acquired
-        // swapchain texture), which leaks GPU resources on shutdown.
+        // Set instead of breaking out: `win.end()` below must still submit the
+        // frame's command buffer, or its swapchain texture leaks on shutdown.
         var quit = false;
 
         if (!project_opened_from_arg) {
@@ -467,6 +480,30 @@ fn run(main_init: std.process.Init) !void {
             EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
             if (cli_project_path) |p| {
                 ProjectOps.openProjectImmediate(p);
+                if (Benchmark.enabled()) {
+                    // Import runs in the background; measuring mid-import
+                    // would time the importer, not the renderer.
+                    EditorState.waitForImport(gui.io);
+                    const scene = Benchmark.config().scene;
+                    if (scene.len > 0) {
+                        var full_buf: [2048]u8 = undefined;
+                        if (std.fmt.bufPrint(&full_buf, "{s}/{s}", .{ p, scene })) |full| {
+                            Documents.openScene(full);
+                        } else |_| log.err("benchmark scene path too long", .{});
+                    }
+                    // Nothing renders unless the Scene panel is its leaf's active tab.
+                    if (!LayoutStore.focusPanelTransient("scene"))
+                        log.err("no Scene panel in the layout — the benchmark will measure an idle editor", .{});
+                    // Uncapped holds the GPU at full load for the whole run, so
+                    // it stays opt-in; a capped run still gives per-pass CPU zones.
+                    const bc = Benchmark.config();
+                    if (bc.uncapped) {
+                        GpuRenderer.requestVsync(false);
+                        win.max_fps = null;
+                    } else if (bc.fps_cap > 0) {
+                        win.max_fps = bc.fps_cap;
+                    }
+                }
                 if (cli_build) {
                     const baked = editor.GameBuild.BuildConfig{
                         .engine_root = build_options.engine_root_path,
@@ -494,11 +531,8 @@ fn run(main_init: std.process.Init) !void {
                     var cfg_arena = std.heap.ArenaAllocator.init(main_init.gpa);
                     defer cfg_arena.deinit();
                     const config = editor.sdk_layout.resolveBuildConfig(gui.io, cfg_arena.allocator(), main_init.environ_map, baked);
-                    // openProject above kicked off asset import and
-                    // script-reflection compile in the background; this CLI
-                    // path needs a fully-cooked cache and populated component
-                    // fields before building, so wait for both here instead
-                    // of racing them.
+                    // Building needs a cooked cache and populated component
+                    // fields, both still in flight after `openProject`.
                     EditorState.waitForImport(gui.io);
                     EditorState.waitForReflect(gui.io);
                     _ = editor.GameBuild.buildGame(
@@ -514,14 +548,9 @@ fn run(main_init: std.process.Init) !void {
             }
         }
 
-        // Auto-detect external asset changes (replaces the manual Refresh
-        // button): poll the assets tree and hot-reload when it changes.
-        // Always poll (keeps its baseline tracking disk state even while
-        // suppressed below) but ignore a detected change while a background
-        // import/reflect job is already in flight — that job is the one
-        // writing the .meta/cache files the poll would otherwise see as an
-        // external edit, and re-entering the synchronous refresh here would
-        // race its own asset_db swap and spawn a redundant reflect compile.
+        // Poll the assets tree and hot-reload on external edits. Changes are
+        // ignored while an import/reflect job runs: that job writes the very
+        // .meta/cache files the poll would read as an external edit.
         const watcher_changed = AssetWatcher.poll(gui.io, nstime);
         if (watcher_changed and EditorState.import_job == null and EditorState.reflect_job == null) {
             EditorState.refreshComponents(gui.io, gui.currentWindow().arena());
@@ -536,10 +565,8 @@ fn run(main_init: std.process.Init) !void {
         var debug_views: [1]engine.introspect.SceneView = undefined;
         debug_srv.pump(studioWorld(&debug_views), studio_applier);
 
-        // Compute a lightweight FPS from the wall-clock frame delta. The engine
-        // profiler only runs in Play mode, so its FPS is 0 while editing; fall
-        // back to this so `fps.changed` and the `metrics` tool stay meaningful
-        // outside Play.
+        // Wall-clock FPS, so `fps.changed` and the `metrics` tool stay
+        // meaningful when the engine profiler isn't recording.
         if (last_frame_ns != 0 and EditorState.debug_metrics.fps == 0) {
             const dt_ns = nstime - last_frame_ns;
             if (dt_ns > 0) {
@@ -561,11 +588,8 @@ fn run(main_init: std.process.Init) !void {
             }
         }
 
-        // Emit scene.loaded / scene.unloaded on scene open/close/switch so LLM
-        // tools can track which scene is live. Polling the live
-        // EditorState here captures every transition regardless of its source
-        // (tab open, new scene, close), without threading the server into
-        // Documents/ProjectOps.
+        // Polling `EditorState` catches every scene transition whatever its
+        // source, without threading the server into Documents/ProjectOps.
         {
             const cur_open = EditorState.scene_open;
             const cur_id: []const u8 = if (EditorState.current_scene_path) |p| p else "";
@@ -582,10 +606,8 @@ fn run(main_init: std.process.Init) !void {
         EditorFrameTiming.markBuildEnd(backend.nanoTime());
         win.endRendering(.{});
         const end_micros = if (do_capture) capture_blk: {
-            // manage_backend = false: we call setCursor/textInputRect/renderPresent
-            // ourselves below, with the capture's blit-to-swapchain + readback
-            // spliced in between backend.end() (already done inside win.end())
-            // and renderPresent (so the window still shows this frame normally).
+            // manage_backend = false so the capture's blit and readback can be
+            // spliced in before `renderPresent`, which still shows this frame.
             const em = try win.end(.{ .manage_backend = false });
             backend.setCursor(win.cursorRequested());
             backend.textInputRect(win.textInputRequested());
@@ -603,14 +625,18 @@ fn run(main_init: std.process.Init) !void {
             break :capture_blk em;
         } else try win.end(.{});
         EditorFrameTiming.endFrame(backend.nanoTime());
+        // After `win.end`, so `Profiler.endFrame` has captured this frame.
+        if (Benchmark.tick(main_init.io)) quit = true;
         if (quit) break :main_loop;
 
         var wait_event_micros = win.waitTime(end_micros);
-        // While a timed capture is pending, don't let the loop sleep until the
-        // next input event — the capture timer only advances when the loop runs.
-        // Cap the wait so an idle window still reaches the capture deadline
-        // (otherwise TURIAN_CAPTURE_AFTER_MS never fires on a quiet screen).
+        // The capture timer only advances when the loop runs, so an idle
+        // window would never reach the deadline.
         if (capture_pending) wait_event_micros = @min(wait_event_micros, 16_000);
+        // An unfocused window receives no input to wake on. A capped run still
+        // needs waking, but paced rather than spinning.
+        if (Benchmark.wantsFrames()) wait_event_micros = 0;
+        if (Benchmark.wantsPacedFrames()) wait_event_micros = @min(wait_event_micros, 16_000);
         interrupted = try backend.waitEventTimeout(wait_event_micros);
     }
 

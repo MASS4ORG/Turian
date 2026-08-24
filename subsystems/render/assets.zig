@@ -12,16 +12,25 @@ const c = gpu.c;
 const page = std.heap.page_allocator;
 const log = std.log.scoped(.render_assets);
 
-pub fn findGpuMesh(guid: []const u8) ?*state.GpuMesh {
-    for (state.meshes[0..state.mesh_count]) |*gm|
-        if (gm.matchesKey(guid)) return gm;
+/// Resolves `guid` through `index` into `entries`, scanning only when the index
+/// overflowed or a hash collision points at the wrong entry.
+fn lookup(comptime T: type, entries: []T, index: *const state.GuidIndex, guid: []const u8) ?*T {
+    if (!index.overflowed) {
+        const i = index.get(guid) orelse return null;
+        if (i < entries.len and entries[i].matchesKey(guid)) return &entries[i];
+    }
+    for (entries) |*e| {
+        if (e.matchesKey(guid)) return e;
+    }
     return null;
 }
 
+pub fn findGpuMesh(guid: []const u8) ?*state.GpuMesh {
+    return lookup(state.GpuMesh, state.meshes[0..state.mesh_count], &state.mesh_index, guid);
+}
+
 pub fn findGpuTexture(guid: []const u8) ?*state.GpuTexture {
-    for (state.textures[0..state.texture_count]) |*gt|
-        if (gt.matchesKey(guid)) return gt;
-    return null;
+    return lookup(state.GpuTexture, state.textures[0..state.texture_count], &state.texture_index, guid);
 }
 
 pub const PickedTexture = struct { tex: *c.SDL_GPUTexture, found: bool };
@@ -61,6 +70,11 @@ pub fn invalidateMaterial(guid: []const u8) void {
         if (e.matchesKey(guid)) {
             state.resolved_material_count -= 1;
             state.resolved_materials[i] = state.resolved_materials[state.resolved_material_count];
+            // The swap moved another entry's index, so rebuild rather than
+            // patch. Invalidation happens on save, not per frame.
+            state.material_index.clear();
+            for (state.resolved_materials[0..state.resolved_material_count], 0..) |*m, j|
+                state.material_index.put(m.key[0..m.key_len], @intCast(j));
             return;
         }
     }
@@ -69,6 +83,7 @@ pub fn invalidateMaterial(guid: []const u8) void {
 /// Drop every cached material resolution (e.g. on project reload).
 pub fn invalidateAllMaterials() void {
     state.resolved_material_count = 0;
+    state.material_index.clear();
 }
 
 /// Resolve a material GUID into scalar values and texture-map GUIDs. Parsed
@@ -81,8 +96,8 @@ pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
         std.mem.eql(u8, mat_guid, state.material_override_key[0..state.material_override_key_len]);
 
     if (!is_override) {
-        for (state.resolved_materials[0..state.resolved_material_count]) |*e|
-            if (e.matchesKey(mat_guid)) return e.value;
+        if (lookup(state.ResolvedMaterialEntry, state.resolved_materials[0..state.resolved_material_count], &state.material_index, mat_guid)) |e|
+            return e.value;
     }
 
     var arena = std.heap.ArenaAllocator.init(page);
@@ -125,10 +140,12 @@ pub fn resolveMaterial(mat_guid: []const u8) types.ResolvedMaterial {
     if (!is_override) {
         state.ensureResolvedMaterialCapacity();
         if (state.resolved_material_count < state.resolved_materials.len) {
-            var e = &state.resolved_materials[state.resolved_material_count];
+            const slot = state.resolved_material_count;
+            var e = &state.resolved_materials[slot];
             state.resolved_material_count += 1;
             e.key_len = setKey(&e.key, mat_guid);
             e.value = out;
+            state.material_index.put(mat_guid, @intCast(slot));
         }
     }
     return out;
@@ -170,9 +187,11 @@ pub fn uploadNewAssets(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, obje
             if (state.mesh_count >= state.meshes.len) continue; // OOM growing the cache
             uploadMesh(cmd, dev, guid) catch {
                 // Register as failed so we don't retry every frame.
-                var gm = &state.meshes[state.mesh_count];
+                const slot = state.mesh_count;
+                var gm = &state.meshes[slot];
                 state.mesh_count += 1;
                 gm.key_len = setKey(&gm.key, guid);
+                state.mesh_index.put(guid, @intCast(slot));
                 gm.idx_count = 0;
                 gm.submeshes = &.{};
             };
@@ -250,7 +269,9 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
             const slot = submeshes[i].material_slot;
             var j = i + 1;
             while (j < submeshes.len and submeshes[j].material_slot == slot) j += 1;
-            groups[gi] = .{ .material_slot = slot, .start = @intCast(i), .count = @intCast(j - i) };
+            var idx_total: u32 = 0;
+            for (submeshes[i..j]) |sm| idx_total += sm.index_count;
+            groups[gi] = .{ .material_slot = slot, .start = @intCast(i), .count = @intCast(j - i), .index_count = idx_total };
             gi += 1;
             i = j;
         }
@@ -366,9 +387,11 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
 
     state.ensureMeshCapacity();
     if (state.mesh_count >= state.meshes.len) return error.MeshCacheFull;
-    var gm = &state.meshes[state.mesh_count];
+    const mesh_slot = state.mesh_count;
+    var gm = &state.meshes[mesh_slot];
     state.mesh_count += 1;
     gm.key_len = setKey(&gm.key, guid);
+    state.mesh_index.put(guid, @intCast(mesh_slot));
     gm.vtx_buf = vtx_buf;
     gm.idx_buf = idx_buf;
     gm.idx_count = @intCast(cpu.indices.len);
@@ -439,9 +462,11 @@ pub fn uploadTexture(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: 
     }
     c.SDL_EndGPUCopyPass(cp);
 
-    var gt = &state.textures[state.texture_count];
+    const tex_slot = state.texture_count;
+    var gt = &state.textures[tex_slot];
     state.texture_count += 1;
     gt.key_len = setKey(&gt.key, guid);
+    state.texture_index.put(guid, @intCast(tex_slot));
     gt.texture = gpu_tex;
     gt.env = null;
     return gpu_tex;
@@ -597,9 +622,11 @@ pub fn uploadEnvironment(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, gu
         }
     }
 
-    var gt = &state.textures[state.texture_count];
+    const tex_slot = state.texture_count;
+    var gt = &state.textures[tex_slot];
     state.texture_count += 1;
     gt.key_len = setKey(&gt.key, guid);
+    state.texture_index.put(guid, @intCast(tex_slot));
     gt.texture = gpu_tex;
     gt.env = env_data;
 }

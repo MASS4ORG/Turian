@@ -376,6 +376,20 @@ pub fn build(b: *std.Build) void {
         const preview_camera_tests = b.addTest(.{ .root_module = preview_camera_test_mod });
         test_step.dependOn(&b.addRunArtifact(preview_camera_tests).step);
 
+        // Headless benchmark harness. Only needs engine + editor, so it tests
+        // standalone like preview_camera_tests above.
+        const benchmark_test_mod = b.createModule(.{
+            .root_source_file = b.path("studio/services/Benchmark.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine_mod },
+                .{ .name = "editor", .module = editor_mod },
+            },
+        });
+        const benchmark_tests = b.addTest(.{ .root_module = benchmark_test_mod });
+        test_step.dependOn(&b.addRunArtifact(benchmark_tests).step);
+
         // UI node-tree -> dvui draw walk. Tested
         // against dvui's own headless `.testing` backend so the composition
         // rule, stable IDs, and image/ninepatch styling run through real

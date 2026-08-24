@@ -378,7 +378,7 @@ pub fn run(
     h: u32,
     settings: PostProcessSettings,
 ) void {
-    var zone = engine.Profiler.zone("render.postprocess");
+    var zone = engine.Profiler.passZone("render.postprocess");
     defer zone.end();
 
     const composite_p = state.post_composite_pipeline orelse return;

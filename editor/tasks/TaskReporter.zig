@@ -25,7 +25,7 @@ fn stderrSink(line: []const u8) void {
 pub fn format(tasks: []const Task, root: Task, now_ms: i64, buf: []u8) []const u8 {
     const roll = task_tree.rollup(tasks, root);
     var detail_buf: [task_tree.DESCRIBE_CAP]u8 = undefined;
-    const detail = task_tree.describe(root, roll, &detail_buf);
+    const detail = task_tree.describe(&root, roll, &detail_buf);
     const pct: u32 = @intFromFloat(@round(std.math.clamp(roll.progress, 0, 1) * 100));
 
     const elapsed = root.elapsedMs(now_ms);

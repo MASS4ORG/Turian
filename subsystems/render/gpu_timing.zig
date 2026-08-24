@@ -24,21 +24,21 @@ fn dispatchAllCascadeCulls(cmd: *c.SDL_GPUCommandBuffer, cascades: [shadow.NUM_C
 
 pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, cascades: [shadow.NUM_CASCADES]shadow.Cascade, objects: []const engine.SceneNode) void {
     if (!state.detailed_gpu_timing) {
-        var z = engine.Profiler.zone("render.shadow");
+        var z = engine.Profiler.passZone("render.shadow");
         defer z.end();
         dispatchAllCascadeCulls(cmd, cascades, objects);
         shadow.renderShadowPass(cmd, cascades, objects);
         return;
     }
     const own = c.SDL_AcquireGPUCommandBuffer(dev) orelse {
-        var z = engine.Profiler.zone("render.shadow");
+        var z = engine.Profiler.passZone("render.shadow");
         defer z.end();
         dispatchAllCascadeCulls(cmd, cascades, objects);
         shadow.renderShadowPass(cmd, cascades, objects);
         return;
     };
     {
-        var z = engine.Profiler.zone("render.shadow");
+        var z = engine.Profiler.passZone("render.shadow");
         defer z.end();
         dispatchAllCascadeCulls(own, cascades, objects);
         shadow.renderShadowPass(own, cascades, objects);
@@ -51,19 +51,19 @@ pub fn runShadowPass(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, cascad
 /// Runs the GPU-driven cull compute phase; fence-waits its own command buffer in detailed mode.
 pub fn runCullPhase(dev: *c.SDL_GPUDevice, cmd: *c.SDL_GPUCommandBuffer, objects: []const engine.SceneNode, frustum: culling.Frustum) void {
     if (!state.detailed_gpu_timing) {
-        var z = engine.Profiler.zone("render.cull");
+        var z = engine.Profiler.passZone("render.cull");
         defer z.end();
         dispatchAll(cmd, objects, frustum);
         return;
     }
     const own = c.SDL_AcquireGPUCommandBuffer(dev) orelse {
-        var z = engine.Profiler.zone("render.cull");
+        var z = engine.Profiler.passZone("render.cull");
         defer z.end();
         dispatchAll(cmd, objects, frustum);
         return;
     };
     {
-        var z = engine.Profiler.zone("render.cull");
+        var z = engine.Profiler.passZone("render.cull");
         defer z.end();
         dispatchAll(own, objects, frustum);
     }

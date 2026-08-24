@@ -368,6 +368,9 @@ pub const MaterialGroup = struct {
     material_slot: i32 = 0,
     start: u32 = 0,
     count: u32 = 0,
+    /// Indices across every submesh in the run, summed at upload. An upper
+    /// bound on what draws, since the GPU cull may zero some instances.
+    index_count: u32 = 0,
 };
 
 pub const GpuMesh = struct {
@@ -455,6 +458,67 @@ pub const ResolvedMaterialEntry = struct {
 pub var resolved_materials: []ResolvedMaterialEntry = &.{};
 pub var resolved_material_count: usize = 0;
 
+/// Open-addressed GUID hash → cache-index map, so the mesh/texture/material
+/// caches resolve a GUID without scanning every entry. Authoritative: a miss
+/// means the GUID is not cached, unless the table has `overflowed`, in which
+/// case lookups fall back to a linear scan.
+pub const GuidIndex = struct {
+    /// Power of two, kept at most half full. Sized past Bistro's 633 textures.
+    pub const CAP: usize = 4096;
+    const EMPTY: u64 = 0;
+
+    hashes: [CAP]u64 = @splat(EMPTY),
+    values: [CAP]u32 = @splat(0),
+    count: usize = 0,
+    /// Set once the table fills; lookups then defer to a scan rather than lie.
+    overflowed: bool = false,
+
+    /// Never returns `EMPTY`, which marks a free slot.
+    fn hash(k: []const u8) u64 {
+        const h = std.hash.Wyhash.hash(0, k);
+        return if (h == EMPTY) 1 else h;
+    }
+
+    pub fn clear(self: *GuidIndex) void {
+        @memset(&self.hashes, EMPTY);
+        self.count = 0;
+        self.overflowed = false;
+    }
+
+    pub fn put(self: *GuidIndex, k: []const u8, value: u32) void {
+        if (self.count * 2 >= CAP) {
+            self.overflowed = true;
+            return;
+        }
+        const h = hash(k);
+        var i = h & (CAP - 1);
+        while (self.hashes[i] != EMPTY) : (i = (i + 1) & (CAP - 1)) {
+            if (self.hashes[i] == h) {
+                self.values[i] = value;
+                return;
+            }
+        }
+        self.hashes[i] = h;
+        self.values[i] = value;
+        self.count += 1;
+    }
+
+    /// The index stored for `k`, or null. Callers must still confirm the entry's
+    /// own key matches, since distinct GUIDs can share a hash.
+    pub fn get(self: *const GuidIndex, k: []const u8) ?u32 {
+        const h = hash(k);
+        var i = h & (CAP - 1);
+        while (self.hashes[i] != EMPTY) : (i = (i + 1) & (CAP - 1)) {
+            if (self.hashes[i] == h) return self.values[i];
+        }
+        return null;
+    }
+};
+
+pub var mesh_index: GuidIndex = .{};
+pub var texture_index: GuidIndex = .{};
+pub var material_index: GuidIndex = .{};
+
 fn growCache(comptime T: type, cur: []T, default_cap: usize) []T {
     var new_cap: usize = if (cur.len == 0) default_cap else cur.len * 2;
     if (new_cap == 0) new_cap = default_cap;
@@ -483,3 +547,46 @@ pub fn ensureResolvedMaterialCapacity() void {
 }
 
 const std = @import("std");
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+const testing = std.testing;
+
+test "GuidIndex round-trips keys and reports absent ones" {
+    var idx: GuidIndex = .{};
+    idx.put("aaaa-bbbb", 7);
+    idx.put("cccc-dddd", 9);
+
+    try testing.expectEqual(@as(?u32, 7), idx.get("aaaa-bbbb"));
+    try testing.expectEqual(@as(?u32, 9), idx.get("cccc-dddd"));
+    try testing.expectEqual(@as(?u32, null), idx.get("never-inserted"));
+}
+
+test "GuidIndex overwrites rather than duplicating a repeated key" {
+    var idx: GuidIndex = .{};
+    idx.put("same", 1);
+    idx.put("same", 2);
+    try testing.expectEqual(@as(?u32, 2), idx.get("same"));
+    try testing.expectEqual(@as(usize, 1), idx.count);
+}
+
+test "GuidIndex clears back to empty" {
+    var idx: GuidIndex = .{};
+    idx.put("x", 3);
+    idx.clear();
+    try testing.expectEqual(@as(?u32, null), idx.get("x"));
+    try testing.expectEqual(@as(usize, 0), idx.count);
+    try testing.expect(!idx.overflowed);
+}
+
+test "GuidIndex flags overflow instead of looping forever when full" {
+    var idx: GuidIndex = .{};
+    var buf: [32]u8 = undefined;
+    for (0..GuidIndex.CAP) |i| {
+        const k = try std.fmt.bufPrint(&buf, "guid-{d}", .{i});
+        idx.put(k, @intCast(i));
+    }
+    try testing.expect(idx.overflowed);
+    // Half the table is the cap, so it stops inserting well before wrapping.
+    try testing.expect(idx.count * 2 <= GuidIndex.CAP);
+}

@@ -12,6 +12,10 @@ pub const MAX_THREADS = 8;
 pub const MAX_ZONES_PER_THREAD = 96;
 /// Max nesting depth of scopes on one thread.
 pub const MAX_DEPTH = 64;
+/// Distinct counter-attributed passes tracked per frame.
+pub const MAX_PASSES = 24;
+/// Max nesting depth of open passes.
+pub const MAX_PASS_DEPTH = 4;
 /// Fixed capacity for a zone / thread name (longer names are truncated).
 pub const NAME_CAP = 48;
 /// Hard cap on the frame-history ring (static storage; ~55 KB/frame). The
@@ -25,6 +29,15 @@ pub var history_limit: usize = 256;
 /// Runtime master switch. Defaults on in Debug, off otherwise so shipped games
 /// pay nothing unless they opt in (`engine.Profiler.enabled = true`).
 pub var enabled: bool = builtin.mode == .Debug;
+
+/// Overrides the host's per-frame choice of `enabled`, letting a release build
+/// or headless run record without the editor's own gating.
+pub var force_enabled: ?bool = null;
+
+/// Resolves `enabled` for this frame. Call before `beginFrame`.
+pub fn resolveEnabled(host_choice: bool) void {
+    enabled = force_enabled orelse host_choice;
+}
 
 /// Monotonic clock source. Set once via `setIo`; without it timestamps read 0
 /// (zones still record, with zero duration — handy in tests).
@@ -72,6 +85,21 @@ pub const Counters = struct {
     material_switches: u32 = 0,
     submeshes_drawn: u32 = 0,
     submeshes_culled: u32 = 0,
+    /// Draw commands the GPU walks from an indirect buffer, including those
+    /// culling marked zero-instance.
+    indirect_commands: u32 = 0,
+};
+
+/// One render pass's share of the frame's counters, so draw calls can be
+/// attributed to the pass that issued them.
+pub const PassCounters = struct {
+    name_buf: [NAME_CAP]u8 = undefined,
+    name_len: u8 = 0,
+    counters: Counters = .{},
+
+    pub fn name(self: *const PassCounters) []const u8 {
+        return self.name_buf[0..self.name_len];
+    }
 };
 
 /// One thread's recorded zones for a captured frame.
@@ -105,11 +133,31 @@ pub const Frame = struct {
     /// when an fps cap or vsync limits the rate. 0 for the first recorded frame.
     period_ns: u64 = 0,
     counters: Counters = .{},
+    /// Per-pass breakdown of `counters`, in the order the passes opened.
+    passes: [MAX_PASSES]PassCounters = @splat(.{}),
+    pass_count: usize = 0,
     threads: [MAX_THREADS]ThreadFrame = @splat(.{}),
     thread_count: usize = 0,
 
     pub fn threadSlice(self: *const Frame) []const ThreadFrame {
         return self.threads[0..self.thread_count];
+    }
+
+    pub fn passSlice(self: *const Frame) []const PassCounters {
+        return self.passes[0..self.pass_count];
+    }
+
+    /// Total time spent in zones named `name`, summed across threads and across
+    /// repeat entries — a zone opened once per viewport reports the frame's
+    /// whole cost, not one viewport's.
+    pub fn zoneTotalNs(self: *const Frame, name: []const u8) u64 {
+        var total: u64 = 0;
+        for (self.threadSlice()) |*t| {
+            for (t.slice()) |*z| {
+                if (std.mem.eql(u8, z.name(), name)) total += z.durationNs();
+            }
+        }
+        return total;
     }
 };
 
@@ -137,10 +185,8 @@ const Track = struct {
 var g_tracks: [MAX_THREADS]Track = undefined;
 var g_track_count: usize = 0;
 
-/// Tiny atomic spinlock guarding one-time per-thread track registration. Held
-/// only on a thread's first zone; the hot path (push/pop) is lock-free since
-/// each thread touches only its own track. Mirrors `editor.TaskManager`'s
-/// spinlock — avoids threading an `Io` through `std.Io.Mutex`.
+/// Guards one-time per-thread track registration. The hot path stays lock-free
+/// because each thread touches only its own track.
 var g_reg_held: std.atomic.Value(bool) = .init(false);
 
 fn regLock() void {
@@ -159,10 +205,8 @@ var g_prev_start_ns: u64 = 0;
 var g_period_ns: u64 = 0;
 var g_capturing: bool = false;
 
-/// Ring of recent captured frames: zones write into the live tracks; `endFrame`
-/// copies into the ring head for the UI to read (chart + timeline scrubbing)
-/// while the next frame records. `g_frame_head` is the next write slot. Only the
-/// first `history_limit` slots are used.
+/// Ring of recent captured frames, readable by the UI while the next frame
+/// records. `g_frame_head` is the next write slot; only `history_limit` are used.
 var g_frames: [MAX_HISTORY]Frame = @splat(.{});
 var g_frame_head: usize = 0;
 var g_frame_count: usize = 0;
@@ -236,6 +280,8 @@ pub fn beginFrame() void {
     g_prev_start_ns = start;
     g_frame_start_ns = start;
     g_counters = .{};
+    g_pass_count = 0;
+    g_pass_depth = 0;
     for (g_tracks[0..g_track_count]) |*t| {
         t.zone_count = 0;
         t.depth = 0;
@@ -254,6 +300,8 @@ pub fn endFrame() void {
     dst.total_ns = end_ns -| g_frame_start_ns;
     dst.period_ns = g_period_ns;
     dst.counters = g_counters;
+    dst.pass_count = g_pass_count;
+    @memcpy(dst.passes[0..g_pass_count], g_passes[0..g_pass_count]);
     dst.thread_count = g_track_count;
 
     for (g_tracks[0..g_track_count], 0..) |*src, i| {
@@ -309,6 +357,17 @@ pub fn writeFrameJson(jw: *std.json.Stringify) !void {
     try jw.write(@as(f64, @floatFromInt(f.period_ns)) / 1_000_000.0);
     try jw.objectField("counters");
     try jw.write(f.counters);
+    try jw.objectField("passes");
+    try jw.beginArray();
+    for (f.passSlice()) |*ps| {
+        try jw.beginObject();
+        try jw.objectField("name");
+        try jw.write(ps.name());
+        try jw.objectField("counters");
+        try jw.write(ps.counters);
+        try jw.endObject();
+    }
+    try jw.endArray();
     try jw.objectField("threads");
     try jw.beginArray();
     for (f.threadSlice()) |*t| {
@@ -340,11 +399,8 @@ fn writeJsonEscaped(w: *std.Io.Writer, s: []const u8) !void {
     };
 }
 
-/// Write the whole history ring as a Chrome/Perfetto **trace event JSON**
-/// (`{"traceEvents":[...]}`) — load it directly in <https://ui.perfetto.dev> or
-/// `chrome://tracing` to analyse zones across frames. Each zone becomes a
-/// complete ("X") event with µs `ts`/`dur`; threads are one Perfetto track each
-///.
+/// Writes the history ring as Chrome/Perfetto trace-event JSON, loadable at
+/// <https://ui.perfetto.dev>. Each zone becomes an "X" event; each thread a track.
 pub fn writeChromeTrace(w: *std.Io.Writer) !void {
     try w.writeAll("{\"traceEvents\":[");
     var first = true;
@@ -384,9 +440,12 @@ pub fn writeChromeTrace(w: *std.Io.Writer) !void {
 /// RAII scope handle. `defer scope.end()` closes the zone.
 pub const Scope = struct {
     active: bool = false,
+    /// Whether the scope also owns an open pass.
+    owns_pass: bool = false,
 
     pub fn end(self: *Scope) void {
         if (self.active) {
+            if (self.owns_pass) endPass();
             endZone();
             self.active = false;
         }
@@ -398,6 +457,15 @@ pub fn zone(name: []const u8) Scope {
     if (!enabled or !g_capturing) return .{};
     beginZone(name);
     return .{ .active = true };
+}
+
+/// Opens a scoped zone that also attributes render counters to itself, so
+/// `name` labels both a timeline lane and a counter row.
+pub fn passZone(name: []const u8) Scope {
+    if (!enabled or !g_capturing) return .{};
+    beginZone(name);
+    beginPass(name);
+    return .{ .active = true, .owns_pass = true };
 }
 
 /// Manually open a zone. Must be balanced by `endZone` on the same thread.
@@ -442,6 +510,51 @@ pub fn endZone() void {
 // ── Counters ─────────────────────────────────────────────────────────────────
 
 var g_counters: Counters = .{};
+var g_passes: [MAX_PASSES]PassCounters = @splat(.{});
+var g_pass_count: usize = 0;
+var g_pass_stack: [MAX_PASS_DEPTH]usize = @splat(0);
+var g_pass_depth: usize = 0;
+
+/// The open pass's counters, or null outside any pass.
+fn currentPass() ?*Counters {
+    if (g_pass_depth == 0) return null;
+    return &g_passes[g_pass_stack[g_pass_depth - 1]].counters;
+}
+
+/// Opens a counter-attributed pass, reusing `name`'s existing row so a pass
+/// entered twice in one frame accumulates rather than splitting.
+pub fn beginPass(name: []const u8) void {
+    if (!enabled or !g_capturing) return;
+    if (g_pass_depth >= MAX_PASS_DEPTH) {
+        g_pass_depth += 1;
+        return;
+    }
+    for (g_passes[0..g_pass_count], 0..) |*e, i| {
+        if (std.mem.eql(u8, e.name(), name)) {
+            g_pass_stack[g_pass_depth] = i;
+            g_pass_depth += 1;
+            return;
+        }
+    }
+    if (g_pass_count >= MAX_PASSES) {
+        g_pass_depth += 1;
+        return;
+    }
+    const idx = g_pass_count;
+    g_pass_count += 1;
+    var e = &g_passes[idx];
+    e.counters = .{};
+    setName(&e.name_buf, &e.name_len, name);
+    g_pass_stack[g_pass_depth] = idx;
+    g_pass_depth += 1;
+}
+
+/// Closes the innermost open pass.
+pub fn endPass() void {
+    if (!enabled or !g_capturing) return;
+    if (g_pass_depth == 0) return;
+    g_pass_depth -= 1;
+}
 
 /// Record one draw call and its primitive load. `textured` marks draws that
 /// bound a texture (for the texture-bind counter).
@@ -451,30 +564,47 @@ pub fn countDraw(triangles: u32, vertices: u32, textured: bool) void {
     g_counters.triangles += triangles;
     g_counters.vertices += vertices;
     if (textured) g_counters.texture_binds += 1;
+    if (currentPass()) |p| {
+        p.draw_calls += 1;
+        p.triangles += triangles;
+        p.vertices += vertices;
+        if (textured) p.texture_binds += 1;
+    }
+}
+
+/// Records `n` draw commands issued from an indirect buffer.
+pub fn countIndirectCommands(n: u32) void {
+    if (!enabled or !g_capturing) return;
+    g_counters.indirect_commands += n;
+    if (currentPass()) |p| p.indirect_commands += n;
 }
 
 /// Record a GPU material/pipeline switch.
 pub fn countMaterialSwitch() void {
     if (!enabled or !g_capturing) return;
     g_counters.material_switches += 1;
+    if (currentPass()) |p| p.material_switches += 1;
 }
 
 /// Record `n` newly created GPU textures this frame.
 pub fn countTexturesCreated(n: u32) void {
     if (!enabled or !g_capturing) return;
     g_counters.textures_created += n;
+    if (currentPass()) |p| p.textures_created += n;
 }
 
 /// Record `n` submeshes that passed frustum culling and were drawn.
 pub fn countSubmeshesDrawn(n: u32) void {
     if (!enabled or !g_capturing) return;
     g_counters.submeshes_drawn += n;
+    if (currentPass()) |p| p.submeshes_drawn += n;
 }
 
 /// Record `n` submeshes skipped by frustum culling (outside the camera view).
 pub fn countSubmeshesCulled(n: u32) void {
     if (!enabled or !g_capturing) return;
     g_counters.submeshes_culled += n;
+    if (currentPass()) |p| p.submeshes_culled += n;
 }
 
 /// Live counters for the in-progress frame (the captured snapshot lags by one
@@ -496,6 +626,9 @@ fn resetForTest() void {
     g_period_ns = 0;
     g_capturing = false;
     g_counters = .{};
+    g_pass_count = 0;
+    g_pass_depth = 0;
+    force_enabled = null;
     g_frame_head = 0;
     g_frame_count = 0;
     g_empty = .{};
@@ -617,6 +750,186 @@ test "counters accumulate within a frame and reset across frames" {
     c = captured().counters;
     try testing.expectEqual(@as(u32, 1), c.draw_calls);
     try testing.expectEqual(@as(u32, 3), c.vertices);
+}
+
+test "pass zones attribute counters to the pass that issued them" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    {
+        var pre = passZone("render.prepass");
+        defer pre.end();
+        countDraw(10, 30, true);
+    }
+    {
+        var main = passZone("render.main");
+        defer main.end();
+        countDraw(1, 3, true);
+        countIndirectCommands(200);
+    }
+    countDraw(5, 15, false);
+    endFrame();
+
+    const f = captured();
+    try testing.expectEqual(@as(u32, 3), f.counters.draw_calls);
+    try testing.expectEqual(@as(u32, 200), f.counters.indirect_commands);
+
+    const passes = f.passSlice();
+    try testing.expectEqual(@as(usize, 2), passes.len);
+    try testing.expectEqualStrings("render.prepass", passes[0].name());
+    try testing.expectEqual(@as(u32, 1), passes[0].counters.draw_calls);
+    try testing.expectEqual(@as(u32, 10), passes[0].counters.triangles);
+    try testing.expectEqual(@as(u32, 0), passes[0].counters.indirect_commands);
+    try testing.expectEqualStrings("render.main", passes[1].name());
+    try testing.expectEqual(@as(u32, 1), passes[1].counters.draw_calls);
+    try testing.expectEqual(@as(u32, 200), passes[1].counters.indirect_commands);
+}
+
+test "reopening a pass in the same frame accumulates into one row" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    for (0..2) |_| {
+        var z = passZone("render.main");
+        defer z.end();
+        countDraw(4, 12, true);
+    }
+    endFrame();
+
+    const passes = captured().passSlice();
+    try testing.expectEqual(@as(usize, 1), passes.len);
+    try testing.expectEqual(@as(u32, 2), passes[0].counters.draw_calls);
+    try testing.expectEqual(@as(u32, 8), passes[0].counters.triangles);
+}
+
+test "a nested pass attributes to itself and restores its parent" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    {
+        var outer = passZone("render.scene");
+        defer outer.end();
+        countDraw(1, 3, false);
+        {
+            var inner = passZone("render.shadow");
+            defer inner.end();
+            countDraw(2, 6, false);
+        }
+        countDraw(4, 12, false);
+    }
+    endFrame();
+
+    const passes = captured().passSlice();
+    try testing.expectEqual(@as(usize, 2), passes.len);
+    // The outer pass gets its own two draws, not the inner one's.
+    try testing.expectEqual(@as(u32, 2), passes[0].counters.draw_calls);
+    try testing.expectEqual(@as(u32, 5), passes[0].counters.triangles);
+    try testing.expectEqual(@as(u32, 1), passes[1].counters.draw_calls);
+    try testing.expectEqual(@as(u32, 2), passes[1].counters.triangles);
+}
+
+test "pass rows reset across frames" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    {
+        var z = passZone("render.main");
+        defer z.end();
+        countDraw(1, 3, false);
+    }
+    endFrame();
+
+    beginFrame();
+    {
+        var z = passZone("render.prepass");
+        defer z.end();
+        countDraw(7, 21, false);
+    }
+    endFrame();
+
+    const passes = captured().passSlice();
+    try testing.expectEqual(@as(usize, 1), passes.len);
+    try testing.expectEqualStrings("render.prepass", passes[0].name());
+    try testing.expectEqual(@as(u32, 7), passes[0].counters.triangles);
+}
+
+test "force_enabled overrides the host's per-frame choice" {
+    resetForTest();
+    defer resetForTest();
+
+    resolveEnabled(false);
+    try testing.expect(!enabled);
+
+    force_enabled = true;
+    resolveEnabled(false);
+    try testing.expect(enabled);
+
+    force_enabled = false;
+    resolveEnabled(true);
+    try testing.expect(!enabled);
+}
+
+test "zoneTotalNs sums repeat entries and ignores other zones" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    // Two viewports each render a scene in one editor frame.
+    for (0..2) |_| {
+        var z = zone("render.scene");
+        defer z.end();
+    }
+    {
+        var z = zone("studio.ui");
+        defer z.end();
+    }
+    endFrame();
+
+    const f = captured();
+    // Without a clock the durations are zero, so assert on what was matched.
+    var scene_zones: usize = 0;
+    for (f.threads[0].slice()) |*z| {
+        if (std.mem.eql(u8, z.name(), "render.scene")) scene_zones += 1;
+    }
+    try testing.expectEqual(@as(usize, 2), scene_zones);
+    try testing.expectEqual(@as(u64, 0), f.zoneTotalNs("render.scene"));
+    try testing.expectEqual(@as(u64, 0), f.zoneTotalNs("never.recorded"));
+}
+
+test "zoneTotalNs adds up recorded durations" {
+    enabled = true;
+    resetForTest();
+    defer resetForTest();
+
+    beginFrame();
+    endFrame();
+
+    // Write durations directly: the test clock is absent, so zones record zero.
+    var f = &g_frames[0];
+    f.thread_count = 1;
+    f.threads[0].zone_count = 3;
+    for ([_]struct { n: []const u8, d: u64 }{
+        .{ .n = "render.scene", .d = 4_000_000 },
+        .{ .n = "render.postprocess", .d = 500_000 },
+        .{ .n = "render.scene", .d = 1_000_000 },
+    }, 0..) |e, i| {
+        var z = &f.threads[0].zones[i];
+        setName(&z.name_buf, &z.name_len, e.n);
+        z.start_ns = 0;
+        z.end_ns = e.d;
+    }
+
+    try testing.expectEqual(@as(u64, 5_000_000), f.zoneTotalNs("render.scene"));
+    try testing.expectEqual(@as(u64, 500_000), f.zoneTotalNs("render.postprocess"));
 }
 
 test "disabled profiler records nothing" {

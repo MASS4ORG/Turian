@@ -122,23 +122,28 @@ pub fn activeRoots(tasks: []const Task) usize {
 pub const DESCRIBE_CAP = task_mod.MAX_LABEL + task_mod.MAX_NOTE + 48;
 
 /// One-line description of a root: its label plus the most specific detail
-/// available — the running child's label, an item count, or the raw note.
-/// Writes into `buf`; falls back to the bare label if formatting overflows.
-pub fn describe(task: Task, roll: Rollup, buf: []u8) []const u8 {
-    if (roll.active_child) |c| {
-        const detail = if (c.units_total > 0)
-            std.fmt.bufPrint(buf, "{s} — {s} ({d}/{d})", .{ task.label(), c.label(), c.units_done, c.units_total })
-        else
-            std.fmt.bufPrint(buf, "{s} — {s}", .{ task.label(), c.label() });
-        return detail catch task.label();
-    }
-    if (task.units_total > 0) {
-        return std.fmt.bufPrint(buf, "{s} ({d}/{d})", .{ task.label(), task.units_done, task.units_total }) catch task.label();
-    }
-    if (task.note().len > 0) {
-        return std.fmt.bufPrint(buf, "{s}: {s}", .{ task.label(), task.note() }) catch task.label();
-    }
-    return task.label();
+/// available — the running child's label, an item count, or the raw note. The
+/// result always points into `buf`, never into `task`, so it stays valid for as
+/// long as the caller's buffer does.
+pub fn describe(task: *const Task, roll: Rollup, buf: []u8) []const u8 {
+    const written = blk: {
+        if (roll.active_child) |c| {
+            break :blk if (c.units_total > 0)
+                std.fmt.bufPrint(buf, "{s} — {s} ({d}/{d})", .{ task.label(), c.label(), c.units_done, c.units_total })
+            else
+                std.fmt.bufPrint(buf, "{s} — {s}", .{ task.label(), c.label() });
+        }
+        if (task.units_total > 0)
+            break :blk std.fmt.bufPrint(buf, "{s} ({d}/{d})", .{ task.label(), task.units_done, task.units_total });
+        if (task.note().len > 0)
+            break :blk std.fmt.bufPrint(buf, "{s}: {s}", .{ task.label(), task.note() });
+        break :blk std.fmt.bufPrint(buf, "{s}", .{task.label()});
+    };
+    return written catch fallback: {
+        const n = @min(task.label().len, buf.len);
+        @memcpy(buf[0..n], task.label()[0..n]);
+        break :fallback buf[0..n];
+    };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -276,17 +281,39 @@ test "describe prefers the running child, then units, then the note" {
     const with_child = [_]Task{ root, child };
     try std.testing.expectEqualStrings(
         "Import assets — Textures (3/9)",
-        describe(root, rollup(&with_child, root), &buf),
+        describe(&root, rollup(&with_child, root), &buf),
     );
 
     root.units_done = 12;
     root.units_total = 40;
     const alone = [_]Task{root};
-    try std.testing.expectEqualStrings("Import assets (12/40)", describe(root, rollup(&alone, root), &buf));
+    try std.testing.expectEqualStrings("Import assets (12/40)", describe(&root, rollup(&alone, root), &buf));
 
     root.units_total = 0;
     @memcpy(root.note_buf[0..5], "brick");
     root.note_len = 5;
     const noted = [_]Task{root};
-    try std.testing.expectEqualStrings("Import assets: brick", describe(root, rollup(&noted, root), &buf));
+    try std.testing.expectEqualStrings("Import assets: brick", describe(&root, rollup(&noted, root), &buf));
+}
+
+test "describe writes into the caller's buffer, never aliasing the task" {
+    // A result aliasing `task` dangles the moment a by-value copy goes out of
+    // scope, which renders as poison bytes rather than text.
+    const root = mk(1, 0, .blocked, 0, 1, "Compile scripts");
+    var buf: [DESCRIBE_CAP]u8 = undefined;
+    const out = describe(&root, rollup(&.{root}, root), &buf);
+
+    try std.testing.expectEqualStrings("Compile scripts", out);
+    try std.testing.expectEqual(@intFromPtr(&buf), @intFromPtr(out.ptr));
+}
+
+test "describe truncates into the buffer rather than falling back to the label" {
+    var long = mk(1, 0, .running, 0, 1, "Import assets");
+    long.units_done = 12;
+    long.units_total = 40;
+    var tiny: [8]u8 = undefined;
+    const out = describe(&long, rollup(&.{long}, long), &tiny);
+
+    try std.testing.expectEqual(@intFromPtr(&tiny), @intFromPtr(out.ptr));
+    try std.testing.expectEqualStrings("Import a", out);
 }

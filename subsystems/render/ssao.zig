@@ -136,7 +136,7 @@ pub fn run(
     const normal_tex = prepass_target.normal orelse return null;
     const target = targetFor(dev, w, h) orelse return null;
 
-    var zone = engine.Profiler.zone("render.ssao");
+    var zone = engine.Profiler.passZone("render.ssao");
     defer zone.end();
 
     const ub = types.SsaoUB{
