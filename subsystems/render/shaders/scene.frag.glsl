@@ -41,6 +41,8 @@ struct Light {
 };
 
 // SDL3GPU SPIR-V fragment uniforms: set=3, binding=slot_index.
+// Per-draw values only — anything frame-constant lives in FrameFragUB
+// (binding=1) instead, pushed once per pass rather than once per draw.
 layout(set = 3, binding = 0) uniform FragUB {
     vec4 camera_pos;      // xyz, w = light_count
     vec4 base_color;      // rgba
@@ -50,12 +52,18 @@ layout(set = 3, binding = 0) uniform FragUB {
     vec4 flags2;          // x=has_occlusion, y=alpha_cutoff, z=alpha_mask_on, w=shadows_enabled
     vec4 env_params;      // x=intensity, y=mip_count, z=has_env, w unused
     vec4 cam_forward;     // xyz camera forward (world space); picks the shadow cascade
+    vec4 probe_params;        // x=resolved reflection-probe weight, y=probe mip_count, zw unused
+} ubo;
+
+// Frame-constant fragment uniforms, pushed once per render pass (see
+// draw.pushFrameUniforms) instead of per draw — mirrors how scene lights
+// live in a storage buffer bound once per pass rather than the per-draw UBO.
+layout(set = 3, binding = 1) uniform FrameFragUB {
     vec4 env_sh[9];       // diffuse irradiance SH coefficients (rgb in xyz)
     mat4 cascade_vp[NUM_CASCADES]; // per-cascade shadow light view-projection
     vec4 cascade_splits;      // per-cascade far distance along cam_forward (world units)
     vec4 cascade_depth_scale; // per-cascade 1/(ortho far-near); converts a world-unit bias to NDC depth
-    vec4 probe_params;        // x=resolved reflection-probe weight, y=probe mip_count, zw unused
-} ubo;
+} frame_ubo;
 
 // Scene lights. Storage buffer (not a fixed uniform array) so the light count is
 // bounded only by GPU memory, not a per-draw uniform size. SDL3 SPIR-V places
@@ -154,11 +162,15 @@ vec2 envBRDFApprox(float roughness, float ndv) {
 // Samples one cascade's shadow-atlas strip at `in_world_pos`, 1 = lit. Returns
 // 1.0 outside this cascade's own frustum, so a boundary blend can lean on it.
 float sampleCascade(int cascade, float bias_world) {
-    vec4 lp = ubo.cascade_vp[cascade] * vec4(in_world_pos, 1.0);
+    vec4 lp = frame_ubo.cascade_vp[cascade] * vec4(in_world_pos, 1.0);
     // Same Z remap shadow.vert applies before depth write (see scene.vert.glsl).
     lp.z = (lp.z + lp.w) * 0.5;
     vec3 proj = lp.xyz / lp.w;
     vec2 uv = proj.xy * 0.5 + 0.5;
+    // Same V flip as ssao.frag.glsl/ssr.frag.glsl: a render target's texel
+    // row 0 is the top, so a UV recomputed from a projection matrix must
+    // invert V or it reads the atlas mirrored inside the cascade strip.
+    uv.y = 1.0 - uv.y;
 
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || proj.z > 1.0)
         return 1.0;
@@ -167,7 +179,7 @@ float sampleCascade(int cascade, float bias_world) {
     // converted to this cascade's NDC depth range — cascades span wildly
     // different world extents, so a single NDC bias either acnes the near
     // cascade or peter-pans the far one.
-    float bias = ubo.cascade_depth_scale[cascade] * bias_world;
+    float bias = frame_ubo.cascade_depth_scale[cascade] * bias_world;
     float depth = proj.z - bias;
 
     // Remap into this cascade's strip of the atlas; PCF taps are clamped to
@@ -199,7 +211,7 @@ float shadowFactor(float ndl) {
     float cam_dist = dot(in_world_pos - ubo.camera_pos.xyz, ubo.cam_forward.xyz);
     int cascade = NUM_CASCADES - 1;
     for (int i = 0; i < NUM_CASCADES - 1; i++) {
-        if (cam_dist < ubo.cascade_splits[i]) {
+        if (cam_dist < frame_ubo.cascade_splits[i]) {
             cascade = i;
             break;
         }
@@ -209,8 +221,8 @@ float shadowFactor(float ndl) {
     float s = sampleCascade(cascade, bias_world);
 
     if (cascade < NUM_CASCADES - 1) {
-        float far_split = ubo.cascade_splits[cascade];
-        float near_split = cascade == 0 ? 0.0 : ubo.cascade_splits[cascade - 1];
+        float far_split = frame_ubo.cascade_splits[cascade];
+        float near_split = cascade == 0 ? 0.0 : frame_ubo.cascade_splits[cascade - 1];
         float margin = max(far_split - near_split, 1e-3) * 0.1;
         float dist_to_far = far_split - cam_dist;
         if (dist_to_far < margin) {
@@ -314,7 +326,7 @@ void main() {
         float intensity = ubo.env_params.x;
         float max_lod = max(ubo.env_params.y - 1.0, 0.0);
 
-        vec3 irradiance = evalSH(N, ubo.env_sh) * intensity;
+        vec3 irradiance = evalSH(N, frame_ubo.env_sh) * intensity;
         vec3 diffuse_ibl = irradiance * albedo / PI * (1.0 - metallic);
 
         vec3 R = reflect(-V, N);

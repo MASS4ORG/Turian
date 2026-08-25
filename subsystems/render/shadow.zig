@@ -73,11 +73,18 @@ pub fn sceneBounds(objects: []const engine.SceneNode) Bounds {
     return .{ .center = center, .radius = radius };
 }
 
+/// Floor for the near distance the split scheme is given. A camera near plane
+/// of a centimetre or two makes `(far/near)^p` explode, which drives every
+/// logarithmic split below the first metre and leaves the uniform term to pick
+/// the splits on its own — so the near cascades end up covering tens of metres.
+const SPLIT_NEAR_MIN: f32 = 0.5;
+
 /// Practical split scheme (Zhang et al.): blends logarithmic and uniform
 /// splits so near cascades stay tight (log) while far ones don't shrink to
-/// nothing (uniform). `lambda = 0.5` is the usual middle ground.
+/// nothing (uniform). Weighted toward the logarithmic term, which is what keeps
+/// the first cascade small enough to spend its texels on near-field detail.
 fn splitDistances(near: f32, far: f32) [NUM_CASCADES]f32 {
-    const lambda: f32 = 0.5;
+    const lambda: f32 = 0.85;
     var splits: [NUM_CASCADES]f32 = undefined;
     for (0..NUM_CASCADES) |i| {
         const p = @as(f32, @floatFromInt(i + 1)) / @as(f32, @floatFromInt(NUM_CASCADES));
@@ -111,11 +118,17 @@ fn frustumCorners(inv_view: Matrix4, fov_deg: f32, aspect: f32, near_d: f32, far
 
 const FittedCascade = struct { vp: Matrix4, depth_scale: f32 };
 
+/// Depth of `p` along the light axis measured from `eye` — the coordinate the
+/// fitted orthographic frustum's near and far planes are expressed in.
+fn depthAlong(p: Vector3, eye: Vector3, dir: Vector3) f32 {
+    return (p.x - eye.x) * dir.x + (p.y - eye.y) * dir.y + (p.z - eye.z) * dir.z;
+}
+
 /// Fits one cascade's orthographic light frustum to `corners` (that cascade's
 /// camera sub-frustum corners, in world space). Uses a bounding sphere, not a
 /// tight AABB, so frustum size depends only on the sub-frustum's shape, not
 /// camera yaw — an AABB would resize and visibly shimmer as the camera turns.
-fn fitCascade(corners: [8]Vector3, dir: Vector3, up: Vector3, view0: Matrix4, inv_view0: Matrix4) FittedCascade {
+fn fitCascade(corners: [8]Vector3, dir: Vector3, up: Vector3, view0: Matrix4, inv_view0: Matrix4, bounds: Bounds) FittedCascade {
     var center = Vector3{ .x = 0, .y = 0, .z = 0 };
     for (corners) |p| {
         center.x += p.x;
@@ -152,7 +165,13 @@ fn fitCascade(corners: [8]Vector3, dir: Vector3, up: Vector3, view0: Matrix4, in
         .z = snapped_center.z - dir.z * radius * 2.0,
     };
     const view = Matrix4.lookAt(eye, snapped_center, up);
-    const near_p: f32 = 0.01;
+    // Occluders standing between the light and this cascade still have to reach
+    // the depth pass, so the near plane retreats far enough to clear the whole
+    // scene along the light axis instead of sitting just in front of the eye. A
+    // fixed near clips a caster taller than the cascade's own sphere — and culls
+    // it too, since `gpu_cull` takes its planes from this same matrix. An
+    // orthographic frustum accepts the resulting negative near.
+    const near_p = @min(0.01, depthAlong(bounds.center, eye, dir) - bounds.radius);
     const far_p = radius * 4.0 + 1.0;
     const ortho = Matrix4.orthographic(-radius, radius, -radius, radius, near_p, far_p);
     return .{ .vp = ortho.multiply(view), .depth_scale = 1.0 / (far_p - near_p) };
@@ -179,7 +198,7 @@ pub fn computeCascades(
     const inv_view0 = view0.inverse();
 
     const shadow_far = @max(@min(cam_far, bounds.radius * 2.0), cam_near + 1.0);
-    const splits = splitDistances(cam_near, shadow_far);
+    const splits = splitDistances(@max(cam_near, SPLIT_NEAR_MIN), shadow_far);
     const inv_view = cam_view.inverse();
 
     var out: [NUM_CASCADES]Cascade = undefined;
@@ -187,7 +206,7 @@ pub fn computeCascades(
     for (0..NUM_CASCADES) |i| {
         const far_d = splits[i];
         const corners = frustumCorners(inv_view, fov_deg, aspect, near_d, far_d);
-        const fitted = fitCascade(corners, d, up, view0, inv_view0);
+        const fitted = fitCascade(corners, d, up, view0, inv_view0, bounds);
         out[i] = .{ .vp = fitted.vp, .far_distance = far_d, .depth_scale = fitted.depth_scale };
         near_d = far_d;
     }
@@ -344,6 +363,65 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Ca
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+/// A camera looking horizontally from `pos` at `yaw` degrees, matching how
+/// `root.zig` builds the view matrix from a node's Euler rotation.
+fn testView(pos: Vector3, yaw_deg: f32) Matrix4 {
+    const fwd = Matrix4.rotationEuler(0, yaw_deg, 0).transformDirection(.{ .x = 0, .y = 0, .z = 1 });
+    const target = Vector3{ .x = pos.x + fwd.x, .y = pos.y + fwd.y, .z = pos.z + fwd.z };
+    return Matrix4.lookAt(pos, target, .{ .x = 0, .y = 1, .z = 0 });
+}
+
+/// A cascade's world-space half-extent across the light axis, recovered from
+/// the length of its view-projection's first row — `vp` is an orthographic
+/// projection times an orthonormal view, so that length is exactly `1/radius`.
+fn cascadeRadius(vp: Matrix4) f32 {
+    const x = vp.m[0];
+    const y = vp.m[4];
+    const z = vp.m[8];
+    return 1.0 / @sqrt(x * x + y * y + z * z);
+}
+
+const test_sun = Vector3{ .x = -0.354, .y = -0.707, .z = -0.612 };
+const test_bounds = Bounds{ .center = .{ .x = 0, .y = 8, .z = 0 }, .radius = 40 };
+
+test "cascade footprint does not change as the camera turns" {
+    // The sphere fit exists so the map's footprint depends on the sub-frustum's
+    // shape alone; an AABB fit would resize with yaw and make edges shimmer.
+    const base = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, 0), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+    for ([_]f32{ 37, 90, 211, 315 }) |yaw| {
+        const turned = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, yaw), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+        for (base, turned) |b, t| {
+            try std.testing.expectApproxEqRel(cascadeRadius(b.vp), cascadeRadius(t.vp), 1e-4);
+            try std.testing.expectApproxEqRel(b.far_distance, t.far_distance, 1e-5);
+        }
+    }
+}
+
+test "a caster far above a cascade still lies inside its clip volume" {
+    // A building standing outside a near cascade's own sphere must still reach
+    // the depth pass, or the ground below it is lit through the wall.
+    const cascades = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, 0), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+    const roof = Vector3{ .x = 0, .y = 20, .z = 6 };
+    for (cascades) |cs| {
+        const clip = cs.vp.transformPoint(roof);
+        try std.testing.expect(clip.z >= -1.0);
+        try std.testing.expect(clip.z <= 1.0);
+    }
+}
+
+test "splits stay ordered and keep the first cascade tight" {
+    // A camera near plane of 0.01 collapses the log term, which used to leave
+    // the uniform split alone to size cascade 0 at a quarter of the whole range.
+    const cascades = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, 0), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+    var prev: f32 = 0;
+    for (cascades) |cs| {
+        try std.testing.expect(cs.far_distance > prev);
+        prev = cs.far_distance;
+    }
+    const shadow_far = cascades[NUM_CASCADES - 1].far_distance;
+    try std.testing.expect(cascades[0].far_distance < shadow_far * 0.12);
+}
 
 test "opaque materials occlude solidly" {
     try std.testing.expectEqual(Occlusion.solid, occlusionFor(.{}));

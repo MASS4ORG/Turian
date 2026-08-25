@@ -613,6 +613,11 @@ pub fn renderScene(
     if (state.lights_buf) |lb|
         c.SDL_BindGPUFragmentStorageBuffers(pass, 0, &[_]?*c.SDL_GPUBuffer{lb}, 1);
 
+    // Frame-constant fragment uniforms (shadow cascades, SH irradiance) —
+    // pushed once for the whole pass, not per draw. Covers both the opaque
+    // loop below and submitTransparent, which share this pass.
+    draw.pushFrameUniforms(cmd, fu);
+
     var bind_state = draw.BindState{};
     draw.transparent_count = 0;
 

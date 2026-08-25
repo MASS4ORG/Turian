@@ -198,6 +198,11 @@ fn captureFace(
         .cascade_splits = .{ 0, 0, 0, 0 },
         .cascade_depth_scale = .{ 0, 0, 0, 0 },
     };
+    // Every scene pipeline now declares 2 fragment uniform buffers; this pass
+    // must push both even though probe capture has no shadows (cascade_vp is
+    // zeroed above) — an unbound slot 1 would be a read into stale/undefined
+    // GPU state.
+    draw.pushFrameUniforms(cmd, fu);
     const dctx = draw.DrawCtx{
         .shadow_tex = shadow_tex,
         .shadow_smp = shadow_smp,

@@ -265,7 +265,8 @@ pub fn createScenePipeline(dev: *c.SDL_GPUDevice, key: state.ScenePipelineState)
         .num_storage_textures = 0,
         // The scene lights storage buffer (set=2, binding=10, after the 10 samplers).
         .num_storage_buffers = 1,
-        .num_uniform_buffers = 1,
+        // FragUB (per-draw, slot 0) + FrameFragUB (per-pass, slot 1).
+        .num_uniform_buffers = 2,
         .props = 0,
     }) orelse return error.FragShader;
     defer c.SDL_ReleaseGPUShader(dev, frag);

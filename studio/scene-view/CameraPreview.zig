@@ -14,9 +14,12 @@ const PREVIEW_H: f32 = 180;
 const MARGIN: f32 = 12;
 /// A full scene render (shadows, SSR, reflection probes, post-process) is
 /// resolution-independent in CPU cost, so re-rendering this 320x180 inset
-/// every frame would roughly double edit-mode's per-frame cost. Throttling
-/// keeps it a framing aid instead of a second full viewport.
-const REFRESH_NS: i128 = 100 * std.time.ns_per_ms;
+/// every frame would roughly double edit-mode's per-frame cost. Rendering is
+/// driven primarily by `stale` (the previewed camera's own selection/
+/// transform/fov changing); this is only a safety-net cadence for scene
+/// edits elsewhere the previewed camera can't detect on its own (no
+/// scene-wide edit-revision counter exists to do that precisely).
+pub var fallback_refresh_ns: i128 = 1000 * std.time.ns_per_ms;
 
 var g_last_render_ns: i128 = 0;
 var g_last_idx: ?usize = null;
@@ -77,7 +80,7 @@ pub fn draw() void {
     const now = gui.frameTimeNS();
     const idx_changed = if (g_last_idx) |li| li != idx else true;
     const stale = idx_changed or !std.meta.eql(g_last_transform, obj.transform) or g_last_fov != cam.fov;
-    const target = if (stale or now - g_last_render_ns >= REFRESH_NS) blk: {
+    const target = if (stale or now - g_last_render_ns >= fallback_refresh_ns) blk: {
         g_last_idx = idx;
         g_last_transform = obj.transform;
         g_last_fov = cam.fov;

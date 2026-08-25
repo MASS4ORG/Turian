@@ -73,10 +73,12 @@ pub const GpuLight = extern struct {
     cone: [4]f32 = .{ -1, 1, 0, 0 }, // cos(outer), cos(inner)
 };
 
-/// Fragment uniforms — layout must match FragUB in scene.frag.glsl exactly.
-/// All members are vec4 (or vec4 arrays) to keep std140 16-byte alignment trivial.
-/// Scene lights are NOT here — they live in a separate storage buffer bound once
-/// per frame (see `state.lights_buf`), so this stays small per draw.
+/// Per-draw fragment uniforms — layout must match FragUB in scene.frag.glsl
+/// exactly. All members are vec4 (or vec4 arrays) to keep std140 16-byte
+/// alignment trivial. Scene lights are NOT here — they live in a separate
+/// storage buffer bound once per pass (see `state.lights_buf`); frame-constant
+/// values (SH irradiance, shadow cascades) are NOT here either — they live in
+/// `FrameFragUB`, pushed once per pass — so this stays small per draw.
 pub const FragUB = extern struct {
     camera_pos: [4]f32, // xyz, w = light_count
     base_color: [4]f32, // rgba
@@ -86,13 +88,19 @@ pub const FragUB = extern struct {
     flags2: [4]f32, // has_occlusion, alpha_cutoff, alpha_mask_on, shadows_enabled
     env_params: [4]f32, // x=intensity, y=mip_count, z=has_env, w unused
     cam_forward: [4]f32, // xyz camera forward (world space), w unused — picks the shadow cascade
+    probe_params: [4]f32, // x=resolved reflection-probe weight, y=probe mip_count, zw unused
+};
+
+/// Frame-constant fragment uniforms — layout must match FrameFragUB in
+/// scene.frag.glsl exactly. Pushed once per render pass (see
+/// `draw.pushFrameUniforms`) instead of once per draw.
+pub const FrameFragUB = extern struct {
     env_sh: [9][4]f32, // diffuse irradiance SH coefficients (rgb in xyz)
     cascade_vp: [NUM_CASCADES][16]f32, // per-cascade shadow light view-projection
     // Packed as a single vec4 in the shader (std140 array-of-float would pad
     // each element to 16 bytes) — one float per cascade, so NUM_CASCADES must stay 4.
     cascade_splits: [4]f32, // per-cascade far distance along cam_forward (world units)
     cascade_depth_scale: [4]f32, // per-cascade 1/(ortho far-near), converts a world-unit bias to NDC depth
-    probe_params: [4]f32, // x=resolved reflection-probe weight, y=probe mip_count, zw unused
 };
 comptime {
     if (NUM_CASCADES < 1 or NUM_CASCADES > 4) @compileError("FragUB packs cascade_splits/cascade_depth_scale into one vec4 each (max 4)");

@@ -210,14 +210,24 @@ fn bindDrawState(
         .flags2 = dp.flags2,
         .env_params = fu.env_params,
         .cam_forward = fu.cam_forward4,
-        .env_sh = fu.env_sh,
-        .cascade_vp = fu.cascade_vp,
-        .cascade_splits = fu.cascade_splits,
-        .cascade_depth_scale = fu.cascade_depth_scale,
         .probe_params = dp.probe_params,
     };
     c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
     c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 10);
+}
+
+/// Pushes the frame-constant fragment uniforms (shadow cascades, SH
+/// irradiance) once for a whole render pass, instead of re-pushing them on
+/// every draw via `bindDrawState`. Call once after `SDL_BeginGPURenderPass`,
+/// before the first `submitDraw`/`submitIndirectDraw` of that pass.
+pub fn pushFrameUniforms(cmd: *c.SDL_GPUCommandBuffer, fu: FrameUniforms) void {
+    const frame_ub = types.FrameFragUB{
+        .env_sh = fu.env_sh,
+        .cascade_vp = fu.cascade_vp,
+        .cascade_splits = fu.cascade_splits,
+        .cascade_depth_scale = fu.cascade_depth_scale,
+    };
+    c.SDL_PushGPUFragmentUniformData(cmd, 1, &frame_ub, @sizeOf(types.FrameFragUB));
 }
 
 /// Bind the draw's state and issue one indexed draw call for a single submesh.
