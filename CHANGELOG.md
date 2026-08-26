@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.1] - 2026-08-26
+
+### Bug Fixes
+- fix: split per-draw fragment uniform into per-draw + per-pass #163 #164
+
 ## [3.6.0] - 2026-08-24
 
 ### Features
