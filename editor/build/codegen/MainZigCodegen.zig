@@ -597,8 +597,9 @@ pub fn generateMainZig(
                     "        return;\n" ++
                     "    }};\n" ++
                     "    defer render.deinit();\n" ++
-                    "    render.setSources(gpuSource, gpuSource, gpuSource);\n\n",
-                .{ esc.items, runtime.width, runtime.height, if (runtime.vsync) "true" else "false" },
+                    "    render.setSources(gpuSource, gpuSource, gpuSource);\n" ++
+                    "    render.setFeatures(render.featuresForQuality(.{s}));\n\n",
+                .{ esc.items, runtime.width, runtime.height, if (runtime.vsync) "true" else "false", runtime.quality },
             ));
             if (runtime.icon_guid.len > 0) {
                 // Window/taskbar icon (ProjectSettings.project.icon): decoded

@@ -326,6 +326,38 @@ pub var black_tex: ?*c.SDL_GPUTexture = null;
 /// Fence-bracketed per-pass GPU timing; off by default (introduces a pipeline stall).
 pub var detailed_gpu_timing: bool = false;
 
+/// Runtime rendering feature set — the quality dial `ProjectSettings.graphics.quality`
+/// seeds. Every default reproduces the renderer's previously hardcoded behaviour,
+/// so an untouched `Features` renders exactly as before.
+pub const Features = struct {
+    /// Scene-pass MSAA samples; clamped to what the device actually supports.
+    /// Pipelines bake this in, so a change rebuilds the scene pipeline cache.
+    msaa: u8 = 4,
+    ssao: bool = true,
+    ssao_half_res: bool = false,
+    /// Hemisphere taps, up to `MAX_SSAO_SAMPLES`.
+    ssao_samples: u32 = 24,
+    ssr: bool = true,
+    ssr_half_res: bool = false,
+    /// March steps, up to `MAX_SSR_STEPS`.
+    ssr_steps: u32 = 32,
+    shadows: bool = true,
+    /// Edge of one cascade's square atlas strip.
+    shadow_dim: u32 = 2048,
+    /// Cascades actually fitted and rendered, 1..`types.NUM_CASCADES`. The
+    /// arrays stay sized for the comptime maximum either way.
+    cascade_count: u32 = types.NUM_CASCADES,
+    reflection_probes: bool = true,
+    bloom: bool = true,
+};
+
+pub var features: Features = .{};
+
+/// A feature set requested between frames, applied at the top of the next
+/// `renderScene` — that is where the GPU device is in hand to release whatever
+/// the change invalidates, so callers (Studio UI, game startup) need no device.
+pub var pending_features: ?Features = null;
+
 // Gizmo line rendering: depth-tested and overlay pipelines, indexed separately to avoid clobber.
 pub var gizmo_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
 pub var gizmo_overlay_pipeline: ?*c.SDL_GPUGraphicsPipeline = null;
@@ -363,6 +395,19 @@ pub const GpuSubmesh = struct {
     probe_slot: i32 = -1,
     probe_weight: f32 = 0,
 };
+/// How a material occludes light. Blended surfaces transmit it and cast
+/// nothing; masked ones occlude only where their cutout test keeps them.
+pub const ShadowOcclusion = enum { solid, cutout, none };
+
+/// One material group's resolved shadow-pass state. Cached per frame so the
+/// cascades share one resolve instead of repeating it per cascade.
+pub const ShadowGroup = struct {
+    occlusion: ShadowOcclusion = .none,
+    /// Cutout groups only: the cutoff uniform and the albedo map its discard reads.
+    fub: types.ShadowMaskFragUB = .{ .flags = .{ 0, 0, 0, 0 }, .base_color = .{ 0, 0, 0, 0 } },
+    albedo: ?*c.SDL_GPUTexture = null,
+};
+
 /// A same-material run of `submeshes` that forms one indirect multi-draw call.
 pub const MaterialGroup = struct {
     material_slot: i32 = 0,
@@ -383,6 +428,14 @@ pub const GpuMesh = struct {
     submeshes: []GpuSubmesh = &.{},
     /// Same-material runs of `submeshes` for indirect multi-draw.
     material_groups: []MaterialGroup = &.{},
+    /// `material_groups`-parallel shadow state, resolved once per frame by
+    /// `shadow.zig` and read by every cascade.
+    shadow_groups: []ShadowGroup = &.{},
+    /// Frame and mesh renderer `shadow_groups` was resolved against. Two
+    /// renderers can share a mesh with different material slots, so a resolve
+    /// is only reusable for the same owner within the same frame.
+    shadow_groups_frame: u64 = 0,
+    shadow_groups_owner: ?*const engine.MeshRendererComponent = null,
     /// Whole-mesh AABB for frustum culling.
     bounds_min: [3]f32 = .{ 0, 0, 0 },
     bounds_max: [3]f32 = .{ 0, 0, 0 },

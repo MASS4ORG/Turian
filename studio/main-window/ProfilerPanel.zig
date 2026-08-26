@@ -66,6 +66,105 @@ fn ms(ns: u64) f64 {
     return @as(f64, @floatFromInt(ns)) / 1_000_000.0;
 }
 
+/// One rendering-feature value button, highlighted when it is the active
+/// choice. Same shape as `fpsBtn`, for the quality dial below.
+fn featBtn(label: []const u8, active: bool, id: usize) bool {
+    return gui.button(@src(), label, .{}, .{
+        .id_extra = id,
+        .gravity_y = 0.5,
+        .style = if (active) .highlight else .control,
+    });
+}
+
+/// The rendering quality dial: one control per feature, applied live so a
+/// toggle's cost shows up in the frame chart without a restart.
+fn renderingControls() void {
+    const Quality = engine.ProjectSettings.Graphics.Quality;
+    var f = render.features();
+    var changed = false;
+
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("preset")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        inline for (.{ Quality.low, Quality.medium, Quality.high, Quality.ultra }, 0..) |q, i| {
+            if (featBtn(@tagName(q), false, i)) {
+                f = render.featuresForQuality(q);
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("msaa")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        inline for (.{ 1, 2, 4, 8 }, 0..) |n, i| {
+            if (featBtn(std.fmt.comptimePrint("{d}x", .{n}), f.msaa == n, i)) {
+                f.msaa = n;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("shadows")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        if (gui.checkbox(@src(), &f.shadows, tr("on"), .{ .gravity_y = 0.5 })) changed = true;
+        inline for (.{ 1024, 2048, 4096 }, 0..) |n, i| {
+            if (featBtn(std.fmt.comptimePrint("{d}", .{n}), f.shadow_dim == n, i)) {
+                f.shadow_dim = n;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("cascades")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        inline for (.{ 1, 2, 3, 4 }, 0..) |n, i| {
+            if (featBtn(std.fmt.comptimePrint("{d}", .{n}), f.cascade_count == n, i)) {
+                f.cascade_count = n;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("ssao")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        if (gui.checkbox(@src(), &f.ssao, tr("on"), .{ .gravity_y = 0.5 })) changed = true;
+        if (gui.checkbox(@src(), &f.ssao_half_res, tr("half-res"), .{ .gravity_y = 0.5 })) changed = true;
+        inline for (.{ 8, 16, 24 }, 0..) |n, i| {
+            if (featBtn(std.fmt.comptimePrint("{d}", .{n}), f.ssao_samples == n, i)) {
+                f.ssao_samples = n;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("ssr")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        if (gui.checkbox(@src(), &f.ssr, tr("on"), .{ .gravity_y = 0.5 })) changed = true;
+        if (gui.checkbox(@src(), &f.ssr_half_res, tr("half-res"), .{ .gravity_y = 0.5 })) changed = true;
+        inline for (.{ 8, 16, 32 }, 0..) |n, i| {
+            if (featBtn(std.fmt.comptimePrint("{d}", .{n}), f.ssr_steps == n, i)) {
+                f.ssr_steps = n;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("effects")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        if (gui.checkbox(@src(), &f.bloom, tr("bloom"), .{ .gravity_y = 0.5 })) changed = true;
+        if (gui.checkbox(@src(), &f.reflection_probes, tr("reflection probes"), .{ .gravity_y = 0.5 })) changed = true;
+    }
+
+    if (changed) render.setFeatures(f);
+}
+
 /// One FPS-cap toggle button. `value` is the `Window.max_fps` it sets (null =
 /// unlimited). Highlighted when it matches the active cap.
 fn fpsBtn(cw: *gui.Window, label: []const u8, value: ?f32, id: usize) void {
@@ -360,6 +459,8 @@ fn drawControls(cw: *gui.Window) void {
             render.setDetailedGpuTiming(on);
         }
     }
+
+    renderingControls();
 
     // history length: how many recent frames to keep for scrubbing (changing it
     // clears the ring). Labelled in seconds assuming ~60 fps.

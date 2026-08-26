@@ -51,7 +51,7 @@ layout(set = 3, binding = 0) uniform FragUB {
     vec4 flags;           // x=has_albedo, y=has_mr, z=has_normal, w=has_emissive
     vec4 flags2;          // x=has_occlusion, y=alpha_cutoff, z=alpha_mask_on, w=shadows_enabled
     vec4 env_params;      // x=intensity, y=mip_count, z=has_env, w unused
-    vec4 cam_forward;     // xyz camera forward (world space); picks the shadow cascade
+    vec4 cam_forward;     // xyz camera forward (world space); w = active cascade count
     vec4 probe_params;        // x=resolved reflection-probe weight, y=probe mip_count, zw unused
 } ubo;
 
@@ -209,8 +209,11 @@ float shadowFactor(float ndl) {
     if (ubo.flags2.w < 0.5) return 1.0;
 
     float cam_dist = dot(in_world_pos - ubo.camera_pos.xyz, ubo.cam_forward.xyz);
-    int cascade = NUM_CASCADES - 1;
-    for (int i = 0; i < NUM_CASCADES - 1; i++) {
+    // cam_forward.w carries how many cascades were actually rendered this frame;
+    // selecting past that would sample an atlas strip holding stale depth.
+    int cascade_n = clamp(int(ubo.cam_forward.w), 1, NUM_CASCADES);
+    int cascade = cascade_n - 1;
+    for (int i = 0; i < cascade_n - 1; i++) {
         if (cam_dist < frame_ubo.cascade_splits[i]) {
             cascade = i;
             break;
@@ -220,7 +223,7 @@ float shadowFactor(float ndl) {
     float bias_world = mix(0.05, 0.35, 1.0 - ndl);
     float s = sampleCascade(cascade, bias_world);
 
-    if (cascade < NUM_CASCADES - 1) {
+    if (cascade < cascade_n - 1) {
         float far_split = frame_ubo.cascade_splits[cascade];
         float near_split = cascade == 0 ? 0.0 : frame_ubo.cascade_splits[cascade - 1];
         float margin = max(far_split - near_split, 1e-3) * 0.1;

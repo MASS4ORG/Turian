@@ -9,6 +9,9 @@ pub const RuntimeConfig = struct {
     width: u32 = 1280,
     height: u32 = 720,
     vsync: bool = true,
+    /// `ProjectSettings.graphics.quality`, baked as the renderer feature preset
+    /// the shipped game applies at startup (same treatment as width/height/vsync).
+    quality: []const u8 = "high",
     /// GUID of the scene the game boots into (loaded through the SceneManager,
     ///). Empty if no scene could be resolved.
     boot_scene_guid: []const u8 = "",

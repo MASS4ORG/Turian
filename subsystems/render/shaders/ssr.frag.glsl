@@ -18,7 +18,7 @@ layout(set = 3, binding = 0) uniform FragUB {
     // `prev_view_proj * inverse(current_view)` — takes a view-space hit
     // position directly to previous-frame clip space in one multiply.
     mat4 reproject;
-    vec4 params; // x=thickness, y=step_scale, z=max_distance, w unused
+    vec4 params; // x=thickness, y=step_scale, z=max_distance, w=active step count
 } ubo;
 
 layout(location = 0) out vec4 out_ssr; // rgb = reflected color, a = confidence
@@ -64,7 +64,8 @@ void main() {
     bool hit = false;
     vec2 hit_uv = vec2(0.0);
 
-    for (int i = 0; i < MAX_STEPS; i++) {
+    int steps = clamp(int(ubo.params.w), 1, MAX_STEPS);
+    for (int i = 0; i < steps; i++) {
         ray += R * step_len;
         if (length(ray - P) > max_distance) break;
 

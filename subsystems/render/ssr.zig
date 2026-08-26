@@ -14,6 +14,9 @@ const Matrix4 = engine.Matrix4;
 
 const THICKNESS: f32 = 0.2; // view-space meters — intersection tolerance
 const STEP_SCALE: f32 = 0.05; // fraction of |view-space depth| per march step
+/// March-step ceiling; must match `MAX_STEPS` in ssr.frag.glsl, which sizes the
+/// loop the runtime count clamps against.
+const MAX_STEPS: u32 = 32;
 const MAX_DISTANCE: f32 = 20.0; // view-space meters — ray reach cap
 
 /// SSR pipeline: 3 fragment samplers (prepass depth, prepass normal, last
@@ -97,7 +100,11 @@ pub fn run(
         state.prev_w == w and state.prev_h == h;
     if (!valid) return null;
 
-    const target = targetFor(dev, w, h) orelse return null;
+    // As with SSAO, half-res only shrinks the target and viewport — the scene
+    // shader samples the result by screen UV.
+    const sw = if (state.features.ssr_half_res) @max(1, w / 2) else w;
+    const sh = if (state.features.ssr_half_res) @max(1, h / 2) else h;
+    const target = targetFor(dev, sw, sh) orelse return null;
 
     var zone = engine.Profiler.passZone("render.ssr");
     defer zone.end();
@@ -107,10 +114,10 @@ pub fn run(
         .inv_proj = proj.inverse().m,
         .proj = proj.m,
         .reproject = reproject.m,
-        .params = .{ THICKNESS, STEP_SCALE, MAX_DISTANCE, 0 },
+        .params = .{ THICKNESS, STEP_SCALE, MAX_DISTANCE, @floatFromInt(@max(1, @min(state.features.ssr_steps, MAX_STEPS))) },
     };
 
-    postprocess_pipeline.fullscreenPass(cmd, pl, target.tex.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
+    postprocess_pipeline.fullscreenPass(cmd, pl, target.tex.?, sw, sh, &[_]c.SDL_GPUTextureSamplerBinding{
         .{ .texture = depth_tex, .sampler = sampler },
         .{ .texture = normal_tex, .sampler = sampler },
         .{ .texture = history_color, .sampler = sampler },

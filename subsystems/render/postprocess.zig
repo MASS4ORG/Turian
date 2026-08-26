@@ -384,7 +384,11 @@ pub fn run(
     const composite_p = state.post_composite_pipeline orelse return;
     const black = state.black_tex orelse return;
     // Bloom reads from the original hdr_color, not from the custom-effect chain.
-    const bloom_tex = runBloom(cmd, dev, sampler, hdr_color, w, h, settings) orelse black;
+    // The global toggle overrides whatever the volumes resolved to.
+    const bloom_tex = if (state.features.bloom)
+        (runBloom(cmd, dev, sampler, hdr_color, w, h, settings) orelse black)
+    else
+        black;
     const final_hdr = runCustomEffects(cmd, dev, sampler, hdr_color, w, h);
     runComposite(cmd, composite_p, sampler, final_hdr, bloom_tex, color_tex, w, h, settings);
 }

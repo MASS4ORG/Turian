@@ -134,23 +134,31 @@ pub fn run(
     const blur_pl = state.ssao_blur_pipeline orelse return null;
     const depth_tex = prepass_target.depth orelse return null;
     const normal_tex = prepass_target.normal orelse return null;
-    const target = targetFor(dev, w, h) orelse return null;
+    // Half-res AO is sampled through a clamped linear sampler by screen UV, so
+    // only the target and the viewport shrink; every consumer is unchanged.
+    const sw = if (state.features.ssao_half_res) @max(1, w / 2) else w;
+    const sh = if (state.features.ssao_half_res) @max(1, h / 2) else h;
+    const target = targetFor(dev, sw, sh) orelse return null;
 
     var zone = engine.Profiler.passZone("render.ssao");
     defer zone.end();
+
+    // Fewer taps reuse a prefix of the same kernel, so the sample distribution
+    // stays the one `ensureKernel` built rather than being regenerated per count.
+    const taps = @max(1, @min(state.features.ssao_samples, KERNEL_SIZE));
 
     const ub = types.SsaoUB{
         .inv_proj = proj.inverse().m,
         .proj = proj.m,
         .kernel_samples = ensureKernel().*,
-        .params = .{ RADIUS, BIAS, POWER, 0 },
+        .params = .{ RADIUS, BIAS, POWER, @floatFromInt(taps) },
     };
-    postprocess_pipeline.fullscreenPass(cmd, raw_pl, target.raw.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
+    postprocess_pipeline.fullscreenPass(cmd, raw_pl, target.raw.?, sw, sh, &[_]c.SDL_GPUTextureSamplerBinding{
         .{ .texture = depth_tex, .sampler = sampler },
         .{ .texture = normal_tex, .sampler = sampler },
     }, &ub, @sizeOf(types.SsaoUB));
 
-    postprocess_pipeline.fullscreenPass(cmd, blur_pl, target.blurred.?, w, h, &[_]c.SDL_GPUTextureSamplerBinding{
+    postprocess_pipeline.fullscreenPass(cmd, blur_pl, target.blurred.?, sw, sh, &[_]c.SDL_GPUTextureSamplerBinding{
         .{ .texture = target.raw.?, .sampler = sampler },
         .{ .texture = depth_tex, .sampler = sampler },
     }, null, 0);

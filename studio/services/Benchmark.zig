@@ -22,6 +22,9 @@ pub const Config = struct {
     scene: []const u8 = "",
     /// Name of a Camera node whose pose the editor camera is pinned to.
     camera: []const u8 = "",
+    /// `ProjectSettings.graphics.quality` preset to apply before recording, so a
+    /// quality level's cost can be measured headlessly. Empty leaves it alone.
+    quality: []const u8 = "",
     frames: u32 = 120,
     warmup: u32 = 40,
     /// Disable vsync and drive frames back to back. Off by default: an uncapped
@@ -89,11 +92,26 @@ pub fn parseArg(arg: []const u8, args: anytype, cfg: *Config) bool {
         cfg.uncapped = true;
         return true;
     }
+    if (std.mem.eql(u8, arg, "--quality")) {
+        if (args.next()) |v| cfg.quality = v;
+        return true;
+    }
     if (std.mem.eql(u8, arg, "--fps-cap")) {
         if (args.next()) |v| cfg.fps_cap = std.fmt.parseFloat(f32, v) catch cfg.fps_cap;
         return true;
     }
     return false;
+}
+
+/// The `--quality` preset as a `ProjectSettings` enum, or null when unset or
+/// unrecognised. Reported rather than applied so this module stays free of
+/// render-module dependencies.
+pub fn qualityPreset() ?engine.ProjectSettings.Graphics.Quality {
+    if (!g_cfg.enabled or g_cfg.quality.len == 0) return null;
+    return std.meta.stringToEnum(engine.ProjectSettings.Graphics.Quality, g_cfg.quality) orelse {
+        log.warn("unknown --quality '{s}'; leaving the feature set alone", .{g_cfg.quality});
+        return null;
+    };
 }
 
 /// A viewport camera pose, reported rather than applied so this module stays

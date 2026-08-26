@@ -313,6 +313,7 @@ fn resolveRuntime(io: std.Io, a: std.mem.Allocator, assets_dir: []const u8, out:
                 out.width = ps.graphics.width;
                 out.height = ps.graphics.height;
                 out.vsync = ps.graphics.vsync;
+                out.quality = @tagName(ps.graphics.quality);
                 if (ps.platform.build_output_path.len > 0)
                     out.output_path = a.dupe(u8, ps.platform.build_output_path) catch out.output_path;
                 if (ps.project.icon.len > 0) {

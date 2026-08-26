@@ -16,7 +16,7 @@ const Matrix4 = engine.Matrix4;
 /// command buffer, so each shadow indirect buffer is written before the pass
 /// reads it even under per-pass fencing.
 fn dispatchAllCascadeCulls(cmd: *c.SDL_GPUCommandBuffer, cascades: [shadow.NUM_CASCADES]shadow.Cascade, objects: []const engine.SceneNode) void {
-    for (cascades, 0..) |cs, i| {
+    for (cascades[0..shadow.activeCascades()], 0..) |cs, i| {
         const frustum = culling.Frustum.extract(cs.vp);
         gpu_cull.dispatchShadowCulls(cmd, objects, frustum, i);
     }

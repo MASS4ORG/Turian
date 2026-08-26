@@ -121,13 +121,20 @@ pub const ProbeSample = struct {
     mip_count: f32 = 1,
 };
 
-/// A blended/additive draw deferred for back-to-front sorting.
+/// A blended/additive draw deferred for back-to-front sorting. Holds only what
+/// genuinely varies between submeshes of one material group — the rest lives
+/// once in `transparent_groups`, so sorting walks 32-byte records instead of
+/// dragging a `DrawParams` per draw through the cache.
 pub const TransparentDraw = struct {
-    params: DrawParams,
+    /// Index into `transparent_groups` for this draw's shared material state.
+    group: u32,
+    index_offset: u32,
+    index_count: u32,
+    probe: ProbeSample,
 };
 
 /// Sort key for one deferred draw. Ordering moves these rather than the
-/// ~420-byte `DrawParams` they point at.
+/// records they point at.
 pub const TransparentKey = struct {
     /// Squared camera distance to the submesh's world bounds centre — cheap
     /// proxy for per-submesh (not per-triangle) back-to-front ordering.
@@ -136,15 +143,56 @@ pub const TransparentKey = struct {
 };
 
 /// Static scratch space for one frame's deferred transparent draws.
-pub const MAX_TRANSPARENT_DRAWS = 1024;
+pub const MAX_TRANSPARENT_DRAWS = 4096;
+/// Distinct material groups those draws can refer to. The indirect path fills
+/// one entry per transparent material group (a handful); only the CPU fallback,
+/// which has no grouping, can approach this, and it warns rather than dropping
+/// silently. Kept well below `MAX_TRANSPARENT_DRAWS` because a `DrawParams` is
+/// ~50x the size of a deferred draw record.
+pub const MAX_TRANSPARENT_GROUPS = 1024;
+pub var transparent_groups: [MAX_TRANSPARENT_GROUPS]DrawParams = undefined;
+pub var transparent_group_count: usize = 0;
 pub var transparent_draws: [MAX_TRANSPARENT_DRAWS]TransparentDraw = undefined;
 pub var transparent_keys: [MAX_TRANSPARENT_DRAWS]TransparentKey = undefined;
 pub var transparent_count: usize = 0;
+/// Set when a frame overflowed the scratch, so the dropped draws are reported
+/// once at submit rather than once per draw.
+var transparent_overflowed: bool = false;
 
-/// Records one deferred draw, returning false when the frame's budget is full.
-pub fn pushTransparent(params: DrawParams, sort_depth: f32) bool {
-    if (transparent_count >= MAX_TRANSPARENT_DRAWS) return false;
-    transparent_draws[transparent_count] = .{ .params = params };
+/// Clears the previous frame's deferred draws. Call once per render pass before
+/// the draw loop that feeds `pushTransparent`.
+pub fn resetTransparent() void {
+    transparent_count = 0;
+    transparent_group_count = 0;
+    transparent_overflowed = false;
+}
+
+/// Records the material-group state a run of deferred draws shares, returning
+/// the handle `pushTransparent` refers to it by.
+pub fn pushTransparentGroup(params: *const DrawParams) ?u32 {
+    if (transparent_group_count >= MAX_TRANSPARENT_GROUPS) {
+        transparent_overflowed = true;
+        return null;
+    }
+    const idx = transparent_group_count;
+    transparent_groups[idx] = params.*;
+    transparent_group_count += 1;
+    return @intCast(idx);
+}
+
+/// Records one deferred draw against an already-registered group, returning
+/// false when the frame's budget is full.
+pub fn pushTransparent(group: u32, index_offset: u32, index_count: u32, probe: ProbeSample, sort_depth: f32) bool {
+    if (transparent_count >= MAX_TRANSPARENT_DRAWS) {
+        transparent_overflowed = true;
+        return false;
+    }
+    transparent_draws[transparent_count] = .{
+        .group = group,
+        .index_offset = index_offset,
+        .index_count = index_count,
+        .probe = probe,
+    };
     transparent_keys[transparent_count] = .{ .sort_depth = sort_depth, .index = @intCast(transparent_count) };
     transparent_count += 1;
     return true;
@@ -162,36 +210,68 @@ pub fn submitTransparent(
     bs: *BindState,
     fu: FrameUniforms,
 ) void {
+    if (transparent_overflowed)
+        log.warn("transparent scratch full ({d}) — some blended draws were dropped this frame", .{MAX_TRANSPARENT_DRAWS});
+
     const keys = transparent_keys[0..transparent_count];
     std.sort.pdq(TransparentKey, keys, {}, transparentFartherFirst);
-    for (keys) |k| submitDraw(cmd, pass, dev, bs, fu, transparent_draws[k.index].params);
+
+    // One `DrawParams` reused across the whole pass: sorted order interleaves
+    // groups arbitrarily, so it is refilled whenever the run's group changes and
+    // otherwise only the four per-submesh fields are patched.
+    var dp: DrawParams = undefined;
+    var loaded: ?u32 = null;
+    for (keys) |k| {
+        const d = &transparent_draws[k.index];
+        if (loaded != d.group) {
+            dp = transparent_groups[d.group];
+            loaded = d.group;
+        }
+        dp.index_offset = d.index_offset;
+        dp.index_count = d.index_count;
+        dp.probe_params = .{ d.probe.weight, d.probe.mip_count, 0, 0 };
+        // Keeps the group's cubemap sampler; only the probe texture varies.
+        dp.bindings[9].texture = d.probe.tex;
+        submitDraw(cmd, pass, dev, bs, fu, &dp);
+    }
 }
 
-/// What a render pass already has bound, so consecutive draws sharing a
-/// pipeline or a mesh skip the redundant rebind.
+/// What a render pass already has bound or pushed, so consecutive draws sharing
+/// a pipeline, a mesh, a material or a transform skip the redundant call. Scoped
+/// to one render pass, since SDL_GPU resets binding state between passes.
 pub const BindState = struct {
     pipeline: ?*c.SDL_GPUGraphicsPipeline = null,
     vtx_buf: ?*c.SDL_GPUBuffer = null,
     idx_buf: ?*c.SDL_GPUBuffer = null,
+    /// Compared by value rather than by material GUID, so the skip stays correct
+    /// however the caller happens to order or group its draws.
+    vub: ?types.VertexUB = null,
+    frag_ub: ?types.FragUB = null,
+    bindings: ?[10]c.SDL_GPUTextureSamplerBinding = null,
 };
 
 /// Bind a draw's pipeline, geometry and material state — everything
 /// `submitDraw`/`submitIndirectDraw` share, short of the draw call itself.
+/// Returns whether the sampler set was actually rebound, which is what the
+/// profiler's `texture_binds` counts.
 fn bindDrawState(
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
     dev: *c.SDL_GPUDevice,
     bs: *BindState,
     fu: FrameUniforms,
-    dp: DrawParams,
-) void {
-    const pl = scenePipelineFor(dev, dp.pl_key) orelse return;
+    dp: *const DrawParams,
+) bool {
+    const pl = scenePipelineFor(dev, dp.pl_key) orelse return false;
     if (bs.pipeline != pl) {
         c.SDL_BindGPUGraphicsPipeline(pass, pl);
         bs.pipeline = pl;
     }
 
-    c.SDL_PushGPUVertexUniformData(cmd, 0, &dp.vub, @sizeOf(types.VertexUB));
+    if (bs.vub == null or !std.meta.eql(bs.vub.?, dp.vub)) {
+        c.SDL_PushGPUVertexUniformData(cmd, 0, &dp.vub, @sizeOf(types.VertexUB));
+        bs.vub = dp.vub;
+    }
     if (bs.vtx_buf != dp.vtx_buf) {
         c.SDL_BindGPUVertexBuffers(pass, 0, &c.SDL_GPUBufferBinding{ .buffer = dp.vtx_buf, .offset = 0 }, 1);
         bs.vtx_buf = dp.vtx_buf;
@@ -212,8 +292,16 @@ fn bindDrawState(
         .cam_forward = fu.cam_forward4,
         .probe_params = dp.probe_params,
     };
-    c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
-    c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 10);
+    if (bs.frag_ub == null or !std.meta.eql(bs.frag_ub.?, fub)) {
+        c.SDL_PushGPUFragmentUniformData(cmd, 0, &fub, @sizeOf(types.FragUB));
+        bs.frag_ub = fub;
+    }
+    if (bs.bindings == null or !std.meta.eql(bs.bindings.?, dp.bindings)) {
+        c.SDL_BindGPUFragmentSamplers(pass, 0, &dp.bindings, 10);
+        bs.bindings = dp.bindings;
+        return true;
+    }
+    return false;
 }
 
 /// Pushes the frame-constant fragment uniforms (shadow cascades, SH
@@ -237,12 +325,11 @@ pub fn submitDraw(
     dev: *c.SDL_GPUDevice,
     bs: *BindState,
     fu: FrameUniforms,
-    dp: DrawParams,
+    dp: *const DrawParams,
 ) void {
-    bindDrawState(cmd, pass, dev, bs, fu, dp);
+    const bound = bindDrawState(cmd, pass, dev, bs, fu, dp);
     c.SDL_DrawGPUIndexedPrimitives(pass, dp.index_count, 1, dp.index_offset, 0, 0);
-    // Every mesh binds samplers.
-    engine.Profiler.countDraw(dp.index_count / 3, dp.index_count, true);
+    engine.Profiler.countDraw(dp.index_count / 3, dp.index_count, bound);
 }
 
 /// Bind one material group and issue an indirect multi-draw call into
@@ -253,15 +340,15 @@ pub fn submitIndirectDraw(
     dev: *c.SDL_GPUDevice,
     bs: *BindState,
     fu: FrameUniforms,
-    dp: DrawParams,
+    dp: *const DrawParams,
     indirect_buf: *c.SDL_GPUBuffer,
     byte_offset: u32,
     draw_count: u32,
     index_count: u32,
 ) void {
-    bindDrawState(cmd, pass, dev, bs, fu, dp);
+    const bound = bindDrawState(cmd, pass, dev, bs, fu, dp);
     c.SDL_DrawGPUIndexedPrimitivesIndirect(pass, indirect_buf, byte_offset, draw_count);
-    engine.Profiler.countDraw(index_count / 3, index_count, true);
+    engine.Profiler.countDraw(index_count / 3, index_count, bound);
     engine.Profiler.countIndirectCommands(draw_count);
     engine.Profiler.countSubmeshesDrawn(draw_count);
 }

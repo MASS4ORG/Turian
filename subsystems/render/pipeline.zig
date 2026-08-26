@@ -109,8 +109,10 @@ pub fn createShadowMap(dev: *c.SDL_GPUDevice) !*c.SDL_GPUTexture {
         .type = c.SDL_GPU_TEXTURETYPE_2D,
         .format = state.SHADOW_FORMAT,
         .usage = c.SDL_GPU_TEXTUREUSAGE_SAMPLER | c.SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-        .width = types.SHADOW_DIM,
-        .height = types.SHADOW_DIM * @as(u32, @intCast(types.NUM_CASCADES)),
+        .width = state.features.shadow_dim,
+        // Height always covers the comptime maximum: the shader maps a cascade
+        // to its strip as `i / NUM_CASCADES`, independent of how many are active.
+        .height = state.features.shadow_dim * @as(u32, @intCast(types.NUM_CASCADES)),
         .layer_count_or_depth = 1,
         .num_levels = 1,
         .sample_count = c.SDL_GPU_SAMPLECOUNT_1,
@@ -587,8 +589,19 @@ pub fn createMsaaColor(dev: *c.SDL_GPUDevice, w: u32, h: u32) !*c.SDL_GPUTexture
 pub fn pickSampleCount(dev: *c.SDL_GPUDevice) c.SDL_GPUSampleCount {
     const color_fmt = state.HDR_COLOR_FORMAT;
     const depth_fmt = c.SDL_GPU_TEXTUREFORMAT_D16_UNORM;
-    if (c.SDL_GPUTextureSupportsSampleCount(dev, color_fmt, c.SDL_GPU_SAMPLECOUNT_4) and
-        c.SDL_GPUTextureSupportsSampleCount(dev, depth_fmt, c.SDL_GPU_SAMPLECOUNT_4))
-        return c.SDL_GPU_SAMPLECOUNT_4;
+    // Step the requested count down to the highest the device supports for both
+    // the colour and depth formats, rather than assuming 4x is available.
+    var want: u8 = state.features.msaa;
+    while (want > 1) : (want /= 2) {
+        const sc: c.SDL_GPUSampleCount = switch (want) {
+            8 => c.SDL_GPU_SAMPLECOUNT_8,
+            4 => c.SDL_GPU_SAMPLECOUNT_4,
+            2 => c.SDL_GPU_SAMPLECOUNT_2,
+            else => break,
+        };
+        if (c.SDL_GPUTextureSupportsSampleCount(dev, color_fmt, sc) and
+            c.SDL_GPUTextureSupportsSampleCount(dev, depth_fmt, sc))
+            return sc;
+    }
     return c.SDL_GPU_SAMPLECOUNT_1;
 }

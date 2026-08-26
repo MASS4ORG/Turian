@@ -14,6 +14,12 @@ const Vector3 = engine.Vector3;
 
 pub const NUM_CASCADES = types.NUM_CASCADES;
 
+/// Cascades actually fitted and rendered this frame, clamped to the comptime
+/// maximum the uniform arrays are sized for.
+pub fn activeCascades() usize {
+    return @max(1, @min(state.features.cascade_count, NUM_CASCADES));
+}
+
 pub const Bounds = struct { center: Vector3, radius: f32 };
 
 /// One cascade's fitted light frustum: the view-projection used both to
@@ -83,11 +89,11 @@ const SPLIT_NEAR_MIN: f32 = 0.5;
 /// splits so near cascades stay tight (log) while far ones don't shrink to
 /// nothing (uniform). Weighted toward the logarithmic term, which is what keeps
 /// the first cascade small enough to spend its texels on near-field detail.
-fn splitDistances(near: f32, far: f32) [NUM_CASCADES]f32 {
+fn splitDistances(near: f32, far: f32, count: usize) [NUM_CASCADES]f32 {
     const lambda: f32 = 0.85;
-    var splits: [NUM_CASCADES]f32 = undefined;
-    for (0..NUM_CASCADES) |i| {
-        const p = @as(f32, @floatFromInt(i + 1)) / @as(f32, @floatFromInt(NUM_CASCADES));
+    var splits: [NUM_CASCADES]f32 = .{far} ** NUM_CASCADES;
+    for (0..count) |i| {
+        const p = @as(f32, @floatFromInt(i + 1)) / @as(f32, @floatFromInt(count));
         const log_split = near * std.math.pow(f32, far / near, p);
         const uniform_split = near + (far - near) * p;
         splits[i] = lambda * log_split + (1.0 - lambda) * uniform_split;
@@ -197,13 +203,14 @@ pub fn computeCascades(
     const view0 = Matrix4.lookAt(.{ .x = 0, .y = 0, .z = 0 }, d, up);
     const inv_view0 = view0.inverse();
 
+    const active = activeCascades();
     const shadow_far = @max(@min(cam_far, bounds.radius * 2.0), cam_near + 1.0);
-    const splits = splitDistances(@max(cam_near, SPLIT_NEAR_MIN), shadow_far);
+    const splits = splitDistances(@max(cam_near, SPLIT_NEAR_MIN), shadow_far, active);
     const inv_view = cam_view.inverse();
 
-    var out: [NUM_CASCADES]Cascade = undefined;
+    var out: [NUM_CASCADES]Cascade = std.mem.zeroes([NUM_CASCADES]Cascade);
     var near_d = cam_near;
-    for (0..NUM_CASCADES) |i| {
+    for (0..active) |i| {
         const far_d = splits[i];
         const corners = frustumCorners(inv_view, fov_deg, aspect, near_d, far_d);
         const fitted = fitCascade(corners, d, up, view0, inv_view0, bounds);
@@ -213,8 +220,7 @@ pub fn computeCascades(
     return out;
 }
 
-/// How a material occludes light, derived from its render state.
-const Occlusion = enum { solid, cutout, none };
+const Occlusion = state.ShadowOcclusion;
 
 /// Blended surfaces (glass, water) transmit light, so they occlude nothing —
 /// casting a solid shadow from a shopfront window would black out the interior
@@ -224,40 +230,86 @@ fn occlusionFor(render: engine.Material.RenderState) Occlusion {
     return if (render.alpha_mask) .cutout else .solid;
 }
 
-/// Per-cascade draw state: the atlas strip being filled and which pipeline is
-/// currently bound, so a run of same-occlusion material groups binds only once.
+/// `gm`'s per-group shadow state, resolving it if this frame hasn't yet for
+/// this renderer. Cascades run back to back over the same meshes, so without
+/// this the same materials resolve once per cascade.
+fn shadowGroupsFor(gm: *state.GpuMesh, mr: *const engine.MeshRendererComponent) []const state.ShadowGroup {
+    if (gm.shadow_groups.len != gm.material_groups.len) return &.{};
+    if (gm.shadow_groups_frame == state.frame_seq and gm.shadow_groups_owner == mr)
+        return gm.shadow_groups;
+
+    const white = state.white_tex;
+    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
+    for (gm.material_groups, gm.shadow_groups) |group, *out| {
+        const mat = assets.resolveMaterial(draw.materialGuidForSlot(mr, mat_n, group.material_slot));
+        const occ = occlusionFor(mat.render);
+        out.* = .{ .occlusion = occ };
+        if (occ != .cutout) continue;
+        const albedo = assets.pickTexture(mat.map(.albedo), white orelse continue);
+        out.fub = .{
+            .flags = .{ assets.present(albedo.found), mat.alpha_cutoff, 0, 0 },
+            .base_color = mat.base_color,
+        };
+        out.albedo = albedo.tex;
+    }
+    gm.shadow_groups_frame = state.frame_seq;
+    gm.shadow_groups_owner = mr;
+    return gm.shadow_groups;
+}
+
+/// The cutout pipeline's per-material state, compared by value to skip a
+/// rebind across a run of groups sharing a material.
+const CutoutBinding = struct {
+    fub: types.ShadowMaskFragUB,
+    tex: *c.SDL_GPUTexture,
+};
+
+/// Per-cascade draw state: the atlas strip being filled, plus what it has
+/// already bound or pushed, so a run of material groups sharing a pipeline, a
+/// mesh transform or a cutout material issues each call only once.
 const Strip = struct {
     cmd: *c.SDL_GPUCommandBuffer,
     pass: *c.SDL_GPURenderPass,
     solid_pipeline: *c.SDL_GPUGraphicsPipeline,
     index: usize,
     bound: ?*c.SDL_GPUGraphicsPipeline = null,
+    pushed_lub: ?types.ShadowUB = null,
+    bound_cutout: ?CutoutBinding = null,
 };
 
 fn bindPipeline(s: *Strip, pl: *c.SDL_GPUGraphicsPipeline) void {
     if (s.bound == pl) return;
     c.SDL_BindGPUGraphicsPipeline(s.pass, pl);
     s.bound = pl;
+    // The newly bound pipeline hasn't seen what the previous one was given, so
+    // whatever was pushed or bound against it no longer counts as current.
+    s.pushed_lub = null;
+    s.bound_cutout = null;
+}
+
+/// Pushes this mesh's light-space transform unless the strip already has it.
+fn pushLightMvp(s: *Strip, lub: types.ShadowUB) void {
+    if (s.pushed_lub != null and std.meta.eql(s.pushed_lub.?, lub)) return;
+    c.SDL_PushGPUVertexUniformData(s.cmd, 0, &lub, @sizeOf(types.ShadowUB));
+    s.pushed_lub = lub;
 }
 
 /// Bind the cutout pipeline along with the albedo map and cutoff its discard
 /// reads. Returns false when the cutout pipeline is unavailable, leaving the
 /// caller to fall back to a solid (quad-shaped) shadow.
-fn bindCutout(s: *Strip, mat: *const types.ResolvedMaterial) bool {
+fn bindCutout(s: *Strip, sg: *const state.ShadowGroup) bool {
     const pl = state.shadow_mask_pipeline orelse return false;
-    const white = state.white_tex orelse return false;
     const smp = state.sampler orelse return false;
+    const tex = sg.albedo orelse return false;
     bindPipeline(s, pl);
 
-    const albedo = assets.pickTexture(mat.map(.albedo), white);
-    const fub = types.ShadowMaskFragUB{
-        .flags = .{ assets.present(albedo.found), mat.alpha_cutoff, 0, 0 },
-        .base_color = mat.base_color,
-    };
-    c.SDL_PushGPUFragmentUniformData(s.cmd, 0, &fub, @sizeOf(types.ShadowMaskFragUB));
+    const want = CutoutBinding{ .fub = sg.fub, .tex = tex };
+    if (s.bound_cutout != null and std.meta.eql(s.bound_cutout.?, want)) return true;
+    c.SDL_PushGPUFragmentUniformData(s.cmd, 0, &want.fub, @sizeOf(types.ShadowMaskFragUB));
     c.SDL_BindGPUFragmentSamplers(s.pass, 0, &[_]c.SDL_GPUTextureSamplerBinding{
-        .{ .texture = albedo.tex, .sampler = smp },
+        .{ .texture = want.tex, .sampler = smp },
     }, 1);
+    s.bound_cutout = want;
     return true;
 }
 
@@ -287,19 +339,20 @@ fn drawCaster(s: *Strip, cascade: Cascade, obj: *const engine.SceneNode, mr: *co
     else
         null;
 
-    const mat_n = @min(mr.material_count, engine.MeshRendererComponent.MAX_MATERIALS);
-    for (gm.material_groups) |group| {
-        const mat_res = assets.resolveMaterial(draw.materialGuidForSlot(mr, mat_n, group.material_slot));
-        switch (occlusionFor(mat_res.render)) {
+    const shadow_groups = shadowGroupsFor(gm, mr);
+    if (shadow_groups.len != gm.material_groups.len) return;
+
+    for (gm.material_groups, shadow_groups) |group, *sg| {
+        switch (sg.occlusion) {
             .none => continue,
             .solid => bindPipeline(s, s.solid_pipeline),
-            .cutout => if (!bindCutout(s, &mat_res)) bindPipeline(s, s.solid_pipeline),
+            .cutout => if (!bindCutout(s, sg)) bindPipeline(s, s.solid_pipeline),
         }
-        // Re-pushed per group: the push is per-command-buffer, and a group that
-        // switched pipeline must still see this mesh's light-space transform.
-        c.SDL_PushGPUVertexUniformData(s.cmd, 0, &lub, @sizeOf(types.ShadowUB));
+        // After the pipeline bind, which invalidates it on a switch: a group
+        // that changed pipeline must still see this mesh's light-space transform.
+        pushLightMvp(s, lub);
 
-        const cutout = occlusionFor(mat_res.render) == .cutout;
+        const cutout = sg.occlusion == .cutout;
         if (indirect) |ib| {
             c.SDL_DrawGPUIndexedPrimitivesIndirect(s.pass, ib, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count);
             engine.Profiler.countDraw(group.index_count / 3, group.index_count, cutout);
@@ -333,21 +386,22 @@ pub fn renderShadowPass(cmd: *c.SDL_GPUCommandBuffer, cascades: [NUM_CASCADES]Ca
     const pass = c.SDL_BeginGPURenderPass(cmd, null, 0, &depth_info) orelse return;
     defer c.SDL_EndGPURenderPass(pass);
 
-    for (cascades, 0..) |cascade, strip| {
-        const y_off: i32 = @intCast(strip * @as(usize, types.SHADOW_DIM));
+    const dim = state.features.shadow_dim;
+    for (cascades[0..activeCascades()], 0..) |cascade, strip| {
+        const y_off: i32 = @intCast(strip * @as(usize, dim));
         c.SDL_SetGPUViewport(pass, &c.SDL_GPUViewport{
             .x = 0,
             .y = @floatFromInt(y_off),
-            .w = @floatFromInt(types.SHADOW_DIM),
-            .h = @floatFromInt(types.SHADOW_DIM),
+            .w = @floatFromInt(dim),
+            .h = @floatFromInt(dim),
             .min_depth = 0.0,
             .max_depth = 1.0,
         });
         c.SDL_SetGPUScissor(pass, &c.SDL_Rect{
             .x = 0,
             .y = y_off,
-            .w = @intCast(types.SHADOW_DIM),
-            .h = @intCast(types.SHADOW_DIM),
+            .w = @intCast(dim),
+            .h = @intCast(dim),
         });
 
         var s = Strip{ .cmd = cmd, .pass = pass, .solid_pipeline = solid_pipeline, .index = strip };
@@ -407,6 +461,27 @@ test "a caster far above a cascade still lies inside its clip volume" {
         const clip = cs.vp.transformPoint(roof);
         try std.testing.expect(clip.z >= -1.0);
         try std.testing.expect(clip.z <= 1.0);
+    }
+}
+
+test "a reduced cascade count still spans the whole shadow range" {
+    // Dropping cascades is a quality lever, not a coverage one: the last active
+    // cascade must still reach the same far distance, or distant geometry
+    // silently stops receiving shadows.
+    defer state.features = .{};
+    const full = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, 0), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+    const full_far = full[NUM_CASCADES - 1].far_distance;
+
+    for ([_]u32{ 1, 2, 3 }) |n| {
+        state.features = .{ .cascade_count = n };
+        try std.testing.expectEqual(@as(usize, n), activeCascades());
+        const cs = computeCascades(testView(.{ .x = 0, .y = 2, .z = 0 }, 0), 60, 16.0 / 9.0, 0.01, 1000, test_sun, test_bounds);
+        try std.testing.expectApproxEqRel(full_far, cs[n - 1].far_distance, 1e-5);
+        var prev: f32 = 0;
+        for (cs[0..n]) |cascade| {
+            try std.testing.expect(cascade.far_distance > prev);
+            prev = cascade.far_distance;
+        }
     }
 }
 

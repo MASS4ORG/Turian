@@ -355,6 +355,66 @@ fn submeshDepth(cam_pos: Vector3, sm: state.GpuSubmesh, model: Matrix4) f32 {
 /// Render `objects` into this size's internal HDR target. Call `runPostProcess`
 /// afterward (after any `renderGizmos` calls) to composite the result into the
 /// final destination texture.
+/// The runtime rendering feature set (#160). Re-exported so Studio and the
+/// generated game can name the type without reaching into `state`.
+pub const Features = state.Features;
+
+/// The feature set a `ProjectSettings.graphics.quality` level selects. `high`
+/// is the renderer's historical behaviour, so it is the neutral point; `low`
+/// and `medium` trade fidelity for frame time and `ultra` spends more on
+/// shadow resolution.
+pub fn featuresForQuality(q: engine.ProjectSettings.Graphics.Quality) state.Features {
+    return switch (q) {
+        .low => .{
+            .msaa = 1,
+            .ssao_half_res = true,
+            .ssao_samples = 8,
+            .ssr = false,
+            .shadow_dim = 1024,
+            .cascade_count = 2,
+        },
+        .medium => .{
+            .msaa = 1,
+            .ssao_half_res = true,
+            .ssr_half_res = true,
+            .ssr_steps = 16,
+            .cascade_count = 3,
+        },
+        .high => .{},
+        .ultra => .{ .shadow_dim = 4096 },
+    };
+}
+
+/// The active rendering feature set (the `graphics.quality` dial, #160).
+pub fn features() state.Features {
+    return state.features;
+}
+
+/// Requests a new feature set, applied at the start of the next frame.
+pub fn setFeatures(next: state.Features) void {
+    state.pending_features = next;
+}
+
+/// Applies a pending feature set, releasing whatever the change invalidates:
+/// MSAA is baked into the scene pipelines and the shadow atlas is sized at
+/// creation, so both are torn down here and rebuilt lazily.
+fn applyFeatures(dev: *c.SDL_GPUDevice, next: state.Features) void {
+    const prev = state.features;
+    state.features = next;
+    state.features.cascade_count = @max(1, @min(next.cascade_count, types.NUM_CASCADES));
+
+    if (prev.msaa != state.features.msaa) {
+        draw.destroyScenePipelines(dev);
+        // Forces the MSAA colour/depth targets to be recreated at the next frame.
+        state.prev_w = 0;
+        state.prev_h = 0;
+    }
+    if (prev.shadow_dim != state.features.shadow_dim) {
+        if (state.shadow_map) |t| c.SDL_ReleaseGPUTexture(dev, t);
+        state.shadow_map = null;
+    }
+}
+
 pub fn renderScene(
     cmd: *c.SDL_GPUCommandBuffer,
     w: u32,
@@ -367,6 +427,10 @@ pub fn renderScene(
     const dev = state.device orelse return;
     const sampler = state.sampler orelse return;
     if (w == 0 or h == 0) return;
+    if (state.pending_features) |next| {
+        applyFeatures(dev, next);
+        state.pending_features = null;
+    }
     state.frame_seq += 1;
 
     if (state.white_tex == null)
@@ -422,9 +486,13 @@ pub fn renderScene(
     var ssr_tex: *c.SDL_GPUTexture = state.ssr_fallback_tex orelse state.white_tex orelse return;
     if (prepass.run(cmd, dev, sampler, w, h, objects, frustum, cam.view, cam.proj)) |prepass_target| {
         const clamp_smp = state.cubemap_sampler orelse sampler;
-        if (ssao.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.proj)) |ao| ao_tex = ao;
-        if (target.hdr_color) |history| {
-            if (ssr.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.view, cam.proj, history)) |refl| ssr_tex = refl;
+        if (state.features.ssao) {
+            if (ssao.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.proj)) |ao| ao_tex = ao;
+        }
+        if (state.features.ssr) {
+            if (target.hdr_color) |history| {
+                if (ssr.run(cmd, dev, clamp_smp, w, h, prepass_target, cam.view, cam.proj, history)) |refl| ssr_tex = refl;
+            }
         }
     }
 
@@ -495,7 +563,7 @@ pub fn renderScene(
     }
 
     const bounds = shadow.sceneBounds(objects);
-    const shadows_on = shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
+    const shadows_on = state.features.shadows and shadow_dir != null and state.shadow_map != null and state.shadow_sampler != null and state.shadow_pipeline != null;
 
     var cascades: [shadow.NUM_CASCADES]shadow.Cascade = std.mem.zeroes([shadow.NUM_CASCADES]shadow.Cascade);
     if (shadows_on) {
@@ -527,7 +595,7 @@ pub fn renderScene(
     // ── Reflection probes: bake at most one dirty probe this frame ──────────
     // Static/bake-once (see reflection_probes.zig) — not part of the main
     // pass below, but needs the same resolved env + this frame's uploaded lights.
-    reflection_probes.bakeDirty(cmd, dev, sampler, objects, .{
+    if (state.features.reflection_probes) reflection_probes.bakeDirty(cmd, dev, sampler, objects, .{
         .prefiltered_tex = env_prefiltered_tex,
         .raw_tex = if (env_tex) |gt| gt.texture else null,
         .show_skybox = env_tex != null and env_show_skybox,
@@ -576,6 +644,7 @@ pub fn renderScene(
     var cascade_vp: [shadow.NUM_CASCADES][16]f32 = undefined;
     var cascade_splits: [4]f32 = .{ 0, 0, 0, 0 };
     var cascade_depth_scale: [4]f32 = .{ 0, 0, 0, 0 };
+    const active_cascades = shadow.activeCascades();
     for (cascades, 0..) |cs, i| {
         cascade_vp[i] = cs.vp.m;
         cascade_splits[i] = cs.far_distance;
@@ -583,7 +652,9 @@ pub fn renderScene(
     }
     const fu = draw.FrameUniforms{
         .cam_pos4 = .{ cam_pos.x, cam_pos.y, cam_pos.z, @floatFromInt(light_count) },
-        .cam_forward4 = .{ cam.forward.x, cam.forward.y, cam.forward.z, 0 },
+        // w carries the active cascade count: the shader must not select a
+        // cascade whose atlas strip this frame never rendered.
+        .cam_forward4 = .{ cam.forward.x, cam.forward.y, cam.forward.z, @floatFromInt(active_cascades) },
         .env_params = env_params,
         .env_sh = env_sh,
         .cascade_vp = cascade_vp,
@@ -619,7 +690,7 @@ pub fn renderScene(
     draw.pushFrameUniforms(cmd, fu);
 
     var bind_state = draw.BindState{};
-    draw.transparent_count = 0;
+    draw.resetTransparent();
 
     // Track the previously bound material GUID so we can count pipeline/material
     // switches for the profiler (a draw with the same material is "free").
@@ -672,8 +743,8 @@ pub fn renderScene(
 
                     // Opaque groups draw as one indirect multi-draw; transparent groups fall back to per-submesh CPU path for depth sort.
                     if (mat_res.render.blend == .disabled) {
-                        draw.submitIndirectDraw(cmd, pass, dev, &bind_state, fu, dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count, group.index_count);
-                    } else {
+                        draw.submitIndirectDraw(cmd, pass, dev, &bind_state, fu, &dp, gm.indirect_buf.?, group.start * @sizeOf(c.SDL_GPUIndexedIndirectDrawCommand), group.count, group.index_count);
+                    } else if (draw.pushTransparentGroup(&dp)) |tgroup| {
                         for (gm.submeshes[group.start..][0..group.count]) |*sm| {
                             if (sm.index_count == 0) continue;
                             if (culling.aabbOutsideFrustum(sm.bounds_min, sm.bounds_max, mdl, frustum)) {
@@ -682,12 +753,7 @@ pub fn renderScene(
                             }
                             engine.Profiler.countSubmeshesDrawn(1);
                             const probe = reflection_probes.resolveForSubmesh(objects, sm, mdl, black_cube);
-                            var tdp = dp;
-                            tdp.index_offset = sm.index_offset;
-                            tdp.index_count = sm.index_count;
-                            tdp.bindings[9] = .{ .texture = probe.tex, .sampler = cube_smp };
-                            tdp.probe_params = .{ probe.weight, probe.mip_count, 0, 0 };
-                            _ = draw.pushTransparent(tdp, submeshDepth(cam_pos, sm.*, mdl));
+                            _ = draw.pushTransparent(tgroup, sm.index_offset, sm.index_count, probe, submeshDepth(cam_pos, sm.*, mdl));
                         }
                     }
                 }
@@ -715,9 +781,9 @@ pub fn renderScene(
 
                 // Opaque draws right away; blended/additive draws are deferred for back-to-front sort.
                 if (mat_res.render.blend == .disabled) {
-                    draw.submitDraw(cmd, pass, dev, &bind_state, fu, dp);
-                } else {
-                    _ = draw.pushTransparent(dp, submeshDepth(cam_pos, sm.*, mdl));
+                    draw.submitDraw(cmd, pass, dev, &bind_state, fu, &dp);
+                } else if (draw.pushTransparentGroup(&dp)) |tgroup| {
+                    _ = draw.pushTransparent(tgroup, sm.index_offset, sm.index_count, probe, submeshDepth(cam_pos, sm.*, mdl));
                 }
             }
         }

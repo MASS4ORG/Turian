@@ -23,6 +23,7 @@ const StudioSettings = editor.StudioSettings;
 const Screenshots = @import("services/Screenshots.zig");
 const LayoutStore = @import("services/LayoutStore.zig");
 const EditorCamera = @import("scene-view/EditorCamera.zig");
+const render = @import("render");
 const Benchmark = @import("services/Benchmark.zig");
 const ProfilerPanel = @import("main-window/ProfilerPanel.zig");
 const build_options = @import("turian_build_options");
@@ -491,6 +492,9 @@ fn run(main_init: std.process.Init) !void {
                             Documents.openScene(full);
                         } else |_| log.err("benchmark scene path too long", .{});
                     }
+                    // Applied before warmup so the recorded frames are all at
+                    // the requested quality, not a mix across the preset change.
+                    if (Benchmark.qualityPreset()) |q| render.setFeatures(render.featuresForQuality(q));
                     // Nothing renders unless the Scene panel is its leaf's active tab.
                     if (!LayoutStore.focusPanelTransient("scene"))
                         log.err("no Scene panel in the layout — the benchmark will measure an idle editor", .{});

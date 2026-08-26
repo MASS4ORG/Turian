@@ -191,7 +191,7 @@ fn captureFace(
 
     const fu = draw.FrameUniforms{
         .cam_pos4 = .{ pos.x, pos.y, pos.z, @floatFromInt(env.light_count) },
-        .cam_forward4 = .{ dir.x, dir.y, dir.z, 0 },
+        .cam_forward4 = .{ dir.x, dir.y, dir.z, 1 },
         .env_params = env.params,
         .env_sh = env.sh,
         .cascade_vp = std.mem.zeroes([types.NUM_CASCADES][16]f32),
@@ -249,7 +249,7 @@ fn captureFace(
                 // circular bake dependency) — weight 0 leaves it unblended.
                 const no_probe = draw.ProbeSample{ .tex = env.prefiltered_tex, .weight = 0, .mip_count = 1 };
                 const dp = draw.buildDrawParams(&mat_res, gm, sm.index_offset, sm.index_count, vub, false, dctx, no_probe);
-                draw.submitDraw(cmd, pass, dev, &bind_state, fu, dp);
+                draw.submitDraw(cmd, pass, dev, &bind_state, fu, &dp);
             }
         }
     }
@@ -406,6 +406,7 @@ const ProbeMatch = struct { slot_index: i32 = -1, weight: f32 = 0 };
 /// contributes nothing rather than sampling an empty texture.
 fn bestProbeMatch(objects: []const engine.SceneNode, p: Vector3) ProbeMatch {
     var best = ProbeMatch{};
+    if (!state.features.reflection_probes) return best;
     var best_priority: f32 = -std.math.inf(f32);
 
     for (objects) |*obj| {

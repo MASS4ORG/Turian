@@ -262,6 +262,9 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
         };
     const groups = try page.alloc(state.MaterialGroup, group_count);
     errdefer page.free(groups);
+    const shadow_groups = try page.alloc(state.ShadowGroup, group_count);
+    errdefer page.free(shadow_groups);
+    @memset(shadow_groups, .{});
     {
         var gi: usize = 0;
         var i: usize = 0;
@@ -397,6 +400,7 @@ fn uploadMesh(cmd: *c.SDL_GPUCommandBuffer, dev: *c.SDL_GPUDevice, guid: []const
     gm.idx_count = @intCast(cpu.indices.len);
     gm.submeshes = submeshes;
     gm.material_groups = groups;
+    gm.shadow_groups = shadow_groups;
     gm.bounds_min = cpu.min;
     gm.bounds_max = cpu.max;
     gm.bounds_buf = bounds_buf;

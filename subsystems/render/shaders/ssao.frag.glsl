@@ -17,7 +17,7 @@ layout(set = 3, binding = 0) uniform FragUB {
     mat4 inv_proj;
     mat4 proj;
     vec4 kernel_samples[KERNEL_SIZE]; // xyz = tangent-space offset, w unused
-    vec4 params; // x=radius, y=bias, z=power, w unused
+    vec4 params; // x=radius, y=bias, z=power, w=active tap count
 } ubo;
 
 layout(location = 0) out vec4 out_ao;
@@ -62,7 +62,8 @@ void main() {
     float bias = ubo.params.y;
     float occlusion = 0.0;
 
-    for (int i = 0; i < KERNEL_SIZE; i++) {
+    int taps = clamp(int(ubo.params.w), 1, KERNEL_SIZE);
+    for (int i = 0; i < taps; i++) {
         vec3 sample_pos = frag_pos + (TBN * ubo.kernel_samples[i].xyz) * radius;
 
         vec4 offset = ubo.proj * vec4(sample_pos, 1.0);
@@ -83,6 +84,6 @@ void main() {
         occlusion += (occluder_pos.z >= sample_pos.z + bias ? 1.0 : 0.0) * range_check;
     }
 
-    occlusion = 1.0 - (occlusion / float(KERNEL_SIZE));
+    occlusion = 1.0 - (occlusion / float(taps));
     out_ao = vec4(pow(clamp(occlusion, 0.0, 1.0), ubo.params.z));
 }
