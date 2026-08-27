@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.2] - 2026-08-27
+
+### Performance
+- perf: a lot of changes for the bistro sample
+
 ## [3.6.1] - 2026-08-26
 
 ### Bug Fixes
