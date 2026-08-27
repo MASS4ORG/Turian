@@ -139,6 +139,21 @@ pub fn generateMainZig(
             "}\n\n",
     );
 
+    if (use_gpu) {
+        // Presenting is the loop's only blocking call, so a frame the swapchain
+        // refuses (occluded or minimized window, or no image free) would
+        // otherwise spin a core at full speed. Scripts still tick on those
+        // iterations — game time keeps advancing while occluded — but `delta` is
+        // clamped, so a long stall arrives as one capped step rather than a jump.
+        try out.appendSlice(
+            a,
+            "/// Yields the rest of an iteration the swapchain gave us no image for.\n" ++
+                "fn idleFrame(io: std.Io) void {\n" ++
+                "    io.sleep(std.Io.Duration.fromMilliseconds(4), .awake) catch {};\n" ++
+                "}\n\n",
+        );
+    }
+
     if (uses_ui) {
         // In-game GUI runtime (C4/C9): `UiInstance`/`UiRuntime` are pure data
         // (zero dvui imports, D7) — only the per-frame draw call below needs
@@ -772,7 +787,10 @@ pub fn generateMainZig(
         a,
         "        const now_ts = std.Io.Clock.awake.now(io);\n" ++
             "        const dur    = prev_ts.durationTo(now_ts);\n" ++
-            "        const delta: f32 = @as(f32, @floatFromInt(@as(i64, @intCast(dur.nanoseconds)))) / 1_000_000_000.0;\n" ++
+            "        const _raw_delta: f32 = @as(f32, @floatFromInt(@as(i64, @intCast(dur.nanoseconds)))) / 1_000_000_000.0;\n" ++
+            "        // Clamped before anything integrates it: a hitch or a frame the\n" ++
+            "        // swapchain refused would otherwise arrive as one huge step.\n" ++
+            "        const delta: f32 = @min(_raw_delta, engine.Time.MAX_DELTA);\n" ++
             "        prev_ts = now_ts;\n" ++
             "        elapsed += delta;\n" ++
             "        frame   += 1;\n\n",
@@ -832,6 +850,8 @@ pub fn generateMainZig(
                 "            render.runPostProcess(fr.cmd, fr.swapchain, fr.width, fr.height, _render_nodes);\n" ++
                 "            _ = try dvui_win.end(.{ .manage_backend = false });\n" ++
                 "            fr.submit();\n" ++
+                "        } else {\n" ++
+                "            idleFrame(io);\n" ++
                 "        }\n" ++
                 "        engine.Profiler.endFrame();\n" ++
                 "    }\n" ++
@@ -845,6 +865,8 @@ pub fn generateMainZig(
                 "            render.renderScene(fr.cmd, fr.width, fr.height, _render_nodes);\n" ++
                 "            render.runPostProcess(fr.cmd, fr.swapchain, fr.width, fr.height, _render_nodes);\n" ++
                 "            fr.submit();\n" ++
+                "        } else {\n" ++
+                "            idleFrame(io);\n" ++
                 "        }\n" ++
                 "        engine.Profiler.endFrame();\n" ++
                 "    }\n" ++
@@ -866,6 +888,41 @@ pub fn generateMainZig(
     }
 
     return try out.toOwnedSlice(a);
+}
+
+test "the generated GPU loop yields instead of spinning on a refused frame" {
+    // Presenting is the loop's only blocking call, so both GPU shapes need the
+    // `else` arm — without it an occluded window pins a core (#170).
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
+
+    for ([_]bool{ false, true }) |uses_ui| {
+        const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, true, uses_ui, &.{});
+        try std.testing.expect(std.mem.indexOf(u8, out, "fn idleFrame(io: std.Io) void") != null);
+        try std.testing.expect(std.mem.indexOf(u8, out, "} else {\n            idleFrame(io);\n        }") != null);
+    }
+}
+
+test "the generated loop clamps delta before scripts see it" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
+    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, true, false, &.{});
+    try std.testing.expect(std.mem.indexOf(u8, out, "@min(_raw_delta, engine.Time.MAX_DELTA)") != null);
+}
+
+test "the software-rendered loop needs no swapchain yield" {
+    // It paces on SDL_RenderPresent, not on a GPU swapchain acquire, so emitting
+    // `idleFrame` there would be dead code.
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
+    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, false, false, &.{});
+    try std.testing.expect(std.mem.indexOf(u8, out, "fn idleFrame") == null);
 }
 
 test "generateMainZig emits plugin registration calls" {
