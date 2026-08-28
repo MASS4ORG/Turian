@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.6.3] - 2026-08-28
+
+### Bug Fixes
+- fix: pace the generated game loop when the swapchain refuses a frame #170
+
 ## [3.6.2] - 2026-08-27
 
 ### Performance
