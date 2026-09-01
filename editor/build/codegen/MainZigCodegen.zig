@@ -139,6 +139,21 @@ pub fn generateMainZig(
             "}\n\n",
     );
 
+    // Sleeps out whatever is left of the frame budget. Sits alongside the
+    // swapchain yield below: that one keeps an unpresentable frame from
+    // spinning, this one holds a presentable frame to the requested rate.
+    try out.appendSlice(
+        a,
+        "/// Holds the loop to `Application.frame_cap` fps, if one is set.\n" ++
+            "fn limitFrameRate(io: std.Io, frame_start: std.Io.Timestamp) void {\n" ++
+            "    const budget = g_application.frameBudgetNs();\n" ++
+            "    if (budget == 0) return;\n" ++
+            "    const spent = frame_start.durationTo(std.Io.Clock.awake.now(io)).nanoseconds;\n" ++
+            "    if (spent >= budget) return;\n" ++
+            "    io.sleep(std.Io.Duration.fromNanoseconds(budget - spent), .awake) catch {};\n" ++
+            "}\n\n",
+    );
+
     if (use_gpu) {
         // Presenting is the loop's only blocking call, so a frame the swapchain
         // refuses (occluded or minimized window, or no image free) would
@@ -531,6 +546,16 @@ pub fn generateMainZig(
             "    // shutdown: `frame.service(engine.Application).?.quit()`.\n" ++
             "    g_services.register(engine.Application, &g_application);\n",
     );
+    try out.appendSlice(
+        a,
+        try std.fmt.allocPrint(
+            a,
+            "    // Seeded from ProjectSettings.graphics.frame_cap; a script or a\n" ++
+                "    // settings screen can change it live through the same service.\n" ++
+                "    g_application.frame_cap = {d};\n",
+            .{runtime.frame_cap},
+        ),
+    );
     if (uses_ui) {
         try out.appendSlice(
             a,
@@ -726,6 +751,7 @@ pub fn generateMainZig(
             "    // outside Debug so release builds pay nothing.\n" ++
             "    engine.Profiler.setIo(io);\n\n" ++
             "    main_loop: while (true) {\n" ++
+            "        const _frame_start = std.Io.Clock.awake.now(io);\n" ++
             "        engine.Profiler.beginFrame();\n" ++
             "        g_input.newFrame();\n" ++
             "        var ev: SDL_Event align(8) = undefined;\n",
@@ -854,6 +880,7 @@ pub fn generateMainZig(
                 "            idleFrame(io);\n" ++
                 "        }\n" ++
                 "        engine.Profiler.endFrame();\n" ++
+                "        limitFrameRate(io, _frame_start);\n" ++
                 "    }\n" ++
                 "}\n",
         );
@@ -869,6 +896,7 @@ pub fn generateMainZig(
                 "            idleFrame(io);\n" ++
                 "        }\n" ++
                 "        engine.Profiler.endFrame();\n" ++
+                "        limitFrameRate(io, _frame_start);\n" ++
                 "    }\n" ++
                 "}\n",
         );
@@ -882,6 +910,7 @@ pub fn generateMainZig(
                 "        _ = SDL_RenderTexture(renderer, sdl_tex, null, null);\n" ++
                 "        _ = SDL_RenderPresent(renderer);\n" ++
                 "        engine.Profiler.endFrame();\n" ++
+                "        limitFrameRate(io, _frame_start);\n" ++
                 "    }\n" ++
                 "}\n",
         );
@@ -903,6 +932,34 @@ test "the generated GPU loop yields instead of spinning on a refused frame" {
         try std.testing.expect(std.mem.indexOf(u8, out, "fn idleFrame(io: std.Io) void") != null);
         try std.testing.expect(std.mem.indexOf(u8, out, "} else {\n            idleFrame(io);\n        }") != null);
     }
+}
+
+test "the generated loop is frame-limited in every shape" {
+    // The limiter sits after endFrame so the sleep is not counted as frame work,
+    // and all three loop shapes (GPU+UI, GPU, software) need it.
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid", .frame_cap = 60 };
+
+    for ([_][2]bool{ .{ true, true }, .{ true, false }, .{ false, false } }) |cfg| {
+        const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, cfg[0], cfg[1], &.{});
+        try std.testing.expect(std.mem.indexOf(u8, out, "fn limitFrameRate(io: std.Io, frame_start: std.Io.Timestamp) void") != null);
+        try std.testing.expect(std.mem.indexOf(u8, out, "engine.Profiler.endFrame();\n        limitFrameRate(io, _frame_start);") != null);
+        try std.testing.expect(std.mem.indexOf(u8, out, "g_application.frame_cap = 60;") != null);
+    }
+}
+
+test "an uncapped project still emits the limiter, disabled" {
+    // `frame_cap = 0` must reach the generated source as a real zero rather than
+    // silently omitting the call, so a settings screen can raise it at runtime.
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const a = arena_state.allocator();
+    const runtime = RuntimeConfig{ .boot_scene_guid = "test-guid" };
+    const out = try generateMainZig(a, "/proj", &.{}, &.{}, 0, runtime, true, false, &.{});
+    try std.testing.expect(std.mem.indexOf(u8, out, "g_application.frame_cap = 0;") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out, "limitFrameRate(io, _frame_start);") != null);
 }
 
 test "the generated loop clamps delta before scripts see it" {

@@ -25,6 +25,9 @@ pub const Config = struct {
     /// `ProjectSettings.graphics.quality` preset to apply before recording, so a
     /// quality level's cost can be measured headlessly. Empty leaves it alone.
     quality: []const u8 = "",
+    /// Overrides `Features.render_scale` after any `--quality` preset, so the
+    /// one toggle can be measured on its own. 0 leaves it alone.
+    render_scale: f32 = 0,
     frames: u32 = 120,
     warmup: u32 = 40,
     /// Disable vsync and drive frames back to back. Off by default: an uncapped
@@ -92,6 +95,10 @@ pub fn parseArg(arg: []const u8, args: anytype, cfg: *Config) bool {
         cfg.uncapped = true;
         return true;
     }
+    if (std.mem.eql(u8, arg, "--render-scale")) {
+        if (args.next()) |v| cfg.render_scale = std.fmt.parseFloat(f32, v) catch cfg.render_scale;
+        return true;
+    }
     if (std.mem.eql(u8, arg, "--quality")) {
         if (args.next()) |v| cfg.quality = v;
         return true;
@@ -112,6 +119,13 @@ pub fn qualityPreset() ?engine.ProjectSettings.Graphics.Quality {
         log.warn("unknown --quality '{s}'; leaving the feature set alone", .{g_cfg.quality});
         return null;
     };
+}
+
+/// The `--render-scale` override, or null when unset. Applied after the
+/// `--quality` preset so the two compose.
+pub fn renderScaleOverride() ?f32 {
+    if (!g_cfg.enabled or g_cfg.render_scale <= 0) return null;
+    return g_cfg.render_scale;
 }
 
 /// A viewport camera pose, reported rather than applied so this module stays

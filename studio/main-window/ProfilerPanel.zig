@@ -97,6 +97,18 @@ fn renderingControls() void {
     {
         var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
         defer row.deinit();
+        gui.label(@src(), "{s}", .{tr("render scale")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
+        inline for (.{ 50, 75, 100 }, 0..) |pct, i| {
+            const v: f32 = @as(f32, @floatFromInt(pct)) / 100.0;
+            if (featBtn(std.fmt.comptimePrint("{d}%", .{pct}), @abs(f.render_scale - v) < 0.001, i)) {
+                f.render_scale = v;
+                changed = true;
+            }
+        }
+    }
+    {
+        var row = gui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal });
+        defer row.deinit();
         gui.label(@src(), "{s}", .{tr("msaa")}, .{ .gravity_y = 0.5, .padding = .{ .w = 6 } });
         inline for (.{ 1, 2, 4, 8 }, 0..) |n, i| {
             if (featBtn(std.fmt.comptimePrint("{d}x", .{n}), f.msaa == n, i)) {

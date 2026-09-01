@@ -12,6 +12,8 @@ pub const RuntimeConfig = struct {
     /// `ProjectSettings.graphics.quality`, baked as the renderer feature preset
     /// the shipped game applies at startup (same treatment as width/height/vsync).
     quality: []const u8 = "high",
+    /// `ProjectSettings.graphics.frame_cap` — the loop's initial fps ceiling.
+    frame_cap: u32 = 0,
     /// GUID of the scene the game boots into (loaded through the SceneManager,
     ///). Empty if no scene could be resolved.
     boot_scene_guid: []const u8 = "",

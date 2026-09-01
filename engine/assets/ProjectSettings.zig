@@ -52,6 +52,10 @@ pub const ProjectSettings = struct {
         vsync: bool = true,
         fullscreen: bool = false,
         quality: Quality = .high,
+        /// Frames per second the shipped game holds itself to; 0 leaves pacing
+        /// to presentation (vsync). Seeds `engine.Application.frame_cap`, which
+        /// a script or settings screen can then change at runtime.
+        frame_cap: u32 = 0,
 
         pub const Quality = enum { low, medium, high, ultra };
     };

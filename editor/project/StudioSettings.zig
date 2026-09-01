@@ -41,12 +41,12 @@ pub const Camera = struct {
     /// Degrees per pixel of mouse movement while looking (RMB drag).
     look_sensitivity: f32 = 0.18,
     /// World units per mouse-wheel notch (dolly).
-    zoom_speed: f32 = 0.6,
+    zoom_fraction: f32 = 0.15,
 
     pub const turian_hints = struct {
         pub const move_speed = FieldHint{ .min = 0.1, .max = 50.0, .widget = .slider_entry, .tooltip = "Free-look movement speed, in world units per second." };
         pub const look_sensitivity = FieldHint{ .min = 0.01, .max = 2.0, .widget = .slider_entry, .tooltip = "Mouse-look sensitivity, in degrees per pixel." };
-        pub const zoom_speed = FieldHint{ .min = 0.1, .max = 10.0, .widget = .slider_entry, .tooltip = "Scroll-wheel dolly speed, in world units per notch." };
+        pub const zoom_fraction = FieldHint{ .min = 0.02, .max = 0.5, .widget = .slider_entry, .tooltip = "Scroll-wheel dolly per notch, as a fraction of the distance to what the view is looking at." };
     };
 };
 
@@ -128,7 +128,7 @@ pub const StudioSettings = struct {
     const KEY_TAB_TITLE_MAX = "editor.tab_title_max";
     const KEY_CAM_MOVE_SPEED = "editor.camera.move_speed";
     const KEY_CAM_LOOK_SENSITIVITY = "editor.camera.look_sensitivity";
-    const KEY_CAM_ZOOM_SPEED = "editor.camera.zoom_speed";
+    const KEY_CAM_ZOOM_FRACTION = "editor.camera.zoom_fraction";
     const KEY_NAME_CHAR_LENGTH = "asset_browser.name_char_length";
     const KEY_HIDE_EXTENSIONS = "asset_browser.hide_extensions";
     // `pub` — reused verbatim by `studio/main-window/ThemeMenu.zig`, which
@@ -156,7 +156,7 @@ pub const StudioSettings = struct {
         self.general.tab_title_max = s.getInt(KEY_TAB_TITLE_MAX, self.general.tab_title_max);
         self.camera.move_speed = @floatCast(s.getFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed));
         self.camera.look_sensitivity = @floatCast(s.getFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity));
-        self.camera.zoom_speed = @floatCast(s.getFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed));
+        self.camera.zoom_fraction = @floatCast(s.getFloat(KEY_CAM_ZOOM_FRACTION, self.camera.zoom_fraction));
         self.asset_browser.name_char_length = s.getInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
         self.asset_browser.hide_extensions = s.getBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
         self.ui.theme_name = s.getString(KEY_UI_THEME_NAME, self.ui.theme_name);
@@ -176,7 +176,7 @@ pub const StudioSettings = struct {
         try s.setInt(KEY_TAB_TITLE_MAX, self.general.tab_title_max);
         try s.setFloat(KEY_CAM_MOVE_SPEED, self.camera.move_speed);
         try s.setFloat(KEY_CAM_LOOK_SENSITIVITY, self.camera.look_sensitivity);
-        try s.setFloat(KEY_CAM_ZOOM_SPEED, self.camera.zoom_speed);
+        try s.setFloat(KEY_CAM_ZOOM_FRACTION, self.camera.zoom_fraction);
         try s.setInt(KEY_NAME_CHAR_LENGTH, self.asset_browser.name_char_length);
         try s.setBool(KEY_HIDE_EXTENSIONS, self.asset_browser.hide_extensions);
         try s.setString(KEY_UI_THEME_NAME, self.ui.theme_name);

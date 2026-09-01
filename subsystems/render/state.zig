@@ -330,6 +330,11 @@ pub var detailed_gpu_timing: bool = false;
 /// seeds. Every default reproduces the renderer's previously hardcoded behaviour,
 /// so an untouched `Features` renders exactly as before.
 pub const Features = struct {
+    /// Scene rendered at this fraction of the output resolution and upsampled
+    /// by the composite pass. Gizmos share the scaled buffer (they are composited
+    /// with the scene), but the editor's own UI is drawn separately and stays
+    /// crisp. 1.0 disables the path entirely.
+    render_scale: f32 = 1.0,
     /// Scene-pass MSAA samples; clamped to what the device actually supports.
     /// Pipelines bake this in, so a change rebuilds the scene pipeline cache.
     msaa: u8 = 4,

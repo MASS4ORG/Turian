@@ -495,6 +495,11 @@ fn run(main_init: std.process.Init) !void {
                     // Applied before warmup so the recorded frames are all at
                     // the requested quality, not a mix across the preset change.
                     if (Benchmark.qualityPreset()) |q| render.setFeatures(render.featuresForQuality(q));
+                    if (Benchmark.renderScaleOverride()) |rs| {
+                        var f = render.features();
+                        f.render_scale = rs;
+                        render.setFeatures(f);
+                    }
                     // Nothing renders unless the Scene panel is its leaf's active tab.
                     if (!LayoutStore.focusPanelTransient("scene"))
                         log.err("no Scene panel in the layout — the benchmark will measure an idle editor", .{});

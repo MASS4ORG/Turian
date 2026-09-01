@@ -68,8 +68,8 @@ var cam_settings_loaded = false;
 
 const CAM_MOVE_KEY = "editor.camera.move_speed";
 const CAM_LOOK_KEY = "editor.camera.look_sensitivity";
-const CAM_ZOOM_KEY = "editor.camera.zoom_speed";
-const CAM_PAN_KEY = "editor.camera.pan_speed";
+const CAM_ZOOM_KEY = "editor.camera.zoom_fraction";
+const CAM_PAN_KEY = "editor.camera.pan_scale";
 
 /// Draw the Scene panel — the edit-time 3D viewport: editor-camera
 /// free-look, gizmo interaction, billboard icons. Always shows the editor
@@ -287,12 +287,8 @@ fn drawCameraMenu() void {
         var changed = false;
         if (speedRow(tr("Move speed"), &EditorCamera.move_speed, 0.5, 40, 0.5, "{d:0.1}", 1)) changed = true;
         if (speedRow(tr("Look sens."), &EditorCamera.look_sensitivity, 0.02, 1.0, 0.01, "{d:0.2}", 2)) changed = true;
-        // Plain number field, not a slider: the useful range spans two orders
-        // of magnitude (a single wheel notch should stay a small nudge even at
-        // close range), which a slider's fixed drag distance can't resolve
-        // precisely — dragging it barely moves the value at the low end.
-        if (numberRow(tr("Zoom speed"), &EditorCamera.zoom_speed, 0.001, 4.0, 3)) changed = true;
-        if (speedRow(tr("Pan speed"), &EditorCamera.pan_speed, 0.002, 0.1, 0.001, "{d:0.3}", 4)) changed = true;
+        if (speedRow(tr("Zoom speed"), &EditorCamera.zoom_fraction, 0.02, 0.5, 0.01, "{d:0.2}", 3)) changed = true;
+        if (speedRow(tr("Pan speed"), &EditorCamera.pan_scale, 0.1, 3.0, 0.05, "{d:0.2}", 4)) changed = true;
 
         if (changed) saveCameraSettings();
     }
@@ -341,8 +337,8 @@ fn loadCameraSettings() void {
     const s = &EditorState.settings;
     EditorCamera.move_speed = @floatCast(s.getFloat(CAM_MOVE_KEY, EditorCamera.move_speed));
     EditorCamera.look_sensitivity = @floatCast(s.getFloat(CAM_LOOK_KEY, EditorCamera.look_sensitivity));
-    EditorCamera.zoom_speed = @floatCast(s.getFloat(CAM_ZOOM_KEY, EditorCamera.zoom_speed));
-    EditorCamera.pan_speed = @floatCast(s.getFloat(CAM_PAN_KEY, EditorCamera.pan_speed));
+    EditorCamera.zoom_fraction = @floatCast(s.getFloat(CAM_ZOOM_KEY, EditorCamera.zoom_fraction));
+    EditorCamera.pan_scale = @floatCast(s.getFloat(CAM_PAN_KEY, EditorCamera.pan_scale));
 }
 
 fn saveCameraSettings() void {
@@ -350,8 +346,8 @@ fn saveCameraSettings() void {
     const s = &EditorState.settings;
     s.setFloat(CAM_MOVE_KEY, EditorCamera.move_speed) catch {};
     s.setFloat(CAM_LOOK_KEY, EditorCamera.look_sensitivity) catch {};
-    s.setFloat(CAM_ZOOM_KEY, EditorCamera.zoom_speed) catch {};
-    s.setFloat(CAM_PAN_KEY, EditorCamera.pan_speed) catch {};
+    s.setFloat(CAM_ZOOM_KEY, EditorCamera.zoom_fraction) catch {};
+    s.setFloat(CAM_PAN_KEY, EditorCamera.pan_scale) catch {};
     s.save(gui.io);
 }
 
@@ -396,10 +392,10 @@ fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physi
                 if (ke.action == .repeat) continue;
                 const pressed = ke.action != .up;
                 switch (ke.code) {
-                    .w => inst.nav_fwd = pressed,
-                    .s => inst.nav_back = pressed,
-                    .a => inst.nav_left = pressed,
-                    .d => inst.nav_right = pressed,
+                    .w, .up => inst.nav_fwd = pressed,
+                    .s, .down => inst.nav_back = pressed,
+                    .a, .left => inst.nav_left = pressed,
+                    .d, .right => inst.nav_right = pressed,
                     .e => inst.nav_up = pressed,
                     .q => inst.nav_down = pressed,
                     .left_shift, .right_shift => inst.nav_fast = pressed,
@@ -451,6 +447,7 @@ fn gatherNav(inst: *InstanceState, content: *gui.BoxWidget, phys: gui.Rect.Physi
         .up = inst.nav_up,
         .down = inst.nav_down,
         .fast = inst.nav_fast,
+        .viewport_height = phys.h,
         .dt = gui.secondsSinceLastFrame(),
     };
 }

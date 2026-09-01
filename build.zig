@@ -376,6 +376,21 @@ pub fn build(b: *std.Build) void {
         const preview_camera_tests = b.addTest(.{ .root_module = preview_camera_test_mod });
         test_step.dependOn(&b.addRunArtifact(preview_camera_tests).step);
 
+        // Scene-view navigation math (`studio/scene-view/EditorCamera.zig`) is
+        // the same shape: engine + render only, no gui/dvui, so it tests
+        // standalone rather than dragging the whole editor in.
+        const editor_camera_test_mod = b.createModule(.{
+            .root_source_file = b.path("studio/scene-view/EditorCamera.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "engine", .module = engine_mod },
+                .{ .name = "render", .module = render_test_mod },
+            },
+        });
+        const editor_camera_tests = b.addTest(.{ .root_module = editor_camera_test_mod });
+        test_step.dependOn(&b.addRunArtifact(editor_camera_tests).step);
+
         // Headless benchmark harness. Only needs engine + editor, so it tests
         // standalone like preview_camera_tests above.
         const benchmark_test_mod = b.createModule(.{

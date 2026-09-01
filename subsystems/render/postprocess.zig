@@ -374,8 +374,12 @@ pub fn run(
     sampler: *c.SDL_GPUSampler,
     hdr_color: *c.SDL_GPUTexture,
     color_tex: *c.SDL_GPUTexture,
-    w: u32,
-    h: u32,
+    /// Size of `hdr_color`, which `Features.render_scale` may have shrunk.
+    src_w: u32,
+    src_h: u32,
+    /// Size of `color_tex`; the composite upsamples into it.
+    dst_w: u32,
+    dst_h: u32,
     settings: PostProcessSettings,
 ) void {
     var zone = engine.Profiler.passZone("render.postprocess");
@@ -386,9 +390,9 @@ pub fn run(
     // Bloom reads from the original hdr_color, not from the custom-effect chain.
     // The global toggle overrides whatever the volumes resolved to.
     const bloom_tex = if (state.features.bloom)
-        (runBloom(cmd, dev, sampler, hdr_color, w, h, settings) orelse black)
+        (runBloom(cmd, dev, sampler, hdr_color, src_w, src_h, settings) orelse black)
     else
         black;
-    const final_hdr = runCustomEffects(cmd, dev, sampler, hdr_color, w, h);
-    runComposite(cmd, composite_p, sampler, final_hdr, bloom_tex, color_tex, w, h, settings);
+    const final_hdr = runCustomEffects(cmd, dev, sampler, hdr_color, src_w, src_h);
+    runComposite(cmd, composite_p, sampler, final_hdr, bloom_tex, color_tex, dst_w, dst_h, settings);
 }

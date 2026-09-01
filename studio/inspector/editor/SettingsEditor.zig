@@ -86,7 +86,7 @@ pub fn save() void {
     EditorState.settings.save(gui.io);
     EditorCamera.move_speed = model.camera.move_speed;
     EditorCamera.look_sensitivity = model.camera.look_sensitivity;
-    EditorCamera.zoom_speed = model.camera.zoom_speed;
+    EditorCamera.zoom_fraction = model.camera.zoom_fraction;
     AssetTileLayout.max_name_chars = model.asset_browser.name_char_length;
     AssetTileLayout.hide_extensions = model.asset_browser.hide_extensions;
     applyUiTheme();

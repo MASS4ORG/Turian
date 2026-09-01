@@ -178,12 +178,28 @@ pub fn sceneCamera(w: u32, h: u32, objects: []const engine.SceneNode) Camera {
     };
 }
 
+/// The internal resolution a `w`x`h` output is rendered at, after
+/// `Features.render_scale`. The composite pass upsamples back to `w`x`h`, so
+/// every caller stays in output space and only the renderer knows the
+/// difference. Uniform, so the projection's aspect is unchanged.
+pub fn renderSize(w: u32, h: u32) struct { w: u32, h: u32 } {
+    const s = state.features.render_scale;
+    if (s >= 0.999) return .{ .w = w, .h = h };
+    const fw = @round(@as(f32, @floatFromInt(w)) * s);
+    const fh = @round(@as(f32, @floatFromInt(h)) * s);
+    return .{
+        .w = @max(1, @as(u32, @intFromFloat(fw))),
+        .h = @max(1, @as(u32, @intFromFloat(fh))),
+    };
+}
+
 /// The HDR resolve target for a `w`x`h` pass rendered this frame (via
 /// `renderScene`), or null if none exists yet. Gizmo overlays must draw into
 /// this — not the final `color_tex` — so post-processing (tonemap, grading,
 /// vignette, bloom) applies to the combined scene+gizmo image. See `runPostProcess`.
 pub fn hdrColorFor(w: u32, h: u32) ?*c.SDL_GPUTexture {
-    const target = state.findTarget(w, h) orelse return null;
+    const rs = renderSize(w, h);
+    const target = state.findTarget(rs.w, rs.h) orelse return null;
     return target.hdr_color;
 }
 
@@ -200,7 +216,8 @@ pub fn renderGizmos(
     verts: []const GizmoVertex,
     overlay: bool,
 ) void {
-    gizmos.renderGizmos(cmd, hdr_color, w, h, view_proj, verts, overlay);
+    const rs = renderSize(w, h);
+    gizmos.renderGizmos(cmd, hdr_color, rs.w, rs.h, view_proj, verts, overlay);
 }
 
 /// Composite the HDR scene (and any gizmos drawn into `hdrColorFor(w, h)`
@@ -218,7 +235,8 @@ pub fn runPostProcess(
     const sampler = state.sampler orelse return;
     const hdr_color = hdrColorFor(w, h) orelse return;
     const cam = sceneCamera(w, h, objects);
-    postprocess.run(cmd, dev, sampler, hdr_color, color_tex, w, h, cam.post);
+    const rs = renderSize(w, h);
+    postprocess.run(cmd, dev, sampler, hdr_color, color_tex, rs.w, rs.h, w, h, cam.post);
 }
 
 /// Register the GUID→bytes callbacks (mesh / texture / material). Call once
@@ -367,6 +385,7 @@ pub fn featuresForQuality(q: engine.ProjectSettings.Graphics.Quality) state.Feat
     return switch (q) {
         .low => .{
             .msaa = 1,
+            .render_scale = 0.75,
             .ssao_half_res = true,
             .ssao_samples = 8,
             .ssr = false,
@@ -402,6 +421,7 @@ fn applyFeatures(dev: *c.SDL_GPUDevice, next: state.Features) void {
     const prev = state.features;
     state.features = next;
     state.features.cascade_count = @max(1, @min(next.cascade_count, types.NUM_CASCADES));
+    state.features.render_scale = @max(0.25, @min(next.render_scale, 1.0));
 
     if (prev.msaa != state.features.msaa) {
         draw.destroyScenePipelines(dev);
@@ -417,8 +437,8 @@ fn applyFeatures(dev: *c.SDL_GPUDevice, next: state.Features) void {
 
 pub fn renderScene(
     cmd: *c.SDL_GPUCommandBuffer,
-    w: u32,
-    h: u32,
+    out_w: u32,
+    out_h: u32,
     objects: []const engine.SceneNode,
 ) void {
     var scene_zone = engine.Profiler.zone("render.scene");
@@ -426,11 +446,17 @@ pub fn renderScene(
 
     const dev = state.device orelse return;
     const sampler = state.sampler orelse return;
-    if (w == 0 or h == 0) return;
+    if (out_w == 0 or out_h == 0) return;
     if (state.pending_features) |next| {
         applyFeatures(dev, next);
         state.pending_features = null;
     }
+    // Everything below draws at the scaled resolution; `runPostProcess` puts it
+    // back to `out_w`x`out_h`. Resolved after the pending feature set is applied
+    // so a scale change takes effect on the frame that requested it.
+    const rs = renderSize(out_w, out_h);
+    const w = rs.w;
+    const h = rs.h;
     state.frame_seq += 1;
 
     if (state.white_tex == null)
@@ -920,4 +946,24 @@ test {
     std.testing.refAllDecls(@This());
     _ = types;
     _ = state;
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+test "renderSize is a no-op at full scale and never collapses to zero" {
+    defer state.features = .{};
+
+    state.features = .{};
+    try std.testing.expectEqual(@as(u32, 1280), renderSize(1280, 720).w);
+    try std.testing.expectEqual(@as(u32, 720), renderSize(1280, 720).h);
+
+    state.features = .{ .render_scale = 0.5 };
+    try std.testing.expectEqual(@as(u32, 640), renderSize(1280, 720).w);
+    try std.testing.expectEqual(@as(u32, 360), renderSize(1280, 720).h);
+
+    // A viewport can legitimately be a couple of pixels wide while a dock split
+    // is dragged; a zero-sized target would fail to create.
+    state.features = .{ .render_scale = 0.25 };
+    try std.testing.expect(renderSize(2, 1).w >= 1);
+    try std.testing.expect(renderSize(2, 1).h >= 1);
 }
