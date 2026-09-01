@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.7.0] - 2026-09-01
+
+### Features
+- feat: distance-proportional scene-view zoom and pan #150
+
 ## [3.6.3] - 2026-08-28
 
 ### Bug Fixes
