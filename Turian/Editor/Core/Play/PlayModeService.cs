@@ -180,6 +180,14 @@ public sealed class PlayModeService(
         playServices?.Dispose();
         playServices = null;
 
+        // The session ran on its own IAssetLoader (see BuildPlayServices), so whatever it mutated
+        // through LoadDataAsync's shared cache is already gone with it. This is the belt-and-braces
+        // twin for any editor-side code that reads DataAssets through the editor's own loader instead:
+        // discard its non-persistent cache too, so it reflects the authored values, never a stale
+        // in-memory value the disk was never actually written to.
+        if (editorServices.GetService(typeof(IAssetLoader)) is IAssetLoader editorLoader)
+            editorLoader.ReleaseAllNonPersistentData();
+
         // Back to the edited scene; everything the session changed goes away with the copy.
         sceneTree.ShowEditorScene();
 

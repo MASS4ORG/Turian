@@ -34,4 +34,36 @@ public interface IAssetLoader
     /// instance exist before calling this method.
     /// </summary>
     void Release(Guid assetId);
+
+    /// <summary>
+    /// Loads a <c>DataAsset</c> payload's content, or returns the cached instance if already
+    /// loaded. Every caller that loads the same <paramref name="dataAssetId"/> receives the same
+    /// object, so mutating it is visible to everyone reading it afterward — the intended way to
+    /// model shared runtime state ("SOAP variables"). Prefer <see cref="DataAsset.Instantiate"/>
+    /// for per-instance data that should not be shared.
+    /// </summary>
+    /// <remarks>
+    /// This is a separate cache from <see cref="LoadAsync{TAsset}"/>'s: that one resolves the
+    /// <c>DataAssetAsset</c> metadata (its path and id), this one resolves the payload the metadata
+    /// points at. <c>DataAssetAsset.GetContent</c> called directly bypasses this cache entirely and
+    /// always returns a fresh, independent instance — use it only where sharing is not wanted.
+    /// </remarks>
+    /// <param name="dataAssetId">The identifier of the <c>DataAssetAsset</c> metadata asset.</param>
+    Task<DataAsset?> LoadDataAsync(Guid dataAssetId);
+
+    /// <summary>
+    /// Returns the cached <c>DataAsset</c> content when one is available for the given identifier.
+    /// Does not load it from disk.
+    /// </summary>
+    /// <param name="dataAssetId">The identifier of the <c>DataAssetAsset</c> metadata asset.</param>
+    /// <param name="content">The cached content, or <c>null</c> when not yet loaded.</param>
+    bool TryGetLoadedData(Guid dataAssetId, out DataAsset? content);
+
+    /// <summary>
+    /// Evicts every cached <c>DataAsset</c> whose declared <see cref="DataAssetPolicy"/> is not
+    /// <see cref="DataAssetPolicy.Persistent"/>, so the next <see cref="LoadDataAsync"/> call
+    /// re-reads it from disk. Called when Play Mode ends, to discard whatever a session mutated:
+    /// the disk copy was never written to, so this is what "reset on play" restores from.
+    /// </summary>
+    void ReleaseAllNonPersistentData();
 }

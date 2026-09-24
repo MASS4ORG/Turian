@@ -457,4 +457,53 @@ public class PlayModeServiceTests : IDisposable
 
         Assert.Same(runningB, playMode.ActiveCamera);
     }
+
+    /// <summary>
+    /// Stopping evicts non-persistent <c>DataAsset</c> content from the editor's own
+    /// <see cref="IAssetLoader"/> too — belt-and-braces alongside the session's own loader, which
+    /// <see cref="PlayModeService.Stop"/> already discards outright by disposing the play scope.
+    /// </summary>
+    [Fact]
+    public async Task Stop_EvictsNonPersistentDataFromTheEditorsOwnLoader()
+    {
+        var editorLoader = new RuntimeAssetLoader(assetDatabase);
+        var session = new PlayModeService(sceneTree, assetDatabase, new SingleServiceProvider(editorLoader), Log.Logger);
+
+        var projectRoot = Path.Combine(Path.GetTempPath(), $"turian-playmode-data-{Guid.NewGuid():N}");
+        var assetsRoot = Path.Combine(projectRoot, "Assets");
+        Directory.CreateDirectory(assetsRoot);
+        try
+        {
+            var assetPath = Path.Combine(assetsRoot, "counter.dataasset");
+            var meta = new DataAssetAsset { RelativePath = assetPath };
+            Serializer.Save(assetPath, new DataAssetTest { Int = 1 });
+            Serializer.Save($"{assetPath}.meta", meta);
+            Assert.True(assetDatabase.RegisterAsset(meta));
+
+            var loaded = (DataAssetTest)(await editorLoader.LoadDataAsync(meta.Id))!;
+            loaded.Int = 999; // some editor-side tool mutating shared state through the editor's own loader
+
+            var root = new Node { Name = "Root" };
+            root.Awake(null);
+            typeof(SceneTreeController)
+                .GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(sceneTree, root);
+
+            Assert.True(session.Start());
+            session.Stop();
+
+            var afterStop = (DataAssetTest)(await editorLoader.LoadDataAsync(meta.Id))!;
+            Assert.Equal(1, afterStop.Int);
+        }
+        finally
+        {
+            Directory.Delete(projectRoot, recursive: true);
+        }
+    }
+
+    /// <summary>Resolves exactly one service, the way a real container would for the one type registered.</summary>
+    sealed class SingleServiceProvider(object service) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType.IsInstanceOfType(service) ? service : null;
+    }
 }

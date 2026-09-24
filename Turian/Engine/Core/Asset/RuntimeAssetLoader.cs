@@ -12,6 +12,8 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     readonly AssetDatabase assetDatabase;
     readonly Dictionary<Guid, Asset> cache = new();
     readonly Dictionary<Guid, Task<Asset?>> inflight = new();
+    readonly Dictionary<Guid, DataAsset> dataCache = new();
+    readonly Dictionary<Guid, Task<DataAsset?>> dataInflight = new();
     readonly object gate = new();
 
     /// <summary>
@@ -72,6 +74,105 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         {
             cache.Remove(assetId);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<DataAsset?> LoadDataAsync(Guid dataAssetId)
+    {
+        if (dataAssetId == Guid.Empty)
+        {
+            return null;
+        }
+
+        Task<DataAsset?> task;
+        lock (gate)
+        {
+            if (dataCache.TryGetValue(dataAssetId, out var cached))
+            {
+                return cached;
+            }
+
+            if (!dataInflight.TryGetValue(dataAssetId, out task!))
+            {
+                task = LoadDataCoreAsync(dataAssetId);
+                dataInflight[dataAssetId] = task;
+            }
+        }
+
+        return await task.ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public bool TryGetLoadedData(Guid dataAssetId, out DataAsset? content)
+    {
+        lock (gate)
+        {
+            if (dataCache.TryGetValue(dataAssetId, out var cached))
+            {
+                content = cached;
+                return true;
+            }
+        }
+
+        content = null;
+        return false;
+    }
+
+    /// <inheritdoc />
+    public void ReleaseAllNonPersistentData()
+    {
+        lock (gate)
+        {
+            var stale = dataCache
+                .Where(pair => DataAssetPolicyAttribute.Resolve(pair.Value.GetType()) != DataAssetPolicy.Persistent)
+                .Select(pair => pair.Key)
+                .ToList();
+
+            foreach (var id in stale)
+            {
+                dataCache.Remove(id);
+            }
+        }
+    }
+
+    async Task<DataAsset?> LoadDataCoreAsync(Guid dataAssetId)
+    {
+        try
+        {
+            var content = await Task.Run(() => LoadDataFromDisk(dataAssetId)).ConfigureAwait(false);
+
+            lock (gate)
+            {
+                if (content is not null)
+                {
+                    dataCache[dataAssetId] = content;
+                }
+                dataInflight.Remove(dataAssetId);
+            }
+
+            return content;
+        }
+        catch
+        {
+            lock (gate)
+            {
+                dataInflight.Remove(dataAssetId);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Loads the metadata asset fresh (bypassing <see cref="cache"/> — this runs off the UI thread
+    /// and the metadata is only a means to find the payload, not something worth caching twice) and
+    /// reads the payload it points at.
+    /// </summary>
+    DataAsset? LoadDataFromDisk(Guid dataAssetId)
+    {
+        if (LoadFromDisk(dataAssetId) is not DataAssetAsset metadata) return null;
+        if (!assetDatabase.TryGetAsset(dataAssetId, out var record) || record is null) return null;
+
+        return metadata.GetContent(record.ProjectRootPath);
     }
 
     async Task<Asset?> LoadCoreAsync(Guid assetId)
