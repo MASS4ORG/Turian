@@ -1,0 +1,32 @@
+app-id: org.MASS4.Turian
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.dotnet10
+build-options:
+  append-path: /usr/lib/sdk/dotnet10/bin
+  append-ld-library-path: /usr/lib/sdk/dotnet10/lib
+  prepend-pkg-config-path: /usr/lib/sdk/dotnet10/lib/pkgconfig
+command: turian-studio
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=network
+  - --filesystem=home
+  - --env=DOTNET_ROOT=/app/lib/dotnet
+modules:
+  - name: turian
+    buildsystem: simple
+    build-commands:
+      - /usr/lib/sdk/dotnet10/bin/install-sdk.sh
+      - dotnet publish Turian/Editor/Studio/Turian.Editor.Studio.csproj -c Release -r linux-x64 --self-contained false -o /app/lib/turian/lib -p:GuinevereLocalPath= -p:GuineverePackageExcludeAssets=none
+      - install -Dm755 .nuke/packaging/flatpak/turian-studio /app/bin/turian-studio
+      - install -Dm644 .nuke/packaging/flatpak/org.MASS4.Turian.desktop /app/share/applications/org.MASS4.Turian.desktop
+      - install -Dm644 .nuke/packaging/flatpak/org.MASS4.Turian.metainfo.xml /app/share/metainfo/org.MASS4.Turian.metainfo.xml
+      - install -Dm644 .nuke/packaging/flatpak/org.MASS4.Turian.svg /app/share/icons/hicolor/scalable/apps/org.MASS4.Turian.svg
+    sources:
+      - type: dir
+        path: ../../..

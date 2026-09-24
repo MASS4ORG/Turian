@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <PackageId>MASS4.Turian.Engine.Core</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+
+    <!-- External libraries -->
+    <ItemGroup>
+        <PackageReference Include="Silk.NET.Input" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Windowing.Common" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Windowing.Glfw" Version="2.23.0"/>
+        <PackageReference Include="StbImageSharp" Version="2.30.16" />
+        <PackageReference Include="Silk.NET.Input.Extensions" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.23.0"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+        <PackageReference Include="System.IO.Hashing" Version="10.0.12" />
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="**/*.spv"/>
+    </ItemGroup>
+</Project>

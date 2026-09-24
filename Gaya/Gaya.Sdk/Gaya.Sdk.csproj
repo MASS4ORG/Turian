@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Gaya.Sdk</RootNamespace>
+        <AssemblyName>Gaya.Sdk</AssemblyName>
+        <PackageId>MASS4.Gaya.Sdk</PackageId>
+        <Title>Gaya SDK</Title>
+        <Description>The Gaya plugin contract: IPlugin, the plugin context and the panel, command, menu, key-binding and chrome registries a plugin contributes through. The only assembly a Gaya plugin needs to reference.</Description>
+    </PropertyGroup>
+
+    <!-- Guinevere window. Local checkout in dev; falls back to the published package. -->
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MASS4.Guinevere" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
+    </ItemGroup>
+
+</Project>

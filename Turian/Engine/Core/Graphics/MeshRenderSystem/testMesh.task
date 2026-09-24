@@ -1,0 +1,22 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(push_constant) uniform Push 
+{
+	mat4 modelMatrix;
+	mat4 normalMatrix;
+} push;
+
+layout(set = 0, binding = 1) buffer SboMeshTest
+{
+	uint triangleCount;
+	float triangleSpacing;
+	float triangleHeight;
+	float triangleWidth;
+} sbo;
+
+
+void main()
+{
+	EmitMeshTasksEXT(sbo.triangleCount, 1, 1);
+}

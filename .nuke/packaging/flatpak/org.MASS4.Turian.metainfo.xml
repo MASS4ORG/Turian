@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.MASS4.Turian</id>
+  <name>Turian Studio</name>
+  <summary>Game engine editor and automation tools</summary>
+  <metadata_license>MPL</metadata_license>
+  <project_license>MPL</project_license>
+  <url type="homepage">https://Turian.MASS4.org/</url>
+  <description><p>Turian is a .NET game engine and editor built on Gaya.</p></description>
+  <launchable type="desktop-id">org.MASS4.Turian.desktop</launchable>
+  <provides><binary>turian-studio</binary></provides>
+  <content_rating type="oars-1.1" />
+</component>

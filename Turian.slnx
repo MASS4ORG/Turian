@@ -1,0 +1,32 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Editor/">
+    <Project Path="Turian/Editor/CLI/Turian.Editor.CLI.csproj" />
+    <Project Path="Turian/Editor/Bootstrap/Turian.Editor.Bootstrap.csproj" />
+    <Project Path="Turian/Editor/Core/Turian.Editor.Core.csproj" />
+    <Project Path="Turian/Editor/Studio/Turian.Editor.Studio.csproj" />
+    <Project Path="Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj" />
+  </Folder>
+  <Folder Name="/Editor/CSharp/">
+    <Project Path="Turian/Editor/CSharp/CodeAnalyzers/Turian.CSharp.CodeAnalyzers.csproj" />
+    <Project Path="Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj" />
+  </Folder>
+  <Folder Name="/Editor/Platform/">
+    <Project Path="Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj" />
+  </Folder>
+  <Folder Name="/Gaya/">
+    <Project Path="Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
+    <Project Path="Gaya/Gaya.Host/Gaya.Host.csproj" />
+  </Folder>
+  <Folder Name="/Engine/">
+    <Project Path="Turian/Engine/Attributes/Turian.Engine.Attributes.csproj" />
+    <Project Path="Turian/Engine/Core/Turian.Engine.Core.csproj" />
+    <Project Path="Turian/Engine/UI/Turian.Engine.UI.csproj" />
+  </Folder>
+  <Project Path=".nuke/Build.csproj" />
+  <Project Path="Turian.Tests/Turian.Tests.csproj" />
+</Solution>

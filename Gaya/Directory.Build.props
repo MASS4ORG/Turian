@@ -1,0 +1,35 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!--
+    Gaya is versioned independently of Turian: it is a platform with its own SDK contract and its
+    own compatibility promise to plugin authors, and it ships from this repository only until the
+    extraction. GitVersion drives Turian's version; this property drives Gaya's, bumped by hand
+    against the SDK surface (see docs/decisions/Gaya-Platform.md, "Versioning").
+  -->
+  <PropertyGroup>
+    <GayaVersion Condition="'$(GayaVersion)' == ''">0.1.0</GayaVersion>
+    <Version>$(GayaVersion)</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>MASS4</Company>
+    <Product>Gaya</Product>
+    <Authors>Bruno Massa</Authors>
+    <PackageLicenseExpression>MPL-2.0</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://turian.mass4.org</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/MASS4ORG/Turian.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>gaya plugin platform workbench docking guinevere desktop</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,76 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+const int uboLights = 10;
+
+struct PointLight {
+	vec4 position;  // ignore w
+	vec4 color;		// w is intensity
+};
+
+// Uniform buffer object containing global data
+layout(set = 0, binding = 0) uniform GlobalUbo
+{
+	mat4 projection;                   // Projection matrix
+	mat4 view;                         // View matrix
+	vec4 front;                        // View direction
+	vec4 ambientColor;                 // Ambient color and intensity
+	PointLight pointLights[uboLights]; // Array of point lights
+} ubo;
+
+layout(push_constant) uniform Push 
+{
+	mat4 modelMatrix;
+	mat4 normalMatrix;
+	uint triangleCount;
+	float triangleSpacing;
+	float triangleSize;
+} push;
+
+layout(set = 0, binding = 1) buffer SboMeshTest
+{
+	uint triangleCount;
+	float triangleSpacing;
+	float triangleHeight;
+	float triangleWidth;
+} sbo;
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 3, max_primitives = 1) out;
+
+layout(location = 0) out VertexOutput
+{
+	vec4 color;
+} vertexOutput[];
+
+const vec4[3] positions = {
+	vec4( 0.0, -1.0, 0.0, 1.0),
+	vec4(-1.0,  1.0, 0.0, 1.0),
+	vec4( 1.0,  1.0, 0.0, 1.0)
+};
+
+const vec4[3] colors = {
+	vec4(0.0, 1.0, 0.0, 1.0),
+	vec4(0.0, 0.0, 1.0, 1.0),
+	vec4(1.0, 0.0, 0.0, 1.0)
+};
+
+void main()
+{
+	// TODO: Need to implement lighting and heigh/width
+	uint iid = gl_LocalInvocationID.x;
+
+	vec4 offset = vec4(0.0, 0.0, gl_GlobalInvocationID.x * sbo.triangleSpacing, 0.0);
+
+	SetMeshOutputsEXT(3, 1);
+	mat4 mvp = ubo.projection * ubo.view * push.modelMatrix;
+	gl_MeshVerticesEXT[0].gl_Position = mvp * (positions[0] + offset);
+	gl_MeshVerticesEXT[1].gl_Position = mvp * (positions[1] + offset);
+	gl_MeshVerticesEXT[2].gl_Position = mvp * (positions[2] + offset);
+	vertexOutput[0].color = colors[0];
+	vertexOutput[1].color = colors[1];
+	vertexOutput[2].color = colors[2];
+	gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] =  uvec3(0, 1, 2);
+}
+
+

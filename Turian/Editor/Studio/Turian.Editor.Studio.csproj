@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Turian.Editor.Studio</RootNamespace>
+        <AssemblyName>Turian.Editor.Studio</AssemblyName>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
+    </PropertyGroup>
+
+    <!-- Thin host: the Gaya platform + the plugins that make it the Turian studio. -->
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
+        <ProjectReference Include="../Gaya.Plugin/Gaya.Plugin.Turian.csproj" />
+    </ItemGroup>
+
+    <!-- Play mode generates a runnable executable from the win-x64 host template that
+         CsProjectGenerator.CopyPlatformSpecificFiles looks for beside the running process (see
+         Turian.Editor.CLI.csproj, which carries its own copy the same way). Without this, Build & Play
+         only works when launched after the Nuke Compile target, which copies it in as an extra step. -->
+    <ItemGroup>
+        <Content Include="$(SolutionDir)/Turian/Editor/CLI/Platform/**/*"
+                 Exclude="$(SolutionDir)/Turian/Editor/CLI/Platform/**/bin/**;$(SolutionDir)/Turian/Editor/CLI/Platform/**/obj/**"
+                 LinkBase="Platform"
+                 CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
+    <!-- Guinevere window. Local checkout in dev; falls back to the published package. -->
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Scripting/Guinevere.Scripting.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Integrations/Guinevere.Vulkan.SilkNET/Guinevere.Vulkan.SilkNET.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12"/>
+        <PackageReference Include="SkiaSharp" Version="4.152.1" />
+        <PackageReference Include="MASS4.Guinevere" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Scripting" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+    </ItemGroup>
+
+</Project>

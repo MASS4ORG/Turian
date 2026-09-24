@@ -1,0 +1,3 @@
+
+[*.cs]
+dotnet_diagnostic.IDE0130.severity = none # All classes should fall into the same Namespace

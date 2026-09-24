@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Turian Studio
+Comment=Turian game engine editor
+Exec=turian-studio
+Icon=org.MASS4.Turian
+Categories=Development;IDE;GameDevelopment;
+Terminal=false

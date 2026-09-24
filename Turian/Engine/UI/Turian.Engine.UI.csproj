@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <PackageId>MASS4.Turian.Engine.UI</PackageId>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <GuinevereUseLocal Condition="'$(GuinevereUseLocal)' == ''">false</GuinevereUseLocal>
+        <GuineverePackageExcludeAssets Condition="'$(GuineverePackageExcludeAssets)' == ''"></GuineverePackageExcludeAssets>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)"/>
+    </ItemGroup>
+
+    <!-- External libraries -->
+    <ItemGroup>
+        <PackageReference Include="MASS4.Guinevere" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+    </ItemGroup>
+
+</Project>
