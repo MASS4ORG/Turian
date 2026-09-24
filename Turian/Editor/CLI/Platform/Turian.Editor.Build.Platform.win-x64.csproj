@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <ExcludeFromBuild>true</ExcludeFromBuild>
+        <!-- Referenced transitively by Editor.Core; without these, publishing any Exe that pulls
+             this project in (any RID) fails with NETSDK1152 (duplicate apphost/runtimeconfig). -->
+        <UseAppHost>false</UseAppHost>
+        <IsPublishable>false</IsPublishable>
+    </PropertyGroup>
+    <PropertyGroup>
+        <TurianDir>$(MSBuildThisFileDirectory)../../../..</TurianDir>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="$(TurianDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
+        <ProjectReference Include="$(TurianDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(TurianDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+        <PackageReference Include="Silk.NET.Input" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Maths" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Windowing.Common" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Windowing.Glfw" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Input.Extensions" Version="2.23.0"/>
+        <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.23.0"/>
+    </ItemGroup>
+
+</Project>

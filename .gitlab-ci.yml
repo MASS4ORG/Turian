@@ -1,0 +1,225 @@
+stages:
+    - test
+    - release-check
+    - build
+    - publish
+    - container
+
+variables:
+    NUKE_TELEMETRY_OPTOUT: "1" # Disable telemetry
+    IGNORE_NORMALISATION_GIT_HEAD_MOVE: "1"
+    # To overwrite them, just set them in the CI/CD settings (or change here)
+    DOTNET_VERSION: "10.0"
+    PUBLISH_SELF_CONTAINED: "false"
+    PUBLISH_SINGLE_FILE: "false"
+    PUBLISH_TRIMMED: "false"
+    GITLAB_REPOSITORY_PATH: "turian/Turian"
+    GITHUB_REPOSITORY: "turian/Turian"
+
+cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+        - .nuget/
+
+##
+## Reuse this piece in multiple jobs
+##
+.build_job_template: &build_job_template
+    image: mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}
+    artifacts:
+        expire_in: 1 week
+
+.build_job_template_matrix: &build_job_template_matrix
+    parallel:
+        matrix:
+            - RID: "win-x64"
+            - RID: "linux-x64"
+
+.dotnet_nuke_template: &dotnet_nuke_template
+    before_script:
+        - chmod +x ./build.sh
+
+# install GLSL compiler to convert GLSL shader to SPIR-V (Vulkan)
+.build_glsl: &build_glsl
+    before_script:
+        - apt-get update -yqq
+        - apt-get install -yqq glslc
+
+# SkiaSharp (via Guinevere) needs fontconfig + a font to load libSkiaSharp.so and resolve font
+# families; the dotnet SDK image ships neither.
+.build_fontconfig: &build_fontconfig
+    before_script:
+        - apt-get install -yqq libfontconfig1 fontconfig fonts-dejavu-core
+
+# build the project on every commit
+test:
+    <<: *build_job_template
+    stage: test
+    rules:
+        - if: '$CI_PIPELINE_SOURCE != "tag" && $CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
+          allow_failure: false
+    before_script:
+        - !reference [.build_glsl, before_script]
+        - !reference [.build_fontconfig, before_script]
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - ./build.sh Restore Compile TestReport --configuration "Debug" --verbosity minimal
+    coverage: '/^  Line coverage: (\d*.\d*)%/'
+    artifacts:
+        reports:
+            coverage_report:
+                coverage_format: cobertura
+                path: coverage-results/coverage/coverage.xml
+
+qodana:
+    stage: test
+    allow_failure: true
+    rules:
+        - if: $QODANA_TOKEN_VALUE == null || $QODANA_TOKEN_VALUE == ""
+          when: never
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+        - if: $CI_MANUAL == "true"
+        - when: manual
+    image:
+        name: jetbrains/qodana-dotnet
+        entrypoint: [""]
+    variables:
+        QODANA_TOKEN: $QODANA_TOKEN_VALUE
+    script:
+        - qodana
+
+# Checks for commits since the last tag; if there are any, updates CHANGELOG.md, tags the release
+# and pushes the commit+tag to GitLab and (if a token is configured) GitHub. The pushed tag
+# triggers this same pipeline's build/publish/container stages on the new tag ref.
+release-check:
+    <<: *build_job_template
+    stage: release-check
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "web"'
+    before_script:
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh Tag \
+              --gitlab-project-path "$GITLAB_REPOSITORY_PATH" \
+              --gitlab-token "$GITLAB_RELEASE_TOKEN" \
+              --github-repository "$GITHUB_REPOSITORY" \
+              --github-token "$GITHUB_RELEASE_TOKEN" \
+              --release-branch "$CI_DEFAULT_BRANCH" \
+              --verbosity minimal
+
+build:
+    <<: *build_job_template
+    parallel:
+        matrix:
+            - RID: "win-x64"
+            - RID: "linux-x64"
+    stage: build
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "tag"'
+          allow_failure: false
+    before_script:
+        - !reference [.build_glsl, before_script]
+        - !reference [.build_fontconfig, before_script]
+        - apt-get install -yqq nsis
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh Pack DebianPackage \
+              --configuration "Release" \
+              --runtime-identifier "$RID" \
+              --publish-self-contained "${PUBLISH_SELF_CONTAINED:-true}" \
+              --publish-single-file "${PUBLISH_SINGLE_FILE:-true}" \
+              --publish-trimmed "${PUBLISH_TRIMMED:-false}" \
+              --verbosity minimal
+    artifacts:
+        paths:
+            - artifacts/*
+
+# GitLab.com doesn't provide a macOS shared runner by default. Wire a "macos" runner tag here once
+# one is provisioned; until then this stays manual so it never blocks the release.
+build-macos:
+    <<: *build_job_template
+    stage: build
+    tags: ["macos"]
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "tag"'
+          when: manual
+          allow_failure: true
+    before_script:
+        - !reference [.build_glsl, before_script]
+        - !reference [.build_fontconfig, before_script]
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh Pack \
+              --configuration "Release" \
+              --runtime-identifier "osx-x64" \
+              --publish-self-contained "${PUBLISH_SELF_CONTAINED:-true}" \
+              --publish-single-file "${PUBLISH_SINGLE_FILE:-true}" \
+              --publish-trimmed "${PUBLISH_TRIMMED:-false}" \
+              --verbosity minimal
+    artifacts:
+        paths:
+            - artifacts/*.zip
+
+gitlab-release:
+    <<: *build_job_template
+    stage: publish
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "tag"'
+          allow_failure: false
+    needs:
+        - build
+        - job: build-macos
+          optional: true
+    before_script:
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh GitLabRelease \
+              --gitlab-project-path "$GITLAB_REPOSITORY_PATH" \
+              --gitlab-token "$GITLAB_RELEASE_TOKEN" \
+              --verbosity minimal
+
+github-release:
+    <<: *build_job_template
+    stage: publish
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "tag"'
+          allow_failure: true
+    needs:
+        - build
+        - job: build-macos
+          optional: true
+    before_script:
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh GitHubRelease \
+              --github-repository "$GITHUB_REPOSITORY" \
+              --github-token "$GITHUB_RELEASE_TOKEN" \
+              --verbosity minimal
+
+# Builds the Turian CLI container image with Podman and pushes it to both the GitLab
+# Container Registry and GHCR. VFS storage avoids needing a privileged runner; drop
+# CONTAINERS_STORAGE_DRIVER on a self-hosted runner with /dev/fuse for faster overlay builds.
+container:
+    <<: *build_job_template
+    stage: container
+    rules:
+        - if: '$CI_PIPELINE_SOURCE == "tag"'
+          allow_failure: true
+    variables:
+        CONTAINERS_STORAGE_DRIVER: vfs
+    before_script:
+        - !reference [.dotnet_nuke_template, before_script]
+        - apt-get update -yqq
+        - apt-get install -yqq podman
+        - echo "$CI_REGISTRY_PASSWORD" | podman login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+        - echo "$GHCR_TOKEN" | podman login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+    script:
+        - |
+            ./build.sh ContainerPush \
+              --container-registries "$CI_REGISTRY_IMAGE,ghcr.io/turian/turian-cli" \
+              --verbosity minimal

@@ -1,0 +1,11 @@
+tag-prefix: 'v'
+commit-message-incrementing: Enabled
+major-version-bump-message: '^\w+(\([\w\-\.]+\))?!:|BREAKING[ -]CHANGE:'
+minor-version-bump-message: '^feat(\([\w\-\.]+\))?:'
+patch-version-bump-message: '^fix(\([\w\-\.]+\))?:|^perf(\([\w\-\.]+\))?:'
+no-bump-message: '^(chore|docs|style|test|ci|build|refactor)(\([\w\-\.]+\))?:'
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    is-release-branch: true

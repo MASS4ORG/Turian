@@ -1,0 +1,63 @@
+{
+  "locale": "pt-BR",
+  "entries": [
+    { "key": "File", "source": "File", "translation": "Arquivo" },
+    { "key": "Edit", "source": "Edit", "translation": "Editar" },
+    { "key": "View", "source": "View", "translation": "Exibir" },
+    { "key": "Project", "source": "Project", "translation": "Projeto" },
+    { "key": "Run", "source": "Run", "translation": "Executar" },
+    { "key": "Themes", "source": "Themes", "translation": "Temas" },
+    { "key": "Localization", "source": "Localization", "translation": "Localização" },
+    { "key": "English", "source": "English", "translation": "Inglês" },
+    { "key": "Português (Brasil)", "source": "Português (Brasil)", "translation": "Português (Brasil)" },
+    { "key": "New Project…", "source": "New Project…", "translation": "Novo projeto…" },
+    { "key": "Open…", "source": "Open…", "translation": "Abrir…" },
+    { "key": "Save", "source": "Save", "translation": "Salvar" },
+    { "key": "Save All", "source": "Save All", "translation": "Salvar tudo" },
+    { "key": "Project Settings…", "source": "Project Settings…", "translation": "Configurações do projeto…" },
+    { "key": "Recompile", "source": "Recompile", "translation": "Recompilar" },
+    { "key": "Reimport Assets", "source": "Reimport Assets", "translation": "Reimportar recursos" },
+    { "key": "Step Frame", "source": "Step Frame", "translation": "Avançar quadro" },
+    { "key": "Export", "source": "Export", "translation": "Exportar" },
+    { "key": "Exit", "source": "Exit", "translation": "Sair" },
+    { "key": "Help", "source": "Help", "translation": "Ajuda" },
+    { "key": "About Turian Studio", "source": "About Turian Studio", "translation": "Sobre o Turian Studio" },
+    { "key": "Play", "source": "Play", "translation": "Executar" },
+    { "key": "Stop", "source": "Stop", "translation": "Parar" },
+    { "key": "Pause", "source": "Pause", "translation": "Pausar" },
+    { "key": "Resume", "source": "Resume", "translation": "Retomar" },
+    { "key": "Build & Run", "source": "Build & Run", "translation": "Compilar e executar" },
+    { "key": "Stop Standalone", "source": "Stop Standalone", "translation": "Parar autônomo" },
+    { "key": "Play Startup Scene", "source": "Play Startup Scene", "translation": "Executar cena inicial" },
+    { "key": "Settings…", "source": "Settings…", "translation": "Configurações…" },
+    {
+      "key": "Player", "source": "Player", "translation": "Aplicativo",
+      "note": "Project Settings menu entry for the built game/executable (as in Unity's Player Settings), not a person playing."
+    },
+    { "key": "Input", "source": "Input", "translation": "Entrada" },
+    { "key": "Graphics", "source": "Graphics", "translation": "Gráficos" },
+    { "key": "Keyboard Shortcuts…", "source": "Keyboard Shortcuts…", "translation": "Atalhos de teclado…" },
+    { "key": "Scene Tree", "source": "Scene Tree", "translation": "Árvore de cena" },
+    { "key": "Inspector", "source": "Inspector", "translation": "Inspetor" },
+    { "key": "Scene", "source": "Scene", "translation": "Cena" },
+    { "key": "Game", "source": "Game", "translation": "Jogo" },
+    { "key": "Assets", "source": "Assets", "translation": "Recursos" },
+    { "key": "Output", "source": "Output", "translation": "Saída" },
+    { "key": "Settings", "source": "Settings", "translation": "Configurações" },
+    { "key": "Shortcuts", "source": "Shortcuts", "translation": "Atalhos" },
+    { "key": "Unsaved Changes", "source": "Unsaved Changes", "translation": "Alterações não salvas" },
+    { "key": "Don't Save", "source": "Don't Save", "translation": "Não salvar" },
+    { "key": "Cancel", "source": "Cancel", "translation": "Cancelar" },
+    {
+      "key": "{0} has unsaved changes. Save them before closing?",
+      "source": "{0} has unsaved changes. Save them before closing?",
+      "translation": "{0} tem alterações não salvas. Salvar antes de fechar?",
+      "note": "{0} is the document name."
+    },
+    {
+      "key": "Some documents have unsaved changes. Save them before exiting?",
+      "source": "Some documents have unsaved changes. Save them before exiting?",
+      "translation": "Alguns documentos têm alterações não salvas. Salvar antes de sair?"
+    }
+  ]
+}

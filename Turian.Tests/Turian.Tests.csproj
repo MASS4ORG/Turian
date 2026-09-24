@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <NoWarn>$(NoWarn);NU1701</NoWarn>
+        <!-- xUnit v3 test projects are self-hosting test applications, so they must be executable. -->
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+        <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0"/>
+        <PackageReference Include="Microsoft.Build" Version="18.9.6" NoWarn="NU1701" />
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.9.6" NoWarn="NU1701" />
+        <PackageReference Include="NSubstitute" Version="6.2.0"/>
+        <PackageReference Include="xunit.v3" Version="4.0.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="Fixtures\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">..</SolutionDir>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/CLI/Turian.Editor.CLI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj" />
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+    </ItemGroup>
+  <!-- Excalibur controls. A gitignored .csproj.user points GuinevereLocalPath at a local checkout;
+       CI has none and restores the package instead. Uncomment the package once it is published. -->
+  <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+    <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- <PackageReference Include="MASS4.Guinevere.Excalibur" Version="2.0.1" ExcludeAssets="$(GuineverePackageExcludeAssets)" /> -->
+  </ItemGroup>
+
+</Project>

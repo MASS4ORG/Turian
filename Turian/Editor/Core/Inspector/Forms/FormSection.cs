@@ -1,0 +1,29 @@
+namespace Turian.Editor.Core;
+
+/// <summary>
+/// A group of fields drawn under one heading — a node's own members, or one of its components.
+/// </summary>
+/// <param name="Title">The heading.</param>
+/// <param name="Target">The object the fields belong to.</param>
+/// <param name="Fields">The editable members, in declaration order.</param>
+/// <param name="Removable">Whether the shell may offer to remove this section's target.</param>
+public sealed record FormSection(
+    string Title,
+    object Target,
+    IReadOnlyList<FormField> Fields,
+    bool Removable = false)
+{
+    /// <summary>The <c>[Button]</c> methods to draw after the fields, in declaration order.</summary>
+    public IReadOnlyList<InspectorButton> Buttons { get; init; } = [];
+
+    /// <summary>
+    /// The target's own on/off switch, so a shell can draw it as a checkbox in the section heading
+    /// the way Unity does, instead of leaving it as a row among the other members.
+    /// </summary>
+    public FormField? EnabledField { get; } =
+        Fields.FirstOrDefault(f => f.Name == nameof(Component.IsActive) && f.ValueType == typeof(bool));
+
+    /// <summary>The fields to draw in the body — everything except what the heading already shows.</summary>
+    public IReadOnlyList<FormField> BodyFields { get; } =
+        [.. Fields.Where(f => f.Name != nameof(Component.IsActive) || f.ValueType != typeof(bool))];
+}

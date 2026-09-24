@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /app/lib/dotnet/dotnet /app/lib/turian/lib/Turian.Editor.Studio.dll "$@"

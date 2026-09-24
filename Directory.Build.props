@@ -1,0 +1,14 @@
+<Project>
+  <ItemGroup>
+    <!--
+      PublicAPI is used for contracts consumed through reflection, JSON, project files, or plugins.
+      Keep this reference private to the repository; the annotation is only analyzer metadata.
+    -->
+    <PackageReference Include="JetBrains.Annotations"
+                      Version="2026.2.0"
+                      PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="JetBrains.Annotations" />
+  </ItemGroup>
+</Project>

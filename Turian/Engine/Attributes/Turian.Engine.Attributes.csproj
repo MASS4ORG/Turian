@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Turian</RootNamespace>
+        <PackageId>MASS4.Turian.Engine.Attributes</PackageId>
+    </PropertyGroup>
+
+</Project>
