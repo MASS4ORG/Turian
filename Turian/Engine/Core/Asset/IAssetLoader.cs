@@ -21,6 +21,14 @@ public interface IAssetLoader
     Task<TAsset?> LoadAsync<TAsset>(Guid assetId) where TAsset : Asset;
 
     /// <summary>
+    /// Loads the shared payload of the <see cref="DataAssetAsset"/> with the given identifier.
+    /// Returns <c>null</c> when the asset cannot be resolved or its payload is not a <typeparamref name="TData"/>.
+    /// </summary>
+    /// <typeparam name="TData">The expected payload type.</typeparam>
+    /// <param name="assetId">The asset identifier.</param>
+    Task<TData?> LoadContentAsync<TData>(Guid assetId) where TData : DataAsset;
+
+    /// <summary>
     /// Returns the cached asset instance when one is available for the given identifier.
     /// Does not load the asset from disk.
     /// </summary>
