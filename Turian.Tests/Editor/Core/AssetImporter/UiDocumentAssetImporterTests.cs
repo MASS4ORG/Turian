@@ -31,7 +31,7 @@ public sealed class UiDocumentAssetImporterTests
         using var dir = new TempDir();
         var source = dir.Write("menu.ui",
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement name="root"><Label text="Hi" /></VisualElement>
             </UI>
             """);
@@ -69,7 +69,7 @@ public sealed class UiDocumentAssetImporterTests
         dir.Write("button.png", "not really a png");
         var source = dir.Write("menu.ui",
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <Style src="theme.uss" />
               <ImageButton image-normal="button.png" image-hover="missing.png" />
             </UI>

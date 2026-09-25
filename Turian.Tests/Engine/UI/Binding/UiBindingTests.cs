@@ -134,7 +134,7 @@ public sealed class UiBindingTests
         Assert.Equal("#ff0000", model.Panel);
         var doc = UiXmlParser.Parse(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement style="flex-grow: 1; background-color: {Panel}" />
             </UI>
             """);
@@ -161,7 +161,7 @@ public sealed class UiBindingTests
         var model = new ToggleModel { On = false };
         var doc = UiXmlParser.Parse(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <Toggle name="v" binding-value="{On, mode=TwoWay}" />
             </UI>
             """);
@@ -189,7 +189,7 @@ public sealed class UiBindingTests
         var onPlay = nameof(MenuController.OnPlay);
         var doc = UiXmlParser.Parse(
             $$"""
-            <UI xmlns="https://turian.dev/ui" controller="MenuController">
+            <UI xmlns="https://turian.mass4.org/ui" controller="MenuController">
               <Button name="go" text="Go" width="120" height="36" click="{{onPlay}}" />
             </UI>
             """);
@@ -208,7 +208,7 @@ public sealed class UiBindingTests
         var model = new ColorModel { Panel = "#00ff00" };
         var doc = UiXmlParser.Parse(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement name="box" style="flex-grow: 1">
                 <Bindings>
                   <Binding element="box" property="background-color" path="Panel" />

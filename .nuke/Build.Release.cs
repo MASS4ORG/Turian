@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Turian.NUKE;
 
 /// <summary>
@@ -36,10 +38,10 @@ sealed partial class Build
             .OnlyWhenDynamic(() => HasNewCommits)
             .Executes(() =>
             {
-                Git("config user.name \"Turian Release Bot\"");
-                Git("config user.email \"release-bot@turian.dev\"");
-                Git($"commit -am \"chore(release): {Version}\"");
-                Git($"tag {TagName}");
+                RunGit("set release bot name", "config", "user.name", "Turian Bot");
+                RunGit("set release bot email", "config", "user.email", "massa+turian@brunomassa.com");
+                RunGit("commit changelog", "-c", "commit.gpgsign=false", "commit", "-am", $"chore(release): {Version}");
+                RunGit("tag release", "-c", "tag.gpgsign=false", "tag", TagName);
 
                 PushToRemote("GitLab", gitlabToken, gitlabProjectPath, "gitlab.com", "oauth2");
                 PushToRemote("GitHub", githubToken, githubRepository, "github.com", "x-access-token");
@@ -55,16 +57,41 @@ sealed partial class Build
 
         var url = $"https://{credentialUser}:{token}@{host}/{repositoryPath}.git";
 
-        var existingTag = Git($"ls-remote --tags \"{url}\" {TagName}", logOutput: false, logInvocation: false);
-        if (existingTag.Any())
+        var existingTag = RunGit("check remote tag", "ls-remote", "--tags", url, TagName);
+        if (!string.IsNullOrWhiteSpace(existingTag))
         {
             Log.Information("{Name} already has tag {TagName}; skipping push", name, TagName);
             return;
         }
 
-        Git($"push \"{url}\" HEAD:{releaseBranch}", logOutput: false, logInvocation: false);
-        Git($"push \"{url}\" {TagName}", logOutput: false, logInvocation: false);
+        RunGit("push release commit", "push", url, $"HEAD:{releaseBranch}");
+        RunGit("push release tag", "push", url, TagName);
         Log.Information("Pushed {TagName} to {Name}", TagName, name);
+    }
+
+    string RunGit(string operation, params string[] arguments)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = RootDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start git for {operation}.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+        var standardOutput = output.GetAwaiter().GetResult();
+        var standardError = error.GetAwaiter().GetResult();
+
+        if (process.ExitCode == 0) return standardOutput;
+
+        var message = standardError;
+        if (!string.IsNullOrEmpty(githubToken)) message = message.Replace(githubToken, "[redacted]", StringComparison.Ordinal);
+        if (!string.IsNullOrEmpty(gitlabToken)) message = message.Replace(gitlabToken, "[redacted]", StringComparison.Ordinal);
+        throw new InvalidOperationException($"Git {operation} failed (exit {process.ExitCode}): {message.Trim()}");
     }
 
     /// <summary>

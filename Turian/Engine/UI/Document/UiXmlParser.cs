@@ -7,7 +7,7 @@ namespace Turian.Engine.UI;
 public static class UiXmlParser
 {
     /// <summary>The default XML namespace for the UI vocabulary.</summary>
-    public const string Namespace = "https://turian.dev/ui";
+    public const string Namespace = "https://turian.mass4.org/ui";
 
     static readonly HashSet<string> eventAttributes = new(StringComparer.OrdinalIgnoreCase)
     {

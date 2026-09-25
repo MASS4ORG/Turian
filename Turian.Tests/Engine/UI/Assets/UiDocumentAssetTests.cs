@@ -9,7 +9,7 @@ public sealed class UiDocumentAssetTests
     {
         var doc = UiDocumentAsset.ParseText(
             """
-            <UI xmlns="https://turian.dev/ui"><VisualElement name="root" /></UI>
+            <UI xmlns="https://turian.mass4.org/ui"><VisualElement name="root" /></UI>
             """);
 
         Assert.Equal("root", doc.Root.Name);
@@ -21,7 +21,7 @@ public sealed class UiDocumentAssetTests
     {
         var original = UiDocumentAsset.ParseText(
             """
-            <UI xmlns="https://turian.dev/ui"><VisualElement name="root"><Label text="Hi" /></VisualElement></UI>
+            <UI xmlns="https://turian.mass4.org/ui"><VisualElement name="root"><Label text="Hi" /></VisualElement></UI>
             """);
 
         var reparsed = UiDocumentAsset.ParseText(original.ToJson());
@@ -37,7 +37,7 @@ public sealed class UiDocumentAssetTests
         var path = Path.Combine(Path.GetTempPath(), $"doc-{Guid.NewGuid():N}.ui");
         File.WriteAllText(path,
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <Style src="theme.uss" />
               <VisualElement name="root" />
             </UI>

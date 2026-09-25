@@ -5,7 +5,7 @@ public sealed class UiXmlParserTests
 {
     const string doc = """
         <?xml version="1.0" encoding="utf-8"?>
-        <UI xmlns="https://turian.dev/ui"
+        <UI xmlns="https://turian.mass4.org/ui"
             xmlns:x="https://example.com/x"
             controller="Usercode.MainMenu">
 
@@ -124,7 +124,7 @@ public sealed class UiXmlParserTests
     public void Parse_RejectsWrongRoot()
     {
         var ex = Assert.Throws<UiParseException>(() =>
-            UiXmlParser.Parse("<Window xmlns=\"https://turian.dev/ui\"><Label/></Window>"));
+            UiXmlParser.Parse("<Window xmlns=\"https://turian.mass4.org/ui\"><Label/></Window>"));
 
         Assert.Contains("Root element must be <UI>", ex.Message, StringComparison.Ordinal);
         Assert.Equal(1, ex.Line);
@@ -135,7 +135,7 @@ public sealed class UiXmlParserTests
     public void Parse_RejectsMalformedXml()
     {
         var ex = Assert.Throws<UiParseException>(() =>
-            UiXmlParser.Parse("<UI xmlns=\"https://turian.dev/ui\">\n  <Label>\n</UI>"));
+            UiXmlParser.Parse("<UI xmlns=\"https://turian.mass4.org/ui\">\n  <Label>\n</UI>"));
 
         Assert.True(ex.Line >= 2);
     }
@@ -145,7 +145,7 @@ public sealed class UiXmlParserTests
     public void Parse_RejectsStyleWithoutSrc()
     {
         var ex = Assert.Throws<UiParseException>(() =>
-            UiXmlParser.Parse("<UI xmlns=\"https://turian.dev/ui\">\n  <Style/>\n  <Label/>\n</UI>"));
+            UiXmlParser.Parse("<UI xmlns=\"https://turian.mass4.org/ui\">\n  <Style/>\n  <Label/>\n</UI>"));
 
         Assert.Contains("requires a 'src'", ex.Message, StringComparison.Ordinal);
         Assert.Equal(2, ex.Line);

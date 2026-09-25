@@ -48,7 +48,7 @@ public sealed class UiRendererTests
     {
         var px = Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement style="flex-grow: 1; background-color: #ff0000" />
             </UI>
             """);
@@ -64,7 +64,7 @@ public sealed class UiRendererTests
         // Two rows with different background colors proves each instance is stamped independently.
         var px = Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <Template name="Row">
                 <VisualElement style="height: 40; background-color: $bg" />
               </Template>
@@ -85,7 +85,7 @@ public sealed class UiRendererTests
     {
         var ex = Record.Exception(() => Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement><Instance template="Nope" /></VisualElement>
             </UI>
             """));
@@ -104,7 +104,7 @@ public sealed class UiRendererTests
 
         Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <Button name="go" text="Go" width="120" height="36" click="OnGo" />
             </UI>
             """,
@@ -171,7 +171,7 @@ public sealed class UiRendererTests
     }
 
     const string tabsDocument = """
-        <UI xmlns="https://turian.dev/ui">
+        <UI xmlns="https://turian.mass4.org/ui">
           <Tabs name="t">
             <Tab header="One" width="60" height="20">
               <Label text="first" style="color:#ff0000; font-size:14" />
@@ -222,7 +222,7 @@ public sealed class UiRendererTests
         var model = new TextModel();
         var renderer = new UiRenderer(UiXmlParser.Parse(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <TextField name="f" width="150" height="30" binding-value="{Value, mode=TwoWay}" />
             </UI>
             """));
@@ -240,7 +240,7 @@ public sealed class UiRendererTests
     {
         var px = Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement style="flex-direction: column">
                 <Repeat items="{Rows}" as="row">
                   <VisualElement style="height: 30; background-color: {row}" />
@@ -261,7 +261,7 @@ public sealed class UiRendererTests
     {
         var px = Render(
             """
-            <UI xmlns="https://turian.dev/ui">
+            <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement style="flex-grow: 1; align-items: center; justify-content: center">
                 <Label class="big" text="HELLO" />
               </VisualElement>
