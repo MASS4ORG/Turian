@@ -7,7 +7,8 @@ namespace Turian.Engine.Core;
 /// <remarks>
 /// The loader is the canonical owner of loaded asset instances. This is the mechanism by
 /// which <c>DataAsset</c>-style singletons remain consistent across <see cref="AssetReference{TAsset}"/>
-/// callers: every caller resolves the same GUID and therefore receives the same object.
+/// callers: every caller resolves the same GUID and therefore receives the same object, and a
+/// <see cref="DataAssetAsset"/> hands out one shared payload. Separate loaders never share instances.
 /// </remarks>
 public interface IAssetLoader
 {
