@@ -73,7 +73,9 @@ public static class MemberValueAccessor
         ArgumentNullException.ThrowIfNull(member);
         ArgumentNullException.ThrowIfNull(target);
 
-        if (newValue is null) return false;
+        // Null is a real value only for a reference to a node, component or DataAsset: it clears the slot.
+        var memberType = member is PropertyInfo property ? property.PropertyType : ((FieldInfo)member).FieldType;
+        if (newValue is null && !ObjectReferences.IsReferenceMember(memberType, allowSceneObjects: true)) return false;
 
         object? current;
         try { current = member.GetValue(target); }

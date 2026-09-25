@@ -58,7 +58,17 @@ public class DataAssetAsset : Asset
         return DataAsset.LoadContent(absolutePath);
     }
 
+    /// <summary>
+    /// Reads the payload and gives it this asset's id, so a reference to the payload names the asset.
+    /// </summary>
     DataAsset? ReadContent(string projectPath)
+    {
+        var payload = ReadPayload(projectPath);
+        if (payload is not null) payload.Id = Id;
+        return payload;
+    }
+
+    DataAsset? ReadPayload(string projectPath)
     {
         var sourcePath = Path.Combine(projectPath, RelativePath);
         if (File.Exists(sourcePath)

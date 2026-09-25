@@ -47,7 +47,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         switch (result.Action)
         {
             case ObjectFieldAction.Drop when result.Payload is ReferenceDragPayload drop:
-                reference.Set(drop.Id);
+                picker.Assign(reference, drop.Id);
                 break;
             case ObjectFieldAction.Clear:
                 reference.Clear();
@@ -134,7 +134,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
                 {
                     if (!CandidateRow(gui, candidate.Name, candidate.Detail, candidate.Id.ToString())) continue;
 
-                    reference.Set(candidate.Id);
+                    picker.Assign(reference, candidate.Id);
                     openFieldId = null;
                     openField = null;
                 }

@@ -16,18 +16,26 @@ public enum ReferenceKind
 /// <summary>
 /// A <see cref="FormField"/> holding an <see cref="AssetReference{TAsset}"/>, <see cref="NodeRef{T}"/>
 /// or <see cref="ComponentRef{T}"/>, seen as a single id plus the type it must point at. Lets one
-/// drawer serve all three without reflecting over open generics itself.
+/// drawer serve all three without reflecting over open generics itself. A member typed directly as a
+/// <see cref="Node"/>, <see cref="Component"/> or <see cref="DataAsset"/> is a reference too (see <see cref="IsDirect"/>).
 /// </summary>
 public sealed class ReferenceField
 {
     readonly FormField source;
 
-    ReferenceField(FormField source, ReferenceKind kind, Type targetType)
+    ReferenceField(FormField source, ReferenceKind kind, Type targetType, bool isDirect = false)
     {
         this.source = source;
         Kind = kind;
         TargetType = targetType;
+        IsDirect = isDirect;
     }
+
+    /// <summary>
+    /// Whether the member holds the referenced object itself rather than an id wrapper; it is written with
+    /// <see cref="SetTarget"/>.
+    /// </summary>
+    public bool IsDirect { get; }
 
     /// <summary>Which registry the reference resolves against.</summary>
     public ReferenceKind Kind { get; }
@@ -44,7 +52,11 @@ public sealed class ReferenceField
     /// <summary>The referenced asset or node id, or <see cref="Guid.Empty"/> when unset.</summary>
     public Guid CurrentId => source.GetValue() switch
     {
+        null when IsDirect && source.Target is IdClass owner
+                  && ObjectReferences.TryGetUnresolved(owner, source.Name, out var pending) => pending[0],
         null => Guid.Empty,
+        Component component when IsDirect => component.Node?.Id ?? component.Id,
+        IdClass value when IsDirect => value.Id,
         var value => IdOf(value),
     };
 
@@ -72,7 +84,7 @@ public sealed class ReferenceField
             }
         }
 
-        if (!type.IsGenericType) return null;
+        if (!type.IsGenericType) return TryCreateDirect(field);
 
         var definition = type.GetGenericTypeDefinition();
         var argument = type.GetGenericArguments()[0];
@@ -105,9 +117,34 @@ public sealed class ReferenceField
         return source.SetValue(value);
     }
 
+    /// <summary>
+    /// Points a direct reference at <paramref name="target"/>, replacing whatever it held, including an id
+    /// whose target was missing.
+    /// </summary>
+    /// <param name="target">The object to reference, or null to clear.</param>
+    /// <returns>True when the write succeeded.</returns>
+    public bool SetTarget(object? target)
+    {
+        if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
+        if (source.Target is IdClass owner) ObjectReferences.Forget(owner, source.Name);
+        return source.SetValue(target);
+    }
+
     /// <summary>Clears the reference.</summary>
     /// <returns>True when the write succeeded.</returns>
-    public bool Clear() => Set(Guid.Empty);
+    public bool Clear() => IsDirect ? SetTarget(null) : Set(Guid.Empty);
+
+    static ReferenceField? TryCreateDirect(FormField field)
+    {
+        var type = field.ValueType;
+        if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true) || type.IsArray || type.IsGenericType)
+            return null;
+
+        var kind = typeof(DataAsset).IsAssignableFrom(type) ? ReferenceKind.Asset
+            : typeof(Component).IsAssignableFrom(type) ? ReferenceKind.Component
+            : ReferenceKind.Node;
+        return new ReferenceField(field, kind, type, isDirect: true);
+    }
 
     Guid IdOf(object value)
     {

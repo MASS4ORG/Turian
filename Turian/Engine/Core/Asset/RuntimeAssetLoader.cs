@@ -59,7 +59,9 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        return metadata.GetContent(record.ProjectRootPath) as TData;
+        var content = metadata.GetContent(record.ProjectRootPath);
+        if (content is not null) ObjectReferences.Resolve(content, this);
+        return content as TData;
     }
 
     /// <inheritdoc />

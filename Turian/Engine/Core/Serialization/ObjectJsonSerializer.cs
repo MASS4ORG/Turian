@@ -31,7 +31,24 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
         var type = ResolveTypeFromJson(root);
         var result = CreateInstance(type);
 
-        ReadMembers(root, type, result, options);
+        if (result is not Node node)
+        {
+            ReadMembers(root, type, result, options);
+            return result;
+        }
+
+        ObjectReferences.EnterNode();
+        try
+        {
+            ReadMembers(root, type, result, options);
+        }
+        catch
+        {
+            ObjectReferences.ExitNode(null);
+            throw;
+        }
+
+        ObjectReferences.ExitNode(node);
         return result;
     }
 
@@ -71,6 +88,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (property.CanRead && property.CanWrite && IsMemberValid(property))
                 {
                     var propValue = property.GetValue(value);
+                    if (value is DataAsset
+                        && ObjectReferences.TryWrite(writer, value, property.Name, property.PropertyType, propValue,
+                            allowSceneObjects: false))
+                    {
+                        continue;
+                    }
+
                     WriteMemberValue(
                         writer,
                         property.Name,
@@ -85,6 +109,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (IsMemberValid(field))
                 {
                     var fieldValue = field.GetValue(value);
+                    if (value is DataAsset
+                        && ObjectReferences.TryWrite(writer, value, field.Name, field.FieldType, fieldValue,
+                            allowSceneObjects: false))
+                    {
+                        continue;
+                    }
+
                     WriteMemberValue(writer, field.Name, fieldValue, field.FieldType, options);
                 }
             }
@@ -154,7 +185,12 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 return;
             }
 
-            if (memberType == typeof(Asset) || memberType.IsSubclassOf(typeof(Asset)))
+            if (result is DataAsset
+                && ObjectReferences.TryRead(result, prop.Name, memberType, prop.Value, false, out var reference))
+            {
+                value = reference;
+            }
+            else if (memberType == typeof(Asset) || memberType.IsSubclassOf(typeof(Asset)))
             {
                 value = CreateAndSetAsset(prop);
             }
