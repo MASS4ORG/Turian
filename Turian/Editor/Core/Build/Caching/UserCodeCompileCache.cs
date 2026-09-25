@@ -5,7 +5,7 @@ namespace Turian.Editor.Core;
 ///
 /// <para>
 /// The manifest represents the exact editor-side inputs that affect the generated user assembly:
-/// source files under <c>Assets/</c>, project settings, package references, and build configuration.
+/// source files under <c>Assets/</c>, project settings, package references, engine assembly, and build configuration.
 /// If all tracked inputs match and the output assembly still exists, recompilation can be skipped.
 /// </para>
 /// </summary>
@@ -47,6 +47,7 @@ public sealed class UserCodeCompileCache(ILogger logger)
             Configuration = configuration.ToString(),
             TargetFramework = settings.TargetFramework,
             TargetSdk = settings.TargetSdk,
+            EngineModuleVersionId = typeof(Component).Assembly.ManifestModule.ModuleVersionId,
             Title = settings.Title,
             ProductName = player.ProductName,
             Author = player.Author,
@@ -149,6 +150,12 @@ public sealed class UserCodeCompileCache(ILogger logger)
         if (!string.Equals(persisted.TargetSdk, current.TargetSdk, StringComparison.OrdinalIgnoreCase))
         {
             logger.LogDebug("Compile cache miss: target SDK changed ({Old} → {New})", persisted.TargetSdk, current.TargetSdk);
+            return false;
+        }
+
+        if (persisted.EngineModuleVersionId != current.EngineModuleVersionId)
+        {
+            logger.LogDebug("Compile cache miss: engine assembly changed");
             return false;
         }
 
@@ -441,6 +448,8 @@ public sealed class UserCodeCompileCacheManifest
     public string? TargetFramework { get; set; }
     /// <summary>Gets or sets the target SDK version.</summary>
     public string? TargetSdk { get; set; }
+    /// <summary>Gets or sets the engine module used to compile the cached assembly.</summary>
+    public Guid EngineModuleVersionId { get; set; }
     /// <summary>Gets or sets the project title.</summary>
     public string? Title { get; set; }
     /// <summary>Gets or sets the product name.</summary>
