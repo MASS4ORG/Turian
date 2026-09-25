@@ -24,4 +24,22 @@ public class DataAsset : IdClass
 
         throw new FileNotFoundException($"DataAsset load failed {absolutePath}");
     }
+
+    /// <summary>
+    /// Creates an independent copy of a payload with a new id, for per-instance runtime data built
+    /// from a shared template (e.g. one enemy's stats). Changes to the copy never reach the original.
+    /// </summary>
+    /// <typeparam name="T">The payload type.</typeparam>
+    /// <param name="original">The payload to copy.</param>
+    /// <returns>The copy.</returns>
+    public static T Instantiate<T>(T original)
+        where T : DataAsset
+    {
+        ArgumentNullException.ThrowIfNull(original);
+
+        var copy = Serializer.LoadData<DataAsset>(Serializer.Serialize<DataAsset>(original)) as T
+            ?? throw new InvalidOperationException($"Could not copy {original.GetType().Name}");
+        copy.Id = Guid.NewGuid();
+        return copy;
+    }
 }

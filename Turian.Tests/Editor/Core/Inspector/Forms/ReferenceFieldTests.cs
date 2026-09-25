@@ -13,6 +13,7 @@ public class ReferenceFieldTests
     [InlineData(nameof(Holder.Texture), ReferenceKind.Asset, typeof(TextureAsset))]
     [InlineData(nameof(Holder.Target), ReferenceKind.Node, typeof(Node))]
     [InlineData(nameof(Holder.Camera), ReferenceKind.Component, typeof(CameraComponent))]
+    [InlineData(nameof(Holder.Stats), ReferenceKind.Asset, typeof(DataAssetAsset))]
     public void EachReferenceGenericIsRecognised(string member, ReferenceKind kind, Type targetType)
     {
         var reference = ReferenceFor(member);
@@ -92,6 +93,7 @@ public class ReferenceFieldTests
         public AssetReference<TextureAsset> Texture { get; set; } = new();
         public NodeRef<Node> Target { get; set; } = new();
         public ComponentRef<CameraComponent> Camera { get; set; } = new();
+        public DataAssetReference<DataAssetTest> Stats { get; set; } = new();
         public int Count { get; set; }
     }
 }

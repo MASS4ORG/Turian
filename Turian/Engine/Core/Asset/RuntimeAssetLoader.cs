@@ -50,6 +50,19 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     }
 
     /// <inheritdoc />
+    public async Task<TData?> LoadContentAsync<TData>(Guid assetId) where TData : DataAsset
+    {
+        if (await LoadAsync<DataAssetAsset>(assetId).ConfigureAwait(false) is not { } metadata
+            || !assetDatabase.TryGetAsset(assetId, out var record)
+            || record is null)
+        {
+            return null;
+        }
+
+        return metadata.GetContent(record.ProjectRootPath) as TData;
+    }
+
+    /// <inheritdoc />
     public bool TryGetLoaded<TAsset>(Guid assetId, out TAsset? asset) where TAsset : Asset
     {
         lock (gate)

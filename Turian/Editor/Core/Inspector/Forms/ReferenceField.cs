@@ -61,7 +61,17 @@ public sealed class ReferenceField
     {
         ArgumentNullException.ThrowIfNull(field);
 
+        // Typed subclasses (PrefabReference, DataAssetReference) are drawn as the AssetReference they extend.
         var type = field.ValueType;
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(AssetReference<>))
+            {
+                type = current;
+                break;
+            }
+        }
+
         if (!type.IsGenericType) return null;
 
         var definition = type.GetGenericTypeDefinition();
