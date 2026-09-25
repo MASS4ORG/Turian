@@ -2,7 +2,7 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Asks the asset browser to show and select an asset. The inspector raises it when a reference
-/// field is clicked, the way Unity pings an asset in the Project window; the browser panel — whatever
+/// field is clicked; the browser panel — whatever
 /// shell it belongs to — is what answers.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]

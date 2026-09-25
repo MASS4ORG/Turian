@@ -22,7 +22,7 @@ public sealed class SceneTreeController(
     /// <summary>
     /// Gets the scene root the editor panels should display, or <c>null</c> when no scene is open.
     /// While play mode is running this is the <em>running</em> hierarchy, so the Scene Tree and
-    /// Inspector show live objects — as in Unity.
+    /// Inspector show live objects.
     /// </summary>
     public Node? CurrentSceneRoot => runtimeRoot ?? sceneRoot;
 

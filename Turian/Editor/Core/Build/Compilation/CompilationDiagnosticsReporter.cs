@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Filters, deduplicates, and logs Roslyn compilation diagnostics in Unity/MSBuild style.
+/// Filters, deduplicates, and logs Roslyn compilation diagnostics.
 /// </summary>
 public static class CompilationDiagnosticsReporter
 {

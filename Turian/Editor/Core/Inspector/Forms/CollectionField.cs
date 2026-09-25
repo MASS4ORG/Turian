@@ -110,7 +110,11 @@ public sealed class CollectionField
                 source.Touch();
                 return true;
             },
-            _ => source.Touch(), IsReadOnly))];
+            _ => source.Touch(), IsReadOnly)
+        {
+            CollectionMember = source.Name,
+            CollectionIndex = index,
+        })];
     }
 
     /// <summary>Appends a default entry, inventing a key when the collection is a dictionary.</summary>

@@ -22,6 +22,13 @@ public abstract class Component : IdClass
         }
     } = true;
 
+    /// <summary>
+    /// Whether the component was destroyed (detached from its node). A reference to it reads as missing: it is
+    /// saved as null and never resolved to.
+    /// </summary>
+    [JsonIgnore, HideInEditor]
+    public bool IsDestroyed { get; private set; }
+
     /// <summary>Gets the node this component is attached to.</summary>
     [JsonIgnore, HideInEditor]
     public Node? Node { get; private set; }
@@ -71,6 +78,7 @@ public abstract class Component : IdClass
         OnDisable();
         OnDetached();
         OnDestroy();
+        IsDestroyed = true;
         Node = null;
         IsAwake = false;
         IsStarted = false;
@@ -88,7 +96,7 @@ public abstract class Component : IdClass
 
     // ── Lifecycle callbacks ────────────────────────────────────────────────
 
-    /// <summary>Called once on first attachment, even if inactive. Equivalent to Unity's Awake.</summary>
+    /// <summary>Called once on first attachment, even if inactive. Runs before the first update.</summary>
     public virtual void OnAwake()
     {
     }

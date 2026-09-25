@@ -10,7 +10,7 @@ public static class LogView
 {
     /// <summary>
     /// Whether a level survives the Output panel's three severity toggles. The Debug toggle gates
-    /// everything below warning — Information, Debug and Verbose — the way Unity's console Log toggle
+    /// everything below warning — Information, Debug and Verbose — the log toggle
     /// gates its whole non-error/non-warning stream.
     /// </summary>
     /// <param name="level">The event's log level.</param>

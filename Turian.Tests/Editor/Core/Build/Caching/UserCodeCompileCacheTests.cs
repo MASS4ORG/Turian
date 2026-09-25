@@ -86,6 +86,18 @@ public sealed class UserCodeCompileCacheTests : IDisposable
         Assert.True(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
     }
 
+    /// <summary>An assembly compiled against another engine module must be rebuilt.</summary>
+    [Fact]
+    public void IsAssemblyUpToDate_EngineChanged_ReturnsFalse()
+    {
+        File.WriteAllText(assemblyPath, "fake-dll");
+        var manifest = cache.CreateManifest(settings, assemblyPath, csprojPath);
+        manifest.EngineModuleVersionId = Guid.NewGuid();
+        cache.SaveManifest(tempRoot, assemblyPath, manifest);
+
+        Assert.False(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+    }
+
     // ── Slot rotation (#73 regression) ───────────────────────────────────────
 
     /// <summary>

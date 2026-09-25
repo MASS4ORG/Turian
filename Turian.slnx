@@ -28,5 +28,6 @@
     <Project Path="Turian/Engine/UI/Turian.Engine.UI.csproj" />
   </Folder>
   <Project Path=".nuke/Build.csproj" />
+  <Project Path="Turian/Benchmarks/Turian.Benchmarks.csproj" />
   <Project Path="Turian.Tests/Turian.Tests.csproj" />
 </Solution>

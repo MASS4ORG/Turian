@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Discovers the menu entries user code contributes with <see cref="MenuItemAttribute"/>, Unity-style:
+/// Discovers the menu entries user code contributes with <see cref="MenuItemAttribute"/>:
 /// a <c>public static</c> method annotated with a path becomes a main-menu item that runs it.
 /// Framework-agnostic — it yields paths and delegates, and a shell turns those into whatever its menu
 /// bar is made of.

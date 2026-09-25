@@ -3,7 +3,7 @@ namespace Gaya.Plugin.Turian;
 /// <summary>
 /// Registers Inspector panel instances: the one the studio starts with, and any more the user opens
 /// from the menu. Each is a fully independent <see cref="InspectorPanel"/> — its own fields, its own
-/// fold state, its own lock — the way Unity lets several Inspector windows coexist.
+/// fold state, its own lock.
 /// </summary>
 sealed class InspectorInstances(IPanelRegistry panels, ITabStripChromeRegistry tabStripChrome)
 {

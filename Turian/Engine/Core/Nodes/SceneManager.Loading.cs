@@ -112,6 +112,7 @@ public partial class SceneManager
             Name = string.IsNullOrWhiteSpace(root.Name) ? "Scene" : root.Name
         };
 
+        List<Node> roots;
         lock (scenesLock)
         {
             loadedScenes.Add(loadedScene);
@@ -120,7 +121,16 @@ public partial class SceneManager
             {
                 activeScene = loadedScene;
             }
+
+            roots = [.. loadedScenes.Select(static scene => scene.RootNode)];
         }
+
+        // A reference into another scene resolves once both are loaded, whichever loaded first.
+        var pending = ObjectReferences.Resolve(roots, RuntimeServices.TryGet<IAssetLoader>());
+        if (pending > 0)
+            Log.Logger.LogWarning(
+                "{Count} reference(s) point at objects that are not loaded; they resolve when their targets load",
+                pending);
 
         return loadedScene;
     }
@@ -217,6 +227,7 @@ public partial class SceneManager
         }
 
         node.OnDestroy();
+        node.IsDestroyed = true;
     }
 
     static Guid HashPathToGuid(string absolutePath)

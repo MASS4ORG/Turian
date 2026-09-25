@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Draws <c>AssetReference</c>, <c>NodeRef</c> and <c>ComponentRef</c> fields as a reference slot:
+/// Draws <c>AssetReference</c> and direct object reference fields as a reference slot:
 /// drop a row from the asset browser or scene tree on it, click it to select what it points at, or
 /// use its pick button for a searchable list of the values its declared type allows.
 /// </summary>
@@ -47,7 +47,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         switch (result.Action)
         {
             case ObjectFieldAction.Drop when result.Payload is ReferenceDragPayload drop:
-                reference.Set(drop.Id);
+                picker.Assign(reference, drop.Id);
                 break;
             case ObjectFieldAction.Clear:
                 reference.Clear();
@@ -74,7 +74,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
 
     /// <summary>
     /// Selects what the reference points at where it lives: an asset in the browser, a node or a
-    /// component's owner in the scene tree. Unity's "ping", and the reason clicking a slot is not
+    /// component's owner in the scene tree. This is why clicking a slot is not
     /// what opens the picker.
     /// </summary>
     void Reveal(ReferenceField reference)
@@ -134,7 +134,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
                 {
                     if (!CandidateRow(gui, candidate.Name, candidate.Detail, candidate.Id.ToString())) continue;
 
-                    reference.Set(candidate.Id);
+                    picker.Assign(reference, candidate.Id);
                     openFieldId = null;
                     openField = null;
                 }

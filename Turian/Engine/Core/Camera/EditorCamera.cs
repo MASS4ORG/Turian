@@ -2,8 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// Editor-only free camera. Lives outside the scene graph — never serialized, never shown in the
-/// SceneTree panel. Matches Unity/Godot's pattern where the editor viewport camera is a dedicated
-/// object owned by the viewport, not a user scene node.
+/// SceneTree panel. The viewport owns this camera rather than a scene node.
 ///
 /// The engine's world space has +Y pointing down (OBJ/FBX importers negate Y), but the camera
 /// convention is Y-up: <see cref="globalUp"/> = +Y, positive pitch = look up. The Vulkan

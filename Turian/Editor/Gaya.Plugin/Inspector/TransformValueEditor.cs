@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// A transform as three labelled vector rows — Position, Rotation, Scale — the way Unity shows it.
+/// A transform as three labelled vector rows — Position, Rotation, Scale.
 /// Rotation is edited in degrees through the transform's own setters, which is why this editor
 /// touches the value in place rather than assigning the field.
 /// </summary>

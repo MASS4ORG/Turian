@@ -44,6 +44,7 @@ public class DataAssetAsset : Asset
             }
 
             CopyFields(fresh, content);
+            content.NotifyChanged(string.Empty);
             return content;
         }
     }
@@ -58,7 +59,17 @@ public class DataAssetAsset : Asset
         return DataAsset.LoadContent(absolutePath);
     }
 
+    /// <summary>
+    /// Reads the payload and gives it this asset's id, so a reference to the payload names the asset.
+    /// </summary>
     DataAsset? ReadContent(string projectPath)
+    {
+        var payload = ReadPayload(projectPath);
+        if (payload is not null) payload.Id = Id;
+        return payload;
+    }
+
+    DataAsset? ReadPayload(string projectPath)
     {
         var sourcePath = Path.Combine(projectPath, RelativePath);
         if (File.Exists(sourcePath)
@@ -83,6 +94,8 @@ public class DataAssetAsset : Asset
                          BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
                          | BindingFlags.DeclaredOnly))
             {
+                // Event subscribers belong to the live instance, not to the data.
+                if (typeof(Delegate).IsAssignableFrom(field.FieldType)) continue;
                 field.SetValue(target, field.GetValue(source));
             }
         }

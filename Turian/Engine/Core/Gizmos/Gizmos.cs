@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Immediate-mode gizmo drawing, Unity-style. Lines submitted during a frame are rendered by
+/// Immediate-mode gizmo drawing. Lines submitted during a frame are rendered by
 /// <see cref="GizmoRenderSystem"/> as part of the same render pass as the scene.
 ///
 /// <para>One instance is shared per Scene View (see <c>SceneViewerService.Gizmos</c>). The buffer is

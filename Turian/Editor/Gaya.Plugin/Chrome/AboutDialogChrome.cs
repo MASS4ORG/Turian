@@ -8,7 +8,7 @@ namespace Gaya.Plugin.Turian;
 /// dialog open on the next one. The version and contributors come from <see cref="BuildInfo"/>,
 /// generated at compile time by <c>BuildInfoGenerator</c>.
 /// </summary>
-sealed class AboutDialogChrome : IChromeItem
+sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 {
     const float dialogWidth = 360f;
     const float bodyHeight = 420f;
@@ -32,23 +32,24 @@ sealed class AboutDialogChrome : IChromeItem
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        gui.Dialog(ref isOpen, "About Turian Studio", () => Body(gui),
+        gui.Dialog(ref isOpen, localization.T("About Turian Studio"), () => Body(gui),
             Theme.Scale(dialogWidth), Theme.Scale(bodyHeight), () => Footer(gui),
             footerHeight: Theme.Scale(footerHeight));
     }
 
-    static void Body(Gui gui)
+    void Body(Gui gui)
     {
-        using (gui.Node().Expand().Direction(Axis.Vertical).ContentAlignX(0.5f).Gap(Theme.Scale(12f)).Enter())
+        using (gui.Node(Theme.Scale(contentWidth), Theme.Scale(bodyHeight - 32f), "about/scroll")
+                   .Direction(Axis.Vertical).ContentAlignX(0.5f).Gap(Theme.Scale(12f)).Enter())
         {
-            gui.ScrollY();
+            gui.ScrollY(Theme.InkDim, Theme.Chrome);
             Header(gui);
             Links(gui);
             Contributors(gui);
         }
     }
 
-    static void Header(Gui gui)
+    void Header(Gui gui)
     {
         using (gui.Node().ExpandWidth().Direction(Axis.Vertical).ContentAlignX(0.5f)
                    .Gap(Theme.Scale(4f)).Enter())
@@ -57,17 +58,17 @@ sealed class AboutDialogChrome : IChromeItem
             else gui.DrawText("◉", Theme.Text(52f), Theme.Accent);
 
             gui.DrawText("Turian Studio", Theme.Text(18f), Theme.Ink);
-            gui.DrawText($"Version {BuildInfo.Version}", Theme.Text(12f), Theme.InkDim);
-            gui.DrawText($"Built {BuildInfo.CompilationDate}", Theme.Text(11f), Theme.InkDim);
+            gui.DrawText($"{localization.T("Version")} {BuildInfo.Version}", Theme.Text(12f), Theme.InkDim);
+            gui.DrawText($"{localization.T("Built")} {BuildInfo.CompilationDate}", Theme.Text(11f), Theme.InkDim);
         }
     }
 
-    static void Links(Gui gui)
+    void Links(Gui gui)
     {
         using (gui.Node().ExpandWidth().Direction(Axis.Vertical).Gap(Theme.Scale(8f)).Enter())
         {
             Divider(gui);
-            gui.DrawText("Documentation & Community", Theme.Text(14f), Theme.Ink, centerInRect: false);
+            gui.DrawText(localization.T("Documentation & Community"), Theme.Text(14f), Theme.Ink, centerInRect: false);
 
             Link(gui, "Documentation", "https://Turian.MASS4.org/");
             Link(gui, "Blog", "https://Turian.MASS4.org/blog");
@@ -78,12 +79,12 @@ sealed class AboutDialogChrome : IChromeItem
         }
     }
 
-    static void Contributors(Gui gui)
+    void Contributors(Gui gui)
     {
         using (gui.Node().ExpandWidth().Direction(Axis.Vertical).Gap(Theme.Scale(4f)).Enter())
         {
             Divider(gui);
-            gui.DrawText("Contributors", Theme.Text(14f), Theme.Ink, centerInRect: false);
+            gui.DrawText(localization.T("Contributors"), Theme.Text(14f), Theme.Ink, centerInRect: false);
 
             foreach (var line in BuildInfo.Contributors.Split('\n'))
             {
@@ -99,15 +100,15 @@ sealed class AboutDialogChrome : IChromeItem
             gui.DrawBackgroundRect(Theme.Border);
     }
 
-    static void Link(Gui gui, string label, string url)
+    void Link(Gui gui, string label, string url)
     {
-        if (gui.Button(label, width: Theme.Scale(contentWidth), height: Theme.Scale(28f)))
+        if (gui.Button(localization.T(label), width: Theme.Scale(contentWidth), height: Theme.Scale(28f)))
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
     }
 
     void Footer(Gui gui)
     {
-        if (gui.Button("Close", width: Theme.Scale(80f), height: Theme.Scale(28f))) isOpen = false;
+        if (gui.Button(localization.T("Close"), width: Theme.Scale(80f), height: Theme.Scale(28f))) isOpen = false;
     }
 
     /// <summary>Loads the embedded logo once; falls back to a glyph when the resource is missing.</summary>

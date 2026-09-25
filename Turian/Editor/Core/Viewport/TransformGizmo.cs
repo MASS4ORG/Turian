@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Unity-style interactive transform gizmo for the Scene View.
+/// Interactive transform gizmo for the Scene View.
 /// Drawn by <see cref="Draw"/> and driven by pointer events routed from <c>SceneViewerControl</c>.
 ///
 /// <para>Translation and scale support axis/uniform dragging with optional snapping. Rotation is

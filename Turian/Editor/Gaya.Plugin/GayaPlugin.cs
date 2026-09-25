@@ -113,7 +113,8 @@ public sealed class GayaPlugin : IPlugin
             "gaya.turian.output.tabMenu", OutputPanelId,
             sp => new OutputPanelChrome(
                 sp.GetRequiredService<OutputPanelSettings>(),
-                sp.GetRequiredService<IEditorSettings>())));
+                sp.GetRequiredService<IEditorSettings>(),
+                sp.GetRequiredService<StudioLocalization>())));
 
         context.TabStripChrome.Register(new TabStripChromeDescriptor(
             "gaya.turian.assets.tabMenu", AssetsPanelId,
@@ -143,13 +144,15 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<OutputPanelSettings>(),
                 sp.GetRequiredService<OutputLogBridge>(),
                 sp.GetRequiredService<SettingsService>(),
-                sp.GetRequiredService<IFocusTracker>())));
+                sp.GetRequiredService<IFocusTracker>(),
+                sp.GetRequiredService<StudioLocalization>())));
 
         context.Panels.Register(new PanelDescriptor(
             SettingsPanelId, "Settings", PanelPlacement.Center,
             sp => new SettingsPanel(
                 sp.GetRequiredService<IEditorSettings>(),
-                sp.GetRequiredService<ILogger>()))
+                sp.GetRequiredService<ILogger>(),
+                sp.GetRequiredService<StudioLocalization>()))
         { OpenByDefault = false });
 
         context.Panels.Register(new PanelDescriptor(

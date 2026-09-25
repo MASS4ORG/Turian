@@ -21,7 +21,7 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="MASS4.Guinevere" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
     </ItemGroup>
 
     <!-- Internal libraries -->

@@ -59,7 +59,36 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        return metadata.GetContent(record.ProjectRootPath) as TData;
+        var content = metadata.GetContent(record.ProjectRootPath);
+        if (content is not null) await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
+        return content as TData;
+    }
+
+    /// <inheritdoc />
+    public Task PreloadAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(assetIds);
+
+        var loads = assetIds.Distinct().Select(PreloadOneAsync).ToList();
+        return loads.Count == 0 ? Task.CompletedTask : Task.WhenAll(loads).WaitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task PreloadLabelAsync(string label, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+
+        var ids = assetDatabase.GetAssetsSnapshot()
+            .Where(record => record.Labels.Contains(label, StringComparer.Ordinal))
+            .Select(static record => record.AssetId)
+            .ToList();
+        return PreloadAsync(ids, cancellationToken);
+    }
+
+    async Task PreloadOneAsync(Guid assetId)
+    {
+        if (await LoadAsync<Asset>(assetId).ConfigureAwait(false) is DataAssetAsset)
+            await LoadContentAsync<DataAsset>(assetId).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

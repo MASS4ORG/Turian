@@ -112,6 +112,11 @@ public sealed class AssetRecord
     public Guid ParentAssetId { get; set; }
 
     /// <summary>
+    /// Gets or sets the asset's labels, copied from its metadata so they can be queried without loading it.
+    /// </summary>
+    public List<string> Labels { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the source asset path relative to the project root.
     /// Example: <c>Assets/Models/ship.glb</c>.
     /// </summary>

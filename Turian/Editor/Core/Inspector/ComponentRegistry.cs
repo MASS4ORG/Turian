@@ -44,7 +44,7 @@ public static class ComponentRegistry
     /// <see cref="Component"/> subclass that is either declared outside the engine or menu-registered.
     /// </summary>
     /// <remarks>
-    /// Every component a project declares is listed, as in Unity; the engine's own need the attribute,
+    /// Every component a project declares is listed; the engine's own need the attribute,
     /// which keeps internal types such as <see cref="MissingComponent"/> out of the menu.
     /// </remarks>
     public static bool IsInspectable(Type type)

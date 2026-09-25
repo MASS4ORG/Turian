@@ -11,7 +11,7 @@ namespace Gaya.Plugin.Turian;
 /// Edits are never staged: writing a field goes straight to the live object and the file follows a
 /// moment later, which is what the rest of the settings-owning programs a user knows do.
 /// </remarks>
-sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
+sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocalization localization) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -73,8 +73,8 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
         {
             gui.DrawBackgroundRect(Theme.Chrome);
 
-            ScopeTab(gui, SettingsScope.User, "User", height);
-            ScopeTab(gui, SettingsScope.Workspace, "Workspace", height);
+            ScopeTab(gui, SettingsScope.User, localization.T("User"), height);
+            ScopeTab(gui, SettingsScope.Workspace, localization.T("Workspace"), height);
         }
     }
 
@@ -114,7 +114,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
     {
         var rowHeight = Theme.Scale(Theme.RowHeight + 4f);
 
-        filter = gui.TextInput(filter, width: 0, height: rowHeight, placeholder: "Search settings",
+        filter = gui.TextInput(filter, width: 0, height: rowHeight, placeholder: localization.T("Search settings"),
             fontSize: Theme.Text(12), padding: 5, id: "settings/filter");
 
         using (gui.Node(-1, rowHeight, "settings/openJson").ExpandWidth().ContentAlignY(0.5f).Enter())
@@ -123,7 +123,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
             var hot = interactable.OnHover();
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
-            gui.DrawText("Open settings.json", Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim,
+            gui.DrawText(localization.T("Open settings.json"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim,
                 centerInRect: false);
 
             if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick()) OpenJson();
@@ -136,7 +136,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
     /// The pages as a tree: a page whose path has several segments hangs under a row for each leading
     /// one, so <c>Editor/Camera</c> and <c>Editor/Grid</c> share an <c>Editor</c> parent.
     /// </summary>
-    static IReadOnlyList<TreeItem> Rows(IReadOnlyList<SettingsPageDescriptor> pages)
+    IReadOnlyList<TreeItem> Rows(IReadOnlyList<SettingsPageDescriptor> pages)
     {
         var rows = new List<TreeItem>();
         var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -149,10 +149,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
             {
                 var groupId = string.Join('/', segments[..(depth + 1)]);
                 if (emitted.Add(groupId))
-                    rows.Add(new TreeItem(groupId, segments[depth], depth, HasChildren: true));
+                    rows.Add(new TreeItem(groupId, localization.T(segments[depth]), depth, HasChildren: true));
             }
 
-            rows.Add(new TreeItem(page.Id, segments[^1], segments.Length - 1, Tag: page));
+            rows.Add(new TreeItem(page.Id, localization.T(segments[^1]), segments.Length - 1, Tag: page));
         }
 
         return rows;
@@ -183,10 +183,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
             return;
         }
 
-        gui.DrawText(page.Title, Theme.Text(20f), Theme.Ink, centerInRect: false);
+        gui.DrawText(localization.T(page.Title), Theme.Text(20f), Theme.Ink, centerInRect: false);
 
         if (page.Description.Length > 0)
-            gui.DrawText(page.Description, Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
+            gui.DrawText(localization.T(page.Description), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);
 
         var fields = Form(page).Sections.SelectMany(section => section.BodyFields).ToList();
@@ -195,16 +195,17 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
         for (var i = 0; i < shown.Count; i++) Option(gui, page, shown[i], $"settings/{page.Id}/field{i}");
 
         if (shown.Count == 0)
-            gui.DrawText("This page has no editable options.", Theme.Text(12), Theme.InkDim, centerInRect: false);
+            gui.DrawText(localization.T("This page has no editable options."), Theme.Text(12), Theme.InkDim,
+                centerInRect: false);
     }
 
     /// <summary>Why the right-hand side is empty, which is not the same question in every scope.</summary>
     string EmptyMessage()
     {
         if (scope == SettingsScope.Workspace && !settings.HasWorkspace)
-            return "Open a project to edit the settings stored with it.";
+            return localization.T("Open a project to edit the settings stored with it.");
 
-        return filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.";
+        return localization.T(filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.");
     }
 
     /// <summary>
@@ -229,7 +230,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
                 using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
                            .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
                 {
-                    gui.DrawText(title, Theme.Text(13f), Theme.Ink, centerInRect: false);
+                    gui.DrawText(localization.T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
 
                     // Beside the title rather than against the panel's edge: at a settings page's
                     // width the two would otherwise be too far apart to read as one row.
@@ -239,12 +240,12 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log) : IPanel
                 }
 
                 if (description.Length > 0)
-                    gui.DrawText(description, Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
+                    gui.DrawText(localization.T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
                         centerInRect: false);
 
                 using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
                            .Direction(Axis.Horizontal).Gap(4f).Enter())
-                    FieldDrawers.DrawEditorOnly(gui, field, id);
+                    FieldDrawers.DrawEditorOnly(gui, field, id, localization.T);
             }
         }
     }

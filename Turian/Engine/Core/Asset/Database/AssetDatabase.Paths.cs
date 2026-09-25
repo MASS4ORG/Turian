@@ -277,6 +277,7 @@ public sealed partial class AssetDatabase
             ParentAssetId = record.ParentAssetId,
             ProjectRootPath = record.ProjectRootPath,
             AssetTypeName = record.AssetTypeName,
+            Labels = [.. record.Labels],
             SourceRelativePath = record.SourceRelativePath,
             MetaRelativePath = record.MetaRelativePath,
             PrimaryContentKey = record.PrimaryContentKey,

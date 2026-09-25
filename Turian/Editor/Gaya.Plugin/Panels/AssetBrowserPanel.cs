@@ -94,7 +94,7 @@ sealed class AssetBrowserPanel : IPanel
 
     /// <summary>
     /// Selects the asset a reveal asked for and opens every folder above it, so the row is one the
-    /// tree can scroll to. Unity's "ping".
+    /// tree can scroll to.
     /// </summary>
     void RevealPending()
     {

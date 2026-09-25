@@ -8,7 +8,8 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class OutputPanelChrome(
     OutputPanelSettings settings,
-    IEditorSettings editorSettings) : IChromeItem
+    IEditorSettings editorSettings,
+    StudioLocalization localization) : IChromeItem
 {
     const string buttonId = "gaya.turian.output/tabMenu";
     const float menuWidth = 210f;
@@ -46,10 +47,10 @@ sealed class OutputPanelChrome(
         // Drawn outside the button's own node: a popup opened from inside a small, tightly-packed
         // node is misplaced and undecorated, the same way one opened from inside a scrolled inspector
         // row is clipped by it. Called every frame, open or not, so its node structure stays stable.
-        gui.Popup(ref menuOpen, () => Preferences(gui, settings, editorSettings),
+        gui.Popup(ref menuOpen, () => Preferences(gui, settings, editorSettings, localization),
             width: theme.Scale(menuWidth),
             height: contentHeight,
-            title: "Output",
+            title: localization.T("Output"),
             position: menuPosition,
             titleBarHeight: titleBar,
             backgroundColor: theme.Panel,
@@ -63,7 +64,8 @@ sealed class OutputPanelChrome(
     /// lines stepper. An edit writes into the settings object and reports the page so the value settles
     /// into the user's settings file — the same page the panel reads back.
     /// </summary>
-    static void Preferences(Gui gui, OutputPanelSettings settings, IEditorSettings editorSettings)
+    static void Preferences(Gui gui, OutputPanelSettings settings, IEditorSettings editorSettings,
+        StudioLocalization localization)
     {
         var theme = StudioTheme.Current;
         var box = theme.Scale(13f);
@@ -73,21 +75,21 @@ sealed class OutputPanelChrome(
 
         using (gui.Node().Direction(Axis.Vertical).Gap(theme.Scale(2f)).Enter())
         {
-            changed |= Toggle(gui, "Show Timestamp", box, size, rowHeight,
+            changed |= Toggle(gui, localization.T("Show Timestamp"), box, size, rowHeight,
                 () => settings.ShowTimestamp, value => settings.ShowTimestamp = value);
-            changed |= Toggle(gui, "Monospace", box, size, rowHeight,
+            changed |= Toggle(gui, localization.T("Monospace"), box, size, rowHeight,
                 () => settings.Monospace, value => settings.Monospace = value);
-            changed |= Toggle(gui, "Clear on Play", box, size, rowHeight,
+            changed |= Toggle(gui, localization.T("Clear on Play"), box, size, rowHeight,
                 () => settings.ClearOnPlay, value => settings.ClearOnPlay = value);
-            changed |= Toggle(gui, "Clear on Build", box, size, rowHeight,
+            changed |= Toggle(gui, localization.T("Clear on Build"), box, size, rowHeight,
                 () => settings.ClearOnBuild, value => settings.ClearOnBuild = value);
-            changed |= Toggle(gui, "Clear on Recompile", box, size, rowHeight,
+            changed |= Toggle(gui, localization.T("Clear on Recompile"), box, size, rowHeight,
                 () => settings.ClearOnRecompile, value => settings.ClearOnRecompile = value);
 
             using (gui.Node(-1, rowHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
                        .Direction(Axis.Horizontal).Gap(theme.Scale(6f)).ContentAlignY(0.5f).Enter())
             {
-                gui.DrawText("Entry lines", size, theme.InkDim);
+                gui.DrawText(localization.T("Entry lines"), size, theme.InkDim);
                 if (StudioControls.SmallTextButton(gui, "−", "gaya.turian.output/tabMenu/minus", theme.Scale(20f)))
                     changed |= StepEntryLines(settings, settings.EntryLines - 1);
                 gui.DrawText(settings.EntryLines.ToString(CultureInfo.InvariantCulture), size, theme.Ink);

@@ -14,20 +14,25 @@ public enum ReferenceKind
 }
 
 /// <summary>
-/// A <see cref="FormField"/> holding an <see cref="AssetReference{TAsset}"/>, <see cref="NodeRef{T}"/>
-/// or <see cref="ComponentRef{T}"/>, seen as a single id plus the type it must point at. Lets one
-/// drawer serve all three without reflecting over open generics itself.
+/// A <see cref="FormField"/> holding an asset reference or a direct node, component, or DataAsset reference.
 /// </summary>
 public sealed class ReferenceField
 {
     readonly FormField source;
 
-    ReferenceField(FormField source, ReferenceKind kind, Type targetType)
+    ReferenceField(FormField source, ReferenceKind kind, Type targetType, bool isDirect = false)
     {
         this.source = source;
         Kind = kind;
         TargetType = targetType;
+        IsDirect = isDirect;
     }
+
+    /// <summary>
+    /// Whether the member holds the referenced object itself rather than an id wrapper; it is written with
+    /// <see cref="SetTarget"/>.
+    /// </summary>
+    public bool IsDirect { get; }
 
     /// <summary>Which registry the reference resolves against.</summary>
     public ReferenceKind Kind { get; }
@@ -44,7 +49,10 @@ public sealed class ReferenceField
     /// <summary>The referenced asset or node id, or <see cref="Guid.Empty"/> when unset.</summary>
     public Guid CurrentId => source.GetValue() switch
     {
+        null when IsDirect => PendingId(),
         null => Guid.Empty,
+        Component component when IsDirect => component.Node?.Id ?? component.Id,
+        IdClass value when IsDirect => value.Id,
         var value => IdOf(value),
     };
 
@@ -52,8 +60,7 @@ public sealed class ReferenceField
     public bool IsEmpty => CurrentId == Guid.Empty;
 
     /// <summary>
-    /// Recognises a field whose type is one of the three reference generics, or null when it is not
-    /// a reference at all.
+    /// Recognises asset reference wrappers and direct scene or DataAsset references.
     /// </summary>
     /// <param name="field">The field to classify.</param>
     /// <returns>A reference view over the field, or null.</returns>
@@ -61,7 +68,7 @@ public sealed class ReferenceField
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        // Typed subclasses (PrefabReference, DataAssetReference) are drawn as the AssetReference they extend.
+        // Typed subclasses are drawn as the AssetReference they extend.
         var type = field.ValueType;
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
@@ -72,19 +79,17 @@ public sealed class ReferenceField
             }
         }
 
-        if (!type.IsGenericType) return null;
+        if (!type.IsGenericType) return TryCreateDirect(field);
 
         var definition = type.GetGenericTypeDefinition();
         var argument = type.GetGenericArguments()[0];
 
         if (definition == typeof(AssetReference<>)) return new ReferenceField(field, ReferenceKind.Asset, argument);
-        if (definition == typeof(NodeRef<>)) return new ReferenceField(field, ReferenceKind.Node, argument);
-        if (definition == typeof(ComponentRef<>)) return new ReferenceField(field, ReferenceKind.Component, argument);
 
         return null;
     }
 
-    /// <summary>Whether the field holds one of the three reference generics.</summary>
+    /// <summary>Whether the field holds a recognised reference.</summary>
     /// <param name="field">The field to classify.</param>
     /// <returns>True when <see cref="TryCreate"/> would succeed.</returns>
     public static bool IsReference(FormField field) => TryCreate(field) is not null;
@@ -105,19 +110,61 @@ public sealed class ReferenceField
         return source.SetValue(value);
     }
 
+    /// <summary>
+    /// Points a direct reference at <paramref name="target"/>, replacing whatever it held, including an id
+    /// whose target was missing.
+    /// </summary>
+    /// <param name="target">The object to reference, or null to clear.</param>
+    /// <returns>True when the write succeeded.</returns>
+    public bool SetTarget(object? target)
+    {
+        if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
+        if (source.Target is IdClass owner)
+        {
+            if (source.CollectionMember is { } list) ObjectReferences.Forget(owner, list, source.CollectionIndex);
+            else ObjectReferences.Forget(owner, source.Name);
+        }
+
+        return source.SetValue(target);
+    }
+
+    /// <summary>The id read from data for a direct reference whose target is not loaded, or empty.</summary>
+    Guid PendingId()
+    {
+        if (source.Target is not IdClass owner) return Guid.Empty;
+
+        var member = source.CollectionMember ?? source.Name;
+        var index = source.CollectionMember is null ? 0 : source.CollectionIndex;
+        return ObjectReferences.TryGetUnresolved(owner, member, out var ids) && index < ids.Length
+            ? ids[index]
+            : Guid.Empty;
+    }
+
     /// <summary>Clears the reference.</summary>
     /// <returns>True when the write succeeded.</returns>
-    public bool Clear() => Set(Guid.Empty);
+    public bool Clear() => IsDirect ? SetTarget(null) : Set(Guid.Empty);
+
+    static ReferenceField? TryCreateDirect(FormField field)
+    {
+        var type = field.ValueType;
+        if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true) || type.IsArray || type.IsGenericType)
+            return null;
+
+        var kind = typeof(DataAsset).IsAssignableFrom(type) ? ReferenceKind.Asset
+            : typeof(Component).IsAssignableFrom(type) ? ReferenceKind.Component
+            : ReferenceKind.Node;
+        return new ReferenceField(field, kind, type, isDirect: true);
+    }
 
     Guid IdOf(object value)
     {
-        var name = Kind == ReferenceKind.Asset ? nameof(AssetReference<Asset>.AssetId) : nameof(NodeRef<Node>.NodeId);
+        var name = nameof(AssetReference<Asset>.AssetId);
         return value.GetType().GetProperty(name)?.GetValue(value) is Guid id ? id : Guid.Empty;
     }
 
     void SetIdOn(object value, Guid id)
     {
-        var name = Kind == ReferenceKind.Asset ? nameof(AssetReference<Asset>.AssetId) : nameof(NodeRef<Node>.NodeId);
+        var name = nameof(AssetReference<Asset>.AssetId);
         value.GetType().GetProperty(name)?.SetValue(value, id);
     }
 }

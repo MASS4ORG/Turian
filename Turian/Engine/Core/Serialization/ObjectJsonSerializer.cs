@@ -29,9 +29,38 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
         using var doc = JsonDocument.ParseValue(ref reader);
         var root = doc.RootElement;
         var type = ResolveTypeFromJson(root);
+
+        if (GeneratedSerializers.TryGet(type, out var generated))
+        {
+            var created = (T)generated.Create();
+            foreach (var property in root.EnumerateObject())
+            {
+                if (property.Name != TypeIdProperty) generated.ReadMember(created, property, options);
+            }
+
+            return created;
+        }
+
         var result = CreateInstance(type);
 
-        ReadMembers(root, type, result, options);
+        if (result is not Node node)
+        {
+            ReadMembers(root, type, result, options);
+            return result;
+        }
+
+        ObjectReferences.EnterNode();
+        try
+        {
+            ReadMembers(root, type, result, options);
+        }
+        catch
+        {
+            ObjectReferences.ExitNode(null);
+            throw;
+        }
+
+        ObjectReferences.ExitNode(node);
         return result;
     }
 
@@ -43,6 +72,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
         writer.WriteStartObject();
         WriteTypeInformation(writer, value);
+
+        if (GeneratedSerializers.TryGet(value.GetType(), out var generated))
+        {
+            generated.WriteMembers(writer, value, options);
+            writer.WriteEndObject();
+            return;
+        }
 
         var members = GetCachedMembers(value.GetType());
         WriteMembers(writer, value, members, options);
@@ -71,6 +107,14 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (property.CanRead && property.CanWrite && IsMemberValid(property))
                 {
                     var propValue = property.GetValue(value);
+                    if (value is DataAsset
+                        && ObjectReferences.IsSavedAsReference(property, property.PropertyType, false)
+                        && ObjectReferences.TryWrite(writer, value, property.Name, property.PropertyType, propValue,
+                            allowSceneObjects: false))
+                    {
+                        continue;
+                    }
+
                     WriteMemberValue(
                         writer,
                         property.Name,
@@ -85,6 +129,14 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (IsMemberValid(field))
                 {
                     var fieldValue = field.GetValue(value);
+                    if (value is DataAsset
+                        && ObjectReferences.IsSavedAsReference(field, field.FieldType, false)
+                        && ObjectReferences.TryWrite(writer, value, field.Name, field.FieldType, fieldValue,
+                            allowSceneObjects: false))
+                    {
+                        continue;
+                    }
+
                     WriteMemberValue(writer, field.Name, fieldValue, field.FieldType, options);
                 }
             }
@@ -154,7 +206,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 return;
             }
 
-            if (memberType == typeof(Asset) || memberType.IsSubclassOf(typeof(Asset)))
+            if (result is DataAsset
+                && ObjectReferences.IsSavedAsReference(memberInfo, memberType, false)
+                && ObjectReferences.TryRead(result, prop.Name, memberType, prop.Value, false, out var reference))
+            {
+                value = reference;
+            }
+            else if (memberType == typeof(Asset) || memberType.IsSubclassOf(typeof(Asset)))
             {
                 value = CreateAndSetAsset(prop);
             }

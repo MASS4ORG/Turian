@@ -12,6 +12,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Turian.Tests"/>
+        <InternalsVisibleTo Include="Turian.Benchmarks"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -39,6 +40,8 @@
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
+                          OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
     <ItemGroup>

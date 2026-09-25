@@ -14,9 +14,33 @@ public readonly record struct ReferenceCandidate(Guid Id, string Name, string De
 /// </summary>
 /// <param name="assets">The project catalog, for asset candidates.</param>
 /// <param name="sceneTree">The open scene, for node and component candidates.</param>
+/// <param name="loader">Resolves the shared payload a direct DataAsset field is set to.</param>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sceneTree)
+public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sceneTree, IAssetLoader loader)
 {
+    /// <summary>
+    /// Points <paramref name="field"/> at the candidate <paramref name="id"/>: the id itself for a wrapper
+    /// reference, or the node, component or shared DataAsset it names for a direct one.
+    /// </summary>
+    /// <param name="field">The reference to write.</param>
+    /// <param name="id">A candidate id from <see cref="Candidates"/> or a drop.</param>
+    /// <returns>True when the write succeeded.</returns>
+    public bool Assign(ReferenceField field, Guid id)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        if (!field.IsDirect) return field.Set(id);
+        if (id == Guid.Empty) return field.SetTarget(null);
+
+        object? target = field.Kind switch
+        {
+            ReferenceKind.Asset => loader.LoadContentAsync<DataAsset>(id).GetAwaiter().GetResult(),
+            ReferenceKind.Component => FindNode(id)?.Components.FirstOrDefault(field.TargetType.IsInstanceOfType),
+            _ => FindNode(id),
+        };
+        return target is not null && field.SetTarget(target);
+    }
+
     /// <summary>Everything <paramref name="field"/> could be pointed at, narrowed by a search.</summary>
     /// <param name="field">The field being edited.</param>
     /// <param name="search">Case-insensitive substring, or null for everything.</param>
@@ -27,7 +51,7 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
 
         var candidates = field.Kind switch
         {
-            ReferenceKind.Asset => AssetCandidates(field.TargetType),
+            ReferenceKind.Asset => AssetCandidates(AssetType(field)),
             ReferenceKind.Node => SceneCandidates(node => field.TargetType.IsInstanceOfType(node)),
             ReferenceKind.Component => SceneCandidates(HasComponent(field.TargetType)),
             _ => [],
@@ -39,8 +63,8 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     }
 
     /// <summary>
-    /// What the field's current value should read as — the asset's or node's name, "None" when
-    /// empty, and a missing marker when the id no longer resolves.
+    /// What the field's current value should read as — the asset's or node's name with the target
+    /// type, "None" when empty, and a missing marker when the id no longer resolves.
     /// </summary>
     /// <param name="field">The field being drawn.</param>
     /// <returns>The text for the value box.</returns>
@@ -54,7 +78,8 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
             ? AssetName(field.CurrentId)
             : FindNode(field.CurrentId)?.Name;
 
-        return name ?? $"Missing ({field.TargetType.Name})";
+        // The target type tells an asset, a node and a component slot apart at a glance, as "Player (Camera)".
+        return name is null ? $"Missing ({field.TargetType.Name})" : $"{name} ({field.TargetType.Name})";
     }
 
     /// <summary>
@@ -73,12 +98,16 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
         return field.Kind switch
         {
             ReferenceKind.Asset => assets.TryGetAsset(id, out var record) && record is not null
-                                   && AssetReferenceQuery.IsValidForAssetType(record, field.TargetType),
+                                   && AssetReferenceQuery.IsValidForAssetType(record, AssetType(field)),
             ReferenceKind.Node => FindNode(id) is { } node && field.TargetType.IsInstanceOfType(node),
             ReferenceKind.Component => FindNode(id) is { } owner && HasComponent(field.TargetType)(owner),
             _ => false,
         };
     }
+
+    // A direct DataAsset field names its payload type; the catalog lists the DataAssetAsset holding it.
+    static Type AssetType(ReferenceField field) =>
+        field.IsDirect ? typeof(DataAssetAsset) : field.TargetType;
 
     static Func<Node, bool> HasComponent(Type componentType) =>
         node => node.Components.Any(componentType.IsInstanceOfType);

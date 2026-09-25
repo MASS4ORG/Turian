@@ -1,20 +1,19 @@
 namespace Turian.Tests.Editor;
 
 /// <summary>
-/// Covers how the inspector sees <c>AssetReference</c>, <c>NodeRef</c> and <c>ComponentRef</c> as one
-/// editable id plus the type a candidate must satisfy.
+/// Covers asset references and direct scene or DataAsset references in the inspector.
 /// </summary>
 public class ReferenceFieldTests
 {
     static readonly Guid someId = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
-    /// <summary>Each of the three reference generics is recognised, with its target type.</summary>
+    /// <summary>Reference fields are recognised with their target type.</summary>
     [Theory]
     [InlineData(nameof(Holder.Texture), ReferenceKind.Asset, typeof(TextureAsset))]
-    [InlineData(nameof(Holder.Target), ReferenceKind.Node, typeof(Node))]
-    [InlineData(nameof(Holder.Camera), ReferenceKind.Component, typeof(CameraComponent))]
-    [InlineData(nameof(Holder.Stats), ReferenceKind.Asset, typeof(DataAssetAsset))]
-    public void EachReferenceGenericIsRecognised(string member, ReferenceKind kind, Type targetType)
+    [InlineData(nameof(Holder.DirectNode), ReferenceKind.Node, typeof(Node))]
+    [InlineData(nameof(Holder.DirectCamera), ReferenceKind.Component, typeof(CameraComponent))]
+    [InlineData(nameof(Holder.DirectData), ReferenceKind.Asset, typeof(DataAssetTest))]
+    public void ReferenceFieldsAreRecognised(string member, ReferenceKind kind, Type targetType)
     {
         var reference = ReferenceFor(member);
 
@@ -31,27 +30,27 @@ public class ReferenceFieldTests
         Assert.False(ReferenceField.IsReference(FieldFor(nameof(Holder.Count))));
     }
 
-    /// <summary>An unset reference reads as empty.</summary>
+    /// <summary>An unset direct reference reads as empty.</summary>
     [Fact]
     public void AnUnsetReferenceIsEmpty()
     {
-        var reference = ReferenceFor(nameof(Holder.Target))!;
+        var reference = ReferenceFor(nameof(Holder.DirectNode))!;
 
         Assert.True(reference.IsEmpty);
         Assert.Equal(Guid.Empty, reference.CurrentId);
     }
 
-    /// <summary>Setting writes through to the underlying reference object.</summary>
+    /// <summary>Setting writes a direct reference to the field.</summary>
     [Fact]
     public void SettingWritesThroughToTheTarget()
     {
         var holder = new Holder();
-        var reference = ReferenceField.TryCreate(FieldFor(nameof(Holder.Target), holder))!;
+        var reference = ReferenceField.TryCreate(FieldFor(nameof(Holder.DirectNode), holder))!;
 
-        Assert.True(reference.Set(someId));
+        Assert.True(reference.SetTarget(new Node { Id = someId }));
 
         Assert.Equal(someId, reference.CurrentId);
-        Assert.Equal(someId, holder.Target.NodeId);
+        Assert.Equal(someId, holder.DirectNode!.Id);
         Assert.False(reference.IsEmpty);
     }
 
@@ -76,11 +75,33 @@ public class ReferenceFieldTests
         var holder = new Holder();
         var notified = new List<object>();
         var field = FormBuilder.Build(holder, notified.Add).Sections[0].Fields
-            .First(f => f.Name == nameof(Holder.Target));
+            .First(f => f.Name == nameof(Holder.DirectNode));
 
         ReferenceField.TryCreate(field)!.Set(someId);
 
         Assert.Equal([holder], notified);
+    }
+
+    /// <summary>A direct field holds the object itself and reports the owning node for a component.</summary>
+    [Fact]
+    public void ADirectFieldHoldsTheObject()
+    {
+        var holder = new Holder();
+        var node = new Node();
+        var camera = new CameraComponent();
+        node.AddComponent(camera);
+
+        var nodeField = ReferenceField.TryCreate(FieldFor(nameof(Holder.DirectNode), holder))!;
+        var cameraField = ReferenceField.TryCreate(FieldFor(nameof(Holder.DirectCamera), holder))!;
+
+        Assert.True(nodeField.IsDirect);
+        Assert.True(nodeField.SetTarget(node));
+        Assert.False(cameraField.SetTarget(node));
+        Assert.True(cameraField.SetTarget(camera));
+        Assert.Same(node, holder.DirectNode);
+        Assert.Equal(node.Id, cameraField.CurrentId);
+        Assert.True(nodeField.Clear());
+        Assert.Null(holder.DirectNode);
     }
 
     static FormField FieldFor(string member, Holder? holder = null) =>
@@ -91,9 +112,9 @@ public class ReferenceFieldTests
     sealed class Holder
     {
         public AssetReference<TextureAsset> Texture { get; set; } = new();
-        public NodeRef<Node> Target { get; set; } = new();
-        public ComponentRef<CameraComponent> Camera { get; set; } = new();
-        public DataAssetReference<DataAssetTest> Stats { get; set; } = new();
+        public Node? DirectNode { get; set; }
+        public CameraComponent? DirectCamera { get; set; }
+        public DataAssetTest? DirectData { get; set; }
         public int Count { get; set; }
     }
 }
