@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Stub component used when a <see cref="Component"/>'s <see cref="TypeIdAttribute"/> Guid
 /// cannot be resolved to a loaded type (e.g., user-code assembly not yet compiled,
 /// or the script was deleted). Allows the prefab/scene to load so the user can
-/// manually remove the missing component — mirrors Unity's behavior.
+/// manually remove the missing component.
 /// </summary>
 public class MissingComponent : Component
 {

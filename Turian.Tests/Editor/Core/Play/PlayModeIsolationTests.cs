@@ -1,7 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>
-/// Covers the mechanism behind Unity-style "play mode state revert": the Studio plays a deep copy
+/// Covers the mechanism behind play mode state revert: the Studio plays a deep copy
 /// of the scene being edited, so the edited hierarchy is never mutated and stopping play needs no
 /// restore step.
 /// </summary>

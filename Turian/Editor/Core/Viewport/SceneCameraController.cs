@@ -2,7 +2,7 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Processes viewport input and drives an <see cref="EditorCamera"/> through four navigation
-/// modes that match Unity/Godot conventions:
+/// navigation modes:
 ///
 ///   • <b>Fly</b> — right-click drag looks around; WASD/QE move (Q/E = world Y).
 ///   • <b>Orbit</b> — Alt + left-click drag rotates around <see cref="orbitPivot"/>.

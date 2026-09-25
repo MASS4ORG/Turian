@@ -67,8 +67,9 @@ static class FieldDrawers
     /// <param name="gui">The GUI instance.</param>
     /// <param name="field">The member to edit.</param>
     /// <param name="id">A unique id for this editor's controls.</param>
-    public static void DrawEditorOnly(Gui gui, FormField field, string id) =>
-        DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType, id);
+    /// <param name="translate">Translates enum labels for the settings panel.</param>
+    public static void DrawEditorOnly(Gui gui, FormField field, string id, Func<string, string>? translate = null) =>
+        DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType, id, translate);
 
     /// <summary>A label on the left and whatever the caller draws filling the rest.</summary>
     internal static void Row(Gui gui, string label, string id, Action editor, Action? labelInteraction = null)
@@ -124,7 +125,7 @@ static class FieldDrawers
     static (double Min, double Max) TypeRange(Type type) =>
         typeRanges.TryGetValue(type, out var range) ? range : (float.MinValue, float.MaxValue);
 
-    static void DrawEditor(Gui gui, FormField field, Type type, string id)
+    static void DrawEditor(Gui gui, FormField field, Type type, string id, Func<string, string>? translate = null)
     {
         if (field.IsReadOnly)
         {
@@ -137,7 +138,7 @@ static class FieldDrawers
 
         if (type == typeof(bool)) DrawBool(gui, field);
         else if (type == typeof(string)) DrawString(gui, field, id);
-        else if (type.IsEnum) DrawEnum(gui, field, type, id);
+        else if (type.IsEnum) DrawEnum(gui, field, type, id, translate);
         else if (IsNumeric(type)) DrawNumber(gui, field, type, id);
         else gui.DrawText(Text(field.GetValue()), Theme.Text(12), InkDim, centerInRect: false);
     }
@@ -159,10 +160,10 @@ static class FieldDrawers
         if (!string.Equals(next, current, StringComparison.Ordinal)) field.SetValue(next);
     }
 
-    static void DrawEnum(Gui gui, FormField field, Type type, string id)
+    static void DrawEnum(Gui gui, FormField field, Type type, string id, Func<string, string>? translate)
     {
         var names = Enum.GetNames(type);
-        var labels = names.Select(name => EnumLabel(type, name)).ToArray();
+        var labels = names.Select(name => translate?.Invoke(EnumLabel(type, name)) ?? EnumLabel(type, name)).ToArray();
         var current = Array.IndexOf(names, field.GetValue()?.ToString() ?? string.Empty);
 
         // Dropdown keys its open state by call site, so every enum field would otherwise share one.
@@ -348,7 +349,7 @@ static class FieldDrawers
 
     /// <summary>
     /// A full-width labeled button running a <c>[Button]</c> method, sized like a row so it reads as
-    /// Unity's inspector button. Blocks input so a press never falls through to the section behind it.
+    /// an inspector button. Blocks input so a press never falls through to the section behind it.
     /// </summary>
     internal static bool TextButton(Gui gui, string label, string id)
     {

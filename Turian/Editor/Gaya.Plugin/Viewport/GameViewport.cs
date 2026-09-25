@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Renders what the scene's primary camera sees, Unity-style: a live, non-interactive preview of the
+/// Renders what the scene's primary camera sees, as a live, non-interactive preview of the
 /// edited scene while nothing is playing, and the running session — fully interactive — once Play
 /// starts. The Guinevere counterpart of StudioA's <c>GameViewControl</c>.
 ///

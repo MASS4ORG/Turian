@@ -18,7 +18,7 @@ public sealed record FormSection(
 
     /// <summary>
     /// The target's own on/off switch, so a shell can draw it as a checkbox in the section heading
-    /// the way Unity does, instead of leaving it as a row among the other members.
+    /// instead of leaving it as a row among the other members.
     /// </summary>
     public FormField? EnabledField { get; } =
         Fields.FirstOrDefault(f => f.Name == nameof(Component.IsActive) && f.ValueType == typeof(bool));

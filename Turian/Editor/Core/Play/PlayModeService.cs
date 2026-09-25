@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Runs the game inside the Studio process, Unity-style, instead of launching a separate window.
+/// Runs the game inside the Studio process.
 ///
 /// <para>
 /// A session runs on a throwaway deep copy of the scene being edited, so the editor's own hierarchy

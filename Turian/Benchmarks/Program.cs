@@ -1,4 +1,4 @@
-// Run: dotnet run -c Release --project Turian.Benchmarks
+// Run: dotnet run -c Release --project Turian/Benchmarks
 using System.Diagnostics;
 using Turian;
 using Turian.Engine.Core;
@@ -41,17 +41,7 @@ try
 
     Console.WriteLine();
     var direct = Serializer.Serialize(BuildScene(static target => new DirectLink { Target = target }));
-    var byId = Serializer.Serialize(BuildScene(static target => new IdLink { Target = new NodeRef<Node>(target.Id) }));
-    var directLoad = Report($"Load a {sceneNodes:N0}-node scene, direct Node fields", () => LoadScene(direct));
-    var idLoad = Report($"Load a {sceneNodes:N0}-node scene, NodeRef<Node> fields", () => LoadScene(byId));
-    var idResolve = Report($"Load a {sceneNodes:N0}-node scene, NodeRef<Node> fields, resolve all", () =>
-    {
-        var scene = LoadScene(byId);
-        foreach (var node in scene.Children)
-            _ = node.GetComponent<IdLink>()!.Target!.Resolve(scene);
-    });
-    Console.WriteLine($"Direct references cost {(directLoad / idLoad - 1) * 100:F1}% over NodeRef load-only, "
-                      + $"{(directLoad / idResolve - 1) * 100:F1}% against NodeRef load-and-resolve");
+    Report($"Load a {sceneNodes:N0}-node scene with direct Node references", () => LoadScene(direct));
 }
 finally
 {
@@ -175,12 +165,4 @@ public sealed class DirectLink : Component
 {
     /// <summary>The referenced node.</summary>
     public Node? Target { get; set; }
-}
-
-/// <summary>A component referencing a node by id.</summary>
-[TypeId("b0000001-0000-4000-8000-000000000003")]
-public sealed class IdLink : Component
-{
-    /// <summary>The referenced node.</summary>
-    public NodeRef<Node>? Target { get; set; }
 }

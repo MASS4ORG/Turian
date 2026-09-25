@@ -96,7 +96,7 @@ public abstract class Component : IdClass
 
     // ── Lifecycle callbacks ────────────────────────────────────────────────
 
-    /// <summary>Called once on first attachment, even if inactive. Equivalent to Unity's Awake.</summary>
+    /// <summary>Called once on first attachment, even if inactive. Runs before the first update.</summary>
     public virtual void OnAwake()
     {
     }

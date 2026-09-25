@@ -30,7 +30,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
     /// <summary>
     /// Whether this instance keeps showing <see cref="lockedTarget"/> instead of following the shared
-    /// selection — Unity's Inspector lock, so one instance can stay put while another follows clicks.
+    /// selection, so one instance can stay put while another follows clicks.
     /// </summary>
     public bool Locked
     {
@@ -272,7 +272,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                        .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
                 FieldDrawers.DrawArrow(gui, isOpen);
 
-            // The component's own on/off switch, beside its name as Unity puts it. It blocks the
+            // The component's own on/off switch, beside its name. It blocks the
             // header behind it so ticking the box does not also fold the section.
             if (section.EnabledField is { } enabled) Toggle(gui, enabled, $"inspector/section{index}/enabled");
 

@@ -5,8 +5,7 @@ namespace Turian.CSharp.CodeGenerator;
 
 /// <summary>
 /// Reports a serialized DataAsset member typed as a node or component. A DataAsset outlives any scene, so it cannot
-/// reference scene objects: the member would be saved as an inline copy. <c>NodeRef&lt;T&gt;</c> or
-/// <c>ComponentRef&lt;T&gt;</c> hold an id resolved against a scene at runtime instead.
+/// reference scene objects: the member would be saved as an inline copy.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
@@ -17,12 +16,11 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
     static readonly DiagnosticDescriptor rule = new(
         DiagnosticId,
         "DataAssets cannot reference scene objects",
-        "DataAsset member '{0}' holds a {1}; use {2}<{3}> to reference a scene object by id",
+        "DataAsset member '{0}' holds a {1}; DataAssets cannot reference scene objects",
         "Turian.Serialization",
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        description: "A DataAsset outlives any scene, so a node or component member is saved as an inline copy "
-                     + "instead of a reference. NodeRef<T> and ComponentRef<T> store an id resolved at runtime.");
+        description: "A DataAsset outlives any scene and cannot hold a node or component reference.");
 
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [rule];
@@ -64,8 +62,7 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
             : null;
         if (kind is null) return;
 
-        context.ReportDiagnostic(Diagnostic.Create(rule, member.Locations.FirstOrDefault(), member.Name, kind,
-            kind == "component" ? "ComponentRef" : "NodeRef", element.Name));
+        context.ReportDiagnostic(Diagnostic.Create(rule, member.Locations.FirstOrDefault(), member.Name, kind));
     }
 
     static bool DerivesFrom(ITypeSymbol? type, string baseName)

@@ -7,7 +7,8 @@ name: Release check
 # it's safe to run this same check independently from both GitLab and GitHub schedules.
 on:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 10 * * *"
+      timezone: "America/Sao_Paulo"
   workflow_dispatch:
 
 env:

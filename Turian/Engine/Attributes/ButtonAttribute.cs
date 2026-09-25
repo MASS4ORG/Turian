@@ -2,8 +2,7 @@ namespace Turian;
 
 /// <summary>
 /// Marks a parameterless method to be shown in the inspector as a clickable button. Pressing it
-/// invokes the method on the inspected object, the way Odin and Unity run tool methods straight
-/// from a scriptable object's members.
+/// invokes the method on the inspected object.
 /// </summary>
 /// <remarks>
 /// The method must be public and take no arguments; others are skipped when the form is built.

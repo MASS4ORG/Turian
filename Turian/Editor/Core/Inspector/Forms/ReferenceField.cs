@@ -14,10 +14,7 @@ public enum ReferenceKind
 }
 
 /// <summary>
-/// A <see cref="FormField"/> holding an <see cref="AssetReference{TAsset}"/>, <see cref="NodeRef{T}"/>
-/// or <see cref="ComponentRef{T}"/>, seen as a single id plus the type it must point at. Lets one
-/// drawer serve all three without reflecting over open generics itself. A member typed directly as a
-/// <see cref="Node"/>, <see cref="Component"/> or <see cref="DataAsset"/> is a reference too (see <see cref="IsDirect"/>).
+/// A <see cref="FormField"/> holding an asset reference or a direct node, component, or DataAsset reference.
 /// </summary>
 public sealed class ReferenceField
 {
@@ -63,8 +60,7 @@ public sealed class ReferenceField
     public bool IsEmpty => CurrentId == Guid.Empty;
 
     /// <summary>
-    /// Recognises a field whose type is one of the three reference generics, or null when it is not
-    /// a reference at all.
+    /// Recognises asset reference wrappers and direct scene or DataAsset references.
     /// </summary>
     /// <param name="field">The field to classify.</param>
     /// <returns>A reference view over the field, or null.</returns>
@@ -72,7 +68,7 @@ public sealed class ReferenceField
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        // Typed subclasses (PrefabReference, DataAssetReference) are drawn as the AssetReference they extend.
+        // Typed subclasses are drawn as the AssetReference they extend.
         var type = field.ValueType;
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
@@ -89,13 +85,11 @@ public sealed class ReferenceField
         var argument = type.GetGenericArguments()[0];
 
         if (definition == typeof(AssetReference<>)) return new ReferenceField(field, ReferenceKind.Asset, argument);
-        if (definition == typeof(NodeRef<>)) return new ReferenceField(field, ReferenceKind.Node, argument);
-        if (definition == typeof(ComponentRef<>)) return new ReferenceField(field, ReferenceKind.Component, argument);
 
         return null;
     }
 
-    /// <summary>Whether the field holds one of the three reference generics.</summary>
+    /// <summary>Whether the field holds a recognised reference.</summary>
     /// <param name="field">The field to classify.</param>
     /// <returns>True when <see cref="TryCreate"/> would succeed.</returns>
     public static bool IsReference(FormField field) => TryCreate(field) is not null;
@@ -164,13 +158,13 @@ public sealed class ReferenceField
 
     Guid IdOf(object value)
     {
-        var name = Kind == ReferenceKind.Asset ? nameof(AssetReference<Asset>.AssetId) : nameof(NodeRef<Node>.NodeId);
+        var name = nameof(AssetReference<Asset>.AssetId);
         return value.GetType().GetProperty(name)?.GetValue(value) is Guid id ? id : Guid.Empty;
     }
 
     void SetIdOn(object value, Guid id)
     {
-        var name = Kind == ReferenceKind.Asset ? nameof(AssetReference<Asset>.AssetId) : nameof(NodeRef<Node>.NodeId);
+        var name = nameof(AssetReference<Asset>.AssetId);
         value.GetType().GetProperty(name)?.SetValue(value, id);
     }
 }

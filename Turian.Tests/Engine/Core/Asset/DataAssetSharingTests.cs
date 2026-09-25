@@ -66,34 +66,6 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.Equal(42, b!.Int);
     }
 
-    /// <summary>Verifies that a typed reference resolves straight to the shared payload.</summary>
-    [Fact]
-    public async Task TypedReference_ResolvesSharedPayload()
-    {
-        var loader = new RuntimeAssetLoader(database);
-        var reference = new DataAssetReference<DataAssetTest>(metadata.Id);
-
-        var payload = await reference.LoadContentAsync(loader);
-
-        Assert.NotNull(payload);
-        Assert.Same(payload, await loader.LoadContentAsync<DataAssetTest>(metadata.Id));
-        Assert.Null(await loader.LoadContentAsync<InputActionsAsset>(metadata.Id));
-    }
-
-    /// <summary>Verifies that a typed reference serializes as a plain asset id.</summary>
-    [Fact]
-    public void TypedReference_RoundTripsAsAssetId()
-    {
-        var reference = new DataAssetReference<DataAssetTest>(metadata.Id);
-        var json = JsonSerializer.Serialize(reference, Serializer.JsonOptions);
-
-        using var document = JsonDocument.Parse(json);
-        Assert.Equal(metadata.Id, document.RootElement.GetProperty("AssetId").GetGuid());
-        Assert.Single(document.RootElement.EnumerateObject());
-        Assert.Equal(metadata.Id,
-            JsonSerializer.Deserialize<DataAssetReference<DataAssetTest>>(json, Serializer.JsonOptions)!.AssetId);
-    }
-
     /// <summary>
     /// Verifies that separate loaders never share payloads, which is what keeps a play session's
     /// runtime changes out of the editor and off disk.

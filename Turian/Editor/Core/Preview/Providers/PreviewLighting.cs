@@ -2,7 +2,7 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Builds the single directional light every scene-based asset preview lights its subject with — a
-/// fixed 3/4 angle, the way Unity's asset preview and material ball are lit.
+/// fixed 3/4 angle.
 /// </summary>
 static class PreviewLighting
 {

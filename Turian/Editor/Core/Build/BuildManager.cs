@@ -106,8 +106,7 @@ public sealed class BuildManager : IDisposable
 
     /// <summary>
     /// Returns only the most recently loaded user assembly.
-    /// TODO: It assumes that user code will generate a single assembly. When we implement
-    /// a Unity's "asmdef", it might generate multiple assemblies.
+    /// User code currently produces a single assembly.
     /// </summary>
     public Assembly? ActiveUserAssembly =>
         slotManager.LoadedAssemblies.LastOrDefault();
@@ -192,8 +191,7 @@ public sealed class BuildManager : IDisposable
     /// </summary>
     /// <remarks>
     /// Swapping the user assembly mid-session would unload the <see cref="System.Runtime.Loader.AssemblyLoadContext"/>
-    /// that the live scene's components were created from, leaving dangling instances — the same
-    /// reason Unity blocks recompilation while in play mode.
+    /// that the live scene's components were created from, leaving dangling instances.
     /// </remarks>
     public void SetPlaying(bool playing)
     {

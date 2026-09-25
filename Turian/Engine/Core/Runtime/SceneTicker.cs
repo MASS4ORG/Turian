@@ -150,7 +150,7 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     }
 
     /// <summary>
-    /// Logs a script's exception and lets the frame go on, as Unity does: one faulty component
+    /// Logs a script's exception and lets the frame go on. One faulty component
     /// must not stop every other script or tear down the game loop. Each component and callback is
     /// reported once, since a callback that throws usually throws on every frame.
     /// </summary>

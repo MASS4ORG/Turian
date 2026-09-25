@@ -1,8 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Previews a <see cref="MaterialAsset"/> on <see cref="PreviewQuadMesh"/>, Unity's material-ball
-/// preview simplified to a swatch since the engine has no built-in primitive sphere mesh.
+/// Previews a <see cref="MaterialAsset"/> on <see cref="PreviewQuadMesh"/>, as a swatch because the engine has no built-in primitive sphere mesh.
 /// </summary>
 [AssetPreview(typeof(MaterialAsset))]
 public sealed class MaterialAssetPreviewProvider : IScenePreviewProvider

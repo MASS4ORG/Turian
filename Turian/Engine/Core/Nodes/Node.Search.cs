@@ -4,10 +4,7 @@ public partial class Node
 {
     /// <summary>
     /// Finds the node with the given id in <paramref name="root"/>'s hierarchy, including the root
-    /// itself. Unlike <see cref="GetChildren{T}(Node?)"/> and
-    /// <see cref="GetComponentsInChildren{T}(Node?)"/>, this does not skip inactive
-    /// nodes — a <see cref="NodeRef{T}"/> or <see cref="ComponentRef{T}"/> resolving its target
-    /// should not fail just because that target happens to be disabled right now.
+    /// itself, including inactive nodes so stored references can resolve consistently.
     /// </summary>
     /// <param name="root">The hierarchy to search.</param>
     /// <param name="id">The node id to find.</param>

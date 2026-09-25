@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The console: the tail of the log buffer under a Unity-style toolbar. A filter box narrows the
+/// The console: the tail of the log buffer under a toolbar. A filter box narrows the
 /// messages, three toggles gate the error/warning/debug lanes, a Collapse toggle merges consecutive
 /// duplicates behind a count badge, and the list follows the tail as long as it is pinned to the
 /// bottom. The entries list and its message detail sit above and below a drag divider, the detail
@@ -17,7 +17,8 @@ sealed class OutputPanel(
     OutputPanelSettings settings,
     OutputLogBridge bridge,
     SettingsService settingsService,
-    IFocusTracker focusTracker) : IPanel
+    IFocusTracker focusTracker,
+    StudioLocalization localization) : IPanel
 {
     const string scrollId = "gaya.turian.output/log";
     const string detailNodeId = "gaya.turian.output/detail";
@@ -89,15 +90,15 @@ sealed class OutputPanel(
         using (gui.Node(-1, height, headerId).ExpandWidth()
                    .Direction(Axis.Horizontal).Gap(10f).ContentAlignY(0.5f).Enter())
         {
-            gui.Checkbox(ref collapse, "Collapse", size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showErrors, "Errors", size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showWarnings, "Warnings", size: box, fontSize: Theme.Text(11f), spacing: 4f);
-            gui.Checkbox(ref showLog, "Debug", size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref collapse, localization.T("Collapse"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref showErrors, localization.T("Errors"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref showWarnings, localization.T("Warnings"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref showLog, localization.T("Debug"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
 
-            filter = gui.TextInput(filter, width: 0, height: height, placeholder: "Filter output",
+            filter = gui.TextInput(filter, width: 0, height: height, placeholder: localization.T("Filter output"),
                 fontSize: Theme.Text(12), padding: 5, id: filterId);
 
-            if (StudioControls.SmallTextButton(gui, "Clear", clearId, Theme.Scale(52f)))
+            if (StudioControls.SmallTextButton(gui, localization.T("Clear"), clearId, Theme.Scale(62f)))
             {
                 LogBuffer.Clear();
                 selectedIndex = -1;

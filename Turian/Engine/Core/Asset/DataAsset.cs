@@ -7,7 +7,7 @@ public delegate void DataAssetChangedHandler(DataAsset asset, string member);
 
 /// <summary>
 /// Represents the serialized payload stored inside a data-asset file.
-/// This is the equivalent of a Unity ScriptableObject-like object.
+/// The payload is shared by the asset loader and can be copied with Instantiate.
 /// </summary>
 [TypeId("a3000000-0000-4000-8000-000000000004")]
 public class DataAsset : IdClass

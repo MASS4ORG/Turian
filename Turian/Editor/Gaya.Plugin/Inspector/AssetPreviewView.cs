@@ -1,8 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Draws the Inspector's asset preview mini-panel: a small render of the selected asset, the way
-/// Unity shows a preview strip above an asset's import settings. Resolves a provider from
+/// Draws a small render of the selected asset above its import settings. Resolves a provider from
 /// <see cref="AssetPreviewCatalog"/> and draws nothing for asset types without one.
 /// </summary>
 sealed class AssetPreviewView(Vulkan vulkan, AssetPreviewCatalog catalog) : IDisposable

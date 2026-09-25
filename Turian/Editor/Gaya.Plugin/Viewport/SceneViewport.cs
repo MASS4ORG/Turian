@@ -277,7 +277,7 @@ sealed class SceneViewport : IDisposable
     }
 
     /// <summary>
-    /// Draws the selected node's camera into the corner, the way Unity previews a camera. Renders the
+    /// Draws the selected node's camera into the corner. Renders the
     /// edited hierarchy, never a play session's, and never resizes the camera it borrows.
     /// </summary>
     void RenderPreview(Gui gui, Rect rect, float dt)

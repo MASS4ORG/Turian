@@ -28,7 +28,7 @@ public class LogViewTests
     public void TheWarningsToggleGatesWarning(LogLevel level, bool expected) =>
         Assert.Equal(expected, LogView.Visible(level, errors: false, warnings: true, log: false));
 
-    /// <summary>The Debug toggle gates everything below warning — the whole log stream, Unity-style.</summary>
+    /// <summary>The Debug toggle gates everything below warning — the whole log stream.</summary>
     [Theory]
     [InlineData(LogLevel.Information, true)]
     [InlineData(LogLevel.Debug, true)]
