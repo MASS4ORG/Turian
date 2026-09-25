@@ -45,10 +45,10 @@
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12"/>
         <PackageReference Include="SkiaSharp" Version="4.152.1" />
-        <PackageReference Include="MASS4.Guinevere" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
-        <PackageReference Include="MASS4.Guinevere.Scripting" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
-        <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="4.1.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Scripting" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
     </ItemGroup>
 
 </Project>

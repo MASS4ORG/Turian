@@ -82,6 +82,63 @@ public sealed class ObjectReferencesTests : IDisposable
         Assert.DoesNotContain(missing.Id.ToString(), Serializer.Serialize(loaded));
     }
 
+    /// <summary>Verifies that a destroyed target is saved as null, like a missing one.</summary>
+    [Fact]
+    public void DestroyedTargets_AreSavedAsNull()
+    {
+        var (root, linker, target, camera) = BuildScene();
+        target.IsDestroyed = true;
+        camera.Detach();
+
+        var json = Serializer.Serialize(root);
+
+        Assert.True(camera.IsDestroyed);
+        Assert.Contains("\"Target\": null", json);
+        Assert.Contains("\"Camera\": null", json);
+        Assert.True(ObjectReferences.IsMissing(linker.Target));
+    }
+
+    /// <summary>Verifies that a reference into another scene resolves once that scene is loaded too.</summary>
+    [Fact]
+    public void CrossSceneReference_ResolvesWhenBothScenesAreLoaded()
+    {
+        TestAssetDatabase.Reset();
+        var scenes = new SceneManager(new AssetDatabase());
+        var other = new Node { Name = "Other" };
+        var holder = new Node { Name = "Holder" };
+        holder.AddComponent(new Linker { Target = other });
+
+        var loadedHolder = Serializer.LoadData<Node>(Serializer.Serialize(holder))!;
+        scenes.AdoptScene(Guid.NewGuid(), loadedHolder);
+        Assert.Null(loadedHolder.GetComponent<Linker>()!.Target);
+
+        scenes.AdoptScene(Guid.NewGuid(), other, LoadSceneMode.Additive);
+
+        Assert.Same(other, loadedHolder.GetComponent<Linker>()!.Target);
+    }
+
+    /// <summary>
+    /// Verifies that the inspector sees a list element's pending id, and that clearing the element drops it.
+    /// </summary>
+    [Fact]
+    public void ListElement_PendingIdIsShownAndCleared()
+    {
+        var (root, linker, target, _) = BuildScene();
+        var missing = new Node();
+        linker.Waypoints = [missing, target];
+        var loaded = Serializer.LoadData<Node>(Serializer.Serialize(root))!;
+        var loadedLinker = loaded.Children[0].GetComponent<Linker>()!;
+
+        var list = CollectionField.TryCreate(FormBuilder.Build(loadedLinker).Sections
+            .SelectMany(static section => section.Fields).First(static f => f.Name == nameof(Linker.Waypoints)))!;
+        var first = ReferenceField.TryCreate(list.Entries()[0])!;
+
+        Assert.Equal(missing.Id, first.CurrentId);
+        Assert.True(first.Clear());
+        Assert.Equal(Guid.Empty, first.CurrentId);
+        Assert.DoesNotContain(missing.Id.ToString(), Serializer.Serialize(loaded));
+    }
+
     /// <summary>Verifies that a scene saved with an inline copy still loads.</summary>
     [Fact]
     public void LegacyInlineValue_StillLoads()

@@ -12,6 +12,9 @@ public class IdClass : IEquatable<IdClass>
     [HideInEditor]
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    /// <summary>Reference ids read from data whose targets are not resolved yet, by member name.</summary>
+    internal List<KeyValuePair<string, Guid[]>>? PendingReferences;
+
     /// <summary>
     /// Indicates whether the current object is equal to another object of the same type.
     /// </summary>

@@ -63,8 +63,8 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     }
 
     /// <summary>
-    /// What the field's current value should read as — the asset's or node's name, "None" when
-    /// empty, and a missing marker when the id no longer resolves.
+    /// What the field's current value should read as — the asset's or node's name with the target
+    /// type, "None" when empty, and a missing marker when the id no longer resolves.
     /// </summary>
     /// <param name="field">The field being drawn.</param>
     /// <returns>The text for the value box.</returns>
@@ -78,7 +78,8 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
             ? AssetName(field.CurrentId)
             : FindNode(field.CurrentId)?.Name;
 
-        return name ?? $"Missing ({field.TargetType.Name})";
+        // The target type tells an asset, a node and a component slot apart at a glance, as "Player (Camera)".
+        return name is null ? $"Missing ({field.TargetType.Name})" : $"{name} ({field.TargetType.Name})";
     }
 
     /// <summary>

@@ -13,13 +13,14 @@ sealed partial class Build
     readonly GitVersion gitVersion;
 
     /// <summary>
-    /// The current version, using GitVersion.
+    /// The current version, using GitVersion. A publish build checks out a tag on a detached HEAD, where
+    /// GitVersion cannot run without remote credentials; the tag being built is the version there.
     /// </summary>
-    string Version => gitVersion.MajorMinorPatch;
+    string Version => gitVersion?.MajorMinorPatch ?? CurrentVersion;
 
-    public string VersionMajor => $"{gitVersion.Major}";
+    public string VersionMajor => Version.Split('.')[0];
 
-    public string VersionMajorMinor => $"{gitVersion.Major}.{gitVersion.Minor}";
+    public string VersionMajorMinor => string.Join('.', Version.Split('.').Take(2));
 
     /// <summary>
     /// The version in a format that can be used as a tag.
@@ -29,7 +30,7 @@ sealed partial class Build
     /// <summary>
     /// Checks if there are new commits since the last tag.
     /// </summary>
-    bool HasNewCommits => gitVersion.CommitsSinceVersionSource != "0";
+    bool HasNewCommits => gitVersion is not null && gitVersion.CommitsSinceVersionSource != "0";
 
     string currentVersion;
     string CurrentTag
@@ -55,9 +56,10 @@ sealed partial class Build
     string CurrentVersion => CurrentTag.TrimStart('v');
 
     /// <summary>
-    /// Whether the repository has at least one tag yet (false on the very first release).
+    /// Whether a tag is reachable from HEAD (false on the very first release). A tag on a commit outside
+    /// HEAD's history does not count: it cannot bound a changelog range.
     /// </summary>
-    bool HasAnyTags => Git("tag", logOutput: false).Any();
+    bool HasAnyTags => CurrentTag != "0.0.0";
 
     /// <summary>
     /// Prints the current version.

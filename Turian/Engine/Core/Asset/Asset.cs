@@ -33,6 +33,11 @@ public class Asset : IdClass
     }
 
     /// <summary>
+    /// Free-form labels grouping this asset with others, e.g. to preload a level's data together.
+    /// </summary>
+    public List<string> Labels { get; set; } = [];
+
+    /// <summary>
     /// Signal that the Asset was modified
     /// </summary>
     [JsonIgnore]

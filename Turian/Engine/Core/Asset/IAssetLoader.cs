@@ -29,6 +29,19 @@ public interface IAssetLoader
     Task<TData?> LoadContentAsync<TData>(Guid assetId) where TData : DataAsset;
 
     /// <summary>
+    /// Loads the given assets in parallel, including the shared payload of every DataAsset among them and of the
+    /// DataAssets those reference, so later loads of them are cache hits.
+    /// </summary>
+    /// <param name="assetIds">The assets to load; unknown ids are skipped.</param>
+    /// <param name="cancellationToken">Stops waiting; loads already started still complete into the cache.</param>
+    Task PreloadAsync(IReadOnlyCollection<Guid> assetIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Preloads every asset carrying <paramref name="label"/> (see <see cref="Asset.Labels"/>).</summary>
+    /// <param name="label">The label to preload.</param>
+    /// <param name="cancellationToken">Stops waiting; loads already started still complete into the cache.</param>
+    Task PreloadLabelAsync(string label, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the cached asset instance when one is available for the given identifier.
     /// Does not load the asset from disk.
     /// </summary>

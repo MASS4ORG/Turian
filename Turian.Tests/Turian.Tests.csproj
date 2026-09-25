@@ -43,6 +43,8 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
+                          OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
   <!-- Excalibur controls. A gitignored .csproj.user points GuinevereLocalPath at a local checkout;
        CI has none and restores the package instead. Uncomment the package once it is published. -->

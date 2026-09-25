@@ -52,8 +52,7 @@ public sealed class ReferenceField
     /// <summary>The referenced asset or node id, or <see cref="Guid.Empty"/> when unset.</summary>
     public Guid CurrentId => source.GetValue() switch
     {
-        null when IsDirect && source.Target is IdClass owner
-                  && ObjectReferences.TryGetUnresolved(owner, source.Name, out var pending) => pending[0],
+        null when IsDirect => PendingId(),
         null => Guid.Empty,
         Component component when IsDirect => component.Node?.Id ?? component.Id,
         IdClass value when IsDirect => value.Id,
@@ -126,8 +125,25 @@ public sealed class ReferenceField
     public bool SetTarget(object? target)
     {
         if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
-        if (source.Target is IdClass owner) ObjectReferences.Forget(owner, source.Name);
+        if (source.Target is IdClass owner)
+        {
+            if (source.CollectionMember is { } list) ObjectReferences.Forget(owner, list, source.CollectionIndex);
+            else ObjectReferences.Forget(owner, source.Name);
+        }
+
         return source.SetValue(target);
+    }
+
+    /// <summary>The id read from data for a direct reference whose target is not loaded, or empty.</summary>
+    Guid PendingId()
+    {
+        if (source.Target is not IdClass owner) return Guid.Empty;
+
+        var member = source.CollectionMember ?? source.Name;
+        var index = source.CollectionMember is null ? 0 : source.CollectionIndex;
+        return ObjectReferences.TryGetUnresolved(owner, member, out var ids) && index < ids.Length
+            ? ids[index]
+            : Guid.Empty;
     }
 
     /// <summary>Clears the reference.</summary>

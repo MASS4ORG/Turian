@@ -74,6 +74,10 @@ sealed partial class Build
 
                 PublishDirectory.GlobFiles("**/*.pdb", "**/*.xml").ForEach(file => file.DeleteFile());
 
+                // The source generator user projects compile with (DataAsset serializers, [Observable]).
+                (RootDirectory / "Turian/Editor/CSharp/CodeGenerator" / "bin" / Configuration / "netstandard2.0" /
+                 "Turian.CSharp.CodeGenerator.dll").CopyToDirectory(libraryDirectory, ExistsPolicy.FileOverwrite);
+
                 foreach (var (directory, name) in engineLibraries)
                 {
                     var source = RootDirectory / directory / "bin" / Configuration / "net10.0" / $"{name}.dll";

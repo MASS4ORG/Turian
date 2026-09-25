@@ -44,6 +44,7 @@ public class DataAssetAsset : Asset
             }
 
             CopyFields(fresh, content);
+            content.NotifyChanged(string.Empty);
             return content;
         }
     }
@@ -93,6 +94,8 @@ public class DataAssetAsset : Asset
                          BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
                          | BindingFlags.DeclaredOnly))
             {
+                // Event subscribers belong to the live instance, not to the data.
+                if (typeof(Delegate).IsAssignableFrom(field.FieldType)) continue;
                 field.SetValue(target, field.GetValue(source));
             }
         }

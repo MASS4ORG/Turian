@@ -168,6 +168,7 @@ public sealed partial class AssetDatabase
             AssetId = asset.Id,
             ProjectRootPath = projectRoot,
             AssetTypeName = asset.GetType().FullName ?? nameof(Asset),
+            Labels = [.. asset.Labels],
             SourceRelativePath = TryMakeRelativeProjectPath(projectRoot, normalizedSourcePath),
             MetaRelativePath = TryMakeRelativeProjectPath(projectRoot, normalizedMetaPath),
             PrimaryContentKey = AssetRecord.CreatePrimaryContentKey(asset.Id),

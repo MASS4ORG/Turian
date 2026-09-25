@@ -1,5 +1,10 @@
 namespace Turian.Engine.Core;
 
+/// <summary>Handles a change to a <see cref="DataAsset"/>.</summary>
+/// <param name="asset">The asset that changed.</param>
+/// <param name="member">The member that changed, or an empty string when the whole asset was reloaded.</param>
+public delegate void DataAssetChangedHandler(DataAsset asset, string member);
+
 /// <summary>
 /// Represents the serialized payload stored inside a data-asset file.
 /// This is the equivalent of a Unity ScriptableObject-like object.
@@ -7,6 +12,16 @@ namespace Turian.Engine.Core;
 [TypeId("a3000000-0000-4000-8000-000000000004")]
 public class DataAsset : IdClass
 {
+    /// <summary>
+    /// Raised when a member changes: by an <see cref="ObservableAttribute"/> property, a call to
+    /// <see cref="NotifyChanged"/>, or a reload of the asset (with an empty member name).
+    /// </summary>
+    public event DataAssetChangedHandler? Changed;
+
+    /// <summary>Raises <see cref="Changed"/> for <paramref name="member"/>.</summary>
+    /// <param name="member">The member that changed, or an empty string for the whole asset.</param>
+    public void NotifyChanged(string member) => Changed?.Invoke(this, member);
+
     /// <summary>
     /// Loads a data-asset payload from the specified absolute path.
     /// </summary>

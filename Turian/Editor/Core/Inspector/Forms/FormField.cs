@@ -57,6 +57,12 @@ public sealed class FormField
     /// <summary>The member's name, or the element's index or key.</summary>
     public string Name { get; }
 
+    /// <summary>For a list element, the name of the list member it belongs to; otherwise null.</summary>
+    public string? CollectionMember { get; init; }
+
+    /// <summary>For a list element, its index in <see cref="CollectionMember"/>; otherwise -1.</summary>
+    public int CollectionIndex { get; init; } = -1;
+
     /// <summary>A display label derived from the name.</summary>
     public string Label { get; }
 

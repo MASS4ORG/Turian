@@ -95,7 +95,9 @@ public class ComponentJsonConverter : JsonConverter<Component>
                 _ => default
             };
             if (name is null) continue;
-            if (ObjectReferences.TryWrite(writer, value, name, memberType, memberValue, allowSceneObjects: true)) continue;
+            if (ObjectReferences.IsSavedAsReference(member, memberType, allowSceneObjects: true)
+                && ObjectReferences.TryWrite(writer, value, name, memberType, memberValue, allowSceneObjects: true))
+                continue;
             writer.WritePropertyName(name);
             JsonSerializer.Serialize(writer, memberValue, memberType, options);
         }
@@ -127,7 +129,9 @@ public class ComponentJsonConverter : JsonConverter<Component>
         if (property?.GetCustomAttribute<JsonIgnoreAttribute>() is not null) return;
         if (property?.CanWrite == true)
         {
-            if (ObjectReferences.TryRead(instance, prop.Name, property.PropertyType, prop.Value, true, out var reference))
+            if (ObjectReferences.IsSavedAsReference(property, property.PropertyType, allowSceneObjects: true)
+                && ObjectReferences.TryRead(instance, prop.Name, property.PropertyType, prop.Value, true,
+                    out var reference))
             {
                 property.SetValue(instance, reference);
                 return;
@@ -139,7 +143,8 @@ public class ComponentJsonConverter : JsonConverter<Component>
         var field = type.GetField(prop.Name, BindingFlags.Public | BindingFlags.Instance);
         if (field is null || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null) return;
         field.SetValue(instance,
-            ObjectReferences.TryRead(instance, prop.Name, field.FieldType, prop.Value, true, out var fieldReference)
+            ObjectReferences.IsSavedAsReference(field, field.FieldType, allowSceneObjects: true)
+            && ObjectReferences.TryRead(instance, prop.Name, field.FieldType, prop.Value, true, out var fieldReference)
                 ? fieldReference
                 : JsonSerializer.Deserialize(prop.Value.GetRawText(), field.FieldType, options));
     }

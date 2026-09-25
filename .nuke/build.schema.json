@@ -145,11 +145,11 @@
           "description": "GitLab personal/project access token with api + write_repository scope. Omit to skip pushing/releasing to GitLab",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "nugetApiKey": {
+        "NugetApiKey": {
           "type": "string",
           "description": "NuGet API key used by PushNuGet. Absent = pack only"
         },
-        "nugetSource": {
+        "NugetSource": {
           "type": "string",
           "description": "NuGet feed to push to (default: nuget.org)"
         },

@@ -51,6 +51,13 @@ public partial class Node : IdClass
     public string Name { get; set; } = "Node";
 
     /// <summary>
+    /// Whether the node was destroyed with its scene. A reference to it reads as missing: it is saved as null and
+    /// never resolved to.
+    /// </summary>
+    [JsonIgnore, HideInEditor]
+    public bool IsDestroyed { get; internal set; }
+
+    /// <summary>
     /// Gets or sets the parent node of this node.
     /// </summary>
     [JsonIgnore, HideInEditor]

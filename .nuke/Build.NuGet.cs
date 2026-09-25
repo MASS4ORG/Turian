@@ -8,10 +8,10 @@ namespace Turian.NUKE;
 sealed partial class Build
 {
     [Parameter("NuGet API key used by PushNuGet. Absent = pack only.")]
-    readonly string nugetApiKey;
+    readonly string NugetApiKey;
 
     [Parameter("NuGet feed to push to (default: nuget.org)")]
-    readonly string nugetSource = "https://api.nuget.org/v3/index.json";
+    readonly string NugetSource = "https://api.nuget.org/v3/index.json";
 
     static AbsolutePath PackagesDirectory => ArtifactsDirectory / "packages";
 
@@ -69,16 +69,16 @@ sealed partial class Build
     public Target PushNuGet => td =>
         td
             .DependsOn(PackNuGet)
-            .Requires(() => nugetApiKey)
+            .Requires(() => NugetApiKey)
             .Executes(() =>
             {
                 foreach (var package in PackagesDirectory.GlobFiles("*.nupkg"))
                 {
-                    Log.Information("Pushing {Package} to {Source}", package.Name, nugetSource);
+                    Log.Information("Pushing {Package} to {Source}", package.Name, NugetSource);
                     _ = DotNetNuGetPush(settings => settings
                         .SetTargetPath(package)
-                        .SetSource(nugetSource)
-                        .SetApiKey(nugetApiKey)
+                        .SetSource(NugetSource)
+                        .SetApiKey(NugetApiKey)
                         .EnableSkipDuplicate());
                 }
             });

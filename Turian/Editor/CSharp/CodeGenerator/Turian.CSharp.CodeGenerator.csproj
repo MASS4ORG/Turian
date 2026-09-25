@@ -10,6 +10,11 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    </ItemGroup>
+
     <!-- External libraries -->
     <ItemGroup>
         <!-- Pinned to the Roslyn version the .NET 10 SDK hosts; a newer package here builds an
