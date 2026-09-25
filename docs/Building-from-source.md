@@ -31,12 +31,12 @@ This will:
 ### 3. Run the Studio
 To launch the editor with an example project:
 ```bash
-dotnet run --project Turian/Editor/Studio/Turian.Editor.Studio.csproj -- --project ../turian-examples/example-01
+dotnet run --project Turian/Editor/Studio/Turian.Editor.Studio.csproj -- --project ../TurianExamples/example-01
 ```
 
 ### 4. Headless diagnostics
 ```bash
-dotnet run --project Turian/Editor/CLI -- screenshot ../turian-examples/example-01/ --out shot.png
+dotnet run --project Turian/Editor/CLI -- screenshot ../TurianExamples/example-01/ --out shot.png
 ```
 
 ## Troubleshooting

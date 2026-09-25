@@ -75,11 +75,16 @@ public partial class SceneManager
         }
     }
 
-    static async Task<Node> DeserializeNodeAsync(Stream stream, string sourceDescription)
+    async Task<Node> DeserializeNodeAsync(Stream stream, string sourceDescription)
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
         var json = await reader.ReadToEndAsync().ConfigureAwait(false);
+        return DeserializeNode(json, sourceDescription);
+    }
 
+    Node DeserializeNode(string json, string sourceDescription)
+    {
+        json = PrefabInstances.Expand(json, id => PrefabInstances.ReadPrefabJson(assetDatabase, id));
         var root = Serializer.LoadData<Node>(json);
         if (root is null)
         {

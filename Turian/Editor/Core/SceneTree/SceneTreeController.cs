@@ -181,7 +181,8 @@ public sealed class SceneTreeController(
         {
             var path = Path.Combine(settingsService.Settings.ProjectAbsoluteDir, prefab.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            Serializer.Save(path, root);
+            File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
+                id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)));
             assetImporter.ReimportNow(path, overwriteExisting: true);
         }
         catch (Exception ex)

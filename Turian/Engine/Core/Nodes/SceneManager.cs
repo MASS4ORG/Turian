@@ -212,10 +212,12 @@ public partial class SceneManager : ISceneManager
     }
 
     /// <inheritdoc />
-    public async Task<Node> InstantiateAsync(Guid sceneAssetId, Node? parent = null)
+    public Task<Node> InstantiateAsync(Guid sceneAssetId, Node? parent = null)
     {
-        var root = await LoadNodeAsync(sceneAssetId).ConfigureAwait(false);
-        return AttachInstantiatedRoot(root, parent);
+        ResolveProvider(sceneAssetId);
+        var json = PrefabInstances.CreateInstanceJson(sceneAssetId, Guid.NewGuid());
+        var root = DeserializeNode(json, $"asset '{sceneAssetId}'");
+        return Task.FromResult(AttachInstantiatedRoot(root, parent));
     }
 
     /// <inheritdoc />

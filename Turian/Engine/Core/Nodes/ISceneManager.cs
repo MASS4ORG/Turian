@@ -117,6 +117,10 @@ public interface ISceneManager
     /// If <paramref name="parent"/> is null, the instantiated root is attached to
     /// the active scene root when available.
     /// </summary>
+    /// <remarks>
+    /// The root keeps a <see cref="PrefabInstance"/> link: every node and component gets an id unique to this
+    /// instance, and saving the scene stores only the instance's differences from the prefab.
+    /// </remarks>
     Task<Node> InstantiateAsync(Guid sceneAssetId, Node? parent = null);
 
     /// <summary>
