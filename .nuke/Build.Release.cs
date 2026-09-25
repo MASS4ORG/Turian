@@ -159,7 +159,10 @@ sealed partial class Build
                 {
                     tag_name = TagName,
                     name = TagName,
-                    body = ReadChangelogSection(TagName),
+                    body = ReadChangelogSection(TagName) +
+                        (Environment.GetEnvironmentVariable("TURIAN_BUILD_RESULT") == "failure"
+                            ? "\n\nSome platform builds failed. Downloadable assets are available only for successful builds; see the publish workflow run."
+                            : string.Empty),
                     draft = false,
                     prerelease = false,
                 });

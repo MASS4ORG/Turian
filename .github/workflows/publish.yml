@@ -77,7 +77,10 @@ jobs:
 
   release:
     needs: build
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    env:
+      TURIAN_BUILD_RESULT: ${{ needs.build.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,6 +95,14 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          if ! find artifacts -maxdepth 1 -type f \( -name '*.zip' -o -name '*.deb' -o -name '*.exe' \) -print -quit | grep -q .; then
+            echo 'No release assets were produced.' >&2
+            exit 1
+          fi
 
       - name: Create GitHub release
         shell: bash

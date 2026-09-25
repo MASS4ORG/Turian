@@ -9,13 +9,19 @@ sealed partial class Build
     Target Clean => td => td
         .Executes(() =>
         {
-            Solution.Directory
-                .GlobDirectories("**/bin", "**/obj", "**/output")
-                .ForEach((path) => path.DeleteDirectory());
+            Solution.AllProjects
+                .Where(project => project.Path != RootDirectory / ".nuke/Build.csproj")
+                .SelectMany(project => new[]
+                {
+                    project.Directory / "bin",
+                    project.Directory / "obj",
+                    project.Directory / "output",
+                })
+                .Distinct()
+                .Where(path => path.DirectoryExists())
+                .ForEach(path => path.DeleteDirectory());
             PublishDirectory.DeleteDirectory();
             CoverageDirectory.DeleteDirectory();
-
-            _ = DotNetClean();
         });
 
     Target Restore => td => td
