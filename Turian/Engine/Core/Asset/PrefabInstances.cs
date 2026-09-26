@@ -108,33 +108,25 @@ public static class PrefabInstances
 
     static void ExpandTree(JsonObject node, Func<Guid, string?> loadPrefab, HashSet<Guid> chain)
     {
-        var expanded = node[instanceMember] is JsonObject && !node.ContainsKey(childrenMember)
-            ? ExpandInstance(node, loadPrefab, chain)
-            : null;
+        // An expanded instance's prefab content was expanded by Instantiate and its additions before attaching.
+        if (node[instanceMember] is JsonObject && !node.ContainsKey(childrenMember))
+        {
+            ExpandInstance(node, loadPrefab, chain);
+            return;
+        }
 
         if (node[childrenMember] is not JsonArray children) return;
-
-        // Descendants of an instance must not instantiate its prefab again, or a self-containing prefab never ends.
-        var entered = expanded is { } prefabId && chain.Add(prefabId);
-        try
-        {
-            foreach (var child in children.OfType<JsonObject>())
-                ExpandTree(child, loadPrefab, chain);
-        }
-        finally
-        {
-            if (entered) chain.Remove(expanded!.Value);
-        }
+        foreach (var child in children.OfType<JsonObject>())
+            ExpandTree(child, loadPrefab, chain);
     }
 
-    static Guid? ExpandInstance(JsonObject instance, Func<Guid, string?> loadPrefab, HashSet<Guid> chain)
+    static void ExpandInstance(JsonObject instance, Func<Guid, string?> loadPrefab, HashSet<Guid> chain)
     {
         var link = (JsonObject)instance[instanceMember]!;
         var instanceId = ReadId(instance) ?? Guid.NewGuid();
-        var prefabId = ReadSourceId(link);
         var sourceToDerived = new Dictionary<Guid, Guid>();
-        var source = Instantiate(prefabId, instanceId, loadPrefab, chain, sourceToDerived);
-        if (source is null) return null;
+        var source = Instantiate(ReadSourceId(link), instanceId, loadPrefab, chain, sourceToDerived);
+        if (source is null) return;
 
         var data = link.Deserialize<PrefabInstance>(Serializer.JsonOptions) ?? new PrefabInstance();
         var index = Index(source);
@@ -157,7 +149,13 @@ public static class PrefabInstances
                 || !index.TryGetValue(id, out var parent) || !parent.IsNode)
                 continue;
 
-            if (addition.Child is not null) ArrayOf(parent.Object, childrenMember).Add(addition.Child.DeepClone());
+            // Additions belong to the instance, not the prefab, so the prefab may appear again inside them.
+            if (addition.Child?.DeepClone() is JsonObject child)
+            {
+                ExpandTree(child, loadPrefab, chain);
+                ArrayOf(parent.Object, childrenMember).Add(child);
+            }
+
             if (addition.Component is not null)
                 ArrayOf(parent.Object, componentsMember).Add(addition.Component.DeepClone());
         }
@@ -169,7 +167,6 @@ public static class PrefabInstances
 
         source[instanceMember] = new JsonObject { [sourceMember] = link[sourceMember]?.DeepClone() };
         ReplaceContent(instance, source);
-        return prefabId;
     }
 
     static JsonObject? Instantiate(
@@ -245,32 +242,33 @@ public static class PrefabInstances
         var derivedToSource = sourceToDerived.ToDictionary(pair => pair.Value, pair => pair.Key);
         var expectedIndex = Index(expected);
         var actualIndex = Index(actual);
+        var detached = Detached(actualIndex, expectedIndex, instanceId);
         var overrides = new JsonArray();
         var added = new JsonArray();
         var removed = new JsonArray();
 
         foreach (var (id, entry) in actualIndex)
         {
-            if (!expectedIndex.TryGetValue(id, out var prefabEntry)) continue;
+            if (detached.Contains(id)) continue;
 
             var target = derivedToSource[id].ToString();
-            AddOverrides(overrides, target, entry.Object, prefabEntry.Object, isRoot: id == instanceId);
+            AddOverrides(overrides, target, entry.Object, expectedIndex[id].Object, isRoot: id == instanceId);
             if (!entry.IsNode) continue;
 
-            foreach (var child in Items(entry.Object, childrenMember).Where(child => !IsFrom(child, expectedIndex)))
+            foreach (var child in Items(entry.Object, childrenMember).Where(child => IsIn(child, detached)))
             {
                 CompactTree(child, loadPrefab, normalize);
                 added.Add(new JsonObject { ["Parent"] = target, ["Child"] = child.DeepClone() });
             }
 
-            foreach (var component in Items(entry.Object, componentsMember)
-                         .Where(component => !IsFrom(component, expectedIndex)))
+            foreach (var component in Items(entry.Object, componentsMember).Where(item => IsIn(item, detached)))
                 added.Add(new JsonObject { ["Parent"] = target, ["Component"] = component.DeepClone() });
         }
 
         foreach (var (id, entry) in expectedIndex)
         {
-            if (!actualIndex.ContainsKey(id) && entry.ParentId is { } parentId && actualIndex.ContainsKey(parentId))
+            if ((!actualIndex.ContainsKey(id) || detached.Contains(id))
+                && entry.ParentId is { } parentId && actualIndex.ContainsKey(parentId) && !detached.Contains(parentId))
                 removed.Add(derivedToSource[id].ToString());
         }
 
@@ -334,8 +332,25 @@ public static class PrefabInstances
         }
     }
 
-    static bool IsFrom(JsonObject item, Dictionary<Guid, Entry> prefabIndex) =>
-        ReadId(item) is { } id && prefabIndex.ContainsKey(id);
+    // Objects the instance owns rather than the prefab: additions, prefab objects moved to another parent, and
+    // everything under them. A moved prefab object is saved as removed plus added, keeping its id.
+    static HashSet<Guid> Detached(Dictionary<Guid, Entry> actual, Dictionary<Guid, Entry> expected, Guid rootId)
+    {
+        return [.. actual.Keys.Where(IsDetached)];
+
+        bool IsDetached(Guid id)
+        {
+            for (Guid? current = id; current is { } node && node != rootId; current = actual[node].ParentId)
+            {
+                if (!expected.TryGetValue(node, out var prefabPlace) || prefabPlace.ParentId != actual[node].ParentId)
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    static bool IsIn(JsonObject item, HashSet<Guid> ids) => ReadId(item) is { } id && ids.Contains(id);
 
     static IEnumerable<JsonObject> Items(JsonObject node, string member) =>
         node[member] is JsonArray array ? array.OfType<JsonObject>() : [];

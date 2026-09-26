@@ -181,4 +181,35 @@ public class PrefabInstancesTests
         Assert.Equal("Loop", instance.Name);
         Assert.Empty(instance.Children[0].Children);
     }
+
+    /// <summary>A prefab node moved to another parent is saved in its new place with its id.</summary>
+    [Fact]
+    public void MovedPrefabNode_KeepsNewParentAndId()
+    {
+        var instance = Instantiate(AddPrefab(Lamp()));
+        var bulb = instance.Children[0];
+        var shade = new Node { Name = "Shade" };
+        instance.Children.Remove(bulb);
+        instance.Children.Add(shade);
+        shade.Children.Add(bulb);
+
+        var reloaded = Reload(Save(Scene(instance))).Children[0];
+
+        var movedBulb = Assert.Single(Assert.Single(reloaded.Children).Children);
+        Assert.Equal(bulb.Id, movedBulb.Id);
+        Assert.NotNull(movedBulb.GetComponent<LightComponent>());
+    }
+
+    /// <summary>An instance may hold another instance of its own prefab as an addition.</summary>
+    [Fact]
+    public void AddedInstanceOfSamePrefab_Expands()
+    {
+        var prefabId = AddPrefab(Lamp());
+        var outer = Instantiate(prefabId);
+        outer.Children.Add(Instantiate(prefabId));
+
+        var reloaded = Reload(Save(Scene(outer))).Children[0];
+
+        Assert.Equal("Bulb", reloaded.Children[1].Children[0].Name);
+    }
 }
