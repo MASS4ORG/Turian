@@ -45,7 +45,7 @@ sealed class SceneViewport : IDisposable
 
     Action<object>? mutateNode;
     bool gizmoOwnsDrag;
-    MouseButton? activeButton;
+    readonly ViewportGesture gesture = new();
     Vector2 pressPosition;
 
     /// <summary>Creates the viewport and follows the framing requests the scene tree raises.</summary>
@@ -149,45 +149,44 @@ sealed class SceneViewport : IDisposable
     {
         if (controller is null || service is null) return;
 
-        // Pushed every frame rather than wired to a change event: three assignments cost nothing, and
-        // an edit made while dragging the view takes effect without leaving the panel.
-        controller.MoveSpeed = cameraSettings.MoveSpeed;
-        controller.LookSensitivity = cameraSettings.LookSensitivity;
-        controller.ZoomFraction = cameraSettings.ZoomFraction;
-
         var input = gui.Input;
         var interactable = gui.GetInteractable();
         var hovered = interactable.OnHover();
 
-        controller.IsAlt = input.IsKeyDown(KeyboardKey.LeftAlt) || input.IsKeyDown(KeyboardKey.RightAlt);
-        controller.IsFast = input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift);
-
-        // Only the button that owns the gesture is asked about. Guinevere keys its drag state by
-        // element rather than by button, so asking about a button that is up would tear down the drag
-        // another button is running — a right-drag look would stop on its second frame.
-        var previous = activeButton;
-        if (activeButton is { } held)
+        SyncCamera(input);
+        var phase = gesture.Update(button => interactable.OnHold(button switch
         {
-            if (!interactable.OnHold(held)) activeButton = null;
-        }
-        else if (interactable.OnHold(MouseButton.Right)) activeButton = MouseButton.Right;
-        else if (interactable.OnHold(MouseButton.Middle)) activeButton = MouseButton.Middle;
-        else if (interactable.OnHold()) activeButton = MouseButton.Left;
-
-        controller.IsLeftButton = activeButton == MouseButton.Left;
-        controller.IsMiddleButton = activeButton == MouseButton.Middle;
-        controller.IsRightButton = activeButton == MouseButton.Right;
+            ViewportButton.Right => MouseButton.Right,
+            ViewportButton.Middle => MouseButton.Middle,
+            _ => MouseButton.Left,
+        }));
+        controller.SetActiveButton(gesture.Active);
 
         var local = new Vector2(input.MousePosition.X - rect.X, input.MousePosition.Y - rect.Y);
-
-        if (activeButton is not null && previous is null) OnPressed(local);
-        else if (activeButton is null && previous is { } released) OnReleased(local, released);
-        else if (activeButton is not null) OnDragged(local);
-        else if (hovered && !playMode.IsActive) Gizmo.ProcessPointerMove(local, service.Camera, ViewportSize);
+        DispatchPointer(phase, local, hovered);
 
         if (hovered && input.MouseWheelDelta != 0f) controller.OnWheel(input.MouseWheelDelta);
-        if (hovered || activeButton is not null) HandleKeyboard(input);
+        if (hovered || gesture.Active is not null) HandleKeyboard(input);
         else heldKeys.Clear();
+    }
+
+    // Pushed every frame rather than wired to a change event: the assignments cost nothing, and an edit made
+    // while dragging the view takes effect without leaving the panel.
+    void SyncCamera(IInputHandler input)
+    {
+        controller!.MoveSpeed = cameraSettings.MoveSpeed;
+        controller.LookSensitivity = cameraSettings.LookSensitivity;
+        controller.ZoomFraction = cameraSettings.ZoomFraction;
+        controller.IsAlt = input.IsKeyDown(KeyboardKey.LeftAlt) || input.IsKeyDown(KeyboardKey.RightAlt);
+        controller.IsFast = input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift);
+    }
+
+    void DispatchPointer(ViewportGesturePhase phase, Vector2 local, bool hovered)
+    {
+        if (phase == ViewportGesturePhase.Pressed) OnPressed(local);
+        else if (phase == ViewportGesturePhase.Released) OnReleased(local, gesture.Released!.Value);
+        else if (phase == ViewportGesturePhase.Dragged) OnDragged(local);
+        else if (hovered && !playMode.IsActive) Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
     }
 
     /// <summary>
@@ -219,7 +218,7 @@ sealed class SceneViewport : IDisposable
     /// A left press that moved nowhere and drove neither the gizmo nor the camera is a pick. Hitting
     /// nothing clears the selection, which is what <c>Select(null)</c> already means.
     /// </summary>
-    void OnReleased(Vector2 local, MouseButton button)
+    void OnReleased(Vector2 local, ViewportButton button)
     {
         if (gizmoOwnsDrag)
         {
@@ -228,7 +227,7 @@ sealed class SceneViewport : IDisposable
             return;
         }
 
-        var isClick = button == MouseButton.Left
+        var isClick = button == ViewportButton.Left
             && !controller!.IsAlt
             && Math.Abs(local.X - pressPosition.X) <= clickDragThreshold
             && Math.Abs(local.Y - pressPosition.Y) <= clickDragThreshold;

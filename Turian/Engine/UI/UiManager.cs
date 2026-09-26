@@ -74,32 +74,14 @@ public sealed class UiManager : IDisposable
         Collect(root, found);
 
         var panels = found
-            .Where(c => (c.OnBuild is not null || !c.Document.IsEmpty)
-                        && c.IsActive
-                        && c.IsAttached
-                        && c.Node?.IsActive is true
-                        && c.Mode is UiRenderMode.ScreenSpaceOverlay or UiRenderMode.ScreenSpaceCamera)
+            .Where(c => IsDrawable(c) && c.Mode is UiRenderMode.ScreenSpaceOverlay or UiRenderMode.ScreenSpaceCamera)
             .OrderBy(c => c.SortOrder)
             .ToArray();
 
         Diagnose($"panels: {found.Count} found, {panels.Length} eligible");
         if (panels.Length == 0) return null;
 
-        var builders = new List<Action<Gui>>(panels.Length);
-        foreach (var panel in panels)
-        {
-            if (panel.OnBuild is { } onBuild)
-            {
-                builders.Add(onBuild);
-                continue;
-            }
-
-            var resolved = ResolveDocumentBuilder(panel);
-            if (resolved is null) continue;
-
-            resolved.Controller?.OnUpdate(deltaTime);
-            builders.Add(resolved.Renderer.Render);
-        }
+        var builders = panels.Select(panel => ResolveBuild(panel, deltaTime)).OfType<Action<Gui>>().ToList();
 
         Diagnose($"builders: {builders.Count}");
         if (builders.Count == 0) return null;
@@ -147,63 +129,24 @@ public sealed class UiManager : IDisposable
         var viewport = new Vector2(frame.Width, frame.Height);
 
         var quads = new List<WorldUiQuad>();
-        foreach (var panel in found)
+        foreach (var panel in found.Where(panel => panel.Mode == UiRenderMode.WorldSpace && IsDrawable(panel)))
         {
-            if (panel.Mode != UiRenderMode.WorldSpace
-                || !panel.IsActive || !panel.IsAttached || panel.Node?.IsActive is not true
-                || (panel.OnBuild is null && panel.Document.IsEmpty))
-            {
-                continue;
-            }
-
             var pw = Math.Max(1, panel.PanelSize.X);
             var ph = Math.Max(1, panel.PanelSize.Y);
-
-            if (!worldPanels.TryGetValue(panel.Id, out var wp))
-            {
-                // Ownership passes to worldPanels, which Dispose releases. A `using` here disposed the
-                // runtime while the dictionary kept it, so the next Render threw ObjectDisposedException.
-                var handler = new WorldPanelInputHandler();
-                // Ownership transfers to WorldPanel on successful construction; the catch below
-                // disposes the runtime if that transfer cannot be completed.
-#pragma warning disable CA2000
-                var runtime = new UiRuntime(vulkan, pw, ph, input: handler);
-#pragma warning restore CA2000
-                try
-                {
-                    worldPanels[panel.Id] = wp = new WorldPanel(runtime, handler);
-                }
-                catch
-                {
-                    runtime.Dispose();
-                    throw;
-                }
-            }
+            var wp = GetOrCreateWorldPanel(panel.Id, pw, ph);
 
             var aspect = (float)ph / pw;
-            var model = Matrix4x4.CreateScale(1f, aspect, 1f) * panel.Node.GlobalTransform.Matrix4X4();
+            var model = Matrix4x4.CreateScale(1f, aspect, 1f) * panel.Node!.GlobalTransform.Matrix4X4();
 
             // Pointer raycast — only when a UiRaycasterComponent opts the panel in.
-            if (panel.Node.GetComponent<UiRaycasterComponent>() is { } raycaster
-                && WorldPanelPointer.TryHit(model, viewProjection, pointer, viewport,
-                    new Vector2(pw, ph), out var hitPixels)
-                && WithinRange(raycaster, frame.Camera, panel.Node))
-            {
-                wp.Input.SetPointer(hitPixels);
-            }
-            else
-            {
-                wp.Input.SetPointer(null);
-            }
+            wp.Input.SetPointer(panel.Node.GetComponent<UiRaycasterComponent>() is { } raycaster
+                                && WorldPanelPointer.TryHit(model, viewProjection, pointer, viewport,
+                                    new Vector2(pw, ph), out var hitPixels)
+                                && WithinRange(raycaster, frame.Camera, panel.Node)
+                ? hitPixels
+                : null);
 
-            var build = panel.OnBuild;
-            if (build is null)
-            {
-                var resolved = ResolveDocumentBuilder(panel);
-                if (resolved is null) continue;
-                resolved.Controller?.OnUpdate(frame.DeltaTime);
-                build = resolved.Renderer.Render;
-            }
+            if (ResolveBuild(panel, frame.DeltaTime) is not { } build) continue;
 
             var texture = wp.Runtime.Render(build, pw, ph, frame.DeltaTime);
             quads.Add(new WorldUiQuad(texture, model));
@@ -211,6 +154,40 @@ public sealed class UiManager : IDisposable
 
         DiagnoseChange("world", $"{quads.Count} world panel(s)");
         return quads;
+    }
+
+    static bool IsDrawable(UiDocumentComponent panel) =>
+        (panel.OnBuild is not null || !panel.Document.IsEmpty)
+        && panel.IsActive && panel.IsAttached && panel.Node?.IsActive is true;
+
+    /// <summary>The panel's code-built UI, or its document's renderer after ticking the document's controller.</summary>
+    Action<Gui>? ResolveBuild(UiDocumentComponent panel, float deltaTime)
+    {
+        if (panel.OnBuild is { } onBuild) return onBuild;
+        if (ResolveDocumentBuilder(panel) is not { } resolved) return null;
+
+        resolved.Controller?.OnUpdate(deltaTime);
+        return resolved.Renderer.Render;
+    }
+
+    WorldPanel GetOrCreateWorldPanel(Guid panelId, int width, int height)
+    {
+        if (worldPanels.TryGetValue(panelId, out var existing)) return existing;
+
+        // Ownership passes to worldPanels, which Dispose releases.
+        var handler = new WorldPanelInputHandler();
+#pragma warning disable CA2000
+        var runtime = new UiRuntime(vulkan, width, height, input: handler);
+#pragma warning restore CA2000
+        try
+        {
+            return worldPanels[panelId] = new WorldPanel(runtime, handler);
+        }
+        catch
+        {
+            runtime.Dispose();
+            throw;
+        }
     }
 
     static bool WithinRange(UiRaycasterComponent raycaster, ICamera camera, Node panelNode)
@@ -269,10 +246,7 @@ public sealed class UiManager : IDisposable
             return null;
         }
 
-        var sheetIds = panel.StyleSheets.Where(r => !r.IsEmpty).Select(r => r.AssetId).ToArray();
-        var key = string.Join(',', sheetIds) + '|' + string.Join(',', document.StyleSheets)
-                  + '|' + (document.ControllerType ?? string.Empty);
-
+        var key = SheetKey(panel, document);
         if (renderers.TryGetValue(panel.Id, out var cached)
             && cached.DocumentId == panel.Document.AssetId
             && cached.SheetKey == key)
@@ -286,21 +260,7 @@ public sealed class UiManager : IDisposable
             FontResolver = new UiFontResolver(db).Resolve,
             TextResolver = Localization.Resolve,
         };
-
-        // <Style src="…"> entries, resolved relative to the document's own project path.
-        var baseDir = Path.GetDirectoryName(docAsset.RelativePath)?.Replace('\\', '/') ?? string.Empty;
-        foreach (var src in document.StyleSheets)
-        {
-            var sheet = ResolveSheetByPath(db, baseDir, src);
-            if (sheet is not null) renderer.StyleSheets.Add(sheet);
-        }
-
-        // Explicit component stylesheets take priority (added last).
-        foreach (var reference in panel.StyleSheets)
-        {
-            var sheet = reference.Resolve(db)?.GetContent();
-            if (sheet is not null) renderer.StyleSheets.Add(sheet);
-        }
+        AddStyleSheets(renderer, db, panel, document, docAsset.RelativePath);
 
         var controller = CreateController(document.ControllerType);
         if (controller is not null)
@@ -309,6 +269,26 @@ public sealed class UiManager : IDisposable
         var entry = new CachedRenderer(panel.Document.AssetId, key, renderer, controller);
         renderers[panel.Id] = entry;
         return entry;
+    }
+
+    // Changes whenever the panel's or the document's stylesheets, or its controller, change.
+    static string SheetKey(UiDocumentComponent panel, UiDocument document) =>
+        string.Join(',', panel.StyleSheets.Where(r => !r.IsEmpty).Select(r => r.AssetId)) + '|'
+        + string.Join(',', document.StyleSheets) + '|' + (document.ControllerType ?? string.Empty);
+
+    static void AddStyleSheets(
+        UiRenderer renderer, AssetDatabase db, UiDocumentComponent panel, UiDocument document, string documentPath)
+    {
+        // <Style src="…"> entries, resolved relative to the document's own project path.
+        var baseDir = Path.GetDirectoryName(documentPath)?.Replace('\\', '/') ?? string.Empty;
+        foreach (var sheet in document.StyleSheets.Select(src => ResolveSheetByPath(db, baseDir, src))
+                     .OfType<StyleSheet>())
+            renderer.StyleSheets.Add(sheet);
+
+        // Explicit component stylesheets take priority (added last).
+        foreach (var sheet in panel.StyleSheets.Select(reference => reference.Resolve(db)?.GetContent())
+                     .OfType<StyleSheet>())
+            renderer.StyleSheets.Add(sheet);
     }
 
     /// <summary>Instantiates the named <see cref="UiController"/> from any loaded assembly, or <c>null</c>.</summary>

@@ -216,91 +216,88 @@ public static class TypeRegistry
     {
         ArgumentNullException.ThrowIfNull(logger);
 
+        using var doc = ReadManifest(manifestPath, logger);
+        if (doc is null || !doc.RootElement.TryGetProperty("Types", out var typesArray)) return;
+
+        // In play/export mode the user-code assembly is a project reference and loads lazily;
+        // without this, GetAssemblies() won't include it and all FQN lookups silently fail.
+        if (Path.GetDirectoryName(manifestPath) is { } manifestDir) LoadAssembliesIn(manifestDir);
+
+        // A single-file game bundles the user assembly, so there is no DLL above to load; it is
+        // loaded by name instead.
+        if (doc.RootElement.TryGetProperty("AssemblyName", out var assemblyNameProp)
+            && assemblyNameProp.GetString() is { Length: > 0 } assemblyName)
+            LoadAssemblyByName(assemblyName, logger);
+
+        var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+        var registered = typesArray.EnumerateArray().Count(entry => RegisterManifestEntry(entry, allAssemblies, logger));
+
+        logger.LogInformation("Registered {Count}/{Total} user type(s) from manifest", registered,
+            typesArray.GetArrayLength());
+    }
+
+    static JsonDocument? ReadManifest(string manifestPath, ILogger logger)
+    {
         if (!File.Exists(manifestPath))
         {
-            logger.LogDebug("User-code type manifest not found at {Path}; user types will not be registered", manifestPath);
-            return;
+            logger.LogDebug("User-code type manifest not found at {Path}; user types will not be registered",
+                manifestPath);
+            return null;
         }
 
-        JsonDocument doc;
         try
         {
-            doc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            return JsonDocument.Parse(File.ReadAllText(manifestPath));
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to parse user-code type manifest at {Path}", manifestPath);
-            return;
-        }
-
-        using (doc)
-        {
-            if (!doc.RootElement.TryGetProperty("Types", out var typesArray))
-                return;
-
-            // Force-load any DLLs in the manifest directory that aren't yet in the AppDomain.
-            // In play/export mode the user-code assembly is a project reference and loads lazily;
-            // without this, GetAssemblies() won't include it and all FQN lookups silently fail.
-            var manifestDir = Path.GetDirectoryName(manifestPath);
-            if (manifestDir is not null)
-            {
-                var loadedLocations = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic)
-                    .Select(a => a.Location)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var dll in Directory.GetFiles(manifestDir, "*.dll", SearchOption.TopDirectoryOnly))
-                {
-                    if (loadedLocations.Contains(dll)) continue;
-                    try { Assembly.LoadFrom(dll); }
-                    catch { /* ignore non-managed or already-loaded DLLs */ }
-                }
-            }
-
-            // A single-file game bundles the user assembly, so there is no DLL above to load; it is
-            // loaded by name instead.
-            if (doc.RootElement.TryGetProperty("AssemblyName", out var assemblyNameProp)
-                && assemblyNameProp.GetString() is { Length: > 0 } assemblyName)
-            {
-                try { Assembly.Load(new AssemblyName(assemblyName)); }
-                catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
-                {
-                    logger.LogWarning(ex, "Could not load user assembly {AssemblyName}", assemblyName);
-                }
-            }
-
-            var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            var registered = 0;
-
-            foreach (var entry in typesArray.EnumerateArray())
-            {
-                var fqn = entry.TryGetProperty("FullyQualifiedName", out var fqnProp) ? fqnProp.GetString() : null;
-                var tidStr = entry.TryGetProperty("TypeId", out var tidProp) ? tidProp.GetString() : null;
-
-                if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(tidStr, out var typeId))
-                    continue;
-
-                Type? type = null;
-                foreach (var asm in allAssemblies)
-                {
-                    type = asm.GetType(fqn);
-                    if (type is not null) break;
-                }
-
-                if (type is null)
-                {
-                    logger.LogWarning("User type '{Fqn}' not found in any loaded assembly; skipping", fqn);
-                    continue;
-                }
-
-                Register(typeId, type);
-                registered++;
-                logger.LogDebug("TypeRegistry: {Fqn} → {TypeId}", fqn, typeId);
-            }
-
-            logger.LogInformation("Registered {Count}/{Total} user type(s) from manifest", registered, typesArray.GetArrayLength());
+            return null;
         }
     }
+
+    static void LoadAssembliesIn(string directory)
+    {
+        var loadedLocations = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic)
+            .Select(a => a.Location)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var dll in Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly))
+        {
+            if (loadedLocations.Contains(dll)) continue;
+            try { Assembly.LoadFrom(dll); }
+            catch { /* ignore non-managed or already-loaded DLLs */ }
+        }
+    }
+
+    static void LoadAssemblyByName(string assemblyName, ILogger logger)
+    {
+        try { Assembly.Load(new AssemblyName(assemblyName)); }
+        catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
+        {
+            logger.LogWarning(ex, "Could not load user assembly {AssemblyName}", assemblyName);
+        }
+    }
+
+    static bool RegisterManifestEntry(JsonElement entry, Assembly[] assemblies, ILogger logger)
+    {
+        var fqn = ReadString(entry, "FullyQualifiedName");
+        if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId)) return false;
+
+        if (assemblies.Select(asm => asm.GetType(fqn)).FirstOrDefault(type => type is not null) is not { } type)
+        {
+            logger.LogWarning("User type '{Fqn}' not found in any loaded assembly; skipping", fqn);
+            return false;
+        }
+
+        Register(typeId, type);
+        logger.LogDebug("TypeRegistry: {Fqn} → {TypeId}", fqn, typeId);
+        return true;
+    }
+
+    static string? ReadString(JsonElement entry, string property) =>
+        entry.TryGetProperty(property, out var value) ? value.GetString() : null;
 
     /// <summary>
     /// Returns the count of currently registered types. Mainly useful for diagnostics

@@ -62,46 +62,9 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         // cached per type, the form is not.
         var components = (target as Node)?.Components.Count ?? 0;
         if (gui.Pass == Pass.Pass1Build && (!ReferenceEquals(builtFor, target) || components != builtComponents))
-        {
-            model = target is Node node
-                ? FormBuilder.BuildForNode(node, _ => assets.AlterAssetForSelectedNode())
-                : FormBuilder.Build(target, _ => assets.AlterAssetForSelectedNode());
-            builtFor = target;
-            builtComponents = components;
+            RebuildForm(target, components);
 
-            // A component title not seen before starts folded when the setting says so; the node's
-            // own section (index 0) is never one of them — its header is always open. A title the
-            // user has already toggled keeps whatever they left it at.
-            if (!settings.AutoExpandComponents)
-                foreach (var section in model.Sections.Skip(1))
-                    collapsed.Add(section.Title);
-            Log.Logger.LogDebug("node form: {Target} sections=[{Sections}]",
-                target.GetType().Name,
-                string.Join(", ", model.Sections.Select(s =>
-                    $"{s.Title}:{s.BodyFields.Count}f/{s.Buttons.Count}b")));
-        }
-
-        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Padding(6f, 4f).Enter())
-        {
-            gui.DropTarget<ScriptDragPayload>("inspector/component-drop",
-                canAccept: payload => payload is ScriptDragPayload drop
-                            && inspector.SelectedNode is not null
-                            && ComponentRegistry.CanAddTo(inspector.SelectedNode, drop.ComponentType),
-                onDrop: payload =>
-                {
-                    if (payload is ScriptDragPayload drop)
-                        inspector.AddComponent(drop.ComponentType);
-                });
-            gui.ScrollY();
-
-            // The node's own section is the header: always open, with the active toggle beside the
-            // name. Components keep their fold.
-            for (var i = 0; i < model.Sections.Count; i++)
-                if (i == 0 && target is Node) RenderHeader(gui, model.Sections[i]);
-                else RenderSection(gui, model.Sections[i], i);
-
-            if (target is Node) RenderAddComponent(gui);
-        }
+        RenderForm(gui, target);
 
         referenceDrawer.DrawPendingPicker(gui);
         DrawAddComponentMenu(gui);
@@ -111,6 +74,47 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             inspector.RemoveComponent(removing);
         }
     }
+
+    void RenderForm(Gui gui, object target)
+    {
+        using var form = gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Padding(6f, 4f).Enter();
+        gui.DropTarget<ScriptDragPayload>("inspector/component-drop",
+            canAccept: CanDropScript, onDrop: DropScript);
+        gui.ScrollY();
+
+        // The node's own section is the header: always open, with the active toggle beside the
+        // name. Components keep their fold.
+        for (var i = 0; i < model.Sections.Count; i++)
+            if (i == 0 && target is Node) RenderHeader(gui, model.Sections[i]);
+            else RenderSection(gui, model.Sections[i], i);
+
+        if (target is Node) RenderAddComponent(gui);
+    }
+
+    void RebuildForm(object target, int components)
+    {
+        model = target is Node node
+            ? FormBuilder.BuildForNode(node, _ => assets.AlterAssetForSelectedNode())
+            : FormBuilder.Build(target, _ => assets.AlterAssetForSelectedNode());
+        builtFor = target;
+        builtComponents = components;
+
+        // A component title not seen before starts folded when the setting says so; the node's
+        // own section (index 0) is never one of them — its header is always open. A title the
+        // user has already toggled keeps whatever they left it at.
+        if (!settings.AutoExpandComponents)
+            foreach (var section in model.Sections.Skip(1))
+                collapsed.Add(section.Title);
+        Log.Logger.LogDebug("node form: {Target} sections=[{Sections}]",
+            target.GetType().Name,
+            string.Join(", ", model.Sections.Select(s =>
+                $"{s.Title}:{s.BodyFields.Count}f/{s.Buttons.Count}b")));
+    }
+
+    bool CanDropScript(ScriptDragPayload drop) =>
+        inspector.SelectedNode is { } node && ComponentRegistry.CanAddTo(node, drop.ComponentType);
+
+    void DropScript(ScriptDragPayload drop) => inspector.AddComponent(drop.ComponentType);
 
     /// <summary>
     /// An asset: the file name, then what there is to edit about it — a data asset's own class, the

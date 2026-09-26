@@ -17,35 +17,35 @@ static class StudioCommands
         Add(context, MenuIds.Edit, "1", 0, new CommandDescriptor(
             "gaya.turian.locale.english", "Edit: Localization: English",
             sp => sp.GetRequiredService<StudioLocalization>().SetLocale("en"))
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("English") }, "Localization");
+        { DynamicLabel = Localized("English") }, "Localization");
 
         Add(context, MenuIds.Edit, "1", 1, new CommandDescriptor(
             "gaya.turian.locale.ptBR", "Edit: Localization: Português (Brasil)",
             sp => sp.GetRequiredService<StudioLocalization>().SetLocale("pt-BR"))
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Português (Brasil)") }, "Localization");
+        { DynamicLabel = Localized("Português (Brasil)") }, "Localization");
 
         // ── File: project and documents ─────────────────────────────────────
         Add(context, MenuIds.File, "1", 0, new CommandDescriptor(
             "gaya.turian.newProject", "File: New Project…",
             NewProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("New Project…") });
+        { DynamicLabel = Localized("New Project…") });
 
         Add(context, MenuIds.File, "1", 1, new CommandDescriptor(
             "gaya.turian.openProject", "File: Open Project…",
             OpenProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Open…") });
+        { DynamicLabel = Localized("Open…") });
 
         Add(context, MenuIds.File, "1", 2, new CommandDescriptor(
             "gaya.turian.save", "File: Save",
             Save,
             sp => sp.GetRequiredService<AssetWorkspace>().Active is not null)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Save") });
+        { DynamicLabel = Localized("Save") });
 
         Add(context, MenuIds.File, "1", 3, new CommandDescriptor(
             "gaya.turian.saveAll", "File: Save All",
             sp => sp.GetRequiredService<AssetWorkspace>().SaveAll(),
             sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Save All") });
+        { DynamicLabel = Localized("Save All") });
 
         context.Shortcuts.Add(new KeyBinding("gaya.turian.save", KeyboardKey.S, KeyModifiers.Ctrl));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.saveAll", KeyboardKey.S,
@@ -55,14 +55,14 @@ static class StudioCommands
         Add(context, MenuIds.File, "2", 0, new CommandDescriptor(
             "gaya.turian.settings", "File: Settings…",
             sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.SettingsPanelId))
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Settings…") });
+        { DynamicLabel = Localized("Settings…") });
 
         context.Shortcuts.Add(new KeyBinding("gaya.turian.settings", KeyboardKey.Comma, KeyModifiers.Ctrl));
 
         Add(context, MenuIds.File, "2", 1, new CommandDescriptor(
             "gaya.turian.keyboardShortcuts", "File: Keyboard Shortcuts…",
             sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Keyboard Shortcuts…") });
+        { DynamicLabel = Localized("Keyboard Shortcuts…") });
 
         // A chord, so the studio ships with one: Ctrl+K arms it and Ctrl+S completes it.
         context.Shortcuts.Add(new KeyBinding("gaya.turian.keyboardShortcuts",
@@ -72,20 +72,20 @@ static class StudioCommands
         Add(context, MenuIds.File, "4", 0, new CommandDescriptor(
             "gaya.turian.exit", "File: Exit",
             Exit)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Exit") });
+        { DynamicLabel = Localized("Exit") });
 
         // ── Project ─────────────────────────────────────────────
         Add(context, MenuIds.Project, "3", 0, new CommandDescriptor(
             "gaya.turian.recompile", "Assets: Recompile Scripts",
             sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),
             HasProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Recompile") });
+        { DynamicLabel = Localized("Recompile") });
 
         Add(context, MenuIds.Project, "3", 1, new CommandDescriptor(
             "gaya.turian.reimportAssets", "Assets: Reimport All",
             Reimport,
             HasProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Reimport Assets") });
+        { DynamicLabel = Localized("Reimport Assets") });
 
         Add(context, MenuIds.Project, "3", 2, new CommandDescriptor(
             "gaya.turian.play", "Run: Play",
@@ -98,7 +98,7 @@ static class StudioCommands
             "gaya.turian.playStartupScene", "Run: Play Startup Scene",
             PlayStartupScene,
             HasProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Play Startup Scene") });
+        { DynamicLabel = Localized("Play Startup Scene") });
 
         context.Shortcuts.Add(new KeyBinding("gaya.turian.play", KeyboardKey.F5));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.playPause", KeyboardKey.F6));
@@ -117,7 +117,7 @@ static class StudioCommands
             "gaya.turian.playStep", "Run: Step Frame",
             sp => sp.GetRequiredService<PlayModeService>().StepFrame(),
             sp => sp.GetRequiredService<PlayModeService>().State == PlayState.Paused)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Step Frame") });
+        { DynamicLabel = Localized("Step Frame") });
 
         Add(context, MenuIds.Project, "3", 6, new CommandDescriptor(
             "gaya.turian.buildAndRun", "Run: Build and Run",
@@ -132,7 +132,7 @@ static class StudioCommands
                 "gaya.turian.export", "Run: Export",
                 Export,
                 HasProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("Export") });
+        { DynamicLabel = Localized("Export") });
 
         AddProjectSettings<PlayerSettings>(context, "player", "Player", 0);
         AddProjectSettings<InputSettings>(context, "input", "Input", 1);
@@ -142,8 +142,11 @@ static class StudioCommands
         Add(context, MenuIds.Help, "1", 0, new CommandDescriptor(
             "gaya.turian.about", "Help: About",
             sp => sp.GetRequiredService<AboutDialogChrome>().Open())
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T("About") });
+        { DynamicLabel = Localized("About") });
     }
+
+    static Func<IServiceProvider, string> Localized(string text) =>
+        services => services.GetRequiredService<StudioLocalization>().T(text);
 
     static void Add(IPluginContext context, string menuId, string group, int order,
         CommandDescriptor command, string path = "")
@@ -160,7 +163,7 @@ static class StudioCommands
             $"gaya.turian.projectSettings.{id}", $"Settings: {label}",
             sp => OpenProjectSettings(sp, typeof(T)),
             HasProject)
-        { DynamicLabel = sp => sp.GetRequiredService<StudioLocalization>().T(label) };
+        { DynamicLabel = Localized(label) };
 
         context.Commands.Register(command);
         context.Menus.Add(new MenuItemDescriptor(MenuIds.Project, command.Id, "2", 2 + order, "Project Settings"));
