@@ -23,10 +23,10 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
         using (gui.Node(-1, ButtonSize, "play/buttons").Direction(Axis.Horizontal).Gap(3f)
                    .Padding(8f, 0f).ContentAlignY(0.5f).Enter())
         {
-            Button(gui, "play", playing ? "■" : "▶", "gaya.turian.play", playing);
-            Button(gui, "startup", "▶", "gaya.turian.playStartupScene", false);
-            Button(gui, "pause", paused ? "▶" : "⏸", "gaya.turian.playPause", paused);
-            Button(gui, "step", "⏭", "gaya.turian.playStep", false);
+            Button(gui, "play", playing ? EditorIcons.Stop : EditorIcons.Play, "gaya.turian.play", playing);
+            Button(gui, "startup", EditorIcons.Backward, "gaya.turian.playStartupScene", false);
+            Button(gui, "pause", paused ? EditorIcons.Play : EditorIcons.Pause, "gaya.turian.playPause", paused);
+            Button(gui, "step", EditorIcons.ForwardStep, "gaya.turian.playStep", false);
         }
     }
 

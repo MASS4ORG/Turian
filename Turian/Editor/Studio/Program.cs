@@ -57,7 +57,10 @@ if (args.Length >= 2 && args[0] == "--script")
     var scriptInput = new ScriptedInputHandler();
     var player = new InputScriptPlayer(scriptInput, message => Log.Logger.LogInformation("{Message}", message),
         Path.GetDirectoryName(Path.GetFullPath(args[1])));
-    var passed = player.Play(script, new Gui { Input = scriptInput }, workbench.Render, WindowFont("Guinevere.font.ttf"));
+    var scriptGui = new Gui { Input = scriptInput };
+    var textFont = WindowFont("Guinevere.font.ttf");
+    scriptGui.ConfigureFonts(textFont, WindowFont("Guinevere.icons.ttf"), WindowFont("Guinevere.widget-icons.ttf"));
+    var passed = player.Play(script, scriptGui, workbench.Render, textFont);
     return passed ? 0 : 1;
 }
 
@@ -86,13 +89,14 @@ static void DumpFrame(Workbench workbench, string path, int width, int height)
     var gui = new Gui { Input = new HeadlessInput() };
     var font = WindowFont("Guinevere.font.ttf");
     var iconFont = WindowFont("Guinevere.icons.ttf");
+    var widgetIconFont = WindowFont("Guinevere.widget-icons.ttf");
 
     using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
     var canvas = surface.Canvas;
     canvas.Clear(SKColors.Black);
 
     gui.SetStage(Pass.Pass1Build);
-    gui.BeginFrame(canvas, font, iconFont);
+    gui.BeginFrame(canvas, font, iconFont, widgetIconFont);
     workbench.Render(gui);
     gui.CalculateLayout();
     gui.SetStage(Pass.Pass2Render);

@@ -387,5 +387,5 @@ static class FieldDrawers
 
     /// <summary>A fold arrow: closed points right, open points down.</summary>
     internal static void DrawArrow(Gui gui, bool isOpen) =>
-        gui.DrawText(isOpen ? "▼" : "▶", Theme.Text(9), InkDim);
+        gui.DrawText(isOpen ? EditorIcons.CaretDown : EditorIcons.CaretRight, Theme.Text(9), InkDim);
 }

@@ -262,7 +262,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
 
-            gui.DrawText("↺", Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
+            gui.DrawText(EditorIcons.RotateLeft, Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

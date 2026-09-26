@@ -54,7 +54,7 @@ sealed class InspectorTabChrome(
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
 
-            gui.DrawText(inspector.Locked ? "🔒" : "🔓", theme.Text(13),
+            gui.DrawText(inspector.Locked ? EditorIcons.Lock : EditorIcons.LockOpen, theme.Text(13),
                 inspector.Locked ? theme.Accent : hot ? theme.Ink : theme.InkDim);
 
             if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())

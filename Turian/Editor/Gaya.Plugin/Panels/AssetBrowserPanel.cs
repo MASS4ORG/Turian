@@ -182,7 +182,7 @@ sealed class AssetBrowserPanel : IPanel
         var size = theme.Scale(theme.RowHeight) - 4f;
 
         if (entry.IsDirectory)
-            return gui => gui.DrawText("📁", theme.Text(13), theme.Folder);
+            return gui => gui.DrawText(EditorIcons.Folder, theme.Text(13), theme.Folder);
 
         var kind = types.Resolve(entry.AbsolutePath);
         var hasTexturePreview = entry.AssetMetadata is { } asset &&
@@ -191,7 +191,7 @@ sealed class AssetBrowserPanel : IPanel
         if (hasTexturePreview && ThumbnailFor(entry.AbsolutePath) is { } thumbnail)
             return gui => gui.Image(thumbnail, size, size);
 
-        var glyph = kind?.DefaultIcon ?? "📄";
+        var glyph = kind?.DefaultIcon ?? EditorIcons.File;
         return gui => gui.DrawText(glyph, theme.Text(13), theme.InkDim);
     }
 

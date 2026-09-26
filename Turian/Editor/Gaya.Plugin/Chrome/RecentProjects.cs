@@ -84,13 +84,13 @@ sealed class ProjectSwitcherChrome(
                                 close = true;
                             }
 
-                            if (gui.IconButton("↗", size: rowHeight))
+                            if (gui.IconButton(EditorIcons.ArrowUpRightFromSquare, size: rowHeight))
                             {
                                 OpenInNewInstance(project);
                                 close = true;
                             }
 
-                            if (gui.IconButton("×", size: rowHeight))
+                            if (gui.IconButton(EditorIcons.Xmark, size: rowHeight))
                             {
                                 if (recent.Remove(project))
                                     editorSettings.NotifyChanged("gaya.turian.recentProjects");
