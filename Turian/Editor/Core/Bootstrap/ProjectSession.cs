@@ -33,6 +33,9 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log)
         services.GetRequiredService<BuildManager>().UpdateSettings(Settings);
         RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings);
 
+        // The importer may have been built before any project was open, so it is pointed at this one explicitly.
+        services.GetRequiredService<AssetImporter>().StartMonitoring();
+
         // String tables live in the asset catalog, so the project localization can only be loaded once
         // the catalog is indexed. Hosts that do not register a LocaleService simply skip this.
         if (services.GetService(typeof(LocaleService)) is LocaleService locale)

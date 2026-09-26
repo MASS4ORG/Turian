@@ -173,6 +173,12 @@ public sealed partial class AssetImporter : IDisposable
 
         lock (syncRoot)
         {
+            if (folderWatcher is not null
+                && string.Equals(assetsRootPath, Path.GetFullPath(assetFolderPath), StringComparison.Ordinal))
+            {
+                return;
+            }
+
             InitializePaths(assetFolderPath);
 
             ScanFolderBatched(assetsRootPath!);
