@@ -102,7 +102,7 @@ static class FieldDrawers
                     && gui.GetInteractable().OnHover();
                 if (labelInteraction is not null && gui.Pass == Pass.Pass2Render)
                     labelInteraction();
-                var color = labelHot || Overridden ? Ink : InkDim;
+                var color = labelHot ? Theme.Accent : Ink;
                 gui.DrawText(label, Theme.Text(12), color, centerInRect: false, effects: Emphasis(Overridden, color));
             }
 
@@ -282,7 +282,7 @@ static class FieldDrawers
                 using (gui.Node(10f, RowHeight, $"{id}/head/arrow").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
                     DrawArrow(gui, isOpen);
 
-                gui.DrawText(collection.Label, Theme.Text(12), Overridden ? Ink : InkDim, centerInRect: false,
+                gui.DrawText(collection.Label, Theme.Text(12), Ink, centerInRect: false,
                     effects: Emphasis(Overridden, Ink));
             }
 
@@ -348,7 +348,7 @@ static class FieldDrawers
             using (gui.Node(10f, RowHeight, $"{id}/head/arrow").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
                 DrawArrow(gui, isOpen);
 
-            gui.DrawText(Summary(field, target), Theme.Text(12), Overridden ? Ink : InkDim, centerInRect: false,
+            gui.DrawText(Summary(field, target), Theme.Text(12), Ink, centerInRect: false,
                 effects: Emphasis(Overridden, Ink));
         }
 

@@ -24,6 +24,7 @@ sealed class AssetBrowserPanel : IPanel
     readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
+    string? inspectedId;
     Guid pendingReveal;
     bool showExtensions;
 
@@ -92,6 +93,13 @@ sealed class AssetBrowserPanel : IPanel
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick);
 
+        // A selection the arrow keys moved is inspected like a clicked one.
+        if (gui.Pass == Pass.Pass2Render && state.SelectedId != inspectedId)
+        {
+            inspectedId = state.SelectedId;
+            if (Selected is { IsDirectory: false } moved) inspector.Select(inspections.Inspect(moved));
+        }
+
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
     }
 
@@ -108,7 +116,9 @@ sealed class AssetBrowserPanel : IPanel
         for (var parent = target.ParentPath; parent is not null; parent = ParentOf(parent))
             state.SetExpanded(parent, true);
 
+        // Revealed for a reference the inspector shows, so the inspector keeps what it is editing.
         state.SelectedId = target.AbsolutePath;
+        inspectedId = target.AbsolutePath;
         state.Reveal();
     }
 
@@ -236,6 +246,7 @@ sealed class AssetBrowserPanel : IPanel
         if (e.Button != MouseButton.Left || entry.IsDirectory) return;
 
         // Folding is the tree's own business; a double click here opens the asset.
+        inspectedId = entry.AbsolutePath;
         if (e.ClickCount >= 2) opener.Open(entry);
         else inspector.Select(inspections.Inspect(entry));
     }

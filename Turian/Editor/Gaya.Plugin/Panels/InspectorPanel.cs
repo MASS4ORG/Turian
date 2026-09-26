@@ -242,6 +242,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         using (gui.Node(-1, Theme.Scale(24f), "inspector/header").ExpandWidth().Direction(Axis.Horizontal)
                    .Padding(6, 2).Gap(6f).Enter())
         {
+            // The name box and the active toggle cannot turn bold, so their overrides mark the header's margin.
+            if (gui.Pass == Pass.Pass2Render
+                && (overrides.IsOverridden(section.Target, nameof(Node.Name))
+                    || overrides.IsOverridden(section.Target, nameof(Node.IsActive))))
+            {
+                var rect = gui.CurrentNode.Rect;
+                gui.DrawRect(new Rect(rect.X, rect.Y + 2f, 2f, rect.H - 4f), Theme.Accent);
+            }
+
             if (active is not null) Toggle(gui, active, "inspector/header/active");
 
             if (name is not null)
