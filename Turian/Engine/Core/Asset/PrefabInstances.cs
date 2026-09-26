@@ -64,6 +64,25 @@ public static class PrefabInstances
         return root.ToJsonString(writeOptions);
     }
 
+    /// <summary>Finds what every expanded prefab instance in a serialized node hierarchy changes about its prefab.</summary>
+    /// <param name="json">A serialized node hierarchy, as <see cref="Serializer.Serialize{T}"/> writes it.</param>
+    /// <param name="loadPrefab">Returns a prefab's serialized hierarchy by asset id, or null when it is missing.</param>
+    /// <param name="normalize">Rewrites a serialized node hierarchy the way <see cref="Serializer"/> would.</param>
+    /// <returns>The overridden members, added objects and missing-prefab instances, by their ids in the hierarchy.</returns>
+    public static PrefabInstanceDiff Diff(string json, Func<Guid, string?> loadPrefab,
+        Func<string, string>? normalize = null)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        ArgumentNullException.ThrowIfNull(loadPrefab);
+
+        var diff = new PrefabInstanceDiff();
+        if (!json.Contains(instanceMember, StringComparison.Ordinal)) return diff;
+        if (JsonNode.Parse(json) is not JsonObject root) return diff;
+
+        DiffTree(root, loadPrefab, normalize ?? NormalizeNode, diff);
+        return diff;
+    }
+
     /// <summary>Reads a prefab's serialized hierarchy from an asset database.</summary>
     /// <param name="database">The database holding the prefab.</param>
     /// <param name="assetId">The prefab asset id.</param>
@@ -288,21 +307,70 @@ public static class PrefabInstances
         ReplaceContent(actual, compact);
     }
 
+    static void DiffTree(JsonObject node, Func<Guid, string?> loadPrefab, Func<string, string> normalize,
+        PrefabInstanceDiff diff)
+    {
+        if (node[instanceMember] is JsonObject && ReadId(node) is { } instanceId)
+        {
+            if (node.ContainsKey(childrenMember)) DiffInstance(node, instanceId, loadPrefab, normalize, diff);
+            else diff.MissingPrefabs.Add(instanceId);
+            return;
+        }
+
+        foreach (var child in Items(node, childrenMember))
+            DiffTree(child, loadPrefab, normalize, diff);
+    }
+
+    static void DiffInstance(JsonObject actual, Guid instanceId, Func<Guid, string?> loadPrefab,
+        Func<string, string> normalize, PrefabInstanceDiff diff)
+    {
+        var link = (JsonObject)actual[instanceMember]!;
+        if (Instantiate(ReadSourceId(link), instanceId, loadPrefab, [], []) is not { } instantiated
+            || JsonNode.Parse(normalize(instantiated.ToJsonString())) is not JsonObject expected)
+        {
+            diff.MissingPrefabs.Add(instanceId);
+            return;
+        }
+
+        var expectedIndex = Index(expected);
+        var actualIndex = Index(actual);
+        var detached = Detached(actualIndex, expectedIndex, instanceId);
+
+        foreach (var (id, entry) in actualIndex)
+        {
+            if (detached.Contains(id))
+            {
+                diff.Added.Add(id);
+                continue;
+            }
+
+            foreach (var member in ChangedMembers(entry.Object, expectedIndex[id].Object, isRoot: id == instanceId))
+                diff.Overrides.Add((id, member));
+
+            // Additions belong to the instance, so an instance inside one is compared with its own prefab.
+            foreach (var child in Items(entry.Object, childrenMember).Where(child => IsIn(child, detached)))
+                DiffTree(child, loadPrefab, normalize, diff);
+        }
+    }
+
     static void AddOverrides(JsonArray overrides, string target, JsonObject actual, JsonObject expected, bool isRoot)
     {
-        foreach (var (member, value) in actual)
+        foreach (var member in ChangedMembers(actual, expected, isRoot))
         {
-            if (structuralMembers.Contains(member) || (isRoot && rootMembers.Contains(member))) continue;
-            if (expected.ContainsKey(member) && JsonNode.DeepEquals(value, expected[member])) continue;
-
             overrides.Add(new JsonObject
             {
                 [nameof(PrefabOverride.Target)] = target,
                 [nameof(PrefabOverride.Member)] = member,
-                [nameof(PrefabOverride.Value)] = value?.DeepClone(),
+                [nameof(PrefabOverride.Value)] = actual[member]?.DeepClone(),
             });
         }
     }
+
+    static IEnumerable<string> ChangedMembers(JsonObject actual, JsonObject expected, bool isRoot) =>
+        actual
+            .Where(pair => !structuralMembers.Contains(pair.Key) && !(isRoot && rootMembers.Contains(pair.Key)))
+            .Where(pair => !expected.ContainsKey(pair.Key) || !JsonNode.DeepEquals(pair.Value, expected[pair.Key]))
+            .Select(pair => pair.Key);
 
     static string NormalizeNode(string json) =>
         Serializer.LoadData<Node>(json) is { } node ? Serializer.Serialize(node) : json;

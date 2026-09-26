@@ -1,11 +1,12 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The scene viewport: a transform-gizmo toolbar over the rendered scene. Falls back to naming the
-/// active document when the open asset is not a scene.
+/// The scene viewport: a transform-gizmo toolbar over the rendered scene, under a breadcrumb back to the scene
+/// while a prefab is open in prefab mode. Falls back to naming the active document when the open asset is not a
+/// scene.
 /// </summary>
 sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
-    NodeInspectorController inspector, AssetWorkspace workspace)
+    NodeInspectorController inspector, AssetWorkspace workspace, PrefabStage prefabStage)
     : IPanel, IDisposable
 {
     static StudioTheme Theme => StudioTheme.Current;
@@ -26,6 +27,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
+            if (prefabStage.Trail.Count > 0) Breadcrumb(gui);
             Toolbar(gui);
 
             using (gui.Node().Expand().Enter())
@@ -58,6 +60,30 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         gui.DrawText(document.Asset.RelativePath, Theme.Text(11), Theme.InkDim, centerInRect: false);
         gui.DrawText(document.Asset is Prefab ? "Loading the scene…" : "Asset editor (S4)", Theme.Text(11), Theme.InkDim,
             centerInRect: false);
+    }
+
+    /// <summary>The documents prefab mode came from, each a way back, then the prefab being edited.</summary>
+    void Breadcrumb(Gui gui)
+    {
+        var trail = prefabStage.Trail;
+        var returnTo = -1;
+
+        using (gui.Node(-1, ToolbarHeight, "scene/breadcrumb").ExpandWidth().Direction(Axis.Horizontal)
+                   .Padding(6f, 3f).Gap(4f).ContentAlignY(0.5f).Enter())
+        {
+            gui.DrawBackgroundRect(Theme.Panel);
+
+            for (var i = 0; i < trail.Count; i++)
+            {
+                if (Button(gui, trail[i].Title, $"scene/breadcrumb/{i}", selected: false)) returnTo = i;
+                gui.DrawText(EditorIcons.CaretRight, Theme.Text(10), Theme.InkFaint);
+            }
+
+            gui.DrawText(EditorIcons.Cube, Theme.Text(11), Theme.Accent);
+            gui.DrawText(workspace.Active?.Title ?? string.Empty, Theme.Text(11), Theme.Ink, centerInRect: false);
+        }
+
+        if (returnTo >= 0) prefabStage.Return(returnTo);
     }
 
     void Toolbar(Gui gui)

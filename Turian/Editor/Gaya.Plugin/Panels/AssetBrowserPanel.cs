@@ -20,6 +20,7 @@ sealed class AssetBrowserPanel : IPanel
     readonly AssetBrowserSettings browserSettings;
     readonly AssetTypeCatalog types;
     readonly AssetPreviewCatalog previews;
+    readonly PrefabAuthoring prefabs;
     readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
@@ -43,10 +44,11 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="editorSettings">Reports preference edits, so the tree rebuilds when the extensions toggle flips.</param>
     /// <param name="types">Resolves a file's kind, for its default icon when it has no live preview.</param>
     /// <param name="previews">Answers whether a row's asset has a live preview, and of which kind.</param>
+    /// <param name="prefabs">Creates prefab variants.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
-        AssetTypeCatalog types, AssetPreviewCatalog previews)
+        AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs)
     {
         ArgumentNullException.ThrowIfNull(reveal);
 
@@ -59,6 +61,7 @@ sealed class AssetBrowserPanel : IPanel
         this.browserSettings = browserSettings;
         this.types = types;
         this.previews = previews;
+        this.prefabs = prefabs;
         showExtensions = browserSettings.ShowFileExtensions;
 
         reveal.Requested += assetId => pendingReveal = assetId;
@@ -257,6 +260,17 @@ sealed class AssetBrowserPanel : IPanel
         menu.Item("Paste", () => Paste(entry), enabled: fileSystem.CanPaste());
         menu.Separator();
         menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
+
+        if (entry is { IsDirectory: false } prefab
+            && string.Equals(Path.GetExtension(prefab.AbsolutePath), ".prefab", StringComparison.OrdinalIgnoreCase))
+            menu.Item("Create Prefab Variant", () => CreateVariant(prefab));
+    }
+
+    void CreateVariant(AssetEntry prefab)
+    {
+        if (prefabs.CreateVariant(prefab.AbsolutePath) is null)
+            Log.Logger.LogWarning("Could not create a variant of {Prefab}", prefab.AbsolutePath);
+        Refresh();
     }
 
     /// <summary>

@@ -44,6 +44,10 @@ public static class EditorIcons
     public const string Image = "\uf03e";
     /// <summary>3D model or prefab.</summary>
     public const string Cube = "\uf1b2";
+    /// <summary>Prefab variant.</summary>
+    public const string Clone = "\uf24d";
+    /// <summary>Broken link, such as an instance of a missing prefab.</summary>
+    public const string LinkSlash = "\uf127";
     /// <summary>Source code.</summary>
     public const string FileCode = "\uf1c9";
     /// <summary>Text file.</summary>

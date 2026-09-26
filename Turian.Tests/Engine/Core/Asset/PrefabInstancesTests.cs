@@ -212,4 +212,109 @@ public class PrefabInstancesTests
 
         Assert.Equal("Bulb", reloaded.Children[1].Children[0].Name);
     }
+
+    PrefabInstanceDiff Diff(Node scene) => PrefabInstances.Diff(Serializer.Serialize(scene), Load);
+
+    /// <summary>An instance left as the prefab made it changes nothing.</summary>
+    [Fact]
+    public void Diff_UnmodifiedInstanceIsEmpty()
+    {
+        var diff = Diff(Scene(Instantiate(AddPrefab(Lamp()))));
+
+        Assert.Empty(diff.Overrides);
+        Assert.Empty(diff.Added);
+        Assert.Empty(diff.MissingPrefabs);
+    }
+
+    /// <summary>A changed member is reported against the object's id in the scene, not in the prefab.</summary>
+    [Fact]
+    public void Diff_ReportsOverriddenMember()
+    {
+        var instance = Instantiate(AddPrefab(Lamp()));
+        var light = instance.Children[0].GetComponent<LightComponent>()!;
+        light.Intensity = 3f;
+
+        var diff = Diff(Scene(instance));
+
+        Assert.Equal([(light.Id, nameof(LightComponent.Intensity))], diff.Overrides);
+        Assert.True(diff.HasOverrides(light.Id));
+        Assert.False(diff.HasOverrides(instance.Children[0].Id));
+    }
+
+    /// <summary>The root's name and placement belong to the instance, so they are not overrides.</summary>
+    [Fact]
+    public void Diff_IgnoresRootPlacement()
+    {
+        var instance = Instantiate(AddPrefab(Lamp()));
+        instance.Name = "Desk Lamp";
+        instance.Transform.Position = new Vector3(1f, 2f, 3f);
+
+        Assert.Empty(Diff(Scene(instance)).Overrides);
+    }
+
+    /// <summary>Children and components the instance adds are reported as added, and everything under them.</summary>
+    [Fact]
+    public void Diff_ReportsAddedObjects()
+    {
+        var instance = Instantiate(AddPrefab(Lamp()));
+        var shade = new Node { Name = "Shade", Children = { new Node { Name = "Tassel" } } };
+        instance.Children[0].Children.Add(shade);
+        var audio = new MeshComponent();
+        instance.Components.Add(audio);
+
+        var diff = Diff(Scene(instance));
+
+        Assert.Contains(shade.Id, diff.Added);
+        Assert.Contains(shade.Children[0].Id, diff.Added);
+        Assert.Contains(audio.Id, diff.Added);
+        Assert.DoesNotContain(instance.Children[0].Id, diff.Added);
+    }
+
+    /// <summary>A change inside a nested prefab is an override of the outer instance.</summary>
+    [Fact]
+    public void Diff_ReportsOverrideInsideNestedPrefab()
+    {
+        var lampId = AddPrefab(Lamp());
+        var room = new Node { Name = "Room" };
+        room.Children.Add(Instantiate(lampId));
+        var roomId = Guid.NewGuid();
+        prefabs[roomId] = Save(room);
+
+        var instance = Instantiate(roomId);
+        var light = instance.Children[0].Children[0].GetComponent<LightComponent>()!;
+        light.Intensity = 9f;
+
+        Assert.Contains((light.Id, nameof(LightComponent.Intensity)), Diff(Scene(instance)).Overrides);
+    }
+
+    /// <summary>An instance added inside another instance is compared with its own prefab.</summary>
+    [Fact]
+    public void Diff_ComparesAddedInstanceWithItsOwnPrefab()
+    {
+        var lampId = AddPrefab(Lamp());
+        var outer = Instantiate(lampId);
+        var inner = Instantiate(lampId);
+        outer.Children.Add(inner);
+        var light = inner.Children[0].GetComponent<LightComponent>()!;
+        light.Intensity = 5f;
+
+        var diff = Diff(Scene(outer));
+
+        Assert.Contains(inner.Id, diff.Added);
+        Assert.Contains((light.Id, nameof(LightComponent.Intensity)), diff.Overrides);
+    }
+
+    /// <summary>An instance whose prefab is gone is reported, not compared.</summary>
+    [Fact]
+    public void Diff_ReportsMissingPrefab()
+    {
+        var prefabId = AddPrefab(Lamp());
+        var instance = Instantiate(prefabId);
+        prefabs.Remove(prefabId);
+
+        var diff = Diff(Scene(instance));
+
+        Assert.Equal([instance.Id], diff.MissingPrefabs);
+        Assert.Empty(diff.Overrides);
+    }
 }

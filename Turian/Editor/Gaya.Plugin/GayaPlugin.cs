@@ -50,7 +50,10 @@ public sealed class GayaPlugin : IPlugin
             sp => new SceneTreePanel(
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetManager>())));
+                sp.GetRequiredService<AssetManager>(),
+                sp.GetRequiredService<PrefabAuthoring>(),
+                sp.GetRequiredService<PrefabStage>(),
+                sp.GetRequiredService<SettingsService>())));
 
         var inspectorInstances = new InspectorInstances(context.Panels, context.TabStripChrome);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -76,7 +79,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<ILogger>()),
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetWorkspace>())));
+                sp.GetRequiredService<AssetWorkspace>(),
+                sp.GetRequiredService<PrefabStage>())));
 
         context.Panels.Register(new PanelDescriptor(
             "gaya.turian.game", "Game", PanelPlacement.Center,
@@ -135,7 +139,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetBrowserSettings>(),
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<AssetTypeCatalog>(),
-                sp.GetRequiredService<AssetPreviewCatalog>())));
+                sp.GetRequiredService<AssetPreviewCatalog>(),
+                sp.GetRequiredService<PrefabAuthoring>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,

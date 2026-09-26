@@ -37,3 +37,21 @@ public sealed record PrefabOverride(Guid Target, string Member, JsonNode? Value)
 /// <param name="Child">The added child node's JSON, or null for a component.</param>
 /// <param name="Component">The added component's JSON, or null for a child.</param>
 public sealed record PrefabAddition(Guid Parent, JsonObject? Child = null, JsonObject? Component = null);
+
+/// <summary>What the prefab instances in a hierarchy change about their prefabs, by object id in the hierarchy.</summary>
+public sealed class PrefabInstanceDiff
+{
+    /// <summary>Members of prefab objects whose value differs from the prefab.</summary>
+    public HashSet<(Guid Object, string Member)> Overrides { get; } = [];
+
+    /// <summary>Nodes and components an instance has that its prefab does not.</summary>
+    public HashSet<Guid> Added { get; } = [];
+
+    /// <summary>Instance roots whose prefab could not be loaded.</summary>
+    public HashSet<Guid> MissingPrefabs { get; } = [];
+
+    /// <summary>Whether any member of the object differs from the prefab.</summary>
+    /// <param name="objectId">A node or component id.</param>
+    /// <returns>True when at least one of its members is overridden.</returns>
+    public bool HasOverrides(Guid objectId) => Overrides.Any(entry => entry.Object == objectId);
+}

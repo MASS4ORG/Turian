@@ -181,15 +181,47 @@ public sealed class SceneTreeController(
         {
             var path = Path.Combine(settingsService.Settings.ProjectAbsoluteDir, prefab.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var previous = File.Exists(path) ? File.ReadAllText(path) : null;
             File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
                 id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)));
             assetImporter.ReimportNow(path, overwriteExisting: true);
+            RefreshInstances(prefab.Id, previous);
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to save scene {RelativePath}", prefab.RelativePath);
             asset.MarkModified();
         }
+    }
+
+    /// <summary>Updates the instances of a just-saved prefab in the other open scenes, keeping their overrides.</summary>
+    void RefreshInstances(Guid prefabId, string? previousJson)
+    {
+        var refreshed = false;
+        foreach (var (assetId, root) in loadedSceneRoots.ToList())
+        {
+            if (assetId == prefabId) continue;
+
+            try
+            {
+                if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
+                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)) is not { } rebuilt)
+                    continue;
+
+                loadedSceneRoots[assetId] = rebuilt;
+                if (ReferenceEquals(sceneRoot, root)) sceneRoot = rebuilt;
+                refreshed = true;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.LogError(ex, "Could not update the prefab instances in scene {AssetId}", assetId);
+            }
+        }
+
+        if (!refreshed) return;
+
+        SceneLoaded?.Invoke(CurrentSceneRoot);
+        SelectionRestoreRequested?.Invoke(RememberedSelection());
     }
 
     // ── Selection ────────────────────────────────────────────────────────────
