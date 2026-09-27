@@ -57,6 +57,59 @@ public sealed class ObjectState
             : new ObjectState(values, null, null);
     }
 
+    /// <summary>
+    /// The same state for the object that replaced this one's target when its scene was rebuilt: members are looked
+    /// up again on the new type, and every object the state refers to is swapped for its replacement.
+    /// </summary>
+    /// <param name="targetType">The replacement's type, which may come from a reloaded assembly.</param>
+    /// <param name="map">Returns the replacement of an object from before the rebuild.</param>
+    /// <returns>The remapped state.</returns>
+    public ObjectState Remap(Type targetType, Func<IdClass, IdClass> map)
+    {
+        ArgumentNullException.ThrowIfNull(targetType);
+        ArgumentNullException.ThrowIfNull(map);
+
+        var byName = values.ToDictionary(value => value.Member.Name, StringComparer.Ordinal);
+        var remapped = new List<(MemberInfo, Type, string, object?)>();
+        foreach (var member in MembersOf(targetType))
+        {
+            if (!byName.TryGetValue(member.Name, out var old)) continue;
+
+            var type = TypeOf(member);
+            if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true))
+            {
+                remapped.Add((member, type, old.Json, null));
+                continue;
+            }
+
+            var value = MapReferences(old.Reference, type, map);
+            remapped.Add((member, type, ReferenceKey(value), value));
+        }
+
+        return new ObjectState([.. remapped],
+            children?.Select(child => (Node)map(child)).ToArray(),
+            components?.Select(component => (Component)map(component)).ToArray());
+    }
+
+    static object? MapReferences(object? value, Type type, Func<IdClass, IdClass> map)
+    {
+        switch (value)
+        {
+            case IdClass obj:
+                return map(obj);
+            case IEnumerable items when type.IsArray:
+                var mapped = items.Cast<object?>().Select(item => item is IdClass obj ? map(obj) : item).ToArray();
+                var array = Array.CreateInstance(type.GetElementType()!, mapped.Length);
+                for (var i = 0; i < mapped.Length; i++) array.SetValue(mapped[i], i);
+                return array;
+            case IEnumerable items when Activator.CreateInstance(type) is IList list:
+                foreach (var item in items) list.Add(item is IdClass obj ? map(obj) : item);
+                return list;
+            default:
+                return value;
+        }
+    }
+
     /// <summary>Whether both snapshots hold the same values and structure.</summary>
     /// <param name="other">A snapshot of the same object.</param>
     /// <returns>True when nothing differs.</returns>

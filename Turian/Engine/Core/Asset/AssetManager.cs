@@ -351,6 +351,11 @@ public class AssetManager
         return added;
     }
 
+    /// <summary>The open asset with the given id, or null when none is open.</summary>
+    /// <param name="assetId">The asset id.</param>
+    /// <returns>The tracked asset.</returns>
+    public Asset? GetTrackedAsset(Guid assetId) => assetsById.GetValueOrDefault(assetId);
+
     Asset? GetTrackedAsset(Asset asset)
     {
         ArgumentNullException.ThrowIfNull(asset);

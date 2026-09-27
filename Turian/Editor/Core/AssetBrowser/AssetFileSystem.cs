@@ -119,12 +119,22 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
                 ? Path.GetFileName(absolutePath)
                 : Path.GetFileNameWithoutExtension(absolutePath);
 
-            if (string.Equals(currentDisplay, name, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(absolutePath, dest, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(currentDisplay, name, StringComparison.Ordinal)
+                || string.Equals(absolutePath, dest, StringComparison.Ordinal))
                 return dest;
 
-            if (isDirectory) Directory.Move(absolutePath, dest);
-            else RenameAssetPreservingMetadata(absolutePath, dest);
+            // A change of letter case only: where the file system ignores case the target already "exists" as the
+            // source itself, so the move goes through a temporary name.
+            if (string.Equals(absolutePath, dest, StringComparison.OrdinalIgnoreCase) && PathExists(dest))
+            {
+                var temporary = Path.Combine(parent, $".rename-{Guid.NewGuid():N}{Path.GetExtension(dest)}");
+                MoveEntry(absolutePath, temporary, isDirectory);
+                MoveEntry(temporary, dest, isDirectory);
+            }
+            else
+            {
+                MoveEntry(absolutePath, dest, isDirectory);
+            }
 
             return dest;
         }
@@ -310,6 +320,12 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
 
     static void RenameAssetPreservingMetadata(string src, string dest)
         => MoveAssetPreservingMetadata(src, dest);
+
+    static void MoveEntry(string src, string dest, bool isDirectory)
+    {
+        if (isDirectory) Directory.Move(src, dest);
+        else RenameAssetPreservingMetadata(src, dest);
+    }
 
     void DuplicateAssetWithNewMetadata(string src, string dest)
     {

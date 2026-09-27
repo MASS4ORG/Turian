@@ -32,19 +32,17 @@ public partial class Node
     public static IEnumerable<T> GetComponentsInChildren<T>(Node? node)
         where T : Component
     {
-        if (node is null)
+        // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
+        if (node is null || !node.IsActive)
         {
             yield break;
         }
 
-        if (node.IsActive)
+        foreach (var component in node.GetComponents<T>())
         {
-            foreach (var component in node.GetComponents<T>())
+            if (component.IsActive)
             {
-                if (component.IsActive)
-                {
-                    yield return component;
-                }
+                yield return component;
             }
         }
 
@@ -72,19 +70,16 @@ public partial class Node
             throw new ArgumentException("Type must derive from Component.", nameof(componentType));
         }
 
-        if (node is null)
+        if (node is null || !node.IsActive)
         {
             yield break;
         }
 
-        if (node.IsActive)
+        foreach (var component in node.GetComponents(componentType))
         {
-            foreach (var component in node.GetComponents(componentType))
+            if (component.IsActive)
             {
-                if (component.IsActive)
-                {
-                    yield return component;
-                }
+                yield return component;
             }
         }
 

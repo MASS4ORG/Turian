@@ -214,25 +214,12 @@ static class StudioCommands
     }
 
     /// <summary>Exits, first asking whether to save documents with unsaved edits.</summary>
-    static void Exit(IServiceProvider services)
-    {
-        var shell = services.GetRequiredService<IShellHost>();
-        var workspace = services.GetRequiredService<AssetWorkspace>();
-        if (!workspace.HasUnsavedChanges)
-        {
-            shell.RequestExit();
-            return;
-        }
+    static void Exit(IServiceProvider services) =>
+        services.GetRequiredService<UnsavedChangesGuard>().Leave(
+            "Some documents have unsaved changes. Save them before exiting?",
+            services.GetRequiredService<IShellHost>().RequestExit);
 
-        var question = services.GetRequiredService<StudioLocalization>()
-            .T("Some documents have unsaved changes. Save them before exiting?");
-        services.GetRequiredService<UnsavedChangesDialogChrome>().Ask(question, choice =>
-        {
-            if (choice == UnsavedChanges.Save) workspace.SaveAll();
-            else workspace.CloseAll();
-            shell.RequestExit();
-        });
-    }
+    const string leaveProjectQuestion = "Some documents have unsaved changes. Save them before leaving the project?";
 
     static bool HasProject(IServiceProvider services) =>
         services.GetRequiredService<SettingsService>().Settings is not null;
@@ -258,7 +245,9 @@ static class StudioCommands
                 : null,
             OnComplete = path =>
             {
-                if (path is not null) session.Create(path);
+                if (path is not null)
+                    services.GetRequiredService<UnsavedChangesGuard>().Leave(leaveProjectQuestion,
+                        () => session.Create(path));
             },
         });
     }
@@ -283,7 +272,9 @@ static class StudioCommands
 
             OnComplete = path =>
             {
-                if (path is not null) session.Open(path);
+                if (path is not null)
+                    services.GetRequiredService<UnsavedChangesGuard>().Leave(leaveProjectQuestion,
+                        () => session.Open(path));
             },
         });
     }

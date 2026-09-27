@@ -70,8 +70,11 @@ public sealed class SceneTreeController(
     /// <summary>Raised when the scene structure changed and the UI tree should be rebuilt.</summary>
     public event Action<Node?>? SceneLoaded;
 
-    /// <summary>Raised when an open scene's objects are replaced by rebuilt ones, with the scene's asset id.</summary>
-    public event Action<Guid>? SceneRebuilt;
+    /// <summary>
+    /// Raised when an open scene's objects are replaced by rebuilt ones with the same ids: the scene's asset id, the
+    /// old root and the new one.
+    /// </summary>
+    public event Action<Guid, Node, Node>? SceneRebuilt;
 
     /// <summary>Raised when the previously selected node should be restored.</summary>
     public event Action<Guid?>? SelectionRestoreRequested;
@@ -139,7 +142,7 @@ public sealed class SceneTreeController(
                 }
 
                 loadedSceneRoots[assetId] = newRoot;
-                SceneRebuilt?.Invoke(assetId);
+                SceneRebuilt?.Invoke(assetId, oldRoot, newRoot);
 
                 if (CurrentAsset?.Id == assetId)
                     sceneRoot = newRoot;
@@ -215,7 +218,7 @@ public sealed class SceneTreeController(
                     continue;
 
                 loadedSceneRoots[assetId] = rebuilt;
-                SceneRebuilt?.Invoke(assetId);
+                SceneRebuilt?.Invoke(assetId, root, rebuilt);
                 if (ReferenceEquals(sceneRoot, root)) sceneRoot = rebuilt;
                 refreshed = true;
             }

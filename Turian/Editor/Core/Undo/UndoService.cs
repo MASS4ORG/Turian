@@ -1,14 +1,16 @@
+using System.Text.Json.Nodes;
+
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Undo and redo for the open scenes, one history per document, the way Unity's <c>Undo</c> works: the selected node
-/// and its components are watched, and any other object is recorded with <see cref="RecordObject"/> before it is
-/// changed. <see cref="Flush"/> turns what changed since the last call into one step.
+/// Undo and redo for the whole project, as in Unity: one history whose steps each belong to a document — an open
+/// scene, or an asset whose content the inspector edits. The selected node and its components are watched, any other
+/// object is recorded with <see cref="RecordObject"/> before it changes, and <see cref="Flush"/> turns what changed
+/// since the last call into one step.
 /// </summary>
 /// <remarks>
-/// While the inspector shows an asset's own content, such as a data asset, that asset has the active history instead.
-/// Steps hold the objects themselves, so a document's history is cleared when its scene is rebuilt from its saved
-/// form. Nothing is recorded while Play Mode shows the running scene.
+/// Undoing a step of another scene brings that scene to the front first. When a scene is rebuilt from its saved form,
+/// its steps move to the rebuilt objects. Nothing is recorded while Play Mode shows the running scene.
 /// </remarks>
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class UndoService : IDisposable
@@ -16,7 +18,8 @@ public sealed class UndoService : IDisposable
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
     readonly AssetManager assets;
-    readonly Dictionary<Guid, UndoHistory> histories = [];
+    readonly UndoHistory history = new();
+    readonly Dictionary<Guid, AssetInspection> inspectedAssets = [];
     readonly Dictionary<IdClass, ObjectState> watched = new(ReferenceEqualityComparer.Instance);
     readonly HashSet<IdClass> recorded = new(ReferenceEqualityComparer.Instance);
     string? recordedLabel;
@@ -26,7 +29,7 @@ public sealed class UndoService : IDisposable
     /// <summary>Follows the selection, the edits and the documents.</summary>
     /// <param name="sceneTree">The open scenes.</param>
     /// <param name="inspector">The selection to watch.</param>
-    /// <param name="assets">Reports edits and closed documents.</param>
+    /// <param name="assets">Reports edits and closed documents, and brings a document to the front.</param>
     public UndoService(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets)
     {
         this.sceneTree = sceneTree;
@@ -35,7 +38,7 @@ public sealed class UndoService : IDisposable
 
         inspector.SelectionChanged += OnSelectionChanged;
         sceneTree.SceneLoaded += OnSceneLoaded;
-        sceneTree.SceneRebuilt += Forget;
+        sceneTree.SceneRebuilt += OnSceneRebuilt;
         assets.AssetAltered += OnAssetAltered;
         assets.AssetClosed += OnAssetClosed;
     }
@@ -43,30 +46,30 @@ public sealed class UndoService : IDisposable
     /// <summary>Raised after a step is recorded, undone or redone.</summary>
     public event Action? Changed;
 
-    /// <summary>
-    /// The active history: the inspected asset's, else the open scene's. Null when there is neither or Play Mode is
-    /// showing.
-    /// </summary>
-    public UndoHistory? History =>
-        sceneTree.IsShowingRuntimeScene ? null
-        : InspectedContent is { } inspected ? HistoryFor(inspected.Metadata.Id)
-        : sceneTree.CurrentAsset is { } asset ? HistoryFor(asset.Id)
-        : null;
+    /// <summary>Raised after an undo or redo changed an asset's content, so it can be saved.</summary>
+    public event Action<AssetInspection>? AssetRestored;
+
+    /// <summary>The project's history.</summary>
+    public UndoHistory History => history;
+
+    /// <summary>Whether there is a step to undo; never while Play Mode shows the running scene.</summary>
+    public bool CanUndo => !sceneTree.IsShowingRuntimeScene && history.CanUndo;
+
+    /// <summary>Whether there is a step to redo; never while Play Mode shows the running scene.</summary>
+    public bool CanRedo => !sceneTree.IsShowingRuntimeScene && history.CanRedo;
+
+    /// <summary>The label of the step Undo would revert, or null.</summary>
+    public string? UndoLabel => CanUndo ? history.UndoSteps[^1].Label : null;
+
+    /// <summary>The label of the step Redo would reapply, or null.</summary>
+    public string? RedoLabel => CanRedo ? history.RedoSteps[^1].Label : null;
 
     AssetInspection? InspectedContent =>
         inspector.SelectedObject is AssetInspection { IsPayload: true, Target: IdClass } inspection ? inspection : null;
 
-    /// <summary>Whether the active document has a step to undo.</summary>
-    public bool CanUndo => History?.CanUndo == true;
-
-    /// <summary>Whether the active document has a step to redo.</summary>
-    public bool CanRedo => History?.CanRedo == true;
-
-    /// <summary>The label of the step Undo would revert, or null.</summary>
-    public string? UndoLabel => History is { CanUndo: true } history ? history.UndoSteps[^1].Label : null;
-
-    /// <summary>The label of the step Redo would reapply, or null.</summary>
-    public string? RedoLabel => History is { CanRedo: true } history ? history.RedoSteps[^1].Label : null;
+    // The document an edit made now belongs to: the inspected asset's content, else the open scene.
+    Guid? CurrentDocument =>
+        sceneTree.IsShowingRuntimeScene ? null : InspectedContent?.Metadata.Id ?? sceneTree.CurrentAsset?.Id;
 
     /// <summary>
     /// Remembers <paramref name="target"/>'s state before a change, so the next <see cref="Flush"/> records the
@@ -83,6 +86,37 @@ public sealed class UndoService : IDisposable
         // Recorded again within the same step, it keeps the state from before the step's first change.
         if (recorded.Add(target)) watched[target] = ObjectState.Capture(target);
         recordedLabel = label;
+    }
+
+    /// <summary>
+    /// Performs a change that reaches beyond scene objects, such as rewriting a prefab file, as one undoable step.
+    /// The <paramref name="keep"/> objects get back the values they have now whenever the step is undone or redone.
+    /// </summary>
+    /// <param name="label">What the change is.</param>
+    /// <param name="keep">Objects whose current values survive the change and its undoing.</param>
+    /// <param name="perform">Makes the change; it also runs again for redo.</param>
+    /// <param name="revert">Undoes the change.</param>
+    public void Perform(string label, IEnumerable<IdClass> keep, Action perform, Action revert)
+    {
+        ArgumentNullException.ThrowIfNull(keep);
+        ArgumentNullException.ThrowIfNull(perform);
+        ArgumentNullException.ThrowIfNull(revert);
+
+        Flush();
+        if (CurrentDocument is not { } document)
+        {
+            perform();
+            return;
+        }
+
+        var states = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
+        foreach (var target in keep) states[target] = ObjectState.Capture(target);
+
+        // Pushed before it runs, so a rebuild the change causes moves the step to the rebuilt objects too.
+        history.Push(new UndoStep(label, document, states, states) { UndoEffect = revert, RedoEffect = perform },
+            mergeable: false);
+        Run(perform);
+        Changed?.Invoke();
     }
 
     /// <summary>Notes an edit that did not go through the open scene, such as one to an inspected asset.</summary>
@@ -102,7 +136,7 @@ public sealed class UndoService : IDisposable
         recordedLabel = null;
         recorded.Clear();
 
-        if (History is not { } history || restoring)
+        if (CurrentDocument is not { } document || restoring)
         {
             WatchSelection();
             return;
@@ -122,22 +156,29 @@ public sealed class UndoService : IDisposable
         WatchSelection();
         if (before.Count == 0) return;
 
-        history.Push(new UndoStep(label ?? EditLabel(before.Keys), before, after), mergeable: !explicitStep);
+        if (InspectedContent is { } inspection) inspectedAssets[document] = inspection;
+        history.Push(new UndoStep(label ?? EditLabel(before.Keys), document, before, after), mergeable: !explicitStep);
         Changed?.Invoke();
     }
 
-    /// <summary>Reverts the active document's latest step.</summary>
+    /// <summary>Reverts the latest step, bringing its document to the front first.</summary>
     public void Undo()
     {
         Flush();
-        Apply(History?.Undo());
+        if (!CanUndo) return;
+
+        Show(history.UndoSteps[^1].Document);
+        Finish(Run(history.Undo));
     }
 
-    /// <summary>Reapplies the active document's latest undone step.</summary>
+    /// <summary>Reapplies the latest undone step, bringing its document to the front first.</summary>
     public void Redo()
     {
         Flush();
-        Apply(History?.Redo());
+        if (!CanRedo) return;
+
+        Show(history.RedoSteps[^1].Document);
+        Finish(Run(history.Redo));
     }
 
     /// <inheritdoc />
@@ -145,40 +186,72 @@ public sealed class UndoService : IDisposable
     {
         inspector.SelectionChanged -= OnSelectionChanged;
         sceneTree.SceneLoaded -= OnSceneLoaded;
-        sceneTree.SceneRebuilt -= Forget;
+        sceneTree.SceneRebuilt -= OnSceneRebuilt;
         assets.AssetAltered -= OnAssetAltered;
         assets.AssetClosed -= OnAssetClosed;
     }
 
-    void Apply(UndoStep? step)
+    // An asset step shows the asset in the inspector; a scene step makes its scene the open one.
+    void Show(Guid document)
     {
-        if (step is null) return;
+        if (inspectedAssets.TryGetValue(document, out var inspection))
+        {
+            if (!ReferenceEquals(inspector.SelectedObject, inspection)) inspector.Select(inspection);
+            return;
+        }
 
+        if (sceneTree.CurrentAsset?.Id != document && assets.GetTrackedAsset(document) is { } scene)
+            assets.ActivateAsset(scene);
+    }
+
+    T Run<T>(Func<T> action)
+    {
         restoring = true;
         try
         {
-            // An asset's content is saved by whoever listens to Changed; a scene is marked and redrawn here.
-            if (InspectedContent is null) RefreshScene(step);
+            return action();
         }
         finally
         {
             restoring = false;
-            altered = false;
-            WatchSelection();
         }
+    }
 
+    void Run(Action action) => Run(() =>
+    {
+        action();
+        return true;
+    });
+
+    void Finish(UndoStep? step)
+    {
+        if (step is null) return;
+
+        if (inspectedAssets.TryGetValue(step.Document, out var inspection)) AssetRestored?.Invoke(inspection);
+        else RefreshScene(step);
+
+        altered = false;
+        WatchSelection();
         Changed?.Invoke();
     }
 
     void RefreshScene(UndoStep step)
     {
-        sceneTree.MarkAssetModified();
-        foreach (var node in step.Before.Keys.OfType<Node>()) assets.RefreshNode(node);
-        assets.UpdateSelectedNode();
+        restoring = true;
+        try
+        {
+            sceneTree.MarkAssetModified();
+            foreach (var node in step.Before.Keys.OfType<Node>()) assets.RefreshNode(node);
+            assets.UpdateSelectedNode();
 
-        // A step can take the selected node out of the scene, such as undoing its creation.
-        if (inspector.SelectedNode is { } selected && !InScene(selected)) inspector.ClearSelection();
-        else inspector.Select(inspector.SelectedObject);
+            // A step can take the selected node out of the scene, such as undoing its creation.
+            if (inspector.SelectedNode is { } selected && !InScene(selected)) inspector.ClearSelection();
+            else inspector.Select(inspector.SelectedObject);
+        }
+        finally
+        {
+            restoring = false;
+        }
     }
 
     bool InScene(Node node)
@@ -219,18 +292,63 @@ public sealed class UndoService : IDisposable
         if (!restoring) altered = true;
     }
 
-    void OnAssetClosed(Asset asset) => histories.Remove(asset.Id);
-
-    void Forget(Guid assetId)
+    void OnAssetClosed(Asset asset)
     {
-        if (histories.TryGetValue(assetId, out var history)) history.Clear();
+        history.Remove(asset.Id);
+        inspectedAssets.Remove(asset.Id);
         Changed?.Invoke();
     }
 
-    UndoHistory HistoryFor(Guid assetId)
+    // The scene's steps move to the rebuilt objects, matched by id. An object only the history still holds, such as a
+    // deleted node, is rebuilt from its saved form too, so it has the current types after a recompile.
+    void OnSceneRebuilt(Guid assetId, Node oldRoot, Node newRoot)
     {
-        if (!histories.TryGetValue(assetId, out var history)) histories[assetId] = history = new UndoHistory();
-        return history;
+        var replacements = new Dictionary<Guid, IdClass>();
+        Register(newRoot);
+        history.Remap(assetId, Replace);
+        Changed?.Invoke();
+
+        IdClass Replace(IdClass old)
+        {
+            if (old is not (Node or Component)) return old;
+            if (replacements.TryGetValue(old.Id, out var found)) return found;
+
+            IdClass? rebuilt = old switch
+            {
+                Node node => NodeCloner.DeepClone(node, awake: false),
+                Component component => RebuildComponent(component),
+                _ => null,
+            };
+            if (rebuilt is null) return old;
+
+            Register(rebuilt);
+            return replacements.GetValueOrDefault(old.Id, rebuilt);
+        }
+
+        void Register(IdClass obj)
+        {
+            replacements.TryAdd(obj.Id, obj);
+            if (obj is not Node node) return;
+
+            foreach (var component in node.Components) replacements.TryAdd(component.Id, component);
+            foreach (var child in node.Children) Register(child);
+        }
+    }
+
+    // A component is read the way a scene reads it, inside a node, then taken out of that node.
+    static Component? RebuildComponent(Component component)
+    {
+        var holder = new JsonObject
+        {
+            [ObjectJsonSerializer<IdClass>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
+            [nameof(Node.Components)] = new JsonArray(JsonNode.Parse(Serializer.Serialize(component))),
+        };
+
+        if (Serializer.LoadData<Node>(holder.ToJsonString()) is not { Components.Count: > 0 } node) return null;
+
+        var rebuilt = node.Components[0];
+        node.Components.Clear();
+        return rebuilt;
     }
 
     static string EditLabel(IEnumerable<IdClass> changed) => changed.FirstOrDefault() switch

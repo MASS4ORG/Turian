@@ -70,7 +70,6 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         if (!trackingEdits)
         {
             assets.AssetAltered += OnAssetAltered;
-            undo.Changed += OnUndoChanged;
             trackingEdits = true;
         }
 
@@ -345,10 +344,6 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                 for (var f = 0; f < section.BodyFields.Count; f++)
                     DrawField(gui, section.BodyFields[f], $"inspector/section{index}/field{f}");
             }
-            else if (section.Buttons.Count == 0)
-            {
-                gui.DrawText("No editable members.", Theme.Text(11), Theme.InkDim, centerInRect: false);
-            }
 
             DrawButtons(gui, section.Buttons, $"inspector/section{index}/button");
         }
@@ -463,11 +458,6 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         undo.MarkAltered();
     }
 
-    // An undo or redo of asset content changes it outside the form, so it is saved the same way.
-    void OnUndoChanged()
-    {
-        if ((lockedTarget ?? inspector.SelectedObject) is AssetInspection inspection) autoSave.MarkChanged(inspection);
-    }
 
     /// <summary>
     /// The <c>[Button]</c> methods under a section's fields, each invoking its action the frame it is
@@ -565,7 +555,6 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     public void Dispose()
     {
         assets.AssetAltered -= OnAssetAltered;
-        undo.Changed -= OnUndoChanged;
         preview.Dispose();
     }
 }

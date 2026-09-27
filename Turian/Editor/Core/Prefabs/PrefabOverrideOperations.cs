@@ -6,8 +6,8 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Unity's prefab Overrides actions for instances in the open scene: revert a value, a component or everything to the
-/// prefab, apply them to the prefab that owns them, and unpack an instance. Reverts and unpacking are undoable; an
-/// apply writes the prefab files and refreshes the open instances.
+/// prefab, apply them to the prefab that owns them, and unpack an instance. All of them are undoable; an apply writes
+/// the prefab files and refreshes the open instances.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class PrefabOverrideOperations(
@@ -110,7 +110,7 @@ public sealed class PrefabOverrideOperations(
             || !TryMemberValue(target, member, expected.SourceIds, out var value))
             return false;
 
-        Write(PrefabInstances.ApplyMember(link.Source.AssetId, sourceId, member, value, LoadPrefab));
+        Write(PrefabInstances.ApplyMember(link.Source.AssetId, sourceId, member, value, LoadPrefab), [target]);
         return true;
     }
 
@@ -137,7 +137,7 @@ public sealed class PrefabOverrideOperations(
                 is not { } content)
             return false;
 
-        Write(new Dictionary<Guid, string> { [link.Source.AssetId] = content });
+        Write(new Dictionary<Guid, string> { [link.Source.AssetId] = content }, ObjectsById(instanceRoot).Values);
         return true;
     }
 
@@ -248,19 +248,36 @@ public sealed class PrefabOverrideOperations(
         return component;
     }
 
-    void Write(IReadOnlyDictionary<Guid, string> changes)
+    // An apply is one undoable step: undoing writes the prefabs back, and the instance keeps the values it had.
+    void Write(IReadOnlyDictionary<Guid, string> changes, IEnumerable<IdClass> instanceObjects)
     {
-        foreach (var (prefabId, content) in changes)
-        {
-            if (!database.TryGetAsset(prefabId, out var record) || record is null) continue;
+        var previous = changes.Keys
+            .Select(prefabId => (prefabId, Content: PathOf(prefabId) is { } path && File.Exists(path)
+                ? File.ReadAllText(path)
+                : null))
+            .Where(entry => entry.Content is not null)
+            .ToDictionary(entry => entry.prefabId, entry => entry.Content!);
 
-            var path = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
+        undo.Perform("Apply to Prefab", instanceObjects, () => WriteFiles(changes), () => WriteFiles(previous));
+    }
+
+    void WriteFiles(IReadOnlyDictionary<Guid, string> contents)
+    {
+        foreach (var (prefabId, content) in contents)
+        {
+            if (PathOf(prefabId) is not { } path) continue;
+
             var previous = File.Exists(path) ? File.ReadAllText(path) : null;
             File.WriteAllText(path, content);
             importer.ReimportNow(path);
             sceneTree.RefreshInstances(prefabId, previous);
         }
     }
+
+    string? PathOf(Guid prefabId) =>
+        database.TryGetAsset(prefabId, out var record) && record is not null
+            ? Path.Combine(record.ProjectRootPath, record.SourceRelativePath)
+            : null;
 
     bool SetMember(IdClass target, string member, JsonNode? json)
     {

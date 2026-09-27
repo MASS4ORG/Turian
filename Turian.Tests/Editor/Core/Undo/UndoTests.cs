@@ -89,7 +89,7 @@ public class UndoTests
     {
         var node = new Node { Name = "Box" };
         var history = new UndoHistory(mergeWindow: TimeSpan.FromSeconds(1));
-        UndoStep Step(string label, DateTime at) => new(label,
+        UndoStep Step(string label, DateTime at) => new(label, scene.Id,
             new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) },
             new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) })
         { LastChanged = at };
@@ -185,7 +185,7 @@ public class UndoTests
         Assert.False(undo.CanUndo);
     }
 
-    /// <summary>An inspected data asset has its own history, and its edits never touch the scene's.</summary>
+    /// <summary>An inspected data asset's edits are steps of that asset, undone even after it is deselected.</summary>
     [Fact]
     public void Undo_RevertsAnInspectedAssetEdit()
     {
@@ -198,10 +198,79 @@ public class UndoTests
         undo.Flush();
         Assert.True(undo.CanUndo);
 
-        undo.Undo();
-        Assert.Equal(10, stats.Health);
+        Assert.Equal(metadata.Id, undo.History.UndoSteps[^1].Document);
 
         inspector.ClearSelection();
-        Assert.False(undo.CanUndo);
+        undo.Undo();
+        Assert.Equal(10, stats.Health);
+    }
+
+    /// <summary>Undo reaches back into another scene and brings it to the front.</summary>
+    [Fact]
+    public void Undo_SwitchesToTheStepsScene()
+    {
+        var box = AddChild("Box");
+        inspector.Select(box);
+        box.Name = "Crate";
+        EndFrame();
+
+        var other = new Prefab { Id = Guid.NewGuid(), RelativePath = "Assets/other.prefab" };
+        assets.OpenAsset(other);
+        sceneTree.OpenAsset(other);
+
+        Asset? activated = null;
+        assets.AssetOpened += asset => activated = asset;
+
+        undo.Undo();
+
+        Assert.Equal("Box", box.Name);
+        Assert.Equal(scene.Id, activated?.Id);
+    }
+
+    /// <summary>A rebuilt scene keeps its history: the steps move to the rebuilt objects by id.</summary>
+    [Fact]
+    public void Undo_SurvivesASceneRebuild()
+    {
+        var box = AddChild("Box");
+        inspector.Select(box);
+        box.Name = "Crate";
+        EndFrame();
+
+        var rebuilt = NodeCloner.DeepClone(root)!;
+        typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(sceneTree, rebuilt);
+        RaiseRebuilt(root, rebuilt);
+
+        undo.Undo();
+
+        Assert.Equal("Box", rebuilt.Children[0].Name);
+        Assert.Equal("Crate", box.Name);
+    }
+
+    void RaiseRebuilt(Node oldRoot, Node newRoot)
+    {
+        var field = typeof(SceneTreeController).GetField(nameof(SceneTreeController.SceneRebuilt),
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        ((Action<Guid, Node, Node>?)field.GetValue(sceneTree))?.Invoke(scene.Id, oldRoot, newRoot);
+    }
+
+    /// <summary>A change beyond scene objects is undone by its effect, and the kept objects get their values back.</summary>
+    [Fact]
+    public void Perform_UndoesItsEffectAndKeepsValues()
+    {
+        var box = AddChild("Box");
+        var file = "old";
+
+        undo.Perform("Apply to Prefab", [box], () => { file = "new"; box.Name = "Changed by rebuild"; },
+            () => { file = "old"; box.Name = "Changed by rebuild"; });
+        Assert.Equal("new", file);
+
+        undo.Undo();
+        Assert.Equal("old", file);
+        Assert.Equal("Box", box.Name);
+
+        undo.Redo();
+        Assert.Equal("new", file);
+        Assert.Equal("Box", box.Name);
     }
 }

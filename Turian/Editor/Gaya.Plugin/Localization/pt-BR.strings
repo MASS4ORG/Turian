@@ -9,6 +9,7 @@
     { "key": "Themes", "source": "Themes", "translation": "Temas" },
     { "key": "Localization", "source": "Localization", "translation": "Localização" },
     { "key": "Undo", "source": "Undo", "translation": "Desfazer" },
+    { "key": "Some documents have unsaved changes. Save them before leaving the project?", "source": "Some documents have unsaved changes. Save them before leaving the project?", "translation": "Alguns documentos têm alterações não salvas. Salvá-los antes de sair do projeto?" },
     { "key": "Redo", "source": "Redo", "translation": "Refazer" },
     { "key": "Unpack Prefab", "source": "Unpack Prefab", "translation": "Desempacotar prefab" },
     { "key": "Unpack and Delete", "source": "Unpack and Delete", "translation": "Desempacotar e excluir" },

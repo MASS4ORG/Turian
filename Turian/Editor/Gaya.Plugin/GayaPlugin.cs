@@ -102,7 +102,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<ProjectSession>(),
                 sp.GetRequiredService<ICommandDispatcher>(),
-                sp.GetRequiredService<IEditorSettings>())));
+                sp.GetRequiredService<IEditorSettings>(),
+                sp.GetRequiredService<UnsavedChangesGuard>())));
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.playToolbar", ChromeSlot.MenuBar,
             sp => new PlayToolbarChrome(
@@ -180,6 +181,7 @@ public sealed class GayaPlugin : IPlugin
             sp => sp.GetRequiredService<FileDialogChrome>()));
 
         context.Services.AddSingleton<UnsavedChangesDialogChrome>();
+        context.Services.AddSingleton<UnsavedChangesGuard>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.unsavedChangesDialog", ChromeSlot.MenuBar,
             sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
@@ -330,6 +332,10 @@ public sealed class GayaPlugin : IPlugin
         // has to exist before anything that pulls in the scene tree.
         services.GetRequiredService<BuildManager>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
+
+        // An undone or redone asset edit is saved like any other edit to it.
+        services.GetRequiredService<UndoService>().AssetRestored +=
+            services.GetRequiredService<AssetAutoSave>().MarkChanged;
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();
