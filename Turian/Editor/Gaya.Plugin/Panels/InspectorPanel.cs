@@ -7,7 +7,9 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
     ReferencePicker references, AssetRevealService reveal, AssetInspectionService inspections,
-    InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews) : IPanel, IDisposable
+    InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews, UndoService undo, AssetAutoSave autoSave,
+    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage)
+    : IPanel, IDisposable
 {
     readonly ReferenceDrawer referenceDrawer = new(references, inspector, reveal);
     readonly AssetPreviewView preview = new(vulkan, previews);
@@ -28,6 +30,9 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     bool addOpen;
     Rect addAnchor;
     Vector2 addMenuAt;
+    bool overrideMenuOpen;
+    Vector2 overrideMenuAt;
+    Action<FlyoutBuilder>? overrideMenu;
     Component? removeRequest;
     object? lockedTarget;
 
@@ -65,6 +70,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         if (!trackingEdits)
         {
             assets.AssetAltered += OnAssetAltered;
+            undo.Changed += OnUndoChanged;
             trackingEdits = true;
         }
 
@@ -80,9 +86,11 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
         referenceDrawer.DrawPendingPicker(gui);
         DrawAddComponentMenu(gui);
+        gui.CascadeMenu(ref overrideMenuOpen, overrideMenuAt, menu => overrideMenu?.Invoke(menu));
         if (removeRequest is { } removing)
         {
             removeRequest = null;
+            if (inspector.SelectedNode is { } owner) undo.RecordObject(owner, "Remove Component");
             inspector.RemoveComponent(removing);
         }
     }
@@ -97,8 +105,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         // The node's own section is the header: always open, with the active toggle beside the
         // name. Components keep their fold.
         for (var i = 0; i < model.Sections.Count; i++)
+        {
             if (i == 0 && target is Node) RenderHeader(gui, model.Sections[i]);
             else RenderSection(gui, model.Sections[i], i);
+
+            if (i == 0 && target is Node node && ReferenceEquals(node, overrides.InstanceRoot)) RenderPrefabBar(gui, node);
+        }
 
         if (target is Node) RenderAddComponent(gui);
     }
@@ -126,12 +138,18 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     bool CanDropScript(ScriptDragPayload drop) =>
         inspector.SelectedNode is { } node && ComponentRegistry.CanAddTo(node, drop.ComponentType);
 
-    void DropScript(ScriptDragPayload drop) => inspector.AddComponent(drop.ComponentType);
+    void DropScript(ScriptDragPayload drop) => AddComponent(drop.ComponentType);
+
+    void AddComponent(Type type)
+    {
+        if (inspector.SelectedNode is { } node) undo.RecordObject(node, "Add Component");
+        inspector.AddComponent(type);
+    }
 
     /// <summary>
     /// An asset: the file name, then what there is to edit about it — a data asset's own class, the
-    /// way a ScriptableObject is edited, or the settings its importer reads when it bakes the file.
-    /// Edits are held until Apply, because applying one reimports the asset.
+    /// way a ScriptableObject is edited, or the settings its importer reads when it bakes the file. Content is saved
+    /// as it is edited; import settings wait for Apply, because applying them reimports the asset.
     /// </summary>
     void RenderAsset(Gui gui, AssetInspection inspection)
     {
@@ -139,7 +157,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         {
             model = inspection.Target is null
                 ? FormModel.Empty
-                : FormBuilder.Build(inspection.Target, _ => assetDirty = true);
+                : FormBuilder.Build(inspection.Target, _ => OnAssetEdited(inspection));
             builtFor = inspection;
             builtComponents = 0;
             assetDirty = false;
@@ -183,7 +201,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                 DrawButtons(gui, model.Sections[0].Buttons, "inspector/asset/button");
             }
 
-            RenderAssetActions(gui);
+            if (!inspection.IsPayload) RenderAssetActions(gui);
         }
 
         referenceDrawer.DrawPendingPicker(gui);
@@ -290,7 +308,10 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             if (gui.Pass == Pass.Pass2Render)
             {
                 gui.DrawBackgroundRect(Theme.Panel, 3);
-                if (gui.GetInteractable().OnClick()) Fold(section.Title);
+                var header = gui.GetInteractable();
+                if (header.OnClick()) Fold(section.Title);
+                if (header.OnClick(MouseButton.Right) && section.Target is Component clicked)
+                    OpenComponentOverrideMenu(gui, clicked);
             }
 
             using (gui.Node(10, Theme.Scale(22f), $"inspector/section{index}/arrow")
@@ -333,13 +354,30 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         }
     }
 
-    /// <summary>Draws a field of the selected node, marked when a prefab instance overrides it.</summary>
+    /// <summary>
+    /// Draws a field of the selected node, marked when a prefab instance overrides it; right-clicking a marked field
+    /// offers to revert it or apply it to the prefab.
+    /// </summary>
     void DrawField(Gui gui, FormField field, string id)
     {
-        FieldDrawers.Overridden = overrides.IsOverridden(field.Target, field.CollectionMember ?? field.Name);
+        var member = field.CollectionMember ?? field.Name;
+        FieldDrawers.Overridden = overrides.IsOverridden(field.Target, member);
         try
         {
-            FieldDrawers.Draw(gui, field, id, referenceDrawer, collapsed);
+            using (gui.Node(-1, -1, $"{id}/prefab").ExpandWidth().Direction(Axis.Vertical).Gap(2f).Enter())
+            {
+                if (FieldDrawers.Overridden && gui.Pass == Pass.Pass2Render && field.Target is IdClass target
+                    && gui.GetInteractable().OnClick(MouseButton.Right))
+                {
+                    OpenOverrideMenu(gui, menu =>
+                    {
+                        menu.Item("Revert", () => Edited(prefabOperations.RevertMember(target, member)));
+                        menu.Item("Apply to Prefab", () => Edited(prefabOperations.ApplyMember(target, member)));
+                    });
+                }
+
+                FieldDrawers.Draw(gui, field, id, referenceDrawer, collapsed);
+            }
         }
         finally
         {
@@ -348,6 +386,88 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     }
 
     void OnAssetAltered(Asset asset) => overrides.Invalidate();
+
+    /// <summary>
+    /// The prefab bar of an instance root: which prefab it comes from, a way into prefab mode, and Revert All / Apply
+    /// All once the instance differs from its prefab.
+    /// </summary>
+    void RenderPrefabBar(Gui gui, Node instance)
+    {
+        var differs = overrides.Diff is { IsEmpty: false };
+        var prefabId = instance.PrefabInstance?.Source.AssetId ?? Guid.Empty;
+        var name = AssetDatabase.Instance.TryGetAsset(prefabId, out var record) && record is not null
+            ? Path.GetFileNameWithoutExtension(record.SourceRelativePath)
+            : "Missing Prefab";
+
+        using (gui.Node(-1, Theme.Scale(26f), "inspector/prefab").ExpandWidth().Direction(Axis.Horizontal)
+                   .Padding(6, 3).Gap(6f).ContentAlignY(0.5f).Enter())
+        {
+            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Panel, 3);
+
+            gui.DrawText(EditorIcons.Cube, Theme.Text(12), Theme.Accent);
+            gui.DrawText(name, Theme.Text(12), Theme.Ink, centerInRect: false);
+            using (gui.Node().Expand().Enter()) { }
+
+            if (TextButton(gui, "Open", "inspector/prefab/open", record is not null)) prefabStage.OpenPrefab(instance);
+            if (TextButton(gui, "Revert All", "inspector/prefab/revert", differs))
+            {
+                prefabOperations.RevertAll(instance);
+                Edited(true);
+            }
+
+            if (TextButton(gui, "Apply All", "inspector/prefab/apply", differs))
+                Edited(prefabOperations.ApplyAll(instance));
+        }
+    }
+
+    void OpenComponentOverrideMenu(Gui gui, Component component)
+    {
+        var added = overrides.IsAdded(component);
+        if (!added && overrides.Diff?.HasOverrides(component.Id) != true) return;
+
+        OpenOverrideMenu(gui, menu =>
+        {
+            menu.Item(added ? "Remove Added Component" : "Revert Component", () =>
+            {
+                prefabOperations.RevertComponent(component);
+                Edited(true);
+            });
+            if (!added)
+            {
+                menu.Item("Apply Component to Prefab", () =>
+                {
+                    prefabOperations.ApplyComponent(component);
+                    Edited(true);
+                });
+            }
+        });
+    }
+
+    void OpenOverrideMenu(Gui gui, Action<FlyoutBuilder> build)
+    {
+        overrideMenu = build;
+        overrideMenuAt = gui.Input.MousePosition;
+        overrideMenuOpen = true;
+    }
+
+    // An override action changes values outside the form, so the marks are compared again.
+    void Edited(bool changed)
+    {
+        if (changed) overrides.Invalidate();
+    }
+
+    void OnAssetEdited(AssetInspection inspection)
+    {
+        assetDirty = true;
+        autoSave.MarkChanged(inspection);
+        undo.MarkAltered();
+    }
+
+    // An undo or redo of asset content changes it outside the form, so it is saved the same way.
+    void OnUndoChanged()
+    {
+        if ((lockedTarget ?? inspector.SelectedObject) is AssetInspection inspection) autoSave.MarkChanged(inspection);
+    }
 
     /// <summary>
     /// The <c>[Button]</c> methods under a section's fields, each invoking its action the frame it is
@@ -421,7 +541,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                      .OrderBy(c => c.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
             var type = candidate.ComponentType;
-            menu.Item(candidate.DisplayName, () => inspector.AddComponent(type));
+            menu.Item(candidate.DisplayName, () => AddComponent(type));
         }
 
         foreach (var group in candidates.Where(c => Segments(c).Length > depth + 1)
@@ -445,6 +565,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     public void Dispose()
     {
         assets.AssetAltered -= OnAssetAltered;
+        undo.Changed -= OnUndoChanged;
         preview.Dispose();
     }
 }

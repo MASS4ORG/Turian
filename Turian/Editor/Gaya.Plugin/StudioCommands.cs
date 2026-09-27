@@ -11,6 +11,23 @@ static class StudioCommands
     /// <param name="context">The registration surface handed to the plugin.</param>
     public static void Register(IPluginContext context)
     {
+        // ── Edit: undo and redo ─────────────────────────────────────────────
+        Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
+            "gaya.turian.undo", "Edit: Undo",
+            sp => sp.GetRequiredService<UndoService>().Undo(),
+            sp => sp.GetRequiredService<UndoService>().CanUndo)
+        { DynamicLabel = sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
+
+        Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
+            "gaya.turian.redo", "Edit: Redo",
+            sp => sp.GetRequiredService<UndoService>().Redo(),
+            sp => sp.GetRequiredService<UndoService>().CanRedo)
+        { DynamicLabel = sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
+
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Y, KeyModifiers.Ctrl));
+
         // ── Edit: the shell's own language ──────────────────────────────────
         // The chosen language is written back into the Language settings page by the bridge, so both
         // the menu and the Settings panel drive the same stored value.
@@ -143,6 +160,13 @@ static class StudioCommands
             "gaya.turian.about", "Help: About",
             sp => sp.GetRequiredService<AboutDialogChrome>().Open())
         { DynamicLabel = Localized("About") });
+    }
+
+    /// <summary>"Undo Rename" or plain "Undo" when there is nothing to name.</summary>
+    static string StepLabel(IServiceProvider services, string action, string? step)
+    {
+        var localization = services.GetRequiredService<StudioLocalization>();
+        return step is null ? localization.T(action) : $"{localization.T(action)} {step}";
     }
 
     static Func<IServiceProvider, string> Localized(string text) =>

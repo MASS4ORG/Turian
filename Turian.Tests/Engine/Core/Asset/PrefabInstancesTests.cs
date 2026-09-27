@@ -317,4 +317,82 @@ public class PrefabInstancesTests
         Assert.Equal([instance.Id], diff.MissingPrefabs);
         Assert.Empty(diff.Overrides);
     }
+
+    /// <summary>A fresh instance maps each of its objects back to the prefab object it comes from.</summary>
+    [Fact]
+    public void Expect_MapsInstanceIdsToPrefabIds()
+    {
+        var lamp = Lamp();
+        var prefabId = AddPrefab(lamp);
+        var instanceId = Guid.NewGuid();
+
+        var expectation = PrefabInstances.Expect(prefabId, instanceId, Load)!;
+
+        Assert.Equal(lamp.Id, expectation.SourceIds[instanceId]);
+        Assert.Equal(lamp.Children[0].Id,
+            expectation.SourceIds[PrefabInstances.DeriveId(instanceId, lamp.Children[0].Id)]);
+    }
+
+    /// <summary>A value applied to an object of the prefab itself is written into that prefab.</summary>
+    [Fact]
+    public void ApplyMember_WritesTheOwningPrefab()
+    {
+        var lamp = Lamp(1f);
+        var prefabId = AddPrefab(lamp);
+        var lightId = lamp.Children[0].GetComponent<LightComponent>()!.Id;
+
+        var changes = PrefabInstances.ApplyMember(prefabId, lightId, nameof(LightComponent.Intensity),
+            JsonValue.Create(6f), Load);
+        prefabs[prefabId] = changes[prefabId];
+
+        Assert.Equal(6f, Instantiate(prefabId).Children[0].GetComponent<LightComponent>()!.Intensity);
+    }
+
+    /// <summary>A value on an object a nested prefab provides goes to that nested prefab, and the outer one stops
+    /// overriding it.</summary>
+    [Fact]
+    public void ApplyMember_NestedObject_WritesInnerPrefabAndDropsOuterOverride()
+    {
+        var lampId = AddPrefab(Lamp(1f));
+        var room = new Node { Name = "Room" };
+        var nested = Instantiate(lampId);
+        nested.Children[0].GetComponent<LightComponent>()!.Intensity = 3f;
+        room.Children.Add(nested);
+        var roomId = Guid.NewGuid();
+        prefabs[roomId] = Save(room);
+        var nestedLight = nested.Children[0].GetComponent<LightComponent>()!;
+
+        var changes = PrefabInstances.ApplyMember(roomId, nestedLight.Id, nameof(LightComponent.Intensity),
+            JsonValue.Create(8f), Load);
+        foreach (var (id, json) in changes) prefabs[id] = json;
+
+        Assert.Contains(lampId, changes.Keys);
+        Assert.DoesNotContain("Overrides", prefabs[roomId], StringComparison.Ordinal);
+        Assert.Equal(8f, Intensity(Instantiate(lampId)));
+        Assert.Equal(8f, Intensity(Instantiate(roomId).Children[0]));
+
+        static float Intensity(Node lampInstance) =>
+            lampInstance.Children[0].GetComponent<LightComponent>()!.Intensity;
+    }
+
+    /// <summary>Apply All folds an instance's overrides and additions into the prefab, which keeps its own root.</summary>
+    [Fact]
+    public void ApplyAll_MakesTheInstanceThePrefab()
+    {
+        var lamp = Lamp(1f);
+        var prefabId = AddPrefab(lamp);
+        var instance = Instantiate(prefabId);
+        instance.Name = "Desk Lamp";
+        instance.Children[0].GetComponent<LightComponent>()!.Intensity = 4f;
+        instance.Children[0].Children.Add(new Node { Name = "Shade" });
+
+        prefabs[prefabId] = PrefabInstances.ApplyAll(Serializer.Serialize(instance), prefabId, Load)!;
+        var fresh = Instantiate(prefabId);
+
+        Assert.Equal("Lamp", Serializer.LoadData<Node>(prefabs[prefabId])!.Name);
+        Assert.Equal(lamp.Id, Serializer.LoadData<Node>(prefabs[prefabId])!.Id);
+        Assert.Equal(4f, fresh.Children[0].GetComponent<LightComponent>()!.Intensity);
+        Assert.Equal("Shade", fresh.Children[0].Children[0].Name);
+        Assert.Empty(PrefabInstances.Diff(Serializer.Serialize(Scene(instance)), Load).Overrides);
+    }
 }

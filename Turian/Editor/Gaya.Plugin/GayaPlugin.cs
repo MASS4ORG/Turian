@@ -53,7 +53,11 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetManager>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
                 sp.GetRequiredService<PrefabStage>(),
-                sp.GetRequiredService<SettingsService>())));
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<UndoService>(),
+                sp.GetRequiredService<PrefabOverrideOperations>(),
+                sp.GetRequiredService<ConfirmDialogChrome>(),
+                sp.GetRequiredService<StudioLocalization>())));
 
         var inspectorInstances = new InspectorInstances(context.Panels, context.TabStripChrome);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -180,6 +184,11 @@ public sealed class GayaPlugin : IPlugin
             "gaya.turian.unsavedChangesDialog", ChromeSlot.MenuBar,
             sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
 
+        context.Services.AddSingleton<ConfirmDialogChrome>();
+        context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.confirmDialog", ChromeSlot.MenuBar,
+            sp => sp.GetRequiredService<ConfirmDialogChrome>()));
+
         context.Services.AddSingleton<AboutDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.aboutDialog", ChromeSlot.MenuBar,
@@ -276,6 +285,8 @@ public sealed class GayaPlugin : IPlugin
         var playMode = services.GetRequiredService<PlayModeService>();
         if (playMode.IsActive) playMode.Tick(deltaTime);
 
+        services.GetRequiredService<UndoService>().Flush();
+        services.GetRequiredService<AssetAutoSave>().Flush();
         services.GetRequiredService<OutputLogBridge>().Tick();
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
@@ -288,6 +299,7 @@ public sealed class GayaPlugin : IPlugin
         ArgumentNullException.ThrowIfNull(services);
 
         // Closing the window cannot be cancelled to ask first, so edits still unsaved then are kept, not lost.
+        services.GetRequiredService<AssetAutoSave>().Flush(force: true);
         var workspace = services.GetRequiredService<AssetWorkspace>();
         if (workspace.HasUnsavedChanges)
         {

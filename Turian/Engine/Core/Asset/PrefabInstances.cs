@@ -83,6 +83,142 @@ public static class PrefabInstances
         return diff;
     }
 
+    /// <summary>What a new instance of a prefab holds, and which prefab object each of its objects comes from.</summary>
+    /// <param name="prefabId">The prefab asset id.</param>
+    /// <param name="instanceId">The id of the instance root.</param>
+    /// <param name="loadPrefab">Returns a prefab's serialized hierarchy by asset id, or null when it is missing.</param>
+    /// <param name="normalize">Rewrites a serialized node hierarchy the way <see cref="Serializer"/> would.</param>
+    /// <returns>The expected instance, or null when the prefab is missing.</returns>
+    public static PrefabExpectation? Expect(Guid prefabId, Guid instanceId, Func<Guid, string?> loadPrefab,
+        Func<string, string>? normalize = null)
+    {
+        ArgumentNullException.ThrowIfNull(loadPrefab);
+
+        var sourceToDerived = new Dictionary<Guid, Guid>();
+        if (Instantiate(prefabId, instanceId, loadPrefab, [], sourceToDerived) is not { } instantiated
+            || JsonNode.Parse((normalize ?? NormalizeNode)(instantiated.ToJsonString())) is not JsonObject content)
+            return null;
+
+        return new PrefabExpectation(content, sourceToDerived.ToDictionary(pair => pair.Value, pair => pair.Key));
+    }
+
+    /// <summary>
+    /// The prefab rewritten to match an instance of it: every override, addition and removal becomes the prefab's own.
+    /// The prefab keeps its root's id, name, placement and, for a variant, its link to the prefab it varies.
+    /// </summary>
+    /// <param name="instanceJson">The expanded instance, as <see cref="Serializer.Serialize{T}"/> writes it.</param>
+    /// <param name="prefabId">The prefab the instance was made from.</param>
+    /// <param name="loadPrefab">Returns a prefab's serialized hierarchy by asset id, or null when it is missing.</param>
+    /// <returns>The prefab's new content, or null when the instance or the prefab cannot be read.</returns>
+    public static string? ApplyAll(string instanceJson, Guid prefabId, Func<Guid, string?> loadPrefab)
+    {
+        ArgumentNullException.ThrowIfNull(instanceJson);
+        ArgumentNullException.ThrowIfNull(loadPrefab);
+
+        if (JsonNode.Parse(instanceJson) is not JsonObject instance || ReadId(instance) is not { } instanceId
+            || loadPrefab(prefabId) is not { } prefabJson || JsonNode.Parse(prefabJson) is not JsonObject prefab
+            || Expect(prefabId, instanceId, loadPrefab) is not { } expectation)
+            return null;
+
+        RewriteIds(instance, expectation.SourceIds.ToDictionary(pair => pair.Key, pair => pair.Value));
+        foreach (var member in rootMembers.Append(idMember))
+        {
+            if (prefab[member] is { } value) instance[member] = value.DeepClone();
+            else instance.Remove(member);
+        }
+
+        if (prefab[instanceMember] is { } variantLink) instance[instanceMember] = variantLink.DeepClone();
+        else instance.Remove(instanceMember);
+
+        return Compact(instance.ToJsonString(writeOptions), loadPrefab);
+    }
+
+    /// <summary>
+    /// Writes one member of a prefab object back to the prefab that owns it. An object a nested prefab provides is
+    /// written to that nested prefab, innermost first, and the outer prefabs stop overriding the member.
+    /// </summary>
+    /// <param name="prefabId">The prefab whose expanded content holds the object.</param>
+    /// <param name="objectId">The object's id in that expanded content.</param>
+    /// <param name="member">The serialized member name.</param>
+    /// <param name="value">The member's new JSON value, with ids in that prefab's terms.</param>
+    /// <param name="loadPrefab">Returns a prefab's serialized hierarchy by asset id, or null when it is missing.</param>
+    /// <returns>The new content of every prefab that changed, by asset id.</returns>
+    public static IReadOnlyDictionary<Guid, string> ApplyMember(Guid prefabId, Guid objectId, string member,
+        JsonNode? value, Func<Guid, string?> loadPrefab)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(member);
+        ArgumentNullException.ThrowIfNull(loadPrefab);
+
+        var changes = new Dictionary<Guid, string>();
+        ApplyMember(prefabId, objectId, member, value, loadPrefab, changes, []);
+        return changes;
+    }
+
+    static void ApplyMember(Guid prefabId, Guid objectId, string member, JsonNode? value,
+        Func<Guid, string?> loadPrefab, Dictionary<Guid, string> changes, HashSet<Guid> chain)
+    {
+        if (!chain.Add(prefabId)
+            || (changes.TryGetValue(prefabId, out var pending) ? pending : loadPrefab(prefabId)) is not { } json
+            || JsonNode.Parse(json) is not JsonObject prefab)
+            return;
+
+        foreach (var owned in OwnObjects(prefab))
+        {
+            var isInstanceRoot = owned[instanceMember] is JsonObject;
+            if (ReadId(owned) != objectId || (isInstanceRoot && !rootMembers.Contains(member))) continue;
+
+            owned[member] = value?.DeepClone();
+            changes[prefabId] = prefab.ToJsonString(writeOptions);
+            return;
+        }
+
+        foreach (var nested in OwnObjects(prefab).Where(node => node[instanceMember] is JsonObject))
+        {
+            if (ReadId(nested) is not { } nestedId) continue;
+
+            var link = (JsonObject)nested[instanceMember]!;
+            var nestedPrefabId = ReadSourceId(link);
+            var sourceToDerived = new Dictionary<Guid, Guid>();
+            if (Instantiate(nestedPrefabId, nestedId, loadPrefab, [], sourceToDerived) is null) continue;
+
+            var derivedToSource = sourceToDerived.ToDictionary(pair => pair.Value, pair => pair.Key);
+            if (!derivedToSource.TryGetValue(objectId, out var sourceId)) continue;
+
+            if (link[nameof(PrefabInstance.Overrides)] is JsonArray overrides)
+            {
+                var stale = overrides.OfType<JsonObject>()
+                    .Where(entry => entry[nameof(PrefabOverride.Target)]?.GetValue<string>() == sourceId.ToString()
+                        && entry[nameof(PrefabOverride.Member)]?.GetValue<string>() == member)
+                    .ToList();
+                foreach (var entry in stale) overrides.Remove(entry);
+                if (overrides.Count == 0) link.Remove(nameof(PrefabInstance.Overrides));
+                if (stale.Count > 0) changes[prefabId] = prefab.ToJsonString(writeOptions);
+            }
+
+            var inner = value?.DeepClone();
+            RewriteIds(inner, derivedToSource);
+            ApplyMember(nestedPrefabId, sourceId, member, inner, loadPrefab, changes, chain);
+            return;
+        }
+    }
+
+    // A compact prefab's own nodes and components: its tree, and what its instances add, but not their prefab content.
+    static IEnumerable<JsonObject> OwnObjects(JsonObject node)
+    {
+        yield return node;
+
+        foreach (var component in Items(node, componentsMember)) yield return component;
+        foreach (var child in Items(node, childrenMember).SelectMany(OwnObjects)) yield return child;
+
+        if (node[instanceMember]?[nameof(PrefabInstance.Added)] is not JsonArray added) yield break;
+        foreach (var addition in added.OfType<JsonObject>())
+        {
+            if (addition[nameof(PrefabAddition.Component)] is JsonObject component) yield return component;
+            if (addition[nameof(PrefabAddition.Child)] is JsonObject child)
+                foreach (var owned in OwnObjects(child)) yield return owned;
+        }
+    }
+
     /// <summary>Reads a prefab's serialized hierarchy from an asset database.</summary>
     /// <param name="database">The database holding the prefab.</param>
     /// <param name="assetId">The prefab asset id.</param>
@@ -350,6 +486,13 @@ public static class PrefabInstances
             // Additions belong to the instance, so an instance inside one is compared with its own prefab.
             foreach (var child in Items(entry.Object, childrenMember).Where(child => IsIn(child, detached)))
                 DiffTree(child, loadPrefab, normalize, diff);
+        }
+
+        foreach (var (id, entry) in expectedIndex)
+        {
+            if ((!actualIndex.ContainsKey(id) || detached.Contains(id))
+                && entry.ParentId is { } parentId && actualIndex.ContainsKey(parentId) && !detached.Contains(parentId))
+                diff.Removed.Add(id);
         }
     }
 
