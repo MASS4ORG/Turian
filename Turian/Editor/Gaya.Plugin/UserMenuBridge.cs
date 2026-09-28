@@ -73,7 +73,7 @@ sealed class UserMenuBridge : IDisposable
     /// The well-known menu names, so <c>[MenuItem("File/…")]</c> lands in the studio's own File menu
     /// rather than opening a second one beside it.
     /// </summary>
-    static readonly Dictionary<string, string> wellKnownMenus = new(StringComparer.OrdinalIgnoreCase)
+    static readonly Dictionary<string, string> WellKnownMenus = new(StringComparer.OrdinalIgnoreCase)
     {
         ["File"] = MenuIds.File,
         ["Edit"] = MenuIds.Edit,
@@ -84,7 +84,7 @@ sealed class UserMenuBridge : IDisposable
 
     /// <summary>A path's first segment names its top-level menu.</summary>
     static string MenuIdFor(string menu) =>
-        wellKnownMenus.TryGetValue(menu, out var id) ? id : $"menubar/{menu}";
+        WellKnownMenus.TryGetValue(menu, out var id) ? id : $"menubar/{menu}";
 
     /// <inheritdoc />
     public void Dispose() => catalog.Changed -= Publish;

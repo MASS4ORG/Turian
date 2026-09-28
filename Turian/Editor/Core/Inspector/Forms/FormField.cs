@@ -90,7 +90,7 @@ public sealed class FormField
     public bool IsReadOnly =>
         forcedReadOnly
         || member?.GetCustomAttribute<ReadOnlyAttribute>() is not null
-        || (member is PropertyInfo property && !property.CanWrite);
+        || member is PropertyInfo { CanWrite: false };
 
     /// <summary>The inclusive bounds from <c>[Range]</c>, or null when the value is unbounded.</summary>
     public (float Min, float Max)? Range =>

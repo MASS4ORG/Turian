@@ -20,12 +20,12 @@ public sealed partial class TransformGizmo
     const int arcSegments = 48;
 
     // Default colors (sRGB).
-    static readonly Vector4 xColor = new(1f, 0.2f, 0.2f, 1f);
-    static readonly Vector4 yColor = new(0.2f, 1f, 0.2f, 1f);
-    static readonly Vector4 zColor = new(0.2f, 0.2f, 1f, 1f);
-    static readonly Vector4 hoverColor = new(1f, 1f, 0.2f, 1f);
-    static readonly Vector4 centerColor = new(0.7f, 0.7f, 0.7f, 1f);
-    static readonly Vector4 dragColor = new(1f, 1f, 1f, 1f);
+    static readonly Vector4 XColor = new(1f, 0.2f, 0.2f, 1f);
+    static readonly Vector4 YColor = new(0.2f, 1f, 0.2f, 1f);
+    static readonly Vector4 ZColor = new(0.2f, 0.2f, 1f, 1f);
+    static readonly Vector4 HoverColor = new(1f, 1f, 0.2f, 1f);
+    static readonly Vector4 CenterColor = new(0.7f, 0.7f, 0.7f, 1f);
+    static readonly Vector4 DragColor = new(1f, 1f, 1f, 1f);
 
     TransformGizmoAxis axis;
     bool isDragging;
@@ -160,22 +160,22 @@ public sealed partial class TransformGizmo
         float scale,
         Vector3 cameraFront)
     {
-        DrawAxisArrow(gizmos, anchor, localX, scale, xColor, TransformGizmoAxis.X);
-        DrawAxisArrow(gizmos, anchor, localY, scale, yColor, TransformGizmoAxis.Y);
-        DrawAxisArrow(gizmos, anchor, localZ, scale, zColor, TransformGizmoAxis.Z);
+        DrawAxisArrow(gizmos, anchor, localX, scale, XColor, TransformGizmoAxis.X);
+        DrawAxisArrow(gizmos, anchor, localY, scale, YColor, TransformGizmoAxis.Y);
+        DrawAxisArrow(gizmos, anchor, localZ, scale, ZColor, TransformGizmoAxis.Z);
 
         var planeSize = scale * 0.4f;
-        DrawPlaneHandle(gizmos, anchor, localX, localY, zColor with { W = planeFillAlpha },
+        DrawPlaneHandle(gizmos, anchor, localX, localY, ZColor with { W = planeFillAlpha },
             TransformGizmoAxis.Xy, planeSize);
-        DrawPlaneHandle(gizmos, anchor, localX, localZ, yColor with { W = planeFillAlpha },
+        DrawPlaneHandle(gizmos, anchor, localX, localZ, YColor with { W = planeFillAlpha },
             TransformGizmoAxis.Xz, planeSize);
-        DrawPlaneHandle(gizmos, anchor, localY, localZ, xColor with { W = planeFillAlpha },
+        DrawPlaneHandle(gizmos, anchor, localY, localZ, XColor with { W = planeFillAlpha },
             TransformGizmoAxis.Yz, planeSize);
 
         if (Mode == TransformGizmoMode.Scale)
         {
             var radius = scale * 0.2f;
-            var color = axis == TransformGizmoAxis.Center ? (isDragging ? dragColor : hoverColor) : centerColor;
+            var color = axis == TransformGizmoAxis.Center ? (isDragging ? DragColor : HoverColor) : CenterColor;
             gizmos.Color = color;
             gizmos.Thickness = 2f;
             gizmos.DrawCircle(anchor, cameraFront, radius);
@@ -190,7 +190,7 @@ public sealed partial class TransformGizmo
         Vector4 baseColor,
         TransformGizmoAxis thisAxis)
     {
-        var color = axis == thisAxis ? (isDragging ? dragColor : hoverColor) : baseColor;
+        var color = axis == thisAxis ? (isDragging ? DragColor : HoverColor) : baseColor;
         gizmos.Color = color;
         gizmos.Thickness = handleThickness;
         var tip = anchor + dir * scale;
@@ -215,7 +215,7 @@ public sealed partial class TransformGizmo
         TransformGizmoAxis thisAxis,
         float size)
     {
-        var color = axis == thisAxis ? (isDragging ? dragColor : hoverColor) : fillColor;
+        var color = axis == thisAxis ? (isDragging ? DragColor : HoverColor) : fillColor;
         gizmos.Color = color;
         gizmos.Thickness = planeOutlineThickness;
         var a = anchor + dirA * size;
@@ -239,11 +239,11 @@ public sealed partial class TransformGizmo
     {
         var radius = scale * 0.85f;
         gizmos.Thickness = 2f;
-        gizmos.Color = axis == TransformGizmoAxis.X ? hoverColor : xColor;
+        gizmos.Color = axis == TransformGizmoAxis.X ? HoverColor : XColor;
         DrawCircleArc(gizmos, anchor, localX, radius, localY);
-        gizmos.Color = axis == TransformGizmoAxis.Y ? hoverColor : yColor;
+        gizmos.Color = axis == TransformGizmoAxis.Y ? HoverColor : YColor;
         DrawCircleArc(gizmos, anchor, localY, radius, localZ);
-        gizmos.Color = axis == TransformGizmoAxis.Z ? hoverColor : zColor;
+        gizmos.Color = axis == TransformGizmoAxis.Z ? HoverColor : ZColor;
         DrawCircleArc(gizmos, anchor, localZ, radius, localX);
     }
 

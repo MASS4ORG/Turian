@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -74,7 +72,7 @@ public sealed class PrefabOverrideTracker(Func<Guid, string?> loadPrefab, TimeSp
         ArgumentNullException.ThrowIfNull(node);
 
         Node? outermost = null;
-        for (Node? current = node; current is not null; current = current.Parent)
+        for (var current = node; current is not null; current = current.Parent)
             if (current.PrefabInstance is not null) outermost = current;
         return outermost;
     }

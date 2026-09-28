@@ -1,5 +1,3 @@
-using Silk.NET.Maths;
-
 namespace Turian.Engine.Core;
 
 /// <summary>
@@ -41,7 +39,7 @@ public class WindowManager : IDisposable
     {
         var options = WindowOptions.DefaultVulkan with
         {
-            Size = new Vector2D<int>(widthInitial, heightInitial),
+            Size = new Silk.NET.Maths.Vector2D<int>(widthInitial, heightInitial),
             Title = title
         };
 

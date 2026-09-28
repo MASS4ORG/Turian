@@ -71,13 +71,13 @@ public sealed partial class DataAssetGeneratorTests
         }
 
         Assert.True(GeneratedSerializers.TryGet(type, out _));
-        var generated = Serializer.Serialize<DataAsset>(value);
+        var generated = Serializer.Serialize(value);
         var generatedRoundTrip = Serializer.Serialize(Serializer.LoadData<DataAsset>(generated));
 
         Assert.True(GeneratedSerializers.Remove(type, out var serializer));
         try
         {
-            Assert.Equal(Serializer.Serialize<DataAsset>(value), generated);
+            Assert.Equal(Serializer.Serialize(value), generated);
             Assert.Equal(Serializer.Serialize(Serializer.LoadData<DataAsset>(generated)), generatedRoundTrip);
         }
         finally
@@ -91,10 +91,11 @@ public sealed partial class DataAssetGeneratorTests
     public void ObservableProperty_RaisesChangedOnChange()
     {
         var sample = new Sample();
+        var senders = new List<object>();
         var changes = new List<string>();
         sample.Changed += (asset, member) =>
         {
-            Assert.Same(sample, asset);
+            senders.Add(asset);
             changes.Add(member);
         };
 
@@ -102,6 +103,7 @@ public sealed partial class DataAssetGeneratorTests
         sample.Health = 5;
         sample.Health = 6;
 
+        Assert.All(senders, sender => Assert.Same(sample, sender));
         Assert.Equal([nameof(Sample.Health), nameof(Sample.Health)], changes);
         Assert.Contains("\"Health\": 6", Serializer.Serialize<DataAsset>(sample));
     }
@@ -155,7 +157,7 @@ public sealed partial class DataAssetGeneratorTests
         CSharpGeneratorDriver.Create(
                 [LoadFromGenerator<IIncrementalGenerator>("Turian.CSharp.CodeGenerator.DataAssetGenerator")
                     .AsSourceGenerator()],
-                parseOptions: parseOptions)
+                parseOptions: ParseOptions)
             .RunGeneratorsAndUpdateCompilation(Compile(source), out var output, out _,
                 TestContext.Current.CancellationToken);
 
@@ -170,12 +172,12 @@ public sealed partial class DataAssetGeneratorTests
         Assert.DoesNotContain("Skipped", generated);
     }
 
-    static readonly CSharpParseOptions parseOptions = new(LanguageVersion.Latest);
+    static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.Latest);
 
     static CSharpCompilation Compile(string source) =>
         CSharpCompilation.Create(
             "GeneratorTest",
-            [CSharpSyntaxTree.ParseText(source, parseOptions)],
+            [CSharpSyntaxTree.ParseText(source, ParseOptions)],
             ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Select(static path => MetadataReference.CreateFromFile(path)),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

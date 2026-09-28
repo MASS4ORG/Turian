@@ -14,13 +14,13 @@ public sealed partial class AssetDatabase
 
     readonly object syncRoot = new();
 
-    static AssetDatabase? instance;
+    static AssetDatabase? _instance;
 
     /// <summary>
     /// Gets the singleton instance of the <see cref="AssetDatabase"/>.
     /// </summary>
     public static AssetDatabase Instance =>
-        instance ?? throw new InvalidOperationException("AssetDatabase not initialized");
+        _instance ?? throw new InvalidOperationException("AssetDatabase not initialized");
 
     /// <summary>
     /// Gets the singleton instance if one has been created, without throwing. For callers that
@@ -31,7 +31,7 @@ public sealed partial class AssetDatabase
     /// <returns><c>true</c> when an instance exists.</returns>
     public static bool TryGetInstance(out AssetDatabase? database)
     {
-        database = instance;
+        database = _instance;
         return database is not null;
     }
 
@@ -45,7 +45,7 @@ public sealed partial class AssetDatabase
     /// </summary>
     public AssetDatabase()
     {
-        instance = instance is null
+        _instance = _instance is null
             ? this
             : throw new InvalidOperationException("AssetDatabase already initialized");
     }

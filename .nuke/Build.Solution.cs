@@ -6,11 +6,10 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
-    [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
-    readonly string configuration;
+    [Parameter("Config to build - Default is 'Debug' (local) or 'Release' (server)")]
+    readonly string Configuration;
 
-    string Configuration =>
-        configuration ?? (IsLocalBuild ? ConfigurationOptions.Debug : ConfigurationOptions.Release);
+    string Config => Configuration ?? (IsLocalBuild ? ConfigurationOptions.Debug : ConfigurationOptions.Release);
 
     [Solution(GenerateProjects = true)]
     private readonly Solution Solution;

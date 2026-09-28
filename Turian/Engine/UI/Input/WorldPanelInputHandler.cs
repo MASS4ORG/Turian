@@ -9,10 +9,10 @@ namespace Turian.Engine.UI;
 public sealed class WorldPanelInputHandler : IUiFrameInput
 {
     // Off-panel sentinel: far outside any layout rect, so nothing hovers when the ray misses.
-    static readonly Vector2 offPanel = new(-100_000f, -100_000f);
+    static readonly Vector2 OffPanel = new(-100_000f, -100_000f);
 
-    Vector2 position = offPanel;
-    Vector2 previous = offPanel;
+    Vector2 position = OffPanel;
+    Vector2 previous = OffPanel;
     string typedCharacters = string.Empty;
 
     /// <summary>Unused by world panels (they rasterise 1:1 with <c>PanelSize</c>); kept for the interface.</summary>
@@ -26,14 +26,14 @@ public sealed class WorldPanelInputHandler : IUiFrameInput
     public void SetPointer(Vector2? panelPixels)
     {
         previous = position;
-        position = panelPixels ?? offPanel;
+        position = panelPixels ?? OffPanel;
     }
 
     /// <inheritdoc/>
     public Vector2 MousePosition => position;
 
     /// <inheritdoc/>
-    public Vector2 MouseDelta => position == offPanel || previous == offPanel ? Vector2.Zero : position - previous;
+    public Vector2 MouseDelta => position == OffPanel || previous == OffPanel ? Vector2.Zero : position - previous;
 
     /// <inheritdoc/>
     public Vector2 PrevMousePosition => previous;
@@ -80,5 +80,5 @@ public sealed class WorldPanelInputHandler : IUiFrameInput
     /// <inheritdoc/>
     public void EndFrame() => typedCharacters = string.Empty;
 
-    bool IsOffPanel => position == offPanel;
+    bool IsOffPanel => position == OffPanel;
 }

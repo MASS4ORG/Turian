@@ -158,7 +158,7 @@ public sealed class UiManager : IDisposable
 
     static bool IsDrawable(UiDocumentComponent panel) =>
         (panel.OnBuild is not null || !panel.Document.IsEmpty)
-        && panel.IsActive && panel.IsAttached && panel.Node?.IsActive is true;
+        && panel is { IsActive: true, IsAttached: true, Node.IsActive: true };
 
     /// <summary>The panel's code-built UI, or its document's renderer after ticking the document's controller.</summary>
     Action<Gui>? ResolveBuild(UiDocumentComponent panel, float deltaTime)
@@ -246,7 +246,7 @@ public sealed class UiManager : IDisposable
             return null;
         }
 
-        var key = SheetKey(panel, document);
+        var key = SheetKeyFor(panel, document);
         if (renderers.TryGetValue(panel.Id, out var cached)
             && cached.DocumentId == panel.Document.AssetId
             && cached.SheetKey == key)
@@ -272,7 +272,7 @@ public sealed class UiManager : IDisposable
     }
 
     // Changes whenever the panel's or the document's stylesheets, or its controller, change.
-    static string SheetKey(UiDocumentComponent panel, UiDocument document) =>
+    static string SheetKeyFor(UiDocumentComponent panel, UiDocument document) =>
         string.Join(',', panel.StyleSheets.Where(r => !r.IsEmpty).Select(r => r.AssetId)) + '|'
         + string.Join(',', document.StyleSheets) + '|' + (document.ControllerType ?? string.Empty);
 

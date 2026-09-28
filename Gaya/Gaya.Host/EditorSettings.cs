@@ -19,7 +19,7 @@ public sealed class EditorSettings : IEditorSettings
     public const string FileName = "settings.json";
 
     /// <summary>How long an edit may sit unwritten while the user keeps changing it.</summary>
-    static readonly TimeSpan writeInterval = TimeSpan.FromSeconds(1);
+    static readonly TimeSpan WriteInterval = TimeSpan.FromSeconds(1);
 
     readonly ILogger log;
     readonly List<SettingsPageDescriptor> pages = [];
@@ -114,7 +114,7 @@ public sealed class EditorSettings : IEditorSettings
     /// </summary>
     public void Flush()
     {
-        if (dirty.Count == 0 || sinceWrite.Elapsed < writeInterval) return;
+        if (dirty.Count == 0 || sinceWrite.Elapsed < WriteInterval) return;
 
         Save();
     }

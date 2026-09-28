@@ -13,9 +13,9 @@ public static class ProjectIcon
     /// <summary>The icon the Windows executable is stamped with.</summary>
     public const string IcoFileName = "icon.ico";
 
-    static readonly int[] icoSizes = [16, 32, 48, 256];
+    static readonly int[] IcoSizes = [16, 32, 48, 256];
 
-    static readonly string[] imageExtensions =
+    static readonly string[] ImageExtensions =
         [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tga", ".ico"];
 
     /// <summary>
@@ -45,7 +45,7 @@ public static class ProjectIcon
         return Directory.EnumerateFiles(project.AssetsAbsoluteDir, "*.meta", SearchOption.AllDirectories)
             .Select(static meta => meta[..^".meta".Length])
             .Where(static source =>
-                imageExtensions.Contains(Path.GetExtension(source), StringComparer.OrdinalIgnoreCase))
+                ImageExtensions.Contains(Path.GetExtension(source), StringComparer.OrdinalIgnoreCase))
             .FirstOrDefault(source => File.Exists(source) && MetaId(source) == icon.AssetId);
     }
 
@@ -88,7 +88,7 @@ public static class ProjectIcon
     {
         ArgumentNullException.ThrowIfNull(image);
 
-        var entries = icoSizes.Select(size => (Size: size, Png: EncodePng(image, size))).ToList();
+        var entries = IcoSizes.Select(size => (Size: size, Png: EncodePng(image, size))).ToList();
 
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);

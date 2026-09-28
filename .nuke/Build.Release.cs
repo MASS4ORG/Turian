@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Turian.NUKE;
 
 /// <summary>
@@ -10,21 +8,21 @@ namespace Turian.NUKE;
 sealed partial class Build
 {
     [Parameter("GitLab group/project path, e.g. turian/Turian (default: turian/Turian)")]
-    readonly string gitlabProjectPath = "turian/Turian";
+    readonly string GitlabProjectPath = "turian/Turian";
 
     [Parameter("GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)")]
-    readonly string githubRepository = "turian/Turian";
+    readonly string GithubRepository = "turian/Turian";
 
     [Parameter("Branch the release commit is pushed to (default: main)")]
-    readonly string releaseBranch = "main";
+    readonly string ReleaseBranch = "main";
 
     [Parameter("GitLab personal/project access token with api + write_repository scope. Omit to skip pushing/releasing to GitLab.")]
     [Secret]
-    readonly string gitlabToken;
+    readonly string GitlabToken;
 
     [Parameter("GitHub token (repo scope, or the Actions-provided GITHUB_TOKEN) with contents:write. Omit to skip pushing/releasing to GitHub.")]
     [Secret]
-    readonly string githubToken;
+    readonly string GithubToken;
 
     /// <summary>
     /// Commits the changelog, tags the release and pushes the commit+tag to every host a token
@@ -43,8 +41,8 @@ sealed partial class Build
                 RunGit("commit changelog", "-c", "commit.gpgsign=false", "commit", "-am", $"chore(release): {Version}");
                 RunGit("tag release", "-c", "tag.gpgsign=false", "tag", TagName);
 
-                PushToRemote("GitLab", gitlabToken, gitlabProjectPath, "gitlab.com", "oauth2");
-                PushToRemote("GitHub", githubToken, githubRepository, "github.com", "x-access-token");
+                PushToRemote("GitLab", GitlabToken, GitlabProjectPath, "gitlab.com", "oauth2");
+                PushToRemote("GitHub", GithubToken, GithubRepository, "github.com", "x-access-token");
             });
 
     void PushToRemote(string name, string token, string repositoryPath, string host, string credentialUser)
@@ -64,7 +62,7 @@ sealed partial class Build
             return;
         }
 
-        RunGit("push release commit", "push", url, $"HEAD:{releaseBranch}");
+        RunGit("push release commit", "push", url, $"HEAD:{ReleaseBranch}");
         RunGit("push release tag", "push", url, TagName);
         Log.Information("Pushed {TagName} to {Name}", TagName, name);
     }
@@ -89,8 +87,8 @@ sealed partial class Build
         if (process.ExitCode == 0) return standardOutput;
 
         var message = standardError;
-        if (!string.IsNullOrEmpty(githubToken)) message = message.Replace(githubToken, "[redacted]", StringComparison.Ordinal);
-        if (!string.IsNullOrEmpty(gitlabToken)) message = message.Replace(gitlabToken, "[redacted]", StringComparison.Ordinal);
+        if (!string.IsNullOrEmpty(GithubToken)) message = message.Replace(GithubToken, "[redacted]", StringComparison.Ordinal);
+        if (!string.IsNullOrEmpty(GitlabToken)) message = message.Replace(GitlabToken, "[redacted]", StringComparison.Ordinal);
         throw new InvalidOperationException($"Git {operation} failed (exit {process.ExitCode}): {message.Trim()}");
     }
 
@@ -100,13 +98,14 @@ sealed partial class Build
     /// </summary>
     public Target GitLabRelease => td =>
         td
-            .Requires(() => gitlabToken)
+            .Requires(() => GitlabToken)
             .Executes(async () =>
             {
-                using var http = new HttpClient { BaseAddress = new Uri("https://gitlab.com/api/v4/") };
-                http.DefaultRequestHeaders.Add("PRIVATE-TOKEN", gitlabToken);
+                using var http = new HttpClient();
+                http.BaseAddress = new Uri("https://gitlab.com/api/v4/");
+                http.DefaultRequestHeaders.Add("PRIVATE-TOKEN", GitlabToken);
 
-                var encodedProject = Uri.EscapeDataString(gitlabProjectPath);
+                var encodedProject = Uri.EscapeDataString(GitlabProjectPath);
                 var links = new List<object>();
 
                 foreach (var archive in ArtifactsDirectory.GlobFiles("*.zip", "*.deb", "*.exe"))
@@ -147,11 +146,12 @@ sealed partial class Build
     /// </summary>
     public Target GitHubRelease => td =>
         td
-            .Requires(() => githubToken)
+            .Requires(() => GithubToken)
             .Executes(async () =>
             {
-                using var http = new HttpClient { BaseAddress = new Uri("https://api.github.com/") };
-                http.DefaultRequestHeaders.Authorization = new("Bearer", githubToken);
+                using var http = new HttpClient();
+                http.BaseAddress = new Uri("https://api.github.com/");
+                http.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
                 http.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
                 http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
@@ -168,7 +168,7 @@ sealed partial class Build
                 });
 
                 var releaseResponse = await http.PostAsync(
-                    $"repos/{githubRepository}/releases",
+                    $"repos/{GithubRepository}/releases",
                     new StringContent(payload, Encoding.UTF8, "application/json"));
                 releaseResponse.EnsureSuccessStatusCode();
 
@@ -176,8 +176,9 @@ sealed partial class Build
                 var releaseId = releaseDocument.RootElement.GetProperty("id").GetInt64();
                 Log.Information("Created GitHub release {TagName}", TagName);
 
-                using var uploadHttp = new HttpClient { BaseAddress = new Uri("https://uploads.github.com/") };
-                uploadHttp.DefaultRequestHeaders.Authorization = new("Bearer", githubToken);
+                using var uploadHttp = new HttpClient();
+                uploadHttp.BaseAddress = new Uri("https://uploads.github.com/");
+                uploadHttp.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
                 uploadHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
                 uploadHttp.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
@@ -188,7 +189,7 @@ sealed partial class Build
                         ? "application/vnd.debian.binary-package"
                         : archive.HasExtension("exe") ? "application/vnd.microsoft.portable-executable" : "application/zip");
                     var uploadResponse = await uploadHttp.PostAsync(
-                        $"repos/{githubRepository}/releases/{releaseId}/assets?name={Uri.EscapeDataString(archive.Name)}",
+                        $"repos/{GithubRepository}/releases/{releaseId}/assets?name={Uri.EscapeDataString(archive.Name)}",
                         content);
                     uploadResponse.EnsureSuccessStatusCode();
                     Log.Information("Uploaded {Archive} to GitHub release {TagName}", archive.Name, TagName);

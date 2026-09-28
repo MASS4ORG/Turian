@@ -5,7 +5,7 @@ namespace Turian.Tests.Editor;
 /// </summary>
 public class ReferenceFieldTests
 {
-    static readonly Guid someId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+    static readonly Guid SomeId = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
     /// <summary>Reference fields are recognised with their target type.</summary>
     [Theory]
@@ -47,10 +47,10 @@ public class ReferenceFieldTests
         var holder = new Holder();
         var reference = ReferenceField.TryCreate(FieldFor(nameof(Holder.DirectNode), holder))!;
 
-        Assert.True(reference.SetTarget(new Node { Id = someId }));
+        Assert.True(reference.SetTarget(new Node { Id = SomeId }));
 
-        Assert.Equal(someId, reference.CurrentId);
-        Assert.Equal(someId, holder.DirectNode!.Id);
+        Assert.Equal(SomeId, reference.CurrentId);
+        Assert.Equal(SomeId, holder.DirectNode!.Id);
         Assert.False(reference.IsEmpty);
     }
 
@@ -58,7 +58,7 @@ public class ReferenceFieldTests
     [Fact]
     public void ClearingEmptiesTheReference()
     {
-        var holder = new Holder { Texture = new AssetReference<TextureAsset>(someId) };
+        var holder = new Holder { Texture = new AssetReference<TextureAsset>(SomeId) };
         var reference = ReferenceField.TryCreate(FieldFor(nameof(Holder.Texture), holder))!;
         Assert.False(reference.IsEmpty);
 
@@ -77,7 +77,7 @@ public class ReferenceFieldTests
         var field = FormBuilder.Build(holder, notified.Add).Sections[0].Fields
             .First(f => f.Name == nameof(Holder.DirectNode));
 
-        ReferenceField.TryCreate(field)!.Set(someId);
+        ReferenceField.TryCreate(field)!.Set(SomeId);
 
         Assert.Equal([holder], notified);
     }

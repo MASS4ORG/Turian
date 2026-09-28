@@ -5,12 +5,12 @@ namespace Turian.Engine.Core;
 /// </summary>
 public static class RuntimeServices
 {
-    static IServiceProvider? services;
+    static IServiceProvider? _services;
 
     /// <summary>
     /// Gets a value indicating whether runtime services have been configured.
     /// </summary>
-    public static bool IsConfigured => services is not null;
+    public static bool IsConfigured => _services is not null;
 
     /// <summary>
     /// Configures the runtime service provider.
@@ -19,7 +19,7 @@ public static class RuntimeServices
     public static void Configure(IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(serviceProvider);
-        services = serviceProvider;
+        _services = serviceProvider;
     }
 
     /// <summary>
@@ -27,7 +27,7 @@ public static class RuntimeServices
     /// </summary>
     public static void Reset()
     {
-        services = null;
+        _services = null;
     }
 
     /// <summary>
@@ -46,5 +46,5 @@ public static class RuntimeServices
     /// </summary>
     /// <typeparam name="T">The service type to resolve.</typeparam>
     /// <returns>The resolved service instance, or <c>null</c> if unavailable.</returns>
-    public static T? TryGet<T>() where T : class => services?.GetService(typeof(T)) as T;
+    public static T? TryGet<T>() where T : class => _services?.GetService(typeof(T)) as T;
 }

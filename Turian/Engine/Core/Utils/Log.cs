@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
-
 namespace Turian.Engine.Core;
 
 /// <summary>
@@ -17,7 +15,7 @@ namespace Turian.Engine.Core;
 /// </remarks>
 public static class Log
 {
-    static ILoggerFactory factory = NullLoggerFactory.Instance;
+    static ILoggerFactory _factory = NullLoggerFactory.Instance;
 
     /// <summary>The ambient logger. A no-op until <see cref="Configure"/> runs.</summary>
     public static ILogger Logger { get; private set; } = NullLogger.Instance;
@@ -31,10 +29,10 @@ public static class Log
     {
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        factory = loggerFactory;
-        Logger = factory.CreateLogger("Turian");
+        _factory = loggerFactory;
+        Logger = _factory.CreateLogger("Turian");
     }
 
     /// <summary>Flushes and disposes the configured backend. A no-op if never configured.</summary>
-    public static void Shutdown() => factory.Dispose();
+    public static void Shutdown() => _factory.Dispose();
 }

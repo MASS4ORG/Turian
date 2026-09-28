@@ -173,7 +173,7 @@ public sealed partial class UiRenderer
         var hasColor = UiValue.TryColor(Style(gui, el, "color"), out var color);
         var ink = hasColor ? color : GuiColor.White;
 
-        if (gui.Pass == Pass.Pass2Render && edit.IsFocused && edit.HasSelection)
+        if (gui.Pass == Pass.Pass2Render && edit is { IsFocused: true, HasSelection: true })
         {
             var font = TextEditor.MeasuringFont(gui, size);
             var inner = gui.CurrentNode.InnerRect;

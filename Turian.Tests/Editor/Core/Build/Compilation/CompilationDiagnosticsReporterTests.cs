@@ -8,7 +8,7 @@ namespace Turian.Tests.Turian.Editor.Build;
 /// </summary>
 public class CompilationDiagnosticsReporterTests
 {
-    static readonly DiagnosticDescriptor errorDescriptor = new(
+    static readonly DiagnosticDescriptor ErrorDescriptor = new(
         id: "TEST0001",
         title: "Test Error",
         messageFormat: "{0}",
@@ -16,7 +16,7 @@ public class CompilationDiagnosticsReporterTests
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    static readonly DiagnosticDescriptor warningDescriptor = new(
+    static readonly DiagnosticDescriptor WarningDescriptor = new(
         id: "TEST0002",
         title: "Test Warning",
         messageFormat: "{0}",
@@ -24,7 +24,7 @@ public class CompilationDiagnosticsReporterTests
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    static readonly DiagnosticDescriptor infoDescriptor = new(
+    static readonly DiagnosticDescriptor InfoDescriptor = new(
         id: "TEST0003",
         title: "Test Info",
         messageFormat: "{0}",
@@ -32,7 +32,7 @@ public class CompilationDiagnosticsReporterTests
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true);
 
-    static readonly DiagnosticDescriptor hiddenDescriptor = new(
+    static readonly DiagnosticDescriptor HiddenDescriptor = new(
         id: "TEST0004",
         title: "Test Hidden",
         messageFormat: "{0}",
@@ -48,7 +48,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void FormatMessage_Error_ReturnsExpectedFormat()
     {
-        var d = MakeDiagnostic(errorDescriptor, "TestFile.cs", line: 4, col: 8, "undeclared variable");
+        var d = MakeDiagnostic(ErrorDescriptor, "TestFile.cs", line: 4, col: 8, "undeclared variable");
 
         var result = CompilationDiagnosticsReporter.FormatMessage(d);
 
@@ -59,7 +59,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void FormatMessage_Warning_ReturnsWarningKeyword()
     {
-        var d = MakeDiagnostic(warningDescriptor, "Foo.cs", line: 0, col: 0, "unused import");
+        var d = MakeDiagnostic(WarningDescriptor, "Foo.cs", line: 0, col: 0, "unused import");
 
         var result = CompilationDiagnosticsReporter.FormatMessage(d);
 
@@ -70,7 +70,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void FormatMessage_NoSourceLocation_ShowsNA()
     {
-        var d = Diagnostic.Create(errorDescriptor, Location.None, "no location");
+        var d = Diagnostic.Create(ErrorDescriptor, Location.None, "no location");
 
         var result = CompilationDiagnosticsReporter.FormatMessage(d);
 
@@ -95,7 +95,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_HiddenDiagnostic_IsNotCounted()
     {
-        var d = Diagnostic.Create(hiddenDescriptor, Location.None, "hidden");
+        var d = Diagnostic.Create(HiddenDescriptor, Location.None, "hidden");
 
         var (errors, warnings) = CompilationDiagnosticsReporter.Report([d], logger);
 
@@ -107,7 +107,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_InfoDiagnostic_IsNotCounted()
     {
-        var d = Diagnostic.Create(infoDescriptor, Location.None, "info");
+        var d = Diagnostic.Create(InfoDescriptor, Location.None, "info");
 
         var (errors, warnings) = CompilationDiagnosticsReporter.Report([d], logger);
 
@@ -119,7 +119,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_ErrorDiagnostic_IsCountedAsError()
     {
-        var d = Diagnostic.Create(errorDescriptor, Location.None, "error msg");
+        var d = Diagnostic.Create(ErrorDescriptor, Location.None, "error msg");
 
         var (errors, warnings) = CompilationDiagnosticsReporter.Report([d], logger);
 
@@ -131,7 +131,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_WarningDiagnostic_IsCountedAsWarning()
     {
-        var d = Diagnostic.Create(warningDescriptor, Location.None, "warn msg");
+        var d = Diagnostic.Create(WarningDescriptor, Location.None, "warn msg");
 
         var (errors, warnings) = CompilationDiagnosticsReporter.Report([d], logger);
 
@@ -145,8 +145,8 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_DuplicateErrorAtSameLocation_CountedOnce()
     {
-        var d1 = MakeDiagnostic(errorDescriptor, "File.cs", line: 2, col: 4, "same error");
-        var d2 = MakeDiagnostic(errorDescriptor, "File.cs", line: 2, col: 4, "same error");
+        var d1 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 2, col: 4, "same error");
+        var d2 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 2, col: 4, "same error");
 
         var (errors, _) = CompilationDiagnosticsReporter.Report([d1, d2], logger);
 
@@ -157,8 +157,8 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_SameCodeDifferentLocations_BothCounted()
     {
-        var d1 = MakeDiagnostic(errorDescriptor, "File.cs", line: 2, col: 4, "error msg");
-        var d2 = MakeDiagnostic(errorDescriptor, "File.cs", line: 5, col: 1, "error msg");
+        var d1 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 2, col: 4, "error msg");
+        var d2 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 5, col: 1, "error msg");
 
         var (errors, _) = CompilationDiagnosticsReporter.Report([d1, d2], logger);
 
@@ -169,8 +169,8 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_SameLocationDifferentMessages_BothCounted()
     {
-        var d1 = MakeDiagnostic(errorDescriptor, "File.cs", line: 2, col: 4, "first error");
-        var d2 = MakeDiagnostic(errorDescriptor, "File.cs", line: 2, col: 4, "second error");
+        var d1 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 2, col: 4, "first error");
+        var d2 = MakeDiagnostic(ErrorDescriptor, "File.cs", line: 2, col: 4, "second error");
 
         var (errors, _) = CompilationDiagnosticsReporter.Report([d1, d2], logger);
 
@@ -184,11 +184,11 @@ public class CompilationDiagnosticsReporterTests
     public void Report_MixedSeverity_ReturnsCorrectCounts()
     {
         var diagnostics = ImmutableArray.Create(
-            Diagnostic.Create(errorDescriptor, Location.None, "e1"),
-            Diagnostic.Create(errorDescriptor, Location.None, "e2"),
-            Diagnostic.Create(warningDescriptor, Location.None, "w1"),
-            Diagnostic.Create(infoDescriptor, Location.None, "i1"),
-            Diagnostic.Create(hiddenDescriptor, Location.None, "h1"));
+            Diagnostic.Create(ErrorDescriptor, Location.None, "e1"),
+            Diagnostic.Create(ErrorDescriptor, Location.None, "e2"),
+            Diagnostic.Create(WarningDescriptor, Location.None, "w1"),
+            Diagnostic.Create(InfoDescriptor, Location.None, "i1"),
+            Diagnostic.Create(HiddenDescriptor, Location.None, "h1"));
 
         var (errors, warnings) = CompilationDiagnosticsReporter.Report(diagnostics, logger);
 
@@ -202,7 +202,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_ErrorDiagnostic_LogsAsError()
     {
-        var d = Diagnostic.Create(errorDescriptor, Location.None, "error msg");
+        var d = Diagnostic.Create(ErrorDescriptor, Location.None, "error msg");
         CompilationDiagnosticsReporter.Report([d], logger);
 
         var levels = LoggedLevels();
@@ -214,7 +214,7 @@ public class CompilationDiagnosticsReporterTests
     [Fact]
     public void Report_WarningDiagnostic_LogsAsWarning()
     {
-        var d = Diagnostic.Create(warningDescriptor, Location.None, "warn msg");
+        var d = Diagnostic.Create(WarningDescriptor, Location.None, "warn msg");
         CompilationDiagnosticsReporter.Report([d], logger);
 
         var levels = LoggedLevels();

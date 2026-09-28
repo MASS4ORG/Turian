@@ -10,13 +10,13 @@ sealed partial class Build
     // fails injection (gitVersion stays null) when the repo's remotes are SSH URLs. The checkout
     // (local or CI) already has the history/tags it needs, so no additional fetch is required.
     [GitVersion(NoFetch = true)]
-    readonly GitVersion gitVersion;
+    readonly GitVersion GitVersion;
 
     /// <summary>
     /// The current version, using GitVersion. A publish build checks out a tag on a detached HEAD, where
     /// GitVersion cannot run without remote credentials; the tag being built is the version there.
     /// </summary>
-    string Version => gitVersion?.MajorMinorPatch ?? CurrentVersion;
+    string Version => GitVersion?.MajorMinorPatch ?? CurrentVersion;
 
     public string VersionMajor => Version.Split('.')[0];
 
@@ -30,27 +30,27 @@ sealed partial class Build
     /// <summary>
     /// Checks if there are new commits since the last tag.
     /// </summary>
-    bool HasNewCommits => gitVersion is not null && gitVersion.CommitsSinceVersionSource != "0";
+    bool HasNewCommits => GitVersion is not null && GitVersion.CommitsSinceVersionSource != "0";
 
-    string currentVersion;
+    string CachedTag;
     string CurrentTag
     {
         get
         {
-            if (currentVersion is null)
+            if (CachedTag is null)
             {
                 try
                 {
-                    currentVersion = Git("describe --tags --abbrev=0")
+                    CachedTag = Git("describe --tags --abbrev=0")
                         .FirstOrDefault()
                         .Text;
                 }
                 catch
                 {
-                    currentVersion = "0.0.0";
+                    CachedTag = "0.0.0";
                 }
             }
-            return currentVersion;
+            return CachedTag;
         }
     }
     string CurrentVersion => CurrentTag.TrimStart('v');
@@ -93,7 +93,7 @@ sealed partial class Build
                 {
                     Log.Information(
                         "There are {GitVersionCommitsSinceVersionSource} new commits since last tag",
-                        gitVersion.CommitsSinceVersionSource
+                        GitVersion.CommitsSinceVersionSource
                     );
                 }
                 else

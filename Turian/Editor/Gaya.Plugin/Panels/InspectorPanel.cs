@@ -161,7 +161,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             builtComponents = 0;
             assetDirty = false;
             var section = model.Sections.Count > 0 ? model.Sections[0] : null;
-            Log.Logger.LogInformation("asset model built for {Path} ({Type}), targetNull={Null}, fields={Fields}, buttons={Buttons}",
+            Log.Logger.LogDebug("asset model built for {Path} ({Type}), targetNull={Null}, fields={Fields}, buttons={Buttons}",
                 Path.GetFileName(inspection.AbsolutePath), inspection.Target?.GetType().FullName,
                 inspection.Target is null, section?.BodyFields.Count ?? -1, section?.Buttons.Count ?? -1);
         }

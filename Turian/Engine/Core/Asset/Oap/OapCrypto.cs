@@ -101,7 +101,7 @@ public static class OapCrypto
     // function is implemented here. The block counter starts at 0, matching the
     // reference OAP writer.
 
-    static readonly uint[] chaChaConstants =
+    static readonly uint[] ChaChaConstants =
         [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
 
     /// <summary>
@@ -125,10 +125,10 @@ public static class OapCrypto
         }
 
         Span<uint> initial = stackalloc uint[16];
-        initial[0] = chaChaConstants[0];
-        initial[1] = chaChaConstants[1];
-        initial[2] = chaChaConstants[2];
-        initial[3] = chaChaConstants[3];
+        initial[0] = ChaChaConstants[0];
+        initial[1] = ChaChaConstants[1];
+        initial[2] = ChaChaConstants[2];
+        initial[3] = ChaChaConstants[3];
         for (var i = 0; i < 8; i++)
         {
             initial[4 + i] = BinaryPrimitives.ReadUInt32LittleEndian(key[(i * 4)..]);

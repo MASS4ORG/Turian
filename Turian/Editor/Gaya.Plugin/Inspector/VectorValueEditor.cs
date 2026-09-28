@@ -11,7 +11,7 @@ namespace Gaya.Plugin.Turian;
 [CustomEditor(typeof(Vector4))]
 sealed class VectorValueEditor : IValueEditor
 {
-    static readonly string[] axes = ["X", "Y", "Z", "W"];
+    static readonly string[] Axes = ["X", "Y", "Z", "W"];
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -95,7 +95,7 @@ sealed class VectorValueEditor : IValueEditor
                 var delta = (drag.FrameDelta.X - drag.FrameDelta.Y) * 0.01;
                 value += delta;
             }
-            gui.DrawText(axes[Math.Min(index, axes.Length - 1)], Theme.Text(11),
+            gui.DrawText(Axes[Math.Min(index, Axes.Length - 1)], Theme.Text(11),
                 hot ? Theme.Ink : InkDim, centerInRect: false);
         }
 

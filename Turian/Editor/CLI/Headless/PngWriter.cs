@@ -5,7 +5,7 @@ namespace Turian.Editor.CLI;
 /// </summary>
 static class PngWriter
 {
-    static readonly byte[] signature = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    static readonly byte[] Signature = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
     /// <summary>
     /// Writes <paramref name="bgra"/> to <paramref name="filePath"/>.
@@ -47,7 +47,7 @@ static class PngWriter
         }
 
         using var file = File.Create(filePath);
-        file.Write(signature);
+        file.Write(Signature);
 
         Span<byte> header = stackalloc byte[13];
         BinaryPrimitives.WriteUInt32BigEndian(header[..4], width);

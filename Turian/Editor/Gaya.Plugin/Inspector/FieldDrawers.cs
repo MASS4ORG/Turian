@@ -128,7 +128,7 @@ static class FieldDrawers
     /// type's edge saturates here instead of overflowing — an unsigned dragged past MinValue must
     /// clamp, not throw the frame away.
     /// </summary>
-    static readonly Dictionary<Type, (double Min, double Max)> typeRanges = new()
+    static readonly Dictionary<Type, (double Min, double Max)> TypeRanges = new()
     {
         [typeof(byte)] = (byte.MinValue, byte.MaxValue),
         [typeof(sbyte)] = (sbyte.MinValue, sbyte.MaxValue),
@@ -144,7 +144,7 @@ static class FieldDrawers
     };
 
     static (double Min, double Max) TypeRange(Type type) =>
-        typeRanges.TryGetValue(type, out var range) ? range : (float.MinValue, float.MaxValue);
+        TypeRanges.TryGetValue(type, out var range) ? range : (float.MinValue, float.MaxValue);
 
     static void DrawEditor(Gui gui, FormField field, Type type, string id, Func<string, string>? translate = null)
     {

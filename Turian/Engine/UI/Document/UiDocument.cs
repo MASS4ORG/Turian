@@ -25,7 +25,7 @@ public sealed class UiDocument
     /// <summary>Project-relative path the document was loaded from, for diagnostics. Optional.</summary>
     public string? SourcePath { get; init; }
 
-    static readonly JsonSerializerOptions jsonOptions = new()
+    static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -33,12 +33,12 @@ public sealed class UiDocument
     };
 
     /// <summary>Serializes the document to JSON (used by tooling and the baked import artifact).</summary>
-    public string ToJson() => JsonSerializer.Serialize(this, jsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
     /// <summary>Rebuilds a document from JSON produced by <see cref="ToJson"/>.</summary>
     /// <param name="json">JSON text.</param>
     public static UiDocument FromJson(string json) =>
-        JsonSerializer.Deserialize<UiDocument>(json, jsonOptions)
+        JsonSerializer.Deserialize<UiDocument>(json, JsonOptions)
         ?? throw new JsonException("The JSON did not contain a UI document");
 
     /// <summary>Finds the first element in the tree with the given <c>name</c>.</summary>

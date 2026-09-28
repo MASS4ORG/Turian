@@ -8,9 +8,9 @@ sealed partial class Build
 {
     static AbsolutePath ChangelogFile => RootDirectory / "CHANGELOG.md";
 
-    const string UnreleasedHeader = "## [Unreleased]";
+    const string unreleasedHeader = "## [Unreleased]";
 
-    static readonly (string Prefix, string Section)[] changelogSections =
+    static readonly (string Prefix, string Section)[] ChangelogSections =
     [
         ("feat", "Added"),
         ("fix", "Fixed"),
@@ -61,7 +61,7 @@ sealed partial class Build
             }
 
             var type = match.Groups["type"].Value;
-            var section = changelogSections
+            var section = ChangelogSections
                 .FirstOrDefault(entry => string.Equals(entry.Prefix, type, StringComparison.OrdinalIgnoreCase))
                 .Section;
             if (section is null)
@@ -85,7 +85,7 @@ sealed partial class Build
         var builder = new StringBuilder();
         builder.AppendLine(CultureInfo.InvariantCulture, $"## [{version}] - {DateTime.UtcNow:yyyy-MM-dd}");
 
-        var orderedSections = changelogSections.Select(entry => entry.Section).Distinct();
+        var orderedSections = ChangelogSections.Select(entry => entry.Section).Distinct();
         foreach (var section in orderedSections)
         {
             if (!grouped.TryGetValue(section, out var entries) || entries.Count == 0)
@@ -107,13 +107,13 @@ sealed partial class Build
     static void WriteChangelogSection(string section)
     {
         var content = ChangelogFile.FileExists() ? ChangelogFile.ReadAllText() : $"# Changelog{Environment.NewLine}";
-        var replacement = $"{UnreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}";
+        var replacement = $"{unreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}";
 
         // Replace the whole old "## [Unreleased]" section (header + body up to the next "## "
         // heading or end of file), not just the header line, so stale Unreleased content doesn't
         // survive as an orphaned block below the newly inserted version section.
         var unreleasedSection = new Regex(
-            $@"{Regex.Escape(UnreleasedHeader)}.*?(?=\n##\s|\z)",
+            $@"{Regex.Escape(unreleasedHeader)}.*?(?=\n##\s|\z)",
             RegexOptions.Singleline);
 
         content = unreleasedSection.IsMatch(content)

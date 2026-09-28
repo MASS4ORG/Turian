@@ -226,7 +226,7 @@ public static partial class ModelUtils
         var buffers = LoadGltfBuffers(root, isGlb ? LoadBinaryChunkFromGlb(path) : null, Path.GetDirectoryName(path));
         var buffer = buffers[view.GetProperty("buffer").GetInt32()];
         var offset = view.TryGetProperty("byteOffset", out var offsetElem) ? offsetElem.GetInt32() : 0;
-        return buffer.AsSpan(offset, view.GetProperty("byteLength").GetInt32()).ToArray();
+        return [.. buffer.AsSpan(offset, view.GetProperty("byteLength").GetInt32())];
     }
 
     static byte[] DecodeDataUri(string uri) =>

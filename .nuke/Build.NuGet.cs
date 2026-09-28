@@ -44,7 +44,7 @@ sealed partial class Build
                         settings = settings
                             .SetProject(project)
                             .SetNoLogo(true)
-                            .SetConfiguration(Configuration)
+                            .SetConfiguration(Config)
                             .SetOutputDirectory(PackagesDirectory)
                             .EnableNoBuild()
                             .SetProperty("GuineverePackageExcludeAssets", "none")

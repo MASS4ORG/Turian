@@ -7,6 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Turian.Engine.Core</RootNamespace>
         <PackageId>MASS4.Turian.Engine.Core</PackageId>
     </PropertyGroup>
 

@@ -3,16 +3,16 @@ namespace Turian.Tests;
 /// <summary>Tests for <see cref="CameraMath.ScreenPointToRay"/>.</summary>
 public class CameraMathTests
 {
-    static readonly Vector2 viewport = new(960f, 540f);
+    static readonly Vector2 Viewport = new(960f, 540f);
 
     /// <summary>The viewport centre casts a ray straight down the camera's forward axis.</summary>
     [Fact]
     public void ScreenPointToRay_ViewportCenter_PointsAlongFront()
     {
         var camera = new EditorCamera { Position = new Vector3(1f, 2f, 3f) };
-        var center = new Vector2(viewport.X / 2f, viewport.Y / 2f);
+        var center = new Vector2(Viewport.X / 2f, Viewport.Y / 2f);
 
-        var ray = CameraMath.ScreenPointToRay(camera, center, viewport);
+        var ray = CameraMath.ScreenPointToRay(camera, center, Viewport);
 
         Assert.NotNull(ray);
         Assert.True(Vector3.Distance(Vector3.Normalize(ray.Value.Direction), camera.Front) < 1e-3f);
@@ -31,10 +31,10 @@ public class CameraMathTests
             FieldOfView = 60f * MathF.PI / 180f,
         };
         var topLeft = new Vector2(0f, 0f);
-        var bottomRight = new Vector2(viewport.X, viewport.Y);
+        var bottomRight = new Vector2(Viewport.X, Viewport.Y);
 
-        var rayA = CameraMath.ScreenPointToRay(camera, topLeft, viewport)!.Value;
-        var rayB = CameraMath.ScreenPointToRay(camera, bottomRight, viewport)!.Value;
+        var rayA = CameraMath.ScreenPointToRay(camera, topLeft, Viewport)!.Value;
+        var rayB = CameraMath.ScreenPointToRay(camera, bottomRight, Viewport)!.Value;
 
         // For a perspective camera every ray originates near the camera position — "near" because
         // the ray's origin is the unprojected near plane, offset from the camera by NearPlane.
@@ -54,8 +54,8 @@ public class CameraMathTests
         var left = new Vector2(100f, 270f);
         var right = new Vector2(860f, 270f);
 
-        var rayA = CameraMath.ScreenPointToRay(camera, left, viewport)!.Value;
-        var rayB = CameraMath.ScreenPointToRay(camera, right, viewport)!.Value;
+        var rayA = CameraMath.ScreenPointToRay(camera, left, Viewport)!.Value;
+        var rayB = CameraMath.ScreenPointToRay(camera, right, Viewport)!.Value;
 
         Assert.True(Vector3.Distance(rayA.Direction, rayB.Direction) < 1e-3f);
         Assert.True(Vector3.Distance(rayA.Origin, rayB.Origin) > 1f);

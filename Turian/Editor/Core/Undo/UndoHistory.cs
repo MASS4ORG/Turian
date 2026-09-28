@@ -225,10 +225,10 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
     }
 
     bool CanMerge(UndoStep previous, UndoStep next) =>
-        !previous.Sealed && previous.UndoEffect is null && next.UndoEffect is null
-        && next.LastChanged - previous.LastChanged <= window
-        && previous.Label == next.Label
-        && previous.Document == next.Document
-        && previous.After.Count == next.Before.Count
-        && next.Before.Keys.All(previous.After.ContainsKey);
+        previous is { Sealed: false, UndoEffect: null } && next.UndoEffect is null
+                                                        && next.LastChanged - previous.LastChanged <= window
+                                                        && previous.Label == next.Label
+                                                        && previous.Document == next.Document
+                                                        && previous.After.Count == next.Before.Count
+                                                        && next.Before.Keys.All(previous.After.ContainsKey);
 }

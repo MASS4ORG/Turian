@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -138,7 +136,7 @@ public sealed class UndoService : IDisposable
         {
             Run(perform);
             history.Push(new UndoStep(label, owner, before, Capture(before.Keys))
-                { UndoEffect = revert, RedoEffect = perform }, mergeable: false);
+            { UndoEffect = revert, RedoEffect = perform }, mergeable: false);
         }
 
         WatchSelection();

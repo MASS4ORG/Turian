@@ -193,7 +193,7 @@ sealed class AssetBrowserPanel : IPanel
     /// anyway), or the kind's default glyph for anything else, including asset types with a live
     /// preview too costly to render per row today (a material or a model — see <see cref="AssetPreviewCatalog"/>).
     /// </summary>
-    Action<Gui>? IconFor(AssetEntry entry)
+    Action<Gui> IconFor(AssetEntry entry)
     {
         var theme = StudioTheme.Current;
         var size = theme.Scale(theme.RowHeight) - 4f;

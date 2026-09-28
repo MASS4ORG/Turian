@@ -111,8 +111,8 @@ sealed class SceneTreePanel : IPanel
                 }
 
                 // A node row dropped on another row moves under it.
-                if (item.Tag is Node target && payload is ReferenceDragPayload moved
-                    && sceneTree.FindNodeById(moved.Id) is { } dropped)
+                if (item.Tag is Node target && payload is ReferenceDragPayload dragged
+                    && sceneTree.FindNodeById(dragged.Id) is { } dropped)
                     Restructure(dropped, () => Reparent(dropped, target));
             });
 
@@ -318,7 +318,7 @@ sealed class SceneTreePanel : IPanel
     void Reparent(Node node, Node target)
     {
         if (ReferenceEquals(node, target) || node.Parent is not { } parent) return;
-        for (Node? ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
+        for (var ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
             if (ReferenceEquals(ancestor, node)) return;
 
         undo.RecordObject(parent, "Reparent");
@@ -433,7 +433,7 @@ sealed class SceneTreePanel : IPanel
             PrefabLink.NestedInstance => (EditorIcons.Cube, theme.InkDim),
             PrefabLink.VariantInstance => (EditorIcons.Clone, theme.Accent),
             PrefabLink.Missing => (EditorIcons.LinkSlash, theme.Error),
-            _ => ((string?)null, default(GuiColor)),
+            _ => (null, default),
         };
 
         return glyph is null ? null : gui => gui.DrawText(glyph, theme.Text(11), color);

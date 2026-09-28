@@ -19,19 +19,27 @@ public static class PluralRules
     {
         var language = (locale ?? string.Empty).Split('-', '_')[0];
         var n = Math.Abs(value);
-        return rules.TryGetValue(language, out var rule) ? rule(new Operands(n)) : Germanic(new Operands(n));
+        return Rules.TryGetValue(language, out var rule) ? rule(new Operands(n)) : Germanic(new Operands(n));
     }
 
-    static readonly Dictionary<string, Func<Operands, PluralCategory>> rules =
+    static readonly Dictionary<string, Func<Operands, PluralCategory>> Rules =
         new(StringComparer.OrdinalIgnoreCase)
         {
             // No grammatical number distinction.
-            ["ja"] = NoPlural, ["ko"] = NoPlural, ["zh"] = NoPlural, ["th"] = NoPlural,
-            ["vi"] = NoPlural, ["id"] = NoPlural, ["tr"] = NoPlural,
+            ["ja"] = NoPlural,
+            ["ko"] = NoPlural,
+            ["zh"] = NoPlural,
+            ["th"] = NoPlural,
+            ["vi"] = NoPlural,
+            ["id"] = NoPlural,
+            ["tr"] = NoPlural,
             ["fr"] = French,
-            ["ru"] = EastSlavic, ["uk"] = EastSlavic, ["be"] = EastSlavic,
+            ["ru"] = EastSlavic,
+            ["uk"] = EastSlavic,
+            ["be"] = EastSlavic,
             ["pl"] = Polish,
-            ["cs"] = WestSlavic, ["sk"] = WestSlavic,
+            ["cs"] = WestSlavic,
+            ["sk"] = WestSlavic,
             ["ar"] = Arabic,
             ["he"] = Hebrew,
         };
@@ -79,8 +87,8 @@ public static class PluralRules
         0 => PluralCategory.Zero,
         1 => PluralCategory.One,
         2 => PluralCategory.Two,
-        _ when o.IsInteger && o.Mod100 is >= 3 and <= 10 => PluralCategory.Few,
-        _ when o.IsInteger && o.Mod100 is >= 11 and <= 99 => PluralCategory.Many,
+        _ when o is { IsInteger: true, Mod100: >= 3 and <= 10 } => PluralCategory.Few,
+        _ when o is { IsInteger: true, Mod100: >= 11 and <= 99 } => PluralCategory.Many,
         _ => PluralCategory.Other,
     };
 

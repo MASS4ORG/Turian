@@ -8,6 +8,7 @@ global using System.Runtime.CompilerServices;
 global using System.Security.Cryptography;
 global using System.Text;
 global using System.Text.Json;
+global using System.Text.Json.Nodes;
 global using System.Text.Json.Serialization;
 global using System.Text.RegularExpressions;
 global using System.Xml.Linq;
@@ -16,6 +17,8 @@ global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
 global using Microsoft.CodeAnalysis;
+global using Microsoft.CodeAnalysis.CSharp;
+global using Microsoft.CodeAnalysis.Diagnostics;
 global using Microsoft.CodeAnalysis.Text;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
@@ -27,9 +30,12 @@ global using Turian.Editor.Core;
 global using Turian.Engine.Core;
 global using Turian.Engine.UI;
 global using Xunit;
+global using Color = Turian.Engine.Core.Color;
 global using GKey = Guinevere.KeyboardKey;
 global using GMouseButton = Guinevere.MouseButton;
 global using GuiColor = Guinevere.Color;
+global using Key = Silk.NET.Input.Key;
+global using SilkMouseButton = Silk.NET.Input.MouseButton;
 
 // Several test classes reset and rebuild the process-wide AssetDatabase singleton.
 [assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]

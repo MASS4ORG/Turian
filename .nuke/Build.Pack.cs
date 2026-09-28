@@ -9,7 +9,7 @@ sealed partial class Build
     static AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
 
     AbsolutePath PackedArchive =>
-        ArtifactsDirectory / $"Turian-{Version}-{runtimeIdentifier}.zip";
+        ArtifactsDirectory / $"Turian-{Version}-{RuntimeIdentifier}.zip";
 
     // Not declared via .Produces(PackedArchive): that evaluates its argument eagerly while Nuke
     // builds the target graph, before GitVersion's [GitVersion] field injection has run, and
@@ -21,7 +21,7 @@ sealed partial class Build
             {
                 ArtifactsDirectory.CreateDirectory();
                 PackedArchive.DeleteFile();
-                ZipFile.CreateFromDirectory(PublishDirectory, PackedArchive, CompressionLevel.Optimal, includeBaseDirectory: false);
-                Log.Information("Packed {PublishDirectory} into {PackedArchive}", PublishDirectory, PackedArchive);
+                ZipFile.CreateFromDirectory(PublishDir, PackedArchive, CompressionLevel.Optimal, includeBaseDirectory: false);
+                Log.Information("Packed {PublishDir} into {PackedArchive}", PublishDir, PackedArchive);
             });
 }

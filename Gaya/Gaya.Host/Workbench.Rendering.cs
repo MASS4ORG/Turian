@@ -209,11 +209,11 @@ public sealed partial class Workbench
     /// </summary>
     IEnumerable<(string MenuId, string Label)> TopLevelMenus()
     {
-        foreach (var menuId in menuOrder.Where(HasItems))
-            yield return (menuId, T(menuLabels[menuId]));
+        foreach (var menuId in MenuOrder.Where(HasItems))
+            yield return (menuId, T(MenuLabels[menuId]));
 
         foreach (var (menuId, label) in app.Menus.DeclaredMenus)
-            if (!menuLabels.ContainsKey(menuId) && HasItems(menuId))
+            if (!MenuLabels.ContainsKey(menuId) && HasItems(menuId))
                 yield return (menuId, T(label));
     }
 

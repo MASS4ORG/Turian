@@ -9,6 +9,6 @@ static class TestAssetDatabase
     /// <summary>Drops the current singleton instance.</summary>
     public static void Reset() =>
         typeof(AssetDatabase)
-            .GetField("instance", BindingFlags.Static | BindingFlags.NonPublic)
+            .GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic)
             ?.SetValue(null, null);
 }

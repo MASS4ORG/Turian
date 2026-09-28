@@ -16,7 +16,7 @@ sealed class SceneViewport : IDisposable
 
     const float previewMargin = 12f;
 
-    static readonly KeyboardKey[] movementKeys =
+    static readonly KeyboardKey[] MovementKeys =
         [KeyboardKey.W, KeyboardKey.A, KeyboardKey.S, KeyboardKey.D, KeyboardKey.Q, KeyboardKey.E];
 
     readonly Vulkan vulkan;
@@ -245,7 +245,7 @@ sealed class SceneViewport : IDisposable
     void HandleKeyboard(IInputHandler input)
     {
         heldKeys.Clear();
-        foreach (var key in movementKeys)
+        foreach (var key in MovementKeys)
             if (input.IsKeyDown(key))
                 heldKeys.Add((int)key);
 

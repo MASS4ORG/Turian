@@ -8,14 +8,13 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 static class ValueEditorRegistry
 {
-    static readonly ConcurrentDictionary<Type, IValueEditor?> editorsByType = new();
-    static Dictionary<Type, IValueEditor>? byEditedType;
+    static readonly ConcurrentDictionary<Type, IValueEditor?> EditorsByType = new();
 
     static Dictionary<Type, IValueEditor> ByEditedType
     {
         get
         {
-            if (byEditedType is not null) return byEditedType;
+            if (field is not null) return field;
 
             var map = new Dictionary<Type, IValueEditor>();
             foreach (var type in typeof(ValueEditorRegistry).Assembly.GetTypes())
@@ -29,7 +28,7 @@ static class ValueEditorRegistry
                     map[attribute.EditorType] = editor;
             }
 
-            return byEditedType = map;
+            return field = map;
         }
     }
 
@@ -40,7 +39,7 @@ static class ValueEditorRegistry
     /// </summary>
     /// <param name="valueType">The type the field holds.</param>
     public static IValueEditor? For(Type valueType) =>
-        editorsByType.GetOrAdd(valueType, static t =>
+        EditorsByType.GetOrAdd(valueType, static t =>
         {
             var map = ByEditedType;
 

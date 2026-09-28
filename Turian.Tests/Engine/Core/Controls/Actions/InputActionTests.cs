@@ -1,5 +1,3 @@
-using Silk.NET.Input;
-
 namespace Turian.Tests;
 
 /// <summary>
