@@ -9,12 +9,8 @@
         <PackageId>MASS4.Turian.Engine.UI</PackageId>
     </PropertyGroup>
 
-    <PropertyGroup>
-        <GuineverePackageExcludeAssets Condition="'$(GuineverePackageExcludeAssets)' == ''"></GuineverePackageExcludeAssets>
-    </PropertyGroup>
-
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
     </ItemGroup>
 
     <!-- External libraries -->

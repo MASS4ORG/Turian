@@ -104,10 +104,19 @@ sealed partial class Build
         return builder.ToString().TrimEnd();
     }
 
-    static void WriteChangelogSection(string section)
+    void WriteChangelogSection(string section)
     {
         var content = ChangelogFile.FileExists() ? ChangelogFile.ReadAllText() : $"# Changelog{Environment.NewLine}";
-        var replacement = $"{unreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}";
+
+        // Link definitions live at the end of the file; they are lifted out so section edits never
+        // swallow them, then written back with the new version's diff link on top.
+        var links = LinkDefinition().Matches(content)
+            .Where(link => link.Groups["label"].Value is var label && label != "Unreleased" && label != Version)
+            .Select(link => link.Value.Trim())
+            .ToList();
+        content = LinkDefinition().Replace(content, string.Empty).TrimEnd();
+
+        var replacement = $"{unreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}{Environment.NewLine}";
 
         // Replace the whole old "## [Unreleased]" section (header + body up to the next "## "
         // heading or end of file), not just the header line, so stale Unreleased content doesn't
@@ -118,10 +127,23 @@ sealed partial class Build
 
         content = unreleasedSection.IsMatch(content)
             ? unreleasedSection.Replace(content, replacement.Replace("$", "$$", StringComparison.Ordinal), 1)
-            : $"{content.TrimEnd()}{Environment.NewLine}{Environment.NewLine}{replacement}{Environment.NewLine}";
+            : $"{content.TrimEnd()}{Environment.NewLine}{Environment.NewLine}{replacement}";
 
-        ChangelogFile.WriteAllText(content);
+        var repositoryUrl = $"https://github.com/{GithubRepository}";
+        links.InsertRange(0,
+        [
+            $"[Unreleased]: {repositoryUrl}/compare/v{Version}...HEAD",
+            HasAnyTags
+                ? $"[{Version}]: {repositoryUrl}/compare/{CurrentTag}...v{Version}"
+                : $"[{Version}]: {repositoryUrl}/releases/tag/v{Version}",
+        ]);
+
+        var newLine = Environment.NewLine;
+        ChangelogFile.WriteAllText($"{content.TrimEnd()}{newLine}{newLine}{string.Join(newLine, links)}{newLine}");
     }
+
+    [GeneratedRegex(@"^\[(?<label>[^\]]+)\]:[ \t]*\S+[ \t]*\r?$\n?", RegexOptions.Multiline)]
+    private static partial Regex LinkDefinition();
 
     /// <summary>
     /// The changelog section body for a given tag, used as release notes for GitLab/GitHub releases.
@@ -138,7 +160,7 @@ sealed partial class Build
         var content = ChangelogFile.ReadAllText();
         var match = Regex.Match(
             content,
-            $@"##\s*\[{Regex.Escape(version)}\][^\n]*\n(?<body>.*?)(?=\n##\s*\[|\z)",
+            $@"##\s*\[{Regex.Escape(version)}\][^\n]*\n(?<body>.*?)(?=\n##\s*\[|\n\[[^\]]+\]:|\z)",
             RegexOptions.Singleline);
         return match.Success ? match.Groups["body"].Value.Trim() : string.Empty;
     }

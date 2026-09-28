@@ -129,7 +129,7 @@
         },
         "GithubRepository": {
           "type": "string",
-          "description": "GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)"
+          "description": "GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)"
         },
         "GithubToken": {
           "type": "string",

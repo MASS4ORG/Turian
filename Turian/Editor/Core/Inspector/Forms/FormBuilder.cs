@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -51,7 +49,7 @@ public static class FormBuilder
         ArgumentNullException.ThrowIfNull(type);
         return memberViewsByType.GetValue(type, static t =>
             new Lazy<IReadOnlyList<MemberInfo>>(() =>
-                Array.AsReadOnly(EditableMetadata(t).Select(metadata => metadata.Member).ToArray()))).Value;
+                Array.AsReadOnly([.. EditableMetadata(t).Select(metadata => metadata.Member)]))).Value;
     }
 
     /// <summary>Cached, ordered metadata for the visible members of a type.</summary>
@@ -60,15 +58,16 @@ public static class FormBuilder
         ArgumentNullException.ThrowIfNull(type);
         return membersByType.GetValue(type, static t =>
             new Lazy<IReadOnlyList<InspectorMemberMetadata>>(() =>
-                Array.AsReadOnly(t.GetMembers(memberScope)
-                    .Where(member => member is FieldInfo field && !field.FieldType.IsByRefLike
-                                     || member is PropertyInfo property && property.GetMethod is not null
-                                     && property.GetIndexParameters().Length == 0
-                                     && !property.PropertyType.IsByRefLike)
-                    .Select(InspectorMemberMetadata.For)
-                    .Where(metadata => metadata.IsVisible)
-                    .OrderBy(metadata => metadata.Priority)
-                    .ToArray()))).Value;
+                Array.AsReadOnly([
+                    .. t.GetMembers(memberScope)
+                        .Where(member => member is FieldInfo field && !field.FieldType.IsByRefLike
+                                         || member is PropertyInfo property && property.GetMethod is not null
+                                                                            && property.GetIndexParameters().Length == 0
+                                                                            && !property.PropertyType.IsByRefLike)
+                        .Select(InspectorMemberMetadata.For)
+                        .Where(metadata => metadata.IsVisible)
+                        .OrderBy(metadata => metadata.Priority)
+                ]))).Value;
     }
 
     static FormSection SectionFor(

@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 
 namespace Turian.Editor.Core;
 
@@ -88,7 +87,7 @@ public sealed class InspectorMemberMetadata
         [.. attributes.OfType<TAttribute>()];
 
     IReadOnlyList<Attribute> Select(Func<Attribute, bool> predicate) =>
-        Array.AsReadOnly(attributes.Where(predicate).ToArray());
+        Array.AsReadOnly([.. attributes.Where(predicate)]);
 
     static Func<object, object?> CompileGetter(MemberInfo member)
     {

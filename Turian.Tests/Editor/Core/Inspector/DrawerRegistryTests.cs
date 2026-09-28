@@ -12,28 +12,33 @@ public class DrawerRegistryTests
     [AttributeUsage(AttributeTargets.Property)]
     sealed class OuterAttribute : Attribute;
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class Target
     {
         [Marker(1), Outer, Marker(2)]
         public int Value { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class TooltippedTarget
     {
         [Tooltip("Explains the value")]
         public int Value { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class NumericTarget
     {
         public int Value { get; set; } = 42;
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class NullableTarget
     {
         public int? Value { get; set; } = 5;
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class ReferenceTarget
     {
         public Node? Value { get; set; }

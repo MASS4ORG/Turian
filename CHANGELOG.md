@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - split CRAP hotspots and cover them with tests
+
 ## [1.0.1] - 2026-09-25
 
 - Fixed: publish successful platform artifacts even when one build fails
@@ -25,3 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-09-25
 
 - First commit!
+
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/MASS4ORG/Turian/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/MASS4ORG/Turian/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/MASS4ORG/Turian/releases/tag/v1.0.0

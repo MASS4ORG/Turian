@@ -10,8 +10,8 @@ sealed partial class Build
     [Parameter("GitLab group/project path, e.g. turian/Turian (default: turian/Turian)")]
     readonly string GitlabProjectPath = "turian/Turian";
 
-    [Parameter("GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)")]
-    readonly string GithubRepository = "turian/Turian";
+    [Parameter("GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)")]
+    readonly string GithubRepository = "MASS4ORG/Turian";
 
     [Parameter("Branch the release commit is pushed to (default: main)")]
     readonly string ReleaseBranch = "main";

@@ -43,6 +43,7 @@ public class FormBuilderTests
         public int DefaultSecond { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class UnsafeTarget
     {
         public int Valid { get; set; }
