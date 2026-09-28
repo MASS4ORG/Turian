@@ -47,7 +47,7 @@
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.2.0" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
     </ItemGroup>
 
 </Project>

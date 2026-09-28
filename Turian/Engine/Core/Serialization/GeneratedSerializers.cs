@@ -52,7 +52,7 @@ public sealed class GeneratedSerializer(
 /// </summary>
 public static class GeneratedSerializers
 {
-    static readonly ConcurrentDictionary<Type, GeneratedSerializer> serializers = new();
+    static readonly ConcurrentDictionary<Type, GeneratedSerializer> Serializers = new();
 
     /// <summary>Registers the generated serializer for <paramref name="type"/>.</summary>
     /// <param name="type">The serializable type.</param>
@@ -61,12 +61,12 @@ public static class GeneratedSerializers
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(serializer);
-        serializers[type] = serializer;
+        Serializers[type] = serializer;
     }
 
     /// <summary>Removes a registration, so the type falls back to reflection (for tests comparing the two).</summary>
     internal static bool Remove(Type type, out GeneratedSerializer? serializer) =>
-        serializers.TryRemove(type, out serializer);
+        Serializers.TryRemove(type, out serializer);
 
     /// <summary>Finds the generated serializer for exactly <paramref name="type"/>.</summary>
     /// <param name="type">The runtime type.</param>
@@ -74,5 +74,5 @@ public static class GeneratedSerializers
     /// <returns>True when one was generated.</returns>
     public static bool TryGet(Type type,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out GeneratedSerializer? serializer) =>
-        serializers.TryGetValue(type, out serializer);
+        Serializers.TryGetValue(type, out serializer);
 }

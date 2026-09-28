@@ -5,8 +5,8 @@ namespace Turian.Engine.Core;
 /// </summary>
 public static class Serializer
 {
-    static JsonSerializerOptions? jsonOptions;
-    static readonly Lock optionsGate = new();
+    static JsonSerializerOptions? _jsonOptions;
+    static readonly Lock OptionsGate = new();
 
     /// <summary>
     /// Default options for (de)serializing Objects
@@ -20,12 +20,12 @@ public static class Serializer
     {
         get
         {
-            var options = jsonOptions;
+            var options = _jsonOptions;
             if (options is not null) return options;
 
-            lock (optionsGate)
+            lock (OptionsGate)
             {
-                if (jsonOptions is not null) return jsonOptions;
+                if (_jsonOptions is not null) return _jsonOptions;
 
                 options = new JsonSerializerOptions
                 {
@@ -60,7 +60,7 @@ public static class Serializer
                         options.Converters.Add(converterInstance);
                 }
 
-                jsonOptions = options;
+                _jsonOptions = options;
                 return options;
             }
         }
@@ -73,9 +73,9 @@ public static class Serializer
     /// </summary>
     public static void ResetOptions()
     {
-        lock (optionsGate)
+        lock (OptionsGate)
         {
-            jsonOptions = null;
+            _jsonOptions = null;
         }
 
         TypeRegistry.Reset();

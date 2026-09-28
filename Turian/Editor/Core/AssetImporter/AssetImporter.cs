@@ -8,7 +8,7 @@ namespace Turian.Editor.Core;
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed partial class AssetImporter : IDisposable
 {
-    static readonly string[] ignoredExtensions =
+    static readonly string[] IgnoredExtensions =
     [
         ".cs",   // source code lives in Assets/ but is compiled, not imported as an asset
         ".tmp",

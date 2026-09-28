@@ -19,7 +19,7 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="MASS4.Guinevere" Version="5.2.0" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere" Version="5.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
     </ItemGroup>

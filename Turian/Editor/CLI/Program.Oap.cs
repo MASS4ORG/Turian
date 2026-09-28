@@ -191,7 +191,7 @@ public static partial class Program
             }
             catch (Exception ex) when (ex is OapException or IOException)
             {
-                Log.Logger.LogError("INVALID: {Path}: {Message}", path, ex.Message);
+                Log.Logger.LogError(ex, "INVALID: {Path}", path);
                 return 1;
             }
 
@@ -211,7 +211,7 @@ public static partial class Program
                 }
                 catch (OapException ex)
                 {
-                    Log.Logger.LogError("  CORRUPT: {Path} ({Message})", reader.VirtualPath(entry), ex.Message);
+                    Log.Logger.LogError(ex, "  CORRUPT: {Path}", reader.VirtualPath(entry));
                     failures++;
                 }
             }

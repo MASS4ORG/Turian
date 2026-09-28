@@ -10,7 +10,7 @@ namespace Turian.Engine.Core;
 [TypeId("a3000000-0000-4000-8000-000000000031")]
 public sealed class StringTableAsset : Asset
 {
-    static readonly ConcurrentDictionary<Guid, StringTable> cache = new();
+    static readonly ConcurrentDictionary<Guid, StringTable> Cache = new();
 
     /// <summary>
     /// Reads this table and returns the parsed <see cref="StringTable"/>, or <c>null</c> when the
@@ -18,7 +18,7 @@ public sealed class StringTableAsset : Asset
     /// </summary>
     public StringTable? GetContent()
     {
-        if (cache.TryGetValue(Id, out var cached)) return cached;
+        if (Cache.TryGetValue(Id, out var cached)) return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
@@ -28,7 +28,7 @@ public sealed class StringTableAsset : Asset
             using var stream = provider.GetAssetStream();
             using var reader = new StreamReader(stream);
             var table = StringTableJson.Load(reader.ReadToEnd());
-            cache[Id] = table;
+            Cache[Id] = table;
             return table;
         }
         catch (Exception ex) when (ex is IOException or JsonException)
@@ -40,10 +40,10 @@ public sealed class StringTableAsset : Asset
 
     /// <summary>Drops the cached table for <paramref name="assetId"/>, forcing a reload on next access.</summary>
     /// <param name="assetId">The string table asset id.</param>
-    public static void InvalidateCacheEntry(Guid assetId) => cache.TryRemove(assetId, out _);
+    public static void InvalidateCacheEntry(Guid assetId) => Cache.TryRemove(assetId, out _);
 
     /// <summary>Clears every cached table. Call on project unload.</summary>
-    public static void ClearCache() => cache.Clear();
+    public static void ClearCache() => Cache.Clear();
 
     /// <summary>Loads a <c>.strings</c> file directly from disk, bypassing the asset database.</summary>
     /// <param name="absolutePath">Absolute path of the <c>.strings</c> file.</param>

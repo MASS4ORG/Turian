@@ -15,11 +15,11 @@ public static class ObjectReferences
     /// <summary>Property name of a serialized reference.</summary>
     public const string RefProperty = "$ref";
 
-    static readonly ConcurrentDictionary<(Type, bool), bool> referenceMembers = new();
-    static readonly ConcurrentDictionary<MemberInfo, bool> inlineMembers = new();
-    static readonly ConcurrentDictionary<(Type, string), MemberInfo?> members = new();
+    static readonly ConcurrentDictionary<(Type, bool), bool> ReferenceMembers = new();
+    static readonly ConcurrentDictionary<MemberInfo, bool> InlineMembers = new();
+    static readonly ConcurrentDictionary<(Type, string), MemberInfo?> Members = new();
 
-    [ThreadStatic] static int nodeReadDepth;
+    [ThreadStatic] static int _nodeReadDepth;
 
     /// <summary>
     /// Whether a member of <paramref name="memberType"/> is serialized as a reference.
@@ -30,7 +30,7 @@ public static class ObjectReferences
     public static bool IsReferenceMember(Type memberType, bool allowSceneObjects)
     {
         ArgumentNullException.ThrowIfNull(memberType);
-        return referenceMembers.GetOrAdd((memberType, allowSceneObjects),
+        return ReferenceMembers.GetOrAdd((memberType, allowSceneObjects),
             static key => IsReferenceType(ElementType(key.Item1) ?? key.Item1, key.Item2));
     }
 
@@ -44,7 +44,7 @@ public static class ObjectReferences
     /// <returns>True when the member is written with <see cref="TryWrite"/>.</returns>
     public static bool IsSavedAsReference(MemberInfo member, Type memberType, bool allowSceneObjects) =>
         IsReferenceMember(memberType, allowSceneObjects)
-        && !inlineMembers.GetOrAdd(member, static m => m.GetCustomAttribute<SerializeInlineAttribute>() is not null);
+        && !InlineMembers.GetOrAdd(member, static m => m.GetCustomAttribute<SerializeInlineAttribute>() is not null);
 
     /// <summary>Whether <paramref name="target"/> is null or a destroyed node or component.</summary>
     /// <param name="target">The referenced object.</param>
@@ -262,12 +262,12 @@ public static class ObjectReferences
         return true;
     }
 
-    internal static void EnterNode() => nodeReadDepth++;
+    internal static void EnterNode() => _nodeReadDepth++;
 
     /// <summary>Leaves a node read; the outermost one resolves the whole hierarchy it produced.</summary>
     internal static void ExitNode(Node? node)
     {
-        if (--nodeReadDepth == 0 && node is not null)
+        if (--_nodeReadDepth == 0 && node is not null)
             Resolve(node, RuntimeServices.TryGet<IAssetLoader>());
     }
 
@@ -445,7 +445,7 @@ public static class ObjectReferences
     }
 
     static MemberInfo? FindMember(Type type, string name) =>
-        members.GetOrAdd((type, name), static key =>
+        Members.GetOrAdd((type, name), static key =>
             (MemberInfo?)key.Item1.GetProperty(key.Item2, BindingFlags.Public | BindingFlags.Instance)
             ?? key.Item1.GetField(key.Item2, BindingFlags.Public | BindingFlags.Instance));
 

@@ -13,13 +13,12 @@ static class ValueEditorRegistry
     sealed record Lookup(IValueEditor? Editor);
 
     static readonly ConditionalWeakTable<Type, Lookup> editorsByType = new();
-    static Dictionary<Type, IValueEditor>? byEditedType;
 
     static Dictionary<Type, IValueEditor> ByEditedType
     {
         get
         {
-            if (byEditedType is not null) return byEditedType;
+            if (field is not null) return field;
 
             var map = new Dictionary<Type, IValueEditor>();
             foreach (var type in typeof(ValueEditorRegistry).Assembly.GetTypes())
@@ -33,7 +32,7 @@ static class ValueEditorRegistry
                     map[attribute.EditorType] = editor;
             }
 
-            return byEditedType = map;
+            return field = map;
         }
     }
 

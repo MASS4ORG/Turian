@@ -12,11 +12,11 @@ public sealed class BuildManager : IDisposable
 {
     // ── Singleton ──────────────────────────────────────────────────────────────
 
-    static BuildManager? instance;
+    static BuildManager? _instance;
 
     /// <summary>Returns the singleton instance, or throws if not yet initialised.</summary>
     public static BuildManager Instance =>
-        instance ?? throw new InvalidOperationException("BuildManager not initialized.");
+        _instance ?? throw new InvalidOperationException("BuildManager not initialized.");
 
     // ── Fields ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ public sealed class BuildManager : IDisposable
             slotManager = new AssemblySlotManager(SlotRoot(this.settings), logger);
         }
 
-        instance = instance is null ? this : throw new InvalidOperationException("BuildManager already initialized.");
+        _instance = _instance is null ? this : throw new InvalidOperationException("BuildManager already initialized.");
     }
 
     // ── Settings ───────────────────────────────────────────────────────────────

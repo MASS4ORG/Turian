@@ -101,7 +101,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     {
         if (type.IsAbstract || type.IsGenericType || !IsReachable(type)) return null;
         if (!type.InstanceConstructors.Any(static c =>
-                c.Parameters.Length == 0 && c.DeclaredAccessibility == Microsoft.CodeAnalysis.Accessibility.Public))
+                c.Parameters.Length == 0 && c.DeclaredAccessibility == Accessibility.Public))
             return null;
 
         var chain = new List<INamedTypeSymbol>();
@@ -115,13 +115,13 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         foreach (var property in chain.SelectMany(static t => t.GetMembers().OfType<IPropertySymbol>()))
         {
             if (property.IsStatic || property.IsIndexer) continue;
-            if (property.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
+            if (property.DeclaredAccessibility != Accessibility.Public)
             {
                 if (HasAttribute(property, JsonIncludeName)) return null;
                 continue;
             }
 
-            if (property.GetMethod?.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
+            if (property.GetMethod?.DeclaredAccessibility != Accessibility.Public)
             {
                 if (HasAttribute(property, JsonIncludeName)) return null;
                 continue;
@@ -129,7 +129,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
 
             if (HasAttribute(property, JsonIgnoreName) || property.SetMethod is null) continue;
             if (property.SetMethod.IsInitOnly
-                || property.SetMethod.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
+                || property.SetMethod.DeclaredAccessibility != Accessibility.Public)
                 return null;
 
             if (!TryAdd(property.Name, property.Type, property)) return null;
@@ -138,7 +138,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         foreach (var field in chain.SelectMany(static t => t.GetMembers().OfType<IFieldSymbol>()))
         {
             if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared) continue;
-            if (field.DeclaredAccessibility != Microsoft.CodeAnalysis.Accessibility.Public)
+            if (field.DeclaredAccessibility != Accessibility.Public)
             {
                 if (HasAttribute(field, JsonIncludeName)) return null;
                 continue;
@@ -170,8 +170,8 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     {
         for (var current = type; current is not null; current = current.ContainingType)
         {
-            if (current.DeclaredAccessibility is not (Microsoft.CodeAnalysis.Accessibility.Public
-                or Microsoft.CodeAnalysis.Accessibility.Internal))
+            if (current.DeclaredAccessibility is not (Accessibility.Public
+                or Accessibility.Internal))
                 return false;
         }
 
@@ -224,11 +224,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
 
     static string Keyword(Accessibility accessibility) => accessibility switch
     {
-        Microsoft.CodeAnalysis.Accessibility.Public => "public",
-        Microsoft.CodeAnalysis.Accessibility.Internal => "internal",
-        Microsoft.CodeAnalysis.Accessibility.Protected => "protected",
-        Microsoft.CodeAnalysis.Accessibility.ProtectedOrInternal => "protected internal",
-        Microsoft.CodeAnalysis.Accessibility.ProtectedAndInternal => "private protected",
+        Accessibility.Public => "public",
+        Accessibility.Internal => "internal",
+        Accessibility.Protected => "protected",
+        Accessibility.ProtectedOrInternal => "protected internal",
+        Accessibility.ProtectedAndInternal => "private protected",
         _ => "private",
     };
 

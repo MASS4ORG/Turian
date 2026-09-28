@@ -9,7 +9,7 @@ public static class UiXmlParser
     /// <summary>The default XML namespace for the UI vocabulary.</summary>
     public const string Namespace = "https://turian.mass4.org/ui";
 
-    static readonly HashSet<string> eventAttributes = new(StringComparer.OrdinalIgnoreCase)
+    static readonly HashSet<string> EventAttributes = new(StringComparer.OrdinalIgnoreCase)
     {
         "click", "value-changed", "changed", "submit", "activated", "selection-changed",
     };
@@ -194,7 +194,7 @@ public static class UiXmlParser
                 continue;
             }
 
-            if (eventAttributes.Contains(an))
+            if (EventAttributes.Contains(an))
             {
                 // A method name, or {controller.Method} — strip the braces either way.
                 element.Events[an] = BindingExpression.IsBinding(av) ? av[1..^1].Trim() : av;

@@ -30,6 +30,7 @@ public sealed class AssetInspectionService(
     AssetImporter importer,
     AssetTypeCatalog types,
     SettingsService settings,
+    IAssetLoader loader,
     ILogger log)
 {
     /// <summary>What the inspector should edit for a browser row.</summary>
@@ -60,6 +61,12 @@ public sealed class AssetInspectionService(
 
         var owner = importer.ImporterFor(absolutePath);
         var kind = types.Resolve(absolutePath)?.DisplayName ?? "Asset";
+
+        // A data asset is edited through the instance the open scenes share, so an edit shows everywhere at once.
+        if (metadata is DataAssetAsset
+            && Load(() => loader.LoadContentAsync<DataAsset>(metadata.Id).GetAwaiter().GetResult(), absolutePath)
+                is { } shared)
+            return new AssetInspection(metadata, absolutePath, shared, shared.GetType().Name, IsPayload: true);
 
         if (Load(() => owner?.LoadAuthoredContent(metadata, absolutePath), absolutePath) is { } content)
             return new AssetInspection(metadata, absolutePath, content, content.GetType().Name, IsPayload: true);

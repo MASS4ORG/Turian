@@ -80,7 +80,7 @@ public class ComponentJsonConverter : JsonConverter<Component>
 
         var members = value.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead && p.CanWrite && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+            .Where(p => p is { CanRead: true, CanWrite: true } && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
             .Cast<MemberInfo>()
             .Concat(value.GetType()
                 .GetFields(BindingFlags.Public | BindingFlags.Instance)

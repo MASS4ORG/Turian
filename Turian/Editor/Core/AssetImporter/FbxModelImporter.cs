@@ -1,5 +1,3 @@
-using Silk.NET.Assimp;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -13,7 +11,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
     // Ultz.Native.Assimp ships libassimp 5 and 6 side by side, under runtimes/<rid>/native.
     // Resolving those by file name alone relies on the host's RID probing, which does not find
     // them in every environment, so the full paths are tried first and version 6 before 5.
-    static readonly string[] nativeLibraryNames = BuildNativeLibraryNames();
+    static readonly string[] NativeLibraryNames = BuildNativeLibraryNames();
 
     static string[] BuildNativeLibraryNames()
     {
@@ -69,14 +67,14 @@ public sealed partial class FbxModelImporter : IAssetImporter
         | PostProcessSteps.GenerateBoundingBoxes);
 
     // Assimp reports FBX geometry Y-up; the engine's world space has +Y pointing down.
-    static readonly Matrix4x4 yMirror = new(
+    static readonly Matrix4x4 YMirror = new(
         1, 0, 0, 0,
         0, -1, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1);
 
-    static readonly Lazy<AssimpApi> assimp =
-        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(nativeLibraryNames)), isThreadSafe: true);
+    static readonly Lazy<AssimpApi> Assimp =
+        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
 
     readonly object syncRoot = new();
     string cacheKey = string.Empty;
@@ -170,10 +168,10 @@ public sealed partial class FbxModelImporter : IAssetImporter
     /// </summary>
     /// <param name="parentAssetId">Id of the model asset the meshes belong to.</param>
     /// <param name="filePath">Absolute path of the FBX file.</param>
-    public EngineNode BuildPrefabRoot(Guid parentAssetId, string filePath) =>
+    public Node BuildPrefabRoot(Guid parentAssetId, string filePath) =>
         BuildPrefabRoot(parentAssetId, Read(filePath, keepGeometry: false), Path.GetFileNameWithoutExtension(filePath));
 
-    static EngineNode BuildPrefabRoot(Guid parentAssetId, FbxImport import, string rootName)
+    static Node BuildPrefabRoot(Guid parentAssetId, FbxImport import, string rootName)
     {
         var counter = 0;
         var root = BuildPrefabNode(parentAssetId, import.Root, ref counter);
@@ -181,9 +179,9 @@ public sealed partial class FbxModelImporter : IAssetImporter
         return root;
     }
 
-    static EngineNode BuildPrefabNode(Guid parentAssetId, FbxNodeInfo source, ref int counter)
+    static Node BuildPrefabNode(Guid parentAssetId, FbxNodeInfo source, ref int counter)
     {
-        var node = new EngineNode
+        var node = new Node
         {
             Id = AssetIdFactory.Derive(parentAssetId, $"node:{counter++}"),
             Name = source.Name,

@@ -20,6 +20,14 @@ sealed partial class Build
         Solution.AllProjects.Where(project =>
             project.Path.FileExists() && project.Path.ReadAllText().Contains("<PackageId>", StringComparison.Ordinal));
 
+    /// <summary>
+    /// Gaya carries its own version (Gaya/Directory.Build.props) because its compatibility promise is
+    /// to plugin authors, not to Turian releases. Turian's libraries follow GitVersion.
+    /// </summary>
+    static bool IsGayaProject(Project project) =>
+        project.Path.ToString().Contains($"{Path.DirectorySeparatorChar}Gaya{Path.DirectorySeparatorChar}",
+            StringComparison.Ordinal);
+
     public Target PackNuGet => td =>
         td
             .DependsOn(Compile)
@@ -32,14 +40,22 @@ sealed partial class Build
                     Log.Information("Packing {Project}", project.Name);
 
                     _ = DotNetPack(settings =>
-                        settings.SetProject(project)
+                    {
+                        settings = settings
+                            .SetProject(project)
                             .SetNoLogo(true)
-                            .SetConfiguration(Configuration)
+                            .SetConfiguration(Config)
                             .SetOutputDirectory(PackagesDirectory)
-                            .AddProcessAdditionalArguments("-p:GuinevereLocalPath=") // Needed to build locally with prod config
-                            .SetVersion(Version)
-                            .SetAssemblyVersion(Version)
-                            .SetInformationalVersion(Version));
+                            .EnableNoBuild()
+                            .SetProperty("GuineverePackageExcludeAssets", "none")
+                            .AddProcessAdditionalArguments("-p:GuinevereLocalPath=");
+
+                        // Gaya's version comes from its own props; overriding it here would tie the
+                        // SDK's compatibility promise back to Turian's release cadence.
+                        return IsGayaProject(project)
+                            ? settings
+                            : settings.SetVersion(Version).SetAssemblyVersion(Version).SetInformationalVersion(Version);
+                    });
                 }
 
                 Log.Information("Packed {Count} packages into {Directory}",

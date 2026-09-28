@@ -70,6 +70,12 @@ public sealed class SceneTreeController(
     /// <summary>Raised when the scene structure changed and the UI tree should be rebuilt.</summary>
     public event Action<Node?>? SceneLoaded;
 
+    /// <summary>
+    /// Raised when an open scene's objects are replaced by rebuilt ones with the same ids: the scene's asset id, the
+    /// old root and the new one.
+    /// </summary>
+    public event Action<Guid, Node, Node>? SceneRebuilt;
+
     /// <summary>Raised when the previously selected node should be restored.</summary>
     public event Action<Guid?>? SelectionRestoreRequested;
 
@@ -136,6 +142,7 @@ public sealed class SceneTreeController(
                 }
 
                 loadedSceneRoots[assetId] = newRoot;
+                SceneRebuilt?.Invoke(assetId, oldRoot, newRoot);
 
                 if (CurrentAsset?.Id == assetId)
                     sceneRoot = newRoot;
@@ -181,14 +188,50 @@ public sealed class SceneTreeController(
         {
             var path = Path.Combine(settingsService.Settings.ProjectAbsoluteDir, prefab.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            Serializer.Save(path, root);
+            var previous = File.Exists(path) ? File.ReadAllText(path) : null;
+            File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
+                id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)));
             assetImporter.ReimportNow(path, overwriteExisting: true);
+            RefreshInstances(prefab.Id, previous);
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to save scene {RelativePath}", prefab.RelativePath);
             asset.MarkModified();
         }
+    }
+
+    /// <summary>Updates the instances of a just-saved prefab in the other open scenes, keeping their overrides.</summary>
+    /// <param name="prefabId">The prefab that was saved.</param>
+    /// <param name="previousJson">The prefab's content before the save, or null when it is new.</param>
+    public void RefreshInstances(Guid prefabId, string? previousJson)
+    {
+        var refreshed = false;
+        foreach (var (assetId, root) in loadedSceneRoots.ToList())
+        {
+            if (assetId == prefabId) continue;
+
+            try
+            {
+                if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
+                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)) is not { } rebuilt)
+                    continue;
+
+                loadedSceneRoots[assetId] = rebuilt;
+                SceneRebuilt?.Invoke(assetId, root, rebuilt);
+                if (ReferenceEquals(sceneRoot, root)) sceneRoot = rebuilt;
+                refreshed = true;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.LogError(ex, "Could not update the prefab instances in scene {AssetId}", assetId);
+            }
+        }
+
+        if (!refreshed) return;
+
+        SceneLoaded?.Invoke(CurrentSceneRoot);
+        SelectionRestoreRequested?.Invoke(RememberedSelection());
     }
 
     // ── Selection ────────────────────────────────────────────────────────────

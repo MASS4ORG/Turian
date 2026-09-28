@@ -245,7 +245,7 @@ public class App : IDisposable
 
         var uiRoot = nodeMain ?? sceneManager.ActiveScene?.RootNode ?? sceneManager.PersistentRoot;
         var fb = windowManager.Window.FramebufferSize;
-        if (fb.X > 0 && fb.Y > 0)
+        if (fb is { X: > 0, Y: > 0 })
         {
             rendererManager.OverlayTexture = uiManager!.TryRenderOverlay(uiRoot, fb.X, fb.Y, (float)deltaTime);
         }

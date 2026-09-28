@@ -24,7 +24,7 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
     /// <summary>Whether <paramref name="text"/> looks like a binding expression (<c>{ … }</c>).</summary>
     /// <param name="text">The attribute value to test.</param>
     public static bool IsBinding(string? text) =>
-        text is not null && text.Length >= 2 && text[0] == '{' && text[^1] == '}';
+        text is not null && text is ['{', _, ..] && text[^1] == '}';
 
     /// <summary>
     /// Parses a <c>{ … }</c> expression. The braces are required.

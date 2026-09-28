@@ -93,7 +93,7 @@ public sealed class AssetPreviewCatalog
 
             foreach (var type in types)
             {
-                if (type is null || !typeof(IAssetPreviewProvider).IsAssignableFrom(type) || type.IsAbstract ||
+                if (!typeof(IAssetPreviewProvider).IsAssignableFrom(type) || type.IsAbstract ||
                     type.IsInterface || type.GetConstructor(Type.EmptyTypes) is null)
                 {
                     continue;

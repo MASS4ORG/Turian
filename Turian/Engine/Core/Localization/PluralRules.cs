@@ -17,56 +17,85 @@ public static class PluralRules
     /// <returns>The category whose variant the message should use.</returns>
     public static PluralCategory GetCategory(string? locale, decimal value)
     {
-        var language = (locale ?? string.Empty).Split('-', '_')[0].ToUpperInvariant();
+        var language = (locale ?? string.Empty).Split('-', '_')[0];
         var n = Math.Abs(value);
-        var integer = (long)n;
-        var isInteger = n == integer;
-        var mod10 = integer % 10;
-        var mod100 = integer % 100;
+        return Rules.TryGetValue(language, out var rule) ? rule(new Operands(n)) : Germanic(new Operands(n));
+    }
 
-        return language switch
+    static readonly Dictionary<string, Func<Operands, PluralCategory>> Rules =
+        new(StringComparer.OrdinalIgnoreCase)
         {
             // No grammatical number distinction.
-            "JA" or "KO" or "ZH" or "TH" or "VI" or "ID" or "TR" => PluralCategory.Other,
-
-            // One for 0 and 1 (0 is singular in French).
-            "FR" => n is 0 or 1 ? PluralCategory.One : PluralCategory.Other,
-
-            "RU" or "UK" or "BE" => isInteger && mod10 == 1 && mod100 != 11
-                ? PluralCategory.One
-                : isInteger && mod10 is >= 2 and <= 4 && (mod100 < 12 || mod100 > 14)
-                    ? PluralCategory.Few
-                    : isInteger && (mod10 == 0 || mod10 is >= 5 and <= 9 || mod100 is >= 11 and <= 14)
-                        ? PluralCategory.Many
-                        : PluralCategory.Other,
-
-            "PL" => isInteger && integer == 1
-                ? PluralCategory.One
-                : isInteger && mod10 is >= 2 and <= 4 && (mod100 < 12 || mod100 > 14)
-                    ? PluralCategory.Few
-                    : isInteger
-                        ? PluralCategory.Many
-                        : PluralCategory.Other,
-
-            "CS" or "SK" => isInteger && integer == 1
-                ? PluralCategory.One
-                : isInteger && integer is >= 2 and <= 4
-                    ? PluralCategory.Few
-                    : PluralCategory.Other,
-
-            "AR" => n == 0 ? PluralCategory.Zero
-                : n == 1 ? PluralCategory.One
-                : n == 2 ? PluralCategory.Two
-                : isInteger && mod100 is >= 3 and <= 10 ? PluralCategory.Few
-                : isInteger && mod100 is >= 11 and <= 99 ? PluralCategory.Many
-                : PluralCategory.Other,
-
-            "HE" => isInteger && integer == 1
-                ? PluralCategory.One
-                : isInteger && integer == 2 ? PluralCategory.Two : PluralCategory.Other,
-
-            // English, Portuguese, Spanish, German, Italian, Dutch and most others.
-            _ => n == 1 ? PluralCategory.One : PluralCategory.Other,
+            ["ja"] = NoPlural,
+            ["ko"] = NoPlural,
+            ["zh"] = NoPlural,
+            ["th"] = NoPlural,
+            ["vi"] = NoPlural,
+            ["id"] = NoPlural,
+            ["tr"] = NoPlural,
+            ["fr"] = French,
+            ["ru"] = EastSlavic,
+            ["uk"] = EastSlavic,
+            ["be"] = EastSlavic,
+            ["pl"] = Polish,
+            ["cs"] = WestSlavic,
+            ["sk"] = WestSlavic,
+            ["ar"] = Arabic,
+            ["he"] = Hebrew,
         };
+
+    readonly record struct Operands(decimal N)
+    {
+        public long Integer => (long)N;
+        public bool IsInteger => N == Integer;
+        public long Mod10 => Integer % 10;
+        public long Mod100 => Integer % 100;
+        public bool IsTeen => Mod100 is >= 12 and <= 14;
     }
+
+    // English, Portuguese, Spanish, German, Italian, Dutch and most others.
+    static PluralCategory Germanic(Operands o) => o.N == 1 ? PluralCategory.One : PluralCategory.Other;
+
+    static PluralCategory NoPlural(Operands _) => PluralCategory.Other;
+
+    // 0 is singular in French.
+    static PluralCategory French(Operands o) => o.N is 0 or 1 ? PluralCategory.One : PluralCategory.Other;
+
+    static PluralCategory EastSlavic(Operands o)
+    {
+        if (!o.IsInteger) return PluralCategory.Other;
+        if (o.Mod10 == 1 && o.Mod100 != 11) return PluralCategory.One;
+        return o.Mod10 is >= 2 and <= 4 && !o.IsTeen ? PluralCategory.Few : PluralCategory.Many;
+    }
+
+    static PluralCategory Polish(Operands o)
+    {
+        if (!o.IsInteger) return PluralCategory.Other;
+        if (o.Integer == 1) return PluralCategory.One;
+        return o.Mod10 is >= 2 and <= 4 && !o.IsTeen ? PluralCategory.Few : PluralCategory.Many;
+    }
+
+    static PluralCategory WestSlavic(Operands o) => o switch
+    {
+        { IsInteger: true, Integer: 1 } => PluralCategory.One,
+        { IsInteger: true, Integer: >= 2 and <= 4 } => PluralCategory.Few,
+        _ => PluralCategory.Other,
+    };
+
+    static PluralCategory Arabic(Operands o) => o.N switch
+    {
+        0 => PluralCategory.Zero,
+        1 => PluralCategory.One,
+        2 => PluralCategory.Two,
+        _ when o is { IsInteger: true, Mod100: >= 3 and <= 10 } => PluralCategory.Few,
+        _ when o is { IsInteger: true, Mod100: >= 11 and <= 99 } => PluralCategory.Many,
+        _ => PluralCategory.Other,
+    };
+
+    static PluralCategory Hebrew(Operands o) => o switch
+    {
+        { IsInteger: true, Integer: 1 } => PluralCategory.One,
+        { IsInteger: true, Integer: 2 } => PluralCategory.Two,
+        _ => PluralCategory.Other,
+    };
 }

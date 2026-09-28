@@ -193,10 +193,6 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
         var shown = fields.Where(field => MatchesFilter(page, field)).ToList();
 
         for (var i = 0; i < shown.Count; i++) Option(gui, page, shown[i], $"settings/{page.Id}/field{i}");
-
-        if (shown.Count == 0)
-            gui.DrawText(localization.T("This page has no editable options."), Theme.Text(12), Theme.InkDim,
-                centerInRect: false);
     }
 
     /// <summary>Why the right-hand side is empty, which is not the same question in every scope.</summary>
@@ -262,7 +258,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
 
-            gui.DrawText("↺", Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
+            gui.DrawText(EditorIcons.RotateLeft, Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

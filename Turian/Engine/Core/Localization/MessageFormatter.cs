@@ -27,13 +27,13 @@ public static class MessageFormatter
         if (string.IsNullOrEmpty(message)) return message;
 
         values ??= count is null
-            ? emptyValues
+            ? EmptyValues
             : new Dictionary<string, object?> { ["count"] = count };
 
         return FormatRange(message, 0, message.Length, values, count, locale);
     }
 
-    static readonly IReadOnlyDictionary<string, object?> emptyValues =
+    static readonly IReadOnlyDictionary<string, object?> EmptyValues =
         new Dictionary<string, object?>();
 
     static string FormatRange(

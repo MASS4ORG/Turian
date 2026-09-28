@@ -33,7 +33,7 @@ shell.PanelRequested += workbench.ShowPanel;
 shell.CommandPaletteRequested += workbench.ToggleCommandPalette;
 
 // Headless: `--dump <file.png> [WxH]` renders one workbench frame and exits (CI / visual review).
-if (args.Length >= 2 && args[0] == "--dump")
+if (args is ["--dump", _, ..])
 {
     var (w, h) = args.Length >= 3 && args[2].Split('x') is [var ws, var hs]
         && int.TryParse(ws, out var pw) && int.TryParse(hs, out var ph)
@@ -45,7 +45,7 @@ if (args.Length >= 2 && args[0] == "--dump")
 }
 
 // Headless: `--script <file.json>` drives the workbench through injected input (Guinevere.InputScript).
-if (args.Length >= 2 && args[0] == "--script")
+if (args is ["--script", _, ..])
 {
     var script = InputScript.FromJson(File.ReadAllText(args[1]));
     if (script is null)
@@ -57,7 +57,10 @@ if (args.Length >= 2 && args[0] == "--script")
     var scriptInput = new ScriptedInputHandler();
     var player = new InputScriptPlayer(scriptInput, message => Log.Logger.LogInformation("{Message}", message),
         Path.GetDirectoryName(Path.GetFullPath(args[1])));
-    var passed = player.Play(script, new Gui { Input = scriptInput }, workbench.Render, WindowFont("Guinevere.font.ttf"));
+    var scriptGui = new Gui { Input = scriptInput };
+    var textFont = WindowFont("Guinevere.font.ttf");
+    scriptGui.ConfigureFonts(textFont, WindowFont("Guinevere.icons.ttf"), WindowFont("Guinevere.widget-icons.ttf"));
+    var passed = player.Play(script, scriptGui, workbench.Render, textFont);
     return passed ? 0 : 1;
 }
 
@@ -67,14 +70,31 @@ Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 var gui = new Gui();
 var window = new GuiWindow(gui, 1600, 950, "Turian Studio");
 var activeWorkbench = workbench;
+
+// Closing the window asks about unsaved work through the Exit command, which closes the window again once answered.
+const string exitCommand = "gaya.turian.exit";
+var exitApproved = false;
+void ApproveExit()
+{
+    exitApproved = true;
+    window.Close();
+}
+
+window.CloseRequested = () =>
+{
+    if (exitApproved || !dispatcher.CanExecute(exitCommand)) return true;
+    dispatcher.Execute(exitCommand);
+    return false;
+};
+
 try
 {
-    shell.ExitRequested += window.Close;
+    shell.ExitRequested += ApproveExit;
     window.RunGui(() => activeWorkbench.Render(gui));
 }
 finally
 {
-    shell.ExitRequested -= window.Close;
+    shell.ExitRequested -= ApproveExit;
     window.Dispose();
 }
 
@@ -86,13 +106,14 @@ static void DumpFrame(Workbench workbench, string path, int width, int height)
     var gui = new Gui { Input = new HeadlessInput() };
     var font = WindowFont("Guinevere.font.ttf");
     var iconFont = WindowFont("Guinevere.icons.ttf");
+    var widgetIconFont = WindowFont("Guinevere.widget-icons.ttf");
 
     using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
     var canvas = surface.Canvas;
     canvas.Clear(SKColors.Black);
 
     gui.SetStage(Pass.Pass1Build);
-    gui.BeginFrame(canvas, font, iconFont);
+    gui.BeginFrame(canvas, font, iconFont, widgetIconFont);
     workbench.Render(gui);
     gui.CalculateLayout();
     gui.SetStage(Pass.Pass2Render);

@@ -122,9 +122,9 @@ static Node BuildScene(Func<Node, Component> link)
     return scene;
 }
 
-static Node LoadScene(string json) => Serializer.LoadData<Node>(json)!;
+static void LoadScene(string json) => Serializer.LoadData<Node>(json);
 
-static double Report(string label, Action run)
+static void Report(string label, Action run)
 {
     run();
     var times = new List<double>();
@@ -139,7 +139,6 @@ static double Report(string label, Action run)
     times.Sort();
     var median = times[runs / 2];
     Console.WriteLine($"{label,-72} {median,9:F1} ms");
-    return median;
 }
 
 /// <summary>A small DataAsset, optionally linking to others.</summary>

@@ -7,7 +7,7 @@ namespace Turian.Tests;
 /// </summary>
 public class TransformGizmoTests
 {
-    static readonly Vector2 viewport = new(960f, 540f);
+    static readonly Vector2 Viewport = new(960f, 540f);
 
     const float gizmoScaleFactor = 0.15f;
     const float distance = 5f;
@@ -50,13 +50,13 @@ public class TransformGizmoTests
         gizmo.Mode = TransformGizmoMode.Translate;
         gizmo.SnapTranslation = 0f;
 
-        gizmo.ProcessPointerDown(downX, camera, viewport);
+        gizmo.ProcessPointerDown(downX, camera, Viewport);
 
         Assert.True(gizmo.IsDragging);
         Assert.Equal(TransformGizmoAxis.X, gizmo.Axis);
 
         var targetPixel = ProjectToPixel(new Vector3(3f, 0f, 0f));
-        gizmo.ProcessPointerMove(targetPixel, camera, viewport);
+        gizmo.ProcessPointerMove(targetPixel, camera, Viewport);
 
         AssertClose(new Vector3(3f, 0f, 0f), node.Transform.Position);
     }
@@ -68,8 +68,8 @@ public class TransformGizmoTests
         gizmo.Mode = TransformGizmoMode.Translate;
         gizmo.SnapTranslation = 1f;
 
-        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, viewport);
-        gizmo.ProcessPointerMove(ProjectToPixel(new Vector3(3.4f, 0f, 0f)), camera, viewport);
+        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, Viewport);
+        gizmo.ProcessPointerMove(ProjectToPixel(new Vector3(3.4f, 0f, 0f)), camera, Viewport);
 
         Assert.Equal(3f, node.Transform.Position.X);
         Assert.Equal(0f, node.Transform.Position.Y);
@@ -83,11 +83,11 @@ public class TransformGizmoTests
         gizmo.Mode = TransformGizmoMode.Scale;
         gizmo.SnapScale = 0f;
 
-        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Scale), camera, viewport);
+        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Scale), camera, Viewport);
         Assert.True(gizmo.IsDragging);
 
         var start = AxisMidpointPixel(TransformGizmoMode.Scale);
-        gizmo.ProcessPointerMove(new Vector2(start.X, start.Y + 200f), camera, viewport);
+        gizmo.ProcessPointerMove(new Vector2(start.X, start.Y + 200f), camera, Viewport);
 
         Assert.Equal(2f, node.Transform.Scale.X, 3);
         Assert.Equal(1f, node.Transform.Scale.Y, 3);
@@ -98,7 +98,7 @@ public class TransformGizmoTests
     [Fact]
     public void PointerDown_Miss_DoesNotStartDrag()
     {
-        gizmo.ProcessPointerDown(new Vector2(900f, 500f), camera, viewport);
+        gizmo.ProcessPointerDown(new Vector2(900f, 500f), camera, Viewport);
 
         Assert.False(gizmo.IsDragging);
         Assert.Equal(TransformGizmoAxis.None, gizmo.Axis);
@@ -110,7 +110,7 @@ public class TransformGizmoTests
     {
         var raised = 0;
         gizmo.DragEnded += () => raised++;
-        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, viewport);
+        gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, Viewport);
         Assert.True(gizmo.IsDragging);
 
         gizmo.ProcessPointerUp();
@@ -126,7 +126,7 @@ public class TransformGizmoTests
         var g = new Gizmos();
         gizmo.Mode = TransformGizmoMode.Translate;
 
-        gizmo.Draw(g, camera, viewport);
+        gizmo.Draw(g, camera, Viewport);
 
         // 3 axes × (stem + 4 head edges) + 3 plane handles × 4 edges.
         Assert.Equal((3 * 5) + (3 * 4), g.LineCount);
@@ -140,7 +140,7 @@ public class TransformGizmoTests
         var g = new Gizmos();
         gizmo.Mode = TransformGizmoMode.Scale;
 
-        gizmo.Draw(g, camera, viewport);
+        gizmo.Draw(g, camera, Viewport);
 
         Assert.Equal((3 * 5) + (3 * 4) + Gizmos.CircleSegments, g.LineCount);
     }
@@ -152,7 +152,7 @@ public class TransformGizmoTests
         var g = new Gizmos();
         gizmo.Mode = TransformGizmoMode.Rotate;
 
-        gizmo.Draw(g, camera, viewport);
+        gizmo.Draw(g, camera, Viewport);
 
         // TransformGizmo.ArcSegments = 48 per ring.
         Assert.Equal(3 * 48, g.LineCount);
@@ -165,7 +165,7 @@ public class TransformGizmoTests
         gizmo.SelectedNode = null;
 
         var g = new Gizmos();
-        gizmo.Draw(g, camera, viewport);
+        gizmo.Draw(g, camera, Viewport);
 
         Assert.Equal(0, g.LineCount);
     }
@@ -186,7 +186,7 @@ public class TransformGizmoTests
             Frustum = 10f,
         };
         var p = cam.Project(world);
-        return new Vector2((p.X + 1f) * 0.5f * viewport.X, (p.Y + 1f) * 0.5f * viewport.Y);
+        return new Vector2((p.X + 1f) * 0.5f * Viewport.X, (p.Y + 1f) * 0.5f * Viewport.Y);
     }
 
     static void AssertClose(Vector3 expected, Vector3 actual)

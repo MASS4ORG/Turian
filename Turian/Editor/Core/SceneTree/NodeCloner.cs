@@ -64,10 +64,10 @@ public static class NodeCloner
 
         foreach (var prop in source.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.CanRead && p.CanWrite
-                && p.GetIndexParameters().Length == 0
-                && p.GetMethod?.GetParameters().Length == 0
-                && p.Name is not (nameof(Node.Children) or nameof(Node.Parent) or nameof(Node.Name))))
+            .Where(p => p is { CanRead: true, CanWrite: true }
+                        && p.GetIndexParameters().Length == 0
+                        && p.GetMethod?.GetParameters().Length == 0
+                        && p.Name is not (nameof(Node.Children) or nameof(Node.Parent) or nameof(Node.Name))))
         {
             object? value;
             try { value = prop.GetValue(source); }

@@ -13,7 +13,7 @@ public sealed class UiDocumentAssetImporter : IAssetImporter
     public const string ArtifactExtension = ".amui";
 
     // Attributes whose value is a project asset path the document depends on.
-    static readonly string[] pathAttributes =
+    static readonly string[] PathAttributes =
     [
         "src", "image", "image-normal", "image-hover", "image-pressed", "image-disabled",
         "icon", "background-image", "font",
@@ -104,7 +104,7 @@ public sealed class UiDocumentAssetImporter : IAssetImporter
             yield return src;
 
         foreach (var element in document.Elements())
-            foreach (var attribute in pathAttributes)
+            foreach (var attribute in PathAttributes)
                 if (element.Attributes.TryGetValue(attribute, out var value) && !string.IsNullOrWhiteSpace(value))
                     yield return value.Trim();
     }

@@ -34,7 +34,7 @@ public sealed record AssetTypeDescriptor(
     string DisplayName,
     IReadOnlyList<string> Extensions,
     AssetActivation Activation,
-    string DefaultIcon = "📄");
+    string DefaultIcon = EditorIcons.File);
 
 /// <summary>
 /// Every asset kind the studio knows, keyed by source extension. It answers what a double click in
@@ -92,17 +92,17 @@ public sealed class AssetTypeCatalog
     /// </summary>
     static IEnumerable<AssetTypeDescriptor> BuiltIn =>
     [
-        new("turian.scene", "Scene", [".prefab"], AssetActivation.Edit, "🎬"),
-        new("turian.material", "Material", [".material"], AssetActivation.Inspect, "🎨"),
-        new("turian.dataAsset", "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect, "📦"),
+        new("turian.scene", "Scene", [".prefab"], AssetActivation.Edit, EditorIcons.Clapperboard),
+        new("turian.material", "Material", [".material"], AssetActivation.Inspect, EditorIcons.Palette),
+        new("turian.dataAsset", "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect, EditorIcons.Database),
         new("turian.texture", "Texture", [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".gif", ".webp", ".dds"],
-            AssetActivation.ExternalProgram, "🖼"),
+            AssetActivation.ExternalProgram, EditorIcons.Image),
         new("turian.model", "Model", [".obj", ".fbx", ".gltf", ".glb", ".dae", ".blend"],
-            AssetActivation.ExternalProgram, "🧊"),
-        new("turian.script", "Script", [".cs"], AssetActivation.ExternalProgram, "📜"),
+            AssetActivation.ExternalProgram, EditorIcons.Cube),
+        new("turian.script", "Script", [".cs"], AssetActivation.ExternalProgram, EditorIcons.FileCode),
         new("turian.text", "Text", [".txt", ".md", ".json", ".xml", ".csv", ".ini", ".strings"],
-            AssetActivation.ExternalProgram),
-        new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, "🖥"),
-        new("turian.uiStyleSheet", "UI Style Sheet", [".uss"], AssetActivation.ExternalProgram, "🧵"),
+            AssetActivation.ExternalProgram, EditorIcons.FileLines),
+        new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.WindowMaximize),
+        new("turian.uiStyleSheet", "UI Style Sheet", [".uss"], AssetActivation.ExternalProgram, EditorIcons.Brush),
     ];
 }

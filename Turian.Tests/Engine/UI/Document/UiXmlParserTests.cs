@@ -94,7 +94,7 @@ public sealed class UiXmlParserTests
 
         var play = parsedDocument.Find("play")!;
         Assert.Equal("OnPlay", play.Events["click"]);
-        Assert.Contains(play.AttributeBindings, b => b.TargetAttribute == "enabled" && b.Expression.Path == "App.CanPlay");
+        Assert.Contains(play.AttributeBindings, b => b is { TargetAttribute: "enabled", Expression.Path: "App.CanPlay" });
 
         var gauge = parsedDocument.Find("fps")!;
         Assert.Equal("Gauge", gauge.Tag);

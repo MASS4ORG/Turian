@@ -9,12 +9,12 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 public static class LogSource
 {
-    static readonly string[] lineJumperEditors = ["code", "codium", "cursor", "zed"];
+    static readonly string[] LineJumperEditors = ["code", "codium", "cursor", "zed"];
 
-    static readonly Regex parenForm = new(
+    static readonly Regex ParenForm = new(
         @"(?<path>.+)\((?<line>\d+)(?:,(?<col>\d+))?\)(?=:)", RegexOptions.Compiled);
 
-    static readonly Regex colonForm = new(
+    static readonly Regex ColonForm = new(
         @"(?<path>.+):(?<line>\d+)(?=:)", RegexOptions.Compiled);
 
     /// <summary>The file and line a message references, when it references one.</summary>
@@ -24,7 +24,7 @@ public static class LogSource
     {
         if (string.IsNullOrEmpty(message)) return null;
 
-        foreach (var match in new[] { parenForm.Match(message), colonForm.Match(message) })
+        foreach (var match in new[] { ParenForm.Match(message), ColonForm.Match(message) })
         {
             if (!match.Success || !int.TryParse(match.Groups["line"].Value, out var line)) continue;
 
@@ -86,7 +86,7 @@ public static class LogSource
 
         var sourceLine = TryParse(message)!.Value.Line;
 
-        var editor = lineJumperEditors.FirstOrDefault(OnPath);
+        var editor = LineJumperEditors.FirstOrDefault(OnPath);
         if (editor is not null)
         {
             try

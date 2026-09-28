@@ -5,21 +5,21 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
-    static readonly IReadOnlyDictionary<string, string> debianArchitectures =
+    static readonly IReadOnlyDictionary<string, string> DebianArchitectures =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["linux-x64"] = "amd64",
             ["linux-arm64"] = "arm64"
         };
 
-    string DebianArchitecture => debianArchitectures[runtimeIdentifier];
+    string DebianArchitecture => DebianArchitectures[RuntimeIdentifier];
 
     public Target DebianPackage => td => td
         .DependsOn(Publish)
-        .OnlyWhenStatic(() => debianArchitectures.ContainsKey(runtimeIdentifier))
+        .OnlyWhenStatic(() => DebianArchitectures.ContainsKey(RuntimeIdentifier))
         .Executes(() =>
         {
-            var stagingRoot = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"turian-debian-{runtimeIdentifier}");
+            var stagingRoot = (AbsolutePath)Path.Combine(Path.GetTempPath(), $"turian-debian-{RuntimeIdentifier}");
             stagingRoot.DeleteDirectory();
             BuildCommonPackage(stagingRoot / "common");
             BuildApplicationPackage(stagingRoot / "cli", "turian-cli", "Turian command-line tools");
@@ -31,7 +31,7 @@ sealed partial class Build
     {
         var applicationDirectory = packageRoot / "usr" / "lib" / "turian";
         applicationDirectory.CreateDirectory();
-        ProcessTasks.StartProcess("cp", $"-a \"{PublishDirectory / "lib"}\" \"{applicationDirectory / "lib"}\"")
+        ProcessTasks.StartProcess("cp", $"-a \"{PublishDir / "lib"}\" \"{applicationDirectory / "lib"}\"")
             .AssertZeroExitCode();
         WriteDebianMetadata(packageRoot, "turian-common", "dotnet-runtime-10.0, libfontconfig1, libvulkan1",
             "Turian shared libraries", "Shared managed and native libraries used by Turian tools.");
@@ -44,7 +44,7 @@ sealed partial class Build
     {
         var applicationDirectory = packageRoot / "usr" / "lib" / "turian";
         applicationDirectory.CreateDirectory();
-        (PublishDirectory / packageName).Copy(applicationDirectory / packageName, ExistsPolicy.FileOverwrite);
+        (PublishDir / packageName).Copy(applicationDirectory / packageName, ExistsPolicy.FileOverwrite);
         var binaryDirectory = packageRoot / "usr" / "bin";
         binaryDirectory.CreateDirectory();
         var launcher = binaryDirectory / packageName;

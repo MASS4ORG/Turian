@@ -348,7 +348,7 @@ public sealed partial class BackgroundTaskManager
         {
             foreach (var t in tasks)
             {
-                if (t.Status == BackgroundTaskStatus.Running && t.StartedAt is null) t.StartedAt = now;
+                if (t is { Status: BackgroundTaskStatus.Running, StartedAt: null }) t.StartedAt = now;
                 if (IsTerminal(t.Status) && t.FinishedAt is null) t.FinishedAt = now;
             }
 
@@ -464,9 +464,8 @@ public sealed partial class BackgroundTaskManager
 
     void ReclaimLocked(DateTimeOffset now)
     {
-        tasks.RemoveAll(t => t.ParentId == 0
-                              && t.Status == BackgroundTaskStatus.Completed
-                              && now - (t.FinishedAt ?? now) >= Retention);
+        tasks.RemoveAll(t => t is { ParentId: 0, Status: BackgroundTaskStatus.Completed }
+                             && now - (t.FinishedAt ?? now) >= Retention);
         tasks.RemoveAll(t => t.ParentId != 0 && Find(t.ParentId) is null);
     }
 

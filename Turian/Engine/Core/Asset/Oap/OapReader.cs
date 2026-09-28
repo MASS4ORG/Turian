@@ -268,7 +268,7 @@ public sealed class OapReader
         Justification = "Ownership of the FileStream transfers to the returned SubStream, which disposes it.")]
     public Stream OpenAssetStream(OapIndexEntry entry)
     {
-        if (entry.Compression == OapCompression.Store && entry.Encryption == OapEncryption.None)
+        if (entry is { Compression: OapCompression.Store, Encryption: OapEncryption.None })
         {
             if (memory is not null)
             {

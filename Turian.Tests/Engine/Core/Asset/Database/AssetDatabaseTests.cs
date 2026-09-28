@@ -5,14 +5,14 @@ namespace Turian.Tests;
 /// </summary>
 public class AssetDatabaseTests : IDisposable
 {
-    static readonly object lockObject = new();
+    static readonly object LockObject = new();
 
     /// <summary>
     /// Initializes a new instance of the AssetDatabaseTests class and resets the singleton.
     /// </summary>
     public AssetDatabaseTests()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
         }
@@ -23,7 +23,7 @@ public class AssetDatabaseTests : IDisposable
     /// </summary>
     public void Dispose()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
         }
@@ -31,7 +31,7 @@ public class AssetDatabaseTests : IDisposable
 
     void ResetAssetDatabase()
     {
-        var field = typeof(AssetDatabase).GetField("instance", BindingFlags.Static | BindingFlags.NonPublic);
+        var field = typeof(AssetDatabase).GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
         if (field != null)
         {
             field.SetValue(null, null);
@@ -44,7 +44,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void Constructor_SetsInstance()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             var db = new AssetDatabase();
@@ -58,7 +58,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void Constructor_ThrowsIfAlreadyInitialized()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             _ = new AssetDatabase();
@@ -72,7 +72,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void TryGetAsset_ReturnsFalseWhenMissing()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             var db = new AssetDatabase();
@@ -88,7 +88,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsMissingWhenThereIsNoCatalog()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             using var project = new TempProject();
@@ -105,7 +105,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsUnreadableWhenTheCatalogIsTruncated()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             using var project = new TempProject();
@@ -124,7 +124,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsUnreadableWhenTheCatalogIsMalformed()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             using var project = new TempProject();
@@ -140,7 +140,7 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsLoadedForAnEmptyButValidCatalog()
     {
-        lock (lockObject)
+        lock (LockObject)
         {
             ResetAssetDatabase();
             using var project = new TempProject();

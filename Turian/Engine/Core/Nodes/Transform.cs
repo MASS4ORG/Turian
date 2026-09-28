@@ -218,12 +218,12 @@ public class Transform : IEquatable<Transform>, IFormattable, INotifyPropertyCha
         );
     }
 
-    static readonly Transform identity = new();
+    static readonly Transform Identity = new();
 
     /// <summary>
     /// Gets a value indicating whether this transformation is the identity transformation.
     /// </summary>
-    public bool IsIdentity => Equals(identity);
+    public bool IsIdentity => Equals(Identity);
 
     /// <summary>
     /// Gets the forward vector in the local space of this transformation.

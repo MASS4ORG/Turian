@@ -20,9 +20,12 @@ sealed class AssetBrowserPanel : IPanel
     readonly AssetBrowserSettings browserSettings;
     readonly AssetTypeCatalog types;
     readonly AssetPreviewCatalog previews;
+    readonly PrefabAuthoring prefabs;
+    readonly AssetFileOperations operations;
     readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
+    string? inspectedId;
     Guid pendingReveal;
     bool showExtensions;
 
@@ -43,10 +46,12 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="editorSettings">Reports preference edits, so the tree rebuilds when the extensions toggle flips.</param>
     /// <param name="types">Resolves a file's kind, for its default icon when it has no live preview.</param>
     /// <param name="previews">Answers whether a row's asset has a live preview, and of which kind.</param>
+    /// <param name="prefabs">Creates prefab variants.</param>
+    /// <param name="operations">Renames, deletes, duplicates and pastes as undoable steps.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
-        AssetTypeCatalog types, AssetPreviewCatalog previews)
+        AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations)
     {
         ArgumentNullException.ThrowIfNull(reveal);
 
@@ -59,9 +64,12 @@ sealed class AssetBrowserPanel : IPanel
         this.browserSettings = browserSettings;
         this.types = types;
         this.previews = previews;
+        this.prefabs = prefabs;
+        this.operations = operations;
         showExtensions = browserSettings.ShowFileExtensions;
 
         reveal.Requested += assetId => pendingReveal = assetId;
+        operations.Changed += Refresh;
         editorSettings.Changed += OnEditorSettingsChanged;
     }
 
@@ -89,6 +97,13 @@ sealed class AssetBrowserPanel : IPanel
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick);
 
+        // A selection the arrow keys moved is inspected like a clicked one.
+        if (gui.Pass == Pass.Pass2Render && state.SelectedId != inspectedId)
+        {
+            inspectedId = state.SelectedId;
+            if (Selected is { IsDirectory: false } moved) inspector.Select(inspections.Inspect(moved));
+        }
+
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
     }
 
@@ -105,7 +120,9 @@ sealed class AssetBrowserPanel : IPanel
         for (var parent = target.ParentPath; parent is not null; parent = ParentOf(parent))
             state.SetExpanded(parent, true);
 
+        // Revealed for a reference the inspector shows, so the inspector keeps what it is editing.
         state.SelectedId = target.AbsolutePath;
+        inspectedId = target.AbsolutePath;
         state.Reveal();
     }
 
@@ -176,13 +193,13 @@ sealed class AssetBrowserPanel : IPanel
     /// anyway), or the kind's default glyph for anything else, including asset types with a live
     /// preview too costly to render per row today (a material or a model — see <see cref="AssetPreviewCatalog"/>).
     /// </summary>
-    Action<Gui>? IconFor(AssetEntry entry)
+    Action<Gui> IconFor(AssetEntry entry)
     {
         var theme = StudioTheme.Current;
         var size = theme.Scale(theme.RowHeight) - 4f;
 
         if (entry.IsDirectory)
-            return gui => gui.DrawText("📁", theme.Text(13), theme.Folder);
+            return gui => gui.DrawText(EditorIcons.Folder, theme.Text(13), theme.Folder);
 
         var kind = types.Resolve(entry.AbsolutePath);
         var hasTexturePreview = entry.AssetMetadata is { } asset &&
@@ -191,7 +208,7 @@ sealed class AssetBrowserPanel : IPanel
         if (hasTexturePreview && ThumbnailFor(entry.AbsolutePath) is { } thumbnail)
             return gui => gui.Image(thumbnail, size, size);
 
-        var glyph = kind?.DefaultIcon ?? "📄";
+        var glyph = kind?.DefaultIcon ?? EditorIcons.File;
         return gui => gui.DrawText(glyph, theme.Text(13), theme.InkDim);
     }
 
@@ -233,6 +250,7 @@ sealed class AssetBrowserPanel : IPanel
         if (e.Button != MouseButton.Left || entry.IsDirectory) return;
 
         // Folding is the tree's own business; a double click here opens the asset.
+        inspectedId = entry.AbsolutePath;
         if (e.ClickCount >= 2) opener.Open(entry);
         else inspector.Select(inspections.Inspect(entry));
     }
@@ -257,6 +275,17 @@ sealed class AssetBrowserPanel : IPanel
         menu.Item("Paste", () => Paste(entry), enabled: fileSystem.CanPaste());
         menu.Separator();
         menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
+
+        if (entry is { IsDirectory: false } prefab
+            && string.Equals(Path.GetExtension(prefab.AbsolutePath), ".prefab", StringComparison.OrdinalIgnoreCase))
+            menu.Item("Create Prefab Variant", () => CreateVariant(prefab));
+    }
+
+    void CreateVariant(AssetEntry prefab)
+    {
+        if (prefabs.CreateVariant(prefab.AbsolutePath) is null)
+            Log.Logger.LogWarning("Could not create a variant of {Prefab}", prefab.AbsolutePath);
+        Refresh();
     }
 
     /// <summary>
@@ -297,8 +326,7 @@ sealed class AssetBrowserPanel : IPanel
         if (Selected is not { } entry) return;
         if ((entry.ParentPath ?? settings.Settings?.AssetsAbsoluteDir) is not { } directory) return;
 
-        fileSystem.Duplicate(entry.AbsolutePath, directory, entry.IsDirectory);
-        Refresh();
+        operations.Duplicate(entry.AbsolutePath, directory, entry.IsDirectory);
     }
 
     /// <summary>The row the tree has selected, or null when nothing is.</summary>
@@ -320,8 +348,7 @@ sealed class AssetBrowserPanel : IPanel
             string.IsNullOrEmpty(Path.GetExtension(name)))
             name += Path.GetExtension(entry.AbsolutePath);
 
-        fileSystem.Rename(entry.AbsolutePath, entry.IsDirectory, name);
-        Refresh();
+        operations.Rename(entry.AbsolutePath, entry.IsDirectory, name);
     }
 
     string DisplayName(string path)
@@ -347,8 +374,7 @@ sealed class AssetBrowserPanel : IPanel
     {
         if (entry is null) return;
 
-        fileSystem.Delete(entry.AbsolutePath);
-        Refresh();
+        operations.Delete(entry.AbsolutePath);
     }
 
     void Copy(AssetEntry? entry)
@@ -362,8 +388,7 @@ sealed class AssetBrowserPanel : IPanel
     {
         if (DirectoryFor(entry) is not { } directory) return;
 
-        fileSystem.Paste(directory);
-        Refresh();
+        operations.Paste(directory);
     }
 
     void Create(AssetCreationKind kind)

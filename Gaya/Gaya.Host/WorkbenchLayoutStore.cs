@@ -28,7 +28,7 @@ public sealed record WorkbenchLayoutState(
 /// </summary>
 public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
 {
-    static readonly JsonSerializerOptions jsonOptions = new()
+    static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
@@ -60,9 +60,9 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
 
             if (DockLayout.FromJson(layoutNode.ToJsonString()) is not { } layout) return null;
 
-            var known = root["known"]?.Deserialize<HashSet<string>>(jsonOptions) ?? [];
+            var known = root["known"]?.Deserialize<HashSet<string>>(JsonOptions) ?? [];
             known.UnionWith(layout.PanelIds);
-            var parked = root["parked"]?.Deserialize<Dictionary<string, ParkedPanelJson>>(jsonOptions) ?? [];
+            var parked = root["parked"]?.Deserialize<Dictionary<string, ParkedPanelJson>>(JsonOptions) ?? [];
 
             return new WorkbenchLayoutState(layout, known,
                 parked.ToDictionary(entry => entry.Key, entry => entry.Value.ToParked()));
@@ -90,13 +90,13 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
             var root = new JsonObject
             {
                 ["layout"] = JsonNode.Parse(state.Layout.ToJson()),
-                ["known"] = JsonSerializer.SerializeToNode(state.KnownPanels.Order().ToList(), jsonOptions),
+                ["known"] = JsonSerializer.SerializeToNode(state.KnownPanels.Order().ToList(), JsonOptions),
                 ["parked"] = JsonSerializer.SerializeToNode(
                     state.ParkedPanels.ToDictionary(entry => entry.Key, entry => ParkedPanelJson.From(entry.Value)),
-                    jsonOptions),
+                    JsonOptions),
             };
 
-            File.WriteAllText(Path, root.ToJsonString(jsonOptions));
+            File.WriteAllText(Path, root.ToJsonString(JsonOptions));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -47,9 +47,10 @@ public partial class Node
             yield break;
         }
 
-        foreach (var child in node.Children)
+        // An inactive child hides its whole subtree, as Unity's activeInHierarchy does.
+        foreach (var child in node.Children.Where(static child => child.IsActive))
         {
-            if (child.IsActive && child is T t)
+            if (child is T t)
             {
                 yield return t;
             }
@@ -73,12 +74,9 @@ public partial class Node
             yield break;
         }
 
-        foreach (var child in node.Children)
+        foreach (var child in node.Children.Where(static child => child.IsActive))
         {
-            if (child.IsActive)
-            {
-                yield return child;
-            }
+            yield return child;
 
             foreach (var grandChild in GetChildren(child))
             {
@@ -101,9 +99,9 @@ public partial class Node
             yield break;
         }
 
-        foreach (var go in list)
+        foreach (var go in list.Where(static node => node.IsActive))
         {
-            if (go.IsActive && go is T t)
+            if (go is T t)
             {
                 yield return t;
             }

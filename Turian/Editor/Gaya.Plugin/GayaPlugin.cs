@@ -50,7 +50,14 @@ public sealed class GayaPlugin : IPlugin
             sp => new SceneTreePanel(
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetManager>())));
+                sp.GetRequiredService<AssetManager>(),
+                sp.GetRequiredService<PrefabAuthoring>(),
+                sp.GetRequiredService<PrefabStage>(),
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<UndoService>(),
+                sp.GetRequiredService<PrefabOverrideOperations>(),
+                sp.GetRequiredService<ConfirmDialogChrome>(),
+                sp.GetRequiredService<StudioLocalization>())));
 
         var inspectorInstances = new InspectorInstances(context.Panels, context.TabStripChrome);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -73,10 +80,12 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<GizmoDrawerCatalog>(),
                     sp.GetRequiredService<PlayModeService>(),
                     sp.GetRequiredService<EditorCameraSettings>(),
-                    sp.GetRequiredService<ILogger>()),
+                    sp.GetRequiredService<ILogger>(),
+                    sp.GetRequiredService<UndoService>()),
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetWorkspace>())));
+                sp.GetRequiredService<AssetWorkspace>(),
+                sp.GetRequiredService<PrefabStage>())));
 
         context.Panels.Register(new PanelDescriptor(
             "gaya.turian.game", "Game", PanelPlacement.Center,
@@ -94,7 +103,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<ProjectSession>(),
                 sp.GetRequiredService<ICommandDispatcher>(),
-                sp.GetRequiredService<IEditorSettings>())));
+                sp.GetRequiredService<IEditorSettings>(),
+                sp.GetRequiredService<UnsavedChangesGuard>())));
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.playToolbar", ChromeSlot.MenuBar,
             sp => new PlayToolbarChrome(
@@ -135,7 +145,9 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetBrowserSettings>(),
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<AssetTypeCatalog>(),
-                sp.GetRequiredService<AssetPreviewCatalog>())));
+                sp.GetRequiredService<AssetPreviewCatalog>(),
+                sp.GetRequiredService<PrefabAuthoring>(),
+                sp.GetRequiredService<AssetFileOperations>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
@@ -171,9 +183,15 @@ public sealed class GayaPlugin : IPlugin
             sp => sp.GetRequiredService<FileDialogChrome>()));
 
         context.Services.AddSingleton<UnsavedChangesDialogChrome>();
+        context.Services.AddSingleton<UnsavedChangesGuard>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.unsavedChangesDialog", ChromeSlot.MenuBar,
             sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
+
+        context.Services.AddSingleton<ConfirmDialogChrome>();
+        context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.confirmDialog", ChromeSlot.MenuBar,
+            sp => sp.GetRequiredService<ConfirmDialogChrome>()));
 
         context.Services.AddSingleton<AboutDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
@@ -271,6 +289,8 @@ public sealed class GayaPlugin : IPlugin
         var playMode = services.GetRequiredService<PlayModeService>();
         if (playMode.IsActive) playMode.Tick(deltaTime);
 
+        services.GetRequiredService<UndoService>().Flush();
+        services.GetRequiredService<AssetAutoSave>().Flush();
         services.GetRequiredService<OutputLogBridge>().Tick();
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
@@ -282,7 +302,8 @@ public sealed class GayaPlugin : IPlugin
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Closing the window cannot be cancelled to ask first, so edits still unsaved then are kept, not lost.
+        // Closing the window asks about unsaved work first; anything still unsaved here is kept rather than lost.
+        services.GetRequiredService<AssetAutoSave>().Flush(force: true);
         var workspace = services.GetRequiredService<AssetWorkspace>();
         if (workspace.HasUnsavedChanges)
         {
@@ -313,6 +334,10 @@ public sealed class GayaPlugin : IPlugin
         // has to exist before anything that pulls in the scene tree.
         services.GetRequiredService<BuildManager>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
+
+        // An undone or redone asset edit is saved like any other edit to it.
+        services.GetRequiredService<UndoService>().AssetRestored +=
+            services.GetRequiredService<AssetAutoSave>().MarkChanged;
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();

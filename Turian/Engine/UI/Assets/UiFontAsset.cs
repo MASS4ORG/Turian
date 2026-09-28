@@ -8,12 +8,12 @@ namespace Turian.Engine.UI;
 [TypeId("a3000001-0000-4000-8000-000000000023")]
 public sealed class UiFontAsset : Asset
 {
-    static readonly ConcurrentDictionary<Guid, Font> cache = new();
+    static readonly ConcurrentDictionary<Guid, Font> Cache = new();
 
     /// <summary>Reads this font's artifact and returns a base <see cref="Font"/>, or <c>null</c>.</summary>
     public Font? GetContent()
     {
-        if (cache.TryGetValue(Id, out var cached)) return cached;
+        if (Cache.TryGetValue(Id, out var cached)) return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
@@ -25,7 +25,7 @@ public sealed class UiFontAsset : Asset
             stream.CopyTo(buffer);
             buffer.Position = 0;
             var font = Font.FromStream(buffer);
-            cache[Id] = font;
+            Cache[Id] = font;
             return font;
         }
         catch (Exception ex) when (ex is IOException or ArgumentException)
@@ -37,10 +37,10 @@ public sealed class UiFontAsset : Asset
 
     /// <summary>Drops the cached font for <paramref name="assetId"/>.</summary>
     /// <param name="assetId">The font asset id.</param>
-    public static void InvalidateCacheEntry(Guid assetId) => cache.TryRemove(assetId, out _);
+    public static void InvalidateCacheEntry(Guid assetId) => Cache.TryRemove(assetId, out _);
 
     /// <summary>Clears every cached font. Call on project unload.</summary>
-    public static void ClearCache() => cache.Clear();
+    public static void ClearCache() => Cache.Clear();
 
     /// <summary>Loads a font file directly from disk. Used by tooling and tests.</summary>
     /// <param name="absolutePath">Absolute path of the <c>.ttf</c> / <c>.otf</c> file.</param>

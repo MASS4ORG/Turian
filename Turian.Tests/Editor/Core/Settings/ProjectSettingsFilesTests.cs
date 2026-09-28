@@ -7,8 +7,8 @@ namespace Turian.Tests.Editor;
 /// </summary>
 public class ProjectSettingsFilesTests : IDisposable
 {
-    static readonly Guid sceneId = Guid.Parse("13bd3bf4-dbe0-47cf-a32d-fc29736b2a0f");
-    static readonly Guid actionsId = Guid.Parse("b1000003-0000-4000-8000-000000000100");
+    static readonly Guid SceneId = Guid.Parse("13bd3bf4-dbe0-47cf-a32d-fc29736b2a0f");
+    static readonly Guid ActionsId = Guid.Parse("b1000003-0000-4000-8000-000000000100");
 
     readonly string root = Path.Combine(Path.GetTempPath(), $"TurianSettings_{Guid.NewGuid():N}");
     readonly string legacyPath;
@@ -34,10 +34,10 @@ public class ProjectSettingsFilesTests : IDisposable
           "CompanyName": "Studio",
           "ApplicationIdentifier": "com.studio.legacy",
           "Version": "1.2.3",
-          "StartupScene": { "AssetId": "{{sceneId}}" },
+          "StartupScene": { "AssetId": "{{SceneId}}" },
           "TextureMaxResolution": 1024,
           "Id": "accf45ba-7e65-4fd7-82a9-c9cb75fc4736",
-          "InputActions": { "AssetId": "{{actionsId}}" }
+          "InputActions": { "AssetId": "{{ActionsId}}" }
         }
         """);
 
@@ -64,8 +64,8 @@ public class ProjectSettingsFilesTests : IDisposable
         Assert.Equal("Studio", player.Author);
         Assert.Equal("com.studio.legacy", player.ApplicationIdentifier);
         Assert.Equal("1.2.3", player.Version);
-        Assert.Equal(sceneId, player.StartupScene?.AssetId);
-        Assert.Equal(actionsId, project.Get<InputSettings>().Actions?.AssetId);
+        Assert.Equal(SceneId, player.StartupScene?.AssetId);
+        Assert.Equal(ActionsId, project.Get<InputSettings>().Actions?.AssetId);
         Assert.Equal(1024, project.Get<GraphicsSettings>().TextureMaxResolution);
     }
 

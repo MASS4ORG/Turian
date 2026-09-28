@@ -19,7 +19,7 @@ public class SceneManagerTests
 
     void ResetAssetDatabase()
     {
-        var field = typeof(AssetDatabase).GetField("instance", BindingFlags.Static | BindingFlags.NonPublic);
+        var field = typeof(AssetDatabase).GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
         if (field != null)
         {
             field.SetValue(null, null);

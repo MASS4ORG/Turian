@@ -9,18 +9,22 @@
         <PackageId>MASS4.Turian.Engine.UI</PackageId>
     </PropertyGroup>
 
-    <!-- Internal libraries -->
-    <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-    </ItemGroup>
+    <PropertyGroup>
+        <GuineverePackageExcludeAssets Condition="'$(GuineverePackageExcludeAssets)' == ''"></GuineverePackageExcludeAssets>
+    </PropertyGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)"/>
     </ItemGroup>
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="MASS4.Guinevere" Version="5.2.0" Condition="'$(GuinevereLocalPath)' == ''"/>
+        <PackageReference Include="MASS4.Guinevere" Version="5.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
     </ItemGroup>
 
 </Project>

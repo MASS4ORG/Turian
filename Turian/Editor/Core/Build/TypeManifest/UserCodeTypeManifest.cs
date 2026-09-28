@@ -21,7 +21,7 @@ public sealed class UserCodeTypeEntry
 /// </summary>
 public sealed class UserCodeTypeManifest
 {
-    static readonly JsonSerializerOptions jsonOptions = new()
+    static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -48,7 +48,7 @@ public sealed class UserCodeTypeManifest
     public static void Save(UserCodeTypeManifest manifest, string assemblyPath)
     {
         var path = ManifestPathFor(assemblyPath);
-        File.WriteAllText(path, JsonSerializer.Serialize(manifest, jsonOptions));
+        File.WriteAllText(path, JsonSerializer.Serialize(manifest, JsonOptions));
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public sealed class UserCodeTypeManifest
         UserCodeTypeManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(path), jsonOptions);
+            manifest = JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(path), JsonOptions);
         }
         catch (Exception ex)
         {

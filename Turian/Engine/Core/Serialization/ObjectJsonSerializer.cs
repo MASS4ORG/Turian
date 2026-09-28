@@ -104,9 +104,10 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
             var member = item.Value;
             if (member is PropertyInfo property)
             {
-                if (property.CanRead && property.CanWrite && IsMemberValid(property))
+                if (property is { CanRead: true, CanWrite: true } && IsMemberValid(property))
                 {
                     var propValue = property.GetValue(value);
+                    if (propValue is null && SkipsNull(property)) continue;
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(property, property.PropertyType, false)
                         && ObjectReferences.TryWrite(writer, value, property.Name, property.PropertyType, propValue,
@@ -129,6 +130,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (IsMemberValid(field))
                 {
                     var fieldValue = field.GetValue(value);
+                    if (fieldValue is null && SkipsNull(field)) continue;
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(field, field.FieldType, false)
                         && ObjectReferences.TryWrite(writer, value, field.Name, field.FieldType, fieldValue,
@@ -193,7 +195,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
             object? value;
             Type memberType;
 
-            if (memberInfo is PropertyInfo propertyInfo && propertyInfo.CanWrite)
+            if (memberInfo is PropertyInfo { CanWrite: true } propertyInfo)
             {
                 memberType = propertyInfo.PropertyType;
             }
@@ -232,6 +234,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
         }
     }
 
+    static bool IsIgnored(MemberInfo member) =>
+        member.GetCustomAttribute<JsonIgnoreAttribute>() is { Condition: JsonIgnoreCondition.Always };
+
+    static bool SkipsNull(MemberInfo member) =>
+        member.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition
+            is JsonIgnoreCondition.WhenWritingNull or JsonIgnoreCondition.WhenWritingDefault;
+
     static bool IsMemberValid(MemberInfo member)
     {
         switch (member)
@@ -249,7 +258,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                     )
                     || (
                         getMethod.IsPublic
-                        && property.GetCustomAttribute(typeof(JsonIgnoreAttribute)) == null
+                        && !IsIgnored(property)
                     );
             case FieldInfo field:
                 return (
@@ -258,7 +267,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                     )
                     || (
                         field.IsPublic
-                        && field.GetCustomAttribute(typeof(JsonIgnoreAttribute)) == null
+                        && !IsIgnored(field)
                     );
             default:
                 throw new ArgumentException("Member is not a property or field", nameof(member));
@@ -267,7 +276,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
     static Dictionary<string, MemberInfo> GetCachedMembers(Type type)
     {
-        if (!ObjectJsonSerializerCache.Members.TryGetValue(type, out var members))
+        if (!ObjectJsonSerializerCache.members.TryGetValue(type, out var members))
         {
             members = [];
 
@@ -289,7 +298,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 members[field.Name] = field;
             }
 
-            ObjectJsonSerializerCache.Members[type] = members;
+            ObjectJsonSerializerCache.members[type] = members;
         }
         return members;
     }
@@ -349,5 +358,5 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
 static class ObjectJsonSerializerCache
 {
-    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> Members = new();
+    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> members = new();
 }

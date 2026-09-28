@@ -9,7 +9,7 @@ public sealed class ExportUserCode(
     BuildConfiguration configuration = BuildConfiguration.Release)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
-    static readonly string[] artifactExtensionsToDelete =
+    static readonly string[] ArtifactExtensionsToDelete =
         [".pdb", ".xml", ".deps.json"];
 
     /// <summary>Publishes the project and returns the export output directory.</summary>
@@ -75,7 +75,7 @@ public sealed class ExportUserCode(
         foreach (var file in Directory.EnumerateFiles(outputDirectory, "*", SearchOption.AllDirectories))
         {
             var ext = Path.GetExtension(file);
-            if (artifactExtensionsToDelete.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            if (ArtifactExtensionsToDelete.Contains(ext, StringComparer.OrdinalIgnoreCase))
             {
                 try
                 {

@@ -126,8 +126,8 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
                 Label(gui, rollup.Status.Text(), Theme.InkDim, 11);
                 Label(gui, Elapsed(root), Theme.InkDim, 11);
 
-                if (root.IsActive && !root.CancelRequested
-                                 && TextButton(gui, "Cancel", $"tasks/{root.Id}/cancel"))
+                if (root is { IsActive: true, CancelRequested: false }
+                    && TextButton(gui, "Cancel", $"tasks/{root.Id}/cancel"))
                 {
                     tasks.RequestCancel(root.Id);
                 }

@@ -176,6 +176,18 @@ public class AssetManager
     }
 
     /// <summary>
+    /// Clears an open asset's modified flag without saving it, when its content is back to what was last saved.
+    /// </summary>
+    /// <param name="assetId">The asset id.</param>
+    public void MarkClean(Guid assetId)
+    {
+        if (!assetsById.TryGetValue(assetId, out var asset) || !asset.IsModified) return;
+
+        asset.MarkSaved();
+        DirtyStateChanged?.Invoke(HasDirtyAssets);
+    }
+
+    /// <summary>
     /// Saves an asset and triggers the AssetSaved event.
     /// </summary>
     /// <param name="asset"></param>
@@ -350,6 +362,11 @@ public class AssetManager
         assetsById[asset.Id] = asset;
         return added;
     }
+
+    /// <summary>The open asset with the given id, or null when none is open.</summary>
+    /// <param name="assetId">The asset id.</param>
+    /// <returns>The tracked asset.</returns>
+    public Asset? GetTrackedAsset(Guid assetId) => assetsById.GetValueOrDefault(assetId);
 
     Asset? GetTrackedAsset(Asset asset)
     {
