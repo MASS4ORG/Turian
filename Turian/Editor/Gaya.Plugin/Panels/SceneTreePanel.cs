@@ -111,8 +111,8 @@ sealed class SceneTreePanel : IPanel
                 }
 
                 // A node row dropped on another row moves under it.
-                if (item.Tag is Node target && payload is ReferenceDragPayload moved
-                    && sceneTree.FindNodeById(moved.Id) is { } dropped)
+                if (item.Tag is Node target && payload is ReferenceDragPayload dragged
+                    && sceneTree.FindNodeById(dragged.Id) is { } dropped)
                     Restructure(dropped, () => Reparent(dropped, target));
             });
 

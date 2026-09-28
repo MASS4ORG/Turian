@@ -1,5 +1,3 @@
-using Microsoft.Build.Framework;
-
 namespace Turian.Editor.Core;
 
 /// <summary>

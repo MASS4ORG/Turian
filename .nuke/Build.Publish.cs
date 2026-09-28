@@ -114,16 +114,4 @@ sealed partial class Build
             .Move(PublishDir / $"{launcherName}{extension}", ExistsPolicy.FileOverwrite);
         output.DeleteDirectory();
     }
-
-    void RenameExecutable(string sourceName, string destinationName)
-    {
-        var extension = RuntimeIdentifier.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : string.Empty;
-        var source = PublishDir / $"{sourceName}{extension}";
-        if (!source.FileExists())
-        {
-            return;
-        }
-
-        source.Move(PublishDir / $"{destinationName}{extension}", ExistsPolicy.FileOverwrite);
-    }
 }

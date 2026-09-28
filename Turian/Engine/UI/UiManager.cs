@@ -246,7 +246,7 @@ public sealed class UiManager : IDisposable
             return null;
         }
 
-        var key = SheetKey(panel, document);
+        var key = SheetKeyFor(panel, document);
         if (renderers.TryGetValue(panel.Id, out var cached)
             && cached.DocumentId == panel.Document.AssetId
             && cached.SheetKey == key)
@@ -272,7 +272,7 @@ public sealed class UiManager : IDisposable
     }
 
     // Changes whenever the panel's or the document's stylesheets, or its controller, change.
-    static string SheetKey(UiDocumentComponent panel, UiDocument document) =>
+    static string SheetKeyFor(UiDocumentComponent panel, UiDocument document) =>
         string.Join(',', panel.StyleSheets.Where(r => !r.IsEmpty).Select(r => r.AssetId)) + '|'
         + string.Join(',', document.StyleSheets) + '|' + (document.ControllerType ?? string.Empty);
 

@@ -1,5 +1,3 @@
-using Color = Turian.Engine.Core.Color;
-
 namespace Turian.Tests;
 
 /// <summary>

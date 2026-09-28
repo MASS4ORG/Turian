@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-
 namespace Turian.Editor.Core;
 
 /// <summary>How a node in a scene relates to prefabs, for the scene tree's icons.</summary>

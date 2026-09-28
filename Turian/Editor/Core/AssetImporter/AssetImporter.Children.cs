@@ -59,10 +59,10 @@ public sealed partial class AssetImporter
                 ex.SourcePath = record.SourceRelativePath;
             }
             logger.LogDebug(
-                "Deferring component-type indexing for prefab {AssetId} at {SourcePath}: {Message}",
+                ex,
+                "Deferring component-type indexing for prefab {AssetId} at {SourcePath}",
                 asset.Id,
-                ex.SourcePath ?? "unknown",
-                ex.Message);
+                ex.SourcePath ?? "unknown");
         }
         catch (Exception ex)
         {

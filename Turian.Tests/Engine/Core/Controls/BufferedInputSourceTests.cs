@@ -1,6 +1,3 @@
-using Silk.NET.Input;
-using MouseButton = Silk.NET.Input.MouseButton;
-
 namespace Turian.Tests;
 
 /// <summary>
@@ -99,12 +96,12 @@ public class BufferedInputSourceTests
         var input = new BufferedInputSource();
 
         input.PushKeyDown(Key.W);
-        input.PushMouseDown(MouseButton.Left);
+        input.PushMouseDown(SilkMouseButton.Left);
 
         input.Clear();
 
         Assert.False(input.IsKeyDown(Key.W));
         Assert.False(input.WasKeyPressed(Key.W));
-        Assert.False(input.IsMouseButtonDown(MouseButton.Left));
+        Assert.False(input.IsMouseButtonDown(SilkMouseButton.Left));
     }
 }

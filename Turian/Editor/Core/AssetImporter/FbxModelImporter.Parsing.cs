@@ -1,5 +1,3 @@
-using Silk.NET.Assimp;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -60,14 +58,14 @@ public sealed partial class FbxModelImporter
         }
     }
 
-    static unsafe FbxImport Build(AssimpApi api, Scene* scene)
+    static unsafe FbxImport Build(AssimpApi api, AssimpScene* scene)
     {
         var texturePaths = new List<string>();
         var textureIndices = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var srgbTextures = new HashSet<int>();
         var greenFlippedTextures = new HashSet<int>();
 
-        int Texture(Material* material, TextureType type, bool isSrgb, bool flipGreen)
+        int Texture(AssimpMaterial* material, AssimpTextureType type, bool isSrgb, bool flipGreen)
         {
             if (api.GetMaterialTextureCount(material, type) == 0)
             {
@@ -100,10 +98,10 @@ public sealed partial class FbxModelImporter
             var material = scene->MMaterials[i];
 
             materials.Add(new FbxMaterialInfo(
-                Texture(material, TextureType.Diffuse, isSrgb: true, flipGreen: false),
-                Texture(material, TextureType.Specular, isSrgb: false, flipGreen: false),
-                Texture(material, TextureType.Normals, isSrgb: false, flipGreen: true),
-                Texture(material, TextureType.Emissive, isSrgb: true, flipGreen: false)));
+                Texture(material, AssimpTextureType.Diffuse, isSrgb: true, flipGreen: false),
+                Texture(material, AssimpTextureType.Specular, isSrgb: false, flipGreen: false),
+                Texture(material, AssimpTextureType.Normals, isSrgb: false, flipGreen: true),
+                Texture(material, AssimpTextureType.Emissive, isSrgb: true, flipGreen: false)));
         }
 
         var vertices = new List<Vertex>();
@@ -134,7 +132,7 @@ public sealed partial class FbxModelImporter
     }
 
     static unsafe FbxNodeInfo BuildNode(
-        Scene* scene,
+        AssimpScene* scene,
         AssimpNode* node,
         List<Vertex> vertices,
         List<Vector2> texCoord1,
@@ -184,7 +182,7 @@ public sealed partial class FbxModelImporter
     }
 
     static unsafe SubMesh? AppendMesh(
-        Mesh* mesh,
+        AssimpMesh* mesh,
         List<Vertex> vertices,
         List<Vector2> texCoord1,
         List<uint> indices)

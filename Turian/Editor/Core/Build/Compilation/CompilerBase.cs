@@ -53,7 +53,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
         }
         catch (Exception e)
         {
-            Logger.LogError("Package restore failed: {Error}", e.Message);
+            Logger.LogError(e, "Package restore failed");
         }
 
         return csprojFilePath;

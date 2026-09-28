@@ -1,5 +1,3 @@
-using System.Xml.Linq;
-
 namespace Turian.Editor.Core;
 
 /// <summary>Lossless XLIFF 1.2 and RFC-4180 CSV interchange for string tables.</summary>

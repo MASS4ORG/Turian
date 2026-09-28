@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging.Abstractions;
+
 
 namespace Gaya.Host;
 
@@ -269,10 +269,8 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         app.Themes.Changed -= OnThemeChanged;
 
         foreach (var panel in panelInstances.Values.OfType<IDisposable>()) panel.Dispose();
-        foreach (var item in chromeInstances.Values)
-            if ((object)item is IDisposable disposable) disposable.Dispose();
-        foreach (var item in tabStripChromeInstances.Values)
-            if ((object)item is IDisposable disposable) disposable.Dispose();
+        foreach (var item in chromeInstances.Values.OfType<IDisposable>()) item.Dispose();
+        foreach (var item in tabStripChromeInstances.Values.OfType<IDisposable>()) item.Dispose();
     }
 
     /// <summary>Runs a command by id (menus, buttons and the palette all funnel through here).</summary>

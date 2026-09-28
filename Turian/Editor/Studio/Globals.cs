@@ -1,6 +1,6 @@
 global using System;
-global using System.Numerics;
 global using System.IO;
+global using System.Numerics;
 global using Gaya.Host;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;

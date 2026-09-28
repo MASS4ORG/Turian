@@ -1,6 +1,3 @@
-using Silk.NET.Input;
-using MouseButton = Silk.NET.Input.MouseButton;
-
 namespace Turian.Tests;
 
 /// <summary>
@@ -38,7 +35,7 @@ public sealed class EngineInputHandlerTests : IDisposable
     [Fact]
     public void MouseButtonState_IsForwardedAndMapped()
     {
-        source.PushMouseDown(MouseButton.Right);
+        source.PushMouseDown(SilkMouseButton.Right);
 
         Assert.True(handler.IsMouseButtonDown(GMouseButton.Right));
         Assert.True(handler.IsMouseButtonPressed(GMouseButton.Right));

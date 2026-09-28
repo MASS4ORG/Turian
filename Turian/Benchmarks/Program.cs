@@ -122,7 +122,7 @@ static Node BuildScene(Func<Node, Component> link)
     return scene;
 }
 
-static Node LoadScene(string json) => Serializer.LoadData<Node>(json)!;
+static void LoadScene(string json) => Serializer.LoadData<Node>(json);
 
 static void Report(string label, Action run)
 {

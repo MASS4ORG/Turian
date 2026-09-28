@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging.Abstractions;
-
 namespace Turian.Engine.Core;
 
 /// <summary>

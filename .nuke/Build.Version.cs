@@ -32,25 +32,25 @@ sealed partial class Build
     /// </summary>
     bool HasNewCommits => GitVersion is not null && GitVersion.CommitsSinceVersionSource != "0";
 
-    string currentVersion;
+    string CachedTag;
     string CurrentTag
     {
         get
         {
-            if (currentVersion is null)
+            if (CachedTag is null)
             {
                 try
                 {
-                    currentVersion = Git("describe --tags --abbrev=0")
+                    CachedTag = Git("describe --tags --abbrev=0")
                         .FirstOrDefault()
                         .Text;
                 }
                 catch
                 {
-                    currentVersion = "0.0.0";
+                    CachedTag = "0.0.0";
                 }
             }
-            return currentVersion;
+            return CachedTag;
         }
     }
     string CurrentVersion => CurrentTag.TrimStart('v');

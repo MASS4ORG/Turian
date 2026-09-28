@@ -7,7 +7,7 @@ public class EditorSettingsFileTests : IDisposable
 
     sealed class LanguagePage
     {
-        public int Language { get; set; }
+        public int Language { get; [UsedImplicitly] set; }
     }
 
     /// <summary>Deletes the file.</summary>

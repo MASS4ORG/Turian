@@ -1,5 +1,3 @@
-using Silk.NET.Assimp;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -170,10 +168,10 @@ public sealed partial class FbxModelImporter : IAssetImporter
     /// </summary>
     /// <param name="parentAssetId">Id of the model asset the meshes belong to.</param>
     /// <param name="filePath">Absolute path of the FBX file.</param>
-    public EngineNode BuildPrefabRoot(Guid parentAssetId, string filePath) =>
+    public Node BuildPrefabRoot(Guid parentAssetId, string filePath) =>
         BuildPrefabRoot(parentAssetId, Read(filePath, keepGeometry: false), Path.GetFileNameWithoutExtension(filePath));
 
-    static EngineNode BuildPrefabRoot(Guid parentAssetId, FbxImport import, string rootName)
+    static Node BuildPrefabRoot(Guid parentAssetId, FbxImport import, string rootName)
     {
         var counter = 0;
         var root = BuildPrefabNode(parentAssetId, import.Root, ref counter);
@@ -181,9 +179,9 @@ public sealed partial class FbxModelImporter : IAssetImporter
         return root;
     }
 
-    static EngineNode BuildPrefabNode(Guid parentAssetId, FbxNodeInfo source, ref int counter)
+    static Node BuildPrefabNode(Guid parentAssetId, FbxNodeInfo source, ref int counter)
     {
-        var node = new EngineNode
+        var node = new Node
         {
             Id = AssetIdFactory.Derive(parentAssetId, $"node:{counter++}"),
             Name = source.Name,

@@ -285,7 +285,7 @@ public static class TypeRegistry
         var fqn = ReadString(entry, "FullyQualifiedName");
         if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId)) return false;
 
-        if (assemblies.Select(asm => asm.GetType(fqn)).FirstOrDefault(type => type is not null) is not { } type)
+        if (assemblies.Select(asm => asm.GetType(fqn)).FirstOrDefault(candidate => candidate is not null) is not { } type)
         {
             logger.LogWarning("User type '{Fqn}' not found in any loaded assembly; skipping", fqn);
             return false;

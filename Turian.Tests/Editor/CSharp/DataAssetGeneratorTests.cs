@@ -91,10 +91,11 @@ public sealed partial class DataAssetGeneratorTests
     public void ObservableProperty_RaisesChangedOnChange()
     {
         var sample = new Sample();
+        var senders = new List<object>();
         var changes = new List<string>();
         sample.Changed += (asset, member) =>
         {
-            Assert.Same(sample, asset);
+            senders.Add(asset);
             changes.Add(member);
         };
 
@@ -102,6 +103,7 @@ public sealed partial class DataAssetGeneratorTests
         sample.Health = 5;
         sample.Health = 6;
 
+        Assert.All(senders, sender => Assert.Same(sample, sender));
         Assert.Equal([nameof(Sample.Health), nameof(Sample.Health)], changes);
         Assert.Contains("\"Health\": 6", Serializer.Serialize<DataAsset>(sample));
     }

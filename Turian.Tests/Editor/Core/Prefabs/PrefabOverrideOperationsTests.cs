@@ -10,7 +10,6 @@ public class PrefabOverrideOperationsTests : IDisposable
     readonly NodeInspectorController inspector;
     readonly UndoService undo;
     readonly PrefabOverrideOperations operations;
-    readonly Prefab scene = new() { Id = Guid.NewGuid(), RelativePath = "Assets/scene.prefab" };
     readonly Node root = new() { Name = "Scene" };
 
     /// <summary>Opens a scene backed by a throwaway project; applies are not exercised, so no importer is needed.</summary>
@@ -23,6 +22,7 @@ public class PrefabOverrideOperationsTests : IDisposable
         undo = new UndoService(sceneTree, inspector, assets);
         operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader: null!);
 
+        var scene = new Prefab { Id = Guid.NewGuid(), RelativePath = "Assets/scene.prefab" };
         assets.OpenAsset(scene);
         sceneTree.OpenAsset(scene);
         typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
