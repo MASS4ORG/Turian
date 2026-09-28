@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: nested prefabs, variants, and prefab override tracking with live refresh (#84, #185)
+- Added: undo/redo with per-document history, covering scene edits, prefab overrides, and asset operations (#81)
+- Added: themed control palette and updated icon set
+- Fixed: start the asset importer when a project opens
+- Changed: prefab instances now save compactly as differences from their prefab; scenes with prefab instances saved before this change need re-saving
+
 ## [1.0.1] - 2026-09-25
 
 ### Fixed
