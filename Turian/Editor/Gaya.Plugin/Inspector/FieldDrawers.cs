@@ -22,8 +22,10 @@ static class FieldDrawers
     static GuiColor Border => Theme.Border;
 
     sealed record EnumMetadata(string[] Names, string[] Labels);
+    sealed record SummaryMetadata(InspectorMemberMetadata? Name, InspectorMemberMetadata? Path);
 
-    static readonly ConditionalWeakTable<Type, EnumMetadata> enumMetadata = new();
+    static readonly ConditionalWeakTable<Type, EnumMetadata> enumMetadata = [];
+    static readonly ConditionalWeakTable<Type, SummaryMetadata> summaryMetadata = [];
 
     /// <summary>Draws one labeled row for a field, or several for a composite like a transform.</summary>
     /// <param name="gui">The GUI instance.</param>
@@ -346,10 +348,27 @@ static class FieldDrawers
     /// The row's heading: a nested object inside a collection has no label of its own, so its own
     /// <c>Name</c> or <c>Path</c> stands in and the list reads as what it holds.
     /// </summary>
-    static string Summary(FormField field, object target) =>
-        target.GetType().GetProperty("Name")?.GetValue(target) as string is { Length: > 0 } name ? name
-        : target.GetType().GetProperty("Path")?.GetValue(target) as string is { Length: > 0 } path ? path
-        : field.Label;
+    static string Summary(FormField field, object target)
+    {
+        var members = summaryMetadata.GetValue(target.GetType(), static type =>
+            new SummaryMetadata(SummaryMember(type, "Name"), SummaryMember(type, "Path")));
+        try
+        {
+            if (members.Name?.GetValue(target) is string { Length: > 0 } name) return name;
+            if (members.Path?.GetValue(target) is string { Length: > 0 } path) return path;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogDebug(ex, "Failed to read inspector summary for {Type}", target.GetType());
+        }
+
+        return field.Label;
+    }
+
+    static InspectorMemberMetadata? SummaryMember(Type type, string name) =>
+        type.GetProperty(name) is { PropertyType: var propertyType } property
+        && propertyType == typeof(string) && property.GetMethod is not null
+        ? InspectorMemberMetadata.For(property) : null;
 
     /// <summary>
     /// A full-width labeled button running a <c>[Button]</c> method, sized like a row so it reads as
