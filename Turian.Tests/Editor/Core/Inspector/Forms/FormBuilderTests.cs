@@ -27,6 +27,52 @@ public class FormBuilderTests
         public Dictionary<string, int> Scores { get; set; } = new() { ["one"] = 1 };
     }
 
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = true)]
+    sealed class CustomHintAttribute(int number) : Attribute
+    {
+        public int Number { get; } = number;
+    }
+
+    sealed class OrderedTarget
+    {
+        public int DefaultFirst { get; set; }
+        [InspectorOrder(10)] public int Last { get; set; }
+        [InspectorOrder(-10), Range(1, 5), ReadOnly, NumericUpDown]
+        [CustomHint(1), CustomHint(2)]
+        public int First { get; set; }
+        public int DefaultSecond { get; set; }
+    }
+
+    sealed class UnsafeTarget
+    {
+        public int Valid { get; set; }
+        public int Throws { get => throw new ApplicationException("Not ready"); set { } }
+        [ShowInEditor] public int WriteOnly { set { } }
+        public Span<int> Unsupported { get => []; set { } }
+        public int this[int index] { get => index; set { } }
+    }
+
+    class InheritedTarget
+    {
+        [Range(2, 3), InspectorOrder(-4)]
+        public virtual int Ordered { get; set; }
+
+        [HideInEditor]
+        public virtual int Hidden { get; set; }
+    }
+
+    sealed class OverriddenTarget : InheritedTarget
+    {
+        public override int Ordered { get; set; }
+        public override int Hidden { get; set; }
+    }
+
+    sealed class ChangingTarget
+    {
+        public bool Ready { get; set; } = true;
+        public int Value { get => Ready ? 42 : throw new ApplicationException("Not ready"); set { } }
+    }
+
     static FormField Field(FormModel model, string name) =>
         model.Sections[0].Fields.Single(field => field.Name == name);
 
@@ -59,6 +105,7 @@ public class FormBuilderTests
         var model = FormBuilder.Build(new Target());
 
         Assert.Contains(model.Sections[0].Fields, field => field.Name == Target.RevealedMemberName);
+        Assert.Equal(false, Field(model, Target.RevealedMemberName).GetValue());
     }
 
     /// <summary>The field carries the member's type, which is what picks a drawer.</summary>
@@ -131,6 +178,88 @@ public class FormBuilderTests
         var second = FormBuilder.EditableMembers(typeof(Target));
 
         Assert.Same(first, second);
+    }
+
+    /// <summary>Forms for different objects reuse the same member metadata and attributes.</summary>
+    [Fact]
+    public void MetadataIsCachedAndSharedBetweenForms()
+    {
+        var first = Field(FormBuilder.Build(new OrderedTarget()), nameof(OrderedTarget.First));
+        var second = Field(FormBuilder.Build(new OrderedTarget()), nameof(OrderedTarget.First));
+
+        Assert.Same(first.Metadata, second.Metadata);
+        Assert.Same(FormBuilder.EditableMetadata(typeof(OrderedTarget)),
+            FormBuilder.EditableMetadata(typeof(OrderedTarget)));
+        Assert.Same(first.Attribute<RangeAttribute>(), second.Attribute<RangeAttribute>());
+        Assert.Equal((1f, 5f), first.Range);
+        Assert.True(first.IsReadOnly);
+    }
+
+    /// <summary>Known concerns are queryable without losing user-defined repeatable attributes.</summary>
+    [Fact]
+    public void MetadataGroupsAttributesWithoutDiscardingCustomOrRepeatedHints()
+    {
+        var metadata = Field(FormBuilder.Build(new OrderedTarget()),
+            nameof(OrderedTarget.First)).Metadata!;
+
+        Assert.Contains(metadata.Layout, attribute => attribute is InspectorOrderAttribute);
+        Assert.Contains(metadata.Validation, attribute => attribute is RangeAttribute);
+        Assert.Contains(metadata.Validation, attribute => attribute is ReadOnlyAttribute);
+        Assert.Contains(metadata.RenderingHints, attribute => attribute is NumericUpDownAttribute);
+        Assert.Equal([1, 2], metadata.GetAttributes<CustomHintAttribute>()
+            .Select(attribute => attribute.Number));
+        Assert.Equal(2, metadata.Attributes.Count(attribute => attribute is CustomHintAttribute));
+    }
+
+    /// <summary>Explicit priority sorts members while preserving reflection order for ties.</summary>
+    [Fact]
+    public void MemberPrioritySortsStablyWithoutReorderingTies()
+    {
+        var names = FormBuilder.Build(new OrderedTarget()).Sections[0].Fields
+            .Select(field => field.Name);
+
+        Assert.Equal([nameof(OrderedTarget.First), nameof(OrderedTarget.DefaultFirst),
+            nameof(OrderedTarget.DefaultSecond), nameof(OrderedTarget.Last)], names);
+    }
+
+    /// <summary>Instance-dependent failing getters and indexers cannot break an inspector redraw.</summary>
+    [Fact]
+    public void UnsafePropertiesAreSkippedAfterMetadataHasBeenBuilt()
+    {
+        var target = new UnsafeTarget();
+        var fields = FormBuilder.Build(target).Sections[0].Fields;
+
+        Assert.Single(fields);
+        Assert.Equal(nameof(UnsafeTarget.Valid), fields[0].Name);
+        Assert.Equal(0, fields[0].GetValue());
+        Assert.Equal([nameof(UnsafeTarget.Valid)],
+            InspectorReflector.GetDisplayableMembers(target).Select(member => member.Name));
+    }
+
+    /// <summary>Overridden members retain inheritable attributes and shared metadata cannot be reordered.</summary>
+    [Fact]
+    public void OverriddenMemberMetadataRetainsBaseAttributes()
+    {
+        var metadata = FormBuilder.EditableMetadata(typeof(OverriddenTarget));
+
+        Assert.DoesNotContain(metadata, member => member.Member.Name == nameof(OverriddenTarget.Hidden));
+        var ordered = Assert.Single(metadata);
+        Assert.Equal(-4, ordered.Priority);
+        Assert.NotNull(ordered.GetAttribute<RangeAttribute>());
+        Assert.False(metadata is InspectorMemberMetadata[]);
+    }
+
+    /// <summary>A previously safe getter can fail later without breaking the existing form.</summary>
+    [Fact]
+    public void AGetterThatBecomesUnsafeReturnsNoValue()
+    {
+        var target = new ChangingTarget();
+        var field = Field(FormBuilder.Build(target), nameof(ChangingTarget.Value));
+        Assert.Equal(42, field.GetValue());
+
+        target.Ready = false;
+
+        Assert.Null(field.GetValue());
     }
 
     /// <summary>Editing a node's name through the form writes it to the node itself.</summary>

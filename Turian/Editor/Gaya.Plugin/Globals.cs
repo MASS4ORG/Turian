@@ -21,3 +21,5 @@ global using Turian.Engine.UI;
 global using GuiColor = Guinevere.Color;
 global using SilkKey = Silk.NET.Input.Key;
 global using SilkMouseButton = Silk.NET.Input.MouseButton;
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Turian.Tests")]

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -9,8 +11,11 @@ public static class FormBuilder
     const BindingFlags memberScope =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
-    static readonly ConcurrentDictionary<Type, MemberInfo[]> MembersByType = new();
-    static readonly ConcurrentDictionary<Type, MethodInfo[]> ButtonMethodsByType = new();
+    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<InspectorMemberMetadata>>> membersByType = new();
+    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<MemberInfo>>> memberViewsByType = new();
+    static readonly ConditionalWeakTable<Type, Lazy<MethodInfo[]>> buttonMethodsByType = new();
+    static readonly InspectorMemberMetadata activeSwitch =
+        InspectorMemberMetadata.For(typeof(Component).GetProperty(nameof(Component.IsActive))!);
 
     /// <summary>Builds the form for a plain object: one section holding its editable members.</summary>
     /// <param name="target">The object to inspect.</param>
@@ -39,33 +44,49 @@ public static class FormBuilder
         return new FormModel(node, sections);
     }
 
-    /// <summary>The editable members of a type, in declaration order.</summary>
+    /// <summary>The editable members of a type, in inspector order.</summary>
     /// <param name="type">The type to reflect over.</param>
     public static IReadOnlyList<MemberInfo> EditableMembers(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
+        return memberViewsByType.GetValue(type, static t =>
+            new Lazy<IReadOnlyList<MemberInfo>>(() =>
+                Array.AsReadOnly(EditableMetadata(t).Select(metadata => metadata.Member).ToArray()))).Value;
+    }
 
-        return MembersByType.GetOrAdd(type, static t => [.. t
-            .GetMembers(memberScope)
-            .Where(member => member.MemberType is MemberTypes.Field or MemberTypes.Property)
-            .Where(ShouldDisplay)]);
+    /// <summary>Cached, ordered metadata for the visible members of a type.</summary>
+    public static IReadOnlyList<InspectorMemberMetadata> EditableMetadata(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return membersByType.GetValue(type, static t =>
+            new Lazy<IReadOnlyList<InspectorMemberMetadata>>(() =>
+                Array.AsReadOnly(t.GetMembers(memberScope)
+                    .Where(member => member is FieldInfo field && !field.FieldType.IsByRefLike
+                                     || member is PropertyInfo property && property.GetMethod is not null
+                                     && property.GetIndexParameters().Length == 0
+                                     && !property.PropertyType.IsByRefLike)
+                    .Select(InspectorMemberMetadata.For)
+                    .Where(metadata => metadata.IsVisible)
+                    .OrderBy(metadata => metadata.Priority)
+                    .ToArray()))).Value;
     }
 
     static FormSection SectionFor(
         object target, string title, Action<object>? mutationNotifier, bool removable = false)
     {
-        var fields = EditableMembers(target.GetType())
-            .Where(member => CanReadSafely(member, target))
-            .Select(member => new FormField(member, target, mutationNotifier))
+        var fields = EditableMetadata(target.GetType())
+            .Where(metadata => CanReadSafely(metadata, target))
+            .Select(metadata => new FormField(metadata.Member, target, mutationNotifier))
             .ToList();
 
-        if (ActiveSwitch(target) is { } active && fields.TrueForAll(f => f.Name != active.Name))
-            fields.Insert(0, new FormField(active, target, mutationNotifier));
+        if (target is Component && fields.TrueForAll(f => f.Name != activeSwitch.Member.Name))
+            fields.Insert(0, new FormField(activeSwitch.Member, target, mutationNotifier));
 
-        var buttons = ButtonMethodsByType.GetOrAdd(target.GetType(), static t => [.. t
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .Where(method => method.GetCustomAttribute<ButtonAttribute>() is not null)
-            .Where(method => method.GetParameters().Length == 0)])
+        var buttons = buttonMethodsByType.GetValue(target.GetType(), static t =>
+            new Lazy<MethodInfo[]>(() => [.. t
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(method => method.GetCustomAttribute<ButtonAttribute>() is not null)
+                .Where(method => method.GetParameters().Length == 0)])).Value
             .Select(method => new InspectorButton(FormField.Humanize(method.Name),
                 () =>
                 {
@@ -85,41 +106,17 @@ public static class FormBuilder
         return new FormSection(title, target, fields, removable) { Buttons = buttons };
     }
 
-    /// <summary>
-    /// A component's <c>IsActive</c>, which is <c>[HideInEditor]</c> because the section heading draws
-    /// it rather than the body. Null for anything that is not a component.
-    /// </summary>
-    static MemberInfo? ActiveSwitch(object target) =>
-        target is Component ? typeof(Component).GetProperty(nameof(Component.IsActive)) : null;
-
-    /// <summary>
-    /// Public and writable, unless hidden; or explicitly shown. Matches the Avalonia inspector so both
-    /// shells display the same members.
-    /// </summary>
-    static bool ShouldDisplay(MemberInfo member)
-    {
-        var isPublic = member switch
-        {
-            PropertyInfo property => (property.GetMethod?.IsPublic ?? false) && property is { CanRead: true, CanWrite: true },
-            FieldInfo field => field.IsPublic,
-            _ => false
-        };
-
-        return (isPublic && member.GetCustomAttribute<HideInEditorAttribute>() is null)
-               || member.GetCustomAttribute<ShowInEditorAttribute>() is not null;
-    }
-
     /// <summary>A property getter can throw on a half-built object; such members are skipped.</summary>
-    static bool CanReadSafely(MemberInfo member, object target)
+    static bool CanReadSafely(InspectorMemberMetadata metadata, object target)
     {
-        if (member is not PropertyInfo property) return true;
+        if (metadata.Member is not PropertyInfo) return true;
 
         try
         {
-            _ = property.GetValue(target);
+            _ = metadata.GetValue(target);
             return true;
         }
-        catch (Exception ex) when (ex is TargetInvocationException or InvalidOperationException or NotSupportedException)
+        catch (Exception)
         {
             return false;
         }

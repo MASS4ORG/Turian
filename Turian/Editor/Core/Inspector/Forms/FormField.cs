@@ -7,7 +7,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public sealed class FormField
 {
-    readonly MemberInfo? member;
+    readonly InspectorMemberMetadata? metadata;
     readonly Func<object?> read;
     readonly Func<object?, bool> write;
     readonly Action<object>? mutationNotifier;
@@ -15,20 +15,23 @@ public sealed class FormField
 
     internal FormField(MemberInfo member, object target, Action<object>? mutationNotifier)
     {
-        this.member = member;
+        metadata = InspectorMemberMetadata.For(member);
         this.mutationNotifier = mutationNotifier;
 
         Target = target;
         Name = member.Name;
-        Label = Humanize(member.Name);
-        ValueType = member switch
-        {
-            PropertyInfo property => property.PropertyType,
-            FieldInfo field => field.FieldType,
-            _ => typeof(object)
-        };
+        Label = metadata.Label;
+        ValueType = metadata.ValueType;
 
-        read = () => member.GetValue(target);
+        read = () =>
+        {
+            try { return metadata.GetValue(target); }
+            catch (Exception ex)
+            {
+                Log.Logger.LogDebug(ex, "Failed to get value for {Member}", member.Name);
+                return null;
+            }
+        };
         write = value => MemberValueAccessor.TrySetValue(member, target, value, mutationNotifier);
     }
 
@@ -69,6 +72,9 @@ public sealed class FormField
     /// <summary>The type the value holds, which selects the drawer.</summary>
     public Type ValueType { get; }
 
+    /// <summary>Cached metadata for a reflected member; null for collection entries.</summary>
+    public InspectorMemberMetadata? Metadata => metadata;
+
     /// <summary>Reads the current value.</summary>
     public object? GetValue() => read();
 
@@ -89,8 +95,7 @@ public sealed class FormField
     /// <summary>Whether the value refuses writes, from <c>[ReadOnly]</c> or a missing setter.</summary>
     public bool IsReadOnly =>
         forcedReadOnly
-        || member?.GetCustomAttribute<ReadOnlyAttribute>() is not null
-        || member is PropertyInfo { CanWrite: false };
+        || metadata?.IsReadOnly == true;
 
     /// <summary>The inclusive bounds from <c>[Range]</c>, or null when the value is unbounded.</summary>
     public (float Min, float Max)? Range =>
@@ -99,7 +104,7 @@ public sealed class FormField
     /// <summary>Looks up an attribute on the member, for drawers that honour ranges, tooltips and such.</summary>
     /// <typeparam name="TAttribute">The attribute to find.</typeparam>
     public TAttribute? Attribute<TAttribute>() where TAttribute : Attribute =>
-        member?.GetCustomAttribute<TAttribute>();
+        metadata?.GetAttribute<TAttribute>();
 
     /// <summary>Turns <c>MaxResolution</c> into <c>Max Resolution</c>.</summary>
     internal static string Humanize(string name)

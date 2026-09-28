@@ -15,42 +15,22 @@ public static class InspectorReflector
     public static IEnumerable<MemberInfo> GetDisplayableMembers(object targetObject)
     {
         ArgumentNullException.ThrowIfNull(targetObject);
-        return targetObject
-            .GetType()
-            .GetMembers(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(m => m.MemberType is MemberTypes.Field or MemberTypes.Property)
-            .Where(m => ShouldDisplay(m) && CanSafelyAccess(m, targetObject));
-    }
-
-    /// <summary>
-    /// Returns <see langword="true"/> if the member should be shown
-    /// based on visibility and editor attributes.
-    /// </summary>
-    static bool ShouldDisplay(MemberInfo member)
-    {
-        var isPublic = member switch
-        {
-            PropertyInfo p => (p.GetMethod?.IsPublic ?? false) && p is { CanWrite: true, CanRead: true },
-            FieldInfo f => f.IsPublic,
-            _ => false
-        };
-
-        return (isPublic && member.GetCustomAttribute<HideInEditorAttribute>() is null)
-               || member.GetCustomAttribute<ShowInEditorAttribute>() is not null;
+        return FormBuilder.EditableMetadata(targetObject.GetType())
+            .Where(metadata => CanSafelyAccess(metadata, targetObject))
+            .Select(metadata => metadata.Member);
     }
 
     /// <summary>
     /// Returns <see langword="true"/> if accessing the member value will not throw.
     /// Fields are always considered safe; property getters are probed.
     /// </summary>
-    static bool CanSafelyAccess(MemberInfo member, object targetObject)
+    static bool CanSafelyAccess(InspectorMemberMetadata metadata, object targetObject)
     {
-        if (member is FieldInfo) return true;
-        if (member is not PropertyInfo prop) return true;
+        if (metadata.Member is not PropertyInfo) return true;
 
         try
         {
-            _ = prop.GetValue(targetObject);
+            _ = metadata.GetValue(targetObject);
             return true;
         }
         catch

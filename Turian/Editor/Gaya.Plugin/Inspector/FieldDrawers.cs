@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
@@ -18,6 +20,12 @@ static class FieldDrawers
     static GuiColor InkDim => Theme.InkDim;
     static GuiColor Field => Theme.Field;
     static GuiColor Border => Theme.Border;
+
+    sealed record EnumMetadata(string[] Names, string[] Labels);
+    sealed record SummaryMetadata(InspectorMemberMetadata? Name, InspectorMemberMetadata? Path);
+
+    static readonly ConditionalWeakTable<Type, EnumMetadata> enumMetadata = [];
+    static readonly ConditionalWeakTable<Type, SummaryMetadata> summaryMetadata = [];
 
     /// <summary>
     /// Whether the rows drawn now hold values that differ from the prefab: their labels turn bold and a bar marks
@@ -46,37 +54,40 @@ static class FieldDrawers
     /// <param name="collapsed">Ids of the collection groups the user has folded shut.</param>
     public static void Draw(Gui gui, FormField field, string id, ReferenceDrawer? references = null,
         ISet<string>? collapsed = null)
+        => AttributeDrawerRegistry.Draw(gui, field, id,
+            () => DrawProperty(gui, field, id, references, collapsed));
+
+    static void DrawProperty(Gui gui, FormField field, string id, ReferenceDrawer? references,
+        ISet<string>? collapsed)
     {
         var type = Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType;
 
-        if (references is not null && ReferenceField.IsReference(field))
-        {
-            Row(gui, field.Label, id, () => references.TryDraw(gui, field, id));
-            return;
-        }
-
-        // A type with a registered editor owns its whole appearance — a vector is one labeled row,
-        // a transform is three. A read-only value skips the editor and shows a text summary below.
-        if (!field.IsReadOnly && ValueEditorRegistry.For(type) is { } customEditor)
+        if (!field.IsReadOnly && PropertyDrawerRegistry.CustomFor(field.ValueType) is { } customEditor)
         {
             customEditor.Draw(gui, field, id);
             return;
         }
 
+        if (references is not null && ReferenceField.IsReference(field))
+        {
+            StructuralPropertyDrawers.Reference(references).Draw(gui, field, id);
+            return;
+        }
+
         if (CollectionField.TryCreate(field) is { } collection)
         {
-            DrawCollection(gui, collection, id, references, collapsed);
+            StructuralPropertyDrawers.Collection(collection, references, collapsed).Draw(gui, field, id);
             return;
         }
 
         if (Nested(field, type) is { } nested)
         {
-            DrawNested(gui, field, nested, id, references, collapsed);
+            StructuralPropertyDrawers.Nested(nested, references, collapsed).Draw(gui, field, id);
             return;
         }
 
-        Row(gui, field.Label, id, () => DrawEditor(gui, field, type, id),
-            IsNumeric(type) && !field.IsReadOnly ? () => ScrubLabel(gui, field, type) : null);
+        (field.IsReadOnly ? BuiltinPropertyDrawers.Summary : PropertyDrawerRegistry.For(field.ValueType))
+            .Draw(gui, field, id);
     }
 
     /// <summary>
@@ -88,7 +99,8 @@ static class FieldDrawers
     /// <param name="id">A unique id for this editor's controls.</param>
     /// <param name="translate">Translates enum labels for the settings panel.</param>
     public static void DrawEditorOnly(Gui gui, FormField field, string id, Func<string, string>? translate = null) =>
-        DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType, id, translate);
+        AttributeDrawerRegistry.Draw(gui, field, id,
+            () => DrawEditor(gui, field, field.ValueType, id, translate));
 
     /// <summary>A label on the left and whatever the caller draws filling the rest.</summary>
     internal static void Row(Gui gui, string label, string id, Action editor, Action? labelInteraction = null)
@@ -111,7 +123,7 @@ static class FieldDrawers
         }
     }
 
-    static void ScrubLabel(Gui gui, FormField field, Type type)
+    internal static void ScrubLabel(Gui gui, FormField field, Type type)
     {
         if (!gui.GetInteractable().OnDrag(out var drag)) return;
 
@@ -154,17 +166,12 @@ static class FieldDrawers
             return;
         }
 
-        // A registered editor's value-only form, for settings rows whose label is drawn elsewhere.
-        if (ValueEditorRegistry.For(type) is { } customEditor && customEditor.DrawValue(gui, field, id)) return;
-
-        if (type == typeof(bool)) DrawBool(gui, field);
-        else if (type == typeof(string)) DrawString(gui, field, id);
-        else if (type.IsEnum) DrawEnum(gui, field, type, id, translate);
-        else if (IsNumeric(type)) DrawNumber(gui, field, type, id);
-        else gui.DrawText(Text(field.GetValue()), Theme.Text(12), InkDim, centerInRect: false);
+        var drawer = PropertyDrawerRegistry.For(type);
+        if (!drawer.DrawValue(gui, field, id, translate))
+            BuiltinPropertyDrawers.For(type).DrawValue(gui, field, id, translate);
     }
 
-    static void DrawBool(Gui gui, FormField field)
+    internal static void DrawBool(Gui gui, FormField field)
     {
         // Checkbox builds its own nodes, so it has to run in both passes, or it never gets a rect.
         var current = field.GetValue() is true;
@@ -173,7 +180,7 @@ static class FieldDrawers
         if (gui.Pass == Pass.Pass2Render && next != current) field.SetValue(next);
     }
 
-    static void DrawString(Gui gui, FormField field, string id)
+    internal static void DrawString(Gui gui, FormField field, string id)
     {
         var current = field.GetValue() as string ?? string.Empty;
         var next = Input(gui, current, $"{id}/text", width: 0);
@@ -181,10 +188,16 @@ static class FieldDrawers
         if (!string.Equals(next, current, StringComparison.Ordinal)) field.SetValue(next);
     }
 
-    static void DrawEnum(Gui gui, FormField field, Type type, string id, Func<string, string>? translate)
+    internal static void DrawEnum(Gui gui, FormField field, Type type, string id, Func<string, string>? translate)
     {
-        var names = Enum.GetNames(type);
-        var labels = names.Select(name => translate?.Invoke(EnumLabel(type, name)) ?? EnumLabel(type, name)).ToArray();
+        var metadata = enumMetadata.GetValue(type, static t =>
+        {
+            var names = Enum.GetNames(t);
+            return new EnumMetadata(names,
+                [.. names.Select(name => t.GetField(name)?.GetCustomAttribute<EnumLabelAttribute>()?.Label ?? name)]);
+        });
+        var names = metadata.Names;
+        var labels = translate is null ? metadata.Labels : [.. metadata.Labels.Select(translate)];
         var current = Array.IndexOf(names, field.GetValue()?.ToString() ?? string.Empty);
 
         // Dropdown keys its open state by call site, so every enum field would otherwise share one.
@@ -196,14 +209,7 @@ static class FieldDrawers
         if (next >= 0 && next != current) field.SetValue(Enum.Parse(type, names[next]));
     }
 
-    /// <summary>
-    /// A member's <see cref="EnumLabelAttribute"/> label, for a name that should not be shown as
-    /// written — a language's own endonym, say — or its own name otherwise.
-    /// </summary>
-    static string EnumLabel(Type type, string name) =>
-        type.GetField(name)?.GetCustomAttribute<EnumLabelAttribute>()?.Label ?? name;
-
-    static void DrawNumber(Gui gui, FormField field, Type type, string id)
+    internal static void DrawNumber(Gui gui, FormField field, Type type, string id)
     {
         var current = Convert.ToDouble(field.GetValue() ?? 0, CultureInfo.InvariantCulture);
         var (min, max) = field.Range ?? (float.MinValue, float.MaxValue);
@@ -254,7 +260,7 @@ static class FieldDrawers
         || type == typeof(sbyte) || type == typeof(uint)
         || type == typeof(ulong) || type == typeof(ushort);
 
-    static bool IsNumeric(Type type) =>
+    internal static bool IsNumeric(Type type) =>
         type == typeof(float) || type == typeof(double) || type == typeof(decimal)
         || type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(byte)
         || type == typeof(sbyte) || type == typeof(uint) || type == typeof(ushort) || type == typeof(ulong);
@@ -265,7 +271,7 @@ static class FieldDrawers
     /// A list, array or dictionary as a foldable group of rows, each entry drawn by the same drawers
     /// a member gets. A resizable collection also offers add and remove.
     /// </summary>
-    static void DrawCollection(Gui gui, CollectionField collection, string id,
+    internal static void DrawCollection(Gui gui, CollectionField collection, string id,
         ReferenceDrawer? references, ISet<string>? collapsed)
     {
         var entries = collection.Entries();
@@ -333,7 +339,7 @@ static class FieldDrawers
     /// A nested object as a foldable group of its own members, drawn by the same drawers a top-level
     /// member gets. What makes an input action's bindings editable without a bespoke panel.
     /// </summary>
-    static void DrawNested(Gui gui, FormField field, object target, string id,
+    internal static void DrawNested(Gui gui, FormField field, object target, string id,
         ReferenceDrawer? references, ISet<string>? collapsed)
     {
         var isOpen = collapsed?.Contains(id) != true;
@@ -367,10 +373,27 @@ static class FieldDrawers
     /// The row's heading: a nested object inside a collection has no label of its own, so its own
     /// <c>Name</c> or <c>Path</c> stands in and the list reads as what it holds.
     /// </summary>
-    static string Summary(FormField field, object target) =>
-        target.GetType().GetProperty("Name")?.GetValue(target) as string is { Length: > 0 } name ? name
-        : target.GetType().GetProperty("Path")?.GetValue(target) as string is { Length: > 0 } path ? path
-        : field.Label;
+    static string Summary(FormField field, object target)
+    {
+        var members = summaryMetadata.GetValue(target.GetType(), static type =>
+            new SummaryMetadata(SummaryMember(type, "Name"), SummaryMember(type, "Path")));
+        try
+        {
+            if (members.Name?.GetValue(target) is string { Length: > 0 } name) return name;
+            if (members.Path?.GetValue(target) is string { Length: > 0 } path) return path;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogDebug(ex, "Failed to read inspector summary for {Type}", target.GetType());
+        }
+
+        return field.Label;
+    }
+
+    static InspectorMemberMetadata? SummaryMember(Type type, string name) =>
+        type.GetProperty(name) is { PropertyType: var propertyType } property
+        && propertyType == typeof(string) && property.GetMethod is not null
+        ? InspectorMemberMetadata.For(property) : null;
 
     /// <summary>
     /// A full-width labeled button running a <c>[Button]</c> method, sized like a row so it reads as

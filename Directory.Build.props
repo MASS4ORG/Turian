@@ -1,14 +1,19 @@
 <Project>
-  <ItemGroup>
-    <!--
-      PublicAPI is used for contracts consumed through reflection, JSON, project files, or plugins.
-      Keep this reference private to the repository; the annotation is only analyzer metadata.
-    -->
-    <PackageReference Include="JetBrains.Annotations"
-                      Version="2026.2.0"
-                      PrivateAssets="all" />
-  </ItemGroup>
-  <ItemGroup>
-    <Using Include="JetBrains.Annotations" />
-  </ItemGroup>
+    <!-- Internal paths -->
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
+        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
+    </PropertyGroup>
+
+    <!-- `Directory.Build.local.props` points to local project -->
+    <Import Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
+            Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')"/>
+
+    <!-- External libraries included in every project -->
+    <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
+    </ItemGroup>
+    <ItemGroup>
+        <Using Include="JetBrains.Annotations"/>
+    </ItemGroup>
 </Project>
