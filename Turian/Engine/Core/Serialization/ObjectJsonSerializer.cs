@@ -107,6 +107,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (property.CanRead && property.CanWrite && IsMemberValid(property))
                 {
                     var propValue = property.GetValue(value);
+                    if (propValue is null && SkipsNull(property)) continue;
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(property, property.PropertyType, false)
                         && ObjectReferences.TryWrite(writer, value, property.Name, property.PropertyType, propValue,
@@ -129,6 +130,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (IsMemberValid(field))
                 {
                     var fieldValue = field.GetValue(value);
+                    if (fieldValue is null && SkipsNull(field)) continue;
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(field, field.FieldType, false)
                         && ObjectReferences.TryWrite(writer, value, field.Name, field.FieldType, fieldValue,
@@ -232,6 +234,13 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
         }
     }
 
+    static bool IsIgnored(MemberInfo member) =>
+        member.GetCustomAttribute<JsonIgnoreAttribute>() is { Condition: JsonIgnoreCondition.Always };
+
+    static bool SkipsNull(MemberInfo member) =>
+        member.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition
+            is JsonIgnoreCondition.WhenWritingNull or JsonIgnoreCondition.WhenWritingDefault;
+
     static bool IsMemberValid(MemberInfo member)
     {
         switch (member)
@@ -249,7 +258,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                     )
                     || (
                         getMethod.IsPublic
-                        && property.GetCustomAttribute(typeof(JsonIgnoreAttribute)) == null
+                        && !IsIgnored(property)
                     );
             case FieldInfo field:
                 return (
@@ -258,7 +267,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                     )
                     || (
                         field.IsPublic
-                        && field.GetCustomAttribute(typeof(JsonIgnoreAttribute)) == null
+                        && !IsIgnored(field)
                     );
             default:
                 throw new ArgumentException("Member is not a property or field", nameof(member));

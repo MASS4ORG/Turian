@@ -42,7 +42,16 @@ jobs:
 
       - name: Install NSIS
         if: matrix.rid == 'win-x64'
-        run: choco install nsis --yes --no-progress
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey failed to install NSIS.' }
+          $nsisDir = @(
+            (Join-Path ${env:ProgramFiles(x86)} 'NSIS'),
+            (Join-Path $env:ProgramFiles 'NSIS')
+          ) | Where-Object { Test-Path (Join-Path $_ 'makensis.exe') } | Select-Object -First 1
+          if (-not $nsisDir) { throw 'NSIS was installed, but makensis.exe was not found.' }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
 
       - name: Pack win-x64
         if: matrix.rid == 'win-x64'

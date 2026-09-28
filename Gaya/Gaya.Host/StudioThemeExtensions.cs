@@ -39,17 +39,29 @@ public static class StudioThemeExtensions
     {
         ArgumentNullException.ThrowIfNull(theme);
 
+        // Every color is set: an unset one keeps Guinevere's light default, such as a white scrollbar track.
         return new ControlPalette
         {
+            BaseBackground = theme.Panel,
             Surface = theme.Field,
             SurfaceHover = theme.Hover,
+            SurfaceActive = theme.Chrome,
             Popup = theme.Panel,
             Border = theme.Border,
+            BorderActive = theme.InkFaint,
+            Divider = theme.Border,
             Accent = theme.Accent,
+            AccentHover = theme.Accent,
+            AccentSubtle = theme.AccentFill,
             Text = theme.Ink,
             TextDim = theme.InkDim,
+            TextDisabled = theme.InkFaint,
+            TextOnAccent = theme.Ink,
             Selected = theme.Accent,
             Negative = theme.Error,
+            Warning = theme.Warning,
+            FocusRing = Color.FromArgb(128, theme.Accent),
+            TextSelection = Color.FromArgb(110, theme.Accent),
         };
     }
 }

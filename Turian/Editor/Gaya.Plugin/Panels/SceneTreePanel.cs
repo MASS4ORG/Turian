@@ -16,6 +16,11 @@ sealed class SceneTreePanel : IPanel
 
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
+    readonly PrefabAuthoring prefabs;
+    readonly PrefabStage prefabStage;
+    readonly SettingsService settings;
+    readonly PrefabLinkClassifier prefabLinks =
+        new(id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
 
     Node? builtFor;
     bool stale = true;
@@ -30,10 +35,17 @@ sealed class SceneTreePanel : IPanel
     /// <param name="sceneTree">Supplies the hierarchy and receives selection.</param>
     /// <param name="inspector">Told what the user selected.</param>
     /// <param name="assets">Watched so an edit to a node on screen refreshes its row.</param>
-    public SceneTreePanel(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets)
+    /// <param name="prefabs">Saves a node as a prefab.</param>
+    /// <param name="prefabStage">Opens an instance's prefab in prefab mode.</param>
+    /// <param name="settings">Locates the open scene's folder, where a new prefab is saved.</param>
+    public SceneTreePanel(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets,
+        PrefabAuthoring prefabs, PrefabStage prefabStage, SettingsService settings)
     {
         this.sceneTree = sceneTree;
         this.inspector = inspector;
+        this.prefabs = prefabs;
+        this.prefabStage = prefabStage;
+        this.settings = settings;
 
         // SceneLoaded covers opening, closing, reloading and the play-mode hierarchy swap; NodeUpdated
         // covers an edit to a node already on screen, such as a rename from the inspector.
@@ -113,6 +125,7 @@ sealed class SceneTreePanel : IPanel
         rows.Clear();
         keysByNode.Clear();
         nodesByKey.Clear();
+        prefabLinks.Reset();
         Append(root, depth: 0, key: "0");
 
         builtFor = root;
@@ -127,13 +140,15 @@ sealed class SceneTreePanel : IPanel
     {
         keysByNode[node] = key;
         nodesByKey[key] = node;
+        var link = prefabLinks.Classify(node);
         rows.Add(new TreeItem(
             key,
             DisplayName(node),
             depth,
             node.Children.Count > 0,
+            Icon: PrefabIcon(link),
             Tag: node,
-            Tint: node.IsActive ? null : StudioTheme.Current.InkFaint));
+            Tint: Tint(node, link)));
 
         var children = node.Children.ToList();
         for (var i = 0; i < children.Count; i++) Append(children[i], depth + 1, $"{key}/{i}");
@@ -178,6 +193,9 @@ sealed class SceneTreePanel : IPanel
         menu.Separator();
         menu.Item("New Node", () => Create(node, asChild: false), enabled: node is not null);
         menu.Item("New Child Node", () => Create(node, asChild: true), enabled: node is not null);
+        menu.Separator();
+        menu.Item("Create Prefab", () => CreatePrefab(node), enabled: node is not null && !isRoot);
+        menu.Item("Open Prefab", () => prefabStage.OpenPrefab(node!), enabled: node?.PrefabInstance is not null);
     }
 
     /// <summary>Whether a node other than the scene root is selected, so an edit has a target.</summary>
@@ -229,6 +247,24 @@ sealed class SceneTreePanel : IPanel
         Invalidate();
     }
 
+    /// <summary>Saves the node as a prefab beside the open scene; the node becomes an instance of it.</summary>
+    void CreatePrefab(Node? node)
+    {
+        if (node?.Parent is null || sceneTree.CurrentAsset is not { } scene || settings.Settings is not { } project)
+            return;
+
+        var directory = Path.GetDirectoryName(Path.Combine(project.ProjectAbsoluteDir, scene.RelativePath))!;
+        if (prefabs.CreatePrefab(node, directory) is null)
+        {
+            Log.Logger.LogWarning("Could not save {Node} as a prefab", node.Name);
+            return;
+        }
+
+        sceneTree.MarkAssetModified();
+        sceneTree.RefreshNode(node);
+        Invalidate();
+    }
+
     void Paste(Node? target)
     {
         if (clipboard is null || target is null) return;
@@ -271,6 +307,35 @@ sealed class SceneTreePanel : IPanel
     }
 
     /// <summary>Imported hierarchies routinely carry unnamed nodes; the type keeps the row readable.</summary>
+    /// <summary>Prefab instance roots get an icon: plain, nested, variant, or a broken link when the prefab is gone.</summary>
+    static Action<Gui>? PrefabIcon(PrefabLink link)
+    {
+        var theme = StudioTheme.Current;
+        var (glyph, color) = link switch
+        {
+            PrefabLink.Instance => (EditorIcons.Cube, theme.Accent),
+            PrefabLink.NestedInstance => (EditorIcons.Cube, theme.InkDim),
+            PrefabLink.VariantInstance => (EditorIcons.Clone, theme.Accent),
+            PrefabLink.Missing => (EditorIcons.LinkSlash, theme.Error),
+            _ => ((string?)null, default(GuiColor)),
+        };
+
+        return glyph is null ? null : gui => gui.DrawText(glyph, theme.Text(11), color);
+    }
+
+    /// <summary>Inactive nodes are faint; nodes a prefab provides take the accent, like Unity's blue prefab rows.</summary>
+    static GuiColor? Tint(Node node, PrefabLink link)
+    {
+        var theme = StudioTheme.Current;
+        if (!node.IsActive) return theme.InkFaint;
+        return link switch
+        {
+            PrefabLink.None => null,
+            PrefabLink.Missing => theme.Error,
+            _ => theme.Accent,
+        };
+    }
+
     static string DisplayName(Node node) =>
         string.IsNullOrWhiteSpace(node.Name) ? $"({node.GetType().Name})" : node.Name;
 }

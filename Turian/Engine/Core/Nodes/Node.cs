@@ -96,6 +96,12 @@ public partial class Node : IdClass
     public Collection<Component> Components { get; init; } = [];
 
     /// <summary>
+    /// The prefab this node was instantiated from, or null when the node is not the root of a prefab instance.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), HideInEditor]
+    public PrefabInstance? PrefabInstance { get; set; }
+
+    /// <summary>
     /// Gets or sets the transformation data for this node.
     /// </summary>
     public Transform Transform

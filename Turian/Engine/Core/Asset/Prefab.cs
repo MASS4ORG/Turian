@@ -37,7 +37,9 @@ public class Prefab : Asset
             using var memoryStream = new MemoryStream();
             assetStream.CopyTo(memoryStream);
 
-            var jsonString = Encoding.UTF8.GetString(memoryStream.ToArray());
+            var jsonString = PrefabInstances.Expand(
+                Encoding.UTF8.GetString(memoryStream.ToArray()),
+                id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
             var node = Serializer.LoadData<Node>(jsonString);
             if (node is null)
             {

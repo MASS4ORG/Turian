@@ -11,6 +11,9 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 {
     readonly ReferenceDrawer referenceDrawer = new(references, inspector, reveal);
     readonly AssetPreviewView preview = new(vulkan, previews);
+    readonly PrefabOverrideTracker overrides =
+        new(id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
+    bool trackingEdits;
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -57,6 +60,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             RenderAsset(gui, inspection);
             return;
         }
+
+        // Any edit to the open scene may change what an instance overrides, the scene tree's included.
+        if (!trackingEdits)
+        {
+            assets.AssetAltered += OnAssetAltered;
+            trackingEdits = true;
+        }
+
+        overrides.Track(target as Node);
 
         // Rebuilt when the selection changes, and when a component is added or removed: reflection is
         // cached per type, the form is not.
@@ -230,6 +242,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         using (gui.Node(-1, Theme.Scale(24f), "inspector/header").ExpandWidth().Direction(Axis.Horizontal)
                    .Padding(6, 2).Gap(6f).Enter())
         {
+            // The name box and the active toggle cannot turn bold, so their overrides mark the header's margin.
+            if (gui.Pass == Pass.Pass2Render
+                && (overrides.IsOverridden(section.Target, nameof(Node.Name))
+                    || overrides.IsOverridden(section.Target, nameof(Node.IsActive))))
+            {
+                var rect = gui.CurrentNode.Rect;
+                gui.DrawRect(new Rect(rect.X, rect.Y + 2f, 2f, rect.H - 4f), Theme.Accent);
+            }
+
             if (active is not null) Toggle(gui, active, "inspector/header/active");
 
             if (name is not null)
@@ -253,7 +274,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         {
             var rest = section.BodyFields.Where(f => f != name).ToList();
             for (var f = 0; f < rest.Count; f++)
-                FieldDrawers.Draw(gui, rest[f], $"inspector/header/field{f}", referenceDrawer, collapsed);
+                DrawField(gui, rest[f], $"inspector/header/field{f}");
             DrawButtons(gui, section.Buttons, "inspector/header/button");
         }
     }
@@ -280,7 +301,11 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             // header behind it so ticking the box does not also fold the section.
             if (section.EnabledField is { } enabled) Toggle(gui, enabled, $"inspector/section{index}/enabled");
 
-            gui.DrawText(section.Title, Theme.Text(12), Theme.Ink, centerInRect: false);
+            // A component the instance added reads "+ Title"; one with overridden values has a bold title.
+            var title = overrides.IsAdded(section.Target) ? $"+ {section.Title}" : section.Title;
+            var overridden = section.Target is IdClass owner && overrides.Diff?.HasOverrides(owner.Id) == true;
+            gui.DrawText(title, Theme.Text(12), Theme.Ink, centerInRect: false,
+                effects: FieldDrawers.Emphasis(overridden, Theme.Ink));
 
             using (gui.Node().Expand().Enter()) { }
 
@@ -297,8 +322,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             if (section.BodyFields.Count > 0)
             {
                 for (var f = 0; f < section.BodyFields.Count; f++)
-                    FieldDrawers.Draw(gui, section.BodyFields[f], $"inspector/section{index}/field{f}",
-                        referenceDrawer, collapsed);
+                    DrawField(gui, section.BodyFields[f], $"inspector/section{index}/field{f}");
             }
             else if (section.Buttons.Count == 0)
             {
@@ -308,6 +332,22 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             DrawButtons(gui, section.Buttons, $"inspector/section{index}/button");
         }
     }
+
+    /// <summary>Draws a field of the selected node, marked when a prefab instance overrides it.</summary>
+    void DrawField(Gui gui, FormField field, string id)
+    {
+        FieldDrawers.Overridden = overrides.IsOverridden(field.Target, field.CollectionMember ?? field.Name);
+        try
+        {
+            FieldDrawers.Draw(gui, field, id, referenceDrawer, collapsed);
+        }
+        finally
+        {
+            FieldDrawers.Overridden = false;
+        }
+    }
+
+    void OnAssetAltered(Asset asset) => overrides.Invalidate();
 
     /// <summary>
     /// The <c>[Button]</c> methods under a section's fields, each invoking its action the frame it is
@@ -402,5 +442,9 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     }
 
     /// <inheritdoc/>
-    public void Dispose() => preview.Dispose();
+    public void Dispose()
+    {
+        assets.AssetAltered -= OnAssetAltered;
+        preview.Dispose();
+    }
 }

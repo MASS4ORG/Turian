@@ -19,6 +19,25 @@ static class FieldDrawers
     static GuiColor Field => Theme.Field;
     static GuiColor Border => Theme.Border;
 
+    /// <summary>
+    /// Whether the rows drawn now hold values that differ from the prefab: their labels turn bold and a bar marks
+    /// the margin. The inspector sets it around each field of a prefab instance.
+    /// </summary>
+    internal static bool Overridden { get; set; }
+
+    /// <summary>Bold text: the bundled font has one weight, so bold is a hairline outline in the text's color.</summary>
+    internal static TextEffects? Emphasis(bool bold, GuiColor color) =>
+        bold ? new TextEffects { Outline = new TextEffects.TextOutline(color, 0.35f) } : null;
+
+    /// <summary>Draws the override bar in the left margin of the current row.</summary>
+    static void MarkOverride(Gui gui)
+    {
+        if (!Overridden || gui.Pass != Pass.Pass2Render) return;
+
+        var rect = gui.CurrentNode.Rect;
+        gui.DrawRect(new Rect(rect.X - Theme.Scale(6f), rect.Y + 1f, 2f, rect.H - 2f), Theme.Accent);
+    }
+
     /// <summary>Draws one labeled row for a field, or several for a composite like a transform.</summary>
     /// <param name="gui">The GUI instance.</param>
     /// <param name="field">The member to edit.</param>
@@ -76,13 +95,15 @@ static class FieldDrawers
     {
         using (gui.Node(-1, RowHeight, id).ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
         {
+            MarkOverride(gui);
             using (gui.Node(LabelWidth, RowHeight, $"{id}/label").Enter())
             {
                 var labelHot = labelInteraction is not null && gui.Pass == Pass.Pass2Render
                     && gui.GetInteractable().OnHover();
                 if (labelInteraction is not null && gui.Pass == Pass.Pass2Render)
                     labelInteraction();
-                gui.DrawText(label, Theme.Text(12), labelHot ? Ink : InkDim, centerInRect: false);
+                var color = labelHot ? Theme.Accent : Ink;
+                gui.DrawText(label, Theme.Text(12), color, centerInRect: false, effects: Emphasis(Overridden, color));
             }
 
             using (gui.Node(-1, RowHeight, $"{id}/editor").Expand().Direction(Axis.Horizontal).Gap(4f).Enter())
@@ -252,6 +273,7 @@ static class FieldDrawers
 
         using (gui.Node(-1, RowHeight, $"{id}/head").ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
         {
+            MarkOverride(gui);
             using (gui.Node(LabelWidth, RowHeight, $"{id}/head/label").Direction(Axis.Horizontal).Gap(2f).Enter())
             {
                 if (gui.Pass == Pass.Pass2Render && gui.GetInteractable().OnClick() && collapsed is not null)
@@ -260,7 +282,8 @@ static class FieldDrawers
                 using (gui.Node(10f, RowHeight, $"{id}/head/arrow").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
                     DrawArrow(gui, isOpen);
 
-                gui.DrawText(collection.Label, Theme.Text(12), InkDim, centerInRect: false);
+                gui.DrawText(collection.Label, Theme.Text(12), Ink, centerInRect: false,
+                    effects: Emphasis(Overridden, Ink));
             }
 
             using (gui.Node(-1, RowHeight, $"{id}/head/actions").Expand()
@@ -318,13 +341,15 @@ static class FieldDrawers
         using (gui.Node(-1, RowHeight, $"{id}/head").ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
         using (gui.Node(LabelWidth, RowHeight, $"{id}/head/label").Direction(Axis.Horizontal).Gap(2f).Enter())
         {
+            MarkOverride(gui);
             if (gui.Pass == Pass.Pass2Render && gui.GetInteractable().OnClick() && collapsed is not null)
                 if (!collapsed.Add(id)) collapsed.Remove(id);
 
             using (gui.Node(10f, RowHeight, $"{id}/head/arrow").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
                 DrawArrow(gui, isOpen);
 
-            gui.DrawText(Summary(field, target), Theme.Text(12), InkDim, centerInRect: false);
+            gui.DrawText(Summary(field, target), Theme.Text(12), Ink, centerInRect: false,
+                effects: Emphasis(Overridden, Ink));
         }
 
         if (!isOpen) return;
@@ -387,5 +412,5 @@ static class FieldDrawers
 
     /// <summary>A fold arrow: closed points right, open points down.</summary>
     internal static void DrawArrow(Gui gui, bool isOpen) =>
-        gui.DrawText(isOpen ? "▼" : "▶", Theme.Text(9), InkDim);
+        gui.DrawText(isOpen ? EditorIcons.CaretDown : EditorIcons.CaretRight, Theme.Text(9), InkDim);
 }
