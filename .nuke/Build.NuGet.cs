@@ -47,8 +47,7 @@ sealed partial class Build
                             .SetConfiguration(Config)
                             .SetOutputDirectory(PackagesDirectory)
                             .EnableNoBuild()
-                            .SetProperty("GuineverePackageExcludeAssets", "none")
-                            .AddProcessAdditionalArguments("-p:GuinevereLocalPath=");
+                            .SetProperty("GuinevereUsePackages", true);
 
                         // Gaya's version comes from its own props; overriding it here would tie the
                         // SDK's compatibility promise back to Turian's release cadence.

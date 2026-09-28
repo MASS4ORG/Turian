@@ -24,8 +24,8 @@ static class FieldDrawers
     sealed record EnumMetadata(string[] Names, string[] Labels);
     sealed record SummaryMetadata(InspectorMemberMetadata? Name, InspectorMemberMetadata? Path);
 
-    static readonly ConditionalWeakTable<Type, EnumMetadata> enumMetadata = [];
-    static readonly ConditionalWeakTable<Type, SummaryMetadata> summaryMetadata = [];
+    static readonly ConditionalWeakTable<Type, EnumMetadata> EnumMetadataByType = [];
+    static readonly ConditionalWeakTable<Type, SummaryMetadata> SummaryMetadataByType = [];
 
     /// <summary>
     /// Whether the rows drawn now hold values that differ from the prefab: their labels turn bold and a bar marks
@@ -86,7 +86,7 @@ static class FieldDrawers
             return;
         }
 
-        (field.IsReadOnly ? BuiltinPropertyDrawers.Summary : PropertyDrawerRegistry.For(field.ValueType))
+        (field.IsReadOnly ? BuiltinPropertyDrawers.summary : PropertyDrawerRegistry.For(field.ValueType))
             .Draw(gui, field, id);
     }
 
@@ -190,7 +190,7 @@ static class FieldDrawers
 
     internal static void DrawEnum(Gui gui, FormField field, Type type, string id, Func<string, string>? translate)
     {
-        var metadata = enumMetadata.GetValue(type, static t =>
+        var metadata = EnumMetadataByType.GetValue(type, static t =>
         {
             var names = Enum.GetNames(t);
             return new EnumMetadata(names,
@@ -375,7 +375,7 @@ static class FieldDrawers
     /// </summary>
     static string Summary(FormField field, object target)
     {
-        var members = summaryMetadata.GetValue(target.GetType(), static type =>
+        var members = SummaryMetadataByType.GetValue(target.GetType(), static type =>
             new SummaryMetadata(SummaryMember(type, "Name"), SummaryMember(type, "Path")));
         try
         {

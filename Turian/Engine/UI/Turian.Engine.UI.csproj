@@ -13,9 +13,8 @@
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
     </ItemGroup>
 
-    <!-- External libraries -->
-    <ItemGroup>
-        <PackageReference Include="MASS4.Guinevere" Version="5.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Guinevere" Version="5.2.0"/>
     </ItemGroup>
 
     <!-- Internal libraries -->

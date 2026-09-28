@@ -1,3 +1,6 @@
+// The fixtures' setters deliberately discard their values.
+// ReSharper disable ValueParameterNotUsed
+
 namespace Turian.Tests.Editor;
 
 /// <summary>

@@ -56,7 +56,7 @@ public static class ModelBoundsUtility
 
     /// <summary>
     /// Transforms local-space bounds into world space by transforming all eight corners and
-    /// re-encapsulating — cheaper alternatives (transforming just the centre and extents) do not
+    /// re-encapsulating — cheaper alternatives (transforming just the center and extents) do not
     /// hold once rotation is involved.
     /// </summary>
     /// <param name="local">Bounds in the source space.</param>

@@ -77,6 +77,8 @@ var exitApproved = false;
 void ApproveExit()
 {
     exitApproved = true;
+    // ApproveExit is unsubscribed before the window is disposed.
+    // ReSharper disable once AccessToDisposedClosure
     window.Close();
 }
 

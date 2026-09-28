@@ -9,6 +9,8 @@
 
 ![Turian Studio: scene tree, scene view, inspector and asset browser](docs/images/studio-overview.webp)
 
+[![CI](https://github.com/MASS4ORG/Turian/actions/workflows/ci.yml/badge.svg)](https://github.com/MASS4ORG/Turian/actions/workflows/ci.yml)
+
 ## Features
 
 ### Rendering

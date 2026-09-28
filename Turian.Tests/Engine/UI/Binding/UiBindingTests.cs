@@ -168,7 +168,7 @@ public sealed class UiBindingTests
         var renderer = new UiRenderer(doc);
         renderer.Bind(model);
 
-        // Toggle laid out at the origin; click its centre.
+        // Toggle laid out at the origin; click its center.
         RenderFrame(renderer, Mouse(20, 10, pressed: true));
 
         Assert.True(model.On, "clicking the toggle should have written On = true back to the model");

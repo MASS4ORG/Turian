@@ -12,7 +12,7 @@ static class ValueEditorRegistry
 {
     sealed record Lookup(IValueEditor? Editor);
 
-    static readonly ConditionalWeakTable<Type, Lookup> editorsByType = new();
+    static readonly ConditionalWeakTable<Type, Lookup> EditorsByType = new();
 
     static Dictionary<Type, IValueEditor> ByEditedType
     {
@@ -43,7 +43,7 @@ static class ValueEditorRegistry
     /// </summary>
     /// <param name="valueType">The type the field holds.</param>
     public static IValueEditor? For(Type valueType) =>
-        editorsByType.GetValue(valueType, static t =>
+        EditorsByType.GetValue(valueType, static t =>
         {
             var map = ByEditedType;
 

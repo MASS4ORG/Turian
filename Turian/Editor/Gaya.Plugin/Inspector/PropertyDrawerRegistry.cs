@@ -5,17 +5,17 @@ namespace Gaya.Plugin.Turian;
 /// <summary>Explicit extensions take precedence over the existing type-registered value editors.</summary>
 public static class PropertyDrawerRegistry
 {
-    static readonly ConditionalWeakTable<Type, IPropertyDrawer> drawers = new();
+    static readonly ConditionalWeakTable<Type, IPropertyDrawer> Drawers = new();
 
     /// <summary>Registers or replaces a drawer for an exact value type.</summary>
     public static void Register(Type valueType, IPropertyDrawer drawer)
     {
         ArgumentNullException.ThrowIfNull(valueType);
         ArgumentNullException.ThrowIfNull(drawer);
-        lock (drawers)
+        lock (Drawers)
         {
-            drawers.Remove(valueType);
-            drawers.Add(valueType, drawer);
+            Drawers.Remove(valueType);
+            Drawers.Add(valueType, drawer);
         }
     }
 
@@ -23,7 +23,7 @@ public static class PropertyDrawerRegistry
     public static void Unregister(Type valueType)
     {
         ArgumentNullException.ThrowIfNull(valueType);
-        drawers.Remove(valueType);
+        Drawers.Remove(valueType);
     }
 
     /// <summary>Finds a registered or built-in drawer for a value type.</summary>
@@ -36,9 +36,9 @@ public static class PropertyDrawerRegistry
         ArgumentNullException.ThrowIfNull(valueType);
         for (var current = valueType; current is not null; current = current.BaseType)
         {
-            if (drawers.TryGetValue(current, out var drawer)) return drawer;
+            if (Drawers.TryGetValue(current, out var drawer)) return drawer;
             foreach (var face in current.GetInterfaces())
-                if (drawers.TryGetValue(face, out drawer)) return drawer;
+                if (Drawers.TryGetValue(face, out drawer)) return drawer;
         }
 
         if (Nullable.GetUnderlyingType(valueType) is { } underlying)

@@ -25,9 +25,9 @@ public sealed class WorldPanelPointerTests
         return Matrix4x4.CreateScale(1f, aspect, 1f) * Matrix4x4.CreateTranslation(0f, 0f, -3f);
     }
 
-    /// <summary>The screen centre hits the centre of the panel quad.</summary>
+    /// <summary>The screen center hits the center of the panel quad.</summary>
     [Fact]
-    public void CentreOfScreen_HitsCentreOfPanel()
+    public void CenterOfScreen_HitsCenterOfPanel()
     {
         var ok = WorldPanelPointer.TryHit(
             PanelModel(), ViewProjection(),
@@ -39,9 +39,9 @@ public sealed class WorldPanelPointerTests
         Assert.Equal(panelH / 2f, hit.Y, 1f);
     }
 
-    /// <summary>A pointer left of centre maps to a lower panel X.</summary>
+    /// <summary>A pointer left of center maps to a lower panel X.</summary>
     [Fact]
-    public void PointerLeftOfCentre_MapsToLowerPanelX()
+    public void PointerLeftOfCenter_MapsToLowerPanelX()
     {
         WorldPanelPointer.TryHit(
             PanelModel(), ViewProjection(),
@@ -51,11 +51,11 @@ public sealed class WorldPanelPointerTests
         Assert.True(hit.X < panelW / 2f);
     }
 
-    /// <summary>A pointer above centre maps to a lower panel Y.</summary>
+    /// <summary>A pointer above center maps to a lower panel Y.</summary>
     [Fact]
-    public void PointerAboveCentre_MapsToLowerPanelY()
+    public void PointerAboveCenter_MapsToLowerPanelY()
     {
-        // Screen "above centre" is a smaller pixel-y; it must land on a smaller panel-y (top).
+        // Screen "above center" is a smaller pixel-y; it must land on a smaller panel-y (top).
         WorldPanelPointer.TryHit(
             PanelModel(), ViewProjection(),
             new Vector2(vpW / 2f, (vpH / 2f) - 100f), new Vector2(vpW, vpH), new Vector2(panelW, panelH),

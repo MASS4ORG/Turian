@@ -22,6 +22,7 @@ sealed partial class Build
                 DotNetRun(settings => settings
                     .SetConfiguration(Config)
                     .SetProjectFile(Solution.Turian_Tests.Path)
+                    .SetProperty("GuinevereUsePackages", GuineverePackages)
                     .SetApplicationArguments(
                         "--coverage",
                         "--coverage-settings", CoverageSettingsFile, // Excludes source generated files

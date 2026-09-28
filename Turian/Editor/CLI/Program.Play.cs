@@ -136,8 +136,8 @@ public static partial class Program
         };
         var widthOption = new Option<uint>("--width") { Description = "Viewport width in pixels", DefaultValueFactory = _ => 1280 };
         var heightOption = new Option<uint>("--height") { Description = "Viewport height in pixels", DefaultValueFactory = _ => 720 };
-        var xOption = new Option<float?>("--x") { Description = "Screen X to pick at; defaults to the viewport centre" };
-        var yOption = new Option<float?>("--y") { Description = "Screen Y to pick at; defaults to the viewport centre" };
+        var xOption = new Option<float?>("--x") { Description = "Screen X to pick at; defaults to the viewport center" };
+        var yOption = new Option<float?>("--y") { Description = "Screen Y to pick at; defaults to the viewport center" };
 
         var cmd = new Command("pick", "Diagnose viewport picking against a loaded scene, headlessly")
         {

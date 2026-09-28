@@ -7,17 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: code sytles fixes
+
 ## [1.1.0] - 2026-09-28
 
-### Added
-- undo/redo with per-document history #81
-- nested prefabs, variants, override tracking, and themed controls #84 #185
-
-### Fixed
-- start the asset importer when a project opens
-
-### Changed
-- split CRAP hotspots and cover them with tests
+- Added: undo/redo with per-document history #81
+- Added: nested prefabs, variants, override tracking, and themed controls #84 #185
+- Fixed: start the asset importer when a project opens
+- Changed: split CRAP hotspots and cover them with tests
 
 ## [1.0.1] - 2026-09-25
 

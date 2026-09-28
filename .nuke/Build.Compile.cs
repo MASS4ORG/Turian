@@ -6,6 +6,13 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
+    /// <summary>
+    /// Builds against the published Guinevere packages even when Directory.Build.local.props points at a local
+    /// checkout; switching modes needs a fresh restore.
+    /// </summary>
+    [Parameter("Build against the published Guinevere packages, ignoring a local checkout")]
+    readonly bool GuineverePackages;
+
     Target Clean => td => td
         .Executes(() =>
         {
@@ -28,7 +35,9 @@ sealed partial class Build
         .DependsOn(Clean)
         .Executes(() =>
         {
-            _ = DotNetRestore(s => s.SetProjectFile(Solution));
+            _ = DotNetRestore(s => s
+                .SetProjectFile(Solution)
+                .SetProperty("GuinevereUsePackages", GuineverePackages));
         });
 
     Target Compile => td => td
@@ -42,6 +51,7 @@ sealed partial class Build
                 .SetNoLogo(true)
                 .SetProjectFile(Solution)
                 .SetConfiguration(Config)
+                .SetProperty("GuinevereUsePackages", GuineverePackages)
                 .EnableNoRestore()
             );
 

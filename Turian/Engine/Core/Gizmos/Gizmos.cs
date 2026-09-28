@@ -112,7 +112,7 @@ public sealed class Gizmos
     }
 
     /// <summary>
-    /// Draws a wireframe cuboid aligned to <paramref name="cubeMatrix"/>. The 2×2×2 cube centred on the
+    /// Draws a wireframe cuboid aligned to <paramref name="cubeMatrix"/>. The 2×2×2 cube centered on the
     /// origin is transformed by <c>Matrix * cubeMatrix</c>.
     /// </summary>
     public void DrawWireCube(Matrix4x4 cubeMatrix)
@@ -135,7 +135,7 @@ public sealed class Gizmos
     }
 
     /// <summary>
-    /// Draws a circle in the plane perpendicular to <paramref name="normal"/>, centred on
+    /// Draws a circle in the plane perpendicular to <paramref name="normal"/>, centered on
     /// <paramref name="center"/>.
     /// </summary>
     public void DrawCircle(Vector3 center, Vector3 normal, float radius)

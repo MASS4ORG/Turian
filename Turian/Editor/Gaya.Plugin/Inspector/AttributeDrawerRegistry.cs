@@ -5,24 +5,24 @@ namespace Gaya.Plugin.Turian;
 /// <summary>Maps metadata attributes to composable field decorators.</summary>
 public static class AttributeDrawerRegistry
 {
-    static readonly ConditionalWeakTable<Type, IAttributeDrawer> drawers = new();
-    static readonly IAttributeDrawer tooltip = new TooltipDrawer();
+    static readonly ConditionalWeakTable<Type, IAttributeDrawer> Drawers = new();
+    static readonly IAttributeDrawer Tooltip = new TooltipDrawer();
 
     /// <summary>Registers or replaces the decorator for an attribute type.</summary>
     public static void Register<TAttribute>(IAttributeDrawer drawer) where TAttribute : Attribute
     {
         ArgumentNullException.ThrowIfNull(drawer);
         var type = typeof(TAttribute);
-        lock (drawers)
+        lock (Drawers)
         {
-            drawers.Remove(type);
-            drawers.Add(type, drawer);
+            Drawers.Remove(type);
+            Drawers.Add(type, drawer);
         }
     }
 
     /// <summary>Removes an attribute decorator.</summary>
     public static void Unregister<TAttribute>() where TAttribute : Attribute =>
-        drawers.Remove(typeof(TAttribute));
+        Drawers.Remove(typeof(TAttribute));
 
     /// <summary>Composes matching decorators outside the value-type drawer.</summary>
     public static void Draw(Gui gui, FormField field, string id, Action inner)
@@ -53,7 +53,7 @@ public static class AttributeDrawerRegistry
     {
         for (var current = type; current is not null && typeof(Attribute).IsAssignableFrom(current);
              current = current.BaseType)
-            if (drawers.TryGetValue(current, out var drawer)) return drawer;
-        return typeof(TooltipAttribute).IsAssignableFrom(type) ? tooltip : null;
+            if (Drawers.TryGetValue(current, out var drawer)) return drawer;
+        return typeof(TooltipAttribute).IsAssignableFrom(type) ? Tooltip : null;
     }
 }
