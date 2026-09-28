@@ -19,6 +19,10 @@ sealed class SceneTreePanel : IPanel
     readonly PrefabAuthoring prefabs;
     readonly PrefabStage prefabStage;
     readonly SettingsService settings;
+    readonly UndoService undo;
+    readonly PrefabOverrideOperations overrides;
+    readonly ConfirmDialogChrome confirm;
+    readonly StudioLocalization localization;
     readonly PrefabLinkClassifier prefabLinks =
         new(id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
 
@@ -38,14 +42,23 @@ sealed class SceneTreePanel : IPanel
     /// <param name="prefabs">Saves a node as a prefab.</param>
     /// <param name="prefabStage">Opens an instance's prefab in prefab mode.</param>
     /// <param name="settings">Locates the open scene's folder, where a new prefab is saved.</param>
+    /// <param name="undo">Records every hierarchy edit made here.</param>
+    /// <param name="overrides">Unpacks prefab instances.</param>
+    /// <param name="confirm">Asks before an edit unpacks a prefab instance.</param>
+    /// <param name="localization">Translates the questions asked.</param>
     public SceneTreePanel(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets,
-        PrefabAuthoring prefabs, PrefabStage prefabStage, SettingsService settings)
+        PrefabAuthoring prefabs, PrefabStage prefabStage, SettingsService settings, UndoService undo,
+        PrefabOverrideOperations overrides, ConfirmDialogChrome confirm, StudioLocalization localization)
     {
         this.sceneTree = sceneTree;
         this.inspector = inspector;
         this.prefabs = prefabs;
         this.prefabStage = prefabStage;
         this.settings = settings;
+        this.undo = undo;
+        this.overrides = overrides;
+        this.confirm = confirm;
+        this.localization = localization;
 
         // SceneLoaded covers opening, closing, reloading and the play-mode hierarchy swap; NodeUpdated
         // covers an edit to a node already on screen, such as a rename from the inspector.
@@ -86,14 +99,21 @@ sealed class SceneTreePanel : IPanel
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
             dropAccept: payload => payload is ScriptDragPayload drop
-                && typeof(Component).IsAssignableFrom(drop.ComponentType),
+                    && typeof(Component).IsAssignableFrom(drop.ComponentType)
+                || payload is ReferenceDragPayload dragged && sceneTree.FindNodeById(dragged.Id) is not null,
             onDrop: (item, payload) =>
             {
                 if (item.Tag is Node node && payload is ScriptDragPayload drop)
                 {
                     inspector.Select(node);
+                    undo.RecordObject(node, "Add Component");
                     if (inspector.AddComponent(drop.ComponentType)) Invalidate();
                 }
+
+                // A node row dropped on another row moves under it.
+                if (item.Tag is Node target && payload is ReferenceDragPayload moved
+                    && sceneTree.FindNodeById(moved.Id) is { } dropped)
+                    Restructure(dropped, () => Reparent(dropped, target));
             });
 
         if (gui.Pass == Pass.Pass2Render
@@ -187,6 +207,10 @@ sealed class SceneTreePanel : IPanel
 
         menu.Item("Rename", () => BeginRename(node), enabled: node is not null && !isRoot);
         menu.Item("Delete", () => Delete(node), enabled: node is not null && !isRoot);
+        menu.Item("Move Up", () => Restructure(node!, () => MoveBy(node!, -1)),
+            enabled: node?.Parent is { } above && above.Children.IndexOf(node) > 0);
+        menu.Item("Move Down", () => Restructure(node!, () => MoveBy(node!, 1)),
+            enabled: node?.Parent is { } below && below.Children.IndexOf(node) < below.Children.Count - 1);
         menu.Separator();
         menu.Item("Copy", () => clipboard = node, enabled: node is not null);
         menu.Item("Paste", () => Paste(node), enabled: clipboard is not null && node is not null);
@@ -196,6 +220,9 @@ sealed class SceneTreePanel : IPanel
         menu.Separator();
         menu.Item("Create Prefab", () => CreatePrefab(node), enabled: node is not null && !isRoot);
         menu.Item("Open Prefab", () => prefabStage.OpenPrefab(node!), enabled: node?.PrefabInstance is not null);
+        menu.Item("Unpack Prefab", () => Unpack(node, completely: false), enabled: node?.PrefabInstance is not null);
+        menu.Item("Unpack Prefab Completely", () => Unpack(node, completely: true),
+            enabled: node?.PrefabInstance is not null);
     }
 
     /// <summary>Whether a node other than the scene root is selected, so an edit has a target.</summary>
@@ -213,6 +240,7 @@ sealed class SceneTreePanel : IPanel
         if (inspector.SelectedNode is not { Parent: { } parent } node) return;
 
         var clone = sceneTree.CloneNode(node, NodeName(node.Name, parent));
+        undo.RecordObject(parent, "Duplicate");
         sceneTree.AttachNode(clone, parent, parent.Children.Count);
         sceneTree.MarkAssetModified();
         Invalidate();
@@ -230,18 +258,104 @@ sealed class SceneTreePanel : IPanel
     {
         if (item.Tag is not Node node || string.IsNullOrWhiteSpace(name)) return;
 
+        undo.RecordObject(node, "Rename");
         sceneTree.RenameNode(node, name, SiblingNames(node.Parent, except: node));
         sceneTree.MarkAssetModified();
         sceneTree.RefreshNode(node);
         Invalidate();
     }
 
+    void Unpack(Node? node, bool completely)
+    {
+        if (node is null) return;
+
+        overrides.Unpack(node, completely);
+        Invalidate();
+    }
+
+    /// <summary>Deletes a node, asking first to unpack the prefab instance that provides it.</summary>
     void Delete(Node? node)
     {
         if (node is null || node.Parent is null) return;
 
+        Restructure(node, () => DeleteNow(node));
+    }
+
+    /// <summary>
+    /// Runs a change to where <paramref name="node"/> sits in the hierarchy. A node its prefab provides must stay where
+    /// the prefab puts it, as in Unity, so the instance is unpacked first when the user agrees.
+    /// </summary>
+    void Restructure(Node node, Action change)
+    {
+        if (PrefabOwned(node) is not { } instance)
+        {
+            change();
+            return;
+        }
+
+        confirm.Ask(localization.T("Unpack Prefab"),
+            string.Format(CultureInfo.CurrentCulture,
+                localization.T("\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to change it?"),
+                node.Name, instance.Name),
+            localization.T("Unpack and Continue"),
+            () =>
+            {
+                // One step: undo repacks the instance and reverts the change together. Each instance level above the
+                // node is unpacked, so a nested prefab's object becomes plain too.
+                undo.BeginGesture();
+                try
+                {
+                    while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
+                    change();
+                }
+                finally
+                {
+                    undo.EndGesture();
+                }
+            });
+    }
+
+    void Reparent(Node node, Node target)
+    {
+        if (ReferenceEquals(node, target) || node.Parent is not { } parent) return;
+        for (Node? ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
+            if (ReferenceEquals(ancestor, node)) return;
+
+        undo.RecordObject(parent, "Reparent");
+        undo.RecordObject(target, "Reparent");
+        sceneTree.DetachNode(node);
+        sceneTree.AttachNode(node, target, target.Children.Count);
+        sceneTree.MarkAssetModified();
+        Invalidate();
+    }
+
+    void MoveBy(Node node, int offset)
+    {
+        if (node.Parent is not { } parent) return;
+
+        var index = parent.Children.IndexOf(node);
+        var destination = index + offset;
+        if (index < 0 || destination < 0 || destination >= parent.Children.Count) return;
+
+        undo.RecordObject(parent, offset < 0 ? "Move Up" : "Move Down");
+        parent.Children.Move(index, destination);
+        sceneTree.MarkAssetModified();
+        Invalidate();
+    }
+
+    /// <summary>The instance whose prefab provides <paramref name="node"/>, or null when the node is its own.</summary>
+    Node? PrefabOwned(Node node) =>
+        PrefabOverrideOperations.InstanceOf(node) is { } instance && !ReferenceEquals(instance, node)
+        && overrides.DiffFor(node)?.Added.Contains(node.Id) != true
+            ? instance
+            : null;
+
+    void DeleteNow(Node node)
+    {
+        if (node.Parent is not { } parent) return;
         if (ReferenceEquals(inspector.SelectedNode, node)) inspector.ClearSelection();
 
+        undo.RecordObject(parent, "Delete");
         sceneTree.DetachNode(node);
         sceneTree.MarkAssetModified();
         Invalidate();
@@ -272,6 +386,7 @@ sealed class SceneTreePanel : IPanel
         var parent = target.Parent ?? target;
         var clone = sceneTree.CloneNode(clipboard, NodeName(clipboard.Name, parent));
 
+        undo.RecordObject(parent, "Paste");
         sceneTree.AttachNode(clone, parent, parent.Children.Count);
         sceneTree.MarkAssetModified();
         Invalidate();
@@ -284,6 +399,7 @@ sealed class SceneTreePanel : IPanel
         var parent = asChild ? reference : reference.Parent ?? reference;
         var node = sceneTree.CreateNode(SiblingNames(parent));
 
+        undo.RecordObject(parent, "Create Node");
         sceneTree.AttachNode(node, parent, parent.Children.Count);
         sceneTree.MarkAssetModified();
         Invalidate();

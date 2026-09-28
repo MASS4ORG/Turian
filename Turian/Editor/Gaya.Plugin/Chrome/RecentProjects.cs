@@ -30,7 +30,8 @@ sealed class ProjectSwitcherChrome(
     SettingsService settings,
     ProjectSession session,
     ICommandDispatcher commands,
-    IEditorSettings editorSettings) : IChromeItem
+    IEditorSettings editorSettings,
+    UnsavedChangesGuard unsaved) : IChromeItem
 {
     readonly Dictionary<string, SKImage?> icons = new(StringComparer.OrdinalIgnoreCase);
 
@@ -47,7 +48,10 @@ sealed class ProjectSwitcherChrome(
                    .ContentAlignY(0.5f).Enter())
         {
             var anchor = gui.CurrentNode.Rect;
-            var label = current is null ? "No project" : Path.GetFileName(current);
+            // A dot beside the name, like a dirty document tab, while anything in the project is unsaved.
+            var label = current is null ? "No project"
+                : unsaved.HasUnsavedChanges ? $"{Path.GetFileName(current)} \u25CF"
+                : Path.GetFileName(current);
             var button = gui.GetInteractable();
             if (current is not null && IconFor(current) is { } currentIcon) gui.Image(currentIcon, rowHeight, rowHeight);
             using (gui.Node().Expand().Enter())
@@ -80,7 +84,11 @@ sealed class ProjectSwitcherChrome(
                             if (gui.Button(Path.GetFileName(project), width: labelWidth, height: rowHeight))
                             {
                                 if (!string.Equals(project, current, StringComparison.OrdinalIgnoreCase))
-                                    session.Open(project);
+                                {
+                                    unsaved.Leave(
+                                        "Some documents have unsaved changes. Save them before leaving the project?",
+                                        () => session.Open(project));
+                                }
                                 close = true;
                             }
 

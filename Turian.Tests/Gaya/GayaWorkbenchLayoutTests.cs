@@ -9,13 +9,18 @@ public class GayaWorkbenchLayoutTests : IDisposable
     readonly string layoutPath = Path.Combine(Path.GetTempPath(),
         $"gaya-layout-{Guid.NewGuid():N}.json");
 
+    // Disposing a workbench saves the settings; without a path of their own they would replace the user's file.
+    readonly string settingsPath = Path.Combine(Path.GetTempPath(),
+        $"gaya-settings-{Guid.NewGuid():N}.json");
+
     readonly List<GayaApplication> applications = [];
 
-    /// <summary>Disposes the applications the test created and deletes its layout file.</summary>
+    /// <summary>Disposes the applications the test created and deletes its layout and settings files.</summary>
     public void Dispose()
     {
         foreach (var application in applications) application.Dispose();
         if (File.Exists(layoutPath)) File.Delete(layoutPath);
+        if (File.Exists(settingsPath)) File.Delete(settingsPath);
         GC.SuppressFinalize(this);
     }
 
@@ -43,7 +48,8 @@ public class GayaWorkbenchLayoutTests : IDisposable
 
         var application = new GayaApplication(services.BuildServiceProvider(), registry, new CommandRegistry(),
             new MenuRegistry(), new ChromeRegistry(), new TabStripChromeRegistry(),
-            new ShortcutService(NullLogger.Instance), new FocusTracker(), []);
+            new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
+            settings: new EditorSettings(NullLogger.Instance, settingsPath));
         applications.Add(application);
         return application;
     }

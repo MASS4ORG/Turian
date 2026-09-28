@@ -70,7 +70,10 @@ public sealed class StudioSettingsStore(ILogger log, string path)
             var directory = System.IO.Path.GetDirectoryName(Path);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
-            File.WriteAllText(Path, document.ToJsonString(jsonOptions));
+            // Replaced in one step, so a studio starting meanwhile never reads a half-written file as empty.
+            var temporary = $"{Path}.tmp";
+            File.WriteAllText(temporary, document.ToJsonString(jsonOptions));
+            File.Move(temporary, Path, overwrite: true);
             stored = document;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

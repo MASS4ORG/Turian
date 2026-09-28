@@ -70,14 +70,31 @@ Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 var gui = new Gui();
 var window = new GuiWindow(gui, 1600, 950, "Turian Studio");
 var activeWorkbench = workbench;
+
+// Closing the window asks about unsaved work through the Exit command, which closes the window again once answered.
+const string exitCommand = "gaya.turian.exit";
+var exitApproved = false;
+void ApproveExit()
+{
+    exitApproved = true;
+    window.Close();
+}
+
+window.CloseRequested = () =>
+{
+    if (exitApproved || !dispatcher.CanExecute(exitCommand)) return true;
+    dispatcher.Execute(exitCommand);
+    return false;
+};
+
 try
 {
-    shell.ExitRequested += window.Close;
+    shell.ExitRequested += ApproveExit;
     window.RunGui(() => activeWorkbench.Render(gui));
 }
 finally
 {
-    shell.ExitRequested -= window.Close;
+    shell.ExitRequested -= ApproveExit;
     window.Dispose();
 }
 

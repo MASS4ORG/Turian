@@ -47,6 +47,9 @@ public sealed class PrefabInstanceDiff
     /// <summary>Nodes and components an instance has that its prefab does not.</summary>
     public HashSet<Guid> Added { get; } = [];
 
+    /// <summary>Prefab objects an instance no longer has, by the id they would have in it.</summary>
+    public HashSet<Guid> Removed { get; } = [];
+
     /// <summary>Instance roots whose prefab could not be loaded.</summary>
     public HashSet<Guid> MissingPrefabs { get; } = [];
 
@@ -54,4 +57,12 @@ public sealed class PrefabInstanceDiff
     /// <param name="objectId">A node or component id.</param>
     /// <returns>True when at least one of its members is overridden.</returns>
     public bool HasOverrides(Guid objectId) => Overrides.Any(entry => entry.Object == objectId);
+
+    /// <summary>Whether anything differs from the prefabs at all.</summary>
+    public bool IsEmpty => Overrides.Count == 0 && Added.Count == 0 && Removed.Count == 0;
 }
+
+/// <summary>What a new instance of a prefab holds.</summary>
+/// <param name="Content">The expanded instance, with the ids its objects get in the instance.</param>
+/// <param name="SourceIds">Each instance object id mapped to the id of the prefab object it comes from.</param>
+public sealed record PrefabExpectation(JsonObject Content, IReadOnlyDictionary<Guid, Guid> SourceIds);

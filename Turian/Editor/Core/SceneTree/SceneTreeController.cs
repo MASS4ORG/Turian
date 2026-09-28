@@ -70,6 +70,12 @@ public sealed class SceneTreeController(
     /// <summary>Raised when the scene structure changed and the UI tree should be rebuilt.</summary>
     public event Action<Node?>? SceneLoaded;
 
+    /// <summary>
+    /// Raised when an open scene's objects are replaced by rebuilt ones with the same ids: the scene's asset id, the
+    /// old root and the new one.
+    /// </summary>
+    public event Action<Guid, Node, Node>? SceneRebuilt;
+
     /// <summary>Raised when the previously selected node should be restored.</summary>
     public event Action<Guid?>? SelectionRestoreRequested;
 
@@ -136,6 +142,7 @@ public sealed class SceneTreeController(
                 }
 
                 loadedSceneRoots[assetId] = newRoot;
+                SceneRebuilt?.Invoke(assetId, oldRoot, newRoot);
 
                 if (CurrentAsset?.Id == assetId)
                     sceneRoot = newRoot;
@@ -195,7 +202,9 @@ public sealed class SceneTreeController(
     }
 
     /// <summary>Updates the instances of a just-saved prefab in the other open scenes, keeping their overrides.</summary>
-    void RefreshInstances(Guid prefabId, string? previousJson)
+    /// <param name="prefabId">The prefab that was saved.</param>
+    /// <param name="previousJson">The prefab's content before the save, or null when it is new.</param>
+    public void RefreshInstances(Guid prefabId, string? previousJson)
     {
         var refreshed = false;
         foreach (var (assetId, root) in loadedSceneRoots.ToList())
@@ -209,6 +218,7 @@ public sealed class SceneTreeController(
                     continue;
 
                 loadedSceneRoots[assetId] = rebuilt;
+                SceneRebuilt?.Invoke(assetId, root, rebuilt);
                 if (ReferenceEquals(sceneRoot, root)) sceneRoot = rebuilt;
                 refreshed = true;
             }

@@ -4,10 +4,11 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Turns scene nodes into prefabs and prefabs into variants, the way Unity's Create Prefab and Create Prefab Variant
-/// do: the source node becomes an instance of the new prefab, so later prefab edits reach it.
+/// do: the source node becomes an instance of the new prefab, so later prefab edits reach it. Both are undoable: undo
+/// moves the new file to the project's trash, redo brings the same file back.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class PrefabAuthoring(AssetImporter importer)
+public sealed class PrefabAuthoring(AssetImporter importer, AssetFileSystem files, UndoService undo)
 {
     const string prefabExtension = ".prefab";
 
@@ -21,11 +22,41 @@ public sealed class PrefabAuthoring(AssetImporter importer)
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 
         var path = UniquePath(directory, node.Name);
-        File.WriteAllText(path, Serialize(node, LoadPrefab));
-        if (ImportedId(path) is not { } prefabId) return null;
+        string? trashed = null;
 
-        LinkToPrefab(node, prefabId);
-        return path;
+        // Linking gives the hierarchy the instance's ids; undo gives the original ones back, redo the linked ones.
+        var restoreOriginalIds = SnapshotIds(node);
+        Action? restoreLinkedIds = null;
+        try
+        {
+            undo.Perform("Create Prefab", [node],
+                () =>
+                {
+                    if (restoreLinkedIds is not null)
+                    {
+                        files.MoveTo(trashed!, path, isDirectory: false);
+                        restoreLinkedIds();
+                        return;
+                    }
+
+                    File.WriteAllText(path, Serialize(node, LoadPrefab));
+                    LinkToPrefab(node, ImportedId(path)
+                        ?? throw new InvalidOperationException($"{path} could not be imported."));
+                    restoreLinkedIds = SnapshotIds(node);
+                },
+                () =>
+                {
+                    trashed = files.MoveToTrash(path);
+                    restoreOriginalIds();
+                });
+            return path;
+        }
+        catch (InvalidOperationException exception)
+        {
+            // Nothing is recorded for a prefab that could not be imported.
+            Log.Logger.LogWarning(exception, "Could not create the prefab {Path}", path);
+            return null;
+        }
     }
 
     /// <summary>Saves a variant of the prefab at <paramref name="prefabPath"/> beside it.</summary>
@@ -39,8 +70,21 @@ public sealed class PrefabAuthoring(AssetImporter importer)
 
         var name = $"{Path.GetFileNameWithoutExtension(prefabPath)} Variant";
         var path = UniquePath(Path.GetDirectoryName(prefabPath)!, name);
-        File.WriteAllText(path, VariantJson(prefabId, name));
-        importer.ReimportNow(path);
+        string? trashed = null;
+        undo.Perform("Create Prefab Variant", [],
+            () =>
+            {
+                if (trashed is not null)
+                {
+                    files.MoveTo(trashed, path, isDirectory: false);
+                    return;
+                }
+
+                File.WriteAllText(path, VariantJson(prefabId, name));
+                importer.ReimportNow(path);
+            },
+            () => trashed = files.MoveToTrash(path),
+            document: UndoService.ProjectDocument);
         return path;
     }
 
@@ -79,6 +123,28 @@ public sealed class PrefabAuthoring(AssetImporter importer)
                 component.Id = PrefabInstances.DeriveId(instanceId, component.Id);
             foreach (var child in node.Children)
                 Relink(child, isRoot: false);
+        }
+    }
+
+    /// <summary>Remembers the ids of a hierarchy's nodes and components, to put them back later.</summary>
+    /// <param name="root">The hierarchy's root.</param>
+    /// <returns>Gives every node and component of the hierarchy, as it is now, its remembered id.</returns>
+    public static Action SnapshotIds(Node root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+
+        var ids = new List<(IdClass Object, Guid Id)>();
+        Collect(root);
+        return () =>
+        {
+            foreach (var (obj, id) in ids) obj.Id = id;
+        };
+
+        void Collect(Node node)
+        {
+            ids.Add((node, node.Id));
+            foreach (var component in node.Components) ids.Add((component, component.Id));
+            foreach (var child in node.Children) Collect(child);
         }
     }
 

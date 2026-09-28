@@ -66,16 +66,17 @@ public class CameraComponent : Component, ICamera
     [HideInEditor]
     public float FieldOfView
     {
-        get => field;
-        set => field = Math.Clamp(value, minFov, maxFov);
-    } = 60f * Mathf.DegreesToRadians;
+        get => FieldOfViewDegrees * Mathf.DegreesToRadians;
+        set => FieldOfViewDegrees = value * Mathf.RadiansToDegrees;
+    }
 
     /// <summary>Gets or sets the vertical field of view in degrees.</summary>
+    /// <remarks>Stored in degrees, as saved, so loading and saving a scene never changes the value.</remarks>
     public float FieldOfViewDegrees
     {
-        get => FieldOfView * Mathf.RadiansToDegrees;
-        set => FieldOfView = value * Mathf.DegreesToRadians;
-    }
+        get => field;
+        set => field = Math.Clamp(value, minFov * Mathf.RadiansToDegrees, maxFov * Mathf.RadiansToDegrees);
+    } = 60f;
 
     /// <summary>Gets or sets the focal length in millimeters. Affects field of view when using physical camera model.</summary>
     [HideInEditor] // TODO: make it conditional (either physical or FOV)

@@ -26,6 +26,7 @@ sealed class SceneViewport : IDisposable
     readonly PlayModeService playMode;
     readonly EditorCameraSettings cameraSettings;
     readonly ILogger log;
+    readonly UndoService undo;
 
     readonly HashSet<int> heldKeys = [];
 
@@ -56,6 +57,7 @@ sealed class SceneViewport : IDisposable
     /// <param name="playMode">Consulted so gizmos and picking stay out of a running session.</param>
     /// <param name="cameraSettings">How the free camera responds to input.</param>
     /// <param name="log">Where an unusable device is reported.</param>
+    /// <param name="undo">Records a whole gizmo drag as one step.</param>
     public SceneViewport(
         Vulkan vulkan,
         SceneTreeController sceneTree,
@@ -63,7 +65,8 @@ sealed class SceneViewport : IDisposable
         GizmoDrawerCatalog gizmos,
         PlayModeService playMode,
         EditorCameraSettings cameraSettings,
-        ILogger log)
+        ILogger log,
+        UndoService undo)
     {
         this.vulkan = vulkan;
         this.sceneTree = sceneTree;
@@ -72,6 +75,7 @@ sealed class SceneViewport : IDisposable
         this.playMode = playMode;
         this.cameraSettings = cameraSettings;
         this.log = log;
+        this.undo = undo;
 
         sceneTree.FrameNodeRequested += OnFrameNodeRequested;
         inspector.SelectionChanged += OnSelectionChanged;
@@ -337,12 +341,17 @@ sealed class SceneViewport : IDisposable
         Gizmo.Draw(g, service.Camera, ViewportSize);
     }
 
-    void OnGizmoDragStarted() => mutateNode = inspector.CreateMutationNotifier();
+    void OnGizmoDragStarted()
+    {
+        undo.BeginGesture();
+        mutateNode = inspector.CreateMutationNotifier();
+    }
 
     void OnGizmoDragEnded()
     {
         NotifyGizmoMutation();
         mutateNode = null;
+        undo.EndGesture();
     }
 
     void NotifyGizmoMutation()
