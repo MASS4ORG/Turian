@@ -6,7 +6,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public sealed class WorkspaceSessionStore(ILogger log)
 {
-    static readonly JsonSerializerOptions options =
+    static readonly JsonSerializerOptions Options =
         new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     /// <summary>The session file for a project directory.</summary>
@@ -22,7 +22,7 @@ public sealed class WorkspaceSessionStore(ILogger log)
         try
         {
             return File.Exists(path)
-                ? JsonSerializer.Deserialize<WorkspaceSession>(File.ReadAllText(path), options)
+                ? JsonSerializer.Deserialize<WorkspaceSession>(File.ReadAllText(path), Options)
                   ?? WorkspaceSession.Empty
                 : WorkspaceSession.Empty;
         }
@@ -41,7 +41,7 @@ public sealed class WorkspaceSessionStore(ILogger log)
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, JsonSerializer.Serialize(session, options));
+            File.WriteAllText(path, JsonSerializer.Serialize(session, Options));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

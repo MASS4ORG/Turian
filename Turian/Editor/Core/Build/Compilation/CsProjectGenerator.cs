@@ -24,7 +24,7 @@ public enum ExecutableGenerationMode
 /// </summary>
 public static class CsProjectGenerator
 {
-    const string CodeGeneratorName = "Turian.CSharp.CodeGenerator";
+    const string codeGeneratorName = "Turian.CSharp.CodeGenerator";
 
     /// <summary>
     /// Generate a brand new .csproj file
@@ -272,9 +272,9 @@ public static class CsProjectGenerator
             // Generates reflection-free serializers and [Observable] properties for the project's DataAssets.
             itemGroup.AddItem("Analyzer",
                 usesPublishedLibraries
-                    ? Path.Combine("$(TurianDir)", "lib", $"{CodeGeneratorName}.dll")
+                    ? Path.Combine("$(TurianDir)", "lib", $"{codeGeneratorName}.dll")
                     : Path.Combine("$(TurianDir)", "Turian", "Editor", "CSharp", "CodeGenerator", "bin", "Debug",
-                        "netstandard2.0", $"{CodeGeneratorName}.dll"));
+                        "netstandard2.0", $"{codeGeneratorName}.dll"));
 
             return projectRoot;
         }

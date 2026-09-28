@@ -8,7 +8,7 @@ public class ModelAsset : Asset
 {
     // Keyed by (assetId, deviceHandle) so the same GUID is never loaded twice per Vulkan device.
     // Cache owns the Model lifetime — callers must not dispose the returned instance.
-    static readonly ConcurrentDictionary<(Guid, nint), Model> modelCache = new();
+    static readonly ConcurrentDictionary<(Guid, nint), Model> ModelCache = new();
 
     /// <summary>
     /// Removes the cached <see cref="Model"/> for <paramref name="assetId"/> and disposes it.
@@ -16,9 +16,9 @@ public class ModelAsset : Asset
     /// </summary>
     public static void InvalidateCacheEntry(Guid assetId)
     {
-        foreach (var key in modelCache.Keys.Where(k => k.Item1 == assetId).ToList())
+        foreach (var key in ModelCache.Keys.Where(k => k.Item1 == assetId).ToList())
         {
-            if (modelCache.TryRemove(key, out var model))
+            if (ModelCache.TryRemove(key, out var model))
                 model.Dispose();
         }
     }
@@ -28,9 +28,9 @@ public class ModelAsset : Asset
     /// </summary>
     public static void ClearCache()
     {
-        foreach (var (_, model) in modelCache)
+        foreach (var (_, model) in ModelCache)
             model.Dispose();
-        modelCache.Clear();
+        ModelCache.Clear();
     }
 
     /// <summary>
@@ -44,7 +44,7 @@ public class ModelAsset : Asset
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         var cacheKey = (Id, vulkan.Device.VkDevice.Handle);
-        if (modelCache.TryGetValue(cacheKey, out var cached))
+        if (ModelCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
@@ -56,7 +56,7 @@ public class ModelAsset : Asset
         {
             using var assetStream = provider.GetAssetStream();
             var loaded = new Model(vulkan, MeshBlob.Read(assetStream).ToModelBuilder());
-            modelCache[cacheKey] = loaded;
+            ModelCache[cacheKey] = loaded;
             return loaded;
         }
         catch (Exception ex)

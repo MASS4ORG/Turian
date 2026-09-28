@@ -27,12 +27,10 @@ public sealed class OutputPanelSettings
     /// <summary>Whether the console clears when user code recompiles and a new assembly is loaded.</summary>
     public bool ClearOnRecompile { get; set; } = true;
 
-    int entryLines = 1;
-
     /// <summary>How many lines of a message an entry in the main list shows at most.</summary>
     public int EntryLines
     {
-        get => entryLines;
-        set => entryLines = value is >= 1 and <= 6 ? value : 1;
-    }
+        get;
+        set => field = value is >= 1 and <= 6 ? value : 1;
+    } = 1;
 }

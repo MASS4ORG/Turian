@@ -15,8 +15,8 @@ public static class TextureMemoryReport
 
     const double bytesPerMebibyte = 1024 * 1024;
 
-    static ulong lastReportedBytes;
-    static bool warned;
+    static ulong _lastReportedBytes;
+    static bool _warned;
 
     /// <summary>
     /// Logs the texture memory total if it changed since the last report, warning when it exceeds
@@ -28,12 +28,12 @@ public static class TextureMemoryReport
         ArgumentNullException.ThrowIfNull(device);
 
         var bytes = TextureAsset.UploadedBytes;
-        if (bytes == lastReportedBytes)
+        if (bytes == _lastReportedBytes)
         {
             return;
         }
 
-        lastReportedBytes = bytes;
+        _lastReportedBytes = bytes;
 
         var budget = device.DeviceLocalMemoryBytes;
         Log.Logger.LogInformation(
@@ -45,16 +45,16 @@ public static class TextureMemoryReport
 
         if (budget == 0 || bytes <= budget * warnFraction)
         {
-            warned = false;
+            _warned = false;
             return;
         }
 
-        if (warned)
+        if (_warned)
         {
             return;
         }
 
-        warned = true;
+        _warned = true;
         Log.Logger.LogWarning(
             "Textures occupy {Megabytes:F1} MiB of {BudgetMegabytes:F0} MiB device-local memory. "
             + "Lower TextureMaxResolution in the project settings, or per texture, to cut this without recompressing",
@@ -68,7 +68,7 @@ public static class TextureMemoryReport
     /// </summary>
     public static void Reset()
     {
-        lastReportedBytes = 0;
-        warned = false;
+        _lastReportedBytes = 0;
+        _warned = false;
     }
 }

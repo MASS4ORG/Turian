@@ -7,14 +7,14 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class PreviewQuadMesh
 {
-    static readonly ConcurrentDictionary<nint, Model> cache = new();
+    static readonly ConcurrentDictionary<nint, Model> Cache = new();
 
     /// <summary>Gets the shared unit quad model for <paramref name="vulkan"/>, building it if needed.</summary>
     public static Model Get(Vulkan vulkan)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
 
-        return cache.GetOrAdd(vulkan.Device.VkDevice.Handle, static (_, v) => Build(v), vulkan);
+        return Cache.GetOrAdd(vulkan.Device.VkDevice.Handle, static (_, v) => Build(v), vulkan);
     }
 
     static Model Build(Vulkan vulkan)

@@ -8,7 +8,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 public sealed class OapMountSet
 {
-    static readonly ConcurrentDictionary<string, CachedMountSet> cache = new(StringComparer.OrdinalIgnoreCase);
+    static readonly ConcurrentDictionary<string, CachedMountSet> Cache = new(StringComparer.OrdinalIgnoreCase);
 
     OapMountSet(IReadOnlyList<OapReader> readers) => Readers = readers;
 
@@ -29,14 +29,14 @@ public sealed class OapMountSet
         var fullPath = Path.GetFullPath(basepackagePath);
         if (!File.Exists(fullPath))
         {
-            cache.TryRemove(fullPath, out _);
+            Cache.TryRemove(fullPath, out _);
             return null;
         }
 
         var packagePaths = DiscoverPackages(fullPath);
         var fingerprint = BuildFingerprint(packagePaths);
 
-        if (cache.TryGetValue(fullPath, out var cached) && cached.Fingerprint == fingerprint)
+        if (Cache.TryGetValue(fullPath, out var cached) && cached.Fingerprint == fingerprint)
         {
             return cached.MountSet;
         }
@@ -55,7 +55,7 @@ public sealed class OapMountSet
         }
 
         var mountSet = new OapMountSet(readers);
-        cache[fullPath] = new CachedMountSet(fingerprint, mountSet);
+        Cache[fullPath] = new CachedMountSet(fingerprint, mountSet);
         WarnAboutUnmetRequirements(readers);
         return mountSet;
     }
@@ -178,17 +178,17 @@ public sealed class OapMountSet
 /// </summary>
 public static class OapRuntimeKey
 {
-    static byte[]? overrideKey;
-    static bool overrideSet;
+    static byte[]? _overrideKey;
+    static bool _overrideSet;
 
     /// <summary>Gets the active 32-byte key, or <see langword="null"/> when none is configured.</summary>
     public static byte[]? Current
     {
         get
         {
-            if (overrideSet)
+            if (_overrideSet)
             {
-                return overrideKey;
+                return _overrideKey;
             }
 
             var passphrase = Environment.GetEnvironmentVariable("TURIAN_OAP_KEY");
@@ -205,8 +205,8 @@ public static class OapRuntimeKey
             throw new ArgumentException($"An OAP key must be {OapCrypto.KeyLength} bytes.", nameof(key));
         }
 
-        overrideKey = key;
-        overrideSet = true;
+        _overrideKey = key;
+        _overrideSet = true;
     }
 
     /// <summary>Derives and sets the runtime key from a passphrase.</summary>

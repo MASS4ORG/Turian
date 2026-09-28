@@ -20,7 +20,7 @@ sealed partial class Build
             .Executes(() =>
             {
                 DotNetRun(settings => settings
-                    .SetConfiguration(Configuration)
+                    .SetConfiguration(Config)
                     .SetProjectFile(Solution.Turian_Tests.Path)
                     .SetApplicationArguments(
                         "--coverage",

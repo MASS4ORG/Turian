@@ -9,10 +9,10 @@ namespace Gaya.Host;
 /// </summary>
 public sealed partial class Workbench : IPanelAccessor, IDisposable
 {
-    static readonly string[] menuOrder =
+    static readonly string[] MenuOrder =
         [MenuIds.File, MenuIds.Edit, MenuIds.View, MenuIds.Project, MenuIds.Run, MenuIds.Help];
 
-    static readonly Dictionary<string, string> menuLabels = new()
+    static readonly Dictionary<string, string> MenuLabels = new()
     {
         [MenuIds.File] = "File",
         [MenuIds.Edit] = "Edit",

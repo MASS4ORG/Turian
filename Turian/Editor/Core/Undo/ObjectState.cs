@@ -1,10 +1,3 @@
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Globalization;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -17,10 +10,10 @@ namespace Turian.Editor.Core;
 /// </remarks>
 public sealed class ObjectState
 {
-    static readonly ConcurrentDictionary<Type, MemberInfo[]> membersByType = new();
+    static readonly ConcurrentDictionary<Type, MemberInfo[]> MembersByType = new();
 
     // Written by the structure, not by a member edit.
-    static readonly string[] structuralMembers = [nameof(IdClass.Id), nameof(Node.Children), nameof(Node.Components)];
+    static readonly string[] StructuralMembers = [nameof(IdClass.Id), nameof(Node.Children), nameof(Node.Components)];
 
     readonly (MemberInfo Member, Type Type, string Json, object? Reference)[] values;
     readonly Node[]? children;
@@ -225,17 +218,17 @@ public sealed class ObjectState
         member is PropertyInfo property ? property.PropertyType : ((FieldInfo)member).FieldType;
 
     // The members the serializer writes for a type, less the ones the structure owns.
-    static MemberInfo[] MembersOf(Type type) => membersByType.GetOrAdd(type, static type =>
+    static MemberInfo[] MembersOf(Type type) => MembersByType.GetOrAdd(type, static type =>
     [
         .. type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(property => property.GetIndexParameters().Length == 0 && property.CanRead && property.CanWrite
-                && Serialized(property, property.GetGetMethod(nonPublic: true)?.IsPublic == true)),
+            .Where(property => property.GetIndexParameters().Length == 0 && property is { CanRead: true, CanWrite: true }
+                                                                         && Serialized(property, property.GetGetMethod(nonPublic: true)?.IsPublic == true)),
         .. type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             .Where(field => !field.IsInitOnly && Serialized(field, field.IsPublic)),
     ]);
 
     static bool Serialized(MemberInfo member, bool isPublic) =>
-        !structuralMembers.Contains(member.Name)
+        !StructuralMembers.Contains(member.Name)
         && (isPublic
             ? member.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always }
             : member.GetCustomAttribute<JsonIncludeAttribute>() is not null);

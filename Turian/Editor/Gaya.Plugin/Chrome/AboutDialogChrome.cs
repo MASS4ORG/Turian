@@ -18,7 +18,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
     /// <summary>The dialog body's own padding (16 either side) subtracted from <see cref="dialogWidth"/>.</summary>
     const float contentWidth = dialogWidth - 32f;
 
-    static readonly Lazy<SKImage?> logo = new(LoadLogo);
+    static readonly Lazy<SKImage?> Logo = new(LoadLogo);
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -54,7 +54,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
         using (gui.Node().ExpandWidth().Direction(Axis.Vertical).ContentAlignX(0.5f)
                    .Gap(Theme.Scale(4f)).Enter())
         {
-            if (logo.Value is { } image) gui.Image(image, Theme.Scale(logoSize), Theme.Scale(logoSize));
+            if (Logo.Value is { } image) gui.Image(image, Theme.Scale(logoSize), Theme.Scale(logoSize));
             else gui.DrawText("◉", Theme.Text(52f), Theme.Accent);
 
             gui.DrawText("Turian Studio", Theme.Text(18f), Theme.Ink);

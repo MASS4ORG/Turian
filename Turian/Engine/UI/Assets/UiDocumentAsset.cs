@@ -8,7 +8,7 @@ namespace Turian.Engine.UI;
 [TypeId("a3000001-0000-4000-8000-000000000021")]
 public sealed class UiDocumentAsset : Asset
 {
-    static readonly ConcurrentDictionary<Guid, UiDocument> cache = new();
+    static readonly ConcurrentDictionary<Guid, UiDocument> Cache = new();
 
     /// <summary>
     /// Reads this document's baked artifact and returns the parsed <see cref="UiDocument"/>, or
@@ -17,7 +17,7 @@ public sealed class UiDocumentAsset : Asset
     /// </summary>
     public UiDocument? GetContent()
     {
-        if (cache.TryGetValue(Id, out var cached)) return cached;
+        if (Cache.TryGetValue(Id, out var cached)) return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
@@ -27,7 +27,7 @@ public sealed class UiDocumentAsset : Asset
             using var stream = provider.GetAssetStream();
             using var reader = new StreamReader(stream);
             var document = ParseText(reader.ReadToEnd(), RelativePath);
-            cache[Id] = document;
+            Cache[Id] = document;
             return document;
         }
         catch (Exception ex) when (ex is IOException or UiParseException or JsonException)
@@ -39,10 +39,10 @@ public sealed class UiDocumentAsset : Asset
 
     /// <summary>Drops the cached document for <paramref name="assetId"/>, forcing a reload on next access.</summary>
     /// <param name="assetId">The document asset id.</param>
-    public static void InvalidateCacheEntry(Guid assetId) => cache.TryRemove(assetId, out _);
+    public static void InvalidateCacheEntry(Guid assetId) => Cache.TryRemove(assetId, out _);
 
     /// <summary>Clears every cached document. Call on project unload.</summary>
-    public static void ClearCache() => cache.Clear();
+    public static void ClearCache() => Cache.Clear();
 
     /// <summary>
     /// Loads and parses a <c>.ui</c> or baked <c>.amui</c> file directly from disk, bypassing the

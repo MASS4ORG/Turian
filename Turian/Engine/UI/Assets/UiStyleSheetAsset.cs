@@ -7,7 +7,7 @@ namespace Turian.Engine.UI;
 [TypeId("a3000001-0000-4000-8000-000000000022")]
 public sealed class UiStyleSheetAsset : Asset
 {
-    static readonly ConcurrentDictionary<Guid, StyleSheet> cache = new();
+    static readonly ConcurrentDictionary<Guid, StyleSheet> Cache = new();
 
     /// <summary>
     /// Reads this stylesheet's artifact and returns the parsed <see cref="StyleSheet"/>, or
@@ -15,7 +15,7 @@ public sealed class UiStyleSheetAsset : Asset
     /// </summary>
     public StyleSheet? GetContent()
     {
-        if (cache.TryGetValue(Id, out var cached)) return cached;
+        if (Cache.TryGetValue(Id, out var cached)) return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
@@ -25,7 +25,7 @@ public sealed class UiStyleSheetAsset : Asset
             using var stream = provider.GetAssetStream();
             using var reader = new StreamReader(stream);
             var sheet = StyleSheet.Parse(reader.ReadToEnd());
-            cache[Id] = sheet;
+            Cache[Id] = sheet;
             return sheet;
         }
         catch (Exception ex) when (ex is IOException or FormatException)
@@ -37,10 +37,10 @@ public sealed class UiStyleSheetAsset : Asset
 
     /// <summary>Drops the cached stylesheet for <paramref name="assetId"/>.</summary>
     /// <param name="assetId">The stylesheet asset id.</param>
-    public static void InvalidateCacheEntry(Guid assetId) => cache.TryRemove(assetId, out _);
+    public static void InvalidateCacheEntry(Guid assetId) => Cache.TryRemove(assetId, out _);
 
     /// <summary>Clears every cached stylesheet. Call on project unload.</summary>
-    public static void ClearCache() => cache.Clear();
+    public static void ClearCache() => Cache.Clear();
 
     /// <summary>Loads and parses a <c>.uss</c> file directly from disk. Used by tooling and tests.</summary>
     /// <param name="absolutePath">Absolute path of the <c>.uss</c> file.</param>

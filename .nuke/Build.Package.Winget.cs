@@ -7,11 +7,11 @@ namespace Turian.NUKE;
 sealed partial class Build
 {
     [Parameter("Public HTTPS URL of the Windows installer, used in generated Winget manifests")]
-    readonly string wingetInstallerUrl;
+    readonly string WingetInstallerUrl;
 
     public Target WingetManifest => td => td
         .DependsOn(WindowsInstaller)
-        .Requires(() => wingetInstallerUrl)
+        .Requires(() => WingetInstallerUrl)
         .Executes(() =>
         {
             using var stream = File.OpenRead(WindowsInstallerFile);
@@ -38,7 +38,7 @@ sealed partial class Build
                     - PackageIdentifier: Microsoft.DotNet.SDK.10
                 Installers:
                   - Architecture: x64
-                    InstallerUrl: {wingetInstallerUrl}
+                    InstallerUrl: {WingetInstallerUrl}
                     InstallerSha256: {hash}
                 ManifestType: installer
                 ManifestVersion: 1.12.0

@@ -337,7 +337,7 @@ public class PrefabInstancesTests
     [Fact]
     public void ApplyMember_WritesTheOwningPrefab()
     {
-        var lamp = Lamp(1f);
+        var lamp = Lamp();
         var prefabId = AddPrefab(lamp);
         var lightId = lamp.Children[0].GetComponent<LightComponent>()!.Id;
 
@@ -353,7 +353,7 @@ public class PrefabInstancesTests
     [Fact]
     public void ApplyMember_NestedObject_WritesInnerPrefabAndDropsOuterOverride()
     {
-        var lampId = AddPrefab(Lamp(1f));
+        var lampId = AddPrefab(Lamp());
         var room = new Node { Name = "Room" };
         var nested = Instantiate(lampId);
         nested.Children[0].GetComponent<LightComponent>()!.Intensity = 3f;
@@ -379,7 +379,7 @@ public class PrefabInstancesTests
     [Fact]
     public void ApplyAll_MakesTheInstanceThePrefab()
     {
-        var lamp = Lamp(1f);
+        var lamp = Lamp();
         var prefabId = AddPrefab(lamp);
         var instance = Instantiate(prefabId);
         instance.Name = "Desk Lamp";

@@ -21,12 +21,12 @@ public static class PrefabInstances
     const string sourceMember = nameof(PrefabInstance.Source);
 
     // An instance root keeps its own name, activation and placement; they are never overrides.
-    static readonly string[] rootMembers = [nameof(Node.Name), nameof(Node.IsActive), nameof(Node.Transform)];
+    static readonly string[] RootMembers = [nameof(Node.Name), nameof(Node.IsActive), nameof(Node.Transform)];
 
-    static readonly string[] structuralMembers =
+    static readonly string[] StructuralMembers =
         [ObjectJsonSerializer<IdClass>.TypeIdProperty, idMember, childrenMember, componentsMember, instanceMember];
 
-    static readonly JsonSerializerOptions writeOptions = new() { WriteIndented = true };
+    static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
     /// <summary>Replaces every saved prefab instance in a serialized node hierarchy with the prefab's content.</summary>
     /// <param name="json">A serialized node hierarchy.</param>
@@ -41,7 +41,7 @@ public static class PrefabInstances
         if (JsonNode.Parse(json) is not JsonObject root) return json;
 
         ExpandTree(root, loadPrefab, []);
-        return root.ToJsonString(writeOptions);
+        return root.ToJsonString(WriteOptions);
     }
 
     /// <summary>Reduces every expanded prefab instance in a serialized node hierarchy to its prefab link and differences.</summary>
@@ -61,7 +61,7 @@ public static class PrefabInstances
         if (JsonNode.Parse(json) is not JsonObject root) return json;
 
         CompactTree(root, loadPrefab, normalize ?? NormalizeNode);
-        return root.ToJsonString(writeOptions);
+        return root.ToJsonString(WriteOptions);
     }
 
     /// <summary>Finds what every expanded prefab instance in a serialized node hierarchy changes about its prefab.</summary>
@@ -121,7 +121,7 @@ public static class PrefabInstances
             return null;
 
         RewriteIds(instance, expectation.SourceIds.ToDictionary(pair => pair.Key, pair => pair.Value));
-        foreach (var member in rootMembers.Append(idMember))
+        foreach (var member in RootMembers.Append(idMember))
         {
             if (prefab[member] is { } value) instance[member] = value.DeepClone();
             else instance.Remove(member);
@@ -130,7 +130,7 @@ public static class PrefabInstances
         if (prefab[instanceMember] is { } variantLink) instance[instanceMember] = variantLink.DeepClone();
         else instance.Remove(instanceMember);
 
-        return Compact(instance.ToJsonString(writeOptions), loadPrefab);
+        return Compact(instance.ToJsonString(WriteOptions), loadPrefab);
     }
 
     /// <summary>
@@ -165,10 +165,10 @@ public static class PrefabInstances
         foreach (var owned in OwnObjects(prefab))
         {
             var isInstanceRoot = owned[instanceMember] is JsonObject;
-            if (ReadId(owned) != objectId || (isInstanceRoot && !rootMembers.Contains(member))) continue;
+            if (ReadId(owned) != objectId || (isInstanceRoot && !RootMembers.Contains(member))) continue;
 
             owned[member] = value?.DeepClone();
-            changes[prefabId] = prefab.ToJsonString(writeOptions);
+            changes[prefabId] = prefab.ToJsonString(WriteOptions);
             return;
         }
 
@@ -192,7 +192,7 @@ public static class PrefabInstances
                     .ToList();
                 foreach (var entry in stale) overrides.Remove(entry);
                 if (overrides.Count == 0) link.Remove(nameof(PrefabInstance.Overrides));
-                if (stale.Count > 0) changes[prefabId] = prefab.ToJsonString(writeOptions);
+                if (stale.Count > 0) changes[prefabId] = prefab.ToJsonString(WriteOptions);
             }
 
             var inner = value?.DeepClone();
@@ -315,7 +315,7 @@ public static class PrefabInstances
                 ArrayOf(parent.Object, componentsMember).Add(addition.Component.DeepClone());
         }
 
-        foreach (var member in rootMembers)
+        foreach (var member in RootMembers)
         {
             if (instance[member] is { } value) source[member] = value.DeepClone();
         }
@@ -436,7 +436,7 @@ public static class PrefabInstances
         foreach (var (member, value) in actual)
         {
             if (member == instanceMember) compact[member] = compactLink;
-            else if (member is ObjectJsonSerializer<IdClass>.TypeIdProperty or idMember || rootMembers.Contains(member))
+            else if (member is ObjectJsonSerializer<IdClass>.TypeIdProperty or idMember || RootMembers.Contains(member))
                 compact[member] = value?.DeepClone();
         }
 
@@ -511,7 +511,7 @@ public static class PrefabInstances
 
     static IEnumerable<string> ChangedMembers(JsonObject actual, JsonObject expected, bool isRoot) =>
         actual
-            .Where(pair => !structuralMembers.Contains(pair.Key) && !(isRoot && rootMembers.Contains(pair.Key)))
+            .Where(pair => !StructuralMembers.Contains(pair.Key) && !(isRoot && RootMembers.Contains(pair.Key)))
             .Where(pair => !expected.ContainsKey(pair.Key) || !JsonNode.DeepEquals(pair.Value, expected[pair.Key]))
             .Select(pair => pair.Key);
 

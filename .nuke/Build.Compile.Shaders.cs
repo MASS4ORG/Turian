@@ -7,14 +7,14 @@ namespace Turian.NUKE;
 sealed partial class Build
 {
     [Parameter("skip-shaders (default: false)")]
-    readonly bool skipShaders;
+    readonly bool SkipShaders;
 
     [Parameter("spirv-version (default: spv1.6)")]
-    readonly string spirVVersion = "spv1.6";
-    readonly AbsolutePath engineProjectDirectory = RootDirectory / "Turian" / "Engine";
+    readonly string SpirVVersion = "spv1.6";
+    readonly AbsolutePath EngineProjectDirectory = RootDirectory / "Turian" / "Engine";
 
     // Compiling shaders
-    static readonly string[] shaderPatterns =
+    static readonly string[] ShaderPatterns =
     [
         "**/*.vert",
         "**/*.frag",
@@ -25,19 +25,19 @@ sealed partial class Build
 
     Target CompileShaders => td =>
         td
-            .OnlyWhenStatic(() => !skipShaders)
+            .OnlyWhenStatic(() => !SkipShaders)
             .Executes(() =>
             {
                 // Deleting existing .spv files
-                var existingSpvFiles = engineProjectDirectory.GlobFiles("**/*.spv");
+                var existingSpvFiles = EngineProjectDirectory.GlobFiles("**/*.spv");
                 foreach (var file in existingSpvFiles)
                 {
                     file.DeleteFile();
                 }
                 var compiled = 0;
-                foreach (var pattern in shaderPatterns)
+                foreach (var pattern in ShaderPatterns)
                 {
-                    var shaders = engineProjectDirectory.GlobFiles(pattern);
+                    var shaders = EngineProjectDirectory.GlobFiles(pattern);
 
                     foreach (var shader in shaders)
                     {
@@ -45,7 +45,7 @@ sealed partial class Build
                         var output = $"{shader}.spv";
                         var process = ProcessTasks.StartProcess(
                             "glslc",
-                            $"\"{shader}\" -o \"{output}\" --target-spv={spirVVersion}"
+                            $"\"{shader}\" -o \"{output}\" --target-spv={SpirVVersion}"
                         );
                         _ = process.AssertZeroExitCode();
                     }
@@ -54,7 +54,7 @@ sealed partial class Build
                 if (compiled == 0)
                 {
                     throw new InvalidOperationException(
-                        $"No shader sources found under {engineProjectDirectory}.");
+                        $"No shader sources found under {EngineProjectDirectory}.");
                 }
             });
 }

@@ -262,7 +262,7 @@ public sealed partial class AssetImporter
     static bool HasIgnoredExtension(string filePath)
     {
         var extension = Path.GetExtension(filePath);
-        return ignoredExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
+        return IgnoredExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
     string ToProjectRelativePath(string absolutePath)

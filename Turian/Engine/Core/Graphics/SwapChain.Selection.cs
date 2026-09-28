@@ -9,8 +9,7 @@ public partial class SwapChain
         foreach (var availableFormat in availableFormats)
         {
             if (
-                availableFormat.Format == Format.B8G8R8A8Srgb
-                && availableFormat.ColorSpace == ColorSpaceKHR.SpaceSrgbNonlinearKhr
+                availableFormat is { Format: Format.B8G8R8A8Srgb, ColorSpace: ColorSpaceKHR.SpaceSrgbNonlinearKhr }
             )
             {
                 return availableFormat;

@@ -11,11 +11,11 @@ namespace Turian.Engine.Core;
 /// </remarks>
 public static class LapLogger
 {
-    static long firstTick;
+    static long _firstTick;
 
-    static long lastTick;
+    static long _lastTick;
 
-    static readonly Dictionary<string, long> laps = [];
+    static readonly Dictionary<string, long> Laps = [];
 
     /// <summary>
     /// Restart the timer and initialize the logger information.
@@ -25,8 +25,8 @@ public static class LapLogger
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        firstTick = DateTime.Now.Ticks;
-        lastTick = firstTick;
+        _firstTick = DateTime.Now.Ticks;
+        _lastTick = _firstTick;
         logger.LogInformation("{Line}",
             $" {"Memory",8} | {"Total",14} | {"Last",12} | {"Lap",12} | {"Name",-12} | Message");
         logger.LogInformation("{Line}",
@@ -37,7 +37,7 @@ public static class LapLogger
     /// Start a new lap with the specified name.
     /// </summary>
     /// <param name="lap">The name of the lap.</param>
-    public static void StartLap(string lap) => laps[lap] = DateTime.Now.Ticks;
+    public static void StartLap(string lap) => Laps[lap] = DateTime.Now.Ticks;
 
     /// <summary>
     /// Log the lap information.
@@ -57,15 +57,15 @@ public static class LapLogger
         var now = DateTime.Now.Ticks;
         if (!skipTimer)
         {
-            if (!laps.TryGetValue(lap, out var value))
+            if (!Laps.TryGetValue(lap, out var value))
             {
                 value = now;
-                laps[lap] = value;
+                Laps[lap] = value;
             }
             var lapTicks = T2Ms(now - value);
             logger.LogInformation("{Line}",
-                $"{memory,6} MB | {T2Ms(now - firstTick),14} | {T2Ms(now - lastTick),12} | {lapTicks,12} | {lap,12} | {msg}");
-            lastTick = now;
+                $"{memory,6} MB | {T2Ms(now - _firstTick),14} | {T2Ms(now - _lastTick),12} | {lapTicks,12} | {lap,12} | {msg}");
+            _lastTick = now;
         }
         else
         {

@@ -158,7 +158,7 @@ public sealed class UiManager : IDisposable
 
     static bool IsDrawable(UiDocumentComponent panel) =>
         (panel.OnBuild is not null || !panel.Document.IsEmpty)
-        && panel.IsActive && panel.IsAttached && panel.Node?.IsActive is true;
+        && panel is { IsActive: true, IsAttached: true, Node.IsActive: true };
 
     /// <summary>The panel's code-built UI, or its document's renderer after ticking the document's controller.</summary>
     Action<Gui>? ResolveBuild(UiDocumentComponent panel, float deltaTime)

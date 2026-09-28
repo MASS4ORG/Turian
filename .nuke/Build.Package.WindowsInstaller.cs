@@ -11,14 +11,14 @@ sealed partial class Build
 
     public Target WindowsInstaller => td => td
         .DependsOn(Publish)
-        .OnlyWhenStatic(() => runtimeIdentifier == "win-x64")
+        .OnlyWhenStatic(() => RuntimeIdentifier == "win-x64")
         .Executes(() =>
         {
             ArtifactsDirectory.CreateDirectory();
             WindowsInstallerFile.DeleteFile();
             var script = Solution.Build.Directory / "packaging" / "windows" / "Turian.nsi";
             ProcessTasks.StartProcess("makensis",
-                    $"-V2 -DVERSION={Version} -DSOURCE_DIR=\"{PublishDirectory}\" " +
+                    $"-V2 -DVERSION={Version} -DSOURCE_DIR=\"{PublishDir}\" " +
                     $"-DOUTPUT_FILE=\"{WindowsInstallerFile}\" \"{script}\"")
                 .AssertZeroExitCode();
         });

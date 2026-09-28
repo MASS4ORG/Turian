@@ -84,7 +84,7 @@ public sealed class OutputLogBridge
 
     void OnBuildTask(BuildTaskStatus status)
     {
-        if (status.State == BuildTaskState.Succeeded && status.TaskName is "Play" or "Export")
+        if (status is { State: BuildTaskState.Succeeded, TaskName: "Play" or "Export" })
             pendingBuild = true;
     }
 

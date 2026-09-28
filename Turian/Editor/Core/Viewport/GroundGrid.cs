@@ -16,10 +16,10 @@ public static class GroundGrid
     /// <summary>Every Nth line is drawn brighter, so distance is readable at a glance.</summary>
     public const int MajorEvery = 10;
 
-    static readonly Vector4 minorColor = new(1f, 1f, 1f, 0.06f);
-    static readonly Vector4 majorColor = new(1f, 1f, 1f, 0.16f);
-    static readonly Vector4 axisXColor = new(0.90f, 0.25f, 0.30f, 0.65f);
-    static readonly Vector4 axisZColor = new(0.25f, 0.55f, 0.95f, 0.65f);
+    static readonly Vector4 MinorColor = new(1f, 1f, 1f, 0.06f);
+    static readonly Vector4 MajorColor = new(1f, 1f, 1f, 0.16f);
+    static readonly Vector4 AxisXColor = new(0.90f, 0.25f, 0.30f, 0.65f);
+    static readonly Vector4 AxisZColor = new(0.25f, 0.55f, 0.95f, 0.65f);
 
     /// <summary>
     /// Draws the grid on the y = 0 plane, centred on the camera so it always extends to the horizon
@@ -49,7 +49,7 @@ public static class GroundGrid
                 new Vector3(originX + offset, 0f, originZ - extent),
                 new Vector3(originX + offset, 0f, originZ + extent),
                 originX + offset,
-                axisZColor,
+                AxisZColor,
                 i);
 
             DrawLine(
@@ -57,7 +57,7 @@ public static class GroundGrid
                 new Vector3(originX - extent, 0f, originZ + offset),
                 new Vector3(originX + extent, 0f, originZ + offset),
                 originZ + offset,
-                axisXColor,
+                AxisXColor,
                 i);
         }
 
@@ -84,7 +84,7 @@ public static class GroundGrid
         }
         else
         {
-            gizmos.Color = index % MajorEvery == 0 ? majorColor : minorColor;
+            gizmos.Color = index % MajorEvery == 0 ? MajorColor : MinorColor;
             gizmos.Thickness = 1f;
         }
 

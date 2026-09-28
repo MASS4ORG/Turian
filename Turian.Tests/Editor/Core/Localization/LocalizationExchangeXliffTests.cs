@@ -9,7 +9,7 @@ public class LocalizationExchangeXliffTests
     {
         var table = new StringTable("pt-BR");
         table.Add(new StringTableEntry
-            { Key = "menu.play", Source = "Play", Translation = "Jogar", Note = "Button", State = "final" });
+        { Key = "menu.play", Source = "Play", Translation = "Jogar", Note = "Button", State = "final" });
         table.Add(new StringTableEntry { Key = "menu.quit", Source = "Quit" });
 
         var read = LocalizationExchange.ReadXliff(LocalizationExchange.WriteXliff(table));

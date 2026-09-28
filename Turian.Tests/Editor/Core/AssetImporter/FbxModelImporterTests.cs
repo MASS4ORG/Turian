@@ -3,8 +3,8 @@ namespace Turian.Tests;
 /// <summary>Tests for <see cref="FbxModelImporter"/> against a small ASCII FBX fixture.</summary>
 public class FbxModelImporterTests
 {
-    static readonly string fixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "cube.fbx");
-    static readonly Guid parentAssetId = Guid.Parse("11111111-2222-4333-8444-555555555555");
+    static readonly string FixturePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "cube.fbx");
+    static readonly Guid ParentAssetId = Guid.Parse("11111111-2222-4333-8444-555555555555");
 
     readonly FbxModelImporter importer = new();
     readonly RecordingImportContext context = new();
@@ -22,7 +22,7 @@ public class FbxModelImporterTests
         public Guid EnsureAsset(string absolutePath)
         {
             Requested.Add(absolutePath);
-            return AssetIdFactory.Derive(parentAssetId, absolutePath);
+            return AssetIdFactory.Derive(ParentAssetId, absolutePath);
         }
 
         public void ConfigureTexture(string absolutePath, bool isSrgb, bool flipGreenChannel) =>
@@ -59,7 +59,7 @@ public class FbxModelImporterTests
 
     MeshBlob ImportBlob(string importDirectory)
     {
-        var artifacts = importer.ImportToCache(new ModelAsset(), fixturePath, importDirectory);
+        var artifacts = importer.ImportToCache(new ModelAsset(), FixturePath, importDirectory);
         return MeshBlob.Load(Path.Combine(importDirectory, artifacts[0]));
     }
 
@@ -70,7 +70,7 @@ public class FbxModelImporterTests
         var directory = Directory.CreateTempSubdirectory("turian-fbx-");
         try
         {
-            var artifacts = importer.ImportToCache(new ModelAsset(), fixturePath, directory.FullName);
+            var artifacts = importer.ImportToCache(new ModelAsset(), FixturePath, directory.FullName);
 
             Assert.Equal($"primary{MeshBlob.FileExtension}", Assert.Single(artifacts));
             Assert.False(File.Exists(Path.Combine(directory.FullName, "primary.fbx")));
@@ -169,7 +169,7 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_EmitsMaterialsMeshesAndPrefab()
     {
-        var children = importer.CreateChildAssets(parentAssetId, fixturePath, context).ToList();
+        var children = importer.CreateChildAssets(ParentAssetId, FixturePath, context).ToList();
 
         Assert.Equal(2, context.Requested.Count);
         Assert.Equal(2, children.OfType<MaterialAsset>().Count());
@@ -181,16 +181,16 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_DerivesDeterministicIds()
     {
-        var children = importer.CreateChildAssets(parentAssetId, fixturePath, context).ToList();
+        var children = importer.CreateChildAssets(ParentAssetId, FixturePath, context).ToList();
 
         Assert.Equal(
-            AssetIdFactory.Derive(parentAssetId, "mesh:0"),
+            AssetIdFactory.Derive(ParentAssetId, "mesh:0"),
             children.OfType<MeshAsset>().Single().Id);
         Assert.Equal(
-            AssetIdFactory.Derive(parentAssetId, "prefab"),
+            AssetIdFactory.Derive(ParentAssetId, "prefab"),
             children.OfType<Prefab>().Single().Id);
         Assert.Equal(
-            AssetIdFactory.Derive(parentAssetId, "material:0"),
+            AssetIdFactory.Derive(ParentAssetId, "material:0"),
             children.OfType<MaterialAsset>().First().Id);
     }
 
@@ -198,9 +198,9 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_MeshCarriesModelReferenceAndRange()
     {
-        var mesh = importer.CreateChildAssets(parentAssetId, fixturePath, context).OfType<MeshAsset>().Single();
+        var mesh = importer.CreateChildAssets(ParentAssetId, FixturePath, context).OfType<MeshAsset>().Single();
 
-        Assert.Equal(parentAssetId, mesh.Model?.AssetId);
+        Assert.Equal(ParentAssetId, mesh.Model?.AssetId);
         Assert.Equal(0u, mesh.SubMeshStart);
         Assert.Equal(2u, mesh.SubMeshCount);
     }
@@ -209,10 +209,10 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_ResolvesTexturePathsAgainstTheModelDirectory()
     {
-        _ = importer.CreateChildAssets(parentAssetId, fixturePath, context).ToList();
+        _ = importer.CreateChildAssets(ParentAssetId, FixturePath, context).ToList();
 
         var expected = Path.GetFullPath(
-            Path.Combine(Path.GetDirectoryName(fixturePath)!, "Textures", "red_BaseColor.dds"));
+            Path.Combine(Path.GetDirectoryName(FixturePath)!, "Textures", "red_BaseColor.dds"));
 
         Assert.Contains(expected, context.Requested);
         Assert.All(context.Requested, path => Assert.True(Path.IsPathRooted(path)));
@@ -222,7 +222,7 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_EmitsNoTextureChildren()
     {
-        var children = importer.CreateChildAssets(parentAssetId, fixturePath, context).ToList();
+        var children = importer.CreateChildAssets(ParentAssetId, FixturePath, context).ToList();
 
         Assert.Empty(children.OfType<TextureAsset>());
         Assert.NotEmpty(context.Requested);
@@ -232,14 +232,14 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssets_MapsDiffuseSlotToBaseColor()
     {
-        var material = importer.CreateChildAssets(parentAssetId, fixturePath, context)
+        var material = importer.CreateChildAssets(ParentAssetId, FixturePath, context)
             .OfType<MaterialAsset>()
             .First();
 
         var baseColorPath = Path.GetFullPath(
-            Path.Combine(Path.GetDirectoryName(fixturePath)!, "Textures", "red_BaseColor.dds"));
+            Path.Combine(Path.GetDirectoryName(FixturePath)!, "Textures", "red_BaseColor.dds"));
 
-        Assert.Equal(AssetIdFactory.Derive(parentAssetId, baseColorPath), material.BaseColorTexture!.AssetId);
+        Assert.Equal(AssetIdFactory.Derive(ParentAssetId, baseColorPath), material.BaseColorTexture!.AssetId);
         Assert.True(context.Configured[baseColorPath].IsSrgb);
     }
 
@@ -247,9 +247,9 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssetContent_ProducesNodeHierarchy()
     {
-        var prefab = importer.CreateChildAssets(parentAssetId, fixturePath, context).OfType<Prefab>().Single();
+        var prefab = importer.CreateChildAssets(ParentAssetId, FixturePath, context).OfType<Prefab>().Single();
 
-        var json = importer.CreateChildAssetContent(parentAssetId, prefab, fixturePath);
+        var json = importer.CreateChildAssetContent(ParentAssetId, prefab, FixturePath);
 
         Assert.NotNull(json);
         var root = Serializer.LoadData<Node>(json);
@@ -262,12 +262,12 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssetContent_BindsMeshAssetToMeshNode()
     {
-        var prefab = importer.CreateChildAssets(parentAssetId, fixturePath, context).OfType<Prefab>().Single();
-        var root = Serializer.LoadData<Node>(importer.CreateChildAssetContent(parentAssetId, prefab, fixturePath)!)!;
+        var prefab = importer.CreateChildAssets(ParentAssetId, FixturePath, context).OfType<Prefab>().Single();
+        var root = Serializer.LoadData<Node>(importer.CreateChildAssetContent(ParentAssetId, prefab, FixturePath)!)!;
 
         var component = Assert.Single(Node.GetComponentsInChildren<ModelComponent>(root));
 
-        Assert.Equal(AssetIdFactory.Derive(parentAssetId, "mesh:0"), component.Mesh?.AssetId);
+        Assert.Equal(AssetIdFactory.Derive(ParentAssetId, "mesh:0"), component.Mesh?.AssetId);
         Assert.Null(component.Model);
     }
 
@@ -275,8 +275,8 @@ public class FbxModelImporterTests
     [Fact]
     public void CreateChildAssetContent_ReturnsNullForMaterials()
     {
-        var material = importer.CreateChildAssets(parentAssetId, fixturePath, context).OfType<MaterialAsset>().First();
+        var material = importer.CreateChildAssets(ParentAssetId, FixturePath, context).OfType<MaterialAsset>().First();
 
-        Assert.Null(importer.CreateChildAssetContent(parentAssetId, material, fixturePath));
+        Assert.Null(importer.CreateChildAssetContent(ParentAssetId, material, FixturePath));
     }
 }

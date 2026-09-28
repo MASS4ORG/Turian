@@ -119,28 +119,28 @@
   "allOf": [
     {
       "properties": {
-        "configuration": {
+        "Configuration": {
           "type": "string",
-          "description": "Configuration to build - Default is 'Debug' (local) or 'Release' (server)"
+          "description": "Config to build - Default is 'Debug' (local) or 'Release' (server)"
         },
-        "containerRegistries": {
+        "ContainerRegistries": {
           "type": "string",
           "description": "Comma-separated image repositories to tag/push, e.g. ghcr.io/mass4org/turian-cli"
         },
-        "githubRepository": {
+        "GithubRepository": {
           "type": "string",
           "description": "GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)"
         },
-        "githubToken": {
+        "GithubToken": {
           "type": "string",
           "description": "GitHub token (repo scope, or the Actions-provided GITHUB_TOKEN) with contents:write. Omit to skip pushing/releasing to GitHub",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "gitlabProjectPath": {
+        "GitlabProjectPath": {
           "type": "string",
           "description": "GitLab group/project path, e.g. turian/Turian (default: turian/Turian)"
         },
-        "gitlabToken": {
+        "GitlabToken": {
           "type": "string",
           "description": "GitLab personal/project access token with api + write_repository scope. Omit to skip pushing/releasing to GitLab",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
@@ -153,31 +153,31 @@
           "type": "string",
           "description": "NuGet feed to push to (default: nuget.org)"
         },
-        "publishDirectory": {
+        "PublishDirectory": {
           "type": "string",
           "description": "publish-directory (default: ./.publish/{runtimeIdentifier})"
         },
-        "publishSelfContained": {
+        "PublishSelfContained": {
           "type": "boolean",
           "description": "publish-self-contained (default: false)"
         },
-        "publishSingleFile": {
+        "PublishSingleFile": {
           "type": "boolean",
           "description": "publish-single-file (default: false)"
         },
-        "publishTrimmed": {
+        "PublishTrimmed": {
           "type": "boolean",
           "description": "publish-trimmed (default: false)"
         },
-        "releaseBranch": {
+        "ReleaseBranch": {
           "type": "string",
           "description": "Branch the release commit is pushed to (default: main)"
         },
-        "runtimeIdentifier": {
+        "RuntimeIdentifier": {
           "type": "string",
           "description": "Runtime identifier for the build (e.g., win-x64, linux-x64, osx-x64) (default: linux-x64)"
         },
-        "skipShaders": {
+        "SkipShaders": {
           "type": "boolean",
           "description": "skip-shaders (default: false)"
         },
@@ -185,11 +185,11 @@
           "type": "string",
           "description": "Path to a solution file that is automatically loaded"
         },
-        "spirVVersion": {
+        "SpirVVersion": {
           "type": "string",
           "description": "spirv-version (default: spv1.6)"
         },
-        "wingetInstallerUrl": {
+        "WingetInstallerUrl": {
           "type": "string",
           "description": "Public HTTPS URL of the Windows installer, used in generated Winget manifests"
         }

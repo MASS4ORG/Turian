@@ -11,18 +11,18 @@ public class TextureAsset : Asset
 {
     // Keyed by (assetId, deviceHandle) so one texture never uploads twice per device.
     // The cache owns the Texture lifetime — callers must not dispose the returned instance.
-    static readonly ConcurrentDictionary<(Guid, nint), Texture> textureCache = new();
+    static readonly ConcurrentDictionary<(Guid, nint), Texture> TextureCache = new();
 
-    static long uploadedBytes;
+    static long _uploadedBytes;
 
     /// <summary>
     /// Bytes of device memory the currently cached textures occupy across every mip level and
     /// device. Grows as textures upload and shrinks when the cache is invalidated.
     /// </summary>
-    public static ulong UploadedBytes => (ulong)Math.Max(0, Interlocked.Read(ref uploadedBytes));
+    public static ulong UploadedBytes => (ulong)Math.Max(0, Interlocked.Read(ref _uploadedBytes));
 
     /// <summary>Number of textures currently held on the GPU.</summary>
-    public static int UploadedCount => textureCache.Count;
+    public static int UploadedCount => TextureCache.Count;
 
     /// <summary>
     /// Whether the texture is sampled in sRGB color space. True for albedo /
@@ -55,11 +55,11 @@ public class TextureAsset : Asset
     /// <param name="assetId">Identifier of the texture asset.</param>
     public static void InvalidateCacheEntry(Guid assetId)
     {
-        foreach (var key in textureCache.Keys.Where(k => k.Item1 == assetId).ToList())
+        foreach (var key in TextureCache.Keys.Where(k => k.Item1 == assetId).ToList())
         {
-            if (!textureCache.TryRemove(key, out var texture)) continue;
+            if (!TextureCache.TryRemove(key, out var texture)) continue;
 
-            Interlocked.Add(ref uploadedBytes, -(long)texture.SizeBytes);
+            Interlocked.Add(ref _uploadedBytes, -(long)texture.SizeBytes);
             texture.Dispose();
         }
     }
@@ -69,10 +69,10 @@ public class TextureAsset : Asset
     /// </summary>
     public static void ClearCache()
     {
-        foreach (var (_, texture) in textureCache)
+        foreach (var (_, texture) in TextureCache)
             texture.Dispose();
-        textureCache.Clear();
-        Interlocked.Exchange(ref uploadedBytes, 0);
+        TextureCache.Clear();
+        Interlocked.Exchange(ref _uploadedBytes, 0);
         TextureMemoryReport.Reset();
     }
 
@@ -87,7 +87,7 @@ public class TextureAsset : Asset
         ArgumentNullException.ThrowIfNull(vulkan);
 
         var cacheKey = (Id, vulkan.Device.VkDevice.Handle);
-        if (textureCache.TryGetValue(cacheKey, out var cached))
+        if (TextureCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
         if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
@@ -122,8 +122,8 @@ public class TextureAsset : Asset
                 texture = new Texture(vulkan, (uint)image.Width, (uint)image.Height, image.Data, IsSrgb, GenerateMips);
             }
 
-            textureCache[cacheKey] = texture;
-            Interlocked.Add(ref uploadedBytes, (long)texture.SizeBytes);
+            TextureCache[cacheKey] = texture;
+            Interlocked.Add(ref _uploadedBytes, (long)texture.SizeBytes);
             return texture;
         }
         catch (Exception ex)

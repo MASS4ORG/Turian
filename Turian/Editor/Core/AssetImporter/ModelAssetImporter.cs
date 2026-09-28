@@ -5,7 +5,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public class ModelAssetImporter : IAssetImporter
 {
-    static readonly string[] supportedExtensions =
+    static readonly string[] SupportedExtensions =
     [
         ".obj",
         ".dae",
@@ -27,7 +27,7 @@ public class ModelAssetImporter : IAssetImporter
         }
 
         var extension = Path.GetExtension(filePath);
-        return supportedExtensions.Contains(extension, StringComparer.InvariantCultureIgnoreCase);
+        return SupportedExtensions.Contains(extension, StringComparer.InvariantCultureIgnoreCase);
     }
 
     /// <inheritdoc/>

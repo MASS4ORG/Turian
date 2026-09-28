@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Turian.Editor.Core;
 
 /// <summary>

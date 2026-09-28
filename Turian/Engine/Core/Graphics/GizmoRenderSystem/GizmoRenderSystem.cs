@@ -225,8 +225,8 @@ public sealed class GizmoRenderSystem : IRenderSystem
         StandardPipeline.EnableAlphaBlending(ref pipelineConfig);
         StandardPipeline.EnableMultiSampling(ref pipelineConfig, vulkan.Device.MsaaSamples);
 
-        pipelineConfig.BindingDescriptions = gizmoBindingDescriptions;
-        pipelineConfig.AttributeDescriptions = gizmoAttributeDescriptions;
+        pipelineConfig.BindingDescriptions = GizmoBindingDescriptions;
+        pipelineConfig.AttributeDescriptions = GizmoAttributeDescriptions;
 
         var depthStencilInfo = pipelineConfig.DepthStencilInfo;
         depthStencilInfo.DepthTestEnable = depthTest ? Vk.True : Vk.False;
@@ -244,7 +244,7 @@ public sealed class GizmoRenderSystem : IRenderSystem
             rendererName);
     }
 
-    static readonly VertexInputBindingDescription[] gizmoBindingDescriptions =
+    static readonly VertexInputBindingDescription[] GizmoBindingDescriptions =
     [
         new()
         {
@@ -254,7 +254,7 @@ public sealed class GizmoRenderSystem : IRenderSystem
         },
     ];
 
-    static readonly VertexInputAttributeDescription[] gizmoAttributeDescriptions =
+    static readonly VertexInputAttributeDescription[] GizmoAttributeDescriptions =
     [
         new() { Location = 0, Binding = 0, Format = Format.R32G32B32Sfloat, Offset = 0 },
         new() { Location = 1, Binding = 0, Format = Format.R32G32B32Sfloat, Offset = 12 },

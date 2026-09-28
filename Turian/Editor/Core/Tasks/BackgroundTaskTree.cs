@@ -158,7 +158,7 @@ public static class BackgroundTaskTree
     public static int ActiveRoots(IReadOnlyList<BackgroundTask> tasks)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return tasks.Count(t => t.ParentId == 0 && t.IsActive);
+        return tasks.Count(t => t is { ParentId: 0, IsActive: true });
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ sealed partial class Build
                 .Distinct()
                 .Where(path => path.DirectoryExists())
                 .ForEach(path => path.DeleteDirectory());
-            PublishDirectory.DeleteDirectory();
+            PublishDir.DeleteDirectory();
             CoverageDirectory.DeleteDirectory();
         });
 
@@ -36,16 +36,16 @@ sealed partial class Build
         .After(Restore)
         .Executes(() =>
         {
-            Log.Debug("Configuration {Configuration}", Configuration);
+            Log.Debug("Config {Config}", Config);
 
             DotNetBuild(settings => settings
                 .SetNoLogo(true)
                 .SetProjectFile(Solution)
-                .SetConfiguration(Configuration)
+                .SetConfiguration(Config)
                 .EnableNoRestore()
             );
 
-            var studioOutputDirectory = Solution.Editor.Turian_Editor_Studio.Directory / "bin" / Configuration / "net10.0";
+            var studioOutputDirectory = Solution.Editor.Turian_Editor_Studio.Directory / "bin" / Config / "net10.0";
             var platformSourceDirectory = Solution.Editor.Turian_Editor_CLI.Directory / "Platform";
             var platformTargetDirectory = studioOutputDirectory / "Platform";
 

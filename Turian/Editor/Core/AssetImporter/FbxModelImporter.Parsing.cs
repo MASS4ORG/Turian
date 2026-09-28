@@ -43,7 +43,7 @@ public sealed partial class FbxModelImporter
 
     static unsafe FbxImport Parse(string filePath)
     {
-        var api = assimp.Value;
+        var api = Assimp.Value;
         var scene = api.ImportFile(filePath, postProcessFlags);
         if (scene is null)
         {
@@ -257,7 +257,7 @@ public sealed partial class FbxModelImporter
     {
         // Assimp stores column-vector matrices; System.Numerics composes row vectors.
         var local = Matrix4x4.Transpose(assimpTransform);
-        var mirrored = yMirror * local * yMirror;
+        var mirrored = YMirror * local * YMirror;
 
         if (!Matrix4x4.Decompose(mirrored, out var scale, out var rotation, out var translation))
         {

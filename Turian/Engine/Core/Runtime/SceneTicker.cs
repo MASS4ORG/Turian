@@ -19,7 +19,7 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     /// <summary>The fixed-update interval, in seconds.</summary>
     public const double FixedTimestep = 1.0 / 60.0;
 
-    static readonly ConditionalWeakTable<Component, HashSet<string>> failedCallbacks = [];
+    static readonly ConditionalWeakTable<Component, HashSet<string>> FailedCallbacks = [];
 
     readonly ISceneManager sceneManager =
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
@@ -156,7 +156,7 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     /// </summary>
     static void LogComponentException(Component component, string callback, Exception ex)
     {
-        if (!failedCallbacks.GetOrCreateValue(component).Add(callback)) return;
+        if (!FailedCallbacks.GetOrCreateValue(component).Add(callback)) return;
 
         Log.Logger.LogError(ex, "{Component} on {Node} threw in {Callback}",
             component.GetType().Name, component.Node?.Name, callback);

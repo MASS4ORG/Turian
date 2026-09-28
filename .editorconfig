@@ -46,6 +46,10 @@ resharper_arrange_type_member_modifiers_highlighting = hint
 resharper_arrange_this_qualifier_highlighting = hint
 resharper_redundant_base_qualifier_highlighting = warning
 
+# Namespaces independent of their folder layout.
+dotnet_diagnostic.IDE0130.severity = none
+resharper_check_namespace_highlighting = none
+
 ## Null Safety & Pattern Matching
 csharp_style_prefer_switch_expression = true:warning
 csharp_style_pattern_matching_over_as_with_null_check = true:warning

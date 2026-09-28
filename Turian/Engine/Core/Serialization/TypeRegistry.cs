@@ -8,10 +8,10 @@ namespace Turian.Engine.Core;
 /// </summary>
 public static class TypeRegistry
 {
-    static readonly ConcurrentDictionary<Guid, Type> idToType = new();
-    static readonly ConcurrentDictionary<Type, Guid> typeToId = new();
-    static readonly object scanLock = new();
-    static readonly HashSet<Assembly> scannedAssemblies = [];
+    static readonly ConcurrentDictionary<Guid, Type> IdToType = new();
+    static readonly ConcurrentDictionary<Type, Guid> TypeToId = new();
+    static readonly object ScanLock = new();
+    static readonly HashSet<Assembly> ScannedAssemblies = [];
 
     static TypeRegistry()
     {
@@ -26,7 +26,7 @@ public static class TypeRegistry
     /// </summary>
     public static void ScanLoadedAssemblies()
     {
-        lock (scanLock)
+        lock (ScanLock)
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -43,9 +43,9 @@ public static class TypeRegistry
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
-        lock (scanLock)
+        lock (ScanLock)
         {
-            if (!scannedAssemblies.Add(assembly))
+            if (!ScannedAssemblies.Add(assembly))
             {
                 return;
             }
@@ -104,8 +104,8 @@ public static class TypeRegistry
             throw new ArgumentException("TypeId cannot be Guid.Empty.", nameof(id));
         }
 
-        idToType[id] = type;
-        typeToId[type] = id;
+        IdToType[id] = type;
+        TypeToId[type] = id;
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ public static class TypeRegistry
     /// </summary>
     public static bool TryGetType(Guid id, out Type? type)
     {
-        if (idToType.TryGetValue(id, out type))
+        if (IdToType.TryGetValue(id, out type))
         {
             return true;
         }
@@ -121,7 +121,7 @@ public static class TypeRegistry
         // An assembly annotated with this id may have loaded lazily since the last scan
         // (e.g. Turian.Engine.UI pulled in only when the first .ui asset is imported).
         ScanLoadedAssemblies();
-        return idToType.TryGetValue(id, out type);
+        return IdToType.TryGetValue(id, out type);
     }
 
     /// <summary>
@@ -130,14 +130,14 @@ public static class TypeRegistry
     /// </summary>
     public static bool TryGetType(string fullName, out Type? type)
     {
-        type = idToType.Values.FirstOrDefault(candidate => candidate.FullName == fullName);
+        type = IdToType.Values.FirstOrDefault(candidate => candidate.FullName == fullName);
         if (type is not null)
         {
             return true;
         }
 
         ScanLoadedAssemblies();
-        type = idToType.Values.FirstOrDefault(candidate => candidate.FullName == fullName);
+        type = IdToType.Values.FirstOrDefault(candidate => candidate.FullName == fullName);
         return type is not null;
     }
 
@@ -147,7 +147,7 @@ public static class TypeRegistry
     public static bool TryGetId(Type type, out Guid id)
     {
         ArgumentNullException.ThrowIfNull(type);
-        return typeToId.TryGetValue(type, out id);
+        return TypeToId.TryGetValue(type, out id);
     }
 
     /// <summary>
@@ -174,7 +174,7 @@ public static class TypeRegistry
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        if (typeToId.TryGetValue(type, out var id))
+        if (TypeToId.TryGetValue(type, out var id))
         {
             return id;
         }
@@ -197,11 +197,11 @@ public static class TypeRegistry
     /// </summary>
     public static void Reset()
     {
-        lock (scanLock)
+        lock (ScanLock)
         {
-            idToType.Clear();
-            typeToId.Clear();
-            scannedAssemblies.Clear();
+            IdToType.Clear();
+            TypeToId.Clear();
+            ScannedAssemblies.Clear();
         }
         ScanLoadedAssemblies();
     }
@@ -303,5 +303,5 @@ public static class TypeRegistry
     /// Returns the count of currently registered types. Mainly useful for diagnostics
     /// and tests.
     /// </summary>
-    public static int Count => idToType.Count;
+    public static int Count => IdToType.Count;
 }

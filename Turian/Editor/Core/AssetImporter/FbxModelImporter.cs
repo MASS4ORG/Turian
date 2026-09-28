@@ -13,7 +13,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
     // Ultz.Native.Assimp ships libassimp 5 and 6 side by side, under runtimes/<rid>/native.
     // Resolving those by file name alone relies on the host's RID probing, which does not find
     // them in every environment, so the full paths are tried first and version 6 before 5.
-    static readonly string[] nativeLibraryNames = BuildNativeLibraryNames();
+    static readonly string[] NativeLibraryNames = BuildNativeLibraryNames();
 
     static string[] BuildNativeLibraryNames()
     {
@@ -69,14 +69,14 @@ public sealed partial class FbxModelImporter : IAssetImporter
         | PostProcessSteps.GenerateBoundingBoxes);
 
     // Assimp reports FBX geometry Y-up; the engine's world space has +Y pointing down.
-    static readonly Matrix4x4 yMirror = new(
+    static readonly Matrix4x4 YMirror = new(
         1, 0, 0, 0,
         0, -1, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1);
 
-    static readonly Lazy<AssimpApi> assimp =
-        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(nativeLibraryNames)), isThreadSafe: true);
+    static readonly Lazy<AssimpApi> Assimp =
+        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
 
     readonly object syncRoot = new();
     string cacheKey = string.Empty;

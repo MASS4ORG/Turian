@@ -10,10 +10,10 @@ namespace Turian.Editor.Core;
 [InternalService(InternalServiceLifetime.Singleton)]
 public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger logger)
 {
-    static readonly TimeSpan pollInterval = TimeSpan.FromMilliseconds(100);
+    static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>How often a running task is polled for a cancel request.</summary>
-    public TimeSpan CancelPollInterval { get; init; } = pollInterval;
+    public TimeSpan CancelPollInterval { get; init; } = PollInterval;
 
     /// <summary>
     /// Submits <paramref name="spec"/> and runs <paramref name="work"/> for it in the background.
@@ -110,7 +110,7 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
         while (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked })
         {
             tasks.ResolveDependencies();
-            if (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked }) await Task.Delay(pollInterval).ConfigureAwait(false);
+            if (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked }) await Task.Delay(PollInterval).ConfigureAwait(false);
         }
 
         return tasks.Get(id) is { IsActive: true };

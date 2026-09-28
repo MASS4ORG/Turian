@@ -10,26 +10,26 @@ public sealed class UserMenuCatalogTests
     public static class Fixtures
     {
         /// <summary>Records what the scanned methods did, so a test can assert they ran.</summary>
-        public static readonly List<string> Calls = [];
+        public static readonly List<string> calls = [];
 
         /// <summary>A plain parameterless entry, the common case.</summary>
         [MenuItem("Tools/Rebuild")]
-        public static void Rebuild() => Calls.Add("rebuild");
+        public static void Rebuild() => calls.Add("rebuild");
 
         /// <summary>An entry nested two levels below its menu.</summary>
         [MenuItem("Tools/Level/Bake Lighting")]
-        public static void Bake() => Calls.Add("bake");
+        public static void Bake() => calls.Add("bake");
 
         /// <summary>The catch-all parameter the Avalonia studio used; it receives the provider.</summary>
         [MenuItem("Tools/WithContext")]
-        public static void WithContext(object? context) => Calls.Add($"context:{context is not null}");
+        public static void WithContext(object? context) => calls.Add($"context:{context is not null}");
 
         /// <summary>Too many parameters for the editor to supply — skipped.</summary>
         [MenuItem("Tools/Unusable")]
-        public static void Unusable(int a, int b) => Calls.Add("unusable");
+        public static void Unusable(int a, int b) => calls.Add("unusable");
 
         /// <summary>No attribute at all.</summary>
-        public static void Ignored() => Calls.Add("ignored");
+        public static void Ignored() => calls.Add("ignored");
     }
 
     /// <summary>Holds the instance method, which a static class cannot.</summary>
@@ -94,12 +94,12 @@ public sealed class UserMenuCatalogTests
     [Fact]
     public void InvokingAnEntryRunsTheMethod()
     {
-        Fixtures.Calls.Clear();
+        Fixtures.calls.Clear();
         var services = new ServiceCollection().BuildServiceProvider();
 
         Find("Tools/Rebuild").Invoke(services);
         Find("Tools/WithContext").Invoke(services);
 
-        Assert.Equal(["rebuild", "context:True"], Fixtures.Calls);
+        Assert.Equal(["rebuild", "context:True"], Fixtures.calls);
     }
 }

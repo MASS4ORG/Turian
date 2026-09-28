@@ -68,9 +68,9 @@ public static partial class BuildInfo
 {{
     static BuildInfo()
     {{
-        SVersion = {ToLiteral(versionString)};
-        SContributors = {ToLiteral(contributorsList)};
-        SCompilationDate = {ToLiteral(compilationDate)};
+        sVersion = {ToLiteral(versionString)};
+        sContributors = {ToLiteral(contributorsList)};
+        sCompilationDate = {ToLiteral(compilationDate)};
     }}
 }}";
             spc.AddSource("BuildInfo.g.cs", SourceText.From(source, Encoding.UTF8));

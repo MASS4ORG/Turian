@@ -9,7 +9,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public class GltfModelImporter : IAssetImporter
 {
-    static readonly string[] supportedExtensions = [".gltf", ".glb"];
+    static readonly string[] SupportedExtensions = [".gltf", ".glb"];
 
     const string imageFragment = "#image:";
 
@@ -25,7 +25,7 @@ public class GltfModelImporter : IAssetImporter
     {
         if (string.IsNullOrWhiteSpace(filePath)) return false;
         var extension = Path.GetExtension(filePath);
-        return supportedExtensions.Contains(extension, StringComparer.InvariantCultureIgnoreCase);
+        return SupportedExtensions.Contains(extension, StringComparer.InvariantCultureIgnoreCase);
     }
 
     /// <inheritdoc/>

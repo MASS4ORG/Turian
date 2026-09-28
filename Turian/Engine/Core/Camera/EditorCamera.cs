@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// SceneTree panel. The viewport owns this camera rather than a scene node.
 ///
 /// The engine's world space has +Y pointing down (OBJ/FBX importers negate Y), but the camera
-/// convention is Y-up: <see cref="globalUp"/> = +Y, positive pitch = look up. The Vulkan
+/// convention is Y-up: <see cref="GlobalUp"/> = +Y, positive pitch = look up. The Vulkan
 /// render pass handles the final Y-flip for display.
 /// </summary>
 public class EditorCamera : ICamera
@@ -14,7 +14,7 @@ public class EditorCamera : ICamera
     const float minFov = 1f * (MathF.PI / 180f);
     const float maxFov = 120f * (MathF.PI / 180f);
 
-    static readonly Vector3 globalUp = Vector3.UnitY;
+    static readonly Vector3 GlobalUp = Vector3.UnitY;
 
     Quaternion orientation = Quaternion.Identity;
     float aspect = 16f / 9f;
@@ -106,7 +106,7 @@ public class EditorCamera : ICamera
             MathF.Sin(clampedPitch),
             MathF.Cos(yawRadians) * MathF.Cos(clampedPitch)));
 
-        LookIn(front, globalUp);
+        LookIn(front, GlobalUp);
     }
 
     /// <summary>
@@ -165,7 +165,7 @@ public class EditorCamera : ICamera
     public EditorCamera() => UpdateVectors();
 
     /// <summary>Levels the camera so its up axis points along world up, keeping the view direction.</summary>
-    public void LevelRoll() => LookIn(Front, globalUp);
+    public void LevelRoll() => LookIn(Front, GlobalUp);
 
     /// <summary>Updates the aspect ratio when the viewport is resized.</summary>
     public void Resize(uint width, uint height)

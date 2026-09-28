@@ -33,7 +33,7 @@ shell.PanelRequested += workbench.ShowPanel;
 shell.CommandPaletteRequested += workbench.ToggleCommandPalette;
 
 // Headless: `--dump <file.png> [WxH]` renders one workbench frame and exits (CI / visual review).
-if (args.Length >= 2 && args[0] == "--dump")
+if (args is ["--dump", _, ..])
 {
     var (w, h) = args.Length >= 3 && args[2].Split('x') is [var ws, var hs]
         && int.TryParse(ws, out var pw) && int.TryParse(hs, out var ph)
@@ -45,7 +45,7 @@ if (args.Length >= 2 && args[0] == "--dump")
 }
 
 // Headless: `--script <file.json>` drives the workbench through injected input (Guinevere.InputScript).
-if (args.Length >= 2 && args[0] == "--script")
+if (args is ["--script", _, ..])
 {
     var script = InputScript.FromJson(File.ReadAllText(args[1]));
     if (script is null)

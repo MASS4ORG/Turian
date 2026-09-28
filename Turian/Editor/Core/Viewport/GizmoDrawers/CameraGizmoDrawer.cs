@@ -7,7 +7,7 @@ namespace Turian.Editor.Core;
 [CustomGizmo(typeof(CameraGizmoDrawer), typeof(CameraComponent))]
 public sealed class CameraGizmoDrawer : IGizmoDrawer
 {
-    static readonly Vector4 bodyColor = new(0.3f, 0.75f, 1f, 1f);
+    static readonly Vector4 BodyColor = new(0.3f, 0.75f, 1f, 1f);
 
     /// <inheritdoc/>
     public void DrawGizmos(Gizmos gizmos, Component component)
@@ -16,7 +16,7 @@ public sealed class CameraGizmoDrawer : IGizmoDrawer
         if (component is not CameraComponent camera || camera.Node is null) return;
 
         var tfm = camera.Node.GlobalTransform;
-        gizmos.Color = bodyColor;
+        gizmos.Color = BodyColor;
         gizmos.Thickness = 1.2f;
         gizmos.DrawWireCube(tfm.Position, new Vector3(0.35f, 0.25f, 0.4f));
 

@@ -17,7 +17,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 public static class StringTableJson
 {
-    static readonly JsonSerializerOptions options = new()
+    static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
@@ -34,7 +34,7 @@ public static class StringTableJson
     {
         ArgumentNullException.ThrowIfNull(json);
 
-        var dto = JsonSerializer.Deserialize<TableDto>(json, options);
+        var dto = JsonSerializer.Deserialize<TableDto>(json, Options);
         if (string.IsNullOrWhiteSpace(dto?.Locale))
             throw new ArgumentException("A string table JSON document requires a locale.", nameof(json));
 
@@ -81,7 +81,7 @@ public static class StringTableJson
                 })],
         };
 
-        return JsonSerializer.Serialize(dto, options);
+        return JsonSerializer.Serialize(dto, Options);
     }
 
     sealed class TableDto

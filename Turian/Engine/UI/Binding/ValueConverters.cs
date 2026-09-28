@@ -15,7 +15,7 @@ public interface IValueConverter
 /// <summary>Registry of named <see cref="IValueConverter"/>s referenced from <c>{Path | name}</c>.</summary>
 public static class ValueConverters
 {
-    static readonly Dictionary<string, IValueConverter> map =
+    static readonly Dictionary<string, IValueConverter> Map =
         new(StringComparer.OrdinalIgnoreCase)
         {
             ["not"] = new NotConverter(),
@@ -28,12 +28,12 @@ public static class ValueConverters
     /// <summary>Registers (or replaces) a converter under <paramref name="name"/>.</summary>
     /// <param name="name">The name used in binding expressions.</param>
     /// <param name="converter">The converter.</param>
-    public static void Register(string name, IValueConverter converter) => map[name] = converter;
+    public static void Register(string name, IValueConverter converter) => Map[name] = converter;
 
     /// <summary>Gets a converter by name, or <c>null</c>.</summary>
     /// <param name="name">The converter name.</param>
     public static IValueConverter? Get(string? name) =>
-        name is not null && map.TryGetValue(name, out var c) ? c : null;
+        name is not null && Map.TryGetValue(name, out var c) ? c : null;
 
     sealed class NotConverter : IValueConverter
     {

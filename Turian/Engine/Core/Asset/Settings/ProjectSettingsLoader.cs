@@ -23,7 +23,7 @@ public static class ProjectSettingsLoader
     /// <summary>The folder under <c>Assets</c> whose copy of a kind wins when a project holds more than one.</summary>
     public const string PreferredFolderName = "Settings";
 
-    static readonly string[] dataAssetExtensions = [".dataasset", ".asset", ".data"];
+    static readonly string[] DataAssetExtensions = [".dataasset", ".asset", ".data"];
 
     /// <summary>
     /// Every settings asset under a project's <c>Assets</c> folder, one entry per file, with the one each
@@ -135,7 +135,7 @@ public static class ProjectSettingsLoader
     public static IEnumerable<string> DataAssetSources(string assetsDirectory) =>
         Directory.EnumerateFiles(assetsDirectory, "*.meta", SearchOption.AllDirectories)
             .Select(static meta => meta[..^".meta".Length])
-            .Where(static source => dataAssetExtensions.Contains(Path.GetExtension(source),
+            .Where(static source => DataAssetExtensions.Contains(Path.GetExtension(source),
                 StringComparer.OrdinalIgnoreCase))
             .Where(File.Exists);
 

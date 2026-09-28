@@ -13,7 +13,7 @@ public class MaterialAsset : Asset
     // too. Keying by device would hand a resource built for the Scene View's context to Play mode's,
     // and disposing either would leave the other binding a freed descriptor set.
     // The cache owns the MaterialResource lifetime — callers must not dispose the returned instance.
-    static readonly ConcurrentDictionary<(Guid, MaterialDescriptorContext), MaterialResource> resourceCache = new();
+    static readonly ConcurrentDictionary<(Guid, MaterialDescriptorContext), MaterialResource> ResourceCache = new();
 
     /// <summary>RGBA base color factor. Multiplied with the base color texture sample if present.</summary>
     public Vector4 BaseColorFactor { get; set; } = new(1f, 1f, 1f, 1f);
@@ -49,9 +49,9 @@ public class MaterialAsset : Asset
     /// <param name="assetId">Identifier of the material asset.</param>
     public static void InvalidateCacheEntry(Guid assetId)
     {
-        foreach (var key in resourceCache.Keys.Where(k => k.Item1 == assetId).ToList())
+        foreach (var key in ResourceCache.Keys.Where(k => k.Item1 == assetId).ToList())
         {
-            if (resourceCache.TryRemove(key, out var resource))
+            if (ResourceCache.TryRemove(key, out var resource))
                 resource.Dispose();
         }
     }
@@ -62,9 +62,9 @@ public class MaterialAsset : Asset
     /// </summary>
     public static void ClearCache()
     {
-        foreach (var (_, resource) in resourceCache)
+        foreach (var (_, resource) in ResourceCache)
             resource.Dispose();
-        resourceCache.Clear();
+        ResourceCache.Clear();
     }
 
     /// <summary>
@@ -77,9 +77,9 @@ public class MaterialAsset : Asset
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        foreach (var key in resourceCache.Keys.Where(k => k.Item2 == context).ToList())
+        foreach (var key in ResourceCache.Keys.Where(k => k.Item2 == context).ToList())
         {
-            if (resourceCache.TryRemove(key, out var resource))
+            if (ResourceCache.TryRemove(key, out var resource))
                 resource.Dispose();
         }
     }
@@ -97,7 +97,7 @@ public class MaterialAsset : Asset
         ArgumentNullException.ThrowIfNull(context);
 
         var cacheKey = (Id, context);
-        if (resourceCache.TryGetValue(cacheKey, out var cached))
+        if (ResourceCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
         // An AssetReference resolves to identity only; the factors and texture references
@@ -110,7 +110,7 @@ public class MaterialAsset : Asset
         }
 
         var resource = new MaterialResource(context, hydrated);
-        resourceCache[cacheKey] = resource;
+        ResourceCache[cacheKey] = resource;
         return resource;
     }
 

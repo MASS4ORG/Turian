@@ -3,7 +3,7 @@ namespace Turian.Tests;
 /// <summary>Tests for <see cref="Bounds.TryIntersect"/>, the slab test viewport picking relies on.</summary>
 public class BoundsIntersectionTests
 {
-    static readonly Bounds unit = new(new Vector3(-1f, -1f, -1f), new Vector3(1f, 1f, 1f));
+    static readonly Bounds Unit = new(new Vector3(-1f, -1f, -1f), new Vector3(1f, 1f, 1f));
 
     /// <summary>A ray aimed straight at the box hits it at the near face.</summary>
     [Fact]
@@ -11,7 +11,7 @@ public class BoundsIntersectionTests
     {
         var ray = new Ray(new Vector3(0f, 0f, -5f), new Vector3(0f, 0f, 1f));
 
-        var hit = unit.TryIntersect(ray, out var distance);
+        var hit = Unit.TryIntersect(ray, out var distance);
 
         Assert.True(hit);
         Assert.Equal(4f, distance, 4);
@@ -23,7 +23,7 @@ public class BoundsIntersectionTests
     {
         var ray = new Ray(new Vector3(5f, 0f, -5f), new Vector3(0f, 0f, 1f));
 
-        Assert.False(unit.TryIntersect(ray, out _));
+        Assert.False(Unit.TryIntersect(ray, out _));
     }
 
     /// <summary>A ray pointing away from the box misses, even though its infinite line would hit.</summary>
@@ -32,7 +32,7 @@ public class BoundsIntersectionTests
     {
         var ray = new Ray(new Vector3(0f, 0f, -5f), new Vector3(0f, 0f, -1f));
 
-        Assert.False(unit.TryIntersect(ray, out _));
+        Assert.False(Unit.TryIntersect(ray, out _));
     }
 
     /// <summary>An origin already inside the box hits at distance zero.</summary>
@@ -41,7 +41,7 @@ public class BoundsIntersectionTests
     {
         var ray = new Ray(Vector3.Zero, new Vector3(1f, 0f, 0f));
 
-        var hit = unit.TryIntersect(ray, out var distance);
+        var hit = Unit.TryIntersect(ray, out var distance);
 
         Assert.True(hit);
         Assert.Equal(0f, distance);
@@ -62,7 +62,7 @@ public class BoundsIntersectionTests
     {
         var ray = new Ray(new Vector3(0f, 5f, 0f), new Vector3(0f, -1f, 0f));
 
-        var hit = unit.TryIntersect(ray, out var distance);
+        var hit = Unit.TryIntersect(ray, out var distance);
 
         Assert.True(hit);
         Assert.Equal(4f, distance, 4);

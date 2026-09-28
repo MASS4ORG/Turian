@@ -9,8 +9,8 @@ public static class FormBuilder
     const BindingFlags memberScope =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
-    static readonly ConcurrentDictionary<Type, MemberInfo[]> membersByType = new();
-    static readonly ConcurrentDictionary<Type, MethodInfo[]> buttonMethodsByType = new();
+    static readonly ConcurrentDictionary<Type, MemberInfo[]> MembersByType = new();
+    static readonly ConcurrentDictionary<Type, MethodInfo[]> ButtonMethodsByType = new();
 
     /// <summary>Builds the form for a plain object: one section holding its editable members.</summary>
     /// <param name="target">The object to inspect.</param>
@@ -45,7 +45,7 @@ public static class FormBuilder
     {
         ArgumentNullException.ThrowIfNull(type);
 
-        return membersByType.GetOrAdd(type, static t => [.. t
+        return MembersByType.GetOrAdd(type, static t => [.. t
             .GetMembers(memberScope)
             .Where(member => member.MemberType is MemberTypes.Field or MemberTypes.Property)
             .Where(ShouldDisplay)]);
@@ -62,7 +62,7 @@ public static class FormBuilder
         if (ActiveSwitch(target) is { } active && fields.TrueForAll(f => f.Name != active.Name))
             fields.Insert(0, new FormField(active, target, mutationNotifier));
 
-        var buttons = buttonMethodsByType.GetOrAdd(target.GetType(), static t => [.. t
+        var buttons = ButtonMethodsByType.GetOrAdd(target.GetType(), static t => [.. t
             .GetMethods(BindingFlags.Public | BindingFlags.Instance)
             .Where(method => method.GetCustomAttribute<ButtonAttribute>() is not null)
             .Where(method => method.GetParameters().Length == 0)])
@@ -100,7 +100,7 @@ public static class FormBuilder
     {
         var isPublic = member switch
         {
-            PropertyInfo property => (property.GetMethod?.IsPublic ?? false) && property.CanRead && property.CanWrite,
+            PropertyInfo property => (property.GetMethod?.IsPublic ?? false) && property is { CanRead: true, CanWrite: true },
             FieldInfo field => field.IsPublic,
             _ => false
         };

@@ -11,7 +11,7 @@ namespace Turian.Engine.Core;
 /// </remarks>
 public static class InputBindingStore
 {
-    static readonly JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
+    static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>The file a game stores its rebindings in, under the user's application data.</summary>
     /// <param name="productName">The folder the game keeps its user data in.</param>
@@ -32,7 +32,7 @@ public static class InputBindingStore
         try
         {
             if (Path.GetDirectoryName(path) is { Length: > 0 } directory) Directory.CreateDirectory(directory);
-            File.WriteAllText(path, JsonSerializer.Serialize(service.CaptureOverrides(), jsonOptions));
+            File.WriteAllText(path, JsonSerializer.Serialize(service.CaptureOverrides(), JsonOptions));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
