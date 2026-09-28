@@ -36,7 +36,7 @@ public sealed class InspectorMemberMetadata
         var isPublic = member switch
         {
             PropertyInfo property => (property.GetMethod?.IsPublic ?? false)
-                                     && property.CanRead && property.CanWrite,
+                                     && property is { CanRead: true, CanWrite: true },
             FieldInfo field => field.IsPublic,
             _ => false
         };

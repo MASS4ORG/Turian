@@ -47,7 +47,7 @@ Label the issue with one of the existing labels (`t:bug`, `p:*`, etc.). Open an 
 4. Open the pull request against `main` with a clear description of *what* and *why*.
 5. Link any related issues with `Closes #N` in the description.
 
-CI (`.github/workflows/ci.yml`: build, shaders and unit tests) must pass before a pull request can be merged.
+CI (`.github/workflows/build-and-test.yml`: build, shaders and unit tests) must pass before a pull request can be merged.
 
 ## Licensing
 

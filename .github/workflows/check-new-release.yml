@@ -1,13 +1,13 @@
-name: Release check
+name: Check new release
 
 # Checks for commits since the last tag; if there are any, updates CHANGELOG.md, tags the release
-# and pushes the commit+tag to GitHub and (if configured) GitLab, then dispatches publish.yml for the new tag.
+# and pushes the commit+tag to GitHub and (if configured) GitLab, then dispatches publish-on-tag.yml for the new tag.
 #
-# Idempotent by design: Tag skips a host if that host's remote already has the computed tag, so
+# Idempotent by design: GitHubCreateTag and GitLabCreateTag skip a host if that host's remote already has the computed tag, so
 # it's safe to run this same check independently from both GitLab and GitHub schedules.
 on:
   schedule:
-    - cron: "0 10 * * *"
+    - cron: "30 10 * * *"
       timezone: "America/Sao_Paulo"
   workflow_dispatch:
 
@@ -23,11 +23,11 @@ jobs:
   release-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "HEAD_BEFORE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           chmod +x ./build.sh
-          ./build.sh Tag \
+          ./build.sh GitHubCreateTag GitLabCreateTag \
             --github-repository "${{ github.repository }}" \
             --github-token "${{ secrets.GITHUB_TOKEN }}" \
             --gitlab-project-path "${{ vars.GITLAB_REPOSITORY_PATH }}" \
@@ -43,11 +43,11 @@ jobs:
             --release-branch "${{ github.event.repository.default_branch }}" \
             --verbosity minimal
 
-      # A tag pushed with GITHUB_TOKEN starts no workflows, so publish.yml is dispatched for it explicitly.
+      # A tag pushed with GITHUB_TOKEN starts no workflows, so publish-on-tag.yml is dispatched for it explicitly.
       - name: Publish the new release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$(git rev-parse HEAD)" != "$HEAD_BEFORE" ]; then
-            gh workflow run publish.yml --ref "$(git tag --points-at HEAD | head -n1)"
+            gh workflow run publish-on-tag.yml --ref "$(git tag --points-at HEAD | head -n1)"
           fi

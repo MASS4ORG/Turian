@@ -60,10 +60,12 @@ public static class FormBuilder
             new Lazy<IReadOnlyList<InspectorMemberMetadata>>(() =>
                 Array.AsReadOnly([
                     .. t.GetMembers(memberScope)
-                        .Where(member => member is FieldInfo field && !field.FieldType.IsByRefLike
-                                         || member is PropertyInfo property && property.GetMethod is not null
-                                                                            && property.GetIndexParameters().Length == 0
-                                                                            && !property.PropertyType.IsByRefLike)
+                        .Where(member => member is FieldInfo { FieldType.IsByRefLike: false } || member is PropertyInfo
+                            {
+                                GetMethod: not null
+                            } property
+                            && property.GetIndexParameters().Length == 0
+                            && !property.PropertyType.IsByRefLike)
                         .Select(InspectorMemberMetadata.For)
                         .Where(metadata => metadata.IsVisible)
                         .OrderBy(metadata => metadata.Priority)

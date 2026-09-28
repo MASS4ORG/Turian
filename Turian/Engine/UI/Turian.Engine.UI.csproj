@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere" Version="5.2.0"/>
+        <PackageReference Include="MASS4.Guinevere" Version="5.*"/>
     </ItemGroup>
 
     <!-- Internal libraries -->

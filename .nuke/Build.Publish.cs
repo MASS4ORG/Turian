@@ -62,11 +62,11 @@ sealed partial class Build
                             .SetPublishTrimmed(PublishTrimmed)
                             .SetProperty("UseAppHost", "false")
                             .SetProperty("SatelliteResourceLanguages", "en")
-                            .SetProperty("GuinevereUsePackages", true) // Releases ship the published Guinevere
+                            .SetProperty("NoLocalPackages", NoLocalPackages)
                             .SetAuthors("Bruno Massa")
-                            .SetVersion(CurrentVersion)
-                            .SetAssemblyVersion(CurrentVersion)
-                            .SetInformationalVersion(CurrentVersion)
+                            .SetVersion(Version)
+                            .SetAssemblyVersion(Version)
+                            .SetInformationalVersion(Version)
                     );
                 }
 

@@ -32,6 +32,6 @@ It warns, without blocking, when the .NET 10 SDK is missing. Uninstalling remove
    pipeline. Fork `microsoft/winget-pkgs`, place the three files under the matching
    `manifests/a/Turian/Turian/<version>/` directory, and open a pull request.
 
-`publish.yml` builds the installer on every release (`Pack` depends on `WindowsInstaller`) but does not sign it, so
+`publish-on-tag.yml` builds the installer on every release (`Pack` depends on `WindowsInstaller`) but does not sign it, so
 Windows SmartScreen warns on first run until signing is added. `WingetManifest` is not called by CI; run it once the
 permanent download URL and the final Winget package identifier are confirmed.

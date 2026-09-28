@@ -30,17 +30,20 @@
         "CompileShaders",
         "ContainerBuild",
         "ContainerPush",
+        "CreateReleaseCommit",
+        "CreateReleaseTag",
         "DebianPackage",
         "Flatpak",
-        "GitHubRelease",
-        "GitLabRelease",
+        "GitHubCreateRelease",
+        "GitHubCreateTag",
+        "GitLabCreateRelease",
+        "GitLabCreateTag",
         "Pack",
         "PackNuGet",
         "Publish",
         "PushNuGet",
         "Restore",
         "ShowCurrentVersion",
-        "Tag",
         "Test",
         "TestReport",
         "UpdateChangelog",
@@ -145,9 +148,9 @@
           "description": "GitLab personal/project access token with api + write_repository scope. Omit to skip pushing/releasing to GitLab",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "GuineverePackages": {
+        "NoLocalPackages": {
           "type": "boolean",
-          "description": "Build against the published Guinevere packages, ignoring a local checkout"
+          "description": "Build against the published packages, ignoring local checkouts from Directory.Build.local.props"
         },
         "NugetApiKey": {
           "type": "string",
@@ -156,6 +159,10 @@
         "NugetSource": {
           "type": "string",
           "description": "NuGet feed to push to (default: nuget.org)"
+        },
+        "PackagingDryRun": {
+          "type": "boolean",
+          "description": "Generate platform package manifests with a placeholder URL and without publishing"
         },
         "PublishDirectory": {
           "type": "string",

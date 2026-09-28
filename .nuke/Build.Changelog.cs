@@ -84,20 +84,20 @@ sealed partial class Build
     {
         var builder = new StringBuilder();
         builder.AppendLine(CultureInfo.InvariantCulture, $"## [{version}] - {DateTime.UtcNow:yyyy-MM-dd}");
+        builder.AppendLine();
 
+        // One line per change, "- Added: ...", grouped in the order sections are declared above.
         var orderedSections = ChangelogSections.Select(entry => entry.Section).Distinct();
         foreach (var section in orderedSections)
         {
-            if (!grouped.TryGetValue(section, out var entries) || entries.Count == 0)
+            if (!grouped.TryGetValue(section, out var entries))
             {
                 continue;
             }
 
-            builder.AppendLine();
-            builder.AppendLine(CultureInfo.InvariantCulture, $"### {section}");
             foreach (var entry in entries)
             {
-                builder.AppendLine(CultureInfo.InvariantCulture, $"- {entry}");
+                builder.AppendLine(CultureInfo.InvariantCulture, $"- {section}: {entry}");
             }
         }
 

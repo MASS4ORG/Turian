@@ -9,11 +9,21 @@ sealed partial class Build
     [Parameter("Public HTTPS URL of the Windows installer, used in generated Winget manifests")]
     readonly string WingetInstallerUrl;
 
+    [Parameter("Generate platform package manifests with a placeholder URL and without publishing")]
+    readonly bool PackagingDryRun;
+
     public Target WingetManifest => td => td
         .DependsOn(WindowsInstaller)
-        .Requires(() => WingetInstallerUrl)
         .Executes(() =>
         {
+            var installerUrl = WingetInstallerUrl;
+            if (string.IsNullOrWhiteSpace(installerUrl))
+            {
+                if (!PackagingDryRun)
+                    throw new InvalidOperationException("WingetManifest requires --winget-installer-url outside a dry run.");
+                installerUrl = $"https://example.invalid/Turian-{Version}-win-x64-setup.exe";
+            }
+
             using var stream = File.OpenRead(WindowsInstallerFile);
             var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream));
             var manifestDirectory = ArtifactsDirectory / "winget" / Version;
@@ -38,7 +48,7 @@ sealed partial class Build
                     - PackageIdentifier: Microsoft.DotNet.SDK.10
                 Installers:
                   - Architecture: x64
-                    InstallerUrl: {WingetInstallerUrl}
+                    InstallerUrl: {installerUrl}
                     InstallerSha256: {hash}
                 ManifestType: installer
                 ManifestVersion: 1.12.0

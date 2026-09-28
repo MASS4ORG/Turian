@@ -176,7 +176,7 @@ public class DrawerRegistryTests
         gui.CalculateLayout();
         var wrapper = Assert.Single(gui.RootNode!.Children,
             node => node.Id == "tooltip-test/tooltip");
-        Assert.True(wrapper.Rect.W > 0 && wrapper.Rect.H > 0);
+        Assert.True(wrapper.Rect is { W: > 0, H: > 0 });
         var row = Assert.Single(wrapper.Children, node => node.Id == "tooltip-test");
         Assert.Equal(wrapper.Rect, row.Rect);
         gui.SetStage(Pass.Pass2Render);
