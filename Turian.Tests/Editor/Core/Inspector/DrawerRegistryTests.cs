@@ -18,6 +18,12 @@ public class DrawerRegistryTests
         public int Value { get; set; }
     }
 
+    sealed class TooltippedTarget
+    {
+        [Tooltip("Explains the value")]
+        public int Value { get; set; }
+    }
+
     sealed class TraceDrawer(List<string> trace, string name, int order) : IAttributeDrawer
     {
         public int Order => order;
@@ -78,5 +84,48 @@ public class DrawerRegistryTests
         }
 
         Assert.Same(original, PropertyDrawerRegistry.For(typeof(Vector3)));
+    }
+
+    /// <summary>The built-in tooltip participates as rendering metadata and an attribute decorator.</summary>
+    [Fact]
+    public void TooltipIsAvailableToTheDrawerPipeline()
+    {
+        var field = FormBuilder.Build(new TooltippedTarget()).Sections[0].Fields.Single();
+
+        Assert.Contains(field.Metadata!.RenderingHints, hint => hint is TooltipAttribute);
+        Assert.Equal("Explains the value", field.Attribute<TooltipAttribute>()?.Text);
+    }
+
+    /// <summary>Both GUI passes can compose a tooltip around the numeric drawer.</summary>
+    [Fact]
+    public void TooltippedFieldRendersInBothPasses()
+    {
+        var field = FormBuilder.Build(new TooltippedTarget()).Sections[0].Fields.Single();
+        using var surface = SKSurface.Create(new SKImageInfo(320, 120));
+        var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+        var font = Font.FromFamilyName("sans-serif", 14);
+        gui.SetStage(Pass.Pass1Build);
+        gui.BeginFrame(surface.Canvas, font, font);
+        AttributeDrawerRegistry.Draw(gui, field, "tooltip-test",
+            () => PropertyDrawerRegistry.For(field.ValueType).Draw(gui, field, "tooltip-test"));
+        gui.CalculateLayout();
+        gui.SetStage(Pass.Pass2Render);
+        AttributeDrawerRegistry.Draw(gui, field, "tooltip-test",
+            () => PropertyDrawerRegistry.For(field.ValueType).Draw(gui, field, "tooltip-test"));
+        gui.Render();
+        gui.EndFrame();
+    }
+
+    /// <summary>Primitive types select built-in property drawers rather than a type switch on every redraw.</summary>
+    [Fact]
+    public void PrimitiveDrawersHaveBuiltInFallbacks()
+    {
+        var summary = PropertyDrawerRegistry.For(typeof(object));
+
+        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(bool)));
+        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(string)));
+        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(int)));
+        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(DayOfWeek)));
+        Assert.Same(summary, PropertyDrawerRegistry.For(typeof(DrawerRegistryTests)));
     }
 }

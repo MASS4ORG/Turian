@@ -7,6 +7,8 @@ public static class AttributeDrawerRegistry
 {
     static readonly ConditionalWeakTable<Type, IAttributeDrawer> drawers = new();
 
+    static AttributeDrawerRegistry() => Register<TooltipAttribute>(new TooltipDrawer());
+
     /// <summary>Registers or replaces the decorator for an attribute type.</summary>
     public static void Register<TAttribute>(IAttributeDrawer drawer) where TAttribute : Attribute
     {

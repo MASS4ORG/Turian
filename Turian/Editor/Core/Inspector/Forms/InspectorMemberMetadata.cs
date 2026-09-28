@@ -29,7 +29,7 @@ public sealed class InspectorMemberMetadata
         Visibility = Select(attribute => attribute is ShowInEditorAttribute or HideInEditorAttribute);
         Layout = Select(attribute => attribute is InspectorOrderAttribute or ExpandAttribute);
         Validation = Select(attribute => attribute is ReadOnlyAttribute or RangeAttribute);
-        RenderingHints = Select(attribute => attribute is NumericUpDownAttribute);
+        RenderingHints = Select(attribute => attribute is NumericUpDownAttribute or TooltipAttribute);
         Priority = GetAttribute<InspectorOrderAttribute>()?.Priority ?? 0;
         IsReadOnly = GetAttribute<ReadOnlyAttribute>() is not null
                      || member is PropertyInfo { CanWrite: false };

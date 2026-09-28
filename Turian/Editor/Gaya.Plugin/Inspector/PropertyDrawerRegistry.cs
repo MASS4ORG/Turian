@@ -26,8 +26,12 @@ public static class PropertyDrawerRegistry
         drawers.Remove(valueType);
     }
 
-    /// <summary>Finds the most specific registered drawer, then falls back to built-in editors.</summary>
-    public static IPropertyDrawer? For(Type valueType)
+    /// <summary>Finds a registered or built-in drawer for a value type.</summary>
+    public static IPropertyDrawer For(Type valueType) =>
+        CustomFor(valueType) ?? BuiltinPropertyDrawers.For(valueType);
+
+    /// <summary>Finds an extension or an existing registered value editor.</summary>
+    internal static IPropertyDrawer? CustomFor(Type valueType)
     {
         ArgumentNullException.ThrowIfNull(valueType);
         for (var current = valueType; current is not null; current = current.BaseType)
