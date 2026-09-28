@@ -15,12 +15,15 @@ static class BuiltinPropertyDrawers
         (gui, field, _, _, _) => gui.DrawText(field.GetValue()?.ToString() ?? "—",
             StudioTheme.Current.Text(12), StudioTheme.Current.InkDim, centerInRect: false));
 
-    public static IPropertyDrawer For(Type type) =>
-        type == typeof(bool) ? boolean
+    public static IPropertyDrawer For(Type type)
+    {
+        type = Nullable.GetUnderlyingType(type) ?? type;
+        return type == typeof(bool) ? boolean
         : type == typeof(string) ? text
         : type.IsEnum ? enumeration
         : FieldDrawers.IsNumeric(type) ? number
         : Summary;
+    }
 
     sealed class PrimitiveDrawer(
         Action<Gui, FormField, Type, string, Func<string, string>?> draw, bool numeric = false)

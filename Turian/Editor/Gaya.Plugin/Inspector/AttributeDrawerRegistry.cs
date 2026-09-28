@@ -6,8 +6,7 @@ namespace Gaya.Plugin.Turian;
 public static class AttributeDrawerRegistry
 {
     static readonly ConditionalWeakTable<Type, IAttributeDrawer> drawers = new();
-
-    static AttributeDrawerRegistry() => Register<TooltipAttribute>(new TooltipDrawer());
+    static readonly IAttributeDrawer tooltip = new TooltipDrawer();
 
     /// <summary>Registers or replaces the decorator for an attribute type.</summary>
     public static void Register<TAttribute>(IAttributeDrawer drawer) where TAttribute : Attribute
@@ -50,11 +49,11 @@ public static class AttributeDrawerRegistry
         next();
     }
 
-    static IAttributeDrawer? Find(Type type)
+    internal static IAttributeDrawer? Find(Type type)
     {
         for (var current = type; current is not null && typeof(Attribute).IsAssignableFrom(current);
              current = current.BaseType)
             if (drawers.TryGetValue(current, out var drawer)) return drawer;
-        return null;
+        return typeof(TooltipAttribute).IsAssignableFrom(type) ? tooltip : null;
     }
 }

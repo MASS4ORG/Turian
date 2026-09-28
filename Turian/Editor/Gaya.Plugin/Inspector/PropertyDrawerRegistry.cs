@@ -41,6 +41,9 @@ public static class PropertyDrawerRegistry
                 if (drawers.TryGetValue(face, out drawer)) return drawer;
         }
 
+        if (Nullable.GetUnderlyingType(valueType) is { } underlying)
+            return CustomFor(underlying);
+
         return ValueEditorRegistry.For(valueType);
     }
 }

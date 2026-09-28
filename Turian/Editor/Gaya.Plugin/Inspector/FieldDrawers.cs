@@ -41,33 +41,31 @@ static class FieldDrawers
     {
         var type = Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType;
 
-        if (references is not null && ReferenceField.IsReference(field))
-        {
-            Row(gui, field.Label, id, () => references.TryDraw(gui, field, id));
-            return;
-        }
-
-        // A type with a registered editor owns its whole appearance — a vector is one labeled row,
-        // a transform is three. A read-only value skips the editor and shows a text summary below.
-        if (!field.IsReadOnly && PropertyDrawerRegistry.CustomFor(type) is { } customEditor)
+        if (!field.IsReadOnly && PropertyDrawerRegistry.CustomFor(field.ValueType) is { } customEditor)
         {
             customEditor.Draw(gui, field, id);
             return;
         }
 
+        if (references is not null && ReferenceField.IsReference(field))
+        {
+            StructuralPropertyDrawers.Reference(references).Draw(gui, field, id);
+            return;
+        }
+
         if (CollectionField.TryCreate(field) is { } collection)
         {
-            DrawCollection(gui, collection, id, references, collapsed);
+            StructuralPropertyDrawers.Collection(collection, references, collapsed).Draw(gui, field, id);
             return;
         }
 
         if (Nested(field, type) is { } nested)
         {
-            DrawNested(gui, field, nested, id, references, collapsed);
+            StructuralPropertyDrawers.Nested(nested, references, collapsed).Draw(gui, field, id);
             return;
         }
 
-        (field.IsReadOnly ? BuiltinPropertyDrawers.Summary : PropertyDrawerRegistry.For(type))
+        (field.IsReadOnly ? BuiltinPropertyDrawers.Summary : PropertyDrawerRegistry.For(field.ValueType))
             .Draw(gui, field, id);
     }
 
@@ -81,8 +79,7 @@ static class FieldDrawers
     /// <param name="translate">Translates enum labels for the settings panel.</param>
     public static void DrawEditorOnly(Gui gui, FormField field, string id, Func<string, string>? translate = null) =>
         AttributeDrawerRegistry.Draw(gui, field, id,
-            () => DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType,
-                id, translate));
+            () => DrawEditor(gui, field, field.ValueType, id, translate));
 
     /// <summary>A label on the left and whatever the caller draws filling the rest.</summary>
     internal static void Row(Gui gui, string label, string id, Action editor, Action? labelInteraction = null)
@@ -148,7 +145,7 @@ static class FieldDrawers
 
         var drawer = PropertyDrawerRegistry.For(type);
         if (!drawer.DrawValue(gui, field, id, translate))
-            BuiltinPropertyDrawers.Summary.DrawValue(gui, field, id);
+            BuiltinPropertyDrawers.For(type).DrawValue(gui, field, id, translate);
     }
 
     internal static void DrawBool(Gui gui, FormField field)
@@ -251,7 +248,7 @@ static class FieldDrawers
     /// A list, array or dictionary as a foldable group of rows, each entry drawn by the same drawers
     /// a member gets. A resizable collection also offers add and remove.
     /// </summary>
-    static void DrawCollection(Gui gui, CollectionField collection, string id,
+    internal static void DrawCollection(Gui gui, CollectionField collection, string id,
         ReferenceDrawer? references, ISet<string>? collapsed)
     {
         var entries = collection.Entries();
@@ -317,7 +314,7 @@ static class FieldDrawers
     /// A nested object as a foldable group of its own members, drawn by the same drawers a top-level
     /// member gets. What makes an input action's bindings editable without a bespoke panel.
     /// </summary>
-    static void DrawNested(Gui gui, FormField field, object target, string id,
+    internal static void DrawNested(Gui gui, FormField field, object target, string id,
         ReferenceDrawer? references, ISet<string>? collapsed)
     {
         var isOpen = collapsed?.Contains(id) != true;
