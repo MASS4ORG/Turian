@@ -131,7 +131,7 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         redo.AddRange(droppedRedo);
     }
 
-    /// <summary>The id of a document's latest undoable step, or <see cref="Guid.Empty"/> when it has none.</summary>
+    /// <summary>The id of a document's latest undoable step, or <see cref="System.Guid.Empty"/> when it has none.</summary>
     /// <param name="document">The document's asset id.</param>
     /// <returns>The step id.</returns>
     public Guid LatestFor(Guid document) =>

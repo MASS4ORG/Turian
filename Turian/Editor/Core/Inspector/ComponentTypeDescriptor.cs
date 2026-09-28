@@ -14,7 +14,7 @@ public sealed class ComponentTypeDescriptor
         ComponentType = componentType ?? throw new ArgumentNullException(nameof(componentType));
     }
 
-    /// <summary>The reflected <see cref="Type"/>.</summary>
+    /// <summary>The reflected <see cref="System.Type"/>.</summary>
     public Type ComponentType { get; }
 
     /// <summary>Short human-readable name (last menu-path segment).</summary>

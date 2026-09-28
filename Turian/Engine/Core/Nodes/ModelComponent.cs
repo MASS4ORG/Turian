@@ -82,7 +82,7 @@ public class ModelComponent : Component, IDisposable
     }
 
     /// <summary>
-    /// Gets the id of the model asset this component draws from, or <see cref="Guid.Empty"/>
+    /// Gets the id of the model asset this component draws from, or <see cref="System.Guid.Empty"/>
     /// when neither reference resolves.
     /// </summary>
     [JsonIgnore, HideInEditor]

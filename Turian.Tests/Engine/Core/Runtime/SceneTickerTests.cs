@@ -142,12 +142,12 @@ public class SceneTickerTests : IDisposable
         var input = new BufferedInputSource();
         var ticker = new SceneTicker(sceneManager) { InputSource = input };
 
-        input.PushKeyDown(Silk.NET.Input.Key.W);
-        Assert.True(input.WasKeyPressed(Silk.NET.Input.Key.W));
+        input.PushKeyDown(Key.W);
+        Assert.True(input.WasKeyPressed(Key.W));
 
         ticker.Tick(0.016);
 
-        Assert.False(input.WasKeyPressed(Silk.NET.Input.Key.W));
-        Assert.True(input.IsKeyDown(Silk.NET.Input.Key.W));
+        Assert.False(input.WasKeyPressed(Key.W));
+        Assert.True(input.IsKeyDown(Key.W));
     }
 }

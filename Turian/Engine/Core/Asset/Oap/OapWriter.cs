@@ -276,7 +276,7 @@ public sealed class OapWriter
 }
 
 /// <summary>
-/// Orders <see cref="Guid"/> values by their raw big-endian bytes, matching the
+/// Orders <see cref="System.Guid"/> values by their raw big-endian bytes, matching the
 /// lexicographic sort the OAP index uses so binary search stays correct.
 /// </summary>
 public sealed class OapAssetIdComparer : IComparer<Guid>

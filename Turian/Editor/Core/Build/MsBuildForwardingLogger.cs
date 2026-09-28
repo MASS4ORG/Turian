@@ -7,9 +7,9 @@ namespace Turian.Editor.Core;
 /// Initializes a new instance of the <see cref="MsBuildForwardingLogger"/> class.
 /// </remarks>
 /// <param name="logger">The logger instance to forward the MSBuild logs to.</param>
-public class MsBuildForwardingLogger(Microsoft.Extensions.Logging.ILogger logger) : Microsoft.Build.Framework.ILogger
+public class MsBuildForwardingLogger(ILogger logger) : Microsoft.Build.Framework.ILogger
 {
-    readonly Microsoft.Extensions.Logging.ILogger logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    readonly ILogger logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// Gets or sets the level of verbosity at which to log.

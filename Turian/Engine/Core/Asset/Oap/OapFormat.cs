@@ -37,7 +37,7 @@ public static class OapFormat
     public const int HeaderCrcCoverage = 60;
 
     /// <summary>
-    /// Maps a <see cref="Guid"/> to the 16 raw bytes stored in an index entry, using
+    /// Maps a <see cref="System.Guid"/> to the 16 raw bytes stored in an index entry, using
     /// RFC&#160;4122 (big-endian) field order so the lexicographic index sort matches the
     /// canonical UUID string order and is independent of the host's endianness.
     /// </summary>
@@ -51,7 +51,7 @@ public static class OapFormat
         }
     }
 
-    /// <summary>Reads a <see cref="Guid"/> from the 16 raw bytes of an index entry.</summary>
+    /// <summary>Reads a <see cref="System.Guid"/> from the 16 raw bytes of an index entry.</summary>
     /// <param name="source">A span of at least <see cref="AssetIdSize"/> bytes.</param>
     /// <returns>The decoded asset identifier.</returns>
     public static Guid ReadAssetId(ReadOnlySpan<byte> source) => new(source[..AssetIdSize], bigEndian: true);

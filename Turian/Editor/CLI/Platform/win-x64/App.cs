@@ -36,7 +36,7 @@ public class App : IDisposable
     /// <param name="vulkan"></param>
     /// <param name="runtimeProjectOptions"></param>
     /// <param name="logger"></param>
-    /// <exception cref="Exception"></exception>
+    /// <exception cref="System.Exception"></exception>
     public App(
         RendererManager rendererManager,
         WindowManager windowManager,

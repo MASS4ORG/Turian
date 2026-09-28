@@ -155,8 +155,8 @@ public sealed unsafe class Texture : IDisposable
     /// graphics queue, so treat this as a synchronous upload and call it at most once per frame.
     /// </summary>
     /// <param name="rgba">Tightly-packed RGBA8 pixels for mip level 0; length must be Width*Height*4.</param>
-    /// <exception cref="InvalidOperationException">The texture has more than one mip level.</exception>
-    /// <exception cref="ArgumentException"><paramref name="rgba"/> is not exactly Width*Height*4 bytes.</exception>
+    /// <exception cref="System.InvalidOperationException">The texture has more than one mip level.</exception>
+    /// <exception cref="System.ArgumentException"><paramref name="rgba"/> is not exactly Width*Height*4 bytes.</exception>
     public void Update(ReadOnlySpan<byte> rgba)
     {
         ObjectDisposedException.ThrowIf(disposed, this);

@@ -28,7 +28,7 @@ public class MeshPipeline : IDisposable
     /// <param name="fragPath">The file path to the fragment shader.</param>
     /// <param name="configInfo">The configuration information for the pipeline.</param>
     /// <param name="renderSystemName">The name of the rendering system (optional, default is "unknown").</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="vk"/> or <paramref name="device"/> is null.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="vk"/> or <paramref name="device"/> is null.</exception>
     /// <remarks>
     /// This constructor initializes a graphics pipeline specifically designed for mesh rendering tasks.
     /// It compiles and links the provided shader files and configures the pipeline based on the provided

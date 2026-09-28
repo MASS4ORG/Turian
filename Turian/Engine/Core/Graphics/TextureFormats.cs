@@ -30,7 +30,7 @@ public static class TextureFormats
     /// formats, one texel otherwise.
     /// </summary>
     /// <param name="format">The format to measure.</param>
-    /// <exception cref="NotSupportedException">The format is not one the engine uploads.</exception>
+    /// <exception cref="System.NotSupportedException">The format is not one the engine uploads.</exception>
     public static uint ElementSizeBytes(Format format) => format switch
     {
         Format.BC1RgbUnormBlock or Format.BC1RgbSrgbBlock

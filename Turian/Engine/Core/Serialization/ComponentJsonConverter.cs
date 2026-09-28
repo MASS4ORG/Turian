@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// JSON converter for polymorphic serialization/deserialization of Component types.
-/// Uses stable <see cref="Guid"/> ids declared with <see cref="TypeIdAttribute"/> and
+/// Uses stable <see cref="System.Guid"/> ids declared with <see cref="TypeIdAttribute"/> and
 /// resolved through <see cref="TypeRegistry"/> so renames and namespace changes do not
 /// break serialized scenes/prefabs.
 /// </summary>

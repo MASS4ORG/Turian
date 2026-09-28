@@ -112,7 +112,7 @@ public partial class Node
     /// </summary>
     /// <param name="component">The component to add.</param>
     /// <returns>The added component.</returns>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="component"/> is null.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="component"/> is null.</exception>
     public Component AddComponent(Component component)
     {
         ArgumentNullException.ThrowIfNull(component);

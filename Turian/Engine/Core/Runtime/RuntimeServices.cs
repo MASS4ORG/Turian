@@ -35,7 +35,7 @@ public static class RuntimeServices
     /// </summary>
     /// <typeparam name="T">The service type to resolve.</typeparam>
     /// <returns>The resolved service instance.</returns>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="System.InvalidOperationException">
     /// Thrown when runtime services have not been configured or the requested service cannot be resolved.
     /// </exception>
     public static T GetRequired<T>() where T : class =>
