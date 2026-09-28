@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
@@ -8,7 +10,9 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 static class ValueEditorRegistry
 {
-    static readonly ConcurrentDictionary<Type, IValueEditor?> editorsByType = new();
+    sealed record Lookup(IValueEditor? Editor);
+
+    static readonly ConditionalWeakTable<Type, Lookup> editorsByType = new();
     static Dictionary<Type, IValueEditor>? byEditedType;
 
     static Dictionary<Type, IValueEditor> ByEditedType
@@ -40,17 +44,17 @@ static class ValueEditorRegistry
     /// </summary>
     /// <param name="valueType">The type the field holds.</param>
     public static IValueEditor? For(Type valueType) =>
-        editorsByType.GetOrAdd(valueType, static t =>
+        editorsByType.GetValue(valueType, static t =>
         {
             var map = ByEditedType;
 
             for (var current = t; current is not null; current = current.BaseType)
             {
-                if (map.TryGetValue(current, out var editor)) return editor;
+                if (map.TryGetValue(current, out var editor)) return new Lookup(editor);
                 foreach (var face in current.GetInterfaces())
-                    if (map.TryGetValue(face, out editor)) return editor;
+                    if (map.TryGetValue(face, out editor)) return new Lookup(editor);
             }
 
-            return null;
-        });
+            return new Lookup(null);
+        }).Editor;
 }

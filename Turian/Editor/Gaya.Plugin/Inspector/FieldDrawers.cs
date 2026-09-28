@@ -27,6 +27,11 @@ static class FieldDrawers
     /// <param name="collapsed">Ids of the collection groups the user has folded shut.</param>
     public static void Draw(Gui gui, FormField field, string id, ReferenceDrawer? references = null,
         ISet<string>? collapsed = null)
+        => AttributeDrawerRegistry.Draw(gui, field, id,
+            () => DrawProperty(gui, field, id, references, collapsed));
+
+    static void DrawProperty(Gui gui, FormField field, string id, ReferenceDrawer? references,
+        ISet<string>? collapsed)
     {
         var type = Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType;
 
@@ -38,7 +43,7 @@ static class FieldDrawers
 
         // A type with a registered editor owns its whole appearance — a vector is one labeled row,
         // a transform is three. A read-only value skips the editor and shows a text summary below.
-        if (!field.IsReadOnly && ValueEditorRegistry.For(type) is { } customEditor)
+        if (!field.IsReadOnly && PropertyDrawerRegistry.For(type) is { } customEditor)
         {
             customEditor.Draw(gui, field, id);
             return;
@@ -69,7 +74,9 @@ static class FieldDrawers
     /// <param name="id">A unique id for this editor's controls.</param>
     /// <param name="translate">Translates enum labels for the settings panel.</param>
     public static void DrawEditorOnly(Gui gui, FormField field, string id, Func<string, string>? translate = null) =>
-        DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType, id, translate);
+        AttributeDrawerRegistry.Draw(gui, field, id,
+            () => DrawEditor(gui, field, Nullable.GetUnderlyingType(field.ValueType) ?? field.ValueType,
+                id, translate));
 
     /// <summary>A label on the left and whatever the caller draws filling the rest.</summary>
     internal static void Row(Gui gui, string label, string id, Action editor, Action? labelInteraction = null)
@@ -134,7 +141,7 @@ static class FieldDrawers
         }
 
         // A registered editor's value-only form, for settings rows whose label is drawn elsewhere.
-        if (ValueEditorRegistry.For(type) is { } customEditor && customEditor.DrawValue(gui, field, id)) return;
+        if (PropertyDrawerRegistry.For(type) is { } customEditor && customEditor.DrawValue(gui, field, id)) return;
 
         if (type == typeof(bool)) DrawBool(gui, field);
         else if (type == typeof(string)) DrawString(gui, field, id);
