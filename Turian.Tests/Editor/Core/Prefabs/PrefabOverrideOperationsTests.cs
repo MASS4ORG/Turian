@@ -164,4 +164,24 @@ public class PrefabOverrideOperationsTests : IDisposable
         Assert.Equal(3f, instance.Children[0].Transform.Position.X);
         Assert.Contains(added, instance.Children);
     }
+
+    /// <summary>Unpacking to delete a prefab's object is one step: undo restores the link and the object.</summary>
+    [Fact]
+    public void UnpackAndDelete_IsOneStep()
+    {
+        var instance = Instantiate(AddPrefab(Lamp()));
+        var bulb = instance.Children[0];
+
+        undo.BeginGesture();
+        operations.Unpack(instance, completely: false);
+        undo.RecordObject(instance, "Delete");
+        sceneTree.DetachNode(bulb);
+        sceneTree.MarkAssetModified();
+        undo.EndGesture();
+
+        Assert.Single(undo.History.UndoSteps);
+        undo.Undo();
+        Assert.NotNull(instance.PrefabInstance);
+        Assert.Contains(bulb, instance.Children);
+    }
 }

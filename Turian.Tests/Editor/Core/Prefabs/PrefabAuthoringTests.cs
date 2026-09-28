@@ -68,4 +68,19 @@ public class PrefabAuthoringTests
         Assert.Equal(lampId, variant.PrefabInstance!.Source.AssetId);
         Assert.Equal(2f, variant.Children[0].GetComponent<LightComponent>()!.Intensity);
     }
+
+    /// <summary>The ids a hierarchy had before linking come back, as undoing Create Prefab needs.</summary>
+    [Fact]
+    public void SnapshotIds_RestoresTheIdsLinkingChanged()
+    {
+        var lamp = Lamp();
+        var original = Ids(lamp).ToList();
+        var restore = PrefabAuthoring.SnapshotIds(lamp);
+
+        PrefabAuthoring.LinkToPrefab(lamp, Guid.NewGuid());
+        Assert.NotEqual(original, Ids(lamp));
+
+        restore();
+        Assert.Equal(original, Ids(lamp));
+    }
 }

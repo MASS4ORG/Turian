@@ -80,7 +80,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<GizmoDrawerCatalog>(),
                     sp.GetRequiredService<PlayModeService>(),
                     sp.GetRequiredService<EditorCameraSettings>(),
-                    sp.GetRequiredService<ILogger>()),
+                    sp.GetRequiredService<ILogger>(),
+                    sp.GetRequiredService<UndoService>()),
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
                 sp.GetRequiredService<AssetWorkspace>(),
@@ -145,7 +146,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<AssetTypeCatalog>(),
                 sp.GetRequiredService<AssetPreviewCatalog>(),
-                sp.GetRequiredService<PrefabAuthoring>())));
+                sp.GetRequiredService<PrefabAuthoring>(),
+                sp.GetRequiredService<AssetFileOperations>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
@@ -300,7 +302,7 @@ public sealed class GayaPlugin : IPlugin
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Closing the window cannot be cancelled to ask first, so edits still unsaved then are kept, not lost.
+        // Closing the window asks about unsaved work first; anything still unsaved here is kept rather than lost.
         services.GetRequiredService<AssetAutoSave>().Flush(force: true);
         var workspace = services.GetRequiredService<AssetWorkspace>();
         if (workspace.HasUnsavedChanges)

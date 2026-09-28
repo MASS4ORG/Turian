@@ -46,16 +46,23 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         clipboard is not null
         && (File.Exists(clipboard.SourcePath) || Directory.Exists(clipboard.SourcePath));
 
+    /// <summary>The path the clipboard content came from, or null when the clipboard is empty.</summary>
+    public string? ClipboardSource => clipboard?.SourcePath;
+
+    /// <summary>Whether the clipboard content is moved rather than copied when pasted.</summary>
+    public bool ClipboardIsCut => clipboard?.Op == ClipboardOp.Cut;
+
     /// <summary>Pastes the clipboard content into <paramref name="targetDirectory"/>.</summary>
-    public bool Paste(string targetDirectory)
+    /// <returns>The pasted entry's path, or null when nothing was pasted.</returns>
+    public string? Paste(string targetDirectory)
     {
-        if (!CanPaste() || clipboard is null) return false;
+        if (!CanPaste() || clipboard is null) return null;
 
         var src = clipboard.SourcePath;
         var isDir = Directory.Exists(src);
         var dest = GetUniquePath(targetDirectory, Path.GetFileName(src), isDir);
 
-        if (string.Equals(src, dest, StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.Equals(src, dest, StringComparison.OrdinalIgnoreCase)) return null;
 
         try
         {
@@ -71,13 +78,51 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
                     clipboard = null;
                     break;
                 default:
-                    return false;
+                    return null;
             }
-            return true;
+            return dest;
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to paste into {Path}", targetDirectory);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Moves a file or folder into the project's trash instead of deleting it, keeping its meta file and asset id, so
+    /// the deletion can be undone.
+    /// </summary>
+    /// <param name="absolutePath">The file or folder to remove.</param>
+    /// <returns>Where it now lies in the trash, or null when it could not be moved.</returns>
+    public string? MoveToTrash(string absolutePath)
+    {
+        if (settingsService.Settings?.ProjectAbsoluteDir is not { } project) return null;
+
+        var isDirectory = Directory.Exists(absolutePath);
+        if (!isDirectory && !File.Exists(absolutePath)) return null;
+
+        var trash = Path.Combine(project, ".Cache", "Trash", Guid.NewGuid().ToString("N"),
+            Path.GetFileName(absolutePath));
+        return MoveTo(absolutePath, trash, isDirectory) ? trash : null;
+    }
+
+    /// <summary>Moves a file with its meta file, or a folder, to an exact path, keeping asset ids.</summary>
+    /// <param name="sourcePath">The entry to move.</param>
+    /// <param name="destinationPath">Its new full path; the parent folder is created when missing.</param>
+    /// <param name="isDirectory">Whether the entry is a folder.</param>
+    /// <returns>True when the entry moved.</returns>
+    public bool MoveTo(string sourcePath, string destinationPath, bool isDirectory)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+            MoveEntry(sourcePath, destinationPath, isDirectory);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogError(ex, "Failed to move {Source} to {Destination}", sourcePath, destinationPath);
             return false;
         }
     }
@@ -179,19 +224,20 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
     }
 
     /// <summary>Duplicates a file or directory. Duplicated assets receive a new GUID.</summary>
-    public bool Duplicate(string sourcePath, string targetDirectory, bool isDirectory)
+    /// <returns>The copy's path, or null when it could not be made.</returns>
+    public string? Duplicate(string sourcePath, string targetDirectory, bool isDirectory)
     {
         try
         {
             var dest = GetUniquePath(targetDirectory, Path.GetFileName(sourcePath), isDirectory);
             if (isDirectory) DuplicateDirectory(sourcePath, dest);
             else DuplicateAssetWithNewMetadata(sourcePath, dest);
-            return true;
+            return dest;
         }
         catch (Exception ex)
         {
             Log.Logger.LogError(ex, "Failed to duplicate {Path}", sourcePath);
-            return false;
+            return null;
         }
     }
 

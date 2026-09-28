@@ -30,6 +30,9 @@ public sealed class AssetAutoSave(AssetInspectionService inspections, TimeSpan? 
         sinceChange.Restart();
     }
 
+    /// <summary>Forgets the pending edits without writing them, when the user chooses not to save.</summary>
+    public void Discard() => pending.Clear();
+
     /// <summary>Writes the pending edits once they have settled. The studio calls it once a frame.</summary>
     /// <param name="force">Writes them now, such as when the studio closes.</param>
     public void Flush(bool force = false)

@@ -99,7 +99,8 @@ sealed class SceneTreePanel : IPanel
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
             dropAccept: payload => payload is ScriptDragPayload drop
-                && typeof(Component).IsAssignableFrom(drop.ComponentType),
+                    && typeof(Component).IsAssignableFrom(drop.ComponentType)
+                || payload is ReferenceDragPayload dragged && sceneTree.FindNodeById(dragged.Id) is not null,
             onDrop: (item, payload) =>
             {
                 if (item.Tag is Node node && payload is ScriptDragPayload drop)
@@ -108,6 +109,11 @@ sealed class SceneTreePanel : IPanel
                     undo.RecordObject(node, "Add Component");
                     if (inspector.AddComponent(drop.ComponentType)) Invalidate();
                 }
+
+                // A node row dropped on another row moves under it.
+                if (item.Tag is Node target && payload is ReferenceDragPayload moved
+                    && sceneTree.FindNodeById(moved.Id) is { } dropped)
+                    Restructure(dropped, () => Reparent(dropped, target));
             });
 
         if (gui.Pass == Pass.Pass2Render
@@ -201,6 +207,10 @@ sealed class SceneTreePanel : IPanel
 
         menu.Item("Rename", () => BeginRename(node), enabled: node is not null && !isRoot);
         menu.Item("Delete", () => Delete(node), enabled: node is not null && !isRoot);
+        menu.Item("Move Up", () => Restructure(node!, () => MoveBy(node!, -1)),
+            enabled: node?.Parent is { } above && above.Children.IndexOf(node) > 0);
+        menu.Item("Move Down", () => Restructure(node!, () => MoveBy(node!, 1)),
+            enabled: node?.Parent is { } below && below.Children.IndexOf(node) < below.Children.Count - 1);
         menu.Separator();
         menu.Item("Copy", () => clipboard = node, enabled: node is not null);
         menu.Item("Paste", () => Paste(node), enabled: clipboard is not null && node is not null);
@@ -263,31 +273,74 @@ sealed class SceneTreePanel : IPanel
         Invalidate();
     }
 
-    /// <summary>
-    /// Deletes a node, first asking to unpack the prefab instance when the node is one its prefab provides: removing
-    /// it would change the prefab's structure, which Unity also only allows once the instance is unpacked.
-    /// </summary>
+    /// <summary>Deletes a node, asking first to unpack the prefab instance that provides it.</summary>
     void Delete(Node? node)
     {
         if (node is null || node.Parent is null) return;
 
-        if (PrefabOwned(node) is { } instance)
+        Restructure(node, () => DeleteNow(node));
+    }
+
+    /// <summary>
+    /// Runs a change to where <paramref name="node"/> sits in the hierarchy. A node its prefab provides must stay where
+    /// the prefab puts it, as in Unity, so the instance is unpacked first when the user agrees.
+    /// </summary>
+    void Restructure(Node node, Action change)
+    {
+        if (PrefabOwned(node) is not { } instance)
         {
-            confirm.Ask(localization.T("Unpack Prefab"),
-                string.Format(CultureInfo.CurrentCulture,
-                    localization.T("\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to delete it?"),
-                    node.Name, instance.Name),
-                localization.T("Unpack and Delete"),
-                () =>
-                {
-                    // Each instance level above the node is unpacked, so a nested prefab's object becomes plain too.
-                    while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
-                    DeleteNow(node);
-                });
+            change();
             return;
         }
 
-        DeleteNow(node);
+        confirm.Ask(localization.T("Unpack Prefab"),
+            string.Format(CultureInfo.CurrentCulture,
+                localization.T("\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to change it?"),
+                node.Name, instance.Name),
+            localization.T("Unpack and Continue"),
+            () =>
+            {
+                // One step: undo repacks the instance and reverts the change together. Each instance level above the
+                // node is unpacked, so a nested prefab's object becomes plain too.
+                undo.BeginGesture();
+                try
+                {
+                    while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
+                    change();
+                }
+                finally
+                {
+                    undo.EndGesture();
+                }
+            });
+    }
+
+    void Reparent(Node node, Node target)
+    {
+        if (ReferenceEquals(node, target) || node.Parent is not { } parent) return;
+        for (Node? ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
+            if (ReferenceEquals(ancestor, node)) return;
+
+        undo.RecordObject(parent, "Reparent");
+        undo.RecordObject(target, "Reparent");
+        sceneTree.DetachNode(node);
+        sceneTree.AttachNode(node, target, target.Children.Count);
+        sceneTree.MarkAssetModified();
+        Invalidate();
+    }
+
+    void MoveBy(Node node, int offset)
+    {
+        if (node.Parent is not { } parent) return;
+
+        var index = parent.Children.IndexOf(node);
+        var destination = index + offset;
+        if (index < 0 || destination < 0 || destination >= parent.Children.Count) return;
+
+        undo.RecordObject(parent, offset < 0 ? "Move Up" : "Move Down");
+        parent.Children.Move(index, destination);
+        sceneTree.MarkAssetModified();
+        Invalidate();
     }
 
     /// <summary>The instance whose prefab provides <paramref name="node"/>, or null when the node is its own.</summary>
@@ -315,7 +368,6 @@ sealed class SceneTreePanel : IPanel
             return;
 
         var directory = Path.GetDirectoryName(Path.Combine(project.ProjectAbsoluteDir, scene.RelativePath))!;
-        undo.RecordObject(node, "Create Prefab");
         if (prefabs.CreatePrefab(node, directory) is null)
         {
             Log.Logger.LogWarning("Could not save {Node} as a prefab", node.Name);

@@ -258,20 +258,42 @@ public sealed class PrefabOverrideOperations(
             .Where(entry => entry.Content is not null)
             .ToDictionary(entry => entry.prefabId, entry => entry.Content!);
 
-        undo.Perform("Apply to Prefab", instanceObjects, () => WriteFiles(changes), () => WriteFiles(previous));
+        undo.Perform("Apply to Prefab", instanceObjects, () => WriteFiles(changes), () => WriteFiles(previous),
+            keepValues: true);
     }
 
+    // All or nothing: when one prefab cannot be written, the ones already written get their content back.
     void WriteFiles(IReadOnlyDictionary<Guid, string> contents)
     {
-        foreach (var (prefabId, content) in contents)
+        var written = new List<(Guid PrefabId, string Path, string? Previous)>();
+        try
         {
-            if (PathOf(prefabId) is not { } path) continue;
+            foreach (var (prefabId, content) in contents)
+            {
+                if (PathOf(prefabId) is not { } path) continue;
 
-            var previous = File.Exists(path) ? File.ReadAllText(path) : null;
-            File.WriteAllText(path, content);
-            importer.ReimportNow(path);
-            sceneTree.RefreshInstances(prefabId, previous);
+                var previous = File.Exists(path) ? File.ReadAllText(path) : null;
+                written.Add((prefabId, path, previous));
+                WriteFile(prefabId, path, content, previous);
+            }
         }
+        catch
+        {
+            foreach (var (prefabId, path, previous) in Enumerable.Reverse(written))
+            {
+                if (previous is null) File.Delete(path);
+                else WriteFile(prefabId, path, previous, File.Exists(path) ? File.ReadAllText(path) : null);
+            }
+
+            throw;
+        }
+    }
+
+    void WriteFile(Guid prefabId, string path, string content, string? previous)
+    {
+        File.WriteAllText(path, content);
+        importer.ReimportNow(path);
+        sceneTree.RefreshInstances(prefabId, previous);
     }
 
     string? PathOf(Guid prefabId) =>

@@ -179,8 +179,6 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
             if (inspection.Target is null)
             {
-                gui.DrawText("This asset is used as it is: there is nothing to import.", Theme.Text(11),
-                    Theme.InkDim, centerInRect: false);
                 return;
             }
 
@@ -310,7 +308,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                 var header = gui.GetInteractable();
                 if (header.OnClick()) Fold(section.Title);
                 if (header.OnClick(MouseButton.Right) && section.Target is Component clicked)
-                    OpenComponentOverrideMenu(gui, clicked);
+                    OpenComponentMenu(gui, clicked);
             }
 
             using (gui.Node(10, Theme.Scale(22f), $"inspector/section{index}/arrow")
@@ -415,13 +413,26 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         }
     }
 
-    void OpenComponentOverrideMenu(Gui gui, Component component)
+    /// <summary>
+    /// A component's menu: moving it among the node's components, then its prefab overrides. A component a prefab
+    /// provides keeps the prefab's order, as in Unity.
+    /// </summary>
+    void OpenComponentMenu(Gui gui, Component component)
     {
         var added = overrides.IsAdded(component);
-        if (!added && overrides.Diff?.HasOverrides(component.Id) != true) return;
+        var prefabOwned = overrides.InstanceRoot is not null && !added;
+        var overridden = !added && overrides.Diff?.HasOverrides(component.Id) == true;
+        var index = component.Node?.Components.IndexOf(component) ?? -1;
+        var count = component.Node?.Components.Count ?? 0;
 
         OpenOverrideMenu(gui, menu =>
         {
+            menu.Item("Move Up", () => MoveComponent(component, up: true), enabled: !prefabOwned && index > 0);
+            menu.Item("Move Down", () => MoveComponent(component, up: false),
+                enabled: !prefabOwned && index >= 0 && index < count - 1);
+            if (!added && !overridden) return;
+
+            menu.Separator();
             menu.Item(added ? "Remove Added Component" : "Revert Component", () =>
             {
                 prefabOperations.RevertComponent(component);
@@ -436,6 +447,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                 });
             }
         });
+    }
+
+    void MoveComponent(Component component, bool up)
+    {
+        if (component.Node is not { } node) return;
+
+        undo.RecordObject(node, up ? "Move Component Up" : "Move Component Down");
+        if (up) inspector.MoveComponentUp(component);
+        else inspector.MoveComponentDown(component);
     }
 
     void OpenOverrideMenu(Gui gui, Action<FlyoutBuilder> build)

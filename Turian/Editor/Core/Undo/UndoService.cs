@@ -20,11 +20,14 @@ public sealed class UndoService : IDisposable
     readonly AssetManager assets;
     readonly UndoHistory history = new();
     readonly Dictionary<Guid, AssetInspection> inspectedAssets = [];
+    readonly Dictionary<Guid, Guid> savedAt = [];
     readonly Dictionary<IdClass, ObjectState> watched = new(ReferenceEqualityComparer.Instance);
     readonly HashSet<IdClass> recorded = new(ReferenceEqualityComparer.Instance);
     string? recordedLabel;
     bool altered;
     bool restoring;
+    int gestures;
+    Guid gestureStep;
 
     /// <summary>Follows the selection, the edits and the documents.</summary>
     /// <param name="sceneTree">The open scenes.</param>
@@ -41,7 +44,11 @@ public sealed class UndoService : IDisposable
         sceneTree.SceneRebuilt += OnSceneRebuilt;
         assets.AssetAltered += OnAssetAltered;
         assets.AssetClosed += OnAssetClosed;
+        assets.AssetSaved += OnAssetSaved;
     }
+
+    /// <summary>The document of changes that belong to the whole project, such as moving files.</summary>
+    public static Guid ProjectDocument => Guid.Empty;
 
     /// <summary>Raised after a step is recorded, undone or redone.</summary>
     public event Action? Changed;
@@ -90,33 +97,77 @@ public sealed class UndoService : IDisposable
 
     /// <summary>
     /// Performs a change that reaches beyond scene objects, such as rewriting a prefab file, as one undoable step.
-    /// The <paramref name="keep"/> objects get back the values they have now whenever the step is undone or redone.
+    /// Nothing is recorded when the change throws.
     /// </summary>
     /// <param name="label">What the change is.</param>
-    /// <param name="keep">Objects whose current values survive the change and its undoing.</param>
+    /// <param name="objects">
+    /// Scene objects the change also affects: their states before and after it are restored with the step. With
+    /// <paramref name="keepValues"/>, they instead keep the values they have now, whether the step is undone or redone.
+    /// </param>
     /// <param name="perform">Makes the change; it also runs again for redo.</param>
     /// <param name="revert">Undoes the change.</param>
-    public void Perform(string label, IEnumerable<IdClass> keep, Action perform, Action revert)
+    /// <param name="keepValues">Whether <paramref name="objects"/> keep their current values.</param>
+    /// <param name="document">The document the step belongs to; the current one when null.</param>
+    public void Perform(string label, IEnumerable<IdClass> objects, Action perform, Action revert,
+        bool keepValues = false, Guid? document = null)
     {
-        ArgumentNullException.ThrowIfNull(keep);
+        ArgumentNullException.ThrowIfNull(objects);
         ArgumentNullException.ThrowIfNull(perform);
         ArgumentNullException.ThrowIfNull(revert);
 
         Flush();
-        if (CurrentDocument is not { } document)
+        var owner = document ?? CurrentDocument ?? ProjectDocument;
+        var before = Capture(objects);
+
+        if (keepValues)
         {
-            perform();
-            return;
+            // Pushed before it runs, so a rebuild the change causes moves the step to the rebuilt objects too.
+            history.Push(new UndoStep(label, owner, before, before) { UndoEffect = revert, RedoEffect = perform },
+                mergeable: false);
+            try
+            {
+                Run(perform);
+            }
+            catch
+            {
+                history.CancelLatest();
+                throw;
+            }
+        }
+        else
+        {
+            Run(perform);
+            history.Push(new UndoStep(label, owner, before, Capture(before.Keys))
+                { UndoEffect = revert, RedoEffect = perform }, mergeable: false);
         }
 
-        var states = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
-        foreach (var target in keep) states[target] = ObjectState.Capture(target);
-
-        // Pushed before it runs, so a rebuild the change causes moves the step to the rebuilt objects too.
-        history.Push(new UndoStep(label, document, states, states) { UndoEffect = revert, RedoEffect = perform },
-            mergeable: false);
-        Run(perform);
+        WatchSelection();
         Changed?.Invoke();
+    }
+
+    /// <summary>Starts a gesture, such as a gizmo drag: everything it changes, however long, is one step.</summary>
+    public void BeginGesture()
+    {
+        if (gestures++ > 0) return;
+
+        Flush();
+        gestureStep = Guid.Empty;
+    }
+
+    /// <summary>Ends the gesture <see cref="BeginGesture"/> started.</summary>
+    public void EndGesture()
+    {
+        if (gestures == 0) return;
+
+        Flush();
+        if (--gestures == 0) gestureStep = Guid.Empty;
+    }
+
+    static Dictionary<IdClass, ObjectState> Capture(IEnumerable<IdClass> objects)
+    {
+        var states = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
+        foreach (var target in objects) states[target] = ObjectState.Capture(target);
+        return states;
     }
 
     /// <summary>Notes an edit that did not go through the open scene, such as one to an inspected asset.</summary>
@@ -157,7 +208,18 @@ public sealed class UndoService : IDisposable
         if (before.Count == 0) return;
 
         if (InspectedContent is { } inspection) inspectedAssets[document] = inspection;
-        history.Push(new UndoStep(label ?? EditLabel(before.Keys), document, before, after), mergeable: !explicitStep);
+        var step = new UndoStep(label ?? EditLabel(before.Keys), document, before, after);
+        if (gestures > 0 && gestureStep != Guid.Empty
+            && history.UndoSteps is [.., { } latest] && latest.Id == gestureStep)
+        {
+            history.MergeIntoLatest(step);
+        }
+        else
+        {
+            history.Push(step, mergeable: !explicitStep && gestures == 0);
+            if (gestures > 0) gestureStep = history.UndoSteps[^1].Id;
+        }
+
         Changed?.Invoke();
     }
 
@@ -168,7 +230,7 @@ public sealed class UndoService : IDisposable
         if (!CanUndo) return;
 
         Show(history.UndoSteps[^1].Document);
-        Finish(Run(history.Undo));
+        Finish(RunEffect(history.Undo, "undo"));
     }
 
     /// <summary>Reapplies the latest undone step, bringing its document to the front first.</summary>
@@ -178,7 +240,22 @@ public sealed class UndoService : IDisposable
         if (!CanRedo) return;
 
         Show(history.RedoSteps[^1].Document);
-        Finish(Run(history.Redo));
+        Finish(RunEffect(history.Redo, "redo"));
+    }
+
+    // A step whose effect failed, such as a file that could not be moved back, stays in place to be tried again.
+    UndoStep? RunEffect(Func<UndoStep?> action, string what)
+    {
+        try
+        {
+            return Run(action);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or InvalidOperationException)
+        {
+            Log.Logger.LogError(exception, "Could not {Action} the last change", what);
+            return null;
+        }
     }
 
     /// <inheritdoc />
@@ -189,6 +266,14 @@ public sealed class UndoService : IDisposable
         sceneTree.SceneRebuilt -= OnSceneRebuilt;
         assets.AssetAltered -= OnAssetAltered;
         assets.AssetClosed -= OnAssetClosed;
+        assets.AssetSaved -= OnAssetSaved;
+    }
+
+    void OnAssetSaved(Asset asset)
+    {
+        Flush();
+        savedAt[asset.Id] = history.LatestFor(asset.Id);
+        history.Seal(asset.Id);
     }
 
     // An asset step shows the asset in the inspector; a scene step makes its scene the open one.
@@ -228,7 +313,7 @@ public sealed class UndoService : IDisposable
         if (step is null) return;
 
         if (inspectedAssets.TryGetValue(step.Document, out var inspection)) AssetRestored?.Invoke(inspection);
-        else RefreshScene(step);
+        else if (step.Document != ProjectDocument) RefreshScene(step);
 
         altered = false;
         WatchSelection();
@@ -247,6 +332,10 @@ public sealed class UndoService : IDisposable
             // A step can take the selected node out of the scene, such as undoing its creation.
             if (inspector.SelectedNode is { } selected && !InScene(selected)) inspector.ClearSelection();
             else inspector.Select(inspector.SelectedObject);
+
+            // Back at the step the scene was saved at, its content is what is on disk again.
+            if (savedAt.TryGetValue(step.Document, out var saved) && saved == history.LatestFor(step.Document))
+                assets.MarkClean(step.Document);
         }
         finally
         {
@@ -296,6 +385,7 @@ public sealed class UndoService : IDisposable
     {
         history.Remove(asset.Id);
         inspectedAssets.Remove(asset.Id);
+        savedAt.Remove(asset.Id);
         Changed?.Invoke();
     }
 

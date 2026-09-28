@@ -262,7 +262,7 @@ public class UndoTests
         var file = "old";
 
         undo.Perform("Apply to Prefab", [box], () => { file = "new"; box.Name = "Changed by rebuild"; },
-            () => { file = "old"; box.Name = "Changed by rebuild"; });
+            () => { file = "old"; box.Name = "Changed by rebuild"; }, keepValues: true);
         Assert.Equal("new", file);
 
         undo.Undo();
@@ -272,5 +272,90 @@ public class UndoTests
         undo.Redo();
         Assert.Equal("new", file);
         Assert.Equal("Box", box.Name);
+    }
+
+    /// <summary>Undoing back to the saved step makes the scene clean again; undoing further dirties it.</summary>
+    [Fact]
+    public void Undo_ToTheSavedStep_ClearsTheDirtyMarker()
+    {
+        var box = AddChild("Box");
+        inspector.Select(box);
+        box.Name = "Saved";
+        EndFrame();
+        assets.SaveAsset(scene);
+
+        box.Name = "Edited";
+        EndFrame();
+        Assert.True(scene.IsModified);
+
+        undo.Undo();
+        Assert.Equal("Saved", box.Name);
+        Assert.False(scene.IsModified);
+
+        undo.Undo();
+        Assert.True(scene.IsModified);
+    }
+
+    /// <summary>A gesture is one step, whatever it changes and however long it lasts.</summary>
+    [Fact]
+    public void Gesture_IsOneStep()
+    {
+        var box = AddChild("Box");
+        box.AddComponent(new LightComponent());
+        inspector.Select(box);
+
+        undo.BeginGesture();
+        box.Transform.Position = new Vector3(1f, 0f, 0f);
+        EndFrame();
+        box.GetComponent<LightComponent>()!.Intensity = 3f;
+        EndFrame();
+        undo.RecordObject(root, "Other");
+        box.Transform.Position = new Vector3(2f, 0f, 0f);
+        EndFrame();
+        undo.EndGesture();
+
+        Assert.Single(undo.History.UndoSteps);
+        undo.Undo();
+        Assert.Equal(Vector3.Zero, box.Transform.Position);
+        Assert.Equal(1f, box.GetComponent<LightComponent>()!.Intensity);
+    }
+
+    /// <summary>A change that throws records nothing and keeps what could be redone.</summary>
+    [Fact]
+    public void Perform_ThatThrows_RecordsNothing()
+    {
+        var box = AddChild("Box");
+        inspector.Select(box);
+        box.Name = "Crate";
+        EndFrame();
+        undo.Undo();
+
+        Assert.Throws<InvalidOperationException>(() => undo.Perform("Apply to Prefab", [box],
+            () => throw new InvalidOperationException(), () => { }, keepValues: true));
+
+        Assert.False(undo.CanUndo);
+        Assert.True(undo.CanRedo);
+    }
+
+    /// <summary>A node deleted before a rebuild comes back as a rebuilt copy with the same id.</summary>
+    [Fact]
+    public void Undo_OfDeleteAfterRebuild_RestoresTheNode()
+    {
+        var box = AddChild("Box");
+        undo.RecordObject(root, "Delete");
+        sceneTree.DetachNode(box);
+        EndFrame();
+
+        var rebuilt = NodeCloner.DeepClone(root)!;
+        typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(sceneTree, rebuilt);
+        RaiseRebuilt(root, rebuilt);
+
+        undo.Undo();
+
+        var restored = Assert.Single(rebuilt.Children);
+        Assert.Equal(box.Id, restored.Id);
+        Assert.NotSame(box, restored);
+        Assert.Same(rebuilt, restored.Parent);
     }
 }

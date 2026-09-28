@@ -47,4 +47,34 @@ public class AssetAutoSaveTests : IDisposable
 
         Assert.False(autoSave.HasPending);
     }
+
+    /// <summary>Choosing not to save drops the pending edits; nothing is written.</summary>
+    [Fact]
+    public void UnsavedWork_DiscardAll_WritesNothing()
+    {
+        var autoSave = new AssetAutoSave(inspections, TimeSpan.FromHours(1));
+        using var workspace = new AssetWorkspace(new AssetManager(), new SettingsService());
+        var unsaved = new UnsavedWork(workspace, autoSave);
+        autoSave.MarkChanged(Inspection(isPayload: true, new ObjectReferencesTests.Stats { Health = 7 }));
+        Assert.True(unsaved.Any);
+
+        unsaved.DiscardAll();
+        autoSave.Flush(force: true);
+
+        Assert.False(unsaved.Any);
+        Assert.False(File.Exists(path));
+    }
+
+    /// <summary>Choosing to save writes the pending edits at once.</summary>
+    [Fact]
+    public void UnsavedWork_SaveAll_WritesPendingEdits()
+    {
+        var autoSave = new AssetAutoSave(inspections, TimeSpan.FromHours(1));
+        using var workspace = new AssetWorkspace(new AssetManager(), new SettingsService());
+        autoSave.MarkChanged(Inspection(isPayload: true, new ObjectReferencesTests.Stats { Health = 7 }));
+
+        new UnsavedWork(workspace, autoSave).SaveAll();
+
+        Assert.Contains("7", File.ReadAllText(path), StringComparison.Ordinal);
+    }
 }
