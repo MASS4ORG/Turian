@@ -4,18 +4,17 @@
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <PackageId>Gaya.Plugin.Turian</PackageId>
-    </PropertyGroup>
-
-    <PropertyGroup>
-        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
     </PropertyGroup>
 
     <ItemGroup>
         <EmbeddedResource Include="Localization/*.strings"/>
         <EmbeddedResource Include="Resources/logo.png"/>
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
@@ -41,14 +40,14 @@
         </PropertyGroup>
     </Target>
 
-    <!-- Guinevere window. Local checkout in dev; falls back to the published package. -->
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
     </ItemGroup>
 
+    <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12"/>
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="4.2.0" ExcludeAssets="$(GuineverePackageExcludeAssets)" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.2.0" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
 
 </Project>

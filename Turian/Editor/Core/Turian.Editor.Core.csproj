@@ -3,9 +3,8 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-        <NoWarn>$(NoWarn);NU1701</NoWarn>
+        <NoWarn>NU1701</NoWarn>
         <Nullable>enable</Nullable>
-        <UseFileScopedNamespaces>true</UseFileScopedNamespaces>
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian.Editor.Core</RootNamespace>
@@ -14,9 +13,6 @@
     </PropertyGroup>
 
     <!-- Internal libraries -->
-    <PropertyGroup>
-        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
-    </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>

@@ -8,15 +8,11 @@
         <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
     </PropertyGroup>
 
-    <!-- Exclude a folder from compilation -->
+    <!-- Internal libraries -->
     <ItemGroup>
-        <Compile Remove="Platform\**\*"/>
-    </ItemGroup>
-
-    <!-- Include a folder as an asset -->
-    <ItemGroup>
-        <Content Include="Platform\**\*" Exclude="Platform\**\bin\**;Platform\**\obj\**"
-                 CopyToOutputDirectory="PreserveNewest"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -27,22 +23,14 @@
         <PackageReference Include="SkiaSharp" Version="4.152.1" />
     </ItemGroup>
 
-    <!-- Internal libraries -->
-    <PropertyGroup>
-        <SolutionDir Condition="'$(SolutionDir)' == ''">../../..</SolutionDir>
-    </PropertyGroup>
+    <!-- The platform host template is copied, not compiled -->
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
+        <Compile Remove="Platform/**/*"/>
     </ItemGroup>
-  <!-- Excalibur controls. A gitignored .csproj.user points GuinevereLocalPath at a local checkout;
-       CI has none and restores the package instead. Uncomment the package once it is published. -->
-  <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-    <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- <PackageReference Include="MASS4.Guinevere.Excalibur" Version="2.0.1" ExcludeAssets="$(GuineverePackageExcludeAssets)" /> -->
-  </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="Platform/**/*" Exclude="Platform/**/bin/**;Platform/**/obj/**"
+                 CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
 
 </Project>

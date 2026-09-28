@@ -32,5 +32,5 @@ public sealed class NotesPlugin : IPlugin
 implementation. The full contract — lifecycle, every registry, versioning policy and the boundary rules —
 is documented in [`docs/decisions/Gaya-Platform.md`](https://github.com/MASS4ORG/Turian/blob/main/docs/decisions/Gaya-Platform.md).
 
-Gaya lives in the Turian repository for now and is versioned independently of it. It does not reference
+Gaya lives in the Turian repository for now and ships on Turian's version (also for now). It does not reference
 Turian in any direction; that boundary is enforced by a test.

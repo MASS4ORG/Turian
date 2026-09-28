@@ -63,8 +63,7 @@ sealed partial class Build
                                 .SetPublishTrimmed(publishTrimmed)
                                 .SetProperty("UseAppHost", "false")
                                 .SetProperty("SatelliteResourceLanguages", "en")
-                                .SetProperty("GuineverePackageExcludeAssets", "none")    // Needed to build locally with prod config
-                                .AddProcessAdditionalArguments("-p:GuinevereLocalPath=") // Needed to build locally with prod config
+                                .AddProcessAdditionalArguments("-p:GuinevereLocalPath=") // Forces the published package over a dev checkout
                                 .SetAuthors("Bruno Massa")
                                 .SetVersion(CurrentVersion)
                                 .SetAssemblyVersion(CurrentVersion)
