@@ -42,6 +42,15 @@ public sealed class SceneCameraController
     /// <summary>Gets or sets whether the right mouse button is held.</summary>
     public bool IsRightButton { get; set; }
 
+    /// <summary>Sets the three button flags from the button that owns the viewport gesture.</summary>
+    /// <param name="button">The owning button, or null when none is held.</param>
+    public void SetActiveButton(ViewportButton? button)
+    {
+        IsLeftButton = button == ViewportButton.Left;
+        IsMiddleButton = button == ViewportButton.Middle;
+        IsRightButton = button == ViewportButton.Right;
+    }
+
     /// <summary>Gets the current navigation mode.</summary>
     public NavigationMode Mode => mode;
 

@@ -27,24 +27,29 @@ public static class LocalizationExchange
         var table = new StringTable(locale);
 
         foreach (var unit in root.Descendants().Where(e => e.Name.LocalName == "trans-unit"))
-        {
-            var source = unit.Elements().FirstOrDefault(e => e.Name.LocalName == "source")?.Value ?? string.Empty;
-            var targetElement = unit.Elements().FirstOrDefault(e => e.Name.LocalName == "target");
-            var target = targetElement?.Value;
-            var note = unit.Elements().FirstOrDefault(e => e.Name.LocalName == "note")?.Value;
-
-            table.Add(new StringTableEntry
-            {
-                Key = (string?)unit.Attribute("id") ?? source,
-                Source = source,
-                Translation = string.IsNullOrEmpty(target) ? null : target,
-                Note = note,
-                State = (string?)targetElement?.Attribute("state") ?? "new",
-            });
-        }
+            table.Add(ReadTransUnit(unit));
 
         return table;
     }
+
+    static StringTableEntry ReadTransUnit(XElement unit)
+    {
+        var source = Child(unit, "source")?.Value ?? string.Empty;
+        var target = Child(unit, "target");
+
+        return new StringTableEntry
+        {
+            Key = (string?)unit.Attribute("id") ?? source,
+            Source = source,
+            Translation = target?.Value is { Length: > 0 } translation ? translation : null,
+            Note = Child(unit, "note")?.Value,
+            State = (string?)target?.Attribute("state") ?? "new",
+        };
+    }
+
+    // XLIFF files come with and without the urn:oasis namespace, so elements match by local name.
+    static XElement? Child(XElement parent, string localName) =>
+        parent.Elements().FirstOrDefault(e => e.Name.LocalName == localName);
 
     /// <summary>Serializes a table as an XLIFF 1.2 document targeting its locale.</summary>
     /// <param name="table">The table to export.</param>
