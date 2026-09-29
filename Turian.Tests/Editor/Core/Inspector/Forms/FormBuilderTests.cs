@@ -1,3 +1,6 @@
+// The fixtures' setters deliberately discard their values.
+// ReSharper disable ValueParameterNotUsed
+
 namespace Turian.Tests.Editor;
 
 /// <summary>
@@ -43,6 +46,7 @@ public class FormBuilderTests
         public int DefaultSecond { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class UnsafeTarget
     {
         public int Valid { get; set; }

@@ -34,7 +34,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
             .. from directory in directories.Distinct()
             from fileName in fileNames
             let path = Path.Combine(directory, fileName)
-            where System.IO.File.Exists(path)
+            where File.Exists(path)
             select path,
 
             .. fileNames
@@ -214,7 +214,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
     /// <param name="import">The parsed file.</param>
     /// <param name="filePath">Absolute path of the FBX file, which texture paths are relative to.</param>
     /// <param name="context">The import pipeline.</param>
-    /// <returns>Asset ids indexed by texture, <see cref="Guid.Empty"/> where the file is missing.</returns>
+    /// <returns>Asset ids indexed by texture, <see cref="System.Guid.Empty"/> where the file is missing.</returns>
     static Guid[] ResolveTextures(FbxImport import, string filePath, IAssetImportContext context)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty;

@@ -32,7 +32,7 @@ public static class CsProjectGenerator
     /// <param name="settings"></param>
     /// <param name="logger"></param>
     /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="System.InvalidOperationException"></exception>
     public static ProjectRootElement GenerateUserCode(IBuildAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -64,7 +64,7 @@ public static class CsProjectGenerator
     /// <param name="logger"></param>
     /// <param name="mode">Controls whether the executable is generated for play mode or export.</param>
     /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <exception cref="System.InvalidOperationException"></exception>
     public static ProjectRootElement GenerateExecutable(
         IBuildAppSettings settings,
         ILogger logger,

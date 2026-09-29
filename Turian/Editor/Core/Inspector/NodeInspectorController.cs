@@ -90,7 +90,7 @@ public sealed class NodeInspectorController
     /// </summary>
     /// <param name="component">The component to remove from the selected node.</param>
     /// <returns>True if the component was successfully removed; otherwise, false.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when the component is null.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown when the component is null.</exception>
     public bool RemoveComponent(Component component)
     {
         ArgumentNullException.ThrowIfNull(component);

@@ -30,17 +30,20 @@
         "CompileShaders",
         "ContainerBuild",
         "ContainerPush",
+        "CreateReleaseCommit",
+        "CreateReleaseTag",
         "DebianPackage",
         "Flatpak",
-        "GitHubRelease",
-        "GitLabRelease",
+        "GitHubCreateRelease",
+        "GitHubCreateTag",
+        "GitLabCreateRelease",
+        "GitLabCreateTag",
         "Pack",
         "PackNuGet",
         "Publish",
         "PushNuGet",
         "Restore",
         "ShowCurrentVersion",
-        "Tag",
         "Test",
         "TestReport",
         "UpdateChangelog",
@@ -129,7 +132,7 @@
         },
         "GithubRepository": {
           "type": "string",
-          "description": "GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)"
+          "description": "GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)"
         },
         "GithubToken": {
           "type": "string",
@@ -145,6 +148,10 @@
           "description": "GitLab personal/project access token with api + write_repository scope. Omit to skip pushing/releasing to GitLab",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
+        "NoLocalPackages": {
+          "type": "boolean",
+          "description": "Build against the published packages, ignoring local checkouts from Directory.Build.local.props"
+        },
         "NugetApiKey": {
           "type": "string",
           "description": "NuGet API key used by PushNuGet. Absent = pack only"
@@ -152,6 +159,10 @@
         "NugetSource": {
           "type": "string",
           "description": "NuGet feed to push to (default: nuget.org)"
+        },
+        "PackagingDryRun": {
+          "type": "boolean",
+          "description": "Generate platform package manifests with a placeholder URL and without publishing"
         },
         "PublishDirectory": {
           "type": "string",

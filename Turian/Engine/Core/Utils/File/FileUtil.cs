@@ -11,7 +11,7 @@ public static class FileUtil
     /// <param name="filename">The name of the shader file.</param>
     /// <param name="renderSystemName">The name of the render system (for error messages).</param>
     /// <returns>The bytes of the shader file.</returns>
-    /// <exception cref="ApplicationException">Thrown when the shader file is not found.</exception>
+    /// <exception cref="System.ApplicationException">Thrown when the shader file is not found.</exception>
     public static byte[] GetShaderBytes(string filename, string renderSystemName)
     {
         // Get the executing assembly.

@@ -68,10 +68,10 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
             var pixels = new byte[size * size * 4];
             svc.CopyPixels(pixels);
 
-            // OffscreenFrameTarget is B8G8R8A8Unorm; the centre pixel should be the panel's green.
-            var centre = (((size / 2) * size) + (size / 2)) * 4;
-            Assert.True(pixels[centre + 1] > 200 && pixels[centre + 0] < 80 && pixels[centre + 2] < 80,
-                $"expected green panel at centre, got B={pixels[centre]} G={pixels[centre + 1]} R={pixels[centre + 2]}");
+            // OffscreenFrameTarget is B8G8R8A8Unorm; the center pixel should be the panel's green.
+            var center = (((size / 2) * size) + (size / 2)) * 4;
+            Assert.True(pixels[center + 1] > 200 && pixels[center + 0] < 80 && pixels[center + 2] < 80,
+                $"expected green panel at center, got B={pixels[center]} G={pixels[center + 1]} R={pixels[center + 2]}");
             svc.WorldUiSource = null;
         }
     }

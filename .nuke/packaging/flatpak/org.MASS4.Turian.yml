@@ -22,7 +22,7 @@ modules:
     buildsystem: simple
     build-commands:
       - /usr/lib/sdk/dotnet10/bin/install-sdk.sh
-      - dotnet publish Turian/Editor/Studio/Turian.Editor.Studio.csproj -c Release -r linux-x64 --self-contained false -o /app/lib/turian/lib -p:GuinevereLocalPath= -p:GuineverePackageExcludeAssets=none
+      - dotnet publish Turian/Editor/Studio/Turian.Editor.Studio.csproj -c Release -r linux-x64 --self-contained false -o /app/lib/turian/lib -p:NoLocalPackages=true
       - install -Dm755 .nuke/packaging/flatpak/turian-studio /app/bin/turian-studio
       - install -Dm644 .nuke/packaging/flatpak/org.MASS4.Turian.desktop /app/share/applications/org.MASS4.Turian.desktop
       - install -Dm644 .nuke/packaging/flatpak/org.MASS4.Turian.metainfo.xml /app/share/metainfo/org.MASS4.Turian.metainfo.xml

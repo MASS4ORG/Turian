@@ -6,6 +6,13 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
+    /// <summary>
+    /// Builds against the published packages even when Directory.Build.local.props points at local checkouts;
+    /// switching modes needs a fresh restore. Pack and publish refuse or warn without it (Directory.Build.targets).
+    /// </summary>
+    [Parameter("Build against the published packages, ignoring local checkouts from Directory.Build.local.props")]
+    readonly bool NoLocalPackages;
+
     Target Clean => td => td
         .Executes(() =>
         {
@@ -28,7 +35,9 @@ sealed partial class Build
         .DependsOn(Clean)
         .Executes(() =>
         {
-            _ = DotNetRestore(s => s.SetProjectFile(Solution));
+            _ = DotNetRestore(s => s
+                .SetProjectFile(Solution)
+                .SetProperty("NoLocalPackages", NoLocalPackages));
         });
 
     Target Compile => td => td
@@ -42,6 +51,7 @@ sealed partial class Build
                 .SetNoLogo(true)
                 .SetProjectFile(Solution)
                 .SetConfiguration(Config)
+                .SetProperty("NoLocalPackages", NoLocalPackages)
                 .EnableNoRestore()
             );
 

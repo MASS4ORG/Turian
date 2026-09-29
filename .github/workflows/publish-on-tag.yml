@@ -1,10 +1,10 @@
-name: Publish
+name: Publish on tag
 
 on:
   push:
     tags:
       - "v*"
-  # Dispatched by release.yml, whose own tag push cannot trigger this workflow.
+  # Dispatched by check-new-release.yml, whose own tag push cannot trigger this workflow.
   workflow_dispatch:
 
 env:
@@ -32,11 +32,11 @@ jobs:
             rid: osx-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -60,6 +60,7 @@ jobs:
           .\build.ps1 Pack DebianPackage `
             --configuration "Release" `
             --runtime-identifier "${{ matrix.rid }}" `
+            --skip-shaders `
             --publish-self-contained "$env:PUBLISH_SELF_CONTAINED" `
             --publish-single-file "$env:PUBLISH_SINGLE_FILE" `
             --publish-trimmed "$env:PUBLISH_TRIMMED" `
@@ -73,12 +74,13 @@ jobs:
           ./build.sh Pack DebianPackage \
             --configuration "Release" \
             --runtime-identifier "${{ matrix.rid }}" \
+            --skip-shaders \
             --publish-self-contained "$PUBLISH_SELF_CONTAINED" \
             --publish-single-file "$PUBLISH_SINGLE_FILE" \
             --publish-trimmed "$PUBLISH_TRIMMED" \
             --verbosity minimal
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ matrix.rid }}
           path: artifacts/*
@@ -91,15 +93,15 @@ jobs:
     env:
       TURIAN_BUILD_RESULT: ${{ needs.build.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: artifacts-*
           path: artifacts
@@ -117,7 +119,7 @@ jobs:
         shell: bash
         run: |
           chmod +x ./build.sh
-          ./build.sh GitHubRelease \
+          ./build.sh GitHubCreateRelease \
             --github-repository "${{ github.repository }}" \
             --github-token "${{ secrets.GITHUB_TOKEN }}" \
             --verbosity minimal
@@ -126,7 +128,7 @@ jobs:
         if: vars.GITLAB_REPOSITORY_PATH != ''
         shell: bash
         run: |
-          ./build.sh GitLabRelease \
+          ./build.sh GitLabCreateRelease \
             --gitlab-project-path "${{ vars.GITLAB_REPOSITORY_PATH }}" \
             --gitlab-token "${{ secrets.GITLAB_RELEASE_TOKEN }}" \
             --verbosity minimal
@@ -137,11 +139,11 @@ jobs:
   container:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 

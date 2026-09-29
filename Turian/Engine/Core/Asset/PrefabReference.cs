@@ -42,8 +42,8 @@ public sealed class PrefabReference<TComponent> : AssetReference<Prefab>
     /// <param name="sceneManager">The scene manager used to resolve and instantiate the prefab.</param>
     /// <param name="parent">Optional parent node. When null, the active scene root is used.</param>
     /// <returns>The first matching component on the instantiated hierarchy.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="sceneManager"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="sceneManager"/> is null.</exception>
+    /// <exception cref="System.InvalidOperationException">
     /// Thrown when the reference is empty or the instantiated hierarchy does not contain
     /// a component of type <typeparamref name="TComponent"/>.
     /// </exception>

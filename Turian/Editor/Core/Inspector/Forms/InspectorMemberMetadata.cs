@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 
 namespace Turian.Editor.Core;
 
@@ -9,7 +8,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public sealed class InspectorMemberMetadata
 {
-    static readonly ConditionalWeakTable<MemberInfo, Lazy<InspectorMemberMetadata>> cache = new();
+    static readonly ConditionalWeakTable<MemberInfo, Lazy<InspectorMemberMetadata>> Cache = new();
 
     readonly IReadOnlyList<Attribute> attributes;
     readonly Lazy<Func<object, object?>> read;
@@ -37,7 +36,7 @@ public sealed class InspectorMemberMetadata
         var isPublic = member switch
         {
             PropertyInfo property => (property.GetMethod?.IsPublic ?? false)
-                                     && property.CanRead && property.CanWrite,
+                                     && property is { CanRead: true, CanWrite: true },
             FieldInfo field => field.IsPublic,
             _ => false
         };
@@ -49,7 +48,7 @@ public sealed class InspectorMemberMetadata
     public static InspectorMemberMetadata For(MemberInfo member)
     {
         ArgumentNullException.ThrowIfNull(member);
-        return cache.GetValue(member, static key =>
+        return Cache.GetValue(member, static key =>
             new Lazy<InspectorMemberMetadata>(() => new InspectorMemberMetadata(key))).Value;
     }
 
@@ -88,7 +87,7 @@ public sealed class InspectorMemberMetadata
         [.. attributes.OfType<TAttribute>()];
 
     IReadOnlyList<Attribute> Select(Func<Attribute, bool> predicate) =>
-        Array.AsReadOnly(attributes.Where(predicate).ToArray());
+        Array.AsReadOnly([.. attributes.Where(predicate)]);
 
     static Func<object, object?> CompileGetter(MemberInfo member)
     {

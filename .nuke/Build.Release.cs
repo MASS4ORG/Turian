@@ -10,8 +10,8 @@ sealed partial class Build
     [Parameter("GitLab group/project path, e.g. turian/Turian (default: turian/Turian)")]
     readonly string GitlabProjectPath = "turian/Turian";
 
-    [Parameter("GitHub owner/repo path, e.g. turian/Turian (default: turian/Turian)")]
-    readonly string GithubRepository = "turian/Turian";
+    [Parameter("GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)")]
+    readonly string GithubRepository = "MASS4ORG/Turian";
 
     [Parameter("Branch the release commit is pushed to (default: main)")]
     readonly string ReleaseBranch = "main";
@@ -25,25 +25,22 @@ sealed partial class Build
     readonly string GithubToken;
 
     /// <summary>
-    /// Commits the changelog, tags the release and pushes the commit+tag to every host a token
-    /// was supplied for. Pushing to both hosts keeps a standalone GitHub mirror in sync without
-    /// relying on platform-native mirroring; a host that already has the tag is skipped so this
-    /// is safe to run redundantly from both GitLab and GitHub schedules.
+    /// Commits the changelog once before creating the release tag.
     /// </summary>
-    public Target Tag => td =>
-        td
-            .DependsOn(UpdateChangelog)
-            .OnlyWhenDynamic(() => HasNewCommits)
-            .Executes(() =>
-            {
-                RunGit("set release bot name", "config", "user.name", "Turian Bot");
-                RunGit("set release bot email", "config", "user.email", "massa+turian@brunomassa.com");
-                RunGit("commit changelog", "-c", "commit.gpgsign=false", "commit", "-am", $"chore(release): {Version}");
-                RunGit("tag release", "-c", "tag.gpgsign=false", "tag", TagName);
+    public Target CreateReleaseCommit => td => td
+        .DependsOn(UpdateChangelog)
+        .OnlyWhenDynamic(() => HasNewCommits)
+        .Executes(() =>
+        {
+            RunGit("set release bot name", "config", "user.name", "Turian Bot");
+            RunGit("set release bot email", "config", "user.email", "massa+turian@brunomassa.com");
+            RunGit("commit changelog", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-am", $"chore(release): {Version}");
+        });
 
-                PushToRemote("GitLab", GitlabToken, GitlabProjectPath, "gitlab.com", "oauth2");
-                PushToRemote("GitHub", GithubToken, GithubRepository, "github.com", "x-access-token");
-            });
+    public Target CreateReleaseTag => td => td
+        .DependsOn(CreateReleaseCommit)
+        .OnlyWhenDynamic(() => HasNewCommits)
+        .Executes(() => RunGit("tag release", "-c", "tag.gpgsign=false", "tag", TagName));
 
     void PushToRemote(string name, string token, string repositoryPath, string host, string credentialUser)
     {
@@ -91,108 +88,4 @@ sealed partial class Build
         if (!string.IsNullOrEmpty(GitlabToken)) message = message.Replace(GitlabToken, "[redacted]", StringComparison.Ordinal);
         throw new InvalidOperationException($"Git {operation} failed (exit {process.ExitCode}): {message.Trim()}");
     }
-
-    /// <summary>
-    /// Creates the GitLab release for the current tag: every archive in <see cref="ArtifactsDirectory"/>
-    /// is uploaded to the project's generic package registry and linked from the release.
-    /// </summary>
-    public Target GitLabRelease => td =>
-        td
-            .Requires(() => GitlabToken)
-            .Executes(async () =>
-            {
-                using var http = new HttpClient();
-                http.BaseAddress = new Uri("https://gitlab.com/api/v4/");
-                http.DefaultRequestHeaders.Add("PRIVATE-TOKEN", GitlabToken);
-
-                var encodedProject = Uri.EscapeDataString(GitlabProjectPath);
-                var links = new List<object>();
-
-                foreach (var archive in ArtifactsDirectory.GlobFiles("*.zip", "*.deb", "*.exe"))
-                {
-                    var packageUrl = $"projects/{encodedProject}/packages/generic/turian/{Version}/{archive.Name}";
-                    using var content = new ByteArrayContent(await File.ReadAllBytesAsync(archive));
-                    var response = await http.PutAsync(packageUrl, content);
-                    response.EnsureSuccessStatusCode();
-
-                    links.Add(new
-                    {
-                        name = archive.Name,
-                        url = $"https://gitlab.com/api/v4/{packageUrl}",
-                        direct_asset_path = $"/{archive.Name}",
-                        link_type = "package",
-                    });
-                    Log.Information("Uploaded {Archive} to GitLab generic package registry", archive.Name);
-                }
-
-                var payload = JsonSerializer.Serialize(new
-                {
-                    tag_name = TagName,
-                    name = TagName,
-                    description = ReadChangelogSection(TagName),
-                    assets = new { links },
-                });
-
-                var releaseResponse = await http.PostAsync(
-                    $"projects/{encodedProject}/releases",
-                    new StringContent(payload, Encoding.UTF8, "application/json"));
-                releaseResponse.EnsureSuccessStatusCode();
-                Log.Information("Created GitLab release {TagName}", TagName);
-            });
-
-    /// <summary>
-    /// Creates the GitHub release for the current tag and uploads every archive in
-    /// <see cref="ArtifactsDirectory"/> as a release asset.
-    /// </summary>
-    public Target GitHubRelease => td =>
-        td
-            .Requires(() => GithubToken)
-            .Executes(async () =>
-            {
-                using var http = new HttpClient();
-                http.BaseAddress = new Uri("https://api.github.com/");
-                http.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
-                http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-
-                var payload = JsonSerializer.Serialize(new
-                {
-                    tag_name = TagName,
-                    name = TagName,
-                    body = ReadChangelogSection(TagName) +
-                        (Environment.GetEnvironmentVariable("TURIAN_BUILD_RESULT") == "failure"
-                            ? "\n\nSome platform builds failed. Downloadable assets are available only for successful builds; see the publish workflow run."
-                            : string.Empty),
-                    draft = false,
-                    prerelease = false,
-                });
-
-                var releaseResponse = await http.PostAsync(
-                    $"repos/{GithubRepository}/releases",
-                    new StringContent(payload, Encoding.UTF8, "application/json"));
-                releaseResponse.EnsureSuccessStatusCode();
-
-                using var releaseDocument = JsonDocument.Parse(await releaseResponse.Content.ReadAsStringAsync());
-                var releaseId = releaseDocument.RootElement.GetProperty("id").GetInt64();
-                Log.Information("Created GitHub release {TagName}", TagName);
-
-                using var uploadHttp = new HttpClient();
-                uploadHttp.BaseAddress = new Uri("https://uploads.github.com/");
-                uploadHttp.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
-                uploadHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
-                uploadHttp.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-
-                foreach (var archive in ArtifactsDirectory.GlobFiles("*.zip", "*.deb", "*.exe"))
-                {
-                    using var content = new ByteArrayContent(await File.ReadAllBytesAsync(archive));
-                    content.Headers.ContentType = new(archive.HasExtension("deb")
-                        ? "application/vnd.debian.binary-package"
-                        : archive.HasExtension("exe") ? "application/vnd.microsoft.portable-executable" : "application/zip");
-                    var uploadResponse = await uploadHttp.PostAsync(
-                        $"repos/{GithubRepository}/releases/{releaseId}/assets?name={Uri.EscapeDataString(archive.Name)}",
-                        content);
-                    uploadResponse.EnsureSuccessStatusCode();
-                    Log.Information("Uploaded {Archive} to GitHub release {TagName}", archive.Name, TagName);
-                }
-            });
 }

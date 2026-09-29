@@ -117,7 +117,7 @@ public static class ProjectIcon
         return stream.ToArray();
     }
 
-    /// <summary>The image fitted, centred and letterboxed, into a transparent square, as PNG.</summary>
+    /// <summary>The image fitted, centered and letterboxed, into a transparent square, as PNG.</summary>
     static byte[] EncodePng(SKBitmap image, int size)
     {
         using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));

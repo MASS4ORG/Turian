@@ -30,7 +30,7 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
     /// Parses a <c>{ … }</c> expression. The braces are required.
     /// </summary>
     /// <param name="text">The full expression including braces.</param>
-    /// <exception cref="FormatException">The text is not a well-formed binding expression.</exception>
+    /// <exception cref="System.FormatException">The text is not a well-formed binding expression.</exception>
     public static BindingExpression Parse(string text)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);

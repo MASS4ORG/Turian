@@ -5,7 +5,7 @@ public class CameraMathTests
 {
     static readonly Vector2 Viewport = new(960f, 540f);
 
-    /// <summary>The viewport centre casts a ray straight down the camera's forward axis.</summary>
+    /// <summary>The viewport center casts a ray straight down the camera's forward axis.</summary>
     [Fact]
     public void ScreenPointToRay_ViewportCenter_PointsAlongFront()
     {

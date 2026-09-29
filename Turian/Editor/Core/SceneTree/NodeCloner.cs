@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Deep-clones a <see cref="Node"/> hierarchy, assigning fresh <see cref="Guid"/> IDs
+/// Deep-clones a <see cref="Node"/> hierarchy, assigning fresh <see cref="System.Guid"/> IDs
 /// and wiring parent/child references. Does not touch any UI state.
 /// </summary>
 public static class NodeCloner

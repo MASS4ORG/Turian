@@ -60,7 +60,7 @@ public static class ObjectReferences
     /// <summary>The member ids read from data whose targets are not resolved yet.</summary>
     /// <param name="owner">The object holding the member.</param>
     /// <param name="member">The member name.</param>
-    /// <param name="ids">The pending ids; <see cref="Guid.Empty"/> marks an element that needs none.</param>
+    /// <param name="ids">The pending ids; <see cref="System.Guid.Empty"/> marks an element that needs none.</param>
     /// <returns>True when the member has pending ids.</returns>
     public static bool TryGetUnresolved(IdClass owner, string member, out Guid[] ids)
     {

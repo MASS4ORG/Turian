@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Turian.Editor.Core;
 
 /// <summary>
@@ -11,10 +9,10 @@ public static class FormBuilder
     const BindingFlags memberScope =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
-    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<InspectorMemberMetadata>>> membersByType = new();
-    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<MemberInfo>>> memberViewsByType = new();
-    static readonly ConditionalWeakTable<Type, Lazy<MethodInfo[]>> buttonMethodsByType = new();
-    static readonly InspectorMemberMetadata activeSwitch =
+    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<InspectorMemberMetadata>>> MembersByType = new();
+    static readonly ConditionalWeakTable<Type, Lazy<IReadOnlyList<MemberInfo>>> MemberViewsByType = new();
+    static readonly ConditionalWeakTable<Type, Lazy<MethodInfo[]>> ButtonMethodsByType = new();
+    static readonly InspectorMemberMetadata ActiveSwitch =
         InspectorMemberMetadata.For(typeof(Component).GetProperty(nameof(Component.IsActive))!);
 
     /// <summary>Builds the form for a plain object: one section holding its editable members.</summary>
@@ -49,26 +47,29 @@ public static class FormBuilder
     public static IReadOnlyList<MemberInfo> EditableMembers(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
-        return memberViewsByType.GetValue(type, static t =>
+        return MemberViewsByType.GetValue(type, static t =>
             new Lazy<IReadOnlyList<MemberInfo>>(() =>
-                Array.AsReadOnly(EditableMetadata(t).Select(metadata => metadata.Member).ToArray()))).Value;
+                Array.AsReadOnly([.. EditableMetadata(t).Select(metadata => metadata.Member)]))).Value;
     }
 
     /// <summary>Cached, ordered metadata for the visible members of a type.</summary>
     public static IReadOnlyList<InspectorMemberMetadata> EditableMetadata(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
-        return membersByType.GetValue(type, static t =>
+        return MembersByType.GetValue(type, static t =>
             new Lazy<IReadOnlyList<InspectorMemberMetadata>>(() =>
-                Array.AsReadOnly(t.GetMembers(memberScope)
-                    .Where(member => member is FieldInfo field && !field.FieldType.IsByRefLike
-                                     || member is PropertyInfo property && property.GetMethod is not null
-                                     && property.GetIndexParameters().Length == 0
-                                     && !property.PropertyType.IsByRefLike)
-                    .Select(InspectorMemberMetadata.For)
-                    .Where(metadata => metadata.IsVisible)
-                    .OrderBy(metadata => metadata.Priority)
-                    .ToArray()))).Value;
+                Array.AsReadOnly([
+                    .. t.GetMembers(memberScope)
+                        .Where(member => member is FieldInfo { FieldType.IsByRefLike: false } || member is PropertyInfo
+                            {
+                                GetMethod: not null
+                            } property
+                            && property.GetIndexParameters().Length == 0
+                            && !property.PropertyType.IsByRefLike)
+                        .Select(InspectorMemberMetadata.For)
+                        .Where(metadata => metadata.IsVisible)
+                        .OrderBy(metadata => metadata.Priority)
+                ]))).Value;
     }
 
     static FormSection SectionFor(
@@ -79,10 +80,10 @@ public static class FormBuilder
             .Select(metadata => new FormField(metadata.Member, target, mutationNotifier))
             .ToList();
 
-        if (target is Component && fields.TrueForAll(f => f.Name != activeSwitch.Member.Name))
-            fields.Insert(0, new FormField(activeSwitch.Member, target, mutationNotifier));
+        if (target is Component && fields.TrueForAll(f => f.Name != ActiveSwitch.Member.Name))
+            fields.Insert(0, new FormField(ActiveSwitch.Member, target, mutationNotifier));
 
-        var buttons = buttonMethodsByType.GetValue(target.GetType(), static t =>
+        var buttons = ButtonMethodsByType.GetValue(target.GetType(), static t =>
             new Lazy<MethodInfo[]>(() => [.. t
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .Where(method => method.GetCustomAttribute<ButtonAttribute>() is not null)

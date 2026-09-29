@@ -1,8 +1,8 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Maps stable <see cref="Guid"/> identifiers (declared via <see cref="TypeIdAttribute"/>)
-/// to runtime <see cref="Type"/> instances and vice versa. Used by the polymorphic JSON
+/// Maps stable <see cref="System.Guid"/> identifiers (declared via <see cref="TypeIdAttribute"/>)
+/// to runtime <see cref="System.Type"/> instances and vice versa. Used by the polymorphic JSON
 /// serializers so that serialized data survives renames, namespace changes and assembly
 /// moves of the annotated classes.
 /// </summary>
@@ -91,9 +91,9 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Registers a <see cref="Type"/> with its stable id. Subsequent registrations for the
+    /// Registers a <see cref="System.Type"/> with its stable id. Subsequent registrations for the
     /// same id overwrite previous entries (this matters for hot-reload of user code, where
-    /// a recompiled assembly produces a new <see cref="Type"/> instance for the same id).
+    /// a recompiled assembly produces a new <see cref="System.Type"/> instance for the same id).
     /// </summary>
     public static void Register(Guid id, Type type)
     {
@@ -109,7 +109,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Tries to look up a registered <see cref="Type"/> by its stable id.
+    /// Tries to look up a registered <see cref="System.Type"/> by its stable id.
     /// </summary>
     public static bool TryGetType(Guid id, out Type? type)
     {
@@ -125,7 +125,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Tries to look up a registered <see cref="Type"/> by its full name, the form asset catalogs
+    /// Tries to look up a registered <see cref="System.Type"/> by its full name, the form asset catalogs
     /// record. Only current registrations are searched, so hot-reloaded user code wins.
     /// </summary>
     public static bool TryGetType(string fullName, out Type? type)
@@ -142,7 +142,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Tries to look up the stable id assigned to a <see cref="Type"/>.
+    /// Tries to look up the stable id assigned to a <see cref="System.Type"/>.
     /// </summary>
     public static bool TryGetId(Type type, out Guid id)
     {
@@ -151,7 +151,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Resolves a registered <see cref="Type"/> by id, or throws if no type is registered
+    /// Resolves a registered <see cref="System.Type"/> by id, or throws if no type is registered
     /// for the given id.
     /// </summary>
     public static Type GetTypeOrThrow(Guid id)
@@ -167,7 +167,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Returns the stable id assigned to a <see cref="Type"/>, or throws if the type is
+    /// Returns the stable id assigned to a <see cref="System.Type"/>, or throws if the type is
     /// not annotated with <see cref="TypeIdAttribute"/>.
     /// </summary>
     public static Guid GetIdOrThrow(Type type)

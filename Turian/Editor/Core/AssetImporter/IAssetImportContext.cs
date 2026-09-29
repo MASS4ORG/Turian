@@ -13,7 +13,7 @@ public interface IAssetImportContext
     /// cache and is registered in the asset database, and returns its asset id.
     /// </summary>
     /// <param name="absolutePath">Absolute path of the file to register.</param>
-    /// <returns>The file's asset id, or <see cref="Guid.Empty"/> when it does not exist.</returns>
+    /// <returns>The file's asset id, or <see cref="System.Guid.Empty"/> when it does not exist.</returns>
     Guid EnsureAsset(string absolutePath);
 
     /// <summary>
@@ -27,7 +27,7 @@ public interface IAssetImportContext
     void ConfigureTexture(string absolutePath, bool isSrgb, bool flipGreenChannel);
 
     /// <summary>
-    /// A context that registers nothing and returns <see cref="Guid.Empty"/> for every path.
+    /// A context that registers nothing and returns <see cref="System.Guid.Empty"/> for every path.
     /// Importers fall back to whatever they can express without external assets.
     /// </summary>
     static IAssetImportContext None { get; } = new NullAssetImportContext();

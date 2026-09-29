@@ -9,6 +9,16 @@
     <Import Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
             Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')"/>
 
+    <!-- `-p:NoLocalPackages=true` ignores every local checkout and builds against the published packages -->
+    <PropertyGroup Condition="'$(NoLocalPackages)' == 'true'">
+        <GuinevereLocalPath></GuinevereLocalPath>
+    </PropertyGroup>
+
+    <!-- Checked by Directory.Build.targets before a pack or publish; list each local checkout here -->
+    <PropertyGroup>
+        <UsesLocalPackages Condition="'$(GuinevereLocalPath)' != ''">true</UsesLocalPackages>
+    </PropertyGroup>
+
     <!-- External libraries included in every project -->
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />

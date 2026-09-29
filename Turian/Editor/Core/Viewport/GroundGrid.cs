@@ -22,11 +22,11 @@ public static class GroundGrid
     static readonly Vector4 AxisZColor = new(0.25f, 0.55f, 0.95f, 0.65f);
 
     /// <summary>
-    /// Draws the grid on the y = 0 plane, centred on the camera so it always extends to the horizon
+    /// Draws the grid on the y = 0 plane, centered on the camera so it always extends to the horizon
     /// rather than running out underfoot. The two world axes through the origin are colored.
     /// </summary>
     /// <param name="gizmos">The gizmo buffer to append to.</param>
-    /// <param name="cameraPosition">Camera position, used to centre the grid.</param>
+    /// <param name="cameraPosition">Camera position, used to center the grid.</param>
     public static void Draw(Gizmos gizmos, Vector3 cameraPosition)
     {
         ArgumentNullException.ThrowIfNull(gizmos);

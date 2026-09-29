@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Provides read access to asset content stored inside an Open Asset Package
 /// (<c>.oap</c>), including any overlay packages mounted on top of it. The asset is
-/// located by the <see cref="Guid"/> encoded in its content key, falling back to the
+/// located by the <see cref="System.Guid"/> encoded in its content key, falling back to the
 /// content key as a virtual path.
 /// </summary>
 /// <param name="oapFilePath">The absolute path to the base <c>.oap</c> file.</param>

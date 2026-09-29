@@ -207,7 +207,7 @@ public unsafe class Buffer : IDisposable
     /// <typeparam name="T">The type of data to write.</typeparam>
     /// <param name="data">The source array containing the data to be written.</param>
     /// <param name="index">The index in the target buffer where writing should begin.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="data"/> is null.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="data"/> is null.</exception>
     public void WriteToIndex<T>(T[] data, int index)
     {
         ArgumentNullException.ThrowIfNull(data);

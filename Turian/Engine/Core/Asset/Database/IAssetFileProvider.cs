@@ -103,7 +103,7 @@ public sealed class AssetRecord
 
     /// <summary>
     /// Gets or sets the identifier of the asset this one was imported from, or
-    /// <see cref="Guid.Empty"/> when the asset has its own source file.
+    /// <see cref="System.Guid.Empty"/> when the asset has its own source file.
     /// Child assets — the materials and textures a model file declares — have no source file
     /// and no <c>.meta</c> of their own; they live inside the parent's import directory and are
     /// re-emitted whenever the parent is reimported. Records whose parent no longer exists are

@@ -99,7 +99,7 @@ public class Asset : IdClass
     /// </summary>
     /// <param name="absolutePath">The absolute path to load content from.</param>
     /// <returns>An instance of <see cref="Asset"/> if the content is successfully loaded; otherwise, an exception is thrown.</returns>
-    /// <exception cref="Exception">Thrown when the content fails to load from the given path.</exception>
+    /// <exception cref="System.Exception">Thrown when the content fails to load from the given path.</exception>
     public static Asset? Load(string absolutePath)
     {
         if (!File.Exists(absolutePath))

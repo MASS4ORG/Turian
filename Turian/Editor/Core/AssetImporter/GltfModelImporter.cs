@@ -132,7 +132,7 @@ public class GltfModelImporter : IAssetImporter
     /// an image embedded in a buffer or <c>data:</c> URI becomes a child of the model.
     /// </summary>
     /// <returns>
-    /// Asset ids indexed by image, <see cref="Guid.Empty"/> where an external file is missing, and
+    /// Asset ids indexed by image, <see cref="System.Guid.Empty"/> where an external file is missing, and
     /// which of them are embedded.
     /// </returns>
     static (Guid[] Ids, bool[] Embedded) ResolveImages(

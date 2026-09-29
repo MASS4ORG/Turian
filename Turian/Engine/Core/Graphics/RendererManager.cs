@@ -74,7 +74,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
     /// <param name="deltaTime">The time elapsed since the last frame.</param>
     /// <param name="camera">The camera used for rendering the scene.</param>
     /// <param name="node">The root node of the scene to render.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="camera"/> or <paramref name="node"/> is null.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="camera"/> or <paramref name="node"/> is null.</exception>
     public void Render(double deltaTime, ICamera camera, Node node)
     {
         ArgumentNullException.ThrowIfNull(camera);

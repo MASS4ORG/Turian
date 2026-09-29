@@ -8,14 +8,14 @@ namespace Turian.Engine.Core;
 /// <remarks>
 /// This JSON converter handles special cases, such as serializing and deserializing objects derived from Asset,
 /// and allows dynamic serialization and deserialization of object properties and fields. Polymorphism is
-/// handled via stable <see cref="Guid"/> ids declared with <see cref="TypeIdAttribute"/> and resolved
+/// handled via stable <see cref="System.Guid"/> ids declared with <see cref="TypeIdAttribute"/> and resolved
 /// through <see cref="TypeRegistry"/>, so serialized data survives renames and namespace changes.
 /// </remarks>
 public class ObjectJsonSerializer<T> : JsonConverter<T>
     where T : IdClass
 {
     /// <summary>
-    /// Property name carrying the stable type id (a <see cref="Guid"/>) for polymorphic dispatch.
+    /// Property name carrying the stable type id (a <see cref="System.Guid"/>) for polymorphic dispatch.
     /// </summary>
     public const string TypeIdProperty = "__TypeId";
 

@@ -1,5 +1,6 @@
 stages:
     - test
+    - package-check
     - release-check
     - build
     - publish
@@ -14,7 +15,7 @@ variables:
     PUBLISH_SINGLE_FILE: "false"
     PUBLISH_TRIMMED: "false"
     GITLAB_REPOSITORY_PATH: "turian/Turian"
-    GITHUB_REPOSITORY: "turian/Turian"
+    GITHUB_REPOSITORY: "MASS4ORG/Turian"
 
 cache:
     key: "${CI_COMMIT_REF_SLUG}"
@@ -56,7 +57,9 @@ test:
     <<: *build_job_template
     stage: test
     rules:
-        - if: '$CI_PIPELINE_SOURCE != "tag" && $CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
+        - if: '$CI_COMMIT_TAG'
+          when: never
+        - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
           allow_failure: false
     before_script:
         - !reference [.build_glsl, before_script]
@@ -69,7 +72,43 @@ test:
         reports:
             coverage_report:
                 coverage_format: cobertura
-                path: coverage-results/coverage/coverage.xml
+                path: coverage/coverage.xml
+
+package-check:
+    <<: *build_job_template
+    stage: package-check
+    rules:
+        - if: '$CI_COMMIT_TAG'
+          when: never
+        - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
+    variables:
+        CONTAINERS_STORAGE_DRIVER: vfs
+    before_script:
+        - !reference [.build_glsl, before_script]
+        - apt-get install -yqq podman nsis
+        - !reference [.dotnet_nuke_template, before_script]
+    script:
+        - |
+            ./build.sh Pack DebianPackage PackNuGet ContainerBuild \
+              --configuration "Release" \
+              --runtime-identifier "linux-x64" \
+              --no-local-packages \
+              --verbosity minimal
+        - |
+            ./build.sh WingetManifest \
+              --configuration "Release" \
+              --runtime-identifier "win-x64" \
+              --skip-shaders \
+              --no-local-packages \
+              --packaging-dry-run \
+              --verbosity minimal
+        - |
+            ./build.sh Pack \
+              --configuration "Release" \
+              --runtime-identifier "osx-x64" \
+              --skip-shaders \
+              --no-local-packages \
+              --verbosity minimal
 
 qodana:
     stage: test
@@ -100,7 +139,7 @@ release-check:
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
-            ./build.sh Tag \
+            ./build.sh GitHubCreateTag GitLabCreateTag \
               --gitlab-project-path "$GITLAB_REPOSITORY_PATH" \
               --gitlab-token "$GITLAB_RELEASE_TOKEN" \
               --github-repository "$GITHUB_REPOSITORY" \
@@ -116,7 +155,7 @@ build:
             - RID: "linux-x64"
     stage: build
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "tag"'
+        - if: '$CI_COMMIT_TAG'
           allow_failure: false
     before_script:
         - !reference [.build_glsl, before_script]
@@ -143,7 +182,7 @@ build-macos:
     stage: build
     tags: ["macos"]
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "tag"'
+        - if: '$CI_COMMIT_TAG'
           when: manual
           allow_failure: true
     before_script:
@@ -167,7 +206,7 @@ gitlab-release:
     <<: *build_job_template
     stage: publish
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "tag"'
+        - if: '$CI_COMMIT_TAG'
           allow_failure: false
     needs:
         - build
@@ -177,7 +216,7 @@ gitlab-release:
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
-            ./build.sh GitLabRelease \
+            ./build.sh GitLabCreateRelease \
               --gitlab-project-path "$GITLAB_REPOSITORY_PATH" \
               --gitlab-token "$GITLAB_RELEASE_TOKEN" \
               --verbosity minimal
@@ -186,7 +225,7 @@ github-release:
     <<: *build_job_template
     stage: publish
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "tag"'
+        - if: '$CI_COMMIT_TAG'
           allow_failure: true
     needs:
         - build
@@ -196,7 +235,7 @@ github-release:
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
-            ./build.sh GitHubRelease \
+            ./build.sh GitHubCreateRelease \
               --github-repository "$GITHUB_REPOSITORY" \
               --github-token "$GITHUB_RELEASE_TOKEN" \
               --verbosity minimal
@@ -208,7 +247,7 @@ container:
     <<: *build_job_template
     stage: container
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "tag"'
+        - if: '$CI_COMMIT_TAG'
           allow_failure: true
     variables:
         CONTAINERS_STORAGE_DRIVER: vfs
@@ -221,5 +260,5 @@ container:
     script:
         - |
             ./build.sh ContainerPush \
-              --container-registries "$CI_REGISTRY_IMAGE,ghcr.io/turian/turian-cli" \
+              --container-registries "$CI_REGISTRY_IMAGE,ghcr.io/mass4org/turian-cli" \
               --verbosity minimal

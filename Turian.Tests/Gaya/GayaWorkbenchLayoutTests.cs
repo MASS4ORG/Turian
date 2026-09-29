@@ -82,12 +82,12 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void SeedingPlacesEveryContributedPanelInTheLayout()
     {
         using var workbench = NewWorkbench(Application(
-            ("centre", PanelPlacement.Center),
+            ("center", PanelPlacement.Center),
             ("tree", PanelPlacement.Left),
             ("inspector", PanelPlacement.Right),
             ("output", PanelPlacement.Bottom)));
 
-        Assert.Equal(["centre", "inspector", "output", "tree"], workbench.Layout.PanelIds.Order());
+        Assert.Equal(["center", "inspector", "output", "tree"], workbench.Layout.PanelIds.Order());
     }
 
     /// <summary>Two Left panels become one column of tabs, not two nested columns.</summary>
@@ -95,7 +95,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void PanelsSharingAPlacementShareOneTabGroup()
     {
         using var workbench = NewWorkbench(Application(
-            ("centre", PanelPlacement.Center),
+            ("center", PanelPlacement.Center),
             ("tree", PanelPlacement.Left),
             ("assets", PanelPlacement.Left)));
 
@@ -109,7 +109,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void AFloatingPlacementBecomesAFloatingWindow()
     {
         using var workbench = NewWorkbench(Application(
-            ("centre", PanelPlacement.Center),
+            ("center", PanelPlacement.Center),
             ("notes", PanelPlacement.Floating)));
 
         Assert.Single(workbench.Layout.Floating);
@@ -120,19 +120,19 @@ public class GayaWorkbenchLayoutTests : IDisposable
     [Fact]
     public void TheLayoutSurvivesARestart()
     {
-        var app = Application(("centre", PanelPlacement.Center), ("tree", PanelPlacement.Left));
+        var app = Application(("center", PanelPlacement.Center), ("tree", PanelPlacement.Left));
 
         using (var first = NewWorkbench(app))
         {
-            first.Layout.DockInto("tree", first.Layout.FindLeaf("centre")!, DockZone.Center);
+            first.Layout.DockInto("tree", first.Layout.FindLeaf("center")!, DockZone.Center);
         }
 
         Assert.True(File.Exists(layoutPath));
 
         using var second = NewWorkbench(app);
-        var leaf = second.Layout.FindLeaf("centre");
+        var leaf = second.Layout.FindLeaf("center");
         Assert.NotNull(leaf);
-        Assert.Equal(["centre", "tree"], leaf.PanelIds);
+        Assert.Equal(["center", "tree"], leaf.PanelIds);
     }
 
     /// <summary>A saved layout outliving its plugin loses that plugin’s panels instead of showing blanks.</summary>
@@ -140,28 +140,28 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void ARestoredLayoutDropsPanelsNoPluginContributesAnyMore()
     {
         using (var first = NewWorkbench(Application(
-                   ("centre", PanelPlacement.Center), ("gone", PanelPlacement.Left))))
+                   ("center", PanelPlacement.Center), ("gone", PanelPlacement.Left))))
         {
             first.Layout.MarkChanged();
         }
 
-        using var second = NewWorkbench(Application(("centre", PanelPlacement.Center)));
+        using var second = NewWorkbench(Application(("center", PanelPlacement.Center)));
 
         Assert.False(second.Layout.Contains("gone"));
-        Assert.True(second.Layout.Contains("centre"));
+        Assert.True(second.Layout.Contains("center"));
     }
 
     /// <summary>A panel registered after the layout was saved still appears, at its declared placement.</summary>
     [Fact]
     public void ARestoredLayoutFoldsInPanelsThatAreNewSinceItWasSaved()
     {
-        using (var first = NewWorkbench(Application(("centre", PanelPlacement.Center))))
+        using (var first = NewWorkbench(Application(("center", PanelPlacement.Center))))
         {
             first.Layout.MarkChanged();
         }
 
         using var second = NewWorkbench(Application(
-            ("centre", PanelPlacement.Center), ("added", PanelPlacement.Right)));
+            ("center", PanelPlacement.Center), ("added", PanelPlacement.Right)));
 
         Assert.True(second.Layout.Contains("added"));
     }
@@ -171,7 +171,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void TogglingAPanelClosesAndReopensIt()
     {
         using var workbench = NewWorkbench(Application(
-            ("centre", PanelPlacement.Center), ("tree", PanelPlacement.Left)));
+            ("center", PanelPlacement.Center), ("tree", PanelPlacement.Left)));
 
         Assert.True(workbench.Layout.Contains("tree"));
 
@@ -188,9 +188,9 @@ public class GayaWorkbenchLayoutTests : IDisposable
     {
         File.WriteAllText(layoutPath, "{ not json at all");
 
-        using var workbench = NewWorkbench(Application(("centre", PanelPlacement.Center)));
+        using var workbench = NewWorkbench(Application(("center", PanelPlacement.Center)));
 
-        Assert.True(workbench.Layout.Contains("centre"));
+        Assert.True(workbench.Layout.Contains("center"));
     }
 
     /// <summary>A panel reached through a command is registered without being opened, until asked for.</summary>
@@ -198,7 +198,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void AnOnDemandPanelOpensOnlyWhenShown()
     {
         using var workbench = NewWorkbench(Application(
-            Panel("centre", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false)));
+            Panel("center", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false)));
 
         Assert.False(workbench.Layout.Contains("settings"));
 
@@ -210,7 +210,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     [Fact]
     public void AClosedPanelStaysClosedAfterARestart()
     {
-        var app = Application(("centre", PanelPlacement.Center), ("tree", PanelPlacement.Left));
+        var app = Application(("center", PanelPlacement.Center), ("tree", PanelPlacement.Left));
 
         using (var first = NewWorkbench(app))
         {
@@ -219,7 +219,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
 
         using var second = NewWorkbench(app);
         Assert.False(second.Layout.Contains("tree"));
-        Assert.True(second.Layout.Contains("centre"));
+        Assert.True(second.Layout.Contains("center"));
     }
 
     /// <summary>An on-demand panel the user left open is open again on the next run.</summary>
@@ -227,7 +227,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void AnOnDemandPanelLeftOpenIsRestored()
     {
         var app = Application(
-            Panel("centre", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false));
+            Panel("center", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false));
 
         using (var first = NewWorkbench(app))
         {
@@ -248,14 +248,14 @@ public class GayaWorkbenchLayoutTests : IDisposable
         var userPanel = Panel("user", PanelPlacement.Floating, openByDefault: false);
         var bounds = new Rect(400, 300, 200, 100);
 
-        using (var first = NewWorkbench(Application(Panel("centre", PanelPlacement.Center), userPanel)))
+        using (var first = NewWorkbench(Application(Panel("center", PanelPlacement.Center), userPanel)))
         {
             first.ShowPanel("user");
             first.Layout.Floating.Single().Bounds = bounds;
             first.Layout.MarkChanged();
         }
 
-        var app = Application(Panel("centre", PanelPlacement.Center));
+        var app = Application(Panel("center", PanelPlacement.Center));
         using var second = NewWorkbench(app);
         Assert.False(second.Layout.Contains("user"));
 
@@ -271,9 +271,9 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void AReregisteredPanelKeepsItsTabGroup()
     {
         var extra = Panel("extra", PanelPlacement.Left);
-        var app = Application(Panel("centre", PanelPlacement.Center), Panel("tree", PanelPlacement.Left), extra);
+        var app = Application(Panel("center", PanelPlacement.Center), Panel("tree", PanelPlacement.Left), extra);
         using var workbench = NewWorkbench(app);
-        workbench.Layout.DockInto("extra", workbench.Layout.FindLeaf("centre")!, DockZone.Center);
+        workbench.Layout.DockInto("extra", workbench.Layout.FindLeaf("center")!, DockZone.Center);
 
         app.Panels.Remove("extra");
         RenderFrame(workbench);
@@ -282,7 +282,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
         app.Panels.Register(extra);
         RenderFrame(workbench);
 
-        Assert.Equal(["centre", "extra"], workbench.Layout.FindLeaf("centre")!.PanelIds);
+        Assert.Equal(["center", "extra"], workbench.Layout.FindLeaf("center")!.PanelIds);
     }
 
     /// <summary>
@@ -293,14 +293,14 @@ public class GayaWorkbenchLayoutTests : IDisposable
     public void ALegacyLayoutDropsOnDemandPanels()
     {
         var legacy = new DockLayout();
-        legacy.DockAtEdge("centre", DockZone.Center);
+        legacy.DockAtEdge("center", DockZone.Center);
         legacy.DockAtEdge("settings", DockZone.Center);
         legacy.Float("user", new Rect(10, 10, 100, 100));
         File.WriteAllText(layoutPath, legacy.ToJson());
 
         using var workbench = NewWorkbench(Application(
-            Panel("centre", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false)));
+            Panel("center", PanelPlacement.Center), Panel("settings", PanelPlacement.Center, openByDefault: false)));
 
-        Assert.Equal(["centre"], workbench.Layout.PanelIds);
+        Assert.Equal(["center"], workbench.Layout.PanelIds);
     }
 }

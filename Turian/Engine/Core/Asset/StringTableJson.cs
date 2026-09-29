@@ -29,7 +29,7 @@ public static class StringTableJson
     /// <param name="json">The JSON text.</param>
     /// <returns>The parsed table.</returns>
     /// <exception cref="System.Text.Json.JsonException">Raised for malformed JSON.</exception>
-    /// <exception cref="ArgumentException">Raised when the JSON lacks a locale.</exception>
+    /// <exception cref="System.ArgumentException">Raised when the JSON lacks a locale.</exception>
     public static StringTable Load(string json)
     {
         ArgumentNullException.ThrowIfNull(json);

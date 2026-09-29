@@ -12,28 +12,33 @@ public class DrawerRegistryTests
     [AttributeUsage(AttributeTargets.Property)]
     sealed class OuterAttribute : Attribute;
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class Target
     {
         [Marker(1), Outer, Marker(2)]
         public int Value { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class TooltippedTarget
     {
         [Tooltip("Explains the value")]
         public int Value { get; set; }
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class NumericTarget
     {
         public int Value { get; set; } = 42;
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class NullableTarget
     {
         public int? Value { get; set; } = 5;
     }
 
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class ReferenceTarget
     {
         public Node? Value { get; set; }
@@ -171,7 +176,7 @@ public class DrawerRegistryTests
         gui.CalculateLayout();
         var wrapper = Assert.Single(gui.RootNode!.Children,
             node => node.Id == "tooltip-test/tooltip");
-        Assert.True(wrapper.Rect.W > 0 && wrapper.Rect.H > 0);
+        Assert.True(wrapper.Rect is { W: > 0, H: > 0 });
         var row = Assert.Single(wrapper.Children, node => node.Id == "tooltip-test");
         Assert.Equal(wrapper.Rect, row.Rect);
         gui.SetStage(Pass.Pass2Render);

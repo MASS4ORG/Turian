@@ -10,7 +10,8 @@
 .nuke/obj/
 artifacts/
 publish/
-coverage-results/
+coverage/
+Directory.Build.local.props
 docs/
 *.md
 .editorconfig

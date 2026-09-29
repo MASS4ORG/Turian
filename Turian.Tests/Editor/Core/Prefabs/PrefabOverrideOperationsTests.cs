@@ -7,7 +7,6 @@ public class PrefabOverrideOperationsTests : IDisposable
     readonly AssetManager assets = new();
     readonly AssetDatabase database;
     readonly SceneTreeController sceneTree;
-    readonly NodeInspectorController inspector;
     readonly UndoService undo;
     readonly PrefabOverrideOperations operations;
     readonly Node root = new() { Name = "Scene" };
@@ -18,7 +17,7 @@ public class PrefabOverrideOperationsTests : IDisposable
         TestAssetDatabase.Reset();
         database = new AssetDatabase();
         sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!);
-        inspector = new NodeInspectorController(assets);
+        var inspector = new NodeInspectorController(assets);
         undo = new UndoService(sceneTree, inspector, assets);
         operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader: null!);
 

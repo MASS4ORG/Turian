@@ -216,8 +216,8 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         knownPanels.UnionWith(app.Panels.All.Select(descriptor => descriptor.Id));
         var opening = app.Panels.All.Where(descriptor => descriptor.OpenByDefault).ToList();
 
-        // Centre first: the edges wrap whatever is already there, so seeding an edge into an empty
-        // layout would make that panel the centre.
+        // Center first: the edges wrap whatever is already there, so seeding an edge into an empty
+        // layout would make that panel the center.
         foreach (var descriptor in opening.Where(d => d.DefaultPlacement == PanelPlacement.Center))
             layout.DockAtEdge(descriptor.Id, DockZone.Center);
 
@@ -269,8 +269,11 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         app.Themes.Changed -= OnThemeChanged;
 
         foreach (var panel in panelInstances.Values.OfType<IDisposable>()) panel.Dispose();
+        // Plugins built outside this solution may contribute chrome items that own resources.
+        // ReSharper disable SuspiciousTypeConversion.Global
         foreach (var item in chromeInstances.Values.OfType<IDisposable>()) item.Dispose();
         foreach (var item in tabStripChromeInstances.Values.OfType<IDisposable>()) item.Dispose();
+        // ReSharper restore SuspiciousTypeConversion.Global
     }
 
     /// <summary>Runs a command by id (menus, buttons and the palette all funnel through here).</summary>

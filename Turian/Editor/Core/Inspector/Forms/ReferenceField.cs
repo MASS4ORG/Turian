@@ -46,7 +46,7 @@ public sealed class ReferenceField
     /// <summary>Whether the member refuses writes.</summary>
     public bool IsReadOnly => source.IsReadOnly;
 
-    /// <summary>The referenced asset or node id, or <see cref="Guid.Empty"/> when unset.</summary>
+    /// <summary>The referenced asset or node id, or <see cref="System.Guid.Empty"/> when unset.</summary>
     public Guid CurrentId => source.GetValue() switch
     {
         null when IsDirect => PendingId(),

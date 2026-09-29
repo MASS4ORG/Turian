@@ -18,7 +18,7 @@ static class GuinevereInputMap
     /// <summary>
     /// Maps a Guinevere key, or returns <c>null</c> when the engine has no equivalent. Both enums are
     /// GLFW usage codes — <c>Space</c> is 32 and <c>Escape</c> is 256 in each — so the cast is the
-    /// mapping; <see cref="Enum.IsDefined{TEnum}"/> drops the few Guinevere names Silk does not carry.
+    /// mapping; <see cref="System.Enum.IsDefined{TEnum}"/> drops the few Guinevere names Silk does not carry.
     /// </summary>
     /// <param name="key">The Guinevere key.</param>
     /// <returns>The engine's key, or null.</returns>

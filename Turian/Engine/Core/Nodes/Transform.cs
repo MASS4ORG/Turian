@@ -286,7 +286,7 @@ public class Transform : IEquatable<Transform>, IFormattable, INotifyPropertyCha
     /// Converts this <see cref="Transform"/> to its string representation using the specified format and format provider.
     /// </summary>
     /// <param name="format">A format string (not used in this implementation).</param>
-    /// <param name="formatProvider">An <see cref="IFormatProvider"/> (not used in this implementation).</param>
+    /// <param name="formatProvider">An <see cref="System.IFormatProvider"/> (not used in this implementation).</param>
     /// <returns>A string representation of the transformation.</returns>
     public string ToString(string? format, IFormatProvider? formatProvider)
     {

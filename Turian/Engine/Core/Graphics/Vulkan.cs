@@ -20,7 +20,7 @@ public class Vulkan
     /// </summary>
     /// <param name="windowManager">The window manager used for creating the Vulkan device.</param>
     /// <param name="logger">The logger used for reporting startup progress.</param>
-    /// <exception cref="ArgumentNullException">Thrown if <paramref name="windowManager"/> is <c>null</c>.</exception>
+    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="windowManager"/> is <c>null</c>.</exception>
     public Vulkan(WindowManager windowManager, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(windowManager);
