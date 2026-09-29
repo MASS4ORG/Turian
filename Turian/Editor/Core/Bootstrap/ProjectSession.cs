@@ -46,6 +46,7 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log)
         // Before any scene is read: a component whose type lives in the user assembly deserialises as
         // MissingComponent when that assembly has not been loaded yet.
         CompileUserScripts();
+        services.GetRequiredService<BuildManager>().EnableHotReload();
 
         RestoreSession(Settings);
         if (openScene is not null) OpenAsset(Settings, openScene);

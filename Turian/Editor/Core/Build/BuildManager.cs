@@ -318,6 +318,7 @@ public sealed class BuildManager : IDisposable
         sourceWatcher.Dispose();
         StopPlayProcessInternal(notify: false);
         TaskRunner.Dispose();
+        if (ReferenceEquals(_instance, this)) _instance = null;
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────────

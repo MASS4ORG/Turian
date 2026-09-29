@@ -141,7 +141,7 @@ public sealed partial class AssetImporter : IDisposable
     List<IAssetImporter> BuildImporterList()
     {
         return [.. BuildManager.Instance.LoadedAssemblies
-            .SelectMany(static assembly => assembly.GetTypes())
+            .SelectMany(static assembly => GetLoadableTypes(assembly))
             .Where(static type =>
                 typeof(IAssetImporter).IsAssignableFrom(type)
                 && type is { IsInterface: false, IsAbstract: false })
@@ -154,6 +154,18 @@ public sealed partial class AssetImporter : IDisposable
             .Select(static item => Activator.CreateInstance(item.Type) as IAssetImporter)
             .Where(static importer => importer is not null)
             .Cast<IAssetImporter>()];
+    }
+
+    static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return ex.Types.OfType<Type>();
+        }
     }
 
     void InitializeForAssetsRoot(string assetFolderPath)

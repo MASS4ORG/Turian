@@ -287,11 +287,11 @@ public sealed class GayaPlugin : IPlugin
         ArgumentNullException.ThrowIfNull(services);
 
         var playMode = services.GetRequiredService<PlayModeService>();
+        services.GetRequiredService<OutputLogBridge>().Tick();
         if (playMode.IsActive) playMode.Tick(deltaTime);
 
         services.GetRequiredService<UndoService>().Flush();
         services.GetRequiredService<AssetAutoSave>().Flush();
-        services.GetRequiredService<OutputLogBridge>().Tick();
         services.GetRequiredService<UserMenuBridge>().Sync();
         services.GetRequiredService<UserSettingsBridge>().Sync();
         services.GetRequiredService<UserPanelBridge>().Sync();
@@ -333,6 +333,7 @@ public sealed class GayaPlugin : IPlugin
         // BuildManager publishes a static Instance that AssetImporter's constructor requires, so it
         // has to exist before anything that pulls in the scene tree.
         services.GetRequiredService<BuildManager>();
+        services.GetRequiredService<OutputLogBridge>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
 
         // An undone or redone asset edit is saved like any other edit to it.
