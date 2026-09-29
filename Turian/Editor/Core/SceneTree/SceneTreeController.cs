@@ -7,7 +7,8 @@ namespace Turian.Editor.Core;
 public sealed class SceneTreeController(
     AssetManager assetManager,
     SettingsService settingsService,
-    AssetImporter assetImporter)
+    AssetImporter assetImporter,
+    IAssetLoader assetLoader)
     : IPlaySceneHost
 {
     readonly Dictionary<Guid, Node> loadedSceneRoots = [];
@@ -134,7 +135,7 @@ public sealed class SceneTreeController(
             var oldRoot = loadedSceneRoots[assetId];
             try
             {
-                var newRoot = NodeCloner.DeepClone(oldRoot);
+                var newRoot = NodeCloner.DeepClone(oldRoot, loader: assetLoader);
                 if (newRoot is null)
                 {
                     Log.Logger.LogWarning("RebindLoadedScenes: serializer returned null for asset {AssetId}", assetId);
@@ -214,7 +215,7 @@ public sealed class SceneTreeController(
             try
             {
                 if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
-                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)) is not { } rebuilt)
+                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id), assetLoader) is not { } rebuilt)
                     continue;
 
                 loadedSceneRoots[assetId] = rebuilt;
@@ -431,7 +432,7 @@ public sealed class SceneTreeController(
         try
         {
             var json = File.ReadAllText(absolutePath, Encoding.UTF8);
-            var root = Serializer.LoadData<Node>(json);
+            var root = Serializer.LoadData<Node>(json, assetLoader);
             if (root is null)
             {
                 Log.Logger.LogError(

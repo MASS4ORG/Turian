@@ -333,6 +333,8 @@ public sealed class GayaPlugin : IPlugin
         // BuildManager publishes a static Instance that AssetImporter's constructor requires, so it
         // has to exist before anything that pulls in the scene tree.
         services.GetRequiredService<BuildManager>();
+        if (services.GetService(typeof(ISceneManager)) is SceneManager sceneManager)
+            sceneManager.BindAssetLoader(services.GetRequiredService<IAssetLoader>());
         services.GetRequiredService<OutputLogBridge>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
 

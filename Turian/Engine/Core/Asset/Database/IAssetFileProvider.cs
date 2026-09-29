@@ -102,8 +102,8 @@ public sealed class AssetRecord
     public string AssetTypeName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Stable serialized payload type id for a DataAssetAsset. Empty in older catalogs or
-    /// when the source could not be inspected; those records require loader-based validation.
+    /// Stable serialized payload type id for a DataAssetAsset. Empty when the source could
+    /// not be inspected; typed Inspector fields reject the asset until it is reimported.
     /// </summary>
     public Guid DataAssetPayloadTypeId { get; set; }
 

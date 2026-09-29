@@ -286,8 +286,7 @@ public static class ObjectReferences
     internal static void ExitNode(Node? node)
     {
         if (--_nodeReadDepth == 0 && node is not null)
-            Resolve(node, DeserializationLoader.Value is { } context
-                ? context.Loader : RuntimeServices.TryGet<IAssetLoader>());
+            Resolve(node, DeserializationLoader.Value?.Loader);
     }
 
     static IEnumerable<Guid> PendingIds(IdClass owner)

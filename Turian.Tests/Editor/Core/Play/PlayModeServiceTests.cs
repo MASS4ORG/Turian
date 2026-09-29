@@ -66,7 +66,8 @@ public class PlayModeServiceTests : IDisposable
         assetDatabase = new AssetDatabase();
         // The importer is only reached through SceneTreeController.SaveAsset, which play mode never
         // calls; constructing a real one would need the BuildManager singleton.
-        sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!);
+        sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!,
+            assetLoader: new RuntimeAssetLoader(assetDatabase));
 
         playMode = new PlayModeService(sceneTree, assetDatabase, new EmptyServiceProvider(), Log.Logger);
     }

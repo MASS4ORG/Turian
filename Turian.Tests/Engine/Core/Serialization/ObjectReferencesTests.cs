@@ -180,10 +180,9 @@ public sealed class ObjectReferencesTests : IDisposable
         Assert.Same(first, first.Next.Next);
         Assert.Same(first.Next, await loader.LoadContentAsync<Stats>(b.Id));
 
-        RuntimeServices.Configure(new ServiceCollection().AddSingleton<IAssetLoader>(loader).BuildServiceProvider());
         var node = new Node();
         node.AddComponent(new Linker { Data = first });
-        var loaded = Serializer.LoadData<Node>(Serializer.Serialize(node))!;
+        var loaded = Serializer.LoadData<Node>(Serializer.Serialize(node), loader)!;
 
         Assert.Same(first, loaded.GetComponent<Linker>()!.Data);
     }

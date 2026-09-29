@@ -13,9 +13,11 @@ public class UndoTests
     /// <summary>Opens a scene with no file behind it; the importer is never reached.</summary>
     public UndoTests()
     {
-        sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!);
+        var loader = Substitute.For<IAssetLoader>();
+        sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
+            assetLoader: loader);
         inspector = new NodeInspectorController(assets);
-        undo = new UndoService(sceneTree, inspector, assets);
+        undo = new UndoService(sceneTree, inspector, assets, loader);
 
         assets.OpenAsset(scene);
         sceneTree.OpenAsset(scene);

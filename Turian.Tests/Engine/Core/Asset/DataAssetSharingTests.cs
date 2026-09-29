@@ -145,9 +145,9 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.All(ids, id => Assert.False(loader.TryGetLoaded<DataAssetAsset>(id, out _)));
     }
 
-    /// <summary>Catalogs written before the payload index still validate through the shared loader.</summary>
+    /// <summary>Typed picker entries without an indexed payload type require a catalog reimport.</summary>
     [Fact]
-    public void Inspector_OldCatalog_FallsBackToPayloadValidation()
+    public void Inspector_CatalogWithoutPayloadType_RequiresReimport()
     {
         database.SaveCatalog(projectRoot);
         var catalogPath = Path.Combine(projectRoot, ".Cache", "assetCatalog.json");
@@ -161,8 +161,13 @@ public sealed class DataAssetSharingTests : IDisposable
         var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
         var loader = new RuntimeAssetLoader(database);
         var picker = new ReferencePicker(database, null!, loader);
-        Assert.Equal([metadata.Id], picker.Candidates(ReferenceField.TryCreate(field)!).Select(c => c.Id));
-        Assert.True(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
+        var reference = ReferenceField.TryCreate(field)!;
+        Assert.Empty(picker.Candidates(reference));
+        Assert.False(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
+
+        Assert.True(database.RegisterAsset(metadata));
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.False(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
     }
 
     /// <summary>An indexed subtype is accepted for both wrapper and direct base-type fields.</summary>

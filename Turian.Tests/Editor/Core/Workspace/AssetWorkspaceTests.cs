@@ -176,7 +176,8 @@ public class AssetWorkspaceTests : IDisposable
     [Fact]
     public void ClosingTheOpenSceneEmptiesTheSceneTree()
     {
-        var sceneTree = new SceneTreeController(assets, settings, null!);
+        var sceneTree = new SceneTreeController(assets, settings, null!,
+            assetLoader: Substitute.For<IAssetLoader>());
         var nodeInspector = new NodeInspectorController(assets);
         using var binder = new SceneDocumentBinder(assets, sceneTree, nodeInspector);
         binder.Attach();

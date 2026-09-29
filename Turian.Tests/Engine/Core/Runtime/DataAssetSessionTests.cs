@@ -147,17 +147,7 @@ public sealed class DataAssetSessionTests : IDisposable
     public async Task SceneManager_ResolvesDirectAssetFromItsBoundSession()
     {
         var (database, assetId, _) = CreateAuthoredManager();
-        var authored = new Node();
-        authored.Components.Add(new DirectManagerConsumer
-        {
-            Manager = new GameManagerAsset { Id = assetId }
-        });
-        var sceneJson = Serializer.Serialize(authored);
-        var scenePath = Path.Combine(projectRoot, "Assets", "Scene.prefab");
-        File.WriteAllText(scenePath, sceneJson);
-        var prefab = new Prefab { RelativePath = scenePath };
-        Serializer.Save($"{scenePath}.meta", new Prefab { Id = prefab.Id, RelativePath = "Assets/Scene.prefab" });
-        Assert.True(database.RegisterAsset(prefab));
+        var (prefab, sceneJson) = CreateDirectScene(database, assetId);
 
         var wrongLoader = Substitute.For<IAssetLoader>();
         wrongLoader.PreloadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
@@ -170,8 +160,10 @@ public sealed class DataAssetSessionTests : IDisposable
 
         var unresolved = Serializer.LoadData<Node>(sceneJson, loader: null)!;
         Assert.Null(unresolved.GetComponent<DirectManagerConsumer>()!.Manager);
-        var legacy = Serializer.LoadData<Node>(sceneJson)!;
-        Assert.Equal(999, legacy.GetComponent<DirectManagerConsumer>()!.Manager!.Coins);
+        var withoutLoader = Serializer.LoadData<Node>(sceneJson)!;
+        Assert.Null(withoutLoader.GetComponent<DirectManagerConsumer>()!.Manager);
+        Assert.True(ObjectReferences.TryGetUnresolved(
+            withoutLoader.GetComponent<DirectManagerConsumer>()!, nameof(DirectManagerConsumer.Manager), out _));
 
         using var sessionServices = new ServiceCollection()
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(database)).BuildServiceProvider();
@@ -190,6 +182,47 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.NotSame(first.Manager, second.Manager);
         first.Manager!.Coins = 42;
         Assert.Equal(10, second.Manager!.Coins);
+    }
+
+    /// <summary>Editor previews can resolve authored data without injecting gameplay services.</summary>
+    [Fact]
+    public async Task EditorPreview_BindsOnlyItsAssetLoader()
+    {
+        var (database, assetId, _) = CreateAuthoredManager();
+        var (prefab, _) = CreateDirectScene(database, assetId);
+        var loader = new RuntimeAssetLoader(database);
+        var preview = new SceneManager(database);
+        preview.BindAssetLoader(loader);
+
+        var loaded = await preview.LoadNodeAsync(prefab.Id);
+        var component = loaded.GetComponent<DirectManagerConsumer>()!;
+
+        Assert.True(component.HadManagerAtAwake);
+        Assert.Null(component.Services);
+        Assert.Same(await loader.LoadContentAsync<GameManagerAsset>(assetId), component.Manager);
+    }
+
+    /// <summary>A headless editor preview can replace a direct asset by GUID without gameplay DI.</summary>
+    [Fact]
+    public async Task EditorPreview_UsesFakeAssetWithTheAuthoredGuid()
+    {
+        var (database, assetId, sourcePath) = CreateAuthoredManager();
+        var (prefab, _) = CreateDirectScene(database, assetId);
+        var replacement = new GameManagerAsset { Id = assetId, Coins = 77 };
+        var loader = Substitute.For<IAssetLoader>();
+        loader.PreloadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        loader.LoadContentAsync<DataAsset>(assetId).Returns(Task.FromResult<DataAsset?>(replacement));
+        var preview = new SceneManager(database);
+        preview.BindAssetLoader(loader);
+
+        var loaded = await preview.LoadNodeAsync(prefab.Id);
+        var component = loaded.GetComponent<DirectManagerConsumer>()!;
+
+        Assert.Same(replacement, component.Manager);
+        Assert.True(component.HadManagerAtAwake);
+        Assert.Null(component.Services);
+        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath)!).Coins);
     }
 
     /// <summary>A play-scene clone can use its own loader even when another provider is ambient.</summary>
@@ -235,6 +268,22 @@ public sealed class DataAssetSessionTests : IDisposable
         var database = new AssetDatabase();
         Assert.True(database.RegisterAsset(new DataAssetAsset { Id = metadata.Id, RelativePath = sourcePath }));
         return (database, metadata.Id, sourcePath);
+    }
+
+    (Prefab Prefab, string Json) CreateDirectScene(AssetDatabase database, Guid assetId)
+    {
+        var authored = new Node();
+        authored.Components.Add(new DirectManagerConsumer
+        {
+            Manager = new GameManagerAsset { Id = assetId }
+        });
+        var json = Serializer.Serialize(authored);
+        var scenePath = Path.Combine(projectRoot, "Assets", "Scene.prefab");
+        File.WriteAllText(scenePath, json);
+        var prefab = new Prefab { RelativePath = scenePath };
+        Serializer.Save($"{scenePath}.meta", new Prefab { Id = prefab.Id, RelativePath = "Assets/Scene.prefab" });
+        Assert.True(database.RegisterAsset(prefab));
+        return (prefab, json);
     }
 
     static string CreateSceneJson(Guid assetId, string sceneName)

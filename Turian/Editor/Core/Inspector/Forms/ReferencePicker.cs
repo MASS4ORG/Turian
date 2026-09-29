@@ -129,27 +129,12 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
         if (!AssetReferenceQuery.IsValidForAssetType(record, AssetType(field))) return false;
         if (field.DataAssetPayloadType is not { } payloadType) return true;
 
-        // Catalog indexing happens during registration/import, not on the UI query path. Resolve
-        // the stable id against the current registry so hot-reloaded types retain their identity.
-        if (record.DataAssetPayloadTypeId != Guid.Empty)
-            return TypeRegistry.TryGetType(record.DataAssetPayloadTypeId, out var indexedType)
-                   && indexedType is not null
-                   && payloadType.IsAssignableFrom(indexedType);
-
-        // Old catalogs without an index still need precise validation via the shared loader.
-        try
-        {
-            var payload = loader.LoadContentAsync<DataAsset>(record.AssetId).GetAwaiter().GetResult();
-            return payload is not null && payloadType.IsInstanceOfType(payload);
-        }
-        catch (IOException)
-        {
-            return false;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
+        // Indexing happens at import, never while drawing the picker. The stable id resolves
+        // against the current type registry after user-code reloads.
+        return record.DataAssetPayloadTypeId != Guid.Empty
+               && TypeRegistry.TryGetType(record.DataAssetPayloadTypeId, out var indexedType)
+               && indexedType is not null
+               && payloadType.IsAssignableFrom(indexedType);
     }
 
     IReadOnlyList<ReferenceCandidate> AssetCandidates(ReferenceField field) =>

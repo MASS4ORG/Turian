@@ -29,9 +29,7 @@ public static class NodeCloner
         ArgumentNullException.ThrowIfNull(source);
 
         var json = Serializer.Serialize(source);
-        var clone = loader is null
-            ? Serializer.LoadData<Node>(json)
-            : Serializer.LoadData<Node>(json, loader);
+        var clone = Serializer.LoadData<Node>(json, loader);
 
         if (awake) clone?.Awake(null);
 

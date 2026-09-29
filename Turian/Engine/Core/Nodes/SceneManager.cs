@@ -19,6 +19,7 @@ public partial class SceneManager : ISceneManager
     readonly List<LoadedScene> loadedScenes = [];
     readonly object scenesLock = new();
     IServiceProvider? services;
+    IAssetLoader? assetLoader;
 
     /// <summary>
     /// Gets a snapshot of all currently loaded scenes.
@@ -93,8 +94,13 @@ public partial class SceneManager : ISceneManager
     public void BindServices(IServiceProvider serviceProvider)
     {
         services = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        assetLoader = services.GetService<IAssetLoader>();
         PersistentRoot.Awake(null, services);
     }
+
+    /// <summary>Uses an editor or test asset loader without injecting gameplay services into scene objects.</summary>
+    public void BindAssetLoader(IAssetLoader loader) =>
+        assetLoader = loader ?? throw new ArgumentNullException(nameof(loader));
 
     /// <inheritdoc />
     public Task<Node> LoadNodeAsync(Guid assetId)

@@ -17,8 +17,10 @@ public class AssetFileOperationsTests : IDisposable
         Directory.CreateDirectory(Assets);
         var settings = new SettingsService();
         settings.Set(new AppSettings { ProjectAbsoluteDir = project });
-        var sceneTree = new SceneTreeController(assets, settings, assetImporter: null!);
-        undo = new UndoService(sceneTree, new NodeInspectorController(assets), assets);
+        var loader = Substitute.For<IAssetLoader>();
+        var sceneTree = new SceneTreeController(assets, settings, assetImporter: null!,
+            assetLoader: loader);
+        undo = new UndoService(sceneTree, new NodeInspectorController(assets), assets, loader);
         files = new AssetFileSystem(settings, assetImporter: null!);
         operations = new AssetFileOperations(files, undo);
     }

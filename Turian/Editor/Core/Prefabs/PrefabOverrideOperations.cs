@@ -201,7 +201,7 @@ public sealed class PrefabOverrideOperations(
             for (var i = 0; i < children.Count; i++)
             {
                 if (ReadId(children[i]) is { } childId && !present.ContainsKey(childId)
-                    && Serializer.LoadData<Node>(children[i].ToJsonString()) is { } restored)
+                    && Serializer.LoadData<Node>(children[i].ToJsonString(), loader) is { } restored)
                 {
                     undo.RecordObject(node, revertLabel);
                     node.Children.Insert(Math.Min(i, node.Children.Count), restored);
@@ -228,7 +228,7 @@ public sealed class PrefabOverrideOperations(
     }
 
     // A component is read the way a scene reads it, inside a node, then taken out of that node.
-    static Component? RestoreComponent(JsonObject json)
+    Component? RestoreComponent(JsonObject json)
     {
         var holder = new JsonObject
         {
@@ -236,7 +236,7 @@ public sealed class PrefabOverrideOperations(
             [nameof(Node.Components)] = new JsonArray(json.DeepClone()),
         };
 
-        if (Serializer.LoadData<Node>(holder.ToJsonString()) is not { } node || node.Components.Count == 0)
+        if (Serializer.LoadData<Node>(holder.ToJsonString(), loader) is not { } node || node.Components.Count == 0)
             return null;
 
         var component = node.Components[0];

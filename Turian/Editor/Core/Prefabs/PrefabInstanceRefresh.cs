@@ -11,18 +11,21 @@ public static class PrefabInstanceRefresh
     /// <param name="prefabId">The prefab that was saved.</param>
     /// <param name="previousJson">The prefab's content before the save, or null when it is new.</param>
     /// <param name="loadPrefab">Returns a prefab's current serialized hierarchy by asset id.</param>
+    /// <param name="loader">Resolves direct DataAsset references in the rebuilt hierarchy.</param>
     /// <returns>The rebuilt, awakened root, or null when the scene does not change.</returns>
-    public static Node? Rebuild(Node root, Guid prefabId, string? previousJson, Func<Guid, string?> loadPrefab)
+    public static Node? Rebuild(Node root, Guid prefabId, string? previousJson, Func<Guid, string?> loadPrefab,
+        IAssetLoader loader)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(loadPrefab);
+        ArgumentNullException.ThrowIfNull(loader);
 
         var json = Serializer.Serialize(root);
         if (previousJson is null || !json.Contains(nameof(Node.PrefabInstance), StringComparison.Ordinal))
             return null;
 
         var compact = PrefabInstances.Compact(json, id => id == prefabId ? previousJson : loadPrefab(id));
-        var rebuilt = Serializer.LoadData<Node>(PrefabInstances.Expand(compact, loadPrefab));
+        var rebuilt = Serializer.LoadData<Node>(PrefabInstances.Expand(compact, loadPrefab), loader);
         if (rebuilt is null || Serializer.Serialize(rebuilt) == json) return null;
 
         rebuilt.Awake(null);
