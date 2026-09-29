@@ -79,4 +79,14 @@ public class EngineServiceModulesTests
 
         Assert.Same(replacement, component.Manager);
     }
+
+    /// <summary>An assembly listed twice in a resolved graph registers its modules only once.</summary>
+    [Fact]
+    public void GraphRegistration_DeduplicatesAssemblies()
+    {
+        var assembly = typeof(BagModule).Assembly;
+        var services = new ServiceCollection().AddEngineModules(assembly, assembly);
+
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IBagManager));
+    }
 }
