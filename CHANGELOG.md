@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: closing the window with no unsaved work exited through a second close that a veto then undid, freezing the editor
+- Changed: code sytles fixes
+
 ## [1.2.0] - 2026-09-29
 
 - Added: inspector property drawers and metadata #28 #29

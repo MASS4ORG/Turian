@@ -285,6 +285,18 @@ public static class TypeRegistry
         var fqn = ReadString(entry, "FullyQualifiedName");
         if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId)) return false;
 
+        // A game ships without its editor-only assemblies.
+        if (entry.TryGetProperty("EditorOnly", out var editorOnly) && editorOnly.ValueKind == JsonValueKind.True)
+            return false;
+
+        // A single-file game loads a referenced user assembly only on first use, so load it by name.
+        if (ReadString(entry, "Assembly") is { Length: > 0 } assemblyName
+            && assemblies.All(asm => asm.GetName().Name != assemblyName))
+        {
+            LoadAssemblyByName(assemblyName, logger);
+            assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        }
+
         if (assemblies.Select(asm => asm.GetType(fqn)).FirstOrDefault(candidate => candidate is not null) is not { } type)
         {
             logger.LogWarning("User type '{Fqn}' not found in any loaded assembly; skipping", fqn);

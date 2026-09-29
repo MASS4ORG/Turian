@@ -64,7 +64,10 @@ public sealed class UserSettingsCatalog
         var previous = pages.Count;
         pages.Clear();
 
-        if (assembly is not null) pages.AddRange(Scan(assembly, log));
+        if (assembly is not null)
+        {
+            foreach (var userAssembly in buildManager.ActiveUserAssemblies) pages.AddRange(Scan(userAssembly, log));
+        }
 
         log.LogDebug("User settings: {Count} page(s) from {Assembly}", pages.Count,
             assembly?.GetName().Name ?? "no user assembly");

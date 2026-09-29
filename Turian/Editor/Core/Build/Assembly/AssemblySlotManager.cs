@@ -26,6 +26,12 @@ public sealed class AssemblySlotManager
     /// <summary>Path of the currently loaded assembly, or <c>null</c> if nothing is loaded.</summary>
     public string? LoadedAssemblyPath { get; private set; }
 
+    /// <summary>The assembly at <see cref="LoadedAssemblyPath"/>, or <c>null</c> if nothing is loaded.</summary>
+    public Assembly? LoadedAssembly { get; private set; }
+
+    /// <summary>The assemblies compiled from the project's scripts, <see cref="LoadedAssembly"/> last.</summary>
+    public IReadOnlyList<Assembly> UserAssemblies { get; private set; } = [];
+
     /// <param name="slotRootDirectory">
     /// Directory that will contain the <c>SlotA/</c> and <c>SlotB/</c> subdirectories.
     /// Typically <c>&lt;cache&gt;/bin/</c>.
@@ -56,8 +62,8 @@ public sealed class AssemblySlotManager
     public string ActiveSlotDirectory => SlotPath(activeSlot);
 
     /// <summary>
-    /// Attempts to load the assembly at <paramref name="assemblyPath"/> into a fresh
-    /// <see cref="UserAssemblyLoadContext"/>.  On success, unloads the previous context
+    /// Attempts to load the assembly at <paramref name="assemblyPath"/>, with every other assembly in its slot,
+    /// into a fresh <see cref="UserAssemblyLoadContext"/>.  On success, unloads the previous context
     /// and promotes the new slot to active.  On any failure the previous state is preserved.
     /// </summary>
     /// <returns><c>true</c> if the assembly was loaded successfully.</returns>
@@ -69,20 +75,34 @@ public sealed class AssemblySlotManager
         try
         {
             newContext.SetResolver(assemblyPath);
-            var userAssembly = newContext.LoadFromAssemblyPath(assemblyPath);
+
+            // Every assembly the compile wrote to the slot: the definitions first, the default one last.
+            var fullPath = Path.GetFullPath(assemblyPath);
+            var userAssemblies = new List<Assembly>();
+            foreach (var path in Directory.EnumerateFiles(Path.GetDirectoryName(fullPath)!, "*.dll")
+                         .Where(path => !string.Equals(Path.GetFullPath(path), fullPath, StringComparison.Ordinal))
+                         .Order(StringComparer.Ordinal))
+            {
+                userAssemblies.Add(newContext.LoadFromAssemblyPath(path));
+            }
+
+            var primary = newContext.LoadFromAssemblyPath(fullPath);
+            userAssemblies.Add(primary);
 
             // Success – unload the old context first
             UnloadCurrentContext();
 
             loadContext = newContext;
             LoadedAssemblyPath = assemblyPath;
+            LoadedAssembly = primary;
+            UserAssemblies = userAssemblies;
 
             // Flip the active slot and persist
             activeSlot = activeSlot == slotA ? slotB : slotA;
             PersistActiveSlot(activeSlot);
 
             Serializer.ResetOptions();
-            UserCodeTypeManifest.RegisterFromManifest(assemblyPath, userAssembly, logger);
+            UserCodeTypeManifest.RegisterFromManifest(assemblyPath, userAssemblies, logger);
 
             logger.LogInformation("Assembly swapped to {Slot}: {Path}", activeSlot, assemblyPath);
             return true;
@@ -105,6 +125,8 @@ public sealed class AssemblySlotManager
     {
         UnloadCurrentContext();
         LoadedAssemblyPath = null;
+        LoadedAssembly = null;
+        UserAssemblies = [];
         logger.LogInformation("Assembly unloaded");
     }
 

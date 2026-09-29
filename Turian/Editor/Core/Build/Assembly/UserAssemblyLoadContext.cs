@@ -6,6 +6,7 @@ namespace Turian.Editor.Core;
 sealed class UserAssemblyLoadContext : AssemblyLoadContext
 {
     AssemblyDependencyResolver? resolver;
+    string? probingDirectory;
 
     public UserAssemblyLoadContext()
         : base("UserAssemblyLoadContext", isCollectible: true)
@@ -15,6 +16,7 @@ sealed class UserAssemblyLoadContext : AssemblyLoadContext
     public void SetResolver(string assemblyPath)
     {
         resolver = new AssemblyDependencyResolver(assemblyPath);
+        probingDirectory = Path.GetDirectoryName(Path.GetFullPath(assemblyPath));
     }
 
     protected override Assembly? Load(AssemblyName assemblyName)
@@ -25,6 +27,11 @@ sealed class UserAssemblyLoadContext : AssemblyLoadContext
             if (path != null)
                 return LoadFromAssemblyPath(path);
         }
+
+        // Sibling user assemblies are emitted without a deps.json, so the resolver does not know them.
+        if (probingDirectory != null && assemblyName.Name is { } name
+            && Path.Combine(probingDirectory, $"{name}.dll") is var sibling && File.Exists(sibling))
+            return LoadFromAssemblyPath(sibling);
 
         try { return Default.LoadFromAssemblyName(assemblyName); }
         catch { /* fallthrough */ }

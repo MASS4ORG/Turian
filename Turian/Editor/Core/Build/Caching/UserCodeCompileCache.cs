@@ -274,7 +274,8 @@ public sealed class UserCodeCompileCache(ILogger logger)
                     StringComparison.OrdinalIgnoreCase)
                 && !path.Contains(
                     $"{Path.AltDirectorySeparatorChar}.Cache{Path.AltDirectorySeparatorChar}",
-                    StringComparison.OrdinalIgnoreCase));
+                    StringComparison.OrdinalIgnoreCase))
+            .Concat(ProjectSettingsLoader.DataAssetSources(assetsAbsoluteDir).Where(AssemblyGraph.IsDefinitionFile));
     }
 
     static SourceFileCacheEntry CreateSourceEntry(string projectRootPath, string absolutePath)

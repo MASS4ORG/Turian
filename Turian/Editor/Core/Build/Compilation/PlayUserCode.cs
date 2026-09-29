@@ -165,7 +165,8 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         {
             // No compiled slot to copy from (the CLI builds straight from source), so generate it.
             var manifest = UserCodeTypeManifestGenerator.Generate(
-                Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly);
+                Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly,
+                CsProjectGenerator.DiscoverAssemblies(Settings));
             UserCodeTypeManifest.Save(manifest, Path.Combine(outputDir, $"{Settings.TitleToPathFriendly}.dll"));
             return;
         }

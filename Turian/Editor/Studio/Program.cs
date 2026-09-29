@@ -86,7 +86,7 @@ window.CloseRequested = () =>
 {
     if (exitApproved || !dispatcher.CanExecute(exitCommand)) return true;
     dispatcher.Execute(exitCommand);
-    return false;
+    return exitApproved;
 };
 
 try

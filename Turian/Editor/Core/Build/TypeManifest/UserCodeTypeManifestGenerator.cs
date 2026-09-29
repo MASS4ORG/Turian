@@ -17,7 +17,9 @@ public static class UserCodeTypeManifestGenerator
     /// <param name="assetsDirectory">The project's Assets folder.</param>
     /// <param name="logger">Receives parse and meta-file problems.</param>
     /// <param name="assemblyName">The user assembly the types compile into, recorded so a runtime can load it.</param>
-    public static UserCodeTypeManifest Generate(string assetsDirectory, ILogger logger, string? assemblyName = null)
+    /// <param name="graph">The project's assemblies; each type records the one other than the default it is in.</param>
+    public static UserCodeTypeManifest Generate(string assetsDirectory, ILogger logger, string? assemblyName = null,
+        AssemblyGraph? graph = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
@@ -42,7 +44,14 @@ public static class UserCodeTypeManifestGenerator
             if (typeId == Guid.Empty)
                 continue;
 
-            manifest.Types.Add(new UserCodeTypeEntry { FullyQualifiedName = fqn, TypeId = typeId });
+            var owner = graph?.AssemblyFor(csFilePath);
+            manifest.Types.Add(new UserCodeTypeEntry
+            {
+                FullyQualifiedName = fqn,
+                TypeId = typeId,
+                Assembly = owner is { IsDefault: false } ? owner.Name : null,
+                EditorOnly = owner?.EditorOnly ?? false,
+            });
             logger.LogDebug("TypeManifest: {Fqn} → {TypeId}", fqn, typeId);
         }
 

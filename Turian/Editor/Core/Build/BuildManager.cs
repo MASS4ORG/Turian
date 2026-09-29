@@ -104,12 +104,11 @@ public sealed class BuildManager : IDisposable
 
     // ── Assembly management ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns only the most recently loaded user assembly.
-    /// User code currently produces a single assembly.
-    /// </summary>
-    public Assembly? ActiveUserAssembly =>
-        slotManager.LoadedAssemblies.LastOrDefault();
+    /// <summary>The default user assembly: every script outside an assembly definition.</summary>
+    public Assembly? ActiveUserAssembly => slotManager.LoadedAssembly;
+
+    /// <summary>Every user assembly in force: the default one and one per assembly definition.</summary>
+    public IReadOnlyList<Assembly> ActiveUserAssemblies => slotManager.UserAssemblies;
 
     /// <summary>All assemblies visible to the editor (entry + user assemblies).</summary>
     public IEnumerable<Assembly> LoadedAssemblies =>

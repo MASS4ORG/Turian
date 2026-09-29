@@ -36,7 +36,19 @@ public static class CsProjectGenerator
     public static ProjectRootElement GenerateUserCode(IBuildAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        return GenerateUserCode(settings, logger, DiscoverAssemblies(settings));
+    }
+
+    /// <summary>The default assembly's project: every script outside an assembly definition.</summary>
+    /// <param name="settings">The project settings.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="graph">The project's assemblies.</param>
+    /// <returns>The generated project, not yet saved.</returns>
+    public static ProjectRootElement GenerateUserCode(IBuildAppSettings settings, ILogger logger, AssemblyGraph graph)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(graph);
         var csprojFilePath = UserCodeCsProjFullPath(settings);
         var isExecutable = false;
 
@@ -46,8 +58,64 @@ public static class CsProjectGenerator
             .AddProjectInfo(settings, executable: isExecutable)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
-            .AddNugetPackageReferences(settings);
-        projectRoot.AddCsFiles(settings);
+            .AddNugetPackageReferences(settings)
+            .AddAssemblyReferences(settings, graph.Default.References);
+        projectRoot.AddCsFiles(settings, graph.ExcludedDirectories(graph.Default));
+
+        return projectRoot;
+    }
+
+    /// <summary>
+    /// Every project the user code compiles through: one per assembly definition, each after the ones it
+    /// references, then the default assembly's.
+    /// </summary>
+    /// <param name="settings">The project settings.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="graph">The project's assemblies.</param>
+    /// <returns>The generated projects, not yet saved.</returns>
+    public static IReadOnlyList<ProjectRootElement> GenerateUserCodeProjects(
+        IBuildAppSettings settings,
+        ILogger logger,
+        AssemblyGraph graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        return [.. graph.Definitions.Select(assembly => GenerateAssemblyDefinition(settings, graph, assembly)),
+            GenerateUserCode(settings, logger, graph)];
+    }
+
+    /// <summary>The project's assemblies, read from the assembly definitions under its <c>Assets</c> folder.</summary>
+    /// <param name="settings">The project settings.</param>
+    /// <returns>The project's assemblies.</returns>
+    public static AssemblyGraph DiscoverAssemblies(IBuildAppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return AssemblyGraph.Discover(settings.AssetsAbsoluteDir, settings.TitleToPathFriendly ?? string.Empty);
+    }
+
+    static ProjectRootElement GenerateAssemblyDefinition(
+        IBuildAppSettings settings,
+        AssemblyGraph graph,
+        ProjectAssembly assembly)
+    {
+        var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
+        projectRoot.Sdk = settings.TargetSdk;
+        projectRoot
+            .AddProjectInfo(settings, executable: false)
+            .AddTurianDir()
+            .AddInternalDllReferences(settings)
+            .AddNugetPackageReferences(settings)
+            .AddAssemblyReferences(settings, assembly.References);
+
+        var group = projectRoot.AddPropertyGroup();
+        group.AddProperty("AssemblyName", assembly.Name);
+        group.AddProperty("RootNamespace", assembly.RootNamespace);
+        group.AddProperty("EnableDefaultCompileItems", "false");
+        if (assembly.AllowUnsafeCode) group.AddProperty("AllowUnsafeBlocks", "true");
+
+        var projectDirectory = Path.GetDirectoryName(projectRoot.FullPath)!;
+        var item = projectRoot.AddItemGroup().AddItem("Compile",
+            $"{Path.GetRelativePath(projectDirectory, assembly.Directory)}/**/*.cs");
+        item.Exclude = string.Join(';', ExcludePatterns(projectDirectory, graph.ExcludedDirectories(assembly)));
 
         return projectRoot;
     }
@@ -56,6 +124,16 @@ public static class CsProjectGenerator
         settings.CacheAbsoluteDir,
         "Source",
         $"{settings.TitleToPathFriendly}.csproj");
+
+    static string AssemblyCsProjFullPath(IBuildAppSettings settings, string assemblyName) => Path.Combine(
+        settings.CacheAbsoluteDir,
+        "Assemblies",
+        assemblyName,
+        $"{assemblyName}.csproj");
+
+    static IEnumerable<string> ExcludePatterns(string projectDirectory, IEnumerable<string> excludedDirectories) =>
+        excludedDirectories.Select(directory => $"{Path.GetRelativePath(projectDirectory, directory)}/**")
+            .Prepend("**/obj/**");
 
     /// <summary>
     /// Generate a brand new .csproj file
@@ -192,11 +270,22 @@ public static class CsProjectGenerator
             return projectRoot;
         }
 
-        private void AddCsFiles(IBuildAppSettings settings)
+        private void AddCsFiles(IBuildAppSettings settings, IEnumerable<string> excludedDirectories)
         {
             var itemGroup = projectRoot.AddItemGroup();
             var item = itemGroup.AddItem("Compile", $"{settings.CacheSourceRelativeDir}/**/*.cs");
-            item.Exclude = $"**/obj/**";
+            item.Exclude = string.Join(';',
+                ExcludePatterns(Path.GetDirectoryName(projectRoot.FullPath)!, excludedDirectories));
+        }
+
+        private ProjectRootElement AddAssemblyReferences(IBuildAppSettings settings, IEnumerable<string> assemblyNames)
+        {
+            var projectDirectory = Path.GetDirectoryName(projectRoot.FullPath)!;
+            var itemGroup = projectRoot.AddItemGroup();
+            foreach (var name in assemblyNames)
+                itemGroup.AddItem("ProjectReference",
+                    Path.GetRelativePath(projectDirectory, AssemblyCsProjFullPath(settings, name)));
+            return projectRoot;
         }
 
         private ProjectRootElement AddProjectInfo(IBuildAppSettings settings,
@@ -246,7 +335,12 @@ public static class CsProjectGenerator
             var itemGroup = projectRoot.AddItemGroup();
             itemGroup.AddItem("ProjectReference",
                 Path.GetRelativePath(Path.GetDirectoryName(projectRoot.FullPath)!, UserCodeCsProjFullPath(settings)));
-            return projectRoot;
+
+            // Definitions the default assembly does not reference would otherwise be left out of the game.
+            var graph = DiscoverAssemblies(settings);
+            return projectRoot.AddAssemblyReferences(settings,
+                graph.Definitions.Where(static a => !a.EditorOnly).Select(static a => a.Name)
+                    .Except(graph.Default.References));
         }
 
         private ProjectRootElement AddInternalDllReferences(IBuildAppSettings settings)

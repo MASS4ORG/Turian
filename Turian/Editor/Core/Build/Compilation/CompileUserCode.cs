@@ -20,46 +20,65 @@ public sealed class CompileUserCode(
     /// </summary>
     public async Task<string> ExecuteAsync()
     {
-        var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
+        var graph = CsProjectGenerator.DiscoverAssemblies(Settings);
+        var csprojFilePaths = await SetupAsync(() => GenerateCsProjFiles(graph)).ConfigureAwait(false);
+        var csprojFilePath = csprojFilePaths[^1];
 
         var assemblyOutputPath = SlotAssemblyOutputPath(outputDirectory);
         EnsureDirectory(assemblyOutputPath);
 
         var cache = new UserCodeCompileCache(Logger);
 
-        if (cache.IsAssemblyUpToDate(Settings, assemblyOutputPath, csprojFilePath, forceRecompile: forceRecompile))
+        if (cache.IsAssemblyUpToDate(Settings, assemblyOutputPath, csprojFilePath, forceRecompile: forceRecompile)
+            && graph.Definitions.All(a => File.Exists(Path.Combine(outputDirectory, $"{a.Name}.dll"))))
         {
             Logger.LogInformation("Compilation skipped. Cached assembly is still valid: {Path}", assemblyOutputPath);
             if (!UserCodeTypeManifest.Exists(assemblyOutputPath))
-                GenerateAndSaveTypeManifest(assemblyOutputPath);
+                GenerateAndSaveTypeManifest(assemblyOutputPath, graph);
             return assemblyOutputPath;
         }
 
-        using var workspace = MSBuildWorkspace.Create();
-        var project = await workspace.OpenProjectAsync(csprojFilePath).ConfigureAwait(false);
-        var compilation = await project.GetCompilationAsync().ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Compilation returned null.");
+        // The slot is loaded as a whole, so an assembly whose definition was removed must not linger in it.
+        foreach (var stale in Directory.EnumerateFiles(outputDirectory, "*.dll"))
+            File.Delete(stale);
 
-        int errorCount, warningCount;
-        await using (var fs = new FileStream(assemblyOutputPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        using var workspace = MSBuildWorkspace.Create();
+        foreach (var path in csprojFilePaths.Reverse())
         {
+            if (workspace.CurrentSolution.Projects.Any(p => PathsEqual(p.FilePath, path))) continue;
+            await workspace.OpenProjectAsync(path).ConfigureAwait(false);
+        }
+
+        int errorCount = 0, warningCount = 0;
+        var solution = workspace.CurrentSolution;
+        foreach (var projectId in solution.GetProjectDependencyGraph().GetTopologicallySortedProjects())
+        {
+            var project = solution.GetProject(projectId)!;
+            var compilation = await project.GetCompilationAsync().ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Compilation of {project.AssemblyName} returned null.");
+
+            await using var fs = new FileStream(Path.Combine(outputDirectory, $"{project.AssemblyName}.dll"),
+                FileMode.Create, FileAccess.Write, FileShare.None);
             var result = compilation.Emit(fs);
-            (errorCount, warningCount) = CompilationDiagnosticsReporter.Report(result.Diagnostics, Logger);
+            var (errors, warnings) = CompilationDiagnosticsReporter.Report(result.Diagnostics, Logger);
+            errorCount += errors;
+            warningCount += warnings;
 
             if (!result.Success)
             {
                 cache.Invalidate(Settings.ProjectAbsoluteDir, assemblyOutputPath);
                 Logger.LogError(
-                    "Compilation failed: {ErrorCount} error(s), {WarningCount} warning(s)",
-                    errorCount,
-                    warningCount);
+                    "Compilation of {Assembly} failed: {ErrorCount} error(s), {WarningCount} warning(s)",
+                    project.AssemblyName,
+                    errors,
+                    warnings);
                 throw new InvalidOperationException("Compilation failed.");
             }
         }
 
         workspace.CloseSolution();
 
-        GenerateAndSaveTypeManifest(assemblyOutputPath);
+        GenerateAndSaveTypeManifest(assemblyOutputPath, graph);
 
         var manifest = cache.CreateManifest(Settings, assemblyOutputPath, csprojFilePath);
         cache.SaveManifest(Settings.ProjectAbsoluteDir, assemblyOutputPath, manifest);
@@ -71,17 +90,21 @@ public sealed class CompileUserCode(
         return assemblyOutputPath;
     }
 
-    string GenerateCsProjFile()
+    IReadOnlyList<string> GenerateCsProjFiles(AssemblyGraph graph)
     {
-        var project = CsProjectGenerator.GenerateUserCode(Settings, Logger);
-        project.Save();
-        return project.FullPath;
+        var projects = CsProjectGenerator.GenerateUserCodeProjects(Settings, Logger, graph);
+        foreach (var project in projects) project.Save();
+        return [.. projects.Select(static project => project.FullPath)];
     }
 
-    void GenerateAndSaveTypeManifest(string assemblyOutputPath)
+    static bool PathsEqual(string? left, string right) =>
+        left is not null && string.Equals(Path.GetFullPath(left), Path.GetFullPath(right),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    void GenerateAndSaveTypeManifest(string assemblyOutputPath, AssemblyGraph graph)
     {
         var typeManifest = UserCodeTypeManifestGenerator.Generate(
-            Settings.AssetsAbsoluteDir, Logger, Path.GetFileNameWithoutExtension(assemblyOutputPath));
+            Settings.AssetsAbsoluteDir, Logger, Path.GetFileNameWithoutExtension(assemblyOutputPath), graph);
         UserCodeTypeManifest.Save(typeManifest, assemblyOutputPath);
     }
 }
