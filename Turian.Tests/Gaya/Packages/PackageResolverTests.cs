@@ -79,7 +79,10 @@ public sealed class PackageResolverTests : IDisposable
     public async Task EmbeddedPackagesWin()
     {
         Package("rules", "com.acme.rules", "1.0.0");
-        Package(Path.Combine("project", "Packages", "rules"), "com.acme.rules", "1.0.1-fork");
+        var embedded = Package(Path.Combine("project", "Packages", "rules"), "com.acme.rules", "1.0.1-fork");
+        var manifest = PackageManifest.Load(embedded);
+        manifest.Categories = ["turian:gameplay"];
+        manifest.Save(embedded);
         Manifest(("com.acme.rules", "file:../../rules"));
 
         var package = Assert.Single((await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
@@ -181,6 +184,7 @@ public sealed class PackageResolverTests : IDisposable
 
     PackageResolver Resolver(bool locked = false) => new(store, new PackageResolverOptions
     {
+        ReservedCategoryPrefixes = ["turian"],
         Hosts = new Dictionary<string, SemanticVersion> { ["turian"] = SemanticVersion.Parse("1.2.0") },
         Locked = locked,
     });

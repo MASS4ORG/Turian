@@ -59,6 +59,9 @@ public sealed record PackageResolverOptions
     /// <summary>Host → its version, checked against each package's <see cref="PackageManifest.Engines"/>.</summary>
     public IReadOnlyDictionary<string, SemanticVersion> Hosts { get; init; } = new Dictionary<string, SemanticVersion>();
 
+    /// <summary>What the packages are installed into; a package must list it among its scopes.</summary>
+    public PackageScope Scope { get; init; } = PackageScope.Project;
+
     /// <summary>Category prefixes any package may use without depending on a package of that id.</summary>
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; init; } = [];
 
@@ -101,7 +104,7 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         var constraints = new List<(string Id, VersionRange Range, string RequiredBy)>();
         var queue = new Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)>();
 
-        foreach (var embedded in EmbeddedPackages(packagesDirectory))
+        foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
             queue.Enqueue((embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1));
 
         foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
@@ -186,8 +189,9 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         var manifest = PackageManifest.Load(root, options.ReservedCategoryPrefixes);
         if (manifest.Name != id)
             throw new PackageException($"{spec} holds package '{manifest.Name}', not '{id}'.");
-        if (!manifest.EffectiveScopes.Contains(PackageScope.Project))
-            throw new PackageException($"{id} cannot be installed into a project; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");
+        if (!manifest.EffectiveScopes.Contains(options.Scope))
+            throw new PackageException(
+                $"{id} cannot be installed with scope {options.Scope}; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");
         CheckEngines(manifest);
 
         return new ResolvedPackage(id, manifest, root, origin, spec, commit, integrity, depth, isOverridden);
@@ -209,14 +213,15 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         }
     }
 
-    static IEnumerable<(string Id, string Path)> EmbeddedPackages(string packagesDirectory)
+    static IEnumerable<(string Id, string Path)> EmbeddedPackages(string packagesDirectory,
+        IReadOnlyCollection<string> reservedCategoryPrefixes)
     {
         if (!Directory.Exists(packagesDirectory)) yield break;
 
         foreach (var directory in Directory.EnumerateDirectories(packagesDirectory).Order(StringComparer.Ordinal))
         {
             if (!File.Exists(Path.Combine(directory, PackageManifest.FileName))) continue;
-            yield return (PackageManifest.Load(directory).Name, directory);
+            yield return (PackageManifest.Load(directory, reservedCategoryPrefixes).Name, directory);
         }
     }
 

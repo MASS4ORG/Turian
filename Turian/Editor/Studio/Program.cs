@@ -13,8 +13,14 @@ Log.Configure(loggerFactory);
 BuildManager.MsBuildLocatorRegisterDefaults();
 TypeRegistry.ScanAssembly(typeof(UiDocumentComponent).Assembly);
 
-// Built-in plugins are compiled in; a plugins/ folder scan is added later.
-var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly };
+// Built-in plugins are compiled in; the rest come from the studio packages the user installed.
+var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(PackagedPlugins.Load(
+    new Dictionary<string, Gaya.Packages.SemanticVersion>
+    {
+        [ProjectPackages.HostName] = ProjectPackages.EngineVersion,
+        ["gaya"] = ProjectPackages.GayaVersion,
+    },
+    Log.Logger));
 var shell = new ShellHost();
 var dispatcher = new CommandDispatcher();
 var panelAccessor = new PanelAccessor();

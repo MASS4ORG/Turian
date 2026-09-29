@@ -18,7 +18,10 @@ public static class ProjectPackages
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];
 
     /// <summary>This engine's version, which packages' <c>engines.turian</c> ranges are checked against.</summary>
-    public static SemanticVersion EngineVersion { get; } = ReadEngineVersion();
+    public static SemanticVersion EngineVersion { get; } = ReadVersion(typeof(Component).Assembly);
+
+    /// <summary>The Gaya platform's version, which packages' <c>engines.gaya</c> ranges are checked against.</summary>
+    public static SemanticVersion GayaVersion { get; } = ReadVersion(typeof(PackageResolver).Assembly);
 
     /// <summary>
     /// Resolves the packages of the project at <paramref name="projectRoot"/>, fetching git sources as needed, and
@@ -84,9 +87,8 @@ public static class ProjectPackages
         return $"{locked}|{string.Join('|', files)}|{string.Join('|', embedded)}";
     }
 
-    static SemanticVersion ReadEngineVersion()
+    static SemanticVersion ReadVersion(Assembly assembly)
     {
-        var assembly = typeof(Component).Assembly;
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (SemanticVersion.TryParse(informational, out var version)) return version;
 
