@@ -89,7 +89,8 @@ public static class CsProjectGenerator
     public static AssemblyGraph DiscoverAssemblies(IBuildAppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return AssemblyGraph.Discover(settings.AssetsAbsoluteDir, settings.TitleToPathFriendly ?? string.Empty);
+        return AssemblyGraph.Discover(settings.AssetsAbsoluteDir, settings.TitleToPathFriendly ?? string.Empty,
+            ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir));
     }
 
     static ProjectRootElement GenerateAssemblyDefinition(
@@ -133,6 +134,7 @@ public static class CsProjectGenerator
 
     static IEnumerable<string> ExcludePatterns(string projectDirectory, IEnumerable<string> excludedDirectories) =>
         excludedDirectories.Select(directory => $"{Path.GetRelativePath(projectDirectory, directory)}/**")
+            .Prepend("**/*~/**")
             .Prepend("**/obj/**");
 
     /// <summary>

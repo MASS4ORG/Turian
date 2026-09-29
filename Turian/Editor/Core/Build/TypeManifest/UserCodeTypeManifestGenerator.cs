@@ -31,7 +31,12 @@ public static class UserCodeTypeManifestGenerator
             return manifest;
         }
 
-        foreach (var csFilePath in Directory.EnumerateFiles(assetsDirectory, "*.cs", SearchOption.AllDirectories))
+        // Package scripts come after the project's; a package's meta paths are relative to the package root.
+        var scripts = Directory.EnumerateFiles(assetsDirectory, "*.cs", SearchOption.AllDirectories)
+            .Select(path => (Path: path, MetaRoot: Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)) ?? assetsDirectory))
+            .Concat((graph?.SourceRoots.Skip(1) ?? []).SelectMany(root => graph!.Scripts(root).Select(path => (Path: path, MetaRoot: root))));
+
+        foreach (var (csFilePath, metaRoot) in scripts)
         {
             var fqn = ExtractPrimaryClassFqn(csFilePath, logger);
             if (fqn is null)
@@ -40,7 +45,7 @@ public static class UserCodeTypeManifestGenerator
             var metaPath = csFilePath + ".meta";
             var typeId = File.Exists(metaPath)
                 ? ReadAssetId(metaPath, logger)
-                : CreateScriptMeta(csFilePath, assetsDirectory, logger);
+                : CreateScriptMeta(csFilePath, metaRoot, logger);
             if (typeId == Guid.Empty)
                 continue;
 
@@ -63,9 +68,8 @@ public static class UserCodeTypeManifestGenerator
     /// Writes the <c>.cs.meta</c> that gives a new script its TypeId. Scenes store components by that
     /// id, so without it a component declared in the script could not be saved.
     /// </summary>
-    static Guid CreateScriptMeta(string csFilePath, string assetsDirectory, ILogger logger)
+    static Guid CreateScriptMeta(string csFilePath, string projectDirectory, ILogger logger)
     {
-        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)) ?? assetsDirectory;
         var meta = new Asset
         {
             Id = Guid.NewGuid(),

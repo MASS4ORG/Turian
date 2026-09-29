@@ -16,6 +16,7 @@
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
     </ItemGroup>
 
     <!-- External libraries -->

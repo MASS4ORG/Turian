@@ -8,7 +8,7 @@ namespace Turian.Tests;
 /// </summary>
 public class GayaBoundaryTests
 {
-    static readonly string[] GayaAssemblies = ["Gaya.Sdk", "Gaya.Host"];
+    static readonly string[] GayaAssemblies = ["Gaya.Sdk", "Gaya.Host", "Gaya.Packages"];
 
     /// <summary>Compiled Gaya assemblies reference no Turian assembly, directly or transitively.</summary>
     [Fact]

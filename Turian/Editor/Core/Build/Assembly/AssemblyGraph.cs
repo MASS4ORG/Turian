@@ -1,3 +1,5 @@
+using Gaya.Packages;
+
 namespace Turian.Editor.Core;
 
 /// <summary>One assembly of a project: the default one or an <see cref="AssemblyDefinition"/>.</summary>
@@ -38,10 +40,12 @@ public sealed class AssemblyGraph
 
     readonly Dictionary<string, ProjectAssembly> byDirectory;
 
-    AssemblyGraph(ProjectAssembly defaultAssembly, IReadOnlyList<ProjectAssembly> definitions)
+    AssemblyGraph(ProjectAssembly defaultAssembly, IReadOnlyList<ProjectAssembly> definitions,
+        IReadOnlyList<string> sourceRoots)
     {
         Default = defaultAssembly;
         Definitions = definitions;
+        SourceRoots = sourceRoots;
         byDirectory = definitions.SelectMany(static d => d.Directories.Select(directory => (directory, d)))
             .ToDictionary(static pair => pair.directory, static pair => pair.d, StringComparer.Ordinal);
     }
@@ -51,6 +55,9 @@ public sealed class AssemblyGraph
 
     /// <summary>The defined assemblies, each after the ones it references.</summary>
     public IReadOnlyList<ProjectAssembly> Definitions { get; }
+
+    /// <summary>The folders scripts are read from: the project's <c>Assets</c>, then each package's root.</summary>
+    public IReadOnlyList<string> SourceRoots { get; }
 
     /// <summary>Every assembly, each after the ones it references; the default one last.</summary>
     public IEnumerable<ProjectAssembly> All => Definitions.Append(Default);
@@ -85,14 +92,28 @@ public sealed class AssemblyGraph
     /// <summary>Reads the definitions under a project's <c>Assets</c> folder and checks they form a valid graph.</summary>
     /// <param name="assetsDirectory">The project's <c>Assets</c> folder.</param>
     /// <param name="defaultName">The name of the default assembly.</param>
+    /// <param name="packages">
+    /// The project's resolved packages; their assembly definitions join the graph, and every script in a package
+    /// must belong to one.
+    /// </param>
     /// <returns>The project's assemblies.</returns>
     /// <exception cref="InvalidOperationException">The definitions conflict, reference unknown assemblies or form a cycle.</exception>
-    public static AssemblyGraph Discover(string assetsDirectory, string defaultName)
+    public static AssemblyGraph Discover(string assetsDirectory, string defaultName,
+        IReadOnlyList<ResolvedPackage>? packages = null)
     {
         ArgumentNullException.ThrowIfNull(defaultName);
+        packages ??= [];
 
         var root = string.IsNullOrWhiteSpace(assetsDirectory) ? string.Empty : Path.GetFullPath(assetsDirectory);
         var (found, referenceFiles) = root.Length > 0 && Directory.Exists(root) ? ReadSources(root) : ([], []);
+        foreach (var package in packages)
+        {
+            var (definitions, references) = ReadSources(package.RootPath);
+            // An editor-only package ships nothing, whatever its definitions say.
+            if (package.Manifest.EditorOnly) definitions.ForEach(static d => d.Definition.EditorOnly = true);
+            found.AddRange(definitions);
+            referenceFiles.AddRange(references);
+        }
 
         var names = new Dictionary<Guid, string>();
         var nodes = new Dictionary<string, (AssemblyDefinition Definition, string Path)>(StringComparer.Ordinal);
@@ -152,8 +173,30 @@ public sealed class AssemblyGraph
             AllowUnsafeCode: false,
             NoEngineReferences: false);
 
-        return new AssemblyGraph(defaultAssembly, ordered);
+        var graph = new AssemblyGraph(defaultAssembly, ordered,
+            [.. defaultAssembly.Directories, .. packages.Select(static p => Path.GetFullPath(p.RootPath))]);
+
+        foreach (var package in packages)
+        {
+            if (graph.Scripts(package.RootPath).FirstOrDefault(script => graph.AssemblyFor(script).IsDefault) is { } stray)
+                throw Conflict($"Script {stray} in package {package.Id} is not under an assembly definition.");
+        }
+
+        return graph;
     }
+
+    /// <summary>The scripts under a folder, leaving out folders whose name ends in <c>~</c>, which are never compiled.</summary>
+    /// <param name="directory">The folder.</param>
+    /// <returns>Absolute script paths.</returns>
+    public IEnumerable<string> Scripts(string directory) =>
+        Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !IsInTildeFolder(Path.GetRelativePath(directory, path)))
+            : [];
+
+    static bool IsInTildeFolder(string relativePath) =>
+        relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1)
+            .Any(static segment => segment.EndsWith('~'));
 
     /// <summary>
     /// Whether a data-asset file holds an <see cref="AssemblyDefinition"/> or an
@@ -198,6 +241,7 @@ public sealed class AssemblyGraph
         var references = new List<(AssemblyDefinitionReference, string)>();
 
         foreach (var path in ProjectSettingsLoader.DataAssetSources(root).Select(Path.GetFullPath)
+                     .Where(path => !IsInTildeFolder(Path.GetRelativePath(root, path)))
                      .Order(StringComparer.Ordinal))
         {
             var typeId = PeekTypeId(path);

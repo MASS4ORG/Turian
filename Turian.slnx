@@ -19,6 +19,7 @@
     <Project Path="Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj" />
   </Folder>
   <Folder Name="/Gaya/">
+    <Project Path="Gaya/Gaya.Packages/Gaya.Packages.csproj" />
     <Project Path="Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
     <Project Path="Gaya/Gaya.Host/Gaya.Host.csproj" />
   </Folder>

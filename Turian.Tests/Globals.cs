@@ -1,6 +1,7 @@
 global using System.Buffers.Binary;
 global using System.Collections.Immutable;
 global using System.Collections.ObjectModel;
+global using System.Diagnostics;
 global using System.Globalization;
 global using System.Numerics;
 global using System.Reflection;
@@ -13,6 +14,7 @@ global using System.Text.Json.Serialization;
 global using System.Text.RegularExpressions;
 global using System.Xml.Linq;
 global using Gaya.Host;
+global using Gaya.Packages;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
