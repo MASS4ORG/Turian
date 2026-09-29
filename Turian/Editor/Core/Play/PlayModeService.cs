@@ -100,7 +100,8 @@ public sealed class PlayModeService(
         Node? clone;
         try
         {
-            clone = NodeCloner.DeepClone(editorRoot, awake: false);
+            clone = NodeCloner.DeepClone(editorRoot, awake: false,
+                loader: playServices.GetRequiredService<IAssetLoader>());
         }
         catch (Exception ex)
         {

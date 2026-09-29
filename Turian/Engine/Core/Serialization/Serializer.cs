@@ -105,6 +105,13 @@ public static class Serializer
     }
 
     /// <summary>
+    /// Deserializes a scene using an explicitly selected asset loader for direct DataAsset references.
+    /// Unlike the legacy overload, this never falls back to the process-wide runtime provider.
+    /// </summary>
+    public static T? LoadData<T>(string data, IAssetLoader? loader) =>
+        ObjectReferences.DeserializeWithLoader(loader, () => JsonSerializer.Deserialize<T>(data, JsonOptions));
+
+    /// <summary>
     /// Save the Object content to the given path
     /// </summary>
     /// <param name="absolutePath"></param>

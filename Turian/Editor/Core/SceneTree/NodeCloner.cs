@@ -22,13 +22,16 @@ public static class NodeCloner
     /// finish preparing the world first — play mode registers its services and tracks the scene
     /// before waking components, because <c>OnAwake</c> is where scripts resolve engine services.
     /// </param>
+    /// <param name="loader">An explicit play-session loader for direct DataAsset references, when available.</param>
     /// <returns>The independent copy, or <c>null</c> if the round-trip produced no node.</returns>
-    public static Node? DeepClone(Node source, bool awake = true)
+    public static Node? DeepClone(Node source, bool awake = true, IAssetLoader? loader = null)
     {
         ArgumentNullException.ThrowIfNull(source);
 
         var json = Serializer.Serialize(source);
-        var clone = Serializer.LoadData<Node>(json);
+        var clone = loader is null
+            ? Serializer.LoadData<Node>(json)
+            : Serializer.LoadData<Node>(json, loader);
 
         if (awake) clone?.Awake(null);
 

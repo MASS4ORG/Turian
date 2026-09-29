@@ -20,6 +20,24 @@ public static class ObjectReferences
     static readonly ConcurrentDictionary<(Type, string), MemberInfo?> Members = new();
 
     [ThreadStatic] static int _nodeReadDepth;
+    static readonly AsyncLocal<LoaderContext?> DeserializationLoader = new();
+
+    sealed record LoaderContext(IAssetLoader? Loader);
+
+    internal static T DeserializeWithLoader<T>(IAssetLoader? loader, Func<T> deserialize)
+    {
+        ArgumentNullException.ThrowIfNull(deserialize);
+        var previous = DeserializationLoader.Value;
+        DeserializationLoader.Value = new LoaderContext(loader);
+        try
+        {
+            return deserialize();
+        }
+        finally
+        {
+            DeserializationLoader.Value = previous;
+        }
+    }
 
     /// <summary>
     /// Whether a member of <paramref name="memberType"/> is serialized as a reference.
@@ -268,7 +286,8 @@ public static class ObjectReferences
     internal static void ExitNode(Node? node)
     {
         if (--_nodeReadDepth == 0 && node is not null)
-            Resolve(node, RuntimeServices.TryGet<IAssetLoader>());
+            Resolve(node, DeserializationLoader.Value is { } context
+                ? context.Loader : RuntimeServices.TryGet<IAssetLoader>());
     }
 
     static IEnumerable<Guid> PendingIds(IdClass owner)

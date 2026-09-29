@@ -85,7 +85,9 @@ public partial class SceneManager
     Node DeserializeNode(string json, string sourceDescription)
     {
         json = PrefabInstances.Expand(json, id => PrefabInstances.ReadPrefabJson(assetDatabase, id));
-        var root = Serializer.LoadData<Node>(json);
+        var root = services is null
+            ? Serializer.LoadData<Node>(json)
+            : Serializer.LoadData<Node>(json, services.GetService<IAssetLoader>());
         if (root is null)
         {
             throw new InvalidOperationException(
@@ -208,7 +210,9 @@ public partial class SceneManager
         ArgumentNullException.ThrowIfNull(source);
 
         var json = Serializer.Serialize(source);
-        var clone = Serializer.LoadData<Node>(json)
+        var clone = (services is null
+                ? Serializer.LoadData<Node>(json)
+                : Serializer.LoadData<Node>(json, services.GetService<IAssetLoader>()))
                     ?? throw new InvalidOperationException(
                         $"Failed to clone node hierarchy of type '{source.GetType().FullName}' via serialization.");
 
