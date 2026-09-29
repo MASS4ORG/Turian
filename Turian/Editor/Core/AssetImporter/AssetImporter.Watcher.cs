@@ -30,6 +30,14 @@ public sealed partial class AssetImporter
 
         var metaFilePath = GetMetaFilePath(filePath);
 
+        // A store package is shared and read-only: it must ship its metas, and its files never change.
+        if (PackageRootOf(filePath) is { ReadOnly: true })
+        {
+            if (File.Exists(metaFilePath)) RegisterExistingMetaFile(metaFilePath);
+            else logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", filePath);
+            return;
+        }
+
         if (!overwriteExisting && File.Exists(metaFilePath))
         {
             try

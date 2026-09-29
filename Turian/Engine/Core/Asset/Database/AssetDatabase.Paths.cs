@@ -209,6 +209,31 @@ public sealed partial class AssetDatabase
             : metaFilePath;
     }
 
+    /// <summary>The project installing the package whose folder holds <paramref name="path"/>; null outside packages.</summary>
+    string? PackageProjectRoot(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        return packageRoots.Any(root => IsUnderDirectory(fullPath, root)) ? packagesProjectRoot : null;
+    }
+
+    /// <summary>Whether <paramref name="path"/> is inside <paramref name="directory"/>.</summary>
+    /// <param name="path">An absolute path.</param>
+    /// <param name="directory">An absolute folder.</param>
+    /// <returns>True when inside.</returns>
+    public static bool IsUnderDirectory(string path, string directory) =>
+        path.StartsWith(Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether a path inside <paramref name="root"/> sits in a folder whose name ends in <c>~</c>, which packages use
+    /// for content that is never imported (samples, documentation).
+    /// </summary>
+    /// <param name="path">An absolute path.</param>
+    /// <param name="root">The package folder.</param>
+    /// <returns>True when the path is in such a folder.</returns>
+    public static bool IsInTildeFolder(string path, string root) =>
+        Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1)
+            .Any(static segment => segment.EndsWith('~'));
+
     static string? TryResolveProjectRoot(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))

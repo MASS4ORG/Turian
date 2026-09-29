@@ -72,7 +72,9 @@ public sealed partial class AssetImporter
             texture.IsSrgb = isSrgb;
             texture.FlipGreenChannel = flipGreenChannel;
             texture.RelativePath = fullPath;
-            File.WriteAllText(metaFilePath, SerializeAssetMetadata(texture));
+            // A store package's meta is read-only; the import still applies the model's choice.
+            if (importer.PackageRootOf(fullPath) is not { ReadOnly: true })
+                File.WriteAllText(metaFilePath, SerializeAssetMetadata(texture));
             importer.ImportAssetToCache(texture, fullPath);
         }
     }

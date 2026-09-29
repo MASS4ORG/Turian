@@ -31,6 +31,8 @@ public sealed partial class AssetImporter : IDisposable
     readonly object syncRoot = new();
 
     AssetFolderWatcher? folderWatcher;
+    List<AssetFolderWatcher> packageWatchers = [];
+    IReadOnlyList<(string Root, bool ReadOnly)> packageRoots = [];
     List<(Asset Asset, string SourcePath)>? pendingBatch;
     string? projectRootPath;
     string? assetsRootPath;
@@ -198,6 +200,15 @@ public sealed partial class AssetImporter : IDisposable
             folderWatcher?.Dispose();
             folderWatcher = new AssetFolderWatcher(logger, this);
             folderWatcher.Start(assetsRootPath!);
+
+            // Store packages never change; a local or embedded package is someone's working copy.
+            packageWatchers.ForEach(static watcher => watcher.Dispose());
+            packageWatchers = [.. packageRoots.Where(static p => !p.ReadOnly).Select(p =>
+            {
+                var watcher = new AssetFolderWatcher(logger, this);
+                watcher.Start(p.Root);
+                return watcher;
+            })];
         }
 
         NotifyAssetsChanged();
@@ -211,6 +222,19 @@ public sealed partial class AssetImporter : IDisposable
         cacheRootPath = Path.Combine(projectRootPath, cacheDirectoryName);
         cacheAssetsRootPath = Path.Combine(cacheRootPath, cacheAssetsDirectoryName);
         Directory.CreateDirectory(cacheAssetsRootPath);
+
+        try
+        {
+            packageRoots = [.. ProjectPackages.ResolveOrEmpty(projectRootPath)
+                .Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
+        }
+        catch (Gaya.Packages.PackageException ex)
+        {
+            logger.LogError(ex, "The project's packages could not be resolved; their assets are left out");
+            packageRoots = [];
+        }
+
+        assetDatabase.SetPackageRoots(projectRootPath, packageRoots.Select(static p => p.Root));
     }
 
     /// <summary>
@@ -219,7 +243,13 @@ public sealed partial class AssetImporter : IDisposable
     /// </summary>
     void ScanFolderBatched(string folderPath)
     {
-        var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+        // A full scan of the project covers its packages too.
+        var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
+            .Concat(string.Equals(folderPath, assetsRootPath, StringComparison.Ordinal)
+                ? packageRoots.Where(p => Directory.Exists(p.Root))
+                    .SelectMany(p => Directory.GetFiles(p.Root, "*", SearchOption.AllDirectories))
+                : [])
+            .ToArray();
         var batch = new List<(Asset Asset, string SourcePath)>();
 
         logger.LogInformation("Importing {FileCount} files from {FolderPath}", files.Length, folderPath);
@@ -393,8 +423,8 @@ public sealed partial class AssetImporter : IDisposable
 
     bool ShouldHandleRename(string oldPath, string newPath)
     {
-        var oldUnderRoot = IsUnderAssetsRoot(oldPath);
-        var newUnderRoot = IsUnderAssetsRoot(newPath);
+        var oldUnderRoot = IsUnderAssetsRoot(oldPath) || PackageRootOf(oldPath) is not null;
+        var newUnderRoot = IsUnderAssetsRoot(newPath) || PackageRootOf(newPath) is not null;
 
         return oldUnderRoot || newUnderRoot;
     }

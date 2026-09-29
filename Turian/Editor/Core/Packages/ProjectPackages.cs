@@ -47,6 +47,7 @@ public static class ProjectPackages
                 Locked = locked,
             });
         var resolution = resolver.ResolveAsync(projectRoot).GetAwaiter().GetResult();
+        PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
 
         if (resolution.UsesUserOverride)
             Log.Logger.LogInformation("Packages resolved with {File}; the lock file is left unchanged",

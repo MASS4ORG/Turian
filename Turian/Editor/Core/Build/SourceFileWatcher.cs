@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Watches a project directory for <c>*.cs</c> file changes and raises
+/// Watches a project directory for changes to <c>*.cs</c> files and assembly definitions, and raises
 /// <see cref="SourceChanged"/> after a configurable debounce period so that
 /// rapid saves do not trigger many back-to-back recompiles.
 ///
@@ -19,7 +19,7 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     // ── Public surface ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Raised (on a thread-pool thread) after <c>*.cs</c> files change and the debounce
+    /// Raised (on a thread-pool thread) after sources change and the debounce
     /// period elapses.  The argument is the directory being watched.
     /// </summary>
     public event Action<string>? SourceChanged;
@@ -27,8 +27,8 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     // ── Watcher configuration ──────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    /// <remarks>Only <c>*.cs</c> files trigger events.</remarks>
-    protected override string Filter => "*.cs";
+    /// <remarks>Every file is watched; <see cref="IsSource"/> keeps scripts and assembly definitions.</remarks>
+    protected override string Filter => "*.*";
 
     /// <inheritdoc/>
     protected override NotifyFilters WatcherNotifyFilters =>
@@ -51,6 +51,7 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileCreated(FileSystemEventArgs e)
     {
+        if (!IsSource(e.FullPath)) return;
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -58,6 +59,7 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileChanged(FileSystemEventArgs e)
     {
+        if (!IsSource(e.FullPath)) return;
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -65,6 +67,7 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileDeleted(FileSystemEventArgs e)
     {
+        if (!IsSource(e.FullPath)) return;
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -72,9 +75,18 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileRenamed(RenamedEventArgs e)
     {
+        if (!IsSource(e.FullPath) && !IsSource(e.OldFullPath)) return;
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
+
+    /// <summary>
+    /// Whether a change to <paramref name="path"/> can change what compiles: a script, or a data asset holding an
+    /// assembly definition (any removed data asset counts, since its content can no longer be read).
+    /// </summary>
+    static bool IsSource(string path) =>
+        path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+        || (GenericAssetImporter.IsDataAssetPath(path) && (!File.Exists(path) || AssemblyGraph.IsDefinitionFile(path)));
 
     // ── Disposal ───────────────────────────────────────────────────────────────
 

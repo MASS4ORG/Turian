@@ -218,7 +218,26 @@ public sealed partial class AssetImporter
             return false;
         }
 
+        if (PackageRootOf(path) is { } package)
+        {
+            var fullPath = Path.GetFullPath(path);
+            return AssetDatabase.IsInTildeFolder(fullPath, package.Root)
+                   || fullPath == Path.Combine(package.Root, Gaya.Packages.PackageManifest.FileName);
+        }
+
         return !IsUnderAssetsRoot(path);
+    }
+
+    /// <summary>The installed package whose folder holds <paramref name="path"/>, or null.</summary>
+    (string Root, bool ReadOnly)? PackageRootOf(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        foreach (var package in packageRoots)
+        {
+            if (AssetDatabase.IsUnderDirectory(fullPath, package.Root)) return package;
+        }
+
+        return null;
     }
 
     bool IsUnderAssetsRoot(string path)
@@ -235,7 +254,7 @@ public sealed partial class AssetImporter
     bool ShouldIgnoreMetaPath(string metaPath)
     {
         var assetPath = GetAssetPathFromMeta(metaPath);
-        return HasIgnoredExtension(assetPath) || !IsUnderAssetsRoot(assetPath);
+        return HasIgnoredExtension(assetPath) || (!IsUnderAssetsRoot(assetPath) && PackageRootOf(assetPath) is null);
     }
 
     void DeleteMetaFile(string metaPath)
@@ -301,6 +320,8 @@ public sealed partial class AssetImporter
         disposed = true;
         folderWatcher?.Dispose();
         folderWatcher = null;
+        packageWatchers.ForEach(static watcher => watcher.Dispose());
+        packageWatchers = [];
     }
 
     // ── Inner watcher ──────────────────────────────────────────────────────────

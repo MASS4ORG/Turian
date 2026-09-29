@@ -69,7 +69,7 @@ public sealed partial class AssetDatabase
         ArgumentException.ThrowIfNullOrWhiteSpace(newSourcePath);
 
         var normalizedSourcePath = Path.GetFullPath(newSourcePath);
-        var projectRoot = TryResolveProjectRoot(normalizedSourcePath)
+        var projectRoot = PackageProjectRoot(normalizedSourcePath) ?? TryResolveProjectRoot(normalizedSourcePath)
             ?? throw new InvalidOperationException("Unable to determine project root for asset move.");
 
         var normalizedMetaPath = $"{normalizedSourcePath}.meta";
