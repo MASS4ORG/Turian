@@ -18,8 +18,7 @@ public class BuildInfoGenerator : IIncrementalGenerator
             return "(contributors list not available)";
         }
 
-        var regex = ContributorRegex();
-        var matches = regex.Matches(markdownContent);
+        var matches = ContributorRegex.Matches(markdownContent);
 
         var contributors = new List<string>();
 
@@ -35,11 +34,9 @@ public class BuildInfoGenerator : IIncrementalGenerator
         return string.Join("\n", contributors);
     }
 
-    static readonly Regex contributorRegex = new(
+    static readonly Regex ContributorRegex = new(
         "\\*\\s+(?:\\[(?<name>[^\\]]+)\\]\\((?<email>[^)]+)\\)|(?<name2>[^[\\n]+))",
         RegexOptions.Multiline | RegexOptions.Compiled);
-
-    static Regex ContributorRegex() => contributorRegex;
 
     /// <inheritdoc />
     public void Initialize(IncrementalGeneratorInitializationContext context)

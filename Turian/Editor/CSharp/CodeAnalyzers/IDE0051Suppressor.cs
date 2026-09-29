@@ -10,7 +10,7 @@ public class IDE0051Suppressor : DiagnosticSuppressor
     /// <summary>
     /// Description of the rule to suppress.
     /// </summary>
-    static readonly SuppressionDescriptor suppressionRule =
+    static readonly SuppressionDescriptor SuppressionRule =
         new(
             "SPR0001",
             "IDE0051", // This is the ID of the diagnostic you want to suppress
@@ -18,7 +18,7 @@ public class IDE0051Suppressor : DiagnosticSuppressor
         );
 
     /// <inheritdoc/>
-    public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = [suppressionRule];
+    public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = [SuppressionRule];
 
     /// <inheritdoc/>
     public override void ReportSuppressions(SuppressionAnalysisContext context)
@@ -55,7 +55,7 @@ public class IDE0051Suppressor : DiagnosticSuppressor
                         && HasSuppressPrivateAttribute(context, attributeSymbol)
                     )
                     {
-                        context.ReportSuppression(Suppression.Create(suppressionRule, diagnostic));
+                        context.ReportSuppression(Suppression.Create(SuppressionRule, diagnostic));
                     }
                 }
             }

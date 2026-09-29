@@ -9,26 +9,26 @@ public class InspectorMemberSuppressor : DiagnosticSuppressor
 {
     // Define the rules we want to suppress
     // 1. Unused private members (for fields/props you might have made private but marked [Expose])
-    static readonly SuppressionDescriptor unusedMemberRule = new(
+    static readonly SuppressionDescriptor UnusedMemberRule = new(
         id: "SPR0001",
         suppressedDiagnosticId: "IDE0051",
         justification: "Member is accessed by the Engine Inspector via reflection.");
 
     // 2. The "Can be made private" suggestion (common for public properties)
-    static readonly SuppressionDescriptor makePrivateRule = new(
+    static readonly SuppressionDescriptor MakePrivateRule = new(
         id: "SPR0002",
         suppressedDiagnosticId: "IDE0040", // Accessibility modifiers
         justification: "Member must remain public for Engine Inspector/Scripting access.");
 
     // 3. Field never assigned (the classic grayed out field)
-    static readonly SuppressionDescriptor unassignedFieldRule = new(
+    static readonly SuppressionDescriptor UnassignedFieldRule = new(
         id: "SPR0003",
         suppressedDiagnosticId: "CS0649",
         justification: "Field is assigned via Engine serialization.");
 
     /// <inheritdoc/>
     public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions
-        => [unusedMemberRule, makePrivateRule, unassignedFieldRule];
+        => [UnusedMemberRule, MakePrivateRule, UnassignedFieldRule];
 
     /// <inheritdoc/>
     public override void ReportSuppressions(SuppressionAnalysisContext context)

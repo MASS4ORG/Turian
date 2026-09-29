@@ -15,19 +15,19 @@ namespace Turian.CSharp.CodeGenerator;
 [Generator]
 public sealed class DataAssetGenerator : IIncrementalGenerator
 {
-    const string DataAssetName = "Turian.Engine.Core.DataAsset";
-    const string AssetName = "Turian.Engine.Core.Asset";
-    const string JsonIgnoreName = "System.Text.Json.Serialization.JsonIgnoreAttribute";
-    const string JsonIncludeName = "System.Text.Json.Serialization.JsonIncludeAttribute";
-    const string SerializeInlineName = "Turian.SerializeInlineAttribute";
-    const string ObservableName = "Turian.ObservableAttribute";
+    const string dataAssetName = "Turian.Engine.Core.DataAsset";
+    const string assetName = "Turian.Engine.Core.Asset";
+    const string jsonIgnoreName = "System.Text.Json.Serialization.JsonIgnoreAttribute";
+    const string jsonIncludeName = "System.Text.Json.Serialization.JsonIncludeAttribute";
+    const string serializeInlineName = "Turian.SerializeInlineAttribute";
+    const string observableName = "Turian.ObservableAttribute";
 
-    const string Json = "global::System.Text.Json";
-    const string Core = "global::Turian.Engine.Core";
+    const string json = "global::System.Text.Json";
+    const string core = "global::Turian.Engine.Core";
 
-    static readonly SymbolDisplayFormat typeFormat = SymbolDisplayFormat.FullyQualifiedFormat;
+    static readonly SymbolDisplayFormat TypeFormat = SymbolDisplayFormat.FullyQualifiedFormat;
 
-    static readonly SymbolDisplayFormat nullableTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
+    static readonly SymbolDisplayFormat NullableTypeFormat = SymbolDisplayFormat.FullyQualifiedFormat
         .AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
 
     /// <inheritdoc />
@@ -47,7 +47,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             var serializable = models.Where(static m => m!.Members is not null).Distinct().ToList();
             if (serializable.Count > 0)
                 output.AddSource("TurianGeneratedSerializers.g.cs",
-                    SourceText.From(EmitSerializers(serializable!), Encoding.UTF8));
+                    SourceText.From(EmitSerializers(serializable), Encoding.UTF8));
 
             foreach (var model in models.Where(static m => m!.Observables.Length > 0).Distinct())
                 output.AddSource($"{model!.HintName}.Observable.g.cs",
@@ -59,19 +59,19 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == DataAssetName) return true;
+            if (current.ToDisplayString() == dataAssetName) return true;
         }
 
         return false;
     }
 
-    static TypeModel? Describe(INamedTypeSymbol type)
+    static TypeModel Describe(INamedTypeSymbol type)
     {
         var observables = type.GetMembers().OfType<IPropertySymbol>()
-            .Where(static p => p.IsPartialDefinition && HasAttribute(p, ObservableName))
+            .Where(static p => p.IsPartialDefinition && HasAttribute(p, observableName))
             .Select(static p => new ObservableModel(
                 p.Name,
-                p.Type.ToDisplayString(nullableTypeFormat),
+                p.Type.ToDisplayString(NullableTypeFormat),
                 Keyword(p.DeclaredAccessibility),
                 p.GetMethod is { } get && get.DeclaredAccessibility != p.DeclaredAccessibility
                     ? Keyword(get.DeclaredAccessibility) + " "
@@ -88,7 +88,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             containers.Insert(0, outer.Name);
 
         return new TypeModel(
-            type.ToDisplayString(typeFormat),
+            type.ToDisplayString(TypeFormat),
             type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString(),
             new EquatableArray<string>([.. containers]),
             type.Name,
@@ -117,17 +117,17 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             if (property.IsStatic || property.IsIndexer) continue;
             if (property.DeclaredAccessibility != Accessibility.Public)
             {
-                if (HasAttribute(property, JsonIncludeName)) return null;
+                if (HasAttribute(property, jsonIncludeName)) return null;
                 continue;
             }
 
             if (property.GetMethod?.DeclaredAccessibility != Accessibility.Public)
             {
-                if (HasAttribute(property, JsonIncludeName)) return null;
+                if (HasAttribute(property, jsonIncludeName)) return null;
                 continue;
             }
 
-            if (HasAttribute(property, JsonIgnoreName) || property.SetMethod is null) continue;
+            if (HasAttribute(property, jsonIgnoreName) || property.SetMethod is null) continue;
             if (property.SetMethod.IsInitOnly
                 || property.SetMethod.DeclaredAccessibility != Accessibility.Public)
                 return null;
@@ -140,11 +140,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared) continue;
             if (field.DeclaredAccessibility != Accessibility.Public)
             {
-                if (HasAttribute(field, JsonIncludeName)) return null;
+                if (HasAttribute(field, jsonIncludeName)) return null;
                 continue;
             }
 
-            if (HasAttribute(field, JsonIgnoreName)) continue;
+            if (HasAttribute(field, jsonIgnoreName)) continue;
             if (field.IsReadOnly) return null;
             if (!TryAdd(field.Name, field.Type, field)) return null;
         }
@@ -153,15 +153,15 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
 
         bool TryAdd(string name, ITypeSymbol memberType, ISymbol member)
         {
-            if (!names.Add(name) || DerivesFrom(memberType, AssetName) || memberType.IsRefLikeType
+            if (!names.Add(name) || DerivesFrom(memberType, assetName) || memberType.IsRefLikeType
                 || memberType.TypeKind == TypeKind.Pointer)
                 return false;
 
             members.Add(new MemberModel(
                 name,
-                memberType.ToDisplayString(typeFormat),
-                !HasAttribute(member, SerializeInlineName) && IsDataAssetReference(memberType),
-                FastPath(memberType)));
+                memberType.ToDisplayString(TypeFormat),
+                !HasAttribute(member, serializeInlineName) && IsDataAssetReference(memberType),
+                FastPathOf(memberType)));
             return true;
         }
     }
@@ -188,7 +188,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 named.TypeArguments[0],
             _ => type,
         };
-        return DerivesFrom(element, DataAssetName);
+        return DerivesFrom(element, dataAssetName);
     }
 
     static bool DerivesFrom(ITypeSymbol type, string baseName)
@@ -201,7 +201,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         return false;
     }
 
-    static string? FastPath(ITypeSymbol type) => type.SpecialType switch
+    static string? FastPathOf(ITypeSymbol type) => type.SpecialType switch
     {
         SpecialType.System_Boolean => "Boolean",
         SpecialType.System_Byte => "Byte",
@@ -303,10 +303,10 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var name = member.Name;
         var id = Identifier(name);
         var general = $"{{ writer.WritePropertyName(\"{name}\"); "
-                      + $"{Json}.JsonSerializer.Serialize(writer, o.{id}, options); }}";
+                      + $"{json}.JsonSerializer.Serialize(writer, o.{id}, options); }}";
 
         if (member.IsReference)
-            return $"{indent}if (!{Core}.ObjectReferences.TryWrite("
+            return $"{indent}if (!{core}.ObjectReferences.TryWrite("
                    + $"writer, o, \"{name}\", typeof({member.Type}), o.{id}, false)) {general}\n";
 
         return member.FastPath switch
@@ -325,17 +325,17 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         const string indent = "                        ";
         var name = member.Name;
         var id = Identifier(name);
-        var general = $"{Json}.JsonSerializer.Deserialize<{member.Type}>(property.Value, options)";
+        var general = $"{json}.JsonSerializer.Deserialize<{member.Type}>(property.Value, options)";
 
         if (member.IsReference)
-            return $"{indent}case \"{name}\": o.{id} = {Core}.ObjectReferences.TryRead("
+            return $"{indent}case \"{name}\": o.{id} = {core}.ObjectReferences.TryRead("
                    + $"o, \"{name}\", typeof({member.Type}), property.Value, false, out var {name}Reference) "
                    + $"? ({member.Type}){name}Reference : {general}; return true;\n";
 
         var fast = member.FastPath switch
         {
             null => null,
-            "Boolean" => $"property.Value.ValueKind is {Json}.JsonValueKind.True or {Json}.JsonValueKind.False "
+            "Boolean" => $"property.Value.ValueKind is {json}.JsonValueKind.True or {json}.JsonValueKind.False "
                          + $"? property.Value.GetBoolean() : {general}",
             "String" => $"{IsKind("String")} ? property.Value.GetString() : {general}",
             "Guid" => $"{IsKind("String")} ? property.Value.GetGuid() : {general}",
@@ -345,7 +345,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         return $"{indent}case \"{name}\": o.{id} = {fast ?? general}; return true;\n";
     }
 
-    static string IsKind(string kind) => $"property.Value.ValueKind == {Json}.JsonValueKind.{kind}";
+    static string IsKind(string kind) => $"property.Value.ValueKind == {json}.JsonValueKind.{kind}";
 
     static string EmitObservables(TypeModel model)
     {
