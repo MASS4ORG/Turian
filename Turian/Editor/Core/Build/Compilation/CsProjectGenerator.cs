@@ -99,10 +99,9 @@ public static class CsProjectGenerator
     {
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
+        projectRoot.AddProjectInfo(settings, executable: false).AddTurianDir();
+        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings);
         projectRoot
-            .AddProjectInfo(settings, executable: false)
-            .AddTurianDir()
-            .AddInternalDllReferences(settings)
             .AddNugetPackageReferences(settings)
             .AddAssemblyReferences(settings, assembly.References);
 
@@ -113,9 +112,10 @@ public static class CsProjectGenerator
         if (assembly.AllowUnsafeCode) group.AddProperty("AllowUnsafeBlocks", "true");
 
         var projectDirectory = Path.GetDirectoryName(projectRoot.FullPath)!;
-        var item = projectRoot.AddItemGroup().AddItem("Compile",
-            $"{Path.GetRelativePath(projectDirectory, assembly.Directory)}/**/*.cs");
-        item.Exclude = string.Join(';', ExcludePatterns(projectDirectory, graph.ExcludedDirectories(assembly)));
+        var exclude = string.Join(';', ExcludePatterns(projectDirectory, graph.ExcludedDirectories(assembly)));
+        var itemGroup = projectRoot.AddItemGroup();
+        foreach (var directory in assembly.Directories)
+            itemGroup.AddItem("Compile", $"{Path.GetRelativePath(projectDirectory, directory)}/**/*.cs").Exclude = exclude;
 
         return projectRoot;
     }

@@ -29,4 +29,10 @@ public class AssemblyDefinition : DataAsset
 
     /// <summary>Allows <c>unsafe</c> code in the assembly.</summary>
     public bool AllowUnsafeCode { get; set; }
+
+    /// <summary>
+    /// Compiles against .NET alone, without the engine, so the code can be reused outside a game (a server, a
+    /// tool); it may only reference other assemblies without engine references.
+    /// </summary>
+    public bool NoEngineReferences { get; set; }
 }

@@ -166,13 +166,7 @@ public sealed class AssemblyGraphTests : IDisposable
     public void EachDefinitionGetsAProject()
     {
         Define("Inventory", "Acme.Inventory");
-        var settings = Substitute.For<IBuildAppSettings>();
-        settings.TitleToPathFriendly.Returns(DefaultName);
-        settings.AssetsAbsoluteDir.Returns(assetsDirectory);
-        settings.CacheAbsoluteDir.Returns(Path.Combine(projectDirectory, ".Cache"));
-        settings.CacheSourceRelativeDir.Returns("../../Assets");
-        settings.PackageReferences.Returns([]);
-        settings.TurianPackages.Returns([]);
+        var settings = Settings();
 
         var projects = CsProjectGenerator.GenerateUserCodeProjects(settings, NullLogger.Instance,
             CsProjectGenerator.DiscoverAssemblies(settings));
@@ -190,6 +184,86 @@ public sealed class AssemblyGraphTests : IDisposable
         Assert.Contains(game.Items, i => i.ItemType == "Compile" && i.Exclude.Contains("../../Assets/Inventory/**"));
     }
 
+    /// <summary>A definition reference adds its folder to the definition's assembly, and out of the default.</summary>
+    [Fact]
+    public void ReferencesAddTheirFolderToTheDefinition()
+    {
+        var inventory = Define("Inventory", "Acme.Inventory");
+        DefineReference(Path.Combine("Game", "InventoryExtensions"), inventory);
+
+        var graph = AssemblyGraph.Discover(assetsDirectory, DefaultName);
+
+        var extensions = Path.Combine(assetsDirectory, "Game", "InventoryExtensions");
+        Assert.Equal("Acme.Inventory", graph.AssemblyFor(Script("Game", "InventoryExtensions", "Pocket.cs")).Name);
+        Assert.Equal(DefaultName, graph.AssemblyFor(Script("Game", "Player.cs")).Name);
+        Assert.Contains(extensions, Assert.Single(graph.Definitions).Directories);
+        Assert.Contains(extensions, graph.ExcludedDirectories(graph.Default));
+    }
+
+    /// <summary>A reference must point to a definition, and shares the one-per-folder rule.</summary>
+    [Fact]
+    public void InvalidReferencesAreRefused()
+    {
+        var inventory = Define("Inventory", "Acme.Inventory");
+        DefineReference("Inventory", inventory);
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+
+        File.Delete(Path.Combine(assetsDirectory, "Inventory", "Reference.dataasset"));
+        DefineReference("Elsewhere", Guid.NewGuid());
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+    }
+
+    /// <summary>An engine-free assembly may only reference other engine-free assemblies.</summary>
+    [Fact]
+    public void EngineFreeAssembliesOnlyReferenceEngineFreeOnes()
+    {
+        var math = Define("Math", "Acme.Math", noEngineReferences: true);
+        Define("Rules", "Acme.Rules", noEngineReferences: true, references: [math]);
+        Assert.Equal(2, AssemblyGraph.Discover(assetsDirectory, DefaultName).Definitions.Count);
+
+        var game = Define("Game", "Acme.Game");
+        Define("Server", "Acme.Server", noEngineReferences: true, references: [game]);
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+    }
+
+    /// <summary>An engine-free assembly's project references neither the engine nor its code generator.</summary>
+    [Fact]
+    public void EngineFreeProjectsHaveNoEngineReferences()
+    {
+        Define("Math", "Acme.Math", noEngineReferences: true);
+        var settings = Settings();
+        settings.TurianPackages.Returns([("Turian/Engine/Core", "Turian.Engine.Core")]);
+
+        var math = CsProjectGenerator.GenerateUserCodeProjects(settings, NullLogger.Instance,
+            CsProjectGenerator.DiscoverAssemblies(settings))[0];
+
+        Assert.DoesNotContain(math.Items, i => i.ItemType is "Reference" or "Analyzer");
+    }
+
+    IBuildAppSettings Settings()
+    {
+        var settings = Substitute.For<IBuildAppSettings>();
+        settings.TitleToPathFriendly.Returns(DefaultName);
+        settings.AssetsAbsoluteDir.Returns(assetsDirectory);
+        settings.CacheAbsoluteDir.Returns(Path.Combine(projectDirectory, ".Cache"));
+        settings.CacheSourceRelativeDir.Returns("../../Assets");
+        settings.PackageReferences.Returns([]);
+        settings.TurianPackages.Returns([]);
+        return settings;
+    }
+
+    void DefineReference(string folder, Guid definition)
+    {
+        var directory = Path.Combine(assetsDirectory, folder);
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "Reference.dataasset");
+        var id = Guid.NewGuid();
+        File.WriteAllText(path,
+            $$"""{ "__TypeId": "{{AssemblyDefinitionReference.TypeIdValue}}", "Definition": { "AssetId": "{{definition}}" }, "Id": "{{id}}" }""");
+        File.WriteAllText($"{path}.meta",
+            $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{id}}" }""");
+    }
+
     string Script(params string[] parts) => Path.Combine([assetsDirectory, .. parts]);
 
     Guid Define(
@@ -197,6 +271,7 @@ public sealed class AssemblyGraphTests : IDisposable
         string? name,
         bool editorOnly = false,
         bool autoReferenced = true,
+        bool noEngineReferences = false,
         Guid[]? references = null,
         string? fileName = null,
         Guid? id = null)
@@ -212,6 +287,7 @@ public sealed class AssemblyGraphTests : IDisposable
             ["Name"] = name,
             ["EditorOnly"] = editorOnly,
             ["AutoReferenced"] = autoReferenced,
+            ["NoEngineReferences"] = noEngineReferences,
             ["References"] = new JsonArray([.. (references ?? []).Select(r => (JsonNode)new JsonObject { ["AssetId"] = r })]),
             ["Id"] = assetId,
         };
