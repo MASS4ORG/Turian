@@ -18,6 +18,7 @@ public partial class SceneManager : ISceneManager
     readonly AssetDatabase assetDatabase;
     readonly List<LoadedScene> loadedScenes = [];
     readonly object scenesLock = new();
+    IServiceProvider? services;
 
     /// <summary>
     /// Gets a snapshot of all currently loaded scenes.
@@ -86,6 +87,13 @@ public partial class SceneManager : ISceneManager
     {
         this.assetDatabase = assetDatabase ?? throw new ArgumentNullException(nameof(assetDatabase));
         PersistentRoot.Awake(null);
+    }
+
+    /// <summary>Binds the services used when waking nodes loaded by this scene manager.</summary>
+    public void BindServices(IServiceProvider serviceProvider)
+    {
+        services = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        PersistentRoot.Awake(null, services);
     }
 
     /// <inheritdoc />

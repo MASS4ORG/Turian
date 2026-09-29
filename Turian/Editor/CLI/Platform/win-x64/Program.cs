@@ -11,11 +11,18 @@ static class Program
     {
         var projectPath = GetProjectPath();
 
+        TypeRegistry.RegisterFromManifest(
+            Path.Combine(AppContext.BaseDirectory, "usercode.typeids.json"),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        TypeRegistry.TryGetType("Usercode.Game", out var gameType);
+
         // Create Host. The default builder wires console logging (ILoggerFactory/ILogger<T>) out
         // of the box; only the non-generic ILogger our engine constructors take needs adding.
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureServices(
-                (_, services) => services
+                (_, services) =>
+                {
+                    services
                         .AddSingleton<ILogger>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger("Turian"))
                         .AddSingleton(new RuntimeProjectOptions
                         {
@@ -30,7 +37,10 @@ static class Program
                         .AddSingleton<RendererManager>()
 
                         // App instance
-                        .AddScoped<App>())
+                        .AddScoped<App>();
+                    if (gameType is not null)
+                        services.AddEngineModules(gameType.Assembly);
+                })
             .Build();
 
         Log.Configure(host.Services.GetRequiredService<ILoggerFactory>());

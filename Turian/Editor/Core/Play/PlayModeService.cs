@@ -90,6 +90,8 @@ public sealed class PlayModeService(
         playServices = BuildPlayServices();
         var sceneManager = playServices.GetRequiredService<ISceneManager>();
         RuntimeServices.Configure(playServices);
+        if (sceneManager is SceneManager concreteSceneManager)
+            concreteSceneManager.BindServices(playServices);
 
         if (localeOverride is not null
             && playServices.GetService(typeof(LocaleService)) is LocaleService locale)
@@ -115,7 +117,7 @@ public sealed class PlayModeService(
         }
 
         sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), clone);
-        clone.Awake(null);
+        clone.Awake(null, playServices);
 
         PlayRoot = clone;
         ticker = new SceneTicker(sceneManager)
@@ -184,7 +186,6 @@ public sealed class PlayModeService(
         sceneTree.ShowEditorScene();
 
         SetState(PlayState.Stopped);
-        logger.LogInformation("Play mode stopped. The edited scene was not modified");
     }
 
     // ── Frame ──────────────────────────────────────────────────────────────────
@@ -279,6 +280,16 @@ public sealed class PlayModeService(
         if (ProjectSettings() is { } appSettings)
             services.AddSingleton(_ => LocalizationLoader.Create(appSettings, assetDatabase));
 
+        if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
+        {
+            if (buildManager.ActiveUserAssembly is { } userAssembly)
+                services.AddEngineModules(userAssembly);
+        }
+        else if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        {
+            services.AddEngineModules(gameType.Assembly);
+        }
+
         var provider = services.BuildServiceProvider();
         LoadActionMaps(provider);
         return provider;
@@ -335,6 +346,8 @@ public sealed class PlayModeService(
     {
         if (State == newState) return;
         State = newState;
+        if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
+            buildManager.SetPlaying(newState != PlayState.Stopped);
         StateChanged?.Invoke(newState);
     }
 }

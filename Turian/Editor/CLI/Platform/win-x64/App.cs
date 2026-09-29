@@ -84,14 +84,16 @@ public class App : IDisposable
         uiManager = new UiManager(vulkan);
         locale = new LocaleService();
 
-        RuntimeServices.Configure(new ServiceCollection()
+        var services = new ServiceCollection()
             .AddSingleton(vulkan)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)
             .AddSingleton<IInputSource>(inputSource)
             .AddSingleton(actions)
             .AddSingleton(locale)
-            .BuildServiceProvider());
+            .BuildServiceProvider();
+        sceneManager.BindServices(services);
+        RuntimeServices.Configure(services);
 
         CreateAssetDatabase();
 

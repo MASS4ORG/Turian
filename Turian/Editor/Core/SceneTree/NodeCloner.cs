@@ -8,7 +8,7 @@ public static class NodeCloner
 {
     /// <summary>
     /// Deep-copies <paramref name="source"/> — including every component — by round-tripping it
-    /// through the polymorphic JSON serializer, then runs <see cref="Node.Awake"/> on the copy.
+    /// through the polymorphic JSON serializer, then runs <see cref="Node.Awake(Node?)"/> on the copy.
     /// </summary>
     /// <remarks>
     /// Prefer this over <see cref="Clone"/> whenever the copy must be fully independent of the
@@ -18,7 +18,7 @@ public static class NodeCloner
     /// </remarks>
     /// <param name="source">The hierarchy to copy.</param>
     /// <param name="awake">
-    /// Whether to run <see cref="Node.Awake"/> on the copy. Pass <c>false</c> when the caller must
+    /// Whether to run <see cref="Node.Awake(Node?)"/> on the copy. Pass <c>false</c> when the caller must
     /// finish preparing the world first — play mode registers its services and tracks the scene
     /// before waking components, because <c>OnAwake</c> is where scripts resolve engine services.
     /// </param>

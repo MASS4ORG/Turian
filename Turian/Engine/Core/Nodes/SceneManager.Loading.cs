@@ -92,7 +92,8 @@ public partial class SceneManager
                 $"Failed to deserialize a node hierarchy from '{sourceDescription}'.");
         }
 
-        root.Awake(null);
+        if (services is null) root.Awake(null);
+        else root.Awake(null, services);
         return root;
     }
 
@@ -131,7 +132,10 @@ public partial class SceneManager
         }
 
         // A reference into another scene resolves once both are loaded, whichever loaded first.
-        var pending = ObjectReferences.Resolve(roots, RuntimeServices.TryGet<IAssetLoader>());
+        var assetLoader = services is null
+            ? RuntimeServices.TryGet<IAssetLoader>()
+            : services.GetService<IAssetLoader>();
+        var pending = ObjectReferences.Resolve(roots, assetLoader);
         if (pending > 0)
             Log.Logger.LogWarning(
                 "{Count} reference(s) point at objects that are not loaded; they resolve when their targets load",
@@ -199,7 +203,7 @@ public partial class SceneManager
     /// This guarantees parity with prefab-loaded hierarchies (same converters, same
     /// handling of <c>[JsonIgnore]</c> / <c>[JsonInclude]</c>, no event-handler leaks).
     /// </summary>
-    static Node CloneHierarchyViaSerialization(Node source)
+    Node CloneHierarchyViaSerialization(Node source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
@@ -208,7 +212,8 @@ public partial class SceneManager
                     ?? throw new InvalidOperationException(
                         $"Failed to clone node hierarchy of type '{source.GetType().FullName}' via serialization.");
 
-        clone.Awake(null);
+        if (services is null) clone.Awake(null);
+        else clone.Awake(null, services);
         return clone;
     }
 

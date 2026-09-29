@@ -64,7 +64,12 @@ sealed class HeadlessProject : IDisposable
             _ = services.AddSingleton(Vulkan);
         }
 
-        RuntimeServices.Configure(services.BuildServiceProvider());
+        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+            services.AddEngineModules(gameType.Assembly);
+
+        var provider = services.BuildServiceProvider();
+        SceneManager.BindServices(provider);
+        RuntimeServices.Configure(provider);
 
         logger.LogInformation(
             "Opened {Title}: {RecordCount} asset records from {CacheDir}",

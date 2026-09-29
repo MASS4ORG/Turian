@@ -82,6 +82,10 @@ public partial class Node : IdClass
         }
     }
 
+    /// <summary>Gets the services bound to this scene hierarchy.</summary>
+    [JsonIgnore, HideInEditor]
+    public IServiceProvider? Services { get; private set; }
+
     /// <summary>
     /// Gets or sets the list of child nodes.
     /// </summary>
@@ -152,10 +156,19 @@ public partial class Node : IdClass
     public virtual void Awake(Node? parentNew)
     {
         Parent = parentNew;
+        Services = parentNew?.Services ?? Services;
+        SceneServiceInjector.Inject(this, Services);
         foreach (var component in Components)
             component.Setup(this);
         foreach (var child in Children)
             child.Awake(this);
+    }
+
+    /// <summary>Wakes a scene hierarchy with an explicit service provider.</summary>
+    public void Awake(Node? parentNew, IServiceProvider services)
+    {
+        Services = services ?? throw new ArgumentNullException(nameof(services));
+        Awake(parentNew);
     }
 
     /// <summary>
