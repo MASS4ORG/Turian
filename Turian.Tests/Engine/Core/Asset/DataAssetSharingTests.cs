@@ -66,6 +66,59 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.Equal(42, b!.Int);
     }
 
+    /// <summary>A typed reference retains the legacy id JSON and loads only the requested payload.</summary>
+    [Fact]
+    public async Task TypedReference_LoadsPayloadAndPreservesAssetIdJson()
+    {
+        var reference = new DataAssetReference<DataAssetTest>(metadata.Id);
+        var json = Serializer.Serialize(reference);
+        Assert.Equal(metadata.Id.ToString(), JsonNode.Parse(json)!["AssetId"]!.GetValue<string>());
+
+        var restored = Serializer.LoadData<DataAssetReference<DataAssetTest>>(json)!;
+        Assert.Equal(metadata.Id, restored.AssetId);
+        Assert.IsType<DataAssetTest>(await restored.LoadContentAsync(new RuntimeAssetLoader(database)));
+        Assert.Null(await new DataAssetReference<PlayerSettings>(metadata.Id)
+            .LoadContentAsync(new RuntimeAssetLoader(database)));
+    }
+
+    /// <summary>Catalog candidates, drops and writes must all check payload, including saved invalid ids.</summary>
+    [Fact]
+    public void Inspector_RejectsPlayerSettingsForInventoryRule()
+    {
+        var settingsPath = Path.Combine(projectRoot, "Assets", "PlayerSettings.dataasset");
+        Serializer.Save<DataAsset>(settingsPath, new PlayerSettings());
+        var settings = new DataAssetAsset { RelativePath = settingsPath };
+        File.WriteAllText($"{settingsPath}.meta", Serializer.Serialize(settings));
+        Assert.True(database.RegisterAsset(settings));
+
+        var holder = new TypedHolder { Rule = new DataAssetReference<DataAssetTest>(settings.Id) };
+        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var reference = ReferenceField.TryCreate(field)!;
+        var picker = new ReferencePicker(database, null!, new RuntimeAssetLoader(database));
+
+        Assert.Equal(typeof(DataAssetTest), reference.DataAssetPayloadType);
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.False(picker.Accepts(reference, settings.Id));
+        Assert.False(picker.Assign(reference, settings.Id));
+        Assert.Equal(settings.Id, holder.Rule.AssetId);
+        Assert.Contains("Invalid", picker.DisplayName(reference));
+        Assert.True(picker.Assign(reference, metadata.Id));
+        Assert.Equal(metadata.Id, holder.Rule.AssetId);
+
+        // A catalog round-trip retains the metadata type, but compatibility still comes
+        // from the payload; prefab records cannot become DataAsset candidates.
+        database.SaveCatalog(projectRoot);
+        database.LoadCatalogFromProject(projectRoot);
+        var reopened = new ReferencePicker(database, null!, new RuntimeAssetLoader(database));
+        Assert.Equal([metadata.Id], reopened.Candidates(reference).Select(c => c.Id));
+        Assert.False(reopened.Accepts(reference, settings.Id));
+    }
+
+    sealed class TypedHolder
+    {
+        public DataAssetReference<DataAssetTest> Rule { get; set; } = new();
+    }
+
     /// <summary>
     /// Verifies that separate loaders never share payloads, which is what keeps a play session's
     /// runtime changes out of the editor and off disk.

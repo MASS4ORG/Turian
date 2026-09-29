@@ -17,6 +17,9 @@ public class FormBuilderTests
 
         [HideInEditor] public int Hidden { get; set; }
 
+        [InjectService, JsonIgnore]
+        public IInputSource? Input { get; private set; }
+
         [ShowInEditor] bool Revealed { get; set; }
         internal const string RevealedMemberName = nameof(Revealed);
 
@@ -98,6 +101,7 @@ public class FormBuilderTests
         var names = model.Sections[0].Fields.Select(field => field.Name).ToList();
 
         Assert.DoesNotContain(nameof(Target.Hidden), names);
+        Assert.DoesNotContain(nameof(Target.Input), names);
         Assert.DoesNotContain(nameof(Target.ReadOnly), names);
         Assert.DoesNotContain(nameof(Target.NotPublic), names);
     }

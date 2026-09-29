@@ -25,7 +25,8 @@ public sealed class InspectorMemberMetadata
         read = new Lazy<Func<object, object?>>(() => CompileGetter(member));
         Label = FormField.Humanize(member.Name);
         attributes = Array.AsReadOnly(Attribute.GetCustomAttributes(member, true));
-        Visibility = Select(attribute => attribute is ShowInEditorAttribute or HideInEditorAttribute);
+        Visibility = Select(attribute => attribute is ShowInEditorAttribute or HideInEditorAttribute
+            or InjectServiceAttribute);
         Layout = Select(attribute => attribute is InspectorOrderAttribute or ExpandAttribute);
         Validation = Select(attribute => attribute is ReadOnlyAttribute or RangeAttribute);
         RenderingHints = Select(attribute => attribute is NumericUpDownAttribute or TooltipAttribute);
@@ -40,8 +41,9 @@ public sealed class InspectorMemberMetadata
             FieldInfo field => field.IsPublic,
             _ => false
         };
-        IsVisible = (isPublic && GetAttribute<HideInEditorAttribute>() is null)
-                    || GetAttribute<ShowInEditorAttribute>() is not null;
+        IsVisible = GetAttribute<InjectServiceAttribute>() is null
+                    && ((isPublic && GetAttribute<HideInEditorAttribute>() is null)
+                        || GetAttribute<ShowInEditorAttribute>() is not null);
     }
 
     /// <summary>Returns the shared metadata for a reflected member.</summary>
