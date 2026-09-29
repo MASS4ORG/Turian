@@ -114,6 +114,87 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.False(reopened.Accepts(reference, settings.Id));
     }
 
+    /// <summary>Cold and warm typed queries filter by catalog type without hydrating 200 payloads.</summary>
+    [Fact]
+    public async Task Inspector_TypedQueries_UseIndexedPayloadTypesWithoutLoadingCandidates()
+    {
+        var ids = new List<Guid>();
+        for (var i = 0; i < 220; i++)
+        {
+            var path = Path.Combine(projectRoot, "Assets", $"Settings{i}.dataasset");
+            Serializer.Save<DataAsset>(path, new PlayerSettings());
+            var asset = new DataAssetAsset { RelativePath = path };
+            File.WriteAllText($"{path}.meta", Serializer.Serialize(asset));
+            Assert.True(database.RegisterAsset(asset));
+            ids.Add(asset.Id);
+        }
+
+        var holder = new TypedHolder();
+        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var reference = ReferenceField.TryCreate(field)!;
+        var loader = new RuntimeAssetLoader(database);
+        var picker = new ReferencePicker(database, null!, loader);
+
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.All(ids, id => Assert.False(loader.TryGetLoaded<DataAssetAsset>(id, out _)));
+        Assert.False(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
+
+        Assert.True(picker.Assign(reference, metadata.Id));
+        Assert.Same(await holder.Rule.LoadContentAsync(loader), await loader.LoadContentAsync<DataAsset>(metadata.Id));
+        Assert.All(ids, id => Assert.False(loader.TryGetLoaded<DataAssetAsset>(id, out _)));
+    }
+
+    /// <summary>Catalogs written before the payload index still validate through the shared loader.</summary>
+    [Fact]
+    public void Inspector_OldCatalog_FallsBackToPayloadValidation()
+    {
+        database.SaveCatalog(projectRoot);
+        var catalogPath = Path.Combine(projectRoot, ".Cache", "assetCatalog.json");
+        var catalog = JsonNode.Parse(File.ReadAllText(catalogPath))!;
+        foreach (var record in catalog["Records"]!.AsArray())
+            record!.AsObject().Remove("DataAssetPayloadTypeId");
+        File.WriteAllText(catalogPath, catalog.ToJsonString());
+        database.LoadCatalogFromProject(projectRoot);
+
+        var holder = new TypedHolder();
+        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var loader = new RuntimeAssetLoader(database);
+        var picker = new ReferencePicker(database, null!, loader);
+        Assert.Equal([metadata.Id], picker.Candidates(ReferenceField.TryCreate(field)!).Select(c => c.Id));
+        Assert.True(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
+    }
+
+    /// <summary>An indexed subtype is accepted for both wrapper and direct base-type fields.</summary>
+    [Fact]
+    public async Task Inspector_IndexedSubtype_AssignsSharedDirectPayload()
+    {
+        var path = Path.Combine(projectRoot, "Assets", "Derived.dataasset");
+        Serializer.Save<DataAsset>(path, new DerivedDataAsset());
+        var asset = new DataAssetAsset { RelativePath = path };
+        File.WriteAllText($"{path}.meta", Serializer.Serialize(asset));
+        Assert.True(database.RegisterAsset(asset));
+
+        var holder = new DirectHolder();
+        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(DirectHolder.Value));
+        var reference = ReferenceField.TryCreate(field)!;
+        var loader = new RuntimeAssetLoader(database);
+        var picker = new ReferencePicker(database, null!, loader);
+        Assert.Contains(picker.Candidates(reference), candidate => candidate.Id == asset.Id);
+        Assert.False(loader.TryGetLoaded<DataAssetAsset>(asset.Id, out _));
+        Assert.True(picker.Assign(reference, asset.Id));
+        Assert.Same(holder.Value, await loader.LoadContentAsync<DataAsset>(asset.Id));
+    }
+
+    /// <summary>A derived payload used to exercise assignability of indexed types.</summary>
+    [TypeId("a3000000-0000-4000-8000-0000000000f1")]
+    public sealed class DerivedDataAsset : DataAssetTest;
+
+    sealed class DirectHolder
+    {
+        public DataAssetTest? Value { get; set; }
+    }
+
     sealed class TypedHolder
     {
         public DataAssetReference<DataAssetTest> Rule { get; set; } = new();

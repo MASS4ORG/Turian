@@ -102,6 +102,12 @@ public sealed class AssetRecord
     public string AssetTypeName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Stable serialized payload type id for a DataAssetAsset. Empty in older catalogs or
+    /// when the source could not be inspected; those records require loader-based validation.
+    /// </summary>
+    public Guid DataAssetPayloadTypeId { get; set; }
+
+    /// <summary>
     /// Gets or sets the identifier of the asset this one was imported from, or
     /// <see cref="System.Guid.Empty"/> when the asset has its own source file.
     /// Child assets — the materials and textures a model file declares — have no source file

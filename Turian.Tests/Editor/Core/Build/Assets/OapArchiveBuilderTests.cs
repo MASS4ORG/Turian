@@ -63,6 +63,7 @@ public sealed class OapArchiveBuilderTests : IDisposable
     public void Build_WritesRuntimeCatalogWithOapStorageKind()
     {
         var asset = AddCachedAsset("Assets/hero.png", "primary.bin", "Turian.Engine.Core.TextureAsset", [1, 1, 1]);
+        asset.DataAssetPayloadTypeId = Guid.NewGuid();
         WriteCatalog(asset);
 
         var outputRoot = Path.Combine(projectRoot, "Export");
@@ -74,6 +75,7 @@ public sealed class OapArchiveBuilderTests : IDisposable
         var runtimeCatalog = Serializer.Load<AssetCatalog>(result.CatalogFilePath)!;
         var record = Assert.Single(runtimeCatalog.Records);
         Assert.Equal(AssetStorageKind.Oap, record.StorageKind);
+        Assert.Equal(asset.DataAssetPayloadTypeId, record.DataAssetPayloadTypeId);
         Assert.Equal(Path.Combine("Content", "game.oap"), record.ImportedRelativePath);
     }
 
