@@ -1,4 +1,7 @@
-namespace Turian.Engine.Core;
+using System.Numerics;
+using Turian.Engine.Core;
+
+namespace Turian.Cameras;
 
 /// <summary>
 /// Translates the camera in its local frame: input X moves along Right, Y along Up, Z along Front.
@@ -8,7 +11,6 @@ namespace Turian.Engine.Core;
 [RequireComponent(typeof(CameraComponent))]
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera/Free Fly")]
-[TypeId("a3000001-0000-4000-8000-000000000004")]
 public class FreeFlyCameraComponent : Component
 {
     /// <summary>Movement speed in world units per second.</summary>

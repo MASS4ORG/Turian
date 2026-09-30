@@ -64,6 +64,11 @@ public sealed class ProjectBootstrapper
             ProjectSettingsFiles.Create(settings, new InputSettings());
             ProjectSettingsFiles.Create(settings, new GraphicsSettings());
 
+            new Gaya.Packages.ProjectManifest
+            {
+                Dependencies = ProjectPackages.DefaultBuiltins.ToDictionary(static id => id, static string? (id) => $"builtin:{id}"),
+            }.Save(projectDirectory);
+
             // Scripts get the engine, its attributes and the input key codes without per-file usings.
             var globalsPath = Path.Combine(assetsDir, "Globals.cs");
             if (!File.Exists(globalsPath))

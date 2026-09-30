@@ -1,4 +1,8 @@
-namespace Turian.Engine.Core;
+using System;
+using System.Numerics;
+using Turian.Engine.Core;
+
+namespace Turian.Cameras;
 
 /// <summary>
 /// Orbits the camera around a fixed point at a fixed distance. Mouse deltas update yaw/pitch and
@@ -8,8 +12,6 @@ namespace Turian.Engine.Core;
 [RequireComponent(typeof(CameraComponent))]
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera/Orbit")]
-[TypeId("a3000001-0000-4000-8000-000000000003")]
-[PublicAPI]
 public class OrbitCameraComponent : Component
 {
     /// <summary>World-space point the camera orbits around.</summary>

@@ -1,4 +1,9 @@
-namespace Turian.Engine.Core;
+using System.Numerics;
+using System.Text.Json.Serialization;
+using Silk.NET.Input;
+using Turian.Engine.Core;
+
+namespace Turian.Cameras;
 
 /// <summary>
 /// First-person camera movement. Like <see cref="FreeFlyCameraComponent"/>, but the forward axis
@@ -8,7 +13,6 @@ namespace Turian.Engine.Core;
 [RequireComponent(typeof(CameraComponent))]
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera/FPS")]
-[TypeId("a3000001-0000-4000-8000-000000000005")]
 public class FpsCameraComponent : Component
 {
     /// <summary>Movement speed in world units per second.</summary>

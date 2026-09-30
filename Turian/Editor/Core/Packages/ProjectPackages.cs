@@ -14,6 +14,15 @@ public static class ProjectPackages
     /// <summary>The variable that moves the package store, such as onto a CI cache.</summary>
     public const string StoreVariable = "TURIAN_PACKAGES";
 
+    /// <summary>
+    /// The engine's built-in packages: the <c>packages</c> folder beside a published engine's assemblies, else the
+    /// checkout's <c>Turian/Packages</c> it was built from.
+    /// </summary>
+    public static string BuiltinDirectory { get; } = FindBuiltinDirectory();
+
+    /// <summary>The built-in packages a new project installs.</summary>
+    public static IReadOnlyList<string> DefaultBuiltins { get; } = ["org.mass4.turian.cameras"];
+
     static readonly Lock CacheLock = new();
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];
 
@@ -46,6 +55,7 @@ public static class ProjectPackages
             new PackageResolverOptions
             {
                 Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
+                BuiltinDirectory = BuiltinDirectory,
                 ReservedCategoryPrefixes = ["gaya", HostName],
                 Locked = locked,
             });
@@ -73,6 +83,15 @@ public static class ProjectPackages
         string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName))
             ? []
             : Resolve(projectRoot).Packages;
+
+    static string FindBuiltinDirectory()
+    {
+        var published = Path.Combine(AppContext.BaseDirectory, "packages");
+        if (Directory.Exists(published)) return published;
+
+        return typeof(ProjectPackages).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(static a => a.Key == "TurianBuiltinPackages")?.Value ?? published;
+    }
 
     static string Stamp(string projectRoot, bool locked)
     {

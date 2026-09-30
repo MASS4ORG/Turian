@@ -4,8 +4,8 @@ namespace Gaya.Packages;
 public abstract record PackageSource
 {
     /// <summary>
-    /// Reads a dependency value: <c>file:path</c>, <c>git+url[#ref]</c> (a <c>./</c> or <c>../</c> url is a local
-    /// repository relative to the declaring file), or else a version range to be satisfied by a source declared
+    /// Reads a dependency value: <c>builtin:id</c>, <c>file:path</c>, <c>git+url[#ref]</c> (a <c>./</c> or <c>../</c>
+    /// url is a local repository relative to the declaring file), or else a version range to be satisfied by a source declared
     /// elsewhere.
     /// </summary>
     /// <param name="spec">The dependency value.</param>
@@ -15,6 +15,11 @@ public abstract record PackageSource
     public static PackageSource Parse(string spec, string baseDirectory)
     {
         ArgumentNullException.ThrowIfNull(spec);
+
+        if (spec.StartsWith("builtin:", StringComparison.Ordinal))
+            return spec.Length > "builtin:".Length
+                ? new BuiltinSource(spec["builtin:".Length..])
+                : throw new PackageException($"'{spec}' names no built-in package.");
 
         if (spec.StartsWith("file:", StringComparison.Ordinal))
             return new FileSource(Path.GetFullPath(spec["file:".Length..], baseDirectory));
@@ -34,8 +39,16 @@ public abstract record PackageSource
 
         return VersionRange.TryParse(spec, out var range)
             ? new RangeSource(range)
-            : throw new PackageException($"'{spec}' is neither a file: path, a git+ url nor a version range.");
+            : throw new PackageException($"'{spec}' is neither a builtin: id, a file: path, a git+ url nor a version range.");
     }
+}
+
+/// <summary>A package shipped with the host, read in place from its built-in folder.</summary>
+/// <param name="Id">The package id.</param>
+public sealed record BuiltinSource(string Id) : PackageSource
+{
+    /// <inheritdoc/>
+    public override string ToString() => $"builtin:{Id}";
 }
 
 /// <summary>A package folder on disk, used in place and never copied to the store.</summary>

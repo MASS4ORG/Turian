@@ -11,6 +11,9 @@ public enum PackageOrigin
 
     /// <summary>A git repository, extracted into the store.</summary>
     Git,
+
+    /// <summary>Shipped with the host and versioned with it.</summary>
+    Builtin,
 }
 
 /// <summary>One package of a resolved project.</summary>
@@ -37,8 +40,8 @@ public sealed record ResolvedPackage(
     /// <summary>The resolved version.</summary>
     public SemanticVersion Version => Manifest.Version!;
 
-    /// <summary>Whether the package must not be edited: store folders are shared by every project.</summary>
-    public bool IsReadOnly => Origin == PackageOrigin.Git;
+    /// <summary>Whether the package must not be edited: store and built-in folders are shared by every project.</summary>
+    public bool IsReadOnly => Origin is PackageOrigin.Git or PackageOrigin.Builtin;
 }
 
 /// <summary>The packages a project installs, each after the packages it depends on, and the lock that pins them.</summary>
@@ -61,6 +64,9 @@ public sealed record PackageResolverOptions
 
     /// <summary>What the packages are installed into; a package must list it among its scopes.</summary>
     public PackageScope Scope { get; init; } = PackageScope.Project;
+
+    /// <summary>The folder holding the host's built-in packages, one per id; null when the host ships none.</summary>
+    public string? BuiltinDirectory { get; init; }
 
     /// <summary>Category prefixes any package may use without depending on a package of that id.</summary>
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; init; } = [];
@@ -161,6 +167,13 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                 if (!Directory.Exists(file.Path)) throw new PackageException($"{id}: folder {file.Path} does not exist.");
                 root = file.Path;
                 origin = spec == "embedded" ? PackageOrigin.Embedded : PackageOrigin.File;
+                break;
+
+            case BuiltinSource builtin:
+                if (builtin.Id != id) throw new PackageException($"{id}: {spec} names another package.");
+                root = options.BuiltinDirectory is { } builtins ? Path.Combine(builtins, id) : "";
+                if (!Directory.Exists(root)) throw new PackageException($"{id} is not a built-in package of this host.");
+                origin = PackageOrigin.Builtin;
                 break;
 
             case GitSource git:

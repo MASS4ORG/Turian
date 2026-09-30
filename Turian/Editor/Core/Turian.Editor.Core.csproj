@@ -49,4 +49,12 @@
         <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
     </ItemGroup>
 
+    <!-- Built-in packages: published beside the engine assemblies, read from the checkout when run from source
+         (ProjectPackages.BuiltinDirectory). -->
+    <ItemGroup>
+        <None Include="$(SolutionDir)/Turian/Packages/**/*" Exclude="$(SolutionDir)/Turian/Packages/**/bin/**;$(SolutionDir)/Turian/Packages/**/obj/**"
+              LinkBase="packages" CopyToPublishDirectory="PreserveNewest"/>
+        <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
+    </ItemGroup>
+
 </Project>

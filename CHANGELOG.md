@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: camera rigs (Follow, Orbit, Free Fly, FPS) moved to the built-in brick `org.mass4.turian.cameras` (namespace `Turian.Cameras`); projects add it to `Packages/manifest.json` as `builtin:org.mass4.turian.cameras`
+- Added: `builtin:` package source; new projects install the default built-in bricks
 - Fixed: closing the window with no unsaved work exited through a second close that a veto then undid, freezing the editor
 - Changed: code sytles fixes
 

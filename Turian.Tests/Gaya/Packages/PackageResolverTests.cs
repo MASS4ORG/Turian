@@ -91,6 +91,39 @@ public sealed class PackageResolverTests : IDisposable
         Assert.Equal("1.0.1-fork", package.Version.ToString());
     }
 
+    /// <summary>A built-in package is read in place from the host's folder, read-only, and locked by its source.</summary>
+    [Fact]
+    public async Task BuiltinPackagesResolveFromTheHostFolder()
+    {
+        var builtin = Package(Path.Combine("host", "com.acme.rules"), "com.acme.rules", "1.0.0");
+        Manifest(("com.acme.rules", "builtin:com.acme.rules"));
+
+        var resolution = await Resolver(builtinDirectory: Path.Combine(root, "host"))
+            .ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        var package = Assert.Single(resolution.Packages);
+        Assert.Equal(PackageOrigin.Builtin, package.Origin);
+        Assert.Equal(builtin, package.RootPath);
+        Assert.True(package.IsReadOnly);
+        Assert.Equal("builtin:com.acme.rules", resolution.Lock.Dependencies["com.acme.rules"].Source);
+    }
+
+    /// <summary>A built-in id the host does not ship fails, as does one naming another package.</summary>
+    [Fact]
+    public async Task UnknownBuiltinPackagesFail()
+    {
+        Package(Path.Combine("host", "com.acme.rules"), "com.acme.rules", "1.0.0");
+
+        Manifest(("com.acme.shop", "builtin:com.acme.shop"));
+        var missing = await Assert.ThrowsAsync<PackageException>(() =>
+            Resolver(builtinDirectory: Path.Combine(root, "host")).ResolveAsync(project, TestContext.Current.CancellationToken));
+        Assert.Contains("not a built-in package", missing.Message, StringComparison.Ordinal);
+
+        Manifest(("com.acme.shop", "builtin:com.acme.rules"));
+        await Assert.ThrowsAsync<PackageException>(() =>
+            Resolver(builtinDirectory: Path.Combine(root, "host")).ResolveAsync(project, TestContext.Current.CancellationToken));
+    }
+
     /// <summary>The user override remaps a package for one machine and marks the resolution as local.</summary>
     [Fact]
     public async Task UserOverridesRemapPackages()
@@ -182,8 +215,9 @@ public sealed class PackageResolverTests : IDisposable
         await Assert.ThrowsAsync<PackageException>(() => Resolver(locked: true).ResolveAsync(project, TestContext.Current.CancellationToken));
     }
 
-    PackageResolver Resolver(bool locked = false) => new(store, new PackageResolverOptions
+    PackageResolver Resolver(bool locked = false, string? builtinDirectory = null) => new(store, new PackageResolverOptions
     {
+        BuiltinDirectory = builtinDirectory,
         ReservedCategoryPrefixes = ["turian"],
         Hosts = new Dictionary<string, SemanticVersion> { ["turian"] = SemanticVersion.Parse("1.2.0") },
         Locked = locked,

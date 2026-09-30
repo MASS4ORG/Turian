@@ -35,4 +35,16 @@ public sealed class ProjectBootstrapperTests : IDisposable
         Assert.Contains("global using Turian;", globals, StringComparison.Ordinal);
         Assert.Contains("global using Silk.NET.Input;", globals, StringComparison.Ordinal);
     }
+
+    /// <summary>A new project installs the default built-in packages, which ship beside the engine.</summary>
+    [Fact]
+    public async Task InstallsDefaultBuiltins()
+    {
+        var project = await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "Game"));
+
+        var packages = ProjectPackages.Resolve(project!).Packages;
+
+        Assert.Equal(ProjectPackages.DefaultBuiltins, packages.Select(static p => p.Id));
+        Assert.All(packages, static p => Assert.Equal(Gaya.Packages.PackageOrigin.Builtin, p.Origin));
+    }
 }

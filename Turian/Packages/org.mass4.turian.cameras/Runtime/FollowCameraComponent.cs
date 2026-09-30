@@ -1,4 +1,7 @@
-namespace Turian.Engine.Core;
+using System.Numerics;
+using Turian.Engine.Core;
+
+namespace Turian.Cameras;
 
 /// <summary>
 /// Keeps the camera at a fixed offset from a target node every frame.
@@ -6,8 +9,6 @@ namespace Turian.Engine.Core;
 [RequireComponent(typeof(CameraComponent))]
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera/Follow")]
-[TypeId("a3000001-0000-4000-8000-000000000002")]
-[PublicAPI]
 public class FollowCameraComponent : Component
 {
     /// <summary>The node the camera follows. When null, the component is a no-op.</summary>
