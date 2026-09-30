@@ -26,12 +26,12 @@ public sealed class LockEntry
 }
 
 /// <summary>
-/// A project's <c>Packages/packages-lock.json</c>: the exact version, commit and content hash each package resolved
+/// A project's <c>Bricks/packages-lock.json</c>: the exact version, commit and content hash each package resolved
 /// to, so every machine and build agent installs the same thing until the project updates them.
 /// </summary>
 public sealed class LockFile
 {
-    /// <summary>The lock file's name, in the project's <c>Packages</c> folder.</summary>
+    /// <summary>The lock file's name, in the project's <c>Bricks</c> folder.</summary>
     public const string FileName = "packages-lock.json";
 
     /// <summary>The resolved packages, by id.</summary>
@@ -43,6 +43,7 @@ public sealed class LockFile
     /// <exception cref="PackageException">The file is unreadable.</exception>
     public static LockFile? Load(string projectRoot)
     {
+        ProjectManifest.MigrateLegacyLayout(projectRoot);
         var path = Path.Combine(projectRoot, ProjectManifest.DirectoryName, FileName);
         if (!File.Exists(path)) return null;
 
@@ -56,7 +57,7 @@ public sealed class LockFile
         }
     }
 
-    /// <summary>Writes the lock file into the project's <c>Packages</c> folder, only when it changed.</summary>
+    /// <summary>Writes the lock file into the project's <c>Bricks</c> folder, only when it changed.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <returns>True when the file was written.</returns>
     public bool Save(string projectRoot)

@@ -34,7 +34,7 @@ public sealed class BrickServiceTests : IDisposable
     public void FailedAddDoesNotRemoveEmbeddedSources()
     {
         var project = Path.Combine(root, "game");
-        var embedded = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.inventory");
+        var embedded = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.inventory");
         var manifest = PackageManifest.Load(embedded, ["turian"]);
         manifest.Dependencies["user.mateo.missing"] = "file:../missing";
         manifest.Save(embedded);

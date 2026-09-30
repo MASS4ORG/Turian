@@ -1,14 +1,17 @@
 namespace Gaya.Packages;
 
 /// <summary>
-/// A project's <c>Packages/manifest.json</c>: the packages it installs, id → source. A git-ignored
+/// A project's <c>Bricks/manifest.json</c>: the packages it installs, id → source. A git-ignored
 /// <c>manifest.user.json</c> beside it can remap entries for one machine, such as pointing a package at a local
 /// checkout being worked on.
 /// </summary>
 public sealed class ProjectManifest
 {
     /// <summary>The folder, under the project root, that holds the manifest, the lock file and embedded packages.</summary>
-    public const string DirectoryName = "Packages";
+    public const string DirectoryName = "Bricks";
+
+    /// <summary>The folder earlier versions used in place of <see cref="DirectoryName"/>.</summary>
+    const string legacyDirectoryName = "Packages";
 
     /// <summary>The manifest's file name.</summary>
     public const string FileName = "manifest.json";
@@ -25,6 +28,17 @@ public sealed class ProjectManifest
     /// <summary>The registries the project takes bricks from by version range, for the names each is scoped to.</summary>
     public List<ScopedRegistry> ScopedRegistries { get; set; } = [];
 
+    /// <summary>Renames a project's legacy <c>Packages</c> folder to <see cref="DirectoryName"/> when it holds a manifest.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    public static void MigrateLegacyLayout(string projectRoot)
+    {
+        var legacy = Path.Combine(projectRoot, legacyDirectoryName);
+        if (Directory.Exists(Path.Combine(projectRoot, DirectoryName))
+            || !File.Exists(Path.Combine(legacy, FileName))) return;
+
+        Directory.Move(legacy, Path.Combine(projectRoot, DirectoryName));
+    }
+
     /// <summary>
     /// Reads a project's manifest, with its user override applied unless <paramref name="includeUserOverride"/> is
     /// false. A project without a manifest installs nothing.
@@ -36,6 +50,7 @@ public sealed class ProjectManifest
     public static (ProjectManifest Manifest, IReadOnlySet<string> Overridden) Load(string projectRoot,
         bool includeUserOverride = true)
     {
+        MigrateLegacyLayout(projectRoot);
         var directory = Path.Combine(projectRoot, DirectoryName);
         var manifest = Read(Path.Combine(directory, FileName)) ?? new ProjectManifest();
         var overridden = new HashSet<string>(StringComparer.Ordinal);

@@ -3,7 +3,7 @@ namespace Gaya.Packages;
 /// <summary>Edits of a project's brick declarations, shared by every host's command line and panel.</summary>
 public static class ProjectBricks
 {
-    /// <summary>Declares a brick in the project's <c>Packages/manifest.json</c>, replacing an earlier declaration of the id.</summary>
+    /// <summary>Declares a brick in the project's <c>Bricks/manifest.json</c>, replacing an earlier declaration of the id.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
     /// <param name="spec">The source or version range, as <c>manifest.json</c> writes it.</param>
@@ -52,7 +52,7 @@ public static class ProjectBricks
     }
 
     /// <summary>
-    /// Copies an installed brick into the project's <c>Packages/&lt;id&gt;</c> folder as a writable fork, which wins
+    /// Copies an installed brick into the project's <c>Bricks/&lt;id&gt;</c> folder as a writable fork, which wins
     /// over the declared source from then on, and records where it came from in its <c>package.json</c>.
     /// </summary>
     /// <param name="package">The installed brick.</param>

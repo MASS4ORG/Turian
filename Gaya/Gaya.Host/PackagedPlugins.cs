@@ -4,7 +4,7 @@ namespace Gaya.Host;
 
 /// <summary>
 /// Plugins installed into the application itself rather than into a project: the packages of the per-user
-/// studio manifest (<c>~/.gaya/studio/Packages/manifest.json</c>) whose scopes include
+/// studio manifest (<c>~/.gaya/studio/Bricks/manifest.json</c>) whose scopes include
 /// <see cref="PackageScope.Studio"/>. Each ships its compiled plugin assemblies in its <c>Precast~/lib</c> folder.
 /// </summary>
 public static class PackagedPlugins
@@ -29,6 +29,7 @@ public static class PackagedPlugins
         ArgumentNullException.ThrowIfNull(hosts);
         ArgumentNullException.ThrowIfNull(logger);
         studioRoot ??= StudioRoot;
+        ProjectManifest.MigrateLegacyLayout(studioRoot);
         if (!File.Exists(Path.Combine(studioRoot, ProjectManifest.DirectoryName, ProjectManifest.FileName))) return [];
 
         PackageResolution resolution;

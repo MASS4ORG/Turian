@@ -114,7 +114,7 @@ public sealed class BricksControllerTests : IDisposable
     {
         Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
 
-        Assert.True(Directory.Exists(Path.Combine(project, "Packages", "org.mass4.turian.cameras")));
+        Assert.True(Directory.Exists(Path.Combine(project, "Bricks", "org.mass4.turian.cameras")));
         Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
     }
 
@@ -123,7 +123,7 @@ public sealed class BricksControllerTests : IDisposable
     public async Task RevertGoesBackToTheGlobalBrick()
     {
         Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
-        var fork = Path.Combine(project, "Packages", "org.mass4.turian.cameras");
+        var fork = Path.Combine(project, "Bricks", "org.mass4.turian.cameras");
         File.WriteAllText(Path.Combine(fork, "mine.txt"), "changed");
 
         Assert.True(await controller.RevertAsync("org.mass4.turian.cameras"));
@@ -137,7 +137,7 @@ public sealed class BricksControllerTests : IDisposable
     [Fact]
     public async Task RevertRefusesABrickMadeInTheProject()
     {
-        var made = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.rules");
+        var made = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
         controller.Refresh();
 
         Assert.False(await controller.RevertAsync("user.mateo.rules"));
@@ -149,7 +149,7 @@ public sealed class BricksControllerTests : IDisposable
     [Fact]
     public async Task RemoveEmbeddedOnlyBrickPreservesSourcesInTrash()
     {
-        var embedded = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.rules");
+        var embedded = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
         File.WriteAllText(Path.Combine(embedded, "authored.txt"), "rules");
         controller.Refresh();
 
@@ -166,7 +166,7 @@ public sealed class BricksControllerTests : IDisposable
     [Fact]
     public async Task RequiredEmbeddedBrickCannotBeRemoved()
     {
-        var packages = Path.Combine(project, "Packages");
+        var packages = Path.Combine(project, "Bricks");
         var rules = BrickService.New(packages, "user.mateo.rules");
         var shop = BrickService.New(packages, "user.mateo.shop");
         var manifest = PackageManifest.Load(shop, ["turian"]);

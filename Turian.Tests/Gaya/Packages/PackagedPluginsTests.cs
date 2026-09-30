@@ -30,7 +30,7 @@ public sealed class PackagedPluginsTests : IDisposable
 
         Assert.Equal(assemblyName, loaded.GetName().Name);
         Assert.Contains(loaded.GetTypes(), type => type.GetCustomAttribute<PluginAttribute>() is not null);
-        Assert.True(File.Exists(Path.Combine(studio, "Packages", LockFile.FileName)));
+        Assert.True(File.Exists(Path.Combine(studio, "Bricks", LockFile.FileName)));
     }
 
     /// <summary>A package made for projects only is not loaded into the application.</summary>

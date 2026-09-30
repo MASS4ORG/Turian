@@ -67,7 +67,7 @@ public static class UserCodeTypeManifestGenerator
                 Assembly = owner is { IsDefault: false } ? owner.Name : null,
                 EditorOnly = owner?.EditorOnly ?? false,
             });
-            logger.LogDebug("TypeManifest: {Fqn} → {TypeId}", fqn, typeId);
+            logger.LogDebug("TypeManifest: {Fqn} ({TypeId})", fqn, typeId);
         }
 
         logger.LogInformation("Type manifest generated: {Count} entry(ies)", manifest.Types.Count);

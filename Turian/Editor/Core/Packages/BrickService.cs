@@ -446,7 +446,7 @@ public static class BrickService
             Editor extensions belong in `Editor/` under an editor-only assembly definition.
 
             Place this folder under a project's `Assets/Bricks/` to develop it as project content,
-            or under `Packages/` to develop it as an embedded brick.
+            or under `Bricks/` to develop it as an embedded brick.
 
             Pack from the Turian checkout:
 

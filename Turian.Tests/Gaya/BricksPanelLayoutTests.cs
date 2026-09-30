@@ -15,7 +15,7 @@ public sealed class BricksPanelLayoutTests : IDisposable
     public async Task RowsDoNotOverlapTheirColumns(int width)
     {
         var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "game")))!;
-        _ = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.inventory",
+        _ = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.inventory",
             "Inventory with a very long display name");
         var settings = new SettingsService();
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });

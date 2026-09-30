@@ -171,19 +171,21 @@ sealed class BricksPanel(BricksController controller) : IPanel
     void Locality(Gui gui, ResolvedPackage brick)
     {
         var local = brick.Origin == PackageOrigin.Embedded;
-        Line(gui, local ? "Local: a copy in this project's Packages folder" : "Global: shared by every project on this machine",
+        var folder = $"{ProjectManifest.DirectoryName}/{brick.Id}";
+        Line(gui, local ? "Local: a copy in this project, committed with it" : "Global: shared by every project on this machine",
             Theme.InkDim);
+        Line(gui, $"Installed at: {brick.RootPath}", Theme.InkDim);
 
         if (local && brick.Manifest.Upstream is not null)
         {
             if (Button(gui, "Revert to global", $"bricks/revert/{brick.Id}", 110f,
-                    "Goes back to the shared version. Your local changes are kept in the project's trash."))
+                    $"Moves {folder} to .Cache/Trash, with your changes, and uses the shared version again."))
                 _ = controller.RevertAsync(brick.Id);
         }
         else if (!local && brick.Origin != PackageOrigin.File)
         {
             if (Button(gui, "Make local", $"bricks/local/{brick.Id}", 90f,
-                    "Copies this brick into the project's Packages folder so you can edit it and keep it in version control."))
+                    $"Copies this brick to {folder} so you can edit it and keep it in version control."))
                 _ = controller.EmbedAsync(brick.Id);
         }
     }

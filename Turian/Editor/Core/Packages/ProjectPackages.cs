@@ -106,10 +106,15 @@ public static class ProjectPackages
     /// <summary>The package folders of a project, dependencies first; none when it declares no packages.</summary>
     /// <param name="projectRoot">The project folder, or empty for none.</param>
     /// <returns>The resolved packages.</returns>
-    public static IReadOnlyList<ResolvedPackage> ResolveOrEmpty(string? projectRoot) =>
-        string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName))
-            ? []
-            : Resolve(projectRoot).Packages;
+    public static IReadOnlyList<ResolvedPackage> ResolveOrEmpty(string? projectRoot)
+    {
+        if (string.IsNullOrWhiteSpace(projectRoot)) return [];
+
+        ProjectManifest.MigrateLegacyLayout(projectRoot);
+        return Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName))
+            ? Resolve(projectRoot).Packages
+            : [];
+    }
 
     /// <summary>The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with MASS4's signing key.</summary>
     public static ScopedRegistry PublicRegistry { get; } = new()

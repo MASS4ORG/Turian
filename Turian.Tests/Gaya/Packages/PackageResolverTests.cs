@@ -41,6 +41,19 @@ public sealed class PackageResolverTests : IDisposable
         Assert.Equal([3, 2, 1], resolution.Packages.Select(p => p.Depth));
     }
 
+    /// <summary>A project still using the old Packages folder is renamed to Bricks when its manifest is read.</summary>
+    [Fact]
+    public void LegacyPackagesFolderIsRenamedToBricks()
+    {
+        Directory.CreateDirectory(Path.Combine(project, "Packages"));
+        File.WriteAllText(Path.Combine(project, "Packages", ProjectManifest.FileName), "{}");
+
+        _ = ProjectManifest.Load(project);
+
+        Assert.True(File.Exists(Path.Combine(project, "Bricks", ProjectManifest.FileName)));
+        Assert.False(Directory.Exists(Path.Combine(project, "Packages")));
+    }
+
     /// <summary>A version range nobody satisfies fails, naming who asked.</summary>
     [Fact]
     public async Task UnsatisfiedRangesFail()
@@ -79,7 +92,7 @@ public sealed class PackageResolverTests : IDisposable
     public async Task EmbeddedPackagesWin()
     {
         Package("rules", "com.acme.rules", "1.0.0");
-        var embedded = Package(Path.Combine("project", "Packages", "rules"), "com.acme.rules", "1.0.1-fork");
+        var embedded = Package(Path.Combine("project", "Bricks", "rules"), "com.acme.rules", "1.0.1-fork");
         var manifest = PackageManifest.Load(embedded);
         manifest.Categories = ["turian:gameplay"];
         manifest.Save(embedded);
@@ -131,7 +144,7 @@ public sealed class PackageResolverTests : IDisposable
         Package("rules", "com.acme.rules", "1.0.0");
         Package("rules-dev", "com.acme.rules", "1.1.0-dev");
         Manifest(("com.acme.rules", "file:../../rules"));
-        File.WriteAllText(Path.Combine(project, "Packages", ProjectManifest.UserFileName),
+        File.WriteAllText(Path.Combine(project, "Bricks", ProjectManifest.UserFileName),
             """{ "dependencies": { "com.acme.rules": "file:../../rules-dev" } }""");
 
         var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);

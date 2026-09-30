@@ -75,7 +75,7 @@ The signed message is, as UTF-8:
 `-----BEGIN SSH SIGNATURE-----` lines. `signedBy` and claims use the fingerprint `ssh-keygen -l` prints.
 
 A host **never learns which keys to trust from the registry**. The keys a project trusts for a registry are part of
-the project's own `Packages/manifest.json` (`scopedRegistries[].keys`), or built into the host for the registry it
+the project's own `Bricks/manifest.json` (`scopedRegistries[].keys`), or built into the host for the registry it
 ships with. `keys` is published so people can copy the key out of band.
 
 ## Claims
@@ -100,7 +100,7 @@ lock file, and are sent only to the registry's own host.
 
 ## Hosts
 
-A project chooses registries with `scopedRegistries` in `Packages/manifest.json`:
+A project chooses registries with `scopedRegistries` in `Bricks/manifest.json`:
 
 ```json
 {

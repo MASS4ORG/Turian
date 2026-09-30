@@ -185,7 +185,7 @@ sealed class AssetBrowserPanel : IPanel
     {
         rows.Add(new TreeItem(
             entry.AbsolutePath,
-            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir!, "Packages")
+            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir!, Gaya.Packages.ProjectManifest.DirectoryName)
                 ? "Bricks" : DisplayName(entry.AbsolutePath),
             depth,
             entry.IsDirectory,

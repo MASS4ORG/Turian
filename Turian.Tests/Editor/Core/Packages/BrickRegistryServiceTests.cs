@@ -27,7 +27,7 @@ public sealed class BrickRegistryServiceTests : IDisposable
         BrickService.AddRegistry(project, new ScopedRegistry { Name = "studio", Url = "https://bricks.studio.example/v1", Scopes = ["com.studio"], Keys = [key] });
 
         Assert.Equal(["studio", "bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
-        var saved = File.ReadAllText(Path.Combine(project, "Packages", "manifest.json"));
+        var saved = File.ReadAllText(Path.Combine(project, "Bricks", "manifest.json"));
         Assert.DoesNotContain("allowUnsigned", saved, StringComparison.Ordinal);
         Assert.Throws<PackageException>(() => BrickService.AddRegistry(project, new ScopedRegistry { Name = "x", Url = "u", Scopes = ["a"] }));
         Assert.Throws<PackageException>(() => BrickService.AddRegistry(project, new ScopedRegistry { Name = "x", Url = "u", Scopes = ["a"], Keys = ["nonsense"] }));

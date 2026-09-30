@@ -134,7 +134,7 @@ public sealed class BrickArchiveTests : IDisposable
 
         var fork = ProjectBricks.Embed(resolution.Packages[0], project);
 
-        Assert.Equal(Path.Combine(project, "Packages", "com.acme.rules"), fork);
+        Assert.Equal(Path.Combine(project, "Bricks", "com.acme.rules"), fork);
         Assert.False(new FileInfo(Path.Combine(fork, "Runtime", "Rule.txt")).IsReadOnly);
         Assert.Equal($"com.acme.rules@1.0.0 ({packed.Integrity})", PackageManifest.Load(fork).Upstream);
         Assert.Throws<PackageException>(() => ProjectBricks.Embed(resolution.Packages[0], project));

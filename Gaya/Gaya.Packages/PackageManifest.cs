@@ -4,7 +4,7 @@ namespace Gaya.Packages;
 [JsonConverter(typeof(JsonStringEnumConverter<PackageScope>))]
 public enum PackageScope
 {
-    /// <summary>Into one project, declared in its <c>Packages/manifest.json</c>.</summary>
+    /// <summary>Into one project, declared in its <c>Bricks/manifest.json</c>.</summary>
     [JsonStringEnumMemberName("project")] Project,
 
     /// <summary>Into the application itself (themes, AI providers, tools), shared by every project.</summary>

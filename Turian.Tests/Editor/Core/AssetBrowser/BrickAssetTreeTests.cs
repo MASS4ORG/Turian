@@ -14,7 +14,7 @@ public sealed class BrickAssetTreeTests : IDisposable
     {
         var project = Path.Combine(root, "game");
         var installed = BrickService.New(root, "user.mateo.installed");
-        var embedded = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.embedded");
+        var embedded = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.embedded");
         Directory.CreateDirectory(Path.Combine(installed, "Precast~"));
         File.WriteAllText(Path.Combine(installed, "Precast~", "Hidden.cs"), "class Hidden {}");
         var files = new AssetFileSystem(new SettingsService(), assetImporter: null!);

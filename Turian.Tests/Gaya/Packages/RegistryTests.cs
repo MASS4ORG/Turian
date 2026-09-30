@@ -99,7 +99,7 @@ public sealed class RegistryTests : IDisposable
         var kept = await Resolver(updateAll: false).ResolveAsync(project, TestContext.Current.CancellationToken);
         Assert.Equal("1.1.0", kept.Packages.Single().Version.ToString());
 
-        File.Delete(Path.Combine(project, "Packages", LockFile.FileName));
+        File.Delete(Path.Combine(project, "Bricks", LockFile.FileName));
         var fresh = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
         Assert.Equal("1.0.0", fresh.Packages.Single().Version.ToString());
     }
