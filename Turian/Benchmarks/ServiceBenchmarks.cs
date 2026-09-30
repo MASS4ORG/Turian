@@ -1,8 +1,3 @@
-using System.Diagnostics;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.DependencyInjection;
-using Turian.Engine.Core;
-
 static class ServiceBenchmarks
 {
     const int componentCount = 10_000;

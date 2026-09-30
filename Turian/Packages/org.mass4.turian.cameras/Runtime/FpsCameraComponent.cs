@@ -1,8 +1,3 @@
-using System.Numerics;
-using System.Text.Json.Serialization;
-using Silk.NET.Input;
-using Turian.Engine.Core;
-
 namespace Turian.Cameras;
 
 /// <summary>

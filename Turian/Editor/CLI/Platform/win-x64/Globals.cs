@@ -5,5 +5,6 @@ global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Hosting;
 global using Microsoft.Extensions.Logging;
 global using Silk.NET.Input;
+global using Silk.NET.Maths;
 global using Silk.NET.Windowing;
 global using Turian.Engine.Core;

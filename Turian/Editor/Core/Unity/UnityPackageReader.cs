@@ -1,6 +1,3 @@
-using System.Formats.Tar;
-using System.IO.Compression;
-
 namespace Turian.Editor.Core;
 
 /// <summary>One asset of a <c>.unitypackage</c>.</summary>

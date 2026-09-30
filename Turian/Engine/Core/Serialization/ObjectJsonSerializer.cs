@@ -276,7 +276,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
     static Dictionary<string, MemberInfo> GetCachedMembers(Type type)
     {
-        if (!ObjectJsonSerializerCache.members.TryGetValue(type, out var members))
+        if (!ObjectJsonSerializerCache.Members.TryGetValue(type, out var members))
         {
             members = [];
 
@@ -298,7 +298,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 members[field.Name] = field;
             }
 
-            ObjectJsonSerializerCache.members[type] = members;
+            ObjectJsonSerializerCache.Members[type] = members;
         }
         return members;
     }
@@ -358,5 +358,5 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
 static class ObjectJsonSerializerCache
 {
-    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> members = new();
+    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> Members = new();
 }

@@ -64,8 +64,8 @@ public sealed class UiPresenterFactoryAttribute(Type factoryType) : Attribute
 public static class UiPresenters
 {
     static readonly Lock CacheLock = new();
-    static int scannedAssemblies = -1;
-    static IUiPresenterFactory? found;
+    static int _scannedAssemblies = -1;
+    static IUiPresenterFactory? _found;
 
     /// <summary>
     /// The factory named by the first loaded assembly that declares one, or <c>null</c> when no interface package is
@@ -77,11 +77,11 @@ public static class UiPresenters
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         lock (CacheLock)
         {
-            if (assemblies.Length == scannedAssemblies) return found;
+            if (assemblies.Length == _scannedAssemblies) return _found;
 
-            scannedAssemblies = assemblies.Length;
-            found = Find(assemblies);
-            return found;
+            _scannedAssemblies = assemblies.Length;
+            _found = Find(assemblies);
+            return _found;
         }
     }
 

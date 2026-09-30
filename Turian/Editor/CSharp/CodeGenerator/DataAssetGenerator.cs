@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 namespace Turian.CSharp.CodeGenerator;
 
 /// <summary>

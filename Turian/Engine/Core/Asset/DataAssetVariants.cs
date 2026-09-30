@@ -10,9 +10,9 @@ public static class DataAssetVariants
     /// <summary>The property that marks a variant file.</summary>
     public const string Property = "__Variant";
 
-    const string BaseProperty = "Base";
-    const string OverridesProperty = "Overrides";
-    const int MaxDepth = 16;
+    const string baseProperty = "Base";
+    const string overridesProperty = "Overrides";
+    const int maxDepth = 16;
 
     // What identifies a payload is the variant's own, never the base's.
     static readonly string[] OwnProperties = ["Id"];
@@ -67,17 +67,17 @@ public static class DataAssetVariants
         if (baseRoot[ObjectJsonSerializer<DataAsset>.TypeIdProperty] is { } typeId)
             root[ObjectJsonSerializer<DataAsset>.TypeIdProperty] = typeId.DeepClone();
         root["Id"] = id.ToString();
-        root[Property] = new JsonObject { [BaseProperty] = baseId.ToString(), [OverridesProperty] = new JsonObject() };
+        root[Property] = new JsonObject { [baseProperty] = baseId.ToString(), [overridesProperty] = new JsonObject() };
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
     static JsonObject Resolve(JsonObject variant, Func<Guid, string?> readBase, List<Guid> chain)
     {
         if (variant[Property] is not JsonObject link) return variant;
-        if (chain.Count >= MaxDepth) throw new InvalidOperationException("Data asset variants are nested too deeply.");
+        if (chain.Count >= maxDepth) throw new InvalidOperationException("Data asset variants are nested too deeply.");
 
-        if (link[BaseProperty]?.GetValue<string>() is not { } text || !Guid.TryParse(text, out var baseId))
-            throw new InvalidOperationException($"A data asset variant must name its base with {Property}.{BaseProperty}.");
+        if (link[baseProperty]?.GetValue<string>() is not { } text || !Guid.TryParse(text, out var baseId))
+            throw new InvalidOperationException($"A data asset variant must name its base with {Property}.{baseProperty}.");
         if (chain.Contains(baseId))
             throw new InvalidOperationException($"Data asset variants form a cycle through {baseId}.");
 
@@ -86,7 +86,7 @@ public static class DataAssetVariants
         chain.Add(baseId);
         var resolved = Resolve(JsonNode.Parse(baseJson)!.AsObject(), readBase, chain);
 
-        if (link[OverridesProperty] is JsonObject overrides) Merge(resolved, overrides);
+        if (link[overridesProperty] is JsonObject overrides) Merge(resolved, overrides);
         foreach (var own in OwnProperties)
         {
             if (variant[own] is { } value) resolved[own] = value.DeepClone();

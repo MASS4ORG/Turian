@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Http.Headers;
-
 namespace Gaya.Packages;
 
 /// <summary>

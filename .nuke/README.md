@@ -1,5 +1,5 @@
-# Nuke Build system
+# Build automation
 
-In order to replicate the same building steps whenever it's in your local pc, in the cloud or anywhere in between, we use the [Nuke](https://nuke.build/) system to abstract.
+NUKE targets shared by local development and CI: restore, compilation, shader compilation, tests and release packaging.
 
-Check our [guide](../docs/Building-from-source.md) how to build it.
+From the repository root, run `./build.sh compile` to restore and build, or `./build.sh --help` to list targets. See the [build guide](../docs/Building-from-source.md) for prerequisites and release commands.

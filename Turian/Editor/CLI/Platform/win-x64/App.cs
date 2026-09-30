@@ -1,5 +1,3 @@
-using Silk.NET.Maths;
-
 namespace Turian;
 
 /// <summary>

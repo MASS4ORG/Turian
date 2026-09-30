@@ -1,7 +1,3 @@
-using System;
-using System.Numerics;
-using Turian.Engine.Core;
-
 namespace Turian.Cameras;
 
 /// <summary>

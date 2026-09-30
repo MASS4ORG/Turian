@@ -20,8 +20,8 @@ public sealed class BrickAssetTreeTests : IDisposable
         var files = new AssetFileSystem(new SettingsService(), assetImporter: null!);
         var packages = new[]
         {
-            Package(installed, Gaya.Packages.PackageOrigin.Git),
-            Package(embedded, Gaya.Packages.PackageOrigin.Embedded),
+            Package(installed, PackageOrigin.Git),
+            Package(embedded, PackageOrigin.Embedded),
         };
 
         var entries = new BrickAssetTree(files).Scan(project, packages);
@@ -35,10 +35,10 @@ public sealed class BrickAssetTreeTests : IDisposable
             entry => Assert.False(entry.IsReadOnly));
     }
 
-    static Gaya.Packages.ResolvedPackage Package(string path, Gaya.Packages.PackageOrigin origin)
+    static ResolvedPackage Package(string path, PackageOrigin origin)
     {
-        var manifest = Gaya.Packages.PackageManifest.Load(path, ["turian"]);
-        return new Gaya.Packages.ResolvedPackage(manifest.Name, manifest, path, origin, "file:" + path,
+        var manifest = PackageManifest.Load(path, ["turian"]);
+        return new ResolvedPackage(manifest.Name, manifest, path, origin, "file:" + path,
             null, null, 1, false);
     }
 }

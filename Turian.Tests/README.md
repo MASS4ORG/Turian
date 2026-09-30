@@ -1,7 +1,11 @@
-# Test Suite
+# Turian tests
 
-Where all the project tests are centralized.
+Engine, editor, Gaya and brick integration tests, using xUnit and Microsoft.Testing.Platform.
 
-## Test Coverage
+Run from the repository root with .NET 10:
 
-It uses [Cobertura](https://cobertura.github.io/cobertura/) format report about how extensive the tests are.
+```sh
+dotnet run --project Turian.Tests/Turian.Tests.csproj
+```
+
+Headless Vulkan tests skip when a usable device is unavailable. Test assets live in `Fixtures/`.

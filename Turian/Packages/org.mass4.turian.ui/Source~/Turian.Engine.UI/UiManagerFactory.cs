@@ -1,4 +1,4 @@
-[assembly: Turian.Engine.Core.UiPresenterFactory(typeof(Turian.Engine.UI.UiManagerFactory))]
+[assembly: UiPresenterFactory(typeof(Turian.Engine.UI.UiManagerFactory))]
 
 namespace Turian.Engine.UI;
 

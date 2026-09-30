@@ -1,8 +1,5 @@
 // Run: dotnet run -c Release --project Turian/Benchmarks
 // Injection only: dotnet run -c Release --project Turian/Benchmarks -- --services
-using System.Diagnostics;
-using Turian;
-using Turian.Engine.Core;
 
 const int assetCount = 10_000;
 const int linksPerAsset = 10;

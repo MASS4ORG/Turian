@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Gaya.Plugin.Turian;
 
 /// <summary>Explicit extensions take precedence over the existing type-registered value editors.</summary>
