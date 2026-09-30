@@ -75,6 +75,29 @@ public static class UserCodeTypeManifestGenerator
     }
 
     /// <summary>
+    /// The component classes of the scripts under <paramref name="directory"/> that already have a <c>.cs.meta</c>:
+    /// fully qualified name and type id. Reads only; folders whose name ends in <c>~</c> are skipped.
+    /// </summary>
+    /// <param name="directory">The folder, such as a brick's.</param>
+    /// <param name="logger">Receives parse problems.</param>
+    /// <returns>One entry per script that declares a class.</returns>
+    public static IReadOnlyList<UserCodeTypeEntry> ScriptTypes(string directory, ILogger logger)
+    {
+        var entries = new List<UserCodeTypeEntry>();
+        foreach (var script in Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories).Order(StringComparer.Ordinal)
+                     .Where(path => !Path.GetRelativePath(directory, path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                         .SkipLast(1).Any(static segment => segment.EndsWith('~'))))
+        {
+            var meta = $"{script}.meta";
+            if (!File.Exists(meta) || ExtractPrimaryClassFqn(script, logger) is not { } fqn) continue;
+            if (ReadAssetId(meta, logger) is { } id && id != Guid.Empty)
+                entries.Add(new UserCodeTypeEntry { FullyQualifiedName = fqn, TypeId = id });
+        }
+
+        return entries;
+    }
+
+    /// <summary>
     /// Writes the <c>.cs.meta</c> that gives a new script its TypeId. Scenes store components by that
     /// id, so without it a component declared in the script could not be saved.
     /// </summary>

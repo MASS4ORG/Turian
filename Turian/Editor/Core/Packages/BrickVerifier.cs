@@ -50,6 +50,36 @@ public static class BrickVerifier
         return issues;
     }
 
+    /// <summary>
+    /// <see cref="Verify"/> plus a check that the brick exposes everything <paramref name="reference"/> does: every
+    /// asset id with the same kind, and every type id with the same class name. For a stub, against the real brick.
+    /// </summary>
+    /// <param name="packageRoot">The brick folder to check, such as a stub.</param>
+    /// <param name="reference">The brick to cover: a folder, or a <c>.brick</c> file.</param>
+    /// <returns>One line per problem; empty when the brick covers the reference.</returns>
+    public static IReadOnlyList<string> VerifyAgainst(string packageRoot, string reference)
+    {
+        var issues = Verify(packageRoot).ToList();
+        var temporary = (string?)null;
+        try
+        {
+            var referenceRoot = Path.GetFullPath(reference);
+            if (File.Exists(referenceRoot))
+            {
+                temporary = Path.Combine(Path.GetTempPath(), $"turian-verify-{Guid.NewGuid():N}");
+                BrickArchive.Extract(referenceRoot, temporary);
+                referenceRoot = temporary;
+            }
+
+            issues.AddRange(BrickContract.Read(packageRoot).Lacks(BrickContract.Read(referenceRoot)));
+            return issues;
+        }
+        finally
+        {
+            if (temporary is not null) Directory.Delete(temporary, recursive: true);
+        }
+    }
+
     static void CheckMeta(string file, string relative, Dictionary<Guid, string> seen, List<string> issues)
     {
         try

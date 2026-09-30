@@ -22,6 +22,9 @@ public static partial class Program
             BrickUpdateCommand(projectOption),
             BrickEmbedCommand(projectOption),
             BrickCopyCommand(projectOption),
+            BrickDiffCommand(projectOption),
+            BrickRebaseCommand(projectOption),
+            BrickStubCommand(),
             BrickVerifyCommand(),
             BrickPackCommand(),
         };
@@ -236,6 +239,63 @@ public static partial class Program
         return command;
     }
 
+    static Command BrickDiffCommand(Option<DirectoryInfo> projectOption)
+    {
+        var idArg = new Argument<string>("id") { Description = "Id of an embedded brick" };
+
+        var command = new Command("diff", "Show what an embedded fork changed since it was copied") { idArg, projectOption };
+        command.SetAction(result => RunBrick(() =>
+        {
+            var differences = BrickService.Diff(result.GetValue(projectOption)!.FullName, result.GetValue(idArg)!);
+            foreach (var difference in differences)
+                Console.WriteLine($"{difference.Change switch { ForkChange.Added => "A", ForkChange.Modified => "M", _ => "D" }} {difference.Path}");
+            if (differences.Count == 0) Console.WriteLine("The fork matches its original");
+        }));
+        return command;
+    }
+
+    static Command BrickRebaseCommand(Option<DirectoryInfo> projectOption)
+    {
+        var idArg = new Argument<string>("id") { Description = "Id of an embedded brick" };
+        var toOption = new Option<string?>("--to")
+        {
+            Description = "Source of the new release (git+<url>#<tag>, file:<.brick>); the declared source, fetched again, when omitted",
+        };
+
+        var command = new Command("rebase", "Merge a new release of an embedded fork's original into the fork") { idArg, toOption, projectOption };
+        command.SetAction(result =>
+        {
+            try
+            {
+                var merged = BrickService.Rebase(result.GetValue(projectOption)!.FullName, result.GetValue(idArg)!, result.GetValue(toOption));
+                foreach (var path in merged.Updated) Console.WriteLine($"updated  {path}");
+                foreach (var path in merged.Added) Console.WriteLine($"added    {path}");
+                foreach (var path in merged.Removed) Console.WriteLine($"removed  {path}");
+                foreach (var path in merged.Merged) Console.WriteLine($"merged   {path}");
+                foreach (var path in merged.Conflicts) Console.Error.WriteLine($"conflict {path}");
+                if (merged.HasConflicts) Console.Error.WriteLine("Resolve the conflicts in the fork; the markers are <<<<<<< fork / ======= / >>>>>>> upstream.");
+                return merged.HasConflicts ? 1 : 0;
+            }
+            catch (PackageException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+        });
+        return command;
+    }
+
+    static Command BrickStubCommand()
+    {
+        var pathArg = new Argument<DirectoryInfo>("path") { Description = "The real brick's folder" };
+        var outOption = new Option<DirectoryInfo>("--out") { Description = "Folder to write the stub into", Required = true };
+
+        var command = new Command("stub", "Write a stub of a brick: the same asset and type ids with placeholder content") { pathArg, outOption };
+        command.SetAction(result => RunBrick(() =>
+            Console.WriteLine($"Wrote stub {BrickStub.Write(result.GetValue(pathArg)!.FullName, result.GetValue(outOption)!.FullName)} to {result.GetValue(outOption)!.FullName}")));
+        return command;
+    }
+
     static Command BrickVerifyCommand()
     {
         var pathArg = new Argument<DirectoryInfo>("path")
@@ -244,10 +304,16 @@ public static partial class Program
             DefaultValueFactory = _ => new DirectoryInfo("./"),
         };
 
-        var command = new Command("verify", "Check a brick's manifest and that every asset ships a unique .meta") { pathArg };
+        var againstOption = new Option<string?>("--against")
+        {
+            Description = "Also check that the brick exposes every asset id and type id of this brick (a folder or .brick file), as a stub must",
+        };
+
+        var command = new Command("verify", "Check a brick's manifest and that every asset ships a unique .meta") { pathArg, againstOption };
         command.SetAction(result =>
         {
-            var issues = BrickVerifier.Verify(result.GetValue(pathArg)!.FullName);
+            var path = result.GetValue(pathArg)!.FullName;
+            var issues = result.GetValue(againstOption) is { } against ? BrickVerifier.VerifyAgainst(path, against) : BrickVerifier.Verify(path);
             foreach (var issue in issues) Console.Error.WriteLine(issue);
             if (issues.Count == 0) Console.WriteLine("Brick is sound");
             return issues.Count == 0 ? 0 : 1;

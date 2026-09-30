@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed: `turian-cli ui` (use `screenshot` or `playmode` to render a document)
 - Fixed: a meta whose asset type is not installed is left untouched instead of being rewritten with a new id
 - Added: `nuget` field in `package.json`, `Precast~/` prebuilt assemblies, and the `IUiPresenter` contract hosts draw interfaces through
+- Added: team flows for bricks: `turian-cli brick stub` makes a placeholder brick with the same asset and type ids, `brick verify --against` checks it (or any brick) still covers the real one, `brick diff` lists what an embedded fork changed and `brick rebase` merges a new release of its original into it three ways
 - Added: Bricks panel (Project → Bricks…): installed bricks, details with what needs and requires each, install, update, remove, embed, restore, and copy an asset into the project under a new id
 - Added: per-project import settings for brick assets in `ProjectSettings/PackageImportOverrides.json` (asset id → meta properties to replace), applied on import without touching the brick
 - Added: data asset variants (`__Variant`: base asset id + overrides), resolved wherever a data asset is read; `turian-cli variant` creates one, `turian-cli brick copy` copies brick assets into the project

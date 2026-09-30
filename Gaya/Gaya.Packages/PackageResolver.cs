@@ -59,6 +59,12 @@ public sealed record PackageResolution(IReadOnlyList<ResolvedPackage> Packages, 
     public bool UsesUserOverride => Packages.Any(static p => p.IsOverridden);
 }
 
+/// <summary>A package's folder fetched from one source, without resolving its dependencies.</summary>
+/// <param name="Folder">The package folder.</param>
+/// <param name="Commit">The git commit, for a git source.</param>
+/// <param name="Integrity">The content hash, for a git source or a <c>.brick</c> file.</param>
+public sealed record FetchedPackage(string Folder, string? Commit, string? Integrity);
+
 /// <summary>Choices that change how a project's packages resolve.</summary>
 public sealed record PackageResolverOptions
 {
@@ -155,6 +161,46 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                 $"{ProjectManifest.DirectoryName}/{ProjectManifest.FileName} no longer matches {LockFile.FileName}; resolve without --locked and commit the lock file.");
 
         return new PackageResolution(ordered, lockFile);
+    }
+
+    /// <summary>
+    /// Fetches one package from <paramref name="source"/> into the store, or finds it in place, without resolving what
+    /// it depends on. For comparing against a package rather than installing it.
+    /// </summary>
+    /// <param name="id">The package id.</param>
+    /// <param name="source">Where the package comes from.</param>
+    /// <param name="cancellationToken">Cancels git work.</param>
+    /// <returns>The package folder and what pins it.</returns>
+    /// <exception cref="PackageException">The source cannot be fetched or does not hold the package.</exception>
+    public async Task<FetchedPackage> FetchAsync(string id, PackageSource source, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        FetchedPackage fetched;
+        switch (source)
+        {
+            case FileSource file when Directory.Exists(file.Path):
+                fetched = new FetchedPackage(file.Path, null, null);
+                break;
+            case ArchiveSource archive when File.Exists(archive.Path):
+                var (folder, hash) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
+                fetched = new FetchedPackage(folder, null, hash);
+                break;
+            case BuiltinSource when options.BuiltinDirectory is { } builtins && Directory.Exists(Path.Combine(builtins, id)):
+                fetched = new FetchedPackage(Path.Combine(builtins, id), null, null);
+                break;
+            case GitSource git:
+                var commit = await store.ResolveCommitAsync(git, cancellationToken).ConfigureAwait(false);
+                var root = store.PackagePath(id, commit);
+                if (!Directory.Exists(root)) root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                fetched = new FetchedPackage(root, commit, PackageStore.ComputeIntegrity(root));
+                break;
+            default:
+                throw new PackageException($"{id}: {source} cannot be found.");
+        }
+
+        var manifest = PackageManifest.Load(fetched.Folder, options.ReservedCategoryPrefixes);
+        return manifest.Name == id ? fetched : throw new PackageException($"{source} holds package '{manifest.Name}', not '{id}'.");
     }
 
     async Task<ResolvedPackage> MaterializeAsync(string id, PackageSource source, string spec, int depth,

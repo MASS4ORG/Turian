@@ -92,6 +92,95 @@ public static class BrickService
         return BrickAssetCopy.Copy(projectRoot, brick, assets, destination, remapReferences);
     }
 
+    /// <summary>What the fork of a brick in the project changed since it was copied.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <returns>The files that differ from the version the fork was copied from.</returns>
+    /// <exception cref="PackageException">The brick is not an embedded fork, or its original cannot be found.</exception>
+    public static IReadOnlyList<ForkDifference> Diff(string projectRoot, string id) =>
+        BrickFork.Diff(FetchUpstream(projectRoot, id).Folder, ForkFolder(projectRoot, id));
+
+    /// <summary>
+    /// Merges a new release of a fork's original into the fork, three ways. Without <paramref name="to"/> the original
+    /// is fetched again from the source the manifest declares (a git brick moves to the newest commit of its ref); with
+    /// it, from that source, which the manifest then declares.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <param name="to">The source of the new release, or null for the declared one.</param>
+    /// <returns>What happened to each file; conflicts are left in the fork as merge markers.</returns>
+    /// <exception cref="PackageException">The brick is not an embedded fork, or an original cannot be found.</exception>
+    public static RebaseResult Rebase(string projectRoot, string id, string? to = null)
+    {
+        var fork = ForkFolder(projectRoot, id);
+        var previous = FetchUpstream(projectRoot, id);
+        var packages = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
+        var spec = to ?? DeclaredSource(projectRoot, id);
+        var next = ProjectPackages.Fetch(id, PackageSource.Parse(spec, packages));
+
+        var result = BrickFork.Rebase(previous.Folder, next.Folder, fork);
+        try
+        {
+            var manifest = PackageManifest.Load(fork, ["gaya", ProjectPackages.HostName]);
+            var pin = next.Commit ?? next.Integrity;
+            var version = PackageManifest.Load(next.Folder, ["gaya", ProjectPackages.HostName]).Version;
+            manifest.Upstream = pin is null ? $"{id}@{version}" : $"{id}@{version} ({pin})";
+            manifest.Save(fork);
+        }
+        catch (PackageException) when (result.Conflicts.Contains(PackageManifest.FileName))
+        {
+            // The manifest itself conflicted; its upstream note is set by hand once the conflict is resolved.
+        }
+
+        if (to is not null && !result.HasConflicts) ProjectBricks.Add(projectRoot, id, to);
+        ProjectPackages.Invalidate(projectRoot);
+        return result;
+    }
+
+    /// <summary>The folder of the original a fork was copied from, at the version it was copied from.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <returns>The original's folder.</returns>
+    /// <exception cref="PackageException">The brick is not a fork, or its original cannot be found.</exception>
+    public static FetchedPackage FetchUpstream(string projectRoot, string id)
+    {
+        var fork = ForkFolder(projectRoot, id);
+        var upstream = PackageManifest.Load(fork, ["gaya", ProjectPackages.HostName]).Upstream
+                       ?? throw new PackageException($"{id} was not made with embed: its package.json has no upstream note.");
+        var open = upstream.IndexOf('(', StringComparison.Ordinal);
+        var pin = open < 0 ? null : upstream[(open + 1)..].TrimEnd(')', ' ');
+
+        var source = PackageSource.Parse(DeclaredSource(projectRoot, id), Path.Combine(projectRoot, ProjectManifest.DirectoryName));
+        switch (source)
+        {
+            case GitSource git when pin is { Length: 40 }:
+                return ProjectPackages.Fetch(id, git with { Ref = pin });
+            case ArchiveSource when pin is not null && pin.StartsWith("sha256-", StringComparison.Ordinal):
+                var hex = Convert.ToHexStringLower(Convert.FromBase64String(pin["sha256-".Length..]));
+                var stored = new PackageStore(PackageStore.DefaultRoot()).PackagePath(id, $"sha256-{hex[..16]}");
+                if (Directory.Exists(stored)) return new FetchedPackage(stored, null, pin);
+
+                var current = ProjectPackages.Fetch(id, source);
+                return current.Integrity == pin
+                    ? current
+                    : throw new PackageException($"The {id} file changed since the fork was made and the original is no longer in the store.");
+            default:
+                return ProjectPackages.Fetch(id, source);
+        }
+    }
+
+    static string ForkFolder(string projectRoot, string id)
+    {
+        var fork = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
+        return File.Exists(Path.Combine(fork, PackageManifest.FileName))
+            ? fork
+            : throw new PackageException($"{id} is not embedded in the project; embed it first.");
+    }
+
+    static string DeclaredSource(string projectRoot, string id) =>
+        ProjectManifest.Load(projectRoot, includeUserOverride: false).Manifest.Dependencies.GetValueOrDefault(id)
+        ?? throw new PackageException($"The manifest declares no source for {id}; a fork needs one to be compared with its original.");
+
     /// <summary>Packs a brick folder into a <c>.brick</c> file after verifying it.</summary>
     /// <param name="packageRoot">The brick folder.</param>
     /// <param name="outputDirectory">Where the file and its hash are written.</param>

@@ -68,16 +68,7 @@ public static class ProjectPackages
     static PackageResolution ResolveUncached(string projectRoot, bool locked, IReadOnlySet<string>? update)
     {
 
-        var resolver = new PackageResolver(new PackageStore(PackageStore.DefaultRoot()),
-            new PackageResolverOptions
-            {
-                Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
-                BuiltinDirectory = BuiltinDirectory,
-                ReservedCategoryPrefixes = ["gaya", HostName],
-                Locked = locked,
-                Update = update,
-            });
-        var resolution = resolver.ResolveAsync(projectRoot).GetAwaiter().GetResult();
+        var resolution = NewResolver(locked, update).ResolveAsync(projectRoot).GetAwaiter().GetResult();
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
 
         if (resolution.UsesUserOverride)
@@ -93,6 +84,14 @@ public static class ProjectPackages
 
         return resolution;
     }
+
+    /// <summary>Fetches one brick from a source without resolving its dependencies, for comparing against it.</summary>
+    /// <param name="id">The brick id.</param>
+    /// <param name="source">Where it comes from.</param>
+    /// <returns>The brick's folder and what pins it.</returns>
+    /// <exception cref="PackageException">The source cannot be fetched or holds another brick.</exception>
+    public static FetchedPackage Fetch(string id, PackageSource source) =>
+        NewResolver(locked: false, update: new HashSet<string>()).FetchAsync(id, source).GetAwaiter().GetResult();
 
     /// <summary>Forgets the cached resolution of a project, for a caller that has just rewritten its manifest.</summary>
     /// <param name="projectRoot">The project folder.</param>
@@ -111,6 +110,16 @@ public static class ProjectPackages
         string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName))
             ? []
             : Resolve(projectRoot).Packages;
+
+    static PackageResolver NewResolver(bool locked, IReadOnlySet<string>? update) =>
+        new(new PackageStore(PackageStore.DefaultRoot()), new PackageResolverOptions
+        {
+            Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
+            BuiltinDirectory = BuiltinDirectory,
+            ReservedCategoryPrefixes = ["gaya", HostName],
+            Locked = locked,
+            Update = update,
+        });
 
     static string FindBuiltinDirectory()
     {
