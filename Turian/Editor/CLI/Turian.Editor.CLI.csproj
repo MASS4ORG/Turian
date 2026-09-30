@@ -11,8 +11,21 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
+        <!-- Built for their Precast~ output (the UI brick's prebuilt assemblies), not referenced by the host. -->
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Engine.UI/Turian.Engine.UI.csproj"
+                          ReferenceOutputAssembly="false" Private="false"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj"
+                          ReferenceOutputAssembly="false" Private="false"/>
+    </ItemGroup>
+
+    <!-- Headless UI renders through the in-game UI brick, whose prebuilt assemblies run on the host's Guinevere and Skia. -->
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Guinevere" Version="5.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

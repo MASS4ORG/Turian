@@ -58,6 +58,7 @@ public static class CsProjectGenerator
             .AddProjectInfo(settings, executable: isExecutable)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
+            .AddBrickReferences(settings)
             .AddNugetPackageReferences(settings)
             .AddAssemblyReferences(settings, graph.Default.References);
         projectRoot.AddCsFiles(settings, graph.ExcludedDirectories(graph.Default));
@@ -101,7 +102,7 @@ public static class CsProjectGenerator
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot.AddProjectInfo(settings, executable: false).AddTurianDir();
-        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings);
+        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings);
         projectRoot
             .AddNugetPackageReferences(settings)
             .AddAssemblyReferences(settings, assembly.References);
@@ -166,6 +167,7 @@ public static class CsProjectGenerator
             .AddProjectInfo(settings, isExecutable, mode)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
+            .AddBrickReferences(settings, shipping: true)
             .AddUserProject(settings)
             .AddNugetPackageReferences(settings)
             .AddAssetsDir(settings)
@@ -371,6 +373,27 @@ public static class CsProjectGenerator
                     ? Path.Combine("$(TurianDir)", "lib", $"{codeGeneratorName}.dll")
                     : Path.Combine("$(TurianDir)", "Turian", "Editor", "CSharp", "CodeGenerator", "bin", "Debug",
                         "netstandard2.0", $"{codeGeneratorName}.dll"));
+
+            return projectRoot;
+        }
+
+        /// <summary>
+        /// References the prebuilt assemblies of the installed bricks and the NuGet packages they need. A game
+        /// leaves out the editor-only bricks.
+        /// </summary>
+        private ProjectRootElement AddBrickReferences(IBuildAppSettings settings, bool shipping = false)
+        {
+            var bricks = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
+                .Where(brick => !brick.Manifest.CompileTimeOnly && !(shipping && brick.Manifest.EditorOnly))
+                .ToList();
+
+            var references = projectRoot.AddItemGroup();
+            foreach (var path in bricks.SelectMany(BrickAssemblies.RuntimeAssemblies))
+                references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
+
+            var declared = settings.PackageReferences.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var (id, version) in bricks.SelectMany(static b => b.Manifest.Nuget).DistinctBy(static p => p.Key))
+                if (declared.Add(id)) references.AddItem("PackageReference", id).AddMetadata("Version", version, true);
 
             return projectRoot;
         }

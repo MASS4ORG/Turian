@@ -7,4 +7,3 @@ global using Microsoft.Extensions.Logging;
 global using Silk.NET.Input;
 global using Silk.NET.Windowing;
 global using Turian.Engine.Core;
-global using Turian.Engine.UI;

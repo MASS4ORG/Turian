@@ -10,7 +10,7 @@ namespace Turian.Engine.UI;
 /// walk each frame, which is cheap for the handful of panels a scene carries and avoids any
 /// registration-order coupling with the component lifecycle.
 /// </remarks>
-public sealed class UiManager : IDisposable
+public sealed class UiManager : IUiPresenter
 {
     readonly Vulkan vulkan;
     readonly IInputSource? inputSource;

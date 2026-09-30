@@ -47,7 +47,7 @@ static class SceneScreenshot
     {
         readonly SceneViewerService viewer;
         readonly Node root;
-        readonly UiManager? uiManager;
+        readonly IUiPresenter? uiPresenter;
         readonly Node? lightNode;
         readonly int frames;
 
@@ -65,9 +65,12 @@ static class SceneScreenshot
             viewer = new SceneViewerService(vulkan, options.Width, options.Height);
             if (drawGizmos) viewer.OnPopulateGizmos = DrawTestGizmos;
 
-            uiManager = new UiManager(vulkan, locale: locale);
-            viewer.OverlaySource = (w, h, dt) => uiManager.TryRenderOverlay(root, (int)w, (int)h, dt);
-            viewer.WorldUiSource = frame => uiManager.RenderWorldPanels(root, frame);
+            uiPresenter = UiPresenters.Find()?.Create(vulkan, null, locale);
+            if (uiPresenter is not null)
+            {
+                viewer.OverlaySource = (w, h, dt) => uiPresenter.TryRenderOverlay(root, (int)w, (int)h, dt);
+                viewer.WorldUiSource = frame => uiPresenter.RenderWorldPanels(root, frame);
+            }
 
             PlaceCamera(viewer.Camera, root, options, bounds, logger);
             lightNode = options.Headlight > 0f ? AddHeadlight(root, viewer.Camera, options.Headlight) : null;
@@ -114,7 +117,7 @@ static class SceneScreenshot
             viewer.OverlaySource = null;
             viewer.WorldUiSource = null;
             viewer.Dispose();
-            uiManager?.Dispose();
+            uiPresenter?.Dispose();
         }
     }
 

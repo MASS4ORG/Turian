@@ -31,6 +31,17 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log)
         Settings = settingsService.Set(loaded);
 
         services.GetRequiredService<BuildManager>().UpdateSettings(Settings);
+
+        // The catalog names asset types by full name, and some of those live in bricks' prebuilt assemblies.
+        try
+        {
+            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log);
+        }
+        catch (Gaya.Packages.PackageException ex)
+        {
+            log.LogError(ex, "The project's packages could not be resolved; their types are unavailable");
+        }
+
         RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings);
 
         // The importer may have been built before any project was open, so it is pointed at this one explicitly.

@@ -21,7 +21,7 @@ public static class ProjectPackages
     public static string BuiltinDirectory { get; } = FindBuiltinDirectory();
 
     /// <summary>The built-in packages a new project installs.</summary>
-    public static IReadOnlyList<string> DefaultBuiltins { get; } = ["org.mass4.turian.cameras"];
+    public static IReadOnlyList<string> DefaultBuiltins { get; } = ["org.mass4.turian.cameras", "org.mass4.turian.ui"];
 
     static readonly Lock CacheLock = new();
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];

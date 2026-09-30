@@ -23,7 +23,15 @@ public static class UserCodeTypeManifestGenerator
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        var manifest = new UserCodeTypeManifest { AssemblyName = assemblyName };
+        var manifest = new UserCodeTypeManifest
+        {
+            AssemblyName = assemblyName,
+            PrecastAssemblies = [.. ProjectPackages.ResolveOrEmpty(Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)))
+                .Where(static brick => !brick.Manifest.EditorOnly && !brick.Manifest.CompileTimeOnly)
+                .SelectMany(BrickAssemblies.RuntimeAssemblies)
+                .Select(Path.GetFileNameWithoutExtension)
+                .OfType<string>()],
+        };
 
         if (!Directory.Exists(assetsDirectory))
         {

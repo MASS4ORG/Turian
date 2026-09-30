@@ -1,4 +1,4 @@
-namespace Turian.Editor.Core;
+namespace Turian.Editor.UI;
 
 /// <summary>
 /// Importer for UI fonts (<c>.ttf</c> / <c>.otf</c>). Validates the file is a readable typeface at

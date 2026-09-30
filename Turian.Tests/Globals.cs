@@ -29,6 +29,7 @@ global using NSubstitute;
 global using Silk.NET.Vulkan;
 global using SkiaSharp;
 global using Turian.Editor.Core;
+global using Turian.Editor.UI;
 global using Turian.Engine.Core;
 global using Turian.Engine.UI;
 global using Xunit;

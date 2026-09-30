@@ -11,7 +11,6 @@ Log.Configure(loggerFactory);
 // Before any MSBuild type loads, and before a scene deserializes: user components would otherwise
 // come back as MissingComponent.
 BuildManager.MsBuildLocatorRegisterDefaults();
-TypeRegistry.ScanAssembly(typeof(UiDocumentComponent).Assembly);
 
 // Built-in plugins are compiled in; the rest come from the studio packages the user installed.
 var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(PackagedPlugins.Load(

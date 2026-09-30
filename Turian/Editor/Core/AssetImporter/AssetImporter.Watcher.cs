@@ -47,6 +47,11 @@ public sealed partial class AssetImporter
                     return;
                 }
             }
+            catch (UnresolvableTypeIdException ex)
+            {
+                WarnUnavailableType(metaFilePath, ex);
+                return;
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(
@@ -56,7 +61,17 @@ public sealed partial class AssetImporter
             }
         }
 
-        var asset = CreateOrLoadAssetMetadata(filePath, metaFilePath);
+        Asset asset;
+        try
+        {
+            asset = CreateOrLoadAssetMetadata(filePath, metaFilePath);
+        }
+        catch (UnresolvableTypeIdException ex)
+        {
+            WarnUnavailableType(metaFilePath, ex);
+            return;
+        }
+
         var metaJson = SerializeAssetMetadata(asset);
 
         var metaDirectory = Path.GetDirectoryName(metaFilePath);
@@ -76,6 +91,16 @@ public sealed partial class AssetImporter
 
         FinishAssetImport(asset, filePath, notify: true);
     }
+
+    /// <summary>
+    /// The type comes from a brick or assembly that is not installed; rewriting the meta would lose its id, so the
+    /// asset is left as it is.
+    /// </summary>
+    void WarnUnavailableType(string metaFilePath, UnresolvableTypeIdException ex) =>
+        logger.LogWarning(
+            "Asset meta file {MetaFilePath} names type {TypeId}, which nothing provides; the asset is skipped",
+            metaFilePath,
+            ex.TypeId);
 
     /// <summary>
     /// Completes an import: rebuilds the database, registers the asset's children and persists the
@@ -166,6 +191,10 @@ public sealed partial class AssetImporter
                     ApplyTypedDefaults(existing, filePath);
                     return existing;
                 }
+            }
+            catch (UnresolvableTypeIdException)
+            {
+                throw;
             }
             catch
             {

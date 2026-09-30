@@ -99,18 +99,20 @@ static class HeadlessPlay
     /// </summary>
     sealed class PlayRenderer : IDisposable
     {
-        readonly UiManager uiManager;
+        readonly IUiPresenter? uiPresenter;
         readonly SceneViewerService viewer;
         Node? overlayRoot;
 
         public PlayRenderer(Vulkan vulkan, IInputSource inputSource, LocaleService? locale, uint width, uint height)
         {
-            uiManager = new UiManager(vulkan, inputSource, locale);
+            uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
             viewer = new SceneViewerService(vulkan, width, height);
+            if (uiPresenter is null) return;
+
             viewer.OverlaySource = (w, h, dt) =>
-                overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
+                overlayRoot is null ? null : uiPresenter.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
             viewer.WorldUiSource = frame =>
-                overlayRoot is null ? Array.Empty<WorldUiQuad>() : uiManager.RenderWorldPanels(overlayRoot, frame);
+                overlayRoot is null ? Array.Empty<WorldUiQuad>() : uiPresenter.RenderWorldPanels(overlayRoot, frame);
         }
 
         public uint Width => viewer.Width;
@@ -130,7 +132,7 @@ static class HeadlessPlay
             viewer.OverlaySource = null;
             viewer.WorldUiSource = null;
             viewer.Dispose();
-            uiManager.Dispose();
+            uiPresenter?.Dispose();
         }
     }
 

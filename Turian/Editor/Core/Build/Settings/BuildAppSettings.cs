@@ -94,16 +94,6 @@ public class BuildAppSettings : IdClass, IBuildAppSettings
         ("StbImageSharp", "2.30.16"),
         ("System.Composition", "10.0.0"),
         ("System.IO.Hashing", "10.0.12"),
-
-        // Turian.Engine.UI → Guinevere → SkiaSharp. The engine DLLs come in as bare
-        // <Reference> entries so these transitive package assets (managed + per-RID natives)
-        // do not flow automatically and must be listed for the game to load its UI backend.
-        ("SkiaSharp", "4.152.1"),
-        ("SkiaSharp.NativeAssets.Linux", "4.152.1"),
-        ("SkiaSharp.NativeAssets.macOS", "4.152.1"),
-        ("SkiaSharp.NativeAssets.Win32", "4.152.1"),
-        ("SkiaSharp.Views.Desktop.Common", "4.152.1"),
-        ("SkiaSharp.Vulkan.SharpVk", "4.152.1"),
     ];
 
     /// <summary>
@@ -111,27 +101,15 @@ public class BuildAppSettings : IdClass, IBuildAppSettings
     /// </summary>
     public string[] InternalPackages => [
         "Turian/Engine/Attributes/Turian.Engine.Attributes",
-        "Turian/Engine/Core/Turian.Engine.Core",
-        "Turian/Engine/UI/Turian.Engine.UI"
+        "Turian/Engine/Core/Turian.Engine.Core"
     ];
 
     /// <summary>
-    /// List of internal engine packages
+    /// The engine assemblies user code references, as (folder, assembly name) pairs.
     /// </summary>
-    /// <remarks>
-    /// Guinevere rides along with the engine assemblies rather than coming in through
-    /// <see cref="PackageReferences"/>: <c>Turian.Engine.UI</c> is built against whichever
-    /// Guinevere the checkout has — a local source build when <c>GuinevereLocalPath</c> is set —
-    /// and a <c>MASS4.Guinevere</c> package of that version need not exist on any feed. Taking the
-    /// copy that sits beside <c>Turian.Engine.UI.dll</c> gives the game the exact assembly the
-    /// engine was compiled against; without it the UI overlay throws
-    /// <see cref="System.IO.FileNotFoundException"/> on every rendered frame.
-    /// </remarks>
     public (string, string)[] TurianPackages => [
         ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
-        ("Turian/Engine/Core", "Turian.Engine.Core"),
-        ("Turian/Engine/UI", "Turian.Engine.UI"),
-        ("Turian/Engine/UI", "Guinevere")
+        ("Turian/Engine/Core", "Turian.Engine.Core")
     ];
 
     /// <summary>

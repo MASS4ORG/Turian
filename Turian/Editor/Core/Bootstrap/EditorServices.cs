@@ -37,7 +37,6 @@ public static class EditorServices
 
         return services.AddInternalServices(
             typeof(SceneManager).Assembly,
-            typeof(UiDocumentComponent).Assembly,
             typeof(SceneTreeController).Assembly);
     }
 }

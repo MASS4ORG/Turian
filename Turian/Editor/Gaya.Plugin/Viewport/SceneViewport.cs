@@ -33,7 +33,7 @@ sealed class SceneViewport : IDisposable
 
     SceneViewerService? service;
     SceneCameraController? controller;
-    UiManager? uiManager;
+    IUiPresenter? uiPresenter;
     Node? overlayRoot;
     string? failure;
 
@@ -118,6 +118,9 @@ sealed class SceneViewport : IDisposable
         RenderFrame(gui, rect);
     }
 
+    /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
+    IUiPresenter? UiPresenter() => uiPresenter ??= UiPresenters.Find()?.Create(vulkan, null, locale);
+
     /// <summary>Creates the renderer on the first frame and follows the node's size after that.</summary>
     bool EnsureService(uint width, uint height)
     {
@@ -127,11 +130,10 @@ sealed class SceneViewport : IDisposable
             {
                 service = new SceneViewerService(vulkan, width, height);
                 service.OnPopulateGizmos = PopulateGizmos;
-                uiManager = new UiManager(vulkan, locale: locale);
                 service.OverlaySource = (w, h, dt) =>
-                    overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
+                    overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>
-                    overlayRoot is null ? [] : uiManager.RenderWorldPanels(overlayRoot, frameInfo);
+                    overlayRoot is null ? [] : UiPresenter()?.RenderWorldPanels(overlayRoot, frameInfo) ?? [];
                 controller = new SceneCameraController(service.Camera);
             }
             else if (service.Width != width || service.Height != height)
@@ -439,7 +441,7 @@ sealed class SceneViewport : IDisposable
         if (service is not null) service.OnPopulateGizmos = null;
         service?.Dispose();
         service = null;
-        uiManager?.Dispose();
-        uiManager = null;
+        uiPresenter?.Dispose();
+        uiPresenter = null;
     }
 }

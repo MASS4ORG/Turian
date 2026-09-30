@@ -12,7 +12,5 @@ global using System.Text.Json;
 global using System.Threading.Tasks;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
-global using SkiaSharp;
 global using Turian.Editor.Core;
 global using Turian.Engine.Core;
-global using Turian.Engine.UI;

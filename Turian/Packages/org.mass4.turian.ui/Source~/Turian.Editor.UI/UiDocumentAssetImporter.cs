@@ -1,4 +1,4 @@
-namespace Turian.Editor.Core;
+namespace Turian.Editor.UI;
 
 /// <summary>
 /// Importer for <c>.ui</c> documents. Parses and validates the XML at import time — a malformed

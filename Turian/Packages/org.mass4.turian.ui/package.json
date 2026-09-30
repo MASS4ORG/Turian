@@ -1,0 +1,23 @@
+{
+  "name": "org.mass4.turian.ui",
+  "version": "1.0.0",
+  "displayName": "In-game UI",
+  "description": "Guinevere-based .ui documents, .uss style sheets, data binding and screen and world-space panels.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "nuget": {
+    "SkiaSharp": "4.152.1",
+    "SkiaSharp.NativeAssets.Linux": "4.152.1",
+    "SkiaSharp.NativeAssets.macOS": "4.152.1",
+    "SkiaSharp.NativeAssets.Win32": "4.152.1",
+    "SkiaSharp.Views.Desktop.Common": "4.152.1",
+    "SkiaSharp.Vulkan.SharpVk": "4.152.1"
+  },
+  "categories": [
+    "turian:ui"
+  ],
+  "keywords": [
+    "ui",
+    "guinevere"
+  ]
+}

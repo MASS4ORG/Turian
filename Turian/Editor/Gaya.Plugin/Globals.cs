@@ -17,7 +17,6 @@ global using SkiaSharp;
 global using Turian;
 global using Turian.Editor.Core;
 global using Turian.Engine.Core;
-global using Turian.Engine.UI;
 global using GuiColor = Guinevere.Color;
 global using SilkKey = Silk.NET.Input.Key;
 global using SilkMouseButton = Silk.NET.Input.MouseButton;

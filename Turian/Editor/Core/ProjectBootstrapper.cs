@@ -21,7 +21,6 @@ public sealed class ProjectBootstrapper
         global using Silk.NET.Input;
         global using Turian;
         global using Turian.Engine.Core;
-        global using Turian.Engine.UI;
 
         """;
 

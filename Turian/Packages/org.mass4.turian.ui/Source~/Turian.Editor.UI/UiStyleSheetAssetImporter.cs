@@ -1,4 +1,4 @@
-namespace Turian.Editor.Core;
+namespace Turian.Editor.UI;
 
 /// <summary>
 /// Importer for <c>.uss</c> stylesheets. Parses the sheet at import time so a malformed selector

@@ -39,6 +39,12 @@ public sealed class UserCodeTypeManifest
     /// <summary>Name of the user assembly, which a runtime loads before resolving <see cref="Types"/>.</summary>
     public string? AssemblyName { get; init; }
 
+    /// <summary>
+    /// The prebuilt assemblies of the installed bricks a game loads by name to register their types; an editor-only
+    /// brick's are left out.
+    /// </summary>
+    public List<string> PrecastAssemblies { get; init; } = [];
+
     /// <summary>Registered type entries.</summary>
     public List<UserCodeTypeEntry> Types { get; init; } = [];
 

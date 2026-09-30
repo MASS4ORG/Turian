@@ -22,4 +22,12 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
     </ItemGroup>
 
+    <!-- The brick ships these assemblies prebuilt in Precast~/lib; games and the editor load them from there. -->
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <PropertyGroup>
+            <PrecastDirectory>$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Precast~/lib</PrecastDirectory>
+        </PropertyGroup>
+        <Copy SourceFiles="$(TargetPath);$(OutDir)Guinevere.dll" DestinationFolder="$(PrecastDirectory)"/>
+    </Target>
+
 </Project>

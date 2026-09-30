@@ -27,7 +27,8 @@ public sealed partial class AssetImporter : IDisposable
     readonly ILogger logger;
     readonly AssetDatabase assetDatabase;
     readonly SettingsService settingsService;
-    readonly List<IAssetImporter> assetImporters;
+    List<IAssetImporter> assetImporters;
+    int importerAssemblyCount;
     readonly object syncRoot = new();
 
     AssetFolderWatcher? folderWatcher;
@@ -140,8 +141,16 @@ public sealed partial class AssetImporter : IDisposable
             ? null
             : assetImporters.FirstOrDefault(candidate => candidate.IsValid(filePath));
 
+    /// <summary>Rebuilds the importer list when assemblies have loaded since it was made.</summary>
+    void RefreshImporters()
+    {
+        if (BuildManager.Instance.LoadedAssemblies.Count() != importerAssemblyCount)
+            assetImporters = BuildImporterList();
+    }
+
     List<IAssetImporter> BuildImporterList()
     {
+        importerAssemblyCount = BuildManager.Instance.LoadedAssemblies.Count();
         return [.. BuildManager.Instance.LoadedAssemblies
             .SelectMany(static assembly => GetLoadableTypes(assembly))
             .Where(static type =>
@@ -225,8 +234,12 @@ public sealed partial class AssetImporter : IDisposable
 
         try
         {
-            packageRoots = [.. ProjectPackages.ResolveOrEmpty(projectRootPath)
-                .Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
+            var packages = ProjectPackages.ResolveOrEmpty(projectRootPath);
+            packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
+
+            // A brick's importers live in its prebuilt editor assembly, which may have loaded since the list was built.
+            BrickAssemblies.Load(packages, logger);
+            RefreshImporters();
         }
         catch (Gaya.Packages.PackageException ex)
         {

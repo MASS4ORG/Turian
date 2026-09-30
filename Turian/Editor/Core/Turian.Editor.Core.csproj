@@ -15,7 +15,6 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
     </ItemGroup>
 
@@ -29,6 +28,7 @@
           <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2"/>
+        <PackageReference Include="SkiaSharp" Version="4.152.1"/>
         <PackageReference Include="Microsoft.NET.StringTools" Version="18.10.1" ExcludeAssets="runtime" PrivateAssets="all">
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -49,11 +49,22 @@
         <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
     </ItemGroup>
 
-    <!-- Built-in packages: published beside the engine assemblies, read from the checkout when run from source
-         (ProjectPackages.BuiltinDirectory). -->
+    <!-- Built-in bricks: published as a packages folder beside the engine assemblies, read from the checkout when run
+         from source (ProjectPackages.BuiltinDirectory). Their sources stay behind; the Precast~ folders are what the
+         solution builds, so the items are listed at publish time rather than at evaluation. -->
+    <Target Name="IncludeBuiltinBricks" BeforeTargets="AssignTargetPaths">
+        <PropertyGroup>
+            <BricksDirectory>$([MSBuild]::EnsureTrailingSlash('$(SolutionDir)'))Turian/Packages/</BricksDirectory>
+        </PropertyGroup>
+        <ItemGroup>
+            <BrickFile Include="$(BricksDirectory)**/*"
+                       Exclude="$(BricksDirectory)**/Source~/**;$(BricksDirectory)**/bin/**;$(BricksDirectory)**/obj/**;$(BricksDirectory)**/.gitignore"/>
+            <None Include="@(BrickFile)" Link="packages/$([MSBuild]::MakeRelative('$(BricksDirectory)', '%(FullPath)'))"
+                  CopyToPublishDirectory="PreserveNewest"/>
+        </ItemGroup>
+    </Target>
+
     <ItemGroup>
-        <None Include="$(SolutionDir)/Turian/Packages/**/*" Exclude="$(SolutionDir)/Turian/Packages/**/bin/**;$(SolutionDir)/Turian/Packages/**/obj/**"
-              LinkBase="packages" CopyToPublishDirectory="PreserveNewest"/>
         <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
     </ItemGroup>
 

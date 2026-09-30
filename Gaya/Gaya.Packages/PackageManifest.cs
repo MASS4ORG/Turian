@@ -59,6 +59,12 @@ public sealed class PackageManifest
     /// <summary>Packages needed only while developing this package itself, never by its consumers.</summary>
     public Dictionary<string, string> DevDependencies { get; set; } = [];
 
+    /// <summary>
+    /// NuGet packages the package's prebuilt assemblies need: id → exact version. Hosts that compile against the
+    /// package add them to every project that uses it.
+    /// </summary>
+    public Dictionary<string, string> Nuget { get; set; } = [];
+
     /// <summary>Host → the host versions the package works with (<c>"my-app": "&gt;=1.2 &lt;2"</c>).</summary>
     public Dictionary<string, VersionRange> Engines { get; set; } = [];
 
