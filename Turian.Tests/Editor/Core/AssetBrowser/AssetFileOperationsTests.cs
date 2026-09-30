@@ -19,7 +19,7 @@ public class AssetFileOperationsTests : IDisposable
         settings.Set(new AppSettings { ProjectAbsoluteDir = project });
         var loader = Substitute.For<IAssetLoader>();
         var sceneTree = new SceneTreeController(assets, settings, assetImporter: null!,
-            assetLoader: loader);
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
         undo = new UndoService(sceneTree, new NodeInspectorController(assets), assets, loader);
         files = new AssetFileSystem(settings, assetImporter: null!);
         operations = new AssetFileOperations(files, undo);

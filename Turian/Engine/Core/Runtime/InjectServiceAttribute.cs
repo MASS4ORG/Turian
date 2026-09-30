@@ -5,4 +5,8 @@ namespace Turian.Engine.Core;
 /// Mark injected properties with <see cref="JsonIgnoreAttribute"/> so they are not persisted in scenes.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
-public sealed class InjectServiceAttribute : Attribute;
+public sealed class InjectServiceAttribute : Attribute
+{
+    /// <summary>Allows an editor or headless host to leave this service unbound.</summary>
+    public bool Optional { get; set; }
+}

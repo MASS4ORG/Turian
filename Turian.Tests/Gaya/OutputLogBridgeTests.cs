@@ -40,7 +40,6 @@ public sealed class OutputLogBridgeTests
         finally
         {
             LogBuffer.Clear();
-            RuntimeServices.Reset();
             TestAssetDatabase.Reset();
         }
     }

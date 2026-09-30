@@ -2,18 +2,15 @@ namespace Turian.Tests;
 
 /// <summary>
 /// Tests for <see cref="EngineInputHandler"/>, which bridges Guinevere's
-/// <c>IInputHandler</c> to the engine's <see cref="Input"/> facade / <see cref="IInputSource"/>.
+/// <c>IInputHandler</c> to an explicitly supplied <see cref="IInputSource"/>.
 /// </summary>
-public sealed class EngineInputHandlerTests : IDisposable
+public sealed class EngineInputHandlerTests
 {
     readonly BufferedInputSource source = new();
-    readonly EngineInputHandler handler = new();
+    readonly EngineInputHandler handler;
 
-    /// <summary>Routes the engine input facade at a controllable buffered source.</summary>
-    public EngineInputHandlerTests() => RuntimeServices.Configure(new SingleService(source));
-
-    /// <inheritdoc/>
-    public void Dispose() => RuntimeServices.Reset();
+    /// <summary>Supplies a controllable buffered input source directly.</summary>
+    public EngineInputHandlerTests() => handler = new EngineInputHandler(source);
 
     /// <summary>Guinevere key codes map onto the engine's Silk key codes (shared GLFW values).</summary>
     [Fact]
@@ -90,17 +87,46 @@ public sealed class EngineInputHandlerTests : IDisposable
     [Fact]
     public void NoSource_YieldsNeutralValues()
     {
-        RuntimeServices.Reset();
+        var neutral = new EngineInputHandler();
 
-        Assert.False(handler.IsKeyDown(GKey.A));
-        Assert.True(handler.IsKeyUp(GKey.A));
-        Assert.Equal(Vector2.Zero, handler.MousePosition);
-        Assert.Equal(0f, handler.MouseWheelDelta);
+        Assert.False(neutral.IsKeyDown(GKey.A));
+        Assert.True(neutral.IsKeyUp(GKey.A));
+        Assert.False(neutral.IsMouseButtonPressed(GMouseButton.Left));
+        Assert.True(neutral.IsMouseButtonUp(GMouseButton.Left));
+        Assert.Equal(Vector2.Zero, neutral.MousePosition);
+        Assert.Equal(0f, neutral.MouseWheelDelta);
     }
 
-    sealed class SingleService(object instance) : IServiceProvider
+    /// <summary>A world panel shares keys and wheel with its source but only clicks when hovered.</summary>
+    [Fact]
+    public void WorldPanel_ForwardsInputOnlyWhenPointerIsOverPanel()
     {
-        public object? GetService(Type serviceType) =>
-            serviceType.IsInstanceOfType(instance) ? instance : null;
+        var world = new WorldPanelInputHandler(source);
+        source.PushKeyDown(Key.Space);
+        source.PushMouseDown(SilkMouseButton.Left);
+        source.PushMouseScroll(1f);
+
+        Assert.True(world.IsKeyDown(GKey.Space));
+        Assert.Equal(1f, world.MouseWheelDelta);
+        Assert.False(world.IsMouseButtonDown(GMouseButton.Left));
+
+        world.SetPointer(new Vector2(10, 20));
+        Assert.True(world.IsMouseButtonDown(GMouseButton.Left));
+        Assert.True(world.IsMouseButtonPressed(GMouseButton.Left));
+
+        world.SetPointer(null);
+        Assert.False(world.IsMouseButtonDown(GMouseButton.Left));
+    }
+
+    /// <summary>World panels with no source never consult global gameplay input.</summary>
+    [Fact]
+    public void WorldPanel_WithoutSourceIsNeutral()
+    {
+        var world = new WorldPanelInputHandler();
+        world.SetPointer(new Vector2(10, 20));
+        Assert.False(world.IsKeyDown(GKey.Space));
+        Assert.True(world.IsKeyUp(GKey.Space));
+        Assert.False(world.IsMouseButtonDown(GMouseButton.Left));
+        Assert.Equal(0f, world.MouseWheelDelta);
     }
 }

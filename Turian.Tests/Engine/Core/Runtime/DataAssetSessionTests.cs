@@ -37,7 +37,6 @@ public sealed class DataAssetSessionTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        RuntimeServices.Reset();
         TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
     }
@@ -116,7 +115,6 @@ public sealed class DataAssetSessionTests : IDisposable
     [Fact]
     public void DirectField_UsesExplicitLoaderWithoutInjectingTheConsumer()
     {
-        RuntimeServices.Reset();
         var assetId = Guid.NewGuid();
         var authored = new Node();
         authored.Components.Add(new DirectManagerConsumer
@@ -142,24 +140,13 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.True(consumer.HadManagerAtAwake);
     }
 
-    /// <summary>Scene loading must use its bound loader before Awake, not another session's ambient loader.</summary>
+    /// <summary>Concurrent scenes resolve direct assets through their own bound session loaders.</summary>
     [Fact]
     public async Task SceneManager_ResolvesDirectAssetFromItsBoundSession()
     {
         var (database, assetId, _) = CreateAuthoredManager();
         var (prefab, sceneJson) = CreateDirectScene(database, assetId);
 
-        var wrongLoader = Substitute.For<IAssetLoader>();
-        wrongLoader.PreloadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-        wrongLoader.LoadContentAsync<DataAsset>(assetId)
-            .Returns(Task.FromResult<DataAsset?>(new GameManagerAsset { Coins = 999 }));
-        using var wrongServices = new ServiceCollection()
-            .AddSingleton<IAssetLoader>(wrongLoader).BuildServiceProvider();
-        RuntimeServices.Configure(wrongServices);
-
-        var unresolved = Serializer.LoadData<Node>(sceneJson, loader: null)!;
-        Assert.Null(unresolved.GetComponent<DirectManagerConsumer>()!.Manager);
         var withoutLoader = Serializer.LoadData<Node>(sceneJson)!;
         Assert.Null(withoutLoader.GetComponent<DirectManagerConsumer>()!.Manager);
         Assert.True(ObjectReferences.TryGetUnresolved(
@@ -225,7 +212,7 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath)!).Coins);
     }
 
-    /// <summary>A play-scene clone can use its own loader even when another provider is ambient.</summary>
+    /// <summary>A play-scene clone resolves direct DataAssets using its explicit session loader.</summary>
     [Fact]
     public void DeepClone_ResolvesDirectAssetsThroughItsExplicitLoader()
     {
@@ -235,14 +222,6 @@ public sealed class DataAssetSessionTests : IDisposable
         {
             Manager = new GameManagerAsset { Id = assetId }
         });
-        var wrong = Substitute.For<IAssetLoader>();
-        wrong.PreloadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
-        wrong.LoadContentAsync<DataAsset>(assetId)
-            .Returns(Task.FromResult<DataAsset?>(new GameManagerAsset { Coins = 999 }));
-        using var wrongServices = new ServiceCollection().AddSingleton<IAssetLoader>(wrong).BuildServiceProvider();
-        RuntimeServices.Configure(wrongServices);
-
         var right = Substitute.For<IAssetLoader>();
         right.PreloadAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);

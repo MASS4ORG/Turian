@@ -13,6 +13,9 @@ namespace Turian.Engine.UI;
 public sealed class UiManager : IDisposable
 {
     readonly Vulkan vulkan;
+    readonly IInputSource? inputSource;
+    /// <summary>The locale used to draw UI documents for the current host/session.</summary>
+    public LocaleService? Locale { get; set; }
     readonly List<UiDocumentComponent> found = [];
     readonly Dictionary<Guid, CachedRenderer> renderers = [];
     readonly Dictionary<Guid, WorldPanel> worldPanels = [];
@@ -23,10 +26,14 @@ public sealed class UiManager : IDisposable
 
     /// <summary>Creates the manager on the shared Vulkan context.</summary>
     /// <param name="vulkan">The context UI textures are created on.</param>
-    public UiManager(Vulkan vulkan)
+    /// <param name="inputSource">Input source, or <c>null</c> for neutral input.</param>
+    /// <param name="locale">Locale service, or <c>null</c> to display authored text.</param>
+    public UiManager(Vulkan vulkan, IInputSource? inputSource = null, LocaleService? locale = null)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         this.vulkan = vulkan;
+        this.inputSource = inputSource;
+        Locale = locale;
     }
 
     /// <summary>
@@ -95,7 +102,7 @@ public sealed class UiManager : IDisposable
                                $"ref {first.ReferenceResolution.X}x{first.ReferenceResolution.Y} -> " +
                                $"raster {scale.PixelWidth}x{scale.PixelHeight} canvasScale {scale.CanvasScale:0.###}");
 
-        overlayRuntime ??= new UiRuntime(vulkan, scale.PixelWidth, scale.PixelHeight);
+        overlayRuntime ??= new UiRuntime(vulkan, scale.PixelWidth, scale.PixelHeight, inputSource: inputSource);
 
         var texture = overlayRuntime.Render(
             gui =>
@@ -125,7 +132,7 @@ public sealed class UiManager : IDisposable
         Collect(root, found);
 
         var viewProjection = frame.Camera.GetViewMatrix() * frame.Camera.GetProjectionMatrix();
-        var pointer = Input.MousePosition;
+        var pointer = inputSource?.MousePosition ?? Vector2.Zero;
         var viewport = new Vector2(frame.Width, frame.Height);
 
         var quads = new List<WorldUiQuad>();
@@ -139,7 +146,8 @@ public sealed class UiManager : IDisposable
             var model = Matrix4x4.CreateScale(1f, aspect, 1f) * panel.Node!.GlobalTransform.Matrix4X4();
 
             // Pointer raycast — only when a UiRaycasterComponent opts the panel in.
-            wp.Input.SetPointer(panel.Node.GetComponent<UiRaycasterComponent>() is { } raycaster
+            wp.Input.SetPointer(inputSource is not null
+                                && panel.Node.GetComponent<UiRaycasterComponent>() is { } raycaster
                                 && WorldPanelPointer.TryHit(model, viewProjection, pointer, viewport,
                                     new Vector2(pw, ph), out var hitPixels)
                                 && WithinRange(raycaster, frame.Camera, panel.Node)
@@ -175,7 +183,7 @@ public sealed class UiManager : IDisposable
         if (worldPanels.TryGetValue(panelId, out var existing)) return existing;
 
         // Ownership passes to worldPanels, which Dispose releases.
-        var handler = new WorldPanelInputHandler();
+        var handler = new WorldPanelInputHandler(inputSource);
 #pragma warning disable CA2000
         var runtime = new UiRuntime(vulkan, width, height, input: handler);
 #pragma warning restore CA2000
@@ -258,7 +266,7 @@ public sealed class UiManager : IDisposable
         {
             ImageResolver = new UiImageResolver(db).Resolve,
             FontResolver = new UiFontResolver(db).Resolve,
-            TextResolver = Localization.Resolve,
+            TextResolver = ResolveText,
         };
         AddStyleSheets(renderer, db, panel, document, docAsset.RelativePath);
 
@@ -269,6 +277,15 @@ public sealed class UiManager : IDisposable
         var entry = new CachedRenderer(panel.Document.AssetId, key, renderer, controller);
         renderers[panel.Id] = entry;
         return entry;
+    }
+
+    string ResolveText(string? key, string? source)
+    {
+        if (key is { Length: > 0 })
+            return Locale?.Translate(key, source ?? key) ?? source ?? key;
+
+        if (string.IsNullOrEmpty(source)) return string.Empty;
+        return Locale?.TranslateSource(source) ?? source;
     }
 
     // Changes whenever the panel's or the document's stylesheets, or its controller, change.

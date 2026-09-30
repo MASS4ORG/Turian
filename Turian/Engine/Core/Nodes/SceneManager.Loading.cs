@@ -93,7 +93,7 @@ public partial class SceneManager
         }
 
         if (services is null) root.Awake(null);
-        else root.Awake(null, services);
+        else root.Awake(null, services, allowMissingServices);
         return root;
     }
 
@@ -210,7 +210,7 @@ public partial class SceneManager
                         $"Failed to clone node hierarchy of type '{source.GetType().FullName}' via serialization.");
 
         if (services is null) clone.Awake(null);
-        else clone.Awake(null, services);
+        else clone.Awake(null, services, allowMissingServices);
         return clone;
     }
 

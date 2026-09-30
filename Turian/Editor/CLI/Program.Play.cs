@@ -257,7 +257,7 @@ public static partial class Program
             var root = project.LoadScene(result.GetValue(sceneOption));
 
             if (result.GetValue(localeOption) is { } locale)
-                Localization.SetLocale(locale);
+                project.Locale.SetLocale(locale);
 
             var report = SceneReport.Collect(root, loadModels: true);
             report.Write(Log.Logger);
@@ -281,7 +281,8 @@ public static partial class Program
                 report.Bounds,
                 Path.GetFullPath(result.GetValue(outputOption)!),
                 Log.Logger,
-                drawGizmos: result.GetValue(gizmosOption));
+                drawGizmos: result.GetValue(gizmosOption),
+                locale: project.Locale);
         });
 
         return cmd;

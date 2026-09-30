@@ -15,7 +15,7 @@ public class UndoTests
     {
         var loader = Substitute.For<IAssetLoader>();
         sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
-            assetLoader: loader);
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
         inspector = new NodeInspectorController(assets);
         undo = new UndoService(sceneTree, inspector, assets, loader);
 

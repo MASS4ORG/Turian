@@ -86,6 +86,10 @@ public partial class Node : IdClass
     [JsonIgnore, HideInEditor]
     public IServiceProvider? Services { get; private set; }
 
+    /// <summary>Whether an edit-time preview may leave gameplay-only services unbound.</summary>
+    [JsonIgnore, HideInEditor]
+    internal bool AllowMissingServices { get; private set; }
+
     /// <summary>
     /// Gets or sets the list of child nodes.
     /// </summary>
@@ -157,7 +161,8 @@ public partial class Node : IdClass
     {
         Parent = parentNew;
         Services = parentNew?.Services ?? Services;
-        SceneServiceInjector.Inject(this, Services);
+        AllowMissingServices = parentNew?.AllowMissingServices ?? AllowMissingServices;
+        SceneServiceInjector.Inject(this, Services, AllowMissingServices);
         foreach (var component in Components)
             component.Setup(this);
         foreach (var child in Children)
@@ -165,9 +170,10 @@ public partial class Node : IdClass
     }
 
     /// <summary>Wakes a scene hierarchy with an explicit service provider.</summary>
-    public void Awake(Node? parentNew, IServiceProvider services)
+    public void Awake(Node? parentNew, IServiceProvider services, bool allowMissingServices = false)
     {
         Services = services ?? throw new ArgumentNullException(nameof(services));
+        AllowMissingServices = allowMissingServices;
         Awake(parentNew);
     }
 

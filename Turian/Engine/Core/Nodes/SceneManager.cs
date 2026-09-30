@@ -20,6 +20,7 @@ public partial class SceneManager : ISceneManager
     readonly object scenesLock = new();
     IServiceProvider? services;
     IAssetLoader? assetLoader;
+    bool allowMissingServices;
 
     /// <summary>
     /// Gets a snapshot of all currently loaded scenes.
@@ -91,11 +92,12 @@ public partial class SceneManager : ISceneManager
     }
 
     /// <summary>Binds the services used when waking nodes loaded by this scene manager.</summary>
-    public void BindServices(IServiceProvider serviceProvider)
+    public void BindServices(IServiceProvider serviceProvider, bool allowMissingServices = false)
     {
         services = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         assetLoader = services.GetService<IAssetLoader>();
-        PersistentRoot.Awake(null, services);
+        this.allowMissingServices = allowMissingServices;
+        PersistentRoot.Awake(null, services, allowMissingServices);
     }
 
     /// <summary>Uses an editor or test asset loader without injecting gameplay services into scene objects.</summary>

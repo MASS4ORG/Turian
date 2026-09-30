@@ -15,13 +15,15 @@ public static class UiImageRenderer
     /// <param name="height">Image height in pixels, greater than zero.</param>
     /// <param name="background">Fill color; transparent by default.</param>
     /// <param name="deltaTime">Seconds since a notional previous frame, for time-based animation.</param>
+    /// <param name="inputSource">Input source, or <c>null</c> for a neutral headless preview.</param>
     /// <returns>PNG-encoded bytes.</returns>
     public static byte[] RenderPng(
         Action<Gui> build,
         int width,
         int height,
         SKColor? background = null,
-        float deltaTime = 0f)
+        float deltaTime = 0f,
+        IInputSource? inputSource = null)
     {
         ArgumentNullException.ThrowIfNull(build);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
@@ -31,7 +33,7 @@ public static class UiImageRenderer
         var canvas = surface.Canvas;
         canvas.Clear(background ?? SKColors.Transparent);
 
-        var gui = new Gui { Input = new EngineInputHandler() };
+        var gui = new Gui { Input = new EngineInputHandler(inputSource) };
         var font = Font.FromFamilyName("sans-serif", 16);
         gui.Time.Update(deltaTime);
 

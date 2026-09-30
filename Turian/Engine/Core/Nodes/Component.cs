@@ -60,7 +60,7 @@ public abstract class Component : IdClass
             OnDetached();
 
         Node = node; // backing field via property
-        SceneServiceInjector.Inject(this, node.Services);
+        SceneServiceInjector.Inject(this, node.Services, node.AllowMissingServices);
         OnAttached();
 
         if (!IsAwake)

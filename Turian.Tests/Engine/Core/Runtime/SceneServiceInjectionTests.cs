@@ -23,6 +23,20 @@ public class SceneServiceInjectionTests
         public override void OnAwake() => InputAtAwake = Input;
     }
 
+    [TypeId("a4000044-0000-4000-8000-000000000003")]
+    sealed class OptionalComponent : Component
+    {
+        [InjectService(Optional = true), JsonIgnore]
+        public IInputSource? Input { get; private set; }
+    }
+
+    [TypeId("a4000044-0000-4000-8000-000000000004")]
+    sealed class PreviewComponent : Component
+    {
+        [InjectService, JsonIgnore]
+        public ISceneManager? SceneManager { get; private set; }
+    }
+
     /// <summary>Scene and component services are ready before lifecycle callbacks.</summary>
     [Fact]
     public void Awake_InjectsSceneServicesBeforeCallbacksAndIntoChildren()
@@ -76,5 +90,38 @@ public class SceneServiceInjectionTests
         root.Components.Add(new InjectedComponent());
 
         Assert.Throws<InvalidOperationException>(() => root.Awake(null, provider));
+    }
+
+    /// <summary>Editor previews may omit optional runtime-only services.</summary>
+    [Fact]
+    public void Awake_OptionalServiceIsNullWithoutRegistration()
+    {
+        using var preview = new ServiceCollection().BuildServiceProvider();
+        var node = new Node();
+        var component = new OptionalComponent();
+        node.Components.Add(component);
+
+        node.Awake(null, preview);
+
+        Assert.Null(component.Input);
+    }
+
+    /// <summary>Edit-time preview may omit game services, while play remains strict by default.</summary>
+    [Fact]
+    public void Awake_EditPreviewAllowsMissingGameplayServices()
+    {
+        using var editorServices = new ServiceCollection()
+            .AddSingleton(Substitute.For<IInputSource>())
+            .BuildServiceProvider();
+        var component = new PreviewComponent();
+        var preview = new Node();
+        preview.Components.Add(component);
+
+        preview.Awake(null, editorServices, allowMissingServices: true);
+
+        Assert.Null(component.SceneManager);
+        var play = new Node();
+        play.Components.Add(new PreviewComponent());
+        Assert.Throws<InvalidOperationException>(() => play.Awake(null, editorServices));
     }
 }

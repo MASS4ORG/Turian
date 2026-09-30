@@ -7,7 +7,7 @@ public class InputSettings : ProjectSettingsAsset
 {
     /// <summary>
     /// The action maps loaded into <see cref="InputActionService"/> at startup. With none set, actions
-    /// resolve to nothing and gameplay falls back to the raw <see cref="Input"/> facade.
+    /// resolve to nothing; gameplay can still read the bound <see cref="IInputSource"/> directly.
     /// </summary>
     public AssetReference<DataAssetAsset>? Actions { get; set; }
 }

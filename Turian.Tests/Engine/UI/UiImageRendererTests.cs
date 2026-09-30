@@ -58,6 +58,37 @@ public sealed class UiImageRendererTests
         Assert.True(hitRed, "expected the red panel to appear in the rendered image");
     }
 
+    /// <summary>Headless renders do not read process-wide gameplay input unless a source is supplied.</summary>
+    [Fact]
+    public void RenderPng_UsesOnlySuppliedInput()
+    {
+        var source = new BufferedInputSource();
+        source.PushMouseMove(new Vector2(20, 30));
+        source.PushKeyDown(Key.Space);
+        var positions = new List<Vector2>();
+        var keys = new List<bool>();
+
+        UiImageRenderer.RenderPng(gui =>
+        {
+            positions.Add(gui.Input.MousePosition);
+            keys.Add(gui.Input.IsKeyDown(GKey.Space));
+        }, 32, 32, inputSource: source);
+
+        Assert.Equal([new Vector2(20, 30), new Vector2(20, 30)], positions);
+        Assert.Equal([true, true], keys);
+
+        positions.Clear();
+        keys.Clear();
+        UiImageRenderer.RenderPng(gui =>
+        {
+            positions.Add(gui.Input.MousePosition);
+            keys.Add(gui.Input.IsKeyDown(GKey.Space));
+        }, 32, 32);
+
+        Assert.Equal([Vector2.Zero, Vector2.Zero], positions);
+        Assert.Equal([false, false], keys);
+    }
+
     /// <summary>Zero or negative dimensions are rejected before any drawing happens.</summary>
     [Fact]
     public void RenderPng_RejectsNonPositiveDimensions()

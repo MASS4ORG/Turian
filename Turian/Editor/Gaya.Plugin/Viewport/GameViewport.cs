@@ -119,7 +119,7 @@ sealed class GameViewport : IDisposable
             if (service is null)
             {
                 service = new SceneViewerService(vulkan, width, height);
-                uiManager = new UiManager(vulkan);
+                uiManager = new UiManager(vulkan, playMode.Input, playMode.Locale);
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>
@@ -139,6 +139,7 @@ sealed class GameViewport : IDisposable
             return false;
         }
 
+        if (uiManager is { } manager) manager.Locale = playMode.Locale;
         if (pixels.Length != width * height * 4) pixels = new byte[width * height * 4];
         return true;
     }

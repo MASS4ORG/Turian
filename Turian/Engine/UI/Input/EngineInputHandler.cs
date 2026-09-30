@@ -2,9 +2,7 @@ namespace Turian.Engine.UI;
 
 /// <summary>
 /// Feeds a <see cref="Gui"/> frame from the engine's screen-space input, bridging
-/// <see cref="Guinevere.IInputHandler"/> to the static <see cref="Input"/> facade
-/// (and through it, whichever <see cref="IInputSource"/> is active — the standalone
-/// runtime's Silk source or the Studio play session's buffered source).
+/// <see cref="Guinevere.IInputHandler"/> to an explicitly supplied <see cref="IInputSource"/>.
 ///
 /// <para>
 /// Pointer coordinates are in viewport pixels with the origin at the top-left, which
@@ -39,7 +37,11 @@ public interface IUiFrameInput : IInputHandler
 /// </summary>
 public sealed class EngineInputHandler : IUiFrameInput
 {
+    readonly IInputSource? source;
     string typedCharacters = string.Empty;
+
+    /// <summary>Creates a screen-space handler. Without a source all input is neutral.</summary>
+    public EngineInputHandler(IInputSource? source = null) => this.source = source;
 
     /// <summary>
     /// The canvas scale the UI is currently rasterized at (<see cref="UiScale"/>). Pointer
@@ -60,34 +62,34 @@ public sealed class EngineInputHandler : IUiFrameInput
     float Inv => CanvasScale is > 0f and not 1f ? 1f / CanvasScale : 1f;
 
     /// <inheritdoc/>
-    public Vector2 MousePosition => Input.MousePosition * Inv;
+    public Vector2 MousePosition => (source?.MousePosition ?? Vector2.Zero) * Inv;
 
     /// <inheritdoc/>
-    public Vector2 MouseDelta => Input.MouseDelta * Inv;
+    public Vector2 MouseDelta => (source?.MouseDelta ?? Vector2.Zero) * Inv;
 
     /// <inheritdoc/>
-    public Vector2 PrevMousePosition => (Input.MousePosition - Input.MouseDelta) * Inv;
+    public Vector2 PrevMousePosition => ((source?.MousePosition ?? Vector2.Zero) - (source?.MouseDelta ?? Vector2.Zero)) * Inv;
 
     /// <inheritdoc/>
-    public float MouseWheelDelta => Input.MouseScrollDelta;
+    public float MouseWheelDelta => source?.MouseScrollDelta ?? 0f;
 
     /// <inheritdoc/>
-    public bool IsKeyDown(KeyboardKey keyboardKey) => Input.IsKeyDown((SilkKey)(int)keyboardKey);
+    public bool IsKeyDown(KeyboardKey keyboardKey) => source?.IsKeyDown((SilkKey)(int)keyboardKey) ?? false;
 
     /// <inheritdoc/>
-    public bool IsKeyPressed(KeyboardKey keyboardKey) => Input.WasKeyPressed((SilkKey)(int)keyboardKey);
+    public bool IsKeyPressed(KeyboardKey keyboardKey) => source?.WasKeyPressed((SilkKey)(int)keyboardKey) ?? false;
 
     /// <inheritdoc/>
-    public bool IsKeyUp(KeyboardKey keyboardKey) => !Input.IsKeyDown((SilkKey)(int)keyboardKey);
+    public bool IsKeyUp(KeyboardKey keyboardKey) => !IsKeyDown(keyboardKey);
 
     /// <inheritdoc/>
-    public bool IsMouseButtonDown(MouseButton button) => Input.IsMouseButtonDown((SilkMouseButton)(int)button);
+    public bool IsMouseButtonDown(MouseButton button) => source?.IsMouseButtonDown((SilkMouseButton)(int)button) ?? false;
 
     /// <inheritdoc/>
-    public bool IsMouseButtonPressed(MouseButton button) => Input.WasMouseButtonPressed((SilkMouseButton)(int)button);
+    public bool IsMouseButtonPressed(MouseButton button) => source?.WasMouseButtonPressed((SilkMouseButton)(int)button) ?? false;
 
     /// <inheritdoc/>
-    public bool IsMouseButtonUp(MouseButton button) => !Input.IsMouseButtonDown((SilkMouseButton)(int)button);
+    public bool IsMouseButtonUp(MouseButton button) => !IsMouseButtonDown(button);
 
     /// <inheritdoc/>
     public string GetTypedCharacters() => typedCharacters;

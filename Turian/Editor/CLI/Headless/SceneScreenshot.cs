@@ -18,6 +18,7 @@ static class SceneScreenshot
     /// When <c>true</c>, populates a representative set of gizmos (axis lines, a wire cube, a wire
     /// sphere and an overlay ring) so the gizmo renderer can be verified headlessly.
     /// </param>
+    /// <param name="locale">The project locale, or <c>null</c> for authored source text.</param>
     public static void Capture(
         Vulkan vulkan,
         Node root,
@@ -25,14 +26,15 @@ static class SceneScreenshot
         Bounds bounds,
         string outputPath,
         ILogger logger,
-        bool drawGizmos = false)
+        bool drawGizmos = false,
+        LocaleService? locale = null)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
-        using var runner = new ScreenshotRunner(vulkan, root, options, bounds, logger, drawGizmos);
+        using var runner = new ScreenshotRunner(vulkan, root, options, bounds, logger, drawGizmos, locale);
         runner.CaptureAndSave(outputPath, logger);
     }
 
@@ -55,14 +57,15 @@ static class SceneScreenshot
             ScreenshotOptions options,
             Bounds bounds,
             ILogger logger,
-            bool drawGizmos)
+            bool drawGizmos,
+            LocaleService? locale)
         {
             this.root = root;
             frames = options.Frames;
             viewer = new SceneViewerService(vulkan, options.Width, options.Height);
             if (drawGizmos) viewer.OnPopulateGizmos = DrawTestGizmos;
 
-            uiManager = new UiManager(vulkan);
+            uiManager = new UiManager(vulkan, locale: locale);
             viewer.OverlaySource = (w, h, dt) => uiManager.TryRenderOverlay(root, (int)w, (int)h, dt);
             viewer.WorldUiSource = frame => uiManager.RenderWorldPanels(root, frame);
 

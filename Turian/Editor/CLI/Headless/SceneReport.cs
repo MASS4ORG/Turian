@@ -34,7 +34,7 @@ sealed class SceneReport
     /// <param name="loadModels">
     /// Whether to upload each model to the GPU while walking, which reports load failures and
     /// covers components that reference a whole model rather than one of its meshes.
-    /// Requires a Vulkan device in <see cref="RuntimeServices"/>.
+    /// Requires the scene to have been awakened with services including a Vulkan device.
     /// </param>
     /// <returns>The collected report.</returns>
     public static SceneReport Collect(Node root, bool loadModels = false)

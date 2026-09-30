@@ -50,7 +50,6 @@ static class Program
         // Use our service
         using var serviceScope = host.Services.CreateScope();
         var services = serviceScope.ServiceProvider;
-        RuntimeServices.Configure(services);
 
         try
         {

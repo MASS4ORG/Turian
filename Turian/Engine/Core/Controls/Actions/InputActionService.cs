@@ -1,12 +1,36 @@
 namespace Turian.Engine.Core;
 
+/// <summary>Reads named input actions from one play session.</summary>
+public interface IInputActions
+{
+    /// <summary>Finds an action by map/name or bare name.</summary>
+    InputAction? Find(string path);
+
+    /// <summary>Whether an action is held.</summary>
+    bool IsPressed(string path);
+
+    /// <summary>Whether an action went down this frame.</summary>
+    bool WasPressed(string path);
+
+    /// <summary>Whether an action went up this frame.</summary>
+    bool WasReleased(string path);
+
+    /// <summary>Reads an action as a single axis.</summary>
+    float ReadAxis(string path);
+
+    /// <summary>Reads an action as a two-dimensional direction.</summary>
+    Vector2 ReadVector(string path);
+
+    /// <summary>Enables or disables a named map.</summary>
+    void SetMapEnabled(string name, bool enabled);
+}
+
 /// <summary>
 /// Holds the action maps in force and advances them once per frame from an
-/// <see cref="IInputSource"/>. Gameplay code reaches it through the static
-/// <see cref="InputActions"/> facade rather than resolving it.
+/// <see cref="IInputSource"/>. Components can receive this session's <see cref="IInputActions"/>.
 /// </summary>
 /// <param name="source">The devices the actions are read from.</param>
-public sealed class InputActionService(IInputSource source)
+public sealed class InputActionService(IInputSource source) : IInputActions
 {
     readonly IInputSource source = source ?? throw new ArgumentNullException(nameof(source));
 
@@ -30,6 +54,21 @@ public sealed class InputActionService(IInputSource source)
     /// <param name="path">The action to find.</param>
     /// <returns>The action, or null when nothing matches.</returns>
     public InputAction? Find(string path) => Asset?.Find(path);
+
+    /// <inheritdoc />
+    public bool IsPressed(string path) => Find(path)?.IsPressed ?? false;
+
+    /// <inheritdoc />
+    public bool WasPressed(string path) => Find(path)?.WasPressed ?? false;
+
+    /// <inheritdoc />
+    public bool WasReleased(string path) => Find(path)?.WasReleased ?? false;
+
+    /// <inheritdoc />
+    public float ReadAxis(string path) => Find(path)?.ReadAxis() ?? 0f;
+
+    /// <inheritdoc />
+    public Vector2 ReadVector(string path) => Find(path)?.ReadVector() ?? Vector2.Zero;
 
     /// <summary>Enables or disables a map, so a menu can take input away from gameplay.</summary>
     /// <param name="name">The map's name.</param>
@@ -186,59 +225,4 @@ public sealed class InputRebind
     static bool IsModifier(Key key) => key
         is Key.ControlLeft or Key.ControlRight or Key.ShiftLeft or Key.ShiftRight
         or Key.AltLeft or Key.AltRight or Key.SuperLeft or Key.SuperRight;
-}
-
-/// <summary>
-/// Static entry point for reading input actions from gameplay code, the action-level counterpart of
-/// <see cref="Input"/>.
-///
-/// <example>
-/// <code>
-/// public override void OnUpdate(float deltaTime)
-/// {
-///     var move = InputActions.ReadVector("Move");
-///     if (InputActions.WasPressed("Jump")) Jump();
-/// }
-/// </code>
-/// </example>
-/// </summary>
-/// <remarks>
-/// Resolves an <see cref="InputActionService"/> from <see cref="RuntimeServices"/> on each call, so a
-/// component works unchanged in the standalone runtime and in the Studio's play mode. With no service
-/// registered — or no asset loaded — every query returns a neutral value instead of throwing.
-/// </remarks>
-public static class InputActions
-{
-    /// <summary>The active action service, or null when actions are not routed.</summary>
-    public static InputActionService? Service => RuntimeServices.TryGet<InputActionService>();
-
-    /// <summary>Finds an action by <c>Map/Action</c> or by a bare name.</summary>
-    /// <param name="path">The action to find.</param>
-    /// <returns>The action, or null when nothing matches.</returns>
-    public static InputAction? Find(string path) => Service?.Find(path);
-
-    /// <summary>Whether an action is currently held.</summary>
-    /// <param name="path">The action to read.</param>
-    public static bool IsPressed(string path) => Find(path)?.IsPressed ?? false;
-
-    /// <summary>Whether an action went down during this frame.</summary>
-    /// <param name="path">The action to read.</param>
-    public static bool WasPressed(string path) => Find(path)?.WasPressed ?? false;
-
-    /// <summary>Whether an action went up during this frame.</summary>
-    /// <param name="path">The action to read.</param>
-    public static bool WasReleased(string path) => Find(path)?.WasReleased ?? false;
-
-    /// <summary>An action's value as a single axis, −1 to 1.</summary>
-    /// <param name="path">The action to read.</param>
-    public static float ReadAxis(string path) => Find(path)?.ReadAxis() ?? 0f;
-
-    /// <summary>An action's value as a direction.</summary>
-    /// <param name="path">The action to read.</param>
-    public static Vector2 ReadVector(string path) => Find(path)?.ReadVector() ?? Vector2.Zero;
-
-    /// <summary>Enables or disables a whole map, so a menu can take input away from gameplay.</summary>
-    /// <param name="name">The map's name.</param>
-    /// <param name="enabled">Whether it should follow the devices.</param>
-    public static void SetMapEnabled(string name, bool enabled) => Service?.SetMapEnabled(name, enabled);
 }

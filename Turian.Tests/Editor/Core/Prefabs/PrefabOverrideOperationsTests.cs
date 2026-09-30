@@ -18,7 +18,7 @@ public class PrefabOverrideOperationsTests : IDisposable
         database = new AssetDatabase();
         var loader = Substitute.For<IAssetLoader>();
         sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
-            assetLoader: loader);
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
         var inspector = new NodeInspectorController(assets);
         undo = new UndoService(sceneTree, inspector, assets, loader);
         operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader);

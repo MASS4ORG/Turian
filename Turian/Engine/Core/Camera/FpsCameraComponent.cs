@@ -19,16 +19,20 @@ public class FpsCameraComponent : Component
 
     /// <summary>
     /// When <c>true</c> (the default), the component reads WASD / Space / Left-Shift for movement
-    /// and right-drag for mouse look from the engine <see cref="Input"/> facade every
+    /// and right-drag for mouse look from the session's input source every
     /// update, so it drives the camera on its own in a running session. Set <c>false</c> to feed
     /// <see cref="Move"/> / <see cref="Look"/> from your own script instead.
     /// </summary>
     public bool CaptureInput { get; set; } = true;
 
+    /// <summary>The input source bound to this scene, if it has one.</summary>
+    [InjectService(Optional = true), JsonIgnore]
+    public IInputSource? InputSource { get; private set; }
+
     /// <inheritdoc/>
     public override void OnUpdate(float deltaTime)
     {
-        if (!CaptureInput) return;
+        if (!CaptureInput || InputSource is not { } input) return;
 
         var forward = Axis(Key.W, Key.S);
         var strafe = Axis(Key.D, Key.A);
@@ -36,15 +40,15 @@ public class FpsCameraComponent : Component
         if (forward != 0f || strafe != 0f || climb != 0f)
             Move(new Vector3(strafe, climb, forward), deltaTime);
 
-        if (Input.IsMouseButtonDown(MouseButton.Right))
+        if (input.IsMouseButtonDown(MouseButton.Right))
         {
-            var delta = Input.MouseDelta;
+            var delta = input.MouseDelta;
             if (delta != Vector2.Zero)
                 Look(delta.X, delta.Y);
         }
 
-        static float Axis(Key positive, Key negative) =>
-            (Input.IsKeyDown(positive) ? 1f : 0f) - (Input.IsKeyDown(negative) ? 1f : 0f);
+        float Axis(Key positive, Key negative) =>
+            (input.IsKeyDown(positive) ? 1f : 0f) - (input.IsKeyDown(negative) ? 1f : 0f);
     }
 
     /// <summary>

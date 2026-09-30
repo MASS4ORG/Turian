@@ -39,7 +39,6 @@ public sealed class ObjectReferencesTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        RuntimeServices.Reset();
         TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
     }
