@@ -169,7 +169,7 @@ public sealed partial class AssetImporter
         AssetsChanged?.Invoke();
     }
 
-    static string SerializeAssetMetadata(Asset asset)
+    internal static string SerializeAssetMetadata(Asset asset)
     {
         return asset switch
         {
