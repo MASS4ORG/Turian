@@ -1,22 +1,38 @@
-using Gaya.Packages;
-
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The Bricks panel: what the project installs, with install, update, remove and the local/global state, and the selected brick's
-/// details including why it is installed. It draws <see cref="BricksController"/> and holds no logic of its own.
+/// The Bricks panel: one searchable list of every brick the project could use, grouped by how far it is from being
+/// used (in use, on this machine, available), and the selected brick's details beside it. A checkbox turns a brick
+/// on or off for the project. It draws <see cref="BricksController"/> and holds no logic of its own.
 /// </summary>
 /// <param name="controller">The bricks' state and actions.</param>
-sealed class BricksPanel(BricksController controller) : IPanel
+/// <param name="dialogs">Asks for a folder or file to add a brick from; without it those menu items are inert.</param>
+sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs = null) : IPanel
 {
-    const float rowHeight = 42f;
-    const int maxAssetRows = 40;
+    const float rowHeight = 36f;
 
-    string idInput = "";
-    string sourceInput = "";
+    static readonly (BrickFilter Filter, string Label, float Width)[] filters =
+    [
+        (BrickFilter.All, "All", 36f),
+        (BrickFilter.Installed, "Installed", 62f),
+        (BrickFilter.Available, "Available", 66f),
+        (BrickFilter.Updates, "Updates", 58f),
+        (BrickFilter.BuiltIn, "Built-in", 58f),
+    ];
+
+    readonly BricksDetails details = new(controller);
+
+    string search = "";
+    string addInput = "";
+    string? addLabel;
+    Func<string, Task<bool>>? addAction;
+    BrickFilter filter = BrickFilter.All;
     bool loaded;
-    string? assetsOf;
-    IReadOnlyList<string> assets = [];
+    bool addMenuOpen;
+    bool moreMenuOpen;
+    Vector2 pointer;
+    Vector2 menuAt;
+    float split = 0.45f;
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -29,200 +45,221 @@ sealed class BricksPanel(BricksController controller) : IPanel
         {
             loaded = true;
             controller.Refresh();
+            _ = controller.RefreshRegistriesAsync();
         }
+
+        pointer = gui.Input.MousePosition;
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(Theme.Gap).Padding(10f, 8f).Enter())
         {
             if (!controller.HasProject)
             {
-                Line(gui, "Open a project to manage its bricks.", Theme.InkDim);
+                BricksDetails.Line(gui, "Open a project to manage its bricks.", Theme.InkDim);
                 return;
             }
 
-            using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+            Toolbar(gui);
+            if (addLabel is not null) AddRow(gui);
+            Notice(gui);
+
+            using (gui.Node().Expand().Direction(Axis.Horizontal).Enter())
             {
-                Scroll(gui);
-                using (gui.Node().ExpandWidth().MinWidth(Theme.Scale(600f)).Direction(Axis.Vertical)
-                           .Gap(Theme.Gap).Enter())
-                {
-                    AddRow(gui);
-                    Notice(gui);
-                    foreach (var row in controller.Rows) Row(gui, row);
-                    if (controller.Rows.Count == 0) Line(gui, "No bricks installed.", Theme.InkDim);
-                    Details(gui);
-                }
+                using (gui.Node().ExpandHeight().ExpandWidth(split).Direction(Axis.Vertical).Enter())
+                    List(gui);
+
+                gui.Splitter(ref split, Axis.Horizontal, thickness: Theme.Scale(2f), min: 0.25f,
+                    color: Theme.Border, hoverColor: Theme.Hover);
+
+                using (gui.Node().ExpandHeight().ExpandWidth(1f - split).Direction(Axis.Vertical).Padding(8f, 0f).Enter())
+                    details.Render(gui);
+            }
+        }
+
+        gui.CascadeMenu(ref addMenuOpen, menuAt, BuildAddMenu);
+        gui.CascadeMenu(ref moreMenuOpen, menuAt, BuildMoreMenu);
+    }
+
+    void Toolbar(Gui gui)
+    {
+        var height = Theme.Scale(Theme.RowHeight + 4f);
+
+        using (gui.Node(-1, height, "bricks/toolbar").ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Gap)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            if (Button(gui, "+", "bricks/add", 28f, "Add a brick by name, from a git repository, a folder or a .brick file."))
+                OpenMenu(ref addMenuOpen);
+
+            using (gui.Node(-1, height, "bricks/search").Expand().Enter())
+                search = gui.TextInput(search, width: 0, height: height, placeholder: "Search bricks",
+                    fontSize: Theme.Text(12), padding: 5, id: "bricks/search/input");
+
+            if (Button(gui, "…", "bricks/more", 28f, "Refresh the registries, restore the project's bricks, or update them all."))
+                OpenMenu(ref moreMenuOpen);
+        }
+
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/filters").ExpandWidth().Direction(Axis.Horizontal)
+                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        {
+            foreach (var (value, label, width) in filters)
+            {
+                if (Chip(gui, label, $"bricks/filter/{value}", width, filter == value)) filter = value;
             }
         }
     }
 
-    static void Scroll(Gui gui)
+    void OpenMenu(ref bool open)
     {
-        var node = gui.CurrentNode;
-        var previous = gui.GetScrollState(node.Id);
-        if (gui.Pass == Pass.Pass1Build && previous?.ShowScrollbarY != true)
-            node.PaddingRight(node.Style.PaddingRight + 12f);
-        gui.Scroll(Theme.InkDim, Theme.Chrome);
-        if (gui.Pass != Pass.Pass2Render || gui.GetScrollState(node.Id)?.ShowScrollbarY == true) return;
-
-        var rect = node.Rect;
-        gui.DrawRectFilled(new Rect(rect.X + rect.W - 12f, rect.Y, 12f, rect.H), Theme.Chrome);
-        gui.DrawRectFilled(new Rect(rect.X + rect.W - 10f, rect.Y + 2f, 8f, Math.Max(0, rect.H - 4f)),
-            Theme.InkDim, 3f);
+        menuAt = pointer;
+        open = true;
     }
+
+    void BuildAddMenu(FlyoutBuilder menu)
+    {
+        menu.Item("Add by name…", () => BeginAdd("Brick name, e.g. org.mass4.turian.ui", AddByName));
+        menu.Item("Add from git URL…", () => BeginAdd("Git repository, optionally ending in #tag or #branch",
+            url => controller.AddFromSourceAsync($"git+{url.Trim()}")));
+        menu.Separator();
+        menu.Item("Add from folder…", () => Pick(FileDialogMode.SelectFolder, "Add a brick from a folder", []),
+            enabled: dialogs is not null);
+        menu.Item("Add from .brick file…", () => Pick(FileDialogMode.OpenFile, "Add a brick from a .brick file",
+            [FileDialogFilter.Of("Bricks", ".brick")]), enabled: dialogs is not null);
+    }
+
+    void BuildMoreMenu(FlyoutBuilder menu)
+    {
+        menu.Item("Refresh registries", () => _ = controller.RefreshRegistriesAsync());
+        menu.Item("Restore", () => _ = controller.RestoreAsync());
+        menu.Item("Update all", () => _ = controller.UpdateAsync());
+    }
+
+    void BeginAdd(string label, Func<string, Task<bool>> action)
+    {
+        addLabel = label;
+        addAction = action;
+        addInput = "";
+    }
+
+    Task<bool> AddByName(string name)
+    {
+        var id = name.Trim();
+        return controller.Catalog.FirstOrDefault(b => b.Id == id) is { } known
+            ? controller.EnableAsync(known)
+            : controller.InstallAsync(id, null);
+    }
+
+    void Pick(FileDialogMode mode, string title, IReadOnlyList<FileDialogFilter> accepted) =>
+        dialogs?.Show(new FileDialogRequest
+        {
+            Mode = mode,
+            Title = title,
+            Filters = accepted,
+            OnComplete = path =>
+            {
+                if (path is not null) _ = controller.AddFromSourceAsync($"file:{path}");
+            },
+        });
 
     void AddRow(Gui gui)
     {
         var height = Theme.Scale(Theme.RowHeight + 4f);
 
-        using (gui.Node(-1, height, "bricks/add").ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Gap).Enter())
+        using (gui.Node(-1, height, "bricks/addRow").ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Gap).Enter())
         {
-            using (gui.Node(-1, height, "bricks/add/id").Expand().Enter())
-                idInput = gui.TextInput(idInput, width: 0, height: height, placeholder: "Brick id, e.g. org.mass4.turian.ui",
-                    fontSize: Theme.Text(12), padding: 5, id: "bricks/id");
-            using (gui.Node(-1, height, "bricks/add/source").Expand().Enter())
-                sourceInput = gui.TextInput(sourceInput, width: 0, height: height,
-                    placeholder: "Source: builtin:, file:, git+ (empty for built-in)",
-                    fontSize: Theme.Text(12), padding: 5, id: "bricks/source");
+            using (gui.Node(-1, height, "bricks/addRow/input").Expand().Enter())
+                addInput = gui.TextInput(addInput, width: 0, height: height, placeholder: addLabel ?? "",
+                    fontSize: Theme.Text(12), padding: 5, id: "bricks/addRow/text");
 
-            if (Button(gui, "Install", "bricks/install", 70f) && idInput.Trim().Length > 0)
+            if (Button(gui, "Add", "bricks/addRow/add", 50f) && addInput.Trim().Length > 0)
             {
-                _ = controller.InstallAsync(idInput, sourceInput);
-                idInput = sourceInput = "";
+                _ = addAction?.Invoke(addInput);
+                addLabel = null;
             }
 
-            if (Button(gui, "Restore", "bricks/restore", 70f)) _ = controller.RestoreAsync();
-            if (Button(gui, "Update All", "bricks/update", 84f)) _ = controller.UpdateAsync();
+            if (Button(gui, "Cancel", "bricks/addRow/cancel", 60f)) addLabel = null;
         }
     }
 
     void Notice(Gui gui)
     {
-        if (controller.IsBusy) Line(gui, "Working…", Theme.InkDim);
-        else if (controller.Error is { } error) Line(gui, error, Theme.Error);
+        if (controller.IsBusy) BricksDetails.Line(gui, "Working…", Theme.InkDim);
+        else if (controller.Error is { } error) BricksDetails.Line(gui, error, Theme.Error);
     }
 
-    void Row(Gui gui, BrickRow row)
+    void List(Gui gui)
     {
-        var id = $"bricks/row/{row.Id}";
-        var height = Theme.Scale(rowHeight);
-        var selected = controller.Selected == row.Id;
+        var shown = BrickCatalog.Filter(controller.Catalog, filter, search);
+        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+        {
+            gui.ScrollY();
+            Group(gui, "In use", shown.Where(static b => b.State == BrickState.Enabled));
+            Group(gui, "On this machine", shown.Where(static b => b.State == BrickState.Installed));
+            Group(gui, "Available", shown.Where(static b => b.State == BrickState.Available));
+            if (shown.Count == 0) BricksDetails.Line(gui, "No bricks match.", Theme.InkDim);
+        }
+    }
 
-        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).ContentAlignY(0.5f).Enter())
+    void Group(Gui gui, string title, IEnumerable<CatalogBrick> bricks)
+    {
+        var rows = bricks.ToList();
+        if (rows.Count == 0) return;
+
+        BricksDetails.Line(gui, $"{title} ({rows.Count})", Theme.Ink);
+        foreach (var brick in rows) Row(gui, brick);
+    }
+
+    void Row(Gui gui, CatalogBrick brick)
+    {
+        var id = $"bricks/row/{brick.Id}";
+        var height = Theme.Scale(rowHeight);
+        var selected = controller.Selected == brick.Id;
+
+        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
+                   .ContentAlignY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
             if (gui.Pass == Pass.Pass2Render)
             {
                 if (selected) gui.DrawBackgroundRect(Theme.Hover, 3f);
                 else if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.Chrome, 3f);
-                if (interactable.OnClick()) controller.Selected = row.Id;
+                if (interactable.OnClick()) controller.Selected = brick.Id;
             }
 
-            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+            var enabled = brick.State == BrickState.Enabled;
+            using (gui.Node(Theme.Scale(18f), height, $"{id}/enabled").ContentAlignY(0.5f).Enter())
+            {
+                if (gui.Checkbox(enabled, size: Theme.Scale(14f)) != enabled && !controller.IsBusy)
+                    _ = enabled ? controller.DisableAsync(brick.Id) : controller.EnableAsync(brick);
+            }
+
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f).Enter())
             {
                 gui.ClipContent();
-                gui.DrawText(row.DisplayName is { Length: > 0 } name ? name : row.Id, Theme.Text(12f),
-                    row.IsDirect ? Theme.Ink : Theme.InkDim, centerInRect: false);
-                gui.DrawText(row.Id, Theme.Text(11f), Theme.InkDim, centerInRect: false);
+                gui.DrawText(brick.DisplayName is { Length: > 0 } name ? name : brick.Id, Theme.Text(12f),
+                    enabled ? Theme.Ink : Theme.InkDim, centerInRect: false);
+                gui.DrawText(brick.Id, Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            Cell(gui, $"{id}/version", row.Version, 70f, height);
-            Cell(gui, $"{id}/origin", Describe(row.Origin), 110f, height);
-
-            if (row.IsDirect && Button(gui, "Remove", $"{id}/remove", 62f)) _ = controller.RemoveAsync(row.Id);
+            var version = brick.InstalledVersion ?? brick.LatestVersion ?? "";
+            BricksDetails.Cell(gui, $"{id}/version", brick.HasUpdate ? $"{version} → {brick.LatestVersion}" : version,
+                brick.HasUpdate ? 110f : 60f, height);
         }
     }
 
-    void Details(Gui gui)
+    static bool Chip(Gui gui, string label, string id, float width, bool active)
     {
-        if (controller.SelectedBrick is not { } brick) return;
+        var height = Theme.Scale(Theme.RowHeight);
 
-        var manifest = brick.Manifest;
-        Line(gui, "", Theme.InkDim);
-        Line(gui, $"{manifest.DisplayName ?? brick.Id} {brick.Version}", Theme.Ink);
-        if (manifest.Description is { Length: > 0 } description) Line(gui, description, Theme.InkDim);
-
-        Line(gui, $"Source: {brick.Source} ({Describe(brick.Origin)}{(brick.IsOverridden ? ", overridden on this machine" : "")})", Theme.InkDim);
-        if (manifest.License is { Length: > 0 } license) Line(gui, $"License: {license}", Theme.InkDim);
-        if (manifest.Author is { Length: > 0 } author) Line(gui, $"Author: {author}", Theme.InkDim);
-        if (manifest.Categories.Count > 0) Line(gui, $"Categories: {string.Join(", ", manifest.Categories)}", Theme.InkDim);
-
-        var needs = manifest.Dependencies.Keys.Order(StringComparer.Ordinal).ToList();
-        Line(gui, needs.Count == 0 ? "Needs: nothing" : $"Needs: {string.Join(", ", needs)}", Theme.InkDim);
-
-        var requiredBy = controller.RequiredBy(brick.Id);
-        Line(gui, requiredBy.Count == 0
-            ? (brick.Depth == 1 ? "Installed by the project" : "Installed as a dependency")
-            : $"Required by: {string.Join(", ", requiredBy)}", Theme.InkDim);
-        if (BrickAssemblies.IsPrecast(brick)) Line(gui, "Ships prebuilt assemblies", Theme.InkDim);
-        Locality(gui, brick);
-
-        // Copying one asset detaches it from the brick: it gets a new id and stays put when the brick updates.
-        if (assetsOf != brick.Id)
+        using (gui.Node(Theme.Scale(width), height, id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
-            assetsOf = brick.Id;
-            assets = BrickAssetCopy.Assets(brick);
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+
+            if (gui.Pass == Pass.Pass2Render)
+                gui.DrawBackgroundRect(active ? Theme.Hover : hot ? Theme.Chrome : Theme.Panel, 9f);
+            gui.DrawText(label, Theme.Text(11f), active || hot ? Theme.Ink : Theme.InkDim);
+
+            return gui.Pass == Pass.Pass2Render && interactable.OnClick();
         }
-
-        if (assets.Count > 0) Line(gui, "Assets (Copy makes your own version in the project):", Theme.Ink);
-        foreach (var asset in assets.Take(maxAssetRows)) AssetRow(gui, brick.Id, asset);
-        if (assets.Count > maxAssetRows) Line(gui, $"… and {assets.Count - maxAssetRows} more; turian-cli brick copy copies any of them.", Theme.InkDim);
-    }
-
-    void Locality(Gui gui, ResolvedPackage brick)
-    {
-        var local = brick.Origin == PackageOrigin.Embedded;
-        var folder = $"{ProjectManifest.DirectoryName}/{brick.Id}";
-        Line(gui, local ? "Local: a copy in this project, committed with it" : "Global: shared by every project on this machine",
-            Theme.InkDim);
-        Line(gui, $"Installed at: {brick.RootPath}", Theme.InkDim);
-
-        if (local && brick.Manifest.Upstream is not null)
-        {
-            if (Button(gui, "Revert to global", $"bricks/revert/{brick.Id}", 110f,
-                    $"Moves {folder} to .Cache/Trash, with your changes, and uses the shared version again."))
-                _ = controller.RevertAsync(brick.Id);
-        }
-        else if (!local && brick.Origin != PackageOrigin.File)
-        {
-            if (Button(gui, "Make local", $"bricks/local/{brick.Id}", 90f,
-                    $"Copies this brick to {folder} so you can edit it and keep it in version control."))
-                _ = controller.EmbedAsync(brick.Id);
-        }
-    }
-
-    void AssetRow(Gui gui, string brickId, string asset)
-    {
-        var id = $"bricks/asset/{brickId}/{asset}";
-        var height = Theme.Scale(rowHeight);
-
-        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).ContentAlignY(0.5f).Enter())
-        {
-            using (gui.Node(-1, height, $"{id}/name").Expand().ContentAlignY(0.5f).Enter())
-                gui.DrawText(asset, Theme.Text(11f), Theme.InkDim, centerInRect: false);
-            if (Button(gui, "Copy", $"{id}/copy", 56f)) _ = controller.CopyAssetsAsync(brickId, [asset]);
-        }
-    }
-
-    static string Describe(PackageOrigin origin) => origin switch
-    {
-        PackageOrigin.Builtin => "built-in",
-        PackageOrigin.Embedded => "local",
-        PackageOrigin.File => "folder",
-        PackageOrigin.Git => "git",
-        PackageOrigin.Archive => ".brick",
-        _ => origin.ToString(),
-    };
-
-    static void Cell(Gui gui, string id, string text, float width, float height)
-    {
-        using (gui.Node(Theme.Scale(width), height, id).ContentAlignY(0.5f).Enter())
-            gui.DrawText(text, Theme.Text(11f), Theme.InkDim, centerInRect: false);
-    }
-
-    static void Line(Gui gui, string text, Guinevere.Color color)
-    {
-        using (gui.Node(-1, Theme.Scale(rowHeight - 4f), $"bricks/line/{text}").ExpandWidth().ContentAlignY(0.5f).Enter())
-            gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
     }
 
     bool Button(Gui gui, string label, string id, float width, string? tooltip = null) =>

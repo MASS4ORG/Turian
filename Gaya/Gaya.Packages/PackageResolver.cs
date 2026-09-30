@@ -241,6 +241,7 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         try
         {
             var (folder, integrity) = store.ExtractArchive(file, options.ReservedCategoryPrefixes);
+            store.RecordOrigin(folder, $"registry:{registry.Name}");
             return Finish(id, folder, integrity, signer, registry, depth);
         }
         finally
@@ -345,6 +346,7 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
             case ArchiveSource archive:
                 if (!File.Exists(archive.Path)) throw new PackageException($"{id}: file {archive.Path} does not exist.");
                 (root, integrity) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
+                store.RecordOrigin(root, archive.ToString());
                 if (options.Locked && existingLock?.Dependencies.GetValueOrDefault(id) is { Integrity: { } pinned } && pinned != integrity)
                     throw new PackageException($"{id}: {archive.Path} does not match the integrity in {LockFile.FileName}.");
                 origin = PackageOrigin.Archive;
@@ -366,6 +368,7 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                 root = store.PackagePath(id, commit);
                 var checkedOut = !Directory.Exists(root);
                 if (checkedOut) root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                store.RecordOrigin(root, git.ToString());
 
                 // Hashing a large package is slow, so an unchanged store folder is trusted unless installing locked.
                 integrity = keepLocked && !checkedOut && !options.Locked && locked!.Integrity is { } known

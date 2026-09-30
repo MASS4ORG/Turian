@@ -180,7 +180,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             BricksPanelId, "Bricks", PanelPlacement.Center,
-            sp => new BricksPanel(sp.GetRequiredService<BricksController>()))
+            sp => new BricksPanel(sp.GetRequiredService<BricksController>(), sp.GetRequiredService<FileDialogChrome>()))
         { OpenByDefault = false });
 
         // Both dialogs are registered on the menu bar only because that strip renders every frame;

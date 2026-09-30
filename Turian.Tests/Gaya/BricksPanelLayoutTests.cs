@@ -8,7 +8,7 @@ public sealed class BricksPanelLayoutTests : IDisposable
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(root, recursive: true);
 
-    /// <summary>Rows keep names separate from versions, and narrow panels can scroll to every control.</summary>
+    /// <summary>Rows keep names separate from versions at narrow and wide dock sizes.</summary>
     [Theory]
     [InlineData(300)]
     [InlineData(900)]
@@ -46,9 +46,6 @@ public sealed class BricksPanelLayoutTests : IDisposable
         var name = Assert.Single(nodes, node => node.Id == "bricks/row/user.mateo.inventory/name");
         var version = Assert.Single(nodes, node => node.Id == "bricks/row/user.mateo.inventory/version");
         Assert.True(name.Rect.X + name.Rect.W <= version.Rect.X);
-        Assert.Contains(nodes, node => gui.GetScrollState(node.Id) is { IsScrollingX: true, IsScrollingY: true });
-        if (width == 300)
-            Assert.Contains(nodes, node => gui.GetScrollState(node.Id) is { ShowScrollbarX: true });
 
         if (Environment.GetEnvironmentVariable("TURIAN_TEST_DUMP") is { Length: > 0 } output)
         {

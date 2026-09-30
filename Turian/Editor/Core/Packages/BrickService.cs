@@ -49,6 +49,37 @@ public static class BrickService
         }
     }
 
+    /// <summary>
+    /// Uses a brick from a folder, a <c>.brick</c> file or a git repository, reading its id from the brick itself.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="spec">The source: <c>file:&lt;path&gt;</c> or <c>git+&lt;url&gt;[#ref]</c>.</param>
+    /// <param name="store">The shared store a git brick is fetched into.</param>
+    /// <returns>The id of the brick now in use.</returns>
+    /// <exception cref="PackageException">The source holds no brick or cannot be fetched.</exception>
+    public static string AddFromSource(string projectRoot, string spec, PackageStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        string[] reserved = ["gaya", ProjectPackages.HostName];
+        var id = PackageSource.Parse(spec, Path.Combine(projectRoot, ProjectManifest.DirectoryName)) switch
+        {
+            FileSource file => PackageManifest.Load(file.Path, reserved).Name,
+            ArchiveSource archive => BrickArchive.ReadManifest(archive.Path, reserved).Name,
+            GitSource git => PackageManifest.Load(CheckoutGit(store, git), reserved).Name,
+            _ => throw new PackageException("Bricks from a registry or the engine are added from the catalog."),
+        };
+
+        _ = Add(projectRoot, id, spec);
+        return id;
+    }
+
+    static string CheckoutGit(PackageStore store, GitSource git)
+    {
+        var commit = store.ResolveCommitAsync(git).GetAwaiter().GetResult();
+        return store.CheckoutAsync(git, commit).GetAwaiter().GetResult();
+    }
+
     /// <summary>Removes a declaration and preserves embedded sources in the project's trash.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
@@ -66,6 +97,40 @@ public static class BrickService
         var removed = ProjectBricks.Remove(projectRoot, id);
         ProjectPackages.Invalidate(projectRoot);
         return removed;
+    }
+
+    /// <summary>
+    /// Stops the project declaring a brick, keeping it on this machine. A brick another brick it uses needs stays in
+    /// use as that one's dependency.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <exception cref="PackageException">The project does not declare the brick, or something it uses cannot do without it.</exception>
+    public static void Disable(string projectRoot, string id)
+    {
+        var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        if (!before.Dependencies.ContainsKey(id))
+        {
+            var needers = List(projectRoot).Where(p => p.Manifest.Dependencies.ContainsKey(id)).Select(p => p.Id).ToArray();
+            throw new PackageException(needers.Length > 0
+                ? $"{id} is needed by {string.Join(", ", needers)}; stop using those first."
+                : $"The project does not declare {id}; a local brick is stopped by uninstalling it.");
+        }
+
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        _ = manifest.Dependencies.Remove(id);
+        manifest.Save(projectRoot);
+        ProjectPackages.Invalidate(projectRoot);
+        try
+        {
+            _ = ProjectPackages.Resolve(projectRoot);
+        }
+        catch (PackageException)
+        {
+            before.Save(projectRoot);
+            ProjectPackages.Invalidate(projectRoot);
+            throw;
+        }
     }
 
     /// <summary>Copies an installed brick into the project as a writable fork.</summary>

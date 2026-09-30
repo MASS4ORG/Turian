@@ -15,7 +15,8 @@ public sealed class BricksControllerTests : IDisposable
         project = new ProjectBootstrapper().CreateAsync(Path.Combine(root, "game")).GetAwaiter().GetResult()!;
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
         controller = new BricksController(settings, new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
-            applier, NullLogger.Instance);
+            applier, NullLogger.Instance)
+        { Store = new PackageStore(Path.Combine(root, "store")) };
     }
 
     /// <inheritdoc/>
@@ -143,6 +144,70 @@ public sealed class BricksControllerTests : IDisposable
         Assert.False(await controller.RevertAsync("user.mateo.rules"));
 
         Assert.True(Directory.Exists(made));
+    }
+
+    /// <summary>Disabling stops the project using a brick; it becomes available again and can be enabled from the catalog.</summary>
+    [Fact]
+    public async Task DisablingStopsUsingABrickAndItCanBeEnabledAgain()
+    {
+        controller.Refresh();
+        var catalog = controller.Catalog.ToDictionary(b => b.Id);
+        Assert.Equal(BrickState.Enabled, catalog["org.mass4.turian.ui"].State);
+
+        Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
+
+        Assert.DoesNotContain(controller.Rows, r => r.Id == "org.mass4.turian.ui");
+        catalog = controller.Catalog.ToDictionary(b => b.Id);
+        Assert.Equal(BrickState.Available, catalog["org.mass4.turian.ui"].State);
+
+        Assert.True(await controller.EnableAsync(catalog["org.mass4.turian.ui"]));
+        Assert.Contains(controller.Rows, r => r.Id == "org.mass4.turian.ui");
+    }
+
+    /// <summary>A brick in use cannot be uninstalled, and a stored one leaves the store.</summary>
+    [Fact]
+    public async Task UninstallDeletesOnlyBricksThatAreNotInUse()
+    {
+        controller.Refresh();
+        Assert.False(await controller.UninstallAsync("org.mass4.turian.ui"));
+
+        var stored = Path.Combine(controller.Store.Root, "user.mateo.stored@abc");
+        Directory.CreateDirectory(controller.Store.Root);
+        Directory.Move(BrickService.New(root, "user.mateo.stored"), stored);
+
+        Assert.True(await controller.UninstallAsync("user.mateo.stored"), controller.Error);
+        Assert.False(Directory.Exists(stored));
+    }
+
+    /// <summary>What the registries offered last time is listed as available without asking them again.</summary>
+    [Fact]
+    public void CatalogListsRegistryBricksFromTheCache()
+    {
+        var cache = Path.Combine(controller.Store.Root, ".registry-cache",
+            $"{Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(project)))[..16]}.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+        File.WriteAllText(cache, """[{"Registry":"bricks.example","Id":"user.mateo.remote","Latest":"1.2.0"}]""");
+
+        controller.Refresh();
+
+        var remote = controller.Catalog.Single(b => b.Id == "user.mateo.remote");
+        Assert.Equal(BrickState.Available, remote.State);
+        Assert.Equal("registry:bricks.example", remote.Origin);
+    }
+
+    /// <summary>A stored brick whose origin nobody recorded is refused rather than declared with no source.</summary>
+    [Fact]
+    public async Task EnablingABrickWithoutAnOriginIsRefused()
+    {
+        controller.Refresh();
+        var stored = Path.Combine(controller.Store.Root, "user.mateo.old@abc");
+        Directory.CreateDirectory(controller.Store.Root);
+        Directory.Move(BrickService.New(root, "user.mateo.old"), stored);
+        controller.Refresh();
+
+        Assert.False(await controller.EnableAsync(controller.Catalog.Single(b => b.Id == "user.mateo.old")));
+        Assert.NotNull(controller.Error);
+        Assert.DoesNotContain(controller.Rows, r => r.Id == "user.mateo.old");
     }
 
     /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>

@@ -27,6 +27,70 @@ public sealed class PackageStore(string root)
     public string ArchiveFolderName(string integrity) =>
         $"sha256-{Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]))[..16]}";
 
+    /// <summary>
+    /// Remembers where the client fetched a store folder from. This record, not anything the package says about
+    /// itself, is the folder's origin; it lives beside the folder so the folder's content hash is unaffected.
+    /// </summary>
+    /// <param name="folder">A folder under <see cref="Root"/>.</param>
+    /// <param name="source">The source as a manifest writes it: <c>git+url#ref</c>, <c>file:path</c> or <c>registry:name</c>.</param>
+    public void RecordOrigin(string folder, string source)
+    {
+        var path = OriginPath(folder);
+        if (File.Exists(path)) return;
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, source);
+    }
+
+    /// <summary>The source a store folder was fetched from, or null for a folder fetched before origins were recorded.</summary>
+    /// <param name="folder">A folder under <see cref="Root"/>.</param>
+    /// <returns>The recorded source, or null.</returns>
+    public string? ReadOrigin(string folder) =>
+        File.Exists(OriginPath(folder)) ? File.ReadAllText(OriginPath(folder)).Trim() : null;
+
+    /// <summary>The package folders in the store, each with the package id and version it holds.</summary>
+    /// <param name="reservedCategoryPrefixes">Category prefixes a manifest may use without depending on them.</param>
+    /// <returns>The folders whose manifest reads; others are skipped.</returns>
+    public IReadOnlyList<(string Folder, PackageManifest Manifest)> Packages(
+        IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
+    {
+        var found = new List<(string, PackageManifest)>();
+        if (!Directory.Exists(Root)) return found;
+
+        foreach (var folder in Directory.EnumerateDirectories(Root).Where(static d => !Path.GetFileName(d).StartsWith('.')))
+        {
+            try
+            {
+                found.Add((folder, PackageManifest.Load(folder, reservedCategoryPrefixes)));
+            }
+            catch (PackageException)
+            {
+                // Not a package folder this host can read.
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>Deletes every stored version of a package, with its recorded origins. Every project on the machine loses it.</summary>
+    /// <param name="id">The package id.</param>
+    /// <returns>How many stored versions were deleted.</returns>
+    public int Remove(string id)
+    {
+        if (!PackageId.IsValid(id) || !Directory.Exists(Root)) return 0;
+
+        var folders = Directory.EnumerateDirectories(Root, $"{id}@*").ToList();
+        foreach (var folder in folders)
+        {
+            DeleteReadOnly(folder);
+            if (File.Exists(OriginPath(folder))) File.Delete(OriginPath(folder));
+        }
+
+        return folders.Count;
+    }
+
+    string OriginPath(string folder) => Path.Combine(Root, ".origins", $"{Path.GetFileName(folder)}.txt");
+
     /// <summary>The store folder of a package at a git commit.</summary>
     /// <param name="id">The package id.</param>
     /// <param name="commit">The full commit hash.</param>
