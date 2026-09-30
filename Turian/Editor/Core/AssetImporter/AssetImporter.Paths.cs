@@ -221,8 +221,7 @@ public sealed partial class AssetImporter
         if (PackageRootOf(path) is { } package)
         {
             var fullPath = Path.GetFullPath(path);
-            return AssetDatabase.IsInTildeFolder(fullPath, package.Root)
-                   || fullPath == Path.Combine(package.Root, Gaya.Packages.PackageManifest.FileName);
+            return BrickVerifier.IsUnimported(Path.GetRelativePath(package.Root, fullPath).Replace('\\', '/'));
         }
 
         return !IsUnderAssetsRoot(path);
@@ -235,6 +234,17 @@ public sealed partial class AssetImporter
         foreach (var package in packageRoots)
         {
             if (AssetDatabase.IsUnderDirectory(fullPath, package.Root)) return package;
+        }
+
+        if (assetsRootPath is not null && AssetDatabase.IsUnderDirectory(fullPath, assetsRootPath))
+        {
+            for (var directory = Path.GetDirectoryName(fullPath);
+                 directory is not null && AssetDatabase.IsUnderDirectory(directory, assetsRootPath);
+                 directory = Path.GetDirectoryName(directory))
+            {
+                if (File.Exists(Path.Combine(directory, Gaya.Packages.PackageManifest.FileName)))
+                    return (directory, ReadOnly: false);
+            }
         }
 
         return null;

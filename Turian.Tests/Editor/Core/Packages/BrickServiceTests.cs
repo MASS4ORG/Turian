@@ -29,6 +29,22 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Throws<PackageException>(() => BrickService.New(root, "Inventory"));
     }
 
+    /// <summary>A failed declaration rolls back only the manifest and preserves embedded sources.</summary>
+    [Fact]
+    public void FailedAddDoesNotRemoveEmbeddedSources()
+    {
+        var project = Path.Combine(root, "game");
+        var embedded = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.inventory");
+        var manifest = PackageManifest.Load(embedded, ["turian"]);
+        manifest.Dependencies["user.mateo.missing"] = "file:../missing";
+        manifest.Save(embedded);
+
+        Assert.Throws<PackageException>(() => BrickService.Add(project, manifest.Name, "file:../other"));
+
+        Assert.True(File.Exists(Path.Combine(embedded, "Runtime", "InventoryComponent.cs")));
+        Assert.Empty(ProjectManifest.Load(project).Manifest.Dependencies);
+    }
+
     /// <summary>Verification names missing metas, duplicate ids and orphans, and ignores <c>~</c> folders.</summary>
     [Fact]
     public void VerifierFindsAssetProblems()

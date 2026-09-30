@@ -9,7 +9,7 @@ namespace Gaya.Plugin.Turian;
 /// <param name="controller">The bricks' state and actions.</param>
 sealed class BricksPanel(BricksController controller) : IPanel
 {
-    const float rowHeight = 26f;
+    const float rowHeight = 42f;
     const int maxAssetRows = 40;
 
     string idInput = "";
@@ -39,17 +39,35 @@ sealed class BricksPanel(BricksController controller) : IPanel
                 return;
             }
 
-            AddRow(gui);
-            Notice(gui);
-
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
             {
-                gui.ScrollY();
-                foreach (var row in controller.Rows) Row(gui, row);
-                if (controller.Rows.Count == 0) Line(gui, "No bricks installed.", Theme.InkDim);
-                Details(gui);
+                Scroll(gui);
+                using (gui.Node().ExpandWidth().MinWidth(Theme.Scale(600f)).Direction(Axis.Vertical)
+                           .Gap(Theme.Gap).Enter())
+                {
+                    AddRow(gui);
+                    Notice(gui);
+                    foreach (var row in controller.Rows) Row(gui, row);
+                    if (controller.Rows.Count == 0) Line(gui, "No bricks installed.", Theme.InkDim);
+                    Details(gui);
+                }
             }
         }
+    }
+
+    static void Scroll(Gui gui)
+    {
+        var node = gui.CurrentNode;
+        var previous = gui.GetScrollState(node.Id);
+        if (gui.Pass == Pass.Pass1Build && previous?.ShowScrollbarY != true)
+            node.PaddingRight(node.Style.PaddingRight + 12f);
+        gui.Scroll(Theme.InkDim, Theme.Chrome);
+        if (gui.Pass != Pass.Pass2Render || gui.GetScrollState(node.Id)?.ShowScrollbarY == true) return;
+
+        var rect = node.Rect;
+        gui.DrawRectFilled(new Rect(rect.X + rect.W - 12f, rect.Y, 12f, rect.H), Theme.Chrome);
+        gui.DrawRectFilled(new Rect(rect.X + rect.W - 10f, rect.Y + 2f, 8f, Math.Max(0, rect.H - 4f)),
+            Theme.InkDim, 3f);
     }
 
     void AddRow(Gui gui)
@@ -99,9 +117,13 @@ sealed class BricksPanel(BricksController controller) : IPanel
                 if (interactable.OnClick()) controller.Selected = row.Id;
             }
 
-            using (gui.Node(-1, height, $"{id}/name").Expand().ContentAlignY(0.5f).Enter())
-                gui.DrawText(row.DisplayName is { Length: > 0 } name ? $"{name}  ({row.Id})" : row.Id, Theme.Text(12f),
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+            {
+                gui.ClipContent();
+                gui.DrawText(row.DisplayName is { Length: > 0 } name ? name : row.Id, Theme.Text(12f),
                     row.IsDirect ? Theme.Ink : Theme.InkDim, centerInRect: false);
+                gui.DrawText(row.Id, Theme.Text(11f), Theme.InkDim, centerInRect: false);
+            }
 
             Cell(gui, $"{id}/version", row.Version, 70f, height);
             Cell(gui, $"{id}/origin", Describe(row.Origin), 110f, height);

@@ -117,4 +117,39 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(project, "Packages", "org.mass4.turian.cameras")));
         Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
     }
+
+    /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>
+    [Fact]
+    public async Task RemoveEmbeddedOnlyBrickPreservesSourcesInTrash()
+    {
+        var embedded = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.rules");
+        File.WriteAllText(Path.Combine(embedded, "authored.txt"), "rules");
+        controller.Refresh();
+
+        Assert.True(await controller.RemoveAsync("user.mateo.rules"));
+
+        Assert.False(Directory.Exists(embedded));
+        Assert.DoesNotContain(controller.Rows, row => row.Id == "user.mateo.rules");
+        var preserved = Directory.GetFiles(Path.Combine(project, ".Cache", "Trash"), "authored.txt",
+            SearchOption.AllDirectories);
+        Assert.Equal("rules", File.ReadAllText(Assert.Single(preserved)));
+    }
+
+    /// <summary>Removing an embedded brick that supplies another brick fails without changing its files.</summary>
+    [Fact]
+    public async Task RequiredEmbeddedBrickCannotBeRemoved()
+    {
+        var packages = Path.Combine(project, "Packages");
+        var rules = BrickService.New(packages, "user.mateo.rules");
+        var shop = BrickService.New(packages, "user.mateo.shop");
+        var manifest = PackageManifest.Load(shop, ["turian"]);
+        manifest.Dependencies["user.mateo.rules"] = "^0.1.0";
+        manifest.Save(shop);
+        controller.Refresh();
+
+        Assert.False(await controller.RemoveAsync("user.mateo.rules"));
+
+        Assert.True(Directory.Exists(rules));
+        Assert.Contains(controller.Rows, row => row.Id == "user.mateo.rules");
+    }
 }

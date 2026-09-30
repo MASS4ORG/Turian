@@ -83,13 +83,13 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     public Task<bool> InstallAsync(string id, string? source) =>
         RunAsync($"Install brick {id}", root => BrickService.Add(root, id.Trim(), string.IsNullOrWhiteSpace(source) ? null : source.Trim()));
 
-    /// <summary>Removes a brick from the project's manifest.</summary>
+    /// <summary>Removes a brick, preserving embedded sources in the project's trash.</summary>
     /// <param name="id">The brick id.</param>
-    /// <returns>Whether the project declared it.</returns>
+    /// <returns>Whether the brick was removed.</returns>
     public Task<bool> RemoveAsync(string id) =>
         RunAsync($"Remove brick {id}", root =>
         {
-            if (!BrickService.Remove(root, id)) throw new PackageException($"The manifest does not declare {id}.");
+            if (!BrickService.Remove(root, id)) throw new PackageException($"The project does not declare or embed {id}.");
         });
 
     /// <summary>Moves git bricks to their newest commit.</summary>
@@ -142,7 +142,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
             var succeeded = status == BackgroundTaskStatus.Completed;
             if (!succeeded) logger.LogWarning("{Label} did not complete ({Status})", label, status);
             Refresh();
-            if (!succeeded) Publish(installed, $"{label} failed; see the Output panel.");
+            if (!succeeded) Publish(installed, $"{label} failed");
             return succeeded;
         }
         finally

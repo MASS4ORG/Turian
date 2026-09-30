@@ -40,7 +40,11 @@ public sealed class AssetInspectionService(
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        return entry.IsDirectory ? null : Inspect(entry.AbsolutePath);
+        if (entry.IsDirectory) return null;
+        var inspection = Inspect(entry.AbsolutePath);
+        return entry.IsReadOnly && inspection is not null
+            ? inspection with { Target = null, Title = $"{inspection.Title} (read-only brick)" }
+            : inspection;
     }
 
     /// <summary>

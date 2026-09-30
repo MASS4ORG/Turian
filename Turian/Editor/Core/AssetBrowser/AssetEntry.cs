@@ -11,4 +11,6 @@ public sealed record AssetEntry(
     // Loaded asset metadata, or <see langword="null"/> for directories.
     Asset? AssetMetadata,
     // Absolute path of the parent directory, or <see langword="null"/> for root entries.
-    string? ParentPath);
+    string? ParentPath,
+    // Installed brick files are browsable but cannot be edited in place.
+    bool IsReadOnly = false);

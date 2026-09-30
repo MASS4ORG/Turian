@@ -34,7 +34,6 @@ public static class BrickService
     public static PackageResolution Add(string projectRoot, string id, string? spec = null)
     {
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        var previous = before.Dependencies.GetValueOrDefault(id);
         ProjectBricks.Add(projectRoot, id, spec ?? $"builtin:{id}");
         ProjectPackages.Invalidate(projectRoot);
         try
@@ -44,19 +43,26 @@ public static class BrickService
         catch (PackageException)
         {
             // A declaration that does not resolve must not stay in the manifest.
-            if (previous is null) ProjectBricks.Remove(projectRoot, id);
-            else ProjectBricks.Add(projectRoot, id, previous);
+            before.Save(projectRoot);
             ProjectPackages.Invalidate(projectRoot);
             throw;
         }
     }
 
-    /// <summary>Removes a brick from the project's manifest.</summary>
+    /// <summary>Removes a declaration and preserves embedded sources in the project's trash.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
-    /// <returns>Whether the project declared it.</returns>
+    /// <returns>Whether the project declared or embedded it.</returns>
     public static bool Remove(string projectRoot, string id)
     {
+        var bricks = List(projectRoot);
+        if (bricks.Any(p => p.Id == id && p.Origin == PackageOrigin.Embedded))
+        {
+            var dependents = bricks.Where(p => p.Id != id && p.Manifest.Dependencies.ContainsKey(id))
+                .Select(p => p.Id).ToArray();
+            if (dependents.Length > 0)
+                throw new PackageException($"Remove {string.Join(", ", dependents)} first; they require embedded brick {id}.");
+        }
         var removed = ProjectBricks.Remove(projectRoot, id);
         ProjectPackages.Invalidate(projectRoot);
         return removed;
@@ -407,6 +413,23 @@ public static class BrickService
             """.ReplaceLineEndings("\n") + "\n");
         Serializer.Save($"{script}.meta", new Asset { Id = Guid.NewGuid(), RelativePath = $"Runtime/{Path.GetFileName(script)}" });
         File.WriteAllText(Path.Combine(root, ".gitignore"), "# Built by `turian-cli brick pack --precast`.\nPrecast~/\n.bricks/\n");
+        File.WriteAllText(Path.Combine(root, "README.md"), $$"""
+            # {{displayName ?? segments[^1]}}
+
+            Brick id: `{{id}}`. Licensed under {{license}}; see `package.json` for version and engine compatibility.
+
+            Author code and assets in `Runtime/`, and keep their `.meta` ids stable between releases.
+            Editor extensions belong in `Editor/` under an editor-only assembly definition.
+
+            Place this folder under a project's `Assets/Bricks/` to develop it as project content,
+            or under `Packages/` to develop it as an embedded brick.
+
+            Pack from the Turian checkout:
+
+            ```sh
+            dotnet run --project Turian/Editor/CLI -- brick pack <brick-folder> --out <output-folder>
+            ```
+            """.ReplaceLineEndings("\n") + "\n");
         return root;
     }
 

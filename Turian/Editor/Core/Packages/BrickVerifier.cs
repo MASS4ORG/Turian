@@ -101,7 +101,7 @@ public static class BrickVerifier
         }
     }
 
-    static bool IsUnimported(string relative)
+    internal static bool IsUnimported(string relative)
     {
         var segments = relative.Split('/');
         var name = segments[^1];

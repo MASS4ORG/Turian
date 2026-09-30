@@ -22,12 +22,14 @@ sealed class AssetBrowserPanel : IPanel
     readonly AssetPreviewCatalog previews;
     readonly PrefabAuthoring prefabs;
     readonly AssetFileOperations operations;
+    readonly BrickAssetTree brickTree;
     readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
     string? inspectedId;
     Guid pendingReveal;
     bool showExtensions;
+    bool bricksChanged;
 
     bool menuOpen;
     Vector2 menuAt;
@@ -48,10 +50,12 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="previews">Answers whether a row's asset has a live preview, and of which kind.</param>
     /// <param name="prefabs">Creates prefab variants.</param>
     /// <param name="operations">Renames, deletes, duplicates and pastes as undoable steps.</param>
+    /// <param name="bricks">Reports changes to the installed bricks.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
-        AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations)
+        AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations,
+        BricksController bricks)
     {
         ArgumentNullException.ThrowIfNull(reveal);
 
@@ -66,6 +70,8 @@ sealed class AssetBrowserPanel : IPanel
         this.previews = previews;
         this.prefabs = prefabs;
         this.operations = operations;
+        brickTree = new BrickAssetTree(fileSystem);
+        bricks.Changed += () => bricksChanged = true;
         showExtensions = browserSettings.ShowFileExtensions;
 
         reveal.Requested += assetId => pendingReveal = assetId;
@@ -86,8 +92,9 @@ sealed class AssetBrowserPanel : IPanel
             return;
         }
 
-        if (gui.Pass == Pass.Pass1Build && root != scannedRoot)
+        if (gui.Pass == Pass.Pass1Build && (root != scannedRoot || bricksChanged))
         {
+            bricksChanged = false;
             Rescan(root);
             Rebuild();
         }
@@ -133,7 +140,10 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="root">The project's assets directory.</param>
     public void Rescan(string root)
     {
-        entries = fileSystem.ScanDirectory(root);
+        var projectRoot = Path.GetDirectoryName(root)!;
+        entries = [new AssetEntry(root, true, null, null),
+            .. fileSystem.ScanDirectory(root).Select(entry => entry with { ParentPath = entry.ParentPath ?? root }),
+            .. brickTree.Scan(projectRoot)];
         scannedRoot = root;
         textureThumbnails.Clear();
     }
@@ -175,7 +185,8 @@ sealed class AssetBrowserPanel : IPanel
     {
         rows.Add(new TreeItem(
             entry.AbsolutePath,
-            DisplayName(entry.AbsolutePath),
+            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir!, "Packages")
+                ? "Bricks" : DisplayName(entry.AbsolutePath),
             depth,
             entry.IsDirectory,
             Icon: IconFor(entry),
@@ -251,7 +262,7 @@ sealed class AssetBrowserPanel : IPanel
 
         // Folding is the tree's own business; a double click here opens the asset.
         inspectedId = entry.AbsolutePath;
-        if (e.ClickCount >= 2) opener.Open(entry);
+        if (e.ClickCount >= 2 && !entry.IsReadOnly) opener.Open(entry);
         else inspector.Select(inspections.Inspect(entry));
     }
 
@@ -268,15 +279,16 @@ sealed class AssetBrowserPanel : IPanel
     {
         var entry = menuEntry;
 
-        menu.Item("Rename", () => BeginRename(entry), enabled: entry is not null);
-        menu.Item("Delete", () => Delete(entry), enabled: entry is not null);
+        menu.Item("Rename", () => BeginRename(entry), enabled: entry is { IsReadOnly: false });
+        menu.Item("Delete", () => Delete(entry), enabled: entry is { IsReadOnly: false });
         menu.Separator();
         menu.Item("Copy", () => Copy(entry), enabled: entry is not null);
-        menu.Item("Paste", () => Paste(entry), enabled: fileSystem.CanPaste());
+        menu.Item("Paste", () => Paste(entry), enabled: entry?.IsReadOnly != true && fileSystem.CanPaste());
         menu.Separator();
-        menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
+        if (entry?.IsReadOnly != true)
+            menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
 
-        if (entry is { IsDirectory: false } prefab
+        if (entry is { IsDirectory: false, IsReadOnly: false } prefab
             && string.Equals(Path.GetExtension(prefab.AbsolutePath), ".prefab", StringComparison.OrdinalIgnoreCase))
             menu.Item("Create Prefab Variant", () => CreateVariant(prefab));
     }
@@ -323,7 +335,7 @@ sealed class AssetBrowserPanel : IPanel
     /// <summary>Copies the selected asset beside itself. What the panel's Duplicate shortcut runs.</summary>
     public void DuplicateSelected()
     {
-        if (Selected is not { } entry) return;
+        if (Selected is not { IsReadOnly: false } entry) return;
         if ((entry.ParentPath ?? settings.Settings?.AssetsAbsoluteDir) is not { } directory) return;
 
         operations.Duplicate(entry.AbsolutePath, directory, entry.IsDirectory);
@@ -335,14 +347,14 @@ sealed class AssetBrowserPanel : IPanel
 
     void BeginRename(AssetEntry? entry)
     {
-        if (entry is null) return;
+        if (entry is null || entry.IsReadOnly) return;
 
         state.BeginRename(entry.AbsolutePath, DisplayName(entry.AbsolutePath));
     }
 
     void Rename(TreeItem item, string name)
     {
-        if (item.Tag is not AssetEntry entry || string.IsNullOrWhiteSpace(name)) return;
+        if (item.Tag is not AssetEntry { IsReadOnly: false } entry || string.IsNullOrWhiteSpace(name)) return;
 
         if (!entry.IsDirectory && !browserSettings.ShowFileExtensions &&
             string.IsNullOrEmpty(Path.GetExtension(name)))
@@ -372,7 +384,7 @@ sealed class AssetBrowserPanel : IPanel
 
     void Delete(AssetEntry? entry)
     {
-        if (entry is null) return;
+        if (entry is null || entry.IsReadOnly) return;
 
         operations.Delete(entry.AbsolutePath);
     }

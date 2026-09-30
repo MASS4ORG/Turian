@@ -18,16 +18,36 @@ public static class ProjectBricks
         manifest.Save(projectRoot);
     }
 
-    /// <summary>Removes a brick's declaration from the project's manifest.</summary>
+    /// <summary>Removes a brick's declaration and moves its embedded source, if any, to the project's trash.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
-    /// <returns>Whether the manifest declared it.</returns>
+    /// <returns>Whether the project declared or embedded it.</returns>
     public static bool Remove(string projectRoot, string id)
     {
+        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id.");
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        if (!manifest.Dependencies.Remove(id)) return false;
+        var embedded = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
+        var hasEmbedded = File.Exists(Path.Combine(embedded, PackageManifest.FileName));
+        var declared = manifest.Dependencies.Remove(id);
+        if (!declared && !hasEmbedded) return false;
 
-        manifest.Save(projectRoot);
+        string? trash = null;
+        if (hasEmbedded)
+        {
+            trash = Path.Combine(projectRoot, ".Cache", "Trash", Guid.NewGuid().ToString("N"), id);
+            Directory.CreateDirectory(Path.GetDirectoryName(trash)!);
+            Directory.Move(embedded, trash);
+        }
+
+        try
+        {
+            if (declared) manifest.Save(projectRoot);
+        }
+        catch
+        {
+            if (trash is not null) Directory.Move(trash, embedded);
+            throw;
+        }
         return true;
     }
 

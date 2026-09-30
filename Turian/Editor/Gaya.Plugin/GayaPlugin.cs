@@ -149,7 +149,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetTypeCatalog>(),
                 sp.GetRequiredService<AssetPreviewCatalog>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
-                sp.GetRequiredService<AssetFileOperations>())));
+                sp.GetRequiredService<AssetFileOperations>(),
+                sp.GetRequiredService<BricksController>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
