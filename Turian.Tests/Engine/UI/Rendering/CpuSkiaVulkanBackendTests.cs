@@ -37,6 +37,7 @@ public sealed class CpuSkiaVulkanBackendTests : IClassFixture<VulkanFixture>
         Assert.Equal(4u, backend.Texture!.Width);
         Assert.Equal(4u, backend.Texture.Height);
         Assert.Equal(1u, backend.Texture.MipLevels);
+        Assert.Equal(Silk.NET.Vulkan.Format.R8G8B8A8Srgb, backend.Texture.Format);
     }
 
     /// <summary>Subsequent renders re-upload into the same texture instance.</summary>

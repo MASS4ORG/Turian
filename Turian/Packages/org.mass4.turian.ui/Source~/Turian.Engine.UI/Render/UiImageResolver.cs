@@ -6,10 +6,8 @@ namespace Turian.Engine.UI;
 /// reference string for the resolver's lifetime.
 /// </summary>
 /// <remarks>
-/// The source file is preferred (loose projects, the editor, the CLI). When only the imported
-/// artifact is available — a packed game — a raw-image artifact still decodes; a baked
-/// <c>.amtex</c> block does not and yields <c>null</c> until the world-space texture path is wired
-/// through here.
+/// Loose projects prefer the source image. Packed games decode the imported RGBA8 texture's
+/// first mip level without uploading it to the GPU.
 /// </remarks>
 public sealed class UiImageResolver
 {
@@ -95,7 +93,25 @@ public sealed class UiImageResolver
             using var stream = provider.GetAssetStream();
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
-            return SKImage.FromEncodedData(buffer.ToArray());
+            var bytes = buffer.ToArray();
+            if (!TextureBlob.IsTextureBlob(bytes)) return SKImage.FromEncodedData(bytes);
+
+            var blob = TextureBlob.Read(bytes);
+            if (blob.Format is not (Silk.NET.Vulkan.Format.R8G8B8A8Srgb or Silk.NET.Vulkan.Format.R8G8B8A8Unorm)
+                || blob.Levels.Count == 0)
+            {
+                Log.Logger.LogWarning("UI image {AssetId} uses unsupported texture format {Format}", assetId, blob.Format);
+                return null;
+            }
+
+            var info = new SKImageInfo(checked((int)blob.Width), checked((int)blob.Height),
+                SKColorType.Rgba8888, SKAlphaType.Unpremul);
+            var pixels = blob.Levels[0].ToArray();
+            if (pixels.Length != checked(info.Width * info.Height * 4))
+                throw new InvalidDataException("UI texture pixels do not match its dimensions.");
+
+            using var data = SKData.CreateCopy(pixels);
+            return SKImage.FromPixels(info, data, info.Width * 4);
         }
         catch (IOException)
         {

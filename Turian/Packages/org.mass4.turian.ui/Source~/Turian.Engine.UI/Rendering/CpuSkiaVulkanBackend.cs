@@ -63,7 +63,7 @@ public sealed class CpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRenderer
                 (uint)rasterizer.Width,
                 (uint)rasterizer.Height,
                 pixels,
-                isSrgb: false,
+                isSrgb: true,
                 generateMips: false,
                 SamplerAddressMode.ClampToEdge);
         }
