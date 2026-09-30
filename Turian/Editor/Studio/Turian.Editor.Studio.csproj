@@ -50,4 +50,6 @@
                  CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
+    <Import Project="$(SolutionDir)/Turian/Packages/Bricks.targets"/>
+
 </Project>

@@ -49,21 +49,8 @@
         <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
     </ItemGroup>
 
-    <!-- Built-in bricks: published as a packages folder beside the engine assemblies, read from the checkout when run
-         from source (ProjectPackages.BuiltinDirectory). Their sources stay behind; the Precast~ folders are what the
-         solution builds, so the items are listed at publish time rather than at evaluation. -->
-    <Target Name="IncludeBuiltinBricks" BeforeTargets="AssignTargetPaths">
-        <PropertyGroup>
-            <BricksDirectory>$([MSBuild]::EnsureTrailingSlash('$(SolutionDir)'))Turian/Packages/</BricksDirectory>
-        </PropertyGroup>
-        <ItemGroup>
-            <BrickFile Include="$(BricksDirectory)**/*"
-                       Exclude="$(BricksDirectory)**/Source~/**;$(BricksDirectory)**/bin/**;$(BricksDirectory)**/obj/**;$(BricksDirectory)**/.gitignore"/>
-            <None Include="@(BrickFile)" Link="packages/$([MSBuild]::MakeRelative('$(BricksDirectory)', '%(FullPath)'))"
-                  CopyToPublishDirectory="PreserveNewest"/>
-        </ItemGroup>
-    </Target>
-
+    <!-- Where the built-in bricks live when run from a checkout (ProjectPackages.BuiltinDirectory); publishing ships them
+         from Turian/Packages/Bricks.targets. -->
     <ItemGroup>
         <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
     </ItemGroup>

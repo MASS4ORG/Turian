@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed: `turian-cli ui` (use `screenshot` or `playmode` to render a document)
 - Fixed: a meta whose asset type is not installed is left untouched instead of being rewritten with a new id
 - Added: `nuget` field in `package.json`, `Precast~/` prebuilt assemblies, and the `IUiPresenter` contract hosts draw interfaces through
+- Added: `turian-cli brick new|add|remove|list|restore|update|embed|verify|pack` and the `.brick` transport file; `pack --precast` compiles a brick's assemblies into `Precast~` so consumers load them instead of compiling the code
+- Changed: the brick store is `~/.gaya/bricks` (override with `GAYA_BRICKS`); studio-scope bricks ship their plugin assemblies in `Precast~/lib`
+- Added: reusable GitHub workflow `.github/workflows/brick.yml` to verify, pack and release a brick and restore a game's bricks from its lock file
 - Added: `builtin:` package source; new projects install the default built-in bricks
 - Fixed: closing the window with no unsaved work exited through a second close that a veto then undid, freezing the editor
 - Changed: code sytles fixes

@@ -1,0 +1,19 @@
+<Project>
+
+    <!-- Built-in bricks ship as a packages folder beside the engine assemblies (ProjectPackages.BuiltinDirectory). The
+         sources stay behind; the Precast~ folders are what the solution builds, so the files are listed only once the
+         build is done. Imported by the applications that publish. -->
+    <Target Name="IncludeBuiltinBricks" BeforeTargets="ComputeResolvedFilesToPublishList">
+        <PropertyGroup>
+            <BricksDirectory>$([MSBuild]::EnsureTrailingSlash('$(SolutionDir)'))Turian/Packages/</BricksDirectory>
+        </PropertyGroup>
+        <ItemGroup>
+            <BrickFile Include="$(BricksDirectory)**/*"
+                       Exclude="$(BricksDirectory)**/Source~/**;$(BricksDirectory)**/bin/**;$(BricksDirectory)**/obj/**;$(BricksDirectory)**/.gitignore;$(BricksDirectory)*.targets"/>
+            <ResolvedFileToPublish Include="@(BrickFile)"
+                                   RelativePath="packages/$([MSBuild]::MakeRelative('$(BricksDirectory)', '%(FullPath)'))"
+                                   CopyToPublishDirectory="PreserveNewest"/>
+        </ItemGroup>
+    </Target>
+
+</Project>

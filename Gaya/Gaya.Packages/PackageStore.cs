@@ -11,14 +11,15 @@ public sealed class PackageStore(string root)
     /// <summary>The store folder.</summary>
     public string Root { get; } = Path.GetFullPath(root);
 
-    /// <summary>The default store folder: <paramref name="environmentVariable"/> when set, else <c>~/.{app}/packages</c>.</summary>
-    /// <param name="applicationName">The host's folder name under the user's home.</param>
-    /// <param name="environmentVariable">The variable that overrides the location, such as for a CI cache.</param>
+    /// <summary>The variable that moves the store, such as onto a CI cache.</summary>
+    public const string StoreVariable = "GAYA_BRICKS";
+
+    /// <summary>The default store folder: the <see cref="StoreVariable"/> variable when set, else <c>~/.gaya/bricks</c>.</summary>
     /// <returns>The store folder.</returns>
-    public static string DefaultRoot(string applicationName, string environmentVariable) =>
-        Environment.GetEnvironmentVariable(environmentVariable) is { Length: > 0 } configured
+    public static string DefaultRoot() =>
+        Environment.GetEnvironmentVariable(StoreVariable) is { Length: > 0 } configured
             ? configured
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), $".{applicationName}", "packages");
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gaya", "bricks");
 
     /// <summary>The store folder of a package at a git commit.</summary>
     /// <param name="id">The package id.</param>
@@ -92,6 +93,43 @@ public sealed class PackageStore(string root)
         }
 
         return target;
+    }
+
+    /// <summary>
+    /// The store folder holding the package of a <c>.brick</c> file, extracted on first use and named by the file's
+    /// content hash. Store folders are never modified once written.
+    /// </summary>
+    /// <param name="archivePath">The <c>.brick</c> file.</param>
+    /// <param name="reservedCategoryPrefixes">Category prefixes the manifest may use without depending on them.</param>
+    /// <returns>The package folder and the file's integrity string.</returns>
+    /// <exception cref="PackageException">The file is not a valid brick.</exception>
+    public (string Folder, string Integrity) ExtractArchive(string archivePath,
+        IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
+    {
+        var integrity = BrickArchive.ComputeIntegrity(archivePath);
+        var manifest = BrickArchive.ReadManifest(archivePath, reservedCategoryPrefixes);
+        var hex = Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]));
+        var target = PackagePath(manifest.Name, $"sha256-{hex[..16]}");
+        if (Directory.Exists(target)) return (target, integrity);
+
+        var staging = Path.Combine(Root, ".staging", Guid.NewGuid().ToString("N"));
+        try
+        {
+            BrickArchive.Extract(archivePath, staging);
+            MakeReadOnly(staging);
+            Directory.CreateDirectory(Root);
+            Directory.Move(staging, target);
+        }
+        catch (IOException) when (Directory.Exists(target))
+        {
+            // Another process extracted the same file first; its copy is identical.
+        }
+        finally
+        {
+            if (Directory.Exists(staging)) DeleteReadOnly(staging);
+        }
+
+        return (target, integrity);
     }
 
     /// <summary>

@@ -14,6 +14,9 @@ public enum PackageOrigin
 
     /// <summary>Shipped with the host and versioned with it.</summary>
     Builtin,
+
+    /// <summary>A packed <c>.brick</c> file, extracted into the store.</summary>
+    Archive,
 }
 
 /// <summary>One package of a resolved project.</summary>
@@ -23,7 +26,7 @@ public enum PackageOrigin
 /// <param name="Origin">How it reached the project.</param>
 /// <param name="Source">The dependency value it came from, as written.</param>
 /// <param name="Commit">The git commit, for a git source.</param>
-/// <param name="Integrity">The store folder's content hash, for a git source.</param>
+/// <param name="Integrity">The content hash: of the store folder for a git source, of the file for a <c>.brick</c>.</param>
 /// <param name="Depth">1 when the project installs it itself, deeper when only another package needs it.</param>
 /// <param name="IsOverridden">Whether the per-user manifest override chose its source.</param>
 public sealed record ResolvedPackage(
@@ -41,7 +44,7 @@ public sealed record ResolvedPackage(
     public SemanticVersion Version => Manifest.Version!;
 
     /// <summary>Whether the package must not be edited: store and built-in folders are shared by every project.</summary>
-    public bool IsReadOnly => Origin is PackageOrigin.Git or PackageOrigin.Builtin;
+    public bool IsReadOnly => Origin is PackageOrigin.Git or PackageOrigin.Builtin or PackageOrigin.Archive;
 }
 
 /// <summary>The packages a project installs, each after the packages it depends on, and the lock that pins them.</summary>
@@ -167,6 +170,14 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                 if (!Directory.Exists(file.Path)) throw new PackageException($"{id}: folder {file.Path} does not exist.");
                 root = file.Path;
                 origin = spec == "embedded" ? PackageOrigin.Embedded : PackageOrigin.File;
+                break;
+
+            case ArchiveSource archive:
+                if (!File.Exists(archive.Path)) throw new PackageException($"{id}: file {archive.Path} does not exist.");
+                (root, integrity) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
+                if (options.Locked && existingLock?.Dependencies.GetValueOrDefault(id) is { Integrity: { } pinned } && pinned != integrity)
+                    throw new PackageException($"{id}: {archive.Path} does not match the integrity in {LockFile.FileName}.");
+                origin = PackageOrigin.Archive;
                 break;
 
             case BuiltinSource builtin:

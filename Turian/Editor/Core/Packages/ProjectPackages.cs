@@ -11,9 +11,6 @@ public static class ProjectPackages
     /// <summary>The host name packages state engine ranges and categories for.</summary>
     public const string HostName = "turian";
 
-    /// <summary>The variable that moves the package store, such as onto a CI cache.</summary>
-    public const string StoreVariable = "TURIAN_PACKAGES";
-
     /// <summary>
     /// The engine's built-in packages: the <c>packages</c> folder beside a published engine's assemblies, else the
     /// checkout's <c>Turian/Packages</c> it was built from.
@@ -51,13 +48,34 @@ public static class ProjectPackages
             if (Cache.TryGetValue(projectRoot, out var cached) && cached.Stamp == stamp) return cached.Resolution;
         }
 
-        var resolver = new PackageResolver(new PackageStore(PackageStore.DefaultRoot(HostName, StoreVariable)),
+        return ResolveUncached(projectRoot, locked, new HashSet<string>());
+    }
+
+    /// <summary>
+    /// Resolves again, fetching newer commits of git sources instead of staying at the locked ones, and writes the
+    /// lock file.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="ids">The packages to update; all of them when null.</param>
+    /// <returns>The resolved packages, dependencies first.</returns>
+    /// <exception cref="PackageException">A package cannot be fetched or does not fit.</exception>
+    public static PackageResolution Update(string projectRoot, IReadOnlySet<string>? ids)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
+        return ResolveUncached(Path.GetFullPath(projectRoot), locked: false, ids);
+    }
+
+    static PackageResolution ResolveUncached(string projectRoot, bool locked, IReadOnlySet<string>? update)
+    {
+
+        var resolver = new PackageResolver(new PackageStore(PackageStore.DefaultRoot()),
             new PackageResolverOptions
             {
                 Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
                 BuiltinDirectory = BuiltinDirectory,
                 ReservedCategoryPrefixes = ["gaya", HostName],
                 Locked = locked,
+                Update = update,
             });
         var resolution = resolver.ResolveAsync(projectRoot).GetAwaiter().GetResult();
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);

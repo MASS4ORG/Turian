@@ -106,24 +106,40 @@ public sealed class AssemblyGraph
 
         var root = string.IsNullOrWhiteSpace(assetsDirectory) ? string.Empty : Path.GetFullPath(assetsDirectory);
         var (found, referenceFiles) = root.Length > 0 && Directory.Exists(root) ? ReadSources(root) : ([], []);
+        var names = new Dictionary<Guid, string>();
+        var precastNames = new HashSet<string>(StringComparer.Ordinal);
+        var sourcePackages = new List<ResolvedPackage>();
         foreach (var package in packages)
         {
             var (definitions, references) = ReadSources(package.RootPath);
             // An editor-only package ships nothing, whatever its definitions say.
             if (package.Manifest.EditorOnly) definitions.ForEach(static d => d.Definition.EditorOnly = true);
+
+            // A brick with a prebuilt payload is not compiled: its assemblies are referenced as they are. Its
+            // definitions still count, so an assembly of the project can name one of them.
+            if (BrickAssemblies.IsPrecast(package))
+            {
+                foreach (var (definition, path, id) in definitions)
+                {
+                    var name = AssemblyName(definition, path);
+                    names[id] = name;
+                    precastNames.Add(name);
+                }
+
+                continue;
+            }
+
+            sourcePackages.Add(package);
             found.AddRange(definitions);
             referenceFiles.AddRange(references);
         }
 
-        var names = new Dictionary<Guid, string>();
         var nodes = new Dictionary<string, (AssemblyDefinition Definition, string Path)>(StringComparer.Ordinal);
         var directories = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var (definition, path, id) in found)
         {
-            var name = string.IsNullOrWhiteSpace(definition.Name)
-                ? Path.GetFileNameWithoutExtension(path)
-                : definition.Name.Trim();
+            var name = AssemblyName(definition, path);
 
             if (string.Equals(name, defaultName, StringComparison.OrdinalIgnoreCase))
                 throw Conflict($"Assembly definition {path} uses the default assembly name '{defaultName}'.");
@@ -147,7 +163,7 @@ public sealed class AssemblyGraph
 
         var assemblies = nodes.ToDictionary(
             static pair => pair.Key,
-            pair => ToAssembly(pair.Key, pair.Value.Definition, pair.Value.Path, names,
+            pair => ToAssembly(pair.Key, pair.Value.Definition, pair.Value.Path, names, precastNames,
                 extraDirectories.GetValueOrDefault(pair.Key) ?? []),
             StringComparer.Ordinal);
 
@@ -174,9 +190,9 @@ public sealed class AssemblyGraph
             NoEngineReferences: false);
 
         var graph = new AssemblyGraph(defaultAssembly, ordered,
-            [.. defaultAssembly.Directories, .. packages.Select(static p => Path.GetFullPath(p.RootPath))]);
+            [.. defaultAssembly.Directories, .. sourcePackages.Select(static p => Path.GetFullPath(p.RootPath))]);
 
-        foreach (var package in packages)
+        foreach (var package in sourcePackages)
         {
             if (graph.Scripts(package.RootPath).FirstOrDefault(script => graph.AssemblyFor(script).IsDefault) is { } stray)
                 throw Conflict($"Script {stray} in package {package.Id} is not under an assembly definition.");
@@ -270,11 +286,15 @@ public sealed class AssemblyGraph
             throw Conflict($"Folder {directory} holds two assembly definitions or references: {directories[directory]} and {path}.");
     }
 
+    static string AssemblyName(AssemblyDefinition definition, string path) =>
+        string.IsNullOrWhiteSpace(definition.Name) ? Path.GetFileNameWithoutExtension(path) : definition.Name.Trim();
+
     static ProjectAssembly ToAssembly(
         string name,
         AssemblyDefinition definition,
         string path,
         Dictionary<Guid, string> names,
+        HashSet<string> precastNames,
         IEnumerable<string> extraDirectories)
     {
         var references = new List<string>();
@@ -284,7 +304,9 @@ public sealed class AssemblyGraph
                 throw Conflict($"Assembly '{name}' references {reference.AssetId}, which is not an assembly definition.");
             if (referenced == name)
                 throw Conflict($"Assembly '{name}' references itself.");
-            if (!references.Contains(referenced)) references.Add(referenced);
+
+            // A prebuilt assembly is referenced as a file by every project, not as a project of the graph.
+            if (!precastNames.Contains(referenced) && !references.Contains(referenced)) references.Add(referenced);
         }
 
         return new ProjectAssembly(

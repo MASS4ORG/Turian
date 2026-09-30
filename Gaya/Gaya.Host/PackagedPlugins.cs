@@ -5,7 +5,7 @@ namespace Gaya.Host;
 /// <summary>
 /// Plugins installed into the application itself rather than into a project: the packages of the per-user
 /// studio manifest (<c>~/.gaya/studio/Packages/manifest.json</c>) whose scopes include
-/// <see cref="PackageScope.Studio"/>. Each ships its compiled plugin assemblies in a <c>lib</c> folder.
+/// <see cref="PackageScope.Studio"/>. Each ships its compiled plugin assemblies in its <c>Precast~/lib</c> folder.
 /// </summary>
 public static class PackagedPlugins
 {
@@ -13,7 +13,7 @@ public static class PackagedPlugins
     public static string StudioRoot => Path.Combine(UserConfigPath.Directory, "studio");
 
     /// <summary>The folder, inside a package, holding its compiled plugin assemblies.</summary>
-    public const string LibraryDirectoryName = "lib";
+    public const string LibraryDirectoryName = "Precast~/lib";
 
     /// <summary>
     /// Resolves the studio packages and loads their plugin assemblies. A package that fails to resolve or load is
@@ -34,7 +34,7 @@ public static class PackagedPlugins
         PackageResolution resolution;
         try
         {
-            var store = new PackageStore(PackageStore.DefaultRoot("gaya", "GAYA_PACKAGES"));
+            var store = new PackageStore(PackageStore.DefaultRoot());
             resolution = new PackageResolver(store, new PackageResolverOptions
             {
                 Hosts = hosts,

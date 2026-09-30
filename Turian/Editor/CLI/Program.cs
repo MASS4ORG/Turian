@@ -32,7 +32,8 @@ public static partial class Program
             SceneCommand(projectArg),
             ScreenshotCommand(projectArg),
             PickCommand(projectArg),
-            OapCommand(projectArg)
+            OapCommand(projectArg),
+            BrickCommand()
         };
 
         return await root.Parse(args).InvokeAsync();

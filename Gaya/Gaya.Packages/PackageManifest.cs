@@ -21,6 +21,22 @@ public enum PackageScope
 public sealed record PackageSample(string DisplayName, string Path, string? Description = null);
 
 /// <summary>
+/// What a packed brick's prebuilt payload (its <c>Precast~</c> folder) was built with, written into the
+/// <c>package.json</c> inside the <c>.brick</c> file.
+/// </summary>
+public sealed class PackagePrecast
+{
+    /// <summary>Host → the exact host version the assemblies were compiled against; consumers on another major or minor version ignore the payload.</summary>
+    public Dictionary<string, SemanticVersion> BuiltWith { get; set; } = [];
+
+    /// <summary>Names of the assemblies games run with (<c>Precast~/lib</c>).</summary>
+    public List<string> Assemblies { get; set; } = [];
+
+    /// <summary>Names of the assemblies only the editor loads (<c>Precast~/editor</c>).</summary>
+    public List<string> EditorAssemblies { get; set; } = [];
+}
+
+/// <summary>
 /// A package's <c>package.json</c>: its identity, what it depends on, and how hosts treat it. Field names follow
 /// Unity's package manifest where the meaning is the same.
 /// </summary>
@@ -83,6 +99,15 @@ public sealed class PackageManifest
     /// </summary>
     public List<string> Categories { get; set; } = [];
 
+    /// <summary>
+    /// For an embedded fork: the version it was copied from, <c>id@version</c> plus the source's commit or hash in
+    /// parentheses when it has one.
+    /// </summary>
+    public string? Upstream { get; set; }
+
+    /// <summary>Set in a packed brick whose <c>Precast~</c> payload was built; absent in a source folder.</summary>
+    public PackagePrecast? Precast { get; set; }
+
     /// <summary>Samples the user can copy into the project.</summary>
     public List<PackageSample> Samples { get; set; } = [];
 
@@ -100,10 +125,21 @@ public sealed class PackageManifest
         var path = Path.Combine(packageRoot, FileName);
         if (!File.Exists(path)) throw new PackageException($"{packageRoot} has no {FileName}.");
 
+        return Parse(File.ReadAllText(path), path, reservedCategoryPrefixes);
+    }
+
+    /// <summary>Reads and checks manifest text.</summary>
+    /// <param name="json">The <c>package.json</c> text.</param>
+    /// <param name="path">Where the text came from, for error messages.</param>
+    /// <param name="reservedCategoryPrefixes">Category prefixes any package may use, such as a host's name.</param>
+    /// <returns>The manifest.</returns>
+    /// <exception cref="PackageException">The text is invalid.</exception>
+    public static PackageManifest Parse(string json, string path, IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
+    {
         PackageManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<PackageManifest>(File.ReadAllText(path), PackageJson.Options);
+            manifest = JsonSerializer.Deserialize<PackageManifest>(json, PackageJson.Options);
         }
         catch (JsonException ex)
         {
@@ -117,8 +153,22 @@ public sealed class PackageManifest
 
     /// <summary>Writes the manifest into <paramref name="packageRoot"/>.</summary>
     /// <param name="packageRoot">The package folder.</param>
-    public void Save(string packageRoot) =>
-        File.WriteAllText(Path.Combine(packageRoot, FileName), JsonSerializer.Serialize(this, PackageJson.Options));
+    public void Save(string packageRoot) => File.WriteAllText(Path.Combine(packageRoot, FileName), ToJson());
+
+    /// <summary>The manifest's text. Empty lists and false flags are the defaults, so they are left out to keep a hand-edited file readable.</summary>
+    /// <returns>The JSON.</returns>
+    public string ToJson()
+    {
+        var node = JsonSerializer.SerializeToNode(this, PackageJson.Options)!.AsObject();
+        foreach (var name in node.Where(static p => IsDefault(p.Value)).Select(static p => p.Key).ToList())
+            node.Remove(name);
+
+        return node.ToJsonString(PackageJson.Options);
+    }
+
+    static bool IsDefault(JsonNode? value) =>
+        value is JsonArray { Count: 0 } or JsonObject { Count: 0 }
+        || value is JsonValue json && json.TryGetValue<bool>(out var flag) && !flag;
 
     void Validate(string path, IReadOnlyCollection<string> reservedCategoryPrefixes)
     {

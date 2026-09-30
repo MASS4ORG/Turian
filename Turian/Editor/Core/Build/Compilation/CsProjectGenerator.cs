@@ -102,7 +102,7 @@ public static class CsProjectGenerator
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot.AddProjectInfo(settings, executable: false).AddTurianDir();
-        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings);
+        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
         projectRoot
             .AddNugetPackageReferences(settings)
             .AddAssemblyReferences(settings, assembly.References);
@@ -379,16 +379,19 @@ public static class CsProjectGenerator
 
         /// <summary>
         /// References the prebuilt assemblies of the installed bricks and the NuGet packages they need. A game
-        /// leaves out the editor-only bricks.
+        /// leaves out the editor-only bricks; only an editor-only assembly sees their editor assemblies.
         /// </summary>
-        private ProjectRootElement AddBrickReferences(IBuildAppSettings settings, bool shipping = false)
+        private ProjectRootElement AddBrickReferences(IBuildAppSettings settings, bool shipping = false, bool editor = false)
         {
             var bricks = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
                 .Where(brick => !brick.Manifest.CompileTimeOnly && !(shipping && brick.Manifest.EditorOnly))
                 .ToList();
 
             var references = projectRoot.AddItemGroup();
-            foreach (var path in bricks.SelectMany(BrickAssemblies.RuntimeAssemblies))
+            // An editor-only assembly may also use what the bricks' editor assemblies offer.
+            var paths = bricks.SelectMany(BrickAssemblies.RuntimeAssemblies)
+                .Concat(editor ? bricks.SelectMany(BrickAssemblies.EditorAssemblies) : []);
+            foreach (var path in paths)
                 references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
 
             var declared = settings.PackageReferences.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);

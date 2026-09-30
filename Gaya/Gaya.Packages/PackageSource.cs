@@ -4,7 +4,7 @@ namespace Gaya.Packages;
 public abstract record PackageSource
 {
     /// <summary>
-    /// Reads a dependency value: <c>builtin:id</c>, <c>file:path</c>, <c>git+url[#ref]</c> (a <c>./</c> or <c>../</c>
+    /// Reads a dependency value: <c>builtin:id</c>, <c>file:path</c> (a folder, or a <c>.brick</c> file), <c>git+url[#ref]</c> (a <c>./</c> or <c>../</c>
     /// url is a local repository relative to the declaring file), or else a version range to be satisfied by a source declared
     /// elsewhere.
     /// </summary>
@@ -22,7 +22,12 @@ public abstract record PackageSource
                 : throw new PackageException($"'{spec}' names no built-in package.");
 
         if (spec.StartsWith("file:", StringComparison.Ordinal))
-            return new FileSource(Path.GetFullPath(spec["file:".Length..], baseDirectory));
+        {
+            var path = Path.GetFullPath(spec["file:".Length..], baseDirectory);
+            return path.EndsWith(BrickArchive.Extension, StringComparison.OrdinalIgnoreCase)
+                ? new ArchiveSource(path)
+                : new FileSource(path);
+        }
 
         if (spec.StartsWith("git+", StringComparison.Ordinal))
         {
@@ -54,6 +59,14 @@ public sealed record BuiltinSource(string Id) : PackageSource
 /// <summary>A package folder on disk, used in place and never copied to the store.</summary>
 /// <param name="Path">The absolute package folder.</param>
 public sealed record FileSource(string Path) : PackageSource
+{
+    /// <inheritdoc/>
+    public override string ToString() => $"file:{Path}";
+}
+
+/// <summary>A packed <c>.brick</c> file, extracted into the store and pinned by its content hash.</summary>
+/// <param name="Path">The absolute path of the <c>.brick</c> file.</param>
+public sealed record ArchiveSource(string Path) : PackageSource
 {
     /// <inheritdoc/>
     public override string ToString() => $"file:{Path}";
