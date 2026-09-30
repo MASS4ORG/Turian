@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>Stubs checked against the real brick, and embedded forks compared with and merged into new releases.</summary>
@@ -142,8 +140,8 @@ public sealed class BrickTeamFlowTests : IDisposable
         Meta(Path.Combine(folder, "Runtime", "Level.bin"));
         File.WriteAllText(Path.Combine(folder, "Runtime", "Notes.txt"), "line one\nline two\nline three\n");
         Meta(Path.Combine(folder, "Runtime", "Notes.txt"));
-        using (var bitmap = new SkiaSharp.SKBitmap(32, 32))
-        using (var png = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100))
+        using (var bitmap = new SKBitmap(32, 32))
+        using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             File.WriteAllBytes(Path.Combine(folder, "Runtime", "Icon.png"), png.ToArray());
         Meta(Path.Combine(folder, "Runtime", "Icon.png"), "a3000000-0000-4000-8000-00000000000b");
         var manifest = PackageManifest.Load(folder, ["turian"]);

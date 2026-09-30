@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>Copying a brick's assets into the project: new ids, detached by default, optionally remapped.</summary>

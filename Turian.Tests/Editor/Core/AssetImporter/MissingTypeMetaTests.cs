@@ -50,7 +50,7 @@ public sealed class MissingTypeMetaTests : IDisposable
         var settings = new SettingsService();
         using var importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings);
 
-        new Gaya.Packages.ProjectManifest { Dependencies = { ["org.mass4.turian.ui"] = "builtin:org.mass4.turian.ui" } }
+        new ProjectManifest { Dependencies = { ["org.mass4.turian.ui"] = "builtin:org.mass4.turian.ui" } }
             .Save(project);
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
         File.WriteAllText(Path.Combine(project, "Assets", "hud.ui"), "<ui/>");

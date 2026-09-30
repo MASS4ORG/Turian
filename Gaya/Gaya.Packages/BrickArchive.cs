@@ -124,7 +124,7 @@ public static class BrickArchive
 
     static IEnumerable<(string Relative, string File)> Files(string packageRoot) =>
         Directory.EnumerateFiles(packageRoot, "*", SearchOption.AllDirectories)
-            .Select(file => (Relative: System.IO.Path.GetRelativePath(packageRoot, file).Replace('\\', '/'), File: file))
+            .Select(file => (Relative: Path.GetRelativePath(packageRoot, file).Replace('\\', '/'), File: file))
             .Where(static f => !IsSkipped(f.Relative))
             .OrderBy(static f => f.Relative, StringComparer.Ordinal);
 

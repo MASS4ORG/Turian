@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Editor.Core;
 
 /// <summary>One asset a brick exposes.</summary>

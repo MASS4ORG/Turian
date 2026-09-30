@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>What a Turian project does with bricks: create, verify, pack, install.</summary>

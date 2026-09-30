@@ -87,7 +87,6 @@ public static class UnityYaml
             }
             else if (line.StartsWith('%'))
             {
-                continue;
             }
             else
             {

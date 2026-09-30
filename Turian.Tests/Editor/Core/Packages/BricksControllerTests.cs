@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>The state and actions behind the Bricks panel.</summary>

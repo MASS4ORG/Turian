@@ -3,9 +3,9 @@ namespace Turian.Tests;
 /// <summary>Ed25519 verification and OpenSSH signatures, against independently produced vectors.</summary>
 public sealed class SignatureTests
 {
-    const string FixtureKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETjciFivC4Q7z6o7KhiydqNS1Z5D6+ZZFbGUxQgL7ur test@example.com";
-    const string FixtureNamespace = "brick-test@example";
-    const string FixtureSignature = """
+    const string fixtureKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETjciFivC4Q7z6o7KhiydqNS1Z5D6+ZZFbGUxQgL7ur test@example.com";
+    const string fixtureNamespace = "brick-test@example";
+    const string fixtureSignature = """
         -----BEGIN SSH SIGNATURE-----
         U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgRONyIWK8LhDvPqjsqGLJ2o1LVn
         kPr5lkVsZTFCAvu6sAAAASYnJpY2stdGVzdEBleGFtcGxlAAAAAAAAAAZzaGE1MTIAAABT
@@ -45,8 +45,8 @@ public sealed class SignatureTests
         Assert.False(Ed25519.Verify(key, message, signature[..63]));
 
         // S + L is the same scalar mod L, but a signature must carry the reduced one.
-        var s = new System.Numerics.BigInteger(signature.AsSpan(32), isUnsigned: true);
-        var l = System.Numerics.BigInteger.Pow(2, 252) + System.Numerics.BigInteger.Parse("27742317777372353535851937790883648493", CultureInfo.InvariantCulture);
+        var s = new BigInteger(signature.AsSpan(32), isUnsigned: true);
+        var l = BigInteger.Pow(2, 252) + BigInteger.Parse("27742317777372353535851937790883648493", CultureInfo.InvariantCulture);
         var malleable = signature.ToArray();
         (s + l).ToByteArray(isUnsigned: true).CopyTo(malleable, 32);
         Assert.False(Ed25519.Verify(key, message, malleable));
@@ -58,19 +58,19 @@ public sealed class SignatureTests
     {
         var message = "hello bricks\n"u8.ToArray();
 
-        Assert.True(SshSignature.Verify(FixtureKey, FixtureNamespace, message, FixtureSignature));
-        Assert.False(SshSignature.Verify(FixtureKey, "other-namespace", message, FixtureSignature));
-        Assert.False(SshSignature.Verify(FixtureKey, FixtureNamespace, "hello bricks"u8.ToArray(), FixtureSignature));
-        Assert.False(SshSignature.Verify(FixtureKey, FixtureNamespace, message, "not a signature"));
-        Assert.False(SshSignature.Verify("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5yk49hAQe0NmpuXPwbWVE1J7LUf+v2w6beGcvpUNpK other", FixtureNamespace, message, FixtureSignature));
+        Assert.True(SshSignature.Verify(fixtureKey, fixtureNamespace, message, fixtureSignature));
+        Assert.False(SshSignature.Verify(fixtureKey, "other-namespace", message, fixtureSignature));
+        Assert.False(SshSignature.Verify(fixtureKey, fixtureNamespace, "hello bricks"u8.ToArray(), fixtureSignature));
+        Assert.False(SshSignature.Verify(fixtureKey, fixtureNamespace, message, "not a signature"));
+        Assert.False(SshSignature.Verify("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC5yk49hAQe0NmpuXPwbWVE1J7LUf+v2w6beGcvpUNpK other", fixtureNamespace, message, fixtureSignature));
     }
 
     /// <summary>Keys parse from public key lines and fingerprint the way <c>ssh-keygen -l</c> does.</summary>
     [Fact]
     public void KeysParseAndFingerprint()
     {
-        Assert.Equal(32, SshSignature.ParsePublicKey(FixtureKey).Length);
-        Assert.Equal("SHA256:jM0P76DVYigT/G0MFh1c0t38h967d7tNnGXkF+pKOkc", SshSignature.Fingerprint(FixtureKey));
+        Assert.Equal(32, SshSignature.ParsePublicKey(fixtureKey).Length);
+        Assert.Equal("SHA256:jM0P76DVYigT/G0MFh1c0t38h967d7tNnGXkF+pKOkc", SshSignature.Fingerprint(fixtureKey));
         Assert.Throws<PackageException>(() => SshSignature.ParsePublicKey("ssh-rsa AAAAB3NzaC1yc2E user"));
         Assert.Throws<PackageException>(() => SshSignature.ParsePublicKey("nonsense"));
     }

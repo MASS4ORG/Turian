@@ -6,7 +6,7 @@ public sealed class DataAssetVariantTests : IDisposable
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-variants-{Guid.NewGuid():N}");
     readonly Guid baseId = Guid.NewGuid();
     readonly Guid variantId = Guid.NewGuid();
-    const string BaseJson = """{ "__TypeId": "a3000002-0000-4000-8000-000000000006", "Name": "Base", "Stats": { "Health": 10, "Mana": 5 }, "Tags": ["a", "b"] }""";
+    const string baseJson = """{ "__TypeId": "a3000002-0000-4000-8000-000000000006", "Name": "Base", "Stats": { "Health": 10, "Mana": 5 }, "Tags": ["a", "b"] }""";
 
     /// <summary>Creates the scratch folder.</summary>
     public DataAssetVariantTests() => Directory.CreateDirectory(root);
@@ -23,7 +23,7 @@ public sealed class DataAssetVariantTests : IDisposable
               "Overrides": { "Name": "Boss", "Stats": { "Health": 99 }, "Tags": ["z"], "Mana": null } } }
             """;
 
-        var flat = JsonNode.Parse(DataAssetVariants.Flatten(variant, id => id == baseId ? BaseJson : null))!;
+        var flat = JsonNode.Parse(DataAssetVariants.Flatten(variant, id => id == baseId ? baseJson : null))!;
 
         Assert.Equal("Boss", (string)flat["Name"]!);
         Assert.Equal(99, (int)flat["Stats"]!["Health"]!);
@@ -38,13 +38,13 @@ public sealed class DataAssetVariantTests : IDisposable
     [Fact]
     public void ChainsResolveAndPlainFilesPassThrough()
     {
-        Assert.Equal(BaseJson, DataAssetVariants.Flatten(BaseJson, _ => throw new InvalidOperationException()));
+        Assert.Equal(baseJson, DataAssetVariants.Flatten(baseJson, _ => throw new InvalidOperationException()));
 
         var middle = Guid.NewGuid();
         var middleJson = $$"""{ "__Variant": { "Base": "{{baseId}}", "Overrides": { "Name": "Middle", "Stats": { "Mana": 50 } } } }""";
         var top = $$"""{ "__Variant": { "Base": "{{middle}}", "Overrides": { "Stats": { "Health": 1 } } } }""";
 
-        var flat = JsonNode.Parse(DataAssetVariants.Flatten(top, id => id == baseId ? BaseJson : id == middle ? middleJson : null))!;
+        var flat = JsonNode.Parse(DataAssetVariants.Flatten(top, id => id == baseId ? baseJson : id == middle ? middleJson : null))!;
 
         Assert.Equal("Middle", (string)flat["Name"]!);
         Assert.Equal(1, (int)flat["Stats"]!["Health"]!);
@@ -68,7 +68,7 @@ public sealed class DataAssetVariantTests : IDisposable
     {
         var baseFile = Path.Combine(root, "Assets", "Hero.dataasset");
         Directory.CreateDirectory(Path.GetDirectoryName(baseFile)!);
-        File.WriteAllText(baseFile, BaseJson);
+        File.WriteAllText(baseFile, baseJson);
         File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "Assets/Hero.dataasset", "Id": "{{baseId}}" }""");
 
         var (path, id) = DataAssetVariantFactory.Create(root, baseFile, "Assets/Variants", "Boss");

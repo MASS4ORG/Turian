@@ -8,10 +8,10 @@ namespace Gaya.Packages;
 /// </summary>
 public static class SshSignature
 {
-    const string Algorithm = "ssh-ed25519";
-    const string Magic = "SSHSIG";
-    const string ArmorBegin = "-----BEGIN SSH SIGNATURE-----";
-    const string ArmorEnd = "-----END SSH SIGNATURE-----";
+    const string algorithm = "ssh-ed25519";
+    const string magic = "SSHSIG";
+    const string armorBegin = "-----BEGIN SSH SIGNATURE-----";
+    const string armorEnd = "-----END SSH SIGNATURE-----";
 
     /// <summary>The 32-byte key in an OpenSSH public key line (<c>ssh-ed25519 AAAA… comment</c>).</summary>
     /// <param name="line">The public key line.</param>
@@ -22,10 +22,10 @@ public static class SshSignature
         var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         try
         {
-            if (parts.Length >= 2 && parts[0] == Algorithm)
+            if (parts is [algorithm, _, ..])
             {
                 var reader = new Reader(Convert.FromBase64String(parts[1]));
-                if (reader.ReadString() is var algorithm && Encoding.ASCII.GetString(algorithm) == Algorithm
+                if (reader.ReadString() is var algorithm && Encoding.ASCII.GetString(algorithm) == SshSignature.algorithm
                     && reader.ReadString() is { Length: Ed25519.PublicKeyLength } key)
                     return key;
             }
@@ -44,7 +44,7 @@ public static class SshSignature
     public static string Fingerprint(string publicKeyLine)
     {
         var key = ParsePublicKey(publicKeyLine);
-        var blob = Write(Encoding.ASCII.GetBytes(Algorithm), key);
+        var blob = Write(Encoding.ASCII.GetBytes(algorithm), key);
         return $"SHA256:{Convert.ToBase64String(SHA256.HashData(blob)).TrimEnd('=')}";
     }
 
@@ -60,10 +60,10 @@ public static class SshSignature
         try
         {
             var reader = new Reader(Decode(armoredSignature));
-            if (Encoding.ASCII.GetString(reader.ReadBytes(Magic.Length)) != Magic || reader.ReadUInt32() != 1) return false;
+            if (Encoding.ASCII.GetString(reader.ReadBytes(magic.Length)) != magic || reader.ReadUInt32() != 1) return false;
 
             var signedBy = new Reader(reader.ReadString());
-            if (Encoding.ASCII.GetString(signedBy.ReadString()) != Algorithm || !signedBy.ReadString().AsSpan().SequenceEqual(key)) return false;
+            if (Encoding.ASCII.GetString(signedBy.ReadString()) != algorithm || !signedBy.ReadString().AsSpan().SequenceEqual(key)) return false;
             if (Encoding.UTF8.GetString(reader.ReadString()) != @namespace) return false;
 
             var reserved = reader.ReadString();
@@ -76,10 +76,10 @@ public static class SshSignature
             };
 
             var signature = new Reader(reader.ReadString());
-            if (hashed is null || Encoding.ASCII.GetString(signature.ReadString()) != Algorithm) return false;
+            if (hashed is null || Encoding.ASCII.GetString(signature.ReadString()) != algorithm) return false;
 
             var raw = signature.ReadString();
-            var signedData = Concatenate(Encoding.ASCII.GetBytes(Magic), Write(Encoding.UTF8.GetBytes(@namespace)),
+            var signedData = Concatenate(Encoding.ASCII.GetBytes(magic), Write(Encoding.UTF8.GetBytes(@namespace)),
                 Write(reserved), Write(Encoding.ASCII.GetBytes(hashName)), Write(hashed));
             return Ed25519.Verify(key, signedData, raw);
         }
@@ -92,7 +92,7 @@ public static class SshSignature
     static byte[] Decode(string armored)
     {
         var lines = armored.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Where(static l => l is not (ArmorBegin or ArmorEnd));
+            .Where(static l => l is not (armorBegin or armorEnd));
         return Convert.FromBase64String(string.Concat(lines));
     }
 

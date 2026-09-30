@@ -196,7 +196,8 @@ public sealed class PackageStore(string root)
         // Fail rather than wait on a credential prompt nobody can answer.
         startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
-        using var process = new Process { StartInfo = startInfo };
+        using var process = new Process();
+        process.StartInfo = startInfo;
         try
         {
             process.Start();

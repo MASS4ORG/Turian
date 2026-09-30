@@ -6,11 +6,11 @@ namespace Turian.Tests;
 /// <summary>Reading Unity's YAML and importing a Unity package.</summary>
 public sealed class UnityImportTests : IDisposable
 {
-    const string TextureGuid = "0123456789abcdef0123456789abcdef";
-    const string ModelGuid = "11111111111111111111111111111111";
-    const string MaterialGuid = "22222222222222222222222222222222";
-    const string PrefabGuid = "33333333333333333333333333333333";
-    const string ScriptGuid = "44444444444444444444444444444444";
+    const string textureGuid = "0123456789abcdef0123456789abcdef";
+    const string modelGuid = "11111111111111111111111111111111";
+    const string materialGuid = "22222222222222222222222222222222";
+    const string prefabGuid = "33333333333333333333333333333333";
+    const string scriptGuid = "44444444444444444444444444444444";
 
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-unity-import-{Guid.NewGuid():N}");
 
@@ -66,7 +66,7 @@ public sealed class UnityImportTests : IDisposable
         var package = BuildPackage();
         var brick = Path.Combine(root, "user.you.crates");
         Directory.CreateDirectory(brick);
-        new Gaya.Packages.PackageManifest { Name = "user.you.crates", Version = Gaya.Packages.SemanticVersion.Parse("0.1.0") }.Save(brick);
+        new PackageManifest { Name = "user.you.crates", Version = SemanticVersion.Parse("0.1.0") }.Save(brick);
 
         var report = UnityPackageImporter.Import(package, new UnityImportTarget(Path.Combine(brick, "Runtime"), brick));
 
@@ -77,21 +77,21 @@ public sealed class UnityImportTests : IDisposable
         Assert.Empty(BrickVerifier.Verify(brick));
 
         var textureMeta = JsonNode.Parse(File.ReadAllText(Path.Combine(brick, "Runtime", "Art", "Crate.png.meta")))!;
-        Assert.Equal(Guid.Parse(TextureGuid).ToString(), (string)textureMeta["Id"]!);
+        Assert.Equal(Guid.Parse(textureGuid).ToString(), (string)textureMeta["Id"]!);
         Assert.Equal("Runtime/Art/Crate.png", (string)textureMeta["RelativePath"]!);
         Assert.False((bool)textureMeta["IsSrgb"]!);
         Assert.False((bool)textureMeta["GenerateMips"]!);
         Assert.Equal(512, (int)textureMeta["ImportSettings"]!["MaxResolution"]!);
         Assert.Equal("crates", (string)textureMeta["Labels"]![0]!);
         Assert.True(File.Exists(Path.Combine(brick, "Runtime", "Models", "crate.obj")));
-        Assert.Equal(Guid.Parse(ModelGuid).ToString(), (string)JsonNode.Parse(File.ReadAllText(Path.Combine(brick, "Runtime", "Models", "crate.obj.meta")))!["Id"]!);
+        Assert.Equal(Guid.Parse(modelGuid).ToString(), (string)JsonNode.Parse(File.ReadAllText(Path.Combine(brick, "Runtime", "Models", "crate.obj.meta")))!["Id"]!);
 
         var material = Serializer.Load<MaterialAsset>(Path.Combine(brick, "Runtime", "Mats", "Wood.material"))!;
         Assert.Equal(new Vector4(1f, 0.5f, 0f, 1f), material.BaseColorFactor);
         Assert.Equal(0.25f, material.MetallicFactor);
         Assert.Equal(0.7f, material.RoughnessFactor, 3);
-        Assert.Equal(Guid.Parse(TextureGuid), material.BaseColorTexture!.AssetId);
-        Assert.Equal(Guid.Parse(MaterialGuid), material.Id);
+        Assert.Equal(Guid.Parse(textureGuid), material.BaseColorTexture!.AssetId);
+        Assert.Equal(Guid.Parse(materialGuid), material.Id);
     }
 
     /// <summary>A prefab becomes a node tree with transforms, a model with its material, a light and a camera; unknown components are counted.</summary>
@@ -112,8 +112,8 @@ public sealed class UnityImportTests : IDisposable
         Assert.Equal(new Vector3(1f, 2f, 3f), crate.Transform.Position);
         Assert.Equal(new Vector3(2f, 2f, 2f), crate.Transform.Scale);
         var model = Assert.Single(crate.Components.OfType<ModelComponent>());
-        Assert.Equal(Guid.Parse(ModelGuid), model.Model!.AssetId);
-        Assert.Equal(Guid.Parse(MaterialGuid), model.Materials.Single()!.AssetId);
+        Assert.Equal(Guid.Parse(modelGuid), model.Model!.AssetId);
+        Assert.Equal(Guid.Parse(materialGuid), model.Materials.Single()!.AssetId);
 
         Assert.Equal(["Lamp", "Eye"], crate.Children.Select(c => c.Name));
         var lamp = crate.Children[0].Components.OfType<LightComponent>().Single();
@@ -124,7 +124,7 @@ public sealed class UnityImportTests : IDisposable
         Assert.Equal(75f, camera.FieldOfViewDegrees, 3);
         Assert.Equal(0.1f, camera.NearPlane, 3);
 
-        Assert.Equal(Guid.Parse(PrefabGuid), JsonNode.Parse(File.ReadAllText(Path.Combine(project, "Assets", "Crates", "Prefabs", "Crate.prefab.meta")))!["Id"]!.GetValue<Guid>());
+        Assert.Equal(Guid.Parse(prefabGuid), JsonNode.Parse(File.ReadAllText(Path.Combine(project, "Assets", "Crates", "Prefabs", "Crate.prefab.meta")))!["Id"]!.GetValue<Guid>());
     }
 
     /// <summary>A path that climbs out of the destination is refused, and a file that is not a package is an error.</summary>
@@ -143,21 +143,21 @@ public sealed class UnityImportTests : IDisposable
     }
 
     static byte[] Yaml(string text) => Encoding.UTF8.GetBytes(text
-        .Replace("@TEX@", TextureGuid, StringComparison.Ordinal).Replace("@MODEL@", ModelGuid, StringComparison.Ordinal)
-        .Replace("@MAT@", MaterialGuid, StringComparison.Ordinal).Replace("@SCRIPT@", ScriptGuid, StringComparison.Ordinal));
+        .Replace("@TEX@", textureGuid, StringComparison.Ordinal).Replace("@MODEL@", modelGuid, StringComparison.Ordinal)
+        .Replace("@MAT@", materialGuid, StringComparison.Ordinal).Replace("@SCRIPT@", scriptGuid, StringComparison.Ordinal));
 
     string BuildPackage(params (string Guid, string Path, byte[] Content, string Meta)[] extra)
     {
         byte[] png;
-        using (var bitmap = new SkiaSharp.SKBitmap(4, 4))
-        using (var encoded = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100))
+        using (var bitmap = new SKBitmap(4, 4))
+        using (var encoded = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             png = encoded.ToArray();
 
         var entries = new List<(string Guid, string Path, byte[]? Content, string Meta)>
         {
-            (TextureGuid, "Assets/Art/Crate.png", png, $"fileFormatVersion: 2\nguid: {TextureGuid}\nlabels:\n- crates\nTextureImporter:\n  sRGBTexture: 0\n  mipmaps:\n    enableMipMap: 0\n  maxTextureSize: 512\n"),
-            (ModelGuid, "Assets/Models/crate.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"u8.ToArray(), $"fileFormatVersion: 2\nguid: {ModelGuid}\n"),
-            (MaterialGuid, "Assets/Mats/Wood.mat", Yaml("""
+            (textureGuid, "Assets/Art/Crate.png", png, $"fileFormatVersion: 2\nguid: {textureGuid}\nlabels:\n- crates\nTextureImporter:\n  sRGBTexture: 0\n  mipmaps:\n    enableMipMap: 0\n  maxTextureSize: 512\n"),
+            (modelGuid, "Assets/Models/crate.obj", "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n"u8.ToArray(), $"fileFormatVersion: 2\nguid: {modelGuid}\n"),
+            (materialGuid, "Assets/Mats/Wood.mat", Yaml("""
                 %YAML 1.1
                 --- !u!21 &2100000
                 Material:
@@ -171,8 +171,8 @@ public sealed class UnityImportTests : IDisposable
                     - _Glossiness: 0.3
                     m_Colors:
                     - _Color: {r: 1, g: 0.5, b: 0, a: 1}
-                """), $"fileFormatVersion: 2\nguid: {MaterialGuid}\n"),
-            (PrefabGuid, "Assets/Prefabs/Crate.prefab", Yaml("""
+                """), $"fileFormatVersion: 2\nguid: {materialGuid}\n"),
+            (prefabGuid, "Assets/Prefabs/Crate.prefab", Yaml("""
                 %YAML 1.1
                 --- !u!1 &100
                 GameObject:
@@ -250,8 +250,8 @@ public sealed class UnityImportTests : IDisposable
                   far clip plane: 500
                   orthographic: 0
                   m_Depth: 1
-                """), $"fileFormatVersion: 2\nguid: {PrefabGuid}\n"),
-            (ScriptGuid, "Assets/Scripts/Spin.cs", "using UnityEngine; class Spin : MonoBehaviour {}"u8.ToArray(), $"fileFormatVersion: 2\nguid: {ScriptGuid}\n"),
+                """), $"fileFormatVersion: 2\nguid: {prefabGuid}\n"),
+            (scriptGuid, "Assets/Scripts/Spin.cs", "using UnityEngine; class Spin : MonoBehaviour {}"u8.ToArray(), $"fileFormatVersion: 2\nguid: {scriptGuid}\n"),
             ("66666666666666666666666666666666", "Assets/Art", null, "fileFormatVersion: 2\nguid: 66666666666666666666666666666666\nfolderAsset: yes\n"),
         };
         entries.AddRange(extra.Select(static e => (e.Guid, e.Path, (byte[]?)e.Content, e.Meta)));

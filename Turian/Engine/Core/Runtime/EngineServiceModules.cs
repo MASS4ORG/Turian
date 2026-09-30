@@ -16,7 +16,7 @@ public static class EngineServiceModules
         {
             ArgumentNullException.ThrowIfNull(assembly);
             foreach (var type in GetLoadableTypes(assembly)
-                         .Where(type => type.IsClass && !type.IsAbstract
+                         .Where(type => type is { IsClass: true, IsAbstract: false }
                                         && typeof(IEngineServiceModule).IsAssignableFrom(type))
                          .OrderBy(type => type.FullName, StringComparer.Ordinal))
             {

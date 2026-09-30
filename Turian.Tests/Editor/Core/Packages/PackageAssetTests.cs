@@ -53,7 +53,7 @@ public sealed class PackageAssetTests : IDisposable
         Meta(Path.Combine(root, "a", "Icon.png"), shared);
         Meta(Path.Combine(root, "b", "Icon.png"), shared);
 
-        var error = Assert.Throws<Gaya.Packages.PackageException>(() =>
+        var error = Assert.Throws<PackageException>(() =>
             PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a"), Package("com.acme.b", "b")]));
         Assert.Contains("com.acme.a", error.Message, StringComparison.Ordinal);
         Assert.Contains("com.acme.b", error.Message, StringComparison.Ordinal);
@@ -69,7 +69,7 @@ public sealed class PackageAssetTests : IDisposable
         PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]);
 
         Meta(Path.Combine(root, "a", "Icon.png"), shared);
-        Assert.Throws<Gaya.Packages.PackageException>(() => PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]));
+        Assert.Throws<PackageException>(() => PackageAssetIds.EnsureUnique(assets, [Package("com.acme.a", "a")]));
     }
 
     ResolvedPackage Package(string id, string folder) =>

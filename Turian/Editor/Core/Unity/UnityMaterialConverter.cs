@@ -33,7 +33,7 @@ static class UnityMaterialConverter
         if (ReadColor(First(colors, "_EmissionColor")) is { } emission) result.EmissiveFactor = new Vector3(emission.X, emission.Y, emission.Z);
         if (result.MetallicRoughnessTexture is not null) notes.Add("metallic map: Unity packs smoothness in alpha, glTF packs roughness in green");
 
-        var target = context.Place(System.IO.Path.ChangeExtension(relative, ".material"));
+        var target = context.Place(Path.ChangeExtension(relative, ".material"));
         Serializer.Save(target, result);
         context.WriteMeta(target, new MaterialAsset { Id = asset.Guid, RelativePath = context.MetaPath(target) });
         context.Report.Converted.Add(new UnityImportEntry(asset.Pathname, context.Relative(target), notes.Count == 0 ? null : string.Join("; ", notes)));

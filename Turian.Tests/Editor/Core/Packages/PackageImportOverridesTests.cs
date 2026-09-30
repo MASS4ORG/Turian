@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>The project's own import settings for assets that live in bricks.</summary>
@@ -14,8 +12,8 @@ public sealed class PackageImportOverridesTests : IDisposable
         var brick = Path.Combine(root, "icons");
         Directory.CreateDirectory(Path.Combine(brick, "Runtime"));
         new PackageManifest { Name = "user.mateo.icons", Version = SemanticVersion.Parse("1.0.0") }.Save(brick);
-        using (var bitmap = new SkiaSharp.SKBitmap(4, 4))
-        using (var png = bitmap.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100))
+        using (var bitmap = new SKBitmap(4, 4))
+        using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             File.WriteAllBytes(Path.Combine(brick, "Runtime", "Icon.png"), png.ToArray());
         File.WriteAllText(Path.Combine(brick, "Runtime", "Icon.png.meta"), $$"""
             { "__TypeId": "a3000000-0000-4000-8000-00000000000b", "IsSrgb": true, "GenerateMips": true,

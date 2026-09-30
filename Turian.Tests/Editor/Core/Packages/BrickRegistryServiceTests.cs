@@ -1,5 +1,3 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>Registries and licensing terms as a Turian project uses them.</summary>

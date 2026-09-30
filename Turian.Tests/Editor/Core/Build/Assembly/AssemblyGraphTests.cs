@@ -6,7 +6,7 @@ namespace Turian.Tests;
 /// </summary>
 public sealed class AssemblyGraphTests : IDisposable
 {
-    const string DefaultName = "Game";
+    const string defaultName = "Game";
 
     readonly string projectDirectory = Path.Combine(Path.GetTempPath(), $"turian-asmdef-{Guid.NewGuid():N}");
     readonly string assetsDirectory;
@@ -25,7 +25,7 @@ public sealed class AssemblyGraphTests : IDisposable
     [Fact]
     public void WithoutDefinitionsEverythingIsDefault()
     {
-        var graph = AssemblyGraph.Discover(assetsDirectory, DefaultName);
+        var graph = AssemblyGraph.Discover(assetsDirectory, defaultName);
 
         Assert.Empty(graph.Definitions);
         Assert.Empty(graph.Default.References);
@@ -39,11 +39,11 @@ public sealed class AssemblyGraphTests : IDisposable
         Define("Inventory", "Acme.Inventory");
         Define(Path.Combine("Inventory", "Editor"), "Acme.Inventory.Editor", editorOnly: true);
 
-        var graph = AssemblyGraph.Discover(assetsDirectory, DefaultName);
+        var graph = AssemblyGraph.Discover(assetsDirectory, defaultName);
 
         Assert.Equal("Acme.Inventory", graph.AssemblyFor(Script("Inventory", "Bag.cs")).Name);
         Assert.Equal("Acme.Inventory.Editor", graph.AssemblyFor(Script("Inventory", "Editor", "Menu.cs")).Name);
-        Assert.Equal(DefaultName, graph.AssemblyFor(Script("Player.cs")).Name);
+        Assert.Equal(defaultName, graph.AssemblyFor(Script("Player.cs")).Name);
 
         var inventory = graph.Definitions.Single(a => a.Name == "Acme.Inventory");
         Assert.Equal([Path.Combine(assetsDirectory, "Inventory", "Editor")], graph.ExcludedDirectories(inventory));
@@ -58,7 +58,7 @@ public sealed class AssemblyGraphTests : IDisposable
         Define("Tools", "Acme.Tools", editorOnly: true);
         Define("Internal", "Acme.Internal", autoReferenced: false);
 
-        var graph = AssemblyGraph.Discover(assetsDirectory, DefaultName);
+        var graph = AssemblyGraph.Discover(assetsDirectory, defaultName);
 
         Assert.Equal(["Acme.Inventory"], graph.Default.References);
     }
@@ -71,7 +71,7 @@ public sealed class AssemblyGraphTests : IDisposable
         var items = Define("Items", "A.Items", references: [core]);
         Define("Shop", "M.Shop", references: [items, core]);
 
-        var names = AssemblyGraph.Discover(assetsDirectory, DefaultName).Definitions.Select(a => a.Name).ToList();
+        var names = AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions.Select(a => a.Name).ToList();
 
         Assert.True(names.IndexOf("Z.Core") < names.IndexOf("A.Items"));
         Assert.True(names.IndexOf("A.Items") < names.IndexOf("M.Shop"));
@@ -83,7 +83,7 @@ public sealed class AssemblyGraphTests : IDisposable
     {
         Define("Inventory", name: null, fileName: "Acme.Bags");
 
-        var assembly = Assert.Single(AssemblyGraph.Discover(assetsDirectory, DefaultName).Definitions);
+        var assembly = Assert.Single(AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions);
 
         Assert.Equal("Acme.Bags", assembly.Name);
         Assert.Equal("Acme.Bags", assembly.RootNamespace);
@@ -96,16 +96,16 @@ public sealed class AssemblyGraphTests : IDisposable
         Define("A", "Acme.Same");
         Define("B", "Acme.Same");
 
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>A definition may not take the default assembly's name.</summary>
     [Fact]
     public void TheDefaultNameIsRefused()
     {
-        Define("A", DefaultName);
+        Define("A", defaultName);
 
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>A folder holds at most one definition.</summary>
@@ -115,7 +115,7 @@ public sealed class AssemblyGraphTests : IDisposable
         Define("A", "Acme.One", fileName: "One");
         Define("A", "Acme.Two", fileName: "Two");
 
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>References that loop back are refused.</summary>
@@ -126,7 +126,7 @@ public sealed class AssemblyGraphTests : IDisposable
         var bId = Define("B", "Acme.B", references: [aId]);
         Define("A", "Acme.A", references: [bId], id: aId);
 
-        var error = Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        var error = Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
         Assert.Contains("cycle", error.Message, StringComparison.Ordinal);
     }
 
@@ -137,7 +137,7 @@ public sealed class AssemblyGraphTests : IDisposable
         var tools = Define("Tools", "Acme.Tools", editorOnly: true);
         Define("Game", "Acme.Game", references: [tools]);
 
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>A reference to something that is not a definition is refused.</summary>
@@ -146,7 +146,7 @@ public sealed class AssemblyGraphTests : IDisposable
     {
         Define("A", "Acme.A", references: [Guid.NewGuid()]);
 
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>Only data assets holding a definition are read as one.</summary>
@@ -191,11 +191,11 @@ public sealed class AssemblyGraphTests : IDisposable
         var inventory = Define("Inventory", "Acme.Inventory");
         DefineReference(Path.Combine("Game", "InventoryExtensions"), inventory);
 
-        var graph = AssemblyGraph.Discover(assetsDirectory, DefaultName);
+        var graph = AssemblyGraph.Discover(assetsDirectory, defaultName);
 
         var extensions = Path.Combine(assetsDirectory, "Game", "InventoryExtensions");
         Assert.Equal("Acme.Inventory", graph.AssemblyFor(Script("Game", "InventoryExtensions", "Pocket.cs")).Name);
-        Assert.Equal(DefaultName, graph.AssemblyFor(Script("Game", "Player.cs")).Name);
+        Assert.Equal(defaultName, graph.AssemblyFor(Script("Game", "Player.cs")).Name);
         Assert.Contains(extensions, Assert.Single(graph.Definitions).Directories);
         Assert.Contains(extensions, graph.ExcludedDirectories(graph.Default));
     }
@@ -206,11 +206,11 @@ public sealed class AssemblyGraphTests : IDisposable
     {
         var inventory = Define("Inventory", "Acme.Inventory");
         DefineReference("Inventory", inventory);
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
 
         File.Delete(Path.Combine(assetsDirectory, "Inventory", "Reference.dataasset"));
         DefineReference("Elsewhere", Guid.NewGuid());
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>An engine-free assembly may only reference other engine-free assemblies.</summary>
@@ -219,11 +219,11 @@ public sealed class AssemblyGraphTests : IDisposable
     {
         var math = Define("Math", "Acme.Math", noEngineReferences: true);
         Define("Rules", "Acme.Rules", noEngineReferences: true, references: [math]);
-        Assert.Equal(2, AssemblyGraph.Discover(assetsDirectory, DefaultName).Definitions.Count);
+        Assert.Equal(2, AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions.Count);
 
         var game = Define("Game", "Acme.Game");
         Define("Server", "Acme.Server", noEngineReferences: true, references: [game]);
-        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, DefaultName));
+        Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
     /// <summary>An engine-free assembly's project references neither the engine nor its code generator.</summary>
@@ -243,7 +243,7 @@ public sealed class AssemblyGraphTests : IDisposable
     IBuildAppSettings Settings()
     {
         var settings = Substitute.For<IBuildAppSettings>();
-        settings.TitleToPathFriendly.Returns(DefaultName);
+        settings.TitleToPathFriendly.Returns(defaultName);
         settings.AssetsAbsoluteDir.Returns(assetsDirectory);
         settings.CacheAbsoluteDir.Returns(Path.Combine(projectDirectory, ".Cache"));
         settings.CacheSourceRelativeDir.Returns("../../Assets");
