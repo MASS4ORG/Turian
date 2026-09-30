@@ -33,6 +33,10 @@ public abstract class Component : IdClass
     [JsonIgnore, HideInEditor]
     public Node? Node { get; private set; }
 
+    /// <summary>Gets the service provider associated with this component's scene.</summary>
+    [JsonIgnore, HideInEditor]
+    public IServiceProvider? Services => Node?.Services;
+
     /// <summary>Gets a value indicating whether this component is currently attached to a node.</summary>
     [JsonIgnore, HideInEditor]
     public bool IsAttached => Node is not null; // uses property, safe here since we null-check
@@ -56,6 +60,7 @@ public abstract class Component : IdClass
             OnDetached();
 
         Node = node; // backing field via property
+        SceneServiceInjector.Inject(this, node.Services, node.AllowMissingServices);
         OnAttached();
 
         if (!IsAwake)

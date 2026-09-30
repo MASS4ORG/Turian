@@ -168,6 +168,9 @@ public sealed partial class AssetDatabase
             AssetId = asset.Id,
             ProjectRootPath = projectRoot,
             AssetTypeName = asset.GetType().FullName ?? nameof(Asset),
+            DataAssetPayloadTypeId = asset is DataAssetAsset
+                ? ReadDataAssetPayloadTypeId(normalizedSourcePath)
+                : Guid.Empty,
             Labels = [.. asset.Labels],
             SourceRelativePath = TryMakeRelativeProjectPath(projectRoot, normalizedSourcePath),
             MetaRelativePath = TryMakeRelativeProjectPath(projectRoot, normalizedMetaPath),
@@ -187,6 +190,28 @@ public sealed partial class AssetDatabase
                 fallbackImportedRelativePath),
             TargetArtifacts = ResolveTargetArtifacts(projectRoot, asset.Id, importedAssetsRoot)
         };
+    }
+
+    static Guid ReadDataAssetPayloadTypeId(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var document = JsonDocument.Parse(stream);
+            return document.RootElement.TryGetProperty(ObjectJsonSerializer<DataAsset>.TypeIdProperty, out var property)
+                   && property.ValueKind == JsonValueKind.String
+                   && Guid.TryParse(property.GetString(), out var id)
+                ? id
+                : Guid.Empty;
+        }
+        catch (IOException)
+        {
+            return Guid.Empty;
+        }
+        catch (JsonException)
+        {
+            return Guid.Empty;
+        }
     }
 
     static Dictionary<Guid, AssetRecord> NormalizeCatalogRecords(

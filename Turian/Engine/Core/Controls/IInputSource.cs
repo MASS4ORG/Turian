@@ -5,8 +5,8 @@ namespace Turian.Engine.Core;
 ///
 /// <para>
 /// The standalone runtime feeds this from Silk.NET (<see cref="SilkInputSource"/>); the Studio's
-/// in-editor play mode feeds it from Avalonia events raised by the Game panel. Gameplay code should
-/// use the static <see cref="Input"/> facade rather than resolving this interface directly.
+/// in-editor play mode feeds it from Avalonia events raised by the Game panel. Inject it into
+/// components that need raw input; hosts without input may leave optional references unbound.
 /// </para>
 /// </summary>
 /// <remarks>

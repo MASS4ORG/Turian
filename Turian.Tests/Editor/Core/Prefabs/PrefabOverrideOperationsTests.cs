@@ -16,10 +16,12 @@ public class PrefabOverrideOperationsTests : IDisposable
     {
         TestAssetDatabase.Reset();
         database = new AssetDatabase();
-        sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!);
+        var loader = Substitute.For<IAssetLoader>();
+        sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
         var inspector = new NodeInspectorController(assets);
-        undo = new UndoService(sceneTree, inspector, assets);
-        operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader: null!);
+        undo = new UndoService(sceneTree, inspector, assets, loader);
+        operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader);
 
         var scene = new Prefab { Id = Guid.NewGuid(), RelativePath = "Assets/scene.prefab" };
         assets.OpenAsset(scene);

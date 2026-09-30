@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Extracts the source-keyed localization calls the engine's UI documents and scripts rely on, so the
 /// strings they use can seed an English table. Matching <c>T("text")</c> and <c>t("text")</c> covers
-/// <see cref="Localization.T"/> and the Studio shorthand <c>Gaya.Plugin.Turian.StudioLocalization.T</c>.
+/// <see cref="LocaleService.TranslateSource"/> and explicit caller-local <c>T(...)</c> helpers.
 /// </summary>
 /// <remarks>
 /// This is a heuristic aid for authoring a project's first English table, not a semantic analyser:
@@ -12,7 +12,8 @@ namespace Turian.Editor.Core;
 /// </remarks>
 public static partial class LocalizationSourceExtractor
 {
-    [GeneratedRegex(@"\b(?:T|t)\s*\(\s*""(?<text>(?:\\.|[^""\\])*)""\s*\)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(?:TranslateSource|T|t)\s*\(\s*""(?<text>(?:\\.|[^""\\])*)""\s*\)",
+        RegexOptions.CultureInvariant)]
     private static partial Regex TranslationCallRegex();
 
     /// <summary>Gathers the distinct string literals passed to <c>T(...)</c> across the given files.</summary>

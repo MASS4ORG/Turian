@@ -29,6 +29,7 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     {
         ArgumentNullException.ThrowIfNull(field);
 
+        if (id != Guid.Empty && !Accepts(field, id)) return false;
         if (!field.IsDirect) return field.Set(id);
         if (id == Guid.Empty) return field.SetTarget(null);
 
@@ -51,7 +52,7 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
 
         var candidates = field.Kind switch
         {
-            ReferenceKind.Asset => AssetCandidates(AssetType(field)),
+            ReferenceKind.Asset => AssetCandidates(field),
             ReferenceKind.Node => SceneCandidates(node => field.TargetType.IsInstanceOfType(node)),
             ReferenceKind.Component => SceneCandidates(HasComponent(field.TargetType)),
             _ => [],
@@ -79,7 +80,10 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
             : FindNode(field.CurrentId)?.Name;
 
         // The target type tells an asset, a node and a component slot apart at a glance, as "Player (Camera)".
-        return name is null ? $"Missing ({field.TargetType.Name})" : $"{name} ({field.TargetType.Name})";
+        if (name is null) return $"Missing ({field.TargetType.Name})";
+        return field.Kind == ReferenceKind.Asset && !Accepts(field, field.CurrentId)
+            ? $"Invalid: {name} (incompatible with {field.DataAssetPayloadType?.Name ?? field.TargetType.Name})"
+            : $"{name} ({field.DataAssetPayloadType?.Name ?? field.TargetType.Name})";
     }
 
     /// <summary>
@@ -98,7 +102,7 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
         return field.Kind switch
         {
             ReferenceKind.Asset => assets.TryGetAsset(id, out var record) && record is not null
-                                   && AssetReferenceQuery.IsValidForAssetType(record, AssetType(field)),
+                                   && IsCompatible(record, field),
             ReferenceKind.Node => FindNode(id) is { } node && field.TargetType.IsInstanceOfType(node),
             ReferenceKind.Component => FindNode(id) is { } owner && HasComponent(field.TargetType)(owner),
             _ => false,
@@ -120,10 +124,23 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
                 yield return descendant;
     }
 
-    IReadOnlyList<ReferenceCandidate> AssetCandidates(Type targetType) =>
+    bool IsCompatible(AssetRecord record, ReferenceField field)
+    {
+        if (!AssetReferenceQuery.IsValidForAssetType(record, AssetType(field))) return false;
+        if (field.DataAssetPayloadType is not { } payloadType) return true;
+
+        // Indexing happens at import, never while drawing the picker. The stable id resolves
+        // against the current type registry after user-code reloads.
+        return record.DataAssetPayloadTypeId != Guid.Empty
+               && TypeRegistry.TryGetType(record.DataAssetPayloadTypeId, out var indexedType)
+               && indexedType is not null
+               && payloadType.IsAssignableFrom(indexedType);
+    }
+
+    IReadOnlyList<ReferenceCandidate> AssetCandidates(ReferenceField field) =>
     [
         .. assets.GetAssetsSnapshot()
-            .Where(record => AssetReferenceQuery.IsValidForAssetType(record, targetType))
+            .Where(record => IsCompatible(record, field))
             .Select(record => new ReferenceCandidate(
                 record.AssetId,
                 Path.GetFileNameWithoutExtension(record.SourceRelativePath),

@@ -92,6 +92,5 @@ public sealed class OutputLogBridge
     {
         LogBuffer.Clear();
         Interlocked.Increment(ref generation);
-        log.LogDebug("Output: cleared on {Reason}", reason);
     }
 }

@@ -27,6 +27,7 @@ sealed class SceneViewport : IDisposable
     readonly EditorCameraSettings cameraSettings;
     readonly ILogger log;
     readonly UndoService undo;
+    readonly LocaleService locale;
 
     readonly HashSet<int> heldKeys = [];
 
@@ -58,6 +59,7 @@ sealed class SceneViewport : IDisposable
     /// <param name="cameraSettings">How the free camera responds to input.</param>
     /// <param name="log">Where an unusable device is reported.</param>
     /// <param name="undo">Records a whole gizmo drag as one step.</param>
+    /// <param name="locale">Resolves UI text for the open editor project.</param>
     public SceneViewport(
         Vulkan vulkan,
         SceneTreeController sceneTree,
@@ -66,7 +68,8 @@ sealed class SceneViewport : IDisposable
         PlayModeService playMode,
         EditorCameraSettings cameraSettings,
         ILogger log,
-        UndoService undo)
+        UndoService undo,
+        LocaleService locale)
     {
         this.vulkan = vulkan;
         this.sceneTree = sceneTree;
@@ -76,6 +79,7 @@ sealed class SceneViewport : IDisposable
         this.cameraSettings = cameraSettings;
         this.log = log;
         this.undo = undo;
+        this.locale = locale;
 
         sceneTree.FrameNodeRequested += OnFrameNodeRequested;
         inspector.SelectionChanged += OnSelectionChanged;
@@ -123,7 +127,7 @@ sealed class SceneViewport : IDisposable
             {
                 service = new SceneViewerService(vulkan, width, height);
                 service.OnPopulateGizmos = PopulateGizmos;
-                uiManager = new UiManager(vulkan);
+                uiManager = new UiManager(vulkan, locale: locale);
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>

@@ -9,8 +9,7 @@ namespace Turian.Engine.Core;
 /// <para>
 /// Registered as a plain singleton rather than through <see cref="InternalServiceAttribute"/>, because
 /// a table-less instance is useless: each host loads the project's tables into it (or a fresh play
-/// scope) before anything reads a key. <see cref="Localization"/> is the static facade game code and
-/// UI documents use.
+/// scope) before anything reads a key. Inject it where localized text is needed.
 /// </para>
 /// <para>
 /// Locale switching is live: <see cref="Generation"/> increments and <see cref="LocaleChanged"/> fires,

@@ -24,6 +24,7 @@ public class App : IDisposable
     SceneTicker sceneTicker = null!;
     SilkInputSource inputSource = null!;
     InputActionService actions = null!;
+    RuntimeAssetLoader assetLoader = null!;
     LocaleService locale = null!;
 
     /// <summary>
@@ -77,21 +78,23 @@ public class App : IDisposable
         rendererManager.Initialize();
 
         sceneManager = new SceneManager(assetDatabase);
-        var assetLoader = new RuntimeAssetLoader(assetDatabase);
+        assetLoader = new RuntimeAssetLoader(assetDatabase);
         inputSource = new SilkInputSource(inputManager);
         actions = new InputActionService(inputSource);
         sceneTicker = new SceneTicker(sceneManager) { InputSource = inputSource, Actions = actions };
-        uiManager = new UiManager(vulkan);
         locale = new LocaleService();
+        uiManager = new UiManager(vulkan, inputSource, locale);
 
-        RuntimeServices.Configure(new ServiceCollection()
+        var services = new ServiceCollection()
             .AddSingleton(vulkan)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)
             .AddSingleton<IInputSource>(inputSource)
             .AddSingleton(actions)
+            .AddSingleton<IInputActions>(actions)
             .AddSingleton(locale)
-            .BuildServiceProvider());
+            .BuildServiceProvider();
+        sceneManager.BindServices(services);
 
         CreateAssetDatabase();
 
@@ -150,7 +153,7 @@ public class App : IDisposable
     {
         if (projectSettings is null) return;
 
-        actions.Load(InputActionsLoader.Resolve(projectSettings, RuntimeServices.TryGet<IAssetLoader>(),
+        actions.Load(InputActionsLoader.Resolve(projectSettings, assetLoader,
             projectDirectory));
 
         if (actions.Asset is not null && projectSettings.Get<PlayerSettings>().ProductName is { Length: > 0 } product)
@@ -225,7 +228,7 @@ public class App : IDisposable
             ProjectAbsoluteDir = projectDirectory,
             Title = Path.GetFileName(projectDirectory),
         };
-        ProjectSettingsLoader.Load(projectSettings, RuntimeServices.TryGet<IAssetLoader>());
+        ProjectSettingsLoader.Load(projectSettings, assetLoader);
 
         return projectSettings;
     }

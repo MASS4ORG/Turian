@@ -42,6 +42,27 @@ public class SceneTickerTests : IDisposable
         public override void OnFixedUpdate(float fixedDeltaTime) => FixedUpdateCount++;
     }
 
+    sealed class ClickerComponent : Component
+    {
+        float accumulated;
+
+        [InjectService, JsonIgnore]
+        public IInputSource? Input { get; private set; }
+
+        public int Currency { get; private set; }
+
+        public override void OnUpdate(float deltaTime)
+        {
+            if (Input?.WasKeyPressed(Key.Space) == true) Currency++;
+            accumulated += deltaTime;
+            while (accumulated >= 1f)
+            {
+                Currency++;
+                accumulated -= 1f;
+            }
+        }
+    }
+
     (SceneTicker Ticker, CountingComponent Component) CreateScene()
     {
         var sceneManager = new SceneManager(assetDatabase);
@@ -149,5 +170,67 @@ public class SceneTickerTests : IDisposable
 
         Assert.False(input.WasKeyPressed(Key.W));
         Assert.True(input.IsKeyDown(Key.W));
+    }
+
+    /// <summary>Clicks and simulated time can be advanced independently of a wall clock.</summary>
+    [Fact]
+    public void Tick_DrivesClickerWithSyntheticInputAndScaledTime()
+    {
+        var input = new BufferedInputSource();
+        using var services = new ServiceCollection().AddSingleton<IInputSource>(input).BuildServiceProvider();
+        var clicker = new ClickerComponent();
+        var root = new Node();
+        root.Components.Add(clicker);
+        root.Awake(null, services);
+        var sceneManager = new SceneManager(assetDatabase);
+        sceneManager.AdoptScene(Guid.NewGuid(), root);
+        var ticker = new SceneTicker(sceneManager) { InputSource = input };
+
+        input.PushKeyDown(Key.Space);
+        ticker.Tick(0.5);
+        Assert.Equal(1, clicker.Currency);
+        ticker.Tick(0.5);
+        Assert.Equal(2, clicker.Currency);
+
+        ticker.TimeScale = 2;
+        ticker.Tick(0.5);
+        Assert.Equal(3, clicker.Currency);
+
+        ticker.TimeScale = 0.5;
+        ticker.Tick(1);
+        ticker.Tick(1);
+        Assert.Equal(4, clicker.Currency);
+
+        ticker.TimeScale = 0;
+        ticker.Tick(1);
+        Assert.Equal(4, clicker.Currency);
+        Assert.Equal(3, ticker.ElapsedSeconds);
+        Assert.Equal(4.5, ticker.UnscaledElapsedSeconds);
+    }
+
+    /// <summary>A paused ticker can advance one explicit frame without relying on wall time.</summary>
+    [Fact]
+    public void StepFrame_AdvancesSimulatedTimeWhileScaleIsZero()
+    {
+        var (ticker, component) = CreateScene();
+        ticker.TimeScale = 0;
+        ticker.Tick(1);
+        ticker.StepFrame();
+
+        Assert.Equal(SceneTicker.FixedTimestep, ticker.ElapsedSeconds);
+        Assert.Equal(1, ticker.UnscaledElapsedSeconds);
+        Assert.Equal(1, component.FixedUpdateCount);
+    }
+
+    /// <summary>Invalid durations are rejected before entering the fixed-step loop.</summary>
+    [Fact]
+    public void Tick_RejectsInvalidTime()
+    {
+        var (ticker, _) = CreateScene();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.TimeScale = double.NaN);
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.TimeScale = -1);
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.Tick(double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.Tick(-0.5));
     }
 }

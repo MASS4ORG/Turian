@@ -8,6 +8,7 @@ namespace Turian.Editor.CLI;
 sealed class HeadlessProject : IDisposable
 {
     readonly ILogger logger;
+    readonly ServiceProvider services;
 
     /// <summary>Gets the project's build settings.</summary>
     public BuildAppSettings Settings { get; }
@@ -20,6 +21,9 @@ sealed class HeadlessProject : IDisposable
 
     /// <summary>Gets the headless Vulkan device, or <c>null</c> when the project was opened without graphics.</summary>
     public Vulkan? Vulkan { get; }
+
+    /// <summary>Gets the project's loaded locale service.</summary>
+    public LocaleService Locale => services.GetRequiredService<LocaleService>();
 
     HeadlessProject(BuildAppSettings settings, ILogger logger, bool withGraphics)
     {
@@ -54,17 +58,21 @@ sealed class HeadlessProject : IDisposable
         SceneManager = new SceneManager(Database);
         Vulkan = withGraphics ? new Vulkan(logger) : null;
 
-        var services = new ServiceCollection()
+        var registrations = new ServiceCollection()
             .AddSingleton<ISceneManager>(SceneManager)
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(Database))
             .AddSingleton(_ => LocalizationLoader.Create(settings, Database));
 
         if (Vulkan is not null)
         {
-            _ = services.AddSingleton(Vulkan);
+            _ = registrations.AddSingleton(Vulkan);
         }
 
-        RuntimeServices.Configure(services.BuildServiceProvider());
+        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+            registrations.AddEngineModules(gameType.Assembly);
+
+        services = registrations.BuildServiceProvider();
+        SceneManager.BindServices(services);
 
         logger.LogInformation(
             "Opened {Title}: {RecordCount} asset records from {CacheDir}",
@@ -127,5 +135,9 @@ sealed class HeadlessProject : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() => ModelAsset.ClearCache();
+    public void Dispose()
+    {
+        services.Dispose();
+        ModelAsset.ClearCache();
+    }
 }

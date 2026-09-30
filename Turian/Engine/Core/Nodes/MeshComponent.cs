@@ -10,6 +10,10 @@ public class MeshComponent : Component, IDisposable
     ExtMeshShader extMeshShader = null!;
     bool hasMeshShaderExtension;
 
+    /// <summary>The render device bound to this scene, or <c>null</c> in a non-rendering host.</summary>
+    [InjectService(Optional = true), JsonIgnore]
+    public Vulkan? RenderDevice { get; private set; }
+
     /// <summary>
     /// Initializes the component by resolving the runtime Vulkan service when available.
     /// </summary>
@@ -17,8 +21,7 @@ public class MeshComponent : Component, IDisposable
     {
         base.OnAwake();
 
-        var vulkan = RuntimeServices.TryGet<Vulkan>();
-        if (vulkan is null)
+        if (RenderDevice is not { } vulkan)
         {
             hasMeshShaderExtension = false;
             return;

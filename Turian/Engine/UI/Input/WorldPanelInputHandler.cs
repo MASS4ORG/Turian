@@ -4,16 +4,20 @@ namespace Turian.Engine.UI;
 /// Input for a <see cref="UiRenderMode.WorldSpace"/> panel. The pointer position is a projection of
 /// the real cursor (or another ray) onto the panel surface, set each frame by
 /// <see cref="SetPointer"/>; buttons, wheel, keys and typed characters pass through from the engine
-/// <see cref="Input"/> facade so a hovered widget still clicks and a focused field still types.
+/// supplied <see cref="IInputSource"/> so a hovered widget still clicks and a focused field still types.
 /// </summary>
 public sealed class WorldPanelInputHandler : IUiFrameInput
 {
     // Off-panel sentinel: far outside any layout rect, so nothing hovers when the ray misses.
     static readonly Vector2 OffPanel = new(-100_000f, -100_000f);
 
+    readonly IInputSource? source;
     Vector2 position = OffPanel;
     Vector2 previous = OffPanel;
     string typedCharacters = string.Empty;
+
+    /// <summary>Creates a panel handler. Without a source all input is neutral.</summary>
+    public WorldPanelInputHandler(IInputSource? source = null) => this.source = source;
 
     /// <summary>Unused by world panels (they rasterise 1:1 with <c>PanelSize</c>); kept for the interface.</summary>
     public float CanvasScale { get; set; } = 1f;
@@ -39,27 +43,27 @@ public sealed class WorldPanelInputHandler : IUiFrameInput
     public Vector2 PrevMousePosition => previous;
 
     /// <inheritdoc/>
-    public float MouseWheelDelta => Input.MouseScrollDelta;
+    public float MouseWheelDelta => source?.MouseScrollDelta ?? 0f;
 
     /// <inheritdoc/>
     public bool IsAnyKeyDown => false;
 
     /// <inheritdoc/>
-    public bool IsKeyDown(KeyboardKey keyboardKey) => Input.IsKeyDown((SilkKey)(int)keyboardKey);
+    public bool IsKeyDown(KeyboardKey keyboardKey) => source?.IsKeyDown((SilkKey)(int)keyboardKey) ?? false;
 
     /// <inheritdoc/>
-    public bool IsKeyPressed(KeyboardKey keyboardKey) => Input.WasKeyPressed((SilkKey)(int)keyboardKey);
+    public bool IsKeyPressed(KeyboardKey keyboardKey) => source?.WasKeyPressed((SilkKey)(int)keyboardKey) ?? false;
 
     /// <inheritdoc/>
-    public bool IsKeyUp(KeyboardKey keyboardKey) => !Input.IsKeyDown((SilkKey)(int)keyboardKey);
+    public bool IsKeyUp(KeyboardKey keyboardKey) => !IsKeyDown(keyboardKey);
 
     /// <inheritdoc/>
     public bool IsMouseButtonDown(MouseButton button) =>
-        !IsOffPanel && Input.IsMouseButtonDown((SilkMouseButton)(int)button);
+        !IsOffPanel && (source?.IsMouseButtonDown((SilkMouseButton)(int)button) ?? false);
 
     /// <inheritdoc/>
     public bool IsMouseButtonPressed(MouseButton button) =>
-        !IsOffPanel && Input.WasMouseButtonPressed((SilkMouseButton)(int)button);
+        !IsOffPanel && (source?.WasMouseButtonPressed((SilkMouseButton)(int)button) ?? false);
 
     /// <inheritdoc/>
     public bool IsMouseButtonUp(MouseButton button) => !IsMouseButtonDown(button);

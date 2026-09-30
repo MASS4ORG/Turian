@@ -99,10 +99,14 @@ public static class Serializer
     /// <typeparam name="T"></typeparam>
     /// <param name="data"></param>
     /// <returns></returns>
-    public static T? LoadData<T>(string data)
-    {
-        return JsonSerializer.Deserialize<T>(data, JsonOptions);
-    }
+    public static T? LoadData<T>(string data) => LoadData<T>(data, loader: null);
+
+    /// <summary>
+    /// Deserializes a scene using the selected asset loader for direct DataAsset references.
+    /// Without a loader, unresolved DataAsset ids remain pending until explicitly resolved.
+    /// </summary>
+    public static T? LoadData<T>(string data, IAssetLoader? loader) =>
+        ObjectReferences.DeserializeWithLoader(loader, () => JsonSerializer.Deserialize<T>(data, JsonOptions));
 
     /// <summary>
     /// Save the Object content to the given path

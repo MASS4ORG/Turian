@@ -25,17 +25,18 @@ public sealed class UiRuntime : IDisposable
     /// <param name="height">Initial surface height in pixels, greater than zero.</param>
     /// <param name="backendMode">Render backend to use, or <c>null</c> for the factory default.</param>
     /// <param name="input">
-    /// Input source, or <c>null</c> for a screen-space <see cref="EngineInputHandler"/>. World-space
-    /// panels pass a <see cref="WorldPanelInputHandler"/>.
+    /// Custom frame handler for world-space panels; otherwise a screen-space handler is created.
     /// </param>
+    /// <param name="inputSource">Screen-space input source, or <c>null</c> for neutral input.</param>
     public UiRuntime(
         Vulkan vulkan, int width, int height,
         UiRenderBackendFactory.Mode? backendMode = null,
-        IUiFrameInput? input = null)
+        IUiFrameInput? input = null,
+        IInputSource? inputSource = null)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         backend = UiRenderBackendFactory.Create(vulkan, width, height, backendMode);
-        this.input = input ?? new EngineInputHandler();
+        this.input = input ?? new EngineInputHandler(inputSource);
         Gui.Input = this.input;
         font = Font.FromFamilyName("sans-serif", 16);
         iconFont = font;

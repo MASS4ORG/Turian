@@ -21,28 +21,31 @@ public class PlayModeServiceTests : IDisposable
     }
 
     /// <summary>
-    /// Mirrors the sample project's <c>SceneLoader</c>: resolve engine services in
+    /// Mirrors a game script: receive engine services before
     /// <see cref="Component.OnAwake"/>, cache them, then use them from a later frame.
     /// </summary>
     [TypeId("a4000003-0000-4000-8000-000000000002")]
     sealed class ServiceCachingComponent : Component
     {
+        [InjectService, JsonIgnore]
+        public ISceneManager? SceneManager { get; private set; }
+
+        [InjectService, JsonIgnore]
+        public IInputSource? Input { get; private set; }
+
         public static ISceneManager? ResolvedAtAwake { get; set; }
         public static IInputSource? InputResolvedAtAwake { get; set; }
 
-        ISceneManager? sceneManager;
-
         public override void OnAwake()
         {
-            sceneManager = RuntimeServices.TryGet<ISceneManager>();
-            ResolvedAtAwake = sceneManager;
-            InputResolvedAtAwake = RuntimeServices.TryGet<IInputSource>();
+            ResolvedAtAwake = SceneManager;
+            InputResolvedAtAwake = Input;
         }
 
         public override void OnUpdate(float deltaTime)
         {
-            // Would throw a NullReferenceException if Awake ran before the play scope existed.
-            _ = sceneManager!.LoadedScenes.Count();
+            // Would throw if Awake ran before the play scope existed.
+            _ = SceneManager!.LoadedScenes.Count();
         }
     }
 
@@ -60,13 +63,15 @@ public class PlayModeServiceTests : IDisposable
     public PlayModeServiceTests()
     {
         TestAssetDatabase.Reset();
-        RuntimeServices.Reset();
+        ServiceCachingComponent.ResolvedAtAwake = null;
+        ServiceCachingComponent.InputResolvedAtAwake = null;
         FrameCountingComponent.TotalUpdates = 0;
 
         assetDatabase = new AssetDatabase();
         // The importer is only reached through SceneTreeController.SaveAsset, which play mode never
         // calls; constructing a real one would need the BuildManager singleton.
-        sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!);
+        sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!,
+            assetLoader: new RuntimeAssetLoader(assetDatabase), sceneManager: Substitute.For<ISceneManager>());
 
         playMode = new PlayModeService(sceneTree, assetDatabase, new EmptyServiceProvider(), Log.Logger);
     }
@@ -75,7 +80,8 @@ public class PlayModeServiceTests : IDisposable
     public void Dispose()
     {
         playMode.Stop();
-        RuntimeServices.Reset();
+        ServiceCachingComponent.ResolvedAtAwake = null;
+        ServiceCachingComponent.InputResolvedAtAwake = null;
         TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
@@ -89,6 +95,7 @@ public class PlayModeServiceTests : IDisposable
         var root = new Node { Name = "Root" };
         var child = new Node { Name = "Mover" };
         child.AddComponent(new FrameCountingComponent());
+        child.AddComponent(new ServiceCachingComponent());
         root.Children.Add(child);
         root.Awake(null);
 
@@ -344,10 +351,10 @@ public class PlayModeServiceTests : IDisposable
         playMode.Start();
         var firstRoot = playMode.PlayRoot;
 
-        // Stand in for a script calling SceneManager.LoadSceneAsync during play.
+        // Stand in for a script calling its injected ISceneManager during play.
         var nextRoot = new Node { Name = "NextScene" };
         nextRoot.Awake(null);
-        RuntimeServices.GetRequired<ISceneManager>().AdoptScene(Guid.NewGuid(), nextRoot);
+        ServiceCachingComponent.ResolvedAtAwake!.AdoptScene(Guid.NewGuid(), nextRoot);
 
         playMode.Tick(0.016);
 
@@ -400,11 +407,10 @@ public class PlayModeServiceTests : IDisposable
     }
 
     /// <summary>
-    /// While a session runs, gameplay resolves engine services from the play scope; stopping puts
-    /// the editor's own provider back so the Scene View keeps working.
+    /// Gameplay receives its play-scoped services before Awake; stopping discards that scene scope.
     /// </summary>
     [Fact]
-    public void RuntimeServices_AreScopedToTheSessionAndRestoredOnStop()
+    public void PlayServices_AreInjectedBeforeAwakeAndDiscardedOnStop()
     {
         var editorServices = new EmptyServiceProvider();
         var service = new PlayModeService(sceneTree, assetDatabase, editorServices, Log.Logger);
@@ -412,12 +418,13 @@ public class PlayModeServiceTests : IDisposable
 
         service.Start();
 
-        Assert.NotNull(RuntimeServices.TryGet<ISceneManager>());
-        Assert.Same(service.Input, RuntimeServices.TryGet<IInputSource>());
+        Assert.NotNull(ServiceCachingComponent.ResolvedAtAwake);
+        Assert.Same(service.Input, ServiceCachingComponent.InputResolvedAtAwake);
+        Assert.NotNull(ServiceCachingComponent.ResolvedAtAwake!.LoadedScenes);
 
         service.Stop();
 
-        Assert.Null(RuntimeServices.TryGet<ISceneManager>());
+        Assert.Null(service.PlayRoot);
     }
 
     /// <summary>

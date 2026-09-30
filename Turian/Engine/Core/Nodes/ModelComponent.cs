@@ -43,6 +43,10 @@ public class ModelComponent : Component, IDisposable
     [JsonIgnore, HideInEditor]
     public Model? ModelOverride { get; set; }
 
+    /// <summary>The render device bound to this scene, or <c>null</c> in a non-rendering host.</summary>
+    [InjectService(Optional = true), JsonIgnore]
+    public Vulkan? RenderDevice { get; private set; }
+
     /// <summary>
     /// Gets the loaded runtime model.
     /// </summary>
@@ -72,8 +76,7 @@ public class ModelComponent : Component, IDisposable
             if (model is not null) return model;
             if (loadFailed || modelAssetId == Guid.Empty) return null;
 
-            var vulkan = RuntimeServices.TryGet<Vulkan>();
-            if (vulkan is null) return null;
+            if (RenderDevice is not { } vulkan) return null;
 
             model = new ModelAsset { Id = modelAssetId }.GetContent(vulkan);
             loadFailed = model is null;

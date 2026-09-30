@@ -36,8 +36,11 @@ public sealed class PlayModeService(
     /// <summary>Gets the root of the running copy of the scene, or <c>null</c> when stopped.</summary>
     public Node? PlayRoot { get; private set; }
 
-    /// <summary>Gets the input source the running game reads through <see cref="Input"/>.</summary>
+    /// <summary>Gets the input source bound to the running game.</summary>
     public BufferedInputSource Input { get; } = new();
+
+    /// <summary>Gets the running game's locale service, if one was configured.</summary>
+    public LocaleService? Locale => playServices?.GetService<LocaleService>();
 
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event Action<PlayState>? StateChanged;
@@ -89,7 +92,8 @@ public sealed class PlayModeService(
         // play scope has to be live and the scene tracked before Awake runs.
         playServices = BuildPlayServices();
         var sceneManager = playServices.GetRequiredService<ISceneManager>();
-        RuntimeServices.Configure(playServices);
+        if (sceneManager is SceneManager concreteSceneManager)
+            concreteSceneManager.BindServices(playServices);
 
         if (localeOverride is not null
             && playServices.GetService(typeof(LocaleService)) is LocaleService locale)
@@ -98,7 +102,8 @@ public sealed class PlayModeService(
         Node? clone;
         try
         {
-            clone = NodeCloner.DeepClone(editorRoot, awake: false);
+            clone = NodeCloner.DeepClone(editorRoot, awake: false,
+                loader: playServices.GetRequiredService<IAssetLoader>());
         }
         catch (Exception ex)
         {
@@ -115,7 +120,7 @@ public sealed class PlayModeService(
         }
 
         sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), clone);
-        clone.Awake(null);
+        clone.Awake(null, playServices);
 
         PlayRoot = clone;
         ticker = new SceneTicker(sceneManager)
@@ -176,7 +181,6 @@ public sealed class PlayModeService(
         clock.Reset();
         Input.Clear();
 
-        RuntimeServices.Configure(editorServices);
         playServices?.Dispose();
         playServices = null;
 
@@ -184,7 +188,6 @@ public sealed class PlayModeService(
         sceneTree.ShowEditorScene();
 
         SetState(PlayState.Stopped);
-        logger.LogInformation("Play mode stopped. The edited scene was not modified");
     }
 
     // ── Frame ──────────────────────────────────────────────────────────────────
@@ -256,7 +259,7 @@ public sealed class PlayModeService(
     }
 
     /// <summary>
-    /// Builds the service scope the running game resolves through <see cref="RuntimeServices"/>.
+    /// Builds the service provider owned by the running game session.
     /// Mirrors the standalone runtime's registration so scripts behave identically in both. The
     /// graphics device is inherited from the editor, so meshes uploaded during play land on the
     /// same headless device the viewports render with.
@@ -269,7 +272,8 @@ public sealed class PlayModeService(
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(assetDatabase))
             .AddSingleton<IInputSource>(Input)
-            .AddSingleton(_ => new InputActionService(Input));
+            .AddSingleton(_ => new InputActionService(Input))
+            .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
 
         if (editorServices.GetService(typeof(Vulkan)) is Vulkan vulkan)
             services.AddSingleton(vulkan);
@@ -279,6 +283,16 @@ public sealed class PlayModeService(
         if (ProjectSettings() is { } appSettings)
             services.AddSingleton(_ => LocalizationLoader.Create(appSettings, assetDatabase));
 
+        if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
+        {
+            if (buildManager.ActiveUserAssembly is { } userAssembly)
+                services.AddEngineModules(userAssembly);
+        }
+        else if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        {
+            services.AddEngineModules(gameType.Assembly);
+        }
+
         var provider = services.BuildServiceProvider();
         LoadActionMaps(provider);
         return provider;
@@ -286,7 +300,7 @@ public sealed class PlayModeService(
 
     /// <summary>
     /// Puts the project's authored action maps in force for the session, so a script polling
-    /// <see cref="InputActions"/> sees the same bindings a built game would.
+    /// the session's <see cref="IInputActions"/> sees the same bindings a built game would.
     /// </summary>
     void LoadActionMaps(IServiceProvider provider)
     {
@@ -326,7 +340,6 @@ public sealed class PlayModeService(
     /// </summary>
     void AbandonPlayServices()
     {
-        RuntimeServices.Configure(editorServices);
         playServices?.Dispose();
         playServices = null;
     }
@@ -335,6 +348,8 @@ public sealed class PlayModeService(
     {
         if (State == newState) return;
         State = newState;
+        if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
+            buildManager.SetPlaying(newState != PlayState.Stopped);
         StateChanged?.Invoke(newState);
     }
 }

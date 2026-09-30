@@ -36,7 +36,7 @@ public static class EditorServices
         services.AddSingleton<PlayModeService>();
 
         return services.AddInternalServices(
-            typeof(RuntimeServices).Assembly,
+            typeof(SceneManager).Assembly,
             typeof(UiDocumentComponent).Assembly,
             typeof(SceneTreeController).Assembly);
     }

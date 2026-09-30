@@ -7,9 +7,13 @@ namespace Turian.Editor.Core;
 public sealed class SceneTreeController(
     AssetManager assetManager,
     SettingsService settingsService,
-    AssetImporter assetImporter)
+    AssetImporter assetImporter,
+    IAssetLoader assetLoader,
+    ISceneManager sceneManager)
     : IPlaySceneHost
 {
+    readonly ISceneManager sceneManager = sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
+
     readonly Dictionary<Guid, Node> loadedSceneRoots = [];
     readonly Dictionary<Guid, Guid> selectedNodeIdsByAssetId = [];
 
@@ -134,7 +138,7 @@ public sealed class SceneTreeController(
             var oldRoot = loadedSceneRoots[assetId];
             try
             {
-                var newRoot = NodeCloner.DeepClone(oldRoot);
+                var newRoot = NodeCloner.DeepClone(oldRoot, loader: assetLoader);
                 if (newRoot is null)
                 {
                     Log.Logger.LogWarning("RebindLoadedScenes: serializer returned null for asset {AssetId}", assetId);
@@ -214,7 +218,7 @@ public sealed class SceneTreeController(
             try
             {
                 if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
-                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)) is not { } rebuilt)
+                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id), assetLoader) is not { } rebuilt)
                     continue;
 
                 loadedSceneRoots[assetId] = rebuilt;
@@ -373,14 +377,8 @@ public sealed class SceneTreeController(
         return fallbackRoot;
     }
 
-    static Node? TryLoadWithSceneManager(Prefab prefab)
+    Node? TryLoadWithSceneManager(Prefab prefab)
     {
-        var sceneManager = RuntimeServices.TryGet<ISceneManager>();
-        if (sceneManager is null)
-        {
-            return null;
-        }
-
         return sceneManager.LoadNodeAsync(prefab.Id).GetAwaiter().GetResult();
     }
 
@@ -407,17 +405,13 @@ public sealed class SceneTreeController(
 
         try
         {
-            var sceneManager = RuntimeServices.TryGet<ISceneManager>();
-            if (sceneManager is not null)
-            {
-                var root = sceneManager.LoadNodeAsync(absolutePath).GetAwaiter().GetResult();
-                Log.Logger.LogInformation(
-                    "SceneTree fallback-loaded prefab root {NodeId} for asset {AssetId} from {AbsolutePath}",
-                    root.Id,
-                    prefab.Id,
-                    absolutePath);
-                return root;
-            }
+            var root = sceneManager.LoadNodeAsync(absolutePath).GetAwaiter().GetResult();
+            Log.Logger.LogInformation(
+                "SceneTree fallback-loaded prefab root {NodeId} for asset {AssetId} from {AbsolutePath}",
+                root.Id,
+                prefab.Id,
+                absolutePath);
+            return root;
         }
         catch (Exception ex)
         {
@@ -431,7 +425,7 @@ public sealed class SceneTreeController(
         try
         {
             var json = File.ReadAllText(absolutePath, Encoding.UTF8);
-            var root = Serializer.LoadData<Node>(json);
+            var root = Serializer.LoadData<Node>(json, assetLoader);
             if (root is null)
             {
                 Log.Logger.LogError(

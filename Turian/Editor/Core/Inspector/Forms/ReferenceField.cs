@@ -40,6 +40,9 @@ public sealed class ReferenceField
     /// <summary>The type a candidate must be assignable to.</summary>
     public Type TargetType { get; }
 
+    /// <summary>The required payload type for a typed DataAsset reference or direct DataAsset field.</summary>
+    public Type? DataAssetPayloadType { get; private set; }
+
     /// <summary>The field's display label.</summary>
     public string Label => source.Label;
 
@@ -70,8 +73,11 @@ public sealed class ReferenceField
 
         // Typed subclasses are drawn as the AssetReference they extend.
         var type = field.ValueType;
-        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        Type? payloadType = null;
+        for (var current = type; current is not null; current = current.BaseType)
         {
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(DataAssetReference<>))
+                payloadType = current.GetGenericArguments()[0];
             if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(AssetReference<>))
             {
                 type = current;
@@ -84,7 +90,8 @@ public sealed class ReferenceField
         var definition = type.GetGenericTypeDefinition();
         var argument = type.GetGenericArguments()[0];
 
-        if (definition == typeof(AssetReference<>)) return new ReferenceField(field, ReferenceKind.Asset, argument);
+        if (definition == typeof(AssetReference<>))
+            return new ReferenceField(field, ReferenceKind.Asset, argument) { DataAssetPayloadType = payloadType };
 
         return null;
     }
@@ -153,7 +160,10 @@ public sealed class ReferenceField
         var kind = typeof(DataAsset).IsAssignableFrom(type) ? ReferenceKind.Asset
             : typeof(Component).IsAssignableFrom(type) ? ReferenceKind.Component
             : ReferenceKind.Node;
-        return new ReferenceField(field, kind, type, isDirect: true);
+        return new ReferenceField(field, kind, type, isDirect: true)
+        {
+            DataAssetPayloadType = kind == ReferenceKind.Asset ? type : null
+        };
     }
 
     Guid IdOf(object value)

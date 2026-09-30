@@ -49,7 +49,7 @@ static class HeadlessPlay
         {
             if (outputPath is not null && project.Vulkan is not null)
             {
-                renderer = new PlayRenderer(project.Vulkan, options.Width, options.Height);
+                renderer = new PlayRenderer(project.Vulkan, play.Input, play.Locale, options.Width, options.Height);
             }
 
             for (var frame = 0; frame < frames; frame++)
@@ -103,9 +103,9 @@ static class HeadlessPlay
         readonly SceneViewerService viewer;
         Node? overlayRoot;
 
-        public PlayRenderer(Vulkan vulkan, uint width, uint height)
+        public PlayRenderer(Vulkan vulkan, IInputSource inputSource, LocaleService? locale, uint width, uint height)
         {
-            uiManager = new UiManager(vulkan);
+            uiManager = new UiManager(vulkan, inputSource, locale);
             viewer = new SceneViewerService(vulkan, width, height);
             viewer.OverlaySource = (w, h, dt) =>
                 overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);

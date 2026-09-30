@@ -85,14 +85,15 @@ public partial class SceneManager
     Node DeserializeNode(string json, string sourceDescription)
     {
         json = PrefabInstances.Expand(json, id => PrefabInstances.ReadPrefabJson(assetDatabase, id));
-        var root = Serializer.LoadData<Node>(json);
+        var root = Serializer.LoadData<Node>(json, assetLoader);
         if (root is null)
         {
             throw new InvalidOperationException(
                 $"Failed to deserialize a node hierarchy from '{sourceDescription}'.");
         }
 
-        root.Awake(null);
+        if (services is null) root.Awake(null);
+        else root.Awake(null, services, allowMissingServices);
         return root;
     }
 
@@ -131,7 +132,7 @@ public partial class SceneManager
         }
 
         // A reference into another scene resolves once both are loaded, whichever loaded first.
-        var pending = ObjectReferences.Resolve(roots, RuntimeServices.TryGet<IAssetLoader>());
+        var pending = ObjectReferences.Resolve(roots, assetLoader);
         if (pending > 0)
             Log.Logger.LogWarning(
                 "{Count} reference(s) point at objects that are not loaded; they resolve when their targets load",
@@ -199,16 +200,17 @@ public partial class SceneManager
     /// This guarantees parity with prefab-loaded hierarchies (same converters, same
     /// handling of <c>[JsonIgnore]</c> / <c>[JsonInclude]</c>, no event-handler leaks).
     /// </summary>
-    static Node CloneHierarchyViaSerialization(Node source)
+    Node CloneHierarchyViaSerialization(Node source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
         var json = Serializer.Serialize(source);
-        var clone = Serializer.LoadData<Node>(json)
+        var clone = Serializer.LoadData<Node>(json, assetLoader)
                     ?? throw new InvalidOperationException(
                         $"Failed to clone node hierarchy of type '{source.GetType().FullName}' via serialization.");
 
-        clone.Awake(null);
+        if (services is null) clone.Awake(null);
+        else clone.Awake(null, services, allowMissingServices);
         return clone;
     }
 

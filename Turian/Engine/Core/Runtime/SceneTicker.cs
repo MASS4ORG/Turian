@@ -25,6 +25,27 @@ public sealed class SceneTicker(ISceneManager sceneManager)
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
 
     double fixedAccumulator;
+    double timeScale = 1d;
+
+    /// <summary>
+    /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
+    /// </summary>
+    public double TimeScale
+    {
+        get => timeScale;
+        set
+        {
+            if (!double.IsFinite(value) || value < 0)
+                throw new ArgumentOutOfRangeException(nameof(value), "Time scale must be finite and non-negative.");
+            timeScale = value;
+        }
+    }
+
+    /// <summary>Seconds advanced by this ticker after applying <see cref="TimeScale"/>.</summary>
+    public double ElapsedSeconds { get; private set; }
+
+    /// <summary>Seconds passed to this ticker before applying <see cref="TimeScale"/>.</summary>
+    public double UnscaledElapsedSeconds { get; private set; }
 
     /// <summary>Gets the input source advanced once per tick, or <c>null</c> when input is not routed.</summary>
     public IInputSource? InputSource { get; init; }
@@ -36,13 +57,23 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     public InputActionService? Actions { get; init; }
 
     /// <summary>
-    /// Advances every loaded scene by <paramref name="deltaTime"/> seconds.
+    /// Advances every loaded scene by <paramref name="deltaTime"/> unscaled seconds.
     /// Runs as many fixed steps as the accumulated time allows, then a single variable
     /// and late pass.
     /// </summary>
-    /// <param name="deltaTime">The time elapsed since the previous tick, in seconds.</param>
+    /// <param name="deltaTime">Unscaled time elapsed since the previous tick, in seconds.</param>
     public void Tick(double deltaTime)
     {
+        if (!double.IsFinite(deltaTime) || deltaTime < 0)
+            throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
+
+        var scaledDeltaTime = deltaTime * TimeScale;
+        if (!double.IsFinite(scaledDeltaTime))
+            throw new ArgumentOutOfRangeException(nameof(deltaTime), "Scaled delta time must be finite.");
+
+        UnscaledElapsedSeconds += deltaTime;
+        deltaTime = scaledDeltaTime;
+        ElapsedSeconds += deltaTime;
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 
@@ -63,11 +94,15 @@ public sealed class SceneTicker(ISceneManager sceneManager)
 
     /// <summary>
     /// Advances every loaded scene by exactly one frame, running a single fixed step
-    /// regardless of the accumulator. Used by the editor's frame-step control.
+    /// regardless of the accumulator or time scale. Used by the editor's frame-step control.
     /// </summary>
     /// <param name="deltaTime">The delta time to report to the update callbacks, in seconds.</param>
     public void StepFrame(double deltaTime = FixedTimestep)
     {
+        if (!double.IsFinite(deltaTime) || deltaTime < 0)
+            throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
+
+        ElapsedSeconds += deltaTime;
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 

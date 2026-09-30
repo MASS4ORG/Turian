@@ -1,8 +1,8 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Routes Silk.NET keyboard and mouse events into a <see cref="BufferedInputSource"/> so that the
-/// standalone runtime exposes the same <see cref="Input"/> surface as the Studio's play mode.
+/// Routes Silk.NET keyboard and mouse events into a <see cref="BufferedInputSource"/> so the standalone
+/// runtime supplies the same <see cref="IInputSource"/> contract as Studio play mode.
 /// </summary>
 /// <param name="inputManager">The runtime input manager owning the Silk.NET input context.</param>
 public sealed class SilkInputSource(InputManager inputManager) : IInputSource, IDisposable

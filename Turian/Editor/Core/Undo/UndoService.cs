@@ -16,6 +16,7 @@ public sealed class UndoService : IDisposable
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
     readonly AssetManager assets;
+    readonly IAssetLoader assetLoader;
     readonly UndoHistory history = new();
     readonly Dictionary<Guid, AssetInspection> inspectedAssets = [];
     readonly Dictionary<Guid, Guid> savedAt = [];
@@ -31,11 +32,14 @@ public sealed class UndoService : IDisposable
     /// <param name="sceneTree">The open scenes.</param>
     /// <param name="inspector">The selection to watch.</param>
     /// <param name="assets">Reports edits and closed documents, and brings a document to the front.</param>
-    public UndoService(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets)
+    /// <param name="assetLoader">Resolves direct DataAsset references when rebuilding history objects.</param>
+    public UndoService(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets,
+        IAssetLoader assetLoader)
     {
         this.sceneTree = sceneTree;
         this.inspector = inspector;
         this.assets = assets;
+        this.assetLoader = assetLoader ?? throw new ArgumentNullException(nameof(assetLoader));
 
         inspector.SelectionChanged += OnSelectionChanged;
         sceneTree.SceneLoaded += OnSceneLoaded;
@@ -403,7 +407,7 @@ public sealed class UndoService : IDisposable
 
             IdClass? rebuilt = old switch
             {
-                Node node => NodeCloner.DeepClone(node, awake: false),
+                Node node => NodeCloner.DeepClone(node, awake: false, loader: assetLoader),
                 Component component => RebuildComponent(component),
                 _ => null,
             };
@@ -424,7 +428,7 @@ public sealed class UndoService : IDisposable
     }
 
     // A component is read the way a scene reads it, inside a node, then taken out of that node.
-    static Component? RebuildComponent(Component component)
+    Component? RebuildComponent(Component component)
     {
         var holder = new JsonObject
         {
@@ -432,7 +436,8 @@ public sealed class UndoService : IDisposable
             [nameof(Node.Components)] = new JsonArray(JsonNode.Parse(Serializer.Serialize(component))),
         };
 
-        if (Serializer.LoadData<Node>(holder.ToJsonString()) is not { Components.Count: > 0 } node) return null;
+        if (Serializer.LoadData<Node>(holder.ToJsonString(), assetLoader) is not { Components.Count: > 0 } node)
+            return null;
 
         var rebuilt = node.Components[0];
         node.Components.Clear();

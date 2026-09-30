@@ -307,6 +307,7 @@ public sealed class OapArchiveBuilder(ILogger logger)
                 AssetId = source.AssetId,
                 ProjectRootPath = outputRoot,
                 AssetTypeName = source.AssetTypeName,
+                DataAssetPayloadTypeId = source.DataAssetPayloadTypeId,
                 ParentAssetId = source.ParentAssetId,
                 SourceRelativePath = source.SourceRelativePath,
                 MetaRelativePath = source.MetaRelativePath,
