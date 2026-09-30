@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   build:
+    if: ${{ vars.RELEASE_REPOSITORY != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -88,7 +89,7 @@ jobs:
 
   release:
     needs: build
-    if: ${{ !cancelled() }}
+    if: ${{ vars.RELEASE_REPOSITORY != '' && !cancelled() }}
     runs-on: ubuntu-latest
     env:
       TURIAN_BUILD_RESULT: ${{ needs.build.result }}
@@ -137,6 +138,7 @@ jobs:
   # Container Registry, if configured). GitHub-hosted runners are full VMs, so no vfs/dind
   # workaround is needed here the way GitLab.com's container-executor runners require.
   container:
+    if: ${{ vars.RELEASE_REPOSITORY != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

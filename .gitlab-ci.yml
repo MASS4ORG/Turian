@@ -134,7 +134,7 @@ release-check:
     <<: *build_job_template
     stage: release-check
     rules:
-        - if: '$CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "web"'
+        - if: '$RELEASE_REPOSITORY != "" && ($CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "web")'
     before_script:
         - !reference [.dotnet_nuke_template, before_script]
     script:
