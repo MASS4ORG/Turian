@@ -82,6 +82,30 @@ public static class BrickService
         return fork;
     }
 
+    /// <summary>
+    /// Goes back from a local fork to the brick's global version; the fork is kept in the project's trash, and put
+    /// back if the brick no longer resolves without it.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <exception cref="PackageException">The brick is not a fork, or cannot be resolved without it.</exception>
+    public static void Revert(string projectRoot, string id)
+    {
+        var fork = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
+        var trash = ProjectBricks.Revert(projectRoot, id, ["gaya", ProjectPackages.HostName]);
+        ProjectPackages.Invalidate(projectRoot);
+        try
+        {
+            _ = ProjectPackages.Resolve(projectRoot);
+        }
+        catch (PackageException)
+        {
+            Directory.Move(trash, fork);
+            ProjectPackages.Invalidate(projectRoot);
+            throw;
+        }
+    }
+
     /// <summary>Copies assets of an installed brick into the project's <c>Assets</c> folder, detached from the brick.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>

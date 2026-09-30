@@ -46,7 +46,7 @@ public sealed class BrickArchiveTests : IDisposable
 
         var packed = BrickArchive.Pack(brick, Path.Combine(root, "out"));
 
-        using var zip = System.IO.Compression.ZipFile.OpenRead(packed.Path);
+        using var zip = ZipFile.OpenRead(packed.Path);
         Assert.Equal([".git-ignored.txt", "Runtime/Rule.txt", "package.json"], zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal));
     }
 
@@ -71,7 +71,7 @@ public sealed class BrickArchiveTests : IDisposable
         Assert.Throws<PackageException>(() => BrickArchive.ReadManifest(notZip));
 
         var empty = Path.Combine(root, "empty.brick");
-        using (var zip = System.IO.Compression.ZipFile.Open(empty, System.IO.Compression.ZipArchiveMode.Create))
+        using (var zip = ZipFile.Open(empty, ZipArchiveMode.Create))
             zip.CreateEntry("readme.txt");
         Assert.Throws<PackageException>(() => BrickArchive.ReadManifest(empty));
     }

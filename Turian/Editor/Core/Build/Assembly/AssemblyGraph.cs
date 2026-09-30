@@ -298,7 +298,7 @@ public sealed class AssemblyGraph
         IEnumerable<string> extraDirectories)
     {
         var references = new List<string>();
-        foreach (var reference in definition.References.Where(static r => !r.IsEmpty))
+        foreach (var reference in definition.References.Where(static r => r is { IsEmpty: false }))
         {
             if (!names.TryGetValue(reference.AssetId, out var referenced))
                 throw Conflict($"Assembly '{name}' references {reference.AssetId}, which is not an assembly definition.");

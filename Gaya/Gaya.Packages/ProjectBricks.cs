@@ -87,6 +87,30 @@ public static class ProjectBricks
         }
     }
 
+    /// <summary>
+    /// Moves a brick's local fork to the project's trash, so the brick is used from its declared source again.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <param name="reservedCategoryPrefixes">Category prefixes the manifest may use without depending on them.</param>
+    /// <returns>The folder the fork moved to.</returns>
+    /// <exception cref="PackageException">The project holds no fork of the brick, or the fork has no global original.</exception>
+    public static string Revert(string projectRoot, string id,
+        IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
+    {
+        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id.");
+        var fork = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
+        if (!File.Exists(Path.Combine(fork, PackageManifest.FileName)))
+            throw new PackageException($"{id} is not local to the project.");
+        if (PackageManifest.Load(fork, reservedCategoryPrefixes).Upstream is null)
+            throw new PackageException($"{id} was made in this project and has no global version to go back to.");
+
+        var trash = Path.Combine(projectRoot, ".Cache", "Trash", Guid.NewGuid().ToString("N"), id);
+        Directory.CreateDirectory(Path.GetDirectoryName(trash)!);
+        Directory.Move(fork, trash);
+        return trash;
+    }
+
     static void CopyDirectory(string source, string target)
     {
         Directory.CreateDirectory(target);

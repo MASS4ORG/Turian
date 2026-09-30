@@ -3,7 +3,7 @@ using Gaya.Packages;
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The Bricks panel: what the project installs, with install, update, remove and embed, and the selected brick's
+/// The Bricks panel: what the project installs, with install, update, remove and the local/global state, and the selected brick's
 /// details including why it is installed. It draws <see cref="BricksController"/> and holds no logic of its own.
 /// </summary>
 /// <param name="controller">The bricks' state and actions.</param>
@@ -128,8 +128,6 @@ sealed class BricksPanel(BricksController controller) : IPanel
             Cell(gui, $"{id}/version", row.Version, 70f, height);
             Cell(gui, $"{id}/origin", Describe(row.Origin), 110f, height);
 
-            if (Button(gui, "Embed", $"{id}/embed", 56f) && row.Origin != PackageOrigin.Embedded)
-                _ = controller.EmbedAsync(row.Id);
             if (row.IsDirect && Button(gui, "Remove", $"{id}/remove", 62f)) _ = controller.RemoveAsync(row.Id);
         }
     }
@@ -156,6 +154,7 @@ sealed class BricksPanel(BricksController controller) : IPanel
             ? (brick.Depth == 1 ? "Installed by the project" : "Installed as a dependency")
             : $"Required by: {string.Join(", ", requiredBy)}", Theme.InkDim);
         if (BrickAssemblies.IsPrecast(brick)) Line(gui, "Ships prebuilt assemblies", Theme.InkDim);
+        Locality(gui, brick);
 
         // Copying one asset detaches it from the brick: it gets a new id and stays put when the brick updates.
         if (assetsOf != brick.Id)
@@ -167,6 +166,26 @@ sealed class BricksPanel(BricksController controller) : IPanel
         if (assets.Count > 0) Line(gui, "Assets (Copy makes your own version in the project):", Theme.Ink);
         foreach (var asset in assets.Take(maxAssetRows)) AssetRow(gui, brick.Id, asset);
         if (assets.Count > maxAssetRows) Line(gui, $"… and {assets.Count - maxAssetRows} more; turian-cli brick copy copies any of them.", Theme.InkDim);
+    }
+
+    void Locality(Gui gui, ResolvedPackage brick)
+    {
+        var local = brick.Origin == PackageOrigin.Embedded;
+        Line(gui, local ? "Local: a copy in this project's Packages folder" : "Global: shared by every project on this machine",
+            Theme.InkDim);
+
+        if (local && brick.Manifest.Upstream is not null)
+        {
+            if (Button(gui, "Revert to global", $"bricks/revert/{brick.Id}", 110f,
+                    "Goes back to the shared version. Your local changes are kept in the project's trash."))
+                _ = controller.RevertAsync(brick.Id);
+        }
+        else if (!local && brick.Origin != PackageOrigin.File)
+        {
+            if (Button(gui, "Make local", $"bricks/local/{brick.Id}", 90f,
+                    "Copies this brick into the project's Packages folder so you can edit it and keep it in version control."))
+                _ = controller.EmbedAsync(brick.Id);
+        }
     }
 
     void AssetRow(Gui gui, string brickId, string asset)
@@ -185,8 +204,8 @@ sealed class BricksPanel(BricksController controller) : IPanel
     static string Describe(PackageOrigin origin) => origin switch
     {
         PackageOrigin.Builtin => "built-in",
-        PackageOrigin.Embedded => "embedded",
-        PackageOrigin.File => "local",
+        PackageOrigin.Embedded => "local",
+        PackageOrigin.File => "folder",
         PackageOrigin.Git => "git",
         PackageOrigin.Archive => ".brick",
         _ => origin.ToString(),
@@ -204,6 +223,6 @@ sealed class BricksPanel(BricksController controller) : IPanel
             gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
     }
 
-    bool Button(Gui gui, string label, string id, float width) =>
-        StudioControls.SmallTextButton(gui, label, id, Theme.Scale(width)) && !controller.IsBusy;
+    bool Button(Gui gui, string label, string id, float width, string? tooltip = null) =>
+        StudioControls.SmallTextButton(gui, label, id, Theme.Scale(width), tooltip) && !controller.IsBusy;
 }

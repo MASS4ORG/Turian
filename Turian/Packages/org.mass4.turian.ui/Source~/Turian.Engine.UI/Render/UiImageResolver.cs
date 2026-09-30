@@ -97,7 +97,7 @@ public sealed class UiImageResolver
             if (!TextureBlob.IsTextureBlob(bytes)) return SKImage.FromEncodedData(bytes);
 
             var blob = TextureBlob.Read(bytes);
-            if (blob.Format is not (Silk.NET.Vulkan.Format.R8G8B8A8Srgb or Silk.NET.Vulkan.Format.R8G8B8A8Unorm)
+            if (blob.Format is not (Format.R8G8B8A8Srgb or Format.R8G8B8A8Unorm)
                 || blob.Levels.Count == 0)
             {
                 Log.Logger.LogWarning("UI image {AssetId} uses unsupported texture format {Format}", assetId, blob.Format);

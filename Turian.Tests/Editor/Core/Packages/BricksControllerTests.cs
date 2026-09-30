@@ -118,6 +118,33 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
     }
 
+    /// <summary>Reverting a fork returns the brick to its global version and keeps the fork's files in the trash.</summary>
+    [Fact]
+    public async Task RevertGoesBackToTheGlobalBrick()
+    {
+        Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
+        var fork = Path.Combine(project, "Packages", "org.mass4.turian.cameras");
+        File.WriteAllText(Path.Combine(fork, "mine.txt"), "changed");
+
+        Assert.True(await controller.RevertAsync("org.mass4.turian.cameras"));
+
+        Assert.False(Directory.Exists(fork));
+        Assert.NotEqual(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
+        Assert.Single(Directory.GetFiles(Path.Combine(project, ".Cache", "Trash"), "mine.txt", SearchOption.AllDirectories));
+    }
+
+    /// <summary>A brick made in the project has no global version, so it cannot be reverted.</summary>
+    [Fact]
+    public async Task RevertRefusesABrickMadeInTheProject()
+    {
+        var made = BrickService.New(Path.Combine(project, "Packages"), "user.mateo.rules");
+        controller.Refresh();
+
+        Assert.False(await controller.RevertAsync("user.mateo.rules"));
+
+        Assert.True(Directory.Exists(made));
+    }
+
     /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>
     [Fact]
     public async Task RemoveEmbeddedOnlyBrickPreservesSourcesInTrash()

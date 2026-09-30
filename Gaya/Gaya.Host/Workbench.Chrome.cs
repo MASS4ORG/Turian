@@ -160,7 +160,7 @@ public sealed partial class Workbench
 
             using (gui.Node(t.Scale(statusSummaryWidth), height).ContentAlignY(0.5f).Enter())
                 gui.DrawText(
-                    $"{gui.Time.SmoothFps:0} fps   ·   {app.LoadedPluginIds.Count} plugin(s)   ·   Gaya",
+                    $"{gui.Time.SmoothFps:0} fps   ·   Gaya",
                     t.Text(12), t.InkDim);
         }
     }

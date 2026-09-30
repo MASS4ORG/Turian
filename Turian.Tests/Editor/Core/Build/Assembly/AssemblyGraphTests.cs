@@ -149,6 +149,21 @@ public sealed class AssemblyGraphTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => AssemblyGraph.Discover(assetsDirectory, defaultName));
     }
 
+    /// <summary>A reference slot just added in the inspector, still null, is skipped rather than crashing the build.</summary>
+    [Fact]
+    public void NullReferenceSlotsAreIgnored()
+    {
+        Define("A", "Acme.A");
+        var path = Path.Combine(assetsDirectory, "A", "Acme.A.dataasset");
+        var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        json["References"] = new JsonArray((JsonNode?)null);
+        File.WriteAllText(path, json.ToJsonString());
+
+        var graph = AssemblyGraph.Discover(assetsDirectory, defaultName);
+
+        Assert.Empty(graph.Definitions.Single().References);
+    }
+
     /// <summary>Only data assets holding a definition are read as one.</summary>
     [Fact]
     public void DefinitionFilesAreRecognizedWithoutLoading()

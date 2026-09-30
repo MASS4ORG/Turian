@@ -9,15 +9,15 @@ namespace Gaya.Plugin.Turian;
 public static partial class BuildInfo
 {
     /// <summary>The version this build was compiled at, from <c>git describe</c>.</summary>
-    public static string Version => sVersion;
+    public static string Version => SVersion;
 
     /// <summary>The contributors listed in <c>docs/CONTRIBUTORS.md</c>, one per line.</summary>
-    public static string Contributors => sContributors;
+    public static string Contributors => SContributors;
 
     /// <summary>The UTC date this assembly was compiled, formatted <c>yyyy-MM-dd</c>.</summary>
-    public static string CompilationDate => sCompilationDate;
+    public static string CompilationDate => SCompilationDate;
 
-    internal static string sVersion = "dev";
-    internal static string sContributors = "(contributors list not available)";
-    internal static string sCompilationDate = "(unknown)";
+    static readonly string SVersion = "dev";
+    static readonly string SContributors = "(contributors list not available)";
+    static readonly string SCompilationDate = "(unknown)";
 }

@@ -107,6 +107,11 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     /// <returns>Whether the brick was embedded.</returns>
     public Task<bool> EmbedAsync(string id) => RunAsync($"Embed brick {id}", root => BrickService.Embed(root, id));
 
+    /// <summary>Goes back from a brick's local fork to its global version, keeping the fork in the project's trash.</summary>
+    /// <param name="id">The brick id.</param>
+    /// <returns>Whether the brick is global again.</returns>
+    public Task<bool> RevertAsync(string id) => RunAsync($"Revert brick {id} to global", root => BrickService.Revert(root, id));
+
     /// <summary>
     /// Copies assets of an installed brick into the project's <c>Assets/&lt;last id segment&gt;</c> folder under new ids,
     /// detached from the brick.
