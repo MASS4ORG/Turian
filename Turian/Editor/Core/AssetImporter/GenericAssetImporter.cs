@@ -43,7 +43,12 @@ public class GenericAssetImporter : IAssetImporter
 
     /// <inheritdoc/>
     public IdClass? LoadAuthoredContent(Asset asset, string sourcePath) =>
-        asset is DataAssetAsset || IsDataAssetPath(sourcePath) ? DataAsset.LoadContent(sourcePath) : null;
+        (asset is DataAssetAsset || IsDataAssetPath(sourcePath)) && !IsVariantFile(sourcePath)
+            ? DataAsset.LoadContent(sourcePath)
+            : null;
+
+    // Saving the inspector's copy would write the resolved values over the file and end the variant.
+    static bool IsVariantFile(string path) => File.Exists(path) && DataAssetVariants.IsVariant(File.ReadAllText(path));
 
     /// <summary>Whether a file is a data asset by its extension — what the New menu writes, or an older one.</summary>
     /// <param name="path">The source file path.</param>

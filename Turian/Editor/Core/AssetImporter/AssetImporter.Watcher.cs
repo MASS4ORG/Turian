@@ -140,6 +140,12 @@ public sealed partial class AssetImporter
         }
 
         var assetPath = GetAssetPathFromMeta(metaFilePath);
+        if (PackageRootOf(assetPath) is not null && importOverrides.Get(asset.Id) is not null)
+        {
+            // The project's own import settings for a brick's asset; the settings hash below then differs, so it reimports.
+            asset = Serializer.LoadData<Asset>(importOverrides.Apply(asset.Id, SerializeAssetMetadata(asset))) ?? asset;
+        }
+
         if (!string.IsNullOrWhiteSpace(assetPath))
         {
             asset.RelativePath = assetPath;

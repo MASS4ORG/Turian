@@ -4,7 +4,7 @@ namespace Turian.Editor.Core;
 /// Opens a project into the editor services: loads its settings, points the build manager and the
 /// asset catalog at it, and restores the documents that were open last time.
 /// </summary>
-public sealed class ProjectSession(IServiceProvider services, ILogger log)
+public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBrickApplier
 {
     /// <summary>The settings of the open project, or null when none has been opened.</summary>
     public AppSettings? Settings { get; private set; }
@@ -98,6 +98,22 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log)
                 exception,
                 "Could not rebuild the asset catalog. Scenes will open empty until the project is reimported");
         }
+    }
+
+    /// <summary>
+    /// Brings the open project in line with its bricks after they changed: loads the prebuilt assemblies of any
+    /// new brick, rescans the assets with the current brick folders, and recompiles the scripts. Assemblies of a
+    /// removed brick stay loaded until the editor restarts.
+    /// </summary>
+    /// <exception cref="Gaya.Packages.PackageException">The bricks cannot be resolved.</exception>
+    public void ApplyBrickChanges()
+    {
+        if (Settings is null) return;
+
+        ProjectPackages.Invalidate(Settings.ProjectAbsoluteDir);
+        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log);
+        services.GetRequiredService<AssetImporter>().StartMonitoring();
+        _ = RecompileScripts();
     }
 
     /// <summary>

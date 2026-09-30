@@ -34,6 +34,7 @@ public sealed partial class AssetImporter : IDisposable
     AssetFolderWatcher? folderWatcher;
     List<AssetFolderWatcher> packageWatchers = [];
     IReadOnlyList<(string Root, bool ReadOnly)> packageRoots = [];
+    PackageImportOverrides importOverrides = new();
     List<(Asset Asset, string SourcePath)>? pendingBatch;
     string? projectRootPath;
     string? assetsRootPath;
@@ -234,6 +235,7 @@ public sealed partial class AssetImporter : IDisposable
 
         try
         {
+            importOverrides = PackageImportOverrides.Load(projectRootPath);
             var packages = ProjectPackages.ResolveOrEmpty(projectRootPath);
             packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
 

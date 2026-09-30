@@ -83,7 +83,8 @@ public class DataAssetAsset : Asset
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
         using var reader = new StreamReader(provider.GetAssetStream());
-        return Serializer.LoadData<DataAsset>(reader.ReadToEnd());
+        return Serializer.LoadData<DataAsset>(
+            DataAssetVariants.Flatten(reader.ReadToEnd(), DataAssetVariants.ReadFromDatabase));
     }
 
     static void CopyFields(DataAsset source, DataAsset target)

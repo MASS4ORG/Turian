@@ -33,7 +33,8 @@ public static partial class Program
             ScreenshotCommand(projectArg),
             PickCommand(projectArg),
             OapCommand(projectArg),
-            BrickCommand()
+            BrickCommand(),
+            VariantCommand()
         };
 
         return await root.Parse(args).InvokeAsync();

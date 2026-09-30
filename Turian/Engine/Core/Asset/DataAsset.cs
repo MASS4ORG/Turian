@@ -34,7 +34,8 @@ public class DataAsset : IdClass
     {
         if (File.Exists(absolutePath))
         {
-            return Serializer.Load<DataAsset>(absolutePath);
+            return Serializer.LoadData<DataAsset>(
+                DataAssetVariants.Flatten(File.ReadAllText(absolutePath), DataAssetVariants.ReadFromDatabase));
         }
 
         throw new FileNotFoundException($"DataAsset load failed {absolutePath}");

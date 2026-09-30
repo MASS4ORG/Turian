@@ -92,6 +92,12 @@ static class StudioCommands
         { DynamicLabel = Localized("Exit") });
 
         // ── Project ─────────────────────────────────────────────
+        Add(context, MenuIds.Project, "2", 0, new CommandDescriptor(
+            "gaya.turian.bricks", "Project: Bricks…",
+            sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BricksPanelId),
+            HasProject)
+        { DynamicLabel = Localized("Bricks…") });
+
         Add(context, MenuIds.Project, "3", 0, new CommandDescriptor(
             "gaya.turian.recompile", "Assets: Recompile Scripts",
             sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),

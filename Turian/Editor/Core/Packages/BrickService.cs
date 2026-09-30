@@ -36,6 +36,7 @@ public static class BrickService
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         var previous = before.Dependencies.GetValueOrDefault(id);
         ProjectBricks.Add(projectRoot, id, spec ?? $"builtin:{id}");
+        ProjectPackages.Invalidate(projectRoot);
         try
         {
             return ProjectPackages.Resolve(projectRoot);
@@ -45,6 +46,7 @@ public static class BrickService
             // A declaration that does not resolve must not stay in the manifest.
             if (previous is null) ProjectBricks.Remove(projectRoot, id);
             else ProjectBricks.Add(projectRoot, id, previous);
+            ProjectPackages.Invalidate(projectRoot);
             throw;
         }
     }
@@ -53,7 +55,12 @@ public static class BrickService
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
     /// <returns>Whether the project declared it.</returns>
-    public static bool Remove(string projectRoot, string id) => ProjectBricks.Remove(projectRoot, id);
+    public static bool Remove(string projectRoot, string id)
+    {
+        var removed = ProjectBricks.Remove(projectRoot, id);
+        ProjectPackages.Invalidate(projectRoot);
+        return removed;
+    }
 
     /// <summary>Copies an installed brick into the project as a writable fork.</summary>
     /// <param name="projectRoot">The project folder.</param>
@@ -64,7 +71,25 @@ public static class BrickService
     {
         var brick = List(projectRoot).FirstOrDefault(p => p.Id == id)
                     ?? throw new PackageException($"The project does not install {id}.");
-        return ProjectBricks.Embed(brick, projectRoot, ["gaya", ProjectPackages.HostName]);
+        var fork = ProjectBricks.Embed(brick, projectRoot, ["gaya", ProjectPackages.HostName]);
+        ProjectPackages.Invalidate(projectRoot);
+        return fork;
+    }
+
+    /// <summary>Copies assets of an installed brick into the project's <c>Assets</c> folder, detached from the brick.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    /// <param name="assets">The assets to copy, relative to the brick folder.</param>
+    /// <param name="destination">The folder, relative to <c>Assets</c>, the copies go into.</param>
+    /// <param name="remapReferences">Whether the project's own files that point at the originals point at the copies afterwards.</param>
+    /// <returns>What was copied.</returns>
+    /// <exception cref="PackageException">The project does not install the brick, or it lacks an asset.</exception>
+    public static IReadOnlyList<CopiedAsset> CopyAssets(string projectRoot, string id, IEnumerable<string> assets,
+        string destination, bool remapReferences = false)
+    {
+        var brick = List(projectRoot).FirstOrDefault(p => p.Id == id)
+                    ?? throw new PackageException($"The project does not install {id}.");
+        return BrickAssetCopy.Copy(projectRoot, brick, assets, destination, remapReferences);
     }
 
     /// <summary>Packs a brick folder into a <c>.brick</c> file after verifying it.</summary>

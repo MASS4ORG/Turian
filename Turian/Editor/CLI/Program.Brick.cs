@@ -21,6 +21,7 @@ public static partial class Program
             BrickRestoreCommand(projectOption),
             BrickUpdateCommand(projectOption),
             BrickEmbedCommand(projectOption),
+            BrickCopyCommand(projectOption),
             BrickVerifyCommand(),
             BrickPackCommand(),
         };
@@ -149,6 +150,89 @@ public static partial class Program
         var command = new Command("embed", "Copy an installed brick into the project as a writable fork") { idArg, projectOption };
         command.SetAction(result => RunBrick(() =>
             Console.WriteLine($"Embedded at {BrickService.Embed(result.GetValue(projectOption)!.FullName, result.GetValue(idArg)!)}")));
+        return command;
+    }
+
+    static Command BrickCopyCommand(Option<DirectoryInfo> projectOption)
+    {
+        var idArg = new Argument<string>("id") { Description = "Brick id" };
+        var assetsArg = new Argument<string[]>("assets")
+        {
+            Description = "Assets to copy, as paths inside the brick; all of its assets when omitted",
+            Arity = ArgumentArity.ZeroOrMore,
+        };
+        var toOption = new Option<string>("--to")
+        {
+            Description = "Folder under Assets the copies go into; the brick's last id segment when omitted",
+        };
+        var remapOption = new Option<bool>("--remap")
+        {
+            Description = "Point the project's own files that use the originals at the copies",
+        };
+
+        var command = new Command("copy", "Copy a brick's assets into the project under new ids, detached from the brick")
+        {
+            idArg, assetsArg, toOption, remapOption, projectOption,
+        };
+        command.SetAction(result => RunBrick(() =>
+        {
+            var id = result.GetValue(idArg)!;
+            var project = result.GetValue(projectOption)!.FullName;
+            var assets = result.GetValue(assetsArg) is { Length: > 0 } chosen
+                ? chosen
+                : [.. BrickAssetCopy.Assets(BrickService.List(project).FirstOrDefault(p => p.Id == id)
+                                            ?? throw new PackageException($"The project does not install {id}."))];
+            foreach (var copy in BrickService.CopyAssets(project, id, assets, result.GetValue(toOption) ?? id.Split('.')[^1],
+                         result.GetValue(remapOption)))
+                Console.WriteLine($"{copy.Source} -> {copy.Target} ({copy.NewId})");
+        }));
+        return command;
+    }
+
+    static Command VariantCommand()
+    {
+        var baseArg = new Argument<string>("base")
+        {
+            Description = "The data asset to vary: a path in the project, or <brick id>:<path inside the brick>",
+        };
+        var nameArg = new Argument<string>("name") { Description = "The variant's file name without extension" };
+        var folderOption = new Option<string>("--folder")
+        {
+            Description = "Folder, relative to the project, the variant is written into",
+            DefaultValueFactory = _ => "Assets",
+        };
+        var projectOption = new Option<DirectoryInfo>("--project")
+        {
+            Description = "Project folder",
+            DefaultValueFactory = _ => new DirectoryInfo("./"),
+        };
+
+        var command = new Command("variant", "Create a variant of a data asset: the same values with the ones you override, without forking the original")
+        {
+            baseArg, nameArg, folderOption, projectOption,
+        };
+        command.SetAction(result =>
+        {
+            try
+            {
+                var project = result.GetValue(projectOption)!.FullName;
+                var spec = result.GetValue(baseArg)!;
+                var colon = spec.IndexOf(':', StringComparison.Ordinal);
+                var baseFile = colon > 0 && PackageId.IsValid(spec[..colon])
+                    ? Path.Combine((BrickService.List(project).FirstOrDefault(p => p.Id == spec[..colon])
+                                    ?? throw new PackageException($"The project does not install {spec[..colon]}.")).RootPath, spec[(colon + 1)..])
+                    : Path.GetFullPath(spec, project);
+
+                var (path, id) = DataAssetVariantFactory.Create(project, baseFile, result.GetValue(folderOption)!, result.GetValue(nameArg)!);
+                Console.WriteLine($"{path} ({id}); put the values to change under {DataAssetVariants.Property}.Overrides");
+                return 0;
+            }
+            catch (Exception ex) when (ex is PackageException or IOException or InvalidOperationException)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+        });
         return command;
     }
 

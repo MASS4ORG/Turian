@@ -94,6 +94,16 @@ public static class ProjectPackages
         return resolution;
     }
 
+    /// <summary>Forgets the cached resolution of a project, for a caller that has just rewritten its manifest.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    public static void Invalidate(string projectRoot)
+    {
+        lock (CacheLock)
+        {
+            _ = Cache.Remove(Path.GetFullPath(projectRoot));
+        }
+    }
+
     /// <summary>The package folders of a project, dependencies first; none when it declares no packages.</summary>
     /// <param name="projectRoot">The project folder, or empty for none.</param>
     /// <returns>The resolved packages.</returns>
