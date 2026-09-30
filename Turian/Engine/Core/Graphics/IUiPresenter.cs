@@ -39,6 +39,18 @@ public interface IUiPresenterFactory
     IUiPresenter Create(Vulkan vulkan, IInputSource? input, LocaleService? locale);
 }
 
+/// <summary>An interface package's way to draw one document on the CPU, without a scene or a GPU: what previews and CI use.</summary>
+public interface IUiDocumentPreview
+{
+    /// <summary>Renders an interface document to a PNG.</summary>
+    /// <param name="documentPath">The document file.</param>
+    /// <param name="width">Image width in pixels.</param>
+    /// <param name="height">Image height in pixels.</param>
+    /// <param name="dataJson">A JSON object bound as the document's data, or <c>null</c>.</param>
+    /// <returns>The PNG bytes.</returns>
+    byte[] RenderPng(string documentPath, int width, int height, string? dataJson);
+}
+
 /// <summary>Marks an assembly as an interface package, naming its <see cref="IUiPresenterFactory"/>.</summary>
 /// <param name="factoryType">A type with a public parameterless constructor implementing the factory.</param>
 [AttributeUsage(AttributeTargets.Assembly)]
@@ -72,6 +84,10 @@ public static class UiPresenters
             return found;
         }
     }
+
+    /// <summary>The document preview of the installed interface package, or <c>null</c> when it offers none.</summary>
+    /// <returns>The preview.</returns>
+    public static IUiDocumentPreview? FindPreview() => Find() as IUiDocumentPreview;
 
     /// <summary>The factory named by the first of <paramref name="assemblies"/> that declares one.</summary>
     /// <param name="assemblies">The assemblies to look in.</param>

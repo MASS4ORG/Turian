@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed: camera rigs (Follow, Orbit, Free Fly, FPS) moved to the built-in brick `org.mass4.turian.cameras` (namespace `Turian.Cameras`); projects add it to `Packages/manifest.json` as `builtin:org.mass4.turian.cameras`
 - Changed: the in-game UI (`.ui`/`.uss`, Guinevere, Skia) moved to the built-in brick `org.mass4.turian.ui`; games without it no longer ship Guinevere or Skia. Projects using UI add `builtin:org.mass4.turian.ui` to `Packages/manifest.json` and `using Turian.Engine.UI;` where they use it (new projects no longer get it as a global using)
-- Removed: `turian-cli ui` (use `screenshot` or `playmode` to render a document)
 - Fixed: a meta whose asset type is not installed is left untouched instead of being rewritten with a new id
 - Added: `nuget` field in `package.json`, `Precast~/` prebuilt assemblies, and the `IUiPresenter` contract hosts draw interfaces through
 - Added: `turian-cli import unitypackage`: textures, models and audio keep their Unity guids as asset ids, import settings map where they exist, materials convert to Turian materials, prefabs and scenes to prefabs (hierarchy, transforms, lights, cameras, mesh renderers); scripts, shaders and animation are reported and left out

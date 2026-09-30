@@ -1,11 +1,9 @@
-using Gaya.Packages;
-
 namespace Turian.Tests;
 
 /// <summary>The in-game UI shipped as the built-in brick <c>org.mass4.turian.ui</c>.</summary>
 public sealed class UiBrickTests : IDisposable
 {
-    const string BrickId = "org.mass4.turian.ui";
+    const string brickId = "org.mass4.turian.ui";
 
     readonly string project = Path.Combine(Path.GetTempPath(), $"turian-ui-brick-{Guid.NewGuid():N}");
 
@@ -22,7 +20,7 @@ public sealed class UiBrickTests : IDisposable
     [Fact]
     public void BrickShipsPrebuiltAssemblies()
     {
-        var brick = Install(BrickId);
+        var brick = Install(brickId);
 
         Assert.Equal(["Guinevere", "Turian.Engine.UI"],
             BrickAssemblies.RuntimeAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
@@ -40,7 +38,7 @@ public sealed class UiBrickTests : IDisposable
 
         Assert.DoesNotContain(References(settings), static name => name == "Turian.Engine.UI");
 
-        Install(BrickId);
+        Install(brickId);
         var references = References(settings);
         Assert.Contains("Turian.Engine.UI", references);
         Assert.Contains("Guinevere", references);
@@ -51,7 +49,7 @@ public sealed class UiBrickTests : IDisposable
     [Fact]
     public void TypeManifestListsPrecastAssemblies()
     {
-        Install(BrickId);
+        Install(brickId);
 
         var manifest = UserCodeTypeManifestGenerator.Generate(Path.Combine(project, "Assets"), NullLogger.Instance);
 
@@ -62,12 +60,24 @@ public sealed class UiBrickTests : IDisposable
     [Fact]
     public void LoadedBrickProvidesThePresenterFactory()
     {
-        var brick = Install(BrickId);
+        var brick = Install(brickId);
 
         BrickAssemblies.Load([brick], NullLogger.Instance);
 
         Assert.NotNull(UiPresenters.Find());
         Assert.Equal(typeof(UiDocumentComponent), TypeRegistry.GetTypeOrThrow(new Guid("a3000001-0000-4000-8000-000000000020")));
+    }
+
+    /// <summary>The brick renders a single document to a PNG on the CPU, which the command line's <c>ui</c> command uses.</summary>
+    [Fact]
+    public void BrickRendersDocumentPreviews()
+    {
+        var file = Path.Combine(project, "hud.ui");
+        File.WriteAllText(file, "<UI xmlns=\"https://turian.mass4.org/ui\"><VisualElement><Label text=\"Score {Score}\"/></VisualElement></UI>");
+
+        var png = new UiManagerFactory().RenderPng(file, 128, 64, "{ \"Score\": 7 }");
+
+        Assert.Equal([0x89, 0x50, 0x4E, 0x47], png[..4]);
     }
 
     ResolvedPackage Install(string id)

@@ -35,7 +35,8 @@ public static partial class Program
             OapCommand(projectArg),
             BrickCommand(),
             VariantCommand(),
-            ImportCommand()
+            ImportCommand(),
+            UiCommand()
         };
 
         return await root.Parse(args).InvokeAsync();
