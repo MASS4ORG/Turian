@@ -108,6 +108,9 @@ public sealed class PackageManifest
     /// <summary>Set in a packed brick whose <c>Precast~</c> payload was built; absent in a source folder.</summary>
     public PackagePrecast? Precast { get; set; }
 
+    /// <summary>Licensing and access terms: entitlement, license agreement, whether the brick may be forked or republished.</summary>
+    public PackageStoreInfo? Store { get; set; }
+
     /// <summary>Samples the user can copy into the project.</summary>
     public List<PackageSample> Samples { get; set; } = [];
 

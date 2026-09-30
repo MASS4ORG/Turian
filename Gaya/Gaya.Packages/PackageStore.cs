@@ -21,6 +21,12 @@ public sealed class PackageStore(string root)
             ? configured
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gaya", "bricks");
 
+    /// <summary>The name a store folder of a <c>.brick</c> file carries after the id, from the file's integrity string.</summary>
+    /// <param name="integrity">The file's integrity string, <c>sha256-</c> + base64.</param>
+    /// <returns>The folder's version part, <c>sha256-</c> and 16 hex digits.</returns>
+    public string ArchiveFolderName(string integrity) =>
+        $"sha256-{Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]))[..16]}";
+
     /// <summary>The store folder of a package at a git commit.</summary>
     /// <param name="id">The package id.</param>
     /// <param name="commit">The full commit hash.</param>
@@ -108,8 +114,7 @@ public sealed class PackageStore(string root)
     {
         var integrity = BrickArchive.ComputeIntegrity(archivePath);
         var manifest = BrickArchive.ReadManifest(archivePath, reservedCategoryPrefixes);
-        var hex = Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]));
-        var target = PackagePath(manifest.Name, $"sha256-{hex[..16]}");
+        var target = PackagePath(manifest.Name, ArchiveFolderName(integrity));
         if (Directory.Exists(target)) return (target, integrity);
 
         var staging = Path.Combine(Root, ".staging", Guid.NewGuid().ToString("N"));

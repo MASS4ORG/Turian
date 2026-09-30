@@ -49,6 +49,10 @@
         <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="Packages/registry-mass4.pub" LogicalName="registry-mass4.pub"/>
+    </ItemGroup>
+
     <!-- Where the built-in bricks live when run from a checkout (ProjectPackages.BuiltinDirectory); publishing ships them
          from Turian/Packages/Bricks.targets. -->
     <ItemGroup>

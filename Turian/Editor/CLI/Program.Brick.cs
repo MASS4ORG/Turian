@@ -25,6 +25,10 @@ public static partial class Program
             BrickDiffCommand(projectOption),
             BrickRebaseCommand(projectOption),
             BrickStubCommand(),
+            BrickPublishCommand(),
+            BrickYankCommand(),
+            BrickSearchCommand(projectOption),
+            BrickRegistryCommand(projectOption),
             BrickVerifyCommand(),
             BrickPackCommand(),
         };
@@ -294,6 +298,96 @@ public static partial class Program
         command.SetAction(result => RunBrick(() =>
             Console.WriteLine($"Wrote stub {BrickStub.Write(result.GetValue(pathArg)!.FullName, result.GetValue(outOption)!.FullName)} to {result.GetValue(outOption)!.FullName}")));
         return command;
+    }
+
+    static Command BrickPublishCommand()
+    {
+        var pathArg = new Argument<DirectoryInfo>("path") { Description = "Brick folder", DefaultValueFactory = _ => new DirectoryInfo("./") };
+        var registryOption = new Option<DirectoryInfo>("--registry") { Description = "The registry's root folder (what you upload to its host)", Required = true };
+        var keyOption = new Option<FileInfo>("--key") { Description = "The registry's private key file (an OpenSSH ed25519 key)", Required = true };
+        var publisherOption = new Option<FileInfo?>("--publisher-key") { Description = "Your own private key, which owns your names in the registry" };
+        var claimOption = new Option<string?>("--claim") { Description = "A name prefix to claim with the publisher key, such as com.acme (user.<name> is claimed on first publish)" };
+        var precastOption = new Option<bool>("--precast") { Description = "Compile the brick's assemblies into Precast~ first" };
+
+        var command = new Command("publish", "Pack a brick and add it, signed, to a static registry folder") { pathArg, registryOption, keyOption, publisherOption, claimOption, precastOption };
+        command.SetAction(async (result, _) => await RunBrickAsync(async () =>
+        {
+            var path = result.GetValue(pathArg)!.FullName;
+            var precast = result.GetValue(precastOption) ? await BrickService.PrecastAsync(path, Log.Logger).ConfigureAwait(false) : null;
+            var published = BrickService.Publish(path, result.GetValue(registryOption)!.FullName, result.GetValue(keyOption)!.FullName,
+                result.GetValue(publisherOption)?.FullName, result.GetValue(claimOption), precast);
+            Console.WriteLine($"Published {published.Id} {published.Version} as {published.Url}");
+        }).ConfigureAwait(false));
+        return command;
+    }
+
+    static Command BrickYankCommand()
+    {
+        var registryArg = new Argument<DirectoryInfo>("registry") { Description = "The registry's root folder" };
+        var idArg = new Argument<string>("id") { Description = "Brick id" };
+        var versionArg = new Argument<string>("version") { Description = "Version to withdraw" };
+
+        var command = new Command("yank", "Withdraw a version from a registry: projects that locked it keep it, nobody new gets it") { registryArg, idArg, versionArg };
+        command.SetAction(result => RunBrick(() =>
+        {
+            RegistryPublisher.Yank(result.GetValue(registryArg)!.FullName, result.GetValue(idArg)!, result.GetValue(versionArg)!);
+            Console.WriteLine("Yanked");
+        }));
+        return command;
+    }
+
+    static Command BrickSearchCommand(Option<DirectoryInfo> projectOption)
+    {
+        var queryArg = new Argument<string>("query") { Description = "Text the brick id contains; everything when omitted", Arity = ArgumentArity.ZeroOrOne };
+
+        var command = new Command("search", "Find bricks in the project's registries and the public one") { queryArg, projectOption };
+        command.SetAction(async (result, _) => await RunBrickAsync(async () =>
+        {
+            foreach (var (registry, id, latest) in await BrickService.SearchAsync(result.GetValue(projectOption)!.FullName, result.GetValue(queryArg) ?? string.Empty).ConfigureAwait(false))
+                Console.WriteLine($"{id} {latest}  [{registry}]");
+        }).ConfigureAwait(false));
+        return command;
+    }
+
+    static Command BrickRegistryCommand(Option<DirectoryInfo> projectOption)
+    {
+        var nameArg = new Argument<string>("name") { Description = "A name for the registry" };
+        var urlArg = new Argument<string>("url") { Description = "The registry's https://…/v1 address, or the v1 folder of a copy" };
+        var scopeOption = new Option<string[]>("--scope") { Description = "Name prefix served from this registry; repeat for several", Required = true, AllowMultipleArgumentsPerToken = true };
+        var keyOption = new Option<string[]>("--key") { Description = "A trusted key: an OpenSSH public key line, or a .pub file; repeat for several", AllowMultipleArgumentsPerToken = true };
+        var unsignedOption = new Option<bool>("--allow-unsigned") { Description = "Accept bricks without a signature (only for a registry you run)" };
+
+        var add = new Command("add", "Take bricks whose names match --scope from a registry") { nameArg, urlArg, scopeOption, keyOption, unsignedOption, projectOption };
+        add.SetAction(result => RunBrick(() =>
+        {
+            var keys = (result.GetValue(keyOption) ?? []).Select(static key => File.Exists(key) ? File.ReadAllText(key).Trim() : key).ToList();
+            BrickService.AddRegistry(result.GetValue(projectOption)!.FullName, new ScopedRegistry
+            {
+                Name = result.GetValue(nameArg)!,
+                Url = result.GetValue(urlArg)!,
+                Scopes = [.. result.GetValue(scopeOption)!],
+                Keys = keys,
+                AllowUnsigned = result.GetValue(unsignedOption),
+            });
+            Console.WriteLine($"Added registry {result.GetValue(nameArg)}");
+        }));
+
+        var removeName = new Argument<string>("name") { Description = "The registry's name" };
+        var remove = new Command("remove", "Stop taking bricks from a registry") { removeName, projectOption };
+        remove.SetAction(result => RunBrick(() =>
+        {
+            if (!BrickService.RemoveRegistry(result.GetValue(projectOption)!.FullName, result.GetValue(removeName)!))
+                throw new PackageException($"The project does not declare a registry named {result.GetValue(removeName)}.");
+        }));
+
+        var list = new Command("list", "List the registries bricks come from") { projectOption };
+        list.SetAction(result => RunBrick(() =>
+        {
+            foreach (var registry in BrickService.Registries(result.GetValue(projectOption)!.FullName))
+                Console.WriteLine($"{registry.Name}  {registry.Url}  scopes: {string.Join(", ", registry.Scopes)}  keys: {registry.Keys.Count}{(registry.AllowUnsigned ? "  (unsigned allowed)" : string.Empty)}");
+        }));
+
+        return new Command("registry", "Registries the project takes bricks from") { add, remove, list };
     }
 
     static Command BrickVerifyCommand()

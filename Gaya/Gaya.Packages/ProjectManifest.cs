@@ -22,6 +22,9 @@ public sealed class ProjectManifest
     /// </summary>
     public Dictionary<string, string?> Dependencies { get; set; } = [];
 
+    /// <summary>The registries the project takes bricks from by version range, for the names each is scoped to.</summary>
+    public List<ScopedRegistry> ScopedRegistries { get; set; } = [];
+
     /// <summary>
     /// Reads a project's manifest, with its user override applied unless <paramref name="includeUserOverride"/> is
     /// false. A project without a manifest installs nothing.
@@ -46,6 +49,13 @@ public sealed class ProjectManifest
                 else manifest.Dependencies[id] = spec;
                 overridden.Add(id);
             }
+
+            // A registry of the same name replaces the project's; others are added.
+            foreach (var registry in user.ScopedRegistries)
+            {
+                manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
+                manifest.ScopedRegistries.Add(registry);
+            }
         }
 
         return (manifest, overridden);
@@ -57,7 +67,9 @@ public sealed class ProjectManifest
     {
         var directory = Path.Combine(projectRoot, DirectoryName);
         Directory.CreateDirectory(directory);
-        File.WriteAllText(Path.Combine(directory, FileName), JsonSerializer.Serialize(this, PackageJson.Options));
+        var node = JsonSerializer.SerializeToNode(this, PackageJson.Options)!.AsObject();
+        if (ScopedRegistries.Count == 0) node.Remove("scopedRegistries");
+        File.WriteAllText(Path.Combine(directory, FileName), node.ToJsonString(PackageJson.Options));
     }
 
     static ProjectManifest? Read(string path)

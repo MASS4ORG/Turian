@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Dedicated to the public domain under CC0 1.0.",
+  "title": "Brick manifest (package.json)",
+  "type": "object",
+  "required": ["name", "version"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$", "description": "Lowercase reverse-DNS id." },
+    "version": { "type": "string", "description": "Semantic version." },
+    "displayName": { "type": "string" },
+    "description": { "type": "string" },
+    "author": { "type": "string" },
+    "license": { "type": "string", "description": "SPDX expression." },
+    "keywords": { "type": "array", "items": { "type": "string" } },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "description": "A version range, or a source: builtin:<id>, file:<folder or .brick>, git+<url>[#ref]." }
+    },
+    "devDependencies": { "type": "object", "additionalProperties": { "type": "string" } },
+    "nuget": { "type": "object", "additionalProperties": { "type": "string" }, "description": "NuGet package id -> exact version, for the prebuilt assemblies." },
+    "engines": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Host name -> version range, e.g. { \"turian\": \">=1.0 <2\" }." },
+    "scopes": { "type": "array", "items": { "enum": ["project", "studio", "game"] } },
+    "editorOnly": { "type": "boolean" },
+    "compileTimeOnly": { "type": "boolean" },
+    "categories": { "type": "array", "items": { "type": "string", "pattern": "^[^:]+:.+$" } },
+    "upstream": { "type": "string", "description": "For an embedded fork: id@version (commit or hash) it was copied from." },
+    "precast": {
+      "type": "object",
+      "description": "Set in a packed brick whose Precast~ folder holds prebuilt assemblies.",
+      "properties": {
+        "builtWith": { "type": "object", "additionalProperties": { "type": "string" } },
+        "assemblies": { "type": "array", "items": { "type": "string" } },
+        "editorAssemblies": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "store": {
+      "type": "object",
+      "properties": {
+        "entitlement": { "type": "string", "enum": ["token"] },
+        "eula": { "type": "string" },
+        "redistribute": { "type": "boolean", "default": true },
+        "embeddable": { "type": "boolean", "default": true }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["displayName", "path"],
+        "properties": { "displayName": { "type": "string" }, "path": { "type": "string" }, "description": { "type": "string" } }
+      }
+    }
+  }
+}

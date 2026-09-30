@@ -44,6 +44,9 @@ public static class ProjectBricks
         IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
     {
         ArgumentNullException.ThrowIfNull(package);
+        if (package.Manifest.Store is { Embeddable: false })
+            throw new PackageException($"{package.Id} is licensed so that it cannot be embedded; use it from its registry, or ask its publisher.");
+
         var target = Path.Combine(projectRoot, ProjectManifest.DirectoryName, package.Id);
         if (package.Origin == PackageOrigin.Embedded || Directory.Exists(target))
             throw new PackageException($"{package.Id} is already embedded at {target}.");

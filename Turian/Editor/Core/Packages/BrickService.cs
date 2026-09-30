@@ -92,6 +92,102 @@ public static class BrickService
         return BrickAssetCopy.Copy(projectRoot, brick, assets, destination, remapReferences);
     }
 
+    /// <summary>
+    /// Packs a brick (after <see cref="Pack"/>'s checks) and publishes it into a static registry folder, signed by the
+    /// registry's key and, for the names that have an owner, by the publisher's.
+    /// </summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <param name="registryRoot">The registry's root folder, which is what gets uploaded to its host.</param>
+    /// <param name="registryKeyFile">The registry's private key file.</param>
+    /// <param name="publisherKeyFile">The publisher's private key file, or null.</param>
+    /// <param name="claim">A name prefix to claim for the publisher.</param>
+    /// <param name="precast">What the brick's <c>Precast~</c> payload was built with, from <see cref="PrecastAsync"/>.</param>
+    /// <returns>What was published.</returns>
+    /// <exception cref="PackageException">The brick is invalid, the version exists, or the name belongs to another key.</exception>
+    public static RegistryPublishResult Publish(string packageRoot, string registryRoot, string registryKeyFile,
+        string? publisherKeyFile, string? claim = null, PackagePrecast? precast = null)
+    {
+        var scratch = Path.Combine(Path.GetTempPath(), $"turian-publish-{Guid.NewGuid():N}");
+        try
+        {
+            var packed = Pack(packageRoot, scratch, precast);
+            return RegistryPublisher.Publish(registryRoot, packed.Path, new SshKeygenSigner(registryKeyFile),
+                publisherKeyFile is null ? null : new SshKeygenSigner(publisherKeyFile), claim, ["gaya", ProjectPackages.HostName]);
+        }
+        finally
+        {
+            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+        }
+    }
+
+    /// <summary>The registries a project takes bricks from: its own scoped ones, then the public one.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <returns>The registries.</returns>
+    public static IReadOnlyList<ScopedRegistry> Registries(string projectRoot) =>
+        [.. ProjectManifest.Load(projectRoot).Manifest.ScopedRegistries, ProjectPackages.PublicRegistry];
+
+    /// <summary>Declares a registry in the project's manifest, replacing one of the same name.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="registry">The registry.</param>
+    /// <exception cref="PackageException">The registry has no name, address or scope, or a key that is not an ed25519 public key.</exception>
+    public static void AddRegistry(string projectRoot, ScopedRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        if (registry.Name.Length == 0 || registry.Url.Length == 0 || registry.Scopes.Count == 0)
+            throw new PackageException("A registry needs a name, an address and at least one scope.");
+        foreach (var key in registry.Keys) _ = SshSignature.ParsePublicKey(key);
+        if (registry.Keys.Count == 0 && !registry.AllowUnsigned)
+            throw new PackageException("A registry needs at least one trusted key (an OpenSSH public key), or must be marked to allow unsigned bricks.");
+
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
+        manifest.ScopedRegistries.Add(registry);
+        manifest.Save(projectRoot);
+        ProjectPackages.Invalidate(projectRoot);
+    }
+
+    /// <summary>Removes a registry from the project's manifest.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="name">The registry's name.</param>
+    /// <returns>Whether the project declared it.</returns>
+    public static bool RemoveRegistry(string projectRoot, string name)
+    {
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0) return false;
+
+        manifest.Save(projectRoot);
+        ProjectPackages.Invalidate(projectRoot);
+        return true;
+    }
+
+    /// <summary>Finds bricks in the project's registries whose id contains <paramref name="query"/>.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="query">Text the id must contain; every brick when empty.</param>
+    /// <returns>The registry, id and newest version of each match; a registry that cannot be read is reported in place of its bricks.</returns>
+    public static async Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string projectRoot, string query)
+    {
+        var found = new List<(string, string, string)>();
+        foreach (var registry in Registries(projectRoot))
+        {
+            try
+            {
+                var index = await new RegistryClient(registry).GetIndexAsync().ConfigureAwait(false);
+                found.AddRange(index.Bricks.Where(b => b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    .Select(b => (registry.Name, b.Key, Newest(b.Value))));
+            }
+            catch (PackageException ex)
+            {
+                found.Add((registry.Name, $"(unavailable: {ex.Message})", string.Empty));
+            }
+        }
+
+        return found;
+    }
+
+    static string Newest(RegistryBrick brick) =>
+        brick.Versions.Where(v => !v.Value.Yanked && SemanticVersion.TryParse(v.Key, out _)).Select(static v => SemanticVersion.Parse(v.Key))
+            .OrderByDescending(static v => v).FirstOrDefault()?.ToString() ?? "(yanked)";
+
     /// <summary>What the fork of a brick in the project changed since it was copied.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
@@ -189,6 +285,9 @@ public static class BrickService
     /// <exception cref="PackageException">The brick fails verification.</exception>
     public static BrickPackResult Pack(string packageRoot, string outputDirectory, PackagePrecast? precast = null)
     {
+        if (PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]) is { Upstream: not null, Store.Redistribute: false } fork)
+            throw new PackageException($"{fork.Name} is licensed so that it cannot be republished, which includes forks of it.");
+
         if (BrickVerifier.Verify(packageRoot) is { Count: > 0 } issues)
             throw new PackageException($"{packageRoot} cannot be packed:{Environment.NewLine}  {string.Join($"{Environment.NewLine}  ", issues)}");
 

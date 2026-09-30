@@ -15,6 +15,9 @@ public sealed class LockEntry
     /// <summary>The content hash of the store folder, for a git source; local folders change and are not hashed.</summary>
     public string? Integrity { get; set; }
 
+    /// <summary>The fingerprint of the key that signed a package from a registry; later installs must be signed by it too.</summary>
+    public string? SignedBy { get; set; }
+
     /// <summary>1 for a package the project installs itself, deeper for what those depend on.</summary>
     public int Depth { get; set; }
 

@@ -111,9 +111,26 @@ public static class ProjectPackages
             ? []
             : Resolve(projectRoot).Packages;
 
+    /// <summary>The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with MASS4's signing key.</summary>
+    public static ScopedRegistry PublicRegistry { get; } = new()
+    {
+        Name = "bricks.mass4.org",
+        Url = "https://bricks.mass4.org/v1",
+        Scopes = ["org.mass4", "user"],
+        Keys = [ReadEmbeddedKey()],
+    };
+
+    static string ReadEmbeddedKey()
+    {
+        using var stream = typeof(ProjectPackages).Assembly.GetManifestResourceStream("registry-mass4.pub")!;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd().Trim();
+    }
+
     static PackageResolver NewResolver(bool locked, IReadOnlySet<string>? update) =>
         new(new PackageStore(PackageStore.DefaultRoot()), new PackageResolverOptions
         {
+            Registries = [PublicRegistry],
             Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
             BuiltinDirectory = BuiltinDirectory,
             ReservedCategoryPrefixes = ["gaya", HostName],
