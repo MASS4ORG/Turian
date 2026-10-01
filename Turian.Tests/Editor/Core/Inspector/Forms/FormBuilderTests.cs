@@ -38,16 +38,16 @@ public class FormBuilderTests
     public void ReadOnlyFormsProtectFieldsCollectionsAndActions()
     {
         var target = new WithAction();
-        var editable = Assert.Single(FormBuilder.Build(target).Sections);
+        var editable = Assert.Single(InspectorForms.Build(target).Sections);
         Assert.Single(editable.Buttons).Invoke();
         Assert.Equal(1, target.Count);
-        var frozen = Assert.Single(FormBuilder.Build(target, readOnly: true).Sections);
+        var frozen = Assert.Single(InspectorForms.Build(target, readOnly: true).Sections);
         Assert.Empty(frozen.Buttons);
         Assert.False(Assert.Single(frozen.Fields).SetValue(2));
         Assert.Equal(1, target.Count);
 
         var collections = new WithCollections();
-        var form = FormBuilder.Build(collections, readOnly: true);
+        var form = InspectorForms.Build(collections, readOnly: true);
         foreach (var field in form.Sections[0].Fields)
         {
             var collection = CollectionField.TryCreate(field)!;
@@ -132,7 +132,7 @@ public class FormBuilderTests
     [Fact]
     public void PublicReadWriteMembersBecomeFields()
     {
-        var model = FormBuilder.Build(new Target());
+        var model = InspectorForms.Build(new Target());
 
         Assert.Contains(model.Sections[0].Fields, field => field.Name == nameof(Target.Speed));
         Assert.Contains(model.Sections[0].Fields, field => field.Name == nameof(Target.Label));
@@ -142,7 +142,7 @@ public class FormBuilderTests
     [Fact]
     public void HiddenReadOnlyAndNonPublicMembersAreSkipped()
     {
-        var model = FormBuilder.Build(new Target());
+        var model = InspectorForms.Build(new Target());
         var names = model.Sections[0].Fields.Select(field => field.Name).ToList();
 
         Assert.DoesNotContain(nameof(Target.Hidden), names);
@@ -155,7 +155,7 @@ public class FormBuilderTests
     [Fact]
     public void ShowInEditorRevealsAPrivateMember()
     {
-        var model = FormBuilder.Build(new Target());
+        var model = InspectorForms.Build(new Target());
 
         Assert.Contains(model.Sections[0].Fields, field => field.Name == Target.RevealedMemberName);
         Assert.Equal(false, Field(model, Target.RevealedMemberName).GetValue());
@@ -165,7 +165,7 @@ public class FormBuilderTests
     [Fact]
     public void AFieldReportsTheTypeThatSelectsItsDrawer()
     {
-        var model = FormBuilder.Build(new Target());
+        var model = InspectorForms.Build(new Target());
 
         Assert.Equal(typeof(float), Field(model, nameof(Target.Speed)).ValueType);
         Assert.Equal(typeof(Vector3), Field(model, nameof(Target.StartPosition)).ValueType);
@@ -175,7 +175,7 @@ public class FormBuilderTests
     [Fact]
     public void LabelsAreHumanised()
     {
-        var model = FormBuilder.Build(new Target());
+        var model = InspectorForms.Build(new Target());
 
         Assert.Equal("Start Position", Field(model, nameof(Target.StartPosition)).Label);
         Assert.Equal("Speed", Field(model, nameof(Target.Speed)).Label);
@@ -186,7 +186,7 @@ public class FormBuilderTests
     public void AFieldReadsAndWritesTheTarget()
     {
         var target = new Target();
-        var model = FormBuilder.Build(target);
+        var model = InspectorForms.Build(target);
         var speed = Field(model, nameof(Target.Speed));
 
         Assert.Equal(1f, speed.GetValue());
@@ -200,7 +200,7 @@ public class FormBuilderTests
     {
         var target = new Target();
         object? mutated = null;
-        var model = FormBuilder.Build(target, changed => mutated = changed);
+        var model = InspectorForms.Build(target, changed => mutated = changed);
 
         Field(model, nameof(Target.Speed)).SetValue(2f);
 
@@ -214,7 +214,7 @@ public class FormBuilderTests
         var node = new Node { Name = "Player" };
         node.Components.Add(new CameraComponent());
 
-        var model = FormBuilder.BuildForNode(node);
+        var model = InspectorForms.BuildForNode(node);
 
         Assert.Equal(2, model.Sections.Count);
         Assert.Equal("Player", model.Sections[0].Title);
@@ -237,8 +237,8 @@ public class FormBuilderTests
     [Fact]
     public void MetadataIsCachedAndSharedBetweenForms()
     {
-        var first = Field(FormBuilder.Build(new OrderedTarget()), nameof(OrderedTarget.First));
-        var second = Field(FormBuilder.Build(new OrderedTarget()), nameof(OrderedTarget.First));
+        var first = Field(InspectorForms.Build(new OrderedTarget()), nameof(OrderedTarget.First));
+        var second = Field(InspectorForms.Build(new OrderedTarget()), nameof(OrderedTarget.First));
 
         Assert.Same(first.Metadata, second.Metadata);
         Assert.Same(FormBuilder.EditableMetadata(typeof(OrderedTarget)),
@@ -252,7 +252,7 @@ public class FormBuilderTests
     [Fact]
     public void MetadataGroupsAttributesWithoutDiscardingCustomOrRepeatedHints()
     {
-        var metadata = Field(FormBuilder.Build(new OrderedTarget()),
+        var metadata = Field(InspectorForms.Build(new OrderedTarget()),
             nameof(OrderedTarget.First)).Metadata!;
 
         Assert.Contains(metadata.Layout, attribute => attribute is InspectorOrderAttribute);
@@ -268,7 +268,7 @@ public class FormBuilderTests
     [Fact]
     public void MemberPrioritySortsStablyWithoutReorderingTies()
     {
-        var names = FormBuilder.Build(new OrderedTarget()).Sections[0].Fields
+        var names = InspectorForms.Build(new OrderedTarget()).Sections[0].Fields
             .Select(field => field.Name);
 
         Assert.Equal([nameof(OrderedTarget.First), nameof(OrderedTarget.DefaultFirst),
@@ -280,7 +280,7 @@ public class FormBuilderTests
     public void UnsafePropertiesAreSkippedAfterMetadataHasBeenBuilt()
     {
         var target = new UnsafeTarget();
-        var fields = FormBuilder.Build(target).Sections[0].Fields;
+        var fields = InspectorForms.Build(target).Sections[0].Fields;
 
         Assert.Single(fields);
         Assert.Equal(nameof(UnsafeTarget.Valid), fields[0].Name);
@@ -307,7 +307,7 @@ public class FormBuilderTests
     public void AGetterThatBecomesUnsafeReturnsNoValue()
     {
         var target = new ChangingTarget();
-        var field = Field(FormBuilder.Build(target), nameof(ChangingTarget.Value));
+        var field = Field(InspectorForms.Build(target), nameof(ChangingTarget.Value));
         Assert.Equal(42, field.GetValue());
 
         target.Ready = false;
@@ -320,7 +320,7 @@ public class FormBuilderTests
     public void EditingANodeNameThroughTheFormReachesTheNode()
     {
         var node = new Node { Name = "Old" };
-        var model = FormBuilder.BuildForNode(node);
+        var model = InspectorForms.BuildForNode(node);
         var name = model.Sections[0].Fields.Single(f => f.Name == nameof(Node.Name));
 
         Assert.True(name.SetValue("New"));
@@ -339,7 +339,7 @@ public class FormBuilderTests
         var node = new Node();
         node.Components.Add(component);
 
-        var section = FormBuilder.BuildForNode(node).Sections[1];
+        var section = InspectorForms.BuildForNode(node).Sections[1];
 
         Assert.NotNull(section.EnabledField);
         Assert.True(section.EnabledField!.SetValue(false));
@@ -353,7 +353,7 @@ public class FormBuilderTests
     {
         var target = new WithCollections();
         var collection = CollectionField.TryCreate(
-            Field(FormBuilder.Build(target), nameof(WithCollections.Names)));
+            Field(InspectorForms.Build(target), nameof(WithCollections.Names)));
 
         Assert.NotNull(collection);
         Assert.False(collection.IsDictionary);
@@ -370,7 +370,7 @@ public class FormBuilderTests
     {
         var target = new WithCollections();
         var collection = CollectionField.TryCreate(
-            Field(FormBuilder.Build(target), nameof(WithCollections.Scores)));
+            Field(InspectorForms.Build(target), nameof(WithCollections.Scores)));
 
         Assert.NotNull(collection);
         Assert.True(collection.IsDictionary);
@@ -392,7 +392,7 @@ public class FormBuilderTests
     {
         var node = new Node();
         object? mutated = null;
-        var model = FormBuilder.BuildForNode(node, changed => mutated = changed);
+        var model = InspectorForms.BuildForNode(node, changed => mutated = changed);
         var transform = model.Sections[0].Fields.Single(f => f.Name == nameof(Node.Transform));
 
         transform.Touch();

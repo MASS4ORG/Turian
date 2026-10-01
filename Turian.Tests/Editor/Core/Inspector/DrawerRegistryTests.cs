@@ -78,7 +78,7 @@ public class DrawerRegistryTests
         AttributeDrawerRegistry.Register<OuterAttribute>(new TraceDrawer(trace, "outer", -5));
         try
         {
-            var field = FormBuilder.Build(new Target()).Sections[0].Fields.Single();
+            var field = InspectorForms.Build(new Target()).Sections[0].Fields.Single();
 
             AttributeDrawerRegistry.Draw(null!, field, "field", () => trace.Add("value"));
 
@@ -117,7 +117,7 @@ public class DrawerRegistryTests
     [Fact]
     public void TooltipIsAvailableToTheDrawerPipeline()
     {
-        var field = FormBuilder.Build(new TooltippedTarget()).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(new TooltippedTarget()).Sections[0].Fields.Single();
 
         Assert.Contains(field.Metadata!.RenderingHints, hint => hint is TooltipAttribute);
         Assert.Equal("Explains the value", field.Attribute<TooltipAttribute>()?.Text);
@@ -147,7 +147,7 @@ public class DrawerRegistryTests
     [Fact]
     public void RegisteredPropertyDrawerOverridesAReference()
     {
-        var field = FormBuilder.Build(new ReferenceTarget()).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(new ReferenceTarget()).Sections[0].Fields.Single();
         var custom = new TestPropertyDrawer();
         PropertyDrawerRegistry.Register(typeof(Node), custom);
         try
@@ -166,7 +166,7 @@ public class DrawerRegistryTests
     [Fact]
     public void TooltippedFieldRendersInBothPasses()
     {
-        var field = FormBuilder.Build(new TooltippedTarget()).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(new TooltippedTarget()).Sections[0].Fields.Single();
         using var surface = SKSurface.Create(new SKImageInfo(320, 120));
         var gui = new Gui { Input = Substitute.For<IInputHandler>() };
         var font = Font.FromFamilyName("sans-serif", 14);
@@ -205,7 +205,7 @@ public class DrawerRegistryTests
     [Fact]
     public void DecliningValueOnlyRenderingFallsBackToTheBuiltInControl()
     {
-        var field = FormBuilder.Build(new NumericTarget()).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(new NumericTarget()).Sections[0].Fields.Single();
         var expected = RenderEditorOnly(field);
         PropertyDrawerRegistry.Register(typeof(int), new TestPropertyDrawer { ValueOnly = false });
         try
@@ -222,7 +222,7 @@ public class DrawerRegistryTests
     [Fact]
     public void NullableDrawerRegistrationIsNotLostDuringDispatch()
     {
-        var field = FormBuilder.Build(new NullableTarget()).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(new NullableTarget()).Sections[0].Fields.Single();
         var custom = new TestPropertyDrawer();
         PropertyDrawerRegistry.Register(typeof(int?), custom);
         try
@@ -251,7 +251,7 @@ public class DrawerRegistryTests
     public void NestedFormsInheritReadOnlyState(bool readOnly)
     {
         var target = new NestedTarget();
-        var field = FormBuilder.Build(target, readOnly: readOnly).Sections[0].Fields.Single();
+        var field = InspectorForms.Build(target, readOnly: readOnly).Sections[0].Fields.Single();
         var custom = new TestPropertyDrawer();
         PropertyDrawerRegistry.Register(typeof(int), custom);
         try

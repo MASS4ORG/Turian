@@ -46,7 +46,7 @@ public sealed class InspectorFormsRenderingTests
         input.MousePosition.Returns(new Vector2(-1, -1));
         var gui = new Gui { Input = input };
         var target = new ScopedRegistry { Name = "Studio" };
-        var model = FormBuilder.Build(target, readOnly: true);
+        var model = InspectorForms.Build(target, readOnly: true);
         var calls = 0;
         var section = model.Sections[0] with
         {

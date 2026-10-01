@@ -20,7 +20,7 @@ sealed class UserPanel(UserPanelPage page) : IPanel
         {
             gui.ScrollY();
 
-            model ??= FormBuilder.Build(page.Target);
+            model ??= InspectorForms.Build(page.Target);
             var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
 
             for (var i = 0; i < fields.Count; i++)

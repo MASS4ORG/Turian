@@ -18,6 +18,14 @@
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
     </ItemGroup>
 
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Forms/Guinevere.Forms.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Guinevere.Forms" Version="5.*"/>
+    </ItemGroup>
+
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Codeuctivity.SanitizeFilename" Version="3.0.230"/>

@@ -126,8 +126,8 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         model = target switch
         {
             FormInspection inspection => inspection.Model,
-            Node node => FormBuilder.BuildForNode(node, _ => assets.AlterAssetForSelectedNode()),
-            _ => FormBuilder.Build(target, _ => assets.AlterAssetForSelectedNode()),
+            Node node => InspectorForms.BuildForNode(node, _ => assets.AlterAssetForSelectedNode()),
+            _ => InspectorForms.Build(target, _ => assets.AlterAssetForSelectedNode()),
         };
         builtFor = target;
         builtComponents = components;
@@ -166,7 +166,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         {
             model = inspection.Target is null
                 ? FormModel.Empty
-                : FormBuilder.Build(inspection.Target, _ => OnAssetEdited(inspection));
+                : InspectorForms.Build(inspection.Target, _ => OnAssetEdited(inspection));
             builtFor = inspection;
             builtComponents = 0;
             assetDirty = false;

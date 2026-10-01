@@ -342,7 +342,7 @@ static class FieldDrawers
     {
         if (!NestedHeading(gui, field, target, id, collapsed)) return;
 
-        var model = FormBuilder.Build(target, _ => field.Touch(), readOnly: field.IsReadOnly);
+        var model = InspectorForms.Build(target, _ => field.Touch(), readOnly: field.IsReadOnly);
         var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
 
         using (gui.Node(-1, -1, $"{id}/body").ExpandWidth().Direction(Axis.Vertical)

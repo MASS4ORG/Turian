@@ -74,7 +74,7 @@ public class ReferenceFieldTests
     {
         var holder = new Holder();
         var notified = new List<object>();
-        var field = FormBuilder.Build(holder, notified.Add).Sections[0].Fields
+        var field = InspectorForms.Build(holder, notified.Add).Sections[0].Fields
             .First(f => f.Name == nameof(Holder.DirectNode));
 
         ReferenceField.TryCreate(field)!.Set(SomeId);
@@ -105,7 +105,7 @@ public class ReferenceFieldTests
     }
 
     static FormField FieldFor(string member, Holder? holder = null) =>
-        FormBuilder.Build(holder ?? new Holder()).Sections[0].Fields.First(f => f.Name == member);
+        InspectorForms.Build(holder ?? new Holder()).Sections[0].Fields.First(f => f.Name == member);
 
     static ReferenceField? ReferenceFor(string member) => ReferenceField.TryCreate(FieldFor(member));
 

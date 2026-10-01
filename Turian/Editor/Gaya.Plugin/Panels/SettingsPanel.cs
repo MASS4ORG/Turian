@@ -286,7 +286,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
             return cached.Model;
 
         var pageId = page.Id;
-        var model = FormBuilder.Build(page.Target, _ => settings.NotifyChanged(pageId));
+        var model = InspectorForms.Build(page.Target, _ => settings.NotifyChanged(pageId));
         forms[page.Id] = (page.Target, model);
         return model;
     }

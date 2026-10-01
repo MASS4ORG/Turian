@@ -128,7 +128,7 @@ public sealed class ObjectReferencesTests : IDisposable
         var loaded = Serializer.LoadData<Node>(Serializer.Serialize(root))!;
         var loadedLinker = loaded.Children[0].GetComponent<Linker>()!;
 
-        var list = CollectionField.TryCreate(FormBuilder.Build(loadedLinker).Sections
+        var list = CollectionField.TryCreate(InspectorForms.Build(loadedLinker).Sections
             .SelectMany(static section => section.Fields).First(static f => f.Name == nameof(Linker.Waypoints)))!;
         var first = ReferenceField.TryCreate(list.Entries()[0])!;
 
