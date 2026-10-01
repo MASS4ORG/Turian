@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Assigns a stable Guid identifier to a class for polymorphic JSON serialization.

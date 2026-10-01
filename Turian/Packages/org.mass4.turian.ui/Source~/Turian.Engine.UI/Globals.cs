@@ -12,6 +12,7 @@ global using System.Text.Json.Serialization;
 global using System.Xml;
 global using System.Xml.Linq;
 global using Guinevere;
+global using MASS4.Attributes;
 global using Microsoft.Extensions.Logging;
 global using Silk.NET.Vulkan;
 global using SkiaSharp;

@@ -1,3 +1,4 @@
+global using MASS4.Attributes;
 global using System;
 global using System.Numerics;
 global using Turian.Engine.Core;

@@ -12,6 +12,7 @@ global using System.Runtime.InteropServices;
 global using System.Text.RegularExpressions;
 global using Gaya.Sdk;
 global using Guinevere;
+global using MASS4.Attributes;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using SkiaSharp;

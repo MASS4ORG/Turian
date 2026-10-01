@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>Orders an inspector member before or after members with the default order (zero).</summary>
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, Inherited = true)]

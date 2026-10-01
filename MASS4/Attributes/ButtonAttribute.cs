@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Marks a parameterless method to be shown in the inspector as a clickable button. Pressing it

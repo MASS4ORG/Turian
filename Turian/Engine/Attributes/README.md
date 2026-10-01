@@ -1,3 +1,3 @@
 # Turian Engine Attributes
 
-Marker attributes shared by engine code, user assemblies and C# tooling. They describe serialization, type identity and service injection without depending on the engine runtime.
+Engine-specific component, asset, observable DataAsset and reference serialization annotations. Generic form/editor metadata, type identity and service discovery are supplied by the shared MASS4.Attributes project.

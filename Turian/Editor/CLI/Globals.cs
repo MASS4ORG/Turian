@@ -10,6 +10,7 @@ global using System.Linq;
 global using System.Numerics;
 global using System.Text.Json;
 global using System.Threading.Tasks;
+global using MASS4.Attributes;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Turian.Editor.Core;

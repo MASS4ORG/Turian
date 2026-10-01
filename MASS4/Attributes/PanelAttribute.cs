@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Marks a class as a panel, as it will be placed in the dock. Also, create a menu item that will open the panel.

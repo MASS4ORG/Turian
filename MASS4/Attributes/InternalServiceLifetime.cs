@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Specifies the service lifetime for a class in the DI container.

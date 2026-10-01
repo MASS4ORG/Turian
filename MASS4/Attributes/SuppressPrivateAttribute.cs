@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Some attributes allow the user to view and modify the value of a private field form the editor.

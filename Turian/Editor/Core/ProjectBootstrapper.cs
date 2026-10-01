@@ -19,6 +19,7 @@ public sealed class ProjectBootstrapper
         global using System.Threading.Tasks;
         global using Microsoft.Extensions.Logging;
         global using Silk.NET.Input;
+        global using MASS4.Attributes;
         global using Turian;
         global using Turian.Engine.Core;
 

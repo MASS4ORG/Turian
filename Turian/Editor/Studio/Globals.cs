@@ -5,6 +5,7 @@ global using Gaya.Host;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
+global using MASS4.Attributes;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using SkiaSharp;

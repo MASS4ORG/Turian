@@ -301,6 +301,7 @@ public static class CsProjectGenerator
             group.AddProperty("TargetFramework", settings.TargetFramework);
             group.AddProperty("ImplicitUsings", "disable");
             group.AddProperty("Nullable", "enable");
+            projectRoot.AddItemGroup().AddItem("Using", "MASS4.Attributes");
 
             if (executable)
             {

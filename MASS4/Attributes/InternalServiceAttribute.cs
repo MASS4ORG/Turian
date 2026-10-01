@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Attribute to annotate services for automatic registration in the Dependency Injection

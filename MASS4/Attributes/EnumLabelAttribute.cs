@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Overrides the label an enum member draws as, in a dropdown built by reflection. Without it, the

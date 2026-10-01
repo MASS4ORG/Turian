@@ -33,6 +33,20 @@ public class CsProjectGeneratorTests
         logger = Substitute.For<ILogger>();
     }
 
+    /// <summary>Play and export projects receive shared attributes and distinct deployment defaults.</summary>
+    [Theory]
+    [InlineData(ExecutableGenerationMode.Play, "false")]
+    [InlineData(ExecutableGenerationMode.Export, "true")]
+    public void ExecutablesImportSharedAttributes(ExecutableGenerationMode mode, string selfContained)
+    {
+        settings.ExportSourceSubDir.Returns("Export");
+        settings.TargetFramework.Returns("net10.0");
+        settings.TargetSdk.Returns("Microsoft.NET.Sdk");
+        var project = CsProjectGenerator.GenerateExecutable(settings, logger, mode);
+        Assert.Contains(project.Items, item => item.ItemType == "Using" && item.Include == "MASS4.Attributes");
+        Assert.Equal(selfContained, project.Properties.Single(p => p.Name == "SelfContained").Value);
+    }
+
     /// <summary>
     /// Should create the CSProj
     /// </summary>

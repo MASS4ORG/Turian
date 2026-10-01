@@ -6,6 +6,7 @@ global using System.Text.Json;
 global using System.Text.Json.Nodes;
 global using System.Xml.Linq;
 global using Guinevere;
+global using MASS4.Attributes;
 global using Microsoft.Extensions.Logging;
 global using SkiaSharp;
 global using Turian.Editor.Core;

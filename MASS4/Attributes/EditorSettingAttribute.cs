@@ -1,4 +1,4 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
 /// <summary>
 /// Declares a page of editor settings when applied to a class, or titles and describes one option

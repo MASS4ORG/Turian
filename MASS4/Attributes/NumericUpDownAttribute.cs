@@ -1,7 +1,5 @@
-namespace Turian;
+namespace MASS4.Attributes;
 
-/// <summary>
-///
-/// </summary>
+/// <summary>Requests a numeric editor with increment and decrement controls.</summary>
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public sealed class NumericUpDownAttribute : Attribute { }
