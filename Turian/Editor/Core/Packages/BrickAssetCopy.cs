@@ -16,7 +16,7 @@ public sealed record CopiedAsset(string Source, string Target, Guid OldId, Guid 
 /// </summary>
 public static class BrickAssetCopy
 {
-    static readonly string[] RemappedExtensions = [".prefab", ".dataasset", ".asset", ".json", ".ui", ".uss", ".meta", ".mat"];
+    static readonly string[] RemappedExtensions = [".prefab", ".dataasset", ".asset", ".json", ".ui", ".uss", ".meta", ".mat", ".material"];
 
     /// <summary>The brick's importable assets: every file with a <c>.meta</c> beside it, outside <c>~</c> folders.</summary>
     /// <param name="brick">The installed brick.</param>
@@ -85,13 +85,23 @@ public static class BrickAssetCopy
         }
     }
 
-    static void ReplaceId(string path, Guid oldId, Guid newId)
+    /// <summary>Rewrites an asset id inside a text asset, which repeats it in its own payload and in references.</summary>
+    /// <param name="path">The file to rewrite; binary files are left alone.</param>
+    /// <param name="oldId">The id to replace.</param>
+    /// <param name="newId">The id that takes its place.</param>
+    internal static void ReplaceId(string path, Guid oldId, Guid newId) => ReplaceIds(path, [(oldId, newId)]);
+
+    /// <summary>Rewrites several asset ids inside a text asset in one pass.</summary>
+    /// <param name="path">The file to rewrite; binary files are left alone.</param>
+    /// <param name="ids">The old ids and the ids that take their place.</param>
+    internal static void ReplaceIds(string path, IReadOnlyList<(Guid Old, Guid New)> ids)
     {
         // Only text files hold ids; a binary asset cannot contain the hyphenated form by accident worth worrying about.
         if (!IsText(path)) return;
 
         var text = File.ReadAllText(path);
-        var replaced = text.Replace(oldId.ToString(), newId.ToString(), StringComparison.OrdinalIgnoreCase);
+        var replaced = ids.Aggregate(text, static (current, id) =>
+            current.Replace(id.Old.ToString(), id.New.ToString(), StringComparison.OrdinalIgnoreCase));
         if (replaced != text) File.WriteAllText(path, replaced);
     }
 

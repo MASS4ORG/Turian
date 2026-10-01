@@ -23,6 +23,7 @@ sealed class AssetBrowserPanel : IPanel
     readonly PrefabAuthoring prefabs;
     readonly AssetFileOperations operations;
     readonly BrickAssetTree brickTree;
+    readonly ConfirmDialogChrome confirm;
     readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
@@ -52,11 +53,12 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="prefabs">Creates prefab variants.</param>
     /// <param name="operations">Renames, deletes, duplicates and pastes as undoable steps.</param>
     /// <param name="bricks">Reports changes to the installed bricks.</param>
+    /// <param name="confirm">Asks before an asset is copied out of a brick by dragging.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
         AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations,
-        BricksController bricks)
+        BricksController bricks, ConfirmDialogChrome confirm)
     {
         ArgumentNullException.ThrowIfNull(reveal);
 
@@ -71,6 +73,7 @@ sealed class AssetBrowserPanel : IPanel
         this.previews = previews;
         this.prefabs = prefabs;
         this.operations = operations;
+        this.confirm = confirm;
         brickTree = new BrickAssetTree(fileSystem);
         bricks.Changed += () => bricksChanged = true;
         showExtensions = browserSettings.ShowFileExtensions;
@@ -104,7 +107,9 @@ sealed class AssetBrowserPanel : IPanel
         if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
         systemClipboard ??= gui.Platform.Require<IClipboard>();
 
-        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick);
+        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
+            dropAccept: static payload => payload is ReferenceDragPayload { AssetPath: not null } or ScriptDragPayload { AssetPath: not null },
+            onDrop: OnDrop);
 
         // A selection the arrow keys moved is inspected like a clicked one.
         if (gui.Pass == Pass.Pass2Render && state.SelectedId != inspectedId)
@@ -156,12 +161,44 @@ sealed class AssetBrowserPanel : IPanel
         foreach (var entry in ChildrenOf(null)) Append(entry, depth: 0);
     }
 
-    /// <summary>A file row carries its asset id, so it can be dropped on a reference field.</summary>
+    /// <summary>
+    /// A file row carries its asset id, so it can be dropped on a reference field, and its path, so a folder row can
+    /// receive it; a folder row carries only its path.
+    /// </summary>
     static object? DragPayload(TreeItem item) =>
-        item.Tag is not AssetEntry { IsDirectory: false } entry ? null
-        : entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
-            ? ScriptPayload(entry)
-            : entry.AssetMetadata is { } asset ? new ReferenceDragPayload(asset.Id, item.Label) : null;
+        item.Tag is not AssetEntry entry ? null
+        : entry.IsDirectory ? new ReferenceDragPayload(Guid.Empty, item.Label, entry.AbsolutePath, IsDirectory: true)
+        : entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? ScriptPayload(entry)
+        : entry.AssetMetadata is { } asset ? new ReferenceDragPayload(asset.Id, item.Label, entry.AbsolutePath) : null;
+
+    /// <summary>
+    /// Drops a brick's asset or folder on a project folder after asking: the copy gets new ids and no longer follows the
+    /// brick. Bricks are never a target, and project assets are not moved by dragging.
+    /// </summary>
+    void OnDrop(TreeItem target, object payload)
+    {
+        var (source, name, isDirectory) = payload switch
+        {
+            ReferenceDragPayload { AssetPath: { } path } reference => (path, reference.Name, reference.IsDirectory),
+            ScriptDragPayload { AssetPath: { } path } script => (path, script.Name, false),
+            _ => (null, "", false),
+        };
+        var project = settings.Settings?.ProjectAbsoluteDir ?? "";
+        if (source is null
+            || target.Tag is not AssetEntry { IsReadOnly: false } targetEntry
+            || rows.Find(r => r.Id == source).Tag is not AssetEntry { IsReadOnly: true }
+            || DirectoryFor(targetEntry) is not { } directory
+            || IsInside(Path.Combine(project, Gaya.Packages.ProjectManifest.DirectoryName), directory)) return;
+
+        var where = Path.GetRelativePath(project, directory).Replace('\\', '/');
+        confirm.Ask("Copy into project",
+            $"Copy '{name}' from a brick into {where}? The copy is your own: it gets new ids and does not change when the brick updates.",
+            "Copy", () => operations.Duplicate(source, directory, isDirectory));
+    }
+
+    static bool IsInside(string folder, string path) =>
+        path.Equals(folder, StringComparison.Ordinal)
+        || path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
     static object? ScriptPayload(AssetEntry entry)
     {
@@ -177,7 +214,7 @@ sealed class AssetBrowserPanel : IPanel
 
             var component = types.FirstOrDefault(type =>
                 typeof(Component).IsAssignableFrom(type) && type.Name.Equals(name, StringComparison.Ordinal));
-            if (component is not null) return new ScriptDragPayload(component, name);
+            if (component is not null) return new ScriptDragPayload(component, name, entry.AbsolutePath);
         }
 
         return null;

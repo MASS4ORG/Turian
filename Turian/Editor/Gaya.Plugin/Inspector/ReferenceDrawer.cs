@@ -39,6 +39,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         var result = gui.ObjectField(
             picker.DisplayName(reference), $"{id}/ref",
             accept: payload => payload is ReferenceDragPayload drop
+                               && drop.Id != Guid.Empty
                                && !reference.IsReadOnly
                                && picker.Accepts(reference, drop.Id),
             isEmpty: reference.IsEmpty,

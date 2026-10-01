@@ -99,6 +99,69 @@ public class AssetFileOperationsTests : IDisposable
         Assert.True(File.Exists(pasted));
     }
 
+    static Guid MetaId(string asset) =>
+        Guid.Parse(JsonNode.Parse(File.ReadAllText($"{asset}.meta"))!["Id"]!.GetValue<string>());
+
+    /// <summary>A copy of a read-only brick asset is writable, has its own id, and carries it in its payload too.</summary>
+    [Fact]
+    public void CopyOfAReadOnlyAsset_IsTheProjectsOwn()
+    {
+        var path = AddAsset("stats.dataasset");
+        var oldId = MetaId(path);
+        File.WriteAllText(path, $$"""{ "Id": "{{oldId}}" }""");
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        var folder = Path.Combine(Assets, "Mine");
+        Directory.CreateDirectory(folder);
+
+        files.Copy(path);
+        var copy = operations.Paste(folder)!;
+
+        var newId = MetaId(copy);
+        Assert.NotEqual(oldId, newId);
+        Assert.False(new FileInfo(copy).IsReadOnly);
+        Assert.Contains(newId.ToString(), File.ReadAllText(copy), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(oldId.ToString(), File.ReadAllText(copy), StringComparison.OrdinalIgnoreCase);
+        File.SetAttributes(path, FileAttributes.Normal);
+    }
+
+    /// <summary>A copied material carries its new id in its payload like any other text asset.</summary>
+    [Fact]
+    public void CopyOfAMaterial_RewritesItsOwnId()
+    {
+        var path = AddAsset("wood.material");
+        var oldId = MetaId(path);
+        File.WriteAllText(path, $$"""{ "Id": "{{oldId}}" }""");
+        var folder = Path.Combine(Assets, "Mine");
+        Directory.CreateDirectory(folder);
+
+        files.Copy(path);
+        var copy = operations.Paste(folder)!;
+
+        Assert.DoesNotContain(oldId.ToString(), File.ReadAllText(copy), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(MetaId(copy).ToString(), File.ReadAllText(copy), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Assets copied together with a folder point at each other's copies, not at the originals.</summary>
+    [Fact]
+    public void CopyOfAFolder_KeepsItsAssetsPointingAtEachOther()
+    {
+        var folder = Path.Combine(Assets, "Pack");
+        Directory.CreateDirectory(folder);
+        var material = AddAsset(Path.Combine("Pack", "material.dataasset"));
+        var prefab = AddAsset(Path.Combine("Pack", "prefab.dataasset"));
+        File.WriteAllText(prefab, $$"""{ "Material": "{{MetaId(material)}}" }""");
+        var target = Path.Combine(Assets, "Mine");
+        Directory.CreateDirectory(target);
+
+        files.Copy(folder);
+        var copy = operations.Paste(target)!;
+
+        var copiedMaterial = MetaId(Path.Combine(copy, "material.dataasset"));
+        Assert.NotEqual(MetaId(material), copiedMaterial);
+        Assert.Contains(copiedMaterial.ToString(), File.ReadAllText(Path.Combine(copy, "prefab.dataasset")),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>File operations belong to the project, not to whichever scene is open.</summary>
     [Fact]
     public void Operations_BelongToTheProject()

@@ -150,7 +150,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetPreviewCatalog>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
                 sp.GetRequiredService<AssetFileOperations>(),
-                sp.GetRequiredService<BricksController>())));
+                sp.GetRequiredService<BricksController>(),
+                sp.GetRequiredService<ConfirmDialogChrome>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
