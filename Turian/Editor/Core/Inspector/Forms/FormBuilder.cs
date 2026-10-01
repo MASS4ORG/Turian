@@ -18,12 +18,13 @@ public static class FormBuilder
     /// <summary>Builds the form for a plain object: one section holding its editable members.</summary>
     /// <param name="target">The object to inspect.</param>
     /// <param name="mutationNotifier">Called with the target after any field is written.</param>
-    public static FormModel Build(object target, Action<object>? mutationNotifier = null)
+    /// <param name="readOnly">Disables edits throughout the object's fields.</param>
+    public static FormModel Build(object target, Action<object>? mutationNotifier = null, bool readOnly = false)
     {
         ArgumentNullException.ThrowIfNull(target);
 
         var title = target is IInspectorTitled titled ? titled.InspectorTitle : target.GetType().Name;
-        return new FormModel(target, [SectionFor(target, title, mutationNotifier)]);
+        return new FormModel(target, [SectionFor(target, title, mutationNotifier, readOnly: readOnly)]);
     }
 
     /// <summary>
@@ -74,21 +75,22 @@ public static class FormBuilder
     }
 
     static FormSection SectionFor(
-        object target, string title, Action<object>? mutationNotifier, bool removable = false)
+        object target, string title, Action<object>? mutationNotifier, bool removable = false, bool readOnly = false)
     {
         var fields = EditableMetadata(target.GetType())
             .Where(metadata => CanReadSafely(metadata, target))
-            .Select(metadata => new FormField(metadata.Member, target, mutationNotifier))
+            .Select(metadata => new FormField(metadata.Member, target, mutationNotifier, readOnly))
             .ToList();
 
         if (target is Component && fields.TrueForAll(f => f.Name != ActiveSwitch.Member.Name))
-            fields.Insert(0, new FormField(ActiveSwitch.Member, target, mutationNotifier));
+            fields.Insert(0, new FormField(ActiveSwitch.Member, target, mutationNotifier, readOnly));
 
         var buttons = ButtonMethodsByType.GetValue(target.GetType(), static t =>
             new Lazy<MethodInfo[]>(() => [.. t
                 .GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .Where(method => method.GetCustomAttribute<ButtonAttribute>() is not null)
                 .Where(method => method.GetParameters().Length == 0)])).Value
+            .Where(_ => !readOnly)
             .Select(method => new InspectorButton(FormField.Humanize(method.Name),
                 () =>
                 {

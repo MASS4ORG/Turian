@@ -340,6 +340,19 @@ static class FieldDrawers
     internal static void DrawNested(Gui gui, FormField field, object target, string id,
         ReferenceDrawer? references, ISet<string>? collapsed)
     {
+        if (!NestedHeading(gui, field, target, id, collapsed)) return;
+
+        var model = FormBuilder.Build(target, _ => field.Touch(), readOnly: field.IsReadOnly);
+        var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
+
+        using (gui.Node(-1, -1, $"{id}/body").ExpandWidth().Direction(Axis.Vertical)
+                   .Margin(Theme.Scale(12f), 0f, 0f, 0f).Enter())
+            for (var i = 0; i < fields.Count; i++)
+                Draw(gui, fields[i], $"{id}/f{i}", references, collapsed);
+    }
+
+    static bool NestedHeading(Gui gui, FormField field, object target, string id, ISet<string>? collapsed)
+    {
         var isOpen = collapsed?.Contains(id) != true;
 
         using (gui.Node(-1, RowHeight, $"{id}/head").ExpandWidth().Direction(Axis.Horizontal).Gap(6f).Enter())
@@ -356,15 +369,8 @@ static class FieldDrawers
                 effects: Emphasis(Overridden, Ink));
         }
 
-        if (!isOpen) return;
+        return isOpen;
 
-        var model = FormBuilder.Build(target, _ => field.Touch());
-        var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
-
-        using (gui.Node(-1, -1, $"{id}/body").ExpandWidth().Direction(Axis.Vertical)
-                   .Margin(Theme.Scale(12f), 0f, 0f, 0f).Enter())
-            for (var i = 0; i < fields.Count; i++)
-                Draw(gui, fields[i], $"{id}/f{i}", references, collapsed);
     }
 
     /// <summary>
@@ -397,17 +403,17 @@ static class FieldDrawers
     /// A full-width labeled button running a <c>[Button]</c> method, sized like a row so it reads as
     /// an inspector button. Blocks input so a press never falls through to the section behind it.
     /// </summary>
-    internal static bool TextButton(Gui gui, string label, string id)
+    internal static bool TextButton(Gui gui, string label, string id, bool enabled = true)
     {
         using (gui.Node(-1, RowHeight, id).ExpandWidth().BlockInput().ContentAlignX(0.5f)
                    .ContentAlignY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
-            var hot = interactable.OnHover();
+            var hot = enabled && interactable.OnHover();
 
             if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Border : Field, 3f);
 
-            gui.DrawText(label, Theme.Text(12), Ink);
+            gui.DrawText(label, Theme.Text(12), enabled ? Ink : InkDim);
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

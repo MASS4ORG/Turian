@@ -84,32 +84,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     /// own buttons; null when nothing is selected.
     /// </summary>
     /// <returns>The object to select in the inspector.</returns>
-    public object? InspectSelection()
-    {
-        if (Tab == BricksTab.Registries)
-        {
-            if (SelectedRegistry is null) return null;
-            if (SelectedRegistry.Length == 0) return new RegistryView(this);
-
-            return Registries.FirstOrDefault(r => r.Name == SelectedRegistry) switch
-            {
-                null => null,
-                var registry when registry.Name == ProjectPackages.PublicRegistry.Name => new PublicRegistryView(registry),
-                var registry => new RegistryView(this, registry),
-            };
-        }
-
-        if (Catalog.FirstOrDefault(b => b.Id == Selected) is not { } brick) return null;
-
-        var resolved = installed.FirstOrDefault(p => p.Id == brick.Id);
-        return brick.State switch
-        {
-            BrickState.Available => new AvailableBrickView(this, brick),
-            BrickState.Installed => new InstalledBrickView(this, brick),
-            _ when resolved is { Origin: PackageOrigin.Embedded } => new LocalBrickView(this, brick, resolved),
-            _ => new EnabledBrickView(this, brick, resolved!),
-        };
-    }
+    public FormInspection? InspectSelection() => BrickInspections.Selection(this, installed);
 
     /// <summary>Writes a registry into the project, replacing the one of the same name, or the one it was renamed from.</summary>
     /// <param name="previousName">The name the registry had when it was opened, or null for a new one.</param>
@@ -118,6 +93,14 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     public Task<bool> SaveRegistryAsync(string? previousName, ScopedRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
+        registry = new ScopedRegistry
+        {
+            Name = registry.Name.Trim(),
+            Url = registry.Url.Trim(),
+            Scopes = [.. registry.Scopes.Select(s => s.Trim()).Where(s => s.Length > 0)],
+            Keys = [.. registry.Keys.Select(s => s.Trim()).Where(s => s.Length > 0)],
+            AllowUnsigned = registry.AllowUnsigned,
+        };
         var before = SelectedRegistry;
         return RunAsync($"Save registry {registry.Name}", root =>
         {

@@ -27,6 +27,51 @@ public class FormBuilderTests
         internal int NotPublic { get; set; }
     }
 
+    sealed class WithAction
+    {
+        public int Count { get; set; }
+        [Button] public void Increment() => Count++;
+    }
+
+    /// <summary>Read-only forms reject writes and suppress annotated actions and collection mutations.</summary>
+    [Fact]
+    public void ReadOnlyFormsProtectFieldsCollectionsAndActions()
+    {
+        var target = new WithAction();
+        var editable = Assert.Single(FormBuilder.Build(target).Sections);
+        Assert.Single(editable.Buttons).Invoke();
+        Assert.Equal(1, target.Count);
+        var frozen = Assert.Single(FormBuilder.Build(target, readOnly: true).Sections);
+        Assert.Empty(frozen.Buttons);
+        Assert.False(Assert.Single(frozen.Fields).SetValue(2));
+        Assert.Equal(1, target.Count);
+
+        var collections = new WithCollections();
+        var form = FormBuilder.Build(collections, readOnly: true);
+        foreach (var field in form.Sections[0].Fields)
+        {
+            var collection = CollectionField.TryCreate(field)!;
+            Assert.True(collection.IsReadOnly);
+            Assert.False(collection.CanResize);
+            Assert.False(collection.Entries()[0].SetValue("changed"));
+        }
+        Assert.Equal("a", collections.Names[0]);
+        Assert.Equal(1, collections.Scores["one"]);
+    }
+
+    /// <summary>A calculated field reads current context and rejects writes without mutating its target.</summary>
+    [Fact]
+    public void CalculatedFieldsRemainLiveAndReadOnly()
+    {
+        var value = 2;
+        var field = FormField.Display("Latest", new object(), () => value);
+        Assert.Equal(2, field.GetValue());
+        value = 3;
+        Assert.Equal(3, field.GetValue());
+        Assert.False(field.SetValue(4));
+        Assert.Equal(3, value);
+    }
+
     sealed class WithCollections
     {
         public List<string> Names { get; set; } = ["a"];

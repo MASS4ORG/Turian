@@ -13,10 +13,11 @@ public sealed class FormField
     readonly Action<object>? mutationNotifier;
     readonly bool forcedReadOnly;
 
-    internal FormField(MemberInfo member, object target, Action<object>? mutationNotifier)
+    internal FormField(MemberInfo member, object target, Action<object>? mutationNotifier, bool isReadOnly = false)
     {
         metadata = InspectorMemberMetadata.For(member);
         this.mutationNotifier = mutationNotifier;
+        forcedReadOnly = isReadOnly;
 
         Target = target;
         Name = member.Name;
@@ -77,6 +78,10 @@ public sealed class FormField
 
     /// <summary>Reads the current value.</summary>
     public object? GetValue() => read();
+
+    /// <summary>Creates a calculated display field without adding a member to the inspected type.</summary>
+    public static FormField Display<T>(string label, object target, Func<T> read) =>
+        new(label, typeof(T), target, () => read(), _ => false, null, isReadOnly: true);
 
     /// <summary>
     /// Writes a value, notifying the editor that the target changed so dirty state and any live views

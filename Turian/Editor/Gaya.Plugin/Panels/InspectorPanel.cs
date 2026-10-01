@@ -116,9 +116,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
     void RebuildForm(object target, int components)
     {
-        model = target is Node node
-            ? FormBuilder.BuildForNode(node, _ => assets.AlterAssetForSelectedNode())
-            : FormBuilder.Build(target, _ => assets.AlterAssetForSelectedNode());
+        model = target switch
+        {
+            FormInspection inspection => inspection.Model,
+            Node node => FormBuilder.BuildForNode(node, _ => assets.AlterAssetForSelectedNode()),
+            _ => FormBuilder.Build(target, _ => assets.AlterAssetForSelectedNode()),
+        };
         builtFor = target;
         builtComponents = components;
 
@@ -488,7 +491,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         for (var b = 0; b < buttons.Count; b++)
         {
             var buttonId = $"{id}{b}";
-            if (FieldDrawers.TextButton(gui, buttons[b].Label, buttonId))
+            if (FieldDrawers.TextButton(gui, buttons[b].Label, buttonId, buttons[b].IsEnabled))
                 buttons[b].Invoke();
         }
     }

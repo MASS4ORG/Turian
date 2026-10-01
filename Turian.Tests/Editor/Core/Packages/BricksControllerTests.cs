@@ -175,6 +175,11 @@ public sealed class BricksControllerTests : IDisposable
         Directory.CreateDirectory(controller.Store.Root);
         Directory.Move(BrickService.New(root, "user.mateo.stored"), stored);
 
+        controller.Refresh();
+        controller.Selected = "user.mateo.stored";
+        var form = controller.InspectSelection()!;
+        Assert.Equal("On this machine, not in use", form.Model.Sections[1].Fields.Single(f => f.Name == "Status").GetValue());
+        Assert.Equal(["Enable", "Uninstall"], form.Model.Sections[1].Buttons.Select(b => b.Label));
         Assert.True(await controller.UninstallAsync("user.mateo.stored"), controller.Error);
         Assert.False(Directory.Exists(stored));
     }
@@ -210,41 +215,51 @@ public sealed class BricksControllerTests : IDisposable
         Assert.DoesNotContain(controller.Rows, r => r.Id == "user.mateo.old");
     }
 
-    /// <summary>The inspector shows a view whose type, and so whose buttons, follows the brick's state.</summary>
+    /// <summary>The inspector composes manifest fields with actions for the brick's state.</summary>
     [Fact]
     public async Task InspectionFollowsTheBricksState()
     {
         controller.Refresh();
         controller.Selected = "org.mass4.turian.ui";
-        Assert.IsType<EnabledBrickView>(controller.InspectSelection());
+        Assert.Equal(["Disable", "Update", "Make Local"],
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(b => b.Label));
+
+        Assert.Equal("In use", controller.InspectSelection()!.Model.Sections[1].Fields
+            .Single(f => f.Name == "Status").GetValue());
 
         Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
         controller.Selected = "org.mass4.turian.ui";
-        var available = Assert.IsType<AvailableBrickView>(controller.InspectSelection());
-        Assert.Equal("org.mass4.turian.ui", available.Name);
-        Assert.Equal("Available", available.Status);
+        var available = Assert.IsType<FormInspection>(controller.InspectSelection());
+        Assert.Equal("org.mass4.turian.ui", Assert.IsType<PackageManifest>(available.Target).Name);
+        Assert.Equal("Available", available.Model.Sections[1].Fields.Single(f => f.Name == "Status").GetValue());
+        Assert.Equal("Enable", Assert.Single(available.Model.Sections[1].Buttons).Label);
 
         var made = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
         controller.Refresh();
         controller.Selected = "user.mateo.rules";
-        Assert.IsType<LocalBrickView>(controller.InspectSelection());
+        Assert.Equal(["Revert To Global", "Uninstall"],
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(b => b.Label));
+        Assert.Equal("In use, local to the project", controller.InspectSelection()!.Model.Sections[1].Fields
+            .Single(f => f.Name == "Status").GetValue());
         Assert.True(Directory.Exists(made));
     }
 
     /// <summary>The inspector form of a brick is read-only manifest fields and the buttons of its state.</summary>
     [Fact]
-    public void BrickViewsBuildAnInspectorForm()
+    public void ManifestsBuildAnInspectorForm()
     {
         controller.Refresh();
         controller.Selected = "org.mass4.turian.ui";
 
-        var model = FormBuilder.Build(controller.InspectSelection()!);
-
-        var section = Assert.Single(model.Sections);
+        var inspection = Assert.IsType<FormInspection>(controller.InspectSelection());
+        Assert.Same(controller.SelectedBrick!.Manifest, inspection.Target);
+        var model = inspection.Model;
+        Assert.Equal(2, model.Sections.Count);
+        var section = model.Sections[0];
         Assert.Equal("Brick 'In-game UI'", section.Title);
         Assert.All(section.BodyFields, f => Assert.True(f.IsReadOnly));
         Assert.Contains(section.BodyFields, f => f.Label == "Name");
-        Assert.Equal(["Disable", "Update", "Make Local"], section.Buttons.Select(b => b.Label));
+        Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(b => b.Label));
     }
 
     /// <summary>A registry is added, renamed and removed through the view the inspector shows.</summary>
@@ -259,7 +274,7 @@ public sealed class BricksControllerTests : IDisposable
 
         controller.Tab = BricksTab.Registries;
         controller.SelectedRegistry = "studio";
-        var view = Assert.IsType<RegistryView>(controller.InspectSelection());
+        var view = Assert.IsType<ScopedRegistry>(Assert.IsType<FormInspection>(controller.InspectSelection()).Target);
         view.Name = "renamed";
         Assert.True(await controller.SaveRegistryAsync("studio", new ScopedRegistry
         {
@@ -291,7 +306,23 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.RemoveRegistryAsync("renamed"));
         Assert.DoesNotContain(controller.Registries, r => r.Name == "renamed");
         controller.SelectedRegistry = ProjectPackages.PublicRegistry.Name;
-        Assert.IsType<PublicRegistryView>(controller.InspectSelection());
+        var publicRegistry = Assert.IsType<FormInspection>(controller.InspectSelection());
+        Assert.IsType<ScopedRegistry>(publicRegistry.Target);
+        Assert.All(Assert.Single(publicRegistry.Model.Sections).Fields, f => Assert.True(f.IsReadOnly));
+        Assert.Empty(publicRegistry.Model.Sections[0].Buttons);
+    }
+
+    /// <summary>Registry-only catalog entries expose only metadata supplied by the index.</summary>
+    [Fact]
+    public void PartialCatalogDoesNotInventManifestFields()
+    {
+        var brick = new CatalogBrick("user.mateo.remote", null, null, null, BrickState.Available,
+            null, "1.2.0", "registry:studio", "^1.2.0", false);
+        var form = BrickInspections.Brick(controller, brick, null);
+        var fields = form.Model.Sections[0].Fields;
+        Assert.Contains(fields, f => f.Name == "Version");
+        Assert.DoesNotContain(fields, f => f.Name is "License" or "Dependencies" or "Nuget");
+        Assert.All(fields, f => Assert.False(f.SetValue("changed")));
     }
 
     /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>

@@ -54,6 +54,9 @@ public enum BrickFilter
 public sealed record CatalogBrick(string Id, string? DisplayName, string? Description, string? Author, BrickState State,
     string? InstalledVersion, string? LatestVersion, string? Origin, string? InstallSource, bool IsBuiltin)
 {
+    /// <summary>The complete manifest when this client has it; null for registry-only catalog entries.</summary>
+    public PackageManifest? Manifest { get; init; }
+
     /// <summary>Whether the brick is on this machine or in use.</summary>
     public bool IsInstalled => State != BrickState.Available;
 
@@ -87,7 +90,8 @@ public static class BrickCatalog
             bricks[package.Id] = new CatalogBrick(package.Id, package.Manifest.DisplayName, package.Manifest.Description,
                 package.Manifest.Author, BrickState.Enabled,
                 package.Version.ToString(), package.Version.ToString(), package.Source, package.Source,
-                package.Origin == PackageOrigin.Builtin);
+                package.Origin == PackageOrigin.Builtin)
+            { Manifest = package.Manifest };
         }
 
         foreach (var manifest in BuiltinBricks(builtinDirectory))
@@ -176,7 +180,8 @@ public static class BrickCatalog
         {
             bricks[manifest.Name] = new CatalogBrick(manifest.Name, manifest.DisplayName, manifest.Description,
                 manifest.Author, stored ? BrickState.Installed : BrickState.Available, stored ? version.ToString() : null,
-                version.ToString(), origin, installSource, IsBuiltin: !stored);
+                version.ToString(), origin, installSource, IsBuiltin: !stored)
+            { Manifest = manifest };
             return;
         }
 
@@ -191,6 +196,7 @@ public static class BrickCatalog
                 InstalledVersion = stored ? version.ToString() : known.InstalledVersion,
                 Origin = origin,
                 InstallSource = installSource,
+                Manifest = manifest,
             };
     }
 

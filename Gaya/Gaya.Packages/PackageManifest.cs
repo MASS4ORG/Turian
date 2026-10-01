@@ -46,12 +46,15 @@ public sealed class PackageManifest
     public const string FileName = "package.json";
 
     /// <summary>The package id, reverse-DNS (<c>com.example.inventory</c>).</summary>
+    [InspectorOrder(-30), Tooltip("Permanent reverse-DNS brick identifier.")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>The package version.</summary>
+    [InspectorOrder(-20)]
     public SemanticVersion? Version { get; set; }
 
     /// <summary>The name shown to users.</summary>
+    [InspectorOrder(-10)]
     public string? DisplayName { get; set; }
 
     /// <summary>What the package is for.</summary>
@@ -70,6 +73,7 @@ public sealed class PackageManifest
     /// The packages this one needs: id → a version range the project must satisfy, or a source
     /// (<c>git+https://…#v1.0.0</c>, <c>file:../other</c>) to fetch it from when the project does not declare it.
     /// </summary>
+    [Tooltip("Other bricks required by this brick.")]
     public Dictionary<string, string> Dependencies { get; set; } = [];
 
     /// <summary>Packages needed only while developing this package itself, never by its consumers.</summary>
@@ -79,6 +83,7 @@ public sealed class PackageManifest
     /// NuGet packages the package's prebuilt assemblies need: id → exact version. Hosts that compile against the
     /// package add them to every project that uses it.
     /// </summary>
+    [Tooltip("NuGet libraries referenced by generated consumer projects.")]
     public Dictionary<string, string> Nuget { get; set; } = [];
 
     /// <summary>Host → the host versions the package works with (<c>"my-app": "&gt;=1.2 &lt;2"</c>).</summary>

@@ -87,12 +87,16 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         seenRevision = controller.Revision;
 
         // A registry being edited keeps its unsaved values until it is saved, removed or another is selected.
-        if (inspector.SelectedObject is RegistryView editing && editing.SavedName == (controller.SelectedRegistry is "" ? null : controller.SelectedRegistry)
-                                                            && controller.Tab == BricksTab.Registries) return;
-        if (inspector.SelectedObject is not (BrickView or RegistryView or PublicRegistryView)) return;
-
+        if (inspector.SelectedObject is not FormInspection inspection) return;
+        if (IsCurrentRegistry(inspection)) return;
         inspector.Select(controller.InspectSelection());
     }
+
+    bool IsCurrentRegistry(FormInspection inspection) =>
+        Equals(inspection.Context, controller.ProjectFolder)
+        && inspection.Target is ScopedRegistry
+        && inspection.Key == $"registry:{controller.SelectedRegistry}"
+        && controller.Tab == BricksTab.Registries;
 
     void Show(Action select)
     {
