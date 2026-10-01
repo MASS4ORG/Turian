@@ -301,7 +301,6 @@ public static class CsProjectGenerator
             group.AddProperty("TargetFramework", settings.TargetFramework);
             group.AddProperty("ImplicitUsings", "disable");
             group.AddProperty("Nullable", "enable");
-            projectRoot.AddItemGroup().AddItem("Using", "MASS4.Attributes");
 
             if (executable)
             {
@@ -350,6 +349,7 @@ public static class CsProjectGenerator
 
         private ProjectRootElement AddInternalDllReferences(IBuildAppSettings settings)
         {
+            projectRoot.AddItemGroup().AddItem("Using", "MASS4.Attributes");
             var itemGroup = projectRoot.AddItemGroup();
             var usesPublishedLibraries = IsPublishedDistribution();
             foreach (var turianPackage in settings.TurianPackages)

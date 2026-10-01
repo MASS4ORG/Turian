@@ -253,6 +253,36 @@ public sealed class AssemblyGraphTests : IDisposable
             CsProjectGenerator.DiscoverAssemblies(settings))[0];
 
         Assert.DoesNotContain(math.Items, i => i.ItemType is "Reference" or "Analyzer");
+        Assert.DoesNotContain(math.Items, i => i.ItemType == "Using" && i.Include == "MASS4.Attributes");
+    }
+
+    /// <summary>Definitions stored with legacy type identifiers still partition the source graph.</summary>
+    [Fact]
+    public void LegacyDefinitionIdentifiersAreRecognized()
+    {
+        Define("Math", "Acme.Math", noEngineReferences: true);
+        var path = Path.Combine(assetsDirectory, "Math", "Acme.Math.dataasset");
+        File.WriteAllText(path, File.ReadAllText(path).Replace(AssemblyDefinition.TypeIdValue,
+            "a3000002-0000-4000-8000-000000000006", StringComparison.Ordinal));
+        var metaPath = $"{path}.meta";
+        File.WriteAllText(metaPath, File.ReadAllText(metaPath).Replace("aab4f92b-7216-52d8-b722-7399613c929c",
+            "a3000000-0000-4000-8000-000000000006", StringComparison.Ordinal));
+
+        Assert.True(AssemblyGraph.IsDefinitionFile(path));
+        Assert.Equal("Acme.Math", Assert.Single(AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions).Name);
+    }
+
+    /// <summary>Unreadable and unrelated data assets do not become assembly definitions.</summary>
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("{\"Other\":5}")]
+    [InlineData("{\"__TypeId\":\"invalid\"}")]
+    [InlineData("{")]
+    public void InvalidDefinitionDiscriminatorsAreIgnored(string json)
+    {
+        var path = Path.Combine(assetsDirectory, "Other.dataasset");
+        File.WriteAllText(path, json);
+        Assert.False(AssemblyGraph.IsDefinitionFile(path));
     }
 
     IBuildAppSettings Settings()

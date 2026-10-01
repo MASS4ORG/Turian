@@ -239,7 +239,7 @@ public sealed class AssemblyGraph
                     continue;
                 }
 
-                return reader.Read() && reader.TryGetGuid(out var id) ? id : null;
+                return reader.Read() && reader.TryGetGuid(out var id) ? TypeRegistry.CanonicalId(id) : null;
             }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)

@@ -3,6 +3,37 @@ namespace Turian.Tests;
 /// <summary>Exercises composed forms and contextual actions through both headless Inspector passes.</summary>
 public sealed class InspectorFormsRenderingTests
 {
+    /// <summary>A settings selection made during rendering takes effect on the next complete frame.</summary>
+    [Theory]
+    [InlineData(typeof(PlayerSettings))]
+    [InlineData(typeof(InputSettings))]
+    [InlineData(typeof(GraphicsSettings))]
+    public void SettingsSelectionBetweenPassesUsesNextFrame(Type settingsType)
+    {
+        var assets = new AssetManager();
+        var selection = new NodeInspectorController(assets);
+        var input = Substitute.For<IInputHandler>();
+        input.MousePosition.Returns(new Vector2(-1, -1));
+        var gui = new Gui { Input = input };
+        var picker = new ReferencePicker(null!, null!, null!);
+        using var panel = new InspectorPanel(selection, assets, picker, null!, null!, new InspectorSettings(),
+            null!, null!, null!, null!, null!, null!);
+        using var surface = SKSurface.Create(new SKImageInfo(640, 800));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        var inspection = new AssetInspection(null!, "settings.dataasset", Activator.CreateInstance(settingsType),
+            "Settings", IsPayload: true);
+
+        Frame(gui, surface, font, current =>
+        {
+            if (current.Pass == Pass.Pass2Render) selection.Select(inspection);
+            panel.Render(current);
+        });
+        Assert.DoesNotContain(Descendants(gui.RootNode!), n => n.Id == "inspector/asset/fields");
+
+        Frame(gui, surface, font, panel.Render);
+        Assert.Contains(Descendants(gui.RootNode!), n => n.Id == "inspector/asset/fields");
+    }
+
     /// <summary>Composed actions run only when enabled and clicked during the render pass.</summary>
     [Theory]
     [InlineData(false)]

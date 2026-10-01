@@ -35,6 +35,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     Action<FlyoutBuilder>? overrideMenu;
     Component? removeRequest;
     object? lockedTarget;
+    object? frameTarget;
 
     /// <summary>
     /// Whether this instance keeps showing <see cref="lockedTarget"/> instead of following the shared
@@ -51,10 +52,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        // A node gets the node form — its own members plus one section per component. Anything else
-        // the shell selects, such as the project settings, gets the plain object form. A locked
-        // instance keeps whatever it was showing when it was locked, live selection notwithstanding.
-        var target = lockedTarget ?? inspector.SelectedNode ?? inspector.SelectedObject;
+        var target = FrameSelection(gui);
         if (target is null)
         {
             return;
@@ -66,20 +64,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             return;
         }
 
-        // Any edit to the open scene may change what an instance overrides, the scene tree's included.
-        if (!trackingEdits)
-        {
-            assets.AssetAltered += OnAssetAltered;
-            trackingEdits = true;
-        }
-
-        overrides.Track(target as Node);
-
-        // Rebuilt when the selection changes, and when a component is added or removed: reflection is
-        // cached per type, the form is not.
-        var components = (target as Node)?.Components.Count ?? 0;
-        if (gui.Pass == Pass.Pass1Build && (!ReferenceEquals(builtFor, target) || components != builtComponents))
-            RebuildForm(target, components);
+        PrepareForm(gui, target);
 
         RenderForm(gui, target);
 
@@ -92,6 +77,28 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             if (inspector.SelectedNode is { } owner) undo.RecordObject(owner, "Remove Component");
             inspector.RemoveComponent(removing);
         }
+    }
+
+    object? FrameSelection(Gui gui)
+    {
+        // Both passes draw the same selection; clicks become visible in the next frame.
+        if (gui.Pass == Pass.Pass1Build)
+            frameTarget = lockedTarget ?? inspector.SelectedNode ?? inspector.SelectedObject;
+        return frameTarget;
+    }
+
+    void PrepareForm(Gui gui, object target)
+    {
+        if (!trackingEdits)
+        {
+            assets.AssetAltered += OnAssetAltered;
+            trackingEdits = true;
+        }
+
+        overrides.Track(target as Node);
+        var components = (target as Node)?.Components.Count ?? 0;
+        if (gui.Pass == Pass.Pass1Build && (!ReferenceEquals(builtFor, target) || components != builtComponents))
+            RebuildForm(target, components);
     }
 
     void RenderForm(Gui gui, object target)

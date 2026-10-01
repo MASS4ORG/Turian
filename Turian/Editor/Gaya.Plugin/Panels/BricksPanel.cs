@@ -16,7 +16,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
 {
     const float rowHeight = 36f;
 
-    static readonly (BrickFilter Filter, string Label, float Width)[] filters =
+    static readonly (BrickFilter Filter, string Label, float Width)[] Filters =
     [
         (BrickFilter.All, "All", 36f),
         (BrickFilter.Installed, "Installed", 62f),
@@ -193,7 +193,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/filters").ExpandWidth().Direction(Axis.Horizontal)
                    .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
         {
-            foreach (var (value, label, width) in filters)
+            foreach (var (value, label, width) in Filters)
             {
                 if (Chip(gui, label, $"bricks/filter/{value}", width, filter == value)) filter = value;
             }

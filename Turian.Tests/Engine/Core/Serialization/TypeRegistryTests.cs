@@ -6,6 +6,19 @@ namespace Turian.Tests;
 /// </summary>
 public class TypeRegistryTests
 {
+    /// <summary>Legacy metadata can be read while serializers write the canonical identifier.</summary>
+    [Fact]
+    public void LegacyMetadataReadsAndWritesCanonicalId()
+    {
+        const string legacyId = "a3000000-0000-4000-8000-000000000006";
+        var metadata = Serializer.LoadData<Asset>("""{ "__TypeId": "a3000000-0000-4000-8000-000000000006" }""");
+        Assert.IsType<DataAssetAsset>(metadata);
+        var currentId = TypeRegistry.GetIdOrThrow(typeof(DataAssetAsset));
+        Assert.NotEqual(Guid.Parse(legacyId), currentId);
+        Assert.Contains(currentId.ToString(), Serializer.Serialize(metadata), StringComparison.Ordinal);
+        Assert.DoesNotContain(legacyId, Serializer.Serialize(metadata), StringComparison.Ordinal);
+    }
+
     [TypeId("b0000000-0000-4000-8000-000000000001")]
     sealed class TaggedSampleA : IdObject;
 

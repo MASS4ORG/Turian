@@ -68,6 +68,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
             catch (Exception e)
             {
                 Logger.LogError(e, "Package restore failed");
+                throw;
             }
         }
 
@@ -100,16 +101,17 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     /// <summary>Restores NuGet packages for the given project.</summary>
     public async Task RestorePackages(string csprojFilePath)
     {
-        var folder = Path.GetDirectoryName(csprojFilePath);
-        Logger.LogInformation("Restoring packages: {Path}", folder);
+        Logger.LogInformation("Restoring packages: {Path}", csprojFilePath);
 
-        var startInfo = new ProcessStartInfo("dotnet", $"restore \"{folder}\"")
+        var startInfo = new ProcessStartInfo("dotnet")
         {
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.ArgumentList.Add("restore");
+        startInfo.ArgumentList.Add(Path.GetFullPath(csprojFilePath));
 
         using var process = new Process();
         process.StartInfo = startInfo;
