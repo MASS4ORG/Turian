@@ -7,7 +7,7 @@ namespace Turian.Engine.Core;
 /// <c>Turian.Engine.UI.Assets.UiDocumentAsset</c>, so it works for loose editors and packed builds
 /// alike.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000031")]
+[TypeId("872b1410-e3b0-50fb-ac51-bbe0ea6c3a60")]
 public sealed class StringTableAsset : Asset
 {
     static readonly ConcurrentDictionary<Guid, StringTable> Cache = new();

@@ -14,10 +14,10 @@ public sealed class BrickAssetCopyTests : IDisposable
         var brick = Path.Combine(root, "stats");
         Directory.CreateDirectory(Path.Combine(brick, "Runtime"));
         new PackageManifest { Name = "user.mateo.stats", Version = SemanticVersion.Parse("1.0.0") }.Save(brick);
-        File.WriteAllText(Path.Combine(brick, "Runtime", "Hero.dataasset"), $$"""{ "__TypeId": "a3000002-0000-4000-8000-000000000001", "Id": "{{stats}}", "Health": 10 }""");
-        File.WriteAllText(Path.Combine(brick, "Runtime", "Hero.dataasset.meta"), $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "Runtime/Hero.dataasset", "Id": "{{stats}}" }""");
+        File.WriteAllText(Path.Combine(brick, "Runtime", "Hero.dataasset"), $$"""{ "__TypeId": "04636c74-0b91-5822-afc0-126ffdc58e8a", "Id": "{{stats}}", "Health": 10 }""");
+        File.WriteAllText(Path.Combine(brick, "Runtime", "Hero.dataasset.meta"), $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "Runtime/Hero.dataasset", "Id": "{{stats}}" }""");
         File.WriteAllBytes(Path.Combine(brick, "Runtime", "Icon.png"), [0x89, 0x50, 0x4E, 0x47]);
-        File.WriteAllText(Path.Combine(brick, "Runtime", "Icon.png.meta"), $$"""{ "__TypeId": "a3000000-0000-4000-8000-00000000000b", "RelativePath": "Runtime/Icon.png", "Id": "{{icon}}" }""");
+        File.WriteAllText(Path.Combine(brick, "Runtime", "Icon.png.meta"), $$"""{ "__TypeId": "f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", "RelativePath": "Runtime/Icon.png", "Id": "{{icon}}" }""");
         Directory.CreateDirectory(Path.Combine(brick, "Samples~"));
         File.WriteAllText(Path.Combine(brick, "Samples~", "Sample.json"), "{}");
         File.WriteAllText(Path.Combine(brick, "Samples~", "Sample.json.meta"), """{ "Id": "00000000-0000-4000-8000-000000000001" }""");

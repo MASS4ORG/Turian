@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// by the model importers — one per mesh-bearing node of the source file. Every mesh
 /// of one file shares that file's vertex and index buffers.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-00000000000c")]
+[TypeId("5773a003-3519-5e1e-82ad-faaffb8edaa9")]
 public class MeshAsset : Asset
 {
     /// <summary>Gets or sets the model asset that owns the shared buffers.</summary>

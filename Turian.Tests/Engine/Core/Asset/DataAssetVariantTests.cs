@@ -6,7 +6,7 @@ public sealed class DataAssetVariantTests : IDisposable
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-variants-{Guid.NewGuid():N}");
     readonly Guid baseId = Guid.NewGuid();
     readonly Guid variantId = Guid.NewGuid();
-    const string baseJson = """{ "__TypeId": "a3000002-0000-4000-8000-000000000006", "Name": "Base", "Stats": { "Health": 10, "Mana": 5 }, "Tags": ["a", "b"] }""";
+    const string baseJson = """{ "__TypeId": "ca028d68-85a9-5f3d-ad2f-c54db757d6fa", "Name": "Base", "Stats": { "Health": 10, "Mana": 5 }, "Tags": ["a", "b"] }""";
 
     /// <summary>Creates the scratch folder.</summary>
     public DataAssetVariantTests() => Directory.CreateDirectory(root);
@@ -30,7 +30,7 @@ public sealed class DataAssetVariantTests : IDisposable
         Assert.Equal(5, (int)flat["Stats"]!["Mana"]!);
         Assert.Equal(["z"], flat["Tags"]!.AsArray().Select(n => (string)n!));
         Assert.Equal(variantId.ToString(), (string)flat["Id"]!);
-        Assert.Equal("a3000002-0000-4000-8000-000000000006", (string)flat["__TypeId"]!);
+        Assert.Equal("ca028d68-85a9-5f3d-ad2f-c54db757d6fa", (string)flat["__TypeId"]!);
         Assert.Null(flat["__Variant"]);
     }
 
@@ -69,14 +69,14 @@ public sealed class DataAssetVariantTests : IDisposable
         var baseFile = Path.Combine(root, "Assets", "Hero.dataasset");
         Directory.CreateDirectory(Path.GetDirectoryName(baseFile)!);
         File.WriteAllText(baseFile, baseJson);
-        File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "Assets/Hero.dataasset", "Id": "{{baseId}}" }""");
+        File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "Assets/Hero.dataasset", "Id": "{{baseId}}" }""");
 
         var (path, id) = DataAssetVariantFactory.Create(root, baseFile, "Assets/Variants", "Boss");
 
         Assert.Equal(Path.Combine(root, "Assets", "Variants", "Boss.dataasset"), path);
         Assert.True(DataAssetVariants.IsVariant(File.ReadAllText(path)));
         Assert.Contains(id.ToString(), File.ReadAllText($"{path}.meta"), StringComparison.Ordinal);
-        Assert.Contains("a3000002-0000-4000-8000-000000000006", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Contains("ca028d68-85a9-5f3d-ad2f-c54db757d6fa", File.ReadAllText(path), StringComparison.Ordinal);
         Assert.Throws<InvalidOperationException>(() => DataAssetVariantFactory.Create(root, baseFile, "Assets/Variants", "Boss"));
         Assert.Null(new GenericAssetImporter().LoadAuthoredContent(new DataAssetAsset(), path));
     }
@@ -96,7 +96,7 @@ public sealed class DataAssetVariantTests : IDisposable
             Directory.CreateDirectory(assets);
             var baseFile = Path.Combine(assets, "Base.dataasset");
             File.WriteAllText(baseFile, $$"""{ "__TypeId": "{{AssemblyDefinition.TypeIdValue}}", "Name": "Base.Asm", "RootNamespace": "Base", "Id": "{{baseId}}" }""");
-            File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "Assets/Base.dataasset", "Id": "{{baseId}}" }""");
+            File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "Assets/Base.dataasset", "Id": "{{baseId}}" }""");
             var (variantFile, id) = DataAssetVariantFactory.Create(project, baseFile, "Assets", "Child");
             File.WriteAllText(variantFile, File.ReadAllText(variantFile).Replace("\"Overrides\": {}", "\"Overrides\": { \"Name\": \"Child.Asm\" }", StringComparison.Ordinal));
 

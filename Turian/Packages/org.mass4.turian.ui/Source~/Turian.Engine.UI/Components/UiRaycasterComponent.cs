@@ -9,7 +9,7 @@ namespace Turian.Engine.UI;
 [RequireComponent(typeof(UiDocumentComponent))]
 [DisallowMultipleComponent]
 [ComponentContextMenu("UI/UI Raycaster")]
-[TypeId("a3000001-0000-4000-8000-000000000024")]
+[TypeId("7dd0fcfe-d1fa-59df-bcb9-b404c8233f7c")]
 [PublicAPI]
 public class UiRaycasterComponent : Component
 {

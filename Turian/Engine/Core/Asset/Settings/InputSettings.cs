@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>Which action maps the game's input is read through.</summary>
 [CreateAssetMenu(fileName: "InputSettings", path: "Settings/Input Settings")]
-[TypeId("a3000005-0000-4000-8000-000000000002")]
+[TypeId("cc688af8-42fd-5923-bf11-02fc3f2fe765")]
 public class InputSettings : ProjectSettingsAsset
 {
     /// <summary>

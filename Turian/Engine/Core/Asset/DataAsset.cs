@@ -9,7 +9,7 @@ public delegate void DataAssetChangedHandler(DataAsset asset, string member);
 /// Represents the serialized payload stored inside a data-asset file.
 /// The payload is shared by the asset loader and can be copied with Instantiate.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000004")]
+[TypeId("2072d8c2-86ad-52b9-9f91-42695ff0800d")]
 public class DataAsset : IdObject
 {
     /// <summary>

@@ -16,7 +16,7 @@ public sealed class PackageImportOverridesTests : IDisposable
         using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             File.WriteAllBytes(Path.Combine(brick, "Runtime", "Icon.png"), png.ToArray());
         File.WriteAllText(Path.Combine(brick, "Runtime", "Icon.png.meta"), $$"""
-            { "__TypeId": "a3000000-0000-4000-8000-00000000000b", "IsSrgb": true, "GenerateMips": true,
+            { "__TypeId": "f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", "IsSrgb": true, "GenerateMips": true,
               "ImportSettings": { "MaxResolution": 0, "PerTarget": {} }, "RelativePath": "Runtime/Icon.png", "Id": "{{iconId}}" }
             """);
 

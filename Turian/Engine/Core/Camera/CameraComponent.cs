@@ -8,7 +8,7 @@ namespace Turian.Engine.Core;
 /// TODO: implement conditional Inspector fields (ShowIfAttribute)
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera")]
-[TypeId("a3000001-0000-4000-8000-000000000001")]
+[TypeId("1e9919ae-f343-569f-8715-8aa2baab3e39")]
 public class CameraComponent : Component, ICamera
 {
     const float minNear = 0.0001f;

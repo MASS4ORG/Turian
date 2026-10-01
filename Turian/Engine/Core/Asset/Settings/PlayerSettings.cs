@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>What a built game is called, who ships it, and the scene it starts in.</summary>
 [CreateAssetMenu(fileName: "PlayerSettings", path: "Settings/Player Settings")]
-[TypeId("a3000005-0000-4000-8000-000000000001")]
+[TypeId("e59d7123-c554-5d48-a6bf-ff26210283e7")]
 public class PlayerSettings : ProjectSettingsAsset
 {
     /// <summary>Product title shown to players in builds and runtime windows.</summary>

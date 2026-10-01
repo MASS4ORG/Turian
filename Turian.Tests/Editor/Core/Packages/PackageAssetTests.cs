@@ -81,6 +81,6 @@ public sealed class PackageAssetTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(assetPath)!);
         File.WriteAllBytes(assetPath, []);
         File.WriteAllText($"{assetPath}.meta",
-            $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000003", "RelativePath": "{{Path.GetFileName(assetPath)}}", "Id": "{{id}}" }""");
+            $$"""{ "__TypeId": "2af5e114-fb34-54c7-8f14-04aed6c7eb74", "RelativePath": "{{Path.GetFileName(assetPath)}}", "Id": "{{id}}" }""");
     }
 }

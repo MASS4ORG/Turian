@@ -170,7 +170,7 @@ public sealed class AssemblyGraphTests : IDisposable
     {
         Define("A", "Acme.A", fileName: "Acme.A");
         var other = Path.Combine(assetsDirectory, "Other.dataasset");
-        File.WriteAllText(other, """{ "__TypeId": "a3000000-0000-4000-8000-000000000004", "Id": "00000000-0000-4000-8000-000000000001" }""");
+        File.WriteAllText(other, """{ "__TypeId": "2072d8c2-86ad-52b9-9f91-42695ff0800d", "Id": "00000000-0000-4000-8000-000000000001" }""");
 
         Assert.True(AssemblyGraph.IsDefinitionFile(Path.Combine(assetsDirectory, "A", "Acme.A.dataasset")));
         Assert.False(AssemblyGraph.IsDefinitionFile(other));
@@ -276,7 +276,7 @@ public sealed class AssemblyGraphTests : IDisposable
         File.WriteAllText(path,
             $$"""{ "__TypeId": "{{AssemblyDefinitionReference.TypeIdValue}}", "Definition": { "AssetId": "{{definition}}" }, "Id": "{{id}}" }""");
         File.WriteAllText($"{path}.meta",
-            $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{id}}" }""");
+            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{id}}" }""");
     }
 
     string Script(params string[] parts) => Path.Combine([assetsDirectory, .. parts]);
@@ -308,7 +308,7 @@ public sealed class AssemblyGraphTests : IDisposable
         };
         File.WriteAllText(path, json.ToJsonString());
         File.WriteAllText($"{path}.meta",
-            $$"""{ "__TypeId": "a3000000-0000-4000-8000-000000000006", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{assetId}}" }""");
+            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{assetId}}" }""");
 
         return assetId;
     }

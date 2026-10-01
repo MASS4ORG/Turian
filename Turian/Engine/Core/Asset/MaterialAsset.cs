@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// are optional; when null the corresponding factor is used directly.
 /// <see cref="GetContent"/> builds the descriptor set the renderer binds per submesh.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-00000000000a")]
+[TypeId("0a3e5372-83ed-59ef-ae7d-124539527fac")]
 public class MaterialAsset : Asset
 {
     // Keyed by (assetId, context) rather than by device: a MaterialResource holds a descriptor set

@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <inheritdoc cref="IAppSettings"/>
-[TypeId("a3000002-0000-4000-8000-000000000001")]
+[TypeId("04636c74-0b91-5822-afc0-126ffdc58e8a")]
 public class BuildAppSettings : IdObject, IBuildAppSettings
 {
     BricksSettings? bricks;

@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Asset metadata that points to a serialized <see cref="DataAsset"/> payload file.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000006")]
+[TypeId("aab4f92b-7216-52d8-b722-7399613c929c")]
 public class DataAssetAsset : Asset
 {
     readonly Lock contentGate = new();

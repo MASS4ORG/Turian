@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Base for all engine objects.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000001")]
+[TypeId("fd11aa4a-f57c-5b76-8f15-79bc19ba50d1")]
 public class IdObject : IEquatable<IdObject>
 {
     /// <summary>

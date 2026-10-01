@@ -5,7 +5,7 @@ namespace Turian.Engine.UI;
 /// importer baked — normalised <see cref="UiDocument"/> JSON — and deserialises it, skipping the
 /// XML parse at runtime. The parsed document is cached per asset id.
 /// </summary>
-[TypeId("a3000001-0000-4000-8000-000000000021")]
+[TypeId("09f19ed0-d67e-5c23-ae3c-f5aa84f9ac45")]
 public sealed class UiDocumentAsset : Asset
 {
     static readonly ConcurrentDictionary<Guid, UiDocument> Cache = new();

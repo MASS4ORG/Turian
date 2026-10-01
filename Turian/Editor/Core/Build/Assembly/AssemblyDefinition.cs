@@ -10,7 +10,7 @@ namespace Turian.Editor.Core;
 public class AssemblyDefinition : DataAsset
 {
     /// <summary>The <see cref="TypeIdAttribute"/> value, read by build tools without loading the asset.</summary>
-    public const string TypeIdValue = "a3000002-0000-4000-8000-000000000006";
+    public const string TypeIdValue = "ca028d68-85a9-5f3d-ad2f-c54db757d6fa";
 
     /// <summary>The assembly name; empty uses the file name.</summary>
     public string? Name { get; set; }

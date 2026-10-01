@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Light")]
-[TypeId("a3000001-0000-4000-8000-000000000006")]
+[TypeId("4d08c521-7f64-5859-9b98-e8f5e418f0be")]
 public class LightComponent : Component
 {
     /// <summary>

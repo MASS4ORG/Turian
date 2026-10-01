@@ -5,7 +5,7 @@ namespace Turian.Engine.UI;
 /// imported file and loads it as a Guinevere <see cref="Font"/> at a default size; callers set the
 /// point size with <see cref="Font.WithSize"/>. Loaded faces are cached per asset id.
 /// </summary>
-[TypeId("a3000001-0000-4000-8000-000000000023")]
+[TypeId("8fb85601-cb69-5917-9351-91dea84247b0")]
 public sealed class UiFontAsset : Asset
 {
     static readonly ConcurrentDictionary<Guid, Font> Cache = new();

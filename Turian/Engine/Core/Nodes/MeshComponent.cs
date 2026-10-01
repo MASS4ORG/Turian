@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Reusable mesh rendering behavior that can be attached to any <see cref="Node"/>.
 /// </summary>
 [ComponentContextMenu("Rendering/Mesh")]
-[TypeId("a3000001-0000-4000-8000-000000000007")]
+[TypeId("439a17b6-0567-576b-9dcd-9404bc53e726")]
 public class MeshComponent : Component, IDisposable
 {
     ExtMeshShader extMeshShader = null!;

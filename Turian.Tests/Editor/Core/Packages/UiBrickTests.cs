@@ -65,7 +65,7 @@ public sealed class UiBrickTests : IDisposable
         BrickAssemblies.Load([brick], NullLogger.Instance);
 
         Assert.NotNull(UiPresenters.Find());
-        Assert.Equal(typeof(UiDocumentComponent), TypeRegistry.GetTypeOrThrow(new Guid("a3000001-0000-4000-8000-000000000020")));
+        Assert.Equal(typeof(UiDocumentComponent), TypeRegistry.GetTypeOrThrow(new Guid("da4b14b7-dfd9-51a0-afd0-83f1a4c982ac")));
     }
 
     /// <summary>The brick renders a single document to a PNG on the CPU, which the command line's <c>ui</c> command uses.</summary>

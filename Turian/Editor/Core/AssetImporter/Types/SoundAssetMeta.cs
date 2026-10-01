@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Base metadata contract for sound assets.
 /// </summary>
-[TypeId("a3000002-0000-4000-8000-000000000003")]
+[TypeId("90f5ce8e-1d39-5ec9-aa6f-da5ae0ba4ddc")]
 [PublicAPI]
 public class SoundAssetMeta : Asset
 {

@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Reusable model rendering behavior that can be attached to any <see cref="Node"/>.
 /// </summary>
 [ComponentContextMenu("Rendering/Model")]
-[TypeId("a3000001-0000-4000-8000-000000000008")]
+[TypeId("9acb4142-14f8-5681-bd8b-d35fddd41ed1")]
 [PublicAPI]
 public class ModelComponent : Component, IDisposable
 {

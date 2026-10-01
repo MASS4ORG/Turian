@@ -4,7 +4,7 @@ namespace Turian.Engine.UI;
 /// Asset metadata for a <c>.uss</c> stylesheet. <see cref="GetContent"/> reads the artifact the
 /// importer validated and parses it into a Guinevere <see cref="StyleSheet"/>, cached per asset id.
 /// </summary>
-[TypeId("a3000001-0000-4000-8000-000000000022")]
+[TypeId("e33bac6d-8920-535f-9507-bd4c31915c15")]
 public sealed class UiStyleSheetAsset : Asset
 {
     static readonly ConcurrentDictionary<Guid, StyleSheet> Cache = new();

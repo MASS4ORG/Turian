@@ -10,7 +10,7 @@ public class ObjectJsonSerializerTests
     /// <summary>
     /// Test subclass that derived from IdObject
     /// </summary>
-    [TypeId("a3000003-0000-4000-8000-000000000001")]
+    [TypeId("ee655586-70ea-58b3-93c4-6888f7b0d97d")]
     internal sealed class InnerTestClass : IdObject
     {
         public int InnerValue { get; set; } = 1;

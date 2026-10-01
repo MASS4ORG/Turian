@@ -8,7 +8,7 @@ namespace Turian.Engine.UI;
 /// </summary>
 [DisallowMultipleComponent]
 [ComponentContextMenu("UI/UI Document")]
-[TypeId("a3000001-0000-4000-8000-000000000020")]
+[TypeId("da4b14b7-dfd9-51a0-afd0-83f1a4c982ac")]
 public class UiDocumentComponent : Component
 {
     /// <summary>The <c>.ui</c> document this panel renders. Empty when the UI is supplied via <see cref="OnBuild"/>.</summary>

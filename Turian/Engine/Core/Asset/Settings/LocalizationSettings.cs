@@ -6,7 +6,7 @@ namespace Turian.Engine.Core;
 /// authors this asset still resolves keys through the <c>en</c> table.
 /// </summary>
 [CreateAssetMenu(fileName: "LocalizationSettings", path: "Settings/Localization Settings")]
-[TypeId("a3000005-0000-4000-8000-000000000004")]
+[TypeId("ea552db5-cfca-5aeb-850d-e9ca1a4892e2")]
 public class LocalizationSettings : ProjectSettingsAsset
 {
     /// <summary>The locale the game starts in and unresolved keys fall back to.</summary>

@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary> </summary>
 [CreateAssetMenu(fileName: "DataAssetTest", path: "DA/DataAssetTest")]
 //[CreateAssetMenu("DA/DataAssetTest")]
-[TypeId("a3000000-0000-4000-8000-000000000007")]
+[TypeId("4019cbce-ba03-5f58-a725-a165168f00b7")]
 public class DataAssetTest : DataAsset
 {
     /// <summary> </summary>

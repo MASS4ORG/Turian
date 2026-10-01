@@ -47,14 +47,14 @@ public sealed class BrickTeamFlowTests : IDisposable
         File.Delete(Path.Combine(stub, "Runtime", "Level.bin"));
         File.Delete(Path.Combine(stub, "Runtime", "Level.bin.meta"));
         var iconMeta = Path.Combine(stub, "Runtime", "Icon.png.meta");
-        File.WriteAllText(iconMeta, File.ReadAllText(iconMeta).Replace("a3000000-0000-4000-8000-00000000000b", "a3000000-0000-4000-8000-000000000003", StringComparison.Ordinal));
+        File.WriteAllText(iconMeta, File.ReadAllText(iconMeta).Replace("f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", "2af5e114-fb34-54c7-8f14-04aed6c7eb74", StringComparison.Ordinal));
         var script = Path.Combine(stub, "Runtime", "Door.cs");
         File.WriteAllText(script, File.ReadAllText(script).Replace("class Door", "class Gate", StringComparison.Ordinal));
 
         var issues = BrickVerifier.VerifyAgainst(stub, real);
 
         Assert.Contains(issues, i => i.Contains("Level.bin) is missing", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("Icon.png", StringComparison.Ordinal) && i.Contains("expected a3000000-0000-4000-8000-00000000000b", StringComparison.Ordinal));
+        Assert.Contains(issues, i => i.Contains("Icon.png", StringComparison.Ordinal) && i.Contains("expected f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", StringComparison.Ordinal));
         Assert.Contains(issues, i => i.Contains("Mateo.Levels.Gate, expected Mateo.Levels.Door", StringComparison.Ordinal));
     }
 
@@ -135,7 +135,7 @@ public sealed class BrickTeamFlowTests : IDisposable
         File.Delete(Path.Combine(folder, "Runtime", "LevelsComponent.cs"));
         File.Delete(Path.Combine(folder, "Runtime", "LevelsComponent.cs.meta"));
         File.WriteAllText(Path.Combine(folder, "Runtime", "Door.cs"), "namespace Mateo.Levels;\npublic class Door : Turian.Engine.Core.Component\n{\n    public void Open() { }\n}\n");
-        Meta(Path.Combine(folder, "Runtime", "Door.cs"), "a3000000-0000-4000-8000-000000000003");
+        Meta(Path.Combine(folder, "Runtime", "Door.cs"), "2af5e114-fb34-54c7-8f14-04aed6c7eb74");
         File.WriteAllBytes(Path.Combine(folder, "Runtime", "Level.bin"), [1, 2, 3, 4, 5, 6, 7, 8]);
         Meta(Path.Combine(folder, "Runtime", "Level.bin"));
         File.WriteAllText(Path.Combine(folder, "Runtime", "Notes.txt"), "line one\nline two\nline three\n");
@@ -143,14 +143,14 @@ public sealed class BrickTeamFlowTests : IDisposable
         using (var bitmap = new SKBitmap(32, 32))
         using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
             File.WriteAllBytes(Path.Combine(folder, "Runtime", "Icon.png"), png.ToArray());
-        Meta(Path.Combine(folder, "Runtime", "Icon.png"), "a3000000-0000-4000-8000-00000000000b");
+        Meta(Path.Combine(folder, "Runtime", "Icon.png"), "f12b8bbf-74b4-5af6-95a3-535c4fa6c16c");
         var manifest = PackageManifest.Load(folder, ["turian"]);
         manifest.Version = SemanticVersion.Parse("1.2.0");
         manifest.Save(folder);
         return folder;
     }
 
-    static void Meta(string assetPath, string typeId = "a3000000-0000-4000-8000-000000000003") =>
+    static void Meta(string assetPath, string typeId = "2af5e114-fb34-54c7-8f14-04aed6c7eb74") =>
         File.WriteAllText($"{assetPath}.meta", $$"""{ "__TypeId": "{{typeId}}", "RelativePath": "{{Path.GetFileName(assetPath)}}", "Id": "{{Guid.NewGuid()}}" }""");
 
     static void Git(string directory, params string[] arguments)

@@ -16,7 +16,7 @@ public sealed class SourceFileWatcherTests : IDisposable
     public async Task ScriptsAndAssemblyDefinitionsTriggerRecompiles()
     {
         Assert.False(await ChangeTriggers("Icon.png", "not a script"));
-        Assert.False(await ChangeTriggers("Stats.dataasset", """{ "__TypeId": "a3000000-0000-4000-8000-000000000004" }"""));
+        Assert.False(await ChangeTriggers("Stats.dataasset", """{ "__TypeId": "2072d8c2-86ad-52b9-9f91-42695ff0800d" }"""));
         Assert.True(await ChangeTriggers("Player.cs", "class Player {}"));
         Assert.True(await ChangeTriggers("Game.dataasset", $$"""{ "__TypeId": "{{AssemblyDefinition.TypeIdValue}}" }"""));
     }

@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Represents a node in the engine's scene graph hierarchy.
 /// </summary>
 [NodeContextMenu]
-[TypeId("a3000000-0000-4000-8000-000000000002")]
+[TypeId("f7cc675d-54f2-510b-8e5d-807281e3012d")]
 public partial class Node : IdObject
 {
     /// <summary>Initializes a node and subscribes its local transform to cache invalidation.</summary>

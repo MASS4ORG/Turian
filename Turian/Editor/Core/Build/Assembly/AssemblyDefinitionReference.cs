@@ -9,7 +9,7 @@ namespace Turian.Editor.Core;
 public class AssemblyDefinitionReference : DataAsset
 {
     /// <summary>The <see cref="TypeIdAttribute"/> value, read by build tools without loading the asset.</summary>
-    public const string TypeIdValue = "a3000002-0000-4000-8000-000000000007";
+    public const string TypeIdValue = "2be9e923-39b9-5256-9a0f-88e8e0b2e6de";
 
     /// <summary>The assembly definition whose assembly the folder's scripts compile into.</summary>
     public AssetReference<DataAssetAsset>? Definition { get; set; }
