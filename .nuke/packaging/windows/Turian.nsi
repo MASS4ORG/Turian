@@ -26,7 +26,7 @@ FunctionEnd
 
 Section "Turian" SecMain
   SetOutPath "$INSTDIR"
-  File /r "${SOURCE_DIR}/*"
+  File /r "${SOURCE_DIR}\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   CreateDirectory "$SMPROGRAMS\Turian"
   CreateShortcut "$SMPROGRAMS\Turian\Turian Studio.lnk" "$INSTDIR\turian-studio.exe"
