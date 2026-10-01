@@ -89,6 +89,12 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         // A registry being edited keeps its unsaved values until it is saved, removed or another is selected.
         if (inspector.SelectedObject is not FormInspection inspection) return;
         if (IsCurrentRegistry(inspection)) return;
+        if (inspection.Key == "bricks-settings")
+        {
+            if (!Equals(inspection.Context, controller.ProjectFolder)) inspector.Select(controller.InspectSettings());
+            return;
+        }
+
         inspector.Select(controller.InspectSelection());
     }
 
@@ -214,6 +220,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
 
     void BuildMoreMenu(FlyoutBuilder menu)
     {
+        menu.Item("Bricks settings", () => inspector?.Select(controller.InspectSettings()));
         menu.Item("Refresh registries", () => _ = controller.RefreshRegistriesAsync());
         menu.Item("Restore", () => _ = controller.RestoreAsync());
         menu.Item("Update all", () => _ = controller.UpdateAsync());

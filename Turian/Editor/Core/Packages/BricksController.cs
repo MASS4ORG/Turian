@@ -86,6 +86,19 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     /// <returns>The object to select in the inspector.</returns>
     public FormInspection? InspectSelection() => BrickInspections.Selection(this, installed);
 
+    /// <summary>The open project's declared brick settings, with save and reload actions.</summary>
+    public FormInspection? InspectSettings() => settings.Settings is { } project
+        ? BrickInspections.Settings(this, project.Bricks)
+        : null;
+
+    /// <summary>Validates, saves and resolves the project's edited brick manifest.</summary>
+    public Task<bool> SaveSettingsAsync(BricksSettings manifest)
+    {
+        var snapshot = JsonSerializer.Deserialize<ProjectManifest>(
+            JsonSerializer.Serialize<ProjectManifest>(manifest, PackageJson.Options), PackageJson.Options)!;
+        return RunAsync("Save brick settings", root => BrickService.SaveManifest(root, snapshot));
+    }
+
     /// <summary>Writes a registry into the project, replacing the one of the same name, or the one it was renamed from.</summary>
     /// <param name="previousName">The name the registry had when it was opened, or null for a new one.</param>
     /// <param name="registry">The registry as edited.</param>
@@ -299,6 +312,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
                 }).ConfigureAwait(false);
 
             var succeeded = status == BackgroundTaskStatus.Completed;
+            if (succeeded && settings.Settings?.ProjectAbsoluteDir == root) settings.Settings.Bricks.Reload();
             if (!succeeded) logger.LogWarning("{Label} did not complete ({Status})", label, status);
             Refresh();
             if (!succeeded) Publish(installed, failure ?? $"{label} failed");

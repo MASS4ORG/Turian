@@ -57,6 +57,43 @@ public sealed class BricksPanelLayoutTests : IDisposable
         }
     }
 
+    /// <summary>Refreshing preserves registry drafts and rebinds settings when the project changes.</summary>
+    [Fact]
+    public void InspectorDraftsFollowTheirProject()
+    {
+        var settings = new SettingsService();
+        var controller = new BricksController(settings,
+            new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
+            Substitute.For<IBrickApplier>(), NullLogger.Instance);
+        var selection = new NodeInspectorController(new AssetManager());
+        var panel = new BricksPanel(controller, inspector: selection);
+        var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+        using var surface = SKSurface.Create(new SKImageInfo(640, 480));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        void Render() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        Render();
+        settings.Set(new AppSettings { ProjectAbsoluteDir = root });
+        controller.Refresh();
+        controller.Tab = BricksTab.Registries;
+        controller.SelectedRegistry = "";
+        var registry = controller.InspectSelection()!;
+        selection.Select(registry);
+        ((ScopedRegistry)registry.Target).Name = "unsaved";
+        controller.Refresh();
+        Render();
+        Assert.Same(registry, selection.SelectedObject);
+        Assert.Equal("unsaved", ((ScopedRegistry)registry.Target).Name);
+        selection.Select(controller.InspectSettings());
+        controller.Refresh();
+        Render();
+        var original = selection.SelectedObject;
+        settings.Set(new AppSettings { ProjectAbsoluteDir = Path.Combine(root, "other") });
+        controller.Refresh();
+        Render();
+        Assert.NotSame(original, selection.SelectedObject);
+        Assert.Equal(settings.Settings!.Bricks, Assert.IsType<FormInspection>(selection.SelectedObject).Target);
+    }
+
     static IEnumerable<LayoutNode> Descendants(LayoutNode node)
     {
         yield return node;

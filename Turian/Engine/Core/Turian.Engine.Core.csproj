@@ -22,6 +22,10 @@
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj" />
+    </ItemGroup>
+
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Silk.NET.Input" Version="2.23.0"/>

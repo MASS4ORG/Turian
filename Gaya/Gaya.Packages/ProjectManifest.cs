@@ -5,7 +5,7 @@ namespace Gaya.Packages;
 /// <c>manifest.user.json</c> beside it can remap entries for one machine, such as pointing a package at a local
 /// checkout being worked on.
 /// </summary>
-public sealed class ProjectManifest
+public class ProjectManifest
 {
     /// <summary>The folder, under the project root, that holds the manifest, the lock file and embedded packages.</summary>
     public const string DirectoryName = "Bricks";
@@ -23,9 +23,11 @@ public sealed class ProjectManifest
     /// The installed packages: id → <c>file:</c> path (relative to the <c>Packages</c> folder), <c>git+</c> url or
     /// version range.
     /// </summary>
+    [Tooltip("Brick id to version range, builtin:, file: or git+ source.")]
     public Dictionary<string, string?> Dependencies { get; set; } = [];
 
     /// <summary>The registries the project takes bricks from by version range, for the names each is scoped to.</summary>
+    [Tooltip("Registries and signing keys explicitly trusted by this project.")]
     public List<ScopedRegistry> ScopedRegistries { get; set; } = [];
 
     /// <summary>Renames a project's legacy <c>Packages</c> folder to <see cref="DirectoryName"/> when it holds a manifest.</summary>

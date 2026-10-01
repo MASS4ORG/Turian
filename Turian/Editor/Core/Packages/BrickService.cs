@@ -227,18 +227,55 @@ public static class BrickService
     /// <exception cref="PackageException">The registry has no name, address or scope, or a key that is not an ed25519 public key.</exception>
     public static void AddRegistry(string projectRoot, ScopedRegistry registry)
     {
-        ArgumentNullException.ThrowIfNull(registry);
-        if (registry.Name.Length == 0 || registry.Url.Length == 0 || registry.Scopes.Count == 0)
-            throw new PackageException("A registry needs a name, an address and at least one scope.");
-        foreach (var key in registry.Keys) _ = SshSignature.ParsePublicKey(key);
-        if (registry.Keys.Count == 0 && !registry.AllowUnsigned)
-            throw new PackageException("A registry needs at least one trusted key (an OpenSSH public key), or must be marked to allow unsigned bricks.");
+        ValidateRegistry(registry);
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
         manifest.ScopedRegistries.Add(registry);
         manifest.Save(projectRoot);
         ProjectPackages.Invalidate(projectRoot);
+    }
+
+    static void ValidateRegistry(ScopedRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace) || registry.Scopes.Count == 0
+            || registry.Scopes.Any(string.IsNullOrWhiteSpace))
+            throw new PackageException("A registry needs a name, an address and at least one scope.");
+        ValidateKeys(registry);
+    }
+
+    static void ValidateKeys(ScopedRegistry registry)
+    {
+        foreach (var key in registry.Keys) _ = SshSignature.ParsePublicKey(key);
+        if (registry.Keys.Count == 0 && !registry.AllowUnsigned)
+            throw new PackageException("A registry needs at least one trusted key (an OpenSSH public key), or must be marked to allow unsigned bricks.");
+    }
+
+    /// <summary>Saves edited dependencies and registries, restoring the original manifest if resolution fails.</summary>
+    public static PackageResolution SaveManifest(string projectRoot, ProjectManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        foreach (var registry in manifest.ScopedRegistries) ValidateRegistry(registry);
+        if (manifest.ScopedRegistries.Select(r => r.Name).Distinct(StringComparer.Ordinal).Count()
+            != manifest.ScopedRegistries.Count)
+            throw new PackageException("Registry names must be unique.");
+
+        var path = Path.Combine(projectRoot, ProjectManifest.DirectoryName, ProjectManifest.FileName);
+        var before = File.Exists(path) ? File.ReadAllText(path) : null;
+        manifest.Save(projectRoot);
+        ProjectPackages.Invalidate(projectRoot);
+        try
+        {
+            return ProjectPackages.Resolve(projectRoot);
+        }
+        catch
+        {
+            if (before is null) File.Delete(path);
+            else File.WriteAllText(path, before);
+            ProjectPackages.Invalidate(projectRoot);
+            throw;
+        }
     }
 
     /// <summary>Removes a registry from the project's manifest.</summary>

@@ -96,6 +96,23 @@ public static class BrickInspections
         return new FormInspection(draft, model with { Sections = [section] }, $"registry:{name}", controller.ProjectFolder);
     }
 
+    /// <summary>Builds the project's brick settings form with explicit persistence actions.</summary>
+    public static FormInspection Settings(BricksController controller, BricksSettings settings)
+    {
+        var model = FormBuilder.Build(settings);
+        var project = controller.ProjectFolder;
+        bool CanReload() => project is not null && controller.ProjectFolder == project && !controller.IsBusy;
+        var section = new FormSection("Bricks Settings", settings, model.Sections[0].Fields)
+        {
+            Buttons =
+            [
+                Action(controller, "Save", () => controller.SaveSettingsAsync(settings)),
+                new InspectorButton("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
+            ],
+        };
+        return new FormInspection(settings, model with { Sections = [section] }, "bricks-settings", controller.ProjectFolder);
+    }
+
     static InspectorButton Action(BricksController controller, string label, Func<Task<bool>> action)
     {
         var project = controller.ProjectFolder;

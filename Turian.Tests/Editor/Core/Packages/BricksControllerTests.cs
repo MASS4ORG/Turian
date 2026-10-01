@@ -312,6 +312,38 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Empty(publicRegistry.Model.Sections[0].Buttons);
     }
 
+    /// <summary>Edited brick settings persist through the controller and failed resolution restores the manifest.</summary>
+    [Fact]
+    public async Task SettingsSaveAndRollback()
+    {
+        controller.Refresh();
+        var form = controller.InspectSettings()!;
+        var bricks = Assert.IsType<BricksSettings>(form.Target);
+        Assert.Same(settings.Settings!.Bricks, bricks);
+        bricks.Dependencies.Remove("org.mass4.turian.cameras");
+        Assert.True(await controller.SaveSettingsAsync(bricks), controller.Error);
+        Assert.DoesNotContain("org.mass4.turian.cameras", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+        var path = Path.Combine(project, "Bricks", "manifest.json");
+        var before = File.ReadAllText(path);
+        bricks.Dependencies["user.mateo.missing"] = "file:../nowhere";
+        Assert.False(await controller.SaveSettingsAsync(bricks));
+        Assert.Equal(before, File.ReadAllText(path));
+        Assert.NotNull(controller.Error);
+        bricks.Reload();
+        Assert.DoesNotContain("user.mateo.missing", bricks.Dependencies.Keys);
+    }
+
+    /// <summary>A catalog refresh preserves unsaved settings edits until an explicit save or reload.</summary>
+    [Fact]
+    public void RefreshKeepsSettingsDraft()
+    {
+        var bricks = settings.Settings!.Bricks;
+        bricks.Dependencies.Remove("org.mass4.turian.cameras");
+        controller.Refresh();
+        Assert.DoesNotContain("org.mass4.turian.cameras", bricks.Dependencies.Keys);
+        Assert.Contains("org.mass4.turian.cameras", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+    }
+
     /// <summary>Registry-only catalog entries expose only metadata supplied by the index.</summary>
     [Fact]
     public void PartialCatalogDoesNotInventManifestFields()
@@ -323,6 +355,24 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Contains(fields, f => f.Name == "Version");
         Assert.DoesNotContain(fields, f => f.Name is "License" or "Dependencies" or "Nuget");
         Assert.All(fields, f => Assert.False(f.SetValue("changed")));
+    }
+
+    /// <summary>Inspections from a previous project cannot act on the newly opened project.</summary>
+    [Fact]
+    public void StaleFormsCannotRunActions()
+    {
+        controller.Refresh();
+        controller.Selected = "org.mass4.turian.ui";
+        var brick = Assert.IsType<FormInspection>(controller.InspectSelection());
+        var form = controller.InspectSettings()!;
+        settings.Set(new AppSettings { ProjectAbsoluteDir = Path.Combine(root, "other") });
+        foreach (var button in brick.Model.Sections.SelectMany(s => s.Buttons).Concat(form.Model.Sections[0].Buttons))
+        {
+            Assert.False(button.IsEnabled);
+            button.Invoke();
+        }
+        Assert.False(controller.IsBusy);
+        applier.DidNotReceive().ApplyBrickChanges();
     }
 
     /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>

@@ -4,6 +4,8 @@ namespace Turian.Editor.Core;
 [TypeId("a3000002-0000-4000-8000-000000000001")]
 public class BuildAppSettings : IdObject, IBuildAppSettings
 {
+    BricksSettings? bricks;
+
     /// <inheritdoc/>
     public string ProjectAbsoluteDir { get; set; } = string.Empty;
 
@@ -39,6 +41,10 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     /// <inheritdoc/>
     [JsonIgnore]
     public ProjectSettingsSet Loaded { get; } = new();
+
+    /// <inheritdoc/>
+    [HideInEditor, JsonIgnore]
+    public BricksSettings Bricks => BricksSettings.ForProject(ref bricks, ProjectAbsoluteDir);
 
     /// <inheritdoc/>
     public T Get<T>()
