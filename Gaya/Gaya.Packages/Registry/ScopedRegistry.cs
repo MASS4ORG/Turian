@@ -7,14 +7,14 @@ namespace Gaya.Packages;
 public sealed class ScopedRegistry
 {
     /// <summary>A name for the registry, shown in messages and used to look up its access token.</summary>
-    [InspectorOrder(-20)]
+    [SetOrder(-20)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
     /// Where the registry is: the <c>https://…/v1</c> address, or a folder of a static copy such as a mirror or a
     /// release asset unpacked for offline use.
     /// </summary>
-    [InspectorOrder(-10)]
+    [SetOrder(-10)]
     public string Url { get; set; } = string.Empty;
 
     /// <summary>The name prefixes served from here: <c>org.mass4</c> covers <c>org.mass4</c> and <c>org.mass4.games.ui</c>.</summary>

@@ -50,7 +50,7 @@ public sealed class InspectorFormsRenderingTests
         var calls = 0;
         var section = model.Sections[0] with
         {
-            Buttons = [new InspectorButton("Save", () =>
+            Buttons = [new Button("Save", () =>
             {
                 Assert.Equal(Pass.Pass2Render, gui.Pass);
                 calls++;

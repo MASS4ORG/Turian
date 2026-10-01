@@ -43,7 +43,7 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     public ProjectSettingsSet Loaded { get; } = new();
 
     /// <inheritdoc/>
-    [HideInEditor, JsonIgnore]
+    [Hide, JsonIgnore]
     public BricksSettings Bricks => BricksSettings.ForProject(ref bricks, ProjectAbsoluteDir);
 
     /// <inheritdoc/>

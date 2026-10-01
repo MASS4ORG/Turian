@@ -15,12 +15,12 @@ public class FormBuilderTests
         public Vector3 StartPosition { get; set; }
         public string Label { get; set; } = string.Empty;
 
-        [HideInEditor] public int Hidden { get; set; }
+        [Hide] public int Hidden { get; set; }
 
         [InjectService, JsonIgnore]
         public IInputSource? Input { get; private set; }
 
-        [ShowInEditor] bool Revealed { get; set; }
+        [Show] bool Revealed { get; set; }
         internal const string RevealedMemberName = nameof(Revealed);
 
         public int ReadOnly => 42;
@@ -87,8 +87,8 @@ public class FormBuilderTests
     sealed class OrderedTarget
     {
         public int DefaultFirst { get; set; }
-        [InspectorOrder(10)] public int Last { get; set; }
-        [InspectorOrder(-10), Range(1, 5), ReadOnly, NumericUpDown]
+        [SetOrder(10)] public int Last { get; set; }
+        [SetOrder(-10), Range(1, 5), ReadOnly, NumericUpDown]
         [CustomHint(1), CustomHint(2)]
         public int First { get; set; }
         public int DefaultSecond { get; set; }
@@ -99,17 +99,17 @@ public class FormBuilderTests
     {
         public int Valid { get; set; }
         public int Throws { get => throw new ApplicationException("Not ready"); set { } }
-        [ShowInEditor] public int WriteOnly { set { } }
+        [Show] public int WriteOnly { set { } }
         public Span<int> Unsupported { get => []; set { } }
         public int this[int index] { get => index; set { } }
     }
 
     class InheritedTarget
     {
-        [Range(2, 3), InspectorOrder(-4)]
+        [Range(2, 3), SetOrder(-4)]
         public virtual int Ordered { get; set; }
 
-        [HideInEditor]
+        [Hide]
         public virtual int Hidden { get; set; }
     }
 
@@ -151,9 +151,9 @@ public class FormBuilderTests
         Assert.DoesNotContain(nameof(Target.NotPublic), names);
     }
 
-    /// <summary>A private member opts in with ShowInEditor.</summary>
+    /// <summary>A private member opts in with Show.</summary>
     [Fact]
-    public void ShowInEditorRevealsAPrivateMember()
+    public void ShowRevealsAPrivateMember()
     {
         var model = InspectorForms.Build(new Target());
 
@@ -255,7 +255,7 @@ public class FormBuilderTests
         var metadata = Field(InspectorForms.Build(new OrderedTarget()),
             nameof(OrderedTarget.First)).Metadata!;
 
-        Assert.Contains(metadata.Layout, attribute => attribute is InspectorOrderAttribute);
+        Assert.Contains(metadata.Layout, attribute => attribute is SetOrderAttribute);
         Assert.Contains(metadata.Validation, attribute => attribute is RangeAttribute);
         Assert.Contains(metadata.Validation, attribute => attribute is ReadOnlyAttribute);
         Assert.Contains(metadata.RenderingHints, attribute => attribute is NumericUpDownAttribute);
@@ -299,7 +299,7 @@ public class FormBuilderTests
         var ordered = Assert.Single(metadata);
         Assert.Equal(-4, ordered.Priority);
         Assert.NotNull(ordered.GetAttribute<RangeAttribute>());
-        Assert.False(metadata is InspectorMemberMetadata[]);
+        Assert.False(metadata is MemberMetadata[]);
     }
 
     /// <summary>A previously safe getter can fail later without breaking the existing form.</summary>

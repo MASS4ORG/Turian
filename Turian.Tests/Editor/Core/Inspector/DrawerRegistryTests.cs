@@ -1,24 +1,11 @@
 namespace Turian.Tests.Editor;
 
-/// <summary>Exercises the registration and composition path without a rendering backend.</summary>
+/// <summary>
+/// Covers Turian's rendering rules over the shared form renderer: references, the transform editor and which
+/// objects are edited inline. Generic registry and dispatch behaviour is tested with the renderer itself.
+/// </summary>
 public class DrawerRegistryTests
 {
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = true)]
-    sealed class MarkerAttribute(int number) : Attribute
-    {
-        public int Number { get; } = number;
-    }
-
-    [AttributeUsage(AttributeTargets.Property)]
-    sealed class OuterAttribute : Attribute;
-
-    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-    sealed class Target
-    {
-        [Marker(1), Outer, Marker(2)]
-        public int Value { get; set; }
-    }
-
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class TooltippedTarget
     {
@@ -27,93 +14,27 @@ public class DrawerRegistryTests
     }
 
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-    sealed class NumericTarget
-    {
-        public int Value { get; set; } = 42;
-    }
-
-    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-    sealed class NullableTarget
-    {
-        public int? Value { get; set; } = 5;
-    }
-
-    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
     sealed class ReferenceTarget
     {
         public Node? Value { get; set; }
     }
 
-    sealed class TraceDrawer(List<string> trace, string name, int order) : IAttributeDrawer
+    [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+    sealed class TransformTarget
     {
-        public int Order => order;
-
-        public void Draw(Gui gui, FormField field, Attribute attribute, string id, Action next)
-        {
-            trace.Add(attribute is MarkerAttribute marker ? $"{name}{marker.Number}" : name);
-            next();
-            trace.Add($"/{name}");
-        }
+        public Transform Value { get; set; } = new();
     }
 
     sealed class TestPropertyDrawer : IPropertyDrawer
     {
         public int DrawCalls { get; private set; }
-        public int ValueOnlyCalls { get; private set; }
-        public bool ValueOnly { get; init; } = true;
-        public void Draw(Gui gui, FormField field, string id) => DrawCalls++;
-        public bool DrawValue(Gui gui, FormField field, string id)
-        {
-            ValueOnlyCalls++;
-            return ValueOnly;
-        }
+
+        public void Draw(Gui gui, FormField field, string id, FormRenderContext context) => DrawCalls++;
+
+        public bool DrawValue(Gui gui, FormField field, string id, FormRenderContext context) => false;
     }
 
-    /// <summary>Attribute decorators nest in priority order and preserve repeated attributes.</summary>
-    [Fact]
-    public void AttributeDrawersComposeAroundOnePropertyDrawer()
-    {
-        var trace = new List<string>();
-        AttributeDrawerRegistry.Register<MarkerAttribute>(new TraceDrawer(trace, "marker", 10));
-        AttributeDrawerRegistry.Register<OuterAttribute>(new TraceDrawer(trace, "outer", -5));
-        try
-        {
-            var field = InspectorForms.Build(new Target()).Sections[0].Fields.Single();
-
-            AttributeDrawerRegistry.Draw(null!, field, "field", () => trace.Add("value"));
-
-            Assert.Equal(["outer", "marker1", "marker2", "value",
-                "/marker", "/marker", "/outer"], trace);
-        }
-        finally
-        {
-            AttributeDrawerRegistry.Unregister<MarkerAttribute>();
-            AttributeDrawerRegistry.Unregister<OuterAttribute>();
-        }
-    }
-
-    /// <summary>An extension overrides a built-in editor without changing the built-in mapping.</summary>
-    [Fact]
-    public void PropertyDrawerRegistrationOverridesAndRestoresValueEditors()
-    {
-        var original = PropertyDrawerRegistry.For(typeof(Vector3));
-        var replacement = new TestPropertyDrawer();
-        Assert.NotNull(original);
-
-        PropertyDrawerRegistry.Register(typeof(Vector3), replacement);
-        try
-        {
-            Assert.Same(replacement, PropertyDrawerRegistry.For(typeof(Vector3)));
-        }
-        finally
-        {
-            PropertyDrawerRegistry.Unregister(typeof(Vector3));
-        }
-
-        Assert.Same(original, PropertyDrawerRegistry.For(typeof(Vector3)));
-    }
-
-    /// <summary>The built-in tooltip participates as rendering metadata and an attribute decorator.</summary>
+    /// <summary>The tooltip reaches the drawer pipeline as rendering metadata.</summary>
     [Fact]
     public void TooltipIsAvailableToTheDrawerPipeline()
     {
@@ -123,174 +44,67 @@ public class DrawerRegistryTests
         Assert.Equal("Explains the value", field.Attribute<TooltipAttribute>()?.Text);
     }
 
-    /// <summary>Removing an extension restores the built-in tooltip decorator.</summary>
+    /// <summary>A drawer registered for a referenced type wins over the reference slot, as a Unity drawer would.</summary>
     [Fact]
-    public void UnregisteringATooltipOverrideRestoresTheDefault()
-    {
-        var original = AttributeDrawerRegistry.Find(typeof(TooltipAttribute));
-        var custom = new TraceDrawer([], "custom", 10);
-        Assert.NotNull(original);
-        AttributeDrawerRegistry.Register<TooltipAttribute>(custom);
-        try
-        {
-            Assert.Same(custom, AttributeDrawerRegistry.Find(typeof(TooltipAttribute)));
-        }
-        finally
-        {
-            AttributeDrawerRegistry.Unregister<TooltipAttribute>();
-        }
-
-        Assert.Same(original, AttributeDrawerRegistry.Find(typeof(TooltipAttribute)));
-    }
-
-    /// <summary>A registered drawer wins over the normal reference slot even when a picker exists.</summary>
-    [Fact]
-    public void RegisteredPropertyDrawerOverridesAReference()
+    public void RegisteredTypeDrawerOverridesTheReferenceSlot()
     {
         var field = InspectorForms.Build(new ReferenceTarget()).Sections[0].Fields.Single();
         var custom = new TestPropertyDrawer();
-        PropertyDrawerRegistry.Register(typeof(Node), custom);
-        try
-        {
-            FieldDrawers.Draw(null!, field, "reference-test",
-                references: new ReferenceDrawer(null!, null!, null!));
-            Assert.Equal(1, custom.DrawCalls);
-        }
-        finally
-        {
-            PropertyDrawerRegistry.Unregister(typeof(Node));
-        }
+        var drawers = new FormDrawers(TurianForms.Drawers);
+        using var references = drawers.Add(ReferenceDrawer.Handles, new ReferenceDrawer(null!, null!, null!));
+        using var registration = drawers.Add(typeof(Node), custom);
+
+        RenderBothPasses(gui => gui.FormField(field, "reference", new FormRenderContext { Drawers = drawers }));
+
+        Assert.Equal(2, custom.DrawCalls);
     }
 
-    /// <summary>Both GUI passes can compose a tooltip around the numeric drawer.</summary>
+    /// <summary>A transform draws through Turian's editor: one vector row each for position, rotation and scale.</summary>
     [Fact]
-    public void TooltippedFieldRendersInBothPasses()
+    public void TransformDrawsThroughTheTurianEditor()
     {
-        var field = InspectorForms.Build(new TooltippedTarget()).Sections[0].Fields.Single();
-        using var surface = SKSurface.Create(new SKImageInfo(320, 120));
+        var field = InspectorForms.Build(new TransformTarget()).Sections[0].Fields.Single();
+        var context = new FormRenderContext { Drawers = TurianForms.Drawers, CanInline = TurianForms.CanInline };
+
+        var ids = RenderBothPasses(gui => gui.FormField(field, "transform", context));
+
+        Assert.Contains("transform/pos", ids);
+        Assert.Contains("transform/rot", ids);
+        Assert.Contains("transform/scale", ids);
+    }
+
+    /// <summary>Nodes, components and assets are referenced, never expanded inside another object's form.</summary>
+    [Fact]
+    public void EngineObjectsAreNeverInlined()
+    {
+        Assert.False(TurianForms.CanInline(typeof(Node)));
+        Assert.False(TurianForms.CanInline(typeof(ModelComponent)));
+        Assert.False(TurianForms.CanInline(typeof(Asset)));
+        Assert.True(TurianForms.CanInline(typeof(TooltippedTarget)));
+    }
+
+    /// <summary>Builds and renders one frame in both passes, returning every node id of the render pass.</summary>
+    static HashSet<string> RenderBothPasses(Action<Gui> draw)
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(480, 200));
         var gui = new Gui { Input = Substitute.For<IInputHandler>() };
         var font = Font.FromFamilyName("sans-serif", 14);
         gui.SetStage(Pass.Pass1Build);
         gui.BeginFrame(surface.Canvas, font, font);
-        FieldDrawers.Draw(gui, field, "tooltip-test");
-        gui.CalculateLayout();
-        var wrapper = Assert.Single(gui.RootNode!.Children,
-            node => node.Id == "tooltip-test/tooltip");
-        Assert.True(wrapper.Rect is { W: > 0, H: > 0 });
-        var row = Assert.Single(wrapper.Children, node => node.Id == "tooltip-test");
-        Assert.Equal(wrapper.Rect, row.Rect);
-        gui.SetStage(Pass.Pass2Render);
-        FieldDrawers.Draw(gui, field, "tooltip-test");
-        gui.Render();
-        gui.EndFrame();
-    }
-
-    /// <summary>Primitive types select built-in property drawers rather than a type switch on every redraw.</summary>
-    [Fact]
-    public void PrimitiveDrawersHaveBuiltInFallbacks()
-    {
-        var summary = PropertyDrawerRegistry.For(typeof(object));
-
-        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(bool)));
-        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(string)));
-        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(int)));
-        Assert.NotSame(summary, PropertyDrawerRegistry.For(typeof(DayOfWeek)));
-        Assert.Same(summary, PropertyDrawerRegistry.For(typeof(DrawerRegistryTests)));
-        Assert.Same(PropertyDrawerRegistry.For(typeof(int)), PropertyDrawerRegistry.For(typeof(int?)));
-        Assert.Same(PropertyDrawerRegistry.For(typeof(bool)), PropertyDrawerRegistry.For(typeof(bool?)));
-        Assert.Same(PropertyDrawerRegistry.For(typeof(DayOfWeek)), PropertyDrawerRegistry.For(typeof(DayOfWeek?)));
-    }
-
-    /// <summary>A full-row-only drawer leaves the label-free primitive control editable.</summary>
-    [Fact]
-    public void DecliningValueOnlyRenderingFallsBackToTheBuiltInControl()
-    {
-        var field = InspectorForms.Build(new NumericTarget()).Sections[0].Fields.Single();
-        var expected = RenderEditorOnly(field);
-        PropertyDrawerRegistry.Register(typeof(int), new TestPropertyDrawer { ValueOnly = false });
-        try
-        {
-            Assert.Equal(expected, RenderEditorOnly(field));
-        }
-        finally
-        {
-            PropertyDrawerRegistry.Unregister(typeof(int));
-        }
-    }
-
-    /// <summary>An exact nullable registration is used by both inspector and label-free rendering.</summary>
-    [Fact]
-    public void NullableDrawerRegistrationIsNotLostDuringDispatch()
-    {
-        var field = InspectorForms.Build(new NullableTarget()).Sections[0].Fields.Single();
-        var custom = new TestPropertyDrawer();
-        PropertyDrawerRegistry.Register(typeof(int?), custom);
-        try
-        {
-            FieldDrawers.Draw(null!, field, "nullable-field");
-            FieldDrawers.DrawEditorOnly(null!, field, "nullable-value");
-
-            Assert.Equal(1, custom.DrawCalls);
-            Assert.Equal(1, custom.ValueOnlyCalls);
-        }
-        finally
-        {
-            PropertyDrawerRegistry.Unregister(typeof(int?));
-        }
-    }
-
-    sealed class NestedTarget
-    {
-        public NumericTarget Child { get; set; } = new();
-    }
-
-    /// <summary>Read-only ownership reaches nested fields so their custom editing drawers cannot run.</summary>
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NestedFormsInheritReadOnlyState(bool readOnly)
-    {
-        var target = new NestedTarget();
-        var field = InspectorForms.Build(target, readOnly: readOnly).Sections[0].Fields.Single();
-        var custom = new TestPropertyDrawer();
-        PropertyDrawerRegistry.Register(typeof(int), custom);
-        try
-        {
-            using var surface = SKSurface.Create(new SKImageInfo(320, 120));
-            var gui = new Gui { Input = Substitute.For<IInputHandler>() };
-            var font = Font.FromFamilyName("sans-serif", 14);
-            gui.SetStage(Pass.Pass1Build);
-            gui.BeginFrame(surface.Canvas, font, font);
-            FieldDrawers.DrawNested(gui, field, target.Child, "nested", null, new HashSet<string>());
-            gui.CalculateLayout();
-            gui.SetStage(Pass.Pass2Render);
-            FieldDrawers.DrawNested(gui, field, target.Child, "nested", null, new HashSet<string>());
-            gui.Render();
-            gui.EndFrame();
-            Assert.Equal(readOnly ? 0 : 2, custom.DrawCalls);
-            Assert.Equal(42, target.Child.Value);
-        }
-        finally
-        {
-            PropertyDrawerRegistry.Unregister(typeof(int));
-        }
-    }
-
-    static byte[] RenderEditorOnly(FormField field)
-    {
-        using var surface = SKSurface.Create(new SKImageInfo(320, 120, SKColorType.Rgba8888, SKAlphaType.Unpremul));
-        var gui = new Gui { Input = Substitute.For<IInputHandler>() };
-        var font = Font.FromFamilyName("sans-serif", 14);
-        gui.SetStage(Pass.Pass1Build);
-        gui.BeginFrame(surface.Canvas, font, font);
-        FieldDrawers.DrawEditorOnly(gui, field, "numeric-test");
+        draw(gui);
         gui.CalculateLayout();
         gui.SetStage(Pass.Pass2Render);
-        FieldDrawers.DrawEditorOnly(gui, field, "numeric-test");
+        draw(gui);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        Collect(gui.RootNode!, ids);
         gui.Render();
         gui.EndFrame();
-        using var snapshot = surface.Snapshot();
-        using var pixels = snapshot.PeekPixels();
-        return [.. pixels.GetPixelSpan()];
+        return ids;
+    }
+
+    static void Collect(LayoutNode node, HashSet<string> ids)
+    {
+        if (node.Id is { } id) ids.Add(id);
+        foreach (var child in node.Children) Collect(child, ids);
     }
 }

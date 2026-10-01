@@ -52,7 +52,7 @@ public static class BrickInspections
         _ => "Available",
     };
 
-    static IReadOnlyList<InspectorButton> Actions(BricksController controller, CatalogBrick brick,
+    static IReadOnlyList<Button> Actions(BricksController controller, CatalogBrick brick,
         ResolvedPackage? resolved) => brick.State switch
         {
             BrickState.Available => [Action(controller, "Enable", () => controller.EnableAsync(brick))],
@@ -107,16 +107,16 @@ public static class BrickInspections
             Buttons =
             [
                 Action(controller, "Save", () => controller.SaveSettingsAsync(settings)),
-                new InspectorButton("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
+                new Button("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
             ],
         };
         return new FormInspection(settings, model with { Sections = [section] }, "bricks-settings", controller.ProjectFolder);
     }
 
-    static InspectorButton Action(BricksController controller, string label, Func<Task<bool>> action)
+    static Button Action(BricksController controller, string label, Func<Task<bool>> action)
     {
         var project = controller.ProjectFolder;
         bool Enabled() => project is not null && controller.ProjectFolder == project && !controller.IsBusy;
-        return new InspectorButton(label, () => { if (Enabled()) _ = action(); }, Enabled);
+        return new Button(label, () => { if (Enabled()) _ = action(); }, Enabled);
     }
 }

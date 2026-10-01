@@ -40,7 +40,7 @@ public class ModelComponent : Component, IDisposable
     /// Runtime-only — never serialized — for editor tooling that renders a procedural mesh with no
     /// backing asset, such as the material preview's display quad.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Model? ModelOverride { get; set; }
 
     /// <summary>The render device bound to this scene, or <c>null</c> in a non-rendering host.</summary>
@@ -57,7 +57,7 @@ public class ModelComponent : Component, IDisposable
     /// still initializing, and retries then. A load that reaches the asset and fails is attempted once
     /// per id: the component returns null from then on, until the reference changes again.
     /// </remarks>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Model? ModelInstance
     {
         get
@@ -88,7 +88,7 @@ public class ModelComponent : Component, IDisposable
     /// Gets the id of the model asset this component draws from, or <see cref="System.Guid.Empty"/>
     /// when neither reference resolves.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Guid ModelAssetId => ResolveModelAssetId();
 
     /// <summary>

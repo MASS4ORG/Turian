@@ -7,7 +7,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
 [MeansImplicitUse(ImplicitUseKindFlags.Assign)]
-public sealed class InjectServiceAttribute : HideInEditorAttribute
+public sealed class InjectServiceAttribute : HideAttribute
 {
     /// <summary>Allows an editor or headless host to leave this service unbound.</summary>
     public bool Optional { get; set; }

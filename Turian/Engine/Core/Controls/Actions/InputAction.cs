@@ -38,7 +38,7 @@ public sealed class InputBinding
 
     /// <summary>The control <see cref="Path"/> names, reparsed whenever the path is rewritten.</summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public InputControl Control
     {
         get
@@ -89,17 +89,17 @@ public sealed class InputAction
 
     /// <summary>Whether the action is currently held.</summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public bool IsPressed => pressed;
 
     /// <summary>Whether the action went down during this frame.</summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public bool WasPressed => wasPressed;
 
     /// <summary>Whether the action went up during this frame.</summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public bool WasReleased => wasReleased;
 
     /// <summary>Raised on the frame the action went down.</summary>

@@ -28,6 +28,16 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
 
     static StudioTheme Theme => StudioTheme.Current;
 
+    FormRenderContext? formContext;
+
+    /// <summary>The panel's form context, translating enum labels into the studio's language.</summary>
+    FormRenderContext FormContext => formContext ??= new FormRenderContext
+    {
+        Drawers = TurianForms.Drawers,
+        CanInline = TurianForms.CanInline,
+        Translate = localization.T,
+    };
+
     /// <inheritdoc />
     public void Render(Gui gui)
     {
@@ -241,7 +251,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
 
                 using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
                            .Direction(Axis.Horizontal).Gap(4f).Enter())
-                    FieldDrawers.DrawEditorOnly(gui, field, id, localization.T);
+                {
+                    TurianForms.ApplyStyle(gui);
+                    gui.FormFieldEditor(field, id, FormContext);
+                }
             }
         }
     }

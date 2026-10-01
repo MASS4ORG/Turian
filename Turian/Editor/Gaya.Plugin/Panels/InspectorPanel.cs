@@ -2,7 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// Edits the selected node: its own members, then one section per component, built by
-/// <see cref="FormBuilder"/> and drawn by <see cref="FieldDrawers"/>. An asset selected in the
+/// <see cref="InspectorForms"/> and drawn by <see cref="FormRenderer"/>. An asset selected in the
 /// browser is edited here too — its data payload, or the import settings its importer declares.
 /// </summary>
 sealed class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
@@ -20,6 +20,10 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     static StudioTheme Theme => StudioTheme.Current;
 
     readonly HashSet<string> collapsed = [];
+    readonly FormDrawers drawers = new(TurianForms.Drawers);
+    IDisposable? referenceRegistration;
+    FormRenderContext? formContext;
+    bool fieldOverridden;
 
     FormModel model = FormModel.Empty;
     object? builtFor;
@@ -79,6 +83,24 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         }
     }
 
+    /// <summary>
+    /// The panel's form context: kept for the panel's lifetime so fold state survives frames, with references drawn
+    /// through this panel's picker and the prefab-override mark of the field being drawn.
+    /// </summary>
+    FormRenderContext FormContext => formContext ??= CreateFormContext();
+
+    FormRenderContext CreateFormContext()
+    {
+        referenceRegistration = drawers.Add(ReferenceDrawer.Handles, referenceDrawer);
+        return new FormRenderContext
+        {
+            Drawers = drawers,
+            Collapsed = collapsed,
+            CanInline = TurianForms.CanInline,
+            IsModified = _ => fieldOverridden,
+        };
+    }
+
     object? FrameSelection(Gui gui)
     {
         // Both passes draw the same selection; clicks become visible in the next frame.
@@ -104,6 +126,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     void RenderForm(Gui gui, object target)
     {
         using var form = gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Padding(6f, 4f).Enter();
+        TurianForms.ApplyStyle(gui);
         gui.DropTarget<ScriptDragPayload>("inspector/component-drop",
             canAccept: CanDropScript, onDrop: DropScript);
         gui.ScrollY();
@@ -178,6 +201,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Padding(6f, 4f).Enter())
         {
+            TurianForms.ApplyStyle(gui);
             gui.ScrollY();
 
             using (gui.Node(-1, Theme.Scale(24f), "inspector/asset/name").ExpandWidth()
@@ -204,7 +228,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             {
                 var fields = model.Sections[0].BodyFields;
                 for (var f = 0; f < fields.Count; f++)
-                    FieldDrawers.Draw(gui, fields[f], $"inspector/asset/field{f}", referenceDrawer, collapsed);
+                    gui.FormField(fields[f], $"inspector/asset/field{f}", FormContext);
                 DrawButtons(gui, model.Sections[0].Buttons, "inspector/asset/button");
             }
 
@@ -323,7 +347,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
             using (gui.Node(10, Theme.Scale(22f), $"inspector/section{index}/arrow")
                        .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
-                FieldDrawers.DrawArrow(gui, isOpen);
+                FormControls.FoldArrow(gui, isOpen);
 
             // The component's own on/off switch, beside its name. It blocks the
             // header behind it so ticking the box does not also fold the section.
@@ -333,12 +357,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             var title = overrides.IsAdded(section.Target) ? $"+ {section.Title}" : section.Title;
             var overridden = section.Target is IdObject owner && overrides.Diff?.HasOverrides(owner.Id) == true;
             gui.DrawText(title, Theme.Text(12), Theme.Ink, centerInRect: false,
-                effects: FieldDrawers.Emphasis(overridden, Theme.Ink));
+                effects: FormControls.Emphasis(overridden, Theme.Ink));
 
             using (gui.Node().Expand().Enter()) { }
 
             if (section is { Removable: true, Target: Component component }
-                && FieldDrawers.SmallButton(gui, "×", $"inspector/section{index}/remove"))
+                && FormControls.SmallButton(gui, "×", $"inspector/section{index}/remove"))
                 removeRequest = component;
         }
 
@@ -364,12 +388,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     void DrawField(Gui gui, FormField field, string id)
     {
         var member = field.CollectionMember ?? field.Name;
-        FieldDrawers.Overridden = overrides.IsOverridden(field.Target, member);
+        fieldOverridden = overrides.IsOverridden(field.Target, member);
         try
         {
             using (gui.Node(-1, -1, $"{id}/prefab").ExpandWidth().Direction(Axis.Vertical).Gap(2f).Enter())
             {
-                if (FieldDrawers.Overridden && gui.Pass == Pass.Pass2Render && field.Target is IdObject target
+                if (fieldOverridden && gui.Pass == Pass.Pass2Render && field.Target is IdObject target
                     && gui.GetInteractable().OnClick(MouseButton.Right))
                 {
                     OpenOverrideMenu(gui, menu =>
@@ -379,12 +403,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                     });
                 }
 
-                FieldDrawers.Draw(gui, field, id, referenceDrawer, collapsed);
+                gui.FormField(field, id, FormContext);
             }
         }
         finally
         {
-            FieldDrawers.Overridden = false;
+            fieldOverridden = false;
         }
     }
 
@@ -493,12 +517,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     /// The <c>[Button]</c> methods under a section's fields, each invoking its action the frame it is
     /// pressed.
     /// </summary>
-    static void DrawButtons(Gui gui, IReadOnlyList<InspectorButton> buttons, string id)
+    static void DrawButtons(Gui gui, IReadOnlyList<Button> buttons, string id)
     {
         for (var b = 0; b < buttons.Count; b++)
         {
             var buttonId = $"{id}{b}";
-            if (FieldDrawers.TextButton(gui, buttons[b].Label, buttonId, buttons[b].IsEnabled))
+            if (FormControls.TextButton(gui, buttons[b].Label, buttonId, buttons[b].IsEnabled))
                 buttons[b].Invoke();
         }
     }
@@ -585,6 +609,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     public void Dispose()
     {
         assets.AssetAltered -= OnAssetAltered;
+        referenceRegistration?.Dispose();
         preview.Dispose();
     }
 }

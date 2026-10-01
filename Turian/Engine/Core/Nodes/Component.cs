@@ -6,7 +6,7 @@ namespace Turian.Engine.Core;
 public abstract class Component : IdObject
 {
     /// <summary>Gets or sets a value indicating whether this component is active.</summary>
-    [HideInEditor]
+    [Hide]
     public bool IsActive
     {
         get;
@@ -26,27 +26,27 @@ public abstract class Component : IdObject
     /// Whether the component was destroyed (detached from its node). A reference to it reads as missing: it is
     /// saved as null and never resolved to.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public bool IsDestroyed { get; private set; }
 
     /// <summary>Gets the node this component is attached to.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Node? Node { get; private set; }
 
     /// <summary>Gets the service provider associated with this component's scene.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public IServiceProvider? Services => Node?.Services;
 
     /// <summary>Gets a value indicating whether this component is currently attached to a node.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public bool IsAttached => Node is not null; // uses property, safe here since we null-check
 
     /// <summary>Gets a value indicating whether this component has been awoken.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public bool IsAwake { get; private set; }
 
     /// <summary>Gets a value indicating whether this component has started.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public bool IsStarted { get; private set; }
 
     /// <summary>

@@ -6,20 +6,21 @@ namespace Gaya.Plugin.Turian;
 /// touches the value in place rather than assigning the field.
 /// </summary>
 [CustomEditor(typeof(Transform))]
-sealed class TransformValueEditor : IValueEditor
+sealed class TransformValueEditor : IPropertyDrawer
 {
-    public void Draw(Gui gui, FormField field, string id)
+    /// <inheritdoc />
+    public void Draw(Gui gui, FormField field, string id, FormRenderContext context)
     {
         if (field.GetValue() is not Transform transform) return;
 
-        VectorValueEditor.DrawRow3(gui, $"{id}/pos", "Position", transform.Position,
-            v => transform.Position = v, field);
-        VectorValueEditor.DrawRow3(gui, $"{id}/rot", "Rotation", transform.Rotation,
-            v => transform.Rotation = v, field);
-        VectorValueEditor.DrawRow3(gui, $"{id}/scale", "Scale", transform.Scale,
-            v => transform.Scale = v, field);
+        FormControls.VectorRow(gui, $"{id}/pos", "Position", transform.Position,
+            v => transform.Position = v, field, context);
+        FormControls.VectorRow(gui, $"{id}/rot", "Rotation", transform.Rotation,
+            v => transform.Rotation = v, field, context);
+        FormControls.VectorRow(gui, $"{id}/scale", "Scale", transform.Scale,
+            v => transform.Scale = v, field, context);
     }
 
     /// <summary>A transform has no value-only form: it is three independent rows by design.</summary>
-    public bool DrawValue(Gui gui, FormField field, string id) => false;
+    public bool DrawValue(Gui gui, FormField field, string id, FormRenderContext context) => false;
 }

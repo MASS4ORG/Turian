@@ -42,10 +42,12 @@
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Forms.Excalibur/Guinevere.Forms.Excalibur.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.*"/>
+        <PackageReference Include="MASS4.Guinevere.Forms.Excalibur" Version="5.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

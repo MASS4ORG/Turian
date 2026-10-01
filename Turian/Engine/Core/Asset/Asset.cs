@@ -16,7 +16,7 @@ public class Asset : IdObject
     /// <summary>
     /// Gets or sets the file path of the asset.
     /// </summary>
-    [HideInEditor]
+    [Hide]
     public string RelativePath
     {
         get => relativePath;
