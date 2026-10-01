@@ -188,7 +188,7 @@ sealed class AssetBrowserPanel : IPanel
             || target.Tag is not AssetEntry { IsReadOnly: false } targetEntry
             || rows.Find(r => r.Id == source).Tag is not AssetEntry { IsReadOnly: true }
             || DirectoryFor(targetEntry) is not { } directory
-            || IsInside(Path.Combine(project, Gaya.Packages.ProjectManifest.DirectoryName), directory)) return;
+            || IsInside(Path.Combine(project, Packages.ProjectManifest.DirectoryName), directory)) return;
 
         var where = Path.GetRelativePath(project, directory).Replace('\\', '/');
         confirm.Ask("Copy into project",
@@ -224,7 +224,7 @@ sealed class AssetBrowserPanel : IPanel
     {
         rows.Add(new TreeItem(
             entry.AbsolutePath,
-            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir!, Gaya.Packages.ProjectManifest.DirectoryName)
+            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir!, Packages.ProjectManifest.DirectoryName)
                 ? "Bricks" : DisplayName(entry.AbsolutePath),
             depth,
             entry.IsDirectory,

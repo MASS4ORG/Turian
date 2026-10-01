@@ -321,7 +321,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
             // A component the instance added reads "+ Title"; one with overridden values has a bold title.
             var title = overrides.IsAdded(section.Target) ? $"+ {section.Title}" : section.Title;
-            var overridden = section.Target is IdClass owner && overrides.Diff?.HasOverrides(owner.Id) == true;
+            var overridden = section.Target is IdObject owner && overrides.Diff?.HasOverrides(owner.Id) == true;
             gui.DrawText(title, Theme.Text(12), Theme.Ink, centerInRect: false,
                 effects: FieldDrawers.Emphasis(overridden, Theme.Ink));
 
@@ -359,7 +359,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         {
             using (gui.Node(-1, -1, $"{id}/prefab").ExpandWidth().Direction(Axis.Vertical).Gap(2f).Enter())
             {
-                if (FieldDrawers.Overridden && gui.Pass == Pass.Pass2Render && field.Target is IdClass target
+                if (FieldDrawers.Overridden && gui.Pass == Pass.Pass2Render && field.Target is IdObject target
                     && gui.GetInteractable().OnClick(MouseButton.Right))
                 {
                     OpenOverrideMenu(gui, menu =>

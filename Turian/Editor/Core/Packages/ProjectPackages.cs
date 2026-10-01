@@ -74,7 +74,7 @@ public static class ProjectPackages
         if (resolution.UsesUserOverride)
             Log.Logger.LogInformation("Packages resolved with {File}; the lock file is left unchanged",
                 ProjectManifest.UserFileName);
-        else if (!locked)
+        else if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
             resolution.Lock.Save(projectRoot);
 
         lock (CacheLock)

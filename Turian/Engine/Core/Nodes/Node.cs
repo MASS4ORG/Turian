@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 [NodeContextMenu]
 [TypeId("a3000000-0000-4000-8000-000000000002")]
-public partial class Node : IdClass
+public partial class Node : IdObject
 {
     /// <summary>Initializes a node and subscribes its local transform to cache invalidation.</summary>
     public Node()

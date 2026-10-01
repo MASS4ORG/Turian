@@ -18,21 +18,21 @@ public sealed class PrefabOverrideOperations(
     /// <summary>The outermost prefab instance <paramref name="target"/> belongs to, or null.</summary>
     /// <param name="target">A node or component in the open scene.</param>
     /// <returns>The instance root.</returns>
-    public static Node? InstanceOf(IdClass target) => NodeOf(target) is { } node
+    public static Node? InstanceOf(IdObject target) => NodeOf(target) is { } node
         ? PrefabOverrideTracker.OutermostInstance(node)
         : null;
 
     /// <summary>What the instance around <paramref name="target"/> changes about its prefab.</summary>
     /// <param name="target">A node or component in the open scene.</param>
     /// <returns>The differences, or null when the target is in no instance.</returns>
-    public PrefabInstanceDiff? DiffFor(IdClass target) =>
+    public PrefabInstanceDiff? DiffFor(IdObject target) =>
         InstanceOf(target) is { } root ? PrefabInstances.Diff(Serializer.Serialize(root), LoadPrefab) : null;
 
     /// <summary>Gives a member back the prefab's value.</summary>
     /// <param name="target">A node or component of an instance.</param>
     /// <param name="member">The serialized member name.</param>
     /// <returns>True when the value was reverted.</returns>
-    public bool RevertMember(IdClass target, string member)
+    public bool RevertMember(IdObject target, string member)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -96,7 +96,7 @@ public sealed class PrefabOverrideOperations(
     /// <param name="target">A node or component of an instance.</param>
     /// <param name="member">The serialized member name.</param>
     /// <returns>True when a prefab was written.</returns>
-    public bool ApplyMember(IdClass target, string member)
+    public bool ApplyMember(IdObject target, string member)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -161,7 +161,7 @@ public sealed class PrefabOverrideOperations(
         sceneTree.NotifySelectedNodeUpdated();
     }
 
-    PrefabExpectation? Expectation(IdClass target) =>
+    PrefabExpectation? Expectation(IdObject target) =>
         InstanceOf(target) is { PrefabInstance: { } link } root
             ? PrefabInstances.Expect(link.Source.AssetId, root.Id, LoadPrefab)
             : null;
@@ -232,7 +232,7 @@ public sealed class PrefabOverrideOperations(
     {
         var holder = new JsonObject
         {
-            [ObjectJsonSerializer<IdClass>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
+            [ObjectJsonSerializer<IdObject>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
             [nameof(Node.Components)] = new JsonArray(json.DeepClone()),
         };
 
@@ -245,7 +245,7 @@ public sealed class PrefabOverrideOperations(
     }
 
     // An apply is one undoable step: undoing writes the prefabs back, and the instance keeps the values it had.
-    void Write(IReadOnlyDictionary<Guid, string> changes, IEnumerable<IdClass> instanceObjects)
+    void Write(IReadOnlyDictionary<Guid, string> changes, IEnumerable<IdObject> instanceObjects)
     {
         var previous = changes.Keys
             .Select(prefabId => (prefabId, Content: PathOf(prefabId) is { } path && File.Exists(path)
@@ -297,7 +297,7 @@ public sealed class PrefabOverrideOperations(
             ? Path.Combine(record.ProjectRootPath, record.SourceRelativePath)
             : null;
 
-    bool SetMember(IdClass target, string member, JsonNode? json)
+    bool SetMember(IdObject target, string member, JsonNode? json)
     {
         if (MemberNamed(target.GetType(), member) is not { } info) return false;
 
@@ -312,7 +312,7 @@ public sealed class PrefabOverrideOperations(
     }
 
     // The member's JSON as the prefab would hold it: references by id, translated to the prefab's own ids.
-    static bool TryMemberValue(IdClass target, string member, IReadOnlyDictionary<Guid, Guid> sourceIds,
+    static bool TryMemberValue(IdObject target, string member, IReadOnlyDictionary<Guid, Guid> sourceIds,
         out JsonNode? json)
     {
         json = null;
@@ -326,7 +326,7 @@ public sealed class PrefabOverrideOperations(
             return true;
         }
 
-        JsonNode? Reference(object? item) => item is IdClass obj
+        JsonNode? Reference(object? item) => item is IdObject obj
             ? new JsonObject { [ObjectReferences.RefProperty] = sourceIds.GetValueOrDefault(obj.Id, obj.Id).ToString() }
             : null;
 
@@ -370,16 +370,16 @@ public sealed class PrefabOverrideOperations(
         (MemberInfo?)type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
         ?? type.GetField(name, BindingFlags.Public | BindingFlags.Instance);
 
-    static Node? NodeOf(IdClass target) => target switch
+    static Node? NodeOf(IdObject target) => target switch
     {
         Node node => node,
         Component component => component.Node,
         _ => null,
     };
 
-    static Dictionary<Guid, IdClass> ObjectsById(Node root)
+    static Dictionary<Guid, IdObject> ObjectsById(Node root)
     {
-        var objects = new Dictionary<Guid, IdClass>();
+        var objects = new Dictionary<Guid, IdObject>();
         foreach (var node in Descendants(root))
         {
             objects.TryAdd(node.Id, node);
@@ -403,7 +403,7 @@ public sealed class PrefabOverrideOperations(
         node[member] is JsonArray array ? array.OfType<JsonObject>() : [];
 
     static Guid? ReadId(JsonObject obj) =>
-        obj[nameof(IdClass.Id)] is JsonValue value && value.TryGetValue<string>(out var text)
+        obj[nameof(IdObject.Id)] is JsonValue value && value.TryGetValue<string>(out var text)
         && Guid.TryParse(text, out var id)
             ? id
             : null;

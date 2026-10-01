@@ -38,7 +38,7 @@ public static class Serializer
                 options.Converters.Add(new AssetReferenceJsonConverterFactory());
                 options.Converters.Add(new Color32JsonConverter());
 
-                var amObjectType = typeof(IdClass);
+                var amObjectType = typeof(IdObject);
                 var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
                     .SelectMany(a =>
                     {
@@ -133,7 +133,7 @@ public static class Serializer
     /// <param name="value"></param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public static string Serialize<T>(T value) //where T : IdClass
+    public static string Serialize<T>(T value) //where T : IdObject
     {
         return JsonSerializer.Serialize(value, JsonOptions);
     }

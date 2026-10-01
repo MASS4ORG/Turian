@@ -10,7 +10,7 @@ public delegate void DataAssetChangedHandler(DataAsset asset, string member);
 /// The payload is shared by the asset loader and can be copied with Instantiate.
 /// </summary>
 [TypeId("a3000000-0000-4000-8000-000000000004")]
-public class DataAsset : IdClass
+public class DataAsset : IdObject
 {
     /// <summary>
     /// Raised when a member changes: by an <see cref="ObservableAttribute"/> property, a call to

@@ -3,7 +3,7 @@ namespace Turian.Tests;
 /// <summary>Tests registering user types from the compiled type manifest.</summary>
 public sealed class TypeRegistryManifestTests : IDisposable
 {
-    sealed class ManifestTarget : IdClass;
+    sealed class ManifestTarget : IdObject;
 
     readonly string directory = Directory.CreateTempSubdirectory("turian-manifest-").FullName;
 

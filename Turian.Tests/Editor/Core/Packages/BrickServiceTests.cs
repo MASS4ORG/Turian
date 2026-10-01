@@ -29,6 +29,19 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Throws<PackageException>(() => BrickService.New(root, "Inventory"));
     }
 
+    /// <summary>A folder that declares no bricks is not given a Bricks folder with an empty lock file.</summary>
+    [Fact]
+    public void ResolvingAFolderWithoutBricksWritesNothing()
+    {
+        var folder = Path.Combine(root, "plain");
+        Directory.CreateDirectory(folder);
+
+        var resolution = ProjectPackages.Resolve(folder);
+
+        Assert.Empty(resolution.Packages);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(folder));
+    }
+
     /// <summary>A failed declaration rolls back only the manifest and preserves embedded sources.</summary>
     [Fact]
     public void FailedAddDoesNotRemoveEmbeddedSources()

@@ -9,20 +9,20 @@ namespace Turian.Engine.Core;
 /// <param name="setMember">Assigns a member by name; false when no writable member has that name.</param>
 /// <param name="memberType">The declared type of a member by name, or null.</param>
 public sealed class GeneratedSerializer(
-    Func<IdClass> create,
-    Action<Utf8JsonWriter, IdClass, JsonSerializerOptions> writeMembers,
-    Func<IdClass, JsonProperty, JsonSerializerOptions, bool> readMember,
-    Func<IdClass, string, object?, bool> setMember,
+    Func<IdObject> create,
+    Action<Utf8JsonWriter, IdObject, JsonSerializerOptions> writeMembers,
+    Func<IdObject, JsonProperty, JsonSerializerOptions, bool> readMember,
+    Func<IdObject, string, object?, bool> setMember,
     Func<string, Type?> memberType)
 {
     /// <summary>Creates an empty instance.</summary>
-    public IdClass Create() => create();
+    public IdObject Create() => create();
 
     /// <summary>Writes every serialized member as JSON properties.</summary>
     /// <param name="writer">The JSON writer, inside the object.</param>
     /// <param name="value">The instance to write.</param>
     /// <param name="options">The serializer options.</param>
-    public void WriteMembers(Utf8JsonWriter writer, IdClass value, JsonSerializerOptions options) =>
+    public void WriteMembers(Utf8JsonWriter writer, IdObject value, JsonSerializerOptions options) =>
         writeMembers(writer, value, options);
 
     /// <summary>Reads one JSON property into its member.</summary>
@@ -30,7 +30,7 @@ public sealed class GeneratedSerializer(
     /// <param name="property">The JSON property.</param>
     /// <param name="options">The serializer options.</param>
     /// <returns>False when no member has that name.</returns>
-    public bool ReadMember(IdClass value, JsonProperty property, JsonSerializerOptions options) =>
+    public bool ReadMember(IdObject value, JsonProperty property, JsonSerializerOptions options) =>
         readMember(value, property, options);
 
     /// <summary>Assigns a member by name.</summary>
@@ -38,7 +38,7 @@ public sealed class GeneratedSerializer(
     /// <param name="member">The member name.</param>
     /// <param name="memberValue">The value to assign.</param>
     /// <returns>False when no writable member has that name.</returns>
-    public bool SetMember(IdClass value, string member, object? memberValue) => setMember(value, member, memberValue);
+    public bool SetMember(IdObject value, string member, object? memberValue) => setMember(value, member, memberValue);
 
     /// <summary>The declared type of a member by name, or null.</summary>
     /// <param name="member">The member name.</param>

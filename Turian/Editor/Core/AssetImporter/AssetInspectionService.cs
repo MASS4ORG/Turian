@@ -96,7 +96,7 @@ public sealed class AssetInspectionService(
             if (inspection.IsPayload)
             {
                 // Serialized through a concrete base: the polymorphic converters are registered per
-                // concrete type, so a static type of IdClass would write the members without a type id.
+                // concrete type, so a static type of IdObject would write the members without a type id.
                 switch (inspection.Target)
                 {
                     case DataAsset payload:

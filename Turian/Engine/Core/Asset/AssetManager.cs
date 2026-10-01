@@ -49,7 +49,7 @@ public class AssetManager
     /// <summary>
     /// Event triggered when a non-node asset object is opened.
     /// </summary>
-    public event Action<IdClass?>? IdClassOpened;
+    public event Action<IdObject?>? IdObjectOpened;
 
     /// <summary>
     /// Event triggered whenever the aggregate dirty state of opened assets may have changed.
@@ -101,7 +101,7 @@ public class AssetManager
         {
             selectedNode = null;
             OpenNode(null);
-            OpenIdClass(null);
+            OpenIdObject(null);
             AssetOpened?.Invoke(null);
             return;
         }
@@ -115,7 +115,7 @@ public class AssetManager
         }
         else
         {
-            OpenIdClass(asset);
+            OpenIdObject(asset);
         }
     }
 
@@ -148,7 +148,7 @@ public class AssetManager
             {
                 selectedNode = null;
                 OpenNode(null);
-                OpenIdClass(null);
+                OpenIdObject(null);
             }
             else
             {
@@ -165,7 +165,7 @@ public class AssetManager
                 }
                 else
                 {
-                    OpenIdClass(activeAsset);
+                    OpenIdObject(activeAsset);
                 }
             }
         }
@@ -328,12 +328,12 @@ public class AssetManager
     }
 
     /// <summary>
-    /// Mark that an IdClass was selected.
+    /// Mark that an IdObject was selected.
     /// </summary>
     /// <param name="amObject"></param>
-    public void OpenIdClass(IdClass? amObject)
+    public void OpenIdObject(IdObject? amObject)
     {
-        IdClassOpened?.Invoke(amObject);
+        IdObjectOpened?.Invoke(amObject);
     }
 
     /// <summary>

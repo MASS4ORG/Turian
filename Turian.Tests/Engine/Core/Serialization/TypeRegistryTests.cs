@@ -7,17 +7,17 @@ namespace Turian.Tests;
 public class TypeRegistryTests
 {
     [TypeId("b0000000-0000-4000-8000-000000000001")]
-    sealed class TaggedSampleA : IdClass;
+    sealed class TaggedSampleA : IdObject;
 
     [TypeId("b0000000-0000-4000-8000-000000000002")]
-    sealed class TaggedSampleB : IdClass;
+    sealed class TaggedSampleB : IdObject;
 
-    sealed class UntaggedSample : IdClass;
+    sealed class UntaggedSample : IdObject;
 
     // Used only by RegisterOverwritesPreviousMapping so the assertion does not pollute
     // mappings other tests rely on.
-    sealed class OverwriteTargetX : IdClass;
-    sealed class OverwriteTargetY : IdClass;
+    sealed class OverwriteTargetX : IdObject;
+    sealed class OverwriteTargetY : IdObject;
 
     /// <summary>Annotated types are discoverable by their stable id.</summary>
     [Fact]

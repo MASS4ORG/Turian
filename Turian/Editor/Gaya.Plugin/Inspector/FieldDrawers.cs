@@ -326,7 +326,7 @@ static class FieldDrawers
     static object? Nested(FormField field, Type type)
     {
         if (type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal)) return null;
-        if (typeof(IdClass).IsAssignableFrom(type) || typeof(Asset).IsAssignableFrom(type)) return null;
+        if (typeof(IdObject).IsAssignableFrom(type) || typeof(Asset).IsAssignableFrom(type)) return null;
         if (type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return null;
         if (FormBuilder.EditableMembers(type).Count == 0) return null;
 

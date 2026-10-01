@@ -131,7 +131,7 @@ public sealed class PrefabAuthoring(AssetImporter importer, AssetFileSystem file
     {
         ArgumentNullException.ThrowIfNull(root);
 
-        var ids = new List<(IdClass Object, Guid Id)>();
+        var ids = new List<(IdObject Object, Guid Id)>();
         Collect(root);
         return () =>
         {

@@ -62,7 +62,7 @@ public interface IAssetImporter
     /// <param name="asset">The asset metadata loaded from the <c>.meta</c> file.</param>
     /// <param name="sourcePath">Absolute path of the source file.</param>
     /// <returns>The authored object, or <c>null</c> when the file is imported rather than authored.</returns>
-    IdClass? LoadAuthoredContent(Asset asset, string sourcePath) => null;
+    IdObject? LoadAuthoredContent(Asset asset, string sourcePath) => null;
 
     /// <summary>
     /// Indicates whether an existing meta file should be regenerated when the source asset changes.

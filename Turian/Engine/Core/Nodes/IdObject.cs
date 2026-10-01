@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Base for all engine objects.
 /// </summary>
 [TypeId("a3000000-0000-4000-8000-000000000001")]
-public class IdClass : IEquatable<IdClass>
+public class IdObject : IEquatable<IdObject>
 {
     /// <summary>
     /// Object ID.
@@ -20,7 +20,7 @@ public class IdClass : IEquatable<IdClass>
     /// </summary>
     /// <param name="other">An object to compare with this object.</param>
     /// <returns>true if the current object is equal to the other parameter; otherwise, false.</returns>
-    public bool Equals(IdClass? other)
+    public bool Equals(IdObject? other)
     {
         if (other is null)
         {
@@ -42,7 +42,7 @@ public class IdClass : IEquatable<IdClass>
     /// <returns>true if the specified object is equal to the current object; otherwise, false.</returns>
     public override bool Equals(object? obj) => obj switch
     {
-        IdClass other => Equals(other),
+        IdObject other => Equals(other),
         _ => false,
     };
 
@@ -55,9 +55,9 @@ public class IdClass : IEquatable<IdClass>
     public override int GetHashCode() => Id.GetHashCode();
 
     /// <summary>
-    /// Equality operator. Checks if two IdClass instances are equal.
+    /// Equality operator. Checks if two IdObject instances are equal.
     /// </summary>
-    public static bool operator ==(IdClass? left, IdClass? right)
+    public static bool operator ==(IdObject? left, IdObject? right)
     {
         if (left is null)
         {
@@ -67,7 +67,7 @@ public class IdClass : IEquatable<IdClass>
     }
 
     /// <summary>
-    /// Inequality operator. Checks if two IdClass instances are not equal.
+    /// Inequality operator. Checks if two IdObject instances are not equal.
     /// </summary>
-    public static bool operator !=(IdClass? left, IdClass? right) => !(left == right);
+    public static bool operator !=(IdObject? left, IdObject? right) => !(left == right);
 }

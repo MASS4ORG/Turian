@@ -80,7 +80,7 @@ public static class ObjectReferences
     /// <param name="member">The member name.</param>
     /// <param name="ids">The pending ids; <see cref="System.Guid.Empty"/> marks an element that needs none.</param>
     /// <returns>True when the member has pending ids.</returns>
-    public static bool TryGetUnresolved(IdClass owner, string member, out Guid[] ids)
+    public static bool TryGetUnresolved(IdObject owner, string member, out Guid[] ids)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -106,7 +106,7 @@ public static class ObjectReferences
     /// </summary>
     /// <param name="owner">The object holding the member.</param>
     /// <param name="member">The member name.</param>
-    public static void Forget(IdClass owner, string member)
+    public static void Forget(IdObject owner, string member)
     {
         ArgumentNullException.ThrowIfNull(owner);
         if (owner.PendingReferences is not { } table) return;
@@ -122,7 +122,7 @@ public static class ObjectReferences
     /// <param name="owner">The object holding the member.</param>
     /// <param name="member">The list or array member name.</param>
     /// <param name="index">The element index.</param>
-    public static void Forget(IdClass owner, string member, int index)
+    public static void Forget(IdObject owner, string member, int index)
     {
         ArgumentNullException.ThrowIfNull(owner);
         if (owner.PendingReferences is not { } table) return;
@@ -157,7 +157,7 @@ public static class ObjectReferences
     {
         ArgumentNullException.ThrowIfNull(roots);
 
-        var objects = new Dictionary<Guid, IdClass>();
+        var objects = new Dictionary<Guid, IdObject>();
         var components = new List<Component>();
         foreach (var root in roots) Index(root, objects, components);
 
@@ -208,7 +208,7 @@ public static class ObjectReferences
     /// <param name="value">The member value.</param>
     /// <param name="allowSceneObjects">Whether nodes and components are references (only on components).</param>
     /// <returns>True when the member was written.</returns>
-    public static bool TryWrite(Utf8JsonWriter writer, IdClass owner, string member, Type memberType,
+    public static bool TryWrite(Utf8JsonWriter writer, IdObject owner, string member, Type memberType,
         object? value, bool allowSceneObjects)
     {
         ArgumentNullException.ThrowIfNull(writer);
@@ -220,7 +220,7 @@ public static class ObjectReferences
 
         if (ElementType(memberType) is null)
         {
-            WriteRef(writer, IsMissing(value) ? pending.FirstOrDefault() : ((IdClass)value!).Id);
+            WriteRef(writer, IsMissing(value) ? pending.FirstOrDefault() : ((IdObject)value!).Id);
             return true;
         }
 
@@ -234,7 +234,7 @@ public static class ObjectReferences
         writer.WriteStartArray();
         for (var i = 0; i < Math.Max(items.Count, pending.Length); i++)
         {
-            var id = i < items.Count && !IsMissing(items[i]) ? ((IdClass)items[i]!).Id : Guid.Empty;
+            var id = i < items.Count && !IsMissing(items[i]) ? ((IdObject)items[i]!).Id : Guid.Empty;
             WriteRef(writer, id != Guid.Empty ? id : i < pending.Length ? pending[i] : Guid.Empty);
         }
         writer.WriteEndArray();
@@ -252,7 +252,7 @@ public static class ObjectReferences
     /// <param name="allowSceneObjects">Whether nodes and components are references (only on components).</param>
     /// <param name="value">The value to assign now: null, or a list of nulls to be filled in.</param>
     /// <returns>True when the member was read.</returns>
-    public static bool TryRead(IdClass owner, string member, Type memberType, JsonElement json,
+    public static bool TryRead(IdObject owner, string member, Type memberType, JsonElement json,
         bool allowSceneObjects, out object? value)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -289,7 +289,7 @@ public static class ObjectReferences
             Resolve(node, DeserializationLoader.Value?.Loader);
     }
 
-    static IEnumerable<Guid> PendingIds(IdClass owner)
+    static IEnumerable<Guid> PendingIds(IdObject owner)
     {
         if (owner.PendingReferences is not { } table) return [];
 
@@ -299,16 +299,16 @@ public static class ObjectReferences
         }
     }
 
-    static int ResolveOwner(IdClass owner, Func<Guid, IdClass?> find) =>
+    static int ResolveOwner(IdObject owner, Func<Guid, IdObject?> find) =>
         TakePending(owner) is { } pending ? Assign(owner, pending, find) : 0;
 
-    static List<KeyValuePair<string, Guid[]>>? TakePending(IdClass owner)
+    static List<KeyValuePair<string, Guid[]>>? TakePending(IdObject owner)
     {
         var pending = Interlocked.Exchange(ref owner.PendingReferences, null);
         return pending is { Count: > 0 } ? pending : null;
     }
 
-    static int Assign(IdClass owner, List<KeyValuePair<string, Guid[]>> pending, Func<Guid, IdClass?> find)
+    static int Assign(IdObject owner, List<KeyValuePair<string, Guid[]>> pending, Func<Guid, IdObject?> find)
     {
         GeneratedSerializers.TryGet(owner.GetType(), out var generated);
         var stillPending = 0;
@@ -363,13 +363,13 @@ public static class ObjectReferences
         return stillPending;
     }
 
-    static object? Match(IdClass? target, Type type) =>
+    static object? Match(IdObject? target, Type type) =>
         !IsMissing(target) && type.IsInstanceOfType(target) ? target : null;
 
-    static IdClass? CachedData(IAssetLoader? loader, Guid id) =>
+    static IdObject? CachedData(IAssetLoader? loader, Guid id) =>
         loader?.LoadContentAsync<DataAsset>(id).GetAwaiter().GetResult();
 
-    static void Index(Node node, Dictionary<Guid, IdClass> objects, List<Component> components)
+    static void Index(Node node, Dictionary<Guid, IdObject> objects, List<Component> components)
     {
         objects.TryAdd(node.Id, node);
         foreach (var component in node.Components)
@@ -382,7 +382,7 @@ public static class ObjectReferences
             Index(child, objects, components);
     }
 
-    static void Record(IdClass owner, string member, Guid[] ids)
+    static void Record(IdObject owner, string member, Guid[] ids)
     {
         if (ids.All(static id => id == Guid.Empty))
         {
@@ -399,7 +399,7 @@ public static class ObjectReferences
         }
     }
 
-    static List<KeyValuePair<string, Guid[]>> PendingTable(IdClass owner)
+    static List<KeyValuePair<string, Guid[]>> PendingTable(IdObject owner)
     {
         if (owner.PendingReferences is { } table) return table;
 

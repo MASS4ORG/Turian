@@ -12,7 +12,7 @@ namespace Turian.Engine.Core;
 /// through <see cref="TypeRegistry"/>, so serialized data survives renames and namespace changes.
 /// </remarks>
 public class ObjectJsonSerializer<T> : JsonConverter<T>
-    where T : IdClass
+    where T : IdObject
 {
     /// <summary>
     /// Property name carrying the stable type id (a <see cref="System.Guid"/>) for polymorphic dispatch.

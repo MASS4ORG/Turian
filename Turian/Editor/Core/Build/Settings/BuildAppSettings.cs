@@ -2,7 +2,7 @@ namespace Turian.Editor.Core;
 
 /// <inheritdoc cref="IAppSettings"/>
 [TypeId("a3000002-0000-4000-8000-000000000001")]
-public class BuildAppSettings : IdClass, IBuildAppSettings
+public class BuildAppSettings : IdObject, IBuildAppSettings
 {
     /// <inheritdoc/>
     public string ProjectAbsoluteDir { get; set; } = string.Empty;

@@ -42,7 +42,7 @@ public class GenericAssetImporter : IAssetImporter
     }
 
     /// <inheritdoc/>
-    public IdClass? LoadAuthoredContent(Asset asset, string sourcePath) =>
+    public IdObject? LoadAuthoredContent(Asset asset, string sourcePath) =>
         (asset is DataAssetAsset || IsDataAssetPath(sourcePath)) && !IsVariantFile(sourcePath)
             ? DataAsset.LoadContent(sourcePath)
             : null;

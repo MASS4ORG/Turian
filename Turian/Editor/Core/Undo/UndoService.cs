@@ -20,8 +20,8 @@ public sealed class UndoService : IDisposable
     readonly UndoHistory history = new();
     readonly Dictionary<Guid, AssetInspection> inspectedAssets = [];
     readonly Dictionary<Guid, Guid> savedAt = [];
-    readonly Dictionary<IdClass, ObjectState> watched = new(ReferenceEqualityComparer.Instance);
-    readonly HashSet<IdClass> recorded = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<IdObject, ObjectState> watched = new(ReferenceEqualityComparer.Instance);
+    readonly HashSet<IdObject> recorded = new(ReferenceEqualityComparer.Instance);
     string? recordedLabel;
     bool altered;
     bool restoring;
@@ -74,7 +74,7 @@ public sealed class UndoService : IDisposable
     public string? RedoLabel => CanRedo ? history.RedoSteps[^1].Label : null;
 
     AssetInspection? InspectedContent =>
-        inspector.SelectedObject is AssetInspection { IsPayload: true, Target: IdClass } inspection ? inspection : null;
+        inspector.SelectedObject is AssetInspection { IsPayload: true, Target: IdObject } inspection ? inspection : null;
 
     // The document an edit made now belongs to: the inspected asset's content, else the open scene.
     Guid? CurrentDocument =>
@@ -86,7 +86,7 @@ public sealed class UndoService : IDisposable
     /// </summary>
     /// <param name="target">The node or component about to change.</param>
     /// <param name="label">What the change is, such as <c>Delete</c>.</param>
-    public void RecordObject(IdClass target, string label)
+    public void RecordObject(IdObject target, string label)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -110,7 +110,7 @@ public sealed class UndoService : IDisposable
     /// <param name="revert">Undoes the change.</param>
     /// <param name="keepValues">Whether <paramref name="objects"/> keep their current values.</param>
     /// <param name="document">The document the step belongs to; the current one when null.</param>
-    public void Perform(string label, IEnumerable<IdClass> objects, Action perform, Action revert,
+    public void Perform(string label, IEnumerable<IdObject> objects, Action perform, Action revert,
         bool keepValues = false, Guid? document = null)
     {
         ArgumentNullException.ThrowIfNull(objects);
@@ -165,9 +165,9 @@ public sealed class UndoService : IDisposable
         if (--gestures == 0) gestureStep = Guid.Empty;
     }
 
-    static Dictionary<IdClass, ObjectState> Capture(IEnumerable<IdClass> objects)
+    static Dictionary<IdObject, ObjectState> Capture(IEnumerable<IdObject> objects)
     {
-        var states = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
+        var states = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
         foreach (var target in objects) states[target] = ObjectState.Capture(target);
         return states;
     }
@@ -195,8 +195,8 @@ public sealed class UndoService : IDisposable
             return;
         }
 
-        var before = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
-        var after = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
+        var before = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
+        var after = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
         foreach (var (target, previous) in watched)
         {
             var current = ObjectState.Capture(target);
@@ -364,7 +364,7 @@ public sealed class UndoService : IDisposable
     {
         watched.Clear();
         if (sceneTree.IsShowingRuntimeScene) return;
-        if (InspectedContent?.Target is IdClass content) watched[content] = ObjectState.Capture(content);
+        if (InspectedContent?.Target is IdObject content) watched[content] = ObjectState.Capture(content);
         if (inspector.SelectedNode is not { } node) return;
 
         watched[node] = ObjectState.Capture(node);
@@ -395,17 +395,17 @@ public sealed class UndoService : IDisposable
     // deleted node, is rebuilt from its saved form too, so it has the current types after a recompile.
     void OnSceneRebuilt(Guid assetId, Node oldRoot, Node newRoot)
     {
-        var replacements = new Dictionary<Guid, IdClass>();
+        var replacements = new Dictionary<Guid, IdObject>();
         Register(newRoot);
         history.Remap(assetId, Replace);
         Changed?.Invoke();
 
-        IdClass Replace(IdClass old)
+        IdObject Replace(IdObject old)
         {
             if (old is not (Node or Component)) return old;
             if (replacements.TryGetValue(old.Id, out var found)) return found;
 
-            IdClass? rebuilt = old switch
+            IdObject? rebuilt = old switch
             {
                 Node node => NodeCloner.DeepClone(node, awake: false, loader: assetLoader),
                 Component component => RebuildComponent(component),
@@ -417,7 +417,7 @@ public sealed class UndoService : IDisposable
             return replacements.GetValueOrDefault(old.Id, rebuilt);
         }
 
-        void Register(IdClass obj)
+        void Register(IdObject obj)
         {
             replacements.TryAdd(obj.Id, obj);
             if (obj is not Node node) return;
@@ -432,7 +432,7 @@ public sealed class UndoService : IDisposable
     {
         var holder = new JsonObject
         {
-            [ObjectJsonSerializer<IdClass>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
+            [ObjectJsonSerializer<IdObject>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
             [nameof(Node.Components)] = new JsonArray(JsonNode.Parse(Serializer.Serialize(component))),
         };
 
@@ -444,7 +444,7 @@ public sealed class UndoService : IDisposable
         return rebuilt;
     }
 
-    static string EditLabel(IEnumerable<IdClass> changed) => changed.FirstOrDefault() switch
+    static string EditLabel(IEnumerable<IdObject> changed) => changed.FirstOrDefault() switch
     {
         Node node => $"Edit {node.Name}",
         Component component => $"Edit {component.GetType().Name}",
