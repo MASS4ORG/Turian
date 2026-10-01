@@ -322,16 +322,19 @@ public sealed partial class AssetImporter
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (disposed)
+        lock (syncRoot)
         {
-            return;
-        }
+            if (disposed)
+            {
+                return;
+            }
 
-        disposed = true;
-        folderWatcher?.Dispose();
-        folderWatcher = null;
-        packageWatchers.ForEach(static watcher => watcher.Dispose());
-        packageWatchers = [];
+            disposed = true;
+            folderWatcher?.Dispose();
+            folderWatcher = null;
+            packageWatchers.ForEach(static watcher => watcher.Dispose());
+            packageWatchers = [];
+        }
     }
 
     // ── Inner watcher ──────────────────────────────────────────────────────────

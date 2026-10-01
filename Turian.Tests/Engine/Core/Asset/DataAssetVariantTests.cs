@@ -113,6 +113,8 @@ public sealed class DataAssetVariantTests : IDisposable
             Assert.Equal("Base", fromSource.RootNamespace);
             Assert.Equal(id, fromSource.Id);
 
+            // The runtime reads imported assets without an editor watcher removing their cache entries.
+            importer.Dispose();
             File.Delete(variantFile);
             var fromImport = Assert.IsType<AssemblyDefinition>(Assert.IsType<DataAssetAsset>(Asset.Load($"{variantFile}.meta")).Reload(project));
             Assert.Equal("Child.Asm", fromImport.Name);

@@ -341,6 +341,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -372,6 +373,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -401,6 +403,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (IsMetaFilePath(e.FullPath))
             {
                 if (ShouldIgnoreMetaPath(e.FullPath))
@@ -425,6 +428,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (!ShouldHandleRename(e.OldFullPath, e.FullPath))
             {
                 return;
