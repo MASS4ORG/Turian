@@ -2,6 +2,16 @@ using Gaya.Packages;
 
 namespace Turian.Editor.Core;
 
+/// <summary>What the Bricks panel lists.</summary>
+public enum BricksTab
+{
+    /// <summary>The bricks the project could use.</summary>
+    Bricks,
+
+    /// <summary>The registries the project takes bricks from.</summary>
+    Registries,
+}
+
 /// <summary>One installed brick as the Bricks panel lists it.</summary>
 /// <param name="Id">The brick id.</param>
 /// <param name="Version">The installed version.</param>
@@ -42,8 +52,20 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     /// <summary>The shared store whose downloaded bricks the catalog lists.</summary>
     public PackageStore Store { get; init; } = new(PackageStore.DefaultRoot());
 
-    /// <summary>The id of the brick the panel shows details of.</summary>
+    /// <summary>The id of the brick selected in the panel.</summary>
     public string? Selected { get; set; }
+
+    /// <summary>The name of the registry selected in the panel; empty for a new one.</summary>
+    public string? SelectedRegistry { get; set; }
+
+    /// <summary>What the panel lists.</summary>
+    public BricksTab Tab { get; set; }
+
+    /// <summary>The registries the project takes bricks from, the public one last.</summary>
+    public IReadOnlyList<ScopedRegistry> Registries { get; private set; } = [];
+
+    /// <summary>Changes whenever the lists were rebuilt, so a view of a selection knows to refresh.</summary>
+    public int Revision { get; private set; }
 
     /// <summary>What went wrong with the last resolve or action; null when it went well.</summary>
     public string? Error { get; private set; }
@@ -57,8 +79,72 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
     /// <summary>Raised when <see cref="Rows"/>, <see cref="Error"/> or <see cref="IsBusy"/> changed, from any thread.</summary>
     public event Action? Changed;
 
+    /// <summary>
+    /// What the inspector should show for the panel's selection: the brick or registry, read-only or editable with its
+    /// own buttons; null when nothing is selected.
+    /// </summary>
+    /// <returns>The object to select in the inspector.</returns>
+    public object? InspectSelection()
+    {
+        if (Tab == BricksTab.Registries)
+        {
+            if (SelectedRegistry is null) return null;
+            if (SelectedRegistry.Length == 0) return new RegistryView(this);
+
+            return Registries.FirstOrDefault(r => r.Name == SelectedRegistry) switch
+            {
+                null => null,
+                var registry when registry.Name == ProjectPackages.PublicRegistry.Name => new PublicRegistryView(registry),
+                var registry => new RegistryView(this, registry),
+            };
+        }
+
+        if (Catalog.FirstOrDefault(b => b.Id == Selected) is not { } brick) return null;
+
+        var resolved = installed.FirstOrDefault(p => p.Id == brick.Id);
+        return brick.State switch
+        {
+            BrickState.Available => new AvailableBrickView(this, brick),
+            BrickState.Installed => new InstalledBrickView(this, brick),
+            _ when resolved is { Origin: PackageOrigin.Embedded } => new LocalBrickView(this, brick, resolved),
+            _ => new EnabledBrickView(this, brick, resolved!),
+        };
+    }
+
+    /// <summary>Writes a registry into the project, replacing the one of the same name, or the one it was renamed from.</summary>
+    /// <param name="previousName">The name the registry had when it was opened, or null for a new one.</param>
+    /// <param name="registry">The registry as edited.</param>
+    /// <returns>Whether the registry was saved.</returns>
+    public Task<bool> SaveRegistryAsync(string? previousName, ScopedRegistry registry)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        var before = SelectedRegistry;
+        return RunAsync($"Save registry {registry.Name}", root =>
+        {
+            if (registry.Name != previousName && BrickService.Registries(root).Any(r => r.Name == registry.Name))
+                throw new PackageException($"A registry named {registry.Name} already exists.");
+
+            BrickService.AddRegistry(root, registry);
+            if (previousName is not null && previousName != registry.Name) _ = BrickService.RemoveRegistry(root, previousName);
+            if (SelectedRegistry == before) SelectedRegistry = registry.Name;
+        }, applyToProject: false);
+    }
+
+    /// <summary>Stops the project taking bricks from a registry.</summary>
+    /// <param name="name">The registry's name.</param>
+    /// <returns>Whether the project declared it.</returns>
+    public Task<bool> RemoveRegistryAsync(string name) =>
+        RunAsync($"Remove registry {name}", root =>
+        {
+            if (!BrickService.RemoveRegistry(root, name)) throw new PackageException($"The project does not declare registry {name}.");
+            if (SelectedRegistry == name) SelectedRegistry = null;
+        }, applyToProject: false);
+
     /// <summary>The installed brick selected in the panel, or null.</summary>
     public ResolvedPackage? SelectedBrick => installed.FirstOrDefault(p => p.Id == Selected);
+
+    /// <summary>The open project's folder, or null; a view of a selection acts only while this is still its own.</summary>
+    public string? ProjectFolder => ProjectRoot;
 
     string? ProjectRoot => settings is { HasSettings: true, Settings.ProjectAbsoluteDir: { Length: > 0 } root } ? root : null;
 
@@ -153,6 +239,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
         registryRoot = root;
         SaveRegistryCache(root);
         var unavailable = found.FirstOrDefault(static f => f.Latest.Length == 0);
+        if (unavailable.Id is not null) logger.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
         Publish(installed, unavailable.Id);
     }
 
@@ -204,6 +291,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
         }
 
         SetBusy(true);
+        string? failure = null;
         try
         {
             var status = await runner.RunAsync(
@@ -211,7 +299,17 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
                 (progress, _) =>
                 {
                     progress.Report(0, label);
-                    work(root);
+                    try
+                    {
+                        work(root);
+                    }
+                    catch (PackageException ex)
+                    {
+                        failure = ex.Message;
+                        logger.LogError("{Label} failed: {Message}", label, ex.Message);
+                        throw;
+                    }
+
                     if (applyToProject) applier.ApplyBrickChanges();
                     progress.Report(1, label);
                     return Task.CompletedTask;
@@ -220,7 +318,7 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
             var succeeded = status == BackgroundTaskStatus.Completed;
             if (!succeeded) logger.LogWarning("{Label} did not complete ({Status})", label, status);
             Refresh();
-            if (!succeeded) Publish(installed, $"{label} failed");
+            if (!succeeded) Publish(installed, failure ?? $"{label} failed");
             return succeeded;
         }
         finally
@@ -239,9 +337,23 @@ public sealed class BricksController(SettingsService settings, BackgroundTaskRun
             .. bricks.Select(static p => new BrickRow(p.Id, p.Version.ToString(), p.Manifest.DisplayName, p.Origin, p.Source,
                 p.Depth == 1, p.IsOverridden, BrickAssemblies.IsPrecast(p))),
         ];
+        Registries = ProjectRoot is { } root ? ReadRegistries(root) : [];
         Error = error;
-        if (Selected is not null && bricks.All(p => p.Id != Selected)) Selected = null;
+        if (Selected is not null && Catalog.All(b => b.Id != Selected)) Selected = null;
+        Revision++;
         Changed?.Invoke();
+    }
+
+    static IReadOnlyList<ScopedRegistry> ReadRegistries(string root)
+    {
+        try
+        {
+            return BrickService.Registries(root);
+        }
+        catch (PackageException)
+        {
+            return [ProjectPackages.PublicRegistry];
+        }
     }
 
     // A project's registries are its own, so each project has its own cache.

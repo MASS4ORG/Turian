@@ -1,13 +1,18 @@
+using Gaya.Packages;
+
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// The Bricks panel: one searchable list of every brick the project could use, grouped by how far it is from being
-/// used (in use, on this machine, available), and the selected brick's details beside it. A checkbox turns a brick
-/// on or off for the project. It draws <see cref="BricksController"/> and holds no logic of its own.
+/// used (in use, on this machine, available), and a second tab for the registries bricks come from. A checkbox turns
+/// a brick on or off for the project; selecting a row shows the brick or registry in the inspector, which is where its
+/// details and actions are. It draws <see cref="BricksController"/> and holds no logic of its own.
 /// </summary>
 /// <param name="controller">The bricks' state and actions.</param>
 /// <param name="dialogs">Asks for a folder or file to add a brick from; without it those menu items are inert.</param>
-sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs = null) : IPanel
+/// <param name="inspector">Shows the selected brick or registry; without it selecting only highlights the row.</param>
+sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs = null,
+    NodeInspectorController? inspector = null) : IPanel
 {
     const float rowHeight = 36f;
 
@@ -20,8 +25,6 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         (BrickFilter.BuiltIn, "Built-in", 58f),
     ];
 
-    readonly BricksDetails details = new(controller);
-
     string search = "";
     string addInput = "";
     string? addLabel;
@@ -32,7 +35,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
     bool moreMenuOpen;
     Vector2 pointer;
     Vector2 menuAt;
-    float split = 0.45f;
+    int seenRevision = -1;
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -49,34 +52,114 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         }
 
         pointer = gui.Input.MousePosition;
+        RefreshInspector();
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(Theme.Gap).Padding(10f, 8f).Enter())
         {
             if (!controller.HasProject)
             {
-                BricksDetails.Line(gui, "Open a project to manage its bricks.", Theme.InkDim);
+                Line(gui, "Open a project to manage its bricks.", Theme.InkDim);
+                return;
+            }
+
+            Tabs(gui);
+            Notice(gui);
+
+            if (controller.Tab == BricksTab.Registries)
+            {
+                Registries(gui);
                 return;
             }
 
             Toolbar(gui);
             if (addLabel is not null) AddRow(gui);
-            Notice(gui);
-
-            using (gui.Node().Expand().Direction(Axis.Horizontal).Enter())
-            {
-                using (gui.Node().ExpandHeight().ExpandWidth(split).Direction(Axis.Vertical).Enter())
-                    List(gui);
-
-                gui.Splitter(ref split, Axis.Horizontal, thickness: Theme.Scale(2f), min: 0.25f,
-                    color: Theme.Border, hoverColor: Theme.Hover);
-
-                using (gui.Node().ExpandHeight().ExpandWidth(1f - split).Direction(Axis.Vertical).Padding(8f, 0f).Enter())
-                    details.Render(gui);
-            }
+            List(gui);
         }
 
         gui.CascadeMenu(ref addMenuOpen, menuAt, BuildAddMenu);
         gui.CascadeMenu(ref moreMenuOpen, menuAt, BuildMoreMenu);
+    }
+
+    void RefreshInspector()
+    {
+        if (inspector is null || controller.Revision == seenRevision) return;
+
+        seenRevision = controller.Revision;
+
+        // A registry being edited keeps its unsaved values until it is saved, removed or another is selected.
+        if (inspector.SelectedObject is RegistryView editing && editing.SavedName == (controller.SelectedRegistry is "" ? null : controller.SelectedRegistry)
+                                                            && controller.Tab == BricksTab.Registries) return;
+        if (inspector.SelectedObject is not (BrickView or RegistryView or PublicRegistryView)) return;
+
+        inspector.Select(controller.InspectSelection());
+    }
+
+    void Show(Action select)
+    {
+        select();
+        inspector?.Select(controller.InspectSelection());
+    }
+
+    void Tabs(Gui gui)
+    {
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/tabs").ExpandWidth().Direction(Axis.Horizontal)
+                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        {
+            foreach (var (tab, label, width) in new[] { (BricksTab.Bricks, "Bricks", 56f), (BricksTab.Registries, "Registries", 76f) })
+            {
+                if (Chip(gui, label, $"bricks/tab/{tab}", width, controller.Tab == tab) && controller.Tab != tab)
+                    Show(() => controller.Tab = tab);
+            }
+        }
+    }
+
+    void Registries(Gui gui)
+    {
+        var height = Theme.Scale(rowHeight);
+
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight + 4f), "bricks/registries/toolbar").ExpandWidth()
+                   .Direction(Axis.Horizontal).Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        {
+            if (Button(gui, "+", "bricks/registries/add", 28f, "Add a registry to take bricks from."))
+                Show(() => controller.SelectedRegistry = "");
+        }
+
+        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
+        {
+            gui.ScrollY();
+            foreach (var registry in controller.Registries)
+                RegistryRow(gui, registry, height);
+        }
+    }
+
+    void RegistryRow(Gui gui, ScopedRegistry registry, float height)
+    {
+        var id = $"bricks/registry/{registry.Name}";
+        using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
+                   .ContentAlignY(0.5f).Enter())
+        {
+            Selectable(gui, controller.SelectedRegistry == registry.Name, () => controller.SelectedRegistry = registry.Name);
+
+            using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f).Enter())
+            {
+                gui.ClipContent();
+                gui.DrawText(registry.Name, Theme.Text(12f), Theme.Ink, centerInRect: false);
+                gui.DrawText(registry.Url, Theme.Text(10f), Theme.InkDim, centerInRect: false);
+            }
+
+            Cell(gui, $"{id}/scopes", string.Join(", ", registry.Scopes), 150f, height);
+        }
+    }
+
+    /// <summary>Highlights the row being drawn and runs <paramref name="select"/> when it is clicked.</summary>
+    void Selectable(Gui gui, bool selected, Action select)
+    {
+        var interactable = gui.GetInteractable();
+        if (gui.Pass != Pass.Pass2Render) return;
+
+        if (selected) gui.DrawBackgroundRect(Theme.Hover, 3f);
+        else if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.Chrome, 3f);
+        if (interactable.OnClick()) Show(select);
     }
 
     void Toolbar(Gui gui)
@@ -181,8 +264,8 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
 
     void Notice(Gui gui)
     {
-        if (controller.IsBusy) BricksDetails.Line(gui, "Working…", Theme.InkDim);
-        else if (controller.Error is { } error) BricksDetails.Line(gui, error, Theme.Error);
+        if (controller.IsBusy) Line(gui, "Working…", Theme.InkDim);
+        else if (controller.Error is { } error) Line(gui, error, Theme.Error);
     }
 
     void List(Gui gui)
@@ -194,7 +277,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
             Group(gui, "In use", shown.Where(static b => b.State == BrickState.Enabled));
             Group(gui, "On this machine", shown.Where(static b => b.State == BrickState.Installed));
             Group(gui, "Available", shown.Where(static b => b.State == BrickState.Available));
-            if (shown.Count == 0) BricksDetails.Line(gui, "No bricks match.", Theme.InkDim);
+            if (shown.Count == 0) Line(gui, "No bricks match.", Theme.InkDim);
         }
     }
 
@@ -203,7 +286,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         var rows = bricks.ToList();
         if (rows.Count == 0) return;
 
-        BricksDetails.Line(gui, $"{title} ({rows.Count})", Theme.Ink);
+        Line(gui, $"{title} ({rows.Count})", Theme.Ink);
         foreach (var brick in rows) Row(gui, brick);
     }
 
@@ -216,13 +299,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         using (gui.Node(-1, height, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Padding(6f, 0f)
                    .ContentAlignY(0.5f).Enter())
         {
-            var interactable = gui.GetInteractable();
-            if (gui.Pass == Pass.Pass2Render)
-            {
-                if (selected) gui.DrawBackgroundRect(Theme.Hover, 3f);
-                else if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.Chrome, 3f);
-                if (interactable.OnClick()) controller.Selected = brick.Id;
-            }
+            Selectable(gui, selected, () => controller.Selected = brick.Id);
 
             var enabled = brick.State == BrickState.Enabled;
             using (gui.Node(Theme.Scale(18f), height, $"{id}/enabled").ContentAlignY(0.5f).Enter())
@@ -240,8 +317,26 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
             }
 
             var version = brick.InstalledVersion ?? brick.LatestVersion ?? "";
-            BricksDetails.Cell(gui, $"{id}/version", brick.HasUpdate ? $"{version} → {brick.LatestVersion}" : version,
+            Cell(gui, $"{id}/version", brick.HasUpdate ? $"{version} → {brick.LatestVersion}" : version,
                 brick.HasUpdate ? 110f : 60f, height);
+        }
+    }
+
+    static void Line(Gui gui, string text, Guinevere.Color color)
+    {
+        using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"bricks/line/{text}").ExpandWidth().ContentAlignY(0.5f).Enter())
+        {
+            gui.ClipContent();
+            gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
+        }
+    }
+
+    static void Cell(Gui gui, string id, string text, float width, float height)
+    {
+        using (gui.Node(Theme.Scale(width), height, id).ContentAlignY(0.5f).Enter())
+        {
+            gui.ClipContent();
+            gui.DrawText(text, Theme.Text(11f), Theme.InkDim, centerInRect: false);
         }
     }
 

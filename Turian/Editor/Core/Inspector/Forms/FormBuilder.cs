@@ -22,7 +22,8 @@ public static class FormBuilder
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        return new FormModel(target, [SectionFor(target, target.GetType().Name, mutationNotifier)]);
+        var title = target is IInspectorTitled titled ? titled.InspectorTitle : target.GetType().Name;
+        return new FormModel(target, [SectionFor(target, title, mutationNotifier)]);
     }
 
     /// <summary>

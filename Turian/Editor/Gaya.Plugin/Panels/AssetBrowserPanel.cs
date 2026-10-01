@@ -35,6 +35,7 @@ sealed class AssetBrowserPanel : IPanel
     Vector2 menuAt;
     AssetEntry? menuEntry;
     Vector2 pointer;
+    IClipboard? systemClipboard;
 
     /// <summary>Creates the panel and listens for reveal requests from elsewhere in the studio.</summary>
     /// <param name="fileSystem">Scans the project's asset folder and performs its file operations.</param>
@@ -101,6 +102,7 @@ sealed class AssetBrowserPanel : IPanel
 
         if (gui.Pass == Pass.Pass1Build && pendingReveal != Guid.Empty) RevealPending();
         if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
+        systemClipboard ??= gui.Platform.Require<IClipboard>();
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick);
 
@@ -285,6 +287,9 @@ sealed class AssetBrowserPanel : IPanel
         menu.Item("Copy", () => Copy(entry), enabled: entry is not null);
         menu.Item("Paste", () => Paste(entry), enabled: entry?.IsReadOnly != true && fileSystem.CanPaste());
         menu.Separator();
+        menu.Item("Copy Path", () => CopyPath(entry, relative: false), "Ctrl+Alt+C", entry is not null);
+        menu.Item("Copy Relative Path", () => CopyPath(entry, relative: true), "Ctrl+Alt+Shift+C", entry is not null);
+        menu.Separator();
         if (entry?.IsReadOnly != true)
             menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
 
@@ -325,6 +330,20 @@ sealed class AssetBrowserPanel : IPanel
 
     /// <summary>Whether a row is selected, so an edit has a target.</summary>
     public bool HasSelection => Selected is not null;
+
+    /// <summary>Puts the selected row's path on the system clipboard. What the panel's Copy Path shortcuts run.</summary>
+    /// <param name="relative">Whether the path starts at the project folder instead of the file system root.</param>
+    public void CopySelectedPath(bool relative) => CopyPath(Selected, relative);
+
+    void CopyPath(AssetEntry? entry, bool relative)
+    {
+        if (entry is null || systemClipboard is null) return;
+
+        var path = relative && settings.Settings?.ProjectAbsoluteDir is { } project
+            ? Path.GetRelativePath(project, entry.AbsolutePath).Replace('\\', '/')
+            : entry.AbsolutePath;
+        systemClipboard.SetClipboardText(path);
+    }
 
     /// <summary>Deletes the selected asset or folder. What the panel's Delete shortcut runs.</summary>
     public void DeleteSelected() => Delete(Selected);

@@ -210,6 +210,90 @@ public sealed class BricksControllerTests : IDisposable
         Assert.DoesNotContain(controller.Rows, r => r.Id == "user.mateo.old");
     }
 
+    /// <summary>The inspector shows a view whose type, and so whose buttons, follows the brick's state.</summary>
+    [Fact]
+    public async Task InspectionFollowsTheBricksState()
+    {
+        controller.Refresh();
+        controller.Selected = "org.mass4.turian.ui";
+        Assert.IsType<EnabledBrickView>(controller.InspectSelection());
+
+        Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
+        controller.Selected = "org.mass4.turian.ui";
+        var available = Assert.IsType<AvailableBrickView>(controller.InspectSelection());
+        Assert.Equal("org.mass4.turian.ui", available.Name);
+        Assert.Equal("Available", available.Status);
+
+        var made = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
+        controller.Refresh();
+        controller.Selected = "user.mateo.rules";
+        Assert.IsType<LocalBrickView>(controller.InspectSelection());
+        Assert.True(Directory.Exists(made));
+    }
+
+    /// <summary>The inspector form of a brick is read-only manifest fields and the buttons of its state.</summary>
+    [Fact]
+    public void BrickViewsBuildAnInspectorForm()
+    {
+        controller.Refresh();
+        controller.Selected = "org.mass4.turian.ui";
+
+        var model = FormBuilder.Build(controller.InspectSelection()!);
+
+        var section = Assert.Single(model.Sections);
+        Assert.Equal("Brick 'In-game UI'", section.Title);
+        Assert.All(section.BodyFields, f => Assert.True(f.IsReadOnly));
+        Assert.Contains(section.BodyFields, f => f.Label == "Name");
+        Assert.Equal(["Disable", "Update", "Make Local"], section.Buttons.Select(b => b.Label));
+    }
+
+    /// <summary>A registry is added, renamed and removed through the view the inspector shows.</summary>
+    [Fact]
+    public async Task RegistriesAreSavedAndRemoved()
+    {
+        controller.Refresh();
+        var fresh = new ScopedRegistry { Name = "studio", Url = "https://bricks.example/v1", Scopes = ["com.acme"], AllowUnsigned = true };
+
+        Assert.True(await controller.SaveRegistryAsync(null, fresh));
+        Assert.Contains(controller.Registries, r => r.Name == "studio");
+
+        controller.Tab = BricksTab.Registries;
+        controller.SelectedRegistry = "studio";
+        var view = Assert.IsType<RegistryView>(controller.InspectSelection());
+        view.Name = "renamed";
+        Assert.True(await controller.SaveRegistryAsync("studio", new ScopedRegistry
+        {
+            Name = view.Name,
+            Url = view.Url,
+            Scopes = view.Scopes,
+            AllowUnsigned = true,
+        }));
+        Assert.DoesNotContain(controller.Registries, r => r.Name == "studio");
+        Assert.Contains(controller.Registries, r => r.Name == "renamed");
+
+        Assert.True(await controller.SaveRegistryAsync(null, new ScopedRegistry
+        {
+            Name = "other",
+            Url = "https://other.example/v1",
+            Scopes = ["com.other"],
+            AllowUnsigned = true,
+        }));
+        Assert.False(await controller.SaveRegistryAsync("other", new ScopedRegistry
+        {
+            Name = "renamed",
+            Url = "https://x.example/v1",
+            Scopes = ["com.x"],
+            AllowUnsigned = true,
+        }));
+        Assert.Equal("https://other.example/v1", controller.Registries.Single(r => r.Name == "other").Url);
+        Assert.True(await controller.RemoveRegistryAsync("other"));
+        Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = "bad" }));
+        Assert.True(await controller.RemoveRegistryAsync("renamed"));
+        Assert.DoesNotContain(controller.Registries, r => r.Name == "renamed");
+        controller.SelectedRegistry = ProjectPackages.PublicRegistry.Name;
+        Assert.IsType<PublicRegistryView>(controller.InspectSelection());
+    }
+
     /// <summary>An embedded-only brick is removed without losing the author's source files.</summary>
     [Fact]
     public async Task RemoveEmbeddedOnlyBrickPreservesSourcesInTrash()
