@@ -70,6 +70,20 @@ jobs:
             --no-local-packages \
             --verbosity minimal
 
+      # Drive the image just built the way a gamedev's CI would: create, compile, export and render a project.
+      - name: Smoke-test the container image
+        run: |
+          image=$(podman images --format '{{.Repository}}:{{.Tag}}' --filter reference=turian-cli | head -n1)
+          work="$RUNNER_TEMP/turian-smoke"
+          mkdir -p "$work"
+          turian() { podman run --rm -v "$work:$work" -w "$work" "$image" "$@"; }
+          turian new sample
+          turian compile sample
+          turian export sample
+          turian screenshot sample --out screenshot.png
+          test -n "$(ls -A "$work/sample/Output")"
+          test -s "$work/screenshot.png"
+
       - name: Build Windows installer and Winget manifests
         run: |
           ./build.sh WingetManifest \

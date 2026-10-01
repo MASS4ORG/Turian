@@ -145,7 +145,8 @@ public static class ProjectPackages
 
     static string FindBuiltinDirectory()
     {
-        var published = Path.Combine(AppContext.BaseDirectory, "packages");
+        // Beside the assembly, not AppContext.BaseDirectory: the turian-cli/turian-studio launchers load the engine from lib/.
+        var published = Path.Combine(Path.GetDirectoryName(typeof(ProjectPackages).Assembly.Location) ?? AppContext.BaseDirectory, "packages");
         if (Directory.Exists(published)) return published;
 
         return typeof(ProjectPackages).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()

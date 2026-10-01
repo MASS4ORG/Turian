@@ -103,17 +103,8 @@ jobs:
             --github-token "${{ secrets.GITHUB_TOKEN }}" \
             --verbosity minimal
 
-      - name: Create GitLab release
-        if: vars.GITLAB_REPOSITORY_PATH != ''
-        shell: bash
-        run: |
-          ./build.sh GitLabCreateRelease \
-            --gitlab-project-path "${{ vars.GITLAB_REPOSITORY_PATH }}" \
-            --gitlab-token "${{ secrets.GITLAB_RELEASE_TOKEN }}" \
-            --verbosity minimal
 
-  # Builds the Turian CLI container image with Podman and pushes it to GHCR (and the GitLab
-  # Container Registry, if configured). GitHub-hosted runners are full VMs, so no vfs/dind
+  # Builds the Turian CLI container image with Podman and pushes it to GHCR. GitHub-hosted runners are full VMs, so no vfs/dind
   # workaround is needed here the way GitLab.com's container-executor runners require.
   container:
     if: ${{ vars.RELEASE_REPOSITORY != '' }}
@@ -133,17 +124,9 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Log in to GitLab Container Registry
-        if: vars.GITLAB_REPOSITORY_PATH != ''
-        run: echo "${{ secrets.GITLAB_RELEASE_TOKEN }}" | podman login registry.gitlab.com -u "${{ vars.GITLAB_REGISTRY_USER }}" --password-stdin
-
       - name: Build and push
         shell: bash
         run: |
           chmod +x ./build.sh
           GITHUB_OWNER=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          REGISTRIES="ghcr.io/$GITHUB_OWNER/turian-cli"
-          if [ -n "${{ vars.GITLAB_REPOSITORY_PATH }}" ]; then
-            REGISTRIES="$REGISTRIES,registry.gitlab.com/${{ vars.GITLAB_REPOSITORY_PATH }}"
-          fi
-          ./build.sh ContainerPush --container-registries "$REGISTRIES" --verbosity minimal
+          ./build.sh ContainerPush --container-registries "ghcr.io/$GITHUB_OWNER/turian-cli" --verbosity minimal
