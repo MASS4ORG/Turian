@@ -91,8 +91,6 @@ sealed class AssetBrowserPanel : IPanel
         var root = settings.Settings?.AssetsAbsoluteDir;
         if (string.IsNullOrEmpty(root))
         {
-            gui.DrawText("No project loaded.", StudioTheme.Current.Text(12), StudioTheme.Current.InkDim,
-                centerInRect: false);
             return;
         }
 
