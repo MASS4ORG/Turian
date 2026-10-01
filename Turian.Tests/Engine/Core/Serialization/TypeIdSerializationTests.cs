@@ -9,7 +9,7 @@ namespace Turian.Tests;
 public class TypeIdSerializationTests
 {
     [TypeId("b0000001-0000-4000-8000-000000000001")]
-    internal class BaseSample : IdClass
+    internal class BaseSample : IdObject
     {
         public int BaseValue { get; set; } = 1;
     }
@@ -137,7 +137,7 @@ public class TypeIdSerializationTests
     }
 
     [TypeId("b0000001-0000-4000-8000-000000000005")]
-    internal sealed class AssetHolder : IdClass
+    internal sealed class AssetHolder : IdObject
     {
         public SampleAsset? Asset { get; set; }
     }

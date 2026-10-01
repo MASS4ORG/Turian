@@ -9,6 +9,7 @@ which plugins are loaded.
 | --- | --- |
 | `MASS4.Gaya.Sdk` | plugins — the contract, and the only Gaya assembly a plugin needs |
 | `MASS4.Gaya.Host` | the application shell — plugin activation, workbench, docking, layout persistence |
+| `Gaya.Packages` | hosts — brick manifests, sources, resolution, the shared store and registries |
 
 A plugin is a class carrying `[Plugin(id, displayName)]` and implementing `IPlugin`:
 
@@ -28,7 +29,7 @@ public sealed class NotesPlugin : IPlugin
 }
 ```
 
-`Gaya.Plugin.GameStudio` in the [Turian](https://github.com/MASS4ORG/Turian) repository is the reference
+`Gaya.Plugin.Turian` in the [Turian](https://github.com/MASS4ORG/Turian) repository is the reference
 implementation. The full contract — lifecycle, every registry, versioning policy and the boundary rules —
 is documented in [`docs/decisions/Gaya-Platform.md`](https://github.com/MASS4ORG/Turian/blob/main/docs/decisions/Gaya-Platform.md).
 

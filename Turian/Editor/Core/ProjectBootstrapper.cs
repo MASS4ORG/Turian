@@ -19,9 +19,9 @@ public sealed class ProjectBootstrapper
         global using System.Threading.Tasks;
         global using Microsoft.Extensions.Logging;
         global using Silk.NET.Input;
+        global using MASS4.Attributes;
         global using Turian;
         global using Turian.Engine.Core;
-        global using Turian.Engine.UI;
 
         """;
 
@@ -63,6 +63,11 @@ public sealed class ProjectBootstrapper
             });
             ProjectSettingsFiles.Create(settings, new InputSettings());
             ProjectSettingsFiles.Create(settings, new GraphicsSettings());
+
+            new Gaya.Packages.ProjectManifest
+            {
+                Dependencies = ProjectPackages.DefaultBuiltins.ToDictionary(static id => id, static string? (id) => $"builtin:{id}"),
+            }.Save(projectDirectory);
 
             // Scripts get the engine, its attributes and the input key codes without per-file usings.
             var globalsPath = Path.Combine(assetsDir, "Globals.cs");

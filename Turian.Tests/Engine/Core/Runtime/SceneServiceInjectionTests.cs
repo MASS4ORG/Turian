@@ -41,8 +41,8 @@ public class SceneServiceInjectionTests
     [Fact]
     public void Awake_InjectsSceneServicesBeforeCallbacksAndIntoChildren()
     {
-        var scene = NSubstitute.Substitute.For<ISceneManager>();
-        var input = NSubstitute.Substitute.For<IInputSource>();
+        var scene = Substitute.For<ISceneManager>();
+        var input = Substitute.For<IInputSource>();
         using var provider = new ServiceCollection()
             .AddSingleton(scene)
             .AddSingleton(input)
@@ -65,8 +65,8 @@ public class SceneServiceInjectionTests
     [Fact]
     public void AddComponent_UsesTheNodeProviderRatherThanTheGlobalProvider()
     {
-        var first = NSubstitute.Substitute.For<IInputSource>();
-        var second = NSubstitute.Substitute.For<IInputSource>();
+        var first = Substitute.For<IInputSource>();
+        var second = Substitute.For<IInputSource>();
         using var firstProvider = new ServiceCollection().AddSingleton(first).BuildServiceProvider();
         using var secondProvider = new ServiceCollection().AddSingleton(second).BuildServiceProvider();
         var firstNode = new Node();

@@ -23,7 +23,8 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj" />
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Engine.UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>

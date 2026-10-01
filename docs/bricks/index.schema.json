@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Dedicated to the public domain under CC0 1.0.",
+  "title": "Brick registry index (v1/index.json)",
+  "type": "object",
+  "required": ["format", "bricks"],
+  "properties": {
+    "format": { "const": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "claims": {
+      "type": "object",
+      "additionalProperties": { "type": "object", "required": ["key"], "properties": { "key": { "type": "string" } } }
+    },
+    "bricks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["versions"],
+        "properties": {
+          "versions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["url", "integrity"],
+              "properties": {
+                "url": { "type": "string" },
+                "integrity": { "type": "string", "pattern": "^sha256-" },
+                "signature": { "type": "string" },
+                "signedBy": { "type": "string" },
+                "publisherSignature": { "type": "string" },
+                "publisherKey": { "type": "string" },
+                "publishedAt": { "type": "string", "format": "date-time" },
+                "dependencies": { "type": "object", "additionalProperties": { "type": "string" } },
+                "engines": { "type": "object", "additionalProperties": { "type": "string" } },
+                "store": { "$ref": "package.schema.json#/properties/store" },
+                "yanked": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

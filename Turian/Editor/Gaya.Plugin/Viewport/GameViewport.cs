@@ -29,7 +29,7 @@ sealed class GameViewport : IDisposable
     readonly HashSet<MouseButton> heldButtons = [];
 
     SceneViewerService? service;
-    UiManager? uiManager;
+    IUiPresenter? uiPresenter;
     Node? overlayRoot;
     CameraComponent? lastResizedCamera;
     string? failure;
@@ -111,6 +111,9 @@ sealed class GameViewport : IDisposable
         return (root, root is null ? null : CameraComponent.FindPrimary(root));
     }
 
+    /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
+    IUiPresenter? UiPresenter() => uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, playMode.Locale);
+
     /// <summary>Creates the renderer on the first frame and follows the node's size after that.</summary>
     bool EnsureService(uint width, uint height)
     {
@@ -119,11 +122,10 @@ sealed class GameViewport : IDisposable
             if (service is null)
             {
                 service = new SceneViewerService(vulkan, width, height);
-                uiManager = new UiManager(vulkan, playMode.Input, playMode.Locale);
                 service.OverlaySource = (w, h, dt) =>
-                    overlayRoot is null ? null : uiManager.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
+                    overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>
-                    overlayRoot is null ? [] : uiManager.RenderWorldPanels(overlayRoot, frameInfo);
+                    overlayRoot is null ? [] : UiPresenter()?.RenderWorldPanels(overlayRoot, frameInfo) ?? [];
             }
             else if (service.Width != width || service.Height != height)
             {
@@ -139,7 +141,7 @@ sealed class GameViewport : IDisposable
             return false;
         }
 
-        if (uiManager is { } manager) manager.Locale = playMode.Locale;
+        if (uiPresenter is { } presenter) presenter.Locale = playMode.Locale;
         if (pixels.Length != width * height * 4) pixels = new byte[width * height * 4];
         return true;
     }
@@ -274,8 +276,8 @@ sealed class GameViewport : IDisposable
         frame = null;
         service?.Dispose();
         service = null;
-        uiManager?.Dispose();
-        uiManager = null;
+        uiPresenter?.Dispose();
+        uiPresenter = null;
         overlayRoot = null;
     }
 }

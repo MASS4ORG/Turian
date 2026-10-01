@@ -15,7 +15,7 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/UI/Turian.Engine.UI.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -28,6 +28,7 @@
           <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2"/>
+        <PackageReference Include="SkiaSharp" Version="4.152.1"/>
         <PackageReference Include="Microsoft.NET.StringTools" Version="18.10.1" ExcludeAssets="runtime" PrivateAssets="all">
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -46,6 +47,16 @@
              Pulls in Ultz.Native.Assimp transitively for the native libassimp binaries. -->
         <PackageReference Include="Silk.NET.Assimp" Version="2.23.0"/>
         <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Packages/registry-mass4.pub" LogicalName="registry-mass4.pub"/>
+    </ItemGroup>
+
+    <!-- Where the built-in bricks live when run from a checkout (ProjectPackages.BuiltinDirectory); publishing ships them
+         from Turian/Packages/Bricks.targets. -->
+    <ItemGroup>
+        <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
     </ItemGroup>
 
 </Project>

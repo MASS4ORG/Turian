@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Asset metadata that points to a serialized <see cref="DataAsset"/> payload file.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000006")]
+[TypeId("aab4f92b-7216-52d8-b722-7399613c929c")]
 public class DataAssetAsset : Asset
 {
     readonly Lock contentGate = new();
@@ -83,7 +83,8 @@ public class DataAssetAsset : Asset
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
         using var reader = new StreamReader(provider.GetAssetStream());
-        return Serializer.LoadData<DataAsset>(reader.ReadToEnd());
+        return Serializer.LoadData<DataAsset>(
+            DataAssetVariants.Flatten(reader.ReadToEnd(), DataAssetVariants.ReadFromDatabase));
     }
 
     static void CopyFields(DataAsset source, DataAsset target)

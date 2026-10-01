@@ -1,0 +1,72 @@
+# Reusable workflow for repositories that author bricks (Turian packages) or build games from them.
+#
+#   jobs:
+#     brick:
+#       uses: MASS4ORG/Turian/.github/workflows/brick.yml@main
+#       with:
+#         brick-path: .          # a folder holding package.json, to verify and pack
+#         project-path: ''       # a game project, to restore its bricks from the lock file
+#
+# On a version tag the packed .brick and its .sha256 are attached to the GitHub release.
+name: Brick
+
+on:
+  workflow_call:
+    inputs:
+      brick-path:
+        description: Folder of the brick to verify and pack; empty skips packing
+        type: string
+        default: ""
+      project-path:
+        description: Folder of a game project whose bricks are restored with --locked; empty skips it
+        type: string
+        default: ""
+      turian-version:
+        description: Tag of the ghcr.io/mass4org/turian-cli image to run
+        type: string
+        default: latest
+
+permissions:
+  contents: write
+
+jobs:
+  brick:
+    runs-on: ubuntu-latest
+    container: ghcr.io/mass4org/turian-cli:${{ inputs.turian-version }}
+    env:
+      # The brick store is the CI cache: the same lock file always fills it with the same content.
+      GAYA_BRICKS: ${{ github.workspace }}/.gaya-bricks
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the brick store
+        uses: actions/cache@v4
+        with:
+          path: .gaya-bricks
+          key: bricks-${{ runner.os }}-${{ hashFiles('**/packages-lock.json') }}
+          restore-keys: bricks-${{ runner.os }}-
+
+      - name: Restore the project's bricks
+        if: inputs.project-path != ''
+        run: turian-cli brick restore --locked --project "${{ inputs.project-path }}"
+
+      - name: Verify the brick
+        if: inputs.brick-path != ''
+        run: turian-cli brick verify "${{ inputs.brick-path }}"
+
+      - name: Pack the brick
+        if: inputs.brick-path != ''
+        run: turian-cli brick pack "${{ inputs.brick-path }}" --out "${{ github.workspace }}/.bricks"
+
+      - name: Keep the packed brick
+        if: inputs.brick-path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: brick
+          path: .bricks/*
+
+      - name: Attach the brick to the release
+        if: inputs.brick-path != '' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .bricks/*

@@ -239,6 +239,43 @@ public class DrawerRegistryTests
         }
     }
 
+    sealed class NestedTarget
+    {
+        public NumericTarget Child { get; set; } = new();
+    }
+
+    /// <summary>Read-only ownership reaches nested fields so their custom editing drawers cannot run.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NestedFormsInheritReadOnlyState(bool readOnly)
+    {
+        var target = new NestedTarget();
+        var field = FormBuilder.Build(target, readOnly: readOnly).Sections[0].Fields.Single();
+        var custom = new TestPropertyDrawer();
+        PropertyDrawerRegistry.Register(typeof(int), custom);
+        try
+        {
+            using var surface = SKSurface.Create(new SKImageInfo(320, 120));
+            var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+            var font = Font.FromFamilyName("sans-serif", 14);
+            gui.SetStage(Pass.Pass1Build);
+            gui.BeginFrame(surface.Canvas, font, font);
+            FieldDrawers.DrawNested(gui, field, target.Child, "nested", null, new HashSet<string>());
+            gui.CalculateLayout();
+            gui.SetStage(Pass.Pass2Render);
+            FieldDrawers.DrawNested(gui, field, target.Child, "nested", null, new HashSet<string>());
+            gui.Render();
+            gui.EndFrame();
+            Assert.Equal(readOnly ? 0 : 2, custom.DrawCalls);
+            Assert.Equal(42, target.Child.Value);
+        }
+        finally
+        {
+            PropertyDrawerRegistry.Unregister(typeof(int));
+        }
+    }
+
     static byte[] RenderEditorOnly(FormField field)
     {
         using var surface = SKSurface.Create(new SKImageInfo(320, 120, SKColorType.Rgba8888, SKAlphaType.Unpremul));

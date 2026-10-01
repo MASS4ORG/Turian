@@ -17,11 +17,23 @@ public static class UserCodeTypeManifestGenerator
     /// <param name="assetsDirectory">The project's Assets folder.</param>
     /// <param name="logger">Receives parse and meta-file problems.</param>
     /// <param name="assemblyName">The user assembly the types compile into, recorded so a runtime can load it.</param>
-    public static UserCodeTypeManifest Generate(string assetsDirectory, ILogger logger, string? assemblyName = null)
+    /// <param name="graph">The project's assemblies; each type records the one other than the default it is in.</param>
+    public static UserCodeTypeManifest Generate(string assetsDirectory, ILogger logger, string? assemblyName = null,
+        AssemblyGraph? graph = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        var manifest = new UserCodeTypeManifest { AssemblyName = assemblyName };
+        var bricks = ProjectPackages.ResolveOrEmpty(Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)))
+            .Where(static brick => !brick.Manifest.CompileTimeOnly).ToList();
+        var manifest = new UserCodeTypeManifest
+        {
+            AssemblyName = assemblyName,
+            PrecastAssemblies = [.. bricks.Where(static brick => !brick.Manifest.EditorOnly)
+                .SelectMany(BrickAssemblies.RuntimeAssemblies)
+                .Select(Path.GetFileNameWithoutExtension)
+                .OfType<string>()],
+        };
+        manifest.Types.AddRange(bricks.SelectMany(BrickAssemblies.PrecastTypes));
 
         if (!Directory.Exists(assetsDirectory))
         {
@@ -29,7 +41,12 @@ public static class UserCodeTypeManifestGenerator
             return manifest;
         }
 
-        foreach (var csFilePath in Directory.EnumerateFiles(assetsDirectory, "*.cs", SearchOption.AllDirectories))
+        // Package scripts come after the project's; a package's meta paths are relative to the package root.
+        var scripts = Directory.EnumerateFiles(assetsDirectory, "*.cs", SearchOption.AllDirectories)
+            .Select(path => (Path: path, MetaRoot: Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)) ?? assetsDirectory))
+            .Concat((graph?.SourceRoots.Skip(1) ?? []).SelectMany(root => graph!.Scripts(root).Select(path => (Path: path, MetaRoot: root))));
+
+        foreach (var (csFilePath, metaRoot) in scripts)
         {
             var fqn = ExtractPrimaryClassFqn(csFilePath, logger);
             if (fqn is null)
@@ -38,12 +55,19 @@ public static class UserCodeTypeManifestGenerator
             var metaPath = csFilePath + ".meta";
             var typeId = File.Exists(metaPath)
                 ? ReadAssetId(metaPath, logger)
-                : CreateScriptMeta(csFilePath, assetsDirectory, logger);
+                : CreateScriptMeta(csFilePath, metaRoot, logger);
             if (typeId == Guid.Empty)
                 continue;
 
-            manifest.Types.Add(new UserCodeTypeEntry { FullyQualifiedName = fqn, TypeId = typeId });
-            logger.LogDebug("TypeManifest: {Fqn} → {TypeId}", fqn, typeId);
+            var owner = graph?.AssemblyFor(csFilePath);
+            manifest.Types.Add(new UserCodeTypeEntry
+            {
+                FullyQualifiedName = fqn,
+                TypeId = typeId,
+                Assembly = owner is { IsDefault: false } ? owner.Name : null,
+                EditorOnly = owner?.EditorOnly ?? false,
+            });
+            logger.LogDebug("TypeManifest: {Fqn} ({TypeId})", fqn, typeId);
         }
 
         logger.LogInformation("Type manifest generated: {Count} entry(ies)", manifest.Types.Count);
@@ -51,12 +75,34 @@ public static class UserCodeTypeManifestGenerator
     }
 
     /// <summary>
+    /// The component classes of the scripts under <paramref name="directory"/> that already have a <c>.cs.meta</c>:
+    /// fully qualified name and type id. Reads only; folders whose name ends in <c>~</c> are skipped.
+    /// </summary>
+    /// <param name="directory">The folder, such as a brick's.</param>
+    /// <param name="logger">Receives parse problems.</param>
+    /// <returns>One entry per script that declares a class.</returns>
+    public static IReadOnlyList<UserCodeTypeEntry> ScriptTypes(string directory, ILogger logger)
+    {
+        var entries = new List<UserCodeTypeEntry>();
+        foreach (var script in Directory.EnumerateFiles(directory, "*.cs", SearchOption.AllDirectories).Order(StringComparer.Ordinal)
+                     .Where(path => !Path.GetRelativePath(directory, path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                         .SkipLast(1).Any(static segment => segment.EndsWith('~'))))
+        {
+            var meta = $"{script}.meta";
+            if (!File.Exists(meta) || ExtractPrimaryClassFqn(script, logger) is not { } fqn) continue;
+            if (ReadAssetId(meta, logger) is { } id && id != Guid.Empty)
+                entries.Add(new UserCodeTypeEntry { FullyQualifiedName = fqn, TypeId = id });
+        }
+
+        return entries;
+    }
+
+    /// <summary>
     /// Writes the <c>.cs.meta</c> that gives a new script its TypeId. Scenes store components by that
     /// id, so without it a component declared in the script could not be saved.
     /// </summary>
-    static Guid CreateScriptMeta(string csFilePath, string assetsDirectory, ILogger logger)
+    static Guid CreateScriptMeta(string csFilePath, string projectDirectory, ILogger logger)
     {
-        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)) ?? assetsDirectory;
         var meta = new Asset
         {
             Id = Guid.NewGuid(),

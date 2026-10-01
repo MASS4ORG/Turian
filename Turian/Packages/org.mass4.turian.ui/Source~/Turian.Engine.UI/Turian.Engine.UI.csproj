@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <PackageId>MASS4.Turian.Engine.UI</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Guinevere" Version="5.*"/>
+    </ItemGroup>
+
+    <!-- Internal libraries -->
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+    </ItemGroup>
+
+    <!-- The brick ships these assemblies prebuilt in Precast~/lib; games and the editor load them from there. -->
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <PropertyGroup>
+            <PrecastDirectory>$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Precast~/lib</PrecastDirectory>
+        </PropertyGroup>
+        <!-- Guinevere comes from a checkout or a package, so it is taken from the references, wherever they resolved to. -->
+        <ItemGroup>
+            <PrecastFile Include="$(TargetPath)"/>
+            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'Guinevere.dll'"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(PrecastFile)" DestinationFolder="$(PrecastDirectory)"/>
+    </Target>
+
+</Project>

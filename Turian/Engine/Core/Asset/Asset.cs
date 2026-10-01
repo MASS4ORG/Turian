@@ -3,8 +3,8 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Represents an asset with a file path.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000003")]
-public class Asset : IdClass
+[TypeId("2af5e114-fb34-54c7-8f14-04aed6c7eb74")]
+public class Asset : IdObject
 {
     string relativePath = string.Empty;
 

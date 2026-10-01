@@ -24,6 +24,7 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton<IShellLocalization>(sp => sp.GetRequiredService<StudioLocalization>());
         context.Services.AddSingleton<LocaleService>();
         context.Services.AddSingleton(sp => new ProjectSession(sp, context.Logger));
+        context.Services.AddSingleton<IBrickApplier>(sp => sp.GetRequiredService<ProjectSession>());
 
         // The registries outlive Configure, so the bridge can keep republishing into them as the user
         // assembly is swapped by a recompile.
@@ -148,7 +149,9 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetTypeCatalog>(),
                 sp.GetRequiredService<AssetPreviewCatalog>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
-                sp.GetRequiredService<AssetFileOperations>())));
+                sp.GetRequiredService<AssetFileOperations>(),
+                sp.GetRequiredService<BricksController>(),
+                sp.GetRequiredService<ConfirmDialogChrome>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
@@ -174,6 +177,12 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<IShortcutService>(),
                 sp.GetRequiredService<ICommandCatalog>(),
                 sp.GetRequiredService<IPanelAccessor>()))
+        { OpenByDefault = false });
+
+        context.Panels.Register(new PanelDescriptor(
+            BricksPanelId, "Bricks", PanelPlacement.Center,
+            sp => new BricksPanel(sp.GetRequiredService<BricksController>(), sp.GetRequiredService<FileDialogChrome>(),
+                sp.GetRequiredService<NodeInspectorController>()))
         { OpenByDefault = false });
 
         // Both dialogs are registered on the menu bar only because that strip renders every frame;
@@ -213,6 +222,9 @@ public sealed class GayaPlugin : IPlugin
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
     public const string ShortcutsPanelId = "gaya.turian.shortcuts";
+
+    /// <summary>The Bricks panel's id, which the Project menu's entry brings to the front.</summary>
+    public const string BricksPanelId = "gaya.turian.bricks";
 
     /// <summary>The Inspector's id, which Project Settings brings to the front.</summary>
     public const string InspectorPanelId = "gaya.turian.inspector";

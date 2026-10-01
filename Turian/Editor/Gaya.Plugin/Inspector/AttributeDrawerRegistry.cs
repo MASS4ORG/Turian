@@ -1,5 +1,3 @@
-using System.Runtime.CompilerServices;
-
 namespace Gaya.Plugin.Turian;
 
 /// <summary>Maps metadata attributes to composable field decorators.</summary>

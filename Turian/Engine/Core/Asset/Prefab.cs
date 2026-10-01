@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Prefab Node
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000005")]
+[TypeId("e71c0802-b566-5959-8327-b8d29818e6c7")]
 public class Prefab : Asset
 {
 }

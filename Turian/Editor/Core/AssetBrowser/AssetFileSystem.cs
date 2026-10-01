@@ -373,24 +373,53 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
         else RenameAssetPreservingMetadata(src, dest);
     }
 
-    void DuplicateAssetWithNewMetadata(string src, string dest)
+    // The copy is the project's own: writable even when the source is a read-only brick file, with the source's
+    // import settings under a new asset id that is also rewritten inside the copy's own payload.
+    void DuplicateAssetWithNewMetadata(string src, string dest, List<(string Path, Guid Old, Guid New)>? copied = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
         File.Copy(src, dest, overwrite: false);
-        RebuildMetaFileWithNewGuid(dest);
+        File.SetAttributes(dest, FileAttributes.Normal);
+
+        if (!TryCloneMeta($"{src}.meta", dest, copied)) RebuildMetaFileWithNewGuid(dest);
     }
 
+    static bool TryCloneMeta(string sourceMeta, string dest, List<(string Path, Guid Old, Guid New)>? copied)
+    {
+        if (!File.Exists(sourceMeta)) return false;
+
+        var text = File.ReadAllText(sourceMeta);
+        if (!Guid.TryParse(JsonNode.Parse(text)?["Id"]?.GetValue<string>(), out var oldId)) return false;
+
+        var newId = Guid.NewGuid();
+        copied?.Add((dest, oldId, newId));
+        var destMeta = $"{dest}.meta";
+        File.WriteAllText(destMeta, text.Replace(oldId.ToString(), newId.ToString(), StringComparison.OrdinalIgnoreCase));
+        BrickAssetCopy.ReplaceId(dest, oldId, newId);
+        UpdateMetaRelativePath(destMeta, dest);
+        return true;
+    }
+
+    // Assets copied together point at each other's copies, so a copied prefab keeps using the copied material.
     void DuplicateDirectory(string src, string dest)
     {
+        var copied = new List<(string Path, Guid Old, Guid New)>();
+        DuplicateDirectory(src, dest, copied);
+
+        var ids = copied.Select(static c => (c.Old, c.New)).ToList();
+        foreach (var (path, _, _) in copied) BrickAssetCopy.ReplaceIds(path, ids);
+    }
+
+    void DuplicateDirectory(string src, string dest, List<(string Path, Guid Old, Guid New)> copied)
+    {
         Directory.CreateDirectory(dest);
-        foreach (var sub in Directory.GetDirectories(src))
-            DuplicateDirectory(sub, Path.Combine(dest, Path.GetFileName(sub)));
+        foreach (var sub in Directory.GetDirectories(src).Where(static d => !Path.GetFileName(d).EndsWith('~')))
+            DuplicateDirectory(sub, Path.Combine(dest, Path.GetFileName(sub)), copied);
         foreach (var file in Directory.GetFiles(src))
         {
             if (file.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) continue;
             var destFile = Path.Combine(dest, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: false);
-            RebuildMetaFileWithNewGuid(destFile);
+            DuplicateAssetWithNewMetadata(file, destFile, copied);
         }
     }
 

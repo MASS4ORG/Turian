@@ -1,4 +1,4 @@
-# Turian CLI: headless editor automation (compile, playmode, screenshot, pick, oap)
+# Turian CLI: headless editor automation (compile, playmode, screenshot, pick, oap, brick)
 # for gamedevs to build their Turian projects in their own CI/CD. Built with Podman.
 ARG DOTNET_VERSION=10.0
 

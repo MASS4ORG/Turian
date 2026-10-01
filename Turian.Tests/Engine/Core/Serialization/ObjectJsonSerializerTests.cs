@@ -8,19 +8,19 @@ namespace Turian.Tests;
 public class ObjectJsonSerializerTests
 {
     /// <summary>
-    /// Test subclass that derived from IdClass
+    /// Test subclass that derived from IdObject
     /// </summary>
-    [TypeId("a3000003-0000-4000-8000-000000000001")]
-    internal sealed class InnerTestClass : IdClass
+    [TypeId("ee655586-70ea-58b3-93c4-6888f7b0d97d")]
+    internal sealed class InnerTestClass : IdObject
     {
         public int InnerValue { get; set; } = 1;
     }
 
     /// <summary>
-    /// Test class that derived from IdClass
+    /// Test class that derived from IdObject
     /// </summary>
     [TypeId("a3000003-0000-4000-8000-000000000002")]
-    internal class TestClass : IdClass
+    internal class TestClass : IdObject
     {
 
         public int PublicProperty { get; set; } = 1;

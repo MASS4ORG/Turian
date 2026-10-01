@@ -5,7 +5,8 @@ public sealed partial class AssetDatabase
     static Dictionary<Guid, AssetRecord> BuildProjectAssetMap(
         string projectRoot,
         string assetsRoot,
-        bool recursive)
+        bool recursive,
+        IReadOnlyList<string> packageRoots)
     {
         var rebuiltAssets = new Dictionary<Guid, AssetRecord>();
         var cacheCatalogPath = GetProjectCatalogPath(projectRoot);
@@ -24,13 +25,25 @@ public sealed partial class AssetDatabase
 
         var importedAssetsRoot = Path.Combine(projectRoot, cacheDirectoryName, "Assets");
         var searchOption = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-        var metaFiles = Directory.GetFiles(assetsRoot, "*.meta", searchOption);
+        var metaFiles = Directory.GetFiles(assetsRoot, "*.meta", searchOption)
+            .Concat(packageRoots.Where(Directory.Exists).SelectMany(root =>
+                Directory.GetFiles(root, "*.meta", SearchOption.AllDirectories)
+                    .Where(meta => !IsInTildeFolder(meta, root))));
+        var metaOfAsset = new Dictionary<Guid, string>();
 
         foreach (var metaFilePath in metaFiles)
         {
             var record = TryBuildAssetRecord(projectRoot, importedAssetsRoot, metaFilePath, rebuiltAssets);
             if (record is null)
             {
+                continue;
+            }
+
+            // Two metas claiming one id would make references ambiguous; the first one found keeps it.
+            if (!metaOfAsset.TryAdd(record.AssetId, metaFilePath))
+            {
+                Log.Logger.LogError("Asset id {AssetId} is claimed by both {First} and {Second}; the second is ignored",
+                    record.AssetId, metaOfAsset[record.AssetId], metaFilePath);
                 continue;
             }
 

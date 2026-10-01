@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Base class for all components that can be attached to nodes in the scene graph.
 /// </summary>
-public abstract class Component : IdClass
+public abstract class Component : IdObject
 {
     /// <summary>Gets or sets a value indicating whether this component is active.</summary>
     [HideInEditor]

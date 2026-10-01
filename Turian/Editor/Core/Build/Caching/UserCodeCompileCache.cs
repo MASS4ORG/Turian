@@ -31,7 +31,9 @@ public sealed class UserCodeCompileCache(ILogger logger)
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyOutputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(csprojFilePath);
 
-        var sourceFiles = EnumerateSourceFiles(settings.AssetsAbsoluteDir);
+        var sourceFiles = EnumerateSourceFiles(settings.AssetsAbsoluteDir)
+            .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
+                .SelectMany(static package => EnumerateSourceFiles(package.RootPath)));
 
         var sourceEntries = sourceFiles
             .Select(path => CreateSourceEntry(settings.ProjectAbsoluteDir, path))
@@ -274,7 +276,8 @@ public sealed class UserCodeCompileCache(ILogger logger)
                     StringComparison.OrdinalIgnoreCase)
                 && !path.Contains(
                     $"{Path.AltDirectorySeparatorChar}.Cache{Path.AltDirectorySeparatorChar}",
-                    StringComparison.OrdinalIgnoreCase));
+                    StringComparison.OrdinalIgnoreCase))
+            .Concat(ProjectSettingsLoader.DataAssetSources(assetsAbsoluteDir).Where(AssemblyGraph.IsDefinitionFile));
     }
 
     static SourceFileCacheEntry CreateSourceEntry(string projectRootPath, string absolutePath)

@@ -10,6 +10,12 @@ public sealed class UserCodeTypeEntry
 
     /// <summary>Stable TypeId sourced from the companion .cs.meta AssetId.</summary>
     public Guid TypeId { get; init; }
+
+    /// <summary>The assembly the class compiles into; null for the manifest's <see cref="UserCodeTypeManifest.AssemblyName"/>.</summary>
+    public string? Assembly { get; init; }
+
+    /// <summary>Whether the class is in an editor-only assembly, which a game does not ship.</summary>
+    public bool EditorOnly { get; init; }
 }
 
 /// <summary>
@@ -33,6 +39,12 @@ public sealed class UserCodeTypeManifest
     /// <summary>Name of the user assembly, which a runtime loads before resolving <see cref="Types"/>.</summary>
     public string? AssemblyName { get; init; }
 
+    /// <summary>
+    /// The prebuilt assemblies of the installed bricks a game loads by name to register their types; an editor-only
+    /// brick's are left out.
+    /// </summary>
+    public List<string> PrecastAssemblies { get; init; } = [];
+
     /// <summary>Registered type entries.</summary>
     public List<UserCodeTypeEntry> Types { get; init; } = [];
 
@@ -53,11 +65,12 @@ public sealed class UserCodeTypeManifest
 
     /// <summary>
     /// Loads the manifest from disk and registers each entry into <see cref="TypeRegistry"/>.
-    /// Types not found in <paramref name="userAssembly"/> are skipped with a warning.
+    /// Types not found in <paramref name="userAssemblies"/> are skipped with a warning.
     /// </summary>
-    public static void RegisterFromManifest(string assemblyPath, ReflectionAssembly userAssembly, ILogger logger)
+    public static void RegisterFromManifest(string assemblyPath, IReadOnlyCollection<ReflectionAssembly> userAssemblies,
+        ILogger logger)
     {
-        ArgumentNullException.ThrowIfNull(userAssembly);
+        ArgumentNullException.ThrowIfNull(userAssemblies);
         ArgumentNullException.ThrowIfNull(logger);
 
         var path = ManifestPathFor(assemblyPath);
@@ -84,7 +97,8 @@ public sealed class UserCodeTypeManifest
         var registered = 0;
         foreach (var entry in manifest.Types)
         {
-            var type = userAssembly.GetType(entry.FullyQualifiedName);
+            var type = userAssemblies.Select(assembly => assembly.GetType(entry.FullyQualifiedName))
+                .FirstOrDefault(static candidate => candidate is not null);
             if (type is null)
             {
                 logger.LogWarning("User type '{Fqn}' not found in assembly; skipping registration", entry.FullyQualifiedName);

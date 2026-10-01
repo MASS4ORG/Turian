@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Represents a model asset, which can be used to load a 3D model from resolved asset content.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000008")]
+[TypeId("ddba9f04-28e9-58ba-8043-cde3e44bdbb1")]
 public class ModelAsset : Asset
 {
     // Keyed by (assetId, deviceHandle) so the same GUID is never loaded twice per Vulkan device.

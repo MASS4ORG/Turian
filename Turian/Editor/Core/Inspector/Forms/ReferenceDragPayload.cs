@@ -7,4 +7,6 @@ namespace Turian.Editor.Core;
 /// </summary>
 /// <param name="Id">The asset or node id.</param>
 /// <param name="Name">Display name, for the drag ghost and for logging.</param>
-public readonly record struct ReferenceDragPayload(Guid Id, string Name);
+/// <param name="AssetPath">The dragged file or folder, for drops that copy or move it; null for a scene row.</param>
+/// <param name="IsDirectory">Whether <paramref name="AssetPath"/> is a folder, which has no id of its own.</param>
+public readonly record struct ReferenceDragPayload(Guid Id, string Name, string? AssetPath = null, bool IsDirectory = false);

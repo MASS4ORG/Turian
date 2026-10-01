@@ -6,7 +6,7 @@ namespace Turian.Engine.Core;
 /// intact, while any other payload is decoded to RGBA8 first. The resulting <see cref="Texture"/>
 /// is cached per asset and device.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-00000000000b")]
+[TypeId("f12b8bbf-74b4-5af6-95a3-535c4fa6c16c")]
 public class TextureAsset : Asset
 {
     // Keyed by (assetId, deviceHandle) so one texture never uploads twice per device.

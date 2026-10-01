@@ -64,4 +64,35 @@ public sealed class UiImageResolverTests : IDisposable
         Assert.Null(resolver.Resolve("Assets/Textures/missing.png"));
         Assert.Null(resolver.Resolve("asset://not-a-guid"));
     }
+
+    /// <summary>A built game resolves both path and id references from the baked texture without source files.</summary>
+    [Fact]
+    public void Resolve_ImportedTextureWithoutSource_PreservesPixels()
+    {
+        TestAssetDatabase.Reset();
+        try
+        {
+            var database = new AssetDatabase();
+            var source = Path.Combine(dir, "Assets", "Textures", "button.png");
+            var texture = new TextureAsset { Id = Guid.NewGuid(), RelativePath = source };
+            var imported = Path.Combine(dir, "imported");
+            Directory.CreateDirectory(imported);
+            var artifact = new TextureAssetImporter().ImportToCache(texture, source, imported)[0];
+            Assert.True(database.RegisterAsset(texture, Path.Combine(imported, artifact)));
+            File.Delete(source);
+
+            var resolver = new UiImageResolver(database);
+            using var byId = resolver.Resolve($"asset://{texture.Id}");
+            Assert.NotNull(byId);
+            Assert.Equal(8, byId.Width);
+            using var bitmap = SKBitmap.FromImage(byId);
+            Assert.Equal(SKColors.Magenta, bitmap.GetPixel(0, 0));
+            using var byPath = resolver.Resolve("Assets/Textures/button.png");
+            Assert.NotNull(byPath);
+        }
+        finally
+        {
+            TestAssetDatabase.Reset();
+        }
+    }
 }

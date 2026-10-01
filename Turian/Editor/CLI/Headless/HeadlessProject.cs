@@ -30,9 +30,9 @@ sealed class HeadlessProject : IDisposable
         this.logger = logger;
         Settings = settings;
 
-        // Engine.UI loads lazily; register its [TypeId] components (UiDocumentComponent, …) before
-        // any scene deserialises so they don't fall back to MissingComponent.
-        TypeRegistry.ScanAssembly(typeof(UiDocumentComponent).Assembly);
+        // The bricks' [TypeId] types must be registered before any scene deserialises, or their components
+        // fall back to MissingComponent.
+        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), logger);
 
         // --reimport builds a database before this runs, and AssetDatabase is a throw-on-second-
         // construction singleton, so reuse that instance rather than making the two options

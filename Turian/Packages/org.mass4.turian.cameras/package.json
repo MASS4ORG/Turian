@@ -1,0 +1,15 @@
+{
+  "name": "org.mass4.turian.cameras",
+  "version": "1.0.0",
+  "displayName": "Camera Rigs",
+  "description": "Follow, orbit, free-fly and first-person camera components.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "dependencies": {},
+  "categories": [
+    "turian:gameplay"
+  ],
+  "keywords": [
+    "camera"
+  ]
+}

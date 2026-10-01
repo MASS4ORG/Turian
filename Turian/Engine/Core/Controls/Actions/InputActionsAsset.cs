@@ -6,7 +6,7 @@ namespace Turian.Engine.Core;
 /// and handed to <see cref="InputActionService"/> at startup.
 /// </summary>
 [CreateAssetMenu(fileName: "InputActions", path: "Input/Input Actions")]
-[TypeId("a3000003-0000-4000-8000-000000000001")]
+[TypeId("ee655586-70ea-58b3-93c4-6888f7b0d97d")]
 public class InputActionsAsset : DataAsset
 {
     /// <summary>The maps this asset defines.</summary>

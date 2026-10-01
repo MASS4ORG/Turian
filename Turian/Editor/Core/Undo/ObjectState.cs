@@ -13,7 +13,7 @@ public sealed class ObjectState
     static readonly ConcurrentDictionary<Type, MemberInfo[]> MembersByType = new();
 
     // Written by the structure, not by a member edit.
-    static readonly string[] StructuralMembers = [nameof(IdClass.Id), nameof(Node.Children), nameof(Node.Components)];
+    static readonly string[] StructuralMembers = [nameof(IdObject.Id), nameof(Node.Children), nameof(Node.Components)];
 
     readonly (MemberInfo Member, Type Type, string Json, object? Reference)[] values;
     readonly Node[]? children;
@@ -29,7 +29,7 @@ public sealed class ObjectState
     /// <summary>Takes the current state of <paramref name="target"/>.</summary>
     /// <param name="target">A node or a component.</param>
     /// <returns>The snapshot.</returns>
-    public static ObjectState Capture(IdClass target)
+    public static ObjectState Capture(IdObject target)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -57,7 +57,7 @@ public sealed class ObjectState
     /// <param name="targetType">The replacement's type, which may come from a reloaded assembly.</param>
     /// <param name="map">Returns the replacement of an object from before the rebuild.</param>
     /// <returns>The remapped state.</returns>
-    public ObjectState Remap(Type targetType, Func<IdClass, IdClass> map)
+    public ObjectState Remap(Type targetType, Func<IdObject, IdObject> map)
     {
         ArgumentNullException.ThrowIfNull(targetType);
         ArgumentNullException.ThrowIfNull(map);
@@ -84,19 +84,19 @@ public sealed class ObjectState
             components?.Select(component => (Component)map(component)).ToArray());
     }
 
-    static object? MapReferences(object? value, Type type, Func<IdClass, IdClass> map)
+    static object? MapReferences(object? value, Type type, Func<IdObject, IdObject> map)
     {
         switch (value)
         {
-            case IdClass obj:
+            case IdObject obj:
                 return map(obj);
             case IEnumerable items when type.IsArray:
-                var mapped = items.Cast<object?>().Select(item => item is IdClass obj ? map(obj) : item).ToArray();
+                var mapped = items.Cast<object?>().Select(item => item is IdObject obj ? map(obj) : item).ToArray();
                 var array = Array.CreateInstance(type.GetElementType()!, mapped.Length);
                 for (var i = 0; i < mapped.Length; i++) array.SetValue(mapped[i], i);
                 return array;
             case IEnumerable items when Activator.CreateInstance(type) is IList list:
-                foreach (var item in items) list.Add(item is IdClass obj ? map(obj) : item);
+                foreach (var item in items) list.Add(item is IdObject obj ? map(obj) : item);
                 return list;
             default:
                 return value;
@@ -119,7 +119,7 @@ public sealed class ObjectState
 
     /// <summary>Puts this snapshot's values and structure back on <paramref name="target"/>.</summary>
     /// <param name="target">The object the snapshot was taken of.</param>
-    public void Restore(IdClass target)
+    public void Restore(IdObject target)
     {
         ArgumentNullException.ThrowIfNull(target);
 
@@ -200,7 +200,7 @@ public sealed class ObjectState
     static string ReferenceKey(object? value) => value switch
     {
         null => "null",
-        IdClass obj => $"{RuntimeHelpers.GetHashCode(obj)}:{obj.Id}",
+        IdObject obj => $"{RuntimeHelpers.GetHashCode(obj)}:{obj.Id}",
         IEnumerable items => string.Join(',', items.Cast<object?>().Select(ReferenceKey)),
         _ => RuntimeHelpers.GetHashCode(value).ToString(CultureInfo.InvariantCulture),
     };

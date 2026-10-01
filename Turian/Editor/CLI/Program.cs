@@ -33,6 +33,9 @@ public static partial class Program
             ScreenshotCommand(projectArg),
             PickCommand(projectArg),
             OapCommand(projectArg),
+            BrickCommand(),
+            VariantCommand(),
+            ImportCommand(),
             UiCommand()
         };
 

@@ -11,8 +11,8 @@ namespace Turian.Editor.Core;
 public sealed record UndoStep(
     string Label,
     Guid Document,
-    IReadOnlyDictionary<IdClass, ObjectState> Before,
-    IReadOnlyDictionary<IdClass, ObjectState> After)
+    IReadOnlyDictionary<IdObject, ObjectState> Before,
+    IReadOnlyDictionary<IdObject, ObjectState> After)
 {
     /// <summary>Identifies the step, and stays the same when later changes merge into it.</summary>
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -32,8 +32,8 @@ public sealed record UndoStep(
     {
         ArgumentNullException.ThrowIfNull(next);
 
-        var before = new Dictionary<IdClass, ObjectState>(Before, ReferenceEqualityComparer.Instance);
-        var after = new Dictionary<IdClass, ObjectState>(After, ReferenceEqualityComparer.Instance);
+        var before = new Dictionary<IdObject, ObjectState>(Before, ReferenceEqualityComparer.Instance);
+        var after = new Dictionary<IdObject, ObjectState>(After, ReferenceEqualityComparer.Instance);
         foreach (var (target, state) in next.Before) before.TryAdd(target, state);
         foreach (var (target, state) in next.After) after[target] = state;
         return this with { Before = before, After = after, LastChanged = next.LastChanged };
@@ -48,16 +48,16 @@ public sealed record UndoStep(
     /// <summary>The step with its objects swapped for their replacements after a rebuild.</summary>
     /// <param name="map">Returns the replacement of an object from before the rebuild.</param>
     /// <returns>The remapped step.</returns>
-    public UndoStep Remap(Func<IdClass, IdClass> map) => this with
+    public UndoStep Remap(Func<IdObject, IdObject> map) => this with
     {
         Before = RemapStates(Before, map),
         After = RemapStates(After, map),
     };
 
-    static Dictionary<IdClass, ObjectState> RemapStates(IReadOnlyDictionary<IdClass, ObjectState> states,
-        Func<IdClass, IdClass> map)
+    static Dictionary<IdObject, ObjectState> RemapStates(IReadOnlyDictionary<IdObject, ObjectState> states,
+        Func<IdObject, IdObject> map)
     {
-        var remapped = new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance);
+        var remapped = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
         foreach (var (target, state) in states)
         {
             var replacement = map(target);
@@ -199,7 +199,7 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
     /// <summary>Swaps a document's objects for their replacements after its scene was rebuilt.</summary>
     /// <param name="document">The rebuilt scene's asset id.</param>
     /// <param name="map">Returns the replacement of an object from before the rebuild.</param>
-    public void Remap(Guid document, Func<IdClass, IdClass> map)
+    public void Remap(Guid document, Func<IdObject, IdObject> map)
     {
         ArgumentNullException.ThrowIfNull(map);
 

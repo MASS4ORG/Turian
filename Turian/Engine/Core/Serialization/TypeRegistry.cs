@@ -104,6 +104,7 @@ public static class TypeRegistry
             throw new ArgumentException("TypeId cannot be Guid.Empty.", nameof(id));
         }
 
+        id = CanonicalId(id);
         IdToType[id] = type;
         TypeToId[type] = id;
     }
@@ -113,6 +114,7 @@ public static class TypeRegistry
     /// </summary>
     public static bool TryGetType(Guid id, out Type? type)
     {
+        id = CanonicalId(id);
         if (IdToType.TryGetValue(id, out type))
         {
             return true;
@@ -123,6 +125,9 @@ public static class TypeRegistry
         ScanLoadedAssemblies();
         return IdToType.TryGetValue(id, out type);
     }
+
+    /// <summary>Resolves built-in legacy type identifiers to the identifiers written by current serializers.</summary>
+    public static Guid CanonicalId(Guid id) => BuiltInTypeIds.Aliases.GetValueOrDefault(id, id);
 
     /// <summary>
     /// Tries to look up a registered <see cref="System.Type"/> by its full name, the form asset catalogs
@@ -219,18 +224,15 @@ public static class TypeRegistry
         using var doc = ReadManifest(manifestPath, logger);
         if (doc is null || !doc.RootElement.TryGetProperty("Types", out var typesArray)) return;
 
-        // In play/export mode the user-code assembly is a project reference and loads lazily;
-        // without this, GetAssemblies() won't include it and all FQN lookups silently fail.
-        if (Path.GetDirectoryName(manifestPath) is { } manifestDir) LoadAssembliesIn(manifestDir);
-
         // A single-file game bundles the user assembly, so there is no DLL above to load; it is
         // loaded by name instead.
-        if (doc.RootElement.TryGetProperty("AssemblyName", out var assemblyNameProp)
-            && assemblyNameProp.GetString() is { Length: > 0 } assemblyName)
+        var assemblyName = ReadString(doc.RootElement, "AssemblyName");
+        if (assemblyName is { Length: > 0 })
             LoadAssemblyByName(assemblyName, logger);
 
         var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-        var registered = typesArray.EnumerateArray().Count(entry => RegisterManifestEntry(entry, allAssemblies, logger));
+        var registered = typesArray.EnumerateArray().Count(entry =>
+            RegisterManifestEntry(entry, allAssemblies, logger, assemblyName));
 
         logger.LogInformation("Registered {Count}/{Total} user type(s) from manifest", registered,
             typesArray.GetArrayLength());
@@ -256,21 +258,6 @@ public static class TypeRegistry
         }
     }
 
-    static void LoadAssembliesIn(string directory)
-    {
-        var loadedLocations = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic)
-            .Select(a => a.Location)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var dll in Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly))
-        {
-            if (loadedLocations.Contains(dll)) continue;
-            try { Assembly.LoadFrom(dll); }
-            catch { /* ignore non-managed or already-loaded DLLs */ }
-        }
-    }
-
     static void LoadAssemblyByName(string assemblyName, ILogger logger)
     {
         try { Assembly.Load(new AssemblyName(assemblyName)); }
@@ -280,20 +267,42 @@ public static class TypeRegistry
         }
     }
 
-    static bool RegisterManifestEntry(JsonElement entry, Assembly[] assemblies, ILogger logger)
+    static bool RegisterManifestEntry(JsonElement entry, Assembly[] assemblies, ILogger logger, string? defaultAssembly)
     {
         var fqn = ReadString(entry, "FullyQualifiedName");
         if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId)) return false;
 
-        if (assemblies.Select(asm => asm.GetType(fqn)).FirstOrDefault(candidate => candidate is not null) is not { } type)
+        // A game ships without its editor-only assemblies.
+        if (entry.TryGetProperty("EditorOnly", out var editorOnly) && editorOnly.ValueKind == JsonValueKind.True)
+            return false;
+
+        var declaredAssembly = ReadString(entry, "Assembly") ?? defaultAssembly;
+        var type = ResolveManifestType(fqn, declaredAssembly, assemblies, logger);
+        if (type is null)
         {
-            logger.LogWarning("User type '{Fqn}' not found in any loaded assembly; skipping", fqn);
+            logger.LogWarning("User type '{Fqn}' not found in its declared assembly; skipping", fqn);
             return false;
         }
 
         Register(typeId, type);
         logger.LogDebug("TypeRegistry: {Fqn} → {TypeId}", fqn, typeId);
         return true;
+    }
+
+    static Type? ResolveManifestType(string fqn, string? declaredAssembly, Assembly[] assemblies, ILogger logger)
+    {
+        // A single-file game loads a referenced user assembly only on first use, so load it by name.
+        if (declaredAssembly is { Length: > 0 } assemblyName
+            && assemblies.All(asm => asm.GetName().Name != assemblyName))
+        {
+            LoadAssemblyByName(assemblyName, logger);
+            assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        }
+
+        var candidates = string.IsNullOrEmpty(declaredAssembly)
+            ? assemblies
+            : assemblies.Where(asm => asm.GetName().Name == declaredAssembly);
+        return candidates.Select(asm => asm.GetType(fqn)).FirstOrDefault(candidate => candidate is not null);
     }
 
     static string? ReadString(JsonElement entry, string property) =>

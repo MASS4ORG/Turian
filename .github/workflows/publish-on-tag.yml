@@ -25,7 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - os: ubuntu-latest
             rid: win-x64
           - os: ubuntu-latest
             rid: linux-x64
@@ -41,34 +41,12 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # makensis builds the Windows installer on Linux, so every release asset except macOS is built here.
       - name: Install NSIS
         if: matrix.rid == 'win-x64'
-        shell: pwsh
-        run: |
-          choco install nsis --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey failed to install NSIS.' }
-          $nsisDir = @(
-            (Join-Path ${env:ProgramFiles(x86)} 'NSIS'),
-            (Join-Path $env:ProgramFiles 'NSIS')
-          ) | Where-Object { Test-Path (Join-Path $_ 'makensis.exe') } | Select-Object -First 1
-          if (-not $nsisDir) { throw 'NSIS was installed, but makensis.exe was not found.' }
-          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
-
-      - name: Pack win-x64
-        if: matrix.rid == 'win-x64'
-        shell: pwsh
-        run: |
-          .\build.ps1 Pack DebianPackage `
-            --configuration "Release" `
-            --runtime-identifier "${{ matrix.rid }}" `
-            --skip-shaders `
-            --publish-self-contained "$env:PUBLISH_SELF_CONTAINED" `
-            --publish-single-file "$env:PUBLISH_SINGLE_FILE" `
-            --publish-trimmed "$env:PUBLISH_TRIMMED" `
-            --verbosity minimal
+        run: sudo apt-get update -yqq && sudo apt-get install -yqq nsis
 
       - name: Pack ${{ matrix.rid }}
-        if: matrix.rid != 'win-x64'
         shell: bash
         run: |
           chmod +x ./build.sh

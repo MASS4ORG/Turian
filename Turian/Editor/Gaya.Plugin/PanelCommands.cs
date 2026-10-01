@@ -61,6 +61,18 @@ static class PanelCommands
             services => Panel<AssetBrowserPanel>(services, panelId)?.DuplicateSelected(),
             services => Panel<AssetBrowserPanel>(services, panelId)?.HasSelection ?? false)
         { MenuLabel = "Duplicate" }, KeyModifiers.Ctrl);
+
+        Add(context, panelId, KeyboardKey.C, new CommandDescriptor(
+            "gaya.turian.assets.copyPath", "Assets: Copy Path",
+            services => Panel<AssetBrowserPanel>(services, panelId)?.CopySelectedPath(relative: false),
+            services => Panel<AssetBrowserPanel>(services, panelId)?.HasSelection ?? false)
+        { MenuLabel = "Copy Path" }, KeyModifiers.Ctrl | KeyModifiers.Alt);
+
+        Add(context, panelId, KeyboardKey.C, new CommandDescriptor(
+            "gaya.turian.assets.copyRelativePath", "Assets: Copy Relative Path",
+            services => Panel<AssetBrowserPanel>(services, panelId)?.CopySelectedPath(relative: true),
+            services => Panel<AssetBrowserPanel>(services, panelId)?.HasSelection ?? false)
+        { MenuLabel = "Copy Relative Path" }, KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift);
     }
 
     /// <summary>

@@ -27,6 +27,27 @@ public class ProjectSettingsFilesTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>Brick settings load before DataAssets, exclude user overrides and follow project changes.</summary>
+    [Fact]
+    public void BrickSettingsFollowTheOwningProject()
+    {
+        var manifest = new ProjectManifest { Dependencies = { ["user.mateo.rules"] = "^1.0.0" } };
+        manifest.Save(root);
+        File.WriteAllText(Path.Combine(root, "Bricks", "manifest.user.json"),
+            """{"dependencies":{"user.mateo.rules":"file:../local"}}""");
+        var app = new AppSettings { ProjectAbsoluteDir = root };
+        var build = new BuildAppSettings { ProjectAbsoluteDir = root };
+        Assert.Equal("^1.0.0", app.Bricks.Dependencies["user.mateo.rules"]);
+        Assert.Same(app.Bricks, app.Bricks);
+        Assert.Equal(app.Bricks.Dependencies, build.Bricks.Dependencies);
+        app.Bricks.Dependencies["user.mateo.rules"] = "^2.0.0";
+        app.Bricks.Save();
+        Assert.Equal("^2.0.0", ProjectManifest.Load(root, includeUserOverride: false).Manifest.Dependencies["user.mateo.rules"]);
+        app.ProjectAbsoluteDir = "";
+        Assert.Empty(app.Bricks.Dependencies);
+        Assert.Throws<ArgumentException>(() => app.Bricks.Save());
+    }
+
     void WriteLegacyProject() => File.WriteAllText(legacyPath, $$"""
         {
           "__TypeId": "a3000000-0000-4000-8000-000000000009",

@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Progress and cancellation channel handed to a long-running editor operation. It lets the
 /// operation describe its shape — nested phases, item counters — without referencing the registry
-/// that renders it. <see cref="NullProgressSink.instance"/> is the no-op default, so an operation
+/// that renders it. <see cref="NullProgressSink.Instance"/> is the no-op default, so an operation
 /// runs unobserved when nobody is watching.
 /// </summary>
 public interface IProgressSink
@@ -56,7 +56,7 @@ public interface IProgressScope : IProgressSink, IDisposable
 public sealed class NullProgressSink : IProgressScope
 {
     /// <summary>The shared no-op instance.</summary>
-    public static readonly NullProgressSink instance = new();
+    public static readonly NullProgressSink Instance = new();
 
     NullProgressSink()
     {
@@ -81,7 +81,7 @@ public sealed class NullProgressSink : IProgressScope
     }
 
     /// <inheritdoc />
-    public IProgressScope BeginChild(BackgroundTaskKind kind, string label, float weight = 1) => instance;
+    public IProgressScope BeginChild(BackgroundTaskKind kind, string label, float weight = 1) => Instance;
 
     /// <inheritdoc />
     public void Finish(bool ok)

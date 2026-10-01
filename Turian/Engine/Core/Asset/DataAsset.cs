@@ -9,8 +9,8 @@ public delegate void DataAssetChangedHandler(DataAsset asset, string member);
 /// Represents the serialized payload stored inside a data-asset file.
 /// The payload is shared by the asset loader and can be copied with Instantiate.
 /// </summary>
-[TypeId("a3000000-0000-4000-8000-000000000004")]
-public class DataAsset : IdClass
+[TypeId("2072d8c2-86ad-52b9-9f91-42695ff0800d")]
+public class DataAsset : IdObject
 {
     /// <summary>
     /// Raised when a member changes: by an <see cref="ObservableAttribute"/> property, a call to
@@ -34,7 +34,8 @@ public class DataAsset : IdClass
     {
         if (File.Exists(absolutePath))
         {
-            return Serializer.Load<DataAsset>(absolutePath);
+            return Serializer.LoadData<DataAsset>(
+                DataAssetVariants.Flatten(File.ReadAllText(absolutePath), DataAssetVariants.ReadFromDatabase));
         }
 
         throw new FileNotFoundException($"DataAsset load failed {absolutePath}");

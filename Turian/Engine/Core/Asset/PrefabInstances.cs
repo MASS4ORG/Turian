@@ -15,14 +15,14 @@ public static class PrefabInstances
     const string instanceMember = nameof(Node.PrefabInstance);
     const string childrenMember = nameof(Node.Children);
     const string componentsMember = nameof(Node.Components);
-    const string idMember = nameof(IdClass.Id);
+    const string idMember = nameof(IdObject.Id);
     const string sourceMember = nameof(PrefabInstance.Source);
 
     // An instance root keeps its own name, activation and placement; they are never overrides.
     static readonly string[] RootMembers = [nameof(Node.Name), nameof(Node.IsActive), nameof(Node.Transform)];
 
     static readonly string[] StructuralMembers =
-        [ObjectJsonSerializer<IdClass>.TypeIdProperty, idMember, childrenMember, componentsMember, instanceMember];
+        [ObjectJsonSerializer<IdObject>.TypeIdProperty, idMember, childrenMember, componentsMember, instanceMember];
 
     static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
@@ -239,7 +239,7 @@ public static class PrefabInstances
     public static string CreateInstanceJson(Guid prefabId, Guid instanceId) =>
         new JsonObject
         {
-            [ObjectJsonSerializer<IdClass>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
+            [ObjectJsonSerializer<IdObject>.TypeIdProperty] = TypeRegistry.GetIdOrThrow(typeof(Node)).ToString(),
             [idMember] = instanceId.ToString(),
             [instanceMember] = new JsonObject { [sourceMember] = SourceReference(prefabId) },
         }.ToJsonString();
@@ -434,7 +434,7 @@ public static class PrefabInstances
         foreach (var (member, value) in actual)
         {
             if (member == instanceMember) compact[member] = compactLink;
-            else if (member is ObjectJsonSerializer<IdClass>.TypeIdProperty or idMember || RootMembers.Contains(member))
+            else if (member is ObjectJsonSerializer<IdObject>.TypeIdProperty or idMember || RootMembers.Contains(member))
                 compact[member] = value?.DeepClone();
         }
 

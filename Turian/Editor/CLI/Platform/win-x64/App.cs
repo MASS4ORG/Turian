@@ -1,5 +1,3 @@
-using Silk.NET.Maths;
-
 namespace Turian;
 
 /// <summary>
@@ -19,7 +17,7 @@ public class App : IDisposable
     readonly string cacheRootDirectory;
     readonly string runtimeContentDirectory;
     Node? nodeMain;
-    UiManager? uiManager;
+    IUiPresenter? uiPresenter;
     SceneManager sceneManager = null!;
     SceneTicker sceneTicker = null!;
     SilkInputSource inputSource = null!;
@@ -83,7 +81,6 @@ public class App : IDisposable
         actions = new InputActionService(inputSource);
         sceneTicker = new SceneTicker(sceneManager) { InputSource = inputSource, Actions = actions };
         locale = new LocaleService();
-        uiManager = new UiManager(vulkan, inputSource, locale);
 
         var services = new ServiceCollection()
             .AddSingleton(vulkan)
@@ -99,6 +96,7 @@ public class App : IDisposable
         CreateAssetDatabase();
 
         RegisterUserCodeTypes();
+        uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
 
         LoadStartupScene();
         SetWindowIcon();
@@ -193,11 +191,9 @@ public class App : IDisposable
 
     void RegisterUserCodeTypes()
     {
-        // Engine.UI loads lazily; register its [TypeId] types (UiDocumentComponent, UiDocumentAsset,
-        // …) before the startup scene and asset catalog deserialise.
-        TypeRegistry.ScanAssembly(typeof(UiDocumentComponent).Assembly);
-
+        // The bricks' [TypeId] types register before the startup scene and asset catalog deserialise.
         var manifestPath = Path.Combine(AppContext.BaseDirectory, "usercode.typeids.json");
+        PrecastAssemblies.Load(manifestPath, logger);
         TypeRegistry.RegisterFromManifest(manifestPath, logger);
     }
 
@@ -248,9 +244,9 @@ public class App : IDisposable
 
         var uiRoot = nodeMain ?? sceneManager.ActiveScene?.RootNode ?? sceneManager.PersistentRoot;
         var fb = windowManager.Window.FramebufferSize;
-        if (fb is { X: > 0, Y: > 0 })
+        if (uiPresenter is not null && fb is { X: > 0, Y: > 0 })
         {
-            rendererManager.OverlayTexture = uiManager!.TryRenderOverlay(uiRoot, fb.X, fb.Y, (float)deltaTime);
+            rendererManager.OverlayTexture = uiPresenter.TryRenderOverlay(uiRoot, fb.X, fb.Y, (float)deltaTime);
         }
 
         var allRoots = sceneManager.LoadedScenes
@@ -290,7 +286,7 @@ public class App : IDisposable
     /// </summary>
     public void Dispose()
     {
-        uiManager?.Dispose();
+        uiPresenter?.Dispose();
         windowManager.Dispose();
         rendererManager.Dispose();
         inputSource.Dispose();

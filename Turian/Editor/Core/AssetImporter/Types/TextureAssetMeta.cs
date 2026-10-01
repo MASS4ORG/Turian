@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Base metadata contract for texture assets.
 /// </summary>
-[TypeId("a3000002-0000-4000-8000-000000000002")]
+[TypeId("ea57af64-61c4-5007-89f2-2dd02475979b")]
 [PublicAPI]
 public class TextureAssetMeta : Asset
 {

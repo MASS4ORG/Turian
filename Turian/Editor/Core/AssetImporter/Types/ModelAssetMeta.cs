@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Base metadata contract for model assets.
 /// </summary>
-[TypeId("a3000002-0000-4000-8000-000000000004")]
+[TypeId("fb70814a-9e82-546d-911f-7a0ec6056780")]
 [PublicAPI]
 public class ModelAssetMeta : ModelAsset
 {

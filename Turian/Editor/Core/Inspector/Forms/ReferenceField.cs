@@ -55,7 +55,7 @@ public sealed class ReferenceField
         null when IsDirect => PendingId(),
         null => Guid.Empty,
         Component component when IsDirect => component.Node?.Id ?? component.Id,
-        IdClass value when IsDirect => value.Id,
+        IdObject value when IsDirect => value.Id,
         var value => IdOf(value),
     };
 
@@ -126,7 +126,7 @@ public sealed class ReferenceField
     public bool SetTarget(object? target)
     {
         if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
-        if (source.Target is IdClass owner)
+        if (source.Target is IdObject owner)
         {
             if (source.CollectionMember is { } list) ObjectReferences.Forget(owner, list, source.CollectionIndex);
             else ObjectReferences.Forget(owner, source.Name);
@@ -138,7 +138,7 @@ public sealed class ReferenceField
     /// <summary>The id read from data for a direct reference whose target is not loaded, or empty.</summary>
     Guid PendingId()
     {
-        if (source.Target is not IdClass owner) return Guid.Empty;
+        if (source.Target is not IdObject owner) return Guid.Empty;
 
         var member = source.CollectionMember ?? source.Name;
         var index = source.CollectionMember is null ? 0 : source.CollectionIndex;

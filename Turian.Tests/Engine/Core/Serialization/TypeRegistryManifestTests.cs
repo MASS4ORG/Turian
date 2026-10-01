@@ -3,7 +3,7 @@ namespace Turian.Tests;
 /// <summary>Tests registering user types from the compiled type manifest.</summary>
 public sealed class TypeRegistryManifestTests : IDisposable
 {
-    sealed class ManifestTarget : IdClass;
+    sealed class ManifestTarget : IdObject;
 
     readonly string directory = Directory.CreateTempSubdirectory("turian-manifest-").FullName;
 
@@ -23,7 +23,8 @@ public sealed class TypeRegistryManifestTests : IDisposable
             {
               "AssemblyName": "Turian.Missing.UserCode",
               "Types": [
-                { "FullyQualifiedName": "{{typeof(ManifestTarget).FullName}}", "TypeId": "{{id}}" },
+                { "FullyQualifiedName": "{{typeof(ManifestTarget).FullName}}", "TypeId": "{{id}}",
+                  "Assembly": "{{typeof(ManifestTarget).Assembly.GetName().Name}}" },
                 { "FullyQualifiedName": "Nowhere.Unknown", "TypeId": "{{unknownId}}" },
                 { "FullyQualifiedName": "Nowhere.BadId", "TypeId": "not-a-guid" },
                 { "TypeId": "{{Guid.NewGuid()}}" }
@@ -51,5 +52,38 @@ public sealed class TypeRegistryManifestTests : IDisposable
         TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance);
 
         Assert.Equal(count, TypeRegistry.Count);
+    }
+
+    /// <summary>Identical type names in old and current assemblies resolve through the declared assembly.</summary>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void DeclaredAssemblyControlsTypeResolution(bool missingAssembly, bool defaultAssembly)
+    {
+        const string name = "Example.DuplicateComponent";
+        var stale = DefineType("Stale");
+        var current = DefineType("Current");
+        var id = Guid.NewGuid();
+        var assemblyName = missingAssembly ? "Missing.Example" : current.Assembly.GetName().Name;
+        var entry = new JsonObject { ["FullyQualifiedName"] = name, ["TypeId"] = id.ToString() };
+        var manifest = new JsonObject { ["Types"] = new JsonArray(entry) };
+        if (defaultAssembly) manifest["AssemblyName"] = assemblyName;
+        else entry["Assembly"] = assemblyName;
+        File.WriteAllText(Manifest, manifest.ToJsonString());
+
+        TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance);
+
+        Assert.NotEqual(stale, current);
+        Assert.Equal(!missingAssembly, TypeRegistry.TryGetType(id, out var resolved));
+        Assert.Equal(missingAssembly ? null : current, resolved);
+
+        static Type DefineType(string prefix)
+        {
+            var assembly = System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName($"{prefix}.{Guid.NewGuid():N}"),
+                System.Reflection.Emit.AssemblyBuilderAccess.Run);
+            return assembly.DefineDynamicModule("Main").DefineType(name).CreateType()!;
+        }
     }
 }

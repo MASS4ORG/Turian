@@ -67,7 +67,10 @@ public sealed class UserMenuCatalog
         var previous = commands.Count;
         commands.Clear();
 
-        if (assembly is not null) commands.AddRange(Scan(assembly, log));
+        if (assembly is not null)
+        {
+            foreach (var userAssembly in buildManager.ActiveUserAssemblies) commands.AddRange(Scan(userAssembly, log));
+        }
 
         log.LogDebug("User menu: {Count} item(s) from {Assembly}", commands.Count,
             assembly?.GetName().Name ?? "no user assembly");

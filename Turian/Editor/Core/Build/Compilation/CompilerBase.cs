@@ -24,6 +24,18 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(generateCsProjFile);
 
+        var csprojFilePaths = await SetupAsync(() => [generateCsProjFile()]).ConfigureAwait(false);
+        return csprojFilePaths[^1];
+    }
+
+    /// <summary>
+    /// Like <see cref="SetupAsync(Func{string})"/> for several generated projects, each restored when its own
+    /// inputs changed.
+    /// </summary>
+    protected async Task<IReadOnlyList<string>> SetupAsync(Func<IReadOnlyList<string>> generateCsProjFiles)
+    {
+        ArgumentNullException.ThrowIfNull(generateCsProjFiles);
+
         ValidateStartupSceneSettings();
         ProjectSettingsLoader.WriteIndex(Settings.AssetsAbsoluteDir,
             Path.Combine(Settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName));
@@ -32,31 +44,35 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
         if (!MSBuildLocator.IsRegistered)
             MSBuildLocator.RegisterDefaults();
 
-        var csprojFilePath = generateCsProjFile();
-        if (string.IsNullOrEmpty(csprojFilePath))
+        var csprojFilePaths = generateCsProjFiles();
+        if (csprojFilePaths.Count == 0 || csprojFilePaths.Any(string.IsNullOrEmpty))
         {
             Logger.LogError("csproj generation returned an empty path");
             throw new InvalidOperationException("Compilation failed.");
         }
 
-        try
+        foreach (var csprojFilePath in csprojFilePaths)
         {
-            if (ShouldRestorePackages(csprojFilePath))
+            try
             {
-                await RestorePackages(csprojFilePath).ConfigureAwait(false);
-                UpdateRestoreStamp(csprojFilePath);
+                if (ShouldRestorePackages(csprojFilePath))
+                {
+                    await RestorePackages(csprojFilePath).ConfigureAwait(false);
+                    UpdateRestoreStamp(csprojFilePath);
+                }
+                else
+                {
+                    Logger.LogInformation("Skipping package restore; project inputs unchanged: {Path}", csprojFilePath);
+                }
             }
-            else
+            catch (Exception e)
             {
-                Logger.LogInformation("Skipping package restore; project inputs unchanged: {Path}", csprojFilePath);
+                Logger.LogError(e, "Package restore failed");
+                throw;
             }
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Package restore failed");
         }
 
-        return csprojFilePath;
+        return csprojFilePaths;
     }
 
     // ── Output path helpers ────────────────────────────────────────────────────
@@ -85,16 +101,17 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     /// <summary>Restores NuGet packages for the given project.</summary>
     public async Task RestorePackages(string csprojFilePath)
     {
-        var folder = Path.GetDirectoryName(csprojFilePath);
-        Logger.LogInformation("Restoring packages: {Path}", folder);
+        Logger.LogInformation("Restoring packages: {Path}", csprojFilePath);
 
-        var startInfo = new ProcessStartInfo("dotnet", $"restore \"{folder}\"")
+        var startInfo = new ProcessStartInfo("dotnet")
         {
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.ArgumentList.Add("restore");
+        startInfo.ArgumentList.Add(Path.GetFullPath(csprojFilePath));
 
         using var process = new Process();
         process.StartInfo = startInfo;

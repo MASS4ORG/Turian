@@ -8,5 +8,9 @@
         <PackageId>MASS4.Turian.Engine.Attributes</PackageId>
     </PropertyGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/MASS4/Attributes/MASS4.Attributes.csproj" />
+        <Using Include="MASS4.Attributes" />
+    </ItemGroup>
 </Project>
 

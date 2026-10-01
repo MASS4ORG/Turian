@@ -1,6 +1,3 @@
-using System.Collections.Immutable;
-using Microsoft.CodeAnalysis.Diagnostics;
-
 namespace Turian.CSharp.CodeGenerator;
 
 /// <summary>

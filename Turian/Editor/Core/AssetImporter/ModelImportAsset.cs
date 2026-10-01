@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Represents a model asset that also stores import-time settings in its meta file.
 /// </summary>
-[TypeId("a3000002-0000-4000-8000-000000000005")]
+[TypeId("308dc8ac-3bc0-55f2-a12e-2c00bb440973")]
 public class ModelImportAsset : ModelAsset
 {
     /// <summary>

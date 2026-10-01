@@ -92,8 +92,8 @@ public class UndoTests
         var node = new Node { Name = "Box" };
         var history = new UndoHistory(mergeWindow: TimeSpan.FromSeconds(1));
         UndoStep Step(string label, DateTime at) => new(label, scene.Id,
-            new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) },
-            new Dictionary<IdClass, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) })
+            new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) },
+            new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance) { [node] = ObjectState.Capture(node) })
         { LastChanged = at };
 
         var start = DateTime.UtcNow;

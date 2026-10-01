@@ -24,6 +24,7 @@ public sealed class BuildManager : IDisposable
     readonly ILogger logger;
     AssemblySlotManager slotManager;
     readonly SourceFileWatcher sourceWatcher;
+    List<SourceFileWatcher> packageSourceWatchers = [];
     readonly object playProcessLock = new();
     bool studioIsActive = true;
     bool isPlaying;
@@ -104,12 +105,11 @@ public sealed class BuildManager : IDisposable
 
     // ── Assembly management ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns only the most recently loaded user assembly.
-    /// User code currently produces a single assembly.
-    /// </summary>
-    public Assembly? ActiveUserAssembly =>
-        slotManager.LoadedAssemblies.LastOrDefault();
+    /// <summary>The default user assembly: every script outside an assembly definition.</summary>
+    public Assembly? ActiveUserAssembly => slotManager.LoadedAssembly;
+
+    /// <summary>Every user assembly in force: the default one and one per assembly definition.</summary>
+    public IReadOnlyList<Assembly> ActiveUserAssemblies => slotManager.UserAssemblies;
 
     /// <summary>All assemblies visible to the editor (entry + user assemblies).</summary>
     public IEnumerable<Assembly> LoadedAssemblies =>
@@ -123,7 +123,8 @@ public sealed class BuildManager : IDisposable
     // ── Hot-reload / file watching ─────────────────────────────────────────────
 
     /// <summary>
-    /// Starts watching <c>&lt;projectRoot&gt;/Assets</c> for <c>*.cs</c> changes.
+    /// Starts watching <c>&lt;projectRoot&gt;/Assets</c>, and the project's local and embedded packages, for script
+    /// and assembly definition changes.
     /// Each detected change (after debounce) enqueues a <see cref="CompileAndLoadAssemblyAsync"/> task
     /// when the Studio is active; otherwise the recompile is deferred until activation.
     /// </summary>
@@ -138,6 +139,34 @@ public sealed class BuildManager : IDisposable
         sourceWatcher.SourceChanged -= OnSourceChanged;
         sourceWatcher.SourceChanged += OnSourceChanged;
         sourceWatcher.Start(settings.AssetsAbsoluteDir);
+
+        StopPackageSourceWatchers();
+        try
+        {
+            // Store packages never change; local and embedded ones are working copies.
+            foreach (var package in ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir).Where(static p => !p.IsReadOnly))
+            {
+                var watcher = new SourceFileWatcher(logger);
+                watcher.SourceChanged += OnSourceChanged;
+                watcher.Start(package.RootPath);
+                packageSourceWatchers.Add(watcher);
+            }
+        }
+        catch (Gaya.Packages.PackageException ex)
+        {
+            logger.LogError(ex, "The project's packages could not be resolved; their scripts are not watched");
+        }
+    }
+
+    void StopPackageSourceWatchers()
+    {
+        foreach (var watcher in packageSourceWatchers)
+        {
+            watcher.SourceChanged -= OnSourceChanged;
+            watcher.Dispose();
+        }
+
+        packageSourceWatchers = [];
     }
 
     /// <summary>Stops the source file watcher.</summary>
@@ -145,6 +174,7 @@ public sealed class BuildManager : IDisposable
     {
         sourceWatcher.SourceChanged -= OnSourceChanged;
         sourceWatcher.Stop();
+        StopPackageSourceWatchers();
     }
 
     void OnSourceChanged(string directory)

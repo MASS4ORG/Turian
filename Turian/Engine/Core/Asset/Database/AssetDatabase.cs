@@ -14,6 +14,9 @@ public sealed partial class AssetDatabase
 
     readonly object syncRoot = new();
 
+    IReadOnlyList<string> packageRoots = [];
+    string? packagesProjectRoot;
+
     static AssetDatabase? _instance;
 
     /// <summary>
@@ -39,6 +42,25 @@ public sealed partial class AssetDatabase
     /// Gets the indexed asset records keyed by asset identifier.
     /// </summary>
     public Dictionary<Guid, AssetRecord> Assets { get; private set; } = [];
+
+    /// <summary>
+    /// The folders of the project's installed packages, whose assets the database indexes beside the project's
+    /// own. Their records belong to the installing project, which is where their imports are cached.
+    /// </summary>
+    public IReadOnlyList<string> PackageRoots => packageRoots;
+
+    /// <summary>Sets the package folders indexed with the project's <c>Assets</c>; empty for none.</summary>
+    /// <param name="projectRoot">The project that installs the packages.</param>
+    /// <param name="roots">The package folders.</param>
+    public void SetPackageRoots(string projectRoot, IEnumerable<string> roots)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        lock (syncRoot)
+        {
+            packagesProjectRoot = Path.GetFullPath(projectRoot);
+            packageRoots = [.. roots.Select(static root => Path.GetFullPath(root))];
+        }
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="AssetDatabase"/> class.
@@ -74,7 +96,8 @@ public sealed partial class AssetDatabase
         var projectRoot = Directory.GetParent(normalizedAssetsRoot)?.FullName
             ?? throw new InvalidOperationException("Unable to determine project root from asset folder path.");
 
-        var rebuiltAssets = BuildProjectAssetMap(projectRoot, normalizedAssetsRoot, recursive);
+        var rebuiltAssets = BuildProjectAssetMap(projectRoot, normalizedAssetsRoot, recursive,
+            string.Equals(projectRoot, packagesProjectRoot, StringComparison.Ordinal) ? packageRoots : []);
 
         lock (syncRoot)
         {
@@ -211,7 +234,7 @@ public sealed partial class AssetDatabase
         }
 
         var sourcePath = Path.GetFullPath(asset.RelativePath);
-        var projectRoot = TryResolveProjectRoot(sourcePath);
+        var projectRoot = PackageProjectRoot(sourcePath) ?? TryResolveProjectRoot(sourcePath);
         if (string.IsNullOrWhiteSpace(projectRoot))
         {
             return false;

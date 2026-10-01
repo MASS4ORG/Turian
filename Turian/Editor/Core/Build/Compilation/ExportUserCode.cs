@@ -131,7 +131,8 @@ public sealed class ExportUserCode(
     void WriteTypeManifest(string exportOutputPath)
     {
         var manifest = UserCodeTypeManifestGenerator.Generate(
-            Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly);
+            Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly,
+            CsProjectGenerator.DiscoverAssemblies(Settings));
         UserCodeTypeManifest.Save(manifest, Path.Combine(exportOutputPath, $"{Settings.TitleToPathFriendly}.dll"));
     }
 

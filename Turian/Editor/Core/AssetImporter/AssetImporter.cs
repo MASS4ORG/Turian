@@ -27,10 +27,14 @@ public sealed partial class AssetImporter : IDisposable
     readonly ILogger logger;
     readonly AssetDatabase assetDatabase;
     readonly SettingsService settingsService;
-    readonly List<IAssetImporter> assetImporters;
+    List<IAssetImporter> assetImporters;
+    int importerAssemblyCount;
     readonly object syncRoot = new();
 
     AssetFolderWatcher? folderWatcher;
+    List<AssetFolderWatcher> packageWatchers = [];
+    IReadOnlyList<(string Root, bool ReadOnly)> packageRoots = [];
+    PackageImportOverrides importOverrides = new();
     List<(Asset Asset, string SourcePath)>? pendingBatch;
     string? projectRootPath;
     string? assetsRootPath;
@@ -138,8 +142,16 @@ public sealed partial class AssetImporter : IDisposable
             ? null
             : assetImporters.FirstOrDefault(candidate => candidate.IsValid(filePath));
 
+    /// <summary>Rebuilds the importer list when assemblies have loaded since it was made.</summary>
+    void RefreshImporters()
+    {
+        if (BuildManager.Instance.LoadedAssemblies.Count() != importerAssemblyCount)
+            assetImporters = BuildImporterList();
+    }
+
     List<IAssetImporter> BuildImporterList()
     {
+        importerAssemblyCount = BuildManager.Instance.LoadedAssemblies.Count();
         return [.. BuildManager.Instance.LoadedAssemblies
             .SelectMany(static assembly => GetLoadableTypes(assembly))
             .Where(static type =>
@@ -198,6 +210,15 @@ public sealed partial class AssetImporter : IDisposable
             folderWatcher?.Dispose();
             folderWatcher = new AssetFolderWatcher(logger, this);
             folderWatcher.Start(assetsRootPath!);
+
+            // Store packages never change; a local or embedded package is someone's working copy.
+            packageWatchers.ForEach(static watcher => watcher.Dispose());
+            packageWatchers = [.. packageRoots.Where(static p => !p.ReadOnly).Select(p =>
+            {
+                var watcher = new AssetFolderWatcher(logger, this);
+                watcher.Start(p.Root);
+                return watcher;
+            })];
         }
 
         NotifyAssetsChanged();
@@ -211,6 +232,24 @@ public sealed partial class AssetImporter : IDisposable
         cacheRootPath = Path.Combine(projectRootPath, cacheDirectoryName);
         cacheAssetsRootPath = Path.Combine(cacheRootPath, cacheAssetsDirectoryName);
         Directory.CreateDirectory(cacheAssetsRootPath);
+
+        try
+        {
+            importOverrides = PackageImportOverrides.Load(projectRootPath);
+            var packages = ProjectPackages.ResolveOrEmpty(projectRootPath);
+            packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
+
+            // A brick's importers live in its prebuilt editor assembly, which may have loaded since the list was built.
+            BrickAssemblies.Load(packages, logger);
+            RefreshImporters();
+        }
+        catch (Gaya.Packages.PackageException ex)
+        {
+            logger.LogError(ex, "The project's packages could not be resolved; their assets are left out");
+            packageRoots = [];
+        }
+
+        assetDatabase.SetPackageRoots(projectRootPath, packageRoots.Select(static p => p.Root));
     }
 
     /// <summary>
@@ -219,7 +258,13 @@ public sealed partial class AssetImporter : IDisposable
     /// </summary>
     void ScanFolderBatched(string folderPath)
     {
-        var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories);
+        // A full scan of the project covers its packages too.
+        var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
+            .Concat(string.Equals(folderPath, assetsRootPath, StringComparison.Ordinal)
+                ? packageRoots.Where(p => Directory.Exists(p.Root))
+                    .SelectMany(p => Directory.GetFiles(p.Root, "*", SearchOption.AllDirectories))
+                : [])
+            .ToArray();
         var batch = new List<(Asset Asset, string SourcePath)>();
 
         logger.LogInformation("Importing {FileCount} files from {FolderPath}", files.Length, folderPath);
@@ -296,6 +341,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -327,6 +373,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -356,6 +403,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (IsMetaFilePath(e.FullPath))
             {
                 if (ShouldIgnoreMetaPath(e.FullPath))
@@ -380,6 +428,7 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
+            if (disposed) return;
             if (!ShouldHandleRename(e.OldFullPath, e.FullPath))
             {
                 return;
@@ -393,8 +442,8 @@ public sealed partial class AssetImporter : IDisposable
 
     bool ShouldHandleRename(string oldPath, string newPath)
     {
-        var oldUnderRoot = IsUnderAssetsRoot(oldPath);
-        var newUnderRoot = IsUnderAssetsRoot(newPath);
+        var oldUnderRoot = IsUnderAssetsRoot(oldPath) || PackageRootOf(oldPath) is not null;
+        var newUnderRoot = IsUnderAssetsRoot(newPath) || PackageRootOf(newPath) is not null;
 
         return oldUnderRoot || newUnderRoot;
     }

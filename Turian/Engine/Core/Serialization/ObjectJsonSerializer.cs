@@ -12,7 +12,7 @@ namespace Turian.Engine.Core;
 /// through <see cref="TypeRegistry"/>, so serialized data survives renames and namespace changes.
 /// </remarks>
 public class ObjectJsonSerializer<T> : JsonConverter<T>
-    where T : IdClass
+    where T : IdObject
 {
     /// <summary>
     /// Property name carrying the stable type id (a <see cref="System.Guid"/>) for polymorphic dispatch.
@@ -276,7 +276,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
     static Dictionary<string, MemberInfo> GetCachedMembers(Type type)
     {
-        if (!ObjectJsonSerializerCache.members.TryGetValue(type, out var members))
+        if (!ObjectJsonSerializerCache.Members.TryGetValue(type, out var members))
         {
             members = [];
 
@@ -298,7 +298,7 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 members[field.Name] = field;
             }
 
-            ObjectJsonSerializerCache.members[type] = members;
+            ObjectJsonSerializerCache.Members[type] = members;
         }
         return members;
     }
@@ -358,5 +358,5 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
 static class ObjectJsonSerializerCache
 {
-    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> members = new();
+    public static readonly ConcurrentDictionary<Type, Dictionary<string, MemberInfo>> Members = new();
 }

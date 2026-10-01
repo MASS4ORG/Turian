@@ -30,6 +30,14 @@ public sealed partial class AssetImporter
 
         var metaFilePath = GetMetaFilePath(filePath);
 
+        // A store package is shared and read-only: it must ship its metas, and its files never change.
+        if (PackageRootOf(filePath) is { ReadOnly: true })
+        {
+            if (File.Exists(metaFilePath)) RegisterExistingMetaFile(metaFilePath);
+            else logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", filePath);
+            return;
+        }
+
         if (!overwriteExisting && File.Exists(metaFilePath))
         {
             try
@@ -38,6 +46,11 @@ public sealed partial class AssetImporter
                 {
                     return;
                 }
+            }
+            catch (UnresolvableTypeIdException ex)
+            {
+                WarnUnavailableType(metaFilePath, ex);
+                return;
             }
             catch (Exception ex)
             {
@@ -48,7 +61,17 @@ public sealed partial class AssetImporter
             }
         }
 
-        var asset = CreateOrLoadAssetMetadata(filePath, metaFilePath);
+        Asset asset;
+        try
+        {
+            asset = CreateOrLoadAssetMetadata(filePath, metaFilePath);
+        }
+        catch (UnresolvableTypeIdException ex)
+        {
+            WarnUnavailableType(metaFilePath, ex);
+            return;
+        }
+
         var metaJson = SerializeAssetMetadata(asset);
 
         var metaDirectory = Path.GetDirectoryName(metaFilePath);
@@ -68,6 +91,16 @@ public sealed partial class AssetImporter
 
         FinishAssetImport(asset, filePath, notify: true);
     }
+
+    /// <summary>
+    /// The type comes from a brick or assembly that is not installed; rewriting the meta would lose its id, so the
+    /// asset is left as it is.
+    /// </summary>
+    void WarnUnavailableType(string metaFilePath, UnresolvableTypeIdException ex) =>
+        logger.LogWarning(
+            "Asset meta file {MetaFilePath} names type {TypeId}, which nothing provides; the asset is skipped",
+            metaFilePath,
+            ex.TypeId);
 
     /// <summary>
     /// Completes an import: rebuilds the database, registers the asset's children and persists the
@@ -107,6 +140,12 @@ public sealed partial class AssetImporter
         }
 
         var assetPath = GetAssetPathFromMeta(metaFilePath);
+        if (PackageRootOf(assetPath) is not null && importOverrides.Get(asset.Id) is not null)
+        {
+            // The project's own import settings for a brick's asset; the settings hash below then differs, so it reimports.
+            asset = Serializer.LoadData<Asset>(importOverrides.Apply(asset.Id, SerializeAssetMetadata(asset))) ?? asset;
+        }
+
         if (!string.IsNullOrWhiteSpace(assetPath))
         {
             asset.RelativePath = assetPath;
@@ -130,7 +169,7 @@ public sealed partial class AssetImporter
         AssetsChanged?.Invoke();
     }
 
-    static string SerializeAssetMetadata(Asset asset)
+    internal static string SerializeAssetMetadata(Asset asset)
     {
         return asset switch
         {
@@ -158,6 +197,10 @@ public sealed partial class AssetImporter
                     ApplyTypedDefaults(existing, filePath);
                     return existing;
                 }
+            }
+            catch (UnresolvableTypeIdException)
+            {
+                throw;
             }
             catch
             {

@@ -55,21 +55,15 @@ public class BuildAppSetttingsTest
     }
 
     /// <summary>
-    /// The engine assemblies reach a generated game as bare <c>&lt;Reference HintPath&gt;</c> entries,
-    /// so nothing they depend on flows in transitively. Guinevere is the case that bit: when it was
-    /// missing from the shipping list the game loaded, then threw
-    /// <see cref="FileNotFoundException"/> out of the UI overlay on every rendered frame.
+    /// The in-game UI and its Guinevere reach a game through the UI brick, not the engine list, so a game without
+    /// the brick ships neither.
     /// </summary>
     [Fact]
-    public void TurianPackagesShipGuinevereAlongsideEngineUi()
+    public void EngineListsLeaveTheUiToItsBrick()
     {
-        Assert.Contains(
-            typeof(UiDocumentComponent).Assembly.GetReferencedAssemblies(),
-            reference => reference.Name == "Guinevere");
-
-        Assert.Contains(
-            settings.TurianPackages,
-            package => string.Equals(package.Item2, "Guinevere", StringComparison.Ordinal));
+        Assert.DoesNotContain(settings.TurianPackages,
+            package => package.Item2 is "Guinevere" or "Turian.Engine.UI");
+        Assert.DoesNotContain(settings.PackageReferences, package => package.Item1.StartsWith("SkiaSharp", StringComparison.Ordinal));
     }
 
     /// <summary>

@@ -2,8 +2,9 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// An open project. A project is a folder holding an <c>Assets</c> folder and nothing else is required:
-/// everything it configures lives in settings assets under <c>Assets</c> — one per aspect, such as
+/// game settings live in assets under <c>Assets</c> — one per aspect, such as
 /// <see cref="PlayerSettings"/> or <see cref="GraphicsSettings"/> — read through <see cref="Get{T}"/>.
+/// Brick dependencies are bootstrap configuration exposed through <see cref="Bricks"/>.
 /// </summary>
 public interface IAppSettings
 {
@@ -21,6 +22,9 @@ public interface IAppSettings
 
     /// <summary>The settings assets read for this project, filled by <see cref="ProjectSettingsLoader"/>.</summary>
     ProjectSettingsSet Loaded { get; }
+
+    /// <summary>The project's declared brick dependencies and registries, read independently of game assets.</summary>
+    BricksSettings Bricks { get; }
 
     /// <summary>The settings of one kind, or its declared defaults when the project has none.</summary>
     /// <typeparam name="T">The settings kind.</typeparam>

@@ -1,3 +1,8 @@
-# Engine
+# Turian Engine
 
-The several parts that consist of the Turian "engine", the underlying technology.
+Runtime libraries for scenes, components, assets, input and Vulkan rendering.
+
+- [Core](Core/): engine runtime and service contracts.
+- [Attributes](Attributes/): markers used by serializers, analyzers and generated code.
+
+Optional features, including camera rigs and in-game UI, ship as [built-in bricks](../Packages/).

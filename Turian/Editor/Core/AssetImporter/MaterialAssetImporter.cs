@@ -17,7 +17,7 @@ public class MaterialAssetImporter : IAssetImporter
     }
 
     /// <inheritdoc/>
-    public IdClass? LoadAuthoredContent(Asset asset, string sourcePath) =>
+    public IdObject? LoadAuthoredContent(Asset asset, string sourcePath) =>
         Serializer.Load<MaterialAsset>(sourcePath);
 
     /// <inheritdoc/>

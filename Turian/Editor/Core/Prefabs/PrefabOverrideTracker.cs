@@ -57,12 +57,12 @@ public sealed class PrefabOverrideTracker(Func<Guid, string?> loadPrefab, TimeSp
     /// <param name="member">The serialized member name.</param>
     /// <returns>True when the value is an override.</returns>
     public bool IsOverridden(object target, string member) =>
-        target is IdClass obj && Diff is { } current && current.Overrides.Contains((obj.Id, member));
+        target is IdObject obj && Diff is { } current && current.Overrides.Contains((obj.Id, member));
 
     /// <summary>Whether the instance added <paramref name="target"/> rather than getting it from the prefab.</summary>
     /// <param name="target">A node or component.</param>
     /// <returns>True for an addition.</returns>
-    public bool IsAdded(object target) => target is IdClass obj && Diff is { } current && current.Added.Contains(obj.Id);
+    public bool IsAdded(object target) => target is IdObject obj && Diff is { } current && current.Added.Contains(obj.Id);
 
     /// <summary>The outermost node linked to a prefab among <paramref name="node"/> and its ancestors.</summary>
     /// <param name="node">Where to start.</param>

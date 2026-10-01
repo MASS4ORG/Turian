@@ -121,30 +121,32 @@ public sealed class AssetCreationCatalog
     }
 
     IEnumerable<AssetCreationKind> DiscoverDataAssets() =>
-        Scan(CandidateAssemblies(buildManager.LoadedAssemblies, buildManager.ActiveUserAssembly), log);
+        Scan(CandidateAssemblies(buildManager.LoadedAssemblies, buildManager.ActiveUserAssemblies), log);
 
     /// <summary>
     /// The assemblies worth scanning: the engine and whatever references it, with every user assembly but
-    /// the active one left out. The editor process also holds MSBuild and Roslyn, whose types can fail to
-    /// resolve their base types, and each recompile leaves the previous user assembly loaded.
+    /// the active ones left out. The editor process also holds MSBuild and Roslyn, whose types can fail to
+    /// resolve their base types, and each recompile leaves the previous user assemblies loaded.
     /// </summary>
     /// <param name="loaded">Every assembly the editor has loaded.</param>
-    /// <param name="activeUserAssembly">The user assembly in force, or null before the first compile.</param>
+    /// <param name="activeUserAssemblies">The user assemblies in force, empty before the first compile.</param>
     /// <returns>The assemblies to scan.</returns>
-    public static IEnumerable<Assembly> CandidateAssemblies(IEnumerable<Assembly> loaded, Assembly? activeUserAssembly)
+    public static IEnumerable<Assembly> CandidateAssemblies(IEnumerable<Assembly> loaded,
+        IReadOnlyCollection<Assembly> activeUserAssemblies)
     {
         ArgumentNullException.ThrowIfNull(loaded);
+        ArgumentNullException.ThrowIfNull(activeUserAssemblies);
 
         var engine = typeof(DataAsset).Assembly;
         var engineName = engine.GetName().Name;
-        var userName = activeUserAssembly?.GetName().Name;
+        var userNames = activeUserAssemblies.Select(static assembly => assembly.GetName().Name).ToHashSet();
 
         return loaded
             .Where(static assembly => !assembly.IsDynamic)
             .Where(assembly => assembly == engine
                                || assembly.GetReferencedAssemblies().Any(reference => reference.Name == engineName))
-            .Where(assembly => userName is null || assembly == activeUserAssembly
-                               || assembly.GetName().Name != userName)
+            .Where(assembly => activeUserAssemblies.Contains(assembly)
+                               || !userNames.Contains(assembly.GetName().Name))
             .Distinct();
     }
 

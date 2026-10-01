@@ -1,17 +1,10 @@
-# Main source code
+# Turian source
 
-> ***
-> This Directory: The Heart and Soul Behind Turian
-> ***
+Turian is a .NET game engine and a Gaya plugin. The source is organized into:
 
-This folder houses the groundbreaking source code behind **Turian**. It's meticulously divided into the following vital parts:
+- [Engine](Engine/): runtime, assets, scenes and rendering.
+- [Editor](Editor/): shared authoring services, Studio and the command line.
+- [Packages](Packages/): optional built-in bricks.
+- [Benchmarks](Benchmarks/): runtime performance measurements.
 
-- **[Engine](./Engine)**: The underlying technology making the magic happen.
-- **[Editor](./Editor)**: The sleek and powerful GUI, assisting you in game and app development.
-- **[Platforms](./Platforms)**: The glue to port and ship your game to different platforms.
-
-## Exploration
-
-Navigate through each directory to uncover the secrets behind **Turian**. Witness the magic and the mind behind the engine that is changing the game development landscape.
-
-Feel free to explore, learn, and even contribute. After all, great knowledge lies within the heart of **Turian**, and it's all here in the source code.
+See the [repository README](../README.md) for setup and the [build guide](../docs/Building-from-source.md).

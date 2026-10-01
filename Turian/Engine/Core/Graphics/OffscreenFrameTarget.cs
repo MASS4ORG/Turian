@@ -8,8 +8,8 @@ namespace Turian.Engine.Core;
 /// </summary>
 public unsafe partial class OffscreenFrameTarget : IDisposable
 {
-    /// <summary>Color format used for the offscreen images. Matches Avalonia's Bgra8888 pixel format.</summary>
-    public const Format ColorFormat = Format.B8G8R8A8Unorm;
+    /// <summary>BGRA8 sRGB output, matching the runtime swapchain and desktop image readback.</summary>
+    public const Format ColorFormat = Format.B8G8R8A8Srgb;
 
     /// <summary>Gets the render pass. Compatible with any pipeline built for the same format + MSAA sample count.</summary>
     public RenderPass RenderPass => renderPass;

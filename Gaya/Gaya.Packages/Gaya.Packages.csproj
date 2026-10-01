@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Gaya.Packages</RootNamespace>
+        <AssemblyName>Gaya.Packages</AssemblyName>
+        <PackageId>MASS4.Gaya.Packages</PackageId>
+        <Title>Gaya Packages</Title>
+        <Description>Package manifests, resolution, lock files and the machine-wide package store shared by Gaya hosts. No UI; shared presentation metadata comes from MASS4.Attributes.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/MASS4/Attributes/MASS4.Attributes.csproj" />
+        <Using Include="MASS4.Attributes" />
+    </ItemGroup>
+</Project>

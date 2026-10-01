@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Turian.Editor.UI</RootNamespace>
+        <PackageId>MASS4.Turian.Editor.UI</PackageId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
+        <ProjectReference Include="../Turian.Engine.UI/Turian.Engine.UI.csproj"/>
+    </ItemGroup>
+
+    <!-- The brick ships this assembly prebuilt in Precast~/editor, which only the editor loads. -->
+    <Target Name="PrecastEditorAssembly" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Precast~/editor"/>
+    </Target>
+
+</Project>

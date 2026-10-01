@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>Project-wide rendering and texture defaults.</summary>
 [CreateAssetMenu(fileName: "GraphicsSettings", path: "Settings/Graphics Settings")]
-[TypeId("a3000005-0000-4000-8000-000000000003")]
+[TypeId("4af10a42-b4f9-5694-aa3b-f96a8f7f23aa")]
 public class GraphicsSettings : ProjectSettingsAsset
 {
     /// <summary>

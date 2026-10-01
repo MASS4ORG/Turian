@@ -9,7 +9,7 @@ public class ComplexSerializationTests
     /// Base class for testing polymorphic serialization.
     /// </summary>
     [TypeId("a3000003-0000-4000-8000-000000000004")]
-    public class BaseClass : IdClass
+    public class BaseClass : IdObject
     {
         /// <summary>
         /// Gets or sets the base name.
@@ -33,7 +33,7 @@ public class ComplexSerializationTests
     /// Container class for testing polymorphic collection serialization.
     /// </summary>
     [TypeId("a3000003-0000-4000-8000-000000000006")]
-    public class ContainerClass : IdClass
+    public class ContainerClass : IdObject
     {
         /// <summary>
         /// Gets or sets the items collection.

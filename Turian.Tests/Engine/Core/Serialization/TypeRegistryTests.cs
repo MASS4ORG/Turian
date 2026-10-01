@@ -6,18 +6,31 @@ namespace Turian.Tests;
 /// </summary>
 public class TypeRegistryTests
 {
+    /// <summary>Legacy metadata can be read while serializers write the canonical identifier.</summary>
+    [Fact]
+    public void LegacyMetadataReadsAndWritesCanonicalId()
+    {
+        const string legacyId = "a3000000-0000-4000-8000-000000000006";
+        var metadata = Serializer.LoadData<Asset>("""{ "__TypeId": "a3000000-0000-4000-8000-000000000006" }""");
+        Assert.IsType<DataAssetAsset>(metadata);
+        var currentId = TypeRegistry.GetIdOrThrow(typeof(DataAssetAsset));
+        Assert.NotEqual(Guid.Parse(legacyId), currentId);
+        Assert.Contains(currentId.ToString(), Serializer.Serialize(metadata), StringComparison.Ordinal);
+        Assert.DoesNotContain(legacyId, Serializer.Serialize(metadata), StringComparison.Ordinal);
+    }
+
     [TypeId("b0000000-0000-4000-8000-000000000001")]
-    sealed class TaggedSampleA : IdClass;
+    sealed class TaggedSampleA : IdObject;
 
     [TypeId("b0000000-0000-4000-8000-000000000002")]
-    sealed class TaggedSampleB : IdClass;
+    sealed class TaggedSampleB : IdObject;
 
-    sealed class UntaggedSample : IdClass;
+    sealed class UntaggedSample : IdObject;
 
     // Used only by RegisterOverwritesPreviousMapping so the assertion does not pollute
     // mappings other tests rely on.
-    sealed class OverwriteTargetX : IdClass;
-    sealed class OverwriteTargetY : IdClass;
+    sealed class OverwriteTargetX : IdObject;
+    sealed class OverwriteTargetY : IdObject;
 
     /// <summary>Annotated types are discoverable by their stable id.</summary>
     [Fact]
