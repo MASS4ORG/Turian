@@ -58,6 +58,7 @@ public sealed class PackageManifest
     public string? DisplayName { get; set; }
 
     /// <summary>What the package is for.</summary>
+    [TextArea(2, 8)]
     public string? Description { get; set; }
 
     /// <summary>The package's author.</summary>

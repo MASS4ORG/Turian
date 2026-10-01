@@ -53,5 +53,6 @@ AGENTS.md
 .delta/
 
 script.sh
-docs/decisions
+script.py
+docs/internal
 Examples/
