@@ -187,9 +187,12 @@ public sealed partial class FbxModelImporter : IAssetImporter
             Name = source.Name,
         };
 
-        node.Transform.Position = source.Position;
-        node.Transform.Orientation = source.Orientation;
-        node.Transform.Scale = source.Scale;
+        node.Transform = new Transform
+        {
+            Position = source.Position,
+            Orientation = source.Orientation,
+            Scale = source.Scale,
+        };
 
         if (source.MeshIndex >= 0)
         {

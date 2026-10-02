@@ -379,7 +379,7 @@ public sealed partial class TransformGizmo
                 SnapValue(newPos.Z, SnapTranslation));
         }
 
-        SelectedNode.Transform.Position = newPos;
+        SelectedNode.Position = newPos;
         TransformEdited?.Invoke();
     }
 
@@ -394,7 +394,7 @@ public sealed partial class TransformGizmo
 
         if (axis == TransformGizmoAxis.Center)
         {
-            SelectedNode.Transform.Scale = axisStartNodeScale * factor;
+            SelectedNode.Scale = axisStartNodeScale * factor;
             return;
         }
 
@@ -414,7 +414,7 @@ public sealed partial class TransformGizmo
             scaleAxis == 0 ? newScale.X * factor : newScale.X,
             scaleAxis == 1 ? newScale.Y * factor : newScale.Y,
             scaleAxis == 2 ? newScale.Z * factor : newScale.Z);
-        SelectedNode.Transform.Scale = newScale;
+        SelectedNode.Scale = newScale;
         TransformEdited?.Invoke();
     }
 

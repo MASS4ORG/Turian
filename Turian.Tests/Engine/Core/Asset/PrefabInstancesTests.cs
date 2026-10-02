@@ -64,7 +64,7 @@ public class PrefabInstancesTests
     public void Compact_UnmodifiedInstanceSavesOnlyTheLink()
     {
         var instance = Instantiate(AddPrefab(Lamp()));
-        instance.Transform.Position = new Vector3(3, 0, 0);
+        instance.Position = new Vector3(3, 0, 0);
 
         var saved = JsonNode.Parse(Save(Scene(instance)))!;
         var savedInstance = saved["Children"]![0]!.AsObject();
@@ -245,7 +245,7 @@ public class PrefabInstancesTests
     {
         var instance = Instantiate(AddPrefab(Lamp()));
         instance.Name = "Desk Lamp";
-        instance.Transform.Position = new Vector3(1f, 2f, 3f);
+        instance.Position = new Vector3(1f, 2f, 3f);
 
         Assert.Empty(Diff(Scene(instance)).Overrides);
     }

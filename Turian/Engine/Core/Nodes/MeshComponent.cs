@@ -38,36 +38,7 @@ public class MeshComponent : Component, IDisposable
     /// Calculates and returns the transformation matrix for the owning node.
     /// </summary>
     /// <returns>The transformation matrix.</returns>
-    public Matrix4x4 TransformationMatrix()
-    {
-        var transform = Node?.Transform;
-        if (transform is null) return Matrix4x4.Identity;
-        var c3 = MathF.Cos(transform.Rotation.Z);
-        var s3 = MathF.Sin(transform.Rotation.Z);
-        var c2 = MathF.Cos(transform.Rotation.X);
-        var s2 = MathF.Sin(transform.Rotation.X);
-        var c1 = MathF.Cos(transform.Rotation.Y);
-        var s1 = MathF.Sin(transform.Rotation.Y);
-
-        return new(
-            transform.Scale.X * ((c1 * c3) + (s1 * s2 * s3)),
-            transform.Scale.X * (c2 * s3),
-            transform.Scale.X * ((c1 * s2 * s3) - (c3 * s1)),
-            0.0f,
-            transform.Scale.Y * ((c3 * s1 * s2) - (c1 * s3)),
-            transform.Scale.Y * (c2 * c3),
-            transform.Scale.Y * ((c1 * c3 * s2) + (s1 * s3)),
-            0.0f,
-            transform.Scale.Z * (c2 * s1),
-            transform.Scale.Z * (-s2),
-            transform.Scale.Z * (c1 * c2),
-            0.0f,
-            transform.Position.X,
-            transform.Position.Y,
-            transform.Position.Z,
-            1.0f
-        );
-    }
+    public Matrix4x4 TransformationMatrix() => Node?.Transform.Matrix4X4() ?? Matrix4x4.Identity;
 
     /// <summary>
     /// Binds the mesh component to a command buffer for rendering.

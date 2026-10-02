@@ -238,8 +238,7 @@ static class SceneScreenshot
 
     static Node AddHeadlight(Node root, EditorCamera camera, float intensity)
     {
-        var node = new Node { Name = "__Headlight" };
-        node.Transform.Position = camera.Position;
+        var node = new Node { Name = "__Headlight", Position = camera.Position };
         node.AddComponent(LightComponent.CreatePointLight(intensity, new Vector4(1f)));
 
         node.Parent = root;

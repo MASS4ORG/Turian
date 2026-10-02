@@ -62,7 +62,7 @@ public class UndoTests
         var node = new Node { Name = "Box" };
         var state = ObjectState.Capture(node);
 
-        node.Transform.Position = new Vector3(4f, 0f, 0f);
+        node.Position = new Vector3(4f, 0f, 0f);
         state.Restore(node);
 
         Assert.Equal(Vector3.Zero, node.Transform.Position);
@@ -338,12 +338,12 @@ public class UndoTests
         inspector.Select(box);
 
         undo.BeginGesture();
-        box.Transform.Position = new Vector3(1f, 0f, 0f);
+        box.Position = new Vector3(1f, 0f, 0f);
         EndFrame();
         box.GetComponent<LightComponent>()!.Intensity = 3f;
         EndFrame();
         undo.RecordObject(root, "Other");
-        box.Transform.Position = new Vector3(2f, 0f, 0f);
+        box.Position = new Vector3(2f, 0f, 0f);
         EndFrame();
         undo.EndGesture();
 

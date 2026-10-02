@@ -153,7 +153,7 @@ public class PrefabOverrideOperationsTests : IDisposable
     {
         var instance = Instantiate(AddPrefab(Lamp()));
         instance.Children[0].Name = "Bulb (tuned)";
-        instance.Children[0].Transform.Position = new Vector3(3f, 0f, 0f);
+        instance.Children[0].Position = new Vector3(3f, 0f, 0f);
         var added = new Node { Name = "Added" };
         instance.Children.Add(added);
 

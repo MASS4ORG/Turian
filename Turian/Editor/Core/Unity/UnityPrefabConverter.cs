@@ -60,9 +60,12 @@ static class UnityPrefabConverter
 
         if (transformOf.TryGetValue(gameObject.FileId, out var transform))
         {
-            node.Transform.Position = Vector(transform.Body["m_LocalPosition"], Vector3.Zero);
-            node.Transform.Orientation = Rotation(transform.Body["m_LocalRotation"]);
-            node.Transform.Scale = Vector(transform.Body["m_LocalScale"], Vector3.One);
+            node.Transform = new Transform
+            {
+                Position = Vector(transform.Body["m_LocalPosition"], Vector3.Zero),
+                Orientation = Rotation(transform.Body["m_LocalRotation"]),
+                Scale = Vector(transform.Body["m_LocalScale"], Vector3.One),
+            };
             if (transform.ClassId == 224) Count(skipped, "RectTransform (UI)");
         }
 

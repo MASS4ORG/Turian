@@ -16,7 +16,7 @@ public class PlayModeServiceTests : IDisposable
         {
             TotalUpdates++;
             var node = Node ?? throw new InvalidOperationException("FrameCountingComponent must be attached to a node.");
-            node.Transform.Position += new Vector3(1f, 0f, 0f);
+            node.Position += new Vector3(1f, 0f, 0f);
         }
     }
 

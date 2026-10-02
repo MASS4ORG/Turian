@@ -210,27 +210,20 @@ public partial class Node
     }
 
     /// <summary>
-    /// Calculates and returns the global transformation of the node, taking into account its parent's transformation.
-    /// </summary>
-    /// <returns>The global transformation of the node.</returns>
-    Transform CalculateGlobalTransform()
-    {
-        // If this node has a parent, combine its transformation with its own.
-        return Parent is not null ? Transform.AddParent(Parent.GlobalTransform) : Transform;
-    }
-
-    /// <summary>
-    /// Invalidates the cached global transform of the node and invokes the global transform invalidated event.
+    /// Marks the cached global transform of this node and its descendants as stale.
     /// </summary>
     public void InvalidateGlobalTransformCache()
     {
-        lock (lockObject)
-        {
-            // Reset the cached global transform to null.
-            cachedGlobalTransform = null;
+        isGlobalTransformDirty = true;
+        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach.
+        for (var i = 0; i < Children.Count; i++)
+            Children[i].MarkGlobalTransformDirty();
+    }
 
-            // Invoke the global transform invalidated event, if any subscribers.
-            OnGlobalTransformInvalidated?.Invoke();
-        }
+    // A dirty node's descendants are already dirty: a cache is only refreshed after its parent's, so stop early.
+    void MarkGlobalTransformDirty()
+    {
+        if (isGlobalTransformDirty) return;
+        InvalidateGlobalTransformCache();
     }
 }

@@ -177,7 +177,7 @@ public class CameraComponent : Component, ICamera
                 return;
             }
 
-            Node.Transform.Rotation = Node.Transform.Rotation with { X = clamped * Mathf.RadiansToDegrees };
+            Node.Rotation = Node.Rotation with { X = clamped * Mathf.RadiansToDegrees };
             UpdateVectors();
         }
     }
@@ -200,7 +200,7 @@ public class CameraComponent : Component, ICamera
                 return;
             }
 
-            Node.Transform.Rotation = Node.Transform.Rotation with { Y = value * Mathf.RadiansToDegrees };
+            Node.Rotation = Node.Rotation with { Y = value * Mathf.RadiansToDegrees };
             UpdateVectors();
         }
     }
@@ -228,7 +228,7 @@ public class CameraComponent : Component, ICamera
     public Vector3 Position
     {
         get => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position;
-        set => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position = value;
+        set => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Position = value;
     }
 
     // ========= Lifecycle =========

@@ -23,9 +23,9 @@ public class NodeTest
         {
             var cube = layer % 2 == 0 ? new Node() : new Node2();
             cube.Name = $"Cube {layer}";
-            cube.Transform.Position = positionDefault;
-            cube.Transform.Rotation = rotationDefault;
-            cube.Transform.Scale = scaleDefault;
+            cube.Position = positionDefault;
+            cube.Rotation = rotationDefault;
+            cube.Scale = scaleDefault;
             cubeBase.Children.Add(cube);
             cubeBase = cube;
         }
@@ -125,7 +125,7 @@ public class NodeTest
         var child = nodeMain.Children[0];
         var before = child.GlobalTransform.Position;
 
-        nodeMain.Transform.Rotation = new(0, 0, 90);
+        nodeMain.Rotation = new(0, 0, 90);
 
         Assert.NotEqual(before, child.GlobalTransform.Position);
         Assert.Equal(positionDefault, child.Transform.Position);
