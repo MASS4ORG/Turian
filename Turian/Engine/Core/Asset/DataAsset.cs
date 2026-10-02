@@ -31,11 +31,15 @@ public class DataAsset : IdObject
     /// Thrown when the specified payload file does not exist.
     /// </exception>
     public static DataAsset? LoadContent(string absolutePath)
+        => LoadContent(absolutePath, null, DataAssetVariants.ReadFromDatabase);
+
+    internal static DataAsset? LoadContent(string absolutePath, Guid? expectedAssetId,
+        Func<Guid, string?> readBase)
     {
         if (File.Exists(absolutePath))
         {
             return Serializer.LoadData<DataAsset>(
-                DataAssetVariants.Flatten(File.ReadAllText(absolutePath), DataAssetVariants.ReadFromDatabase));
+                DataAssetVariants.Flatten(File.ReadAllText(absolutePath), readBase, expectedAssetId));
         }
 
         throw new FileNotFoundException($"DataAsset load failed {absolutePath}");

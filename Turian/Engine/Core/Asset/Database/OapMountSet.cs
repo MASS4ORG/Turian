@@ -8,16 +8,26 @@ namespace Turian.Engine.Core;
 /// </summary>
 public sealed class OapMountSet
 {
-    static readonly ConcurrentDictionary<string, CachedMountSet> Cache = new(StringComparer.OrdinalIgnoreCase);
+    static readonly ConcurrentDictionary<string, WeakReference<OapMountSet>> Cache =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    OapMountSet(IReadOnlyList<OapReader> readers) => Readers = readers;
+    readonly string basePackagePath;
+    readonly string fingerprint;
+
+    OapMountSet(IReadOnlyList<OapReader> readers, string basePackagePath, string fingerprint)
+    {
+        Readers = readers;
+        this.basePackagePath = basePackagePath;
+        this.fingerprint = fingerprint;
+    }
 
     /// <summary>Gets the mounted readers, highest priority first.</summary>
     public IReadOnlyList<OapReader> Readers { get; }
 
     /// <summary>
     /// Gets or resolves the mount set for a base package, layering any overlay packages
-    /// found in a sibling <c>overlays</c> directory (sorted by name, later names win).
+    /// found in a sibling <c>overlays</c> directory. Dependents win over their requirements;
+    /// unrelated overlays are sorted by name, with later names winning.
     /// The result is cached and rebuilt when any package file changes on disk.
     /// </summary>
     /// <param name="basepackagePath">The absolute path to the base <c>.oap</c> file.</param>
@@ -36,11 +46,23 @@ public sealed class OapMountSet
         var packagePaths = DiscoverPackages(fullPath);
         var fingerprint = BuildFingerprint(packagePaths);
 
-        if (Cache.TryGetValue(fullPath, out var cached) && cached.Fingerprint == fingerprint)
+        if (Cache.TryGetValue(fullPath, out var reference) &&
+            reference.TryGetTarget(out var cached) && cached.fingerprint == fingerprint)
         {
-            return cached.MountSet;
+            return cached;
         }
 
+        var readers = OpenReaders(packagePaths);
+        readers = OrderByRequirements(readers);
+        WarnAboutConflicts(readers);
+        var mountSet = new OapMountSet(readers, fullPath, fingerprint);
+        if (Cache.Count > 64) Cache.Clear();
+        Cache[fullPath] = new WeakReference<OapMountSet>(mountSet);
+        return mountSet;
+    }
+
+    static List<OapReader> OpenReaders(IReadOnlyCollection<string> packagePaths)
+    {
         var key = OapRuntimeKey.Current;
         var readers = new List<OapReader>(packagePaths.Count);
         foreach (var path in packagePaths)
@@ -53,11 +75,16 @@ public sealed class OapMountSet
 
             readers.Add(reader);
         }
+        return readers;
+    }
 
-        var mountSet = new OapMountSet(readers);
-        Cache[fullPath] = new CachedMountSet(fingerprint, mountSet);
-        WarnAboutUnmetRequirements(readers);
-        return mountSet;
+    /// <summary>Rejects package changes while a runtime session uses this mount.</summary>
+    public void EnsureUnchanged()
+    {
+        if (!File.Exists(basePackagePath) ||
+            BuildFingerprint(DiscoverPackages(basePackagePath)) != fingerprint)
+            throw new InvalidDataException(
+                $"OAP content changed during the active session at '{basePackagePath}'; start a new content session.");
     }
 
     /// <summary>Resolves an asset by its id across the mounted packages.</summary>
@@ -136,39 +163,113 @@ public sealed class OapMountSet
         return builder.ToString();
     }
 
-    static void WarnAboutUnmetRequirements(IReadOnlyList<OapReader> readers)
+    static List<OapReader> OrderByRequirements(IReadOnlyList<OapReader> readers)
     {
-        var present = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var reader in readers)
-        {
-            if (OapManifest.TryParse(reader.Manifest) is { Name.Length: > 0 } manifest)
-            {
-                present.Add(manifest.Name);
-            }
-        }
-
-        foreach (var reader in readers)
-        {
-            var manifest = OapManifest.TryParse(reader.Manifest);
-            if (manifest is null)
-            {
-                continue;
-            }
-
-            foreach (var required in manifest.Requires)
-            {
-                if (!present.Contains(required))
-                {
-                    Log.Logger.LogWarning(
-                        "OAP package '{Package}' requires '{Required}', which is not mounted",
-                        manifest.Name,
-                        required);
-                }
-            }
-        }
+        var manifests = ReadManifests(readers);
+        var dependencies = BuildDependencies(manifests, IndexNames(manifests));
+        return SortReaders(readers, dependencies);
     }
 
-    readonly record struct CachedMountSet(string Fingerprint, OapMountSet MountSet);
+    static Dictionary<string, int> IndexNames(IReadOnlyList<OapManifest?> manifests)
+    {
+        var byName = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var i = 0; i < manifests.Count; i++)
+            if (manifests[i] is { Name.Length: > 0 } manifest && !byName.TryAdd(manifest.Name, i))
+                throw new InvalidOperationException($"Multiple OAP packages are named '{manifest.Name}'.");
+        return byName;
+    }
+
+    static List<OapReader> SortReaders(IReadOnlyList<OapReader> readers, IReadOnlyList<int[]> dependencies)
+    {
+        var dependents = CountDependents(dependencies);
+        var ready = ReadyPackages(dependents);
+        var ordered = new List<OapReader>(readers.Count);
+        while (ready.TryDequeue(out var index, out _))
+        {
+            ordered.Add(readers[index]);
+            foreach (var dependency in dependencies[index])
+                if (--dependents[dependency] == 0) ready.Enqueue(dependency, dependency);
+        }
+
+        if (ordered.Count != readers.Count)
+            throw new InvalidOperationException("OAP package requirements form a cycle.");
+        return ordered;
+    }
+
+    static int[] CountDependents(IReadOnlyList<int[]> dependencies)
+    {
+        var dependents = new int[dependencies.Count];
+        foreach (var packageDependencies in dependencies)
+            foreach (var dependency in packageDependencies)
+                dependents[dependency]++;
+        return dependents;
+    }
+
+    static PriorityQueue<int, int> ReadyPackages(IReadOnlyList<int> dependents)
+    {
+        var ready = new PriorityQueue<int, int>();
+        for (var i = 0; i < dependents.Count; i++)
+            if (dependents[i] == 0) ready.Enqueue(i, i);
+        return ready;
+    }
+
+    static OapManifest?[] ReadManifests(IReadOnlyList<OapReader> readers)
+    {
+        var manifests = new OapManifest?[readers.Count];
+        for (var i = 0; i < readers.Count; i++)
+        {
+            manifests[i] = OapManifest.TryParse(readers[i].Manifest);
+            if (readers[i].Manifest is { Length: > 0 } && manifests[i] is null)
+                throw new InvalidOperationException($"OAP mount {i} has an invalid manifest.");
+        }
+        return manifests;
+    }
+
+    static int[][] BuildDependencies(IReadOnlyList<OapManifest?> manifests, IReadOnlyDictionary<string, int> byName)
+    {
+        var dependencies = new int[manifests.Count][];
+        for (var i = 0; i < manifests.Count; i++)
+        {
+            var manifest = manifests[i];
+            var resolved = new List<int>();
+            if (manifest is not null)
+                foreach (var required in manifest.Requires)
+                {
+                    if (!byName.TryGetValue(required, out var dependency))
+                        throw new InvalidOperationException(
+                            $"OAP package '{manifest.Name}' requires '{required}', which is not mounted.");
+                    if (i == manifests.Count - 1)
+                        throw new InvalidOperationException(
+                            $"Base OAP package '{manifest.Name}' cannot require overlay '{required}'.");
+                    resolved.Add(dependency);
+                }
+            dependencies[i] = [.. resolved.Distinct()];
+        }
+        return dependencies;
+    }
+
+    static void WarnAboutConflicts(IReadOnlyList<OapReader> readers)
+    {
+        if (readers.Count < 2) return;
+
+        var owners = new Dictionary<Guid, int>();
+        var conflicts = 0;
+        Guid firstConflict = default;
+        for (var i = 0; i < readers.Count; i++)
+        {
+            foreach (var entry in readers[i].Entries)
+            {
+                if (owners.TryAdd(entry.AssetId, i) || owners[entry.AssetId] == i) continue;
+                if (conflicts++ == 0) firstConflict = entry.AssetId;
+            }
+        }
+
+        if (conflicts > 0)
+            Log.Logger.LogWarning(
+                "{Count} OAP asset override(s) occur across mounted packages (first: {AssetId}); highest-priority mount wins",
+                conflicts, firstConflict);
+    }
+
 }
 
 /// <summary>
@@ -243,18 +344,8 @@ public sealed record OapManifest(string Name, string Version, string Generator, 
                 return null;
             }
 
-            var requires = new List<string>();
-            if (root.TryGetProperty("requires", out var requiresElement) &&
-                requiresElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in requiresElement.EnumerateArray())
-                {
-                    if (item.ValueKind == JsonValueKind.String && item.GetString() is { } value)
-                    {
-                        requires.Add(value);
-                    }
-                }
-            }
+            var requires = ParseRequires(root);
+            if (requires is null) return null;
 
             return new OapManifest(
                 GetString(root, "name"),
@@ -266,6 +357,21 @@ public sealed record OapManifest(string Name, string Version, string Generator, 
         {
             return null;
         }
+    }
+
+    static List<string>? ParseRequires(JsonElement root)
+    {
+        var requires = new List<string>();
+        if (!root.TryGetProperty("requires", out var values)) return requires;
+        if (values.ValueKind != JsonValueKind.Array) return null;
+        foreach (var item in values.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String ||
+                item.GetString() is not { } value || string.IsNullOrWhiteSpace(value))
+                return null;
+            requires.Add(value);
+        }
+        return requires;
     }
 
     static string GetString(JsonElement element, string property) =>

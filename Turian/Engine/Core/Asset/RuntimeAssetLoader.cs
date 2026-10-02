@@ -13,6 +13,7 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     readonly Dictionary<Guid, Asset> cache = new();
     readonly Dictionary<Guid, Task<Asset?>> inflight = new();
     readonly object gate = new();
+    Dictionary<string, OapMountSet?>? sessionMounts;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RuntimeAssetLoader"/> class.
@@ -59,9 +60,48 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        var content = metadata.GetContent(record.ProjectRootPath);
+        var content = metadata.GetContent(record.ProjectRootPath, ReadBaseFromSession, GetProvider(assetId));
         if (content is not null) await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
         return content as TData;
+    }
+
+    IAssetFileProvider? GetProvider(Guid assetId)
+    {
+        if (!assetDatabase.TryGetAsset(assetId, out var record) || record is null)
+            return null;
+        if (record.StorageKind != AssetStorageKind.Oap)
+            return assetDatabase.TryGetAssetProvider(assetId, out var provider) ? provider : null;
+
+        var path = record.ResolveContentPath();
+        return new OapAssetFileProvider(path, record.PrimaryContentKey, GetSessionMount(path));
+    }
+
+    OapMountSet GetSessionMount(string path)
+    {
+        lock (gate)
+        {
+            sessionMounts ??= CaptureMounts();
+
+            if (!sessionMounts.TryGetValue(path, out var mount) || mount is null)
+                throw new FileNotFoundException("OAP content is absent from this session.", path);
+            return mount;
+        }
+    }
+
+    Dictionary<string, OapMountSet?> CaptureMounts() =>
+        assetDatabase.GetAssetsSnapshot()
+            .Where(static asset => asset.StorageKind == AssetStorageKind.Oap)
+            .Select(static asset => asset.ResolveContentPath())
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static candidate => candidate, OapMountSet.ForBasePackage,
+                StringComparer.OrdinalIgnoreCase);
+
+    string? ReadBaseFromSession(Guid assetId)
+    {
+        if (GetProvider(assetId) is not { } provider) return null;
+        using var reader = new StreamReader(provider.GetAssetStream());
+        return reader.ReadToEnd();
     }
 
     /// <inheritdoc />

@@ -41,25 +41,91 @@ public sealed class DataAssetVariantTests : IDisposable
         Assert.Equal(baseJson, DataAssetVariants.Flatten(baseJson, _ => throw new InvalidOperationException()));
 
         var middle = Guid.NewGuid();
-        var middleJson = $$"""{ "__Variant": { "Base": "{{baseId}}", "Overrides": { "Name": "Middle", "Stats": { "Mana": 50 } } } }""";
-        var top = $$"""{ "__Variant": { "Base": "{{middle}}", "Overrides": { "Stats": { "Health": 1 } } } }""";
+        var middleJson = $$"""{ "Id": "{{middle}}", "__Variant": { "Base": "{{baseId}}", "Overrides": { "Name": "Middle", "Stats": { "Mana": 50 } } } }""";
+        var top = $$"""{ "Id": "{{variantId}}", "__Variant": { "Base": "{{middle}}", "Overrides": { "Stats": { "Health": 1 } } } }""";
 
         var flat = JsonNode.Parse(DataAssetVariants.Flatten(top, id => id == baseId ? baseJson : id == middle ? middleJson : null))!;
 
         Assert.Equal("Middle", (string)flat["Name"]!);
         Assert.Equal(1, (int)flat["Stats"]!["Health"]!);
         Assert.Equal(50, (int)flat["Stats"]!["Mana"]!);
+        Assert.Equal(variantId.ToString(), (string)flat["Id"]!);
     }
 
     /// <summary>A missing base and a cycle are reported instead of looping or returning half a payload.</summary>
     [Fact]
     public void BrokenChainsFail()
     {
-        var variant = $$"""{ "__Variant": { "Base": "{{baseId}}" } }""";
+        var variant = $$"""{ "Id": "{{variantId}}", "__Variant": { "Base": "{{baseId}}" } }""";
         Assert.Throws<InvalidOperationException>(() => DataAssetVariants.Flatten(variant, _ => null));
 
-        var selfReferencing = $$"""{ "__Variant": { "Base": "{{variantId}}" } }""";
-        Assert.Throws<InvalidOperationException>(() => DataAssetVariants.Flatten(selfReferencing, _ => selfReferencing));
+        var other = Guid.NewGuid();
+        var first = $$"""{ "Id": "{{variantId}}", "__Variant": { "Base": "{{other}}" } }""";
+        var second = $$"""{ "Id": "{{other}}", "__Variant": { "Base": "{{variantId}}" } }""";
+        Assert.Throws<InvalidOperationException>(() => DataAssetVariants.Flatten(first,
+            id => id == other ? second : id == variantId ? first : null));
+    }
+
+    /// <summary>Overrides cannot impersonate another asset or change the base payload's type.</summary>
+    [Theory]
+    [InlineData("Id")]
+    [InlineData("__TypeId")]
+    [InlineData("__Variant")]
+    public void OverridesCannotChangeIdentity(string member)
+    {
+        var variant = $$"""
+            { "Id": "{{variantId}}", "__Variant": {
+                "Base": "{{baseId}}", "Overrides": { "{{member}}": "unexpected" } } }
+            """;
+
+        Assert.Contains(member, Assert.Throws<InvalidOperationException>(
+            () => DataAssetVariants.Flatten(variant, id => id == baseId ? baseJson : null)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>Link syntax this version does not understand fails instead of being ignored.</summary>
+    [Theory]
+    [InlineData("\"Patch\": []")]
+    [InlineData("\"Overrides\": []")]
+    public void UnknownLinkSyntaxFails(string member)
+    {
+        var variant = $$"""{ "Id": "{{variantId}}", "__Variant": { "Base": "{{baseId}}", {{member}} } }""";
+
+        Assert.Throws<InvalidOperationException>(
+            () => DataAssetVariants.Flatten(variant, id => id == baseId ? baseJson : null));
+    }
+
+    /// <summary>A variant declaring a different payload type fails rather than loading as its base.</summary>
+    [Fact]
+    public void VariantTypeMustMatchBase()
+    {
+        var variant = $$"""
+            { "__TypeId": "2072d8c2-86ad-52b9-9f91-42695ff0800d", "Id": "{{variantId}}",
+              "__Variant": { "Base": "{{baseId}}", "Overrides": {} } }
+            """;
+
+        Assert.Contains("same type", Assert.Throws<InvalidOperationException>(
+            () => DataAssetVariants.Flatten(variant, id => id == baseId ? baseJson : null)).Message,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>A variant needs its own catalog identity and matching type identity, regardless of GUID spelling.</summary>
+    [Fact]
+    public void VariantIdentityIsCheckedAgainstItsCatalogEntry()
+    {
+        var authored = $$"""{ "Id": "{{baseId}}", "__TypeId": "ca028d68-85a9-5f3d-ad2f-c54db757d6fa" }""";
+        var missing = $$"""{ "__Variant": { "Base": "{{baseId}}" } }""";
+        var wrong = $$"""{ "Id": "{{variantId}}", "__Variant": { "Base": "{{baseId}}" } }""";
+        Assert.Throws<InvalidOperationException>(() => DataAssetVariants.Flatten(missing, _ => authored));
+        Assert.Throws<InvalidOperationException>(() => DataAssetVariants.Flatten(wrong, _ => authored, Guid.NewGuid()));
+        Assert.Throws<ArgumentException>(() => DataAssetVariants.Create(baseId, authored, baseId));
+
+        var right = $$"""
+            { "Id": "{{variantId}}", "__TypeId": "CA028D68-85A9-5F3D-AD2F-C54DB757D6FA",
+              "__Variant": { "Base": "{{baseId}}", "Overrides": {} } }
+            """;
+        var flat = JsonNode.Parse(DataAssetVariants.Flatten(right, _ => authored, variantId))!;
+        Assert.Equal(variantId.ToString(), flat["Id"]!.GetValue<string>());
     }
 
     /// <summary>The factory writes a variant of a real file with its own meta, and the file resolves against the base.</summary>
