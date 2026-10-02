@@ -45,7 +45,7 @@ public static class TypeRegistry
 
         lock (ScanLock)
         {
-            if (!ScannedAssemblies.Add(assembly))
+            if (CollectibleAssemblies.IsReleased(assembly) || !ScannedAssemblies.Add(assembly))
             {
                 return;
             }
@@ -209,6 +209,19 @@ public static class TypeRegistry
             ScannedAssemblies.Clear();
         }
         ScanLoadedAssemblies();
+    }
+
+    /// <summary>Forgets registrations and scans of assemblies released by <see cref="CollectibleAssemblies"/>.</summary>
+    internal static void ReleaseCollectible()
+    {
+        lock (ScanLock)
+        {
+            ScannedAssemblies.RemoveWhere(CollectibleAssemblies.IsReleased);
+            CollectibleAssemblies.RemoveReleased(TypeToId, static type => type);
+            foreach (var (id, type) in IdToType)
+                if (CollectibleAssemblies.IsReleased(type))
+                    IdToType.TryRemove(new KeyValuePair<Guid, Type>(id, type));
+        }
     }
 
     /// <summary>

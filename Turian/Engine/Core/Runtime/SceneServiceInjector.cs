@@ -4,6 +4,8 @@ static class SceneServiceInjector
 {
     static readonly ConcurrentDictionary<Type, (PropertyInfo Property, bool Optional)[]> Properties = new();
 
+    internal static void ReleaseCollectible() => CollectibleAssemblies.RemoveReleased(Properties, static type => type);
+
     internal static void Inject(object instance, IServiceProvider? services, bool allowMissingServices)
     {
         if (services is null) return;

@@ -40,6 +40,7 @@ public static class Serializer
 
                 var amObjectType = typeof(IdObject);
                 var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
+                    .Where(static a => !CollectibleAssemblies.IsReleased(a))
                     .SelectMany(a =>
                     {
                         try
@@ -73,12 +74,17 @@ public static class Serializer
     /// </summary>
     public static void ResetOptions()
     {
+        ClearOptions();
+        TypeRegistry.Reset();
+    }
+
+    /// <summary>Drops the default options, and the converters and type metadata they cache, until next use.</summary>
+    internal static void ClearOptions()
+    {
         lock (OptionsGate)
         {
             _jsonOptions = null;
         }
-
-        TypeRegistry.Reset();
     }
 
     /// <summary>

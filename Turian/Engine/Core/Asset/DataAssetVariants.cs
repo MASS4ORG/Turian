@@ -14,8 +14,8 @@ public static class DataAssetVariants
     const string overridesProperty = "Overrides";
     const int maxDepth = 16;
 
-    // What identifies a payload is the variant's own, never the base's.
-    static readonly string[] OwnProperties = ["Id"];
+    static readonly string[] LinkProperties = [baseProperty, overridesProperty];
+    static readonly string[] ReservedOverrideProperties = ["Id", ObjectJsonSerializer<DataAsset>.TypeIdProperty, Property];
 
     /// <summary>Whether the text of a data asset file is a variant.</summary>
     /// <param name="json">The file's text.</param>
@@ -27,15 +27,16 @@ public static class DataAssetVariants
     /// <summary>The text of a complete payload: the file itself, or a variant resolved against its bases.</summary>
     /// <param name="json">The file's text.</param>
     /// <param name="readBase">Gives the text of another data asset's file by asset id, or null when it is unknown.</param>
+    /// <param name="assetId">The expected asset id, when the payload comes from a catalog entry.</param>
     /// <returns>JSON a payload deserializes from.</returns>
     /// <exception cref="InvalidOperationException">A base is unknown, or the variants form a cycle.</exception>
-    public static string Flatten(string json, Func<Guid, string?> readBase)
+    public static string Flatten(string json, Func<Guid, string?> readBase, Guid? assetId = null)
     {
         ArgumentNullException.ThrowIfNull(json);
         ArgumentNullException.ThrowIfNull(readBase);
 
         return json.Contains($"\"{Property}\"", StringComparison.Ordinal)
-            ? Resolve(JsonNode.Parse(json)!.AsObject(), readBase, []).ToJsonString()
+            ? Resolve(JsonNode.Parse(json)!.AsObject(), readBase, [], assetId).ToJsonString()
             : json;
     }
 
@@ -62,6 +63,8 @@ public static class DataAssetVariants
     /// <returns>The JSON to write.</returns>
     public static string Create(Guid baseId, string baseJson, Guid id)
     {
+        if (baseId == Guid.Empty || id == Guid.Empty || id == baseId)
+            throw new ArgumentException("A variant and its base must have distinct, nonempty asset ids.");
         var baseRoot = JsonNode.Parse(baseJson)!.AsObject();
         var root = new JsonObject();
         if (baseRoot[ObjectJsonSerializer<DataAsset>.TypeIdProperty] is { } typeId)
@@ -71,28 +74,69 @@ public static class DataAssetVariants
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
-    static JsonObject Resolve(JsonObject variant, Func<Guid, string?> readBase, List<Guid> chain)
+    static JsonObject Resolve(JsonObject variant, Func<Guid, string?> readBase, List<Guid> chain, Guid? assetId)
     {
         if (variant[Property] is not JsonObject link) return variant;
         if (chain.Count >= maxDepth) throw new InvalidOperationException("Data asset variants are nested too deeply.");
 
-        if (link[baseProperty]?.GetValue<string>() is not { } text || !Guid.TryParse(text, out var baseId))
+        CheckLink(link);
+        if (link[baseProperty] is not JsonValue baseValue || !baseValue.TryGetValue<string>(out var text)
+            || !Guid.TryParse(text, out var baseId))
             throw new InvalidOperationException($"A data asset variant must name its base with {Property}.{baseProperty}.");
+        var id = GetVariantId(variant, baseId, assetId);
         if (chain.Contains(baseId))
             throw new InvalidOperationException($"Data asset variants form a cycle through {baseId}.");
 
         var baseJson = readBase(baseId)
                        ?? throw new InvalidOperationException($"The base {baseId} of a data asset variant is not in the project.");
         chain.Add(baseId);
-        var resolved = Resolve(JsonNode.Parse(baseJson)!.AsObject(), readBase, chain);
+        var resolved = Resolve(JsonNode.Parse(baseJson)!.AsObject(), readBase, chain, baseId);
 
-        if (link[overridesProperty] is JsonObject overrides) Merge(resolved, overrides);
-        foreach (var own in OwnProperties)
+        ApplyOverrides(resolved, variant, link);
+        resolved["Id"] = id.ToString();
+        return resolved;
+    }
+
+    // A link member this version does not understand fails, so newer variant syntax is never silently ignored.
+    static void CheckLink(JsonObject link)
+    {
+        if (link.Select(static member => member.Key).FirstOrDefault(static name => !LinkProperties.Contains(name))
+            is { } unknown)
+            throw new InvalidOperationException($"A data asset variant has an unknown {Property} member '{unknown}'.");
+        if (link[overridesProperty] is { } overrides && overrides is not JsonObject)
+            throw new InvalidOperationException($"{Property}.{overridesProperty} must be an object.");
+    }
+
+    static Guid GetVariantId(JsonObject variant, Guid baseId, Guid? expected)
+    {
+        if (variant["Id"] is not JsonValue value || !value.TryGetValue<string>(out var text) ||
+            !Guid.TryParse(text, out var id) || id == Guid.Empty || id == baseId ||
+            expected is { } expectedId && id != expectedId)
+            throw new InvalidOperationException("A data asset variant must have its own asset id.");
+        return id;
+    }
+
+    static void ApplyOverrides(JsonObject resolved, JsonObject variant, JsonObject link)
+    {
+        if (link[overridesProperty] is JsonObject overrides)
         {
-            if (variant[own] is { } value) resolved[own] = value.DeepClone();
+            foreach (var reserved in ReservedOverrideProperties)
+                if (overrides.ContainsKey(reserved))
+                    throw new InvalidOperationException($"A data asset variant cannot override '{reserved}'.");
+            Merge(resolved, overrides);
         }
 
-        return resolved;
+        CheckType(resolved, variant);
+    }
+
+    static void CheckType(JsonObject resolved, JsonObject variant)
+    {
+        var type = ObjectJsonSerializer<DataAsset>.TypeIdProperty;
+        if (variant[type] is not null &&
+            (!Guid.TryParse(variant[type]?.ToString(), out var declared) ||
+             !Guid.TryParse(resolved[type]?.ToString(), out var inherited) ||
+             TypeRegistry.CanonicalId(declared) != TypeRegistry.CanonicalId(inherited)))
+            throw new InvalidOperationException("A data asset variant must have the same type as its base.");
     }
 
     // RFC 7386: objects merge, anything else replaces, null removes.

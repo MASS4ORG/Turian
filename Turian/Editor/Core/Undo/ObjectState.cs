@@ -218,6 +218,10 @@ public sealed class ObjectState
         member is PropertyInfo property ? property.PropertyType : ((FieldInfo)member).FieldType;
 
     // The members the serializer writes for a type, less the ones the structure owns.
+    /// <summary>Forgets cached members of types from assemblies released by <see cref="CollectibleAssemblies"/>.</summary>
+    internal static void ReleaseCollectible() =>
+        CollectibleAssemblies.RemoveReleased(MembersByType, static type => type);
+
     static MemberInfo[] MembersOf(Type type) => MembersByType.GetOrAdd(type, static type =>
     [
         .. type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)

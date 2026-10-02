@@ -24,6 +24,14 @@ public static class ObjectReferences
 
     sealed record LoaderContext(IAssetLoader? Loader);
 
+    /// <summary>Forgets cached members of types from assemblies released by <see cref="CollectibleAssemblies"/>.</summary>
+    internal static void ReleaseCollectible()
+    {
+        CollectibleAssemblies.RemoveReleased(ReferenceMembers, static key => key.Item1);
+        CollectibleAssemblies.RemoveReleased(InlineMembers, static member => member.ReflectedType);
+        CollectibleAssemblies.RemoveReleased(Members, static key => key.Item1);
+    }
+
     internal static T DeserializeWithLoader<T>(IAssetLoader? loader, Func<T> deserialize)
     {
         ArgumentNullException.ThrowIfNull(deserialize);

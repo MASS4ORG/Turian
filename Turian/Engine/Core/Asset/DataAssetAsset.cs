@@ -19,16 +19,19 @@ public class DataAssetAsset : Asset
     /// </remarks>
     /// <param name="projectPath">The absolute project root path.</param>
     /// <returns>The shared <see cref="DataAsset"/> payload instance.</returns>
-    public DataAsset? GetContent(string projectPath)
+    public DataAsset? GetContent(string projectPath) =>
+        GetContent(projectPath, DataAssetVariants.ReadFromDatabase, null);
+
+    internal DataAsset? GetContent(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
         lock (contentGate)
         {
-            return content ??= ReadContent(projectPath);
+            return content ??= ReadContent(projectPath, readBase, provider);
         }
     }
 
     /// <summary>
-    /// Re-reads the payload into the instance <see cref="GetContent"/> already handed out, so live
+    /// Re-reads the payload into the instance <see cref="GetContent(string)"/> already handed out, so live
     /// references see the new values. The instance is replaced only when the payload type changed.
     /// </summary>
     /// <param name="projectPath">The absolute project root path.</param>
@@ -37,7 +40,7 @@ public class DataAssetAsset : Asset
     {
         lock (contentGate)
         {
-            var fresh = ReadContent(projectPath);
+            var fresh = ReadContent(projectPath, DataAssetVariants.ReadFromDatabase, null);
             if (content is null || fresh is null || fresh.GetType() != content.GetType())
             {
                 return content = fresh;
@@ -62,29 +65,29 @@ public class DataAssetAsset : Asset
     /// <summary>
     /// Reads the payload and gives it this asset's id, so a reference to the payload names the asset.
     /// </summary>
-    DataAsset? ReadContent(string projectPath)
+    DataAsset? ReadContent(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
-        var payload = ReadPayload(projectPath);
+        var payload = ReadPayload(projectPath, readBase, provider);
         if (payload is not null) payload.Id = Id;
         return payload;
     }
 
-    DataAsset? ReadPayload(string projectPath)
+    DataAsset? ReadPayload(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
         var sourcePath = Path.Combine(projectPath, RelativePath);
-        if (File.Exists(sourcePath)
-            || !AssetDatabase.TryGetInstance(out var database)
-            || database is null
-            || !database.TryGetAssetProvider(Id, out var provider)
-            || provider is null)
+        if (File.Exists(sourcePath))
         {
-            return DataAsset.LoadContent(sourcePath);
+            return DataAsset.LoadContent(sourcePath, Id, readBase);
         }
+
+        if (provider is null && AssetDatabase.TryGetInstance(out var database) && database is not null)
+            database.TryGetAssetProvider(Id, out provider);
+        if (provider is null) return DataAsset.LoadContent(sourcePath, Id, readBase);
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
         using var reader = new StreamReader(provider.GetAssetStream());
         return Serializer.LoadData<DataAsset>(
-            DataAssetVariants.Flatten(reader.ReadToEnd(), DataAssetVariants.ReadFromDatabase));
+            DataAssetVariants.Flatten(reader.ReadToEnd(), readBase, Id));
     }
 
     static void CopyFields(DataAsset source, DataAsset target)

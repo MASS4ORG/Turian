@@ -8,7 +8,9 @@ namespace Turian.Engine.Core;
 /// </summary>
 /// <param name="oapFilePath">The absolute path to the base <c>.oap</c> file.</param>
 /// <param name="contentKey">The logical content key, typically <c>{assetId:N}:primary</c>.</param>
-public sealed class OapAssetFileProvider(string oapFilePath, string contentKey) : IAssetFileProvider
+/// <param name="sessionMount">A fixed content-session mount, or null for editor live lookup.</param>
+public sealed class OapAssetFileProvider(string oapFilePath, string contentKey, OapMountSet? sessionMount = null)
+    : IAssetFileProvider
 {
     /// <summary>Gets the absolute path to the base package file.</summary>
     public string OapFilePath { get; } = oapFilePath;
@@ -28,6 +30,7 @@ public sealed class OapAssetFileProvider(string oapFilePath, string contentKey) 
     /// <inheritdoc/>
     public Stream GetAssetStream()
     {
+        sessionMount?.EnsureUnchanged();
         if (!TryResolve(out var reader, out var entry))
         {
             throw new FileNotFoundException("OAP asset entry was not found.", ContentKey);
@@ -41,7 +44,7 @@ public sealed class OapAssetFileProvider(string oapFilePath, string contentKey) 
         reader = null!;
         entry = default;
 
-        var mountSet = OapMountSet.ForBasePackage(OapFilePath);
+        var mountSet = sessionMount ?? OapMountSet.ForBasePackage(OapFilePath);
         if (mountSet is null)
         {
             return false;

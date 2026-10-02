@@ -68,6 +68,37 @@ public class UndoTests
         Assert.Equal(Vector3.Zero, node.Transform.Position);
     }
 
+    sealed class LinkComponent : Component
+    {
+        public Component? Single { get; set; }
+        public Component? Missing { get; set; }
+        public Component[] Many { get; set; } = [];
+        public List<Component> Listed { get; set; } = [];
+        public int Count { get; set; }
+    }
+
+    /// <summary>A remapped snapshot swaps every referenced object, in members, arrays and lists, for its replacement.</summary>
+    [Fact]
+    public void ObjectState_RemapsReferencesOntoReplacements()
+    {
+        var (oldA, oldB, newA, newB) = (new LightComponent(), new LightComponent(), new LightComponent(), new LightComponent());
+        var source = new LinkComponent { Single = oldA, Many = [oldA, oldB], Listed = [oldB], Count = 3 };
+        var replacements = new Dictionary<IdObject, IdObject>(ReferenceEqualityComparer.Instance)
+        {
+            [oldA] = newA,
+            [oldB] = newB
+        };
+        var target = new LinkComponent();
+
+        ObjectState.Capture(source).Remap(typeof(LinkComponent), obj => replacements[obj]).Restore(target);
+
+        Assert.Same(newA, target.Single);
+        Assert.Null(target.Missing);
+        Assert.Equal([newA, newB], target.Many);
+        Assert.Equal([newB], target.Listed);
+        Assert.Equal(3, target.Count);
+    }
+
     /// <summary>A node's children come back in their order, with their parent set.</summary>
     [Fact]
     public void ObjectState_RestoresChildren()
