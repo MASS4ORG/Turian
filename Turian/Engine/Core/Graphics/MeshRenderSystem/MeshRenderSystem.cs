@@ -14,6 +14,7 @@ public class MeshRenderSystem : IRenderSystem
 
     MeshPipeline pipeline = null!;
     PipelineLayout pipelineLayout;
+    readonly List<MeshComponent> meshes = [];
 
     /// <summary>
     /// .ctor
@@ -49,9 +50,10 @@ public class MeshRenderSystem : IRenderSystem
             null
         );
 
-        foreach (var rootNode in frameInfo.Nodes.Where(static node => node.IsActive))
+        for (var n = 0; n < frameInfo.Nodes.Count; n++)
         {
-            foreach (var component in rootNode.GetComponentsInChildren<MeshComponent>())
+            frameInfo.Nodes[n].GetComponentsInChildren(meshes);
+            foreach (var component in meshes)
             {
                 StandardPushConstantData push = new()
                 {

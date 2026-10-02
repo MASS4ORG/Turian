@@ -14,6 +14,8 @@ public class StandardRenderSystem : IRenderSystem
     StandardPipeline pipeline = null!;
     PipelineLayout pipelineLayout;
     readonly MaterialDescriptorContext materials;
+    readonly List<ModelComponent> models = [];
+    readonly List<LightComponent> lights = [];
 
     /// <summary>
     /// .ctor
@@ -62,9 +64,10 @@ public class StandardRenderSystem : IRenderSystem
 
     unsafe void DrawSolids(FrameInfo frameInfo)
     {
-        foreach (var node in frameInfo.Nodes.Where(static node => node.IsActive))
+        for (var n = 0; n < frameInfo.Nodes.Count; n++)
         {
-            foreach (var component in node.GetComponentsInChildren<ModelComponent>())
+            frameInfo.Nodes[n].GetComponentsInChildren(models);
+            foreach (var component in models)
             {
                 var model = component.ModelInstance;
                 if (model is null)
@@ -152,7 +155,7 @@ public class StandardRenderSystem : IRenderSystem
         return new MaterialAsset { Id = childId }.GetContent(materials) ?? materials.DefaultMaterial;
     }
 
-    static void UpdateLights(FrameInfo frameInfo, GlobalUbo ubo)
+    void UpdateLights(FrameInfo frameInfo, GlobalUbo ubo)
     {
         // Slots are filled from scratch every frame: a slot left over from a scene with more lights
         // would keep shining, and a default point light sits on the world origin at full intensity.
@@ -161,9 +164,10 @@ public class StandardRenderSystem : IRenderSystem
         var pointIndex = 0;
         var directionalIndex = 0;
 
-        foreach (var rootNode in frameInfo.Nodes.Where(static node => node.IsActive))
+        for (var n = 0; n < frameInfo.Nodes.Count; n++)
         {
-            foreach (var component in rootNode.GetComponentsInChildren<LightComponent>())
+            frameInfo.Nodes[n].GetComponentsInChildren(lights);
+            foreach (var component in lights)
             {
                 if (component.Node is not { } lightNode) continue;
 
