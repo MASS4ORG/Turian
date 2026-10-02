@@ -52,7 +52,7 @@ AGENTS.md
 .windsurf/
 .delta/
 
-script.sh
-script.py
+.script.[sp][hy]
+.script-[0-9].[sp][hy]
 docs/internal
 Examples/

@@ -19,11 +19,11 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Forms/Guinevere.Forms.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers/Autoformers.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere.Forms" Version="5.*"/>
+        <PackageReference Include="MASS4.Autoformers" Version="5.*"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -36,7 +36,7 @@
           <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2"/>
-        <PackageReference Include="SkiaSharp" Version="4.152.1"/>
+        <PackageReference Include="SkiaSharp" Version="4.153.1" />
         <PackageReference Include="Microsoft.NET.StringTools" Version="18.10.1" ExcludeAssets="runtime" PrivateAssets="all">
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

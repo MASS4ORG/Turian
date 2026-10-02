@@ -33,7 +33,7 @@
         <PackageReference Include="System.CommandLine" Version="2.0.12" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12" />
-        <PackageReference Include="SkiaSharp" Version="4.152.1" />
+        <PackageReference Include="SkiaSharp" Version="4.153.1" />
     </ItemGroup>
 
     <!-- The platform host template is copied, not compiled -->

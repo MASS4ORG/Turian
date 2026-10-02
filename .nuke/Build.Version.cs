@@ -13,10 +13,37 @@ sealed partial class Build
     readonly GitVersion GitVersion;
 
     /// <summary>
-    /// The current version, using GitVersion. A publish build checks out a tag on a detached HEAD, where
-    /// GitVersion cannot run without remote credentials; the tag being built is the version there.
+    /// The release version. GitVersion decides it; the Conventional Commits fallback only takes over when
+    /// GitVersion does not land above the latest release tag (shallow clone, stray older tag). A publish build
+    /// checks out a tag on a detached HEAD, where GitVersion cannot run without remote credentials; the tag
+    /// being built is the version there.
     /// </summary>
-    string Version => GitVersion?.MajorMinorPatch ?? CurrentVersion;
+    string Version => CachedVersion ??= ResolveVersion();
+
+    string CachedVersion;
+
+    string ResolveVersion()
+    {
+        if (GitVersion?.MajorMinorPatch is not { } gitVersion)
+        {
+            return CurrentVersion;
+        }
+
+        if (!HasAnyTags || IsVersionEarlierThan(CurrentVersion, gitVersion))
+        {
+            return gitVersion;
+        }
+
+        var messageLines = Git($"log --format=%B {CurrentTag}..HEAD", logOutput: false).Select(output => output.Text);
+        var fallback = BumpVersion(CurrentVersion, messageLines);
+        if (fallback != CurrentVersion)
+        {
+            Log.Warning("GitVersion returned {GitVersion}, which is not above release {Release}. Using {Fallback}",
+                gitVersion, CurrentVersion, fallback);
+        }
+
+        return fallback;
+    }
 
     public string VersionMajor => Version.Split('.')[0];
 
@@ -28,11 +55,17 @@ sealed partial class Build
     string TagName => $"v{Version}";
 
     /// <summary>
-    /// Checks if there are new commits since the last tag.
+    /// Checks if there are new commits since the last tag that warrant a release.
     /// </summary>
-    bool HasNewCommits => GitVersion is not null && GitVersion.CommitsSinceVersionSource != "0";
+    bool HasNewCommits =>
+        GitVersion is not null && GitVersion.CommitsSinceVersionSource != "0" && Version != CurrentVersion;
 
     string CachedTag;
+
+    /// <summary>
+    /// The highest release tag reachable from HEAD, or "0.0.0" before the first release. `describe` is not used
+    /// because it selects the closest tag, which is wrong when a stray tag was created after a newer release.
+    /// </summary>
     string CurrentTag
     {
         get
@@ -41,9 +74,9 @@ sealed partial class Build
             {
                 try
                 {
-                    CachedTag = Git("describe --tags --abbrev=0")
-                        .FirstOrDefault()
-                        .Text;
+                    CachedTag = Git("tag --merged HEAD --sort=-version:refname", logOutput: false)
+                        .Select(output => output.Text)
+                        .FirstOrDefault(tag => ReleaseTagRegex().IsMatch(tag)) ?? "0.0.0";
                 }
                 catch
                 {
@@ -60,6 +93,55 @@ sealed partial class Build
     /// HEAD's history does not count: it cannot bound a changelog range.
     /// </summary>
     bool HasAnyTags => CurrentTag != "0.0.0";
+
+    static bool IsVersionEarlierThan(string candidate, string baseline) =>
+        System.Version.TryParse(candidate, out var candidateVersion) &&
+        System.Version.TryParse(baseline, out var baselineVersion) &&
+        candidateVersion < baselineVersion;
+
+    /// <summary>
+    /// Returns <paramref name="version"/> bumped by the largest change in the commit message lines, using the
+    /// GitVersion.yml rules: major for `type!:` or `BREAKING CHANGE:`, minor for `feat:`, patch for `fix:` and
+    /// `perf:`; any other type leaves the version unchanged.
+    /// </summary>
+    internal static string BumpVersion(string version, IEnumerable<string> messageLines)
+    {
+        var current = System.Version.Parse(version);
+        var bump = messageLines.Select(GetReleaseBump).DefaultIfEmpty(ReleaseBump.None).Max();
+        return bump switch
+        {
+            ReleaseBump.Major => $"{current.Major + 1}.0.0",
+            ReleaseBump.Minor => $"{current.Major}.{current.Minor + 1}.0",
+            ReleaseBump.Patch => $"{current.Major}.{current.Minor}.{current.Build + 1}",
+            _ => version,
+        };
+    }
+
+    static ReleaseBump GetReleaseBump(string line) =>
+        BreakingChangeRegex().IsMatch(line) ? ReleaseBump.Major
+        : FeatureRegex().IsMatch(line) ? ReleaseBump.Minor
+        : PatchRegex().IsMatch(line) ? ReleaseBump.Patch
+        : ReleaseBump.None;
+
+    enum ReleaseBump
+    {
+        None,
+        Patch,
+        Minor,
+        Major,
+    }
+
+    [GeneratedRegex(@"^v\d+\.\d+\.\d+$")]
+    private static partial Regex ReleaseTagRegex();
+
+    [GeneratedRegex(@"^\w+(\([\w\-\.]+\))?!:|BREAKING[ -]CHANGE:")]
+    private static partial Regex BreakingChangeRegex();
+
+    [GeneratedRegex(@"^feat(\([\w\-\.]+\))?:")]
+    private static partial Regex FeatureRegex();
+
+    [GeneratedRegex(@"^fix(\([\w\-\.]+\))?:|^perf(\([\w\-\.]+\))?:")]
+    private static partial Regex PatchRegex();
 
     /// <summary>
     /// Prints the current version.

@@ -164,14 +164,6 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<StudioLocalization>())));
 
         context.Panels.Register(new PanelDescriptor(
-            SettingsPanelId, "Settings", PanelPlacement.Center,
-            sp => new SettingsPanel(
-                sp.GetRequiredService<IEditorSettings>(),
-                sp.GetRequiredService<ILogger>(),
-                sp.GetRequiredService<StudioLocalization>()))
-        { OpenByDefault = false });
-
-        context.Panels.Register(new PanelDescriptor(
             ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
             sp => new ShortcutsPanel(
                 sp.GetRequiredService<IShortcutService>(),
@@ -216,9 +208,6 @@ public sealed class GayaPlugin : IPlugin
         StudioCommands.Register(context);
         PanelCommands.Register(context);
     }
-
-    /// <summary>The Settings panel's id, which the File menu's entry brings to the front.</summary>
-    public const string SettingsPanelId = "gaya.turian.settings";
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
     public const string ShortcutsPanelId = "gaya.turian.shortcuts";

@@ -364,4 +364,14 @@ public static class ShellCommands
 {
     /// <summary>Opens or closes the command palette.</summary>
     public const string CommandPalette = "gaya.shell.commandPalette";
+
+    /// <summary>Brings the Settings panel to the front.</summary>
+    public const string Settings = "gaya.shell.settings";
+}
+
+/// <summary>Ids of the panels the workbench itself contributes, before any plugin is configured.</summary>
+public static class ShellPanels
+{
+    /// <summary>Every registered settings page, drawn as a form.</summary>
+    public const string Settings = "gaya.shell.settings";
 }

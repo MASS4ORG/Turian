@@ -12,7 +12,7 @@
     </PropertyGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/MASS4.Attributes/MASS4.Attributes.csproj" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
