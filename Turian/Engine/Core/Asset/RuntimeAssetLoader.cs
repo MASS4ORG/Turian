@@ -202,17 +202,7 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        var projectRoot = record.ProjectRootPath;
-        if (string.IsNullOrWhiteSpace(projectRoot) || string.IsNullOrWhiteSpace(record.MetaRelativePath))
-        {
-            return CreateFromRecord(record);
-        }
-
-        var metaPath = Path.IsPathRooted(record.MetaRelativePath)
-            ? record.MetaRelativePath
-            : Path.GetFullPath(Path.Combine(projectRoot, record.MetaRelativePath));
-
-        if (!File.Exists(metaPath))
+        if (MetaPath(record) is not { } metaPath)
         {
             return CreateFromRecord(record);
         }
@@ -223,6 +213,20 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             asset.RelativePath = record.SourceRelativePath;
         }
         return asset;
+    }
+
+    // The record's existing meta file, or null when the game ships without it.
+    static string? MetaPath(AssetRecord record)
+    {
+        if (string.IsNullOrWhiteSpace(record.ProjectRootPath) || string.IsNullOrWhiteSpace(record.MetaRelativePath))
+        {
+            return null;
+        }
+
+        var metaPath = Path.IsPathRooted(record.MetaRelativePath)
+            ? record.MetaRelativePath
+            : Path.GetFullPath(Path.Combine(record.ProjectRootPath, record.MetaRelativePath));
+        return File.Exists(metaPath) ? metaPath : null;
     }
 
     /// <summary>

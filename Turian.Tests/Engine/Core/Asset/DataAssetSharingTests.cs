@@ -50,6 +50,26 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.Same(first, metadata.GetContent(projectRoot));
     }
 
+    /// <summary>A failed load names the asset's source, is not cached, and a later load retries it.</summary>
+    [Fact]
+    public async Task Loader_ReportsFailedLoadsAndRetries()
+    {
+        var metaPath = $"{sourcePath}.meta";
+        var valid = File.ReadAllText(metaPath);
+        var unknownType = JsonNode.Parse(valid)!.AsObject();
+        unknownType[ObjectJsonSerializer<Asset>.TypeIdProperty] = Guid.NewGuid().ToString();
+        File.WriteAllText(metaPath, unknownType.ToJsonString());
+        var loader = new RuntimeAssetLoader(database);
+
+        var error = await Assert.ThrowsAsync<UnresolvableTypeIdException>(() => loader.LoadAsync<Asset>(metadata.Id));
+        Assert.False(string.IsNullOrEmpty(error.SourcePath));
+        File.WriteAllText(metaPath, "{");
+        await Assert.ThrowsAnyAsync<JsonException>(() => loader.LoadAsync<Asset>(metadata.Id));
+        File.WriteAllText(metaPath, valid);
+
+        Assert.NotNull(await loader.LoadAsync<DataAssetAsset>(metadata.Id));
+    }
+
     /// <summary>Verifies that every load of an id through one loader shares one payload.</summary>
     [Fact]
     public async Task Loader_SharesPayloadAcrossReferences()

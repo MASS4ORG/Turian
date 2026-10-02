@@ -111,7 +111,11 @@ public sealed class AssemblySlotManager
         {
             logger.LogError(ex, "Failed to load assembly from {Path}. Reverting to previous slot", assemblyPath);
 
-            try { newContext.Unload(); }
+            try
+            {
+                Release(newContext);
+                newContext.Unload();
+            }
             catch { /* best effort */ }
 
             return false;
@@ -142,6 +146,7 @@ public sealed class AssemblySlotManager
 
         try
         {
+            Release(loadContext);
             loadContext.Unload();
             loadContext = null;
 
@@ -153,6 +158,13 @@ public sealed class AssemblySlotManager
         {
             logger.LogWarning(ex, "Error while unloading previous assembly context");
         }
+    }
+
+    // Static caches holding the context's types would keep it from ever being collected.
+    static void Release(UserAssemblyLoadContext context)
+    {
+        CollectibleAssemblies.Release(context.Assemblies.ToArray());
+        ObjectState.ReleaseCollectible();
     }
 
     string SlotPath(string slot) => Path.Combine(slotRootDirectory, slot);

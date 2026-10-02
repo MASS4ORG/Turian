@@ -68,6 +68,9 @@ public static class GeneratedSerializers
     internal static bool Remove(Type type, out GeneratedSerializer? serializer) =>
         Serializers.TryRemove(type, out serializer);
 
+    /// <summary>Forgets serializers of types from assemblies released by <see cref="CollectibleAssemblies"/>.</summary>
+    internal static void ReleaseCollectible() => CollectibleAssemblies.RemoveReleased(Serializers, static type => type);
+
     /// <summary>Finds the generated serializer for exactly <paramref name="type"/>.</summary>
     /// <param name="type">The runtime type.</param>
     /// <param name="serializer">The serializer, when one was generated.</param>
