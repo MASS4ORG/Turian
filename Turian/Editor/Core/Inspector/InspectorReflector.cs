@@ -24,7 +24,7 @@ public static class InspectorReflector
     /// Returns <see langword="true"/> if accessing the member value will not throw.
     /// Fields are always considered safe; property getters are probed.
     /// </summary>
-    static bool CanSafelyAccess(InspectorMemberMetadata metadata, object targetObject)
+    static bool CanSafelyAccess(MemberMetadata metadata, object targetObject)
     {
         if (metadata.Member is not PropertyInfo) return true;
 

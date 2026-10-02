@@ -68,14 +68,7 @@ static class StudioCommands
         context.Shortcuts.Add(new KeyBinding("gaya.turian.saveAll", KeyboardKey.S,
             KeyModifiers.Ctrl | KeyModifiers.Shift));
 
-        // ── File: settings ──────────────────────────────────────────────────
-        Add(context, MenuIds.File, "2", 0, new CommandDescriptor(
-            "gaya.turian.settings", "File: Settings…",
-            sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.SettingsPanelId))
-        { DynamicLabel = Localized("Settings…") });
-
-        context.Shortcuts.Add(new KeyBinding("gaya.turian.settings", KeyboardKey.Comma, KeyModifiers.Ctrl));
-
+        // ── File: settings (the Settings entry itself is the host's) ────────
         Add(context, MenuIds.File, "2", 1, new CommandDescriptor(
             "gaya.turian.keyboardShortcuts", "File: Keyboard Shortcuts…",
             sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))

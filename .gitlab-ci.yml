@@ -14,8 +14,7 @@ variables:
     PUBLISH_SELF_CONTAINED: "false"
     PUBLISH_SINGLE_FILE: "false"
     PUBLISH_TRIMMED: "false"
-    GITLAB_REPOSITORY_PATH: "turian/Turian"
-    GITHUB_REPOSITORY: "MASS4ORG/Turian"
+    GITLAB_REPOSITORY_PATH: "$CI_PROJECT_PATH"
 
 cache:
     key: "${CI_COMMIT_REF_SLUG}"
@@ -128,7 +127,7 @@ qodana:
         - qodana
 
 # Checks for commits since the last tag; if there are any, updates CHANGELOG.md, tags the release
-# and pushes the commit+tag to GitLab and (if a token is configured) GitHub. The pushed tag
+# and pushes the commit+tag to this GitLab project. The pushed tag
 # triggers this same pipeline's build/publish/container stages on the new tag ref.
 release-check:
     <<: *build_job_template
@@ -139,11 +138,9 @@ release-check:
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
-            ./build.sh GitHubCreateTag GitLabCreateTag \
+            ./build.sh GitLabCreateTag \
               --gitlab-project-path "$GITLAB_REPOSITORY_PATH" \
               --gitlab-token "$GITLAB_RELEASE_TOKEN" \
-              --github-repository "$GITHUB_REPOSITORY" \
-              --github-token "$GITHUB_RELEASE_TOKEN" \
               --release-branch "$CI_DEFAULT_BRANCH" \
               --verbosity minimal
 
@@ -221,27 +218,8 @@ gitlab-release:
               --gitlab-token "$GITLAB_RELEASE_TOKEN" \
               --verbosity minimal
 
-github-release:
-    <<: *build_job_template
-    stage: publish
-    rules:
-        - if: '$CI_COMMIT_TAG'
-          allow_failure: true
-    needs:
-        - build
-        - job: build-macos
-          optional: true
-    before_script:
-        - !reference [.dotnet_nuke_template, before_script]
-    script:
-        - |
-            ./build.sh GitHubCreateRelease \
-              --github-repository "$GITHUB_REPOSITORY" \
-              --github-token "$GITHUB_RELEASE_TOKEN" \
-              --verbosity minimal
-
-# Builds the Turian CLI container image with Podman and pushes it to both the GitLab
-# Container Registry and GHCR. VFS storage avoids needing a privileged runner; drop
+# Builds the Turian CLI container image with Podman and pushes it to this project's GitLab
+# Container Registry. VFS storage avoids needing a privileged runner; drop
 # CONTAINERS_STORAGE_DRIVER on a self-hosted runner with /dev/fuse for faster overlay builds.
 container:
     <<: *build_job_template
@@ -256,9 +234,8 @@ container:
         - apt-get update -yqq
         - apt-get install -yqq podman
         - echo "$CI_REGISTRY_PASSWORD" | podman login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-        - echo "$GHCR_TOKEN" | podman login ghcr.io -u "$GHCR_USERNAME" --password-stdin
     script:
         - |
             ./build.sh ContainerPush \
-              --container-registries "$CI_REGISTRY_IMAGE,ghcr.io/mass4org/turian-cli" \
+              --container-registries "$CI_REGISTRY_IMAGE" \
               --verbosity minimal

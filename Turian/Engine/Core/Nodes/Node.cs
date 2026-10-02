@@ -54,13 +54,13 @@ public partial class Node : IdObject
     /// Whether the node was destroyed with its scene. A reference to it reads as missing: it is saved as null and
     /// never resolved to.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public bool IsDestroyed { get; internal set; }
 
     /// <summary>
     /// Gets or sets the parent node of this node.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Node? Parent
     {
         get;
@@ -83,30 +83,30 @@ public partial class Node : IdObject
     }
 
     /// <summary>Gets the services bound to this scene hierarchy.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public IServiceProvider? Services { get; private set; }
 
     /// <summary>Whether an edit-time preview may leave gameplay-only services unbound.</summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     internal bool AllowMissingServices { get; private set; }
 
     /// <summary>
     /// Gets or sets the list of child nodes.
     /// </summary>
-    [HideInEditor]
+    [Hide]
     public ObservableCollection<Node> Children { get; set; } = [];
 
     /// <summary>
     /// Gets the list of components attached to this node.
     /// </summary>
     [JsonConverter(typeof(ComponentJsonConverter))]
-    [HideInEditor]
+    [Hide]
     public Collection<Component> Components { get; init; } = [];
 
     /// <summary>
     /// The prefab this node was instantiated from, or null when the node is not the root of a prefab instance.
     /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), HideInEditor]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), Hide]
     public PrefabInstance? PrefabInstance { get; set; }
 
     /// <summary>
@@ -140,7 +140,7 @@ public partial class Node : IdObject
     /// <summary>
     /// Gets the cached global transformation of the node.
     /// </summary>
-    [JsonIgnore, HideInEditor]
+    [JsonIgnore, Hide]
     public Transform GlobalTransform
     {
         get

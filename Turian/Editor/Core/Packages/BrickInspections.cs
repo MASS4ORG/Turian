@@ -17,7 +17,7 @@ public static class BrickInspections
     public static FormInspection Brick(BricksController controller, CatalogBrick brick, ResolvedPackage? resolved)
     {
         var manifest = Manifest(brick, resolved);
-        var model = FormBuilder.Build(manifest, readOnly: true);
+        var model = InspectorForms.Build(manifest, readOnly: true);
         var fields = model.Sections[0].Fields;
         if (resolved is null && brick.Manifest is null)
             fields = [.. fields.Where(f => f.Name is "Name" or "DisplayName" or "Description" or "Author" or "Version")];
@@ -52,7 +52,7 @@ public static class BrickInspections
         _ => "Available",
     };
 
-    static IReadOnlyList<InspectorButton> Actions(BricksController controller, CatalogBrick brick,
+    static IReadOnlyList<Button> Actions(BricksController controller, CatalogBrick brick,
         ResolvedPackage? resolved) => brick.State switch
         {
             BrickState.Available => [Action(controller, "Enable", () => controller.EnableAsync(brick))],
@@ -82,7 +82,7 @@ public static class BrickInspections
         var readOnly = name == ProjectPackages.PublicRegistry.Name;
         var draft = JsonSerializer.Deserialize<ScopedRegistry>(JsonSerializer.Serialize(registry, PackageJson.Options),
             PackageJson.Options)!;
-        var model = FormBuilder.Build(draft, readOnly: readOnly);
+        var model = InspectorForms.Build(draft, readOnly: readOnly);
         var savedName = name.Length == 0 ? null : name;
         var title = savedName is null ? "New registry" : $"Registry '{savedName}'";
         var section = new FormSection(title, draft, model.Sections[0].Fields)
@@ -99,7 +99,7 @@ public static class BrickInspections
     /// <summary>Builds the project's brick settings form with explicit persistence actions.</summary>
     public static FormInspection Settings(BricksController controller, BricksSettings settings)
     {
-        var model = FormBuilder.Build(settings);
+        var model = InspectorForms.Build(settings);
         var project = controller.ProjectFolder;
         bool CanReload() => project is not null && controller.ProjectFolder == project && !controller.IsBusy;
         var section = new FormSection("Bricks Settings", settings, model.Sections[0].Fields)
@@ -107,16 +107,16 @@ public static class BrickInspections
             Buttons =
             [
                 Action(controller, "Save", () => controller.SaveSettingsAsync(settings)),
-                new InspectorButton("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
+                new Button("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
             ],
         };
         return new FormInspection(settings, model with { Sections = [section] }, "bricks-settings", controller.ProjectFolder);
     }
 
-    static InspectorButton Action(BricksController controller, string label, Func<Task<bool>> action)
+    static Button Action(BricksController controller, string label, Func<Task<bool>> action)
     {
         var project = controller.ProjectFolder;
         bool Enabled() => project is not null && controller.ProjectFolder == project && !controller.IsBusy;
-        return new InspectorButton(label, () => { if (Enabled()) _ = action(); }, Enabled);
+        return new Button(label, () => { if (Enabled()) _ = action(); }, Enabled);
     }
 }

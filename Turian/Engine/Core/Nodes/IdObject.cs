@@ -9,7 +9,7 @@ public class IdObject : IEquatable<IdObject>
     /// <summary>
     /// Object ID.
     /// </summary>
-    [HideInEditor]
+    [Hide]
     public Guid Id { get; set; } = Guid.NewGuid();
 
     /// <summary>Reference ids read from data whose targets are not resolved yet, by member name.</summary>

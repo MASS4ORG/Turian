@@ -29,7 +29,7 @@ sealed partial class Build
 
     static readonly (string Directory, string Name)[] EngineLibraries =
     [
-        ("MASS4/Attributes", "MASS4.Attributes"),
+        ("Turian/Engine/Attributes", "Attributes"),
         ("Gaya/Gaya.Packages", "Gaya.Packages"),
         ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
         ("Turian/Engine/Core", "Turian.Engine.Core")

@@ -124,6 +124,7 @@ public static class PluginHost
         services.AddSingleton<IFocusTracker>(focus);
 
         RegisterShellCommands(commands, shortcuts);
+        RegisterSettingsPanel(panels, commands, menus, shortcuts);
 
         var args = commandLineArgs ?? [];
         var loaded = new List<string>();
@@ -171,6 +172,29 @@ public static class PluginHost
 
         shortcuts.Add(new KeyBinding(ShellCommands.CommandPalette, KeyboardKey.P,
             KeyModifiers.Ctrl | KeyModifiers.Shift));
+    }
+
+    /// <summary>
+    /// The editor for every page in <see cref="IEditorSettings"/>, with its File entry and shortcut. Registered
+    /// before any plugin, like the shell commands, so a plugin may rebind or replace it.
+    /// </summary>
+    static void RegisterSettingsPanel(PanelRegistry panels, CommandRegistry commands, MenuRegistry menus,
+        ShortcutService shortcuts)
+    {
+        panels.Register(new PanelDescriptor(
+            ShellPanels.Settings, "Settings", PanelPlacement.Center,
+            services => new SettingsPanel(
+                services.GetRequiredService<IEditorSettings>(),
+                services.GetRequiredService<ILogger>(),
+                services.GetService<IShellLocalization>()))
+        { OpenByDefault = false });
+
+        commands.Register(new CommandDescriptor(ShellCommands.Settings, "File: Settings…",
+            services => services.GetRequiredService<IShellHost>().ShowPanel(ShellPanels.Settings))
+        { DynamicLabel = services => services.GetService<IShellLocalization>()?.T("Settings…") ?? "Settings…" });
+
+        menus.Add(new MenuItemDescriptor(MenuIds.File, ShellCommands.Settings, "2", 0));
+        shortcuts.Add(new KeyBinding(ShellCommands.Settings, KeyboardKey.Comma, KeyModifiers.Ctrl));
     }
 
     static IEnumerable<(PluginAttribute Attr, Type Type)> Discover(IEnumerable<Assembly> assemblies)

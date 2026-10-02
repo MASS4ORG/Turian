@@ -4,6 +4,8 @@ global using System.Text.Json;
 global using System.Text.Json.Nodes;
 global using Gaya.Sdk;
 global using Guinevere;
+global using MASS4.Attributes;
+global using Autoformers;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Logging.Abstractions;

@@ -92,7 +92,7 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.True(database.RegisterAsset(settings));
 
         var holder = new TypedHolder { Rule = new DataAssetReference<DataAssetTest>(settings.Id) };
-        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
         var reference = ReferenceField.TryCreate(field)!;
         var picker = new ReferencePicker(database, null!, new RuntimeAssetLoader(database));
 
@@ -130,7 +130,7 @@ public sealed class DataAssetSharingTests : IDisposable
         }
 
         var holder = new TypedHolder();
-        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
         var reference = ReferenceField.TryCreate(field)!;
         var loader = new RuntimeAssetLoader(database);
         var picker = new ReferencePicker(database, null!, loader);
@@ -158,7 +158,7 @@ public sealed class DataAssetSharingTests : IDisposable
         database.LoadCatalogFromProject(projectRoot);
 
         var holder = new TypedHolder();
-        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
         var loader = new RuntimeAssetLoader(database);
         var picker = new ReferencePicker(database, null!, loader);
         var reference = ReferenceField.TryCreate(field)!;
@@ -181,7 +181,7 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.True(database.RegisterAsset(asset));
 
         var holder = new DirectHolder();
-        var field = FormBuilder.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(DirectHolder.Value));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(DirectHolder.Value));
         var reference = ReferenceField.TryCreate(field)!;
         var loader = new RuntimeAssetLoader(database);
         var picker = new ReferencePicker(database, null!, loader);

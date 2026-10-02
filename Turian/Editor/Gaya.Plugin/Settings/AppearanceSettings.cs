@@ -10,7 +10,7 @@ public sealed class AppearanceSettings
     int textSize = 12;
 
     /// <summary>The name of the committed <c>StudioTheme</c>.</summary>
-    [HideInEditor]
+    [Hide]
     public string Theme { get; set; } = "Dark";
 
     /// <summary>The editor's base text size in points.</summary>

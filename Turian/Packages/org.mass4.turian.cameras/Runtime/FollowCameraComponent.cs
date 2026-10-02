@@ -9,6 +9,7 @@ namespace Turian.Cameras;
 public class FollowCameraComponent : Component
 {
     /// <summary>The node the camera follows. When null, the component is a no-op.</summary>
+    [Required]
     public Node? Target { get; set; }
 
     /// <summary>World-space offset from the target's position.</summary>

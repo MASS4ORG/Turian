@@ -66,15 +66,18 @@ public sealed class StringTableEntry
     public string Key { get; set; } = string.Empty;
 
     /// <summary>The English text the key was authored from — also the fallback for a missing translation.</summary>
+    [TextArea(1, 6)]
     public string Source { get; set; } = string.Empty;
 
     /// <summary>The translated text, or <c>null</c> when the entry is untranslated.</summary>
+    [TextArea(1, 6)]
     public string? Translation { get; set; }
 
     /// <summary>Per-category plural variants, keyed by <see cref="PluralCategory"/>.</summary>
     public Dictionary<PluralCategory, string> Plurals { get; set; } = [];
 
     /// <summary>Context shown to translators, never to players.</summary>
+    [TextArea(1, 6)]
     public string? Note { get; set; }
 
     /// <summary>A translation-workflow state such as <c>new</c>, <c>translated</c> or <c>fuzzy</c>.</summary>

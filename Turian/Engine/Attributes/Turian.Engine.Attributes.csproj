@@ -6,10 +6,20 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian</RootNamespace>
         <PackageId>MASS4.Turian.Engine.Attributes</PackageId>
+        <!-- User projects and releases take Attributes.dll (MASS4.Attributes) from this output (BuildAppSettings.TurianPackages),
+             also when it comes from a package. -->
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Attributes" Version="5.*" />
+    </ItemGroup>
+
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/MASS4/Attributes/MASS4.Attributes.csproj" />
         <Using Include="MASS4.Attributes" />
     </ItemGroup>
 </Project>

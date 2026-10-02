@@ -40,7 +40,7 @@ public class Transform : IEquatable<Transform>, IFormattable, INotifyPropertyCha
     /// <summary>
     /// Gets or sets the orientation of the transformation as a quaternion.
     /// </summary>
-    [HideInEditor]
+    [Hide]
     public Quaternion Orientation
     {
         get => orientation;

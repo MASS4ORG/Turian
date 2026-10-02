@@ -12,8 +12,15 @@
         <Description>Package manifests, resolution, lock files and the machine-wide package store shared by Gaya hosts. No UI; shared presentation metadata comes from MASS4.Attributes.</Description>
     </PropertyGroup>
 
+    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
+        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
+        <PackageReference Include="MASS4.Attributes" Version="5.*" />
+    </ItemGroup>
+
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/MASS4/Attributes/MASS4.Attributes.csproj" />
         <Using Include="MASS4.Attributes" />
     </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@
         <AssemblyName>Gaya.Host</AssemblyName>
         <PackageId>MASS4.Gaya.Host</PackageId>
         <Title>Gaya Host</Title>
-        <Description>The Gaya workbench host: plugin discovery and activation, the docking workbench, command palette, menus and layout persistence. Referenced by the application shell, not by plugins.</Description>
+        <Description>The Gaya workbench host: plugin discovery and activation, the docking workbench, command palette, settings panel, menus and layout persistence. Referenced by the application shell, not by plugins.</Description>
     </PropertyGroup>
 
     <!-- Internal libraries -->
@@ -20,10 +20,12 @@
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.*"/>
+        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="5.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

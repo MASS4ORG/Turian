@@ -52,6 +52,7 @@ AGENTS.md
 .windsurf/
 .delta/
 
-script.sh
-docs/decisions
+.script.[sp][hy]
+.script-[0-9].[sp][hy]
+docs/internal
 Examples/

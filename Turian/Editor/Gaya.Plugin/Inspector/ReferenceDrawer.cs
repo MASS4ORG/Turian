@@ -9,7 +9,7 @@ namespace Gaya.Plugin.Turian;
 /// <param name="inspector">Receives a revealed node, which is what selects it in the scene tree.</param>
 /// <param name="reveal">Asks the asset browser to show a revealed asset.</param>
 sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController inspector,
-    AssetRevealService reveal)
+    AssetRevealService reveal) : IPropertyDrawer
 {
     const float pickerWidth = 280f;
     const float pickerHeight = 240f;
@@ -22,6 +22,17 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     ReferenceField? openField;
     string search = string.Empty;
     Rect openAnchor;
+
+    /// <summary>Whether a field is drawn by this drawer: it holds a node, component or asset reference.</summary>
+    public static bool Handles(FormField field) => ReferenceField.IsReference(field);
+
+    /// <inheritdoc />
+    public void Draw(Gui gui, FormField field, string id, FormRenderContext context) =>
+        FormControls.Row(gui, field.Label, id, () => TryDraw(gui, field, id),
+            context.IsModified?.Invoke(field) == true);
+
+    /// <inheritdoc />
+    public bool DrawValue(Gui gui, FormField field, string id, FormRenderContext context) => TryDraw(gui, field, id);
 
     /// <summary>
     /// Draws <paramref name="field"/> when it holds a reference.

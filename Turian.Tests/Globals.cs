@@ -21,6 +21,7 @@ global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
 global using MASS4.Attributes;
+global using Autoformers;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;
 global using Microsoft.CodeAnalysis.Diagnostics;

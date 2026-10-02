@@ -63,7 +63,7 @@ public class CameraComponent : Component, ICamera
 
     /// <inheritdoc/>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public float FieldOfView
     {
         get => FieldOfViewDegrees * Mathf.DegreesToRadians;
@@ -79,7 +79,7 @@ public class CameraComponent : Component, ICamera
     } = 60f;
 
     /// <summary>Gets or sets the focal length in millimeters. Affects field of view when using physical camera model.</summary>
-    [HideInEditor] // TODO: make it conditional (either physical or FOV)
+    [Hide] // TODO: make it conditional (either physical or FOV)
     [JsonIgnore] // Its setter recomputes FieldOfView, so loading it would overwrite the saved field of view.
     public float FocalLength
     {
@@ -92,7 +92,7 @@ public class CameraComponent : Component, ICamera
     }
 
     /// <summary>Gets or sets the sensor height in millimeters. Affects field of view when using physical camera model.</summary>
-    [HideInEditor] // TODO: make it conditional (either physical or FOV)
+    [Hide] // TODO: make it conditional (either physical or FOV)
     [JsonIgnore] // Its setter recomputes FieldOfView, so loading it would overwrite the saved field of view.
     public float SensorHeight
     {
@@ -116,11 +116,11 @@ public class CameraComponent : Component, ICamera
     } = 40f;
 
     /// <summary>Gets or sets how the camera determines its aspect ratio.</summary>
-    [HideInEditor]
+    [Hide]
     public AspectMode AspectMode { get; set; } = AspectMode.Viewport;
 
     /// <summary>Gets or sets the fixed aspect ratio used when AspectMode is Fixed.</summary>
-    [HideInEditor]
+    [Hide]
     public float FixedAspectRatio { get; set; } = 16f / 9f;
 
     /// <summary>
@@ -131,7 +131,7 @@ public class CameraComponent : Component, ICamera
     /// this camera's viewport currently relies on.
     /// </summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public float AspectRatio => aspect;
 
     /// <summary>
@@ -160,7 +160,7 @@ public class CameraComponent : Component, ICamera
     /// <c>Transform.Orientation</c> is never second-guessed by a redundant scalar copy.
     /// </summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public float Pitch
     {
         // Transform.Rotation is Euler degrees (Transform.cs: Orientation.ToEulerDegrees()); this
@@ -188,7 +188,7 @@ public class CameraComponent : Component, ICamera
     /// independently serialized.
     /// </summary>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public float Yaw
     {
         get => Node is not null ? Node.Transform.Rotation.Y * Mathf.DegreesToRadians : yaw;
@@ -209,22 +209,22 @@ public class CameraComponent : Component, ICamera
 
     /// <inheritdoc/>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public Vector3 Front { get; private set; } = Vector3.UnitZ;
 
     /// <inheritdoc/>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public Vector3 Right { get; private set; } = Vector3.UnitX;
 
     /// <inheritdoc/>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public Vector3 Up { get; private set; } = GlobalUp;
 
     /// <inheritdoc/>
     [JsonIgnore]
-    [HideInEditor]
+    [Hide]
     public Vector3 Position
     {
         get => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position;

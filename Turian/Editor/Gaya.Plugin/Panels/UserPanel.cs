@@ -7,7 +7,12 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class UserPanel(UserPanelPage page) : IPanel
 {
-    readonly HashSet<string> collapsed = [];
+    readonly FormRenderContext context = new()
+    {
+        Drawers = TurianForms.Drawers,
+        CanInline = TurianForms.CanInline,
+    };
+
     FormModel? model;
 
     /// <inheritdoc />
@@ -18,19 +23,20 @@ sealed class UserPanel(UserPanelPage page) : IPanel
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(StudioTheme.Current.Scale(8f))
                    .Padding(StudioTheme.Current.Scale(12f)).Enter())
         {
+            TurianForms.ApplyStyle(gui);
             gui.ScrollY();
 
-            model ??= FormBuilder.Build(page.Target);
+            model ??= InspectorForms.Build(page.Target);
             var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
 
             for (var i = 0; i < fields.Count; i++)
-                FieldDrawers.Draw(gui, fields[i], $"userpanel/{page.Id}/field{i}", references: null, collapsed);
+                gui.FormField(fields[i], $"userpanel/{page.Id}/field{i}", context);
 
             foreach (var section in model.Sections)
                 for (var b = 0; b < section.Buttons.Count; b++)
                 {
                     var button = section.Buttons[b];
-                    if (FieldDrawers.TextButton(gui, button.Label, $"userpanel/{page.Id}/button{b}"))
+                    if (FormControls.TextButton(gui, button.Label, $"userpanel/{page.Id}/button{b}"))
                         button.Invoke();
                 }
         }

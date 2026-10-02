@@ -43,7 +43,7 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     public ProjectSettingsSet Loaded { get; } = new();
 
     /// <inheritdoc/>
-    [HideInEditor, JsonIgnore]
+    [Hide, JsonIgnore]
     public BricksSettings Bricks => BricksSettings.ForProject(ref bricks, ProjectAbsoluteDir);
 
     /// <inheritdoc/>
@@ -106,17 +106,17 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     /// List of internal engine packages
     /// </summary>
     public string[] InternalPackages => [
-        "MASS4/Attributes/MASS4.Attributes",
         "Gaya/Gaya.Packages/Gaya.Packages",
         "Turian/Engine/Attributes/Turian.Engine.Attributes",
         "Turian/Engine/Core/Turian.Engine.Core"
     ];
 
     /// <summary>
-    /// The engine assemblies user code references, as (folder, assembly name) pairs.
+    /// The engine assemblies user code references, as (folder, assembly name) pairs. The Guinevere attributes
+    /// assembly (Attributes.dll, package MASS4.Attributes) is copied into Turian.Engine.Attributes' output.
     /// </summary>
     public (string, string)[] TurianPackages => [
-        ("MASS4/Attributes", "MASS4.Attributes"),
+        ("Turian/Engine/Attributes", "Attributes"),
         ("Gaya/Gaya.Packages", "Gaya.Packages"),
         ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
         ("Turian/Engine/Core", "Turian.Engine.Core")

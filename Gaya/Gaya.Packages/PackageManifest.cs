@@ -46,18 +46,19 @@ public sealed class PackageManifest
     public const string FileName = "package.json";
 
     /// <summary>The package id, reverse-DNS (<c>com.example.inventory</c>).</summary>
-    [InspectorOrder(-30), Tooltip("Permanent reverse-DNS brick identifier.")]
+    [SetOrder(-30), Tooltip("Permanent reverse-DNS brick identifier.")]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>The package version.</summary>
-    [InspectorOrder(-20)]
+    [SetOrder(-20)]
     public SemanticVersion? Version { get; set; }
 
     /// <summary>The name shown to users.</summary>
-    [InspectorOrder(-10)]
+    [SetOrder(-10)]
     public string? DisplayName { get; set; }
 
     /// <summary>What the package is for.</summary>
+    [TextArea(2, 8)]
     public string? Description { get; set; }
 
     /// <summary>The package's author.</summary>

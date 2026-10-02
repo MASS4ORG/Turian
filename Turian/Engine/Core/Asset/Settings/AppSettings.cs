@@ -20,7 +20,7 @@ public class AppSettings : IAppSettings
     public ProjectSettingsSet Loaded { get; } = new();
 
     /// <inheritdoc/>
-    [HideInEditor, JsonIgnore]
+    [Hide, JsonIgnore]
     public BricksSettings Bricks => BricksSettings.ForProject(ref bricks, ProjectAbsoluteDir);
 
     /// <inheritdoc/>

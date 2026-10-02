@@ -1,4 +1,4 @@
-namespace Gaya.Plugin.Turian;
+namespace Gaya.Host;
 
 /// <summary>
 /// Every editor setting in one place, laid out the way an IDE does it: the scope tabs and the
@@ -11,7 +11,10 @@ namespace Gaya.Plugin.Turian;
 /// Edits are never staged: writing a field goes straight to the live object and the file follows a
 /// moment later, which is what the rest of the settings-owning programs a user knows do.
 /// </remarks>
-sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocalization localization) : IPanel
+/// <param name="settings">The registered settings pages and their storage.</param>
+/// <param name="log">Receives file and form failures.</param>
+/// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
+sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -27,6 +30,13 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
     float measuredWidth;
 
     static StudioTheme Theme => StudioTheme.Current;
+
+    FormRenderContext? formContext;
+
+    /// <summary>The panel's form context, translating enum labels into the studio's language.</summary>
+    FormRenderContext FormContext => formContext ??= new FormRenderContext { Translate = T };
+
+    string T(string source) => localization?.T(source) ?? source;
 
     /// <inheritdoc />
     public void Render(Gui gui)
@@ -73,8 +83,8 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
         {
             gui.DrawBackgroundRect(Theme.Chrome);
 
-            ScopeTab(gui, SettingsScope.User, localization.T("User"), height);
-            ScopeTab(gui, SettingsScope.Workspace, localization.T("Workspace"), height);
+            ScopeTab(gui, SettingsScope.User, T("User"), height);
+            ScopeTab(gui, SettingsScope.Workspace, T("Workspace"), height);
         }
     }
 
@@ -114,7 +124,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
     {
         var rowHeight = Theme.Scale(Theme.RowHeight + 4f);
 
-        filter = gui.TextInput(filter, width: 0, height: rowHeight, placeholder: localization.T("Search settings"),
+        filter = gui.TextInput(filter, width: 0, height: rowHeight, placeholder: T("Search settings"),
             fontSize: Theme.Text(12), padding: 5, id: "settings/filter");
 
         using (gui.Node(-1, rowHeight, "settings/openJson").ExpandWidth().ContentAlignY(0.5f).Enter())
@@ -123,13 +133,13 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
             var hot = interactable.OnHover();
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
-            gui.DrawText(localization.T("Open settings.json"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim,
+            gui.DrawText(T("Open settings.json"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim,
                 centerInRect: false);
 
             if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick()) OpenJson();
         }
 
-        gui.TreeView(categories, Rows(pages), StudioControls.Tree(), OnCategoryClick);
+        gui.TreeView(categories, Rows(pages), SettingsStyle.Tree(), OnCategoryClick);
     }
 
     /// <summary>
@@ -149,10 +159,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
             {
                 var groupId = string.Join('/', segments[..(depth + 1)]);
                 if (emitted.Add(groupId))
-                    rows.Add(new TreeItem(groupId, localization.T(segments[depth]), depth, HasChildren: true));
+                    rows.Add(new TreeItem(groupId, T(segments[depth]), depth, HasChildren: true));
             }
 
-            rows.Add(new TreeItem(page.Id, localization.T(segments[^1]), segments.Length - 1, Tag: page));
+            rows.Add(new TreeItem(page.Id, T(segments[^1]), segments.Length - 1, Tag: page));
         }
 
         return rows;
@@ -183,10 +193,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
             return;
         }
 
-        gui.DrawText(localization.T(page.Title), Theme.Text(20f), Theme.Ink, centerInRect: false);
+        gui.DrawText(T(page.Title), Theme.Text(20f), Theme.Ink, centerInRect: false);
 
         if (page.Description.Length > 0)
-            gui.DrawText(localization.T(page.Description), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
+            gui.DrawText(T(page.Description), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);
 
         var fields = Form(page).Sections.SelectMany(section => section.BodyFields).ToList();
@@ -199,9 +209,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
     string EmptyMessage()
     {
         if (scope == SettingsScope.Workspace && !settings.HasWorkspace)
-            return localization.T("Open a project to edit the settings stored with it.");
+            return T("Open a project to edit the settings stored with it.");
 
-        return localization.T(filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.");
+        return T(filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.");
     }
 
     /// <summary>
@@ -226,7 +236,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
                 using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
                            .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
                 {
-                    gui.DrawText(localization.T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
+                    gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
 
                     // Beside the title rather than against the panel's edge: at a settings page's
                     // width the two would otherwise be too far apart to read as one row.
@@ -236,12 +246,15 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
                 }
 
                 if (description.Length > 0)
-                    gui.DrawText(localization.T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
+                    gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
                         centerInRect: false);
 
                 using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
                            .Direction(Axis.Horizontal).Gap(4f).Enter())
-                    FieldDrawers.DrawEditorOnly(gui, field, id, localization.T);
+                {
+                    SettingsStyle.ApplyFormStyle(gui);
+                    gui.FormFieldEditor(field, id, FormContext);
+                }
             }
         }
     }
@@ -258,7 +271,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
 
-            gui.DrawText(EditorIcons.RotateLeft, Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
+            gui.DrawText(SettingsStyle.RevertIcon, Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }
@@ -286,9 +299,24 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, StudioLocaliza
             return cached.Model;
 
         var pageId = page.Id;
-        var model = FormBuilder.Build(page.Target, _ => settings.NotifyChanged(pageId));
+        var model = FormBuilder.Build(page.Target, new FormOptions
+        {
+            MutationNotifier = _ => settings.NotifyChanged(pageId),
+            FailureReporter = ReportFailure,
+        });
         forms[page.Id] = (page.Target, model);
         return model;
+    }
+
+    /// <summary>A failing action is an error the user should see in the log; a failing getter or setter is noise.</summary>
+    void ReportFailure(FormFailure failure)
+    {
+        if (failure.Kind == FormFailureKind.Action)
+            log.LogError(failure.Exception, "Settings: {Member} failed on {Target}", failure.Member,
+                failure.Target.GetType().Name);
+        else
+            log.LogDebug(failure.Exception, "Settings: {Kind} of {Member} failed on {Target}", failure.Kind,
+                failure.Member, failure.Target.GetType().Name);
     }
 
     /// <summary>

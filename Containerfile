@@ -17,7 +17,8 @@ RUN dotnet publish Turian/Editor/CLI/Turian.Editor.CLI.csproj \
     -c Release \
     -o /app/bootstrap \
     --use-current-runtime --self-contained false -p:PublishSingleFile=true \
-    && mv /app/bootstrap/Turian.Editor.Bootstrap /app/publish/turian-cli
+    && mv /app/bootstrap/Turian.Editor.Bootstrap /app/publish/turian-cli \
+    && cp Turian/Editor/CSharp/CodeGenerator/bin/Release/netstandard2.0/Turian.CSharp.CodeGenerator.dll /app/publish/lib/
 
 # The dotnet SDK (not just the runtime) is required at runtime: the CLI uses
 # Microsoft.Build.Locator to compile a gamedev's own project via MSBuild.
