@@ -6,7 +6,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian</RootNamespace>
         <PackageId>MASS4.Turian.Engine.Attributes</PackageId>
-        <!-- User projects and releases take MASS4.Attributes.dll from this output (BuildAppSettings.TurianPackages),
+        <!-- User projects and releases take Attributes.dll (MASS4.Attributes) from this output (BuildAppSettings.TurianPackages),
              also when it comes from a package. -->
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>

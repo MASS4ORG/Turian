@@ -112,11 +112,11 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     ];
 
     /// <summary>
-    /// The engine assemblies user code references, as (folder, assembly name) pairs. MASS4.Attributes comes from
-    /// Guinevere and is copied into Turian.Engine.Attributes' output.
+    /// The engine assemblies user code references, as (folder, assembly name) pairs. The Guinevere attributes
+    /// assembly (Attributes.dll, package MASS4.Attributes) is copied into Turian.Engine.Attributes' output.
     /// </summary>
     public (string, string)[] TurianPackages => [
-        ("Turian/Engine/Attributes", "MASS4.Attributes"),
+        ("Turian/Engine/Attributes", "Attributes"),
         ("Gaya/Gaya.Packages", "Gaya.Packages"),
         ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
         ("Turian/Engine/Core", "Turian.Engine.Core")
