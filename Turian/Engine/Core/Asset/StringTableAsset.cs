@@ -16,11 +16,13 @@ public sealed class StringTableAsset : Asset
     /// Reads this table and returns the parsed <see cref="StringTable"/>, or <c>null</c> when the
     /// artifact is missing or unreadable. The result is cached — callers must not mutate it.
     /// </summary>
-    public StringTable? GetContent()
+    /// <param name="database">The asset database the table is registered in.</param>
+    public StringTable? GetContent(AssetDatabase database)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (Cache.TryGetValue(Id, out var cached)) return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
 
         try

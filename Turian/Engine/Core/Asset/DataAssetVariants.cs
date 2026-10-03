@@ -44,12 +44,12 @@ public static class DataAssetVariants
     /// The text of another data asset's file, from the asset database: its imported copy, which exists in the editor
     /// and in a built game alike.
     /// </summary>
+    /// <param name="database">The asset database, or null when no project is loaded.</param>
     /// <param name="id">The asset id.</param>
     /// <returns>The text, or null when the database does not know the asset.</returns>
-    public static string? ReadFromDatabase(Guid id)
+    public static string? ReadFromDatabase(AssetDatabase? database, Guid id)
     {
-        if (!AssetDatabase.TryGetInstance(out var database) || database is null
-            || !database.TryGetAssetProvider(id, out var provider) || provider is null)
+        if (database is null || !database.TryGetAssetProvider(id, out var provider) || provider is null)
             return null;
 
         using var reader = new StreamReader(provider.GetAssetStream());

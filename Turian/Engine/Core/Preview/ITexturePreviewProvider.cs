@@ -13,5 +13,6 @@ public interface ITexturePreviewProvider : IAssetPreviewProvider
     /// </summary>
     /// <param name="asset">The asset to preview.</param>
     /// <param name="vulkan">The Vulkan context to resolve GPU resources against.</param>
-    Texture? GetPreviewTexture(Asset asset, Vulkan vulkan);
+    /// <param name="assets">The asset database the previewed content is read from.</param>
+    Texture? GetPreviewTexture(Asset asset, Vulkan vulkan, AssetDatabase assets);
 }

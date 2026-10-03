@@ -21,14 +21,16 @@ public class MeshAsset : Asset
     public Bounds Bounds { get; set; }
 
     /// <summary>
-    /// Reads the mesh metadata registered under <paramref name="assetId"/> from the asset database.
+    /// Reads the mesh metadata registered under <paramref name="assetId"/> from <paramref name="database"/>.
     /// </summary>
+    /// <param name="database">The asset database the mesh is registered in.</param>
     /// <param name="assetId">Identifier of the mesh child asset.</param>
     /// <returns>The mesh asset, or <c>null</c> when it cannot be resolved.</returns>
-    public static MeshAsset? Resolve(Guid assetId)
+    public static MeshAsset? Resolve(AssetDatabase database, Guid assetId)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (assetId == Guid.Empty
-            || !AssetDatabase.Instance.TryGetAssetProvider(assetId, out var provider)
+            || !database.TryGetAssetProvider(assetId, out var provider)
             || provider is null)
         {
             return null;

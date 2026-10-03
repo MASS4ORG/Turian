@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>Checks that queued watcher events cannot mutate an importer after disposal.</summary>
-[Collection(SerialTests.Name)]
 public sealed class AssetImporterLifetimeTests : IDisposable
 {
     readonly string project = Directory.CreateTempSubdirectory("turian-import-lifetime-").FullName;
@@ -9,7 +8,6 @@ public sealed class AssetImporterLifetimeTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(project, recursive: true);
     }
 
@@ -25,7 +23,6 @@ public sealed class AssetImporterLifetimeTests : IDisposable
     [InlineData(WatcherChangeTypes.Renamed, true)]
     public void WatcherEventsRespectImporterLifetime(WatcherChangeTypes change, bool dispose)
     {
-        TestAssetDatabase.Reset();
         var assets = Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
         var source = Path.Combine(assets, "Base.dataasset");
         var content = new AssemblyDefinition { Name = "Original" };
@@ -78,7 +75,6 @@ public sealed class AssetImporterLifetimeTests : IDisposable
     [InlineData("Script.cs", false)]
     public void LiveDeletionEventsRespectAssetKinds(string name, bool removesAsset)
     {
-        TestAssetDatabase.Reset();
         var assets = Directory.CreateDirectory(Path.Combine(project, "Assets")).FullName;
         Serializer.Save<DataAsset>(Path.Combine(assets, "Base.dataasset"), new AssemblyDefinition { Name = "Base" });
         using var build = new BuildManager(new AppSettings(), NullLogger.Instance);

@@ -5,7 +5,6 @@ namespace Turian.Tests;
 /// of the scene being edited, so the edited hierarchy is never mutated and stopping play needs no
 /// restore step.
 /// </summary>
-[Collection(SerialTests.Name)]
 public class PlayModeIsolationTests : IDisposable
 {
     readonly AssetDatabase assetDatabase;
@@ -13,14 +12,12 @@ public class PlayModeIsolationTests : IDisposable
     /// <summary>Resets the <see cref="AssetDatabase"/> singleton, as the other suites do.</summary>
     public PlayModeIsolationTests()
     {
-        TestAssetDatabase.Reset();
         assetDatabase = new AssetDatabase();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

@@ -33,7 +33,7 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        using var svc = new SceneViewerService(fixture.Vulkan, size, size);
+        using var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         var root = new Node();
 
         svc.Render(root, 0.016);
@@ -56,7 +56,7 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
 
         // Keep the texture alive while the source closure can still be called.
         using (var green = OpaqueGreen(fixture.Vulkan))
-        using (var svc = new SceneViewerService(fixture.Vulkan, size, size))
+        using (var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size))
         {
             var root = new Node();
 

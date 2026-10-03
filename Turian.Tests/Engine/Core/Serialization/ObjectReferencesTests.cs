@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Tests that members typed as a node, component or DataAsset serialize as references and resolve after load,
 /// instead of being written as inline copies.
 /// </summary>
-[Collection(SerialTests.Name)]
 public sealed class ObjectReferencesTests : IDisposable
 {
     /// <summary>A component holding every kind of direct reference.</summary>
@@ -40,7 +39,6 @@ public sealed class ObjectReferencesTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
     }
 
@@ -102,7 +100,6 @@ public sealed class ObjectReferencesTests : IDisposable
     [Fact]
     public void CrossSceneReference_ResolvesWhenBothScenesAreLoaded()
     {
-        TestAssetDatabase.Reset();
         var scenes = new SceneManager(new AssetDatabase());
         var other = new Node { Name = "Other" };
         var holder = new Node { Name = "Holder" };
@@ -160,7 +157,6 @@ public sealed class ObjectReferencesTests : IDisposable
     [Fact]
     public async Task DataAssetReferences_ResolveThroughTheLoader()
     {
-        TestAssetDatabase.Reset();
         var database = new AssetDatabase();
         var assets = Path.Combine(projectRoot, "Assets");
         Directory.CreateDirectory(assets);

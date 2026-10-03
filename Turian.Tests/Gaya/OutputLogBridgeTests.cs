@@ -15,7 +15,6 @@ public sealed class OutputLogBridgeTests
     [Fact]
     public void ClearOnPlay_LeavesFirstGameUpdateVisible()
     {
-        TestAssetDatabase.Reset();
         LogBuffer.Clear();
         try
         {
@@ -41,7 +40,6 @@ public sealed class OutputLogBridgeTests
         finally
         {
             LogBuffer.Clear();
-            TestAssetDatabase.Reset();
         }
     }
 }

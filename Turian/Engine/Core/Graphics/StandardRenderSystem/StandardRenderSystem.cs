@@ -24,16 +24,18 @@ public class StandardRenderSystem : IRenderSystem
     /// .ctor
     /// </summary>
     /// <param name="vulkan"></param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="renderPass"></param>
     /// <param name="globalSetLayout"></param>
     public StandardRenderSystem(
         Vulkan vulkan,
+        AssetDatabase assets,
         RenderPass renderPass,
         Silk.NET.Vulkan.DescriptorSetLayout globalSetLayout
     )
     {
         this.vulkan = vulkan;
-        materials = new MaterialDescriptorContext(vulkan);
+        materials = new MaterialDescriptorContext(vulkan, assets);
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }

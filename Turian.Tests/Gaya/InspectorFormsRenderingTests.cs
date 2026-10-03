@@ -17,7 +17,7 @@ public sealed class InspectorFormsRenderingTests
         var gui = new Gui { Input = input };
         var picker = new ReferencePicker(null!, null!, null!);
         using var panel = new InspectorPanel(selection, assets, picker, null!, null!, new InspectorSettings(),
-            null!, null!, null!, null!, null!, null!);
+            null!, null!, null!, null!, null!, null!, null!);
         using var surface = SKSurface.Create(new SKImageInfo(640, 800));
         var font = Font.FromFamilyName("sans-serif", 14);
         var inspection = new AssetInspection(null!, "settings.dataasset", Activator.CreateInstance(settingsType),
@@ -58,7 +58,7 @@ public sealed class InspectorFormsRenderingTests
         };
         selection.Select(new FormInspection(target, model with { Sections = [section] }, "registry:studio"));
         using var panel = new InspectorPanel(selection, assets, null!, null!, null!, new InspectorSettings(),
-            null!, null!, null!, null!, null!, null!);
+            null!, null!, null!, null!, null!, null!, null!);
         using var surface = SKSurface.Create(new SKImageInfo(640, 800));
         var font = Font.FromFamilyName("sans-serif", 14);
         Frame(gui, surface, font, panel.Render);
@@ -85,7 +85,7 @@ public sealed class InspectorFormsRenderingTests
         node.Components.Add(new ModelComponent());
         selection.Select(node);
         using var panel = new InspectorPanel(selection, assets, new ReferencePicker(null!, null!, null!), null!, null!,
-            new InspectorSettings(), null!, null!, null!, null!, null!, null!);
+            new InspectorSettings(), null!, null!, null!, null!, null!, null!, null!);
         using var surface = SKSurface.Create(new SKImageInfo(640, 800));
         var font = Font.FromFamilyName("sans-serif", 14);
 

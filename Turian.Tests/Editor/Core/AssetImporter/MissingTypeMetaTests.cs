@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>A meta whose asset type comes from an assembly that is not loaded must survive a scan untouched.</summary>
-[Collection(SerialTests.Name)]
 public sealed class MissingTypeMetaTests : IDisposable
 {
     readonly string project = Path.Combine(Path.GetTempPath(), $"turian-missing-type-{Guid.NewGuid():N}");
@@ -10,13 +9,11 @@ public sealed class MissingTypeMetaTests : IDisposable
     public MissingTypeMetaTests()
     {
         Directory.CreateDirectory(Path.Combine(project, "Assets"));
-        TestAssetDatabase.Reset();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(project, recursive: true);
     }
 

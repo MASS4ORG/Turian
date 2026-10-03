@@ -55,6 +55,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
             RedirectStandardError = true,
             WorkingDirectory = buildProjectDirectory
         };
+        WithoutLocatorEnvironment(buildStartInfo);
 
         using (var buildProcess = new Process())
         {

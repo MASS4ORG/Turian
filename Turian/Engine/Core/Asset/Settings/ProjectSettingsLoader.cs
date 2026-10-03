@@ -72,7 +72,7 @@ public static class ProjectSettingsLoader
         {
             try
             {
-                if (DataAsset.LoadContent(source.SourcePath) is ProjectSettingsAsset loaded)
+                if (DataAsset.LoadContent(source.SourcePath, database: null) is ProjectSettingsAsset loaded)
                     settings.Loaded.Use(loaded);
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
@@ -106,8 +106,8 @@ public static class ProjectSettingsLoader
         {
             try
             {
-                if (new AssetReference<DataAssetAsset>(assetId).LoadAsync(loader).GetAwaiter().GetResult()
-                        ?.GetContent(settings.ProjectAbsoluteDir) is ProjectSettingsAsset loaded)
+                if (loader.LoadContentAsync<ProjectSettingsAsset>(assetId).GetAwaiter().GetResult()
+                    is { } loaded)
                     settings.Loaded.Use(loaded);
             }
             catch (Exception ex) when (ex is IOException or JsonException)

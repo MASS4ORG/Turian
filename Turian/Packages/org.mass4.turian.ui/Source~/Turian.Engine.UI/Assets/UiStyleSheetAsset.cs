@@ -13,11 +13,13 @@ public sealed class UiStyleSheetAsset : Asset
     /// Reads this stylesheet's artifact and returns the parsed <see cref="StyleSheet"/>, or
     /// <c>null</c> when the artifact is missing or unreadable. The result is cached.
     /// </summary>
-    public StyleSheet? GetContent()
+    /// <param name="database">The asset database the asset is registered in.</param>
+    public StyleSheet? GetContent(AssetDatabase database)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (Cache.TryGetValue(Id, out var cached)) return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
 
         try

@@ -8,7 +8,7 @@ namespace Turian.Editor.Core;
 public sealed class ModelAssetPreviewProvider : IScenePreviewProvider
 {
     /// <inheritdoc/>
-    public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan)
+    public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan, AssetDatabase assets)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         if (asset is not ModelAsset modelAsset) return default;
@@ -24,7 +24,7 @@ public sealed class ModelAssetPreviewProvider : IScenePreviewProvider
 
         root.Children.Add(PreviewLighting.CreateLightNode());
 
-        var model = modelAsset.GetContent(vulkan);
+        var model = modelAsset.GetContent(vulkan, assets);
         var bounds = Bounds.Empty;
         if (model is not null)
             foreach (var subMesh in model.SubMeshes)

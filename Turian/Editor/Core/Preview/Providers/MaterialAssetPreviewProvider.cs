@@ -9,7 +9,7 @@ public sealed class MaterialAssetPreviewProvider : IScenePreviewProvider
     static readonly Bounds QuadBounds = new(new(-0.5f, -0.5f, -0.01f), new(0.5f, 0.5f, 0.01f));
 
     /// <inheritdoc/>
-    public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan)
+    public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan, AssetDatabase assets)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         if (asset is not MaterialAsset materialAsset) return default;

@@ -44,7 +44,7 @@ public class GenericAssetImporter : IAssetImporter
     /// <inheritdoc/>
     public IdObject? LoadAuthoredContent(Asset asset, string sourcePath) =>
         (asset is DataAssetAsset || IsDataAssetPath(sourcePath)) && !IsVariantFile(sourcePath)
-            ? DataAsset.LoadContent(sourcePath)
+            ? DataAsset.LoadContent(sourcePath, database: null)
             : null;
 
     // Saving the inspector's copy would write the resolved values over the file and end the variant.

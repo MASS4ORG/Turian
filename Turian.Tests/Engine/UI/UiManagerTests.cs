@@ -15,7 +15,6 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
     public UiManagerTests(VulkanFixture fixture)
     {
         this.fixture = fixture;
-        TestAssetDatabase.Reset();
         UiDocumentAsset.ClearCache();
         database = new AssetDatabase();
     }
@@ -23,7 +22,6 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         UiDocumentAsset.ClearCache();
         Directory.Delete(directory, recursive: true);
     }
@@ -101,7 +99,11 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
             </UI>
             """);
         using var manager = new UiManager(fixture.Vulkan);
-        var (root, _) = Scene(new UiDocumentComponent { Document = new AssetReference<UiDocumentAsset>(documentId) });
+        var (root, _) = Scene(new UiDocumentComponent
+        {
+            Document = new AssetReference<UiDocumentAsset>(documentId),
+            Assets = database,
+        });
         CountingController.Updates = 0;
 
         Assert.NotNull(manager.RenderOverlay(root, 128, 64, 0.016f));

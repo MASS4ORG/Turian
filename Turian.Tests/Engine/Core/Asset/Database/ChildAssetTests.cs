@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Tests for child assets — the materials and textures a model file declares, which have no
 /// source file and no <c>.meta</c> of their own and are addressed through their parent.
 /// </summary>
-[Collection(SerialTests.Name)]
 public sealed class ChildAssetTests : IDisposable
 {
     readonly string projectRoot;
@@ -14,7 +13,6 @@ public sealed class ChildAssetTests : IDisposable
     /// <summary>Creates a throwaway project on disk and a fresh database singleton.</summary>
     public ChildAssetTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
 
         projectRoot = Path.Combine(Path.GetTempPath(), $"turian-child-assets-{Guid.NewGuid():N}");
@@ -25,7 +23,6 @@ public sealed class ChildAssetTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot))
         {
             Directory.Delete(projectRoot, recursive: true);

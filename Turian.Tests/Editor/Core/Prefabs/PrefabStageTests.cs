@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>Tests for prefab editing mode's way back to the scene an instance's prefab was opened from.</summary>
-[Collection(SerialTests.Name)]
 public class PrefabStageTests : IDisposable
 {
     readonly AssetManager assets = new();
@@ -12,7 +11,6 @@ public class PrefabStageTests : IDisposable
     /// <summary>Creates a workspace with a prefab in the database.</summary>
     public PrefabStageTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
         workspace = new AssetWorkspace(assets, new SettingsService());
         stage = new PrefabStage(workspace, database);
@@ -23,7 +21,6 @@ public class PrefabStageTests : IDisposable
     {
         stage.Dispose();
         workspace.Dispose();
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

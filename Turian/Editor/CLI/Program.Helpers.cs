@@ -65,7 +65,7 @@ public static partial class Program
             var settingsService = new SettingsService();
             settingsService.Set(appSettings);
 
-            using var importer = new AssetImporter(Log.Logger, assetDatabase, settingsService);
+            using var importer = new AssetImporter(Log.Logger, assetDatabase, settingsService, buildManager);
             importer.GenerateMetaFiles(assetsDir);
 
             Log.Logger.LogInformation("Asset import completed");

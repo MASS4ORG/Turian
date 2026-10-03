@@ -8,8 +8,10 @@ namespace Turian.Engine.Core;
 /// </remarks>
 /// <param name="windowManager">The window manager responsible for the rendering surface.</param>
 /// <param name="vulkan">The Vulkan context used for rendering.</param>
+/// <param name="assets">The asset database materials and textures are read from.</param>
 /// <param name="logger">The logger for recording initialization steps.</param>
-public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger logger) : IDisposable
+public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDatabase assets, ILogger logger)
+    : IDisposable
 {
     // set to true to force FIFO swapping
     const bool useFifo = false;
@@ -188,6 +190,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
         renderSystems.Add(
             new StandardRenderSystem(
                 vulkan,
+                assets,
                 Renderer.SwapChainRenderPass,
                 globalSetLayout.GetDescriptorSetLayout()
             )

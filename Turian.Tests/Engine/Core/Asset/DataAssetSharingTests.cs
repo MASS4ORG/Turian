@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Tests that a DataAsset payload is one shared instance per asset and loader, and that
 /// <see cref="DataAsset.Instantiate{T}"/> gives independent copies.
 /// </summary>
-[Collection(SerialTests.Name)]
 public sealed class DataAssetSharingTests : IDisposable
 {
     readonly string projectRoot;
@@ -15,7 +14,6 @@ public sealed class DataAssetSharingTests : IDisposable
     /// <summary>Writes a throwaway project holding one registered <see cref="DataAssetTest"/>.</summary>
     public DataAssetSharingTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
 
         projectRoot = Path.Combine(Path.GetTempPath(), $"turian-dataasset-{Guid.NewGuid():N}");
@@ -33,7 +31,6 @@ public sealed class DataAssetSharingTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot))
         {
             Directory.Delete(projectRoot, recursive: true);
@@ -44,11 +41,11 @@ public sealed class DataAssetSharingTests : IDisposable
     [Fact]
     public void GetContent_ReturnsSameInstanceWithoutIo()
     {
-        var first = metadata.GetContent(projectRoot);
+        var first = metadata.GetContent(projectRoot, database);
         File.Delete(sourcePath);
 
         Assert.NotNull(first);
-        Assert.Same(first, metadata.GetContent(projectRoot));
+        Assert.Same(first, metadata.GetContent(projectRoot, database));
     }
 
     /// <summary>A failed load names the asset's source, is not cached, and a later load retries it.</summary>
@@ -78,8 +75,8 @@ public sealed class DataAssetSharingTests : IDisposable
         var loader = new RuntimeAssetLoader(database);
         var reference = new AssetReference<DataAssetAsset>(metadata.Id);
 
-        var a = (await reference.LoadAsync(loader))?.GetContent(projectRoot) as DataAssetTest;
-        var b = (await reference.LoadAsync(loader))?.GetContent(projectRoot) as DataAssetTest;
+        var a = (await reference.LoadAsync(loader))?.GetContent(projectRoot, database) as DataAssetTest;
+        var b = (await reference.LoadAsync(loader))?.GetContent(projectRoot, database) as DataAssetTest;
 
         Assert.NotNull(a);
         Assert.Same(a, b);
@@ -236,24 +233,24 @@ public sealed class DataAssetSharingTests : IDisposable
         var editor = await new RuntimeAssetLoader(database).LoadAsync<DataAssetAsset>(metadata.Id);
         var play = await new RuntimeAssetLoader(database).LoadAsync<DataAssetAsset>(metadata.Id);
 
-        var played = (DataAssetTest)play!.GetContent(projectRoot)!;
+        var played = (DataAssetTest)play!.GetContent(projectRoot, database)!;
         played.Int = 42;
 
-        Assert.Equal(1, ((DataAssetTest)editor!.GetContent(projectRoot)!).Int);
-        Assert.Equal(1, ((DataAssetTest)DataAsset.LoadContent(sourcePath)!).Int);
+        Assert.Equal(1, ((DataAssetTest)editor!.GetContent(projectRoot, database)!).Int);
+        Assert.Equal(1, ((DataAssetTest)DataAsset.LoadContent(sourcePath, database)!).Int);
     }
 
     /// <summary>Verifies that a reload updates the instance live references hold.</summary>
     [Fact]
     public void Reload_KeepsIdentityAndAppliesNewValues()
     {
-        var shared = (DataAssetTest)metadata.GetContent(projectRoot)!;
+        var shared = (DataAssetTest)metadata.GetContent(projectRoot, database)!;
         Serializer.Save<DataAsset>(sourcePath, new DataAssetTest { Id = shared.Id, Int = 7 });
 
         var changes = new List<string>();
         shared.Changed += (_, member) => changes.Add(member);
 
-        var reloaded = metadata.Reload(projectRoot);
+        var reloaded = metadata.Reload(projectRoot, database);
 
         Assert.Same(shared, reloaded);
         Assert.Equal(7, shared.Int);
@@ -289,7 +286,7 @@ public sealed class DataAssetSharingTests : IDisposable
     [Fact]
     public void Instantiate_ReturnsIndependentCopy()
     {
-        var template = (DataAssetTest)metadata.GetContent(projectRoot)!;
+        var template = (DataAssetTest)metadata.GetContent(projectRoot, database)!;
 
         var copy = DataAsset.Instantiate(template);
         copy.Int = 99;

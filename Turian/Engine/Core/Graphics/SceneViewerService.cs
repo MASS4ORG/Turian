@@ -42,6 +42,7 @@ public sealed class SceneViewerService : IDisposable
     public Action<Gizmos>? OnPopulateGizmos { get; set; }
 
     readonly Vulkan vulkan;
+    readonly AssetDatabase assets;
     OffscreenFrameTarget frameTarget;
     DescriptorPool globalPool = null!;
     DescriptorSetLayout globalSetLayout = null!;
@@ -84,12 +85,15 @@ public sealed class SceneViewerService : IDisposable
     /// Creates a new scene viewer service.
     /// </summary>
     /// <param name="vulkan">The shared headless Vulkan context (editor singleton).</param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="initialWidth">Initial viewport width in pixels.</param>
     /// <param name="initialHeight">Initial viewport height in pixels.</param>
-    public SceneViewerService(Vulkan vulkan, uint initialWidth, uint initialHeight)
+    public SceneViewerService(Vulkan vulkan, AssetDatabase assets, uint initialWidth, uint initialHeight)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentNullException.ThrowIfNull(assets);
         this.vulkan = vulkan;
+        this.assets = assets;
         Camera = new EditorCamera();
         Camera.Resize(initialWidth, initialHeight);
         frameTarget = new OffscreenFrameTarget(vulkan.Vk, vulkan.Device, initialWidth, initialHeight);
@@ -293,7 +297,7 @@ public sealed class SceneViewerService : IDisposable
     void InitializeRenderSystems()
     {
         standardSystem = new StandardRenderSystem(
-            vulkan, frameTarget.RenderPass, globalSetLayout.GetDescriptorSetLayout());
+            vulkan, assets, frameTarget.RenderPass, globalSetLayout.GetDescriptorSetLayout());
         meshSystem = new MeshRenderSystem(
             vulkan, frameTarget.RenderPass, globalSetLayout.GetDescriptorSetLayout());
         gizmoSystem = new GizmoRenderSystem(

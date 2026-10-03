@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>A fixture tying authored IDs, references, variants, mounted overrides and runtime saves together.</summary>
-[Collection(SerialTests.Name)]
 public sealed class ContentContractTests : IDisposable
 {
     [TypeId("4c373005-0a26-46fc-8bcd-853fe6bfd192")]
@@ -19,14 +18,12 @@ public sealed class ContentContractTests : IDisposable
     /// <summary>Creates an isolated package directory and asset database.</summary>
     public ContentContractTests()
     {
-        TestAssetDatabase.Reset();
         Directory.CreateDirectory(Path.Combine(root, "overlays"));
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(root, recursive: true);
     }
 

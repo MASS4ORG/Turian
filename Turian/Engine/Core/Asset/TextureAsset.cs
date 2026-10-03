@@ -81,16 +81,18 @@ public class TextureAsset : Asset
     /// The returned <see cref="Texture"/> is owned by the cache — do not dispose it.
     /// </summary>
     /// <param name="vulkan">The Vulkan context the texture is created on.</param>
+    /// <param name="database">The asset database the texture is registered in.</param>
     /// <returns>The uploaded texture, or <c>null</c> when the artifact is missing or undecodable.</returns>
-    public Texture? GetContent(Vulkan vulkan)
+    public Texture? GetContent(Vulkan vulkan, AssetDatabase database)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentNullException.ThrowIfNull(database);
 
         var cacheKey = (Id, vulkan.Device.VkDevice.Handle);
         if (TextureCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
         {
             return null;
         }

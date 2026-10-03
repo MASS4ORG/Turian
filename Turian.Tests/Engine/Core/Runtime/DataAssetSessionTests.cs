@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>Probes mutable DataAssets wired by identity across runtime and test sessions.</summary>
-[Collection(SerialTests.Name)]
 public sealed class DataAssetSessionTests : IDisposable
 {
     readonly string projectRoot = Path.Combine(Path.GetTempPath(), $"turian-da-session-{Guid.NewGuid():N}");
@@ -38,7 +37,6 @@ public sealed class DataAssetSessionTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
     }
 
@@ -76,7 +74,7 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.Equal(10, secondManager.Coins);
         Assert.Equal(45, dungeonManager.Coins);
         Assert.Equal(10, secondManager.Coins);
-        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath)!).Coins);
+        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath, database)!).Coins);
 
         var savePath = Path.Combine(projectRoot, "save.json");
         Serializer.Save(savePath, new SavedGame { Coins = firstManager.Coins });
@@ -88,7 +86,7 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.Equal(10, nextManager.Coins);
         nextManager.Coins = Serializer.Load<SavedGame>(savePath)!.Coins;
         Assert.Equal(45, nextManager.Coins);
-        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath)!).Coins);
+        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath, database)!).Coins);
     }
 
     /// <summary>A fake loader replaces the manager behind the original GUID without rewiring consumers.</summary>
@@ -210,7 +208,7 @@ public sealed class DataAssetSessionTests : IDisposable
         Assert.Same(replacement, component.Manager);
         Assert.True(component.HadManagerAtAwake);
         Assert.Null(component.Services);
-        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath)!).Coins);
+        Assert.Equal(10, ((GameManagerAsset)DataAsset.LoadContent(sourcePath, database)!).Coins);
     }
 
     /// <summary>A play-scene clone resolves direct DataAssets using its explicit session loader.</summary>
@@ -239,7 +237,6 @@ public sealed class DataAssetSessionTests : IDisposable
 
     (AssetDatabase Database, Guid AssetId, string SourcePath) CreateAuthoredManager()
     {
-        TestAssetDatabase.Reset();
         Directory.CreateDirectory(Path.Combine(projectRoot, "Assets"));
         var sourcePath = Path.Combine(projectRoot, "Assets", "GameManager.dataasset");
         Serializer.Save<DataAsset>(sourcePath, new GameManagerAsset());

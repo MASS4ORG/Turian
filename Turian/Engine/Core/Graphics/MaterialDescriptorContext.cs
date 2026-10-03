@@ -27,6 +27,9 @@ public sealed class MaterialDescriptorContext : IDisposable
     /// <summary>The Vulkan context used by all material resources built through this context.</summary>
     public Vulkan Vulkan { get; }
 
+    /// <summary>The asset database materials and their textures are read from.</summary>
+    public AssetDatabase Assets { get; }
+
     /// <summary>The descriptor set layout shared by every PBR material.</summary>
     public DescriptorSetLayout SetLayout { get; }
 
@@ -51,14 +54,17 @@ public sealed class MaterialDescriptorContext : IDisposable
     /// Creates the shared layout, first pool and fallback textures.
     /// </summary>
     /// <param name="vulkan">The Vulkan context every material resource is built on.</param>
+    /// <param name="assets">The asset database materials and their textures are read from.</param>
     /// <param name="materialsPerPool">
     /// How many <see cref="MaterialResource"/> instances one descriptor pool holds. This is a
     /// growth increment, not a cap — pools are added as needed.
     /// </param>
-    public MaterialDescriptorContext(Vulkan vulkan, uint materialsPerPool = maxMaterialsPerPool)
+    public MaterialDescriptorContext(Vulkan vulkan, AssetDatabase assets, uint materialsPerPool = maxMaterialsPerPool)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentNullException.ThrowIfNull(assets);
         Vulkan = vulkan;
+        Assets = assets;
         this.materialsPerPool = Math.Max(1u, materialsPerPool);
 
         SetLayout = new DescriptorSetLayoutBuilder(vulkan.Vk, vulkan.Device)

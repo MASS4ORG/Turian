@@ -234,7 +234,7 @@ public sealed class UiManager : IUiPresenter
     /// </summary>
     CachedRenderer? ResolveDocumentBuilder(UiDocumentComponent panel)
     {
-        if (!AssetDatabase.TryGetInstance(out var db) || db is null)
+        if (panel.Assets is not { } db)
         {
             Diagnose("no AssetDatabase; document panels cannot resolve");
             return null;
@@ -247,7 +247,7 @@ public sealed class UiManager : IUiPresenter
             return null;
         }
 
-        var document = docAsset.GetContent();
+        var document = docAsset.GetContent(db);
         if (document is null)
         {
             Diagnose($"document asset {panel.Document.AssetId} ({docAsset.RelativePath}) has no readable content");
@@ -303,7 +303,7 @@ public sealed class UiManager : IUiPresenter
             renderer.StyleSheets.Add(sheet);
 
         // Explicit component stylesheets take priority (added last).
-        foreach (var sheet in panel.StyleSheets.Select(reference => reference.Resolve(db)?.GetContent())
+        foreach (var sheet in panel.StyleSheets.Select(reference => reference.Resolve(db)?.GetContent(db))
                      .OfType<StyleSheet>())
             renderer.StyleSheets.Add(sheet);
     }
@@ -368,7 +368,7 @@ public sealed class UiManager : IUiPresenter
             if (record is null) continue;
 
             var asset = new UiStyleSheetAsset { Id = record.AssetId, RelativePath = record.SourceRelativePath };
-            return asset.GetContent();
+            return asset.GetContent(db);
         }
 
         return null;

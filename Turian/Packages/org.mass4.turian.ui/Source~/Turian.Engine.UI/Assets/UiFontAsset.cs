@@ -11,11 +11,13 @@ public sealed class UiFontAsset : Asset
     static readonly ConcurrentDictionary<Guid, Font> Cache = new();
 
     /// <summary>Reads this font's artifact and returns a base <see cref="Font"/>, or <c>null</c>.</summary>
-    public Font? GetContent()
+    /// <param name="database">The asset database the asset is registered in.</param>
+    public Font? GetContent(AssetDatabase database)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (Cache.TryGetValue(Id, out var cached)) return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
 
         try

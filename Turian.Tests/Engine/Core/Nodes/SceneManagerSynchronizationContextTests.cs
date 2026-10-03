@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Covers loading a scene from a thread that owns a single-threaded synchronization context and
 /// blocks on the returned task, the way the Studio's scene tree does on the UI thread.
 /// </summary>
-[Collection(SerialTests.Name)]
 public class SceneManagerSynchronizationContextTests
 {
     /// <summary>
@@ -24,7 +23,6 @@ public class SceneManagerSynchronizationContextTests
     [Fact]
     public void LoadNodeAsync_BlockedOnSingleThreadedContext_Completes()
     {
-        TestAssetDatabase.Reset();
 
         var scenePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.prefab");
         File.WriteAllText(scenePath, Serializer.Serialize(new Node { Name = "SceneRoot" }));
@@ -59,7 +57,6 @@ public class SceneManagerSynchronizationContextTests
         finally
         {
             File.Delete(scenePath);
-            TestAssetDatabase.Reset();
         }
     }
 }

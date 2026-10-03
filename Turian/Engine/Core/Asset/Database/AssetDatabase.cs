@@ -17,27 +17,6 @@ public sealed partial class AssetDatabase
     IReadOnlyList<string> packageRoots = [];
     string? packagesProjectRoot;
 
-    static AssetDatabase? _instance;
-
-    /// <summary>
-    /// Gets the singleton instance of the <see cref="AssetDatabase"/>.
-    /// </summary>
-    public static AssetDatabase Instance =>
-        _instance ?? throw new InvalidOperationException("AssetDatabase not initialized");
-
-    /// <summary>
-    /// Gets the singleton instance if one has been created, without throwing. For callers that
-    /// run both inside a loaded project and standalone (the UI compositor, driven by code-built
-    /// panels in headless demos and by document assets in a project).
-    /// </summary>
-    /// <param name="database">The instance, or <c>null</c> when no project is loaded.</param>
-    /// <returns><c>true</c> when an instance exists.</returns>
-    public static bool TryGetInstance(out AssetDatabase? database)
-    {
-        database = _instance;
-        return database is not null;
-    }
-
     /// <summary>
     /// Gets the indexed asset records keyed by asset identifier.
     /// </summary>
@@ -60,16 +39,6 @@ public sealed partial class AssetDatabase
             packagesProjectRoot = Path.GetFullPath(projectRoot);
             packageRoots = [.. roots.Select(static root => Path.GetFullPath(root))];
         }
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="AssetDatabase"/> class.
-    /// </summary>
-    public AssetDatabase()
-    {
-        _instance = _instance is null
-            ? this
-            : throw new InvalidOperationException("AssetDatabase already initialized");
     }
 
     /// <summary>

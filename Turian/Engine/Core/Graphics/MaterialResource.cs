@@ -25,7 +25,7 @@ public sealed class MaterialResource : IDisposable
 
         // The normal map's convention travels on the texture asset, not the material, so it has to
         // be resolved before the UBO is written.
-        var normalAsset = material.NormalTexture?.Resolve(AssetDatabase.Instance);
+        var normalAsset = material.NormalTexture?.Resolve(context.Assets);
 
         var uboData = new MaterialPbrUbo
         {
@@ -52,7 +52,7 @@ public sealed class MaterialResource : IDisposable
             material.MetallicRoughnessTexture,
             context.Defaults.LinearWhite,
             unresolved: context.Defaults.Dielectric);
-        var normal = normalAsset?.GetContent(context.Vulkan) ?? context.Defaults.FlatNormal;
+        var normal = normalAsset?.GetContent(context.Vulkan, context.Assets) ?? context.Defaults.FlatNormal;
         var occlusion = ResolveTexture(context, material.OcclusionTexture, context.Defaults.LinearWhite);
         var emissive = ResolveTexture(context, material.EmissiveTexture, context.Defaults.Black);
 
@@ -71,7 +71,7 @@ public sealed class MaterialResource : IDisposable
     /// <summary>
     /// Resolves a texture slot to an uploaded texture.
     /// </summary>
-    /// <param name="context">The context holding the fallback textures.</param>
+    /// <param name="context">The context holding the asset database and the fallback textures.</param>
     /// <param name="reference">The material's reference for this slot.</param>
     /// <param name="fallback">Texture bound when the slot declares no reference.</param>
     /// <param name="unresolved">
@@ -89,8 +89,8 @@ public sealed class MaterialResource : IDisposable
             return fallback;
         }
 
-        var resolved = reference.Resolve(AssetDatabase.Instance);
-        return resolved?.GetContent(context.Vulkan) ?? unresolved ?? fallback;
+        var resolved = reference.Resolve(context.Assets);
+        return resolved?.GetContent(context.Vulkan, context.Assets) ?? unresolved ?? fallback;
     }
 
     /// <inheritdoc />

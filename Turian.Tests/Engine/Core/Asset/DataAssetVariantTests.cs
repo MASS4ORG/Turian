@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>Data asset variants: a base plus overrides, resolved wherever a payload is read.</summary>
-[Collection(SerialTests.Name)]
 public sealed class DataAssetVariantTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-variants-{Guid.NewGuid():N}");
@@ -155,42 +154,34 @@ public sealed class DataAssetVariantTests : IDisposable
     [Fact]
     public void ImportedVariantsLoadAsTheirBaseType()
     {
-        TestAssetDatabase.Reset();
-        try
-        {
-            var project = Path.Combine(root, "game");
-            var assets = Path.Combine(project, "Assets");
-            Directory.CreateDirectory(assets);
-            var baseFile = Path.Combine(assets, "Base.dataasset");
-            File.WriteAllText(baseFile, $$"""{ "__TypeId": "{{AssemblyDefinition.TypeIdValue}}", "Name": "Base.Asm", "RootNamespace": "Base", "Id": "{{baseId}}" }""");
-            File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "Assets/Base.dataasset", "Id": "{{baseId}}" }""");
-            var (variantFile, id) = DataAssetVariantFactory.Create(project, baseFile, "Assets", "Child");
-            File.WriteAllText(variantFile, File.ReadAllText(variantFile).Replace("\"Overrides\": {}", "\"Overrides\": { \"Name\": \"Child.Asm\" }", StringComparison.Ordinal));
+        var project = Path.Combine(root, "game");
+        var assets = Path.Combine(project, "Assets");
+        Directory.CreateDirectory(assets);
+        var baseFile = Path.Combine(assets, "Base.dataasset");
+        File.WriteAllText(baseFile, $$"""{ "__TypeId": "{{AssemblyDefinition.TypeIdValue}}", "Name": "Base.Asm", "RootNamespace": "Base", "Id": "{{baseId}}" }""");
+        File.WriteAllText($"{baseFile}.meta", $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "Assets/Base.dataasset", "Id": "{{baseId}}" }""");
+        var (variantFile, id) = DataAssetVariantFactory.Create(project, baseFile, "Assets", "Child");
+        File.WriteAllText(variantFile, File.ReadAllText(variantFile).Replace("\"Overrides\": {}", "\"Overrides\": { \"Name\": \"Child.Asm\" }", StringComparison.Ordinal));
 
-            var settings = new SettingsService();
-            settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
-            using var build = new BuildManager(new AppSettings(), NullLogger.Instance);
-            var database = new AssetDatabase();
-            using var importer = new AssetImporter(NullLogger.Instance, database, settings);
-            importer.GenerateMetaFiles(assets);
+        var settings = new SettingsService();
+        settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
+        using var build = new BuildManager(new AppSettings(), NullLogger.Instance);
+        var database = new AssetDatabase();
+        using var importer = new AssetImporter(NullLogger.Instance, database, settings);
+        importer.GenerateMetaFiles(assets);
 
-            var meta = Assert.IsType<DataAssetAsset>(Asset.Load($"{variantFile}.meta"));
-            var fromSource = Assert.IsType<AssemblyDefinition>(meta.GetContent(project));
-            Assert.Equal("Child.Asm", fromSource.Name);
-            Assert.Equal("Base", fromSource.RootNamespace);
-            Assert.Equal(id, fromSource.Id);
+        var meta = Assert.IsType<DataAssetAsset>(Asset.Load($"{variantFile}.meta"));
+        var fromSource = Assert.IsType<AssemblyDefinition>(meta.GetContent(project, database));
+        Assert.Equal("Child.Asm", fromSource.Name);
+        Assert.Equal("Base", fromSource.RootNamespace);
+        Assert.Equal(id, fromSource.Id);
 
-            // The runtime reads imported assets without an editor watcher removing their cache entries.
-            importer.Dispose();
-            File.Delete(variantFile);
-            var fromImport = Assert.IsType<AssemblyDefinition>(Assert.IsType<DataAssetAsset>(Asset.Load($"{variantFile}.meta")).Reload(project));
-            Assert.Equal("Child.Asm", fromImport.Name);
-            Assert.True(database.TryGetAsset(id, out var record));
-            Assert.Equal(Guid.Parse(AssemblyDefinition.TypeIdValue), record!.DataAssetPayloadTypeId);
-        }
-        finally
-        {
-            TestAssetDatabase.Reset();
-        }
+        // The runtime reads imported assets without an editor watcher removing their cache entries.
+        importer.Dispose();
+        File.Delete(variantFile);
+        var fromImport = Assert.IsType<AssemblyDefinition>(Assert.IsType<DataAssetAsset>(Asset.Load($"{variantFile}.meta")).Reload(project, database));
+        Assert.Equal("Child.Asm", fromImport.Name);
+        Assert.True(database.TryGetAsset(id, out var record));
+        Assert.Equal(Guid.Parse(AssemblyDefinition.TypeIdValue), record!.DataAssetPayloadTypeId);
     }
 }

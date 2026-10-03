@@ -30,7 +30,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
 
     int CenterBrightness(Node root)
     {
-        using var viewer = new SceneViewerService(fixture.Vulkan, size, size);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         viewer.Render(root, 0.016);
         var pixels = new byte[size * size * 4];
         viewer.CopyPixels(pixels);
@@ -58,44 +58,35 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
     public void UnresolvedMaterialsFallBackToDefault()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        TestAssetDatabase.Reset();
-        _ = new AssetDatabase();
-        try
+        var quad = PreviewQuadMesh.Get(fixture.Vulkan);
+        var slotted = new Model(fixture.Vulkan, new ModelBuilder
         {
-            var quad = PreviewQuadMesh.Get(fixture.Vulkan);
-            var slotted = new Model(fixture.Vulkan, new ModelBuilder
-            {
-                Vertices = [new(new(-0.5f, -0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
+            Vertices = [new(new(-0.5f, -0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
                     new(new(0.5f, -0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
                     new(new(0.5f, 0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
                     new(new(-0.5f, 0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ }],
-                Indices = [0, 1, 2, 0, 2, 3],
-                SubMeshes = [new SubMesh(0, 6, MaterialIndex: 0)],
-            });
-            using (slotted)
-            {
-                var root = QuadScene(quad, withLight: true);
-                var component = root.Children[0].GetComponent<ModelComponent>()!;
-                component.ModelOverride = slotted;
-                component.Model = new AssetReference<ModelAsset>(Guid.NewGuid());
-                component.Materials = [new AssetReference<MaterialAsset>(Guid.NewGuid())];
-                var expected = CenterBrightness(QuadScene(quad, withLight: true));
-
-                using var viewer = new SceneViewerService(fixture.Vulkan, size, size);
-                var first = new byte[size * size * 4];
-                var second = new byte[size * size * 4];
-                viewer.Render(root, 0.016);
-                viewer.CopyPixels(first);
-                viewer.Render(root, 0.016);
-                viewer.CopyPixels(second);
-
-                Assert.Equal(expected, first[center] + first[center + 1] + first[center + 2]);
-                Assert.Equal(first, second);
-            }
-        }
-        finally
+            Indices = [0, 1, 2, 0, 2, 3],
+            SubMeshes = [new SubMesh(0, 6, MaterialIndex: 0)],
+        });
+        using (slotted)
         {
-            TestAssetDatabase.Reset();
+            var root = QuadScene(quad, withLight: true);
+            var component = root.Children[0].GetComponent<ModelComponent>()!;
+            component.ModelOverride = slotted;
+            component.Model = new AssetReference<ModelAsset>(Guid.NewGuid());
+            component.Materials = [new AssetReference<MaterialAsset>(Guid.NewGuid())];
+            var expected = CenterBrightness(QuadScene(quad, withLight: true));
+
+            using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
+            var first = new byte[size * size * 4];
+            var second = new byte[size * size * 4];
+            viewer.Render(root, 0.016);
+            viewer.CopyPixels(first);
+            viewer.Render(root, 0.016);
+            viewer.CopyPixels(second);
+
+            Assert.Equal(expected, first[center] + first[center + 1] + first[center + 2]);
+            Assert.Equal(first, second);
         }
     }
 
@@ -106,7 +97,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var quad = PreviewQuadMesh.Get(fixture.Vulkan);
         var root = QuadScene(quad, withLight: true);
-        using var viewer = new SceneViewerService(fixture.Vulkan, size, size);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         var first = new byte[size * size * 4];
         var second = new byte[size * size * 4];
 

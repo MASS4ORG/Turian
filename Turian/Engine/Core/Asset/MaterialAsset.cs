@@ -103,7 +103,7 @@ public class MaterialAsset : Asset
         // An AssetReference resolves to identity only; the factors and texture references
         // come from the artifact the importer wrote. Without one there is no material here,
         // and the caller binds its own default rather than this instance's unset values.
-        var hydrated = Load(Id);
+        var hydrated = Load(context.Assets, Id);
         if (hydrated is null)
         {
             return null;
@@ -117,12 +117,14 @@ public class MaterialAsset : Asset
     /// <summary>
     /// Reads a material's stored property values from its artifact.
     /// </summary>
+    /// <param name="database">The asset database the material is registered in.</param>
     /// <param name="assetId">Identifier of the material asset.</param>
     /// <returns>The material, or <c>null</c> when it is unknown or its artifact cannot be read.</returns>
-    public static MaterialAsset? Load(Guid assetId)
+    public static MaterialAsset? Load(AssetDatabase database, Guid assetId)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (assetId == Guid.Empty
-            || !AssetDatabase.Instance.TryGetAssetProvider(assetId, out var provider)
+            || !database.TryGetAssetProvider(assetId, out var provider)
             || provider is null)
         {
             return null;

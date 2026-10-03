@@ -11,19 +11,16 @@ public static class InputActionsLoader
     /// Loads the project's action maps, or null when none are configured or the asset cannot be read.
     /// </summary>
     /// <param name="settings">The project settings naming the asset.</param>
-    /// <param name="loader">Resolves the asset metadata by id.</param>
-    /// <param name="projectDirectory">Root the asset's relative path is resolved against.</param>
+    /// <param name="loader">Resolves the asset and its payload by id.</param>
     /// <returns>The maps, or null.</returns>
-    public static InputActionsAsset? Resolve(IAppSettings? settings, IAssetLoader? loader,
-        string? projectDirectory)
+    public static InputActionsAsset? Resolve(IAppSettings? settings, IAssetLoader? loader)
     {
         if (settings?.Get<InputSettings>().Actions is not { IsEmpty: false } reference) return null;
-        if (loader is null || string.IsNullOrWhiteSpace(projectDirectory)) return null;
+        if (loader is null) return null;
 
         try
         {
-            return reference.LoadAsync(loader).GetAwaiter().GetResult()?.GetContent(projectDirectory)
-                as InputActionsAsset;
+            return loader.LoadContentAsync<InputActionsAsset>(reference.AssetId).GetAwaiter().GetResult();
         }
         catch (Exception ex) when (ex is IOException or JsonException or FileNotFoundException)
         {

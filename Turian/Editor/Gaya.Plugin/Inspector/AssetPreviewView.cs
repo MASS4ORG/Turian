@@ -4,7 +4,7 @@ namespace Gaya.Plugin.Turian;
 /// Draws a small render of the selected asset above its import settings. Resolves a provider from
 /// <see cref="AssetPreviewCatalog"/> and draws nothing for asset types without one.
 /// </summary>
-sealed class AssetPreviewView(Vulkan vulkan, AssetPreviewCatalog catalog) : IDisposable
+sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewCatalog catalog) : IDisposable
 {
     const uint previewSize = 180;
 
@@ -43,7 +43,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetPreviewCatalog catalog) : IDis
 
         try
         {
-            service = new SceneViewerService(vulkan, previewSize, previewSize);
+            service = new SceneViewerService(vulkan, assets, previewSize, previewSize);
             return true;
         }
         catch (Exception)
@@ -57,7 +57,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetPreviewCatalog catalog) : IDis
         var svc = service!;
 
         svc.OverlayTexture = provider is ITexturePreviewProvider textureProvider
-            ? textureProvider.GetPreviewTexture(asset, vulkan)
+            ? textureProvider.GetPreviewTexture(asset, vulkan, assets)
             : null;
 
         var root = emptyRoot;
@@ -66,7 +66,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetPreviewCatalog catalog) : IDis
             if (sceneAssetId != asset.Id || sceneProviderType != provider.GetType())
             {
                 scene?.OwnedResources?.Dispose();
-                scene = sceneProvider.BuildPreview(asset, vulkan);
+                scene = sceneProvider.BuildPreview(asset, vulkan, assets);
                 sceneAssetId = asset.Id;
                 sceneProviderType = provider.GetType();
                 svc.FrameBounds(scene.Value.Bounds);

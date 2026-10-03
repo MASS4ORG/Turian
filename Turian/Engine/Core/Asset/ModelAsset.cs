@@ -39,15 +39,17 @@ public class ModelAsset : Asset
     /// The returned <see cref="Model"/> is owned by the cache — do not dispose it.
     /// </summary>
     /// <param name="vulkan">The Vulkan context used for loading the model.</param>
+    /// <param name="database">The asset database the model is registered in.</param>
     /// <returns>A loaded 3D model or <c>null</c> if the asset could not be found or loaded.</returns>
-    public Model? GetContent(Vulkan vulkan)
+    public Model? GetContent(Vulkan vulkan, AssetDatabase database)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentNullException.ThrowIfNull(database);
         var cacheKey = (Id, vulkan.Device.VkDevice.Handle);
         if (ModelCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
         {
             return null;
         }

@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Package assets: indexed beside the project's own, owned by the installing project, and never allowed to reuse
 /// an asset id.
 /// </summary>
-[Collection(SerialTests.Name)]
 public sealed class PackageAssetTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-package-assets-{Guid.NewGuid():N}");
@@ -17,13 +16,11 @@ public sealed class PackageAssetTests : IDisposable
         project = Path.Combine(root, "game");
         assets = Path.Combine(project, "Assets");
         Directory.CreateDirectory(assets);
-        TestAssetDatabase.Reset();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(root, recursive: true);
     }
 

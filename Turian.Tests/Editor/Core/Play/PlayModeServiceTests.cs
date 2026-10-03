@@ -63,7 +63,6 @@ public class PlayModeServiceTests : IDisposable
     /// <summary>Starts each test from a clean singleton and runtime-service state.</summary>
     public PlayModeServiceTests()
     {
-        TestAssetDatabase.Reset();
         ServiceCachingComponent.ResolvedAtAwake = null;
         ServiceCachingComponent.InputResolvedAtAwake = null;
         FrameCountingComponent.TotalUpdates = 0;
@@ -72,7 +71,8 @@ public class PlayModeServiceTests : IDisposable
         // The importer is only reached through SceneTreeController.SaveAsset, which play mode never
         // calls; constructing a real one would need the BuildManager singleton.
         sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!,
-            assetLoader: new RuntimeAssetLoader(assetDatabase), sceneManager: Substitute.For<ISceneManager>());
+            assetLoader: new RuntimeAssetLoader(assetDatabase), sceneManager: Substitute.For<ISceneManager>(),
+            database: assetDatabase);
 
         playMode = new PlayModeService(sceneTree, assetDatabase, new EmptyServiceProvider(), Log.Logger);
     }
@@ -83,7 +83,6 @@ public class PlayModeServiceTests : IDisposable
         playMode.Stop();
         ServiceCachingComponent.ResolvedAtAwake = null;
         ServiceCachingComponent.InputResolvedAtAwake = null;
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

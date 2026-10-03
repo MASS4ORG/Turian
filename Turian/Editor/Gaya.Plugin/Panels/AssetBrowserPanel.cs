@@ -12,6 +12,7 @@ sealed class AssetBrowserPanel : IPanel
     readonly List<TreeItem> rows = [];
 
     readonly AssetFileSystem fileSystem;
+    readonly BuildManager build;
     readonly SettingsService settings;
     readonly AssetOpenService opener;
     readonly AssetInspectionService inspections;
@@ -54,12 +55,14 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="operations">Renames, deletes, duplicates and pastes as undoable steps.</param>
     /// <param name="bricks">Reports changes to the installed bricks.</param>
     /// <param name="confirm">Asks before an asset is copied out of a brick by dragging.</param>
+    /// <param name="build">Supplies the loaded user assemblies a dragged script's component type is found in.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
         AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations,
-        BricksController bricks, ConfirmDialogChrome confirm)
+        BricksController bricks, ConfirmDialogChrome confirm, BuildManager build)
     {
+        this.build = build;
         ArgumentNullException.ThrowIfNull(reveal);
 
         this.fileSystem = fileSystem;
@@ -163,7 +166,7 @@ sealed class AssetBrowserPanel : IPanel
     /// A file row carries its asset id, so it can be dropped on a reference field, and its path, so a folder row can
     /// receive it; a folder row carries only its path.
     /// </summary>
-    static object? DragPayload(TreeItem item) =>
+    object? DragPayload(TreeItem item) =>
         item.Tag is not AssetEntry entry ? null
         : entry.IsDirectory ? new ReferenceDragPayload(Guid.Empty, item.Label, entry.AbsolutePath, IsDirectory: true)
         : entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? ScriptPayload(entry)
@@ -198,12 +201,12 @@ sealed class AssetBrowserPanel : IPanel
         path.Equals(folder, StringComparison.Ordinal)
         || path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
-    static object? ScriptPayload(AssetEntry entry)
+    object? ScriptPayload(AssetEntry entry)
     {
         if (!entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) return null;
 
         var name = Path.GetFileNameWithoutExtension(entry.AbsolutePath);
-        foreach (var assembly in BuildManager.Instance.LoadedAssemblies)
+        foreach (var assembly in build.LoadedAssemblies)
         {
             Type[] types;
             try { types = assembly.GetTypes(); }

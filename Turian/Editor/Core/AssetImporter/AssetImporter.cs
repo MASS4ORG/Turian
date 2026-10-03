@@ -50,11 +50,17 @@ public sealed partial class AssetImporter : IDisposable
     /// <summary>
     /// Initializes a new instance of the <see cref="AssetImporter"/> class.
     /// </summary>
+    /// <param name="logger">The logger import progress is reported through.</param>
+    /// <param name="assetDatabase">The database imported assets are registered in.</param>
+    /// <param name="settingsService">The project settings naming the assets folder.</param>
+    /// <param name="build">Supplies user assemblies that may add importers; without one only the app domain's are used.</param>
     public AssetImporter(
         ILogger logger,
         AssetDatabase assetDatabase,
-        SettingsService settingsService)
+        SettingsService settingsService,
+        BuildManager? build = null)
     {
+        this.build = build;
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(assetDatabase);
         ArgumentNullException.ThrowIfNull(settingsService);
@@ -142,17 +148,21 @@ public sealed partial class AssetImporter : IDisposable
             ? null
             : assetImporters.FirstOrDefault(candidate => candidate.IsValid(filePath));
 
+    readonly BuildManager? build;
+
+    IEnumerable<Assembly> LoadedAssemblies => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+
     /// <summary>Rebuilds the importer list when assemblies have loaded since it was made.</summary>
     void RefreshImporters()
     {
-        if (BuildManager.Instance.LoadedAssemblies.Count() != importerAssemblyCount)
+        if (LoadedAssemblies.Count() != importerAssemblyCount)
             assetImporters = BuildImporterList();
     }
 
     List<IAssetImporter> BuildImporterList()
     {
-        importerAssemblyCount = BuildManager.Instance.LoadedAssemblies.Count();
-        return [.. BuildManager.Instance.LoadedAssemblies
+        importerAssemblyCount = LoadedAssemblies.Count();
+        return [.. LoadedAssemblies
             .SelectMany(static assembly => GetLoadableTypes(assembly))
             .Where(static type =>
                 typeof(IAssetImporter).IsAssignableFrom(type)

@@ -47,6 +47,10 @@ public class ModelComponent : Component, IDisposable
     [InjectService(Optional = true), JsonIgnore]
     public Vulkan? RenderDevice { get; private set; }
 
+    /// <summary>The asset database the model and mesh are read from, or <c>null</c> outside a project.</summary>
+    [InjectService(Optional = true), JsonIgnore]
+    public AssetDatabase? Assets { get; private set; }
+
     /// <summary>
     /// Gets the loaded runtime model.
     /// </summary>
@@ -76,9 +80,9 @@ public class ModelComponent : Component, IDisposable
             if (model is not null) return model;
             if (loadFailed || modelAssetId == Guid.Empty) return null;
 
-            if (RenderDevice is not { } vulkan) return null;
+            if (RenderDevice is not { } vulkan || Assets is not { } assets) return null;
 
-            model = new ModelAsset { Id = modelAssetId }.GetContent(vulkan);
+            model = new ModelAsset { Id = modelAssetId }.GetContent(vulkan, assets);
             loadFailed = model is null;
             return model;
         }
@@ -132,7 +136,7 @@ public class ModelComponent : Component, IDisposable
         {
             if (meshAssetId != Mesh.AssetId)
             {
-                meshAsset = MeshAsset.Resolve(Mesh.AssetId);
+                meshAsset = Assets is { } assets ? MeshAsset.Resolve(assets, Mesh.AssetId) : null;
                 meshAssetId = Mesh.AssetId;
             }
 

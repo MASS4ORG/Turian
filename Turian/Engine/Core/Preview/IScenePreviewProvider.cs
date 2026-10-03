@@ -13,5 +13,6 @@ public interface IScenePreviewProvider : IAssetPreviewProvider
     /// </summary>
     /// <param name="asset">The asset to preview.</param>
     /// <param name="vulkan">The Vulkan context to build GPU resources against.</param>
-    AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan);
+    /// <param name="assets">The asset database the previewed content is read from.</param>
+    AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan, AssetDatabase assets);
 }

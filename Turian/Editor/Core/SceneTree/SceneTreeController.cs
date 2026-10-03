@@ -9,7 +9,8 @@ public sealed class SceneTreeController(
     SettingsService settingsService,
     AssetImporter assetImporter,
     IAssetLoader assetLoader,
-    ISceneManager sceneManager)
+    ISceneManager sceneManager,
+    AssetDatabase database)
     : IPlaySceneHost
 {
     readonly ISceneManager sceneManager = sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
@@ -194,7 +195,7 @@ public sealed class SceneTreeController(
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var previous = File.Exists(path) ? File.ReadAllText(path) : null;
             File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
-                id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id)));
+                id => PrefabInstances.ReadPrefabJson(database, id)));
             assetImporter.ReimportNow(path, overwriteExisting: true);
             RefreshInstances(prefab.Id, previous);
         }
@@ -218,7 +219,7 @@ public sealed class SceneTreeController(
             try
             {
                 if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
-                        id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id), assetLoader) is not { } rebuilt)
+                        id => PrefabInstances.ReadPrefabJson(database, id), assetLoader) is not { } rebuilt)
                     continue;
 
                 loadedSceneRoots[assetId] = rebuilt;

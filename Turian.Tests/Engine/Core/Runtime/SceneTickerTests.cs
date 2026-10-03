@@ -4,7 +4,6 @@ namespace Turian.Tests;
 /// Tests for <see cref="SceneTicker"/>, the shared game-loop driver used by both the standalone
 /// runtime and the Studio's in-editor play mode.
 /// </summary>
-[Collection(SerialTests.Name)]
 public class SceneTickerTests : IDisposable
 {
     readonly AssetDatabase assetDatabase;
@@ -12,14 +11,12 @@ public class SceneTickerTests : IDisposable
     /// <summary>Resets the <see cref="AssetDatabase"/> singleton, as the other suites do.</summary>
     public SceneTickerTests()
     {
-        TestAssetDatabase.Reset();
         assetDatabase = new AssetDatabase();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

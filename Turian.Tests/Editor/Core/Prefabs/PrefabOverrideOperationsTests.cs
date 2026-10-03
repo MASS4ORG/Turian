@@ -1,7 +1,6 @@
 namespace Turian.Tests;
 
 /// <summary>Tests for reverting and unpacking prefab instances in the open scene.</summary>
-[Collection(SerialTests.Name)]
 public class PrefabOverrideOperationsTests : IDisposable
 {
     readonly string projectRoot = Path.Combine(Path.GetTempPath(), $"turian-overrides-{Guid.NewGuid():N}");
@@ -15,11 +14,10 @@ public class PrefabOverrideOperationsTests : IDisposable
     /// <summary>Opens a scene backed by a throwaway project; applies are not exercised, so no importer is needed.</summary>
     public PrefabOverrideOperationsTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
         var loader = Substitute.For<IAssetLoader>();
         sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
-            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>(), database: database);
         var inspector = new NodeInspectorController(assets);
         undo = new UndoService(sceneTree, inspector, assets, loader);
         operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader);
@@ -35,7 +33,6 @@ public class PrefabOverrideOperationsTests : IDisposable
     public void Dispose()
     {
         undo.Dispose();
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
         GC.SuppressFinalize(this);
     }
