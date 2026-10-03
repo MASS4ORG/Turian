@@ -77,7 +77,7 @@ public sealed class PlayModeClockTests
         }
     }
 
-    /// <summary>Game modules can provide the clock used by both editor and headless authorities.</summary>
+    /// <summary>Game modules override both hosts' clocks and leave the type registry when their build is disposed.</summary>
     [Fact]
     public void GameModule_OverridesTheSessionClockInBothHosts()
     {
@@ -146,6 +146,14 @@ public sealed class PlayModeClockTests
             using var project = global::Turian.Editor.CLI.HeadlessProject.Open(settings, NullLogger.Instance, false);
             var loaded = project.LoadScene(sceneFile);
             Assert.Equal(0.04, Assert.IsType<ClockComponent>(loaded.Components.Single()).Clock!.FixedDeltaTime);
+
+            build.Dispose();
+            Assert.False(build.IsAssemblyLoaded);
+            Assert.Null(build.ActiveUserAssembly);
+            Assert.Empty(build.ActiveUserAssemblies);
+            Assert.False(TypeRegistry.TryGetType("Usercode.Game", out _));
+            TypeRegistry.Reset();
+            Assert.False(TypeRegistry.TryGetType("Usercode.Game", out _));
         }
         finally
         {
