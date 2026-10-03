@@ -32,8 +32,13 @@ public sealed class AppearanceSettings
         Description = "Use operating system decorations. Disable for application window controls and dragging.")]
     public bool NativeTitlebar { get; set; }
 
-    internal static AppearanceSettings Register(EditorSettings settings)
+    /// <summary>Registers the shared page, restoring preferences from an optional application-owned page.</summary>
+    /// <param name="settings">The registry and storage used by the workbench.</param>
+    /// <param name="previousPageId">The application's former appearance page id, when migrating preferences.</param>
+    /// <returns>The shared appearance settings object.</returns>
+    public static AppearanceSettings Register(EditorSettings settings, string? previousPageId = null)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         if (settings.Pages.FirstOrDefault(page => page.Id == PageId)?.Target is AppearanceSettings existing)
             return existing;
 
@@ -42,7 +47,7 @@ public sealed class AppearanceSettings
         {
             Description = "Theme, interface size and window decorations.",
         };
-        settings.RestoreUserPage(page with { Id = "gaya.turian.appearance" });
+        if (previousPageId is not null) settings.RestoreUserPage(page with { Id = previousPageId });
         settings.RestoreUserPage(page with { Id = "gaya.window" });
         settings.Register(page);
         return appearance;

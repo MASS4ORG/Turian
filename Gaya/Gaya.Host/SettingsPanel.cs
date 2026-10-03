@@ -223,9 +223,6 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     /// </summary>
     void Option(Gui gui, SettingsPageDescriptor page, FormField field, string id)
     {
-        var setting = field.Attribute<EditorSettingAttribute>();
-        var title = setting is { Path.Length: > 0 } ? setting.Path : field.Label;
-        var description = setting?.Description ?? "";
         var modified = IsModified(page, field);
 
         using (gui.Node(-1, -1, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Margin(0, 6f).Enter())
@@ -235,34 +232,46 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
                     gui.DrawBackgroundRect(Theme.Accent, 1.5f);
 
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(3f).Enter())
-            {
-                using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
-                           .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
-                {
-                    gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
-
-                    // Beside the title rather than against the panel's edge: at a settings page's
-                    // width the two would otherwise be too far apart to read as one row.
-                    if (modified && RevertButton(gui, $"{id}/revert")) Revert(page, field);
-
-                    using (gui.Node().Expand().Enter()) { }
-                }
-
-                if (description.Length > 0)
-                    gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
-                        centerInRect: false);
-
-                using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
-                           .Direction(Axis.Horizontal).Gap(4f).Enter())
-                {
-                    SettingsStyle.ApplyFormStyle(gui);
-                    if (page.Target is AppearanceSettings && field.Name == nameof(AppearanceSettings.Theme))
-                        ThemeEditor(gui, field, id);
-                    else
-                        gui.FormFieldEditor(field, id, FormContext);
-                }
-            }
+                OptionContent(gui, page, field, id, modified);
         }
+    }
+
+    void OptionContent(Gui gui, SettingsPageDescriptor page, FormField field, string id, bool modified)
+    {
+        var setting = field.Attribute<EditorSettingAttribute>();
+        var title = setting is { Path.Length: > 0 } ? setting.Path : field.Label;
+        var description = setting?.Description ?? "";
+        OptionHeading(gui, page, field, id, title, modified);
+
+        if (description.Length > 0)
+            gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
+                centerInRect: false);
+
+        using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
+                   .Direction(Axis.Horizontal).Gap(4f).Enter())
+        {
+            SettingsStyle.ApplyFormStyle(gui);
+            FieldEditor(gui, field, id);
+        }
+    }
+
+    void OptionHeading(Gui gui, SettingsPageDescriptor page, FormField field, string id, string title, bool modified)
+    {
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
+                   .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
+        {
+            gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
+            if (modified && RevertButton(gui, $"{id}/revert")) Revert(page, field);
+            using (gui.Node().Expand().Enter()) { }
+        }
+    }
+
+    void FieldEditor(Gui gui, FormField field, string id)
+    {
+        if (field.Target is AppearanceSettings && field.Name == nameof(AppearanceSettings.Theme))
+            ThemeEditor(gui, field, id);
+        else
+            gui.FormFieldEditor(field, id, FormContext);
     }
 
     void ThemeEditor(Gui gui, FormField field, string id)

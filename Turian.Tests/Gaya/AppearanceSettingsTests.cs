@@ -5,6 +5,36 @@ namespace Turian.Tests;
 /// <summary>Checks shared appearance preferences and live desktop window gestures.</summary>
 public sealed class AppearanceSettingsTests
 {
+    /// <summary>A plugin that resolves the host's appearance preferences during activation.</summary>
+    [Plugin("test.appearance", "Appearance consumer")]
+    public sealed class AppearanceConsumer : IPlugin
+    {
+        /// <summary>The shared preferences resolved at startup.</summary>
+        public AppearanceSettings? Appearance { get; private set; }
+
+        /// <inheritdoc />
+        public void Configure(IPluginContext context) { }
+
+        /// <inheritdoc />
+        public void Start(IServiceProvider services) => Appearance = services.GetRequiredService<AppearanceSettings>();
+
+        /// <inheritdoc />
+        public void Stop(IServiceProvider services) { }
+
+        /// <inheritdoc />
+        public void Tick(IServiceProvider services, float deltaTime) { }
+    }
+
+    /// <summary>A plugin can resolve the same Appearance object that the host's Settings page edits.</summary>
+    [Fact]
+    public void PluginsReadTheHostAppearancePreferences()
+    {
+        using var app = PluginHost.Load([typeof(AppearanceConsumer).Assembly], NullLogger.Instance);
+        var plugin = Assert.IsType<AppearanceConsumer>(Assert.Single(app.Plugins));
+        Assert.Same(app.Services.GetRequiredService<AppearanceSettings>(), plugin.Appearance);
+        Assert.Same(app.Settings.Pages.Single(page => page.Id == AppearanceSettings.PageId).Target, plugin.Appearance);
+    }
+
     /// <summary>Studio selects XWayland when available and preserves an explicit backend choice.</summary>
     [Theory]
     [InlineData(true, ":0", null, true)]
@@ -48,6 +78,7 @@ public sealed class AppearanceSettingsTests
              "gaya.window":{"NativeTitlebar":true}}
             """);
         var restored = new EditorSettings(NullLogger.Instance, path);
+        AppearanceSettings.Register(restored, "gaya.turian.appearance");
         using var app = Application(restored);
         using var workbench = new Workbench(app, layoutStore: LayoutStore(path));
         Assert.Equal("Light", workbench.Appearance.Theme);
@@ -64,6 +95,7 @@ public sealed class AppearanceSettingsTests
         Assert.True(next.NativeTitlebar);
         next.Appearance.TextSize = 2;
         Assert.Equal(12, next.Appearance.TextSize);
+        Assert.Throws<ArgumentNullException>(() => AppearanceSettings.Register(null!));
     }
 
     /// <summary>The theme dropdown offers custom themes and changes the same committed choice as the menu.</summary>

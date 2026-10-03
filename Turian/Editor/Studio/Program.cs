@@ -30,7 +30,7 @@ using var app = PluginHost.Load(pluginAssemblies, Log.Logger,
         services.AddSingleton<ICommandDispatcher>(dispatcher);
         services.AddSingleton<IPanelAccessor>(panelAccessor);
     },
-    args);
+    args, previousAppearancePageId: "gaya.turian.appearance");
 using var workbench = new Workbench(app);
 dispatcher.Bind(workbench);
 panelAccessor.Bind(workbench);
