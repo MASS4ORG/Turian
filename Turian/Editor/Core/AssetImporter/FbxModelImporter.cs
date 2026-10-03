@@ -185,13 +185,12 @@ public sealed partial class FbxModelImporter : IAssetImporter
         {
             Id = AssetIdFactory.Derive(parentAssetId, $"node:{counter++}"),
             Name = source.Name,
-        };
-
-        node.Transform = new Transform
-        {
-            Position = source.Position,
-            Orientation = source.Orientation,
-            Scale = source.Scale,
+            Transform = new Transform
+            {
+                Position = source.Position,
+                Orientation = source.Orientation,
+                Scale = source.Scale,
+            },
         };
 
         if (source.MeshIndex >= 0)

@@ -50,7 +50,8 @@ public sealed class SourceFileWatcherTests : IDisposable
 
         await File.WriteAllTextAsync(Path.Combine(directory, fileName), content);
 
-        var finished = await Task.WhenAny(changed.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+        // Twenty times the 50 ms debounce: room for a change that should fire, short for one that should not.
+        var finished = await Task.WhenAny(changed.Task, Task.Delay(TimeSpan.FromSeconds(1)));
         return finished == changed.Task;
     }
 }

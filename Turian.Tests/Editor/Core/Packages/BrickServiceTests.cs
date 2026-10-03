@@ -163,12 +163,13 @@ public sealed class BrickServiceTests : IDisposable
         return Directory.GetFiles(Path.Combine(root, "out"), "*.brick").Single();
     }
 
-    static async Task<(int ExitCode, string Output)> RunCli(params string[] arguments)
+    async Task<(int ExitCode, string Output)> RunCli(params string[] arguments)
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(typeof(global::Turian.Editor.CLI.Program).Assembly.Location);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        start.Environment[PackageStore.StoreVariable] = Path.Combine(Path.GetTempPath(), "turian-tests-bricks");
+        // Inside the scratch folder, so the store is deleted with it instead of piling up in the temp directory.
+        start.Environment[PackageStore.StoreVariable] = Path.Combine(root, "store");
 
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync();
