@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests that a DataAsset payload is one shared instance per asset and loader, and that
 /// <see cref="DataAsset.Instantiate{T}"/> gives independent copies.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class DataAssetSharingTests : IDisposable
 {
     readonly string projectRoot;

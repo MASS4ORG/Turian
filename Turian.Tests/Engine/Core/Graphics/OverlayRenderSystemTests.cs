@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// a texture set as the overlay is composited over the rendered frame and shows up in the
 /// offscreen read-back. Skipped when no usable Vulkan device is present.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
 {
     const int size = 16;

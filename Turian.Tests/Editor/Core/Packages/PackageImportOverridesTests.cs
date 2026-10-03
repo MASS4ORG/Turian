@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>The project's own import settings for assets that live in bricks.</summary>
+[Collection(SerialTests.Name)]
 public sealed class PackageImportOverridesTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-import-overrides-{Guid.NewGuid():N}");

@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Covers <see cref="UiManager"/>'s world-space panels and <c>.ui</c> document panels on a headless Vulkan device.
 /// Skipped when no usable Vulkan device.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
 {
     readonly VulkanFixture fixture;

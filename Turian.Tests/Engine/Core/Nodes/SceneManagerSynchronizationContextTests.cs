@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Covers loading a scene from a thread that owns a single-threaded synchronization context and
 /// blocks on the returned task, the way the Studio's scene tree does on the UI thread.
 /// </summary>
+[Collection(SerialTests.Name)]
 public class SceneManagerSynchronizationContextTests
 {
     /// <summary>

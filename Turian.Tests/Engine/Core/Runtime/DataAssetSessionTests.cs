@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Probes mutable DataAssets wired by identity across runtime and test sessions.</summary>
+[Collection(SerialTests.Name)]
 public sealed class DataAssetSessionTests : IDisposable
 {
     readonly string projectRoot = Path.Combine(Path.GetTempPath(), $"turian-da-session-{Guid.NewGuid():N}");

@@ -3,6 +3,7 @@ using System.Net;
 namespace Turian.Tests;
 
 /// <summary>A static registry: publishing signed bricks into it, and resolving, locking and updating from it.</summary>
+[Collection(SerialTests.Name)]
 public sealed class RegistryTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"gaya-registry-{Guid.NewGuid():N}");

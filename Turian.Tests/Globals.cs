@@ -15,13 +15,13 @@ global using System.Text.Json.Nodes;
 global using System.Text.Json.Serialization;
 global using System.Text.RegularExpressions;
 global using System.Xml.Linq;
+global using Autoformers;
 global using Gaya.Host;
 global using Gaya.Packages;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
 global using MASS4.Attributes;
-global using Autoformers;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;
 global using Microsoft.CodeAnalysis.Diagnostics;
@@ -44,5 +44,5 @@ global using GuiColor = Guinevere.Color;
 global using Key = Silk.NET.Input.Key;
 global using SilkMouseButton = Silk.NET.Input.MouseButton;
 
-// Several test classes reset and rebuild the process-wide AssetDatabase singleton.
-[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None)]
+// Test classes run in parallel; those sharing process-wide state opt into the serial SerialTests collection.
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.Collections)]

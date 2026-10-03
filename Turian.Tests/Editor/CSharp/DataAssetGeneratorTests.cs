@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests the DataAsset source generator: generated serializers write exactly what reflection writes, [Observable]
 /// properties raise change notifications, and the scene-reference analyzer flags node and component members.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed partial class DataAssetGeneratorTests
 {
     /// <summary>A mode, to cover enums.</summary>

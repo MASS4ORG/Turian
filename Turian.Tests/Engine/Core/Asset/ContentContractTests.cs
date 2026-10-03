@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>A fixture tying authored IDs, references, variants, mounted overrides and runtime saves together.</summary>
+[Collection(SerialTests.Name)]
 public sealed class ContentContractTests : IDisposable
 {
     [TypeId("4c373005-0a26-46fc-8bcd-853fe6bfd192")]

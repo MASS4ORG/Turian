@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// lit quad rendered offscreen. Skipped without a Vulkan device.
 /// </summary>
 /// <param name="fixture">The headless Vulkan device shared by the class.</param>
+[Collection(SerialTests.Name)]
 public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
     const int size = 32;

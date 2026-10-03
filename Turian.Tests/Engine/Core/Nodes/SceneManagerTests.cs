@@ -3,6 +3,7 @@ namespace Turian.Tests;
 /// <summary>
 /// Tests for the SceneManager class.
 /// </summary>
+[Collection(SerialTests.Name)]
 public class SceneManagerTests
 {
     readonly SceneManager sceneManager;

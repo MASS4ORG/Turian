@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests for child assets — the materials and textures a model file declares, which have no
 /// source file and no <c>.meta</c> of their own and are addressed through their parent.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class ChildAssetTests : IDisposable
 {
     readonly string projectRoot;

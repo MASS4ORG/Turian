@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests for <see cref="PlayModeService"/>, the Studio's in-editor play mode: its transport state
 /// machine, and the guarantee that a session never mutates the scene being edited.
 /// </summary>
+[Collection(SerialTests.Name)]
 public class PlayModeServiceTests : IDisposable
 {
     /// <summary>Counts frames so tests can assert exactly how far a session advanced.</summary>

@@ -3,6 +3,7 @@ namespace Turian.Tests;
 /// <summary>
 /// Tests for the AssetDatabase class.
 /// </summary>
+[Collection(SerialTests.Name)]
 public class AssetDatabaseTests : IDisposable
 {
     static readonly object LockObject = new();

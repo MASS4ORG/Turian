@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Checks that queued watcher events cannot mutate an importer after disposal.</summary>
+[Collection(SerialTests.Name)]
 public sealed class AssetImporterLifetimeTests : IDisposable
 {
     readonly string project = Directory.CreateTempSubdirectory("turian-import-lifetime-").FullName;

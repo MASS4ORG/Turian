@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests that members typed as a node, component or DataAsset serialize as references and resolve after load,
 /// instead of being written as inline copies.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class ObjectReferencesTests : IDisposable
 {
     /// <summary>A component holding every kind of direct reference.</summary>

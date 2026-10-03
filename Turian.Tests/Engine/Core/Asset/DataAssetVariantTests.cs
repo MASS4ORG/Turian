@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Data asset variants: a base plus overrides, resolved wherever a payload is read.</summary>
+[Collection(SerialTests.Name)]
 public sealed class DataAssetVariantTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-variants-{Guid.NewGuid():N}");

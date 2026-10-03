@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Package assets: indexed beside the project's own, owned by the installing project, and never allowed to reuse
 /// an asset id.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class PackageAssetTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-package-assets-{Guid.NewGuid():N}");

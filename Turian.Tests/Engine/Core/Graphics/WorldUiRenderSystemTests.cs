@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// a <see cref="WorldUiQuad"/> supplied via <see cref="SceneViewerService.WorldUiSource"/> is drawn
 /// into the scene and shows up in the offscreen read-back. Skipped without a Vulkan device.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
 {
     const int size = 32;

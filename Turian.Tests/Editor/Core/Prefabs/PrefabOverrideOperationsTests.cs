@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Tests for reverting and unpacking prefab instances in the open scene.</summary>
+[Collection(SerialTests.Name)]
 public class PrefabOverrideOperationsTests : IDisposable
 {
     readonly string projectRoot = Path.Combine(Path.GetTempPath(), $"turian-overrides-{Guid.NewGuid():N}");

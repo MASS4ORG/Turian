@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Checks Output's play-boundary clearing without starting a window or Vulkan device.</summary>
+[Collection(SerialTests.Name)]
 public sealed class OutputLogBridgeTests
 {
     [TypeId("be91f438-ddba-43ab-95e3-ad135a19477c")]

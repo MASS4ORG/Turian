@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Exercises the source-watch lifecycle used when a Studio project opens.</summary>
+[Collection(SerialTests.Name)]
 public sealed class ProjectSessionHotReloadTests
 {
     /// <summary>Opening a project begins watching its Assets directory after the initial compile attempt.</summary>

@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Tests for <see cref="UiImageResolver"/> — path / <c>asset://</c> resolution and caching.</summary>
+[Collection(SerialTests.Name)]
 public sealed class UiImageResolverTests : IDisposable
 {
     readonly string dir = Path.Combine(Path.GetTempPath(), $"ui-img-{Guid.NewGuid():N}");
