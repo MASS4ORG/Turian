@@ -3,10 +3,7 @@ namespace Gaya.Plugin.Turian;
 /// <summary>
 /// Hosts the Help ▸ About dialog: the studio's logo, name, build version and compilation date, links
 /// to documentation and community spaces, and the contributor list from <c>docs/CONTRIBUTORS.md</c>.
-/// Draws nothing of its own in the menu bar strip it is registered on — it only needs a slot that
-/// renders every frame, so <see cref="Open"/> (called from the Help menu's command) can flip the
-/// dialog open on the next one. The version and contributors come from <see cref="BuildInfo"/>,
-/// generated at compile time by <c>BuildInfoGenerator</c>.
+/// Renders in the workbench overlay slot when opened through the Help menu.
 /// </summary>
 sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 {

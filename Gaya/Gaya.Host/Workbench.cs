@@ -68,6 +68,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// <summary>The dock arrangement currently on screen.</summary>
     public DockLayout Layout { get; }
 
+    /// <summary>Whether the application bar preserves the operating system's title bar.</summary>
+    public bool NativeTitlebar { get; set; }
+
     /// <summary>The theme every part of the workbench is drawn with, preview included.</summary>
     StudioTheme Theme => app.Themes.Current;
 
@@ -314,11 +317,12 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
+        if (gui.Pass == Pass.Pass1Build) SyncChrome();
         SyncPanels();
         HandleShortcuts(gui);
 
         var t = Theme;
-        gui.Controls = controlPalette;
+        gui.ControlPalette = controlPalette;
         gui.DrawRect(gui.ScreenRect, t.Background);
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(t.Gap).Padding(t.Gap).Enter())
@@ -335,6 +339,8 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
             StatusBar(gui);
         }
+
+        RenderOverlays(gui);
 
         if (app.Services.GetService(typeof(IUiBlocker)) is IUiBlocker { IsBlocked: true } blocker)
         {

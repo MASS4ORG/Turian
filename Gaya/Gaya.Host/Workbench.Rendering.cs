@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Gaya.Host;
 
 /// <summary>
@@ -33,7 +35,7 @@ public sealed partial class Workbench
     /// </summary>
     void ChromeStrip(Gui gui, ChromeSlot slot)
     {
-        var items = app.Chrome.For(slot).ToList();
+        var items = ChromeFor(slot);
         if (items.Count == 0) return;
 
         var height = Theme.Scale(items.Max(item => item.Height > 0 ? item.Height : Theme.HeaderHeight));
@@ -170,17 +172,16 @@ public sealed partial class Workbench
     void MenuBar(Gui gui)
     {
         var t = Theme;
-        var height = t.Scale(t.MenuHeight);
+        var height = Math.Max(24f, t.Scale(t.MenuHeight));
 
-        using (gui.Node(-1, height, "menubar").ExpandWidth().Direction(Axis.Horizontal).Enter())
+        using (gui.AppBar(height: height, nativeTitlebar: NativeTitlebar, backgroundColor: t.Chrome,
+                   resizable: true, minimumWindowSize: new Vector2(640, 400)))
         {
-            gui.DrawBackgroundRect(t.Chrome);
-
-            using (gui.Node().Expand().Enter())
+            using (gui.Node(-1, height, "menubar").Direction(Axis.Horizontal).Enter())
                 gui.MenuBar(BuildMenus, height, t.Chrome, t.Ink, t.Hover, t.Text(13f), padding: 10f);
 
-            // The menus expand, so whatever a plugin puts here lands against the right edge.
-            foreach (var item in app.Chrome.For(ChromeSlot.MenuBar))
+            gui.Node().ExpandWidth();
+            foreach (var item in ChromeFor(ChromeSlot.MenuBar))
                 using (gui.Node(-1, height, $"chrome/MenuBar/{item.Id}")
                            .Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
                     ResolveChrome(item).Render(gui);
@@ -189,6 +190,7 @@ public sealed partial class Workbench
 
     void BuildMenus(MenuBarBuilder bar)
     {
+        bar.Collapsible();
         foreach (var (menuId, label) in TopLevelMenus())
         {
             var id = menuId;

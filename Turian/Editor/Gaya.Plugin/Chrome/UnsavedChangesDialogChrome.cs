@@ -2,8 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// Asks what to do with unsaved edits before a document closes or the studio exits: save them, discard
-/// them, or cancel. Draws nothing in the menu bar strip it is registered on — like the About dialog, it
-/// only needs a slot that renders every frame.
+/// them, or cancel. Renders in the workbench overlay slot.
 /// </summary>
 sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChromeItem
 {
