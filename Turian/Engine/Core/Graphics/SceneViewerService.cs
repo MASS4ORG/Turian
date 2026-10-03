@@ -60,6 +60,26 @@ public sealed class SceneViewerService : IDisposable
     /// <summary>Gets the submitted and culled submesh counts from this viewer's latest frame.</summary>
     public RenderCullingStats CullingStats => standardSystem.CullingStats;
 
+    /// <summary>Enables the optional visibility Brick for this view.</summary>
+    public bool UseOcclusionCulling
+    {
+        get => standardSystem.UseOcclusionCulling;
+        set => standardSystem.UseOcclusionCulling = value;
+    }
+
+    /// <summary>The factory to use for this view, or null to discover a loaded Brick.</summary>
+    public IOcclusionCullingFactory? OcclusionCullingFactory
+    {
+        get => standardSystem.OcclusionCullingFactory;
+        set => standardSystem.OcclusionCullingFactory = value;
+    }
+
+    /// <summary>Visibility counts from the last completed frame slot.</summary>
+    public RenderCullingStats OcclusionStats => standardSystem.OcclusionStats;
+
+    /// <summary>Bytes allocated for optional visibility resources.</summary>
+    public ulong OcclusionAllocatedBytes => standardSystem.OcclusionAllocatedBytes;
+
     /// <summary>Gets or sets whether this viewer rejects submeshes outside its camera frustum.</summary>
     public bool UseFrustumCulling
     {
@@ -162,6 +182,7 @@ public sealed class SceneViewerService : IDisposable
         // Gathering fills the light slots, so it runs before the upload or lights reach the GPU a frame late.
         standardSystem.Prepare(frameInfo, ubo);
         uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
+        standardSystem.RecordBeforeRenderPass(frameInfo);
 
         frameTarget.BeginRenderPass(cmd.Value);
 
@@ -221,6 +242,8 @@ public sealed class SceneViewerService : IDisposable
         // Recreate them so their pipelines point to the new render pass. The overlay texture is
         // re-supplied by the caller each frame, so it is not carried across.
         var useFrustumCulling = UseFrustumCulling;
+        var useOcclusionCulling = UseOcclusionCulling;
+        var occlusionFactory = OcclusionCullingFactory;
         standardSystem.Dispose();
         meshSystem.Dispose();
         gizmoSystem.Dispose();
@@ -228,6 +251,8 @@ public sealed class SceneViewerService : IDisposable
         overlayUiSystem.Dispose();
         InitializeRenderSystems();
         UseFrustumCulling = useFrustumCulling;
+        UseOcclusionCulling = useOcclusionCulling;
+        OcclusionCullingFactory = occlusionFactory;
     }
 
     /// <inheritdoc/>

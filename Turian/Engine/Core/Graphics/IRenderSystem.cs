@@ -15,6 +15,11 @@ public interface IRenderSystem : IDisposable
     {
     }
 
+    /// <summary>Records depth or compute work after the UBO upload and before the main render pass begins.</summary>
+    void RecordBeforeRenderPass(FrameInfo frameInfo)
+    {
+    }
+
     /// <summary>
     /// Renders a frame using the rendering system.
     /// </summary>

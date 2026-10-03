@@ -39,6 +39,16 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
 
     /// <summary>Gets the submitted and culled submesh counts from the runtime's latest frame.</summary>
     public RenderCullingStats CullingStats => standardSystem.CullingStats;
+
+    /// <summary>Enables the optional GPU visibility Brick for the runtime view.</summary>
+    public bool UseOcclusionCulling
+    {
+        get => standardSystem.UseOcclusionCulling;
+        set => standardSystem.UseOcclusionCulling = value;
+    }
+
+    /// <summary>Gets counts from the latest completed visibility frame slot.</summary>
+    public RenderCullingStats OcclusionStats => standardSystem.OcclusionStats;
     DescriptorPool globalPool = null!;
 
     /// <summary>
@@ -86,38 +96,42 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
         ArgumentNullException.ThrowIfNull(camera);
         ArgumentNullException.ThrowIfNull(node);
         var commandBuffer = Renderer.BeginFrame();
+        if (commandBuffer is not null) RenderFrame(commandBuffer.Value, deltaTime, camera, node);
+    }
+
+    void RenderFrame(CommandBuffer commandBuffer, double deltaTime, ICamera camera, Node node)
+    {
         var frameIndex = Renderer.FrameIndex;
-
-        if (commandBuffer is not null)
+        frameInfo = new()
         {
-            frameInfo = new()
-            {
-                FrameIndex = frameIndex,
-                FrameTime = (float)deltaTime,
-                CommandBuffer = commandBuffer.Value,
-                Camera = camera,
-                GlobalDescriptorSet = globalDescriptorSets[frameIndex],
-                Nodes = node.Children
-            };
+            FrameIndex = frameIndex,
+            FrameTime = (float)deltaTime,
+            CommandBuffer = commandBuffer,
+            Camera = camera,
+            GlobalDescriptorSet = globalDescriptorSets[frameIndex],
+            Nodes = node.Children,
+            ViewportWidth = Renderer.SwapChain.Width,
+            ViewportHeight = Renderer.SwapChain.Height,
+        };
 
-            ubos[frameIndex].Update(
-                camera.GetProjectionMatrix(),
-                camera.GetViewMatrix(),
-                new Vector4(camera.Front, 0)
-            );
-            PrepareSystems(ubos[frameIndex]);
-            uboBuffers[frameIndex].WriteBytesToBuffer(ubos[frameIndex].AsBytes());
+        ubos[frameIndex].Update(
+            camera.GetProjectionMatrix(),
+            camera.GetViewMatrix(),
+            new Vector4(camera.Front, 0)
+        );
+        PrepareSystems(ubos[frameIndex]);
+        uboBuffers[frameIndex].WriteBytesToBuffer(ubos[frameIndex].AsBytes());
+        RecordBeforeRenderPass();
 
-            Renderer.BeginSwapChainRenderPass(commandBuffer.Value);
-            if (OnRender is not null)
-            {
-                OnRender(frameInfo, ref ubos[frameIndex]);
-            }
-
-            Renderer.EndSwapChainRenderPass(commandBuffer.Value);
-
-            Renderer.EndFrame();
+        Renderer.BeginSwapChainRenderPass(commandBuffer);
+        if (OnRender is not null)
+        {
+            OnRender(frameInfo, ref ubos[frameIndex]);
         }
+
+        Renderer.EndSwapChainRenderPass(commandBuffer);
+
+        Renderer.EndFrame();
     }
 
     // Gathering fills the light slots, so it runs before the upload or lights reach the GPU late.
@@ -126,6 +140,12 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
         foreach (var system in renderSystems)
             system.Prepare(frameInfo, ubo);
         windowManager.CullingStats = CullingStats;
+    }
+
+    void RecordBeforeRenderPass()
+    {
+        foreach (var system in renderSystems)
+            system.RecordBeforeRenderPass(frameInfo);
     }
 
     /// <summary>

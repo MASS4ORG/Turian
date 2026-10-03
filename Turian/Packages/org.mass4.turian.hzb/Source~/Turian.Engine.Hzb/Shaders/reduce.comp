@@ -1,0 +1,15 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0) uniform sampler2D inputDepth;
+layout(r32f, set = 0, binding = 1) writeonly uniform image2D outputDepth;
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, imageSize(outputDepth)))) return;
+    ivec2 source = pixel * 2;
+    ivec2 last = textureSize(inputDepth, 0) - 1;
+    float depth = 0.0;
+    for (int y = 0; y < 2; ++y)
+        for (int x = 0; x < 2; ++x)
+            depth = max(depth, texelFetch(inputDepth, min(source + ivec2(x, y), last), 0).r);
+    imageStore(outputDepth, pixel, vec4(depth));
+}

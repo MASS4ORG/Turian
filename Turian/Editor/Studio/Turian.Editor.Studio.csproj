@@ -14,6 +14,8 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj"
+                          ReferenceOutputAssembly="false" Private="false"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj"/>
         <!-- Built for their Precast~ output (the UI brick's prebuilt assemblies), not referenced by the host. -->
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Engine.UI/Turian.Engine.UI.csproj"

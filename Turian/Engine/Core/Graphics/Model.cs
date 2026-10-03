@@ -141,13 +141,22 @@ public class Model : IDisposable
         }
     }
 
+    /// <summary>Draws one GPU-written command; indexed and non-indexed models use a common 20-byte stride.</summary>
+    public void DrawSubMeshIndirect(CommandBuffer commandBuffer, Silk.NET.Vulkan.Buffer commands, ulong offset)
+    {
+        if (hasIndexBuffer)
+            vulkan.Vk.CmdDrawIndexedIndirect(commandBuffer, commands, offset, 1, 20);
+        else
+            vulkan.Vk.CmdDrawIndirect(commandBuffer, commands, offset, 1, 20);
+    }
+
     /// <summary>
     /// Releases the resources held by the model.
     /// </summary>
     public void Dispose()
     {
         vertexBuffer.Dispose();
-        indexBuffer.Dispose();
+        if (hasIndexBuffer) indexBuffer.Dispose();
         GC.SuppressFinalize(this);
     }
 }

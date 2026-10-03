@@ -8,6 +8,7 @@ namespace Turian.Engine.Core;
 /// <param name="NormalMatrix">The normal matrix of the owning node.</param>
 /// <param name="SortKey">Material order in the high bits, model order in the low bits.</param>
 /// <param name="Sequence">Scene order, used to preserve depth and blend ordering within equal sort keys.</param>
+/// <param name="WorldBounds">The world-space bounds supplied to optional visibility passes.</param>
 readonly record struct DrawItem(
     Model Model,
     int SubMesh,
@@ -15,7 +16,8 @@ readonly record struct DrawItem(
     Matrix4x4 ModelMatrix,
     Matrix4x4 NormalMatrix,
     long SortKey,
-    int Sequence = 0);
+    int Sequence = 0,
+    Bounds WorldBounds = default);
 
 /// <summary>
 /// The scene content one frame draws: models and lights gathered in a single walk, and the submesh draws sorted so
