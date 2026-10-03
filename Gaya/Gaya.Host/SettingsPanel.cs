@@ -14,7 +14,9 @@ namespace Gaya.Host;
 /// <param name="settings">The registered settings pages and their storage.</param>
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
-sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization) : IPanel
+/// <param name="themes">The themes available through the appearance dropdown.</param>
+sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
+    IThemeService themes) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -28,6 +30,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     SettingsScope scope = SettingsScope.User;
     float contentWidth = 360f;
     float measuredWidth;
+    string? frameThemeSelection;
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -253,10 +256,28 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
                            .Direction(Axis.Horizontal).Gap(4f).Enter())
                 {
                     SettingsStyle.ApplyFormStyle(gui);
-                    gui.FormFieldEditor(field, id, FormContext);
+                    if (page.Target is AppearanceSettings && field.Name == nameof(AppearanceSettings.Theme))
+                        ThemeEditor(gui, field, id);
+                    else
+                        gui.FormFieldEditor(field, id, FormContext);
                 }
             }
         }
+    }
+
+    void ThemeEditor(Gui gui, FormField field, string id)
+    {
+        var names = themes.Themes.Select(theme => theme.Name).ToArray();
+        var current = Array.IndexOf(names, field.GetValue() as string);
+        var style = gui.ControlStyle;
+        // ReSharper disable once ExplicitCallerInfoArgument
+        var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
+            backgroundColor: style.Surface, borderColor: style.Border, textColor: style.Text,
+            dropdownColor: style.Popup, filePath: $"{id}/theme");
+        if (gui.Pass == Pass.Pass1Build)
+            frameThemeSelection = next >= 0 && next != current ? names[next] : null;
+        else if (frameThemeSelection is { } selected)
+            field.SetValue(selected);
     }
 
     /// <summary>The button that puts a setting back the way the page declares it.</summary>

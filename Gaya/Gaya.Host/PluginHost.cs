@@ -108,6 +108,7 @@ public static class PluginHost
         // the context, and anything that reads a setting resolves the service.
         var settings = new EditorSettings(logger);
         var themes = new ThemeService();
+        services.AddSingleton(AppearanceSettings.Register(settings));
         services.AddSingleton<IEditorSettings>(settings);
         services.AddSingleton<IThemeService>(themes);
 
@@ -186,7 +187,8 @@ public static class PluginHost
             services => new SettingsPanel(
                 services.GetRequiredService<IEditorSettings>(),
                 services.GetRequiredService<ILogger>(),
-                services.GetService<IShellLocalization>()))
+                services.GetService<IShellLocalization>(),
+                services.GetRequiredService<IThemeService>()))
         { OpenByDefault = false });
 
         commands.Register(new CommandDescriptor(ShellCommands.Settings, "File: Settings…",

@@ -40,6 +40,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="$(SolutionDir)/Turian/Editor/Studio/WindowPlatform.cs" Link="Studio/WindowPlatform.cs" />
         <None Update="Fixtures/**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

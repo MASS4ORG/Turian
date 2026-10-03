@@ -9,6 +9,7 @@ namespace Gaya.Host;
 /// </summary>
 public sealed partial class Workbench
 {
+    bool frameNativeTitlebar;
 
     /// <summary>
     /// Advances every plugin once per drawn frame. A play session has to keep running while its
@@ -173,8 +174,14 @@ public sealed partial class Workbench
     {
         var t = Theme;
         var height = Math.Max(24f, t.Scale(t.MenuHeight));
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            gui.Platform.TryGet<IWindowChromeCapability>(out var window);
+            frameNativeTitlebar = NativeTitlebar || window?.CanMove == false;
+        }
 
-        using (gui.AppBar(height: height, nativeTitlebar: NativeTitlebar, backgroundColor: t.Chrome,
+        using (gui.AppBar(height: height, windowControls: !frameNativeTitlebar,
+                   nativeTitlebar: frameNativeTitlebar, backgroundColor: t.Chrome,
                    resizable: true, minimumWindowSize: new Vector2(640, 400)))
         {
             using (gui.Node(-1, height, "menubar").Direction(Axis.Horizontal).Enter())

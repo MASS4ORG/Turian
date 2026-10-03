@@ -73,6 +73,8 @@ Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 
 // The workbench publishes the themed control palette onto the Gui every frame.
 var gui = new Gui();
+WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
+    Environment.SetEnvironmentVariable);
 var window = new GuiWindow(gui, 1600, 950, "Turian Studio");
 var activeWorkbench = workbench;
 

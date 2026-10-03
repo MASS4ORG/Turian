@@ -54,6 +54,8 @@ public sealed class EditorSettings : IEditorSettings
     public string PathFor(SettingsScope scope) =>
         scope == SettingsScope.User ? user.Path : workspace?.Path ?? string.Empty;
 
+    internal void RestoreUserPage(SettingsPageDescriptor page) => user.Restore(page);
+
     /// <inheritdoc />
     public void Register(SettingsPageDescriptor page)
     {

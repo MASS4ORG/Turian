@@ -25,7 +25,7 @@ public sealed class GayaChromeTests
         }
     }
 
-    sealed class Frame : IDisposable
+    internal sealed class Frame : IDisposable
     {
         readonly string directory = Path.Combine(Path.GetTempPath(), $"gaya-chrome-{Guid.NewGuid():N}");
         readonly SKSurface surface = SKSurface.Create(new SKImageInfo(800, 600));
@@ -36,12 +36,14 @@ public sealed class GayaChromeTests
         public Frame(StudioTheme? theme = null)
         {
             Directory.CreateDirectory(directory);
+            var settings = new EditorSettings(NullLogger.Instance, Path.Combine(directory, "settings.json"));
+            var themes = new ThemeService();
             var services = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
+                .AddSingleton<IEditorSettings>(settings).AddSingleton<IThemeService>(themes)
                 .AddSingleton(Blocker).BuildServiceProvider();
             application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
                 new MenuRegistry(), Chrome, new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance),
-                new FocusTracker(), [], settings: new EditorSettings(NullLogger.Instance,
-                    Path.Combine(directory, "settings.json")));
+                new FocusTracker(), [], settings: settings, themes: themes);
             Workbench = new Workbench(application, theme,
                 new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
             if (theme is not null) application.Themes.SetScale(theme.FontSize, theme.Zoom);
@@ -64,6 +66,14 @@ public sealed class GayaChromeTests
         public CommandRegistry Commands => application.Commands;
         /// <summary>The registered menu entries.</summary>
         public MenuRegistry Menus => application.Menus;
+        /// <summary>The page registry and persistence used by the workbench.</summary>
+        public EditorSettings Settings => application.Settings;
+        /// <summary>The services used by contributed panels.</summary>
+        public IServiceProvider Services => application.Services;
+        /// <summary>The themes available to menus and the Appearance settings page.</summary>
+        public ThemeService Themes => application.Themes;
+        /// <summary>The panels rendered by the workbench.</summary>
+        public PanelRegistry Panels => application.Panels;
 
         /// <summary>Draws both passes, optionally mutating contributions after layout is calculated.</summary>
         public void Draw(Action? betweenPasses = null)
@@ -315,7 +325,7 @@ public sealed class GayaChromeTests
         Assert.Throws<ArgumentNullException>(() => frame.Workbench.Render(null!));
     }
 
-    /// <summary>The host's native preference and unsupported movement both preserve operating system decorations.</summary>
+    /// <summary>Native decorations and unsupported movement both suppress application-drawn window buttons.</summary>
     [Theory]
     [InlineData(true, false, false)]
     [InlineData(true, true, true)]
@@ -329,10 +339,65 @@ public sealed class GayaChromeTests
         frame.Workbench.NativeTitlebar = native;
         frame.Draw();
         frame.Draw();
-        window.Received(1).DrawWindowTitlebar(expected);
+        var bar = frame.Gui.RootNode!.Children[0].Children[0];
+        Assert.Equal(expected ? 1 : 4, bar.Children.Count);
+        if (!expected) window.Received(1).DrawWindowTitlebar(false);
+        else window.DidNotReceive().DrawWindowTitlebar(false);
         frame.Workbench.NativeTitlebar = true;
         frame.Draw();
-        window.Received().DrawWindowTitlebar(true);
+        Assert.Single(frame.Gui.RootNode!.Children[0].Children[0].Children);
+        if (!expected) window.Received(1).DrawWindowTitlebar(true);
+    }
+
+    /// <summary>A persisted window page is visible in the settings API and changing it takes effect next frame.</summary>
+    [Fact]
+    public void WindowPreferencesArePersistedAndKeepBothPassesConsistent()
+    {
+        using var frame = new Frame();
+        var page = frame.Settings.Pages.Single(page => page.Id == AppearanceSettings.PageId);
+        Assert.Equal("Appearance", page.Path);
+        Assert.Equal(SettingsScope.User, page.Scope);
+        Assert.False(page.Hidden);
+        Assert.Same(frame.Workbench.Appearance, page.Target);
+        var window = Substitute.For<IWindowChromeCapability>();
+        window.CanMove.Returns(true);
+        frame.Gui.Platform.Register(window);
+        frame.Draw(() => frame.Workbench.NativeTitlebar = true);
+        Assert.Equal(4, frame.Gui.RootNode!.Children[0].Children[0].Children.Count);
+        frame.Draw();
+        Assert.Single(frame.Gui.RootNode!.Children[0].Children[0].Children);
+        frame.Settings.Save();
+        var restored = new EditorSettings(NullLogger.Instance, frame.Settings.PathFor(SettingsScope.User));
+        var preferences = new AppearanceSettings();
+        restored.Register(SettingsPages.Describe(AppearanceSettings.PageId, preferences));
+        Assert.True(preferences.NativeTitlebar);
+        using var restoredApp = new GayaApplication(new ServiceCollection().BuildServiceProvider(),
+            new PanelRegistry(), new CommandRegistry(), new MenuRegistry(), new ChromeRegistry(),
+            new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
+            settings: restored);
+        using var another = new Workbench(restoredApp, layoutStore: new WorkbenchLayoutStore(NullLogger.Instance,
+            Path.Combine(Path.GetTempPath(), $"gaya-unused-layout-{Guid.NewGuid():N}.json")));
+        Assert.True(another.NativeTitlebar);
+        Assert.Same(preferences, another.Appearance);
+        another.NativeTitlebar = true;
+    }
+
+    /// <summary>The Settings panel edits the window preference through its generated checkbox.</summary>
+    [Fact]
+    public void WindowPreferencesCanBeEditedInTheSettingsPanel()
+    {
+        using var frame = new Frame();
+        using var shell = PluginHost.Load([], NullLogger.Instance);
+        var panel = shell.Panels.All.Single(item => item.Id == ShellPanels.Settings).Factory(frame.Services);
+        using var surface = SKSurface.Create(new SKImageInfo(900, 600));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);
+        var checkbox = Descendants(frame.Gui.RootNode!).Single(node =>
+            node.Id == $"settings/{AppearanceSettings.PageId}/field3/editor");
+        frame.Input.MousePosition.Returns(checkbox.Rect.Position + new Vector2(6, checkbox.Rect.H / 2));
+        frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+        InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);
+        Assert.True(frame.Workbench.NativeTitlebar);
     }
 
     /// <summary>The compact menu still dispatches commands through their guards and dynamic labels.</summary>
@@ -404,7 +469,7 @@ public sealed class GayaChromeTests
         commands.Received(1).Execute("gaya.turian.play");
     }
 
-    static IEnumerable<LayoutNode> Descendants(LayoutNode node)
+    internal static IEnumerable<LayoutNode> Descendants(LayoutNode node)
     {
         yield return node;
         foreach (var child in node.Children)

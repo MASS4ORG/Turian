@@ -1,4 +1,4 @@
-namespace Gaya.Plugin.Turian;
+namespace Gaya.Host;
 
 /// <summary>
 /// Keeps the appearance page and the theme service pointing at the same thing: the stored theme and
@@ -7,9 +7,6 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class AppearanceBridge : IDisposable
 {
-    /// <summary>The id the appearance page's values are stored under.</summary>
-    public const string PageId = "gaya.turian.appearance";
-
     readonly AppearanceSettings appearance;
     readonly IThemeService themes;
     readonly IEditorSettings settings;
@@ -49,7 +46,7 @@ sealed class AppearanceBridge : IDisposable
         if (string.Equals(themes.CommittedName, appearance.Theme, StringComparison.Ordinal)) return;
 
         appearance.Theme = themes.CommittedName;
-        settings.NotifyChanged(PageId);
+        settings.NotifyChanged(AppearanceSettings.PageId);
     }
 
     /// <inheritdoc />
