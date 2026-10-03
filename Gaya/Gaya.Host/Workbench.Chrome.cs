@@ -145,7 +145,7 @@ public sealed partial class Workbench
     void StatusBar(Gui gui)
     {
         var t = Theme;
-        var items = app.Chrome.For(ChromeSlot.StatusBar).ToList();
+        var items = ChromeFor(ChromeSlot.StatusBar);
         var height = t.Scale(items.Count == 0
             ? t.StatusHeight
             : Math.Max(t.StatusHeight, items.Max(item => item.Height > 0 ? item.Height : t.StatusHeight)));

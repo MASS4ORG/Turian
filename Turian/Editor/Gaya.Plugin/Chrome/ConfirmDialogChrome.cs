@@ -2,7 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// Asks the user to confirm an action, such as unpacking a prefab instance before deleting one of its objects.
-/// Registered on the menu bar strip only because it renders every frame; it draws nothing there.
+/// Renders in the workbench overlay slot.
 /// </summary>
 sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
 {

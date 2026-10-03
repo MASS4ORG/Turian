@@ -221,7 +221,10 @@ public enum ChromeSlot
     TopBar,
 
     /// <summary>A segment of the status bar along the bottom.</summary>
-    StatusBar
+    StatusBar,
+
+    /// <summary>Modal dialogs and other absolute overlays, rendered outside the application bar.</summary>
+    Overlay
 }
 
 /// <summary>Chrome drawn outside the dock space, such as a document tab strip or a play toolbar.</summary>
@@ -261,6 +264,14 @@ public interface IChromeRegistry
     /// <summary>Adds a chrome contribution.</summary>
     /// <param name="descriptor">The contribution.</param>
     void Register(ChromeDescriptor descriptor);
+
+    /// <summary>Replaces an existing contribution, retaining its position among items with the same order.</summary>
+    /// <param name="descriptor">The replacement, with the registered id.</param>
+    void Replace(ChromeDescriptor descriptor);
+
+    /// <summary>Removes a contribution; its cached instance is released before the next frame.</summary>
+    /// <param name="chromeId">The contribution id.</param>
+    void Remove(string chromeId);
 }
 
 /// <summary>

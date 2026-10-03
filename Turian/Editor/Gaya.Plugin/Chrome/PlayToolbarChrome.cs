@@ -36,7 +36,7 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
         {
             var enabled = commands.CanExecute(commandId);
             var interactable = gui.GetInteractable();
-            var hot = enabled && interactable.OnHover();
+            var hot = gui.Pass == Pass.Pass2Render && enabled && interactable.OnHover();
 
             if (active) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
             else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);

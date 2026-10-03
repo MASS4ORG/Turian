@@ -88,11 +88,13 @@ public static class PluginHost
     /// <param name="logger">Host logger; shared by every plugin.</param>
     /// <param name="configureServices">Optional hook to seed host services before plugins run.</param>
     /// <param name="commandLineArgs">Process arguments handed to each plugin through its context.</param>
+    /// <param name="previousAppearancePageId">An application's former page id for migrating appearance preferences.</param>
     public static GayaApplication Load(
         IEnumerable<Assembly> assemblies,
         ILogger logger,
         Action<IServiceCollection>? configureServices = null,
-        IReadOnlyList<string>? commandLineArgs = null)
+        IReadOnlyList<string>? commandLineArgs = null,
+        string? previousAppearancePageId = null)
     {
         ArgumentNullException.ThrowIfNull(assemblies);
         ArgumentNullException.ThrowIfNull(logger);
@@ -108,6 +110,7 @@ public static class PluginHost
         // the context, and anything that reads a setting resolves the service.
         var settings = new EditorSettings(logger);
         var themes = new ThemeService();
+        services.AddSingleton(AppearanceSettings.Register(settings, previousAppearancePageId));
         services.AddSingleton<IEditorSettings>(settings);
         services.AddSingleton<IThemeService>(themes);
 
@@ -186,7 +189,8 @@ public static class PluginHost
             services => new SettingsPanel(
                 services.GetRequiredService<IEditorSettings>(),
                 services.GetRequiredService<ILogger>(),
-                services.GetService<IShellLocalization>()))
+                services.GetService<IShellLocalization>(),
+                services.GetRequiredService<IThemeService>()))
         { OpenByDefault = false });
 
         commands.Register(new CommandDescriptor(ShellCommands.Settings, "File: Settings…",

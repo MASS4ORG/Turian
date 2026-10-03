@@ -177,27 +177,25 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<NodeInspectorController>()))
         { OpenByDefault = false });
 
-        // Both dialogs are registered on the menu bar only because that strip renders every frame;
-        // neither draws anything into it.
         context.Services.AddSingleton<FileDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
-            "gaya.turian.fileDialog", ChromeSlot.MenuBar,
+            "gaya.turian.fileDialog", ChromeSlot.Overlay,
             sp => sp.GetRequiredService<FileDialogChrome>()));
 
         context.Services.AddSingleton<UnsavedChangesDialogChrome>();
         context.Services.AddSingleton<UnsavedChangesGuard>();
         context.Chrome.Register(new ChromeDescriptor(
-            "gaya.turian.unsavedChangesDialog", ChromeSlot.MenuBar,
+            "gaya.turian.unsavedChangesDialog", ChromeSlot.Overlay,
             sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
 
         context.Services.AddSingleton<ConfirmDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
-            "gaya.turian.confirmDialog", ChromeSlot.MenuBar,
+            "gaya.turian.confirmDialog", ChromeSlot.Overlay,
             sp => sp.GetRequiredService<ConfirmDialogChrome>()));
 
         context.Services.AddSingleton<AboutDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
-            "gaya.turian.aboutDialog", ChromeSlot.MenuBar,
+            "gaya.turian.aboutDialog", ChromeSlot.Overlay,
             sp => sp.GetRequiredService<AboutDialogChrome>()));
 
         context.Chrome.Register(new ChromeDescriptor(
@@ -240,27 +238,22 @@ public sealed class GayaPlugin : IPlugin
     /// </summary>
     static void RegisterSettings(IPluginContext context)
     {
-        var appearance = new AppearanceSettings();
         var camera = new EditorCameraSettings();
         var recent = new RecentProjectsSettings();
         var language = new StudioLanguageSettings();
         var inspector = new InspectorSettings();
 
-        context.Services.AddSingleton(appearance);
         context.Services.AddSingleton(camera);
         context.Services.AddSingleton(recent);
         context.Services.AddSingleton(language);
         context.Services.AddSingleton(inspector);
         var assetBrowser = new AssetBrowserSettings();
         context.Services.AddSingleton(assetBrowser);
-        context.Services.AddSingleton(sp => new AppearanceBridge(appearance,
-            sp.GetRequiredService<IThemeService>(), sp.GetRequiredService<IEditorSettings>()));
         context.Services.AddSingleton(sp => new LocalizationBridge(language,
             sp.GetRequiredService<StudioLocalization>(), sp.GetRequiredService<IEditorSettings>()));
         var output = new OutputPanelSettings();
         context.Services.AddSingleton(output);
 
-        context.Settings.Register(SettingsPages.Describe(AppearanceBridge.PageId, appearance));
         context.Settings.Register(SettingsPages.Describe(LocalizationBridge.PageId, language));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.editorCamera", camera));
         context.Settings.Register(SettingsPages.Describe(AssetBrowserSettings.PageId, assetBrowser));
@@ -344,7 +337,6 @@ public sealed class GayaPlugin : IPlugin
         services.GetRequiredService<UserPanelBridge>().Sync();
 
         // Resolving the bridge is what starts it: it applies the stored theme and follows the menu.
-        services.GetRequiredService<AppearanceBridge>();
         services.GetRequiredService<LocalizationBridge>();
 
         // Workspace-scoped pages are stored inside the project, so they can only be restored once one

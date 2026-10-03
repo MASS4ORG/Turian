@@ -113,6 +113,11 @@ public sealed class MenuRegistry : IMenuRegistry
 public sealed class ChromeRegistry : IChromeRegistry
 {
     readonly List<ChromeDescriptor> chrome = [];
+    readonly Dictionary<string, int> versions = [];
+    readonly Dictionary<ChromeSlot, IReadOnlyList<ChromeDescriptor>> slots = [];
+
+    /// <summary>Changes whenever a contribution is registered, replaced or removed.</summary>
+    public int Revision { get; private set; }
 
     /// <inheritdoc />
     public void Register(ChromeDescriptor descriptor)
@@ -121,14 +126,48 @@ public sealed class ChromeRegistry : IChromeRegistry
         if (chrome.Any(item => item.Id == descriptor.Id))
             throw new InvalidOperationException($"Duplicate chrome id '{descriptor.Id}'.");
         chrome.Add(descriptor);
+        Changed();
+        versions[descriptor.Id] = Revision;
+    }
+
+    /// <inheritdoc />
+    public void Replace(ChromeDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var index = chrome.FindIndex(item => item.Id == descriptor.Id);
+        if (index < 0) throw new KeyNotFoundException($"Chrome id '{descriptor.Id}' is not registered.");
+        chrome[index] = descriptor;
+        Changed();
+        versions[descriptor.Id] = Revision;
+    }
+
+    /// <inheritdoc />
+    public void Remove(string chromeId)
+    {
+        if (chrome.RemoveAll(item => item.Id == chromeId) == 0) return;
+        versions.Remove(chromeId);
+        Changed();
+    }
+
+    internal int VersionFor(string chromeId) => versions[chromeId];
+
+    void Changed()
+    {
+        Revision++;
+        slots.Clear();
     }
 
     /// <summary>All registered chrome, in registration order.</summary>
     public IReadOnlyList<ChromeDescriptor> All => chrome;
 
     /// <summary>Chrome for a slot, in <see cref="ChromeDescriptor.Order"/> then registration order.</summary>
-    public IEnumerable<ChromeDescriptor> For(ChromeSlot slot) =>
-        chrome.Where(item => item.Slot == slot).OrderBy(item => item.Order);
+    public IEnumerable<ChromeDescriptor> For(ChromeSlot slot)
+    {
+        if (slots.TryGetValue(slot, out var items)) return items;
+        items = Array.AsReadOnly(chrome.Where(item => item.Slot == slot).OrderBy(item => item.Order).ToArray());
+        slots[slot] = items;
+        return items;
+    }
 }
 
 /// <summary>In-memory <see cref="ITabStripChromeRegistry"/>.</summary>

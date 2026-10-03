@@ -1,9 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Hosts the studio's one file dialog. Like <see cref="AboutDialogChrome"/> it draws nothing into the
-/// strip it is registered on — it only needs a slot that renders every frame, so a command can raise
-/// the dialog through <see cref="Show"/> and have it appear on the next one.
+/// Hosts the studio's one file dialog in the workbench overlay slot.
 /// </summary>
 /// <remarks>
 /// A single instance, shared by every caller, because the dialog is modal: raising a second one while

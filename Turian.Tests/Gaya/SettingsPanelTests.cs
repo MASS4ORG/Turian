@@ -35,7 +35,7 @@ public sealed class SettingsPanelTests
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
         var page = new SamplePage();
-        app.Settings.Register(new SettingsPageDescriptor("sample", "Audio", page));
+        app.Settings.Register(new SettingsPageDescriptor("sample", "Audio", page, Order: -1));
         var changes = 0;
         app.Settings.Changed += () => changes++;
         var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);

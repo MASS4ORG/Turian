@@ -7,11 +7,12 @@ public class StudioContributionsTests
         List<CommandDescriptor> Commands,
         List<MenuItemDescriptor> Menus,
         List<KeyBinding> Shortcuts,
-        List<PanelDescriptor> Panels);
+        List<PanelDescriptor> Panels,
+        List<ChromeDescriptor> Chrome);
 
     static Contributions Configure()
     {
-        var found = new Contributions([], [], [], []);
+        var found = new Contributions([], [], [], [], []);
         var context = Substitute.For<IPluginContext>();
         context.CommandLineArgs.Returns([]);
         context.Commands.When(r => r.Register(Arg.Any<CommandDescriptor>()))
@@ -22,6 +23,8 @@ public class StudioContributionsTests
             .Do(call => found.Shortcuts.Add(call.Arg<KeyBinding>()));
         context.Panels.When(r => r.Register(Arg.Any<PanelDescriptor>()))
             .Do(call => found.Panels.Add(call.Arg<PanelDescriptor>()));
+        context.Chrome.When(r => r.Register(Arg.Any<ChromeDescriptor>()))
+            .Do(call => found.Chrome.Add(call.Arg<ChromeDescriptor>()));
 
         new GayaPlugin().Configure(context);
         return found;
@@ -51,5 +54,17 @@ public class StudioContributionsTests
         Assert.Equal(first.Commands.Select(c => c.Id), second.Commands.Select(c => c.Id));
         Assert.Equal(first.Panels.Select(p => p.Id), second.Panels.Select(p => p.Id));
         Assert.Contains(first.Commands, command => command.Id == "gaya.turian.save");
+    }
+
+    /// <summary>Modal dialogs render independently of the application bar's widgets and drag region.</summary>
+    [Fact]
+    public void DialogsUseTheOverlaySlot()
+    {
+        var contributions = Configure();
+        Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.playToolbar"],
+            contributions.Chrome.Where(item => item.Slot == ChromeSlot.MenuBar).Select(item => item.Id));
+        Assert.Equal(["gaya.turian.fileDialog", "gaya.turian.unsavedChangesDialog",
+                "gaya.turian.confirmDialog", "gaya.turian.aboutDialog"],
+            contributions.Chrome.Where(item => item.Slot == ChromeSlot.Overlay).Select(item => item.Id));
     }
 }

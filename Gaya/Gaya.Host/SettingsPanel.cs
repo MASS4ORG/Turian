@@ -14,7 +14,9 @@ namespace Gaya.Host;
 /// <param name="settings">The registered settings pages and their storage.</param>
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
-sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization) : IPanel
+/// <param name="themes">The themes available through the appearance dropdown.</param>
+sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
+    IThemeService themes) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -28,6 +30,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     SettingsScope scope = SettingsScope.User;
     float contentWidth = 360f;
     float measuredWidth;
+    string? frameThemeSelection;
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -220,9 +223,6 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     /// </summary>
     void Option(Gui gui, SettingsPageDescriptor page, FormField field, string id)
     {
-        var setting = field.Attribute<EditorSettingAttribute>();
-        var title = setting is { Path.Length: > 0 } ? setting.Path : field.Label;
-        var description = setting?.Description ?? "";
         var modified = IsModified(page, field);
 
         using (gui.Node(-1, -1, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Margin(0, 6f).Enter())
@@ -232,31 +232,61 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
                     gui.DrawBackgroundRect(Theme.Accent, 1.5f);
 
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(3f).Enter())
-            {
-                using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
-                           .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
-                {
-                    gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
-
-                    // Beside the title rather than against the panel's edge: at a settings page's
-                    // width the two would otherwise be too far apart to read as one row.
-                    if (modified && RevertButton(gui, $"{id}/revert")) Revert(page, field);
-
-                    using (gui.Node().Expand().Enter()) { }
-                }
-
-                if (description.Length > 0)
-                    gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
-                        centerInRect: false);
-
-                using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
-                           .Direction(Axis.Horizontal).Gap(4f).Enter())
-                {
-                    SettingsStyle.ApplyFormStyle(gui);
-                    gui.FormFieldEditor(field, id, FormContext);
-                }
-            }
+                OptionContent(gui, page, field, id, modified);
         }
+    }
+
+    void OptionContent(Gui gui, SettingsPageDescriptor page, FormField field, string id, bool modified)
+    {
+        var setting = field.Attribute<EditorSettingAttribute>();
+        var title = setting is { Path.Length: > 0 } ? setting.Path : field.Label;
+        var description = setting?.Description ?? "";
+        OptionHeading(gui, page, field, id, title, modified);
+
+        if (description.Length > 0)
+            gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
+                centerInRect: false);
+
+        using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
+                   .Direction(Axis.Horizontal).Gap(4f).Enter())
+        {
+            SettingsStyle.ApplyFormStyle(gui);
+            FieldEditor(gui, field, id);
+        }
+    }
+
+    void OptionHeading(Gui gui, SettingsPageDescriptor page, FormField field, string id, string title, bool modified)
+    {
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), $"{id}/title").ExpandWidth()
+                   .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
+        {
+            gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
+            if (modified && RevertButton(gui, $"{id}/revert")) Revert(page, field);
+            using (gui.Node().Expand().Enter()) { }
+        }
+    }
+
+    void FieldEditor(Gui gui, FormField field, string id)
+    {
+        if (field.Target is AppearanceSettings && field.Name == nameof(AppearanceSettings.Theme))
+            ThemeEditor(gui, field, id);
+        else
+            gui.FormFieldEditor(field, id, FormContext);
+    }
+
+    void ThemeEditor(Gui gui, FormField field, string id)
+    {
+        var names = themes.Themes.Select(theme => theme.Name).ToArray();
+        var current = Array.IndexOf(names, field.GetValue() as string);
+        var style = gui.ControlStyle;
+        // ReSharper disable once ExplicitCallerInfoArgument
+        var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
+            backgroundColor: style.Surface, borderColor: style.Border, textColor: style.Text,
+            dropdownColor: style.Popup, filePath: $"{id}/theme");
+        if (gui.Pass == Pass.Pass1Build)
+            frameThemeSelection = next >= 0 && next != current ? names[next] : null;
+        else if (frameThemeSelection is { } selected)
+            field.SetValue(selected);
     }
 
     /// <summary>The button that puts a setting back the way the page declares it.</summary>

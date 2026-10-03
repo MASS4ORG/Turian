@@ -25,6 +25,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     readonly GayaApplication app;
     readonly ILogger log;
     readonly WorkbenchLayoutStore layoutStore;
+    readonly AppearanceBridge appearanceBridge;
     readonly Dictionary<string, IPanel> panelInstances = [];
     readonly Dictionary<string, IChromeItem> chromeInstances = [];
     readonly Dictionary<string, IChromeItem> tabStripChromeInstances = [];
@@ -47,13 +48,16 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         ArgumentNullException.ThrowIfNull(app);
         this.app = app;
         log = app.Services.GetService(typeof(ILogger)) as ILogger ?? NullLogger.Instance;
+        Appearance = AppearanceSettings.Register(app.Settings);
 
         if (theme is not null)
         {
             app.Themes.Register(theme);
             app.Themes.Apply(theme.Name);
+            Appearance.Theme = theme.Name;
         }
 
+        appearanceBridge = new AppearanceBridge(Appearance, app.Themes, app.Settings);
         dockTheme = Theme.ToDockTheme();
         controlPalette = Theme.ToControlPalette();
         app.Themes.Changed += OnThemeChanged;
@@ -67,6 +71,21 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
     /// <summary>The dock arrangement currently on screen.</summary>
     public DockLayout Layout { get; }
+
+    /// <summary>The persisted preferences exposed by the Appearance settings page.</summary>
+    public AppearanceSettings Appearance { get; }
+
+    /// <summary>Whether the operating system supplies the title bar; changes are persisted through the settings API.</summary>
+    public bool NativeTitlebar
+    {
+        get => Appearance.NativeTitlebar;
+        set
+        {
+            if (Appearance.NativeTitlebar == value) return;
+            Appearance.NativeTitlebar = value;
+            app.Settings.NotifyChanged(AppearanceSettings.PageId);
+        }
+    }
 
     /// <summary>The theme every part of the workbench is drawn with, preview included.</summary>
     StudioTheme Theme => app.Themes.Current;
@@ -266,6 +285,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     {
         SaveLayoutIfChanged();
         app.Settings.Save();
+        appearanceBridge.Dispose();
         app.Themes.Changed -= OnThemeChanged;
 
         foreach (var panel in panelInstances.Values.OfType<IDisposable>()) panel.Dispose();
@@ -314,11 +334,12 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
+        if (gui.Pass == Pass.Pass1Build) SyncChrome();
         SyncPanels();
         HandleShortcuts(gui);
 
         var t = Theme;
-        gui.Controls = controlPalette;
+        gui.ControlPalette = controlPalette;
         gui.DrawRect(gui.ScreenRect, t.Background);
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(t.Gap).Padding(t.Gap).Enter())
@@ -335,6 +356,8 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
             StatusBar(gui);
         }
+
+        RenderOverlays(gui);
 
         if (app.Services.GetService(typeof(IUiBlocker)) is IUiBlocker { IsBlocked: true } blocker)
         {
