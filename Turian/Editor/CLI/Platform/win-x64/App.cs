@@ -79,14 +79,20 @@ public class App : IDisposable
         assetLoader = new RuntimeAssetLoader(assetDatabase);
         inputSource = new SilkInputSource(inputManager);
         actions = new InputActionService(inputSource);
-        sceneTicker = new SceneTicker(sceneManager) { InputSource = inputSource, Actions = actions };
         locale = new LocaleService();
+
+        CreateAssetDatabase();
+        RegisterUserCodeTypes();
+        var projectSettings = LoadProjectSettings();
+        var simulationClock = new SimulationClock(projectSettings.Get<TimeSettings>());
+        sceneTicker = new SceneTicker(sceneManager, simulationClock) { InputSource = inputSource, Actions = actions };
 
         var services = new ServiceCollection()
             .AddSingleton(vulkan)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)
+            .AddSingleton(simulationClock)
             .AddSingleton<IInputSource>(inputSource)
             .AddSingleton(actions)
             .AddSingleton<IInputActions>(actions)
@@ -94,12 +100,9 @@ public class App : IDisposable
             .BuildServiceProvider();
         sceneManager.BindServices(services);
 
-        CreateAssetDatabase();
-
-        RegisterUserCodeTypes();
         uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
 
-        LoadStartupScene();
+        LoadStartupScene(projectSettings);
         SetWindowIcon();
         logger.Lap("startup", "objects loaded");
 
@@ -158,9 +161,8 @@ public class App : IDisposable
             InputBindingStore.Load(actions, InputBindingStore.DefaultPath(product));
     }
 
-    void LoadStartupScene()
+    void LoadStartupScene(AppSettings projectSettings)
     {
-        var projectSettings = LoadProjectSettings();
         windowManager.Title = projectSettings.Get<PlayerSettings>().ProductName is { Length: > 0 } productName
             ? productName
             : projectSettings.Title ?? windowManager.Title;

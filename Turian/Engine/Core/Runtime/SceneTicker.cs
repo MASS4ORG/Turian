@@ -14,9 +14,13 @@ namespace Turian.Engine.Core;
 /// Instances are not thread-safe and are expected to be driven from a single loop thread.
 /// </remarks>
 /// <param name="sceneManager">The scene manager whose loaded scenes should be ticked.</param>
-public sealed class SceneTicker(ISceneManager sceneManager)
+/// <param name="clock">The session's authoritative clock, or a fresh clock with default settings.</param>
+public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clock)
 {
-    /// <summary>The fixed-update interval, in seconds.</summary>
+    /// <summary>Creates a scene driver with a fresh simulation clock using default timing settings.</summary>
+    public SceneTicker(ISceneManager sceneManager) : this(sceneManager, null) { }
+
+    /// <summary>The default fixed-update interval, in seconds.</summary>
     public const double FixedTimestep = 1.0 / 60.0;
 
     static readonly ConditionalWeakTable<Component, HashSet<string>> FailedCallbacks = [];
@@ -24,21 +28,16 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     readonly ISceneManager sceneManager =
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
 
-    double fixedAccumulator;
-    double timeScale = 1d;
+    /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
+    public SimulationClock Clock { get; } = clock ?? new SimulationClock();
 
     /// <summary>
     /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
     /// </summary>
     public double TimeScale
     {
-        get => timeScale;
-        set
-        {
-            if (!double.IsFinite(value) || value < 0)
-                throw new ArgumentOutOfRangeException(nameof(value), "Time scale must be finite and non-negative.");
-            timeScale = value;
-        }
+        get => Clock.TimeScale;
+        set => Clock.TimeScale = value;
     }
 
     /// <summary>Seconds advanced by this ticker after applying <see cref="TimeScale"/>.</summary>
@@ -58,8 +57,7 @@ public sealed class SceneTicker(ISceneManager sceneManager)
 
     /// <summary>
     /// Advances every loaded scene by <paramref name="deltaTime"/> unscaled seconds.
-    /// Runs as many fixed steps as the accumulated time allows, then a single variable
-    /// and late pass.
+    /// Runs fixed steps within the clock's frame budget, retaining backlog, then a single variable and late pass.
     /// </summary>
     /// <param name="deltaTime">Unscaled time elapsed since the previous tick, in seconds.</param>
     public void Tick(double deltaTime)
@@ -67,7 +65,8 @@ public sealed class SceneTicker(ISceneManager sceneManager)
         if (!double.IsFinite(deltaTime) || deltaTime < 0)
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
 
-        var scaledDeltaTime = deltaTime * TimeScale;
+        var unscaledDeltaTime = deltaTime;
+        var scaledDeltaTime = Clock.IsPaused ? 0d : deltaTime * TimeScale;
         if (!double.IsFinite(scaledDeltaTime))
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Scaled delta time must be finite.");
 
@@ -79,12 +78,8 @@ public sealed class SceneTicker(ISceneManager sceneManager)
 
         var roots = CollectRoots();
 
-        fixedAccumulator += deltaTime;
-        while (fixedAccumulator >= FixedTimestep)
-        {
-            RunFixedUpdate(roots);
-            fixedAccumulator -= FixedTimestep;
-        }
+        Clock.Advance(unscaledDeltaTime,
+            (_, interval) => RunFixedUpdate(roots, (float)interval));
 
         RunUpdate(roots, (float)deltaTime);
         RunLateUpdate(roots, (float)deltaTime);
@@ -96,8 +91,11 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     /// Advances every loaded scene by exactly one frame, running a single fixed step
     /// regardless of the accumulator or time scale. Used by the editor's frame-step control.
     /// </summary>
+    public void StepFrame() => StepFrame(Clock.FixedDeltaTime);
+
+    /// <summary>Runs one fixed tick and one presentation frame with an explicit presentation delta.</summary>
     /// <param name="deltaTime">The delta time to report to the update callbacks, in seconds.</param>
-    public void StepFrame(double deltaTime = FixedTimestep)
+    public void StepFrame(double deltaTime)
     {
         if (!double.IsFinite(deltaTime) || deltaTime < 0)
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
@@ -108,7 +106,7 @@ public sealed class SceneTicker(ISceneManager sceneManager)
 
         var roots = CollectRoots();
 
-        RunFixedUpdate(roots);
+        Clock.Step((_, interval) => RunFixedUpdate(roots, (float)interval));
         RunUpdate(roots, (float)deltaTime);
         RunLateUpdate(roots, (float)deltaTime);
 
@@ -116,24 +114,24 @@ public sealed class SceneTicker(ISceneManager sceneManager)
     }
 
     /// <summary>Discards accumulated fixed-step time, e.g. after resuming from a pause.</summary>
-    public void ResetAccumulator() => fixedAccumulator = 0d;
+    public void ResetAccumulator() => Clock.ResetAccumulator();
 
     List<Node> CollectRoots() =>
         [.. sceneManager.LoadedScenes
             .Select(scene => scene.RootNode)
             .Prepend(sceneManager.PersistentRoot)];
 
-    static void RunFixedUpdate(List<Node> roots)
+    static void RunFixedUpdate(List<Node> roots, float fixedDeltaTime)
     {
         foreach (var node in ActiveNodes(roots))
         {
-            node.OnFixedUpdate((float)FixedTimestep);
+            node.OnFixedUpdate(fixedDeltaTime);
             foreach (var component in node.Components)
             {
                 if (!component.IsActive) continue;
                 try
                 {
-                    component.OnFixedUpdate((float)FixedTimestep);
+                    component.OnFixedUpdate(fixedDeltaTime);
                 }
                 catch (Exception ex)
                 {

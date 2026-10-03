@@ -58,6 +58,7 @@ sealed class HeadlessProject : IDisposable
             .AddSingleton(Database)
             .AddSingleton<ISceneManager>(SceneManager)
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(Database))
+            .AddSingleton(new SimulationClock(settings.Get<TimeSettings>()))
             .AddSingleton(_ => LocalizationLoader.Create(settings, Database));
 
         if (Vulkan is not null)
