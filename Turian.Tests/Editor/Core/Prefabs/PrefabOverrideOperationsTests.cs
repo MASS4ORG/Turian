@@ -14,11 +14,10 @@ public class PrefabOverrideOperationsTests : IDisposable
     /// <summary>Opens a scene backed by a throwaway project; applies are not exercised, so no importer is needed.</summary>
     public PrefabOverrideOperationsTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
         var loader = Substitute.For<IAssetLoader>();
         sceneTree = new SceneTreeController(assets, new SettingsService(), assetImporter: null!,
-            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>());
+            assetLoader: loader, sceneManager: Substitute.For<ISceneManager>(), database: database);
         var inspector = new NodeInspectorController(assets);
         undo = new UndoService(sceneTree, inspector, assets, loader);
         operations = new PrefabOverrideOperations(sceneTree, undo, importer: null!, database, loader);
@@ -34,7 +33,6 @@ public class PrefabOverrideOperationsTests : IDisposable
     public void Dispose()
     {
         undo.Dispose();
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
         GC.SuppressFinalize(this);
     }
@@ -153,7 +151,7 @@ public class PrefabOverrideOperationsTests : IDisposable
     {
         var instance = Instantiate(AddPrefab(Lamp()));
         instance.Children[0].Name = "Bulb (tuned)";
-        instance.Children[0].Transform.Position = new Vector3(3f, 0f, 0f);
+        instance.Children[0].Position = new Vector3(3f, 0f, 0f);
         var added = new Node { Name = "Added" };
         instance.Children.Add(added);
 

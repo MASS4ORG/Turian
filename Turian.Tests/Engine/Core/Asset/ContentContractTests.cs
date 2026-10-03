@@ -18,14 +18,12 @@ public sealed class ContentContractTests : IDisposable
     /// <summary>Creates an isolated package directory and asset database.</summary>
     public ContentContractTests()
     {
-        TestAssetDatabase.Reset();
         Directory.CreateDirectory(Path.Combine(root, "overlays"));
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(root, recursive: true);
     }
 

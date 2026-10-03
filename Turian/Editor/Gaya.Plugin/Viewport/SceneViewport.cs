@@ -20,6 +20,7 @@ sealed class SceneViewport : IDisposable
         [KeyboardKey.W, KeyboardKey.A, KeyboardKey.S, KeyboardKey.D, KeyboardKey.Q, KeyboardKey.E];
 
     readonly Vulkan vulkan;
+    readonly AssetDatabase assets;
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
     readonly GizmoDrawerCatalog gizmos;
@@ -52,6 +53,7 @@ sealed class SceneViewport : IDisposable
 
     /// <summary>Creates the viewport and follows the framing requests the scene tree raises.</summary>
     /// <param name="vulkan">Shared device the offscreen target is allocated from.</param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="sceneTree">Supplies the hierarchy to render and raises framing requests.</param>
     /// <param name="inspector">Receives picks and supplies the node the gizmo transforms.</param>
     /// <param name="gizmos">Resolves the per-component gizmo drawers.</param>
@@ -62,6 +64,7 @@ sealed class SceneViewport : IDisposable
     /// <param name="locale">Resolves UI text for the open editor project.</param>
     public SceneViewport(
         Vulkan vulkan,
+        AssetDatabase assets,
         SceneTreeController sceneTree,
         NodeInspectorController inspector,
         GizmoDrawerCatalog gizmos,
@@ -72,6 +75,7 @@ sealed class SceneViewport : IDisposable
         LocaleService locale)
     {
         this.vulkan = vulkan;
+        this.assets = assets;
         this.sceneTree = sceneTree;
         this.inspector = inspector;
         this.gizmos = gizmos;
@@ -128,7 +132,7 @@ sealed class SceneViewport : IDisposable
         {
             if (service is null)
             {
-                service = new SceneViewerService(vulkan, width, height);
+                service = new SceneViewerService(vulkan, assets, width, height);
                 service.OnPopulateGizmos = PopulateGizmos;
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
@@ -389,7 +393,7 @@ sealed class SceneViewport : IDisposable
 
         try
         {
-            previewService ??= new SceneViewerService(vulkan, width, height);
+            previewService ??= new SceneViewerService(vulkan, assets, width, height);
             if (previewService.Width != width || previewService.Height != height)
                 previewService.Resize(width, height);
         }

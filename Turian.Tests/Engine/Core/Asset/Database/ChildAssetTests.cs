@@ -13,7 +13,6 @@ public sealed class ChildAssetTests : IDisposable
     /// <summary>Creates a throwaway project on disk and a fresh database singleton.</summary>
     public ChildAssetTests()
     {
-        TestAssetDatabase.Reset();
         database = new AssetDatabase();
 
         projectRoot = Path.Combine(Path.GetTempPath(), $"turian-child-assets-{Guid.NewGuid():N}");
@@ -24,7 +23,6 @@ public sealed class ChildAssetTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         if (Directory.Exists(projectRoot))
         {
             Directory.Delete(projectRoot, recursive: true);

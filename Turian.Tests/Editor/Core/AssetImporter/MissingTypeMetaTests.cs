@@ -9,13 +9,11 @@ public sealed class MissingTypeMetaTests : IDisposable
     public MissingTypeMetaTests()
     {
         Directory.CreateDirectory(Path.Combine(project, "Assets"));
-        TestAssetDatabase.Reset();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(project, recursive: true);
     }
 

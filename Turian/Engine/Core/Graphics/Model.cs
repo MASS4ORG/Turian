@@ -101,14 +101,9 @@ public class Model : IDisposable
     /// <param name="commandBuffer">The Vulkan command buffer.</param>
     public unsafe void Bind(CommandBuffer commandBuffer)
     {
-        Silk.NET.Vulkan.Buffer[] vertexBuffers = [vertexBuffer.VkBuffer];
-        ulong[] offsets = [0];
-
-        fixed (ulong* offsetsPtr = offsets)
-        fixed (Silk.NET.Vulkan.Buffer* vertexBuffersPtr = vertexBuffers)
-        {
-            vulkan.Vk.CmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffersPtr, offsetsPtr);
-        }
+        var vertexBufferHandle = vertexBuffer.VkBuffer;
+        ulong offset = 0;
+        vulkan.Vk.CmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBufferHandle, &offset);
 
         if (hasIndexBuffer)
         {

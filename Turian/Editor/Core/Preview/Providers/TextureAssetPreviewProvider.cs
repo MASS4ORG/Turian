@@ -7,9 +7,9 @@ namespace Turian.Editor.Core;
 public sealed class TextureAssetPreviewProvider : ITexturePreviewProvider
 {
     /// <inheritdoc/>
-    public Texture? GetPreviewTexture(Asset asset, Vulkan vulkan)
+    public Texture? GetPreviewTexture(Asset asset, Vulkan vulkan, AssetDatabase assets)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
-        return asset is TextureAsset texture ? texture.GetContent(vulkan) : null;
+        return asset is TextureAsset texture ? texture.GetContent(vulkan, assets) : null;
     }
 }

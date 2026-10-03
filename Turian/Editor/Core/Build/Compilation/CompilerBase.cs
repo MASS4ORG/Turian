@@ -112,6 +112,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
         };
         startInfo.ArgumentList.Add("restore");
         startInfo.ArgumentList.Add(Path.GetFullPath(csprojFilePath));
+        WithoutLocatorEnvironment(startInfo);
 
         using var process = new Process();
         process.StartInfo = startInfo;
@@ -133,6 +134,23 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
 
         Logger.LogInformation("Package restore succeeded");
     }
+
+    /// <summary>
+    /// Removes the MSBuild paths <see cref="MSBuildLocator"/> put in this process's environment, so a child
+    /// <c>dotnet</c> uses the SDK it resolves itself. Inherited, they pair one SDK's MSBuild with another SDK's host
+    /// whenever several SDKs are installed, and the child fails without an error.
+    /// </summary>
+    /// <param name="startInfo">The child process to start.</param>
+    /// <returns>The same <paramref name="startInfo"/>.</returns>
+    public static ProcessStartInfo WithoutLocatorEnvironment(ProcessStartInfo startInfo)
+    {
+        ArgumentNullException.ThrowIfNull(startInfo);
+        foreach (var variable in LocatorVariables)
+            startInfo.Environment.Remove(variable);
+        return startInfo;
+    }
+
+    static readonly string[] LocatorVariables = ["MSBUILD_EXE_PATH", "MSBuildExtensionsPath", "MSBuildSDKsPath"];
 
     // ── Restore caching ────────────────────────────────────────────────────────
 

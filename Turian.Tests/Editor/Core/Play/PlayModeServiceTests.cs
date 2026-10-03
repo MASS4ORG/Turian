@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// Tests for <see cref="PlayModeService"/>, the Studio's in-editor play mode: its transport state
 /// machine, and the guarantee that a session never mutates the scene being edited.
 /// </summary>
+[Collection(SerialTests.Name)]
 public class PlayModeServiceTests : IDisposable
 {
     /// <summary>Counts frames so tests can assert exactly how far a session advanced.</summary>
@@ -16,7 +17,7 @@ public class PlayModeServiceTests : IDisposable
         {
             TotalUpdates++;
             var node = Node ?? throw new InvalidOperationException("FrameCountingComponent must be attached to a node.");
-            node.Transform.Position += new Vector3(1f, 0f, 0f);
+            node.Position += new Vector3(1f, 0f, 0f);
         }
     }
 
@@ -62,7 +63,6 @@ public class PlayModeServiceTests : IDisposable
     /// <summary>Starts each test from a clean singleton and runtime-service state.</summary>
     public PlayModeServiceTests()
     {
-        TestAssetDatabase.Reset();
         ServiceCachingComponent.ResolvedAtAwake = null;
         ServiceCachingComponent.InputResolvedAtAwake = null;
         FrameCountingComponent.TotalUpdates = 0;
@@ -71,7 +71,8 @@ public class PlayModeServiceTests : IDisposable
         // The importer is only reached through SceneTreeController.SaveAsset, which play mode never
         // calls; constructing a real one would need the BuildManager singleton.
         sceneTree = new SceneTreeController(new AssetManager(), new SettingsService(), assetImporter: null!,
-            assetLoader: new RuntimeAssetLoader(assetDatabase), sceneManager: Substitute.For<ISceneManager>());
+            assetLoader: new RuntimeAssetLoader(assetDatabase), sceneManager: Substitute.For<ISceneManager>(),
+            database: assetDatabase);
 
         playMode = new PlayModeService(sceneTree, assetDatabase, new EmptyServiceProvider(), Log.Logger);
     }
@@ -82,7 +83,6 @@ public class PlayModeServiceTests : IDisposable
         playMode.Stop();
         ServiceCachingComponent.ResolvedAtAwake = null;
         ServiceCachingComponent.InputResolvedAtAwake = null;
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

@@ -23,7 +23,6 @@ public class SceneManagerSynchronizationContextTests
     [Fact]
     public void LoadNodeAsync_BlockedOnSingleThreadedContext_Completes()
     {
-        TestAssetDatabase.Reset();
 
         var scenePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.prefab");
         File.WriteAllText(scenePath, Serializer.Serialize(new Node { Name = "SceneRoot" }));
@@ -58,7 +57,6 @@ public class SceneManagerSynchronizationContextTests
         finally
         {
             File.Delete(scenePath);
-            TestAssetDatabase.Reset();
         }
     }
 }

@@ -26,12 +26,13 @@ public class DataAsset : IdObject
     /// Loads a data-asset payload from the specified absolute path.
     /// </summary>
     /// <param name="absolutePath">The absolute file path of the payload asset.</param>
+    /// <param name="database">The asset database a variant's bases are read from, or null when there is none.</param>
     /// <returns>The deserialized <see cref="DataAsset"/> payload instance.</returns>
     /// <exception cref="FileNotFoundException">
     /// Thrown when the specified payload file does not exist.
     /// </exception>
-    public static DataAsset? LoadContent(string absolutePath)
-        => LoadContent(absolutePath, null, DataAssetVariants.ReadFromDatabase);
+    public static DataAsset? LoadContent(string absolutePath, AssetDatabase? database)
+        => LoadContent(absolutePath, null, id => DataAssetVariants.ReadFromDatabase(database, id));
 
     internal static DataAsset? LoadContent(string absolutePath, Guid? expectedAssetId,
         Func<Guid, string?> readBase)

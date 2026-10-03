@@ -23,8 +23,7 @@ sealed class SceneTreePanel : IPanel
     readonly PrefabOverrideOperations overrides;
     readonly ConfirmDialogChrome confirm;
     readonly StudioLocalization localization;
-    readonly PrefabLinkClassifier prefabLinks =
-        new(id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
+    readonly PrefabLinkClassifier prefabLinks;
 
     Node? builtFor;
     bool stale = true;
@@ -46,11 +45,14 @@ sealed class SceneTreePanel : IPanel
     /// <param name="overrides">Unpacks prefab instances.</param>
     /// <param name="confirm">Asks before an edit unpacks a prefab instance.</param>
     /// <param name="localization">Translates the questions asked.</param>
+    /// <param name="database">The asset database prefab links are read from.</param>
     public SceneTreePanel(SceneTreeController sceneTree, NodeInspectorController inspector, AssetManager assets,
         PrefabAuthoring prefabs, PrefabStage prefabStage, SettingsService settings, UndoService undo,
-        PrefabOverrideOperations overrides, ConfirmDialogChrome confirm, StudioLocalization localization)
+        PrefabOverrideOperations overrides, ConfirmDialogChrome confirm, StudioLocalization localization,
+        AssetDatabase database)
     {
         this.sceneTree = sceneTree;
+        prefabLinks = new PrefabLinkClassifier(id => PrefabInstances.ReadPrefabJson(database, id));
         this.inspector = inspector;
         this.prefabs = prefabs;
         this.prefabStage = prefabStage;

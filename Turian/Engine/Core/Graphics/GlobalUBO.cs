@@ -109,33 +109,24 @@ public class GlobalUbo
         directionalLights[lightIndex].SetColor(color, intensity);
     }
 
+    byte[]? bytes;
+
     /// <summary>
-    /// Converts the UBO data to a byte array.
+    /// Writes the UBO data in its std140 layout into a buffer this UBO reuses on every call, so uploading each frame
+    /// allocates nothing. Copy the result if it must outlive the next call.
     /// </summary>
-    /// <returns>A byte array containing the UBO data.</returns>
+    /// <returns>The UBO's byte buffer, overwritten by the next call.</returns>
     public byte[] AsBytes()
     {
-        uint offset = 0;
-        uint fsize = sizeof(float);
-        var vsize = fsize * 4;
-        var msize = vsize * 4;
-        var bytes = new byte[SizeOf];
+        bytes ??= new byte[SizeOf];
+        var span = bytes.AsSpan();
 
-        projection.AsBytes().CopyTo(bytes, offset);
-        offset += msize;
-        view.AsBytes().CopyTo(bytes, offset);
-        offset += msize;
-
-        frontVec.AsBytes().CopyTo(bytes, offset);
-        offset += vsize;
-        ambientColor.AsBytes().CopyTo(bytes, offset);
-        offset += vsize;
-
-        var pbytes = pointLights.AsBytes();
-        pbytes.CopyTo(bytes, offset);
-        offset += uboLights * PointLight.SizeOf;
-
-        directionalLights.AsBytes().CopyTo(bytes, offset);
+        MemoryMarshal.Write(span, in projection);
+        MemoryMarshal.Write(span[64..], in view);
+        MemoryMarshal.Write(span[128..], in frontVec);
+        MemoryMarshal.Write(span[144..], in ambientColor);
+        MemoryMarshal.AsBytes(pointLights.AsSpan()).CopyTo(span[160..]);
+        MemoryMarshal.AsBytes(directionalLights.AsSpan()).CopyTo(span[(160 + ((int)uboLights * 32))..]);
 
         return bytes;
     }

@@ -15,11 +15,13 @@ public sealed class UiDocumentAsset : Asset
     /// <c>null</c> when the artifact is missing or unreadable. The result is cached — callers must
     /// not mutate it.
     /// </summary>
-    public UiDocument? GetContent()
+    /// <param name="database">The asset database the asset is registered in.</param>
+    public UiDocument? GetContent(AssetDatabase database)
     {
+        ArgumentNullException.ThrowIfNull(database);
         if (Cache.TryGetValue(Id, out var cached)) return cached;
 
-        if (!AssetDatabase.Instance.TryGetAssetProvider(Id, out var provider) || provider is null)
+        if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
             return null;
 
         try

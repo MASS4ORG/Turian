@@ -8,8 +8,10 @@ namespace Turian.Engine.Core;
 /// </remarks>
 /// <param name="windowManager">The window manager responsible for the rendering surface.</param>
 /// <param name="vulkan">The Vulkan context used for rendering.</param>
+/// <param name="assets">The asset database materials and textures are read from.</param>
 /// <param name="logger">The logger for recording initialization steps.</param>
-public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger logger) : IDisposable
+public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDatabase assets, ILogger logger)
+    : IDisposable
 {
     // set to true to force FIFO swapping
     const bool useFifo = false;
@@ -99,6 +101,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
                 camera.GetViewMatrix(),
                 new Vector4(camera.Front, 0)
             );
+            PrepareSystems(ubos[frameIndex]);
             uboBuffers[frameIndex].WriteBytesToBuffer(ubos[frameIndex].AsBytes());
 
             Renderer.BeginSwapChainRenderPass(commandBuffer.Value);
@@ -111,6 +114,13 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
 
             Renderer.EndFrame();
         }
+    }
+
+    // Gathering fills the light slots, so it runs before the upload or lights reach the GPU late.
+    void PrepareSystems(GlobalUbo ubo)
+    {
+        foreach (var system in renderSystems)
+            system.Prepare(frameInfo, ubo);
     }
 
     /// <summary>
@@ -180,6 +190,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
         renderSystems.Add(
             new StandardRenderSystem(
                 vulkan,
+                assets,
                 Renderer.SwapChainRenderPass,
                 globalSetLayout.GetDescriptorSetLayout()
             )

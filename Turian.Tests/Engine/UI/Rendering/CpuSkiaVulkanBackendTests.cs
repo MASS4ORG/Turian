@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// a real headless Vulkan device, a Skia frame, the initial texture upload and the per-frame
 /// re-upload. Skipped when no usable Vulkan device is present.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class CpuSkiaVulkanBackendTests : IClassFixture<VulkanFixture>
 {
     readonly VulkanFixture fixture;

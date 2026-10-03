@@ -3,7 +3,8 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// PBR forward render system. Binds the global UBO at set 0 and, for every submesh drawn,
 /// the material descriptor set at set 1. Materials come from the model's material slots,
-/// falling back to a default material for submeshes that declare none.
+/// falling back to a default material for submeshes that declare none. Draws are sorted by material, then model,
+/// so each is bound once per run of draws that share it.
 /// </summary>
 public class StandardRenderSystem : IRenderSystem
 {
@@ -14,29 +15,48 @@ public class StandardRenderSystem : IRenderSystem
     StandardPipeline pipeline = null!;
     PipelineLayout pipelineLayout;
     readonly MaterialDescriptorContext materials;
+    readonly RenderList renderList = new();
+    readonly Dictionary<(Guid Model, int Index), MaterialAsset> derivedMaterials = [];
+    readonly Dictionary<Guid, MaterialAsset> overrideMaterials = [];
+    bool prepared;
 
     /// <summary>
     /// .ctor
     /// </summary>
     /// <param name="vulkan"></param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="renderPass"></param>
     /// <param name="globalSetLayout"></param>
     public StandardRenderSystem(
         Vulkan vulkan,
+        AssetDatabase assets,
         RenderPass renderPass,
         Silk.NET.Vulkan.DescriptorSetLayout globalSetLayout
     )
     {
         this.vulkan = vulkan;
-        materials = new MaterialDescriptorContext(vulkan);
+        materials = new MaterialDescriptorContext(vulkan, assets);
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }
 
     /// <inheritdoc />
-    public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
+    public void Prepare(FrameInfo frameInfo, GlobalUbo ubo)
     {
         ArgumentNullException.ThrowIfNull(ubo);
+
+        renderList.Gather(frameInfo.Nodes);
+        UpdateLights(renderList.Lights, ubo);
+        BuildDraws();
+        prepared = true;
+    }
+
+    /// <inheritdoc />
+    public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
+    {
+        // A host that skips Prepare still draws; its lights then reach the GPU a frame late.
+        if (!prepared) Prepare(frameInfo, ubo);
+        prepared = false;
 
         pipeline.Bind(frameInfo.CommandBuffer);
 
@@ -52,107 +72,129 @@ public class StandardRenderSystem : IRenderSystem
             null
         );
 
-        UpdateLights(frameInfo, ubo);
-        DrawSolids(frameInfo);
+        RecordDraws(frameInfo.CommandBuffer);
 
         // Every material a visible scene needs has resolved by the end of the first frame, so this
         // reports the settled total once rather than counting textures as they stream in.
         TextureMemoryReport.ReportIfChanged(vulkan.Device);
     }
 
-    unsafe void DrawSolids(FrameInfo frameInfo)
+    void BuildDraws()
     {
-        foreach (var node in frameInfo.Nodes.Where(static node => node.IsActive))
+        foreach (var component in renderList.Models)
         {
-            foreach (var component in node.GetComponentsInChildren<ModelComponent>())
-            {
-                var model = component.ModelInstance;
-                if (model is null)
-                {
-                    continue;
-                }
-
-                if (component.Node is not { } modelNode)
-                {
-                    continue;
-                }
-
-                StandardPushConstantData push = new()
-                {
-                    ModelMatrix = modelNode.GlobalTransform.Matrix4X4(),
-                    NormalMatrix = modelNode.GlobalTransform.NormalMatrix()
-                };
-                vulkan.Vk.CmdPushConstants(
-                    frameInfo.CommandBuffer,
-                    pipelineLayout,
-                    ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                    0,
-                    StandardPushConstantData.SizeOf(),
-                    ref push
-                );
-                model.Bind(frameInfo.CommandBuffer);
-
-                var start = 0;
-                var last = model.SubMeshes.Count;
-                if (component.TryGetSubMeshRange(out var rangeStart, out var rangeCount))
-                {
-                    start = rangeStart;
-                    last = Math.Min(rangeStart + rangeCount, model.SubMeshes.Count);
-                }
-
-                var modelAssetId = component.ModelAssetId;
-                for (var i = start; i < last; i++)
-                {
-                    var slot = i - start;
-                    var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
-                    var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
-
-                    var materialSet = material.DescriptorSet;
-                    vulkan.Vk.CmdBindDescriptorSets(
-                        frameInfo.CommandBuffer,
-                        PipelineBindPoint.Graphics,
-                        pipelineLayout,
-                        firstSet: 1,
-                        descriptorSetCount: 1,
-                        in materialSet,
-                        0,
-                        null
-                    );
-
-                    model.DrawSubMesh(frameInfo.CommandBuffer, i);
-                }
-            }
+            if (component.ModelInstance is { } model && component.Node is { } node)
+                AddDraws(component, model, node.GlobalTransform);
         }
+
+        renderList.Sort();
+    }
+
+    void AddDraws(ModelComponent component, Model model, Transform global)
+    {
+        var start = 0;
+        var last = model.SubMeshes.Count;
+        if (component.TryGetSubMeshRange(out var rangeStart, out var rangeCount))
+        {
+            start = rangeStart;
+            last = Math.Min(rangeStart + rangeCount, model.SubMeshes.Count);
+        }
+
+        var modelMatrix = global.Matrix4X4();
+        var normalMatrix = global.NormalMatrix();
+        var modelAssetId = component.ModelAssetId;
+        var modelOrder = renderList.OrderOf(model);
+        for (var i = start; i < last; i++)
+        {
+            var slot = i - start;
+            var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
+            var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
+            var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
+            renderList.Draws.Add(new DrawItem(model, i, material, modelMatrix, normalMatrix, key));
+        }
+    }
+
+    void RecordDraws(CommandBuffer commandBuffer)
+    {
+        Model? boundModel = null;
+        MaterialResource? boundMaterial = null;
+        foreach (ref readonly var draw in CollectionsMarshal.AsSpan(renderList.Draws))
+        {
+            if (!ReferenceEquals(draw.Material, boundMaterial))
+            {
+                BindMaterial(commandBuffer, draw.Material);
+                boundMaterial = draw.Material;
+            }
+
+            if (!ReferenceEquals(draw.Model, boundModel))
+            {
+                draw.Model.Bind(commandBuffer);
+                boundModel = draw.Model;
+            }
+
+            StandardPushConstantData push = new() { ModelMatrix = draw.ModelMatrix, NormalMatrix = draw.NormalMatrix };
+            vulkan.Vk.CmdPushConstants(
+                commandBuffer,
+                pipelineLayout,
+                ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
+                0,
+                StandardPushConstantData.SizeOf(),
+                ref push
+            );
+            draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh);
+        }
+    }
+
+    unsafe void BindMaterial(CommandBuffer commandBuffer, MaterialResource material)
+    {
+        var materialSet = material.DescriptorSet;
+        vulkan.Vk.CmdBindDescriptorSets(
+            commandBuffer,
+            PipelineBindPoint.Graphics,
+            pipelineLayout,
+            firstSet: 1,
+            descriptorSetCount: 1,
+            in materialSet,
+            0,
+            null
+        );
     }
 
     /// <summary>
     /// Resolves the material for one submesh: an override slot first, then the child material
-    /// the importer derived from the source file, then the default material.
+    /// the importer derived from the source file, then the default material. Material handles are kept per id, so
+    /// steady frames neither allocate nor re-derive ids.
     /// </summary>
     MaterialResource ResolveMaterial(
         Guid modelAssetId,
         int? materialIndex,
-        AssetReference<MaterialAsset>? overrideReference)
+        AssetReference<MaterialAsset>? overrideReference) =>
+        OverrideMaterial(overrideReference) ?? DerivedMaterial(modelAssetId, materialIndex) ?? materials.DefaultMaterial;
+
+    MaterialResource? OverrideMaterial(AssetReference<MaterialAsset>? reference)
     {
-        if (overrideReference is { IsEmpty: false })
-        {
-            var overridden = new MaterialAsset { Id = overrideReference.AssetId }.GetContent(materials);
-            if (overridden is not null)
-            {
-                return overridden;
-            }
-        }
-
-        if (modelAssetId == Guid.Empty || materialIndex is null)
-        {
-            return materials.DefaultMaterial;
-        }
-
-        var childId = AssetIdFactory.Derive(modelAssetId, $"material:{materialIndex.Value}");
-        return new MaterialAsset { Id = childId }.GetContent(materials) ?? materials.DefaultMaterial;
+        if (reference is not { IsEmpty: false }) return null;
+        if (!overrideMaterials.TryGetValue(reference.AssetId, out var handle))
+            overrideMaterials[reference.AssetId] = handle = new MaterialAsset { Id = reference.AssetId };
+        return handle.GetContent(materials);
     }
 
-    static void UpdateLights(FrameInfo frameInfo, GlobalUbo ubo)
+    MaterialResource? DerivedMaterial(Guid modelAssetId, int? materialIndex)
+    {
+        if (modelAssetId == Guid.Empty || materialIndex is not { } index) return null;
+        if (!derivedMaterials.TryGetValue((modelAssetId, index), out var handle))
+        {
+            var id = AssetIdFactory.Derive(modelAssetId, $"material:{index}");
+            derivedMaterials[(modelAssetId, index)] = handle = new MaterialAsset { Id = id };
+        }
+
+        return handle.GetContent(materials);
+    }
+
+    /// <summary>Fills the UBO's light slots from <paramref name="lights"/>, clearing slots no light uses.</summary>
+    /// <param name="lights">The active lights, in scene order; lights beyond the slot count are ignored.</param>
+    /// <param name="ubo">The global UBO to fill.</param>
+    internal static void UpdateLights(List<LightComponent> lights, GlobalUbo ubo)
     {
         // Slots are filled from scratch every frame: a slot left over from a scene with more lights
         // would keep shining, and a default point light sits on the world origin at full intensity.
@@ -160,38 +202,35 @@ public class StandardRenderSystem : IRenderSystem
 
         var pointIndex = 0;
         var directionalIndex = 0;
-
-        foreach (var rootNode in frameInfo.Nodes.Where(static node => node.IsActive))
+        foreach (var component in lights)
         {
-            foreach (var component in rootNode.GetComponentsInChildren<LightComponent>())
+            if (component.Node is not { } lightNode) continue;
+
+            if (component.Type == LightType.Directional)
             {
-                if (component.Node is not { } lightNode) continue;
+                if (directionalIndex == ubo.DirectionalCount) continue;
 
-                if (component.Type == LightType.Directional)
-                {
-                    if (directionalIndex == ubo.DirectionalCount) continue;
-
-                    ubo.SetDirectionalLight(
-                        directionalIndex,
-                        lightNode.GlobalTransform.Forward,
-                        component.Color,
-                        component.Intensity);
-                    directionalIndex++;
-                    continue;
-                }
-
-                if (pointIndex == ubo.Count) continue;
-
-                ubo.SetPointLightPosition(pointIndex, lightNode.GlobalTransform.Position);
-                ubo.SetPointLightColor(pointIndex, component.Color, component.Intensity);
-                pointIndex++;
+                ubo.SetDirectionalLight(
+                    directionalIndex++,
+                    lightNode.GlobalTransform.Forward,
+                    component.Color,
+                    component.Intensity);
+                continue;
             }
+
+            if (pointIndex == ubo.Count) continue;
+
+            ubo.SetPointLightPosition(pointIndex, lightNode.GlobalTransform.Position);
+            ubo.SetPointLightColor(pointIndex++, component.Color, component.Intensity);
         }
     }
 
     /// <inheritdoc />
     public unsafe void Dispose()
     {
+        renderList.Reset();
+        derivedMaterials.Clear();
+        overrideMaterials.Clear();
         pipeline.Dispose();
         materials.Dispose();
         vulkan.Vk.DestroyPipelineLayout(vulkan.Device.VkDevice, pipelineLayout, null);

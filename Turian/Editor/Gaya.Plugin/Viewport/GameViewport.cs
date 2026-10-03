@@ -21,6 +21,7 @@ namespace Gaya.Plugin.Turian;
 sealed class GameViewport : IDisposable
 {
     readonly Vulkan vulkan;
+    readonly AssetDatabase assets;
     readonly SceneTreeController sceneTree;
     readonly PlayModeService playMode;
     readonly ILogger log;
@@ -39,12 +40,15 @@ sealed class GameViewport : IDisposable
 
     /// <summary>Creates the viewport over the shared device and the editor's play session.</summary>
     /// <param name="vulkan">Shared device the offscreen target is allocated from.</param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="sceneTree">Supplies the edited hierarchy the stopped panel previews.</param>
     /// <param name="playMode">The session to display and forward input to.</param>
     /// <param name="log">Where an unusable device is reported.</param>
-    public GameViewport(Vulkan vulkan, SceneTreeController sceneTree, PlayModeService playMode, ILogger log)
+    public GameViewport(
+        Vulkan vulkan, AssetDatabase assets, SceneTreeController sceneTree, PlayModeService playMode, ILogger log)
     {
         this.vulkan = vulkan;
+        this.assets = assets;
         this.sceneTree = sceneTree;
         this.playMode = playMode;
         this.log = log;
@@ -121,7 +125,7 @@ sealed class GameViewport : IDisposable
         {
             if (service is null)
             {
-                service = new SceneViewerService(vulkan, width, height);
+                service = new SceneViewerService(vulkan, assets, width, height);
                 service.OverlaySource = (w, h, dt) =>
                     overlayRoot is null ? null : UiPresenter()?.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);
                 service.WorldUiSource = frameInfo =>

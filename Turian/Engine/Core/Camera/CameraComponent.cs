@@ -146,10 +146,16 @@ public class CameraComponent : Component, ICamera
     /// <see cref="Priority"/>, or <c>null</c> when the hierarchy holds none.
     /// </summary>
     /// <param name="root">Root of the hierarchy to search.</param>
-    public static CameraComponent? FindPrimary(Node? root) =>
-        Node.GetComponentsInChildren<CameraComponent>(root)
-            .OrderByDescending(static camera => camera.Priority)
-            .FirstOrDefault();
+    public static CameraComponent? FindPrimary(Node? root)
+    {
+        // A plain scan instead of OrderByDescending: hosts ask for the active camera every frame. The first camera
+        // wins a tie, as the stable sort did.
+        CameraComponent? primary = null;
+        foreach (var camera in Node.GetComponentsInChildren<CameraComponent>(root))
+            if (primary is null || camera.Priority > primary.Priority)
+                primary = camera;
+        return primary;
+    }
 
     // ========= Transform-driven rotation =========
 
@@ -177,7 +183,7 @@ public class CameraComponent : Component, ICamera
                 return;
             }
 
-            Node.Transform.Rotation = Node.Transform.Rotation with { X = clamped * Mathf.RadiansToDegrees };
+            Node.Rotation = Node.Rotation with { X = clamped * Mathf.RadiansToDegrees };
             UpdateVectors();
         }
     }
@@ -200,7 +206,7 @@ public class CameraComponent : Component, ICamera
                 return;
             }
 
-            Node.Transform.Rotation = Node.Transform.Rotation with { Y = value * Mathf.RadiansToDegrees };
+            Node.Rotation = Node.Rotation with { Y = value * Mathf.RadiansToDegrees };
             UpdateVectors();
         }
     }
@@ -228,7 +234,7 @@ public class CameraComponent : Component, ICamera
     public Vector3 Position
     {
         get => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position;
-        set => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position = value;
+        set => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Position = value;
     }
 
     // ========= Lifecycle =========

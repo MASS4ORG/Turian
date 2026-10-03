@@ -10,14 +10,6 @@ namespace Turian.Editor.Core;
 /// </summary>
 public sealed class BuildManager : IDisposable
 {
-    // ── Singleton ──────────────────────────────────────────────────────────────
-
-    static BuildManager? _instance;
-
-    /// <summary>Returns the singleton instance, or throws if not yet initialised.</summary>
-    public static BuildManager Instance =>
-        _instance ?? throw new InvalidOperationException("BuildManager not initialized.");
-
     // ── Fields ─────────────────────────────────────────────────────────────────
 
     BuildAppSettings settings;
@@ -74,8 +66,6 @@ public sealed class BuildManager : IDisposable
             this.settings = LoadSettings(settings);
             slotManager = new AssemblySlotManager(SlotRoot(this.settings), logger);
         }
-
-        _instance = _instance is null ? this : throw new InvalidOperationException("BuildManager already initialized.");
     }
 
     // ── Settings ───────────────────────────────────────────────────────────────
@@ -348,7 +338,6 @@ public sealed class BuildManager : IDisposable
         sourceWatcher.Dispose();
         StopPlayProcessInternal(notify: false);
         TaskRunner.Dispose();
-        if (ReferenceEquals(_instance, this)) _instance = null;
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────────

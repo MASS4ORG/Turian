@@ -8,13 +8,15 @@ public static class ComponentRegistry
 {
     /// <summary>
     /// Enumerates all concrete, inspectable <see cref="Component"/> types
-    /// across every assembly loaded by <see cref="BuildManager"/>.
+    /// across <paramref name="assemblies"/>.
     /// </summary>
-    public static IEnumerable<Type> GetAvailableTypes()
+    /// <param name="assemblies">The assemblies to scan, usually <see cref="BuildManager.LoadedAssemblies"/>.</param>
+    public static IEnumerable<Type> GetAvailableTypes(IEnumerable<Assembly> assemblies)
     {
+        ArgumentNullException.ThrowIfNull(assemblies);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var assembly in BuildManager.Instance.LoadedAssemblies)
+        foreach (var assembly in assemblies)
         {
             Type[] types;
             try

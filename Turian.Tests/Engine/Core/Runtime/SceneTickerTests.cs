@@ -11,14 +11,12 @@ public class SceneTickerTests : IDisposable
     /// <summary>Resets the <see cref="AssetDatabase"/> singleton, as the other suites do.</summary>
     public SceneTickerTests()
     {
-        TestAssetDatabase.Reset();
         assetDatabase = new AssetDatabase();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 

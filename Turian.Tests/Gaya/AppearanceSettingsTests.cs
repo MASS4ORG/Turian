@@ -3,6 +3,7 @@ using Turian.Editor.Studio;
 namespace Turian.Tests;
 
 /// <summary>Checks shared appearance preferences and live desktop window gestures.</summary>
+[Collection(SerialTests.Name)]
 public sealed class AppearanceSettingsTests
 {
     /// <summary>A plugin that resolves the host's appearance preferences during activation.</summary>

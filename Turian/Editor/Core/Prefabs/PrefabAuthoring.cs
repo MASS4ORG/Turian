@@ -6,7 +6,8 @@ namespace Turian.Editor.Core;
 /// moves the new file to the project's trash, redo brings the same file back.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class PrefabAuthoring(AssetImporter importer, AssetFileSystem files, UndoService undo)
+public sealed class PrefabAuthoring(
+    AssetImporter importer, AssetFileSystem files, UndoService undo, AssetDatabase database)
 {
     const string prefabExtension = ".prefab";
 
@@ -157,7 +158,7 @@ public sealed class PrefabAuthoring(AssetImporter importer, AssetFileSystem file
         return variant.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
-    static string? LoadPrefab(Guid id) => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id);
+    string? LoadPrefab(Guid id) => PrefabInstances.ReadPrefabJson(database, id);
 
     Guid? ImportedId(string path)
     {

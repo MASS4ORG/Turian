@@ -22,13 +22,11 @@ public sealed class PackageImportOverridesTests : IDisposable
 
         Directory.CreateDirectory(Path.Combine(root, "game", "Assets"));
         ProjectBricks.Add(Path.Combine(root, "game"), "user.mateo.icons", "file:../../icons");
-        TestAssetDatabase.Reset();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(root, recursive: true);
     }
 
@@ -69,7 +67,6 @@ public sealed class PackageImportOverridesTests : IDisposable
         var overrides = new PackageImportOverrides();
         overrides.Set(iconId, "GenerateMips", false);
         overrides.Save(project);
-        TestAssetDatabase.Reset();
         var changed = SettingsHash(project);
 
         Assert.NotEqual(plain, changed);

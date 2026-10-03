@@ -42,22 +42,11 @@ public partial class Node
     public static IEnumerable<T> GetChildren<T>(Node? node)
         where T : Node
     {
-        if (node is null)
-        {
-            yield break;
-        }
-
-        // An inactive child hides its whole subtree, as Unity's activeInHierarchy does.
-        foreach (var child in node.Children.Where(static child => child.IsActive))
+        foreach (var child in GetChildren(node))
         {
             if (child is T t)
             {
                 yield return t;
-            }
-
-            foreach (var grandChild in GetChildren<T>(child))
-            {
-                yield return grandChild;
             }
         }
     }
@@ -74,15 +63,24 @@ public partial class Node
             yield break;
         }
 
-        foreach (var child in node.Children.Where(static child => child.IsActive))
+        // One explicit stack instead of a nested iterator per visited node; children are pushed in reverse so the
+        // walk stays depth-first in hierarchy order.
+        var pending = new Stack<Node>();
+        PushActiveChildren(node, pending);
+        while (pending.TryPop(out var current))
         {
-            yield return child;
-
-            foreach (var grandChild in GetChildren(child))
-            {
-                yield return grandChild;
-            }
+            yield return current;
+            PushActiveChildren(current, pending);
         }
+    }
+
+    // An inactive child hides its whole subtree, as Unity's activeInHierarchy does.
+    static void PushActiveChildren(Node node, Stack<Node> pending)
+    {
+        var children = node.Children;
+        for (var i = children.Count - 1; i >= 0; i--)
+            if (children[i].IsActive)
+                pending.Push(children[i]);
     }
 
     /// <summary>
@@ -121,9 +119,11 @@ public partial class Node
     public T? GetComponent<T>()
         where T : Component
     {
-        foreach (var component in Components)
+        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach; this runs per node in queries.
+        var components = Components;
+        for (var i = 0; i < components.Count; i++)
         {
-            if (component is T componentT)
+            if (components[i] is T componentT)
             {
                 return componentT;
             }
@@ -146,11 +146,12 @@ public partial class Node
             throw new ArgumentException("Type must derive from Component.", nameof(componentType));
         }
 
-        foreach (var component in Components)
+        var components = Components;
+        for (var i = 0; i < components.Count; i++)
         {
-            if (componentType.IsInstanceOfType(component))
+            if (componentType.IsInstanceOfType(components[i]))
             {
-                return component;
+                return components[i];
             }
         }
 

@@ -12,6 +12,24 @@ if (args.Contains("--services"))
     return;
 }
 
+if (args.Contains("--transforms"))
+{
+    TransformBenchmarks.Run();
+    return;
+}
+
+if (args.Contains("--traversal"))
+{
+    TraversalBenchmarks.Run();
+    return;
+}
+
+if (args.Contains("--user-traversal"))
+{
+    UserTraversalBenchmarks.Run();
+    return;
+}
+
 var root = Path.Combine(Path.GetTempPath(), $"turian-bench-{Guid.NewGuid():N}");
 var assets = Path.Combine(root, "Assets");
 Directory.CreateDirectory(assets);

@@ -24,6 +24,36 @@ public partial class Node
     }
 
     /// <summary>
+    /// Fills <paramref name="results"/> with the active components of type <typeparamref name="T"/> on this node and
+    /// its active descendants, depth-first. Reusing the list keeps per-frame queries allocation-free.
+    /// </summary>
+    /// <typeparam name="T">The component type to retrieve.</typeparam>
+    /// <param name="results">The list to clear and fill.</param>
+    public void GetComponentsInChildren<T>(List<T> results)
+        where T : Component
+    {
+        ArgumentNullException.ThrowIfNull(results);
+        results.Clear();
+        CollectComponentsInChildren(this, results);
+    }
+
+    static void CollectComponentsInChildren<T>(Node node, List<T> results)
+        where T : Component
+    {
+        if (!node.IsActive) return;
+
+        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach.
+        var components = node.Components;
+        for (var i = 0; i < components.Count; i++)
+            if (components[i] is T { IsActive: true } component)
+                results.Add(component);
+
+        var children = node.Children;
+        for (var i = 0; i < children.Count; i++)
+            CollectComponentsInChildren(children[i], results);
+    }
+
+    /// <summary>
     /// Gets all components of type <typeparamref name="T"/> attached to the given node and its children.
     /// </summary>
     /// <typeparam name="T">The component type to retrieve.</typeparam>
@@ -32,26 +62,25 @@ public partial class Node
     public static IEnumerable<T> GetComponentsInChildren<T>(Node? node)
         where T : Component
     {
-        // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
-        if (node is null || !node.IsActive)
-        {
-            yield break;
-        }
+        if (node is null) yield break;
 
-        foreach (var component in node.GetComponents<T>())
+        // One explicit stack instead of a nested iterator per visited node; children are pushed in reverse so the
+        // walk stays depth-first in hierarchy order.
+        var pending = new Stack<Node>();
+        pending.Push(node);
+        while (pending.TryPop(out var current))
         {
-            if (component.IsActive)
-            {
-                yield return component;
-            }
-        }
+            // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
+            if (!current.IsActive) continue;
 
-        foreach (var child in node.Children)
-        {
-            foreach (var component in GetComponentsInChildren<T>(child))
-            {
-                yield return component;
-            }
+            var components = current.Components;
+            for (var i = 0; i < components.Count; i++)
+                if (components[i] is T { IsActive: true } component)
+                    yield return component;
+
+            var children = current.Children;
+            for (var i = children.Count - 1; i >= 0; i--)
+                pending.Push(children[i]);
         }
     }
 
@@ -70,25 +99,22 @@ public partial class Node
             throw new ArgumentException("Type must derive from Component.", nameof(componentType));
         }
 
-        if (node is null || !node.IsActive)
-        {
-            yield break;
-        }
+        if (node is null) yield break;
 
-        foreach (var component in node.GetComponents(componentType))
+        var pending = new Stack<Node>();
+        pending.Push(node);
+        while (pending.TryPop(out var current))
         {
-            if (component.IsActive)
-            {
-                yield return component;
-            }
-        }
+            if (!current.IsActive) continue;
 
-        foreach (var child in node.Children)
-        {
-            foreach (var component in GetComponentsInChildren(child, componentType))
-            {
-                yield return component;
-            }
+            var components = current.Components;
+            for (var i = 0; i < components.Count; i++)
+                if (components[i] is { IsActive: true } component && componentType.IsInstanceOfType(component))
+                    yield return component;
+
+            var children = current.Children;
+            for (var i = children.Count - 1; i >= 0; i--)
+                pending.Push(children[i]);
         }
     }
 
@@ -210,27 +236,20 @@ public partial class Node
     }
 
     /// <summary>
-    /// Calculates and returns the global transformation of the node, taking into account its parent's transformation.
-    /// </summary>
-    /// <returns>The global transformation of the node.</returns>
-    Transform CalculateGlobalTransform()
-    {
-        // If this node has a parent, combine its transformation with its own.
-        return Parent is not null ? Transform.AddParent(Parent.GlobalTransform) : Transform;
-    }
-
-    /// <summary>
-    /// Invalidates the cached global transform of the node and invokes the global transform invalidated event.
+    /// Marks the cached global transform of this node and its descendants as stale.
     /// </summary>
     public void InvalidateGlobalTransformCache()
     {
-        lock (lockObject)
-        {
-            // Reset the cached global transform to null.
-            cachedGlobalTransform = null;
+        isGlobalTransformDirty = true;
+        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach.
+        for (var i = 0; i < Children.Count; i++)
+            Children[i].MarkGlobalTransformDirty();
+    }
 
-            // Invoke the global transform invalidated event, if any subscribers.
-            OnGlobalTransformInvalidated?.Invoke();
-        }
+    // A dirty node's descendants are already dirty: a cache is only refreshed after its parent's, so stop early.
+    void MarkGlobalTransformDirty()
+    {
+        if (isGlobalTransformDirty) return;
+        InvalidateGlobalTransformCache();
     }
 }

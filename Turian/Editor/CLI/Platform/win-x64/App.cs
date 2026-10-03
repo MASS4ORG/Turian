@@ -84,6 +84,7 @@ public class App : IDisposable
 
         var services = new ServiceCollection()
             .AddSingleton(vulkan)
+            .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)
             .AddSingleton<IInputSource>(inputSource)
@@ -151,8 +152,7 @@ public class App : IDisposable
     {
         if (projectSettings is null) return;
 
-        actions.Load(InputActionsLoader.Resolve(projectSettings, assetLoader,
-            projectDirectory));
+        actions.Load(InputActionsLoader.Resolve(projectSettings, assetLoader));
 
         if (actions.Asset is not null && projectSettings.Get<PlayerSettings>().ProductName is { Length: > 0 } product)
             InputBindingStore.Load(actions, InputBindingStore.DefaultPath(product));

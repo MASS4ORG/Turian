@@ -28,7 +28,7 @@ public static class ModelBoundsUtility
 
         if (component.Mesh is { IsEmpty: false } meshReference)
         {
-            var mesh = MeshAsset.Resolve(meshReference.AssetId);
+            var mesh = component.Assets is { } assets ? MeshAsset.Resolve(assets, meshReference.AssetId) : null;
             isResolved = mesh is not null && (!loadModels || component.ModelInstance is not null);
             return mesh?.Bounds ?? Bounds.Empty;
         }

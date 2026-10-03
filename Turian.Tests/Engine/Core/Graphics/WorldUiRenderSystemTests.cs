@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// a <see cref="WorldUiQuad"/> supplied via <see cref="SceneViewerService.WorldUiSource"/> is drawn
 /// into the scene and shows up in the offscreen read-back. Skipped without a Vulkan device.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
 {
     const int size = 32;
@@ -32,7 +33,7 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        using var svc = new SceneViewerService(fixture.Vulkan, size, size);
+        using var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         var root = new Node();
 
         svc.Render(root, 0.016);
@@ -55,7 +56,7 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
 
         // Keep the texture alive while the source closure can still be called.
         using (var green = OpaqueGreen(fixture.Vulkan))
-        using (var svc = new SceneViewerService(fixture.Vulkan, size, size))
+        using (var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size))
         {
             var root = new Node();
 

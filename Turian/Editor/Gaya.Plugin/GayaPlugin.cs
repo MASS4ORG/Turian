@@ -58,7 +58,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<UndoService>(),
                 sp.GetRequiredService<PrefabOverrideOperations>(),
                 sp.GetRequiredService<ConfirmDialogChrome>(),
-                sp.GetRequiredService<StudioLocalization>())));
+                sp.GetRequiredService<StudioLocalization>(),
+                sp.GetRequiredService<AssetDatabase>())));
 
         var inspectorInstances = new InspectorInstances(context.Panels, context.TabStripChrome);
         inspectorInstances.RegisterInitial(InspectorPanelId);
@@ -76,6 +77,7 @@ public sealed class GayaPlugin : IPlugin
             sp => new ScenePanel(
                 new SceneViewport(
                     sp.GetRequiredService<Vulkan>(),
+                    sp.GetRequiredService<AssetDatabase>(),
                     sp.GetRequiredService<SceneTreeController>(),
                     sp.GetRequiredService<NodeInspectorController>(),
                     sp.GetRequiredService<GizmoDrawerCatalog>(),
@@ -94,6 +96,7 @@ public sealed class GayaPlugin : IPlugin
             sp => new GamePanel(
                 new GameViewport(
                     sp.GetRequiredService<Vulkan>(),
+                    sp.GetRequiredService<AssetDatabase>(),
                     sp.GetRequiredService<SceneTreeController>(),
                     sp.GetRequiredService<PlayModeService>(),
                     sp.GetRequiredService<ILogger>()))));
@@ -151,7 +154,8 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<PrefabAuthoring>(),
                 sp.GetRequiredService<AssetFileOperations>(),
                 sp.GetRequiredService<BricksController>(),
-                sp.GetRequiredService<ConfirmDialogChrome>())));
+                sp.GetRequiredService<ConfirmDialogChrome>(),
+                sp.GetRequiredService<BuildManager>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,

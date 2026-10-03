@@ -43,4 +43,11 @@ public class UiDocumentComponent : Component
     /// </summary>
     [JsonIgnore]
     public Action<Gui>? OnBuild { get; set; }
+
+    /// <summary>
+    /// The asset database the document and its stylesheets are read from, or <c>null</c> outside a project, where
+    /// only an <see cref="OnBuild"/> panel can draw.
+    /// </summary>
+    [InjectService(Optional = true), JsonIgnore, Hide]
+    public AssetDatabase? Assets { get; set; }
 }

@@ -16,13 +16,11 @@ public sealed class PackageAssetTests : IDisposable
         project = Path.Combine(root, "game");
         assets = Path.Combine(project, "Assets");
         Directory.CreateDirectory(assets);
-        TestAssetDatabase.Reset();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         Directory.Delete(root, recursive: true);
     }
 

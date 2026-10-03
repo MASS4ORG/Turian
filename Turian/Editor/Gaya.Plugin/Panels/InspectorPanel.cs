@@ -8,13 +8,13 @@ namespace Gaya.Plugin.Turian;
 sealed class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
     ReferencePicker references, AssetRevealService reveal, AssetInspectionService inspections,
     InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews, UndoService undo, AssetAutoSave autoSave,
-    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage)
+    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database)
     : IPanel, IDisposable
 {
     readonly ReferenceDrawer referenceDrawer = new(references, inspector, reveal);
-    readonly AssetPreviewView preview = new(vulkan, previews);
+    readonly AssetPreviewView preview = new(vulkan, database, previews);
     readonly PrefabOverrideTracker overrides =
-        new(id => PrefabInstances.ReadPrefabJson(AssetDatabase.Instance, id));
+        new(id => PrefabInstances.ReadPrefabJson(database, id));
     bool trackingEdits;
 
     static StudioTheme Theme => StudioTheme.Current;
@@ -422,7 +422,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     {
         var differs = overrides.Diff is { IsEmpty: false };
         var prefabId = instance.PrefabInstance?.Source.AssetId ?? Guid.Empty;
-        var name = AssetDatabase.Instance.TryGetAsset(prefabId, out var record) && record is not null
+        var name = database.TryGetAsset(prefabId, out var record) && record is not null
             ? Path.GetFileNameWithoutExtension(record.SourceRelativePath)
             : "Missing Prefab";
 

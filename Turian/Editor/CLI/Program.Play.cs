@@ -276,6 +276,7 @@ public static partial class Program
 
             SceneScreenshot.Capture(
                 project.Vulkan!,
+                project.Database,
                 root,
                 options,
                 report.Bounds,

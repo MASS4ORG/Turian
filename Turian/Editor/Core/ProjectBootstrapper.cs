@@ -118,20 +118,14 @@ public sealed class ProjectBootstrapper
         var cameraNode = new Node
         {
             Name = "Camera",
-            Transform =
-            {
-                Position = new Vector3(0f, 2f, -6f)
-            }
+            Position = new Vector3(0f, 2f, -6f)
         };
         cameraNode.AddComponent<CameraComponent>();
 
         var light = new Node
         {
             Name = "Light",
-            Transform =
-            {
-                Position = new Vector3(2f, 4f, -2f)
-            }
+            Position = new Vector3(2f, 4f, -2f)
         };
         light.AddComponent(LightComponent.CreatePointLight(1.5f, new Vector4(1f, 1f, 1f, 1f)));
 

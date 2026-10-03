@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// Vulkan device: a Guinevere frame becomes a texture, and the manager discovers screen-space
 /// panels in a scene and composites them in sort order. Skipped when no usable Vulkan device.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class UiRuntimeTests : IClassFixture<VulkanFixture>
 {
     readonly VulkanFixture fixture;

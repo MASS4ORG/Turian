@@ -49,9 +49,11 @@ static class HeadlessPlay
         {
             if (outputPath is not null && project.Vulkan is not null)
             {
-                renderer = new PlayRenderer(project.Vulkan, play.Input, play.Locale, options.Width, options.Height);
+                renderer = new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Locale, options.Width,
+                    options.Height);
             }
 
+            var stats = new RenderStats();
             for (var frame = 0; frame < frames; frame++)
             {
                 var started = Stopwatch.GetTimestamp();
@@ -61,7 +63,12 @@ static class HeadlessPlay
                 {
                     // Render through the session's own camera so this exercises the same path the
                     // Game panel takes, falling back to the offscreen camera when the scene has none.
-                    renderer.Render(playRoot, 1.0 / 60.0, play.ActiveCamera);
+                    var camera = play.ActiveCamera;
+                    var renderStarted = Stopwatch.GetTimestamp();
+                    var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                    renderer.Render(playRoot, 1.0 / 60.0, camera);
+                    stats.Add(Stopwatch.GetElapsedTime(renderStarted).TotalMilliseconds,
+                        GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
                 }
 
                 if (frame == 0 || frame == frames - 1)
@@ -73,6 +80,8 @@ static class HeadlessPlay
                         Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                 }
             }
+
+            stats.Report(logger);
 
             if (renderer is not null && outputPath is not null)
             {
@@ -103,10 +112,11 @@ static class HeadlessPlay
         readonly SceneViewerService viewer;
         Node? overlayRoot;
 
-        public PlayRenderer(Vulkan vulkan, IInputSource inputSource, LocaleService? locale, uint width, uint height)
+        public PlayRenderer(
+            Vulkan vulkan, AssetDatabase assets, IInputSource inputSource, LocaleService? locale, uint width, uint height)
         {
             uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
-            viewer = new SceneViewerService(vulkan, width, height);
+            viewer = new SceneViewerService(vulkan, assets, width, height);
             if (uiPresenter is null) return;
 
             viewer.OverlaySource = (w, h, dt) =>

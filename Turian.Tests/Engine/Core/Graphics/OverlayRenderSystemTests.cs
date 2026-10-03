@@ -5,6 +5,7 @@ namespace Turian.Tests;
 /// a texture set as the overlay is composited over the rendered frame and shows up in the
 /// offscreen read-back. Skipped when no usable Vulkan device is present.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
 {
     const int size = 16;
@@ -32,7 +33,7 @@ public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        using var svc = new SceneViewerService(fixture.Vulkan, size, size);
+        using var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         var root = new Node();
 
         svc.Render(root, 0.016);
@@ -52,7 +53,7 @@ public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        using var svc = new SceneViewerService(fixture.Vulkan, size, size);
+        using var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         using var red = OpaqueRed(fixture.Vulkan);
         var root = new Node();
 
@@ -78,7 +79,7 @@ public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        using var svc = new SceneViewerService(fixture.Vulkan, size, size);
+        using var svc = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         using var red = OpaqueRed(fixture.Vulkan);
         var root = new Node();
 
@@ -102,7 +103,7 @@ public sealed class OverlayRenderSystemTests : IClassFixture<VulkanFixture>
     public void UiOverlay_PreservesSrgbColors()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var viewer = new SceneViewerService(fixture.Vulkan, size, size);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
         using var backend = new CpuSkiaVulkanBackend(fixture.Vulkan, size, size);
         var color = new SKColor(31, 36, 48);
         backend.Render(canvas => canvas.Clear(color));

@@ -9,6 +9,7 @@ static class SceneScreenshot
     /// Renders <paramref name="root"/> and writes <paramref name="outputPath"/>.
     /// </summary>
     /// <param name="vulkan">The headless Vulkan device.</param>
+    /// <param name="assets">The asset database materials and textures are read from.</param>
     /// <param name="root">The hierarchy to render.</param>
     /// <param name="options">Camera, size and frame-count options.</param>
     /// <param name="bounds">World bounds used when framing the whole scene.</param>
@@ -21,6 +22,7 @@ static class SceneScreenshot
     /// <param name="locale">The project locale, or <c>null</c> for authored source text.</param>
     public static void Capture(
         Vulkan vulkan,
+        AssetDatabase assets,
         Node root,
         ScreenshotOptions options,
         Bounds bounds,
@@ -30,11 +32,12 @@ static class SceneScreenshot
         LocaleService? locale = null)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
-        using var runner = new ScreenshotRunner(vulkan, root, options, bounds, logger, drawGizmos, locale);
+        using var runner = new ScreenshotRunner(vulkan, assets, root, options, bounds, logger, drawGizmos, locale);
         runner.CaptureAndSave(outputPath, logger);
     }
 
@@ -53,6 +56,7 @@ static class SceneScreenshot
 
         public ScreenshotRunner(
             Vulkan vulkan,
+            AssetDatabase assets,
             Node root,
             ScreenshotOptions options,
             Bounds bounds,
@@ -62,7 +66,7 @@ static class SceneScreenshot
         {
             this.root = root;
             frames = options.Frames;
-            viewer = new SceneViewerService(vulkan, options.Width, options.Height);
+            viewer = new SceneViewerService(vulkan, assets, options.Width, options.Height);
             if (drawGizmos) viewer.OnPopulateGizmos = DrawTestGizmos;
 
             uiPresenter = UiPresenters.Find()?.Create(vulkan, null, locale);
@@ -238,8 +242,7 @@ static class SceneScreenshot
 
     static Node AddHeadlight(Node root, EditorCamera camera, float intensity)
     {
-        var node = new Node { Name = "__Headlight" };
-        node.Transform.Position = camera.Position;
+        var node = new Node { Name = "__Headlight", Position = camera.Position };
         node.AddComponent(LightComponent.CreatePointLight(intensity, new Vector4(1f)));
 
         node.Parent = root;

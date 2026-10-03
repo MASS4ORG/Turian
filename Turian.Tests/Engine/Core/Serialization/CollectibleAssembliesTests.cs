@@ -3,6 +3,7 @@ using System.Runtime.Loader;
 namespace Turian.Tests;
 
 /// <summary>Unloaded user assemblies are not kept alive by the engine's and editor's static type caches.</summary>
+[Collection(SerialTests.Name)]
 public sealed class CollectibleAssembliesTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-collectible-{Guid.NewGuid():N}");

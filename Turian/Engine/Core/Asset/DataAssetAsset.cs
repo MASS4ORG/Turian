@@ -18,9 +18,12 @@ public class DataAssetAsset : Asset
     /// same loader shares one payload. Use <see cref="DataAsset.Instantiate{T}"/> for a private copy.
     /// </remarks>
     /// <param name="projectPath">The absolute project root path.</param>
+    /// <param name="database">
+    /// The asset database supplying imported copies and variant bases, or null to read from the sources only.
+    /// </param>
     /// <returns>The shared <see cref="DataAsset"/> payload instance.</returns>
-    public DataAsset? GetContent(string projectPath) =>
-        GetContent(projectPath, DataAssetVariants.ReadFromDatabase, null);
+    public DataAsset? GetContent(string projectPath, AssetDatabase? database) =>
+        GetContent(projectPath, id => DataAssetVariants.ReadFromDatabase(database, id), ProviderFrom(database));
 
     internal DataAsset? GetContent(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
@@ -31,16 +34,20 @@ public class DataAssetAsset : Asset
     }
 
     /// <summary>
-    /// Re-reads the payload into the instance <see cref="GetContent(string)"/> already handed out, so live
-    /// references see the new values. The instance is replaced only when the payload type changed.
+    /// Re-reads the payload into the instance <see cref="GetContent(string, AssetDatabase)"/> already handed out, so
+    /// live references see the new values. The instance is replaced only when the payload type changed.
     /// </summary>
     /// <param name="projectPath">The absolute project root path.</param>
+    /// <param name="database">
+    /// The asset database supplying imported copies and variant bases, or null to read from the sources only.
+    /// </param>
     /// <returns>The shared <see cref="DataAsset"/> payload instance.</returns>
-    public DataAsset? Reload(string projectPath)
+    public DataAsset? Reload(string projectPath, AssetDatabase? database)
     {
         lock (contentGate)
         {
-            var fresh = ReadContent(projectPath, DataAssetVariants.ReadFromDatabase, null);
+            var fresh = ReadContent(projectPath, id => DataAssetVariants.ReadFromDatabase(database, id),
+                ProviderFrom(database));
             if (content is null || fresh is null || fresh.GetType() != content.GetType())
             {
                 return content = fresh;
@@ -56,10 +63,11 @@ public class DataAssetAsset : Asset
     /// Loads a payload from the specified absolute path.
     /// </summary>
     /// <param name="absolutePath">The absolute file path of the payload asset.</param>
+    /// <param name="database">The asset database a variant's bases are read from, or null when there is none.</param>
     /// <returns>The deserialized <see cref="DataAsset"/> payload instance.</returns>
-    public static DataAsset? LoadContent(string absolutePath)
+    public static DataAsset? LoadContent(string absolutePath, AssetDatabase? database)
     {
-        return DataAsset.LoadContent(absolutePath);
+        return DataAsset.LoadContent(absolutePath, database);
     }
 
     /// <summary>
@@ -80,8 +88,6 @@ public class DataAssetAsset : Asset
             return DataAsset.LoadContent(sourcePath, Id, readBase);
         }
 
-        if (provider is null && AssetDatabase.TryGetInstance(out var database) && database is not null)
-            database.TryGetAssetProvider(Id, out provider);
         if (provider is null) return DataAsset.LoadContent(sourcePath, Id, readBase);
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
@@ -89,6 +95,9 @@ public class DataAssetAsset : Asset
         return Serializer.LoadData<DataAsset>(
             DataAssetVariants.Flatten(reader.ReadToEnd(), readBase, Id));
     }
+
+    IAssetFileProvider? ProviderFrom(AssetDatabase? database) =>
+        database is not null && database.TryGetAssetProvider(Id, out var provider) ? provider : null;
 
     static void CopyFields(DataAsset source, DataAsset target)
     {

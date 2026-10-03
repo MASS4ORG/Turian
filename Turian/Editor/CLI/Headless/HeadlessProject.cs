@@ -34,12 +34,8 @@ sealed class HeadlessProject : IDisposable
         // fall back to MissingComponent.
         BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), logger);
 
-        // --reimport builds a database before this runs, and AssetDatabase is a throw-on-second-
-        // construction singleton, so reuse that instance rather than making the two options
-        // mutually exclusive.
-        Database = AssetDatabase.TryGetInstance(out var existing) && existing is not null
-            ? existing
-            : new AssetDatabase();
+        // --reimport writes the catalog this reads, so the two options combine without sharing an instance.
+        Database = new AssetDatabase();
 
         var catalogStatus = Database.LoadCatalogFromProject(settings.ProjectAbsoluteDir);
         if (catalogStatus is AssetCatalogLoadStatus.Unreadable)
@@ -59,6 +55,7 @@ sealed class HeadlessProject : IDisposable
         Vulkan = withGraphics ? new Vulkan(logger) : null;
 
         var registrations = new ServiceCollection()
+            .AddSingleton(Database)
             .AddSingleton<ISceneManager>(SceneManager)
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(Database))
             .AddSingleton(_ => LocalizationLoader.Create(settings, Database));

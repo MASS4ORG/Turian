@@ -27,10 +27,14 @@ public sealed class NodeInspectorController
     /// Initializes a new instance of the <see cref="NodeInspectorController"/> class.
     /// </summary>
     /// <param name="assetManager">The asset manager used for persistence operations.</param>
-    public NodeInspectorController(AssetManager assetManager)
+    /// <param name="build">Supplies the loaded user assemblies; without one only the app domain's are offered.</param>
+    public NodeInspectorController(AssetManager assetManager, BuildManager? build = null)
     {
         this.assetManager = assetManager;
+        this.build = build;
     }
+
+    readonly BuildManager? build;
 
     /// <summary>
     /// Returns an <see cref="Action{T}"/> that marks the engine dirty after
@@ -149,7 +153,7 @@ public sealed class NodeInspectorController
         var node = selectedNode;
         var filter = searchText?.Trim() ?? string.Empty;
 
-        return ComponentRegistry.GetAvailableTypes()
+        return ComponentRegistry.GetAvailableTypes(build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies())
             .Where(t => ComponentRegistry.MatchesSearch(t, filter))
             .Where(t => ComponentRegistry.CanAddTo(node, t))
             .Select(t => new ComponentTypeDescriptor(t))

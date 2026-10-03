@@ -48,7 +48,7 @@ public static class ProjectValidator
         {
             try
             {
-                if (DataAsset.LoadContent(source.SourcePath) is not ProjectSettingsAsset)
+                if (DataAsset.LoadContent(source.SourcePath, database: null) is not ProjectSettingsAsset)
                     issues.Add(new(ProjectIssueSeverity.Warning,
                         $"{Relative(directory, source.SourcePath)} could not be read as {source.Kind.Name}."));
             }

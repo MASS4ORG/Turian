@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Checks application bar composition and the lifetime of plugin chrome across both GUI passes.</summary>
+[Collection(SerialTests.Name)]
 public sealed class GayaChromeTests
 {
     sealed class Item(Action<Gui>? render = null, Action? dispose = null) : IChromeItem, IDisposable

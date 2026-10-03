@@ -8,7 +8,6 @@ public sealed class ProjectSessionHotReloadTests
     public async Task OpeningProject_SchedulesRecompileForEditedUserScript()
     {
         var root = Path.Combine(Path.GetTempPath(), $"turian-hot-reload-{Guid.NewGuid():N}");
-        TestAssetDatabase.Reset();
         try
         {
             var project = await new ProjectBootstrapper().CreateAsync(root);
@@ -34,7 +33,6 @@ public sealed class ProjectSessionHotReloadTests
         }
         finally
         {
-            TestAssetDatabase.Reset();
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }

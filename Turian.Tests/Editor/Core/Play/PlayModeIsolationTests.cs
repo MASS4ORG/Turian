@@ -12,14 +12,12 @@ public class PlayModeIsolationTests : IDisposable
     /// <summary>Resets the <see cref="AssetDatabase"/> singleton, as the other suites do.</summary>
     public PlayModeIsolationTests()
     {
-        TestAssetDatabase.Reset();
         assetDatabase = new AssetDatabase();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        TestAssetDatabase.Reset();
         GC.SuppressFinalize(this);
     }
 
@@ -30,7 +28,7 @@ public class PlayModeIsolationTests : IDisposable
         public override void OnUpdate(float deltaTime)
         {
             var node = Node ?? throw new InvalidOperationException("DriftingComponent must be attached to a node.");
-            node.Transform.Position += new Vector3(1f, 0f, 0f);
+            node.Position += new Vector3(1f, 0f, 0f);
         }
     }
 

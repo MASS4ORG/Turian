@@ -7,17 +7,6 @@ namespace Turian.Engine.Core;
 [TypeId("f7cc675d-54f2-510b-8e5d-807281e3012d")]
 public partial class Node : IdObject
 {
-    /// <summary>Initializes a node and subscribes its local transform to cache invalidation.</summary>
-    public Node()
-    {
-        Transform.PropertyChanged += TransformChanged;
-    }
-
-    /// <summary>
-    /// Event that is triggered when the global transform of the node is invalidated.
-    /// </summary>
-    public event Action? OnGlobalTransformInvalidated;
-
     /// <summary>
     /// Gets or sets a value indicating whether the node is active.
     /// </summary>
@@ -66,18 +55,7 @@ public partial class Node : IdObject
         get;
         set
         {
-            if (field != null)
-            {
-                field.OnGlobalTransformInvalidated -= InvalidateGlobalTransformCache;
-            }
-
             field = value;
-
-            if (field != null)
-            {
-                field.OnGlobalTransformInvalidated += InvalidateGlobalTransformCache;
-            }
-
             InvalidateGlobalTransformCache();
         }
     }
@@ -110,48 +88,72 @@ public partial class Node : IdObject
     public PrefabInstance? PrefabInstance { get; set; }
 
     /// <summary>
-    /// Gets or sets the transformation data for this node.
+    /// Gets or sets the local transformation of this node, relative to its parent.
     /// </summary>
     public Transform Transform
     {
         get;
         set
         {
-            if (field != value)
-            {
-                field.PropertyChanged -= TransformChanged;
-                field = value;
-                field.PropertyChanged += TransformChanged;
-
-                InvalidateGlobalTransformCache();
-            }
+            if (field == value) return;
+            field = value;
+            InvalidateGlobalTransformCache();
         }
-    } = new();
+    } = Transform.Identity;
 
-    void TransformChanged(object? sender, PropertyChangedEventArgs? e)
+    /// <summary>Gets or sets the local position; shorthand for editing <see cref="Transform"/>.</summary>
+    [JsonIgnore, Hide]
+    public Vector3 Position
     {
-        InvalidateGlobalTransformCache();
+        get => Transform.Position;
+        set => Transform = Transform with { Position = value };
     }
 
-    readonly object lockObject = new();
+    /// <summary>Gets or sets the local orientation; shorthand for editing <see cref="Transform"/>.</summary>
+    [JsonIgnore, Hide]
+    public Quaternion Orientation
+    {
+        get => Transform.Orientation;
+        set => Transform = Transform with { Orientation = value };
+    }
 
-    Transform? cachedGlobalTransform;
+    /// <summary>Gets or sets the local rotation in Euler degrees; shorthand for editing <see cref="Transform"/>.</summary>
+    [JsonIgnore, Hide]
+    public Vector3 Rotation
+    {
+        get => Transform.Rotation;
+        set => Transform = Transform with { Rotation = value };
+    }
+
+    /// <summary>Gets or sets the local scale; shorthand for editing <see cref="Transform"/>.</summary>
+    [JsonIgnore, Hide]
+    public Vector3 Scale
+    {
+        get => Transform.Scale;
+        set => Transform = Transform with { Scale = value };
+    }
+
+    Transform globalTransform;
+    bool isGlobalTransformDirty = true;
 
     /// <summary>
-    /// Gets the cached global transformation of the node.
+    /// Gets or sets the global transformation of the node, calculated lazily and cached until it or an ancestor
+    /// changes.
     /// </summary>
     [JsonIgnore, Hide]
     public Transform GlobalTransform
     {
         get
         {
-            lock (lockObject)
+            if (isGlobalTransformDirty)
             {
-                cachedGlobalTransform ??= CalculateGlobalTransform();
-                return cachedGlobalTransform;
+                globalTransform = Parent is null ? Transform : Transform.AddParent(Parent.GlobalTransform);
+                isGlobalTransformDirty = false;
             }
+
+            return globalTransform;
         }
-        set => Transform = Transform.RemoveParent(value);
+        set => Transform = Parent is null ? value : value.RemoveParent(Parent.GlobalTransform);
     }
 
     /// <summary>

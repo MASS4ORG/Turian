@@ -3,67 +3,26 @@ namespace Turian.Tests;
 /// <summary>
 /// Tests for the AssetDatabase class.
 /// </summary>
-public class AssetDatabaseTests : IDisposable
+public class AssetDatabaseTests
 {
-    static readonly object LockObject = new();
-
     /// <summary>
-    /// Initializes a new instance of the AssetDatabaseTests class and resets the singleton.
-    /// </summary>
-    public AssetDatabaseTests()
-    {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-        }
-    }
-
-    /// <summary>
-    /// Disposes of the tests and resets the singleton.
-    /// </summary>
-    public void Dispose()
-    {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-        }
-    }
-
-    void ResetAssetDatabase()
-    {
-        var field = typeof(AssetDatabase).GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
-        if (field != null)
-        {
-            field.SetValue(null, null);
-        }
-    }
-
-    /// <summary>
-    /// Verifies that the constructor sets the singleton instance.
+    /// Databases are plain instances: two can coexist, and a record registered in one is unknown to the other.
     /// </summary>
     [Fact]
-    public void Constructor_SetsInstance()
+    public void Instances_AreIndependent()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            var db = new AssetDatabase();
-            Assert.Same(db, AssetDatabase.Instance);
-        }
-    }
+        using var project = new TempProject();
+        var path = Path.Combine(project.Root, "Assets", "Stats.asset");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "{}");
+        var first = new AssetDatabase();
+        var second = new AssetDatabase();
+        var record = new DataAssetAsset { RelativePath = path };
 
-    /// <summary>
-    /// Verifies that attempting to create a second instance of AssetDatabase throws an exception.
-    /// </summary>
-    [Fact]
-    public void Constructor_ThrowsIfAlreadyInitialized()
-    {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            _ = new AssetDatabase();
-            Assert.Throws<InvalidOperationException>(() => new AssetDatabase());
-        }
+        Assert.True(first.RegisterAsset(record));
+
+        Assert.True(first.TryGetAsset(record.Id, out _));
+        Assert.False(second.TryGetAsset(record.Id, out _));
     }
 
     /// <summary>
@@ -72,14 +31,10 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void TryGetAsset_ReturnsFalseWhenMissing()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            var db = new AssetDatabase();
-            var result = db.TryGetAsset(Guid.NewGuid(), out var record);
-            Assert.False(result);
-            Assert.Null(record);
-        }
+        var db = new AssetDatabase();
+        var result = db.TryGetAsset(Guid.NewGuid(), out var record);
+        Assert.False(result);
+        Assert.Null(record);
     }
 
     /// <summary>
@@ -88,13 +43,9 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsMissingWhenThereIsNoCatalog()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            using var project = new TempProject();
+        using var project = new TempProject();
 
-            Assert.Equal(AssetCatalogLoadStatus.Missing, new AssetDatabase().LoadCatalogFromProject(project.Root));
-        }
+        Assert.Equal(AssetCatalogLoadStatus.Missing, new AssetDatabase().LoadCatalogFromProject(project.Root));
     }
 
     /// <summary>
@@ -105,17 +56,13 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsUnreadableWhenTheCatalogIsTruncated()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            using var project = new TempProject();
-            project.WriteCatalog(string.Empty);
+        using var project = new TempProject();
+        project.WriteCatalog(string.Empty);
 
-            var database = new AssetDatabase();
+        var database = new AssetDatabase();
 
-            Assert.Equal(AssetCatalogLoadStatus.Unreadable, database.LoadCatalogFromProject(project.Root));
-            Assert.Empty(database.Assets);
-        }
+        Assert.Equal(AssetCatalogLoadStatus.Unreadable, database.LoadCatalogFromProject(project.Root));
+        Assert.Empty(database.Assets);
     }
 
     /// <summary>
@@ -124,14 +71,10 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsUnreadableWhenTheCatalogIsMalformed()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            using var project = new TempProject();
-            project.WriteCatalog("{\"Records\": [{\"AssetId\":");
+        using var project = new TempProject();
+        project.WriteCatalog("{\"Records\": [{\"AssetId\":");
 
-            Assert.Equal(AssetCatalogLoadStatus.Unreadable, new AssetDatabase().LoadCatalogFromProject(project.Root));
-        }
+        Assert.Equal(AssetCatalogLoadStatus.Unreadable, new AssetDatabase().LoadCatalogFromProject(project.Root));
     }
 
     /// <summary>
@@ -140,14 +83,10 @@ public class AssetDatabaseTests : IDisposable
     [Fact]
     public void LoadCatalogFromProject_ReportsLoadedForAnEmptyButValidCatalog()
     {
-        lock (LockObject)
-        {
-            ResetAssetDatabase();
-            using var project = new TempProject();
-            project.WriteCatalog("{\"Version\":1,\"Records\":[]}");
+        using var project = new TempProject();
+        project.WriteCatalog("{\"Version\":1,\"Records\":[]}");
 
-            Assert.Equal(AssetCatalogLoadStatus.Loaded, new AssetDatabase().LoadCatalogFromProject(project.Root));
-        }
+        Assert.Equal(AssetCatalogLoadStatus.Loaded, new AssetDatabase().LoadCatalogFromProject(project.Root));
     }
 
     /// <summary>A throwaway project folder with a <c>.Cache</c> directory.</summary>

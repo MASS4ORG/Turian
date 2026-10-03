@@ -263,7 +263,7 @@ public sealed class AssemblyGraph
             var typeId = PeekTypeId(path);
             if (typeId != DefinitionTypeId && typeId != ReferenceTypeId) continue;
 
-            switch (DataAsset.LoadContent(path))
+            switch (DataAsset.LoadContent(path, database: null))
             {
                 case AssemblyDefinition definition:
                     definitions.Add((definition, path, Asset.Load($"{path}.meta")?.Id ?? definition.Id));

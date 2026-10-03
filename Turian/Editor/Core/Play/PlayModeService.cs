@@ -308,8 +308,7 @@ public sealed class PlayModeService(
         // instance the editor keeps for anything that needs the type before a project is opened.
         if (ProjectSettings() is not { } settings) return;
 
-        var maps = InputActionsLoader.Resolve(settings, provider.GetService<IAssetLoader>(),
-            settings.ProjectAbsoluteDir);
+        var maps = InputActionsLoader.Resolve(settings, provider.GetService<IAssetLoader>());
 
         provider.GetRequiredService<InputActionService>().Load(maps);
 

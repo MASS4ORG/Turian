@@ -4,6 +4,7 @@ namespace Turian.Tests;
 /// The Settings panel is the host's own: a Gaya application with no plugin at all offers it, and it draws and edits
 /// settings pages with the shared form renderer.
 /// </summary>
+[Collection(SerialTests.Name)]
 public sealed class SettingsPanelTests
 {
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
