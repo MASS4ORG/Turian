@@ -338,6 +338,7 @@ public sealed class BuildManager : IDisposable
         sourceWatcher.Dispose();
         StopPlayProcessInternal(notify: false);
         TaskRunner.Dispose();
+        slotManager.Unload();
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────────

@@ -79,27 +79,36 @@ public class App : IDisposable
         assetLoader = new RuntimeAssetLoader(assetDatabase);
         inputSource = new SilkInputSource(inputManager);
         actions = new InputActionService(inputSource);
-        sceneTicker = new SceneTicker(sceneManager) { InputSource = inputSource, Actions = actions };
         locale = new LocaleService();
 
-        var services = new ServiceCollection()
+        CreateAssetDatabase();
+        RegisterUserCodeTypes();
+        var projectSettings = LoadProjectSettings();
+        var simulationClock = new SimulationClock(projectSettings.Get<TimeSettings>());
+        var registrations = new ServiceCollection()
             .AddSingleton(vulkan)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)
+            .AddSingleton(simulationClock)
             .AddSingleton<IInputSource>(inputSource)
             .AddSingleton(actions)
             .AddSingleton<IInputActions>(actions)
-            .AddSingleton(locale)
-            .BuildServiceProvider();
+            .AddSingleton(locale);
+        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+            registrations.AddEngineModules(gameType.Assembly);
+        var services = registrations.BuildServiceProvider();
+        sceneTicker = new SceneTicker(sceneManager, services.GetRequiredService<SimulationClock>())
+        {
+            Simulation = services.GetService<SimulationSession>(),
+            InputSource = inputSource,
+            Actions = actions
+        };
         sceneManager.BindServices(services);
 
-        CreateAssetDatabase();
-
-        RegisterUserCodeTypes();
         uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
 
-        LoadStartupScene();
+        LoadStartupScene(projectSettings);
         SetWindowIcon();
         logger.Lap("startup", "objects loaded");
 
@@ -158,9 +167,8 @@ public class App : IDisposable
             InputBindingStore.Load(actions, InputBindingStore.DefaultPath(product));
     }
 
-    void LoadStartupScene()
+    void LoadStartupScene(AppSettings projectSettings)
     {
-        var projectSettings = LoadProjectSettings();
         windowManager.Title = projectSettings.Get<PlayerSettings>().ProductName is { Length: > 0 } productName
             ? productName
             : projectSettings.Title ?? windowManager.Title;

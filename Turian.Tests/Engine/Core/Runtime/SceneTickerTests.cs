@@ -27,6 +27,8 @@ public class SceneTickerTests : IDisposable
         public int UpdateCount { get; private set; }
         public int LateUpdateCount { get; private set; }
         public int FixedUpdateCount { get; private set; }
+        /// <summary>The interval supplied to the most recent fixed callback.</summary>
+        public float LastFixedDeltaTime { get; private set; }
         public int UpdateCountAtFirstStart { get; private set; } = -1;
 
         public override void OnStart()
@@ -37,7 +39,11 @@ public class SceneTickerTests : IDisposable
 
         public override void OnUpdate(float deltaTime) => UpdateCount++;
         public override void OnLateUpdate(float deltaTime) => LateUpdateCount++;
-        public override void OnFixedUpdate(float fixedDeltaTime) => FixedUpdateCount++;
+        public override void OnFixedUpdate(float fixedDeltaTime)
+        {
+            FixedUpdateCount++;
+            LastFixedDeltaTime = fixedDeltaTime;
+        }
     }
 
     sealed class ClickerComponent : Component
@@ -230,5 +236,54 @@ public class SceneTickerTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => ticker.TimeScale = -1);
         Assert.Throws<ArgumentOutOfRangeException>(() => ticker.Tick(double.PositiveInfinity));
         Assert.Throws<ArgumentOutOfRangeException>(() => ticker.Tick(-0.5));
+    }
+
+    /// <summary>The scene driver uses its injected clock's interval and retains bounded catch-up backlog.</summary>
+    [Fact]
+    public void Tick_UsesConfiguredAuthoritativeClock()
+    {
+        var (_, component) = CreateScene();
+        var manager = new SceneManager(assetDatabase);
+        var root = component.Node!.Parent!;
+        manager.AdoptScene(Guid.NewGuid(), root);
+        var clock = new SimulationClock(new TimeSettings { FixedDeltaTime = 0.02, MaxTicksPerFrame = 2 });
+        var ticker = new SceneTicker(manager, clock);
+
+        ticker.Tick(0.1);
+
+        Assert.Same(clock, ticker.Clock);
+        Assert.Equal(2, clock.TickIndex);
+        Assert.Equal(2, component.FixedUpdateCount);
+        Assert.Equal(0.02f, component.LastFixedDeltaTime);
+        Assert.Equal(0.06, clock.AccumulatorSeconds, 12);
+        clock.IsPaused = true;
+        ticker.Tick(1);
+        ticker.StepFrame();
+        Assert.Equal(3, clock.TickIndex);
+        Assert.Equal(3, component.FixedUpdateCount);
+        Assert.Equal(0.12, ticker.ElapsedSeconds, 12);
+        clock.IsPaused = false;
+        ticker.Tick(0);
+        Assert.Equal(5, clock.TickIndex);
+        ticker.ResetAccumulator();
+        Assert.Equal(0, clock.AccumulatorSeconds);
+    }
+
+    /// <summary>Presentation durations cannot change the fixed simulation interval or accept invalid time.</summary>
+    [Fact]
+    public void StepFrame_UsesFixedIntervalAndValidatesPresentationTime()
+    {
+        var (ticker, component) = CreateScene();
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.StepFrame(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.StepFrame(-1));
+        Assert.Throws<ArgumentNullException>(() => new SceneTicker(null!));
+        ticker.TimeScale = double.MaxValue;
+        Assert.Throws<ArgumentOutOfRangeException>(() => ticker.Tick(2));
+
+        ticker.StepFrame(0.5);
+
+        Assert.Equal(1, ticker.Clock.TickIndex);
+        Assert.Equal((float)SceneTicker.FixedTimestep, component.LastFixedDeltaTime);
+        Assert.Equal(0.5, ticker.ElapsedSeconds);
     }
 }

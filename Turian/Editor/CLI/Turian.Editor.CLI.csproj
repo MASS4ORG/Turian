@@ -10,6 +10,10 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <!-- Built for their Precast~ output (the UI brick's prebuilt assemblies), not referenced by the host. -->

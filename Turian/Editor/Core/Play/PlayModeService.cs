@@ -87,17 +87,7 @@ public sealed class PlayModeService(
 
         Input.Clear();
 
-        // The world must be fully built before any component wakes: scripts resolve engine services
-        // (ISceneManager, IInputSource, ...) in OnAwake and cache them for the whole session, so the
-        // play scope has to be live and the scene tracked before Awake runs.
-        playServices = BuildPlayServices();
-        var sceneManager = playServices.GetRequiredService<ISceneManager>();
-        if (sceneManager is SceneManager concreteSceneManager)
-            concreteSceneManager.BindServices(playServices);
-
-        if (localeOverride is not null
-            && playServices.GetService(typeof(LocaleService)) is LocaleService locale)
-            locale.SetLocale(localeOverride);
+        var sceneManager = PreparePlayServices(localeOverride);
 
         Node? clone;
         try
@@ -123,8 +113,9 @@ public sealed class PlayModeService(
         clone.Awake(null, playServices);
 
         PlayRoot = clone;
-        ticker = new SceneTicker(sceneManager)
+        ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
         {
+            Simulation = playServices.GetService<SimulationSession>(),
             InputSource = Input,
             Actions = playServices.GetService<InputActionService>(),
         };
@@ -146,6 +137,7 @@ public sealed class PlayModeService(
     {
         if (State != PlayState.Playing) return;
         Input.Clear();
+        ticker!.Clock.IsPaused = true;
         SetState(PlayState.Paused);
     }
 
@@ -153,7 +145,7 @@ public sealed class PlayModeService(
     public void Resume()
     {
         if (State != PlayState.Paused) return;
-        ticker?.ResetAccumulator();
+        ticker!.Clock.IsPaused = false;
         // Discard the time spent paused, otherwise the first frame back replays it all at once.
         lastTickSeconds = clock.Elapsed.TotalSeconds;
         SetState(PlayState.Playing);
@@ -241,6 +233,27 @@ public sealed class PlayModeService(
 
     // ── Internals ──────────────────────────────────────────────────────────────
 
+    [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(playServices))]
+    ISceneManager PreparePlayServices(string? localeOverride)
+    {
+        playServices = BuildPlayServices();
+        _ = playServices.GetRequiredService<SimulationClock>();
+        var sceneManager = playServices.GetRequiredService<ISceneManager>();
+        if (sceneManager is SceneManager concreteSceneManager)
+            concreteSceneManager.BindServices(playServices);
+        if (localeOverride is not null && playServices.GetService<LocaleService>() is { } locale)
+            locale.SetLocale(localeOverride);
+        return sceneManager;
+    }
+
+    void AddProjectServices(IServiceCollection services)
+    {
+        var settings = ProjectSettings();
+        services.AddSingleton(new SimulationClock(settings?.Get<TimeSettings>()));
+        if (settings is not null)
+            services.AddSingleton(_ => LocalizationLoader.Create(settings, assetDatabase));
+    }
+
     /// <summary>
     /// Runs one tick, stopping the session if user code throws. A script bug should surface in the
     /// Output panel and drop the Studio back to edit mode, not spam an exception every frame.
@@ -278,10 +291,7 @@ public sealed class PlayModeService(
         if (editorServices.GetService(typeof(Vulkan)) is Vulkan vulkan)
             services.AddSingleton(vulkan);
 
-        // The session's localization: a fresh service loaded from the project's settings and string
-        // tables, so the play scope starts in the game's default locale without touching the editor's.
-        if (ProjectSettings() is { } appSettings)
-            services.AddSingleton(_ => LocalizationLoader.Create(appSettings, assetDatabase));
+        AddProjectServices(services);
 
         if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
         {
