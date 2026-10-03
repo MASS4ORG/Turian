@@ -99,6 +99,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
                 camera.GetViewMatrix(),
                 new Vector4(camera.Front, 0)
             );
+            PrepareSystems(ubos[frameIndex]);
             uboBuffers[frameIndex].WriteBytesToBuffer(ubos[frameIndex].AsBytes());
 
             Renderer.BeginSwapChainRenderPass(commandBuffer.Value);
@@ -111,6 +112,13 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, ILogger
 
             Renderer.EndFrame();
         }
+    }
+
+    // Gathering fills the light slots, so it runs before the upload or lights reach the GPU late.
+    void PrepareSystems(GlobalUbo ubo)
+    {
+        foreach (var system in renderSystems)
+            system.Prepare(frameInfo, ubo);
     }
 
     /// <summary>

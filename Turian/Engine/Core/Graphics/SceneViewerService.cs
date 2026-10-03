@@ -129,14 +129,6 @@ public sealed class SceneViewerService : IDisposable
         var cmd = frameTarget.BeginFrame();
         if (cmd is null) return;
 
-        ubo.Update(
-            activeCamera.GetProjectionMatrix(),
-            activeCamera.GetViewMatrix(),
-            new Vector4(activeCamera.Front, 0));
-        uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
-
-        frameTarget.BeginRenderPass(cmd.Value);
-
         var frameInfo = new FrameInfo
         {
             FrameIndex = 0,
@@ -148,6 +140,16 @@ public sealed class SceneViewerService : IDisposable
             ViewportWidth = frameTarget.Width,
             ViewportHeight = frameTarget.Height,
         };
+
+        ubo.Update(
+            activeCamera.GetProjectionMatrix(),
+            activeCamera.GetViewMatrix(),
+            new Vector4(activeCamera.Front, 0));
+        // Gathering fills the light slots, so it runs before the upload or lights reach the GPU a frame late.
+        standardSystem.Prepare(frameInfo, ubo);
+        uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
+
+        frameTarget.BeginRenderPass(cmd.Value);
 
         standardSystem.Render(frameInfo, ref ubo);
         meshSystem.Render(frameInfo, ref ubo);
