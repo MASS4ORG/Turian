@@ -95,6 +95,10 @@ static class SceneScreenshot
                         Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                 }
 
+                var culling = viewer.CullingStats;
+                logger.LogInformation("Culling: {Submitted} submitted, {Culled}/{Total} submeshes culled",
+                    culling.Submitted, culling.Culled, culling.Total);
+
                 var pixels = new byte[viewer.Width * viewer.Height * 4];
                 viewer.CopyPixels(pixels);
                 PngWriter.Save(outputPath, pixels, viewer.Width, viewer.Height);

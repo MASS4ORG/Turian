@@ -34,7 +34,11 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
     DescriptorSetLayout globalSetLayout = null!;
     DescriptorSet[] globalDescriptorSets = null!;
     readonly List<IRenderSystem> renderSystems = [];
+    StandardRenderSystem standardSystem = null!;
     OverlayRenderSystem overlayUiSystem = null!;
+
+    /// <summary>Gets the submitted and culled submesh counts from the runtime's latest frame.</summary>
+    public RenderCullingStats CullingStats => standardSystem.CullingStats;
     DescriptorPool globalPool = null!;
 
     /// <summary>
@@ -121,6 +125,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
     {
         foreach (var system in renderSystems)
             system.Prepare(frameInfo, ubo);
+        windowManager.CullingStats = CullingStats;
     }
 
     /// <summary>
@@ -187,14 +192,13 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
 
     void InitializeRenderSystems()
     {
-        renderSystems.Add(
-            new StandardRenderSystem(
+        standardSystem = new StandardRenderSystem(
                 vulkan,
                 assets,
                 Renderer.SwapChainRenderPass,
                 globalSetLayout.GetDescriptorSetLayout()
-            )
-        );
+            );
+        renderSystems.Add(standardSystem);
         renderSystems.Add(
             new MeshRenderSystem(
                 vulkan,

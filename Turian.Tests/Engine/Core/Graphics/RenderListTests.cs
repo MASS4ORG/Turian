@@ -89,6 +89,27 @@ public class RenderListTests
         Assert.Equal([3, 1, 0, 2], list.Draws.Select(draw => draw.SubMesh));
     }
 
+    /// <summary>Removing invisible draws preserves scene order among draws sharing the same material and model.</summary>
+    [Fact]
+    public void SortPreservesSceneOrderWithinEqualKeys()
+    {
+        var full = new RenderList();
+        var culled = new RenderList();
+        for (var sequence = 0; sequence < 64; sequence++)
+        {
+            var draw = new DrawItem(null!, sequence, null!, default, default,
+                RenderList.SortKey(sequence % 3, 0), sequence);
+            full.Draws.Add(draw);
+            if (sequence % 5 != 0) culled.Draws.Add(draw);
+        }
+
+        full.Sort();
+        culled.Sort();
+        var expected = Enumerable.Range(0, 64).OrderBy(sequence => sequence % 3).ThenBy(sequence => sequence);
+        Assert.Equal(expected, full.Draws.Select(draw => draw.Sequence));
+        Assert.Equal(full.Draws.Where(draw => draw.Sequence % 5 != 0), culled.Draws);
+    }
+
     /// <summary>Lights fill their slots in scene order, past the slot count are dropped, and stale slots clear.</summary>
     [Fact]
     public void UpdateLightsFillsAndClearsSlots()

@@ -19,6 +19,9 @@ public class Model : IDisposable
     /// </summary>
     public IReadOnlyList<SubMesh> SubMeshes { get; }
 
+    /// <summary>Gets the model-space bounds enclosing all submeshes.</summary>
+    public Bounds Bounds { get; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="Model"/> class.
     /// </summary>
@@ -36,9 +39,8 @@ public class Model : IDisposable
             CreateIndexBuffers(builder.Indices);
         }
 
-        SubMeshes = builder.SubMeshes is { Count: > 0 }
-            ? builder.SubMeshes.AsReadOnly()
-            : (IReadOnlyList<SubMesh>)[new SubMesh(0, indexCount > 0 ? indexCount : vertexCount)];
+        SubMeshes = builder.GetBoundedSubMeshes();
+        Bounds = SubMeshes.Aggregate(Bounds.Empty, static (bounds, sub) => bounds.Encapsulate(sub.Bounds));
     }
 
     void CreateVertexBuffers(Vertex[] vertices)

@@ -18,7 +18,15 @@ public class StandardRenderSystem : IRenderSystem
     readonly RenderList renderList = new();
     readonly Dictionary<(Guid Model, int Index), MaterialAsset> derivedMaterials = [];
     readonly Dictionary<Guid, MaterialAsset> overrideMaterials = [];
+    readonly ConditionalWeakTable<ModelComponent, WorldBoundsCache> worldBounds = [];
+    readonly Plane[] frustumPlanes = new Plane[6];
     bool prepared;
+
+    /// <summary>Gets or sets whether submeshes outside the camera frustum are rejected before material resolution.</summary>
+    public bool UseFrustumCulling { get; set; } = true;
+
+    /// <summary>Gets the submitted and culled submesh counts from the latest prepared frame.</summary>
+    public RenderCullingStats CullingStats { get; private set; }
 
     /// <summary>
     /// .ctor
@@ -47,6 +55,9 @@ public class StandardRenderSystem : IRenderSystem
 
         renderList.Gather(frameInfo.Nodes);
         UpdateLights(renderList.Lights, ubo);
+        GeometryUtility.CalculateFrustumPlanes(
+            frameInfo.Camera.GetViewMatrix() * frameInfo.Camera.GetProjectionMatrix(), frustumPlanes);
+        CullingStats = default;
         BuildDraws();
         prepared = true;
     }
@@ -88,6 +99,7 @@ public class StandardRenderSystem : IRenderSystem
         }
 
         renderList.Sort();
+        CullingStats = CullingStats with { Submitted = renderList.Draws.Count };
     }
 
     void AddDraws(ModelComponent component, Model model, Transform global)
@@ -100,17 +112,24 @@ public class StandardRenderSystem : IRenderSystem
             last = Math.Min(rangeStart + rangeCount, model.SubMeshes.Count);
         }
 
-        var modelMatrix = global.Matrix4X4();
-        var normalMatrix = global.NormalMatrix();
+        var cached = worldBounds.GetValue(component, static _ => new WorldBoundsCache());
+        cached.Update(model, global, start, Math.Max(0, last - start));
         var modelAssetId = component.ModelAssetId;
         var modelOrder = renderList.OrderOf(model);
         for (var i = start; i < last; i++)
         {
+            if (UseFrustumCulling && !GeometryUtility.TestPlanesAABB(frustumPlanes, cached.Bounds[i - start]))
+            {
+                CullingStats = CullingStats with { Culled = CullingStats.Culled + 1 };
+                continue;
+            }
+
             var slot = i - start;
             var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
             var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
             var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
-            renderList.Draws.Add(new DrawItem(model, i, material, modelMatrix, normalMatrix, key));
+            renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
+                renderList.Draws.Count));
         }
     }
 
@@ -229,6 +248,7 @@ public class StandardRenderSystem : IRenderSystem
     public unsafe void Dispose()
     {
         renderList.Reset();
+        worldBounds.Clear();
         derivedMaterials.Clear();
         overrideMaterials.Clear();
         pipeline.Dispose();

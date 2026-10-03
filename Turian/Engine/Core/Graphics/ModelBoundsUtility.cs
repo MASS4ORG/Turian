@@ -2,8 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// Resolves a <see cref="ModelComponent"/>'s bounds. Bounds are baked at import time in local
-/// (model) space only — never cached in world space at runtime — so anything that needs a node's
-/// on-screen extent, such as headless scene reporting or viewport picking, transforms them itself.
+/// (model) space; viewport picking and scene reporting transform them into world space.
 /// </summary>
 public static class ModelBoundsUtility
 {
@@ -56,13 +55,13 @@ public static class ModelBoundsUtility
 
     /// <summary>
     /// Transforms local-space bounds into world space by transforming all eight corners and
-    /// re-encapsulating — cheaper alternatives (transforming just the center and extents) do not
-    /// hold once rotation is involved.
+    /// re-encapsulating to handle rotation, nonuniform scale and reflection.
     /// </summary>
     /// <param name="local">Bounds in the source space.</param>
     /// <param name="transform">The transform from that space into world space.</param>
     public static Bounds ToWorldBounds(Bounds local, Matrix4x4 transform)
     {
+        if (local.IsEmpty) return Bounds.Empty;
         var world = Bounds.Empty;
 
         for (var corner = 0; corner < 8; corner++)

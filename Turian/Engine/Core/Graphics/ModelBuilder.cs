@@ -31,4 +31,37 @@ public struct ModelBuilder
         Indices = [];
         SubMeshes = [];
     }
+
+    /// <summary>Resolves submeshes, computing bounds for procedural geometry that supplies no bounds.</summary>
+    internal IReadOnlyList<SubMesh> GetBoundedSubMeshes()
+    {
+        var source = SubMeshes is { Count: > 0 }
+            ? SubMeshes
+            : [new SubMesh(0, (uint)(Indices.Length > 0 ? Indices.Length : Vertices.Length))];
+        var result = new SubMesh[source.Count];
+        for (var i = 0; i < source.Count; i++)
+        {
+            var sub = source[i];
+            result[i] = sub.Bounds == default || sub.Bounds.IsEmpty
+                ? sub with { Bounds = ComputeBounds(sub) }
+                : sub;
+        }
+
+        return Array.AsReadOnly(result);
+    }
+
+    Bounds ComputeBounds(SubMesh sub)
+    {
+        var bounds = Bounds.Empty;
+        var indexed = Indices.Length > 0;
+        var last = Math.Min((ulong)sub.IndexStart + sub.IndexCount,
+            (ulong)(indexed ? Indices.Length : Vertices.Length));
+        for (var i = sub.IndexStart; i < last; i++)
+        {
+            var index = indexed ? Indices[i] : i;
+            bounds = bounds.Encapsulate(Vertices[index].Position);
+        }
+
+        return bounds;
+    }
 }

@@ -111,7 +111,18 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
                 gui.DrawText("Snap", Theme.Text(11), Theme.InkDim, centerInRect: false);
 
             SnapField(gui, gizmo);
+            DrawCullingStats(gui);
         }
+    }
+
+    void DrawCullingStats(Gui gui)
+    {
+        var stats = viewport.CullingStats;
+        if (stats.Total == 0) return;
+        using (gui.Node(-1, ToolbarHeight, "scene/toolbar/culling").ExpandWidth()
+                   .ContentAlignX(1f).ContentAlignY(0.5f).Enter())
+            gui.DrawText($"{stats.Submitted} drawn · {stats.Culled}/{stats.Total} culled",
+                Theme.Text(11), Theme.InkDim, centerInRect: false);
     }
 
     /// <summary>The snap step of whichever mode is selected, matching how StudioA's single box behaves.</summary>

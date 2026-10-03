@@ -51,11 +51,21 @@ public sealed class SceneViewerService : IDisposable
     Buffer uboBuffer = null!;
     Buffer sboBuffer = null!;
     SboMeshTest sboMeshTest = default;
-    IRenderSystem standardSystem = null!;
+    StandardRenderSystem standardSystem = null!;
     IRenderSystem meshSystem = null!;
     GizmoRenderSystem gizmoSystem = null!;
     WorldUiRenderSystem worldUiSystem = null!;
     OverlayRenderSystem overlayUiSystem = null!;
+
+    /// <summary>Gets the submitted and culled submesh counts from this viewer's latest frame.</summary>
+    public RenderCullingStats CullingStats => standardSystem.CullingStats;
+
+    /// <summary>Gets or sets whether this viewer rejects submeshes outside its camera frustum.</summary>
+    public bool UseFrustumCulling
+    {
+        get => standardSystem.UseFrustumCulling;
+        set => standardSystem.UseFrustumCulling = value;
+    }
 
     /// <summary>
     /// A texture composited over the rendered frame, after the scene and gizmos — the engine's
@@ -210,12 +220,14 @@ public sealed class SceneViewerService : IDisposable
         // Render systems bind to the render pass handle, which is recreated on resize.
         // Recreate them so their pipelines point to the new render pass. The overlay texture is
         // re-supplied by the caller each frame, so it is not carried across.
+        var useFrustumCulling = UseFrustumCulling;
         standardSystem.Dispose();
         meshSystem.Dispose();
         gizmoSystem.Dispose();
         worldUiSystem.Dispose();
         overlayUiSystem.Dispose();
         InitializeRenderSystems();
+        UseFrustumCulling = useFrustumCulling;
     }
 
     /// <inheritdoc/>
