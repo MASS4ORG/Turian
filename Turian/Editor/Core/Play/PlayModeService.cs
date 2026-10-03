@@ -115,6 +115,7 @@ public sealed class PlayModeService(
         PlayRoot = clone;
         ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
         {
+            Simulation = playServices.GetService<SimulationSession>(),
             InputSource = Input,
             Actions = playServices.GetService<InputActionService>(),
         };

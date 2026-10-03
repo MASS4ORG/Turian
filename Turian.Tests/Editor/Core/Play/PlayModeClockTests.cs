@@ -11,12 +11,21 @@ public sealed class PlayModeClockTests
         [InjectService, JsonIgnore]
         public SimulationClock? Clock { get; private set; }
 
+        /// <summary>The optional authoritative world injected by a game service module.</summary>
+        [InjectService(Optional = true), JsonIgnore]
+        public SimulationSession? Simulation { get; private set; }
+
         /// <summary>The interval delivered by the most recent fixed callback.</summary>
         [JsonIgnore]
         public float LastInterval { get; private set; }
 
         /// <inheritdoc/>
-        public override void OnFixedUpdate(float fixedDeltaTime) => LastInterval = fixedDeltaTime;
+        public override void OnFixedUpdate(float fixedDeltaTime)
+        {
+            LastInterval = fixedDeltaTime;
+            Simulation?.Schedule(Guid.Parse("759b9dcc-52df-4ac2-875a-53f85c81b7c5"), Clock!.TickIndex + 1,
+                "fixed-input", JsonSerializer.SerializeToElement(new { }));
+        }
     }
 
     /// <summary>Project settings configure one injected clock and catch-up survives pause, step and resume.</summary>
@@ -89,9 +98,23 @@ public sealed class PlayModeClockTests
                          public sealed class Game { }
                          public sealed class ClockModule : IEngineServiceModule
                          {
-                             public void ConfigureServices(IServiceCollection services) =>
+                             public void ConfigureServices(IServiceCollection services)
+                             {
                                  services.AddSingleton(new SimulationClock(new TimeSettings
                                  { FixedDeltaTime = 0.04, MaxTicksPerFrame = 1 }));
+                                 services.AddSingleton(provider => new SimulationSession(new World(),
+                                     provider.GetRequiredService<SimulationClock>(), 10, "module-fixture-v1"));
+                             }
+                         }
+                         public sealed class World : ISimulationWorld
+                         {
+                             long lastTick;
+                             public bool ApplyCommand(SimulationCommand command, SimulationRandomStreams random) => false;
+                             public void Tick(long tick, double interval, SimulationRandomStreams random) => lastTick = tick;
+                             public System.Text.Json.JsonElement CaptureState() =>
+                                 System.Text.Json.JsonSerializer.SerializeToElement(new { lastTick });
+                             public void RestoreState(System.Text.Json.JsonElement state) =>
+                                 lastTick = state.GetProperty("lastTick").GetInt64();
                          }
                          """;
             var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
@@ -136,10 +159,16 @@ public sealed class PlayModeClockTests
         try
         {
             Assert.True(play.Start());
-            var clock = Assert.IsType<ClockComponent>(play.PlayRoot!.Components.Single()).Clock!;
+            var component = Assert.IsType<ClockComponent>(play.PlayRoot!.Components.Single());
+            var clock = component.Clock!;
+            var simulation = Assert.IsType<SimulationSession>(component.Simulation);
+            Assert.Same(clock, simulation.Clock);
             play.Tick(0.1);
             Assert.Equal(0.04, clock.FixedDeltaTime);
             Assert.Equal(1, clock.TickIndex);
+            Assert.Equal(1, simulation.CaptureState().World.GetProperty("lastTick").GetInt64());
+            Assert.Single(simulation.LastResults);
+            Assert.Equal("fixed-input", simulation.LastResults[0].Command.Kind);
         }
         finally
         {

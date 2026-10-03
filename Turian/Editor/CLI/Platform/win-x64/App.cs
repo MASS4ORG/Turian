@@ -85,9 +85,7 @@ public class App : IDisposable
         RegisterUserCodeTypes();
         var projectSettings = LoadProjectSettings();
         var simulationClock = new SimulationClock(projectSettings.Get<TimeSettings>());
-        sceneTicker = new SceneTicker(sceneManager, simulationClock) { InputSource = inputSource, Actions = actions };
-
-        var services = new ServiceCollection()
+        var registrations = new ServiceCollection()
             .AddSingleton(vulkan)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)
@@ -96,8 +94,16 @@ public class App : IDisposable
             .AddSingleton<IInputSource>(inputSource)
             .AddSingleton(actions)
             .AddSingleton<IInputActions>(actions)
-            .AddSingleton(locale)
-            .BuildServiceProvider();
+            .AddSingleton(locale);
+        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+            registrations.AddEngineModules(gameType.Assembly);
+        var services = registrations.BuildServiceProvider();
+        sceneTicker = new SceneTicker(sceneManager, services.GetRequiredService<SimulationClock>())
+        {
+            Simulation = services.GetService<SimulationSession>(),
+            InputSource = inputSource,
+            Actions = actions
+        };
         sceneManager.BindServices(services);
 
         uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);

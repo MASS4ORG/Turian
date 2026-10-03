@@ -59,6 +59,9 @@ public sealed class SimulationClock
     /// The callback receives the tick being executed and its fixed interval.
     /// </summary>
     public int Advance(double unscaledDeltaTime, Action<long, double> tick)
+        => AdvanceWithCompletion(unscaledDeltaTime, tick, null);
+
+    internal int AdvanceWithCompletion(double unscaledDeltaTime, Action<long, double> tick, Action? completed)
     {
         EnsureIdle();
         ArgumentNullException.ThrowIfNull(tick);
@@ -74,6 +77,7 @@ public sealed class SimulationClock
             Step(tick);
             AccumulatorSeconds = Math.Max(0d, AccumulatorSeconds - FixedDeltaTime);
             count++;
+            completed?.Invoke();
         }
         return count;
     }

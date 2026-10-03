@@ -31,6 +31,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
     public SimulationClock Clock { get; } = clock ?? new SimulationClock();
 
+    /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
+    public SimulationSession? Simulation { get; init; }
+
     /// <summary>
     /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
     /// </summary>
@@ -78,8 +81,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
         var roots = CollectRoots();
 
-        Clock.Advance(unscaledDeltaTime,
-            (_, interval) => RunFixedUpdate(roots, (float)interval));
+        Clock.AdvanceWithCompletion(unscaledDeltaTime,
+            (tick, interval) => RunFixedTick(roots, tick, interval), PublishCompletedTick);
 
         RunUpdate(roots, (float)deltaTime);
         RunLateUpdate(roots, (float)deltaTime);
@@ -106,7 +109,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
         var roots = CollectRoots();
 
-        Clock.Step((_, interval) => RunFixedUpdate(roots, (float)interval));
+        Clock.Step((tick, interval) => RunFixedTick(roots, tick, interval));
+        PublishCompletedTick();
         RunUpdate(roots, (float)deltaTime);
         RunLateUpdate(roots, (float)deltaTime);
 
@@ -120,6 +124,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         [.. sceneManager.LoadedScenes
             .Select(scene => scene.RootNode)
             .Prepend(sceneManager.PersistentRoot)];
+
+    void RunFixedTick(List<Node> roots, long tick, double interval)
+    {
+        var simulation = Simulation;
+        if (simulation is not null && !ReferenceEquals(simulation.Clock, Clock))
+            throw new InvalidOperationException("The scene and simulation must share one clock.");
+        RunFixedUpdate(roots, (float)interval);
+        simulation?.RunTick(tick, interval);
+    }
+
+    void PublishCompletedTick() => Simulation?.PublishCompletedTick();
 
     static void RunFixedUpdate(List<Node> roots, float fixedDeltaTime)
     {
