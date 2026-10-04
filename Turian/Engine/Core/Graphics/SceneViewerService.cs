@@ -17,6 +17,9 @@ public sealed class SceneViewerService : IDisposable
     /// <summary>The editor camera for this viewer. Not a scene node — never serialized.</summary>
     public EditorCamera Camera { get; }
 
+    /// <summary>Gets or sets the linear RGBA color used wherever the scene draws no geometry.</summary>
+    public Vector4 ClearColor { get; set; } = new(0.39f, 0.58f, 0.93f, 1f);
+
     /// <summary>Current render width.</summary>
     public uint Width => frameTarget.Width;
 
@@ -184,7 +187,7 @@ public sealed class SceneViewerService : IDisposable
         uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
         standardSystem.RecordBeforeRenderPass(frameInfo);
 
-        frameTarget.BeginRenderPass(cmd.Value);
+        frameTarget.BeginRenderPass(cmd.Value, ClearColor);
 
         standardSystem.Render(frameInfo, ref ubo);
         meshSystem.Render(frameInfo, ref ubo);

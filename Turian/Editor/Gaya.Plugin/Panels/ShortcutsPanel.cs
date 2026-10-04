@@ -159,6 +159,17 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
         }
 
         if (KeyStroke.Read(gui.Input) is not { } stroke) return;
+        BindStroke(commandId, stroke);
+    }
+
+    void BindStroke(string commandId, KeyStroke stroke)
+    {
+        if (shortcuts.Entries.Any(entry => entry.CommandId == commandId && entry.Default.IsContinuous))
+        {
+            shortcuts.Rebind(commandId, stroke);
+            Cancel();
+            return;
+        }
 
         // A stroke that is only modifiers arms nothing; a second stroke completes the chord the first
         // one started, which is how Ctrl+K Ctrl+S is entered.

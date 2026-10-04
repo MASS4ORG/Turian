@@ -9,6 +9,12 @@ public enum TransformGizmoMode
     /// <summary>Scale.</summary>
     Scale,
 
-    /// <summary>Rotate — visual arcs only, drag not yet implemented.</summary>
+    /// <summary>Rotate around an axis using its ring handle.</summary>
     Rotate,
+
+    /// <summary>Translation, rotation and scale handles displayed together.</summary>
+    Combined,
+
+    /// <summary>Pick scene objects without displaying or editing transform handles.</summary>
+    Select,
 }

@@ -27,6 +27,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     string filter = "";
     string? selectedId;
+    string? frameSelectedId;
     SettingsScope scope = SettingsScope.User;
     float contentWidth = 360f;
     float measuredWidth;
@@ -51,8 +52,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         if (gui.Pass == Pass.Pass1Build) contentWidth = measuredWidth;
 
         var pages = Visible();
-        if (selectedId is null || pages.All(page => page.Id != selectedId))
-            Select(pages.FirstOrDefault()?.Id);
+        if (selectedId is null || pages.All(page => !SameCategory(page, selectedId)))
+            Select(pages.FirstOrDefault() is { } first ? TopLevel(first) : null);
+        if (gui.Pass == Pass.Pass1Build) frameSelectedId = selectedId;
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
@@ -68,7 +70,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
                            .Padding(Theme.Scale(16f), Theme.Scale(12f)).Enter())
                 {
                     gui.ScrollY();
-                    Page(gui, pages.FirstOrDefault(page => page.Id == selectedId));
+                    Category(gui, pages);
                 }
             }
         }
@@ -145,59 +147,66 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         gui.TreeView(categories, Rows(pages), SettingsStyle.Tree(), OnCategoryClick);
     }
 
-    /// <summary>
-    /// The pages as a tree: a page whose path has several segments hangs under a row for each leading
-    /// one, so <c>Editor/Camera</c> and <c>Editor/Grid</c> share an <c>Editor</c> parent.
-    /// </summary>
-    IReadOnlyList<TreeItem> Rows(IReadOnlyList<SettingsPageDescriptor> pages)
-    {
-        var rows = new List<TreeItem>();
-        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Lists each top-level category once; nested sections are rendered with their options.</summary>
+    IReadOnlyList<TreeItem> Rows(IReadOnlyList<SettingsPageDescriptor> pages) =>
+        [.. pages.Select(TopLevel).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(category => new TreeItem(category, T(category), 0, Tag: category))];
 
-        foreach (var page in pages)
-        {
-            var segments = Segments(page.Path);
+    static string TopLevel(SettingsPageDescriptor page) => Segments(page.Path)[0];
 
-            for (var depth = 0; depth < segments.Length - 1; depth++)
-            {
-                var groupId = string.Join('/', segments[..(depth + 1)]);
-                if (emitted.Add(groupId))
-                    rows.Add(new TreeItem(groupId, T(segments[depth]), depth, HasChildren: true));
-            }
-
-            rows.Add(new TreeItem(page.Id, T(segments[^1]), segments.Length - 1, Tag: page));
-        }
-
-        return rows;
-    }
+    static bool SameCategory(SettingsPageDescriptor page, string? category) =>
+        string.Equals(TopLevel(page), category, StringComparison.OrdinalIgnoreCase);
 
     void OnCategoryClick(TreeViewEvent clicked)
     {
-        if (clicked.Item.Tag is SettingsPageDescriptor page) Select(page.Id);
+        if (clicked.Item.Tag is string category) Select(category);
     }
 
-    /// <summary>Selects a page, keeping the tree's own highlight on the same row.</summary>
-    void Select(string? pageId)
+    /// <summary>Selects a category, keeping the left-hand highlight on the same row.</summary>
+    void Select(string? category)
     {
-        selectedId = pageId;
-        categories.SelectedId = pageId;
+        selectedId = category;
+        categories.SelectedId = category;
     }
 
-    /// <summary>One page: its title and description, then every option that survives the filter.</summary>
-    void Page(Gui gui, SettingsPageDescriptor? page)
+    /// <summary>Shows the category's own options and all nested sections in a single scrolling panel.</summary>
+    void Category(Gui gui, IReadOnlyList<SettingsPageDescriptor> pages)
     {
         if (gui.Pass == Pass.Pass2Render)
             measuredWidth = Math.Max(120f, gui.CurrentNode.Rect.W - Theme.Scale(40f));
 
-        if (page is null)
+        if (frameSelectedId is null)
         {
             gui.DrawText(EmptyMessage(), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);
             return;
         }
 
-        gui.DrawText(T(page.Title), Theme.Text(20f), Theme.Ink, centerInRect: false);
+        Heading(gui, frameSelectedId, frameSelectedId, 0);
+        var headings = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var page in pages.Where(page => SameCategory(page, frameSelectedId))
+                     .OrderBy(page => page.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            var segments = Segments(page.Path);
+            for (var depth = 1; depth < segments.Length; depth++)
+            {
+                var path = string.Join('/', segments[..(depth + 1)]);
+                if (headings.Add(path)) Heading(gui, path, segments[depth], depth);
+            }
+            Page(gui, page);
+        }
+    }
 
+    void Heading(Gui gui, string path, string title, int depth)
+    {
+        using (gui.Node(-1, Theme.Scale(depth == 0 ? 32f : 28f), "settings/heading/" + path)
+                   .ExpandWidth().Margin(0, depth == 0 ? 0 : 8f).ContentAlignY(0.5f).Enter())
+            gui.DrawText(T(title), Theme.Text(Math.Max(13f, 20f - depth * 3f)), Theme.Ink, centerInRect: false);
+    }
+
+    /// <summary>Renders a contributed page's description and options beneath its section heading.</summary>
+    void Page(Gui gui, SettingsPageDescriptor page)
+    {
         if (page.Description.Length > 0)
             gui.DrawText(T(page.Description), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);

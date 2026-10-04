@@ -16,7 +16,7 @@ public enum EditorLanguage : byte
 /// The language the editor's own interface is drawn in, kept in the user scope so it follows the
 /// user across projects. Defaults to <see cref="EditorLanguage.English"/>, as  <see cref="EditorLanguage"/> enum's default.
 /// </summary>
-[EditorSetting("General", Description = "The language the editor's own interface is drawn in.")]
+[EditorSetting("General")]
 public sealed class StudioLanguageSettings
 {
     /// <summary>The language of the editor interface.</summary>

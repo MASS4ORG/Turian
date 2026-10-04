@@ -22,8 +22,6 @@ public class CameraMathTests
     [Fact]
     public void ScreenPointToRay_Perspective_RaysDivergeFromTheCameraPosition()
     {
-        // FieldOfView's default (10 rad) is degenerate for CreatePerspectiveFieldOfView — see the
-        // open note on EditorCamera.FieldOfView — so this test sets a normal 60° explicitly.
         var camera = new EditorCamera
         {
             Position = new Vector3(0f, 0f, 0f),
@@ -59,6 +57,34 @@ public class CameraMathTests
 
         Assert.True(Vector3.Distance(rayA.Direction, rayB.Direction) < 1e-3f);
         Assert.True(Vector3.Distance(rayA.Origin, rayB.Origin) > 1f);
+    }
+
+    /// <summary>World up projects above the pivot and upper screen rays point toward world up.</summary>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ProjectionAndPicking_UseYUp(bool sceneCamera, bool orthographic)
+    {
+        ICamera camera = sceneCamera
+            ? new CameraComponent { UsePerspective = !orthographic }
+            : new EditorCamera { IsOrthographic = orthographic, Position = new Vector3(0, 0, -5) };
+        if (camera is CameraComponent component)
+        {
+            new Node { Position = new Vector3(0, 0, -5) }.AddComponent(component);
+            component.Resize(960, 540);
+        }
+        else ((EditorCamera)camera).Resize(960, 540);
+        var center = camera.Project(Vector3.Zero);
+        var above = camera.Project(Vector3.UnitY);
+        Assert.True(above.Y < center.Y);
+        Assert.Equal(center.X, above.X, 5);
+        var pixel = (above + Vector2.One) * 0.5f * Viewport;
+        var ray = CameraMath.ScreenPointToRay(camera, pixel, Viewport)!.Value;
+        var point = ray.Origin + ray.Direction * (-ray.Origin.Z / ray.Direction.Z);
+        Assert.True(Vector3.Distance(Vector3.UnitY, point) < 1e-4f);
+        Assert.True(CameraMath.ScreenPointToRay(camera, new Vector2(480, 100), Viewport)!.Value.Origin.Y > 0f);
     }
 
     /// <summary>A zero-area viewport has no rays to cast.</summary>

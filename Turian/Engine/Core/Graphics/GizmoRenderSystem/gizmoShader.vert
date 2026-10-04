@@ -29,6 +29,21 @@ void main() {
     vec4 p1 = projection * view * vec4(aA, 1.0);
     vec4 p2 = projection * view * vec4(aB, 1.0);
 
+    // Filled primitives use their world vertex directly instead of expanding a line.
+    if (aThickness <= 0.0) {
+        gl_Position = p1;
+        gl_Position.z += push.depthOffset * p1.w;
+        return;
+    }
+
+    // Clip to the near plane before dividing by W so crossing segments cannot fold across the view.
+    if (p1.z < 0.0 && p2.z < 0.0) {
+        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        return;
+    }
+    if (p1.z < 0.0) p1 = mix(p1, p2, -p1.z / (p2.z - p1.z));
+    if (p2.z < 0.0) p2 = mix(p2, p1, -p2.z / (p1.z - p2.z));
+
     // A vertex is at/behind the far plane in clip space when z >= w (NDC z in [0;1]).
     // Skip segments that are entirely beyond it.
     if (p1.z >= p1.w && p2.z >= p2.w) {
@@ -70,5 +85,6 @@ void main() {
     vec2 cornerNdc = (corner / push.viewportSize) * 2.0 - 1.0;
     float cornerZ = (aEnd < 0.0 ? p1.z / p1.w : p2.z / p2.w) + push.depthOffset;
 
-    gl_Position = vec4(cornerNdc, cornerZ, 1.0);
+    float cornerW = aEnd < 0.0 ? p1.w : p2.w;
+    gl_Position = vec4(cornerNdc * cornerW, cornerZ * cornerW, cornerW);
 }

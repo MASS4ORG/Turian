@@ -1,93 +1,89 @@
 namespace Turian.Editor.Core;
 
-/// <summary>
-/// The reference grid drawn on the world's ground plane. With free camera rotation the view can end
-/// up rolled or upside down, and a scene of loose geometry gives nothing to orient against — the
-/// grid is what tells you where the floor is and which way you are facing.
-/// </summary>
+/// <summary>Draws a world-aligned reference grid with intermediate and major line intervals.</summary>
 public static class GroundGrid
 {
-    /// <summary>World-space size of one grid cell.</summary>
+    /// <summary>The default world-space size of a grid cell.</summary>
     public const float CellSize = 1f;
-
-    /// <summary>Cells drawn either side of the origin along each axis.</summary>
+    /// <summary>The default number of cells either side of the camera.</summary>
     public const int HalfExtent = 50;
-
-    /// <summary>Every Nth line is drawn brighter, so distance is readable at a glance.</summary>
+    /// <summary>The default interval of major lines in cells.</summary>
     public const int MajorEvery = 10;
 
-    static readonly Vector4 MinorColor = new(1f, 1f, 1f, 0.06f);
-    static readonly Vector4 MajorColor = new(1f, 1f, 1f, 0.16f);
-    static readonly Vector4 AxisXColor = new(0.90f, 0.25f, 0.30f, 0.65f);
-    static readonly Vector4 AxisZColor = new(0.25f, 0.55f, 0.95f, 0.65f);
+    static readonly SceneGridSettings Defaults = new();
+    static readonly SceneGizmoSettings DefaultColors = new();
 
-    /// <summary>
-    /// Draws the grid on the y = 0 plane, centered on the camera so it always extends to the horizon
-    /// rather than running out underfoot. The two world axes through the origin are colored.
-    /// </summary>
-    /// <param name="gizmos">The gizmo buffer to append to.</param>
-    /// <param name="cameraPosition">Camera position, used to center the grid.</param>
-    public static void Draw(Gizmos gizmos, Vector3 cameraPosition)
+    /// <summary>Draws the configured grid around the camera while preserving the caller's drawing state.</summary>
+    public static void Draw(Gizmos gizmos, Vector3 cameraPosition, SceneGridSettings? settings = null,
+        SceneGizmoSettings? colors = null)
     {
         ArgumentNullException.ThrowIfNull(gizmos);
-
-        var previousColor = gizmos.Color;
-        var previousThickness = gizmos.Thickness;
-        gizmos.Thickness = 1f;
-
-        // Snap to the cell lattice so the grid does not shimmer as the camera moves.
-        var originX = MathF.Floor(cameraPosition.X / CellSize) * CellSize;
-        var originZ = MathF.Floor(cameraPosition.Z / CellSize) * CellSize;
-        var extent = HalfExtent * CellSize;
-
-        for (var i = -HalfExtent; i <= HalfExtent; i++)
+        settings ??= Defaults;
+        colors ??= DefaultColors;
+        if (!settings.Visible) return;
+        var state = (gizmos.Color, gizmos.Thickness, gizmos.Matrix, gizmos.DepthTest);
+        try
         {
-            var offset = i * CellSize;
-
-            DrawLine(
-                gizmos,
-                new Vector3(originX + offset, 0f, originZ - extent),
-                new Vector3(originX + offset, 0f, originZ + extent),
-                originX + offset,
-                AxisZColor,
-                i);
-
-            DrawLine(
-                gizmos,
-                new Vector3(originX - extent, 0f, originZ + offset),
-                new Vector3(originX + extent, 0f, originZ + offset),
-                originZ + offset,
-                AxisXColor,
-                i);
+            gizmos.Matrix = Matrix4x4.Identity;
+            gizmos.DepthTest = true;
+            var (u, v) = Basis(settings.Plane);
+            var cell = Math.Clamp(settings.CellSize, 0.01f, 100f);
+            var count = Math.Clamp(settings.HalfExtent, 5, 500);
+            var originU = (int)MathF.Floor(Vector3.Dot(cameraPosition, u) / cell);
+            var originV = (int)MathF.Floor(Vector3.Dot(cameraPosition, v) / cell);
+            var extent = count * cell;
+            for (var i = -count; i <= count; i++)
+            {
+                DrawLine(gizmos, u * ((originU + i) * cell) + v * (originV * cell - extent),
+                    u * ((originU + i) * cell) + v * (originV * cell + extent), originU + i, v, settings, colors);
+                DrawLine(gizmos, v * ((originV + i) * cell) + u * (originU * cell - extent),
+                    v * ((originV + i) * cell) + u * (originU * cell + extent), originV + i, u, settings, colors);
+            }
+            if (settings.ShowNormalAxis)
+            {
+                var normal = Vector3.Cross(u, v);
+                gizmos.Color = colors.AxisColor(normal, settings.AxisOpacity);
+                gizmos.Thickness = settings.AxisThickness;
+                gizmos.DrawLine(-normal * extent, normal * extent);
+            }
         }
-
-        gizmos.Color = previousColor;
-        gizmos.Thickness = previousThickness;
+        finally
+        {
+            (gizmos.Color, gizmos.Thickness, gizmos.Matrix, gizmos.DepthTest) = state;
+        }
     }
 
-    /// <summary>
-    /// Draws one grid line, coloring it as the world axis when it passes through the origin and
-    /// brightening every <see cref="MajorEvery"/>th line otherwise.
-    /// </summary>
-    static void DrawLine(
-        Gizmos gizmos,
-        Vector3 from,
-        Vector3 to,
-        float coordinate,
-        Vector4 axisColor,
-        int index)
+    static (Vector3 U, Vector3 V) Basis(SceneGridPlane plane) => plane switch
     {
-        if (MathF.Abs(coordinate) < CellSize * 0.5f)
+        SceneGridPlane.Xz => (Vector3.UnitX, Vector3.UnitZ),
+        SceneGridPlane.Yz => (Vector3.UnitY, Vector3.UnitZ),
+        _ => (Vector3.UnitX, Vector3.UnitY)
+    };
+
+    static void DrawLine(Gizmos gizmos, Vector3 from, Vector3 to, int index, Vector3 direction,
+        SceneGridSettings settings, SceneGizmoSettings colors)
+    {
+        if (index == 0 && settings.ShowPlaneAxes)
         {
-            gizmos.Color = axisColor;
-            gizmos.Thickness = 2f;
+            gizmos.Color = colors.AxisColor(direction, settings.AxisOpacity);
+            gizmos.Thickness = settings.AxisThickness;
+        }
+        else if (index % Math.Max(1, settings.MajorEvery) == 0)
+        {
+            gizmos.Color = new Vector4(1, 1, 1, settings.MajorOpacity);
+            gizmos.Thickness = settings.MajorThickness;
+        }
+        else if (index % Math.Max(1, settings.IntermediateEvery) == 0)
+        {
+            gizmos.Color = new Vector4(1, 1, 1, settings.IntermediateOpacity);
+            gizmos.Thickness = settings.IntermediateThickness;
         }
         else
         {
-            gizmos.Color = index % MajorEvery == 0 ? MajorColor : MinorColor;
-            gizmos.Thickness = 1f;
+            gizmos.Color = new Vector4(1, 1, 1, settings.MinorOpacity);
+            gizmos.Thickness = settings.MinorThickness;
         }
-
         gizmos.DrawLine(from, to);
     }
+
 }

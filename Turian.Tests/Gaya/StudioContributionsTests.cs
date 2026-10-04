@@ -3,6 +3,41 @@ namespace Turian.Tests;
 /// <summary>Checks the Turian studio plugin's contributions are consistent with each other.</summary>
 public class StudioContributionsTests
 {
+    /// <summary>The grid settings page and Scene view share one live settings object.</summary>
+    [Fact]
+    public void SceneGridSettingsPageSharesViewportPreferences()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IShortcutService>());
+        services.AddSingleton(Substitute.For<IFocusTracker>());
+        services.AddSingleton(Substitute.For<IEditorSettings>());
+        var pages = new List<SettingsPageDescriptor>();
+        var context = Substitute.For<IPluginContext>();
+        context.CommandLineArgs.Returns([]);
+        context.Services.Returns(services);
+        context.Settings.When(registry => registry.Register(Arg.Any<SettingsPageDescriptor>()))
+            .Do(call => pages.Add(call.Arg<SettingsPageDescriptor>()));
+        new GayaPlugin().Configure(context);
+        var page = Assert.Single(pages, item => item.Id == "gaya.turian.sceneGrid");
+        var settings = Assert.IsType<SceneGridSettings>(page.Target);
+        using var provider = services.BuildServiceProvider();
+        var camera = provider.GetRequiredService<EditorCameraSettings>();
+        Assert.Same(settings, camera.Grid);
+        Assert.Equal("Scene Viewer/Grid", page.Path);
+        Assert.Same(camera.Gizmos, pages.Single(item => item.Id == "gaya.turian.sceneGizmos").Target);
+        Assert.Same(camera.Tools, pages.Single(item => item.Id == "gaya.turian.sceneTransform").Target);
+        var environment = pages.Single(item => item.Id == "gaya.turian.sceneViewer");
+        Assert.Same(camera.View, environment.Target);
+        Assert.Equal("Scene Viewer", environment.Path);
+        Assert.Equal(new Vector3(0.035f), camera.View.EmptySkyColor);
+        Assert.NotNull(camera.Navigation);
+        settings.CellSize = 3;
+        settings.HalfExtent = 5;
+        var drawing = new Gizmos();
+        GroundGrid.Draw(drawing, Vector3.Zero, camera.Grid);
+        Assert.All(drawing.WorldLines, line => Assert.Equal(0f, line.A.X % 3));
+    }
+
     sealed record Contributions(
         List<CommandDescriptor> Commands,
         List<MenuItemDescriptor> Menus,

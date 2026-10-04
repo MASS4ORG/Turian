@@ -1,13 +1,8 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Renders the line segments recorded by <see cref="Gizmos"/> inside the same render pass as the
-/// scene, after the solid render systems. Lines can be split into two passes:
-/// a depth-tested "world" pass (occluded by scene geometry) and an "overlay" pass drawn on top.
-///
-/// Each <see cref="GizmoLine"/> is expanded on the CPU into six <see cref="GizmoExpandedVertex"/>
-/// vertices (two triangles) and the shader expands them into a screen-space quad of the requested
-/// pixel thickness.
+/// Renders filled triangles and lines after scene geometry, using separate world and overlay depth settings.
+/// Lines expand into screen-space quads of the requested pixel thickness; filled triangles retain world projection.
 /// </summary>
 public sealed class GizmoRenderSystem : IRenderSystem
 {
@@ -15,6 +10,8 @@ public sealed class GizmoRenderSystem : IRenderSystem
     const string fragShaderPath = "gizmoShader.frag.spv";
     const string rendererName = "GizmoRenderer";
     const int verticesPerLine = 6;
+    const int verticesPerTriangle = 3;
+    const int maxVertices = Gizmos.MaxLines * verticesPerLine + Gizmos.MaxTriangles * verticesPerTriangle;
     const int initialCapacity = 1_024;
     const float worldDepthOffset = -0.0005f;
 
@@ -34,7 +31,7 @@ public sealed class GizmoRenderSystem : IRenderSystem
     /// <param name="vulkan">The shared headless Vulkan context.</param>
     /// <param name="renderPass">The render pass to draw inside.</param>
     /// <param name="globalSetLayout">The global descriptor set layout (set 0).</param>
-    /// <param name="gizmos">The line source to draw every frame.</param>
+    /// <param name="gizmos">The geometry source to draw every frame.</param>
     public GizmoRenderSystem(
         Vulkan vulkan,
         RenderPass renderPass,
@@ -51,29 +48,15 @@ public sealed class GizmoRenderSystem : IRenderSystem
     /// <inheritdoc/>
     public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
-        if (gizmos.LineCount == 0) return;
-
-        var worldVertexCount = gizmos.WorldLines.Count * verticesPerLine;
-        var overlayVertexCount = gizmos.OverlayLines.Count * verticesPerLine;
+        var worldVertexCount = gizmos.WorldLines.Count * verticesPerLine
+            + gizmos.WorldTriangles.Count * verticesPerTriangle;
+        var overlayVertexCount = gizmos.OverlayLines.Count * verticesPerLine
+            + gizmos.OverlayTriangles.Count * verticesPerTriangle;
         var totalVertexCount = worldVertexCount + overlayVertexCount;
         if (totalVertexCount == 0) return;
 
         EnsureCapacity(totalVertexCount);
-
-        var cursor = 0;
-        foreach (var line in gizmos.WorldLines)
-        {
-            ExpandLine(scratch.AsSpan(cursor, verticesPerLine), in line);
-            cursor += verticesPerLine;
-        }
-
-        foreach (var line in gizmos.OverlayLines)
-        {
-            ExpandLine(scratch.AsSpan(cursor, verticesPerLine), in line);
-            cursor += verticesPerLine;
-        }
-
-        vertexBuffer.WriteToIndex(scratch, 0);
+        UploadVertices(frameInfo.Camera);
 
         Silk.NET.Vulkan.Buffer[] vertexBuffers = [vertexBuffer.VkBuffer];
         ulong[] offsets = [0];
@@ -116,6 +99,25 @@ public sealed class GizmoRenderSystem : IRenderSystem
         }
     }
 
+    void UploadVertices(ICamera camera)
+    {
+        var cursor = 0;
+        AppendTriangles(gizmos.WorldTriangles, camera, ref cursor);
+        AppendLines(gizmos.WorldLines, ref cursor);
+        AppendTriangles(gizmos.OverlayTriangles, camera, ref cursor);
+        AppendLines(gizmos.OverlayLines, ref cursor);
+        vertexBuffer.WriteToIndex(scratch, 0);
+    }
+
+    void AppendLines(IReadOnlyList<GizmoLine> lines, ref int cursor)
+    {
+        foreach (var line in lines)
+        {
+            ExpandLine(scratch.AsSpan(cursor, verticesPerLine), in line);
+            cursor += verticesPerLine;
+        }
+    }
+
     /// <inheritdoc/>
     public unsafe void Dispose()
     {
@@ -125,28 +127,47 @@ public sealed class GizmoRenderSystem : IRenderSystem
         vertexBuffer.Dispose();
     }
 
-    void ExpandLine(Span<GizmoExpandedVertex> target, in GizmoLine line)
+    internal static void ExpandLine(Span<GizmoExpandedVertex> target, in GizmoLine line)
     {
         Span<GizmoExpandedVertex> quad =
         [
             new(line.A, line.B, line.Color, line.Thickness, -1f, -1f),
             new(line.A, line.B, line.Color, line.Thickness, -1f, +1f),
             new(line.A, line.B, line.Color, line.Thickness, +1f, +1f),
-            new(line.A, line.B, line.Color, line.Thickness, +1f, -1f),
             new(line.A, line.B, line.Color, line.Thickness, -1f, -1f),
+            new(line.A, line.B, line.Color, line.Thickness, +1f, +1f),
             new(line.A, line.B, line.Color, line.Thickness, +1f, -1f),
         ];
         quad.CopyTo(target);
     }
+
+    void AppendTriangles(IReadOnlyList<GizmoTriangle> triangles, ICamera camera, ref int cursor)
+    {
+        if (triangles.Count == 0) return;
+        var sorted = triangles.ToArray();
+        Array.Sort(sorted, (a, b) => Depth(b).CompareTo(Depth(a)));
+        foreach (var triangle in sorted)
+        {
+            scratch[cursor++] = SolidVertex(triangle.A, triangle.Color);
+            scratch[cursor++] = SolidVertex(triangle.B, triangle.Color);
+            scratch[cursor++] = SolidVertex(triangle.C, triangle.Color);
+        }
+
+        float Depth(GizmoTriangle triangle) =>
+            Vector3.Dot((triangle.A + triangle.B + triangle.C) / 3f - camera.Position, camera.Front);
+    }
+
+    static GizmoExpandedVertex SolidVertex(Vector3 position, Vector4 color) =>
+        new(position, position, color, 0f, 0f, 0f);
 
     void EnsureCapacity(int requiredVertexCount)
     {
         if (requiredVertexCount <= capacity) return;
 
         var newCapacity = Math.Max(initialCapacity, Math.Max(capacity * 2, requiredVertexCount));
-        if (newCapacity > (Gizmos.MaxLines * verticesPerLine))
+        if (newCapacity > maxVertices)
         {
-            newCapacity = Gizmos.MaxLines * verticesPerLine;
+            newCapacity = maxVertices;
         }
 
         ScopedBufferRecreate(newCapacity);
@@ -227,6 +248,9 @@ public sealed class GizmoRenderSystem : IRenderSystem
 
         pipelineConfig.BindingDescriptions = GizmoBindingDescriptions;
         pipelineConfig.AttributeDescriptions = GizmoAttributeDescriptions;
+        var rasterization = pipelineConfig.RasterizationInfo;
+        rasterization.CullMode = CullModeFlags.None;
+        pipelineConfig.RasterizationInfo = rasterization;
 
         var depthStencilInfo = pipelineConfig.DepthStencilInfo;
         depthStencilInfo.DepthTestEnable = depthTest ? Vk.True : Vk.False;

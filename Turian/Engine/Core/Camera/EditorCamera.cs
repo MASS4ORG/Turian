@@ -2,11 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// Editor-only free camera. Lives outside the scene graph — never serialized, never shown in the
-/// SceneTree panel. The viewport owns this camera rather than a scene node.
-///
-/// The engine's world space has +Y pointing down (OBJ/FBX importers negate Y), but the camera
-/// convention is Y-up: <see cref="GlobalUp"/> = +Y, positive pitch = look up. The Vulkan
-/// render pass handles the final Y-flip for display.
+/// SceneTree panel, with +Y as world up and projection adapted to Vulkan's downward screen Y.
 /// </summary>
 public class EditorCamera : ICamera
 {
@@ -188,7 +184,9 @@ public class EditorCamera : ICamera
             return Matrix4x4.CreateOrthographicOffCenter(-halfW, halfW, halfH, -halfH, NearPlane, FarPlane);
         }
 
-        return Matrix4x4.CreatePerspectiveFieldOfView(FieldOfView, aspect, NearPlane, FarPlane);
+        var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfView, aspect, NearPlane, FarPlane);
+        projection.M22 = -projection.M22;
+        return projection;
     }
 
     /// <inheritdoc/>

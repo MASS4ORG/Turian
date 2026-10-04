@@ -243,11 +243,22 @@ public sealed class GayaPlugin : IPlugin
     static void RegisterSettings(IPluginContext context)
     {
         var camera = new EditorCameraSettings();
+        var grid = camera.Grid;
         var recent = new RecentProjectsSettings();
         var language = new StudioLanguageSettings();
         var inspector = new InspectorSettings();
 
-        context.Services.AddSingleton(camera);
+        context.Services.AddSingleton<SceneNavigationBindings>();
+        context.Services.AddSingleton(sp =>
+        {
+            camera.Navigation = sp.GetRequiredService<SceneNavigationBindings>();
+            camera.Store = sp.GetRequiredService<IEditorSettings>();
+            return camera;
+        });
+        context.Services.AddSingleton(grid);
+        context.Services.AddSingleton(camera.View);
+        context.Services.AddSingleton(camera.Gizmos);
+        context.Services.AddSingleton(camera.Tools);
         context.Services.AddSingleton(recent);
         context.Services.AddSingleton(language);
         context.Services.AddSingleton(inspector);
@@ -260,6 +271,10 @@ public sealed class GayaPlugin : IPlugin
 
         context.Settings.Register(SettingsPages.Describe(LocalizationBridge.PageId, language));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.editorCamera", camera));
+        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGrid", grid));
+        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneViewer", camera.View));
+        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGizmos", camera.Gizmos));
+        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneTransform", camera.Tools));
         context.Settings.Register(SettingsPages.Describe(AssetBrowserSettings.PageId, assetBrowser));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.inspector", inspector));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.recentProjects", recent) with

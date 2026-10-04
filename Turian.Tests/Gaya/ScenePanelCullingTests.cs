@@ -1,12 +1,12 @@
 namespace Turian.Tests;
 
-/// <summary>Checks scene toolbar culling statistics through both headless GUI passes.</summary>
+/// <summary>Checks that rendering diagnostics are available without occupying the Scene toolbar.</summary>
 [Collection(SerialTests.Name)]
 public sealed class ScenePanelCullingTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
-    /// <summary>A populated viewport shows a stats node, and an empty view removes it.</summary>
+    /// <summary>Culling counts remain available to diagnostics while the toolbar contains only tools.</summary>
     [Fact]
-    public void ToolbarShowsCountsOnlyForDrawableContent()
+    public void ToolbarOmitsCullingCounts()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var assets = new AssetManager();
@@ -19,8 +19,8 @@ public sealed class ScenePanelCullingTests(VulkanFixture fixture) : IClassFixtur
         var viewer = new SceneViewerService(fixture.Vulkan, database, 32, 32);
         typeof(SceneViewport).GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(viewport, viewer);
-        using var panel = new ScenePanel(viewport, tree, inspector, null!, null!);
-        var toolbar = typeof(ScenePanel).GetMethod("Toolbar", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        using var owner = viewport;
+        var toolbar = new SceneToolbar(viewport, () => { });
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1f));
         var gui = new Gui { Input = input };
@@ -32,15 +32,13 @@ public sealed class ScenePanelCullingTests(VulkanFixture fixture) : IClassFixtur
         root.Children.Add(child);
         viewer.Render(root, 0.016);
 
-        InspectorFormsRenderingTests.Frame(gui, surface, font, current => toolbar.Invoke(panel, [current]));
-        var stats = Assert.Single(Descendants(gui.RootNode!), node => node.Id == "scene/toolbar/culling");
-        var snap = Assert.Single(Descendants(gui.RootNode!), node => node.Id == "scene/toolbar/snapLabel");
-        Assert.True(stats.Rect.X >= snap.Rect.X + snap.Rect.W);
+        InspectorFormsRenderingTests.Frame(gui, surface, font, toolbar.Render);
+        Assert.DoesNotContain(Descendants(gui.RootNode!), node => node.Id == "scene/toolbar/culling");
         Assert.Equal(new RenderCullingStats(1, 0), viewport.CullingStats);
 
         root.Children.Clear();
         viewer.Render(root, 0.016);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, current => toolbar.Invoke(panel, [current]));
+        InspectorFormsRenderingTests.Frame(gui, surface, font, toolbar.Render);
         Assert.DoesNotContain(Descendants(gui.RootNode!), node => node.Id == "scene/toolbar/culling");
     }
 

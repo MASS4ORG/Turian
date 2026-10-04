@@ -49,6 +49,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         this.app = app;
         log = app.Services.GetService(typeof(ILogger)) as ILogger ?? NullLogger.Instance;
         Appearance = AppearanceSettings.Register(app.Settings);
+        FrameRate = new FrameRateLimiter(FrameRateSettings.Register(app.Settings));
 
         if (theme is not null)
         {
@@ -74,6 +75,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
     /// <summary>The persisted preferences exposed by the Appearance settings page.</summary>
     public AppearanceSettings Appearance { get; }
+
+    /// <summary>The desktop frame limiter driven by the performance settings page.</summary>
+    public FrameRateLimiter FrameRate { get; }
 
     /// <summary>Whether the operating system supplies the title bar; changes are persisted through the settings API.</summary>
     public bool NativeTitlebar

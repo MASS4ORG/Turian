@@ -99,7 +99,11 @@ window.CloseRequested = () =>
 try
 {
     shell.ExitRequested += ApproveExit;
-    window.RunGui(() => activeWorkbench.Render(gui));
+    window.RunGui(() =>
+    {
+        if (gui.Pass == Pass.Pass1Build) activeWorkbench.FrameRate.Wait();
+        activeWorkbench.Render(gui);
+    });
 }
 finally
 {

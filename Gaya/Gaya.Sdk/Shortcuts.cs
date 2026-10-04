@@ -189,6 +189,9 @@ public sealed record KeyBinding(
     KeyStroke? Second = null,
     string Context = ShortcutContexts.Global)
 {
+    /// <summary>Whether the command reads held input each frame instead of firing on a key press.</summary>
+    public bool IsContinuous { get; init; }
+
     /// <summary>Builds a single-stroke binding from a key and its modifiers.</summary>
     /// <param name="commandId">The command the stroke invokes.</param>
     /// <param name="key">The key that fires it.</param>
@@ -252,7 +255,7 @@ public sealed record ShortcutEntry(string CommandId, KeyBinding Default, KeyBind
     public string Context => Default.Context;
 
     /// <summary>Whether the user changed this shortcut away from what was declared.</summary>
-    public bool IsModified => Effective?.Display != Default.Display;
+    public bool IsModified => (Effective?.Display ?? string.Empty) != Default.Display;
 
     /// <summary>The sequence in force as a menu shows it, or an empty string when unbound.</summary>
     public string Display => Effective?.Display ?? string.Empty;
@@ -281,6 +284,14 @@ public interface IShortcutService : IShortcutRegistry
     /// <param name="commandId">The command to look up.</param>
     /// <returns>The display form of the binding in force.</returns>
     string DisplayFor(string commandId);
+
+    /// <summary>Checks a continuous single-stroke binding, honoring its context, overrides and capture state.</summary>
+    /// <param name="commandId">The command whose held binding is tested.</param>
+    /// <param name="input">This frame's keyboard state.</param>
+    /// <param name="activePanelId">The panel receiving the input.</param>
+    /// <param name="extraModifiers">Modifiers allowed in addition to those required by the binding.</param>
+    bool IsHeld(string commandId, IInputHandler input, string activePanelId,
+        KeyModifiers extraModifiers = KeyModifiers.None);
 
     /// <summary>
     /// Rebinds a command. Passing <see cref="KeyStroke.None"/> as the first stroke clears the

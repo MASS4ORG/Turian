@@ -76,8 +76,7 @@ static class PanelCommands
     }
 
     /// <summary>
-    /// The viewport's own keys. W / E / R switch the gizmo without a modifier, which is why they need
-    /// a context: the same keys drive the editor camera and mean nothing outside the scene view.
+    /// The viewport's transform and navigation bindings fire only while the Scene panel has focus.
     /// </summary>
     static void Viewport(IPluginContext context)
     {
@@ -91,6 +90,9 @@ static class PanelCommands
         GizmoMode(context, panelId, "translate", "Move", TransformGizmoMode.Translate, KeyboardKey.W);
         GizmoMode(context, panelId, "rotate", "Rotate", TransformGizmoMode.Rotate, KeyboardKey.E);
         GizmoMode(context, panelId, "scale", "Scale", TransformGizmoMode.Scale, KeyboardKey.R);
+        GizmoMode(context, panelId, "select", "Select", TransformGizmoMode.Select, KeyboardKey.Q);
+        GizmoMode(context, panelId, "combined", "All", TransformGizmoMode.Combined, KeyboardKey.T);
+        SceneNavigationBindings.Register(context);
     }
 
     static void GizmoMode(IPluginContext context, string panelId, string id, string label,

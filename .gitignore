@@ -33,6 +33,7 @@ coverage/
 .publish/
 *.trx
 *.user
+.local
 
 # OS
 .DS_Store
@@ -56,3 +57,4 @@ AGENTS.md
 .script-[0-9].[csp][hys]
 docs/internal
 Examples/
+Precast~/

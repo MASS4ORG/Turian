@@ -16,9 +16,6 @@ sealed class SceneViewport : IDisposable
 
     const float previewMargin = 12f;
 
-    static readonly KeyboardKey[] MovementKeys =
-        [KeyboardKey.W, KeyboardKey.A, KeyboardKey.S, KeyboardKey.D, KeyboardKey.Q, KeyboardKey.E];
-
     readonly Vulkan vulkan;
     readonly AssetDatabase assets;
     readonly SceneTreeController sceneTree;
@@ -29,6 +26,8 @@ sealed class SceneViewport : IDisposable
     readonly ILogger log;
     readonly UndoService undo;
     readonly LocaleService locale;
+    readonly SceneGridSettings gridSettings;
+    readonly SceneOrientationWidget orientationWidget = new();
 
     readonly HashSet<int> heldKeys = [];
 
@@ -48,6 +47,7 @@ sealed class SceneViewport : IDisposable
 
     Action<object>? mutateNode;
     bool gizmoOwnsDrag;
+    bool showGizmoCursor;
     readonly ViewportGesture gesture = new();
     Vector2 pressPosition;
 
@@ -84,6 +84,8 @@ sealed class SceneViewport : IDisposable
         this.log = log;
         this.undo = undo;
         this.locale = locale;
+        gridSettings = cameraSettings.Grid;
+        Gizmo.Settings = cameraSettings.Gizmos;
 
         sceneTree.FrameNodeRequested += OnFrameNodeRequested;
         inspector.SelectionChanged += OnSelectionChanged;
@@ -96,19 +98,40 @@ sealed class SceneViewport : IDisposable
     /// <summary>The interactive transform gizmo, so the panel's toolbar can drive its mode and snap.</summary>
     public TransformGizmo Gizmo { get; } = new();
 
+    /// <summary>The live settings shared by the toolbar and Settings pages.</summary>
+    public EditorCameraSettings Settings => cameraSettings;
+
+    /// <summary>Gets whether the Scene camera is using orthographic projection.</summary>
+    public bool IsOrthographic => controller?.Camera.IsOrthographic ?? false;
+
+    /// <summary>Changes projection while retaining the selected object's framing.</summary>
+    public void ToggleProjection() => controller?.ToggleProjection(inspector.SelectedNode?.GlobalTransform.Position);
+
+    /// <summary>Moves the camera once along a command palette direction.</summary>
+    public void MoveCamera(int direction)
+    {
+        if (direction < 0 || direction >= SceneNavigationBindings.Directions.Length) return;
+        controller?.ApplyKeyboardMovement([direction], 0.1f, 0, 1, 2, 3, 4, 5);
+    }
+
     /// <summary>The submitted and culled submesh counts from the scene viewport's latest frame.</summary>
     public RenderCullingStats CullingStats => service?.CullingStats ?? default;
 
     Vector2 ViewportSize => new(service?.Width ?? 0, service?.Height ?? 0);
 
     /// <summary>
-    /// Draws one frame into the current layout node. Everything happens in the render pass: the
-    /// node's rectangle — which sizes the offscreen target — is only resolved after layout.
+    /// Builds feedback nodes during layout and draws the scene during the render pass using the resolved rectangle.
+    /// Input is processed only in the render pass.
     /// </summary>
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            DrawGestureFeedback(gui);
+            orientationWidget.Render(gui, controller, inspector.SelectedNode, cameraSettings.Gizmos);
+            return;
+        }
 
         if (failure is not null)
         {
@@ -121,8 +144,23 @@ sealed class SceneViewport : IDisposable
         var height = (uint)Math.Max(1f, rect.H);
         if (!EnsureService(width, height)) return;
 
+        orientationWidget.Render(gui, controller, inspector.SelectedNode, cameraSettings.Gizmos);
         HandleInput(gui, rect);
         RenderFrame(gui, rect);
+        DrawGestureFeedback(gui);
+    }
+
+    void DrawGestureFeedback(Gui gui)
+    {
+        var text = Gizmo.IsDragging && Gizmo.HandleMode == TransformGizmoMode.Rotate
+            ? $"{Gizmo.RotationDegrees:0.#}°" : string.Empty;
+        using (gui.Node(120f, 24f, "scene/rotationFeedback").Absolute(12f, 12f).Enter())
+            gui.DrawText(text, StudioTheme.Current.Text(13), StudioTheme.Current.Ink, centerInRect: false);
+        var pointer = gui.Input.MousePosition;
+        using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
+                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+            gui.DrawText(showGizmoCursor ? EditorIcons.Move : string.Empty,
+                StudioTheme.Current.Text(18), StudioTheme.Current.Ink);
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
@@ -181,21 +219,37 @@ sealed class SceneViewport : IDisposable
 
         var local = new Vector2(input.MousePosition.X - rect.X, input.MousePosition.Y - rect.Y);
         DispatchPointer(phase, local, hovered);
+        UpdateGizmoCursor(gui, hovered);
 
         if (hovered && input.MouseWheelDelta != 0f) controller.OnWheel(input.MouseWheelDelta);
-        if (hovered || gesture.Active is not null) HandleKeyboard(input);
+        if (hovered || gesture.Active is not null) HandleKeyboard(gui);
         else heldKeys.Clear();
+    }
+
+    void UpdateGizmoCursor(Gui gui, bool hovered)
+    {
+        showGizmoCursor = hovered && !playMode.IsActive && Gizmo.Axis != TransformGizmoAxis.None;
+        if (showGizmoCursor) gui.RequestPointerMode(PointerMode.Hidden);
+        if (!hovered && !gizmoOwnsDrag) Gizmo.ClearHover();
     }
 
     // Pushed every frame rather than wired to a change event: the assignments cost nothing, and an edit made
     // while dragging the view takes effect without leaving the panel.
     void SyncCamera(IInputHandler input)
     {
+        service!.ClearColor = new Vector4(cameraSettings.View.EmptySkyColor, 1f);
         controller!.MoveSpeed = cameraSettings.MoveSpeed;
         controller.LookSensitivity = cameraSettings.LookSensitivity;
         controller.ZoomFraction = cameraSettings.ZoomFraction;
+        controller.Camera.FieldOfView = cameraSettings.FieldOfView * MathF.PI / 180f;
+        controller.Camera.NearPlane = cameraSettings.NearClip;
+        controller.Camera.FarPlane = Math.Max(cameraSettings.FarClip, controller.Camera.NearPlane + 0.01f);
         controller.IsAlt = input.IsKeyDown(KeyboardKey.LeftAlt) || input.IsKeyDown(KeyboardKey.RightAlt);
         controller.IsFast = input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift);
+        Gizmo.SnapEnabled = cameraSettings.Tools.SnapEnabled;
+        Gizmo.SnapTranslation = cameraSettings.Tools.TranslationSnap;
+        Gizmo.SnapRotation = cameraSettings.Tools.RotationSnap;
+        Gizmo.SnapScale = cameraSettings.Tools.ScaleSnap;
     }
 
     void DispatchPointer(ViewportGesturePhase phase, Vector2 local, bool hovered)
@@ -255,15 +309,10 @@ sealed class SceneViewport : IDisposable
         controller!.OnMouseUp();
     }
 
-    void HandleKeyboard(IInputHandler input)
+    void HandleKeyboard(Gui gui)
     {
         heldKeys.Clear();
-        foreach (var key in MovementKeys)
-            if (input.IsKeyDown(key))
-                heldKeys.Add((int)key);
-
-        if (input.IsKeyPressed(KeyboardKey.F) && inspector.SelectedNode is { } selected)
-            controller!.FrameNode(selected);
+        cameraSettings.Navigation?.Read(gui.Input, heldKeys, gui.Focus.IsTextInputFocused);
     }
 
     // ── Frame ───────────────────────────────────────────────────────────────
@@ -274,12 +323,7 @@ sealed class SceneViewport : IDisposable
 
         controller!.ApplyKeyboardMovement(
             heldKeys, dt,
-            moveForward: (int)KeyboardKey.W,
-            moveBackward: (int)KeyboardKey.S,
-            moveLeft: (int)KeyboardKey.A,
-            moveRight: (int)KeyboardKey.D,
-            moveUp: (int)KeyboardKey.Q,
-            moveDown: (int)KeyboardKey.E);
+            moveForward: 0, moveBackward: 1, moveLeft: 2, moveRight: 3, moveUp: 4, moveDown: 5);
 
         overlayRoot = sceneTree.CurrentSceneRoot ?? service!.EditorOverlayRoot;
         service!.Render(overlayRoot, dt);
@@ -344,7 +388,9 @@ sealed class SceneViewport : IDisposable
     {
         if (playMode.IsActive || service is null) return;
 
-        GroundGrid.Draw(g, service.Camera.Position);
+        GroundGrid.Draw(g, service.Camera.Position, gridSettings, cameraSettings.Gizmos);
+
+        if (!cameraSettings.Gizmos.Visible) return;
 
         if (Gizmo.SelectedNode is { } selected)
             foreach (var component in selected.Components)

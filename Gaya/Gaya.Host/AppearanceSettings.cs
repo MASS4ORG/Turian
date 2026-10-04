@@ -1,7 +1,7 @@
 namespace Gaya.Host;
 
 /// <summary>The workbench's theme, interface scale and desktop window decorations.</summary>
-[EditorSetting("Appearance", Description = "Theme, interface size and window decorations.")]
+[EditorSetting("Appearance")]
 public sealed class AppearanceSettings
 {
     int textSize = 12;

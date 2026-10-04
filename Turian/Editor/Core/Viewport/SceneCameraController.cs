@@ -1,20 +1,10 @@
 namespace Turian.Editor.Core;
 
-/// <summary>
-/// Processes viewport input and drives an <see cref="EditorCamera"/> through four navigation
-/// navigation modes:
-///
-///   • <b>Fly</b> — right-click drag looks around; WASD/QE move (Q/E = world Y).
-///   • <b>Orbit</b> — Alt + left-click drag rotates around <see cref="orbitPivot"/>.
-///   • <b>Pan</b> — middle-click drag translates the camera on its local XZ plane.
-///   • <b>Zoom</b> — scroll wheel dollies along <see cref="EditorCamera.Front"/>.
-///
-/// This class is UI-framework-agnostic — it receives abstract input events and mutates the
-/// camera. The Studio's <c>SceneViewerControl</c> translates Avalonia events into these calls.
-/// </summary>
-public sealed class SceneCameraController
+/// <summary>Drives an editor camera through fly, orbit, pan and zoom gestures using abstract viewport input.</summary>
+public sealed partial class SceneCameraController
 {
     const float fastMoveMultiplier = 4f;
+    const float flyPitchLimit = 89f * MathF.PI / 180f;
 
     NavigationMode mode;
     float lastMouseX;
@@ -144,11 +134,16 @@ public sealed class SceneCameraController
     }
 
     /// <summary>
-    /// Processes a scroll-wheel event. Positive <paramref name="delta"/> zooms in (dollies forward);
-    /// negative zooms out.
+    /// Processes wheel zoom, changing the orthographic viewing volume or moving the perspective camera.
+    /// Positive <paramref name="delta"/> zooms in; negative zooms out.
     /// </summary>
     public void OnWheel(float delta)
     {
+        if (Camera.IsOrthographic)
+        {
+            Camera.Frustum *= MathF.Max(1f - delta * ZoomFraction, 0.001f);
+            return;
+        }
         if (mode == NavigationMode.Orbit)
         {
             orbitDistance *= 1f - delta * ZoomFraction;
@@ -166,17 +161,16 @@ public sealed class SceneCameraController
     }
 
     /// <summary>
-    /// Applies WASD/QE keyboard movement for the current frame. Call once per frame with the
-    /// elapsed time. The <paramref name="keys"/> set should contain the currently-held keys.
+    /// Applies configured movement directions for the current frame using the supplied elapsed time.
     /// </summary>
-    /// <param name="keys">Set of held key codes (engine key enum values as integers).</param>
+    /// <param name="keys">Set of held movement codes resolved by the caller.</param>
     /// <param name="dt">Delta time in seconds.</param>
     /// <param name="moveForward">Key code for move-forward.</param>
     /// <param name="moveBackward">Key code for move-backward.</param>
     /// <param name="moveLeft">Key code for strafe-left.</param>
     /// <param name="moveRight">Key code for strafe-right.</param>
-    /// <param name="moveUp">Key code for move-up along the camera's own up axis (Q).</param>
-    /// <param name="moveDown">Key code for move-down along the camera's own up axis (E).</param>
+    /// <param name="moveUp">Movement code for camera-local up.</param>
+    /// <param name="moveDown">Movement code for camera-local down.</param>
     public void ApplyKeyboardMovement(
         HashSet<int> keys, float dt,
         int moveForward, int moveBackward,
@@ -186,33 +180,23 @@ public sealed class SceneCameraController
         ArgumentNullException.ThrowIfNull(keys);
         if (keys.Count == 0) return;
 
-        var x = 0f;
-        var y = 0f;
-        var z = 0f;
-
-        if (keys.Contains(moveRight)) x += 1f;
-        if (keys.Contains(moveLeft)) x -= 1f;
-        if (keys.Contains(moveUp)) y += 1f;
-        if (keys.Contains(moveDown)) y -= 1f;
-        if (keys.Contains(moveForward)) z += 1f;
-        if (keys.Contains(moveBackward)) z -= 1f;
+        var x = MovementAxis(keys, moveRight, moveLeft);
+        var y = MovementAxis(keys, moveUp, moveDown);
+        var z = MovementAxis(keys, moveForward, moveBackward);
 
         if (x == 0f && y == 0f && z == 0f) return;
 
         var multiplier = IsFast ? fastMoveMultiplier : 1f;
         var step = MoveSpeed * multiplier * dt;
 
-        // Every axis is camera-local, Q/E included: with free rotation the camera can be rolled or
-        // upside down, and a world-Y lift would then send it sideways relative to what you see.
-        if (x != 0f || z != 0f)
-        {
-            Camera.Position += Camera.Right * x * step;
-            Camera.Position += Camera.Front * z * step;
-        }
-
-        if (y != 0f)
-            Camera.Position += Camera.Up * y * step;
+        // Camera-local movement follows the visible axes even when the camera is rolled.
+        Camera.Position += Camera.Right * x * step;
+        Camera.Position += Camera.Front * z * step;
+        Camera.Position += Camera.Up * y * step;
     }
+
+    static float MovementAxis(HashSet<int> keys, int positive, int negative) =>
+        (keys.Contains(positive) ? 1f : 0f) - (keys.Contains(negative) ? 1f : 0f);
 
     /// <summary>
     /// Moves the camera to frame a node at a fixed distance along the current view direction.
@@ -242,11 +226,10 @@ public sealed class SceneCameraController
         Camera.FarPlane = MathF.Max(Camera.FarPlane, (distance + radius * 2f) * 1.5f);
     }
 
-    // Rotation is about the camera's own axes, so a horizontal drag moves the view along the
-    // screen's horizontal instead of sweeping a cone around world up, and a vertical drag carries
-    // straight over the top. Screen Y grows downward, hence the negated dy.
+    // World-up yaw and bounded pitch keep free-flight navigation level through repeated drags.
     void FlyLook(float dx, float dy) =>
-        Camera.RotateLocal(dx * LookSensitivity, -dy * LookSensitivity);
+        Camera.SetYawPitch(Camera.Yaw - dx * LookSensitivity,
+             Math.Clamp(Camera.Pitch - dy * LookSensitivity, -flyPitchLimit, flyPitchLimit));
 
     void OrbitLook(float dx, float dy)
     {
@@ -271,7 +254,7 @@ public enum NavigationMode
     /// <summary>No navigation active.</summary>
     None,
 
-    /// <summary>Free-fly mode (right-click drag + WASD/QE).</summary>
+    /// <summary>Free-fly mode with right-click look and configurable keyboard movement.</summary>
     Fly,
 
     /// <summary>Orbit mode (Alt + left-click drag).</summary>

@@ -34,7 +34,9 @@ public sealed partial class TransformGizmo
         var dot02 = Vector2.Dot(v0, v2);
         var dot11 = Vector2.Dot(v1, v1);
         var dot12 = Vector2.Dot(v1, v2);
-        var inv = 1f / ((dot00 * dot11) - (dot01 * dot01));
+        var determinant = (dot00 * dot11) - (dot01 * dot01);
+        if (MathF.Abs(determinant) < 1e-6f) return false;
+        var inv = 1f / determinant;
         var u = ((dot11 * dot02) - (dot01 * dot12)) * inv;
         var v = ((dot00 * dot12) - (dot01 * dot02)) * inv;
         return u >= 0f && v >= 0f && (u + v) <= 1f;
