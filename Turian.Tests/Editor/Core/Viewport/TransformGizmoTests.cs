@@ -29,12 +29,13 @@ public class TransformGizmoTests
         gizmo.SelectedNode = node;
     }
 
-    /// <summary>A fresh gizmo defaults to world-space translate with snapping enabled.</summary>
+    /// <summary>A fresh gizmo defaults to world-space translate with snapping off and the standard intervals.</summary>
     [Fact]
     public void Defaults_AreTranslateWorldWithSnaps()
     {
         Assert.Equal(TransformGizmoMode.Translate, gizmo.Mode);
         Assert.Equal(TransformGizmoSpace.World, gizmo.Space);
+        Assert.False(gizmo.SnapEnabled);
         Assert.Equal(1f, gizmo.SnapTranslation);
         Assert.Equal(15f, gizmo.SnapRotation);
         Assert.Equal(0.1f, gizmo.SnapScale);
@@ -65,6 +66,7 @@ public class TransformGizmoTests
     public void Translation_WithSnap_RoundsToUnitGrid()
     {
         gizmo.Mode = TransformGizmoMode.Translate;
+        gizmo.SnapEnabled = true;
         gizmo.SnapTranslation = 1f;
 
         gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, Viewport);

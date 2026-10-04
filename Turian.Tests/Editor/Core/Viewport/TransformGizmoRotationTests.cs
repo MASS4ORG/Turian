@@ -39,6 +39,7 @@ public class TransformGizmoRotationTests
     public void RotationDrag_SnapsInDegrees(float angle, float expected)
     {
         var (camera, node, gizmo) = Create(Vector3.UnitZ);
+        gizmo.SnapEnabled = true;
         gizmo.SnapRotation = 15f;
         var (u, v) = Basis(Vector3.UnitZ);
 
