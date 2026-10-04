@@ -9,9 +9,8 @@ public class TransformGizmoTests
 {
     static readonly Vector2 Viewport = new(960f, 540f);
 
-    const float gizmoScaleFactor = 0.15f;
     const float distance = 5f;
-    const float gizmoScale = distance * gizmoScaleFactor;
+    const float gizmoScale = 20f * 90f / 540f;
 
     readonly EditorCamera camera;
     readonly Node node;
@@ -58,7 +57,7 @@ public class TransformGizmoTests
         var targetPixel = ProjectToPixel(new Vector3(3f, 0f, 0f));
         gizmo.ProcessPointerMove(targetPixel, camera, Viewport);
 
-        AssertClose(new Vector3(3f, 0f, 0f), node.Transform.Position);
+        AssertClose(new Vector3(3f - gizmoScale * 0.5f, 0f, 0f), node.Transform.Position);
     }
 
     /// <summary>Translation with snapping rounds the node position to the unit grid.</summary>
@@ -69,7 +68,7 @@ public class TransformGizmoTests
         gizmo.SnapTranslation = 1f;
 
         gizmo.ProcessPointerDown(AxisMidpointPixel(TransformGizmoMode.Translate), camera, Viewport);
-        gizmo.ProcessPointerMove(ProjectToPixel(new Vector3(3.4f, 0f, 0f)), camera, Viewport);
+        gizmo.ProcessPointerMove(ProjectToPixel(new Vector3(3.4f + gizmoScale * 0.5f, 0f, 0f)), camera, Viewport);
 
         Assert.Equal(3f, node.Transform.Position.X);
         Assert.Equal(0f, node.Transform.Position.Y);
@@ -87,7 +86,7 @@ public class TransformGizmoTests
         Assert.True(gizmo.IsDragging);
 
         var start = AxisMidpointPixel(TransformGizmoMode.Scale);
-        gizmo.ProcessPointerMove(new Vector2(start.X, start.Y + 200f), camera, Viewport);
+        gizmo.ProcessPointerMove(new Vector2(start.X - 90f, start.Y), camera, Viewport);
 
         Assert.Equal(2f, node.Transform.Scale.X, 3);
         Assert.Equal(1f, node.Transform.Scale.Y, 3);
@@ -119,7 +118,7 @@ public class TransformGizmoTests
         Assert.Equal(1, raised);
     }
 
-    /// <summary>Translate mode draws linear handles for the three axes and three plane handles.</summary>
+    /// <summary>Translation uses solid overlay arrows and three outlined, filled plane handles.</summary>
     [Fact]
     public void Draw_Translate_ProducesLinearHandlesAndPlanes()
     {
@@ -128,21 +127,23 @@ public class TransformGizmoTests
 
         gizmo.Draw(g, camera, Viewport);
 
-        // 3 axes × (stem + 4 head edges) + 3 plane handles × 4 edges.
-        Assert.Equal((3 * 5) + (3 * 4), g.LineCount);
-        Assert.Empty(g.OverlayLines);
+        Assert.Equal(12, g.LineCount);
+        Assert.NotEmpty(g.OverlayTriangles);
+        Assert.Empty(g.WorldLines);
+        Assert.Empty(g.WorldTriangles);
     }
 
-    /// <summary>Scale mode additionally draws a center circle.</summary>
+    /// <summary>Scale uses solid boxes and plane handles with a center box for uniform scaling.</summary>
     [Fact]
-    public void Draw_Scale_AddsCenterCircle()
+    public void Draw_Scale_UsesSolidBoxes()
     {
         var g = new Gizmos();
         gizmo.Mode = TransformGizmoMode.Scale;
 
         gizmo.Draw(g, camera, Viewport);
 
-        Assert.Equal((3 * 5) + (3 * 4) + Gizmos.CircleSegments, g.LineCount);
+        Assert.Equal(12, g.LineCount);
+        Assert.NotEmpty(g.OverlayTriangles);
     }
 
     /// <summary>Rotate mode draws one arc per axis.</summary>
@@ -154,8 +155,8 @@ public class TransformGizmoTests
 
         gizmo.Draw(g, camera, Viewport);
 
-        // TransformGizmo.ArcSegments = 48 per ring.
-        Assert.Equal(3 * 48, g.LineCount);
+        Assert.Equal(3 * 64, g.LineCount);
+        Assert.All(g.OverlayLines, line => Assert.Equal(4f, line.Thickness));
     }
 
     /// <summary>With no node selected the gizmo draws nothing.</summary>

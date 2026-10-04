@@ -6,30 +6,14 @@ public sealed partial class TransformGizmo
     Quaternion rotationParentOrientation;
     Vector3 rotationAxis;
     Vector3 rotationPreviousDirection;
+    Vector3 rotationStartDirection;
     Vector2 rotationScreenTangent;
     Vector2 rotationPreviousScreen;
     float rotationAngle;
     bool rotationUsesPlane;
 
-    TransformGizmoAxis HitRotationRing(
-        Vector2 screenPos, ICamera camera, Vector2 viewportSize, Vector3 anchor, float radius)
-    {
-        var (x, y, z) = GetAxes();
-        var best = TransformGizmoAxis.None;
-        var bestDistance = hitThresholdPx;
-        Consider(TransformGizmoAxis.X, x);
-        Consider(TransformGizmoAxis.Y, y);
-        Consider(TransformGizmoAxis.Z, z);
-        return best;
-
-        void Consider(TransformGizmoAxis candidate, Vector3 normal)
-        {
-            var distance = DistanceToCircle(screenPos, camera, viewportSize, anchor, normal, radius);
-            if (distance >= bestDistance) return;
-            best = candidate;
-            bestDistance = distance;
-        }
-    }
+    float AppliedRotationAngle => SnapRotation > 0f
+        ? SnapValue(rotationAngle, SnapRotation * MathF.PI / 180f) : rotationAngle;
 
     void BeginRotation(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
@@ -47,8 +31,9 @@ public sealed partial class TransformGizmo
         rotationUsesPlane = MathF.Abs(Vector3.Dot(rotationAxis, camera.Front)) > 0.05f;
         rotationPreviousDirection = RotationDirection(screenPos, camera, viewportSize) ?? Vector3.Zero;
 
-        var radius = ComputeGizmoScale(camera, axisStartAnchorWorld) * 0.85f;
-        var direction = ClosestRingDirection(screenPos, camera, viewportSize, radius);
+        var radius = ComputeGizmoScale(camera, axisStartAnchorWorld, viewportSize) * rotationRadius;
+        var direction = ClosestRingDirection(screenPos, camera, viewportSize, axisStartAnchorWorld, rotationAxis, radius);
+        rotationStartDirection = rotationPreviousDirection.LengthSquared() > 0f ? rotationPreviousDirection : direction;
         var point = axisStartAnchorWorld + direction * radius;
         rotationScreenTangent = WorldToPixel(point + Vector3.Cross(rotationAxis, direction) * radius,
             camera, viewportSize) - WorldToPixel(point, camera, viewportSize);
@@ -75,9 +60,7 @@ public sealed partial class TransformGizmo
         }
 
         rotationPreviousScreen = screenPos;
-        var angle = rotationAngle;
-        if (SnapRotation > 0f) angle = SnapValue(angle, SnapRotation * MathF.PI / 180f);
-        var orientation = Quaternion.CreateFromAxisAngle(rotationAxis, angle) * rotationStartOrientation;
+        var orientation = Quaternion.CreateFromAxisAngle(rotationAxis, AppliedRotationAngle) * rotationStartOrientation;
         SelectedNode!.Orientation = Quaternion.Normalize(Quaternion.Inverse(rotationParentOrientation) * orientation);
         TransformEdited?.Invoke();
     }
@@ -93,16 +76,18 @@ public sealed partial class TransformGizmo
         return direction.LengthSquared() < 1e-9f ? null : Vector3.Normalize(direction);
     }
 
-    Vector3 ClosestRingDirection(Vector2 screenPos, ICamera camera, Vector2 viewportSize, float radius)
+    static Vector3 ClosestRingDirection(Vector2 screenPos, ICamera camera, Vector2 viewportSize, Vector3 anchor,
+        Vector3 normal, float radius)
     {
-        var (u, v) = OrthogonalBasis(rotationAxis);
+        var (u, v) = RingBasis(normal, anchor, camera);
+        var halfAngle = RingHalfAngle(normal, anchor, camera);
         var closest = u;
         var bestDistance = float.MaxValue;
-        for (var i = 0; i < arcSegments; i++)
+        for (var i = 0; i <= arcSegments; i++)
         {
-            var angle = MathF.Tau * i / arcSegments;
+            var angle = -halfAngle + halfAngle * 2f * i / arcSegments;
             var direction = u * MathF.Cos(angle) + v * MathF.Sin(angle);
-            var pixel = WorldToPixel(axisStartAnchorWorld + direction * radius, camera, viewportSize);
+            var pixel = WorldToPixel(anchor + direction * radius, camera, viewportSize);
             var distance = Vector2.DistanceSquared(screenPos, pixel);
             if (distance >= bestDistance) continue;
             closest = direction;

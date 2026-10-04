@@ -48,6 +48,7 @@ sealed class SceneViewport : IDisposable
 
     Action<object>? mutateNode;
     bool gizmoOwnsDrag;
+    bool showGizmoCursor;
     readonly ViewportGesture gesture = new();
     Vector2 pressPosition;
 
@@ -102,13 +103,17 @@ sealed class SceneViewport : IDisposable
     Vector2 ViewportSize => new(service?.Width ?? 0, service?.Height ?? 0);
 
     /// <summary>
-    /// Draws one frame into the current layout node. Everything happens in the render pass: the
-    /// node's rectangle — which sizes the offscreen target — is only resolved after layout.
+    /// Builds feedback nodes during layout and draws the scene during the render pass using the resolved rectangle.
+    /// Input is processed only in the render pass.
     /// </summary>
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            DrawGestureFeedback(gui);
+            return;
+        }
 
         if (failure is not null)
         {
@@ -123,6 +128,20 @@ sealed class SceneViewport : IDisposable
 
         HandleInput(gui, rect);
         RenderFrame(gui, rect);
+        DrawGestureFeedback(gui);
+    }
+
+    void DrawGestureFeedback(Gui gui)
+    {
+        var text = Gizmo.IsDragging && Gizmo.HandleMode == TransformGizmoMode.Rotate
+            ? $"{Gizmo.RotationDegrees:0.#}°" : string.Empty;
+        using (gui.Node(120f, 24f, "scene/rotationFeedback").Absolute(12f, 12f).Enter())
+            gui.DrawText(text, StudioTheme.Current.Text(13), StudioTheme.Current.Ink, centerInRect: false);
+        var pointer = gui.Input.MousePosition;
+        using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
+                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+            gui.DrawText(showGizmoCursor ? EditorIcons.Move : string.Empty,
+                StudioTheme.Current.Text(18), StudioTheme.Current.Ink);
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
@@ -181,10 +200,18 @@ sealed class SceneViewport : IDisposable
 
         var local = new Vector2(input.MousePosition.X - rect.X, input.MousePosition.Y - rect.Y);
         DispatchPointer(phase, local, hovered);
+        UpdateGizmoCursor(gui, hovered);
 
         if (hovered && input.MouseWheelDelta != 0f) controller.OnWheel(input.MouseWheelDelta);
         if (hovered || gesture.Active is not null) HandleKeyboard(input);
         else heldKeys.Clear();
+    }
+
+    void UpdateGizmoCursor(Gui gui, bool hovered)
+    {
+        showGizmoCursor = hovered && !playMode.IsActive && Gizmo.Axis != TransformGizmoAxis.None;
+        if (showGizmoCursor) gui.RequestPointerMode(PointerMode.Hidden);
+        if (!hovered && !gizmoOwnsDrag) Gizmo.ClearHover();
     }
 
     // Pushed every frame rather than wired to a change event: the assignments cost nothing, and an edit made

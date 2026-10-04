@@ -11,4 +11,7 @@ public enum TransformGizmoMode
 
     /// <summary>Rotate around an axis using its ring handle.</summary>
     Rotate,
+
+    /// <summary>Translation, rotation and scale handles displayed together.</summary>
+    Combined,
 }

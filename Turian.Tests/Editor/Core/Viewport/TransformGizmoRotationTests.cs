@@ -4,7 +4,7 @@ namespace Turian.Tests;
 public class TransformGizmoRotationTests
 {
     static readonly Vector2 Viewport = new(960f, 540f);
-    const float Radius = 5f * 0.15f * 0.85f;
+    static float Radius => 2f * 5f * 90f / (MathF.Sqrt(3f) * 540f) * 0.85f;
 
     /// <summary>Each rotation ring rotates its axis without changing position or scale.</summary>
     [Theory]
@@ -56,8 +56,9 @@ public class TransformGizmoRotationTests
         camera.IsOrthographic = true;
         camera.Frustum = 10f;
         var (u, v) = Basis(Vector3.UnitZ);
-
-        Drag(gizmo, camera, node.Position, u, v, 0.4f);
+        var radius = 20f * 90f / 540f * 0.85f;
+        gizmo.ProcessPointerDown(Pixel(camera, (u * MathF.Cos(0.6f) + v * MathF.Sin(0.6f)) * radius), camera, Viewport);
+        gizmo.ProcessPointerMove(Pixel(camera, (u * MathF.Cos(1f) + v * MathF.Sin(1f)) * radius), camera, Viewport);
 
         Assert.Equal(TransformGizmoAxis.Z, gizmo.Axis);
         AssertRotation(Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 0.4f), node.Orientation);

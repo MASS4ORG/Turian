@@ -7,7 +7,7 @@ namespace Turian.Engine.Core;
 /// <para>One instance is shared per Scene View (see <c>SceneViewerService.Gizmos</c>). The buffer is
 /// cleared at the start of every frame, so anything not redrawn disappears.</para>
 /// </summary>
-public sealed class Gizmos
+public sealed partial class Gizmos
 {
     /// <summary>The maximum number of line segments that can be recorded per frame.</summary>
     public const int MaxLines = 32_768;
@@ -49,11 +49,13 @@ public sealed class Gizmos
     /// </summary>
     public bool DepthTest { get; set; } = true;
 
-    /// <summary>Clears all lines recorded for the previous frame. Called once per frame before drawing.</summary>
+    /// <summary>Clears all primitives recorded for the previous frame. Called once per frame before drawing.</summary>
     public void Clear()
     {
         worldLines.Clear();
         overlayLines.Clear();
+        worldTriangles.Clear();
+        overlayTriangles.Clear();
         IsOverflow = false;
     }
 

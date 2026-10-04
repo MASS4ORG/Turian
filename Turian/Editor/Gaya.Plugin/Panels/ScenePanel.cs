@@ -97,6 +97,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             ModeButton(gui, gizmo, "Move", TransformGizmoMode.Translate);
             ModeButton(gui, gizmo, "Rotate", TransformGizmoMode.Rotate);
             ModeButton(gui, gizmo, "Scale", TransformGizmoMode.Scale);
+            ModeButton(gui, gizmo, "All", TransformGizmoMode.Combined);
 
             using (gui.Node(Theme.Scale(8f), ToolbarHeight).Enter()) { } // spacer
 
@@ -109,7 +110,13 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             using (gui.Node(34f, ToolbarHeight, "scene/toolbar/snapLabel").ContentAlignY(0.5f).Enter())
                 gui.DrawText("Snap", Theme.Text(11), Theme.InkDim, centerInRect: false);
 
-            SnapField(gui, gizmo);
+            if (gizmo.Mode == TransformGizmoMode.Combined)
+            {
+                SnapField(gui, gizmo, TransformGizmoMode.Translate, "M");
+                SnapField(gui, gizmo, TransformGizmoMode.Rotate, "R");
+                SnapField(gui, gizmo, TransformGizmoMode.Scale, "S");
+            }
+            else SnapField(gui, gizmo, gizmo.Mode);
             DrawCullingStats(gui);
         }
     }
@@ -124,10 +131,11 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
                 Theme.Text(11), Theme.InkDim, centerInRect: false);
     }
 
-    /// <summary>The snap step of whichever mode is selected, matching how StudioA's single box behaves.</summary>
-    static void SnapField(Gui gui, TransformGizmo gizmo)
+    /// <summary>Edits one operation's snap interval, with an optional label for the combined tool.</summary>
+    static void SnapField(Gui gui, TransformGizmo gizmo, TransformGizmoMode operation, string? label = null)
     {
-        var current = gizmo.Mode switch
+        if (label is not null) gui.DrawText(label, Theme.Text(11), Theme.InkDim);
+        var current = operation switch
         {
             TransformGizmoMode.Rotate => gizmo.SnapRotation,
             TransformGizmoMode.Scale => gizmo.SnapScale,
@@ -138,12 +146,17 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         var edited = gui.TextInput(text, width: SnapWidth, height: Theme.Scale(20f),
             fontSize: Theme.Text(11),
             backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
-            id: "scene/toolbar/snap", alignX: 1f);
+            id: label is null ? "scene/toolbar/snap" : $"scene/toolbar/snap/{operation}", alignX: 1f);
 
         if (string.Equals(edited, text, StringComparison.Ordinal)) return;
         if (!float.TryParse(edited, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)) return;
 
-        switch (gizmo.Mode)
+        SetSnapStep(gizmo, operation, value);
+    }
+
+    static void SetSnapStep(TransformGizmo gizmo, TransformGizmoMode operation, float value)
+    {
+        switch (operation)
         {
             case TransformGizmoMode.Rotate: gizmo.SnapRotation = value; break;
             case TransformGizmoMode.Scale: gizmo.SnapScale = value; break;

@@ -29,6 +29,13 @@ void main() {
     vec4 p1 = projection * view * vec4(aA, 1.0);
     vec4 p2 = projection * view * vec4(aB, 1.0);
 
+    // Filled primitives use their world vertex directly instead of expanding a line.
+    if (aThickness <= 0.0) {
+        gl_Position = p1;
+        gl_Position.z += push.depthOffset * p1.w;
+        return;
+    }
+
     // A vertex is at/behind the far plane in clip space when z >= w (NDC z in [0;1]).
     // Skip segments that are entirely beyond it.
     if (p1.z >= p1.w && p2.z >= p2.w) {
