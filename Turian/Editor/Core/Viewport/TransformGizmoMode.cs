@@ -9,6 +9,6 @@ public enum TransformGizmoMode
     /// <summary>Scale.</summary>
     Scale,
 
-    /// <summary>Rotate — visual arcs only, drag not yet implemented.</summary>
+    /// <summary>Rotate around an axis using its ring handle.</summary>
     Rotate,
 }

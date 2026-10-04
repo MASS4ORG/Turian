@@ -44,15 +44,15 @@ public class SceneCameraControllerTests
             $"Front {camera.Front} did not turn away from screen-right {screenRight}");
     }
 
-    /// <summary>Dragging the mouse up must tilt the view up.</summary>
+    /// <summary>Dragging up lowers pitch with inverted vertical look.</summary>
     [Fact]
-    public void FlyLook_DraggingUp_TiltsTheViewUp()
+    public void FlyLook_DraggingUp_LowersPitch()
     {
         var controller = FlyController(out var camera);
 
         controller.OnMouseMove(100f, 60f);
 
-        Assert.True(camera.Pitch > 0f, $"Pitch {camera.Pitch} did not rise");
+        Assert.True(camera.Pitch < 0f, $"Pitch {camera.Pitch} did not fall");
     }
 
     /// <summary>
@@ -75,60 +75,91 @@ public class SceneCameraControllerTests
         Assert.Equal(0f, upInView.X, 5);
     }
 
-    /// <summary>
-    /// A horizontal drag rotates about the camera's own up axis, so the view direction stays in the
-    /// plane the screen horizontal spans. Rotating about world up instead sweeps a cone — the arc
-    /// that made pitched-down navigation feel wrong.
-    /// </summary>
+    /// <summary>Horizontal look changes world yaw while preserving pitch and a level horizon.</summary>
     [Fact]
-    public void FlyLook_HorizontalDrag_DoesNotSweepAConeWhenPitched()
+    public void FlyLook_HorizontalDrag_PreservesPitchAndLevelHorizon()
     {
         var controller = FlyController(out var camera);
-        controller.OnMouseMove(100f, 40f);       // pitch up first
-        var localUp = camera.Up;
-        var pitchBefore = Vector3.Dot(camera.Front, localUp);
+        controller.OnMouseMove(100f, 40f);
+        var pitchBefore = camera.Pitch;
 
-        controller.OnMouseMove(220f, 40f);       // then drag purely horizontally
+        controller.OnMouseMove(220f, 40f);
 
-        // Rotating about the camera's own up cannot change the view's tilt relative to that axis.
-        Assert.Equal(pitchBefore, Vector3.Dot(camera.Front, localUp), 4);
+        Assert.Equal(pitchBefore, camera.Pitch, 4);
+        Assert.Equal(0f, camera.Right.Y, 5);
+        Assert.True(camera.Up.Y > 0f);
     }
 
-    /// <summary>
-    /// Dragging up keeps going past vertical instead of stopping at 90°, and the camera ends up
-    /// looking behind and below itself rather than jamming.
-    /// </summary>
-    [Fact]
-    public void FlyLook_DraggingFarUp_PassesOverTheTop()
+    /// <summary>Large vertical drags stop short of the poles and reverse immediately.</summary>
+    [Theory]
+    [InlineData(-1f)]
+    [InlineData(1f)]
+    public void FlyLook_LargeVerticalDrag_ClampsPitchAndCanReverse(float direction)
     {
         var controller = FlyController(out var camera);
-        var startFront = camera.Front;
+        controller.OnMouseMove(100f, 100f + direction * 40000f);
 
-        // Sensitivity is 0.005 rad/px, so 40 000 px of travel is a little over one full turn.
-        for (var i = 0; i < 200; i++)
-        {
-            controller.OnMouseMove(100f, 100f - ((i + 1) * 200f));
-        }
+        Assert.True(MathF.Abs(camera.Pitch) < MathF.PI / 2f);
+        Assert.True(camera.Up.Y > 0f);
+        Assert.Equal(direction, MathF.Sign(camera.Pitch));
+        var clampedPitch = MathF.Abs(camera.Pitch);
 
-        Assert.True(camera.Front.Y is > -1.01f and < 1.01f);
-        Assert.True(
-            Vector3.Dot(camera.Front, startFront) < 0.99f,
-            "the camera never left its starting direction, so rotation is still clamped");
+        controller.OnMouseMove(100f, 100f + direction * 39990f);
+
+        Assert.True(MathF.Abs(camera.Pitch) < clampedPitch);
     }
 
-    /// <summary>Rotation is free enough to end up upside down, which world-up yaw cannot reach.</summary>
+    /// <summary>Repeated mixed drags keep the horizon level and the camera upright.</summary>
     [Fact]
-    public void FlyLook_CanEndUpUpsideDown()
+    public void FlyLook_RepeatedMixedDrags_StaysUpright()
     {
         var controller = FlyController(out var camera);
 
-        // Half a turn of pitch: 180° / 0.005 rad per px = 36 000 px.
         for (var i = 0; i < 180; i++)
         {
-            controller.OnMouseMove(100f, 100f - ((i + 1) * 200f));
+            controller.OnMouseMove(100f + (i + 1) * 50f, 100f - (i + 1) * 200f);
+            Assert.True(camera.Up.Y > 0f);
+            Assert.Equal(0f, camera.Right.Y, 5);
         }
+    }
 
-        Assert.True(camera.Up.Y < 0f, $"camera up {camera.Up} is not inverted after half a turn");
+    /// <summary>The same pointer travel gives the same orientation from any press position.</summary>
+    [Theory]
+    [InlineData(0f, 0f)]
+    [InlineData(480f, 270f)]
+    [InlineData(850f, 490f)]
+    public void FlyLook_UsesPointerDeltaRegardlessOfPressPosition(float x, float y)
+    {
+        var controller = FlyController(out var camera);
+        camera.SetYawPitch(0.7f, -0.3f);
+        var position = camera.Position;
+        controller.OnMouseDown(x, y);
+        controller.OnMouseMove(x, y);
+        Assert.Equal(0.7f, camera.Yaw, 4);
+        Assert.Equal(-0.3f, camera.Pitch, 4);
+
+        controller.OnMouseMove(x + 40f, y + 20f);
+
+        Assert.Equal(0.5f, camera.Yaw, 4);
+        Assert.Equal(-0.2f, camera.Pitch, 4);
+        Assert.Equal(position, camera.Position);
+    }
+
+    /// <summary>Starting another drag records its press position without rotating the camera.</summary>
+    [Fact]
+    public void FlyLook_NewGesture_DoesNotJump()
+    {
+        var controller = FlyController(out var camera);
+        controller.OnMouseMove(150f, 130f);
+        controller.SetActiveButton(null);
+        controller.OnMouseUp();
+        var orientation = camera.Orientation;
+
+        controller.SetActiveButton(ViewportButton.Right);
+        controller.OnMouseDown(800f, 500f);
+        controller.OnMouseMove(800f, 500f);
+
+        Assert.True(MathF.Abs(Quaternion.Dot(orientation, camera.Orientation)) > 0.99999f);
     }
 
     /// <summary>Q/E move along the camera's own up axis, so they stay useful when it is rolled.</summary>

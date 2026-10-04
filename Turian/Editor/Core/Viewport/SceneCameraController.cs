@@ -15,6 +15,7 @@ namespace Turian.Editor.Core;
 public sealed class SceneCameraController
 {
     const float fastMoveMultiplier = 4f;
+    const float flyPitchLimit = 89f * MathF.PI / 180f;
 
     NavigationMode mode;
     float lastMouseX;
@@ -242,11 +243,10 @@ public sealed class SceneCameraController
         Camera.FarPlane = MathF.Max(Camera.FarPlane, (distance + radius * 2f) * 1.5f);
     }
 
-    // Rotation is about the camera's own axes, so a horizontal drag moves the view along the
-    // screen's horizontal instead of sweeping a cone around world up, and a vertical drag carries
-    // straight over the top. Screen Y grows downward, hence the negated dy.
+    // World-up yaw and bounded pitch keep free-flight navigation level through repeated drags.
     void FlyLook(float dx, float dy) =>
-        Camera.RotateLocal(dx * LookSensitivity, -dy * LookSensitivity);
+        Camera.SetYawPitch(Camera.Yaw - dx * LookSensitivity,
+            Math.Clamp(Camera.Pitch + dy * LookSensitivity, -flyPitchLimit, flyPitchLimit));
 
     void OrbitLook(float dx, float dy)
     {

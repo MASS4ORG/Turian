@@ -52,7 +52,6 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         var document = workspace.Active;
         if (document?.Asset is null)
         {
-            gui.DrawText("Open a scene to edit it here.", Theme.Text(12), Theme.InkDim, centerInRect: false);
             return;
         }
 

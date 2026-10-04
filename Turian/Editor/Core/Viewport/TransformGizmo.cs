@@ -4,8 +4,7 @@ namespace Turian.Editor.Core;
 /// Interactive transform gizmo for the Scene View.
 /// Drawn by <see cref="Draw"/> and driven by pointer events routed from <c>SceneViewerControl</c>.
 ///
-/// <para>Translation and scale support axis/uniform dragging with optional snapping. Rotation is
-/// visual only (arcs) — drag is not yet implemented.</para>
+/// <para>Translation, rotation and scale support axis dragging with optional snapping.</para>
 /// </summary>
 public sealed partial class TransformGizmo
 {
@@ -85,6 +84,7 @@ public sealed partial class TransformGizmo
         axisStartAnchorWorld = SelectedNode.GlobalTransform.Position;
         axisStartNodePosition = SelectedNode.Transform.Position;
         axisStartNodeScale = SelectedNode.Transform.Scale;
+        if (Mode == TransformGizmoMode.Rotate) BeginRotation(screenPos, camera, viewportSize);
         DragStarted?.Invoke();
     }
 
@@ -100,6 +100,12 @@ public sealed partial class TransformGizmo
             return;
         }
 
+        if (Mode == TransformGizmoMode.Rotate)
+        {
+            ApplyRotation(screenPos, camera, viewportSize);
+            return;
+        }
+
         var hitWorld = IntersectScreenPlane(screenPos, camera, viewportSize, axisStartAnchorWorld);
         if (hitWorld is null) return;
 
@@ -111,8 +117,6 @@ public sealed partial class TransformGizmo
             case TransformGizmoMode.Scale:
                 ApplyScale(screenPos);
                 break;
-            case TransformGizmoMode.Rotate:
-                break; // drag not yet implemented
         }
     }
 
@@ -275,82 +279,79 @@ public sealed partial class TransformGizmo
     {
         var anchor = SelectedNode!.GlobalTransform.Position;
         var gizmoScale = ComputeGizmoScale(camera, anchor);
-        var (localX, localY, localZ) = GetAxes();
-        var anchorPx = WorldToPixel(anchor, camera, viewportSize);
-
         if (Mode is TransformGizmoMode.Translate or TransformGizmoMode.Scale)
-        {
-            // Axis handles.
-            var xEnd = WorldToPixel(anchor + localX * gizmoScale, camera, viewportSize);
-            var yEnd = WorldToPixel(anchor + localY * gizmoScale, camera, viewportSize);
-            var zEnd = WorldToPixel(anchor + localZ * gizmoScale, camera, viewportSize);
-
-            var best = TransformGizmoAxis.None;
-            var bestDist = hitThresholdPx;
-            var dX = DistToSegment(screenPos, anchorPx, xEnd);
-            var dY = DistToSegment(screenPos, anchorPx, yEnd);
-            var dZ = DistToSegment(screenPos, anchorPx, zEnd);
-            if (dX < bestDist) { best = TransformGizmoAxis.X; bestDist = dX; }
-            if (dY < bestDist) { best = TransformGizmoAxis.Y; bestDist = dY; }
-            if (dZ < bestDist) best = TransformGizmoAxis.Z;
-            if (best != TransformGizmoAxis.None) return best;
-
-            // Plane handles (square defined by anchor, a, b, c = a + b).
-            var planeSize = gizmoScale * 0.4f;
-            var xaPx = WorldToPixel(anchor + localX * planeSize, camera, viewportSize);
-            var ybPx = WorldToPixel(anchor + localY * planeSize, camera, viewportSize);
-            var xyPx = WorldToPixel(anchor + localX * planeSize + localY * planeSize, camera, viewportSize);
-            if (PointInQuad(screenPos, anchorPx, xaPx, ybPx, xyPx)) return TransformGizmoAxis.Xy;
-
-            var xzPx = WorldToPixel(anchor + localX * planeSize + localZ * planeSize, camera, viewportSize);
-            var zPx = WorldToPixel(anchor + localZ * planeSize, camera, viewportSize);
-            if (PointInQuad(screenPos, anchorPx, xaPx, zPx, xzPx)) return TransformGizmoAxis.Xz;
-
-            var yzPx = WorldToPixel(anchor + localY * planeSize + localZ * planeSize, camera, viewportSize);
-            if (PointInQuad(screenPos, anchorPx, ybPx, zPx, yzPx)) return TransformGizmoAxis.Yz;
-
-            // Center handle (uniform scale).
-            if (Mode == TransformGizmoMode.Scale &&
-                Vector2.Distance(screenPos, anchorPx) < centerHitRadiusPx)
-            {
-                return TransformGizmoAxis.Center;
-            }
-        }
+            return HitLinearHandles(screenPos, camera, viewportSize, anchor, gizmoScale);
 
         if (Mode == TransformGizmoMode.Rotate)
-        {
-            var radius = gizmoScale * 0.85f;
-            if (HitCircle(screenPos, camera, viewportSize, anchor, localX, radius, TransformGizmoAxis.X))
-                return TransformGizmoAxis.X;
-            if (HitCircle(screenPos, camera, viewportSize, anchor, localY, radius, TransformGizmoAxis.Y))
-                return TransformGizmoAxis.Y;
-            if (HitCircle(screenPos, camera, viewportSize, anchor, localZ, radius, TransformGizmoAxis.Z))
-                return TransformGizmoAxis.Z;
-        }
+            return HitRotationRing(screenPos, camera, viewportSize, anchor, gizmoScale * 0.85f);
 
         return TransformGizmoAxis.None;
     }
 
-    static bool HitCircle(
+    TransformGizmoAxis HitLinearHandles(
+        Vector2 screenPos, ICamera camera, Vector2 viewportSize, Vector3 anchor, float scale)
+    {
+        var (x, y, z) = GetAxes();
+        var anchorPx = WorldToPixel(anchor, camera, viewportSize);
+        var best = TransformGizmoAxis.None;
+        var bestDistance = hitThresholdPx;
+        Consider(TransformGizmoAxis.X, x);
+        Consider(TransformGizmoAxis.Y, y);
+        Consider(TransformGizmoAxis.Z, z);
+        if (best != TransformGizmoAxis.None) return best;
+
+        var plane = HitPlaneHandles(screenPos, camera, viewportSize, anchor, scale * 0.4f);
+        if (plane != TransformGizmoAxis.None) return plane;
+        return Mode == TransformGizmoMode.Scale && Vector2.Distance(screenPos, anchorPx) < centerHitRadiusPx
+            ? TransformGizmoAxis.Center : TransformGizmoAxis.None;
+
+        void Consider(TransformGizmoAxis candidate, Vector3 direction)
+        {
+            var end = WorldToPixel(anchor + direction * scale, camera, viewportSize);
+            var distance = DistToSegment(screenPos, anchorPx, end);
+            if (distance >= bestDistance) return;
+            best = candidate;
+            bestDistance = distance;
+        }
+    }
+
+    TransformGizmoAxis HitPlaneHandles(
+        Vector2 screenPos, ICamera camera, Vector2 viewportSize, Vector3 anchor, float size)
+    {
+        var (x, y, z) = GetAxes();
+        var anchorPx = WorldToPixel(anchor, camera, viewportSize);
+        var xaPx = WorldToPixel(anchor + x * size, camera, viewportSize);
+        var ybPx = WorldToPixel(anchor + y * size, camera, viewportSize);
+        var xyPx = WorldToPixel(anchor + x * size + y * size, camera, viewportSize);
+        if (PointInQuad(screenPos, anchorPx, xaPx, ybPx, xyPx)) return TransformGizmoAxis.Xy;
+
+        var xzPx = WorldToPixel(anchor + x * size + z * size, camera, viewportSize);
+        var zPx = WorldToPixel(anchor + z * size, camera, viewportSize);
+        if (PointInQuad(screenPos, anchorPx, xaPx, zPx, xzPx)) return TransformGizmoAxis.Xz;
+
+        var yzPx = WorldToPixel(anchor + y * size + z * size, camera, viewportSize);
+        return PointInQuad(screenPos, anchorPx, ybPx, zPx, yzPx) ? TransformGizmoAxis.Yz : TransformGizmoAxis.None;
+    }
+
+    static float DistanceToCircle(
         Vector2 screenPos,
         ICamera camera,
         Vector2 viewportSize,
         Vector3 anchor,
         Vector3 normal,
-        float radius,
-        TransformGizmoAxis axis)
+        float radius)
     {
-        _ = axis;
         var (u, v) = OrthogonalBasis(normal);
+        var distance = float.MaxValue;
         var prev = WorldToPixel(anchor + u * radius, camera, viewportSize);
         for (var i = 1; i <= arcSegments; i++)
         {
             var a = (MathF.PI * 2f * i) / arcSegments;
             var cur = WorldToPixel(anchor + (u * MathF.Cos(a) + v * MathF.Sin(a)) * radius, camera, viewportSize);
-            if (DistToSegment(screenPos, prev, cur) < hitThresholdPx) return true;
+            distance = MathF.Min(distance, DistToSegment(screenPos, prev, cur));
             prev = cur;
         }
-        return false;
+        return distance;
     }
 
     // ── Drag logic ────────────────────────────────────────────────────────────────────────────
@@ -424,7 +425,7 @@ public sealed partial class TransformGizmo
     {
         if (Space == TransformGizmoSpace.Local && SelectedNode is not null)
         {
-            var q = SelectedNode.Transform.Orientation;
+            var q = SelectedNode.GlobalTransform.Orientation;
             return (
                 Vector3.Transform(Vector3.UnitX, q),
                 Vector3.Transform(Vector3.UnitY, q),
