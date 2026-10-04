@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>Controls the reference grid's plane, spacing, emphasis and origin axes.</summary>
-[EditorSetting("Scene Viewer/Grid", Description = "Reference grid spacing and world axes.")]
+[EditorSetting("Scene Viewer/Grid")]
 public sealed class SceneGridSettings
 {
     /// <summary>Gets or sets whether the reference grid is visible.</summary>

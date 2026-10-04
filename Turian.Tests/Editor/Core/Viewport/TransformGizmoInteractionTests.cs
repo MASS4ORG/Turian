@@ -69,7 +69,7 @@ public sealed class TransformGizmoInteractionTests
         var start = Pixel(camera, new Vector3(Scale * 0.33f, Scale * 0.33f, 0));
         gizmo.ProcessPointerDown(start, camera, Viewport);
         Assert.Equal(TransformGizmoAxis.Xy, gizmo.Axis);
-        gizmo.ProcessPointerMove(start + new Vector2(-90, 90), camera, Viewport);
+        gizmo.ProcessPointerMove(start + new Vector2(-90, -90), camera, Viewport);
         Assert.Equal(new Vector3(2, 2, 1), node.Scale);
     }
 
@@ -151,6 +151,28 @@ public sealed class TransformGizmoInteractionTests
             return drawing.OverlayTriangles.SelectMany(triangle => new[] { triangle.A, triangle.B, triangle.C })
                 .Max(point => MathF.Abs(Pixel(camera, point).X - 480));
         }
+    }
+
+    /// <summary>The upper Y handle increases world height or Y scale when dragged upward.</summary>
+    [Theory]
+    [InlineData(TransformGizmoMode.Translate, false)]
+    [InlineData(TransformGizmoMode.Translate, true)]
+    [InlineData(TransformGizmoMode.Scale, false)]
+    [InlineData(TransformGizmoMode.Scale, true)]
+    public void YHandleAbovePivot_DraggingUpIncreasesY(TransformGizmoMode mode, bool orthographic)
+    {
+        var (camera, node, gizmo) = Create(mode);
+        camera.IsOrthographic = orthographic;
+        var start = Viewport * 0.5f - new Vector2(0, 60);
+        gizmo.ProcessPointerDown(start, camera, Viewport);
+        Assert.True(gizmo.IsDragging);
+        Assert.Equal(TransformGizmoAxis.Y, gizmo.Axis);
+        gizmo.ProcessPointerMove(start - new Vector2(0, 30), camera, Viewport);
+        Assert.True(mode == TransformGizmoMode.Translate ? node.Position.Y > 0f : node.Scale.Y > 1f);
+        Assert.Equal(0f, node.Position.X);
+        Assert.Equal(0f, node.Position.Z);
+        Assert.Equal(1f, node.Scale.X);
+        Assert.Equal(1f, node.Scale.Z);
     }
 
     static Vector2 Pixel(EditorCamera camera, Vector3 point) =>

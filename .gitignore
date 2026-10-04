@@ -33,6 +33,7 @@ coverage/
 .publish/
 *.trx
 *.user
+.local
 
 # OS
 .DS_Store

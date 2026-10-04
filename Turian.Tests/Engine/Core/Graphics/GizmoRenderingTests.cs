@@ -118,6 +118,30 @@ public sealed class GizmoRenderingTests(VulkanFixture fixture) : IClassFixture<V
         Assert.Equal(crossing, Pixels(viewer, scene));
     }
 
+    /// <summary>The rendered green Y shaft is above the pivot in both camera projections.</summary>
+    [Theory]
+    [InlineData(TransformGizmoMode.Translate, false)]
+    [InlineData(TransformGizmoMode.Translate, true)]
+    [InlineData(TransformGizmoMode.Scale, false)]
+    [InlineData(TransformGizmoMode.Scale, true)]
+    public void YHandleRendersAbovePivot(TransformGizmoMode mode, bool orthographic)
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), 256, 256);
+        viewer.Camera.Position = new Vector3(0, 0, -5);
+        viewer.Camera.IsOrthographic = orthographic;
+        var scene = new Node();
+        var baseline = Pixels(viewer, scene);
+        var gizmo = new TransformGizmo { SelectedNode = new Node(), Mode = mode };
+        viewer.OnPopulateGizmos = drawing => gizmo.Draw(drawing, viewer.Camera, new Vector2(256));
+        var result = Pixels(viewer, scene);
+        var upper = (80 * 256 + 128) * 4;
+        var lower = (176 * 256 + 128) * 4;
+        Assert.NotEqual(baseline.AsSpan(upper, 4).ToArray(), result.AsSpan(upper, 4).ToArray());
+        Assert.Equal(baseline.AsSpan(lower, 4).ToArray(), result.AsSpan(lower, 4).ToArray());
+        Assert.True(result[upper + 1] > result[upper] && result[upper + 1] > result[upper + 2]);
+    }
+
     static byte[] Pixels(SceneViewerService viewer, Node scene)
     {
         viewer.Render(scene, 0.016);

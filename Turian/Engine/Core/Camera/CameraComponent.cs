@@ -267,6 +267,7 @@ public class CameraComponent : Component, ICamera
         if (UsePerspective)
         {
             var proj = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfView, aspect, NearPlane, FarPlane);
+            proj.M22 = -proj.M22;
 
             proj.M31 += jitter.X;
             proj.M32 += jitter.Y;

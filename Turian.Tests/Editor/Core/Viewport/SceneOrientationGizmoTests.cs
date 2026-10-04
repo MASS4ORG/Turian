@@ -93,6 +93,8 @@ public sealed class SceneOrientationGizmoTests
         Assert.Null(SceneOrientationGizmo.HitTest(camera, new Vector2(100)));
         Assert.Equal(3, SceneOrientationGizmo.Faces(camera).Length);
         camera.LookIn(Vector3.UnitZ, Vector3.UnitY);
+        Assert.True(SceneOrientationGizmo.Markers(camera).Single(marker => marker.Direction == Vector3.UnitY)
+            .Offset.Y < 0f);
         Assert.Single(SceneOrientationGizmo.Faces(camera));
         Assert.Equal(Vector3.Zero, SceneOrientationGizmo.HitTest(camera, Vector2.Zero));
     }
