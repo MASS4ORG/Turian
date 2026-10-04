@@ -12,7 +12,7 @@ public sealed partial class TransformGizmo
     float rotationAngle;
     bool rotationUsesPlane;
 
-    float AppliedRotationAngle => SnapRotation > 0f
+    float AppliedRotationAngle => SnapEnabled && SnapRotation > 0f
         ? SnapValue(rotationAngle, SnapRotation * MathF.PI / 180f) : rotationAngle;
 
     void BeginRotation(Vector2 screenPos, ICamera camera, Vector2 viewportSize)

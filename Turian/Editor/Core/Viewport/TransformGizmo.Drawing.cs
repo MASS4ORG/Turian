@@ -7,13 +7,13 @@ public sealed partial class TransformGizmo
     {
         ArgumentNullException.ThrowIfNull(gizmos);
         ArgumentNullException.ThrowIfNull(camera);
-        if (SelectedNode is null) return;
+        if (!CanInteract) return;
         var state = (gizmos.DepthTest, gizmos.Matrix, gizmos.Color, gizmos.Thickness);
         try
         {
             gizmos.DepthTest = false;
             gizmos.Matrix = Matrix4x4.Identity;
-            var anchor = SelectedNode.GlobalTransform.Position;
+            var anchor = SelectedNode!.GlobalTransform.Position;
             var scale = ComputeGizmoScale(camera, anchor, viewportSize);
             if (Mode != TransformGizmoMode.Rotate) DrawLinearHandles(gizmos, anchor, scale);
             if (Mode is TransformGizmoMode.Rotate or TransformGizmoMode.Combined)

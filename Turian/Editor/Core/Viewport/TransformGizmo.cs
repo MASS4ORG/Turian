@@ -11,9 +11,9 @@ public sealed partial class TransformGizmo
     const float rotationRadius = 0.85f;
     const int arcSegments = 64;
 
-    static readonly Vector4 XColor = new(0.96f, 0.36f, 0.40f, 1f);
-    static readonly Vector4 YColor = new(0.35f, 0.89f, 0.55f, 1f);
-    static readonly Vector4 ZColor = new(0.28f, 0.55f, 1f, 1f);
+    Vector4 XColor => Settings.AxisColor(Vector3.UnitX);
+    Vector4 YColor => Settings.AxisColor(Vector3.UnitY);
+    Vector4 ZColor => Settings.AxisColor(Vector3.UnitZ);
     static readonly Vector4 HoverColor = new(1f, 0.87f, 0.52f, 1f);
     static readonly Vector4 CenterColor = new(0.86f, 0.89f, 0.95f, 1f);
     static readonly Vector4 DragColor = Vector4.One;
@@ -37,6 +37,12 @@ public sealed partial class TransformGizmo
     /// <summary>Gets or sets whether the gizmo uses world or local axes.</summary>
     public TransformGizmoSpace Space { get; set; } = TransformGizmoSpace.World;
 
+    /// <summary>Gets or sets the shared Scene view gizmo colors and visibility.</summary>
+    public SceneGizmoSettings Settings { get; set; } = new();
+
+    /// <summary>Gets or sets whether snapping applies, retaining the individual snap intervals.</summary>
+    public bool SnapEnabled { get; set; } = true;
+
     /// <summary>Gets or sets the translation snap interval. Zero disables snapping.</summary>
     public float SnapTranslation { get; set; } = 1f;
 
@@ -58,6 +64,8 @@ public sealed partial class TransformGizmo
     /// <summary>Gets whether a transform gesture is active.</summary>
     public bool IsDragging => isDragging;
 
+    bool CanInteract => SelectedNode is not null && Settings.Visible && Mode != TransformGizmoMode.Select;
+
     /// <summary>Gets the snapped rotation angle of the active gesture in degrees.</summary>
     public float RotationDegrees => AppliedRotationAngle * 180f / MathF.PI;
 
@@ -74,7 +82,7 @@ public sealed partial class TransformGizmo
     public void ProcessPointerDown(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
         ArgumentNullException.ThrowIfNull(camera);
-        if (SelectedNode is null || isDragging) return;
+        if (!CanInteract || isDragging) return;
         var hit = HitTest(screenPos, camera, viewportSize);
         if (hit.Axis == TransformGizmoAxis.None) return;
 
@@ -82,7 +90,7 @@ public sealed partial class TransformGizmo
         handleMode = hit.Mode;
         isDragging = true;
         pointerScreen = dragStartScreen = screenPos;
-        axisStartAnchorWorld = SelectedNode.GlobalTransform.Position;
+        axisStartAnchorWorld = SelectedNode!.GlobalTransform.Position;
         axisStartNodeScale = SelectedNode.Scale;
         (dragX, dragY, dragZ) = GetAxes();
         axisStartPointerWorld = IntersectScreenPlane(screenPos, camera, viewportSize, axisStartAnchorWorld)
@@ -108,7 +116,11 @@ public sealed partial class TransformGizmo
     {
         ArgumentNullException.ThrowIfNull(camera);
         pointerScreen = screenPos;
-        if (SelectedNode is null) return;
+        if (!CanInteract)
+        {
+            ClearHover();
+            return;
+        }
         if (!isDragging)
         {
             var hit = HitTest(screenPos, camera, viewportSize);
@@ -157,14 +169,15 @@ public sealed partial class TransformGizmo
         TransformEdited?.Invoke();
     }
 
-    float SnapDistance(float distance) => SnapTranslation > 0f ? SnapValue(distance, SnapTranslation) : distance;
+    float SnapDistance(float distance) =>
+        SnapEnabled && SnapTranslation > 0f ? SnapValue(distance, SnapTranslation) : distance;
 
     void ApplyScale(Vector2 screenPos)
     {
         var delta = screenPos - dragStartScreen;
         var amount = axis == TransformGizmoAxis.Center ? (delta.X - delta.Y) * 0.005f : ScaleTravel(delta);
         var factor = 1f + amount;
-        if (SnapScale > 0f) factor = SnapValue(factor, SnapScale);
+        if (SnapEnabled && SnapScale > 0f) factor = SnapValue(factor, SnapScale);
         factor = MathF.Max(factor, 0.01f);
         var mask = AxisMask(axis);
         SelectedNode!.Scale = axisStartNodeScale * (Vector3.One + mask * (factor - 1f));

@@ -11,12 +11,15 @@ public static class GroundGrid
     public const int MajorEvery = 10;
 
     static readonly SceneGridSettings Defaults = new();
+    static readonly SceneGizmoSettings DefaultColors = new();
 
     /// <summary>Draws the configured grid around the camera while preserving the caller's drawing state.</summary>
-    public static void Draw(Gizmos gizmos, Vector3 cameraPosition, SceneGridSettings? settings = null)
+    public static void Draw(Gizmos gizmos, Vector3 cameraPosition, SceneGridSettings? settings = null,
+        SceneGizmoSettings? colors = null)
     {
         ArgumentNullException.ThrowIfNull(gizmos);
         settings ??= Defaults;
+        colors ??= DefaultColors;
         if (!settings.Visible) return;
         var state = (gizmos.Color, gizmos.Thickness, gizmos.Matrix, gizmos.DepthTest);
         try
@@ -32,14 +35,14 @@ public static class GroundGrid
             for (var i = -count; i <= count; i++)
             {
                 DrawLine(gizmos, u * ((originU + i) * cell) + v * (originV * cell - extent),
-                    u * ((originU + i) * cell) + v * (originV * cell + extent), originU + i, v, settings);
+                    u * ((originU + i) * cell) + v * (originV * cell + extent), originU + i, v, settings, colors);
                 DrawLine(gizmos, v * ((originV + i) * cell) + u * (originU * cell - extent),
-                    v * ((originV + i) * cell) + u * (originU * cell + extent), originV + i, u, settings);
+                    v * ((originV + i) * cell) + u * (originU * cell + extent), originV + i, u, settings, colors);
             }
             if (settings.ShowNormalAxis)
             {
                 var normal = Vector3.Cross(u, v);
-                gizmos.Color = AxisColor(normal, settings.AxisOpacity);
+                gizmos.Color = colors.AxisColor(normal, settings.AxisOpacity);
                 gizmos.Thickness = settings.AxisThickness;
                 gizmos.DrawLine(-normal * extent, normal * extent);
             }
@@ -58,11 +61,11 @@ public static class GroundGrid
     };
 
     static void DrawLine(Gizmos gizmos, Vector3 from, Vector3 to, int index, Vector3 direction,
-        SceneGridSettings settings)
+        SceneGridSettings settings, SceneGizmoSettings colors)
     {
         if (index == 0 && settings.ShowPlaneAxes)
         {
-            gizmos.Color = AxisColor(direction, settings.AxisOpacity);
+            gizmos.Color = colors.AxisColor(direction, settings.AxisOpacity);
             gizmos.Thickness = settings.AxisThickness;
         }
         else if (index % Math.Max(1, settings.MajorEvery) == 0)
@@ -83,8 +86,4 @@ public static class GroundGrid
         gizmos.DrawLine(from, to);
     }
 
-    static Vector4 AxisColor(Vector3 axis, float opacity) =>
-        new(MathF.Abs(axis.X) * 0.9f + MathF.Abs(axis.Y) * 0.3f + MathF.Abs(axis.Z) * 0.25f,
-            MathF.Abs(axis.X) * 0.3f + MathF.Abs(axis.Y) * 0.85f + MathF.Abs(axis.Z) * 0.55f,
-            MathF.Abs(axis.X) * 0.35f + MathF.Abs(axis.Y) * 0.5f + MathF.Abs(axis.Z) * 0.95f, opacity);
 }

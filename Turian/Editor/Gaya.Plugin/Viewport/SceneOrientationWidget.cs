@@ -4,10 +4,13 @@ namespace Gaya.Plugin.Turian;
 sealed class SceneOrientationWidget
 {
     readonly EditorCamera initialCamera = new();
+    SceneGizmoSettings settings = new();
+    bool frameVisible;
 
     /// <summary>Draws stable layout nodes for the cube and signed axes in both GUI passes.</summary>
-    public void Render(Gui gui, SceneCameraController? controller, Node? selected)
+    public void Render(Gui gui, SceneCameraController? controller, Node? selected, SceneGizmoSettings? preferences = null)
     {
+        if (!BeginFrame(gui, preferences)) return;
         using (gui.Node(-1, 104, "scene/orientationHost").ExpandWidth().Absolute(0, 0)
                    .Direction(Axis.Vertical).ContentAlignX(1f).ContentAlignY(0f).Padding(12).Enter())
         using (gui.Node(SceneOrientationGizmo.Size, SceneOrientationGizmo.Size, "scene/orientation")
@@ -24,7 +27,14 @@ sealed class SceneOrientationWidget
         }
     }
 
-    static void DrawContents(Gui gui, Vector2 center, EditorCamera camera, Vector3? hit)
+    bool BeginFrame(Gui gui, SceneGizmoSettings? preferences)
+    {
+        settings = preferences ?? settings;
+        if (gui.Pass == Pass.Pass1Build) frameVisible = settings.ShowOrientation;
+        return frameVisible;
+    }
+
+    void DrawContents(Gui gui, Vector2 center, EditorCamera camera, Vector3? hit)
     {
         var markers = SceneOrientationGizmo.Markers(camera);
         foreach (var marker in markers.Where(marker => marker.Depth >= 0))
@@ -60,7 +70,7 @@ sealed class SceneOrientationWidget
         }
     }
 
-    static void DrawMarker(Gui gui, Vector2 center, SceneOrientationGizmo.Marker marker, Vector3? hit)
+    void DrawMarker(Gui gui, Vector2 center, SceneOrientationGizmo.Marker marker, Vector3? hit)
     {
         if (!marker.IsVisible) return;
         var positive = Vector3.Dot(marker.Direction, Vector3.One) > 0;
@@ -84,12 +94,9 @@ sealed class SceneOrientationWidget
                 StudioTheme.Current.Text(Math.Clamp(marker.Radius * 1.25f, 8f, 11f)), StudioTheme.Current.Chrome);
     }
 
-    static GuiColor AxisColor(Vector3 direction) =>
-        GuiColor.FromArgb(255,
-            (int)((MathF.Abs(direction.X) * 0.96f + MathF.Abs(direction.Y) * 0.35f
-                + MathF.Abs(direction.Z) * 0.28f) * 255),
-            (int)((MathF.Abs(direction.X) * 0.36f + MathF.Abs(direction.Y) * 0.89f
-                + MathF.Abs(direction.Z) * 0.55f) * 255),
-            (int)((MathF.Abs(direction.X) * 0.4f + MathF.Abs(direction.Y) * 0.55f
-                + MathF.Abs(direction.Z)) * 255));
+    GuiColor AxisColor(Vector3 direction)
+    {
+        var color = settings.AxisColor(direction);
+        return GuiColor.FromArgb(255, (int)(color.X * 255), (int)(color.Y * 255), (int)(color.Z * 255));
+    }
 }

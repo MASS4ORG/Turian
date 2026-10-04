@@ -8,6 +8,9 @@ public class StudioContributionsTests
     public void SceneGridSettingsPageSharesViewportPreferences()
     {
         var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<IShortcutService>());
+        services.AddSingleton(Substitute.For<IFocusTracker>());
+        services.AddSingleton(Substitute.For<IEditorSettings>());
         var pages = new List<SettingsPageDescriptor>();
         var context = Substitute.For<IPluginContext>();
         context.CommandLineArgs.Returns([]);
@@ -17,10 +20,13 @@ public class StudioContributionsTests
         new GayaPlugin().Configure(context);
         var page = Assert.Single(pages, item => item.Id == "gaya.turian.sceneGrid");
         var settings = Assert.IsType<SceneGridSettings>(page.Target);
-        var camera = Assert.IsType<EditorCameraSettings>(services
-            .Single(item => item.ServiceType == typeof(EditorCameraSettings)).ImplementationInstance);
+        using var provider = services.BuildServiceProvider();
+        var camera = provider.GetRequiredService<EditorCameraSettings>();
         Assert.Same(settings, camera.Grid);
         Assert.Equal("Scene Viewer/Grid", page.Path);
+        Assert.Same(camera.Gizmos, pages.Single(item => item.Id == "gaya.turian.sceneGizmos").Target);
+        Assert.Same(camera.Tools, pages.Single(item => item.Id == "gaya.turian.sceneTransform").Target);
+        Assert.NotNull(camera.Navigation);
         settings.CellSize = 3;
         settings.HalfExtent = 5;
         var drawing = new Gizmos();

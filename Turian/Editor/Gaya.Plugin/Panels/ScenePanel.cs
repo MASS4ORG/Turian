@@ -12,7 +12,10 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
     static StudioTheme Theme => StudioTheme.Current;
 
     static float ToolbarHeight => Theme.Scale(26f);
-    static float SnapWidth => Theme.Scale(64f);
+    readonly SceneToolbar toolbar = new(viewport, () =>
+    {
+        if (inspector.SelectedNode is { } selected) sceneTree.RequestFrameNode(selected);
+    });
 
     /// <inheritdoc />
     public void Render(Gui gui)
@@ -28,7 +31,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
             if (prefabStage.Trail.Count > 0) Breadcrumb(gui);
-            Toolbar(gui);
+            toolbar.Render(gui);
 
             using (gui.Node().Expand().Enter())
                 viewport.Render(gui);
@@ -37,6 +40,9 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
 
     /// <summary>The viewport's transform gizmo, which the panel's W / E / R shortcuts switch modes on.</summary>
     public TransformGizmo Gizmo => viewport.Gizmo;
+
+    /// <summary>Moves the Scene camera once in the requested navigation direction.</summary>
+    public void MoveCamera(int direction) => viewport.MoveCamera(direction);
 
     /// <summary>Frames the selected node in the viewport. What the panel's F shortcut runs.</summary>
     public void FrameSelected()
@@ -83,90 +89,6 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
         }
 
         if (returnTo >= 0) prefabStage.Return(returnTo);
-    }
-
-    void Toolbar(Gui gui)
-    {
-        var gizmo = viewport.Gizmo;
-
-        using (gui.Node(-1, ToolbarHeight, "scene/toolbar").ExpandWidth().Direction(Axis.Horizontal)
-                   .Padding(4f, 3f).Gap(3f).Enter())
-        {
-            gui.DrawBackgroundRect(Theme.Chrome);
-
-            ModeButton(gui, gizmo, "Move", TransformGizmoMode.Translate);
-            ModeButton(gui, gizmo, "Rotate", TransformGizmoMode.Rotate);
-            ModeButton(gui, gizmo, "Scale", TransformGizmoMode.Scale);
-            ModeButton(gui, gizmo, "All", TransformGizmoMode.Combined);
-
-            using (gui.Node(Theme.Scale(8f), ToolbarHeight).Enter()) { } // spacer
-
-            var isWorld = gizmo.Space == TransformGizmoSpace.World;
-            if (Button(gui, isWorld ? "Global" : "Local", "scene/toolbar/space", selected: false))
-                gizmo.Space = isWorld ? TransformGizmoSpace.Local : TransformGizmoSpace.World;
-
-            using (gui.Node(Theme.Scale(8f), ToolbarHeight).Enter()) { } // spacer
-
-            using (gui.Node(34f, ToolbarHeight, "scene/toolbar/snapLabel").ContentAlignY(0.5f).Enter())
-                gui.DrawText("Snap", Theme.Text(11), Theme.InkDim, centerInRect: false);
-
-            if (gizmo.Mode == TransformGizmoMode.Combined)
-            {
-                SnapField(gui, gizmo, TransformGizmoMode.Translate, "M");
-                SnapField(gui, gizmo, TransformGizmoMode.Rotate, "R");
-                SnapField(gui, gizmo, TransformGizmoMode.Scale, "S");
-            }
-            else SnapField(gui, gizmo, gizmo.Mode);
-            DrawCullingStats(gui);
-        }
-    }
-
-    void DrawCullingStats(Gui gui)
-    {
-        var stats = viewport.CullingStats;
-        if (stats.Total == 0) return;
-        using (gui.Node(-1, ToolbarHeight, "scene/toolbar/culling").ExpandWidth()
-                   .ContentAlignX(1f).ContentAlignY(0.5f).Enter())
-            gui.DrawText($"{stats.Submitted} drawn · {stats.Culled}/{stats.Total} culled",
-                Theme.Text(11), Theme.InkDim, centerInRect: false);
-    }
-
-    /// <summary>Edits one operation's snap interval, with an optional label for the combined tool.</summary>
-    static void SnapField(Gui gui, TransformGizmo gizmo, TransformGizmoMode operation, string? label = null)
-    {
-        if (label is not null) gui.DrawText(label, Theme.Text(11), Theme.InkDim);
-        var current = operation switch
-        {
-            TransformGizmoMode.Rotate => gizmo.SnapRotation,
-            TransformGizmoMode.Scale => gizmo.SnapScale,
-            _ => gizmo.SnapTranslation
-        };
-
-        var text = current.ToString("0.###", CultureInfo.InvariantCulture);
-        var edited = gui.TextInput(text, width: SnapWidth, height: Theme.Scale(20f),
-            fontSize: Theme.Text(11),
-            backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
-            id: label is null ? "scene/toolbar/snap" : $"scene/toolbar/snap/{operation}", alignX: 1f);
-
-        if (string.Equals(edited, text, StringComparison.Ordinal)) return;
-        if (!float.TryParse(edited, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)) return;
-
-        SetSnapStep(gizmo, operation, value);
-    }
-
-    static void SetSnapStep(TransformGizmo gizmo, TransformGizmoMode operation, float value)
-    {
-        switch (operation)
-        {
-            case TransformGizmoMode.Rotate: gizmo.SnapRotation = value; break;
-            case TransformGizmoMode.Scale: gizmo.SnapScale = value; break;
-            default: gizmo.SnapTranslation = value; break;
-        }
-    }
-
-    static void ModeButton(Gui gui, TransformGizmo gizmo, string label, TransformGizmoMode mode)
-    {
-        if (Button(gui, label, $"scene/toolbar/{mode}", gizmo.Mode == mode)) gizmo.Mode = mode;
     }
 
     static bool Button(Gui gui, string label, string id, bool selected)

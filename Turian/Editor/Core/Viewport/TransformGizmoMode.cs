@@ -14,4 +14,7 @@ public enum TransformGizmoMode
 
     /// <summary>Translation, rotation and scale handles displayed together.</summary>
     Combined,
+
+    /// <summary>Pick scene objects without displaying or editing transform handles.</summary>
+    Select,
 }

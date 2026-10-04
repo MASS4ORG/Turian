@@ -1,60 +1,55 @@
 namespace Turian.Tests;
 
-/// <summary>Checks that each combined-tool snap field edits the corresponding operation.</summary>
+/// <summary>Checks that the snapping popover edits each operation independently.</summary>
 public sealed class ScenePanelSnapTests
 {
-    /// <summary>Typing in a snap field updates only its operation, including the three combined fields.</summary>
+    /// <summary>Typing updates only its operation, and invalid input retains the valid interval.</summary>
     [Theory]
-    [InlineData(TransformGizmoMode.Translate, null)]
-    [InlineData(TransformGizmoMode.Rotate, null)]
-    [InlineData(TransformGizmoMode.Scale, null)]
-    [InlineData(TransformGizmoMode.Translate, "M")]
-    [InlineData(TransformGizmoMode.Rotate, "R")]
-    [InlineData(TransformGizmoMode.Scale, "S")]
-    public void SnapFieldEditsOnlyItsOperation(TransformGizmoMode operation, string? label)
+    [InlineData("move")]
+    [InlineData("rotate")]
+    [InlineData("scale")]
+    public void SnapFieldEditsOnlyItsOperation(string operation)
     {
-        var gizmo = new TransformGizmo { SnapTranslation = 1, SnapRotation = 15, SnapScale = 0.1f };
-        var snapField = typeof(ScenePanel).GetMethod("SnapField", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var input = Substitute.For<IInputHandler>();
-        input.MousePosition.Returns(new Vector2(-1));
-        input.GetTypedCharacters().Returns(string.Empty);
-        var gui = new Gui { Input = input };
-        using var surface = SKSurface.Create(new SKImageInfo(300, 100));
-        var font = Font.FromFamilyName("sans-serif", 14);
-        Frame();
-        var field = Descendants(gui.RootNode!).Single(node => MathF.Abs(node.Rect.W - 64) < 0.1f);
-        input.MousePosition.Returns(new Vector2(field.Rect.X + 5, field.Rect.Y + 5));
-        input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
-        Frame();
-        input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
-        input.IsKeyDown(GKey.LeftControl).Returns(true);
-        input.IsKeyPressed(GKey.A).Returns(true);
-        Frame();
-        input.IsKeyDown(GKey.LeftControl).Returns(false);
-        input.IsKeyPressed(GKey.A).Returns(false);
-        input.GetTypedCharacters().Returns("2.5");
-        Frame();
-        Assert.Equal(operation == TransformGizmoMode.Translate ? 2.5f : 1f, gizmo.SnapTranslation);
-        Assert.Equal(operation == TransformGizmoMode.Rotate ? 2.5f : 15f, gizmo.SnapRotation);
-        Assert.Equal(operation == TransformGizmoMode.Scale ? 2.5f : 0.1f, gizmo.SnapScale);
-
-        input.GetTypedCharacters().Returns(string.Empty);
-        input.IsKeyDown(GKey.LeftControl).Returns(true);
-        input.IsKeyPressed(GKey.A).Returns(true);
-        Frame();
-        input.IsKeyDown(GKey.LeftControl).Returns(false);
-        input.IsKeyPressed(GKey.A).Returns(false);
-        input.GetTypedCharacters().Returns("invalid");
-        Frame();
-        Assert.Equal(operation == TransformGizmoMode.Rotate ? 2.5f : 15f, gizmo.SnapRotation);
-
-        void Frame() => InspectorFormsRenderingTests.Frame(gui, surface, font, current =>
+        using var host = new SceneToolbarHarness();
+        host.Click("scene/toolbar/snapOptions");
+        host.Replace(operation, "2.5");
+        var tools = host.Settings.Tools;
+        Assert.Equal(operation == "move" ? 2.5f : 1f, tools.TranslationSnap);
+        Assert.Equal(operation == "rotate" ? 2.5f : 15f, tools.RotationSnap);
+        Assert.Equal(operation == "scale" ? 2.5f : 0.1f, tools.ScaleSnap);
+        host.Replace(operation, "invalid");
+        Assert.Equal(operation == "rotate" ? 2.5f : 15f, tools.RotationSnap);
+        host.Replace(operation, "NaN");
+        Assert.Equal(operation == "move" ? 2.5f : 1f, tools.TranslationSnap);
+        host.Replace(operation, "-1");
+        Assert.Equal(0, operation switch
         {
-            using (current.Node(300, 100, "snapHost").Direction(Axis.Horizontal).Enter())
-                snapField.Invoke(null, [current, gizmo, operation, label]);
+            "move" => tools.TranslationSnap,
+            "rotate" => tools.RotationSnap,
+            _ => tools.ScaleSnap
         });
+        host.Settings.Store!.Received().NotifyChanged("gaya.turian.sceneTransform");
     }
 
-    static IEnumerable<LayoutNode> Descendants(LayoutNode node) =>
-        new[] { node }.Concat(node.Children.SelectMany(Descendants));
+    /// <summary>Camera fields constrain invalid ranges and notify the same Settings page.</summary>
+    [Fact]
+    public void CameraFieldsEditLivePreferences()
+    {
+        using var host = new SceneToolbarHarness();
+        host.Click("scene/toolbar/View");
+        var row = host.Nodes().Single(node => node.Id.Contains("/menubar/", StringComparison.Ordinal)
+            && node.Id.EndsWith("/i7"));
+        host.Click(row.Id);
+        host.Replace("fov", "150");
+        Assert.Equal(120, host.Settings.FieldOfView);
+        host.Replace("near", "-1");
+        Assert.Equal(0.001f, host.Settings.NearClip);
+        host.Replace("far", "0");
+        Assert.Equal(0.011f, host.Settings.FarClip);
+        host.Replace("speed", "200");
+        Assert.Equal(100, host.Settings.MoveSpeed);
+        host.Replace("look", "0");
+        Assert.Equal(0.0005f, host.Settings.LookSensitivity);
+        host.Settings.Store!.Received().NotifyChanged("gaya.turian.editorCamera");
+    }
 }

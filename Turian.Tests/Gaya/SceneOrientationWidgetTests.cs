@@ -64,6 +64,7 @@ public sealed class SceneOrientationWidgetTests
     [Fact]
     public void NegativeAxisColorIsOpaqueAndLighter()
     {
+        var settings = new SceneGizmoSettings();
         var camera = new EditorCamera();
         camera.LookIn(new Vector3(3, 2, 4), Vector3.UnitY);
         var controller = new SceneCameraController(camera);
@@ -84,6 +85,14 @@ public sealed class SceneOrientationWidgetTests
         Frame();
         Assert.Equal(black, Pixel());
         Assert.True(black.Red > 130 && black.Green > 220 && black.Blue > 150);
+        settings.YColor = new Vector3(1, 0, 0);
+        Frame();
+        Assert.Equal(255, Pixel().Red);
+        Assert.InRange(Pixel().Green, 120, 135);
+        Assert.InRange(Pixel().Blue, 120, 135);
+        settings.ShowOrientation = false;
+        Frame();
+        Assert.DoesNotContain(Descendants(gui.RootNode!), child => child.Id == "scene/orientation");
 
         SKColor Pixel()
         {
@@ -93,6 +102,6 @@ public sealed class SceneOrientationWidgetTests
         }
 
         void Frame() => InspectorFormsRenderingTests.Frame(gui, surface, font,
-            current => widget.Render(current, controller, null));
+            current => widget.Render(current, controller, null, settings));
     }
 }

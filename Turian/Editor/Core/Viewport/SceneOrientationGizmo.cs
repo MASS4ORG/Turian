@@ -10,7 +10,7 @@ public static class SceneOrientationGizmo
     public readonly record struct Marker(Vector3 Direction, Vector2 Offset, float Depth, string Label)
     {
         /// <summary>The endpoint's radius in pixels, including perspective foreshortening.</summary>
-        public float Radius { get; init; } = 8f;
+        public float Radius { get; init; } = 10f;
 
         /// <summary>Whether the endpoint projects outside the central cube.</summary>
         public bool IsVisible => Offset.LengthSquared() >= 10f * 10f;

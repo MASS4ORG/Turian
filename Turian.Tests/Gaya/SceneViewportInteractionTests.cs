@@ -26,7 +26,8 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
             .SetValue(tree, root);
         using var services = new ServiceCollection().BuildServiceProvider();
         var play = new PlayModeService(Substitute.For<IPlaySceneHost>(), database, services, NullLogger.Instance);
-        using var viewport = new SceneViewport(fixture.Vulkan, database, tree, inspector, null!, play,
+        using var build = new BuildManager(new AppSettings(), NullLogger.Instance);
+        using var viewport = new SceneViewport(fixture.Vulkan, database, tree, inspector, new GizmoDrawerCatalog(build), play,
             new EditorCameraSettings(), NullLogger.Instance, undo, new LocaleService());
         inspector.Select(node);
         viewport.Gizmo.Mode = TransformGizmoMode.Rotate;
@@ -81,6 +82,43 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         var viewer = (SceneViewerService)typeof(SceneViewport)
             .GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;
         Assert.True(viewer.Camera.IsOrthographic);
+
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
+        input.IsMouseButtonDown(GMouseButton.Left).Returns(false);
+        using var workspace = new AssetWorkspace(assets, new SettingsService());
+        using var stage = new PrefabStage(workspace, database);
+        var panel = new ScenePanel(viewport, tree, inspector, workspace, stage);
+        PanelFrame();
+        input.MousePosition.Returns(Descendants(gui.RootNode!).Single(child => child.Id == "scene/toolbar/frame").Rect.Center);
+        PanelFrame();
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+        PanelFrame();
+        Assert.True(viewer.Camera.Project(node.GlobalTransform.Position).Length() < 1e-4f);
+        var cameraPosition = viewer.Camera.Position;
+        panel.MoveCamera(0);
+        Assert.NotEqual(cameraPosition, viewer.Camera.Position);
+        var commands = new List<CommandDescriptor>();
+        var context = Substitute.For<IPluginContext>();
+        context.Commands.When(registry => registry.Register(Arg.Any<CommandDescriptor>()))
+            .Do(call => commands.Add(call.Arg<CommandDescriptor>()));
+        SceneNavigationBindings.Register(context);
+        var accessor = Substitute.For<IPanelAccessor>();
+        accessor.Panel(GayaPlugin.ViewportPanelId).Returns(panel);
+        using var commandServices = new ServiceCollection().AddSingleton(accessor).BuildServiceProvider();
+        commands.Single(command => command.Id == SceneNavigationBindings.CommandId(1)).Execute(commandServices);
+        Assert.True(Vector3.Distance(cameraPosition, viewer.Camera.Position) < 1e-5f);
+        commands[0].Execute(services);
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
+        viewport.Settings.Grid.Visible = false;
+        node.AddComponent(new LightComponent());
+        PanelFrame();
+        Assert.NotEmpty(viewer.Gizmos.WorldLines);
+        viewport.Settings.Gizmos.Visible = false;
+        PanelFrame();
+        Assert.Empty(viewer.Gizmos.WorldLines);
+        Assert.Empty(viewer.Gizmos.OverlayTriangles);
+
+        void PanelFrame() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
 
         bool CursorVisible() => (bool)typeof(SceneViewport)
             .GetField("showGizmoCursor", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;

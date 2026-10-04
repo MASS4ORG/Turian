@@ -9,6 +9,19 @@ public static class EditorIcons
     /// <summary>Move along any axis.</summary>
     public const string Move = "\uf0b2";
 
+    /// <summary>Pick an object.</summary>
+    public const string Select = "\uf245";
+    /// <summary>Rotate a transform.</summary>
+    public const string Rotate = "\uf2f1";
+    /// <summary>Scale a transform.</summary>
+    public const string Scale = "\uf424";
+    /// <summary>Use all transform operations.</summary>
+    public const string Transform = "\uf5b0";
+    /// <summary>Frame the selected object.</summary>
+    public const string Frame = "\uf05b";
+    /// <summary>Snap transform edits.</summary>
+    public const string Magnet = "\uf076";
+
     /// <summary>Play.</summary>
     public const string Play = "\uf04b";
     /// <summary>Pause.</summary>

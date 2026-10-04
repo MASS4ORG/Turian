@@ -82,9 +82,55 @@ public sealed class ShortcutService : IShortcutService
             .FirstOrDefault(binding => binding is not null)?.Display ?? string.Empty;
 
     /// <inheritdoc />
+    public bool IsHeld(string commandId, IInputHandler input, string activePanelId,
+        KeyModifiers extraModifiers = KeyModifiers.None)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (IsCapturing || !pending.IsNone) return false;
+        var binding = HeldBinding(commandId, activePanelId);
+        if (binding is null || !MatchesHeld(input, binding.Stroke, extraModifiers)) return false;
+        var stroke = new KeyStroke(binding.Stroke.Key, HeldModifiers(input));
+        var best = Best(entry => entry.Effective?.Stroke == stroke, activePanelId)
+                   ?? Best(entry => entry.Effective?.Stroke == binding.Stroke, activePanelId);
+        return best?.CommandId == commandId;
+    }
+
+    KeyBinding? HeldBinding(string commandId, string activePanelId)
+    {
+        var declared = defaults.Find(binding => binding.CommandId == commandId && binding.IsContinuous
+                                               && binding.Context == activePanelId)
+                       ?? defaults.Find(binding => binding.CommandId == commandId && binding.IsContinuous
+                                                   && ShortcutContexts.IsGlobal(binding.Context));
+        if (declared is null) return null;
+        return Effective(declared) is { Second: null } effective && !effective.Stroke.IsNone ? effective : null;
+    }
+
+    static bool MatchesHeld(IInputHandler input, KeyStroke stroke, KeyModifiers extraModifiers)
+    {
+        if (!input.IsKeyDown(stroke.Key)) return false;
+        var modifiers = HeldModifiers(input);
+        var required = stroke.Modifiers;
+        return (modifiers & required) == required && (modifiers & ~(required | extraModifiers)) == 0;
+    }
+
+    static KeyModifiers HeldModifiers(IInputHandler input)
+    {
+        var result = KeyModifiers.None;
+        if (input.IsKeyDown(KeyboardKey.LeftControl) || input.IsKeyDown(KeyboardKey.RightControl))
+            result |= KeyModifiers.Ctrl;
+        if (input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift))
+            result |= KeyModifiers.Shift;
+        if (input.IsKeyDown(KeyboardKey.LeftAlt) || input.IsKeyDown(KeyboardKey.RightAlt))
+            result |= KeyModifiers.Alt;
+        return result;
+    }
+
+    /// <inheritdoc />
     public void Rebind(string commandId, KeyStroke stroke, KeyStroke? second = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
+        if (second is not null && defaults.Exists(binding => binding.CommandId == commandId && binding.IsContinuous))
+            throw new ArgumentException("Continuous shortcuts require a single stroke.", nameof(second));
 
         overrides.Bindings[commandId] = stroke.IsNone
             ? string.Empty
@@ -157,15 +203,21 @@ public sealed class ShortcutService : IShortcutService
                 return chord.CommandId;
         }
 
-        if (Best(entry => entry.Effective is { Second: not null } && entry.Effective.Stroke == stroke,
+        if (Best(entry => !entry.Default.IsContinuous
+                          && entry.Effective is { Second: not null } && entry.Effective.Stroke == stroke,
                 activePanelId) is not null)
         {
             pending = stroke;
             return null;
         }
 
-        return Best(entry => entry.Effective is { Second: null } && entry.Effective.Stroke == stroke,
-            activePanelId)?.CommandId;
+        return PressedCommand(stroke, activePanelId);
+    }
+
+    string? PressedCommand(KeyStroke stroke, string activePanelId)
+    {
+        var matched = Best(entry => entry.Effective is { Second: null } && entry.Effective.Stroke == stroke, activePanelId);
+        return matched?.Default.IsContinuous == true ? null : matched?.CommandId;
     }
 
     /// <summary>Drops an armed chord, which is what Escape and a focus change do.</summary>
@@ -187,7 +239,8 @@ public sealed class ShortcutService : IShortcutService
     /// <summary>The binding in force for a declared one, or null when the user cleared it.</summary>
     KeyBinding? Effective(KeyBinding declared)
     {
-        if (!overrides.Bindings.TryGetValue(declared.CommandId, out var stored)) return declared;
+        if (!overrides.Bindings.TryGetValue(declared.CommandId, out var stored))
+            return declared.Stroke.IsNone ? null : declared;
         if (stored.Length == 0) return null;
 
         if (!KeyBinding.TryParseSequence(stored, out var strokes))
