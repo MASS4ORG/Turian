@@ -15,6 +15,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     bool frameOptionsOpen;
     bool frameCameraOptions;
     Vector2 frameOptionsAt;
+    Rect toolbarBounds;
 
     /// <summary>Builds the toolbar and processes its actions in the render pass.</summary>
     public void Render(Gui gui)
@@ -22,6 +23,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         using (gui.Node(-1, Height, "scene/toolbar").ExpandWidth().Direction(Axis.Horizontal)
                    .Padding(4f, 3f).Gap(3f).ContentAlignY(0.5f).Enter())
         {
+            if (gui.Pass == Pass.Pass2Render) toolbarBounds = gui.CurrentNode.Rect;
             gui.DrawBackgroundRect(Theme.Chrome);
             Tools(gui);
             Divider(gui, "tools");
@@ -175,7 +177,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     {
         snapOptions = !camera;
         cameraOptions = camera;
-        var rect = gui.CurrentNode.Rect;
+        var rect = toolbarBounds;
         optionsAt = new Vector2(Math.Clamp(gui.Input.MousePosition.X, rect.X,
             Math.Max(rect.X, rect.BottomRight.X - Theme.Scale(250f))), rect.BottomRight.Y + 2f);
         transformMenu = viewMenu = false;

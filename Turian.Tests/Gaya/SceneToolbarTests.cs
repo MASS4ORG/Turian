@@ -98,6 +98,10 @@ public sealed class SceneToolbarTests
         Assert.NotNull(Find("scene/options/value/far"));
         Assert.NotNull(Find("scene/options/value/speed"));
         Assert.NotNull(Find("scene/options/value/look"));
+        var options = Find("scene/options").Rect;
+        var toolbarBounds = Find("scene/toolbar").Rect;
+        Assert.True(options.X >= toolbarBounds.X && options.BottomRight.X <= toolbarBounds.BottomRight.X);
+        Assert.Equal(toolbarBounds.BottomRight.Y + 2f, options.Y);
         ClickAt(new Vector2(5, 400));
         Assert.DoesNotContain(Nodes(), node => node.Id == "scene/options");
         settings.Store.Received().NotifyChanged("gaya.turian.sceneGrid");

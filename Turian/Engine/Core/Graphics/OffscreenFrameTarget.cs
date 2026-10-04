@@ -86,15 +86,14 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
         return commandBuffer;
     }
 
-    /// <summary>Begins the render pass on the given command buffer.</summary>
-    public void BeginRenderPass(CommandBuffer cmd)
+    /// <summary>Begins the render pass, clearing empty pixels to the supplied linear RGBA color.</summary>
+    public void BeginRenderPass(CommandBuffer cmd, Vector4? clearColor = null)
     {
         Debug.Assert(isFrameStarted);
-
+        var color = Vector4.Clamp(clearColor ?? new Vector4(0.39f, 0.58f, 0.93f, 1f), Vector4.Zero, Vector4.One);
         ClearValue[] clearValues =
         [
-            new() { Color = new() { Float32_0 = 0.39f, Float32_1 = 0.58f, Float32_2 = 0.93f, Float32_3 = 1f } }, // cornflower blue — visible debug clear
-            // new() { Color = new() { Float32_0 = 0.01f, Float32_1 = 0.01f, Float32_2 = 0.01f, Float32_3 = 1f } },
+            new() { Color = new() { Float32_0 = color.X, Float32_1 = color.Y, Float32_2 = color.Z, Float32_3 = color.W } },
             new() { DepthStencil = new() { Depth = 1f, Stencil = 0 } }
         ];
 

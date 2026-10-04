@@ -41,7 +41,7 @@ public sealed partial class TransformGizmo
     public SceneGizmoSettings Settings { get; set; } = new();
 
     /// <summary>Gets or sets whether snapping applies, retaining the individual snap intervals.</summary>
-    public bool SnapEnabled { get; set; } = true;
+    public bool SnapEnabled { get; set; } = false;
 
     /// <summary>Gets or sets the translation snap interval. Zero disables snapping.</summary>
     public float SnapTranslation { get; set; } = 1f;

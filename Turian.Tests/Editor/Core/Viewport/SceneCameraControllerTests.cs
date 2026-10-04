@@ -44,15 +44,15 @@ public class SceneCameraControllerTests
             $"Front {camera.Front} did not turn away from screen-right {screenRight}");
     }
 
-    /// <summary>Dragging up lowers pitch with inverted vertical look.</summary>
+    /// <summary>Dragging up turns the view toward world up.</summary>
     [Fact]
-    public void FlyLook_DraggingUp_LowersPitch()
+    public void FlyLook_DraggingUp_RaisesPitch()
     {
         var controller = FlyController(out var camera);
 
         controller.OnMouseMove(100f, 60f);
 
-        Assert.True(camera.Pitch < 0f, $"Pitch {camera.Pitch} did not fall");
+        Assert.True(camera.Front.Y > 0f, $"Front {camera.Front} did not turn upward");
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public class SceneCameraControllerTests
 
         Assert.True(MathF.Abs(camera.Pitch) < MathF.PI / 2f);
         Assert.True(camera.Up.Y > 0f);
-        Assert.Equal(direction, MathF.Sign(camera.Pitch));
+        Assert.Equal(-direction, MathF.Sign(camera.Pitch));
         var clampedPitch = MathF.Abs(camera.Pitch);
 
         controller.OnMouseMove(100f, 100f + direction * 39990f);
@@ -141,7 +141,7 @@ public class SceneCameraControllerTests
         controller.OnMouseMove(x + 40f, y + 20f);
 
         Assert.Equal(0.5f, camera.Yaw, 4);
-        Assert.Equal(-0.2f, camera.Pitch, 4);
+        Assert.Equal(-0.4f, camera.Pitch, 4);
         Assert.Equal(position, camera.Position);
     }
 

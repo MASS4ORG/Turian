@@ -26,6 +26,10 @@ public class StudioContributionsTests
         Assert.Equal("Scene Viewer/Grid", page.Path);
         Assert.Same(camera.Gizmos, pages.Single(item => item.Id == "gaya.turian.sceneGizmos").Target);
         Assert.Same(camera.Tools, pages.Single(item => item.Id == "gaya.turian.sceneTransform").Target);
+        var environment = pages.Single(item => item.Id == "gaya.turian.sceneViewer");
+        Assert.Same(camera.View, environment.Target);
+        Assert.Equal("Scene Viewer", environment.Path);
+        Assert.Equal(new Vector3(0.035f), camera.View.EmptySkyColor);
         Assert.NotNull(camera.Navigation);
         settings.CellSize = 3;
         settings.HalfExtent = 5;

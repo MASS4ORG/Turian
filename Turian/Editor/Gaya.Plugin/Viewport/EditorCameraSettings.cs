@@ -10,6 +10,9 @@ public sealed class EditorCameraSettings
     /// <summary>The shared grid preferences registered as a separate Scene Viewer settings page.</summary>
     internal SceneGridSettings Grid { get; } = new();
 
+    /// <summary>The shared Scene view environment preferences.</summary>
+    internal SceneViewSettings View { get; } = new();
+
     /// <summary>The shared appearance preferences for Scene view gizmos.</summary>
     internal SceneGizmoSettings Gizmos { get; } = new();
 

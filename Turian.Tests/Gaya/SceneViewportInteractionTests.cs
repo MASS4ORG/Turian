@@ -82,6 +82,10 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         var viewer = (SceneViewerService)typeof(SceneViewport)
             .GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;
         Assert.True(viewer.Camera.IsOrthographic);
+        Assert.Equal(new Vector4(viewport.Settings.View.EmptySkyColor, 1f), viewer.ClearColor);
+        viewport.Settings.View.EmptySkyColor = new Vector3(0.1f, 0.2f, 0.3f);
+        Frame();
+        Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 1f), viewer.ClearColor);
 
         input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
         input.IsMouseButtonDown(GMouseButton.Left).Returns(false);

@@ -237,6 +237,7 @@ sealed class SceneViewport : IDisposable
     // while dragging the view takes effect without leaving the panel.
     void SyncCamera(IInputHandler input)
     {
+        service!.ClearColor = new Vector4(cameraSettings.View.EmptySkyColor, 1f);
         controller!.MoveSpeed = cameraSettings.MoveSpeed;
         controller.LookSensitivity = cameraSettings.LookSensitivity;
         controller.ZoomFraction = cameraSettings.ZoomFraction;

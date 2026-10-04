@@ -256,6 +256,7 @@ public sealed class GayaPlugin : IPlugin
             return camera;
         });
         context.Services.AddSingleton(grid);
+        context.Services.AddSingleton(camera.View);
         context.Services.AddSingleton(camera.Gizmos);
         context.Services.AddSingleton(camera.Tools);
         context.Services.AddSingleton(recent);
@@ -271,6 +272,7 @@ public sealed class GayaPlugin : IPlugin
         context.Settings.Register(SettingsPages.Describe(LocalizationBridge.PageId, language));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.editorCamera", camera));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGrid", grid));
+        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneViewer", camera.View));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGizmos", camera.Gizmos));
         context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneTransform", camera.Tools));
         context.Settings.Register(SettingsPages.Describe(AssetBrowserSettings.PageId, assetBrowser));
