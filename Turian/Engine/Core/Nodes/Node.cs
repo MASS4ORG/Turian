@@ -17,6 +17,7 @@ public partial class Node : IdObject
         {
             if (field == value) return;
             field = value;
+            RefreshActiveHierarchy();
             if (value)
             {
                 OnEnable();
@@ -44,7 +45,16 @@ public partial class Node : IdObject
     /// never resolved to.
     /// </summary>
     [JsonIgnore, Hide]
-    public bool IsDestroyed { get; internal set; }
+    public bool IsDestroyed
+    {
+        get;
+        internal set
+        {
+            field = value;
+            if (value) tagRegistry?.Unregister(this);
+            RefreshActiveHierarchy();
+        }
+    }
 
     /// <summary>
     /// Gets or sets the parent node of this node.
@@ -55,7 +65,12 @@ public partial class Node : IdObject
         get;
         set
         {
+            if (ReferenceEquals(field, value)) return;
+            var previous = field;
             field = value;
+            previous?.Children.Remove(this);
+            BindTagRegistry(value?.tagRegistry);
+            RefreshActiveHierarchy();
             InvalidateGlobalTransformCache();
         }
     }
@@ -72,7 +87,20 @@ public partial class Node : IdObject
     /// Gets or sets the list of child nodes.
     /// </summary>
     [Hide]
-    public ObservableCollection<Node> Children { get; set; } = [];
+    public ObservableCollection<Node> Children
+    {
+        get;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (ReferenceEquals(field, value)) return;
+            field.CollectionChanged -= ChildrenChanged;
+            field = value;
+            field.CollectionChanged += ChildrenChanged;
+            ChildrenChanged(this, new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
+                System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+        }
+    } = [];
 
     /// <summary>
     /// Gets the list of components attached to this node.
@@ -164,6 +192,8 @@ public partial class Node : IdObject
         Parent = parentNew;
         Services = parentNew?.Services ?? Services;
         AllowMissingServices = parentNew?.AllowMissingServices ?? AllowMissingServices;
+        BindLayers();
+        EnsureTagRegistry();
         SceneServiceInjector.Inject(this, Services, AllowMissingServices);
         foreach (var component in Components)
             component.Setup(this);

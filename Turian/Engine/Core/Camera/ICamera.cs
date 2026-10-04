@@ -6,6 +6,9 @@ namespace Turian.Engine.Core;
 /// </summary>
 public interface ICamera
 {
+    /// <summary>The rendering layers included by this camera.</summary>
+    LayerMask CullingMask => LayerMask.Everything;
+
     /// <summary>
     /// Gets or sets the position of the camera in 3D space.
     /// </summary>

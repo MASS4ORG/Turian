@@ -50,6 +50,43 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
         Assert.True(lit > unlit + 30, $"expected the first frame lit: unlit={unlit}, lit={lit}");
     }
 
+    /// <summary>The camera mask excludes draws on the selected rendering layer and includes them when enabled.</summary>
+    [Fact]
+    public void CameraMaskExcludesRenderLayers()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        var root = QuadScene(PreviewQuadMesh.Get(fixture.Vulkan), withLight: false);
+        root.Children[0].RenderLayer = 31;
+        root.Children[0].PhysicsLayer = 0;
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
+        viewer.Camera.CullingMask = LayerMask.FromLayer(0);
+        viewer.Render(root, 0.016);
+        Assert.Equal(0, viewer.CullingStats.Submitted);
+        var camera = new CameraComponent { CullingMask = LayerMask.FromLayer(31) };
+        new Node().AddComponent(camera);
+        camera.Resize(size, size);
+        viewer.Render(root, 0.016, camera);
+        Assert.Equal(1, viewer.CullingStats.Submitted);
+    }
+
+    /// <summary>Point and directional lights illuminate only the rendering layers their masks include.</summary>
+    [Theory]
+    [InlineData(LightType.Point)]
+    [InlineData(LightType.Directional)]
+    public void LightMasksControlRenderedIllumination(LightType type)
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        var root = QuadScene(PreviewQuadMesh.Get(fixture.Vulkan), withLight: true);
+        root.Children[0].RenderLayer = 31;
+        var light = root.Children[1].GetComponent<LightComponent>()!;
+        light.Type = type;
+        light.CullingMask = LayerMask.FromLayer(0);
+        var excluded = CenterBrightness(root);
+        light.CullingMask = LayerMask.FromLayer(31);
+        var included = CenterBrightness(root);
+        Assert.True(included > excluded + 30, $"excluded={excluded}, included={included}");
+    }
+
     /// <summary>
     /// A model with an asset id and material slots draws with the default material when neither the override nor
     /// the imported material exists, on the first frame and from the cached handles on the next.

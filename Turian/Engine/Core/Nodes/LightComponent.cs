@@ -8,6 +8,9 @@ namespace Turian.Engine.Core;
 [TypeId("4d08c521-7f64-5859-9b98-e8f5e418f0be")]
 public class LightComponent : Component
 {
+    /// <summary>The rendering layers receiving illumination from this light.</summary>
+    public LayerMask CullingMask { get; set; } = LayerMask.Everything;
+
     /// <summary>
     /// Gets or sets how the light emits. A <see cref="LightType.Directional"/> light ignores the
     /// node's position and shines along its forward axis.

@@ -143,6 +143,7 @@ void main() {
 
     for (int i = 0; i < uboLights; i++) {
         PointLight light = ubo.pointLights[i];
+        if ((floatBitsToUint(light.position.w) & floatBitsToUint(push.normalMatrix[3][3])) == 0u) continue;
         vec3 toLight = light.position.xyz - fragPosWorld;
         float distSq = dot(toLight, toLight);
         float attenuation = 1.0 / max(distSq, 1e-4);
@@ -156,6 +157,7 @@ void main() {
     // Directional light does not attenuate: the sun reaches every surface at the same strength.
     for (int i = 0; i < uboDirectionalLights; i++) {
         DirectionalLight light = ubo.directionalLights[i];
+        if ((floatBitsToUint(light.direction.w) & floatBitsToUint(push.normalMatrix[3][3])) == 0u) continue;
         if (light.color.w < 1e-4) continue;
 
         vec3 L = normalize(-light.direction.xyz);

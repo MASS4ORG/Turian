@@ -55,6 +55,9 @@ public sealed partial class TransformGizmo
     /// <summary>Gets or sets the node currently targeted by the gizmo. Null hides the gizmo.</summary>
     public Node? SelectedNode { get; set; }
 
+    /// <summary>The Scene view layer locks respected by every transform gesture.</summary>
+    public SceneViewSettings ViewSettings { get; set; } = new();
+
     /// <summary>Gets the axis currently highlighted or being dragged.</summary>
     public TransformGizmoAxis Axis => axis;
 
@@ -64,7 +67,8 @@ public sealed partial class TransformGizmo
     /// <summary>Gets whether a transform gesture is active.</summary>
     public bool IsDragging => isDragging;
 
-    bool CanInteract => SelectedNode is not null && Settings.Visible && Mode != TransformGizmoMode.Select;
+    bool CanInteract => SelectedNode is not null && ViewSettings.CanSelect(SelectedNode)
+                        && Settings.Visible && Mode != TransformGizmoMode.Select;
 
     /// <summary>Gets the snapped rotation angle of the active gesture in degrees.</summary>
     public float RotationDegrees => AppliedRotationAngle * 180f / MathF.PI;
@@ -118,6 +122,7 @@ public sealed partial class TransformGizmo
         pointerScreen = screenPos;
         if (!CanInteract)
         {
+            ProcessPointerUp();
             ClearHover();
             return;
         }

@@ -6,6 +6,9 @@ namespace Turian.Engine.Core;
 /// </summary>
 public class EditorCamera : ICamera
 {
+    /// <summary>The rendering layers visible in this editor view.</summary>
+    public LayerMask CullingMask { get; set; } = LayerMask.Everything;
+
     const float minNear = 0.001f;
     const float minFov = 1f * (MathF.PI / 180f);
     const float maxFov = 120f * (MathF.PI / 180f);

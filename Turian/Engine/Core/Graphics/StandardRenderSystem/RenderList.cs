@@ -9,6 +9,7 @@ namespace Turian.Engine.Core;
 /// <param name="SortKey">Material order in the high bits, model order in the low bits.</param>
 /// <param name="Sequence">Scene order, used to preserve depth and blend ordering within equal sort keys.</param>
 /// <param name="WorldBounds">The world-space bounds supplied to optional visibility passes.</param>
+/// <param name="RenderLayer">The owning node's rendering layer index.</param>
 readonly record struct DrawItem(
     Model Model,
     int SubMesh,
@@ -17,7 +18,8 @@ readonly record struct DrawItem(
     Matrix4x4 NormalMatrix,
     long SortKey,
     int Sequence = 0,
-    Bounds WorldBounds = default);
+    Bounds WorldBounds = default,
+    int RenderLayer = 0);
 
 /// <summary>
 /// The scene content one frame draws: models and lights gathered in a single walk, and the submesh draws sorted so
@@ -40,30 +42,32 @@ sealed class RenderList
 
     /// <summary>Collects the active models and lights under <paramref name="roots"/>, depth-first.</summary>
     /// <param name="roots">The scene's top-level nodes.</param>
-    public void Gather(IList<Node> roots)
+    /// <param name="cullingMask">Rendering layers accepted by the camera; null includes all layers.</param>
+    public void Gather(IList<Node> roots, LayerMask? cullingMask = null)
     {
         Models.Clear();
         Lights.Clear();
         Draws.Clear();
         for (var i = 0; i < roots.Count; i++)
-            Collect(roots[i]);
+            Collect(roots[i], cullingMask ?? LayerMask.Everything);
     }
 
-    void Collect(Node node)
+    void Collect(Node node, LayerMask cullingMask)
     {
         // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
-        if (!node.IsActive) return;
+        if (!node.IsActive || node.IsDestroyed) return;
 
         var components = node.Components;
         for (var i = 0; i < components.Count; i++)
         {
+            if (!cullingMask.Contains(node.RenderLayer)) continue;
             if (components[i] is ModelComponent { IsActive: true } model) Models.Add(model);
             else if (components[i] is LightComponent { IsActive: true } light) Lights.Add(light);
         }
 
         var children = node.Children;
         for (var i = 0; i < children.Count; i++)
-            Collect(children[i]);
+            Collect(children[i], cullingMask);
     }
 
     /// <summary>

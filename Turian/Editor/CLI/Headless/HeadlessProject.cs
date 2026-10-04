@@ -55,6 +55,9 @@ sealed class HeadlessProject : IDisposable
         Vulkan = withGraphics ? new Vulkan(logger) : null;
 
         var registrations = new ServiceCollection()
+            .AddSingleton<IAppSettings>(settings)
+            .AddSingleton<LayerFilter>()
+            .AddSingleton<IPhysicsQueries, PhysicsQueries>()
             .AddSingleton(Database)
             .AddSingleton<ISceneManager>(SceneManager)
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(Database))

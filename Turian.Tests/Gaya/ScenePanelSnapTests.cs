@@ -38,7 +38,7 @@ public sealed class ScenePanelSnapTests
         using var host = new SceneToolbarHarness();
         host.Click("scene/toolbar/View");
         var row = host.Nodes().Single(node => node.Id.Contains("/menubar/", StringComparison.Ordinal)
-            && node.Id.EndsWith("/i7"));
+            && node.Id.EndsWith("/i9"));
         host.Click(row.Id);
         host.Replace("fov", "150");
         Assert.Equal(120, host.Settings.FieldOfView);

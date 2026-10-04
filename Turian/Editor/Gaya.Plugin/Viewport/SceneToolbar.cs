@@ -132,7 +132,26 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             .CheckItem("Orthographic", () => viewport.IsOrthographic, _ => viewport.ToggleProjection())
             .Separator();
         VisibilityItems(menu);
+        menu.Submenu("Visible layers", sub => LayerItems(sub, visibility: true));
+        menu.Submenu("Locked layers", sub => LayerItems(sub, visibility: false));
         menu.Separator().Item("Camera options…", () => OpenOptions(gui, camera: true));
+    }
+
+    void LayerItems(FlyoutBuilder menu, bool visibility)
+    {
+        var view = viewport.Settings.View;
+        foreach (var slot in viewport.RenderLayers.OrderBy(slot => slot.Index))
+        {
+            if ((uint)slot.Index >= 32) continue;
+            var index = slot.Index;
+            menu.CheckItem($"{index}: {slot.Name}",
+                () => (visibility ? view.VisibleLayers : view.LockedLayers).Contains(index), value =>
+                {
+                    if (visibility) view.SetVisible(index, value);
+                    else view.SetLocked(index, value);
+                    Changed("sceneViewer");
+                });
+        }
     }
 
     void VisibilityItems(FlyoutBuilder menu)

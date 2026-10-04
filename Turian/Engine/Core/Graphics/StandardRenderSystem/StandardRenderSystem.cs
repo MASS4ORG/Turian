@@ -72,7 +72,7 @@ public class StandardRenderSystem : IRenderSystem
     {
         ArgumentNullException.ThrowIfNull(ubo);
 
-        renderList.Gather(frameInfo.Nodes);
+        renderList.Gather(frameInfo.Nodes, frameInfo.Camera.CullingMask);
         UpdateLights(renderList.Lights, ubo);
         if (UseFrustumCulling && renderList.Models.Count != 0)
             GeometryUtility.CalculateFrustumPlanes(
@@ -174,7 +174,7 @@ public class StandardRenderSystem : IRenderSystem
             var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
             var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
             renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
-                renderList.Draws.Count, cached.Bounds[i - start]));
+                renderList.Draws.Count, cached.Bounds[i - start], component.Node!.RenderLayer));
         }
     }
 
@@ -198,6 +198,10 @@ public class StandardRenderSystem : IRenderSystem
             }
 
             StandardPushConstantData push = new() { ModelMatrix = draw.ModelMatrix, NormalMatrix = draw.NormalMatrix };
+            var normal = push.NormalMatrix;
+            // The normal matrix's unused final element carries layer bits within the 128-byte push constant limit.
+            normal.M44 = BitConverter.UInt32BitsToSingle(LayerMask.FromLayer(draw.RenderLayer).Value);
+            push.NormalMatrix = normal;
             vulkan.Vk.CmdPushConstants(
                 commandBuffer,
                 pipelineLayout,
@@ -280,17 +284,19 @@ public class StandardRenderSystem : IRenderSystem
                 if (directionalIndex == ubo.DirectionalCount) continue;
 
                 ubo.SetDirectionalLight(
-                    directionalIndex++,
+                    directionalIndex,
                     lightNode.GlobalTransform.Forward,
                     component.Color,
                     component.Intensity);
+                ubo.SetDirectionalLightMask(directionalIndex++, component.CullingMask);
                 continue;
             }
 
             if (pointIndex == ubo.Count) continue;
 
             ubo.SetPointLightPosition(pointIndex, lightNode.GlobalTransform.Position);
-            ubo.SetPointLightColor(pointIndex++, component.Color, component.Intensity);
+            ubo.SetPointLightColor(pointIndex, component.Color, component.Intensity);
+            ubo.SetPointLightMask(pointIndex++, component.CullingMask);
         }
     }
 
