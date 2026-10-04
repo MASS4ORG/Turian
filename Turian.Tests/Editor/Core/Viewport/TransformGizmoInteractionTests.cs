@@ -69,7 +69,7 @@ public sealed class TransformGizmoInteractionTests
         var start = Pixel(camera, new Vector3(Scale * 0.33f, Scale * 0.33f, 0));
         gizmo.ProcessPointerDown(start, camera, Viewport);
         Assert.Equal(TransformGizmoAxis.Xy, gizmo.Axis);
-        gizmo.ProcessPointerMove(start + new Vector2(-90, -90), camera, Viewport);
+        gizmo.ProcessPointerMove(start + new Vector2(-90, 90), camera, Viewport);
         Assert.Equal(new Vector3(2, 2, 1), node.Scale);
     }
 

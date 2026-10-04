@@ -93,6 +93,31 @@ public sealed class GizmoRenderingTests(VulkanFixture fixture) : IClassFixture<V
     static Vector2 Pixel(EditorCamera camera, Vector3 world, Vector2 size) =>
         (camera.Project(world) + Vector2.One) * 0.5f * size;
 
+    /// <summary>Segments crossing the near plane cannot fold onto the opposite side of the screen.</summary>
+    [Fact]
+    public void LineCrossingNearPlaneMatchesClippedSegment()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), 256, 256);
+        viewer.Camera.Position = Vector3.Zero;
+        var scene = new Node();
+        var baseline = Pixels(viewer, scene);
+        var startZ = -2f;
+        viewer.OnPopulateGizmos = drawing =>
+        {
+            drawing.DepthTest = false;
+            drawing.Color = new Vector4(1, 0, 0, 1);
+            drawing.Thickness = 5;
+            drawing.DrawLine(new Vector3(1, 0, startZ), new Vector3(1, 0, 4));
+        };
+        var crossing = Pixels(viewer, scene);
+        Assert.Equal(baseline.AsSpan((128 * 256 + 128) * 4, 4).ToArray(),
+            crossing.AsSpan((128 * 256 + 128) * 4, 4).ToArray());
+        Assert.NotEqual(baseline, crossing);
+        startZ = viewer.Camera.NearPlane;
+        Assert.Equal(crossing, Pixels(viewer, scene));
+    }
+
     static byte[] Pixels(SceneViewerService viewer, Node scene)
     {
         viewer.Render(scene, 0.016);

@@ -4,9 +4,12 @@ namespace Gaya.Plugin.Turian;
 /// How the Scene view's free camera responds to input. Applied to the viewport's
 /// <c>SceneCameraController</c> every frame, so an edit is visible on the next drag.
 /// </summary>
-[EditorSetting("Scene Viewer", Description = "How the Scene view camera flies, looks and zooms.")]
+[EditorSetting("Scene Viewer/Camera", Description = "How the Scene view camera flies, looks and zooms.")]
 public sealed class EditorCameraSettings
 {
+    /// <summary>The shared grid preferences registered as a separate Scene Viewer settings page.</summary>
+    internal SceneGridSettings Grid { get; } = new();
+
     /// <summary>Metres per second the camera flies at, before the Shift multiplier.</summary>
     [EditorSetting("Move Speed", Description = "Metres per second with WASD. Holding Shift is four times this.")]
     [Range(0.1f, 100f)]

@@ -12,7 +12,7 @@ namespace Turian.Editor.Core;
 /// This class is UI-framework-agnostic — it receives abstract input events and mutates the
 /// camera. The Studio's <c>SceneViewerControl</c> translates Avalonia events into these calls.
 /// </summary>
-public sealed class SceneCameraController
+public sealed partial class SceneCameraController
 {
     const float fastMoveMultiplier = 4f;
     const float flyPitchLimit = 89f * MathF.PI / 180f;
@@ -145,11 +145,16 @@ public sealed class SceneCameraController
     }
 
     /// <summary>
-    /// Processes a scroll-wheel event. Positive <paramref name="delta"/> zooms in (dollies forward);
-    /// negative zooms out.
+    /// Processes wheel zoom, changing the orthographic viewing volume or moving the perspective camera.
+    /// Positive <paramref name="delta"/> zooms in; negative zooms out.
     /// </summary>
     public void OnWheel(float delta)
     {
+        if (Camera.IsOrthographic)
+        {
+            Camera.Frustum *= MathF.Max(1f - delta * ZoomFraction, 0.001f);
+            return;
+        }
         if (mode == NavigationMode.Orbit)
         {
             orbitDistance *= 1f - delta * ZoomFraction;

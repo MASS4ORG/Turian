@@ -185,7 +185,7 @@ public class EditorCamera : ICamera
         {
             var halfH = Frustum;
             var halfW = halfH * aspect;
-            return Matrix4x4.CreateOrthographicOffCenter(-halfW, halfW, halfH, -halfH, NearPlane, FarPlane);
+            return Matrix4x4.CreateOrthographicOffCenter(-halfW, halfW, -halfH, halfH, NearPlane, FarPlane);
         }
 
         return Matrix4x4.CreatePerspectiveFieldOfView(FieldOfView, aspect, NearPlane, FarPlane);

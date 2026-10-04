@@ -3,6 +3,31 @@ namespace Turian.Tests;
 /// <summary>Checks the Turian studio plugin's contributions are consistent with each other.</summary>
 public class StudioContributionsTests
 {
+    /// <summary>The grid settings page and Scene view share one live settings object.</summary>
+    [Fact]
+    public void SceneGridSettingsPageSharesViewportPreferences()
+    {
+        var services = new ServiceCollection();
+        var pages = new List<SettingsPageDescriptor>();
+        var context = Substitute.For<IPluginContext>();
+        context.CommandLineArgs.Returns([]);
+        context.Services.Returns(services);
+        context.Settings.When(registry => registry.Register(Arg.Any<SettingsPageDescriptor>()))
+            .Do(call => pages.Add(call.Arg<SettingsPageDescriptor>()));
+        new GayaPlugin().Configure(context);
+        var page = Assert.Single(pages, item => item.Id == "gaya.turian.sceneGrid");
+        var settings = Assert.IsType<SceneGridSettings>(page.Target);
+        var camera = Assert.IsType<EditorCameraSettings>(services
+            .Single(item => item.ServiceType == typeof(EditorCameraSettings)).ImplementationInstance);
+        Assert.Same(settings, camera.Grid);
+        Assert.Equal("Scene Viewer/Grid", page.Path);
+        settings.CellSize = 3;
+        settings.HalfExtent = 5;
+        var drawing = new Gizmos();
+        GroundGrid.Draw(drawing, Vector3.Zero, camera.Grid);
+        Assert.All(drawing.WorldLines, line => Assert.Equal(0f, line.A.X % 3));
+    }
+
     sealed record Contributions(
         List<CommandDescriptor> Commands,
         List<MenuItemDescriptor> Menus,

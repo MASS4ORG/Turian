@@ -29,6 +29,8 @@ sealed class SceneViewport : IDisposable
     readonly ILogger log;
     readonly UndoService undo;
     readonly LocaleService locale;
+    readonly SceneGridSettings gridSettings;
+    readonly SceneOrientationWidget orientationWidget = new();
 
     readonly HashSet<int> heldKeys = [];
 
@@ -85,6 +87,7 @@ sealed class SceneViewport : IDisposable
         this.log = log;
         this.undo = undo;
         this.locale = locale;
+        gridSettings = cameraSettings.Grid;
 
         sceneTree.FrameNodeRequested += OnFrameNodeRequested;
         inspector.SelectionChanged += OnSelectionChanged;
@@ -112,6 +115,7 @@ sealed class SceneViewport : IDisposable
         if (gui.Pass != Pass.Pass2Render)
         {
             DrawGestureFeedback(gui);
+            orientationWidget.Render(gui, controller, inspector.SelectedNode);
             return;
         }
 
@@ -126,6 +130,7 @@ sealed class SceneViewport : IDisposable
         var height = (uint)Math.Max(1f, rect.H);
         if (!EnsureService(width, height)) return;
 
+        orientationWidget.Render(gui, controller, inspector.SelectedNode);
         HandleInput(gui, rect);
         RenderFrame(gui, rect);
         DrawGestureFeedback(gui);
@@ -371,7 +376,7 @@ sealed class SceneViewport : IDisposable
     {
         if (playMode.IsActive || service is null) return;
 
-        GroundGrid.Draw(g, service.Camera.Position);
+        GroundGrid.Draw(g, service.Camera.Position, gridSettings);
 
         if (Gizmo.SelectedNode is { } selected)
             foreach (var component in selected.Components)

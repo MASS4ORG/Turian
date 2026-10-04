@@ -70,6 +70,17 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         input.MousePosition.Returns(new Vector2(800, 400));
         input.MouseWheelDelta.Returns(1f);
         Frame();
+        input.MouseWheelDelta.Returns(0f);
+        var orientation = Descendants(gui.RootNode!).Single(child => child.Id == "scene/orientation");
+        input.MousePosition.Returns(orientation.Rect.Center);
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+        input.IsMouseButtonDown(GMouseButton.Left).Returns(true);
+        Frame();
+        Assert.Same(node, inspector.SelectedNode);
+        Assert.False(viewport.Gizmo.IsDragging);
+        var viewer = (SceneViewerService)typeof(SceneViewport)
+            .GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;
+        Assert.True(viewer.Camera.IsOrthographic);
 
         bool CursorVisible() => (bool)typeof(SceneViewport)
             .GetField("showGizmoCursor", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;
