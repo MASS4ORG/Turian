@@ -18,7 +18,31 @@ public class StandardRenderSystem : IRenderSystem
     readonly RenderList renderList = new();
     readonly Dictionary<(Guid Model, int Index), MaterialAsset> derivedMaterials = [];
     readonly Dictionary<Guid, MaterialAsset> overrideMaterials = [];
+    readonly ConditionalWeakTable<ModelComponent, WorldBoundsCache> worldBounds = [];
+    readonly Plane[] frustumPlanes = new Plane[6];
     bool prepared;
+    readonly Silk.NET.Vulkan.DescriptorSetLayout globalLayout;
+    IOcclusionCuller? occlusion;
+    OcclusionDraw[] candidates = [];
+    bool indirect;
+
+    /// <summary>Optional visibility factory; the installed Brick is discovered when no factory is supplied.</summary>
+    public IOcclusionCullingFactory? OcclusionCullingFactory { get; set; }
+
+    /// <summary>Enables the optional GPU visibility pass for this view; disabled by default.</summary>
+    public bool UseOcclusionCulling { get; set; }
+
+    /// <summary>Counts from the latest completed visibility pass, which may lag by the frame slot count.</summary>
+    public RenderCullingStats OcclusionStats => occlusion?.CompletedStats ?? default;
+
+    /// <summary>Bytes allocated for optional visibility resources.</summary>
+    public ulong OcclusionAllocatedBytes => occlusion?.AllocatedBytes ?? 0;
+
+    /// <summary>Gets or sets whether submeshes outside the camera frustum are rejected before material resolution.</summary>
+    public bool UseFrustumCulling { get; set; } = true;
+
+    /// <summary>Gets the submitted and culled submesh counts from the latest prepared frame.</summary>
+    public RenderCullingStats CullingStats { get; private set; }
 
     /// <summary>
     /// .ctor
@@ -35,7 +59,10 @@ public class StandardRenderSystem : IRenderSystem
     )
     {
         this.vulkan = vulkan;
+        globalLayout = globalSetLayout;
         materials = new MaterialDescriptorContext(vulkan, assets);
+        OcclusionCullingFactory = OcclusionCullers.Find();
+        UseOcclusionCulling = OcclusionCullingFactory?.IsEnabled(assets) ?? false;
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }
@@ -47,8 +74,37 @@ public class StandardRenderSystem : IRenderSystem
 
         renderList.Gather(frameInfo.Nodes);
         UpdateLights(renderList.Lights, ubo);
+        if (UseFrustumCulling && renderList.Models.Count != 0)
+            GeometryUtility.CalculateFrustumPlanes(
+                frameInfo.Camera.GetViewMatrix() * frameInfo.Camera.GetProjectionMatrix(), frustumPlanes);
+        CullingStats = default;
         BuildDraws();
         prepared = true;
+        indirect = false;
+    }
+
+    /// <inheritdoc />
+    public void RecordBeforeRenderPass(FrameInfo frameInfo)
+    {
+        if (!UseOcclusionCulling || renderList.Draws.Count == 0) return;
+        occlusion ??= CreateOcclusionCuller();
+        if (occlusion is null) return;
+        FillOcclusionCandidates();
+        indirect = occlusion.Record(frameInfo, candidates.AsSpan(0, renderList.Draws.Count));
+    }
+
+    IOcclusionCuller? CreateOcclusionCuller() =>
+        (OcclusionCullingFactory ?? OcclusionCullers.Find())?.Create(vulkan, globalLayout);
+
+    void FillOcclusionCandidates()
+    {
+        var count = renderList.Draws.Count;
+        if (candidates.Length < count) candidates = new OcclusionDraw[count];
+        for (var i = 0; i < count; i++)
+        {
+            var draw = renderList.Draws[i];
+            candidates[i] = new OcclusionDraw(draw.Model, draw.SubMesh, draw.ModelMatrix, draw.WorldBounds);
+        }
     }
 
     /// <inheritdoc />
@@ -88,6 +144,7 @@ public class StandardRenderSystem : IRenderSystem
         }
 
         renderList.Sort();
+        CullingStats = CullingStats with { Submitted = renderList.Draws.Count };
     }
 
     void AddDraws(ModelComponent component, Model model, Transform global)
@@ -100,17 +157,24 @@ public class StandardRenderSystem : IRenderSystem
             last = Math.Min(rangeStart + rangeCount, model.SubMeshes.Count);
         }
 
-        var modelMatrix = global.Matrix4X4();
-        var normalMatrix = global.NormalMatrix();
+        var cached = worldBounds.GetValue(component, static _ => new WorldBoundsCache());
+        cached.Update(model, global, start, Math.Max(0, last - start));
         var modelAssetId = component.ModelAssetId;
         var modelOrder = renderList.OrderOf(model);
         for (var i = start; i < last; i++)
         {
+            if (UseFrustumCulling && !GeometryUtility.TestPlanesAABB(frustumPlanes, cached.Bounds[i - start]))
+            {
+                CullingStats = CullingStats with { Culled = CullingStats.Culled + 1 };
+                continue;
+            }
+
             var slot = i - start;
             var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
             var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
             var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
-            renderList.Draws.Add(new DrawItem(model, i, material, modelMatrix, normalMatrix, key));
+            renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
+                renderList.Draws.Count, cached.Bounds[i - start]));
         }
     }
 
@@ -118,6 +182,7 @@ public class StandardRenderSystem : IRenderSystem
     {
         Model? boundModel = null;
         MaterialResource? boundMaterial = null;
+        var drawIndex = 0;
         foreach (ref readonly var draw in CollectionsMarshal.AsSpan(renderList.Draws))
         {
             if (!ReferenceEquals(draw.Material, boundMaterial))
@@ -141,7 +206,11 @@ public class StandardRenderSystem : IRenderSystem
                 StandardPushConstantData.SizeOf(),
                 ref push
             );
-            draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh);
+            if (indirect)
+                draw.Model.DrawSubMeshIndirect(commandBuffer, occlusion!.IndirectBuffer, (ulong)drawIndex * 20);
+            else
+                draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh);
+            drawIndex++;
         }
     }
 
@@ -229,6 +298,8 @@ public class StandardRenderSystem : IRenderSystem
     public unsafe void Dispose()
     {
         renderList.Reset();
+        occlusion?.Dispose();
+        worldBounds.Clear();
         derivedMaterials.Clear();
         overrideMaterials.Clear();
         pipeline.Dispose();

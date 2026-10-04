@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <EmbeddedResource Include="Shaders/*.spv"/>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+    <ItemGroup>
+        <HzbShader Include="Shaders/*.vert;Shaders/*.comp"/>
+    </ItemGroup>
+    <Target Name="CompileHzbShaders" BeforeTargets="BeforeBuild"
+            Inputs="@(HzbShader)" Outputs="@(HzbShader->'%(Identity).spv');Shaders/base-single.comp.spv">
+        <Exec Command="glslc &quot;%(HzbShader.Identity)&quot; -o &quot;%(HzbShader.Identity).spv&quot;"/>
+        <Exec Command="glslc -DSINGLE_SAMPLE Shaders/base.comp -o Shaders/base-single.comp.spv"/>
+    </Target>
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <Copy SourceFiles="$(TargetPath)"
+              DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.hzb/Precast~/lib"/>
+    </Target>
+</Project>

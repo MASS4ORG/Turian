@@ -7,13 +7,17 @@ namespace Turian.Engine.Core;
 /// <param name="ModelMatrix">The world matrix of the owning node.</param>
 /// <param name="NormalMatrix">The normal matrix of the owning node.</param>
 /// <param name="SortKey">Material order in the high bits, model order in the low bits.</param>
+/// <param name="Sequence">Scene order, used to preserve depth and blend ordering within equal sort keys.</param>
+/// <param name="WorldBounds">The world-space bounds supplied to optional visibility passes.</param>
 readonly record struct DrawItem(
     Model Model,
     int SubMesh,
     MaterialResource Material,
     Matrix4x4 ModelMatrix,
     Matrix4x4 NormalMatrix,
-    long SortKey);
+    long SortKey,
+    int Sequence = 0,
+    Bounds WorldBounds = default);
 
 /// <summary>
 /// The scene content one frame draws: models and lights gathered in a single walk, and the submesh draws sorted so
@@ -86,7 +90,11 @@ sealed class RenderList
 
     /// <summary>Orders <see cref="Draws"/> by material, then model, so recording rebinds as little as possible.</summary>
     public void Sort() =>
-        CollectionsMarshal.AsSpan(Draws).Sort(static (a, b) => a.SortKey.CompareTo(b.SortKey));
+        CollectionsMarshal.AsSpan(Draws).Sort(static (a, b) =>
+        {
+            var order = a.SortKey.CompareTo(b.SortKey);
+            return order != 0 ? order : a.Sequence.CompareTo(b.Sequence);
+        });
 
     /// <summary>Forgets the material and model numbering, for when the resources behind them are released.</summary>
     public void Reset()

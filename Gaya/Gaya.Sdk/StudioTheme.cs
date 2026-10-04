@@ -46,10 +46,10 @@ public sealed record StudioTheme
     public Color InkFaint { get; init; } = Color.FromArgb(255, 105, 111, 120);
 
     /// <summary>Focus ring, selection outline and the color of anything the user is acting on.</summary>
-    public Color Accent { get; init; } = Color.FromArgb(255, 84, 143, 224);
+    public Color Accent { get; init; } = Color.FromArgb(255, 84, 84, 84);
 
     /// <summary>Fill behind a selected row or an engaged toolbar button, drawn under <see cref="Ink"/>.</summary>
-    public Color AccentFill { get; init; } = Color.FromArgb(255, 62, 95, 138);
+    public Color AccentFill { get; init; } = Color.FromArgb(255, 62, 62, 62);
 
     /// <summary>Central editor-area fill when nothing occupies it.</summary>
     public Color EditorArea { get; init; } = Color.FromArgb(255, 16, 18, 22);

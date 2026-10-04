@@ -19,6 +19,9 @@ public class Model : IDisposable
     /// </summary>
     public IReadOnlyList<SubMesh> SubMeshes { get; }
 
+    /// <summary>Gets the model-space bounds enclosing all submeshes.</summary>
+    public Bounds Bounds { get; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="Model"/> class.
     /// </summary>
@@ -36,9 +39,8 @@ public class Model : IDisposable
             CreateIndexBuffers(builder.Indices);
         }
 
-        SubMeshes = builder.SubMeshes is { Count: > 0 }
-            ? builder.SubMeshes.AsReadOnly()
-            : (IReadOnlyList<SubMesh>)[new SubMesh(0, indexCount > 0 ? indexCount : vertexCount)];
+        SubMeshes = builder.GetBoundedSubMeshes();
+        Bounds = SubMeshes.Aggregate(Bounds.Empty, static (bounds, sub) => bounds.Encapsulate(sub.Bounds));
     }
 
     void CreateVertexBuffers(Vertex[] vertices)
@@ -139,13 +141,22 @@ public class Model : IDisposable
         }
     }
 
+    /// <summary>Draws one GPU-written command; indexed and non-indexed models use a common 20-byte stride.</summary>
+    public void DrawSubMeshIndirect(CommandBuffer commandBuffer, Silk.NET.Vulkan.Buffer commands, ulong offset)
+    {
+        if (hasIndexBuffer)
+            vulkan.Vk.CmdDrawIndexedIndirect(commandBuffer, commands, offset, 1, 20);
+        else
+            vulkan.Vk.CmdDrawIndirect(commandBuffer, commands, offset, 1, 20);
+    }
+
     /// <summary>
     /// Releases the resources held by the model.
     /// </summary>
     public void Dispose()
     {
         vertexBuffer.Dispose();
-        indexBuffer.Dispose();
+        if (hasIndexBuffer) indexBuffer.Dispose();
         GC.SuppressFinalize(this);
     }
 }

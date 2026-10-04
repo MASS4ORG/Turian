@@ -32,6 +32,9 @@ public class WindowManager : IDisposable
     /// <summary>Gets or sets whether the title also shows the window size and frame rate.</summary>
     public bool ShowStats { get; set; }
 
+    /// <summary>Gets or sets the current view's submesh counts, displayed alongside the frame rate.</summary>
+    public RenderCullingStats CullingStats { get; set; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowManager"/> class.
     /// </summary>
@@ -75,7 +78,8 @@ public class WindowManager : IDisposable
         var fps = frameCount / (frametime * frameCount);
         if (Window is IWindow w)
         {
-            w.Title = $"{title} | {Window.Size.X}x{Window.Size.Y} | {fps,-8: 0} fps";
+            w.Title = $"{title} | {Window.Size.X}x{Window.Size.Y} | {fps,-8: 0} fps"
+                + $" | {CullingStats.Submitted} drawn, {CullingStats.Culled}/{CullingStats.Total} culled";
         }
         fpsLastUpdate = DateTime.Now.Ticks;
         frameCount = 0;

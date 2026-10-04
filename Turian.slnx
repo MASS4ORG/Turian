@@ -29,6 +29,9 @@
     <Project Path="Turian/Packages/org.mass4.turian.ui/Source~/Turian.Engine.UI/Turian.Engine.UI.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj" />
   </Folder>
+  <Folder Name="/Packages/">
+    <Project Path="Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj" />
+  </Folder>
   <Project Path=".nuke/Build.csproj" />
   <Project Path="Turian/Benchmarks/Turian.Benchmarks.csproj" />
   <Project Path="Turian.Tests/Turian.Tests.csproj" />

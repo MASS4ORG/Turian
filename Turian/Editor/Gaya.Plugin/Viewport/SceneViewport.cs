@@ -96,6 +96,9 @@ sealed class SceneViewport : IDisposable
     /// <summary>The interactive transform gizmo, so the panel's toolbar can drive its mode and snap.</summary>
     public TransformGizmo Gizmo { get; } = new();
 
+    /// <summary>The submitted and culled submesh counts from the scene viewport's latest frame.</summary>
+    public RenderCullingStats CullingStats => service?.CullingStats ?? default;
+
     Vector2 ViewportSize => new(service?.Width ?? 0, service?.Height ?? 0);
 
     /// <summary>

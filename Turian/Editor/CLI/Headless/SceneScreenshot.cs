@@ -95,6 +95,11 @@ static class SceneScreenshot
                         Stopwatch.GetElapsedTime(started).TotalMilliseconds);
                 }
 
+                var culling = viewer.CullingStats;
+                logger.LogInformation("Culling: {Submitted} submitted, {Culled}/{Total} submeshes culled",
+                    culling.Submitted, culling.Culled, culling.Total);
+                ReportOcclusion(logger);
+
                 var pixels = new byte[viewer.Width * viewer.Height * 4];
                 viewer.CopyPixels(pixels);
                 PngWriter.Save(outputPath, pixels, viewer.Width, viewer.Height);
@@ -122,6 +127,14 @@ static class SceneScreenshot
             viewer.WorldUiSource = null;
             viewer.Dispose();
             uiPresenter?.Dispose();
+        }
+
+        void ReportOcclusion(ILogger logger)
+        {
+            if (!viewer.UseOcclusionCulling) return;
+            var counts = viewer.OcclusionStats;
+            logger.LogInformation("GPU occlusion: {Visible} visible, {Culled}/{Total} hidden; {Memory:F2} MiB (completed frame)",
+                counts.Submitted, counts.Culled, counts.Total, viewer.OcclusionAllocatedBytes / 1048576.0);
         }
     }
 
