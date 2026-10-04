@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-04
+
+- Added: frustum culling CPU #8 GPU/HZB draft #52
+- Added: multiplayer foundation #155
+- Fixed: scene gizmos
+
 ## [2.0.0] - 2026-10-03
 
 - Added: collapsable main menu and windowless
@@ -38,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/MASS4ORG/Turian/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/MASS4ORG/Turian/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/MASS4ORG/Turian/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MASS4ORG/Turian/compare/v1.0.1...v1.1.0
