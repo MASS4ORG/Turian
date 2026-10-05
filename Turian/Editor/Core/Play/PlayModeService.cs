@@ -249,6 +249,9 @@ public sealed class PlayModeService(
     void AddProjectServices(IServiceCollection services)
     {
         var settings = ProjectSettings();
+        services.AddSingleton<IAppSettings>(settings ?? new AppSettings());
+        services.AddSingleton<LayerFilter>();
+        services.AddSingleton<IPhysicsQueries, PhysicsQueries>();
         services.AddSingleton(new SimulationClock(settings?.Get<TimeSettings>()));
         if (settings is not null)
             services.AddSingleton(_ => LocalizationLoader.Create(settings, assetDatabase));

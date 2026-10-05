@@ -23,6 +23,7 @@ sealed class SceneViewport : IDisposable
     readonly GizmoDrawerCatalog gizmos;
     readonly PlayModeService playMode;
     readonly EditorCameraSettings cameraSettings;
+    readonly LayerFilter layers;
     readonly ILogger log;
     readonly UndoService undo;
     readonly LocaleService locale;
@@ -62,6 +63,7 @@ sealed class SceneViewport : IDisposable
     /// <param name="log">Where an unusable device is reported.</param>
     /// <param name="undo">Records a whole gizmo drag as one step.</param>
     /// <param name="locale">Resolves UI text for the open editor project.</param>
+    /// <param name="layers">Resolves the current project's named rendering layers.</param>
     public SceneViewport(
         Vulkan vulkan,
         AssetDatabase assets,
@@ -72,7 +74,8 @@ sealed class SceneViewport : IDisposable
         EditorCameraSettings cameraSettings,
         ILogger log,
         UndoService undo,
-        LocaleService locale)
+        LocaleService locale,
+        LayerFilter? layers = null)
     {
         this.vulkan = vulkan;
         this.assets = assets;
@@ -84,8 +87,10 @@ sealed class SceneViewport : IDisposable
         this.log = log;
         this.undo = undo;
         this.locale = locale;
+        this.layers = layers ?? new LayerFilter();
         gridSettings = cameraSettings.Grid;
         Gizmo.Settings = cameraSettings.Gizmos;
+        Gizmo.ViewSettings = cameraSettings.View;
 
         sceneTree.FrameNodeRequested += OnFrameNodeRequested;
         inspector.SelectionChanged += OnSelectionChanged;
@@ -100,6 +105,9 @@ sealed class SceneViewport : IDisposable
 
     /// <summary>The live settings shared by the toolbar and Settings pages.</summary>
     public EditorCameraSettings Settings => cameraSettings;
+
+    /// <summary>The rendering layer definitions supplied by the current project settings.</summary>
+    public IReadOnlyList<LayerSlot> RenderLayers => layers.Settings.RenderLayers;
 
     /// <summary>Gets whether the Scene camera is using orthographic projection.</summary>
     public bool IsOrthographic => controller?.Camera.IsOrthographic ?? false;
@@ -238,6 +246,7 @@ sealed class SceneViewport : IDisposable
     void SyncCamera(IInputHandler input)
     {
         service!.ClearColor = new Vector4(cameraSettings.View.EmptySkyColor, 1f);
+        service.Camera.CullingMask = cameraSettings.View.VisibleLayers;
         controller!.MoveSpeed = cameraSettings.MoveSpeed;
         controller.LookSensitivity = cameraSettings.LookSensitivity;
         controller.ZoomFraction = cameraSettings.ZoomFraction;
@@ -304,7 +313,7 @@ sealed class SceneViewport : IDisposable
             && Math.Abs(local.Y - pressPosition.Y) <= clickDragThreshold;
 
         if (isClick && sceneTree.CurrentSceneRoot is { } root)
-            inspector.Select(ScenePicker.Pick(root, service!.Camera, local, ViewportSize));
+            inspector.Select(ScenePicker.Pick(root, service!.Camera, local, ViewportSize, cameraSettings.View));
 
         controller!.OnMouseUp();
     }

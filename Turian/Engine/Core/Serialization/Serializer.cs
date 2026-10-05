@@ -61,6 +61,8 @@ public static class Serializer
                         options.Converters.Add(converterInstance);
                 }
 
+                options.Converters.Add(new ObjectJsonSerializerFactory());
+
                 _jsonOptions = options;
                 return options;
             }

@@ -32,6 +32,12 @@ public enum DuplicateSceneLoadPolicy
 /// </remarks>
 public interface ISceneManager
 {
+    /// <summary>Finds the first active tagged node across loaded scenes and persistent nodes.</summary>
+    Node? FindWithTag(string? tag);
+
+    /// <summary>Finds active tagged nodes across loaded scenes in registration order.</summary>
+    IReadOnlyList<Node> FindAllWithTag(string? tag);
+
     /// <summary>
     /// Gets a snapshot of all currently loaded scenes.
     /// </summary>

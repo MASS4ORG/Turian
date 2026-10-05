@@ -63,6 +63,7 @@ public sealed class ProjectBootstrapper
             });
             ProjectSettingsFiles.Create(settings, new InputSettings());
             ProjectSettingsFiles.Create(settings, new GraphicsSettings());
+            ProjectSettingsFiles.Create(settings, new TagsAndLayersSettings());
 
             new Gaya.Packages.ProjectManifest
             {

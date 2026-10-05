@@ -55,6 +55,7 @@ public class MeshRenderSystem : IRenderSystem
             frameInfo.Nodes[n].GetComponentsInChildren(meshes);
             foreach (var component in meshes)
             {
+                if (component.Node is not { } node || !frameInfo.Camera.CullingMask.Contains(node.RenderLayer)) continue;
                 StandardPushConstantData push = new()
                 {
                     ModelMatrix = component.TransformationMatrix(),

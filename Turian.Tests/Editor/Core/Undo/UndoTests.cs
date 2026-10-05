@@ -238,6 +238,56 @@ public class UndoTests
         Assert.Equal(10, stats.Health);
     }
 
+    /// <summary>Settings tag, layer name and list order edits undo and redo with slot identities intact.</summary>
+    [Fact]
+    public void UndoRestoresTagsLayersAndSettingsOrder()
+    {
+        var settings = new TagsAndLayersSettings();
+        var physicsId = settings.PhysicsLayers[7].Id;
+        var renderId = settings.RenderLayers[9].Id;
+        var metadata = new DataAssetAsset { Id = Guid.NewGuid(), RelativePath = "Assets/layers.dataasset" };
+        inspector.Select(new AssetInspection(metadata, "/tmp/layers.dataasset", settings, "Layers", IsPayload: true));
+        settings.Tags.Add("Player");
+        settings.PhysicsLayers[7].Name = "Characters";
+        settings.RenderLayers[9].Name = "Effects";
+        settings.PhysicsLayers.Reverse();
+        settings.RenderLayers.Reverse();
+        undo.MarkAltered();
+        undo.Flush();
+        undo.Undo();
+        Assert.Equal(["Untagged"], settings.Tags);
+        Assert.Equal(0, settings.PhysicsLayers[0].Index);
+        Assert.Equal("Layer 7", settings.FindPhysicsLayer(7)!.Name);
+        Assert.Equal(physicsId, settings.FindPhysicsLayer(7)!.Id);
+        undo.Redo();
+        Assert.Contains("Player", settings.Tags);
+        Assert.Equal(31, settings.PhysicsLayers[0].Index);
+        Assert.Equal("Characters", settings.FindPhysicsLayer(7)!.Name);
+        Assert.Equal("Effects", settings.FindRenderLayer(9)!.Name);
+        Assert.Equal(renderId, settings.FindRenderLayer(9)!.Id);
+    }
+
+    /// <summary>Undoing node tag edits refreshes the scene registry while keeping masks and indices.</summary>
+    [Fact]
+    public void UndoRefreshesNodeTagRegistry()
+    {
+        var node = AddChild("Tagged");
+        root.Awake(null);
+        inspector.Select(node);
+        node.Tags = ["Player"];
+        node.PhysicsLayer = 7;
+        node.RenderLayer = 9;
+        EndFrame();
+        Assert.Same(node, root.FindWithTag("Player"));
+        undo.Undo();
+        Assert.Null(root.FindWithTag("Player"));
+        Assert.Equal(0, node.PhysicsLayer);
+        undo.Redo();
+        Assert.Same(node, root.FindWithTag("Player"));
+        Assert.Equal(7, node.PhysicsLayer);
+        Assert.Equal(9, node.RenderLayer);
+    }
+
     /// <summary>Undo reaches back into another scene and brings it to the front.</summary>
     [Fact]
     public void Undo_SwitchesToTheStepsScene()

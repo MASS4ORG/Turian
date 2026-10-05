@@ -86,6 +86,9 @@ public class App : IDisposable
         var projectSettings = LoadProjectSettings();
         var simulationClock = new SimulationClock(projectSettings.Get<TimeSettings>());
         var registrations = new ServiceCollection()
+            .AddSingleton<IAppSettings>(projectSettings)
+            .AddSingleton<LayerFilter>()
+            .AddSingleton<IPhysicsQueries, PhysicsQueries>()
             .AddSingleton(vulkan)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)

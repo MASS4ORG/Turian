@@ -29,6 +29,9 @@ public struct DirectionalLight
     public void SetColor(Vector4 col, float intensity) =>
         color = new Vector4(col.X, col.Y, col.Z, intensity);
 
+    /// <summary>Stores rendering layer bits in the unused fourth direction channel.</summary>
+    public void SetLayerMask(LayerMask mask) => direction.W = BitConverter.UInt32BitsToSingle(mask.Value);
+
     /// <summary>Turns the light off, so the shader skips its slot.</summary>
     public void Clear()
     {

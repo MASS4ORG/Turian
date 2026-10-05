@@ -42,5 +42,10 @@ static class BuiltInTypeIds
         [new("a3000005-0000-4000-8000-000000000002")] = new("cc688af8-42fd-5923-bf11-02fc3f2fe765"),
         [new("a3000005-0000-4000-8000-000000000003")] = new("4af10a42-b4f9-5694-aa3b-f96a8f7f23aa"),
         [new("a3000005-0000-4000-8000-000000000004")] = new("ea552db5-cfca-5aeb-850d-e9ca1a4892e2"),
+        [new("aa0c7d85-70db-4db4-aeaa-ea91d17f7608")] = new("35df23dd-ab7a-53ee-a580-741fa147caeb"),
+        [new("b9ee2d03-11c2-4826-aac3-615e146972b7")] = new("beaa551f-3c02-5add-8879-a3aa9c39b72a"),
+        [new("9c948080-6463-4bb7-83e7-58999c5f9d94")] = new("19ab83e0-67a6-51bb-9d57-b5e0b38a8765"),
+        [new("9b2c918e-3b11-4e3c-b33b-a1c2a0b20f8e")] = new("bda16c7d-0660-5900-a068-fc33916c3654"),
+        [new("c2e378eb-0b0c-49aa-916c-aa9c8a219f21")] = new("90104bcf-6e4b-559e-98cf-4c428ca1221d"),
     };
 }

@@ -7,6 +7,7 @@ namespace Turian.Editor.Core;
 public sealed class NodeInspectorController
 {
     readonly AssetManager assetManager;
+    readonly SceneViewSettings? viewSettings;
 
     /// <summary>Gets the currently selected Node, or null if no node is selected.</summary>
     public Node? SelectedNode => selectedNode;
@@ -28,10 +29,14 @@ public sealed class NodeInspectorController
     /// </summary>
     /// <param name="assetManager">The asset manager used for persistence operations.</param>
     /// <param name="build">Supplies the loaded user assemblies; without one only the app domain's are offered.</param>
-    public NodeInspectorController(AssetManager assetManager, BuildManager? build = null)
+    /// <param name="viewSettings">The shared Scene view layer locks.</param>
+    public NodeInspectorController(AssetManager assetManager, BuildManager? build = null,
+        SceneViewSettings? viewSettings = null)
     {
         this.assetManager = assetManager;
         this.build = build;
+        this.viewSettings = viewSettings;
+        if (viewSettings is not null) viewSettings.LocksChanged += OnLocksChanged;
     }
 
     readonly BuildManager? build;
@@ -50,14 +55,21 @@ public sealed class NodeInspectorController
     /// <param name="target">The object to select. Can be a Node, Component, or null to clear selection.</param>
     public void Select(object? target)
     {
-        SelectedObject = target;
-        selectedNode = target switch
+        var node = target switch
         {
             Node n => n,
             Component { IsAttached: true } c => c.Node,
             _ => null
         };
+        if (node is not null && viewSettings?.CanSelect(node) == false) return;
+        SelectedObject = target;
+        selectedNode = node;
         SelectionChanged?.Invoke();
+    }
+
+    void OnLocksChanged()
+    {
+        if (selectedNode is not null && viewSettings?.CanSelect(selectedNode) == false) ClearSelection();
     }
 
     /// <summary>Clears the current selection, setting both SelectedObject and SelectedNode to null.</summary>

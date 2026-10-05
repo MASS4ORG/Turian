@@ -8,14 +8,16 @@ namespace Gaya.Plugin.Turian;
 sealed class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
     ReferencePicker references, AssetRevealService reveal, AssetInspectionService inspections,
     InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews, UndoService undo, AssetAutoSave autoSave,
-    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database)
+    PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database, LayerFilter? layers = null)
     : IPanel, IDisposable
 {
     readonly ReferenceDrawer referenceDrawer = new(references, inspector, reveal);
+    readonly LayerFilter layerFilter = layers ?? new LayerFilter();
     readonly AssetPreviewView preview = new(vulkan, database, previews);
     readonly PrefabOverrideTracker overrides =
         new(id => PrefabInstances.ReadPrefabJson(database, id));
     bool trackingEdits;
+    IReadOnlyList<string> validationWarnings = [];
 
     static StudioTheme Theme => StudioTheme.Current;
 
@@ -64,11 +66,13 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
         if (target is AssetInspection inspection)
         {
+            if (inspection.Target is { } payload) DrawValidation(gui, payload);
             RenderAsset(gui, inspection);
             return;
         }
 
         PrepareForm(gui, target);
+        DrawValidation(gui, target);
 
         RenderForm(gui, target);
 
@@ -91,6 +95,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
     FormRenderContext CreateFormContext()
     {
+        drawers.Add(LayerDrawer.Handles, new LayerDrawer(layerFilter));
         referenceRegistration = drawers.Add(ReferenceDrawer.Handles, referenceDrawer);
         return new FormRenderContext
         {
@@ -142,6 +147,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         }
 
         if (target is Node) RenderAddComponent(gui);
+    }
+
+    void DrawValidation(Gui gui, object target)
+    {
+        if (gui.Pass == Pass.Pass1Build)
+            validationWarnings = TagsAndLayersValidation.Warnings(target, layerFilter.Settings);
+        for (var i = 0; i < validationWarnings.Count; i++)
+            using (gui.Node(-1, Theme.Scale(24f), $"inspector/layers/warning/{i}").ExpandWidth().Enter())
+                gui.DrawText(validationWarnings[i], Theme.Text(11f), Theme.InkDim);
     }
 
     void RebuildForm(object target, int components)

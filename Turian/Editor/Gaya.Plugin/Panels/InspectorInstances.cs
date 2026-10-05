@@ -37,7 +37,8 @@ sealed class InspectorInstances(IPanelRegistry panels, ITabStripChromeRegistry t
                 sp.GetRequiredService<AssetAutoSave>(),
                 sp.GetRequiredService<PrefabOverrideOperations>(),
                 sp.GetRequiredService<PrefabStage>(),
-                sp.GetRequiredService<AssetDatabase>())));
+                sp.GetRequiredService<AssetDatabase>(),
+                sp.GetRequiredService<LayerFilter>())));
 
         tabStripChrome.Register(new TabStripChromeDescriptor($"{panelId}.tabMenu", panelId,
             sp => new InspectorTabChrome(

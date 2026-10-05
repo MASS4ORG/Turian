@@ -58,6 +58,25 @@ public class RenderListTests
         Assert.Empty(list.Lights);
     }
 
+    /// <summary>Excluded parents leave included child layers visible, and physics layers do not affect rendering.</summary>
+    [Fact]
+    public void GatherFiltersRenderLayersIndependentlyOfParentsAndPhysics()
+    {
+        var parent = NodeWith("parent", new ModelComponent(), new LightComponent());
+        parent.RenderLayer = 7;
+        var childModel = new ModelComponent();
+        var childLight = new LightComponent();
+        var child = Child(parent, NodeWith("child", childModel, childLight));
+        child.PhysicsLayer = 7;
+        var list = new RenderList();
+        list.Gather([parent], LayerMask.FromLayer(0));
+        Assert.Equal([childModel], list.Models);
+        Assert.Equal([childLight], list.Lights);
+        list.Gather([parent], LayerMask.Nothing);
+        Assert.Empty(list.Models);
+        Assert.Empty(list.Lights);
+    }
+
     /// <summary>State numbers are stable per object, first-seen order, and restart after a reset.</summary>
     [Fact]
     public void OrderOfIsStablePerObject()
@@ -131,7 +150,9 @@ public class RenderListTests
         StandardRenderSystem.UpdateLights(lights, ubo);
         var bytes = ubo.AsBytes();
 
-        Assert.Equal(new Vector4(4, 2, 3, 0), ReadVector(bytes, PointLightsOffset + (4 * 32)));
+        var position = ReadVector(bytes, PointLightsOffset + (4 * 32));
+        Assert.Equal(new Vector3(4, 2, 3), new Vector3(position.X, position.Y, position.Z));
+        Assert.Equal(uint.MaxValue, BitConverter.SingleToUInt32Bits(position.W));
         Assert.Equal(new Vector4(9, 0, 0, 1), ReadVector(bytes, PointLightsOffset + (9 * 32) + 16));
         Assert.Equal(0.5f, ReadVector(bytes, DirectionalLightsOffset + 16).W);
 

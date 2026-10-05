@@ -87,6 +87,13 @@ public class GlobalUbo
     public void SetPointLightPosition(int lightIndex, Vector3 position) =>
         pointLights[lightIndex].SetPosition(position);
 
+    /// <summary>Sets the rendering layers receiving illumination from a point light.</summary>
+    public void SetPointLightMask(int lightIndex, LayerMask mask) => pointLights[lightIndex].SetLayerMask(mask);
+
+    /// <summary>Sets the rendering layers receiving illumination from a directional light.</summary>
+    public void SetDirectionalLightMask(int lightIndex, LayerMask mask) =>
+        directionalLights[lightIndex].SetLayerMask(mask);
+
     /// <summary>
     /// Sets the color and intensity of a point light at the specified index.
     /// </summary>

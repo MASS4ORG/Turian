@@ -112,6 +112,7 @@ public partial class SceneManager
         ArgumentNullException.ThrowIfNull(root);
 
         root.Parent = null;
+        root.BindTagRegistry(new TagRegistry());
 
         var loadedScene = new LoadedScene(assetId, root)
         {

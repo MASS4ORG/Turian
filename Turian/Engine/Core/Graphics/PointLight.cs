@@ -31,6 +31,9 @@ public struct PointLight : IEquatable<PointLight>
     public void SetPosition(Vector3 pos) =>
         position = new Vector4(pos.X, pos.Y, pos.Z, 0f);
 
+    /// <summary>Stores rendering layer bits in the unused fourth position channel.</summary>
+    public void SetLayerMask(LayerMask mask) => position.W = BitConverter.UInt32BitsToSingle(mask.Value);
+
     /// <summary>
     /// Sets the color and intensity of the point light.
     /// </summary>

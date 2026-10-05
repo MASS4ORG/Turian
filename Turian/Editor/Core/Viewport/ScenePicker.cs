@@ -20,15 +20,17 @@ public static class ScenePicker
     /// <param name="camera">The camera the click was made through.</param>
     /// <param name="screenPos">Pointer position in viewport pixels.</param>
     /// <param name="viewportSize">Viewport size in pixels.</param>
+    /// <param name="settings">The Scene view layer locks; visibility does not affect selection.</param>
     /// <returns>The hit node, or <c>null</c> when the ray hits nothing.</returns>
-    public static Node? Pick(Node root, ICamera camera, Vector2 screenPos, Vector2 viewportSize)
+    public static Node? Pick(Node root, ICamera camera, Vector2 screenPos, Vector2 viewportSize,
+        SceneViewSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(camera);
 
         if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray) return null;
 
-        return PickClosest(EnumerateWorldBounds(root), ray);
+        return PickClosest(EnumerateWorldBounds(root), ray, settings);
     }
 
     /// <summary>
@@ -39,7 +41,9 @@ public static class ScenePicker
     /// </summary>
     /// <param name="candidates">Nodes paired with their world-space bounding boxes.</param>
     /// <param name="ray">The ray to test against each box.</param>
-    public static Node? PickClosest(IEnumerable<(Node Node, Bounds WorldBounds)> candidates, Ray ray)
+    /// <param name="settings">The Scene view layer locks; visibility does not affect selection.</param>
+    public static Node? PickClosest(IEnumerable<(Node Node, Bounds WorldBounds)> candidates, Ray ray,
+        SceneViewSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(candidates);
 
@@ -48,6 +52,7 @@ public static class ScenePicker
 
         foreach (var (node, bounds) in candidates)
         {
+            if (!node.IsActiveInHierarchy || settings?.CanSelect(node) == false) continue;
             if (!bounds.TryIntersect(ray, out var distance)) continue;
 
             if (distance < closestDistance)

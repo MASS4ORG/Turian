@@ -3,6 +3,33 @@ namespace Turian.Tests;
 /// <summary>Exercises composed forms and contextual actions through both headless Inspector passes.</summary>
 public sealed class InspectorFormsRenderingTests
 {
+    /// <summary>Invalid project slots and node references display warnings through both Inspector passes.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LayerValidationWarningsAreVisible(bool asset)
+    {
+        var settings = new TagsAndLayersSettings();
+        settings.PhysicsLayers[3].Name = "";
+        var project = new AppSettings();
+        project.Loaded.Use(settings);
+        var assets = new AssetManager();
+        var selection = new NodeInspectorController(assets);
+        selection.Select(asset
+            ? new AssetInspection(null!, "settings.dataasset", settings, "Settings", IsPayload: true)
+            : new Node { PhysicsLayer = 3 });
+        var input = Substitute.For<IInputHandler>();
+        input.MousePosition.Returns(new Vector2(-1));
+        var gui = new Gui { Input = input };
+        using var panel = new InspectorPanel(selection, assets, new ReferencePicker(null!, null!, null!),
+            null!, null!, new InspectorSettings(), null!, null!, null!, null!, null!, null!, null!,
+            new LayerFilter(project));
+        using var surface = SKSurface.Create(new SKImageInfo(640, 800));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        Frame(gui, surface, font, panel.Render);
+        Assert.Contains(Descendants(gui.RootNode!), node => node.Id == "inspector/layers/warning/0");
+    }
+
     /// <summary>A settings selection made during rendering takes effect on the next complete frame.</summary>
     [Theory]
     [InlineData(typeof(PlayerSettings))]

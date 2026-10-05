@@ -92,7 +92,15 @@ public sealed class SceneToolbarTests
         MenuClick(5);
         Assert.False(settings.Gizmos.ShowOrientation);
         Click("scene/toolbar/View");
+        MenuClick(6);
+        SubmenuClick("Visible layers", 0);
+        Assert.False(settings.View.VisibleLayers.Contains(0));
+        Click("scene/toolbar/View");
         MenuClick(7);
+        SubmenuClick("Locked layers", 0);
+        Assert.True(settings.View.LockedLayers.Contains(0));
+        Click("scene/toolbar/View");
+        MenuClick(9);
         Assert.NotNull(Find("scene/options/value/fov"));
         Assert.NotNull(Find("scene/options/value/near"));
         Assert.NotNull(Find("scene/options/value/far"));
@@ -115,6 +123,11 @@ public sealed class SceneToolbarTests
 
         void MenuClick(int index) => Click(Nodes().Single(node =>
             node.Id.Contains("/menubar/", StringComparison.Ordinal) && node.Id.EndsWith("/i" + index)).Id);
+        void SubmenuClick(string name, int index)
+        {
+            Click(Nodes().Single(node => node.Id.Contains($"/{name}/", StringComparison.Ordinal)
+                && node.Id.EndsWith("/i" + index)).Id);
+        }
         void Click(string id) => ClickAt(Find(id).Rect.Center);
         void ClickAt(Vector2 point)
         {

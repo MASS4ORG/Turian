@@ -296,8 +296,9 @@ public partial class SceneManager : ISceneManager
             }
         }
 
-        DetachNodeHierarchy(scene.RootNode);
+        scene.RootNode.BindTagRegistry(null);
         RecursiveCleanup(scene.RootNode);
+        DetachNodeHierarchy(scene.RootNode);
         scene.ResetRuntimeState();
     }
 

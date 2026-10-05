@@ -11,6 +11,9 @@ namespace Turian.Engine.Core;
 [TypeId("1e9919ae-f343-569f-8715-8aa2baab3e39")]
 public class CameraComponent : Component, ICamera
 {
+    /// <summary>The rendering layers included by this camera.</summary>
+    public LayerMask CullingMask { get; set; } = LayerMask.Everything;
+
     const float minNear = 0.0001f;
     const float minFov = 1f * Mathf.DegreesToRadians;
     const float maxFov = 120f * Mathf.DegreesToRadians;

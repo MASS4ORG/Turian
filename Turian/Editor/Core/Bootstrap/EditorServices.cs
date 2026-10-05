@@ -21,6 +21,7 @@ public static class EditorServices
         services.AddSingleton<BuildManager>();
         services.AddSingleton<AssetDatabase>();
         services.AddSingleton<AssetManager>();
+        services.AddSingleton<SceneViewSettings>();
         services.AddSingleton<NodeInspectorController>();
         services.AddSingleton<SceneTreeController>();
 

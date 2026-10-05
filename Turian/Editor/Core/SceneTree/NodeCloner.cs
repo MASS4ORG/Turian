@@ -62,13 +62,15 @@ public static class NodeCloner
         ArgumentNullException.ThrowIfNull(source);
         var clone = (Node)Activator.CreateInstance(source.GetType())!;
         clone.Name = newName;
+        clone.Tags = [.. source.Tags];
 
         foreach (var prop in source.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p is { CanRead: true, CanWrite: true }
                         && p.GetIndexParameters().Length == 0
                         && p.GetMethod?.GetParameters().Length == 0
-                        && p.Name is not (nameof(Node.Children) or nameof(Node.Parent) or nameof(Node.Name))))
+                        && p.Name is not (nameof(Node.Children) or nameof(Node.Parent) or nameof(Node.Name)
+                            or nameof(Node.Tags))))
         {
             object? value;
             try { value = prop.GetValue(source); }
