@@ -1,6 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>A set of indices in one of the project's independent 32-slot layer spaces.</summary>
+/// <remarks>Compatibility API for legacy consumers; use LayerMaskState for durable GUID-based selections.</remarks>
 [JsonConverter(typeof(LayerMaskJsonConverter))]
 public readonly record struct LayerMask(uint Value)
 {

@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>Authored identity and presentation for a value that can be interned at runtime.</summary>
-[TypeId("aa0c7d85-70db-4db4-aeaa-ea91d17f7608")]
+[TypeId("35df23dd-ab7a-53ee-a580-741fa147caeb")]
 public abstract class EnumValueAsset : DataAsset
 {
     /// <summary>The editable display name; references use the asset identity.</summary>
@@ -16,10 +16,10 @@ public abstract class EnumValueAsset : DataAsset
 
 /// <summary>A single membership value in a layer group.</summary>
 [CreateAssetMenu(fileName: "LayerValue", path: "Layers/Value")]
-[TypeId("b9ee2d03-11c2-4826-aac3-615e146972b7")]
+[TypeId("beaa551f-3c02-5add-8879-a3aa9c39b72a")]
 public sealed class LayerValueAsset : EnumValueAsset;
 
 /// <summary>An independently identified tag that nodes can share.</summary>
 [CreateAssetMenu(fileName: "Tag", path: "Layers/Tag")]
-[TypeId("9c948080-6463-4bb7-83e7-58999c5f9d94")]
+[TypeId("19ab83e0-67a6-51bb-9d57-b5e0b38a8765")]
 public sealed class TagAsset : EnumValueAsset;

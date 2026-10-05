@@ -1,6 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>Inline memberships with sparse overflow; zero selects each group's explicit runtime default.</summary>
+[JsonConverter(typeof(SessionLayerJsonConverter<NodeLayers>))]
 public struct NodeLayers
 {
     /// <summary>The number of memberships stored inline, independently of the project's group count.</summary>
@@ -97,4 +98,16 @@ public struct NodeLayers
     {
         byte first;
     }
+}
+
+/// <summary>Rejects durable serialization of layer caches; persist NodeLayerState or LayerMaskState GUIDs.</summary>
+public sealed class SessionLayerJsonConverter<T> : JsonConverter<T>
+{
+    /// <inheritdoc />
+    public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        throw new NotSupportedException("Layer caches are session-scoped; persist NodeLayerState or LayerMaskState GUIDs.");
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) =>
+        throw new NotSupportedException("Layer caches are session-scoped; persist NodeLayerState or LayerMaskState GUIDs.");
 }

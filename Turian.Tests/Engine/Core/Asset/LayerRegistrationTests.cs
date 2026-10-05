@@ -76,15 +76,18 @@ public sealed class LayerRegistrationTests
         Assert.Equal(2, builder.Build().Tags.Count);
     }
 
-    /// <summary>Duplicate identities and groups without explicit defaults are rejected.</summary>
+    /// <summary>Repeated registrations from one source and groups without defaults are rejected.</summary>
     [Fact]
     public void ConflictingIdentitiesAreRejected()
     {
         var assets = TypedSettings();
         Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder().Include(assets.Groups[0])
-            .Group<Physics>(group => group.Default()).Build());
+            .Include(assets.Groups[0]).Build());
         Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder().Include(assets.Tags[0])
-            .Tag<Player>().Build());
+            .Include(assets.Tags[0]).Build());
+        Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder().Tag<Player>().Tag<Player>().Build());
+        Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder()
+            .Group<Physics>(group => group.Default()).Group<Physics>(group => group.Default()).Build());
         Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder()
             .Group<Physics>(group => group.Default().Value<Water>().Value<RenamedWater>()).Build());
         Assert.Throws<InvalidOperationException>(() => new LayerRegistrationBuilder()
@@ -99,6 +102,7 @@ public sealed class LayerRegistrationTests
         Assert.Throws<ArgumentNullException>(() => builder.Group<Physics>(null!));
         Assert.Throws<ArgumentNullException>(() => builder.Include((LayerGroupAsset)null!));
         Assert.Throws<ArgumentNullException>(() => builder.Include((TagAsset)null!));
+        Assert.Throws<ArgumentNullException>(() => builder.Include((LayerValueAsset)null!));
         Assert.Throws<InvalidOperationException>(() => builder.Group<MissingGroupId>(group => group.Default()));
         Assert.Throws<InvalidOperationException>(() => builder.Group<Physics>(group => group.Value<MissingValueId>()));
         Assert.Throws<InvalidOperationException>(() => builder.Tag<MissingTagId>());

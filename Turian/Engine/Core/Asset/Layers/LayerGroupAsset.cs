@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>An ordered manifest of up to 256 layer values with an explicit fallback identity.</summary>
 [CreateAssetMenu(fileName: "LayerGroup", path: "Layers/Group")]
-[TypeId("9b2c918e-3b11-4e3c-b33b-a1c2a0b20f8e")]
+[TypeId("bda16c7d-0660-5900-a068-fc33916c3654")]
 public sealed class LayerGroupAsset : DataAsset
 {
     /// <summary>The unique group name within the project.</summary>

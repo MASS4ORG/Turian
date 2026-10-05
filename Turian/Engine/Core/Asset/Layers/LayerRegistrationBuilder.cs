@@ -5,6 +5,11 @@ public sealed class LayerRegistrationBuilder
 {
     readonly List<LayerGroupAsset> groups = [];
     readonly List<TagAsset> tags = [];
+    readonly List<LayerGroupAsset> assetGroups = [];
+    readonly List<TagAsset> assetTags = [];
+    readonly List<LayerValueAsset> assetValues = [];
+    readonly List<Guid> groupOrder = [];
+    readonly List<Guid> tagOrder = [];
 
     /// <summary>Registers a group identified by its key type's explicit TypeId.</summary>
     public LayerRegistrationBuilder Group<TGroup>(Action<LayerGroupBuilder<TGroup>> configure, string? name = null)
@@ -14,6 +19,7 @@ public sealed class LayerRegistrationBuilder
         var group = new LayerGroupAsset { Id = LayerKeyIdentity<TGroup>.Id, Name = name ?? typeof(TGroup).Name };
         configure(new LayerGroupBuilder<TGroup>(group));
         groups.Add(group);
+        groupOrder.Add(group.Id);
         return this;
     }
 
@@ -21,39 +27,61 @@ public sealed class LayerRegistrationBuilder
     public LayerRegistrationBuilder Tag<TTag>(string? name = null, Color32? color = null, string description = "")
         where TTag : class, ITagKey
     {
-        tags.Add(new TagAsset
+        var tag = new TagAsset
         {
             Id = LayerKeyIdentity<TTag>.Id,
             Name = name ?? typeof(TTag).Name,
             Color = color ?? new Color32(255, 255, 255),
             Description = description,
-        });
+        };
+        tags.Add(tag);
+        tagOrder.Add(tag.Id);
         return this;
     }
 
-    /// <summary>Includes an asset-authored group without changing its identity.</summary>
+    /// <summary>Includes an authored group, enriching a matching code identity with the designer's manifest.</summary>
     public LayerRegistrationBuilder Include(LayerGroupAsset group)
     {
         ArgumentNullException.ThrowIfNull(group);
-        groups.Add(group);
+        assetGroups.Add(group);
+        groupOrder.Add(group.Id);
         return this;
     }
 
-    /// <summary>Includes an asset-authored tag without changing its identity.</summary>
+    /// <summary>Includes an authored tag, enriching a matching code identity with presentation data.</summary>
     public LayerRegistrationBuilder Include(TagAsset tag)
     {
         ArgumentNullException.ThrowIfNull(tag);
-        tags.Add(tag);
+        assetTags.Add(tag);
+        tagOrder.Add(tag.Id);
+        return this;
+    }
+
+    /// <summary>Enriches a registered value whose identity matches this authored asset.</summary>
+    public LayerRegistrationBuilder Include(LayerValueAsset value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        assetValues.Add(value);
         return this;
     }
 
     /// <summary>Builds and validates settings; invalid registrations never produce a usable layout.</summary>
     public NodeLayerSettings Build()
     {
-        var settings = new NodeLayerSettings { Groups = [.. groups], Tags = [.. tags] };
+        var settings = new NodeLayerSettings
+        {
+            Groups = Order(LayerRegistrationMerge.Groups(groups, assetGroups, assetValues), groupOrder),
+            Tags = Order(LayerRegistrationMerge.Values(tags, assetTags), tagOrder),
+        };
         var errors = settings.Validate();
         if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
         return settings;
+    }
+
+    static List<T> Order<T>(List<T> values, List<Guid> order) where T : DataAsset
+    {
+        var indexed = values.ToDictionary(value => value.Id);
+        return [.. order.Distinct().Select(id => indexed[id])];
     }
 }
 

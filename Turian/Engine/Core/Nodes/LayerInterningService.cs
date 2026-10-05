@@ -16,6 +16,7 @@ public sealed class LayerInterningService
     readonly Guid[] groupIds;
     readonly Guid[][] layerIds;
     readonly Guid[] tagIds;
+    readonly ConcurrentDictionary<LayerReference, byte> warned = new();
 
     /// <summary>Validates and snapshots one provider; subsequent asset edits require a new session layout.</summary>
     public LayerInterningService(ILayerSettingsProvider provider)
@@ -27,6 +28,7 @@ public sealed class LayerInterningService
             groupIds = [];
             layerIds = [];
             tagIds = [];
+            Fingerprint = LayerLayoutFingerprint.Compute(groupIds, layerIds, tagIds);
             return;
         }
 
@@ -36,6 +38,17 @@ public sealed class LayerInterningService
         layerIds = new Guid[groupIds.Length][];
         for (var slot = 0; slot < groupIds.Length; slot++) IndexGroup(master.Groups[slot], slot);
         tagIds = IndexTags(master.Tags);
+        Fingerprint = LayerLayoutFingerprint.Compute(groupIds, layerIds, tagIds);
+    }
+
+    /// <summary>The versioned hash of this snapshot's ordered identities and runtime slots.</summary>
+    public string Fingerprint { get; }
+
+    /// <summary>Rejects a peer or replay whose compact indices describe another layout.</summary>
+    public void RequireCompatibleLayout(string fingerprint)
+    {
+        if (!string.Equals(Fingerprint, fingerprint, StringComparison.Ordinal))
+            throw new InvalidDataException("Layer layout fingerprints do not match; runtime indices cannot be shared.");
     }
 
     /// <summary>The number of groups in this session layout.</summary>
@@ -72,6 +85,9 @@ public sealed class LayerInterningService
     /// <summary>Gets a value's stable identity for saving a runtime membership.</summary>
     public Guid GetLayerId(int slot, int index) => layerIds[slot][index];
 
+    /// <summary>The number of values declared in a snapshot group, including its default.</summary>
+    public int GetLayerCount(int slot) => layerIds[slot].Length;
+
     /// <summary>Finds a tag's compact id by stable identity; zero is a valid tag id.</summary>
     public bool TryGetTagId(Guid tagId, out ushort index) => tags.TryGetValue(tagId, out index);
 
@@ -81,6 +97,26 @@ public sealed class LayerInterningService
 
     /// <summary>Gets a tag's stable identity for saving runtime tags.</summary>
     public Guid GetTagId(ushort index) => tagIds[index];
+
+    internal byte ResolveLayer(LayerReference reference)
+    {
+        if (TryGetLayerIndex(reference.GroupId, reference.ValueId, out var index)) return index;
+        WarnMissing(reference);
+        return 0;
+    }
+
+    internal void WarnMissing(LayerReference reference)
+    {
+        if (warned.TryAdd(reference, 0))
+            Log.Logger.LogWarning("Layer reference {GroupId}/{ValueId} is missing in the session layout",
+                reference.GroupId, reference.ValueId);
+    }
+
+    internal void WarnMissingTag(Guid id)
+    {
+        if (warned.TryAdd(new LayerReference(Guid.Empty, id), 0))
+            Log.Logger.LogWarning("Tag reference {TagId} is missing in the session layout", id);
+    }
 
     Guid[] IndexTags(List<TagAsset> values)
     {

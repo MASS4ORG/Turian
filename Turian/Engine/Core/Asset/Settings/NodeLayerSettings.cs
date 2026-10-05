@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>The project's ordered layer groups and tag identities used to build one runtime layout.</summary>
 [CreateAssetMenu(fileName: "NodeLayerSettings", path: "Settings/Node Layers")]
-[TypeId("c2e378eb-0b0c-49aa-916c-aa9c8a219f21")]
+[TypeId("90104bcf-6e4b-559e-98cf-4c428ca1221d")]
 public sealed class NodeLayerSettings : ProjectSettingsAsset
 {
     /// <summary>The ordered group references used to assign runtime slots.</summary>
