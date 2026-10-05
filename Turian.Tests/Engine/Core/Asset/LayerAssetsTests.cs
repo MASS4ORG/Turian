@@ -5,7 +5,7 @@ public sealed class LayerAssetsTests
 {
     /// <summary>An empty master is a valid project with no layer groups or tags.</summary>
     [Fact]
-    public void EmptyMasterIsValid() => Assert.Empty(new MasterNodeLayersAsset().Validate());
+    public void EmptyMasterIsValid() => Assert.Empty(new NodeLayerSettings().Validate());
 
     /// <summary>Group values and defaults are saved as shared references and resolve through the asset loader.</summary>
     [Fact]
@@ -19,11 +19,11 @@ public sealed class LayerAssetsTests
         };
         var group = new LayerGroupAsset { Name = "Physics", Values = [value], DefaultValue = value };
         var tag = new TagAsset { Name = "Player" };
-        var master = new MasterNodeLayersAsset { Groups = [group], Tags = [tag] };
+        var master = new NodeLayerSettings { Groups = [group], Tags = [tag] };
         var json = Serializer.Serialize<DataAsset>(master);
         Assert.Contains($"\"$ref\": \"{group.Id}\"", json);
         Assert.DoesNotContain("Physics", json);
-        var loaded = Assert.IsType<MasterNodeLayersAsset>(Serializer.LoadData<DataAsset>(json));
+        var loaded = Assert.IsType<NodeLayerSettings>(Serializer.LoadData<DataAsset>(json));
         Assert.Contains(loaded.Validate(), error => error.Contains("unresolved", StringComparison.Ordinal));
         Assert.Contains(group.Id.ToString(), Serializer.Serialize<DataAsset>(loaded));
 
@@ -55,7 +55,7 @@ public sealed class LayerAssetsTests
     [Fact]
     public void MissingReferencesAreRejected()
     {
-        var master = new MasterNodeLayersAsset { Groups = [null!], Tags = [null!] };
+        var master = new NodeLayerSettings { Groups = [null!], Tags = [null!] };
         Assert.Equal(2, master.Validate().Count);
         master.Groups = [new LayerGroupAsset { Name = "Physics", Values = [null!] }];
         Assert.Contains(master.Validate(), error => error.Contains("unresolved value", StringComparison.Ordinal));
@@ -80,15 +80,15 @@ public sealed class LayerAssetsTests
             Values = [value],
             DefaultValue = new LayerValueAsset { Name = "Default" },
         };
-        var master = new MasterNodeLayersAsset { Groups = [group] };
+        var master = new NodeLayerSettings { Groups = [group] };
         Assert.Contains(master.Validate(), error => error.Contains("default must reference", StringComparison.Ordinal));
         group.DefaultValue = value;
         Assert.Empty(master.Validate());
     }
 
-    /// <summary>Names are exact and nonempty, with unique groups, unique tags, and unique values per group.</summary>
+    /// <summary>Names are nonempty presentation metadata and may be reused by independently identified assets.</summary>
     [Fact]
-    public void DuplicateAndEmptyNamesAreRejected()
+    public void DisplayNamesCanRepeatButCannotBeEmpty()
     {
         var value = new LayerValueAsset { Name = "Default" };
         var group = new LayerGroupAsset
@@ -97,16 +97,16 @@ public sealed class LayerAssetsTests
             Values = [value, new LayerValueAsset { Name = "Default" }],
             DefaultValue = value,
         };
-        var master = new MasterNodeLayersAsset
+        var master = new NodeLayerSettings
         {
-            Groups = [group, new LayerGroupAsset { Name = "Physics" }, new LayerGroupAsset { Name = " " }],
-            Tags = [new TagAsset { Name = "Player" }, new TagAsset { Name = "Player" }, new TagAsset()],
+            Groups = [group, LayerTestData.Group(), LayerTestData.Group()],
+            Tags = [new TagAsset { Name = "Player" }, new TagAsset { Name = "Player" }],
         };
+        Assert.Empty(master.Validate());
+        master.Groups[2].Name = " ";
+        master.Tags.Add(new TagAsset());
         var errors = master.Validate();
-        Assert.Contains(errors, error => error.Contains("value name 'Default' is duplicated", StringComparison.Ordinal));
-        Assert.Contains(errors, error => error == "Group name 'Physics' is duplicated.");
         Assert.Contains(errors, error => error == "Group name cannot be empty.");
-        Assert.Contains(errors, error => error == "Tag name 'Player' is duplicated.");
         Assert.Contains(errors, error => error == "Tag name cannot be empty.");
         value.Name = "";
         Assert.Contains(master.Validate(), error => error.Contains("value name cannot be empty", StringComparison.Ordinal));
@@ -118,7 +118,7 @@ public sealed class LayerAssetsTests
     {
         var value = new LayerValueAsset { Name = "Default" };
         var group = new LayerGroupAsset { Name = "Physics", Values = [value], DefaultValue = value };
-        var master = new MasterNodeLayersAsset
+        var master = new NodeLayerSettings
         {
             Groups = [group],
             Tags = [new TagAsset { Id = value.Id, Name = "Player" }, new TagAsset { Name = "Enemy" }],
@@ -135,12 +135,8 @@ public sealed class LayerAssetsTests
     [Fact]
     public void OversizedManifestsAreRejected()
     {
-        var builder = new LayerRegistrationBuilder("Capacity");
-        for (var i = 0; i < 17; i++) builder.Group($"Group{i}", group => group.Value("Default"));
-        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
-        Assert.Contains("Groups count 17 exceeds capacity 16", exception.Message);
         var values = Enumerable.Range(0, 257).Select(i => new LayerValueAsset { Name = $"Value{i}" }).ToList();
-        var master = new MasterNodeLayersAsset
+        var master = new NodeLayerSettings
         {
             Groups = [new LayerGroupAsset { Name = "Physics", Values = values, DefaultValue = values[0] }],
             Tags = [.. Enumerable.Range(0, 65_537).Select(i => new TagAsset { Name = $"Tag{i}" })],

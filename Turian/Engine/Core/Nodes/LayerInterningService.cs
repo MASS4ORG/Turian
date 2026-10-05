@@ -3,17 +3,16 @@ namespace Turian.Engine.Core;
 /// <summary>Supplies the fully resolved authoring manifest from assets, code, or a test fixture.</summary>
 public interface ILayerSettingsProvider
 {
-    /// <summary>The active master; null selects an empty runtime layout.</summary>
-    MasterNodeLayersAsset? Master { get; }
+    /// <summary>The active settings; null selects an empty runtime layout.</summary>
+    NodeLayerSettings? Settings { get; }
 }
 
 /// <summary>Maps stable asset identities to compact indices in an immutable session layout.</summary>
 public sealed class LayerInterningService
 {
-    readonly Dictionary<Guid, byte> groupSlots = [];
-    readonly Dictionary<Guid, (byte Slot, byte Index)> layers = [];
+    readonly Dictionary<Guid, int> groupSlots = [];
+    readonly Dictionary<Guid, (int Slot, byte Index)> layers = [];
     readonly Dictionary<Guid, ushort> tags = [];
-    readonly Dictionary<string, ushort> tagNames = new(StringComparer.Ordinal);
     readonly Guid[] groupIds;
     readonly Guid[][] layerIds;
     readonly Guid[] tagIds;
@@ -22,7 +21,7 @@ public sealed class LayerInterningService
     public LayerInterningService(ILayerSettingsProvider provider)
     {
         ArgumentNullException.ThrowIfNull(provider);
-        var master = provider.Master;
+        var master = provider.Settings;
         if (master is null)
         {
             groupIds = [];
@@ -35,7 +34,7 @@ public sealed class LayerInterningService
         if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
         groupIds = [.. master.Groups.Select(group => group.Id)];
         layerIds = new Guid[groupIds.Length][];
-        for (var slot = 0; slot < groupIds.Length; slot++) IndexGroup(master.Groups[slot], (byte)slot);
+        for (var slot = 0; slot < groupIds.Length; slot++) IndexGroup(master.Groups[slot], slot);
         tagIds = IndexTags(master.Tags);
     }
 
@@ -46,7 +45,11 @@ public sealed class LayerInterningService
     public int TagCount => tagIds.Length;
 
     /// <summary>Finds a group's runtime slot by stable identity.</summary>
-    public bool TryGetGroupSlot(Guid groupId, out byte slot) => groupSlots.TryGetValue(groupId, out slot);
+    public bool TryGetGroupSlot(Guid groupId, out int slot) => groupSlots.TryGetValue(groupId, out slot);
+
+    /// <summary>Finds a group's runtime slot by its typed key.</summary>
+    public bool TryGetGroupSlot<TGroup>(out int slot) where TGroup : class, ILayerGroupKey =>
+        TryGetGroupSlot(LayerKeyIdentity<TGroup>.Id, out slot);
 
     /// <summary>Finds a value's runtime index only when it belongs to the requested group.</summary>
     public bool TryGetLayerIndex(Guid groupId, Guid valueId, out byte index)
@@ -58,6 +61,11 @@ public sealed class LayerInterningService
         return true;
     }
 
+    /// <summary>Finds a value's runtime index by typed keys that declare the same group.</summary>
+    public bool TryGetLayerIndex<TGroup, TValue>(out byte index)
+        where TGroup : class, ILayerGroupKey where TValue : class, ILayerValueKey<TGroup> =>
+        TryGetLayerIndex(LayerKeyIdentity<TGroup>.Id, LayerKeyIdentity<TValue>.Id, out index);
+
     /// <summary>Gets the stable identity for a runtime group slot.</summary>
     public Guid GetGroupId(int slot) => groupIds[slot];
 
@@ -67,8 +75,9 @@ public sealed class LayerInterningService
     /// <summary>Finds a tag's compact id by stable identity; zero is a valid tag id.</summary>
     public bool TryGetTagId(Guid tagId, out ushort index) => tags.TryGetValue(tagId, out index);
 
-    /// <summary>Finds a tag's compact id using its exact authored name.</summary>
-    public bool TryGetTagId(string name, out ushort index) => tagNames.TryGetValue(name, out index);
+    /// <summary>Finds a tag's compact id by its typed key.</summary>
+    public bool TryGetTagId<TTag>(out ushort index) where TTag : class, ITagKey =>
+        TryGetTagId(LayerKeyIdentity<TTag>.Id, out index);
 
     /// <summary>Gets a tag's stable identity for saving runtime tags.</summary>
     public Guid GetTagId(ushort index) => tagIds[index];
@@ -82,12 +91,11 @@ public sealed class LayerInterningService
             var tag = ordered[index];
             ids[index] = tag.Id;
             tags.Add(tag.Id, (ushort)index);
-            tagNames.Add(tag.Name, (ushort)index);
         }
         return ids;
     }
 
-    void IndexGroup(LayerGroupAsset group, byte slot)
+    void IndexGroup(LayerGroupAsset group, int slot)
     {
         groupSlots.Add(group.Id, slot);
         var ids = new List<Guid> { group.DefaultValue!.Id };

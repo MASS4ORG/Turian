@@ -1,40 +1,30 @@
 namespace Turian.Engine.Core;
 
-/// <summary>Creates code-authored identities and combines them with asset-authored manifests.</summary>
+/// <summary>Creates code-authored identities from typed keys and combines them with asset manifests.</summary>
 public sealed class LayerRegistrationBuilder
 {
-    static readonly Guid IdentityNamespace = new("2974087e-1a25-4efc-b5c5-17b5f0d29972");
-    readonly string module;
     readonly List<LayerGroupAsset> groups = [];
     readonly List<TagAsset> tags = [];
 
-    /// <summary>Uses a stable module key as the identity namespace for code registrations.</summary>
-    public LayerRegistrationBuilder(string module)
+    /// <summary>Registers a group identified by its key type's explicit TypeId.</summary>
+    public LayerRegistrationBuilder Group<TGroup>(Action<LayerGroupBuilder<TGroup>> configure, string? name = null)
+        where TGroup : class, ILayerGroupKey
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(module);
-        this.module = module;
-    }
-
-    /// <summary>Registers an independent group whose first declared value is its explicit default.</summary>
-    public LayerRegistrationBuilder Group(string key, Action<LayerGroupBuilder> configure)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentNullException.ThrowIfNull(configure);
-        var group = new LayerGroupAsset { Id = Identity("group", key), Name = key };
-        configure(new LayerGroupBuilder(group));
+        var group = new LayerGroupAsset { Id = LayerKeyIdentity<TGroup>.Id, Name = name ?? typeof(TGroup).Name };
+        configure(new LayerGroupBuilder<TGroup>(group));
         groups.Add(group);
         return this;
     }
 
-    /// <summary>Registers a tag with a stable identity derived from its module and key.</summary>
-    public LayerRegistrationBuilder Tag(string key, string? name = null, Color32? color = null,
-        string description = "")
+    /// <summary>Registers a tag identified by its key type's explicit TypeId and optional presentation metadata.</summary>
+    public LayerRegistrationBuilder Tag<TTag>(string? name = null, Color32? color = null, string description = "")
+        where TTag : class, ITagKey
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
         tags.Add(new TagAsset
         {
-            Id = Identity("tag", key),
-            Name = name ?? key,
+            Id = LayerKeyIdentity<TTag>.Id,
+            Name = name ?? typeof(TTag).Name,
             Color = color ?? new Color32(255, 255, 255),
             Description = description,
         });
@@ -57,44 +47,54 @@ public sealed class LayerRegistrationBuilder
         return this;
     }
 
-    /// <summary>Builds and validates a master; invalid registrations never produce a usable layout.</summary>
-    public MasterNodeLayersAsset Build()
+    /// <summary>Builds and validates settings; invalid registrations never produce a usable layout.</summary>
+    public NodeLayerSettings Build()
     {
-        var master = new MasterNodeLayersAsset
-        {
-            Id = Identity("master", string.Empty),
-            Groups = [.. groups],
-            Tags = [.. tags],
-        };
-        var errors = master.Validate();
+        var settings = new NodeLayerSettings { Groups = [.. groups], Tags = [.. tags] };
+        var errors = settings.Validate();
         if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
-        return master;
+        return settings;
     }
-
-    Guid Identity(string kind, string key) => AssetIdFactory.Derive(IdentityNamespace,
-        FormattableString.Invariant($"v1/{module.Length}:{module}/{kind}/{key.Length}:{key}"));
 }
 
-/// <summary>Declares code-authored values in one independent layer group.</summary>
-public sealed class LayerGroupBuilder
+/// <summary>Declares values whose key types belong to one specific group.</summary>
+public sealed class LayerGroupBuilder<TGroup> where TGroup : class, ILayerGroupKey
 {
     readonly LayerGroupAsset group;
 
     internal LayerGroupBuilder(LayerGroupAsset group) => this.group = group;
 
-    /// <summary>Adds a value with a stable key and optional presentation metadata.</summary>
-    public LayerGroupBuilder Value(string key, string? name = null, Color32? color = null, string description = "")
+    /// <summary>Declares the group's default with an identity derived from the group's TypeId.</summary>
+    public LayerGroupBuilder<TGroup> Default(string name = "Default")
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var value = new LayerValueAsset
+        if (group.DefaultValue is not null) throw new InvalidOperationException("A group can declare one default.");
+        var value = new LayerValueAsset { Id = AssetIdFactory.Derive(group.Id, "default"), Name = name };
+        group.Values.Add(value);
+        group.DefaultValue = value;
+        return this;
+    }
+
+    /// <summary>Declares a typed default value with optional presentation metadata.</summary>
+    public LayerGroupBuilder<TGroup> Default<TValue>(string? name = null, Color32? color = null,
+        string description = "") where TValue : class, ILayerValueKey<TGroup>
+    {
+        if (group.DefaultValue is not null) throw new InvalidOperationException("A group can declare one default.");
+        Value<TValue>(name, color, description);
+        group.DefaultValue = group.Values[^1];
+        return this;
+    }
+
+    /// <summary>Adds a value identified by its key type's explicit TypeId and optional presentation metadata.</summary>
+    public LayerGroupBuilder<TGroup> Value<TValue>(string? name = null, Color32? color = null,
+        string description = "") where TValue : class, ILayerValueKey<TGroup>
+    {
+        group.Values.Add(new LayerValueAsset
         {
-            Id = AssetIdFactory.Derive(group.Id, FormattableString.Invariant($"v1/value/{key.Length}:{key}")),
-            Name = name ?? key,
+            Id = LayerKeyIdentity<TValue>.Id,
+            Name = name ?? typeof(TValue).Name,
             Color = color ?? new Color32(255, 255, 255),
             Description = description,
-        };
-        group.Values.Add(value);
-        group.DefaultValue ??= value;
+        });
         return this;
     }
 }
