@@ -11,6 +11,12 @@ public sealed class NodeLayerSettings : ProjectSettingsAsset
     /// <summary>The available tag references; at most 65,536 tags can be active.</summary>
     public List<TagAsset> Tags { get; set; } = [];
 
+    /// <summary>The physics consumer's group reference, or null when the project does not use physics layers.</summary>
+    public LayerGroupAsset? PhysicsGroup { get; set; }
+
+    /// <summary>The rendering consumer's group reference, or null when the project does not use rendering layers.</summary>
+    public LayerGroupAsset? RenderingGroup { get; set; }
+
     /// <summary>Reports unresolved references, duplicate identities, empty names, and capacity violations.</summary>
     public IReadOnlyList<string> Validate() => LayerAssetValidation.Validate(this);
 }

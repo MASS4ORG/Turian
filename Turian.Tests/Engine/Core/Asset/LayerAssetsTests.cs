@@ -19,10 +19,16 @@ public sealed class LayerAssetsTests
         };
         var group = new LayerGroupAsset { Name = "Physics", Values = [value], DefaultValue = value };
         var tag = new TagAsset { Name = "Player" };
-        var master = new NodeLayerSettings { Groups = [group], Tags = [tag] };
+        var master = new NodeLayerSettings
+        {
+            Groups = [group],
+            Tags = [tag],
+            PhysicsGroup = group,
+            RenderingGroup = group,
+        };
         var json = Serializer.Serialize<DataAsset>(master);
         Assert.Contains($"\"$ref\": \"{group.Id}\"", json);
-        Assert.DoesNotContain("Physics", json);
+        Assert.DoesNotContain("\"Name\": \"Physics\"", json);
         var loaded = Assert.IsType<NodeLayerSettings>(Serializer.LoadData<DataAsset>(json));
         Assert.Contains(loaded.Validate(), error => error.Contains("unresolved", StringComparison.Ordinal));
         Assert.Contains(group.Id.ToString(), Serializer.Serialize<DataAsset>(loaded));
@@ -45,6 +51,8 @@ public sealed class LayerAssetsTests
         await ObjectReferences.ResolveAsync(loadedGroup, loader);
         await ObjectReferences.ResolveAsync(loaded, loader);
         Assert.Same(loadedGroup, loaded.Groups[0]);
+        Assert.Same(loadedGroup, loaded.PhysicsGroup);
+        Assert.Same(loadedGroup, loaded.RenderingGroup);
         Assert.Same(loadedValue, loadedGroup.Values[0]);
         Assert.Same(loadedValue, loadedGroup.DefaultValue);
         Assert.Same(loadedTag, loaded.Tags[0]);

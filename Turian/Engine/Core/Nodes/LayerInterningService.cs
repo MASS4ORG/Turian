@@ -34,15 +34,25 @@ public sealed class LayerInterningService
 
         var errors = master.Validate();
         if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        PhysicsGroupId = master.PhysicsGroup?.Id ?? Guid.Empty;
+        RenderingGroupId = master.RenderingGroup?.Id ?? Guid.Empty;
         groupIds = [.. master.Groups.Select(group => group.Id)];
         layerIds = new Guid[groupIds.Length][];
         for (var slot = 0; slot < groupIds.Length; slot++) IndexGroup(master.Groups[slot], slot);
         tagIds = IndexTags(master.Tags);
-        Fingerprint = LayerLayoutFingerprint.Compute(groupIds, layerIds, tagIds);
+        Fingerprint = LayerLayoutFingerprint.Compute(groupIds, layerIds, tagIds, PhysicsGroupId, RenderingGroupId);
+        WarnOverflowGroup(master.PhysicsGroup, "Physics");
+        WarnOverflowGroup(master.RenderingGroup, "Rendering");
     }
 
     /// <summary>The versioned hash of this snapshot's ordered identities and runtime slots.</summary>
     public string Fingerprint { get; }
+
+    /// <summary>The physics consumer's group identity in this snapshot, or empty when it is unbound.</summary>
+    public Guid PhysicsGroupId { get; }
+
+    /// <summary>The rendering consumer's group identity in this snapshot, or empty when it is unbound.</summary>
+    public Guid RenderingGroupId { get; }
 
     /// <summary>Rejects a peer or replay whose compact indices describe another layout.</summary>
     public void RequireCompatibleLayout(string fingerprint)
@@ -116,6 +126,14 @@ public sealed class LayerInterningService
     {
         if (warned.TryAdd(new LayerReference(Guid.Empty, id), 0))
             Log.Logger.LogWarning("Tag reference {TagId} is missing in the session layout", id);
+    }
+
+    void WarnOverflowGroup(LayerGroupAsset? group, string consumer)
+    {
+        if (group is not null && groupSlots[group.Id] >= NodeLayers.InlineCapacity)
+            Log.Logger.LogWarning("{Consumer} group {GroupId} uses overflow slot {Slot}; place it in the first {Count} "
+                + "groups for per-frame membership reads", consumer, group.Id, groupSlots[group.Id],
+                NodeLayers.InlineCapacity);
     }
 
     Guid[] IndexTags(List<TagAsset> values)

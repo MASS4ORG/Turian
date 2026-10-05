@@ -30,7 +30,16 @@ static class LayerAssetValidation
         }
 
         ValidateTags(tags, identities, errors);
+        ValidateConsumerGroup(master.PhysicsGroup, groups, "Physics", errors);
+        ValidateConsumerGroup(master.RenderingGroup, groups, "Rendering", errors);
         return errors;
+    }
+
+    static void ValidateConsumerGroup(LayerGroupAsset? group, List<LayerGroupAsset> groups, string consumer,
+        List<string> errors)
+    {
+        if (group is not null && !groups.Any(registered => registered?.Id == group.Id))
+            errors.Add($"{consumer} group must reference a group in the settings manifest.");
     }
 
     static void ValidateGroup(LayerGroupAsset group, Dictionary<Guid, string> identities, List<string> errors)
