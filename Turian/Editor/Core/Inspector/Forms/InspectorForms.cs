@@ -31,6 +31,17 @@ public static class InspectorForms
         return model with { Sections = [.. model.Sections.Select(section => WithActiveSwitch(section, options))] };
     }
 
+    /// <summary>Builds the fields common to objects of the same type, preserving each object's mutation callback.</summary>
+    public static FormModel BuildForObjects(IReadOnlyList<object> targets, Action<object>? mutationNotifier = null)
+    {
+        ArgumentNullException.ThrowIfNull(targets);
+        if (targets.Count == 0) return FormModel.Empty;
+        if (targets.Any(target => target.GetType() != targets[0].GetType())) return FormModel.Empty;
+        if (targets.Count == 1) return Build(targets[0], mutationNotifier);
+        var sections = targets.Select(target => Build(target, mutationNotifier).Sections[0]).ToArray();
+        return new FormModel(targets[0], [CombineSections(sections, sections[0].Title)]);
+    }
+
     /// <summary>
     /// Builds the form for a node: its own members first, then one removable section per component,
     /// which is the shape an inspector shows.
@@ -47,6 +58,47 @@ public static class InspectorForms
             FormBuilder.Section(component, component.GetType().Name, options, removable: true), options)));
 
         return new FormModel(node, sections);
+    }
+
+    /// <summary>Builds shared node fields and components matched by type and occurrence across every selected node.</summary>
+    public static FormModel BuildForNodes(IReadOnlyList<Node> nodes, Action<object>? mutationNotifier = null)
+    {
+        ArgumentNullException.ThrowIfNull(nodes);
+        if (nodes.Count == 0) return FormModel.Empty;
+        if (nodes.Count == 1) return BuildForNode(nodes[0], mutationNotifier);
+
+        var models = nodes.Select(node => BuildForNode(node, mutationNotifier)).ToArray();
+        var sections = new List<FormSection>
+        {
+            CombineSections(models.Select(model => model.Sections[0]).ToArray(), $"{nodes.Count} Objects"),
+        };
+        var occurrences = new Dictionary<Type, int>();
+        foreach (var section in models[0].Sections.Skip(1))
+        {
+            var type = section.Target.GetType();
+            var occurrence = occurrences.GetValueOrDefault(type);
+            occurrences[type] = occurrence + 1;
+            var common = models.Select(model => model.Sections.Skip(1)
+                .Where(candidate => candidate.Target.GetType() == type).ElementAtOrDefault(occurrence)).ToArray();
+            if (common.All(candidate => candidate is not null))
+                sections.Add(CombineSections(common.OfType<FormSection>().ToArray(), section.Title));
+        }
+        return new FormModel(nodes[0], sections);
+    }
+
+    static FormSection CombineSections(IReadOnlyList<FormSection> sections, string title)
+    {
+        var first = sections[0];
+        var fields = new List<FormField>();
+        foreach (var field in first.Fields)
+        {
+            var common = sections.Select(section => section.Fields.FirstOrDefault(candidate =>
+                candidate.Name == field.Name && candidate.ValueType == field.ValueType)).ToArray();
+            if (common.All(candidate => candidate is not null))
+                fields.Add(FormField.Combine(common.OfType<FormField>()));
+        }
+        var enabled = fields.FirstOrDefault(field => field.Name == first.EnabledField?.Name);
+        return first with { Title = title, Fields = fields, EnabledField = enabled, Buttons = [] };
     }
 
     /// <summary>

@@ -7,7 +7,7 @@ namespace Turian.Editor.Core;
 /// <param name="files">Performs the moves and copies.</param>
 /// <param name="undo">Records each operation.</param>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class AssetFileOperations(AssetFileSystem files, UndoService undo)
+public sealed partial class AssetFileOperations(AssetFileSystem files, UndoService undo)
 {
     /// <summary>Raised after an operation, its undo or its redo changed the files, so the browser rescans.</summary>
     public event Action? Changed;

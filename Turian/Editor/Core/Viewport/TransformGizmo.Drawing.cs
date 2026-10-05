@@ -13,7 +13,7 @@ public sealed partial class TransformGizmo
         {
             gizmos.DepthTest = false;
             gizmos.Matrix = Matrix4x4.Identity;
-            var anchor = SelectedNode!.GlobalTransform.Position;
+            var anchor = PivotPosition;
             var scale = ComputeGizmoScale(camera, anchor, viewportSize);
             if (Mode != TransformGizmoMode.Rotate) DrawLinearHandles(gizmos, anchor, scale);
             if (Mode is TransformGizmoMode.Rotate or TransformGizmoMode.Combined)

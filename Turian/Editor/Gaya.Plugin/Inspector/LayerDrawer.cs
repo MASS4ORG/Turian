@@ -28,7 +28,7 @@ sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
     void DrawLayer(Gui gui, FormField field, LayerSlot[] slots, string id)
     {
         var value = (int)(field.GetValue() ?? 0);
-        var current = Array.FindIndex(slots, slot => slot.Index == value);
+        var current = field.HasMixedValue ? -1 : Array.FindIndex(slots, slot => slot.Index == value);
         var next = Dropdown(gui, [.. slots.Select(slot => $"{slot.Index}: {slot.Name}")], current, id);
         if (gui.Pass == Pass.Pass2Render && next >= 0 && next != current) field.SetValue(slots[next].Index);
     }
@@ -38,7 +38,7 @@ sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
         var mask = (LayerMask)(field.GetValue() ?? LayerMask.Nothing);
         string[] labels =
         [
-            mask == LayerMask.Everything ? "Everything" : mask == LayerMask.Nothing ? "Nothing" : $"0x{mask.Value:X8}",
+            MaskLabel(field, mask),
             "Everything", "Nothing",
             .. slots.Select(slot => $"{(mask.Contains(slot.Index) ? "✓ " : "")} {slot.Index}: {slot.Name}"),
         ];
@@ -48,8 +48,20 @@ sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
         else if (next == 2) field.SetValue(LayerMask.Nothing);
         else
         {
-            var bit = LayerMask.FromLayer(slots[next - 3].Index);
-            field.SetValue(mask.Intersects(bit) ? mask & ~bit : mask | bit);
+            ToggleBit(field, LayerMask.FromLayer(slots[next - 3].Index), mask);
+        }
+    }
+
+    static string MaskLabel(FormField field, LayerMask mask) => field.HasMixedValue ? "—"
+        : mask == LayerMask.Everything ? "Everything" : mask == LayerMask.Nothing ? "Nothing" : $"0x{mask.Value:X8}";
+
+    static void ToggleBit(FormField field, LayerMask bit, LayerMask mask)
+    {
+        var remove = mask.Intersects(bit);
+        foreach (var source in field.Sources)
+        {
+            var own = (LayerMask)(source.GetValue() ?? LayerMask.Nothing);
+            source.SetValue(remove ? own & ~bit : own | bit);
         }
     }
 
@@ -60,7 +72,7 @@ sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
         var next = gui.Dropdown(labels, current, width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
             backgroundColor: theme.Field, borderColor: theme.Border, textColor: theme.Ink,
             dropdownColor: theme.Field, hoverColor: theme.Hover, selectedColor: theme.AccentFill,
-            filePath: $"{id}/layer");
+            placeholder: "—", filePath: $"{id}/layer");
         if (gui.Pass == Pass.Pass1Build) frameSelections[id] = next;
         else frameSelections.Remove(id);
         return next;

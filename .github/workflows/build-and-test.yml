@@ -34,7 +34,7 @@ jobs:
       - name: Restore, compile, test
         run: |
           chmod +x ./build.sh
-          ./build.sh Restore Compile TestReport --configuration "Debug" --verbosity minimal
+          ./build.sh Restore Compile TestReport --configuration "Debug" --no-local-packages --verbosity minimal
 
       - name: Upload coverage report
         if: always()

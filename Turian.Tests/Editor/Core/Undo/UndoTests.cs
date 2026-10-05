@@ -40,6 +40,110 @@ public class UndoTests
         undo.Flush();
     }
 
+    /// <summary>Editing ten mixed lights creates one undo step and restores every original intensity.</summary>
+    [Fact]
+    public void MultiObjectLightEditIsOneUndoStep()
+    {
+        var nodes = Enumerable.Range(0, 10).Select(index =>
+        {
+            var node = AddChild($"Light {index}");
+            node.AddComponent(new LightComponent { Intensity = index + 1 });
+            return node;
+        }).ToArray();
+        inspector.SelectMany(nodes, nodes[3]);
+        var field = InspectorForms.BuildForNodes(nodes, inspector.CreateMutationNotifier()).Sections[1].Fields
+            .Single(field => field.Name == nameof(LightComponent.Intensity));
+        Assert.True(field.HasMixedValue);
+        Assert.True(field.SetValue(4f));
+        EndFrame();
+        Assert.Single(undo.History.UndoSteps);
+        Assert.All(nodes, node => Assert.Equal(4f, node.GetComponent<LightComponent>()!.Intensity));
+        undo.Undo();
+        for (var i = 0; i < nodes.Length; i++) Assert.Equal(i + 1, nodes[i].GetComponent<LightComponent>()!.Intensity);
+        Assert.Equal(nodes, inspector.SelectedNodes);
+        Assert.Same(nodes[3], inspector.SelectedNode);
+        undo.Redo();
+        Assert.All(nodes, node => Assert.Equal(4f, node.GetComponent<LightComponent>()!.Intensity));
+    }
+
+    /// <summary>Batch deletion covers selected descendants once and brings all subtrees back in one undo.</summary>
+    [Fact]
+    public void MultiDeleteAndDuplicateAreSingleSteps()
+    {
+        var first = AddChild("First");
+        var second = AddChild("Second");
+        var child = new Node { Name = "Child", Parent = first };
+        first.Children.Add(child);
+        inspector.SelectMany([first, child, second]);
+        var operations = new NodeSelectionOperations(sceneTree, inspector, undo);
+        operations.Delete(inspector.SelectedNodes);
+        Assert.Empty(root.Children);
+        Assert.Single(undo.History.UndoSteps);
+        undo.Undo();
+        Assert.Equal([first, second], root.Children);
+        Assert.Same(first, child.Parent);
+        Assert.Contains(child, first.Children);
+        var copies = operations.Duplicate([first, child, second]);
+        Assert.Equal(2, copies.Count);
+        Assert.NotEqual(first.Id, copies[0].Id);
+        Assert.Single(copies[0].Children);
+        Assert.Equal(4, root.Children.Count);
+        undo.Undo();
+        Assert.Equal([first, second], root.Children);
+        undo.Redo();
+        Assert.Equal(4, root.Children.Count);
+    }
+
+    /// <summary>Batch reparenting preserves world placement and undo restores hierarchy and local transforms.</summary>
+    [Fact]
+    public void MultiReparentPreservesWorldAndRejectsCycles()
+    {
+        var first = AddChild("First");
+        var second = AddChild("Second");
+        var target = AddChild("Target");
+        first.Position = new Vector3(1, 2, 3);
+        second.Position = new Vector3(4, 5, 6);
+        target.Position = new Vector3(10, 0, 0);
+        var operations = new NodeSelectionOperations(sceneTree, inspector, undo);
+        operations.Reparent([first, second], target);
+        Assert.Equal(new Vector3(1, 2, 3), first.GlobalTransform.Position);
+        Assert.Equal(new Vector3(4, 5, 6), second.GlobalTransform.Position);
+        Assert.Single(undo.History.UndoSteps);
+        operations.Reparent([target], first);
+        Assert.Same(root, target.Parent);
+        undo.Undo();
+        Assert.Same(root, first.Parent);
+        Assert.Same(root, second.Parent);
+        Assert.Equal(new Vector3(1, 2, 3), first.Position);
+        undo.Redo();
+        Assert.Same(target, first.Parent);
+        Assert.Same(target, second.Parent);
+    }
+
+    /// <summary>Batch duplicates have independent components and map references to copied peers and original externals.</summary>
+    [Fact]
+    public void MultiDuplicateRemapsPeerReferencesAndKeepsExternalReferences()
+    {
+        var first = AddChild("First");
+        var second = AddChild("Second");
+        var external = AddChild("External");
+        var linker = new ObjectReferencesTests.Linker { Target = second, Waypoints = [second, external, first] };
+        first.AddComponent(linker);
+        var copies = new NodeSelectionOperations(sceneTree, inspector, undo).Duplicate([first, second]);
+        var copiedLink = copies[0].GetComponent<ObjectReferencesTests.Linker>()!;
+        Assert.NotSame(linker, copiedLink);
+        Assert.NotEqual(linker.Id, copiedLink.Id);
+        Assert.Same(copies[1], copiedLink.Target);
+        Assert.Equal([copies[1], external, copies[0]], copiedLink.Waypoints!);
+        Assert.Same(second, linker.Target);
+        Assert.Single(undo.History.UndoSteps);
+        undo.Undo();
+        Assert.Equal([first, second, external], root.Children);
+        undo.Redo();
+        Assert.Contains(copies[0], root.Children);
+        Assert.Contains(copies[1], root.Children);
+    }
+
     /// <summary>A component's values come back from its snapshot, and a copy never tracks later edits.</summary>
     [Fact]
     public void ObjectState_RestoresValues()
@@ -216,6 +320,43 @@ public class UndoTests
         EndFrame();
 
         Assert.False(undo.CanUndo);
+    }
+
+    /// <summary>An inspected data asset's edits are steps of that asset, undone even after it is deselected.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MultiAssetEditsRestoreAndNotifyEveryPayload(bool locked)
+    {
+        var first = new ObjectReferencesTests.Stats { Health = 10 };
+        var second = new ObjectReferencesTests.Stats { Health = 20 };
+        var inspections = new[] { first, second }.Select((target, index) => new AssetInspection(
+            new DataAssetAsset { Id = target.Id, RelativePath = $"Assets/stats{index}.dataasset" },
+            $"/tmp/stats{index}.dataasset", target, "Stats", IsPayload: true)).ToArray();
+        inspector.SelectMany(inspections);
+        if (locked)
+        {
+            inspector.Select(root);
+            undo.RecordInspections(inspections, "Edit Selection");
+        }
+        var field = InspectorForms.BuildForObjects([first, second], _ => undo.MarkAltered()).Sections[0].Fields
+            .Single(member => member.Name == nameof(ObjectReferencesTests.Stats.Health));
+        Assert.True(field.HasMixedValue);
+        field.SetValue(50);
+        undo.Flush();
+        Assert.Single(undo.History.UndoSteps);
+        var restored = new List<AssetInspection>();
+        undo.AssetRestored += restored.Add;
+        inspector.ClearSelection();
+        undo.Undo();
+        Assert.Equal(10, first.Health);
+        Assert.Equal(20, second.Health);
+        Assert.Equal(inspections.ToHashSet(), [.. restored]);
+        restored.Clear();
+        undo.Redo();
+        Assert.Equal(50, first.Health);
+        Assert.Equal(50, second.Health);
+        Assert.Equal(inspections.ToHashSet(), [.. restored]);
     }
 
     /// <summary>An inspected data asset's edits are steps of that asset, undone even after it is deselected.</summary>

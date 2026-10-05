@@ -122,6 +122,42 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         Assert.Empty(viewer.Gizmos.WorldLines);
         Assert.Empty(viewer.Gizmos.OverlayTriangles);
 
+        viewport.Gizmo.Mode = TransformGizmoMode.Select;
+        inspector.Select(node);
+        var initialPosition = viewer.Camera.Position;
+        void DragRectangle()
+        {
+            input.MousePosition.Returns(new Vector2(500, 300));
+            input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+            input.IsMouseButtonDown(GMouseButton.Left).Returns(true);
+            Frame();
+            input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
+            input.MousePosition.Returns(new Vector2(600, 400));
+            Frame();
+            input.IsMouseButtonDown(GMouseButton.Left).Returns(false);
+            Frame();
+        }
+        DragRectangle();
+        Assert.Empty(inspector.SelectedNodes);
+        Assert.Equal(initialPosition, viewer.Camera.Position);
+        inspector.Select(node);
+        input.IsKeyDown(KeyboardKey.LeftShift).Returns(true);
+        DragRectangle();
+        Assert.Equal([node], inspector.SelectedNodes);
+        input.IsKeyDown(KeyboardKey.LeftShift).Returns(false);
+        input.IsKeyDown(KeyboardKey.LeftControl).Returns(true);
+        DragRectangle();
+        Assert.Equal([node], inspector.SelectedNodes);
+        input.MousePosition.Returns(new Vector2(500, 300));
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
+        input.IsMouseButtonDown(GMouseButton.Left).Returns(true);
+        Frame();
+        input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
+        input.IsMouseButtonDown(GMouseButton.Left).Returns(false);
+        Frame();
+        Assert.Equal([node], inspector.SelectedNodes);
+        input.IsKeyDown(KeyboardKey.LeftControl).Returns(false);
+
         void PanelFrame() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
 
         bool CursorVisible() => (bool)typeof(SceneViewport)

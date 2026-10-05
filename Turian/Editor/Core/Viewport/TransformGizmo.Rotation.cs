@@ -2,8 +2,6 @@ namespace Turian.Editor.Core;
 
 public sealed partial class TransformGizmo
 {
-    Quaternion rotationStartOrientation;
-    Quaternion rotationParentOrientation;
     Vector3 rotationAxis;
     Vector3 rotationPreviousDirection;
     Vector3 rotationStartDirection;
@@ -24,8 +22,6 @@ public sealed partial class TransformGizmo
             TransformGizmoAxis.Y => y,
             _ => z,
         };
-        rotationStartOrientation = SelectedNode!.GlobalTransform.Orientation;
-        rotationParentOrientation = SelectedNode.Parent?.GlobalTransform.Orientation ?? Quaternion.Identity;
         rotationAngle = 0f;
         rotationPreviousScreen = screenPos;
         rotationUsesPlane = MathF.Abs(Vector3.Dot(rotationAxis, camera.Front)) > 0.05f;
@@ -60,8 +56,7 @@ public sealed partial class TransformGizmo
         }
 
         rotationPreviousScreen = screenPos;
-        var orientation = Quaternion.CreateFromAxisAngle(rotationAxis, AppliedRotationAngle) * rotationStartOrientation;
-        SelectedNode!.Orientation = Quaternion.Normalize(Quaternion.Inverse(rotationParentOrientation) * orientation);
+        transformSelection!.Rotate(Quaternion.CreateFromAxisAngle(rotationAxis, AppliedRotationAngle));
         TransformEdited?.Invoke();
     }
 

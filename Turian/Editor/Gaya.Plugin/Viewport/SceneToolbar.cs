@@ -64,6 +64,12 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 
     void Coordinates(Gui gui)
     {
+        var center = viewport.Settings.Tools.CenterPivot;
+        if (Button(gui, center ? "Center" : "Pivot", "pivot", "Switch selection centre / active object pivot", width: 54f))
+        {
+            viewport.Settings.Tools.CenterPivot = !center;
+            Changed("sceneTransform");
+        }
         var world = viewport.Gizmo.Space == TransformGizmoSpace.World;
         if (Button(gui, world ? "Global" : "Local", "space", "Switch global / local axes", width: 54f))
             viewport.Gizmo.Space = world ? TransformGizmoSpace.Local : TransformGizmoSpace.World;

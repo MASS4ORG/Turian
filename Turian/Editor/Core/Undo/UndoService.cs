@@ -23,6 +23,7 @@ public sealed class UndoService : IDisposable
     readonly Dictionary<IdObject, ObjectState> watched = new(ReferenceEqualityComparer.Instance);
     readonly HashSet<IdObject> recorded = new(ReferenceEqualityComparer.Instance);
     string? recordedLabel;
+    Guid? recordedDocument;
     bool altered;
     bool restoring;
     int gestures;
@@ -95,6 +96,18 @@ public sealed class UndoService : IDisposable
         // Recorded again within the same step, it keeps the state from before the step's first change.
         if (recorded.Add(target)) watched[target] = ObjectState.Capture(target);
         recordedLabel = label;
+    }
+
+    /// <summary>Records payload assets shown in a locked Inspector with their owning document.</summary>
+    public void RecordInspections(IReadOnlyList<AssetInspection> inspections, string label)
+    {
+        foreach (var inspection in inspections)
+        {
+            if (inspection is not { IsPayload: true, Target: IdObject target }) continue;
+            RecordObject(target, label);
+            inspectedAssets[inspection.Metadata.Id] = inspection;
+            recordedDocument ??= inspection.Metadata.Id;
+        }
     }
 
     /// <summary>
@@ -185,16 +198,31 @@ public sealed class UndoService : IDisposable
         altered = false;
 
         var label = recordedLabel;
+        var owner = recordedDocument ?? CurrentDocument;
+        recordedDocument = null;
         var explicitStep = recorded.Count > 0;
         recordedLabel = null;
         recorded.Clear();
 
-        if (CurrentDocument is not { } document || restoring)
+        if (!CanRecordDocument(owner))
         {
             WatchSelection();
             return;
         }
 
+        var (before, after) = CaptureChanges();
+        WatchSelection();
+        if (before.Count == 0) return;
+
+        RegisterInspectedAssets();
+        StoreStep(new UndoStep(label ?? EditLabel(before.Keys), owner!.Value, before, after), explicitStep);
+        Changed?.Invoke();
+    }
+
+    bool CanRecordDocument(Guid? owner) => owner is not null && !restoring;
+
+    (Dictionary<IdObject, ObjectState> Before, Dictionary<IdObject, ObjectState> After) CaptureChanges()
+    {
         var before = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
         var after = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
         foreach (var (target, previous) in watched)
@@ -206,23 +234,32 @@ public sealed class UndoService : IDisposable
             after[target] = current;
         }
 
-        WatchSelection();
-        if (before.Count == 0) return;
+        return (before, after);
+    }
 
-        if (InspectedContent is { } inspection) inspectedAssets[document] = inspection;
-        var step = new UndoStep(label ?? EditLabel(before.Keys), document, before, after);
+    void RegisterInspectedAssets()
+    {
+        foreach (var inspection in inspector.Selection.Objects.OfType<AssetInspection>()
+                     .Where(inspection => inspection is { IsPayload: true, Target: IdObject }))
+            inspectedAssets[inspection.Metadata.Id] = inspection;
+    }
+
+    void StoreStep(UndoStep step, bool explicitStep)
+    {
+        if (TryMergeGesture(step)) return;
+        history.Push(step, mergeable: !explicitStep && gestures == 0);
+        if (gestures > 0) gestureStep = history.UndoSteps[^1].Id;
+    }
+
+    bool TryMergeGesture(UndoStep step)
+    {
         if (gestures > 0 && gestureStep != Guid.Empty
             && history.UndoSteps is [.., { } latest] && latest.Id == gestureStep)
         {
             history.MergeIntoLatest(step);
+            return true;
         }
-        else
-        {
-            history.Push(step, mergeable: !explicitStep && gestures == 0);
-            if (gestures > 0) gestureStep = history.UndoSteps[^1].Id;
-        }
-
-        Changed?.Invoke();
+        return false;
     }
 
     /// <summary>Reverts the latest step, bringing its document to the front first.</summary>
@@ -314,7 +351,10 @@ public sealed class UndoService : IDisposable
     {
         if (step is null) return;
 
-        if (inspectedAssets.TryGetValue(step.Document, out var inspection)) AssetRestored?.Invoke(inspection);
+        var assetEdits = inspectedAssets.Values.Where(inspection => inspection.Target is IdObject target
+            && step.Before.ContainsKey(target)).ToArray();
+        if (assetEdits.Length > 0)
+            foreach (var inspection in assetEdits) AssetRestored?.Invoke(inspection);
         else if (step.Document != ProjectDocument) RefreshScene(step);
 
         altered = false;
@@ -332,8 +372,9 @@ public sealed class UndoService : IDisposable
             assets.UpdateSelectedNode();
 
             // A step can take the selected node out of the scene, such as undoing its creation.
-            if (inspector.SelectedNode is { } selected && !InScene(selected)) inspector.ClearSelection();
-            else inspector.Select(inspector.SelectedObject);
+            if (inspector.SelectedNodes.Count > 0)
+                inspector.SelectMany(inspector.SelectedNodes.Where(InScene), inspector.SelectedNode);
+            inspector.RefreshSelection();
 
             // Back at the step the scene was saved at, its content is what is on disk again.
             if (savedAt.TryGetValue(step.Document, out var saved) && saved == history.LatestFor(step.Document))
@@ -364,11 +405,13 @@ public sealed class UndoService : IDisposable
     {
         watched.Clear();
         if (sceneTree.IsShowingRuntimeScene) return;
-        if (InspectedContent?.Target is IdObject content) watched[content] = ObjectState.Capture(content);
-        if (inspector.SelectedNode is not { } node) return;
-
-        watched[node] = ObjectState.Capture(node);
-        foreach (var component in node.Components) watched[component] = ObjectState.Capture(component);
+        foreach (var inspection in inspector.Selection.Objects.OfType<AssetInspection>())
+            if (inspection is { IsPayload: true, Target: IdObject content }) watched[content] = ObjectState.Capture(content);
+        foreach (var node in inspector.SelectedNodes)
+        {
+            watched[node] = ObjectState.Capture(node);
+            foreach (var component in node.Components) watched[component] = ObjectState.Capture(component);
+        }
     }
 
     void OnSceneLoaded(Node? root)
