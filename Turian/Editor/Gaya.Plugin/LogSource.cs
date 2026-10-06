@@ -17,6 +17,13 @@ public static class LogSource
     static readonly Regex ColonForm = new(
         @"(?<path>.+):(?<line>\d+)(?=:)", RegexOptions.Compiled);
 
+    static readonly Regex StackForm = new(
+        @"\bin (?<path>.+):line (?<line>\d+)", RegexOptions.Compiled);
+
+    /// <summary>Uses an explicit message location or the source captured with the event.</summary>
+    public static string LocationMessage(LogLine line) => TryParse(line.Text) is not null ? line.Text
+        : line.SourceFile is not null && line.SourceLine > 0 ? $"{line.SourceFile}({line.SourceLine}):" : line.Text;
+
     /// <summary>The file and line a message references, when it references one.</summary>
     /// <param name="message">The rendered log message.</param>
     /// <returns>The file and line, or null when the message names no source location.</returns>
@@ -24,11 +31,11 @@ public static class LogSource
     {
         if (string.IsNullOrEmpty(message)) return null;
 
-        foreach (var match in new[] { ParenForm.Match(message), ColonForm.Match(message) })
+        foreach (var match in new[] { ParenForm.Match(message), StackForm.Match(message), ColonForm.Match(message) })
         {
             if (!match.Success || !int.TryParse(match.Groups["line"].Value, out var line)) continue;
 
-            var path = match.Groups["path"].Value;
+            var path = match.Groups["path"].Value.Trim();
             if (path.Length == 0 || string.IsNullOrWhiteSpace(path)) continue;
 
             return (path, line);
@@ -64,7 +71,7 @@ public static class LogSource
 
     /// <summary>
     /// Opens the source a message points at, positioned on its line. Prefers an editor that accepts
-    /// <c>--goto path:line</c> when one is on PATH; otherwise the file goes to the desktop's default
+    /// source coordinates when one is on PATH; otherwise the file goes to the desktop's default
     /// program. Silently ignores a message with no source location.
     /// </summary>
     /// <param name="message">The rendered log message.</param>
@@ -77,39 +84,46 @@ public static class LogSource
         var path = ResolvePath(message, projectDirectory);
         if (path is null)
         {
-            var hit = TryParse(message);
-            if (hit is { } source)
-                log.LogWarning("Output: {Path} is not a source file, cannot jump to line {Line}",
-                    source.Path, source.Line);
+            ReportMissing(message, log);
             return;
         }
 
-        var sourceLine = TryParse(message)!.Value.Line;
+        LaunchSource(path, TryParse(message)!.Value.Line, log, OnPath, Process.Start);
+    }
 
-        var editor = LineJumperEditors.FirstOrDefault(OnPath);
-        if (editor is not null)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(editor, $"--goto \"{path}\":{sourceLine}")
-                {
-                    UseShellExecute = false,
-                })?.Dispose();
-                return;
-            }
-            catch (Exception ex)
-            {
-                log.LogWarning(ex, "Output: {Editor} could not open {Path}:{Line}", editor, path, sourceLine);
-            }
-        }
+    static void ReportMissing(string message, ILogger log)
+    {
+        if (TryParse(message) is { } source)
+            log.LogWarning("Output: {Path} is not a source file, cannot jump to line {Line}", source.Path, source.Line);
+    }
 
+    internal static void LaunchSource(string path, int line, ILogger log, Func<string, bool> onPath,
+        Func<ProcessStartInfo, Process?> start)
+    {
+        var editor = LineJumperEditors.FirstOrDefault(onPath);
+        if (editor is not null && TryLaunch(EditorStartInfo(editor, path, line), log, start)) return;
+        TryLaunch(new ProcessStartInfo(path) { UseShellExecute = true }, log, start);
+    }
+
+    internal static ProcessStartInfo EditorStartInfo(string editor, string path, int line)
+    {
+        var info = new ProcessStartInfo(editor) { UseShellExecute = false };
+        if (editor != "zed") info.ArgumentList.Add("--goto");
+        info.ArgumentList.Add($"{path}:{line}");
+        return info;
+    }
+
+    static bool TryLaunch(ProcessStartInfo info, ILogger log, Func<ProcessStartInfo, Process?> start)
+    {
         try
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+            start(info)?.Dispose();
+            return true;
         }
         catch (Exception ex)
         {
-            log.LogWarning(ex, "Output: no editor opened {Path}", path);
+            log.LogWarning(ex, "Output: could not open {File}", info.FileName);
+            return false;
         }
     }
 

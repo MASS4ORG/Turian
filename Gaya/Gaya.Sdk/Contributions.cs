@@ -243,7 +243,19 @@ public interface IUiBlocker
 
     /// <summary>Human-readable operation shown on the overlay.</summary>
     string Message { get; }
+
+    /// <summary>A consistent progress snapshot, or null when only an operation name is available.</summary>
+    UiBlockerProgress? Progress => null;
 }
+
+/// <summary>Information displayed while an operation holds the workbench's input.</summary>
+/// <param name="Title">Operation name.</param>
+/// <param name="Detail">Current phase or item.</param>
+/// <param name="Fraction">Current phase completion, or null for work with no known item count.</param>
+/// <param name="Counter">Processed and total item counts.</param>
+/// <param name="Elapsed">Time the operation has been running.</param>
+public sealed record UiBlockerProgress(string Title, string Detail = "", float? Fraction = null,
+    string Counter = "", TimeSpan Elapsed = default);
 
 /// <summary>A chrome contribution.</summary>
 /// <param name="Id">Stable unique id.</param>

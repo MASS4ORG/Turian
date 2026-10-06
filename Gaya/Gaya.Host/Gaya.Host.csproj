@@ -14,6 +14,10 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <EmbeddedResource Include="Resources/logo.png"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
     </ItemGroup>

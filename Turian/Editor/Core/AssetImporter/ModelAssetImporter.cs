@@ -15,8 +15,8 @@ public class ModelAssetImporter : IAssetImporter
     ];
 
     /// <inheritdoc/>
-    /// <remarks>Version 2 bakes <c>.obj</c> geometry into <c>.ammesh</c>.</remarks>
-    public int Version => 2;
+    /// <remarks>Cached OBJ geometry preserves the source's upward Y axis.</remarks>
+    public int Version => 3;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath)

@@ -20,6 +20,7 @@ public sealed class GayaPlugin : IPlugin
         log = context.Logger;
         context.Services.AddEditorServices(context.Logger);
         context.Services.AddSingleton<IUiBlocker, BackgroundTaskUiBlocker>();
+        context.Services.AddSingleton<IWindowIdentity, ProjectWindowIdentity>();
         context.Services.AddSingleton<StudioLocalization>();
         context.Services.AddSingleton<IShellLocalization>(sp => sp.GetRequiredService<StudioLocalization>());
         context.Services.AddSingleton<LocaleService>();
@@ -99,7 +100,8 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<AssetDatabase>(),
                     sp.GetRequiredService<SceneTreeController>(),
                     sp.GetRequiredService<PlayModeService>(),
-                    sp.GetRequiredService<ILogger>()))));
+                    sp.GetRequiredService<ILogger>(),
+                    sp.GetRequiredService<EditorCameraSettings>()))));
 
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.projectSwitcher", ChromeSlot.MenuBar,
@@ -300,6 +302,7 @@ public sealed class GayaPlugin : IPlugin
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        if (services.GetRequiredService<ProjectSession>().TickStartup()) return;
         var playMode = services.GetRequiredService<PlayModeService>();
         services.GetRequiredService<OutputLogBridge>().Tick();
         if (playMode.IsActive) playMode.Tick(deltaTime);
@@ -315,6 +318,7 @@ public sealed class GayaPlugin : IPlugin
     public void Stop(IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(services);
+        services.GetRequiredService<ProjectSession>().FinishStartup();
 
         // Closing the window asks about unsaved work first; anything still unsaved here is kept rather than lost.
         services.GetRequiredService<AssetAutoSave>().Flush(force: true);
@@ -377,6 +381,8 @@ public sealed class GayaPlugin : IPlugin
             return;
         }
 
-        services.GetRequiredService<ProjectSession>().Open(projectPath, ArgumentValue("--scene"));
+        var session = services.GetRequiredService<ProjectSession>();
+        if (args.FirstOrDefault() is "--dump" or "--script") session.Open(projectPath, ArgumentValue("--scene"));
+        else session.QueueOpen(projectPath, ArgumentValue("--scene"));
     }
 }

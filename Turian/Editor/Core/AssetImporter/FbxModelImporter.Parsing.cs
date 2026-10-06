@@ -195,35 +195,11 @@ public sealed partial class FbxModelImporter
         var baseVertex = (uint)vertices.Count;
         var indexStart = (uint)indices.Count;
 
-        var uv0 = mesh->MTextureCoords[0];
         var uv1 = mesh->MTextureCoords[1];
-        var colors = mesh->MColors[0];
 
         for (uint i = 0; i < mesh->MNumVertices; i++)
         {
-            var position = Mirror(mesh->MVertices[i]);
-            var normal = mesh->MNormals is null ? new Vector3(0f, 1f, 0f) : Mirror(mesh->MNormals[i]);
-
-            var tangent = new Vector4(0f, 0f, 0f, 0f);
-            if (mesh->MTangents is not null && mesh->MBitangents is not null)
-            {
-                var t = Mirror(mesh->MTangents[i]);
-                var b = Mirror(mesh->MBitangents[i]);
-                var handedness = Vector3.Dot(Vector3.Cross(normal, t), b) < 0f ? -1f : 1f;
-                tangent = new Vector4(t.X, t.Y, t.Z, handedness);
-            }
-
-            var color = colors is null
-                ? new Vector3(1f, 1f, 1f)
-                : new Vector3(colors[i].X, colors[i].Y, colors[i].Z);
-
-            vertices.Add(new Vertex(position, color)
-            {
-                Normal = normal,
-                Uv = uv0 is null ? default : new Vector2(uv0[i].X, uv0[i].Y),
-                Tangent = tangent,
-            });
-
+            vertices.Add(ReadVertex(mesh, i));
             texCoord1.Add(uv1 is null ? default : new Vector2(uv1[i].X, uv1[i].Y));
         }
 
@@ -238,8 +214,8 @@ public sealed partial class FbxModelImporter
 
         var box = mesh->MAABB;
         var bounds = new Bounds(
-            new Vector3(box.Min.X, -box.Max.Y, box.Min.Z),
-            new Vector3(box.Max.X, -box.Min.Y, box.Max.Z));
+            new Vector3(box.Min.X, box.Min.Y, box.Min.Z),
+            new Vector3(box.Max.X, box.Max.Y, box.Max.Z));
 
         return new SubMesh(
             indexStart,
@@ -248,19 +224,38 @@ public sealed partial class FbxModelImporter
             bounds);
     }
 
-    static Vector3 Mirror(Vector3 value) => new(value.X, -value.Y, value.Z);
+    static unsafe Vertex ReadVertex(Silk.NET.Assimp.Mesh* mesh, uint index)
+    {
+        var normal = mesh->MNormals is null ? Vector3.UnitY : mesh->MNormals[index];
+        var colors = mesh->MColors[0];
+        var color = colors is null ? Vector3.One : new Vector3(colors[index].X, colors[index].Y, colors[index].Z);
+        var uv = mesh->MTextureCoords[0];
+        return new Vertex(mesh->MVertices[index], color)
+        {
+            Normal = normal,
+            Uv = uv is null ? default : new Vector2(uv[index].X, uv[index].Y),
+            Tangent = ReadTangent(mesh, index, normal),
+        };
+    }
+
+    static unsafe Vector4 ReadTangent(Silk.NET.Assimp.Mesh* mesh, uint index, Vector3 normal)
+    {
+        if (mesh->MTangents is null || mesh->MBitangents is null) return Vector4.Zero;
+        var tangent = mesh->MTangents[index];
+        var bitangent = mesh->MBitangents[index];
+        var handedness = Vector3.Dot(Vector3.Cross(normal, tangent), bitangent) < 0f ? -1f : 1f;
+        return new Vector4(tangent.X, tangent.Y, tangent.Z, handedness);
+    }
 
     static (Vector3 Position, Quaternion Orientation, Vector3 Scale)
         DecomposeTransform(Matrix4x4 assimpTransform)
     {
         // Assimp stores column-vector matrices; System.Numerics composes row vectors.
         var local = Matrix4x4.Transpose(assimpTransform);
-        var mirrored = YMirror * local * YMirror;
-
-        if (!Matrix4x4.Decompose(mirrored, out var scale, out var rotation, out var translation))
+        if (!Matrix4x4.Decompose(local, out var scale, out var rotation, out var translation))
         {
             return (
-                new Vector3(mirrored.M41, mirrored.M42, mirrored.M43),
+                new Vector3(local.M41, local.M42, local.M43),
                 Quaternion.Identity,
                 Vector3.One);
         }

@@ -81,7 +81,9 @@ public sealed partial class AssetImporter : IDisposable
     /// Generates missing meta files, imports all assets into the cache,
     /// and rebuilds the asset database.
     /// </summary>
-    public void GenerateMetaFiles(string assetFolderPath)
+    /// <param name="assetFolderPath">Project or package folder to scan.</param>
+    /// <param name="progress">Receives import phases and item counts.</param>
+    public void GenerateMetaFiles(string assetFolderPath, IProgressSink? progress = null)
     {
         if (string.IsNullOrWhiteSpace(assetFolderPath) || !Directory.Exists(assetFolderPath))
         {
@@ -92,7 +94,7 @@ public sealed partial class AssetImporter : IDisposable
         lock (syncRoot)
         {
             InitializePaths(assetFolderPath);
-            ScanFolderBatched(assetFolderPath);
+            ScanFolderBatched(assetFolderPath, progress);
         }
 
         NotifyAssetsChanged();
@@ -109,7 +111,8 @@ public sealed partial class AssetImporter : IDisposable
     /// <summary>
     /// Starts monitoring the currently loaded project's asset folder.
     /// </summary>
-    public void StartMonitoring()
+    /// <param name="progress">Receives import phases and item counts when the project is scanned.</param>
+    public void StartMonitoring(IProgressSink? progress = null)
     {
         if (settingsService.Settings is null)
         {
@@ -117,14 +120,14 @@ public sealed partial class AssetImporter : IDisposable
             return;
         }
 
-        InitializeForAssetsRoot(settingsService.Settings.AssetsAbsoluteDir);
+        InitializeForAssetsRoot(settingsService.Settings.AssetsAbsoluteDir, progress);
     }
 
     /// <summary>
     /// Runs <see cref="StartMonitoring"/> on a background thread so opening a project does not
     /// block the caller while its assets are imported. Progress is reported through the logger.
     /// </summary>
-    public Task StartMonitoringAsync() => Task.Run(StartMonitoring);
+    public Task StartMonitoringAsync() => Task.Run(() => StartMonitoring());
 
     /// <summary>
     /// Stops monitoring the asset folder.
@@ -190,20 +193,9 @@ public sealed partial class AssetImporter : IDisposable
         }
     }
 
-    void InitializeForAssetsRoot(string assetFolderPath)
+    void InitializeForAssetsRoot(string assetFolderPath, IProgressSink? progress = null)
     {
-        if (string.IsNullOrWhiteSpace(assetFolderPath))
-        {
-            return;
-        }
-
-        if (!Directory.Exists(assetFolderPath))
-        {
-            logger.LogWarning(
-                "Unable to initialize asset importer. Asset folder does not exist: {AssetFolderPath}",
-                assetFolderPath);
-            return;
-        }
+        if (!HasAssetsFolder(assetFolderPath)) return;
 
         lock (syncRoot)
         {
@@ -215,7 +207,7 @@ public sealed partial class AssetImporter : IDisposable
 
             InitializePaths(assetFolderPath);
 
-            ScanFolderBatched(assetsRootPath!);
+            ScanFolderBatched(assetsRootPath!, progress);
 
             folderWatcher?.Dispose();
             folderWatcher = new AssetFolderWatcher(logger, this);
@@ -232,6 +224,14 @@ public sealed partial class AssetImporter : IDisposable
         }
 
         NotifyAssetsChanged();
+    }
+
+    bool HasAssetsFolder(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        if (Directory.Exists(path)) return true;
+        logger.LogWarning("Unable to initialize asset importer. Asset folder does not exist: {AssetFolderPath}", path);
+        return false;
     }
 
     void InitializePaths(string assetFolderPath)
@@ -266,8 +266,9 @@ public sealed partial class AssetImporter : IDisposable
     /// Imports every file under <paramref name="folderPath"/>, then rebuilds the database,
     /// registers the child assets and persists the catalog once for the whole scan.
     /// </summary>
-    void ScanFolderBatched(string folderPath)
+    void ScanFolderBatched(string folderPath, IProgressSink? progress = null)
     {
+        progress ??= NullProgressSink.Instance;
         // A full scan of the project covers its packages too.
         var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
             .Concat(string.Equals(folderPath, assetsRootPath, StringComparison.Ordinal)
@@ -282,27 +283,14 @@ public sealed partial class AssetImporter : IDisposable
         pendingBatch = batch;
         try
         {
-            for (var i = 0; i < files.Length; i++)
-            {
-                EnsureAssetImported(files[i], overwriteExisting: false);
-
-                if ((i + 1) % importProgressInterval == 0 || i + 1 == files.Length)
-                {
-                    logger.LogInformation("Asset import: {Imported}/{FileCount} files", i + 1, files.Length);
-                }
-            }
-
-            RebuildDatabase();
+            using (var phase = progress.BeginChild(BackgroundTaskKind.Import, "Importing assets"))
+                ImportFiles(files, phase);
 
             // The batch stays open here: a model reconfiguring its textures reimports them, and an
             // immediate rebuild would reseed the database from the on-disk catalog, discarding the
             // children registered so far. Those reimports append to the batch and are handled below.
-            for (var i = 0; i < batch.Count; i++)
-            {
-                var (asset, sourcePath) = batch[i];
-                RegisterChildAssets(asset, sourcePath);
-                RefreshPrefabComponentIndex(asset, ResolveImportedPrimaryPath(asset.Id));
-            }
+            using (var phase = progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets"))
+                IndexImportedAssets(batch, phase);
         }
         finally
         {
@@ -313,6 +301,33 @@ public sealed partial class AssetImporter : IDisposable
 
         logger.LogInformation("Asset import finished: {ImportedCount} assets from {FolderPath}", batch.Count, folderPath);
         ReportTextureCacheSize();
+    }
+
+    void ImportFiles(string[] files, IProgressSink progress)
+    {
+        progress.Units(0, files.Length);
+        for (var i = 0; i < files.Length; i++)
+        {
+            progress.Report(0, Path.GetFileName(files[i]));
+            EnsureAssetImported(files[i], overwriteExisting: false);
+            progress.Units(i + 1, files.Length);
+            if ((i + 1) % importProgressInterval == 0 || i + 1 == files.Length)
+                logger.LogInformation("Asset import: {Imported}/{FileCount} files", i + 1, files.Length);
+        }
+    }
+
+    void IndexImportedAssets(List<(Asset Asset, string SourcePath)> batch, IProgressSink progress)
+    {
+        RebuildDatabase();
+        progress.Units(0, batch.Count);
+        for (var i = 0; i < batch.Count; i++)
+        {
+            var (asset, sourcePath) = batch[i];
+            progress.Report(0, Path.GetFileName(sourcePath));
+            RegisterChildAssets(asset, sourcePath);
+            RefreshPrefabComponentIndex(asset, ResolveImportedPrimaryPath(asset.Id));
+            progress.Units(i + 1, batch.Count);
+        }
     }
 
     /// <summary>

@@ -9,20 +9,21 @@ namespace Gaya.Plugin.Turian;
 public static class LogView
 {
     /// <summary>
-    /// Whether a level survives the Output panel's three severity toggles. The Debug toggle gates
-    /// everything below warning — Information, Debug and Verbose — the log toggle
-    /// gates its whole non-error/non-warning stream.
+    /// Whether a level survives the Output panel's severity toggles.
     /// </summary>
     /// <param name="level">The event's log level.</param>
     /// <param name="errors">Whether the Errors toggle is on; gates <see cref="LogLevel.Critical"/> and <see cref="LogLevel.Error"/>.</param>
     /// <param name="warnings">Whether the Warnings toggle is on; gates <see cref="LogLevel.Warning"/>.</param>
-    /// <param name="log">Whether the Debug toggle is on; gates everything below warning.</param>
+    /// <param name="log">Whether Debug and Trace are visible.</param>
+    /// <param name="information">Whether Information is visible; null uses the Debug toggle.</param>
     /// <returns>True when the level is visible under the given toggles.</returns>
-    public static bool Visible(LogLevel level, bool errors, bool warnings, bool log) => level switch
+    public static bool Visible(LogLevel level, bool errors, bool warnings, bool log, bool? information = null) => level switch
     {
         LogLevel.Critical or LogLevel.Error => errors,
         LogLevel.Warning => warnings,
-        _ => log,
+        LogLevel.Information => information ?? log,
+        LogLevel.Debug or LogLevel.Trace => log,
+        _ => false,
     };
 
     /// <summary>
@@ -37,9 +38,11 @@ public static class LogView
     /// <param name="warnings">Whether warning rows are visible.</param>
     /// <param name="log">Whether the non-error/warning rows are visible.</param>
     /// <param name="collapse">Whether consecutive duplicates collapse into one row with a count.</param>
+    /// <param name="information">Whether Information rows are visible; null uses the Debug toggle.</param>
+    /// <param name="studio">Whether events from Studio and engine services are visible.</param>
     /// <returns>The visible rows, oldest first.</returns>
     public static IReadOnlyList<LogRow> Project(IReadOnlyList<LogLine> lines, string filter,
-        bool errors, bool warnings, bool log, bool collapse)
+        bool errors, bool warnings, bool log, bool collapse, bool? information = null, bool studio = true)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(filter);
@@ -47,11 +50,9 @@ public static class LogView
         for (var index = 0; index < lines.Count; index++)
         {
             var line = lines[index];
-            if (!Visible(line.Level, errors, warnings, log)) continue;
-            if (filter.Length > 0 && !line.Text.Contains(filter, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!Matches(line, filter, errors, warnings, log, information, studio)) continue;
 
-            if (!collapse || rows.Count == 0 || rows[^1].Line.Level != line.Level
-                || rows[^1].Line.Text != line.Text)
+            if (!collapse || rows.Count == 0 || !SameEvent(rows[^1].Line, line))
             {
                 rows.Add(new LogRow(line, 1, index));
             }
@@ -63,6 +64,15 @@ public static class LogView
 
         return rows;
     }
+
+    static bool Matches(LogLine line, string filter, bool errors, bool warnings, bool debug,
+        bool? information, bool studio) => (studio || !line.IsInternal)
+        && Visible(line.Level, errors, warnings, debug, information)
+        && (filter.Length == 0 || line.Text.Contains(filter, StringComparison.OrdinalIgnoreCase));
+
+    static bool SameEvent(LogLine first, LogLine second) => first.Level == second.Level
+        && first.Text == second.Text && first.Category == second.Category
+        && first.SourceFile == second.SourceFile && first.SourceLine == second.SourceLine;
 
     /// <summary>
     /// Reduces a message to its first <paramref name="lineCount"/> lines, the cap the Entry Lines

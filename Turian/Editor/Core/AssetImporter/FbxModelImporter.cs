@@ -66,19 +66,15 @@ public sealed partial class FbxModelImporter : IAssetImporter
         | PostProcessSteps.JoinIdenticalVertices
         | PostProcessSteps.GenerateBoundingBoxes);
 
-    // Assimp reports FBX geometry Y-up; the engine's world space has +Y pointing down.
-    static readonly Matrix4x4 YMirror = new(
-        1, 0, 0, 0,
-        0, -1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1);
-
     static readonly Lazy<AssimpApi> Assimp =
         new(() => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
 
     readonly object syncRoot = new();
     string cacheKey = string.Empty;
     FbxImport? cached;
+
+    /// <inheritdoc/>
+    public int Version => 2;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath) =>

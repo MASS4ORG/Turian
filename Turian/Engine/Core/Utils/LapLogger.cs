@@ -63,8 +63,7 @@ public static class LapLogger
                 Laps[lap] = value;
             }
             var lapTicks = T2Ms(now - value);
-            logger.LogInformation("{Line}",
-                $"{memory,6} MB | {T2Ms(now - _firstTick),14} | {T2Ms(now - _lastTick),12} | {lapTicks,12} | {lap,12} | {msg}");
+            logger.LogDebug("{Line}", $"{memory,6} MB | {T2Ms(now - _firstTick),14} | {T2Ms(now - _lastTick),12} | {lapTicks,12} | {lap,12} | {msg}");
             _lastTick = now;
         }
         else

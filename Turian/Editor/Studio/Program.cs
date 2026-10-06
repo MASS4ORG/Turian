@@ -75,7 +75,7 @@ Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 var gui = new Gui();
 WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
     Environment.SetEnvironmentVariable);
-var window = new GuiWindow(gui, 1600, 950, "Turian Studio");
+var window = new GuiWindow(gui, 1600, 950, "Gaya");
 var activeWorkbench = workbench;
 
 // Closing the window asks about unsaved work through the Exit command, which closes the window again once answered.

@@ -209,10 +209,6 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         if (!settings.AutoExpandComponents)
             foreach (var section in model.Sections.Skip(1))
                 collapsed.Add(section.Title);
-        Log.Logger.LogDebug("node form: {Target} sections=[{Sections}]",
-            target.GetType().Name,
-            string.Join(", ", model.Sections.Select(s =>
-                $"{s.Title}:{s.BodyFields.Count}f/{s.Buttons.Count}b")));
     }
 
     bool CanDropScript(ScriptDragPayload drop) =>

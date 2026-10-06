@@ -338,7 +338,11 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
-        if (gui.Pass == Pass.Pass1Build) SyncChrome();
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            SyncChrome();
+            SyncWindowIdentity(gui);
+        }
         SyncPanels();
         HandleShortcuts(gui);
 
@@ -363,19 +367,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         RenderOverlays(gui);
 
-        if (app.Services.GetService(typeof(IUiBlocker)) is IUiBlocker { IsBlocked: true } blocker)
-        {
-            using (gui.Node(gui.ScreenRect.W, gui.ScreenRect.H, "__uiBlocker")
-                       .AbsoluteScreen(0, 0).BlockInput().Enter())
-            {
-                gui.SetZIndex(10_000);
-                if (gui.Pass == Pass.Pass2Render)
-                {
-                    gui.DrawRect(gui.CurrentNode.Rect, Color.FromArgb(170, 0, 0, 0));
-                    gui.DrawText(blocker.Message, 16, Color.White);
-                }
-            }
-        }
+        RenderBlocker(gui);
 
         if (gui.Pass != Pass.Pass2Render) return;
 

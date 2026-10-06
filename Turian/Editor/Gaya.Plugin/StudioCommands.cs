@@ -273,7 +273,7 @@ static class StudioCommands
             {
                 if (path is not null)
                     services.GetRequiredService<UnsavedChangesGuard>().Leave(leaveProjectQuestion,
-                        () => session.Open(path));
+                        () => session.QueueOpen(path));
             },
         });
     }

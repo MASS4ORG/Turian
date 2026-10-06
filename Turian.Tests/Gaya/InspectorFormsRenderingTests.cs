@@ -3,6 +3,21 @@ namespace Turian.Tests;
 /// <summary>Exercises composed forms and contextual actions through both headless Inspector passes.</summary>
 public sealed class InspectorFormsRenderingTests
 {
+    /// <summary>Inactive parents dim every descendant, and reactivation restores their tint.</summary>
+    [Fact]
+    public void HierarchyTintIncludesDisabledAncestors()
+    {
+        var parent = new Node { IsActive = false };
+        var child = new Node { Parent = parent };
+        parent.Children.Add(child);
+        var tint = typeof(SceneTreePanel).GetMethod("Tint", BindingFlags.Static | BindingFlags.NonPublic)!;
+        Assert.Equal(StudioTheme.Current.InkFaint, tint.Invoke(null, [child, PrefabLink.None]));
+        parent.IsActive = true;
+        Assert.Null(tint.Invoke(null, [child, PrefabLink.None]));
+        Assert.Equal(StudioTheme.Current.Accent, tint.Invoke(null, [child, PrefabLink.Instance]));
+        Assert.Equal(StudioTheme.Current.Error, tint.Invoke(null, [child, PrefabLink.Missing]));
+    }
+
     /// <summary>Hierarchy modifier clicks keep their ordered selection when synchronized with the Inspector.</summary>
     [Fact]
     public void HierarchyRangeSelectionReachesInspector()
