@@ -14,7 +14,9 @@
     <ItemGroup>
         <HzbShader Include="Shaders/*.vert;Shaders/*.comp"/>
     </ItemGroup>
+    <!-- Skipping shader compilation ships the .spv committed in the tag, so a release build needs no glslc. -->
     <Target Name="CompileHzbShaders" BeforeTargets="BeforeBuild"
+            Condition="'$(SkipShaders)' != 'true'"
             Inputs="@(HzbShader)" Outputs="@(HzbShader->'%(Identity).spv');Shaders/base-single.comp.spv">
         <Exec Command="glslc &quot;%(HzbShader.Identity)&quot; -o &quot;%(HzbShader.Identity).spv&quot;"/>
         <Exec Command="glslc -DSINGLE_SAMPLE Shaders/base.comp -o Shaders/base-single.comp.spv"/>

@@ -52,6 +52,7 @@ sealed partial class Build
                 .SetProjectFile(Solution)
                 .SetConfiguration(Config)
                 .SetProperty("NoLocalPackages", NoLocalPackages)
+                .SetProperty("SkipShaders", SkipShaders)
                 .EnableNoRestore()
             );
 
