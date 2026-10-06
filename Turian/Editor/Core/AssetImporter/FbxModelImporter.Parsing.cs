@@ -252,10 +252,11 @@ public sealed partial class FbxModelImporter
     {
         // Assimp stores column-vector matrices; System.Numerics composes row vectors.
         var local = Matrix4x4.Transpose(assimpTransform);
-        if (!Matrix4x4.Decompose(local, out var scale, out var rotation, out var translation))
+        var mirrored = YMirror * local * YMirror;
+        if (!Matrix4x4.Decompose(mirrored, out var scale, out var rotation, out var translation))
         {
             return (
-                new Vector3(local.M41, local.M42, local.M43),
+                new Vector3(mirrored.M41, mirrored.M42, mirrored.M43),
                 Quaternion.Identity,
                 Vector3.One);
         }

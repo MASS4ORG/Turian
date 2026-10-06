@@ -65,7 +65,7 @@ public sealed class OutputPanelInteractionTests
             Assert.Equal("/missing/Game.cs(7): first", input.GetClipboardText());
             items[2].Action!();
             Assert.Contains("second line", input.GetClipboardText());
-            Assert.Contains("debug", input.GetClipboardText());
+            Assert.DoesNotContain("debug", input.GetClipboardText());
             input.IsKeyPressed(GKey.Escape).Returns(true);
             Frame();
             Frame();
@@ -74,6 +74,7 @@ public sealed class OutputPanelInteractionTests
             Frame();
             Assert.Equal(0, typeof(OutputPanel).GetField("selectedIndex", instanceFields)!.GetValue(panel));
             var header = Nodes(gui.RootNode!).Single(node => node.Id == "gaya.turian.output/header");
+            Click(header.Children[4].Center);
             Click(header.Children[3].Center);
             Frame();
             var rows = (IReadOnlyList<LogRow>)typeof(OutputPanel).GetField("rows", instanceFields)!.GetValue(panel)!;

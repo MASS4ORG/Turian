@@ -1,9 +1,12 @@
+LogLevel minimumLevel;
+try { minimumLevel = StudioLogOptions.MinimumLevel(args); }
+catch (ArgumentException exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    return 2;
+}
 using var loggerFactory = LoggerFactory.Create(builder => builder
-#if DEBUG
-    .SetMinimumLevel(LogLevel.Debug)
-#else
-    .SetMinimumLevel(LogLevel.Information)
-#endif
+    .SetMinimumLevel(minimumLevel)
     .AddConsole()
     .AddProvider(LogBuffer.Provider));
 Log.Configure(loggerFactory);
