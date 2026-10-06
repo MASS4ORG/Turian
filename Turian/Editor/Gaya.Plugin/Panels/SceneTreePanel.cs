@@ -7,12 +7,13 @@ namespace Gaya.Plugin.Turian;
 sealed class SceneTreePanel : IPanel
 {
 
-    readonly TreeViewState state = new();
+    readonly TreeViewState state = new() { MultiSelect = true };
     readonly List<TreeItem> rows = [];
     readonly Dictionary<Node, string> keysByNode = [];
     readonly Dictionary<string, Node> nodesByKey = [];
 
     Node? syncedSelection;
+    IReadOnlyList<Node> syncedNodes = [];
 
     readonly SceneTreeController sceneTree;
     readonly NodeInspectorController inspector;
@@ -87,44 +88,66 @@ sealed class SceneTreePanel : IPanel
 
         // Flattening a scene the size of Bistro allocates thousands of rows, so it only happens when
         // the hierarchy changes rather than every frame.
-        if (gui.Pass == Pass.Pass1Build && (stale || !ReferenceEquals(builtFor, root))) Rebuild(root);
+        if (gui.Pass == Pass.Pass1Build) PrepareTree(root);
 
         // The selection flows both ways: the controller wins when something else changed it, and the
         // tree wins when the keyboard moved it. Pushing the controller's value in unconditionally
         // undid every arrow-key move on the next frame.
-        if (!ReferenceEquals(inspector.SelectedNode, syncedSelection))
+        if (gui.Pass == Pass.Pass1Build) PushSelection();
+
+        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
+            dropAccept: CanDrop, onDrop: Drop);
+
+        if (gui.Pass == Pass.Pass2Render) PullSelection();
+        gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+    }
+
+    void PrepareTree(Node root)
+    {
+        if (stale || !ReferenceEquals(builtFor, root)) Rebuild(root);
+    }
+
+    void PushSelection()
+    {
+        if (!ReferenceEquals(inspector.SelectedNode, syncedSelection)
+            || !inspector.SelectedNodes.SequenceEqual(syncedNodes))
         {
             syncedSelection = inspector.SelectedNode;
-            state.SelectedId = syncedSelection is null ? null : keysByNode.GetValueOrDefault(syncedSelection);
+            syncedNodes = inspector.SelectedNodes;
+            state.SetSelection(syncedNodes.Select(node => keysByNode.GetValueOrDefault(node)).OfType<string>(),
+                syncedSelection is null ? null : keysByNode.GetValueOrDefault(syncedSelection));
             if (state.SelectedId is { } revealed) Reveal(revealed);
         }
 
-        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
-            dropAccept: payload => payload is ScriptDragPayload drop
+    }
+
+    bool CanDrop(object payload) => payload is ScriptDragPayload drop
                     && typeof(Component).IsAssignableFrom(drop.ComponentType)
-                || payload is ReferenceDragPayload dragged && sceneTree.FindNodeById(dragged.Id) is not null,
-            onDrop: (item, payload) =>
-            {
-                if (item.Tag is Node node && payload is ScriptDragPayload drop)
-                {
-                    inspector.Select(node);
-                    undo.RecordObject(node, "Add Component");
-                    if (inspector.AddComponent(drop.ComponentType)) Invalidate();
-                }
+                || payload is ReferenceDragPayload dragged && sceneTree.FindNodeById(dragged.Id) is not null;
 
-                // A node row dropped on another row moves under it.
-                if (item.Tag is Node target && payload is ReferenceDragPayload dragged
-                    && sceneTree.FindNodeById(dragged.Id) is { } dropped)
-                    Restructure(dropped, () => Reparent(dropped, target));
-            });
+    void Drop(TreeItem item, object payload)
+    {
+        if (item.Tag is Node node && payload is ScriptDragPayload drop)
+        {
+            DropComponent(node, drop.ComponentType);
+        }
 
-        if (gui.Pass == Pass.Pass2Render
-            && state.SelectedId is { } selectedKey
-            && nodesByKey.GetValueOrDefault(selectedKey) is { } moved
-            && !ReferenceEquals(moved, syncedSelection))
-            Select(moved);
+        // A node row dropped on another row moves under it.
+        if (item.Tag is Node target && payload is ReferenceDragPayload dragged
+            && sceneTree.FindNodeById(dragged.Id) is { } dropped)
+            ReparentSelection(dropped, target);
+    }
 
-        gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+    void DropComponent(Node node, Type type)
+    {
+        if (!inspector.SelectedNodes.Contains(node)) inspector.Select(node);
+        undo.BeginGesture();
+        try
+        {
+            foreach (var selected in inspector.SelectedNodes) undo.RecordObject(selected, "Add Component");
+            if (inspector.AddComponents(inspector.SelectedNodes, type)) Invalidate();
+        }
+        finally { undo.EndGesture(); }
     }
 
     /// <summary>Forces a rebuild; call after editing the hierarchy from this panel.</summary>
@@ -152,6 +175,7 @@ sealed class SceneTreePanel : IPanel
 
         builtFor = root;
         stale = false;
+        syncedNodes = [];
     }
 
     /// <summary>
@@ -182,6 +206,7 @@ sealed class SceneTreePanel : IPanel
 
         if (e.Button == MouseButton.Right)
         {
+            if (!inspector.SelectedNodes.Contains(node)) Select(node);
             menuNode = node;
             menuAt = pointer;
             menuOpen = true;
@@ -190,7 +215,7 @@ sealed class SceneTreePanel : IPanel
 
         if (e.Button != MouseButton.Left) return;
 
-        Select(node);
+        PullSelection();
     }
 
     void OnEmptyClick(MouseButton button)
@@ -208,7 +233,8 @@ sealed class SceneTreePanel : IPanel
         var isRoot = node is not null && node.Parent is null;
 
         menu.Item("Rename", () => BeginRename(node), enabled: node is not null && !isRoot);
-        menu.Item("Delete", () => Delete(node), enabled: node is not null && !isRoot);
+        menu.Item("Delete", DeleteSelected, enabled: HasEditableSelection);
+        menu.Item("Duplicate", DuplicateSelected, enabled: HasEditableSelection);
         menu.Item("Move Up", () => Restructure(node!, () => MoveBy(node!, -1)),
             enabled: node?.Parent is { } above && above.Children.IndexOf(node) > 0);
         menu.Item("Move Down", () => Restructure(node!, () => MoveBy(node!, 1)),
@@ -220,6 +246,11 @@ sealed class SceneTreePanel : IPanel
         menu.Item("New Node", () => Create(node, asChild: false), enabled: node is not null);
         menu.Item("New Child Node", () => Create(node, asChild: true), enabled: node is not null);
         menu.Separator();
+        BuildPrefabMenu(menu, node, isRoot);
+    }
+
+    void BuildPrefabMenu(FlyoutBuilder menu, Node? node, bool isRoot)
+    {
         menu.Item("Create Prefab", () => CreatePrefab(node), enabled: node is not null && !isRoot);
         menu.Item("Open Prefab", () => prefabStage.OpenPrefab(node!), enabled: node?.PrefabInstance is not null);
         menu.Item("Unpack Prefab", () => Unpack(node, completely: false), enabled: node?.PrefabInstance is not null);
@@ -228,10 +259,14 @@ sealed class SceneTreePanel : IPanel
     }
 
     /// <summary>Whether a node other than the scene root is selected, so an edit has a target.</summary>
-    public bool HasEditableSelection => inspector.SelectedNode is { Parent: not null };
+    public bool HasEditableSelection => inspector.SelectedNodes.Any(node => node.Parent is not null);
 
     /// <summary>Removes the selected node. What the panel's Delete shortcut runs.</summary>
-    public void DeleteSelected() => Delete(inspector.SelectedNode);
+    public void DeleteSelected() => RestructureSelection(() =>
+    {
+        operations.Delete(inspector.SelectedNodes);
+        Invalidate();
+    });
 
     /// <summary>Starts the in-place rename of the selected node. What the panel's F2 shortcut runs.</summary>
     public void RenameSelected() => BeginRename(inspector.SelectedNode);
@@ -239,14 +274,10 @@ sealed class SceneTreePanel : IPanel
     /// <summary>Clones the selected node beside itself. What the panel's Duplicate shortcut runs.</summary>
     public void DuplicateSelected()
     {
-        if (inspector.SelectedNode is not { Parent: { } parent } node) return;
-
-        var clone = sceneTree.CloneNode(node, NodeName(node.Name, parent));
-        undo.RecordObject(parent, "Duplicate");
-        sceneTree.AttachNode(clone, parent, parent.Children.Count);
-        sceneTree.MarkAssetModified();
+        var clones = operations.Duplicate(inspector.SelectedNodes);
+        if (clones.Count == 0) return;
         Invalidate();
-        Select(clone);
+        inspector.SelectMany(clones);
     }
 
     void BeginRename(Node? node)
@@ -422,6 +453,54 @@ sealed class SceneTreePanel : IPanel
         syncedSelection = node;
         sceneTree.SelectNode(node);
         inspector.Select(node);
+    }
+
+    NodeSelectionOperations operations => selectionOperations ??= new(sceneTree, inspector, undo);
+    NodeSelectionOperations? selectionOperations;
+
+    void PullSelection()
+    {
+        var nodes = state.SelectedIds.Select(key => nodesByKey.GetValueOrDefault(key)).OfType<Node>().ToArray();
+        var active = state.SelectedId is { } key ? nodesByKey.GetValueOrDefault(key) : null;
+        if (nodes.SequenceEqual(syncedNodes) && ReferenceEquals(active, syncedSelection)) return;
+        inspector.SelectMany(nodes, active);
+        syncedNodes = inspector.SelectedNodes;
+        syncedSelection = inspector.SelectedNode;
+        state.SetSelection(syncedNodes.Select(node => keysByNode.GetValueOrDefault(node)).OfType<string>(),
+            syncedSelection is null ? null : keysByNode.GetValueOrDefault(syncedSelection));
+        if (syncedSelection is not null) sceneTree.SelectNode(syncedSelection);
+    }
+
+    void ReparentSelection(Node dragged, Node target)
+    {
+        if (!inspector.SelectedNodes.Contains(dragged)) Select(dragged);
+        RestructureSelection(() =>
+        {
+            operations.Reparent(inspector.SelectedNodes, target);
+            Invalidate();
+        });
+    }
+
+    void RestructureSelection(Action change)
+    {
+        var nodes = SelectionService.TopLevelNodes(inspector.SelectedNodes).ToArray();
+        var protectedNode = nodes.FirstOrDefault(node => PrefabOwned(node) is not null);
+        if (protectedNode is null) { change(); return; }
+        var instance = PrefabOwned(protectedNode)!;
+        confirm.Ask(localization.T("Unpack Prefab"),
+            string.Format(CultureInfo.CurrentCulture,
+                localization.T("\"{0}\" is part of the prefab instance \"{1}\". Unpack the instance to change it?"),
+                protectedNode.Name, instance.Name), localization.T("Unpack and Continue"), () =>
+            {
+                undo.BeginGesture();
+                try
+                {
+                    foreach (var node in nodes)
+                        while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
+                    change();
+                }
+                finally { undo.EndGesture(); }
+            });
     }
 
     /// <summary>Imported hierarchies routinely carry unnamed nodes; the type keeps the row readable.</summary>

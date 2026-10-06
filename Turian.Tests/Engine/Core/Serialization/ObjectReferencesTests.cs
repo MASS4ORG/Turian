@@ -80,6 +80,21 @@ public sealed class ObjectReferencesTests : IDisposable
         Assert.DoesNotContain(missing.Id.ToString(), Serializer.Serialize(loaded));
     }
 
+    /// <summary>Resolving a later scene retains list entries already resolved in the first scene.</summary>
+    [Fact]
+    public void LaterResolutionPreservesResolvedListEntries()
+    {
+        var (root, linker, target, _) = BuildScene();
+        var external = new Node { Name = "External" };
+        linker.Waypoints = [target, external, null, root];
+        var loaded = Serializer.LoadData<Node>(Serializer.Serialize(root))!;
+        var loadedLinker = loaded.Children[0].GetComponent<Linker>()!;
+        var loadedTarget = loaded.Children[1];
+        Assert.Equal([loadedTarget, null, null, loaded], loadedLinker.Waypoints!);
+        ObjectReferences.Resolve([loaded, external], loader: null);
+        Assert.Equal([loadedTarget, external, null, loaded], loadedLinker.Waypoints!);
+    }
+
     /// <summary>Verifies that a destroyed target is saved as null, like a missing one.</summary>
     [Fact]
     public void DestroyedTargets_AreSavedAsNull()

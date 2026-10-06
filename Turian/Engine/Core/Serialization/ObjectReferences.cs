@@ -323,53 +323,75 @@ public static class ObjectReferences
 
         foreach (var (member, ids) in pending)
         {
-            var info = generated is null ? FindMember(owner.GetType(), member) : null;
-            if ((generated?.MemberType(member) ?? (info is null ? null : MemberType(info))) is not { } memberType)
-                continue;
-
-            var elementType = ElementType(memberType);
-            var missing = new Guid[ids.Length];
-            var anyMissing = false;
-            object? value;
-
-            if (elementType is null)
-            {
-                value = ids[0] == Guid.Empty ? null : Match(find(ids[0]), memberType);
-                if (value is null && ids[0] != Guid.Empty)
-                {
-                    missing[0] = ids[0];
-                    anyMissing = true;
-                }
-            }
-            else
-            {
-                var list = CreateList(memberType, elementType, ids.Length);
-                for (var i = 0; i < ids.Length; i++)
-                {
-                    if (ids[i] == Guid.Empty) continue;
-                    list[i] = Match(find(ids[i]), elementType);
-                    if (list[i] is not null) continue;
-                    missing[i] = ids[i];
-                    anyMissing = true;
-                }
-                value = list;
-            }
-
-            if (generated is not null) generated.SetMember(owner, member, value);
-            else SetValue(info!, owner, value);
-
-            if (!anyMissing) continue;
-
-            stillPending += missing.Count(static id => id != Guid.Empty);
-            var table = PendingTable(owner);
-            lock (table)
-            {
-                if (IndexOf(table, member) < 0) table.Add(new(member, missing));
-            }
+            stillPending += AssignMember(owner, member, ids, find, generated);
         }
-
         return stillPending;
     }
+
+    static int AssignMember(IdObject owner, string member, Guid[] ids, Func<Guid, IdObject?> find,
+        GeneratedSerializer? generated)
+    {
+        if (ReferenceMemberType(owner, member, generated, out var info) is not { } memberType)
+            return 0;
+
+        var (value, missing) = ResolveMemberValue(owner, member, memberType, ids, find);
+
+        if (generated is not null) generated.SetMember(owner, member, value);
+        else SetValue(info!, owner, value);
+
+        if (missing.All(static id => id == Guid.Empty)) return 0;
+
+        var table = PendingTable(owner);
+        lock (table)
+        {
+            if (IndexOf(table, member) < 0) table.Add(new(member, missing));
+        }
+        return missing.Count(static id => id != Guid.Empty);
+    }
+
+    static Type? ReferenceMemberType(IdObject owner, string member, GeneratedSerializer? generated,
+        out MemberInfo? info)
+    {
+        info = generated is null ? FindMember(owner.GetType(), member) : null;
+        return generated?.MemberType(member) ?? (info is null ? null : MemberType(info));
+    }
+
+    static (object? Value, Guid[] Missing) ResolveMemberValue(IdObject owner, string member, Type memberType,
+        Guid[] ids, Func<Guid, IdObject?> find)
+    {
+        var missing = new Guid[ids.Length];
+        if (ElementType(memberType) is { } elementType)
+            return (ResolveList(owner, member, memberType, elementType, ids, missing, find), missing);
+        var value = ids[0] == Guid.Empty ? null : Match(find(ids[0]), memberType);
+        if (value is null) missing[0] = ids[0];
+        return (value, missing);
+    }
+
+    static System.Collections.IList ResolveList(IdObject owner, string member, Type memberType, Type elementType,
+        Guid[] ids, Guid[] missing, Func<Guid, IdObject?> find)
+    {
+        var list = CreateList(memberType, elementType, ids.Length);
+        var existing = ExistingList(owner, member);
+        for (var i = 0; i < ids.Length; i++)
+        {
+            if (ids[i] == Guid.Empty)
+            {
+                if (existing is not null && i < existing.Count) list[i] = existing[i];
+                continue;
+            }
+            list[i] = Match(find(ids[i]), elementType);
+            if (list[i] is null) missing[i] = ids[i];
+        }
+        return list;
+    }
+
+    static System.Collections.IList? ExistingList(IdObject owner, string member) =>
+        FindMember(owner.GetType(), member) switch
+        {
+            PropertyInfo property => property.GetValue(owner) as System.Collections.IList,
+            FieldInfo field => field.GetValue(owner) as System.Collections.IList,
+            _ => null,
+        };
 
     static object? Match(IdObject? target, Type type) =>
         !IsMissing(target) && type.IsInstanceOfType(target) ? target : null;

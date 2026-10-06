@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>Edits layer indices and masks using the project's named slots.</summary>
-sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
+sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IPropertyDrawer
 {
     readonly Dictionary<string, int> frameSelections = new(StringComparer.Ordinal);
 
@@ -28,39 +28,36 @@ sealed class LayerDrawer(LayerFilter layers) : IPropertyDrawer
     void DrawLayer(Gui gui, FormField field, LayerSlot[] slots, string id)
     {
         var value = (int)(field.GetValue() ?? 0);
-        var current = Array.FindIndex(slots, slot => slot.Index == value);
-        var next = Dropdown(gui, [.. slots.Select(slot => $"{slot.Index}: {slot.Name}")], current, id);
+        var current = field.HasMixedValue ? -1 : Array.FindIndex(slots, slot => slot.Index == value);
+        var next = Dropdown(gui, [.. slots.Select(slot => $"{slot.Index}: {slot.Name}")], current, id, !field.IsReadOnly);
         if (gui.Pass == Pass.Pass2Render && next >= 0 && next != current) field.SetValue(slots[next].Index);
     }
 
     void DrawMask(Gui gui, FormField field, LayerSlot[] slots, string id)
     {
-        var mask = (LayerMask)(field.GetValue() ?? LayerMask.Nothing);
-        string[] labels =
-        [
-            mask == LayerMask.Everything ? "Everything" : mask == LayerMask.Nothing ? "Nothing" : $"0x{mask.Value:X8}",
-            "Everything", "Nothing",
-            .. slots.Select(slot => $"{(mask.Contains(slot.Index) ? "✓ " : "")} {slot.Index}: {slot.Name}"),
-        ];
-        var next = Dropdown(gui, labels, 0, id);
-        if (gui.Pass != Pass.Pass2Render || next <= 0) return;
-        if (next == 1) field.SetValue(LayerMask.Everything);
-        else if (next == 2) field.SetValue(LayerMask.Nothing);
-        else
-        {
-            var bit = LayerMask.FromLayer(slots[next - 3].Index);
-            field.SetValue(mask.Intersects(bit) ? mask & ~bit : mask | bit);
-        }
+        var masks = field.Sources.Select(source => (LayerMask)(source.GetValue() ?? LayerMask.Nothing)).ToArray();
+        var options = slots.Select(slot => slot.Index).ToArray();
+        var selected = options.Where(masks[0].Contains).ToArray();
+        var labels = slots.ToDictionary(slot => slot.Index, slot => $"{slot.Index}: {slot.Name}");
+        var theme = StudioTheme.Current;
+        var result = gui.MultiDropdown(options, selected, display: index => labels[index],
+            mixed: field.HasMixedValue,
+            isMixed: index => masks.Any(mask => mask.Contains(index) != masks[0].Contains(index)),
+            width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
+            placeholder: "none", enabled: !field.IsReadOnly, filePath: $"{id}/layer-mask");
+        if (result.Changed)
+            InspectorSelectionEdits.ApplyLayerMask(field,
+                result.Changes.Select(change => (change.Item, change.Selected)).ToArray(), undo);
     }
 
-    int Dropdown(Gui gui, string[] labels, int current, string id)
+    int Dropdown(Gui gui, string[] labels, int current, string id, bool enabled)
     {
         var theme = StudioTheme.Current;
         if (gui.Pass == Pass.Pass2Render && frameSelections.TryGetValue(id, out var selection)) current = selection;
         var next = gui.Dropdown(labels, current, width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
             backgroundColor: theme.Field, borderColor: theme.Border, textColor: theme.Ink,
             dropdownColor: theme.Field, hoverColor: theme.Hover, selectedColor: theme.AccentFill,
-            filePath: $"{id}/layer");
+            placeholder: "—", enabled: enabled, filePath: $"{id}/layer");
         if (gui.Pass == Pass.Pass1Build) frameSelections[id] = next;
         else frameSelections.Remove(id);
         return next;

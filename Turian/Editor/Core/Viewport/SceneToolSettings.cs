@@ -4,6 +4,9 @@ namespace Turian.Editor.Core;
 [EditorSetting("Scene Viewer/Transform")]
 public sealed class SceneToolSettings
 {
+    /// <summary>Whether a group gizmo pivots around the selection centre rather than the active object.</summary>
+    public bool CenterPivot { get; set; }
+
     /// <summary>Gets or sets whether transform gestures snap to the configured intervals.</summary>
     public bool SnapEnabled { get; set; } = true;
 

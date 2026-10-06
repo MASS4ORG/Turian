@@ -295,6 +295,10 @@ public sealed class SceneTreeController(
     /// </summary>
     public Node CloneNode(Node source, string newName) => NodeCloner.Clone(source, newName);
 
+    /// <summary>Copies selected subtrees with fresh ids and shared asset references resolved by the scene loader.</summary>
+    public IReadOnlyList<Node> DuplicateNodes(IReadOnlyList<Node> nodes) =>
+        NodeDuplication.Copy(nodes, assetLoader, id => PrefabInstances.ReadPrefabJson(database, id));
+
     /// <summary>
     /// Marks the current asset as modified. Does nothing while a play session is displayed:
     /// edits made to running objects are discarded when play stops, so they must not dirty the

@@ -10,16 +10,22 @@ public sealed class NodeInspectorController
     readonly SceneViewSettings? viewSettings;
 
     /// <summary>Gets the currently selected Node, or null if no node is selected.</summary>
-    public Node? SelectedNode => selectedNode;
+    public Node? SelectedNode => NodeOf(SelectedObject);
+
+    /// <summary>The shared ordered selection used by the hierarchy, viewport and inspector.</summary>
+    public SelectionService Selection { get; } = new();
+
+    /// <summary>All selected scene nodes, including the owners of selected components.</summary>
+    public IReadOnlyList<Node> SelectedNodes => [.. Selection.Objects.Select(NodeOf).OfType<Node>().Distinct()];
 
     /// <summary>
     /// The object handed to <see cref="Select"/>, whatever its type. A shell that can edit
     /// project-level objects — the app settings, say — reads this when
     /// <see cref="SelectedNode"/> is null.
     /// </summary>
-    public object? SelectedObject { get; private set; }
+    public object? SelectedObject => Selection.ActiveObject;
 
-    Node? selectedNode;
+    Node? selectedNode => SelectedNode;
 
     /// <summary>Raised after selection or component list changes.</summary>
     public event Action? SelectionChanged;
@@ -36,6 +42,7 @@ public sealed class NodeInspectorController
         this.assetManager = assetManager;
         this.build = build;
         this.viewSettings = viewSettings;
+        Selection.Changed += () => SelectionChanged?.Invoke();
         if (viewSettings is not null) viewSettings.LocksChanged += OnLocksChanged;
     }
 
@@ -55,21 +62,44 @@ public sealed class NodeInspectorController
     /// <param name="target">The object to select. Can be a Node, Component, or null to clear selection.</param>
     public void Select(object? target)
     {
-        var node = target switch
-        {
-            Node n => n,
-            Component { IsAttached: true } c => c.Node,
-            _ => null
-        };
+        var node = NodeOf(target);
         if (node is not null && viewSettings?.CanSelect(node) == false) return;
-        SelectedObject = target;
-        selectedNode = node;
-        SelectionChanged?.Invoke();
+        Selection.Select(target);
     }
+
+    /// <summary>Replaces the selection with selectable objects and chooses an active object.</summary>
+    public void SelectMany(IEnumerable<object> targets, object? active = null) =>
+        Selection.SetObjects(targets.Where(CanSelect), active);
+
+    /// <summary>Selects, adds or toggles a node according to the viewport's modifier keys.</summary>
+    public void SelectNode(Node? node, bool additive = false, bool toggle = false)
+    {
+        if (node is null)
+        {
+            if (!additive && !toggle) ClearSelection();
+            return;
+        }
+        if (!CanSelect(node)) return;
+        if (toggle) Selection.Toggle(node);
+        else if (additive) Selection.Add(node);
+        else Select(node);
+    }
+
+    /// <summary>Notifies listeners that the selected objects' structure changed without replacing the selection.</summary>
+    public void RefreshSelection() => SelectionChanged?.Invoke();
+
+    bool CanSelect(object target) => NodeOf(target) is not { } node || viewSettings?.CanSelect(node) != false;
+
+    static Node? NodeOf(object? target) => target switch
+    {
+        Node node => node,
+        Component { IsAttached: true } component => component.Node,
+        _ => null,
+    };
 
     void OnLocksChanged()
     {
-        if (selectedNode is not null && viewSettings?.CanSelect(selectedNode) == false) ClearSelection();
+        SelectMany(Selection.Objects, SelectedObject);
     }
 
     /// <summary>Clears the current selection, setting both SelectedObject and SelectedNode to null.</summary>
@@ -99,6 +129,69 @@ public sealed class NodeInspectorController
             Log.Logger.LogError(ex, "Failed to add component {Type}", componentType.FullName);
             return false;
         }
+    }
+
+    /// <summary>Adds the component to every supplied node when it is addable to all of them.</summary>
+    public bool AddComponents(IReadOnlyList<Node> nodes, Type componentType)
+    {
+        ArgumentNullException.ThrowIfNull(componentType);
+        if (nodes.Count == 0 || !typeof(Component).IsAssignableFrom(componentType)
+            || nodes.Any(node => !ComponentRegistry.CanAddTo(node, componentType))) return false;
+        try
+        {
+            var instances = nodes.Select(_ => (Component)Activator.CreateInstance(componentType)!).ToArray();
+            for (var i = 0; i < nodes.Count; i++)
+            {
+                nodes[i].AddComponent(instances[i]);
+                NotifyMutation(nodes[i]);
+            }
+            RefreshSelection();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogError(ex, "Failed to add component {Type}", componentType.FullName);
+            return false;
+        }
+    }
+
+    /// <summary>Returns components matching a representative's type and occurrence across the supplied nodes.</summary>
+    public static IReadOnlyList<Component> MatchingComponents(IReadOnlyList<Node> nodes, Component representative)
+    {
+        var type = representative.GetType();
+        if (representative.Node is not { } owner) return [];
+        var occurrence = owner.Components.Where(component => component.GetType() == type)
+            .ToList().IndexOf(representative);
+        if (occurrence < 0) return [];
+        return [.. nodes.Select(node => node.Components.Where(component => component.GetType() == type)
+            .ElementAtOrDefault(occurrence)).OfType<Component>()];
+    }
+
+    /// <summary>Removes matching components from all supplied nodes and refreshes their inspector sections.</summary>
+    public void RemoveComponents(IReadOnlyList<Node> nodes, Component representative)
+    {
+        foreach (var component in MatchingComponents(nodes, representative))
+        {
+            if (component.Node is not { } node) continue;
+            if (node.RemoveComponent(component)) NotifyMutation(node);
+        }
+        RefreshSelection();
+    }
+
+    /// <summary>Moves each matching component one position in its owner's list.</summary>
+    public void MoveComponents(IReadOnlyList<Node> nodes, Component representative, bool up)
+    {
+        foreach (var component in MatchingComponents(nodes, representative))
+        {
+            var node = component.Node!;
+            var index = node.Components.IndexOf(component);
+            var destination = index + (up ? -1 : 1);
+            if (destination < 0 || destination >= node.Components.Count) continue;
+            node.Components.RemoveAt(index);
+            node.Components.Insert(destination, component);
+            NotifyMutation(node);
+        }
+        RefreshSelection();
     }
 
     /// <summary>
@@ -158,20 +251,26 @@ public sealed class NodeInspectorController
     /// Safe to call off the UI thread.
     /// </summary>
     /// <param name="searchText">Optional text to filter components by name or menu path.</param>
+    /// <param name="targets">Nodes shown by a locked Inspector; the shared selection when omitted.</param>
     /// <returns>An enumerable collection of component type descriptors matching the search criteria.</returns>
-    public IEnumerable<ComponentTypeDescriptor> GetAvailableComponents(string? searchText = null)
+    public IEnumerable<ComponentTypeDescriptor> GetAvailableComponents(string? searchText = null,
+        IReadOnlyList<Node>? targets = null)
     {
-        if (selectedNode is null) return [];
-        var node = selectedNode;
-        var filter = searchText?.Trim() ?? string.Empty;
+        var nodes = targets ?? SelectedNodes;
+        if (nodes.Count == 0) return [];
+        var filter = SearchFilter(searchText);
 
-        return ComponentRegistry.GetAvailableTypes(build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies())
+        return ComponentRegistry.GetAvailableTypes(LoadedAssemblies())
             .Where(t => ComponentRegistry.MatchesSearch(t, filter))
-            .Where(t => ComponentRegistry.CanAddTo(node, t))
+            .Where(t => nodes.All(node => ComponentRegistry.CanAddTo(node, t)))
             .Select(t => new ComponentTypeDescriptor(t))
             .OrderBy(d => d.MenuPath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(d => d.DisplayName, StringComparer.OrdinalIgnoreCase);
     }
+
+    static string SearchFilter(string? searchText) => searchText?.Trim() ?? string.Empty;
+
+    IEnumerable<Assembly> LoadedAssemblies() => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
 
     /// <summary>
     /// Notifies the asset manager of mutations to the specified target.

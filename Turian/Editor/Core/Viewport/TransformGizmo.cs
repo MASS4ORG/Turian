@@ -26,10 +26,10 @@ public sealed partial class TransformGizmo
     Vector2 scaleScreenDirection;
     Vector3 axisStartAnchorWorld;
     Vector3 axisStartPointerWorld;
-    Vector3 axisStartNodeScale;
     Vector3 dragX;
     Vector3 dragY;
     Vector3 dragZ;
+    TransformSelection? transformSelection;
 
     /// <summary>Gets or sets the displayed tool, including the combined transform tool.</summary>
     public TransformGizmoMode Mode { get; set; } = TransformGizmoMode.Translate;
@@ -54,6 +54,18 @@ public sealed partial class TransformGizmo
 
     /// <summary>Gets or sets the node currently targeted by the gizmo. Null hides the gizmo.</summary>
     public Node? SelectedNode { get; set; }
+
+    /// <summary>The selected objects transformed together; an empty set uses SelectedNode alone.</summary>
+    public IReadOnlyList<Node> SelectedNodes { get; set; } = [];
+
+    /// <summary>Whether the shared pivot uses the selection's centre instead of the active object.</summary>
+    public bool CenterPivot { get; set; }
+
+    /// <summary>The shared world position displayed by the handles.</summary>
+    public Vector3 PivotPosition => TransformSelection.GetPivot(TargetNodes, SelectedNode, CenterPivot);
+
+    IReadOnlyList<Node> TargetNodes => SelectedNodes.Count > 0 ? SelectedNodes
+        : SelectedNode is { } node ? [node] : [];
 
     /// <summary>The Scene view layer locks respected by every transform gesture.</summary>
     public SceneViewSettings ViewSettings { get; set; } = new();
@@ -94,8 +106,9 @@ public sealed partial class TransformGizmo
         handleMode = hit.Mode;
         isDragging = true;
         pointerScreen = dragStartScreen = screenPos;
-        axisStartAnchorWorld = SelectedNode!.GlobalTransform.Position;
-        axisStartNodeScale = SelectedNode.Scale;
+        axisStartAnchorWorld = PivotPosition;
+        transformSelection = new TransformSelection(TargetNodes.Where(ViewSettings.CanSelect), axisStartAnchorWorld,
+            Space == TransformGizmoSpace.Local ? SelectedNode!.GlobalTransform.Orientation : Quaternion.Identity);
         (dragX, dragY, dragZ) = GetAxes();
         axisStartPointerWorld = IntersectScreenPlane(screenPos, camera, viewportSize, axisStartAnchorWorld)
             ?? axisStartAnchorWorld;
@@ -170,7 +183,7 @@ public sealed partial class TransformGizmo
                 + dragY * SnapDistance(Vector3.Dot(delta, dragY)) * mask.Y
                 + dragZ * SnapDistance(Vector3.Dot(delta, dragZ)) * mask.Z;
         }
-        SelectedNode!.GlobalTransform = SelectedNode.GlobalTransform with { Position = axisStartAnchorWorld + delta };
+        transformSelection!.Translate(delta);
         TransformEdited?.Invoke();
     }
 
@@ -185,7 +198,7 @@ public sealed partial class TransformGizmo
         if (SnapEnabled && SnapScale > 0f) factor = SnapValue(factor, SnapScale);
         factor = MathF.Max(factor, 0.01f);
         var mask = AxisMask(axis);
-        SelectedNode!.Scale = axisStartNodeScale * (Vector3.One + mask * (factor - 1f));
+        transformSelection!.Scale(Vector3.One + mask * (factor - 1f));
         TransformEdited?.Invoke();
     }
 

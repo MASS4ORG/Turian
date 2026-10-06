@@ -28,19 +28,29 @@ public sealed class LayerDrawerTests
         internal void Frame()
         {
             var before = field.GetValue();
+            object? builtValue = null;
             surface.Canvas.Clear(SKColors.Transparent);
             InspectorFormsRenderingTests.Frame(Gui, surface, font, gui =>
             {
                 using (gui.Node(300, 250, "layer-panel").Direction(Axis.Vertical).Enter())
                     drawer.Draw(gui, field, "layer-field", context);
-                if (gui.Pass == Pass.Pass1Build) Assert.Equal(before, field.GetValue());
+                if (gui.Pass == Pass.Pass1Build)
+                {
+                    if (field.ValueType != typeof(LayerMask)) Assert.Equal(before, field.GetValue());
+                    builtValue = field.GetValue();
+                }
+                else if (field.ValueType == typeof(LayerMask)) Assert.Equal(builtValue, field.GetValue());
             });
         }
 
         internal LayoutNode Button => Nodes().Single(node => node.Id.EndsWith("/button", StringComparison.Ordinal));
         internal LayoutNode List => Nodes().Single(node => node.Id.EndsWith("/list", StringComparison.Ordinal));
         internal LayoutNode Option(int index) => Nodes().Single(node =>
-            node.Id.EndsWith($"/list/{index}", StringComparison.Ordinal));
+            node.Id.EndsWith(field.ValueType == typeof(LayerMask) ? $"/option/{index}" : $"/list/{index}",
+                StringComparison.Ordinal));
+
+        internal void ClickAction(string action) =>
+            Click(Nodes().Single(node => node.Id.EndsWith($"/{action}", StringComparison.Ordinal)).Rect.Center);
 
         internal void Click(Vector2 position)
         {
@@ -119,27 +129,23 @@ public sealed class LayerDrawerTests
         Assert.Equal(0, node.RenderLayer);
     }
 
-    /// <summary>Mask choices write only during the render pass and preserve all 32 bits.</summary>
+    /// <summary>Queued mask choices preserve all 32 bits and keep the checkbox popup open.</summary>
     [Fact]
     public void MaskPickerSelectsNothingEverythingAndIndividualBits()
     {
         var camera = new CameraComponent();
         using var host = new Harness(camera, nameof(CameraComponent.CullingMask));
         host.Open();
-        host.Click(host.Option(2).Rect.Center);
+        host.ClickAction("clear");
         Assert.Equal(LayerMask.Nothing, camera.CullingMask);
-        host.Open();
-        host.Click(host.Option(3).Rect.Center);
+        host.Click(host.Option(0).Rect.Center);
         Assert.Equal(LayerMask.FromLayer(0), camera.CullingMask);
-        host.Open();
-        host.Click(host.Option(3).Rect.Center);
+        host.Click(host.Option(0).Rect.Center);
         Assert.Equal(LayerMask.Nothing, camera.CullingMask);
-        host.Open();
-        host.Click(host.Option(1).Rect.Center);
+        host.ClickAction("all");
         Assert.Equal(LayerMask.Everything, camera.CullingMask);
-        host.Open();
         host.ScrollToEnd();
-        host.Click(host.Option(34).Rect.Center);
+        host.Click(host.Option(31).Rect.Center);
         Assert.Equal(~LayerMask.FromLayer(31), camera.CullingMask);
     }
 }

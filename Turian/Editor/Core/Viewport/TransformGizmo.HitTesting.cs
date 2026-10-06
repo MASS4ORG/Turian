@@ -8,7 +8,7 @@ public sealed partial class TransformGizmo
     HandleHit HitTest(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
         if (viewportSize.X <= 0f || viewportSize.Y <= 0f) return Miss;
-        var anchor = SelectedNode!.GlobalTransform.Position;
+        var anchor = PivotPosition;
         var scale = ComputeGizmoScale(camera, anchor, viewportSize);
         var best = Miss;
         if (Mode != TransformGizmoMode.Rotate)

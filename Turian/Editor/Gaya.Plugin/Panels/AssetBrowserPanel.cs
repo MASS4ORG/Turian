@@ -8,7 +8,7 @@ namespace Gaya.Plugin.Turian;
 sealed class AssetBrowserPanel : IPanel
 {
 
-    readonly TreeViewState state = new();
+    readonly TreeViewState state = new() { MultiSelect = true };
     readonly List<TreeItem> rows = [];
 
     readonly AssetFileSystem fileSystem;
@@ -29,6 +29,7 @@ sealed class AssetBrowserPanel : IPanel
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
     string? inspectedId;
+    IReadOnlyList<string> inspectedIds = [];
     Guid pendingReveal;
     bool showExtensions;
     bool bricksChanged;
@@ -97,14 +98,7 @@ sealed class AssetBrowserPanel : IPanel
             return;
         }
 
-        if (gui.Pass == Pass.Pass1Build && (root != scannedRoot || bricksChanged))
-        {
-            bricksChanged = false;
-            Rescan(root);
-            Rebuild();
-        }
-
-        if (gui.Pass == Pass.Pass1Build && pendingReveal != Guid.Empty) RevealPending();
+        if (gui.Pass == Pass.Pass1Build) PrepareTree(root);
         if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
         systemClipboard ??= gui.Platform.Require<IClipboard>();
 
@@ -112,14 +106,20 @@ sealed class AssetBrowserPanel : IPanel
             dropAccept: static payload => payload is ReferenceDragPayload { AssetPath: not null } or ScriptDragPayload { AssetPath: not null },
             onDrop: OnDrop);
 
-        // A selection the arrow keys moved is inspected like a clicked one.
-        if (gui.Pass == Pass.Pass2Render && state.SelectedId != inspectedId)
+        if (gui.Pass == Pass.Pass2Render) InspectSelection();
+        gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+    }
+
+    void PrepareTree(string root)
+    {
+        if (root != scannedRoot || bricksChanged)
         {
-            inspectedId = state.SelectedId;
-            if (Selected is { IsDirectory: false } moved) inspector.Select(inspections.Inspect(moved));
+            bricksChanged = false;
+            Rescan(root);
+            Rebuild();
         }
 
-        gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+        if (pendingReveal != Guid.Empty) RevealPending();
     }
 
     /// <summary>
@@ -138,6 +138,7 @@ sealed class AssetBrowserPanel : IPanel
         // Revealed for a reference the inspector shows, so the inspector keeps what it is editing.
         state.SelectedId = target.AbsolutePath;
         inspectedId = target.AbsolutePath;
+        inspectedIds = state.SelectedIds;
         state.Reveal();
     }
 
@@ -166,17 +167,46 @@ sealed class AssetBrowserPanel : IPanel
     /// A file row carries its asset id, so it can be dropped on a reference field, and its path, so a folder row can
     /// receive it; a folder row carries only its path.
     /// </summary>
-    object? DragPayload(TreeItem item) =>
-        item.Tag is not AssetEntry entry ? null
-        : entry.IsDirectory ? new ReferenceDragPayload(Guid.Empty, item.Label, entry.AbsolutePath, IsDirectory: true)
-        : entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) ? ScriptPayload(entry)
-        : entry.AssetMetadata is { } asset ? new ReferenceDragPayload(asset.Id, item.Label, entry.AbsolutePath) : null;
+    object? DragPayload(TreeItem item)
+    {
+        if (item.Tag is not AssetEntry entry) return null;
+        var selected = SelectedEntries;
+        var carried = selected.Any(candidate => candidate.AbsolutePath == entry.AbsolutePath) ? selected : [entry];
+        if (carried.Count == 1 && entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            return ScriptPayload(entry);
+        return new ReferenceDragPayload(entry.AssetMetadata?.Id ?? Guid.Empty, item.Label,
+            entry.AbsolutePath, entry.IsDirectory)
+        { Entries = carried };
+    }
 
     /// <summary>
     /// Drops a brick's asset or folder on a project folder after asking: the copy gets new ids and no longer follows the
     /// brick. Bricks are never a target, and project assets are not moved by dragging.
     /// </summary>
     void OnDrop(TreeItem target, object payload)
+    {
+        if (TryMoveSelection(target, payload)) return;
+        CopyBrickAsset(target, payload);
+    }
+
+    bool TryMoveSelection(TreeItem target, object payload)
+    {
+        if (payload is ReferenceDragPayload { Entries.Count: > 0 } dragged
+            && MoveDestination(target, dragged.Entries) is { } folder)
+        {
+            operations.MoveMany(dragged.Entries, folder);
+            return true;
+        }
+        return false;
+    }
+
+    string? MoveDestination(TreeItem target, IReadOnlyList<AssetEntry> carried)
+    {
+        if (target.Tag is not AssetEntry { IsReadOnly: false } destination) return null;
+        return carried.All(entry => !entry.IsReadOnly) ? DirectoryFor(destination) : null;
+    }
+
+    void CopyBrickAsset(TreeItem target, object payload)
     {
         var (source, name, isDirectory) = payload switch
         {
@@ -185,16 +215,21 @@ sealed class AssetBrowserPanel : IPanel
             _ => (null, "", false),
         };
         var project = settings.Settings?.ProjectAbsoluteDir ?? "";
-        if (source is null
-            || target.Tag is not AssetEntry { IsReadOnly: false } targetEntry
-            || rows.Find(r => r.Id == source).Tag is not AssetEntry { IsReadOnly: true }
-            || DirectoryFor(targetEntry) is not { } directory
-            || IsInside(Path.Combine(project, Packages.ProjectManifest.DirectoryName), directory)) return;
+        if (BrickCopyDestination(target, source, project) is not { } directory) return;
 
         var where = Path.GetRelativePath(project, directory).Replace('\\', '/');
         confirm.Ask("Copy into project",
             $"Copy '{name}' from a brick into {where}? The copy is your own: it gets new ids and does not change when the brick updates.",
-            "Copy", () => operations.Duplicate(source, directory, isDirectory));
+            "Copy", () => operations.Duplicate(source!, directory, isDirectory));
+    }
+
+    string? BrickCopyDestination(TreeItem target, string? source, string project)
+    {
+        if (source is null || target.Tag is not AssetEntry { IsReadOnly: false } entry) return null;
+        if (rows.Find(row => row.Id == source).Tag is not AssetEntry { IsReadOnly: true }) return null;
+        var directory = DirectoryFor(entry);
+        return directory is null || IsInside(Path.Combine(project, Packages.ProjectManifest.DirectoryName), directory)
+            ? null : directory;
     }
 
     static bool IsInside(string folder, string path) =>
@@ -292,6 +327,8 @@ sealed class AssetBrowserPanel : IPanel
 
         if (e.Button == MouseButton.Right)
         {
+            if (!state.SelectedIds.Contains(entry.AbsolutePath)) state.SelectedId = entry.AbsolutePath;
+            InspectSelection();
             menuEntry = entry;
             menuAt = pointer;
             menuOpen = true;
@@ -301,9 +338,8 @@ sealed class AssetBrowserPanel : IPanel
         if (e.Button != MouseButton.Left || entry.IsDirectory) return;
 
         // Folding is the tree's own business; a double click here opens the asset.
-        inspectedId = entry.AbsolutePath;
         if (e.ClickCount >= 2 && !entry.IsReadOnly) opener.Open(entry);
-        else inspector.Select(inspections.Inspect(entry));
+        else InspectSelection();
     }
 
     void OnEmptyClick(MouseButton button)
@@ -319,15 +355,31 @@ sealed class AssetBrowserPanel : IPanel
     {
         var entry = menuEntry;
 
+        BuildEditMenu(menu, entry);
+        BuildCopyMenu(menu, entry);
+        BuildCreationMenu(menu, entry);
+    }
+
+    void BuildEditMenu(FlyoutBuilder menu, AssetEntry? entry)
+    {
         menu.Item("Rename", () => BeginRename(entry), enabled: entry is { IsReadOnly: false });
-        menu.Item("Delete", () => Delete(entry), enabled: entry is { IsReadOnly: false });
+        menu.Item("Delete", DeleteSelected, enabled: entry is { IsReadOnly: false, ParentPath: not null });
+        menu.Item("Duplicate", DuplicateSelected, enabled: entry is { IsReadOnly: false, ParentPath: not null });
         menu.Separator();
+    }
+
+    void BuildCopyMenu(FlyoutBuilder menu, AssetEntry? entry)
+    {
         menu.Item("Copy", () => Copy(entry), enabled: entry is not null);
         menu.Item("Paste", () => Paste(entry), enabled: entry?.IsReadOnly != true && fileSystem.CanPaste());
         menu.Separator();
         menu.Item("Copy Path", () => CopyPath(entry, relative: false), "Ctrl+Alt+C", entry is not null);
         menu.Item("Copy Relative Path", () => CopyPath(entry, relative: true), "Ctrl+Alt+Shift+C", entry is not null);
         menu.Separator();
+    }
+
+    void BuildCreationMenu(FlyoutBuilder menu, AssetEntry? entry)
+    {
         if (entry?.IsReadOnly != true)
             menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
 
@@ -384,7 +436,14 @@ sealed class AssetBrowserPanel : IPanel
     }
 
     /// <summary>Deletes the selected asset or folder. What the panel's Delete shortcut runs.</summary>
-    public void DeleteSelected() => Delete(Selected);
+    public void DeleteSelected()
+    {
+        if (operations.DeleteMany(SelectedEntries))
+        {
+            state.SetSelection([]);
+            InspectSelection();
+        }
+    }
 
     /// <summary>Starts the in-place rename of the selected row. What the panel's F2 shortcut runs.</summary>
     public void RenameSelected() => BeginRename(Selected);
@@ -392,15 +451,26 @@ sealed class AssetBrowserPanel : IPanel
     /// <summary>Copies the selected asset beside itself. What the panel's Duplicate shortcut runs.</summary>
     public void DuplicateSelected()
     {
-        if (Selected is not { IsReadOnly: false } entry) return;
-        if ((entry.ParentPath ?? settings.Settings?.AssetsAbsoluteDir) is not { } directory) return;
-
-        operations.Duplicate(entry.AbsolutePath, directory, entry.IsDirectory);
+        operations.DuplicateMany(SelectedEntries);
     }
 
     /// <summary>The row the tree has selected, or null when nothing is.</summary>
     AssetEntry? Selected =>
         entries.FirstOrDefault(entry => entry.AbsolutePath == state.SelectedId);
+
+    IReadOnlyList<AssetEntry> SelectedEntries =>
+        [.. state.SelectedIds.Select(id => entries.FirstOrDefault(entry => entry.AbsolutePath == id))
+            .OfType<AssetEntry>()];
+
+    void InspectSelection()
+    {
+        if (state.SelectedId == inspectedId && state.SelectedIds.SequenceEqual(inspectedIds)) return;
+        inspectedId = state.SelectedId;
+        inspectedIds = state.SelectedIds;
+        var selected = SelectedEntries.Where(entry => !entry.IsDirectory)
+            .Select(entry => inspections.Inspect(entry)).OfType<AssetInspection>().ToArray();
+        inspector.SelectMany(selected, selected.FirstOrDefault(item => item.AbsolutePath == inspectedId));
+    }
 
     void BeginRename(AssetEntry? entry)
     {

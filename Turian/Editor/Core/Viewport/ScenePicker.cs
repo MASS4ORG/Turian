@@ -65,7 +65,7 @@ public static class ScenePicker
         return closestNode;
     }
 
-    static IEnumerable<(Node Node, Bounds WorldBounds)> EnumerateWorldBounds(Node root)
+    internal static IEnumerable<(Node Node, Bounds WorldBounds)> EnumerateWorldBounds(Node root)
     {
         foreach (var component in Node.GetComponentsInChildren<ModelComponent>(root))
         {

@@ -79,6 +79,84 @@ public class PrefabOverrideOperationsTests : IDisposable
         },
     };
 
+    /// <summary>Copied instances retain inherited identities and their real overrides, including added nested instances.</summary>
+    [Fact]
+    public void DuplicateInstances_PreservesPrefabLinksAndOverrides()
+    {
+        var prefab = Lamp();
+        var id = AddPrefab(prefab);
+        var first = Instantiate(id);
+        var second = Instantiate(id);
+        first.Children[0].GetComponent<LightComponent>()!.Intensity = 7f;
+        var nested = Instantiate(id);
+        root.Children.Remove(nested);
+        first.Children.Add(nested);
+        root.Awake(null);
+
+        var copies = sceneTree.DuplicateNodes([first, second]);
+
+        Assert.NotEqual(first.Id, copies[0].Id);
+        Assert.NotEqual(second.Id, copies[1].Id);
+        Assert.Equal(PrefabInstances.DeriveId(copies[0].Id, prefab.Children[0].Id), copies[0].Children[0].Id);
+        var light = copies[0].Children[0].GetComponent<LightComponent>()!;
+        Assert.Equal(PrefabInstances.DeriveId(copies[0].Id, prefab.Children[0].Components[0].Id), light.Id);
+        Assert.Equal(7f, light.Intensity);
+        var diff = operations.DiffFor(copies[0])!;
+        Assert.Single(diff.Overrides);
+        Assert.Equal(operations.DiffFor(first)!.Added.Count, diff.Added.Count);
+        Assert.Empty(diff.Removed);
+        Assert.Empty(operations.DiffFor(copies[1])!.Overrides);
+        Assert.Empty(operations.DiffFor(copies[1])!.Added);
+        Assert.Empty(operations.DiffFor(copies[1])!.Removed);
+        var nestedCopy = copies[0].Children[2];
+        Assert.NotEqual(nested.Id, nestedCopy.Id);
+        Assert.Equal(PrefabInstances.DeriveId(nestedCopy.Id, prefab.Children[0].Id), nestedCopy.Children[0].Id);
+        var nestedDiff = PrefabInstances.Diff(Serializer.Serialize(nestedCopy),
+            assetId => PrefabInstances.ReadPrefabJson(database, assetId));
+        Assert.Empty(nestedDiff.Overrides);
+        Assert.Empty(nestedDiff.Added);
+        Assert.Empty(nestedDiff.Removed);
+
+        var compact = PrefabInstances.Compact(Serializer.Serialize(copies[1]),
+            assetId => PrefabInstances.ReadPrefabJson(database, assetId));
+        prefab.Children[0].GetComponent<LightComponent>()!.Intensity = 3f;
+        File.WriteAllText(Path.Combine(projectRoot, $"Assets/{id:N}.prefab"), Serializer.Serialize(prefab));
+        var expanded = Serializer.LoadData<Node>(PrefabInstances.Expand(compact,
+            assetId => PrefabInstances.ReadPrefabJson(database, assetId)))!;
+        Assert.Equal(3f, expanded.Children[0].GetComponent<LightComponent>()!.Intensity);
+    }
+
+    /// <summary>A protected multi-selection unpacks each instance and deletes every selected child in one undo step.</summary>
+    [Fact]
+    public void HierarchyMultiDeleteConfirmsAndUnpacksEachInstance()
+    {
+        var id = AddPrefab(Lamp());
+        var first = Instantiate(id);
+        var second = Instantiate(id);
+        var selection = new NodeInspectorController(assets);
+        selection.SelectMany([first.Children[0], second.Children[0]]);
+        var localization = new StudioLocalization();
+        var confirm = new ConfirmDialogChrome(localization);
+        var panel = new SceneTreePanel(sceneTree, selection, assets, null!, null!, new SettingsService(),
+            undo, operations, confirm, localization, database);
+        panel.DeleteSelected();
+        Assert.Equal(2, first.Children.Count);
+        Assert.Equal(2, second.Children.Count);
+        var continuation = (Action)typeof(ConfirmDialogChrome)
+            .GetField("confirmed", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(confirm)!;
+        continuation();
+        Assert.Single(first.Children);
+        Assert.Single(second.Children);
+        Assert.Null(first.PrefabInstance);
+        Assert.Null(second.PrefabInstance);
+        Assert.Single(undo.History.UndoSteps);
+        undo.Undo();
+        Assert.Equal(2, first.Children.Count);
+        Assert.Equal(2, second.Children.Count);
+        Assert.NotNull(first.PrefabInstance);
+        Assert.NotNull(second.PrefabInstance);
+    }
+
     /// <summary>A reverted value takes the prefab's again, and undo brings the override back.</summary>
     [Fact]
     public void RevertMember_RestoresThePrefabValue()

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Studio multi-selection, shared Inspector editing with mixed values and searchable tag/layer choices, group gizmos, and undoable batch scene and asset operations #82
+
 ## [2.2.0] - 2026-10-06
 
 - Added: tags and layers

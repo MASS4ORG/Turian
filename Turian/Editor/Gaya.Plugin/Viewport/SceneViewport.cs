@@ -51,6 +51,10 @@ sealed class SceneViewport : IDisposable
     bool showGizmoCursor;
     readonly ViewportGesture gesture = new();
     Vector2 pressPosition;
+    Vector2 marqueePosition;
+    bool marqueeOwnsDrag;
+    bool additiveSelection;
+    bool toggleSelection;
 
     /// <summary>Creates the viewport and follows the framing requests the scene tree raises.</summary>
     /// <param name="vulkan">Shared device the offscreen target is allocated from.</param>
@@ -226,12 +230,23 @@ sealed class SceneViewport : IDisposable
         controller.SetActiveButton(gesture.Active);
 
         var local = new Vector2(input.MousePosition.X - rect.X, input.MousePosition.Y - rect.Y);
+        if (phase == ViewportGesturePhase.Pressed)
+        {
+            ReadSelectionModifiers(input);
+        }
         DispatchPointer(phase, local, hovered);
         UpdateGizmoCursor(gui, hovered);
 
         if (hovered && input.MouseWheelDelta != 0f) controller.OnWheel(input.MouseWheelDelta);
         if (hovered || gesture.Active is not null) HandleKeyboard(gui);
         else heldKeys.Clear();
+    }
+
+    void ReadSelectionModifiers(IInputHandler input)
+    {
+        additiveSelection = input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift);
+        toggleSelection = input.IsKeyDown(KeyboardKey.LeftControl) || input.IsKeyDown(KeyboardKey.RightControl)
+            || input.IsKeyDown(KeyboardKey.LeftSuper) || input.IsKeyDown(KeyboardKey.RightSuper);
     }
 
     void UpdateGizmoCursor(Gui gui, bool hovered)
@@ -259,6 +274,7 @@ sealed class SceneViewport : IDisposable
         Gizmo.SnapTranslation = cameraSettings.Tools.TranslationSnap;
         Gizmo.SnapRotation = cameraSettings.Tools.RotationSnap;
         Gizmo.SnapScale = cameraSettings.Tools.ScaleSnap;
+        Gizmo.CenterPivot = cameraSettings.Tools.CenterPivot;
     }
 
     void DispatchPointer(ViewportGesturePhase phase, Vector2 local, bool hovered)
@@ -276,13 +292,16 @@ sealed class SceneViewport : IDisposable
     void OnPressed(Vector2 local)
     {
         pressPosition = local;
+        marqueePosition = local;
         gizmoOwnsDrag = false;
+        marqueeOwnsDrag = false;
 
         if (controller!.IsLeftButton && !controller.IsAlt
             && !controller.IsMiddleButton && !controller.IsRightButton && !playMode.IsActive)
         {
             Gizmo.ProcessPointerDown(local, service!.Camera, ViewportSize);
             gizmoOwnsDrag = Gizmo.IsDragging;
+            marqueeOwnsDrag = !gizmoOwnsDrag;
         }
 
         if (!gizmoOwnsDrag) controller.OnMouseDown(local.X, local.Y);
@@ -291,6 +310,7 @@ sealed class SceneViewport : IDisposable
     void OnDragged(Vector2 local)
     {
         if (gizmoOwnsDrag) Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
+        else if (marqueeOwnsDrag) marqueePosition = local;
         else controller!.OnMouseMove(local.X, local.Y);
     }
 
@@ -304,18 +324,34 @@ sealed class SceneViewport : IDisposable
         {
             Gizmo.ProcessPointerUp();
             gizmoOwnsDrag = false;
+            controller!.OnMouseUp();
             return;
         }
 
-        var isClick = button == ViewportButton.Left
-            && !controller!.IsAlt
-            && Math.Abs(local.X - pressPosition.X) <= clickDragThreshold
-            && Math.Abs(local.Y - pressPosition.Y) <= clickDragThreshold;
-
-        if (isClick && sceneTree.CurrentSceneRoot is { } root)
-            inspector.Select(ScenePicker.Pick(root, service!.Camera, local, ViewportSize, cameraSettings.View));
-
+        if (!playMode.IsActive && sceneTree.CurrentSceneRoot is { } root)
+            SelectReleased(root, local, button);
+        marqueeOwnsDrag = false;
         controller!.OnMouseUp();
+    }
+
+    bool IsSelectionClick(Vector2 local, ViewportButton button) => button == ViewportButton.Left
+        && !controller!.IsAlt
+        && Math.Abs(local.X - pressPosition.X) <= clickDragThreshold
+        && Math.Abs(local.Y - pressPosition.Y) <= clickDragThreshold;
+
+    void SelectReleased(Node root, Vector2 local, ViewportButton button)
+    {
+        if (IsSelectionClick(local, button))
+            inspector.SelectNode(ScenePicker.Pick(root, service!.Camera, local, ViewportSize, cameraSettings.View),
+                additiveSelection, toggleSelection);
+        else if (marqueeOwnsDrag && button == ViewportButton.Left)
+        {
+            var selected = SceneMarquee.Pick(root, service!.Camera, pressPosition, local,
+                ViewportSize, cameraSettings.View);
+            var previous = inspector.SelectedNodes;
+            inspector.SelectMany(toggleSelection ? previous.Except(selected).Concat(selected.Except(previous))
+                : additiveSelection ? previous.Concat(selected) : selected);
+        }
     }
 
     void HandleKeyboard(Gui gui)
@@ -341,6 +377,7 @@ sealed class SceneViewport : IDisposable
         frame?.Dispose();
         frame = Snapshot(pixels, service.Width, service.Height);
         if (frame is not null) gui.DrawImage(frame, rect);
+        DrawMarquee(gui, rect);
 
         RenderPreview(gui, rect, dt);
     }
@@ -401,7 +438,7 @@ sealed class SceneViewport : IDisposable
 
         if (!cameraSettings.Gizmos.Visible) return;
 
-        if (Gizmo.SelectedNode is { } selected)
+        foreach (var selected in inspector.SelectedNodes)
             foreach (var component in selected.Components)
                 foreach (var drawer in gizmos.GetDrawers(component.GetType()))
                     drawer.DrawGizmos(g, component);
@@ -424,7 +461,7 @@ sealed class SceneViewport : IDisposable
 
     void NotifyGizmoMutation()
     {
-        if (Gizmo.SelectedNode is { } node) mutateNode?.Invoke(node);
+        foreach (var node in inspector.SelectedNodes) mutateNode?.Invoke(node);
     }
 
     // ── Selection ───────────────────────────────────────────────────────────
@@ -432,6 +469,7 @@ sealed class SceneViewport : IDisposable
     void OnSelectionChanged()
     {
         Gizmo.SelectedNode = inspector.SelectedNode;
+        Gizmo.SelectedNodes = inspector.SelectedNodes;
         UpdatePreviewCamera(inspector.SelectedNode?.GetComponent<CameraComponent>());
     }
 
@@ -463,6 +501,16 @@ sealed class SceneViewport : IDisposable
         }
 
         if (previewPixels.Length != width * height * 4) previewPixels = new byte[width * height * 4];
+    }
+
+    void DrawMarquee(Gui gui, Rect viewport)
+    {
+        if (!marqueeOwnsDrag || Vector2.DistanceSquared(pressPosition, marqueePosition) <= 16f) return;
+        var start = Vector2.Clamp(Vector2.Min(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
+        var end = Vector2.Clamp(Vector2.Max(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
+        var rect = new Rect(viewport.X + start.X, viewport.Y + start.Y, end.X - start.X, end.Y - start.Y);
+        gui.DrawRect(rect, StudioTheme.Current.AccentFill);
+        gui.DrawRectBorder(rect, StudioTheme.Current.Accent);
     }
 
     void DisposePreview()

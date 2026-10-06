@@ -5,7 +5,7 @@ namespace Gaya.Plugin.Turian;
 /// <see cref="InspectorForms"/> and drawn by <see cref="FormRenderer"/>. An asset selected in the
 /// browser is edited here too — its data payload, or the import settings its importer declares.
 /// </summary>
-sealed class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
+sealed partial class InspectorPanel(NodeInspectorController inspector, AssetManager assets,
     ReferencePicker references, AssetRevealService reveal, AssetInspectionService inspections,
     InspectorSettings settings, Vulkan vulkan, AssetPreviewCatalog previews, UndoService undo, AssetAutoSave autoSave,
     PrefabOverrideOperations prefabOperations, PrefabStage prefabStage, AssetDatabase database, LayerFilter? layers = null)
@@ -42,6 +42,13 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     Component? removeRequest;
     object? lockedTarget;
     object? frameTarget;
+    IReadOnlyList<Node> frameNodes = [];
+    IReadOnlyList<Node> builtNodes = [];
+    IReadOnlyList<Node> lockedNodes = [];
+    int selectionComponents;
+    IReadOnlyList<AssetInspection> frameAssets = [];
+    IReadOnlyList<AssetInspection> builtAssets = [];
+    IReadOnlyList<AssetInspection> lockedAssets = [];
 
     /// <summary>
     /// Whether this instance keeps showing <see cref="lockedTarget"/> instead of following the shared
@@ -50,7 +57,12 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     public bool Locked
     {
         get => lockedTarget is not null;
-        set => lockedTarget = value ? inspector.SelectedNode ?? inspector.SelectedObject : null;
+        set
+        {
+            lockedTarget = value ? inspector.SelectedNode ?? inspector.SelectedObject : null;
+            lockedNodes = value ? inspector.SelectedNodes : [];
+            lockedAssets = value ? [.. inspector.Selection.Objects.OfType<AssetInspection>()] : [];
+        }
     }
 
     /// <inheritdoc />
@@ -63,6 +75,8 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         {
             return;
         }
+
+        if (Locked) RecordLockedSelection();
 
         if (target is AssetInspection inspection)
         {
@@ -82,9 +96,18 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         if (removeRequest is { } removing)
         {
             removeRequest = null;
-            if (inspector.SelectedNode is { } owner) undo.RecordObject(owner, "Remove Component");
-            inspector.RemoveComponent(removing);
+            RemoveComponents(removing);
         }
+    }
+
+    void RecordLockedSelection()
+    {
+        foreach (var node in frameNodes)
+        {
+            undo.RecordObject(node, "Edit Selection");
+            foreach (var component in node.Components) undo.RecordObject(component, "Edit Selection");
+        }
+        undo.RecordInspections(frameAssets, "Edit Selection");
     }
 
     /// <summary>
@@ -95,7 +118,8 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
     FormRenderContext CreateFormContext()
     {
-        drawers.Add(LayerDrawer.Handles, new LayerDrawer(layerFilter));
+        drawers.Add(TagDrawer.Handles, new TagDrawer(layerFilter, undo));
+        drawers.Add(LayerDrawer.Handles, new LayerDrawer(layerFilter, undo));
         referenceRegistration = drawers.Add(ReferenceDrawer.Handles, referenceDrawer);
         return new FormRenderContext
         {
@@ -110,7 +134,11 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     {
         // Both passes draw the same selection; clicks become visible in the next frame.
         if (gui.Pass == Pass.Pass1Build)
+        {
             frameTarget = lockedTarget ?? inspector.SelectedNode ?? inspector.SelectedObject;
+            frameNodes = Locked ? lockedNodes : inspector.SelectedNodes;
+            frameAssets = Locked ? lockedAssets : [.. inspector.Selection.Objects.OfType<AssetInspection>()];
+        }
         return frameTarget;
     }
 
@@ -122,11 +150,15 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
             trackingEdits = true;
         }
 
-        overrides.Track(target as Node);
+        overrides.Track(frameNodes.Count > 1 ? null : target as Node);
         var components = (target as Node)?.Components.Count ?? 0;
-        if (gui.Pass == Pass.Pass1Build && (!ReferenceEquals(builtFor, target) || components != builtComponents))
+        var allComponents = frameNodes.Sum(node => node.Components.Count);
+        if (gui.Pass == Pass.Pass1Build && NeedsRebuild(target, components, allComponents))
             RebuildForm(target, components);
     }
+
+    bool NeedsRebuild(object target, int components, int allComponents) => !ReferenceEquals(builtFor, target)
+        || components != builtComponents || allComponents != selectionComponents || !builtNodes.SequenceEqual(frameNodes);
 
     void RenderForm(Gui gui, object target)
     {
@@ -163,11 +195,13 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         model = target switch
         {
             FormInspection inspection => inspection.Model,
-            Node node => InspectorForms.BuildForNode(node, _ => assets.AlterAssetForSelectedNode()),
+            Node => InspectorForms.BuildForNodes(frameNodes, inspector.CreateMutationNotifier()),
             _ => InspectorForms.Build(target, _ => assets.AlterAssetForSelectedNode()),
         };
         builtFor = target;
         builtComponents = components;
+        selectionComponents = frameNodes.Sum(node => node.Components.Count);
+        builtNodes = frameNodes;
 
         // A component title not seen before starts folded when the setting says so; the node's
         // own section (index 0) is never one of them — its header is always open. A title the
@@ -182,99 +216,30 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     }
 
     bool CanDropScript(ScriptDragPayload drop) =>
-        inspector.SelectedNode is { } node && ComponentRegistry.CanAddTo(node, drop.ComponentType);
+        frameNodes.Count > 0 && frameNodes.All(node => ComponentRegistry.CanAddTo(node, drop.ComponentType));
 
     void DropScript(ScriptDragPayload drop) => AddComponent(drop.ComponentType);
 
     void AddComponent(Type type)
     {
-        if (inspector.SelectedNode is { } node) undo.RecordObject(node, "Add Component");
-        inspector.AddComponent(type);
+        undo.BeginGesture();
+        try
+        {
+            foreach (var node in frameNodes) undo.RecordObject(node, "Add Component");
+            inspector.AddComponents(frameNodes, type);
+        }
+        finally { undo.EndGesture(); }
     }
 
-    /// <summary>
-    /// An asset: the file name, then what there is to edit about it — a data asset's own class, the
-    /// way a ScriptableObject is edited, or the settings its importer reads when it bakes the file. Content is saved
-    /// as it is edited; import settings wait for Apply, because applying them reimports the asset.
-    /// </summary>
-    void RenderAsset(Gui gui, AssetInspection inspection)
+    void RemoveComponents(Component representative)
     {
-        if (gui.Pass == Pass.Pass1Build && !ReferenceEquals(builtFor, inspection))
+        undo.BeginGesture();
+        try
         {
-            model = inspection.Target is null
-                ? FormModel.Empty
-                : InspectorForms.Build(inspection.Target, _ => OnAssetEdited(inspection));
-            builtFor = inspection;
-            builtComponents = 0;
-            assetDirty = false;
-            var section = model.Sections.Count > 0 ? model.Sections[0] : null;
-            Log.Logger.LogDebug("asset model built for {Path} ({Type}), targetNull={Null}, fields={Fields}, buttons={Buttons}",
-                Path.GetFileName(inspection.AbsolutePath), inspection.Target?.GetType().FullName,
-                inspection.Target is null, section?.BodyFields.Count ?? -1, section?.Buttons.Count ?? -1);
+            foreach (var node in frameNodes) undo.RecordObject(node, "Remove Component");
+            inspector.RemoveComponents(frameNodes, representative);
         }
-
-        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Padding(6f, 4f).Enter())
-        {
-            TurianForms.ApplyStyle(gui);
-            gui.ScrollY();
-
-            using (gui.Node(-1, Theme.Scale(24f), "inspector/asset/name").ExpandWidth()
-                       .Padding(6, 2).ContentAlignY(0.5f).Enter())
-                gui.DrawText(Path.GetFileName(inspection.AbsolutePath), Theme.Text(13), Theme.Ink,
-                    centerInRect: false);
-
-            preview.Draw(gui, inspection.Metadata);
-
-            if (inspection.Target is null)
-            {
-                return;
-            }
-
-            using (gui.Node(-1, Theme.Scale(22f), "inspector/asset/header").ExpandWidth()
-                       .Padding(6, 0).ContentAlignY(0.5f).Enter())
-            {
-                if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Panel, 3);
-                gui.DrawText(inspection.Title, Theme.Text(12), Theme.Ink, centerInRect: false);
-            }
-
-            using (gui.Node(-1, -1, "inspector/asset/fields").ExpandWidth().Direction(Axis.Vertical)
-                       .Padding(8, 2).Gap(2f).Enter())
-            {
-                var fields = model.Sections[0].BodyFields;
-                for (var f = 0; f < fields.Count; f++)
-                    gui.FormField(fields[f], $"inspector/asset/field{f}", FormContext);
-                DrawButtons(gui, model.Sections[0].Buttons, "inspector/asset/button");
-            }
-
-            if (!inspection.IsPayload) RenderAssetActions(gui);
-        }
-
-        referenceDrawer.DrawPendingPicker(gui);
-
-        if (applyRequested)
-        {
-            applyRequested = false;
-            if (inspections.Apply(inspection)) assetDirty = false;
-        }
-
-        if (revertRequested)
-        {
-            revertRequested = false;
-            inspector.Select(inspections.Inspect(inspection.AbsolutePath));
-        }
-    }
-
-    /// <summary>Apply writes the edit and reimports; revert re-reads what is on disk.</summary>
-    void RenderAssetActions(Gui gui)
-    {
-        using (gui.Node(-1, Theme.Scale(28f), "inspector/asset/actions").ExpandWidth()
-                   .Direction(Axis.Horizontal).Padding(8, 4).Gap(6f).Enter())
-        {
-            using (gui.Node().Expand().Enter()) { }
-
-            if (TextButton(gui, "Revert", "inspector/asset/revert", assetDirty)) revertRequested = true;
-            if (TextButton(gui, "Apply", "inspector/asset/apply", assetDirty)) applyRequested = true;
-        }
+        finally { undo.EndGesture(); }
     }
 
     /// <summary>A labelled button, dimmed and inert while it has nothing to do.</summary>
@@ -306,30 +271,16 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                    .Padding(6, 2).Gap(6f).Enter())
         {
             // The name box and the active toggle cannot turn bold, so their overrides mark the header's margin.
-            if (gui.Pass == Pass.Pass2Render
-                && (overrides.IsOverridden(section.Target, nameof(Node.Name))
-                    || overrides.IsOverridden(section.Target, nameof(Node.IsActive))))
-            {
-                var rect = gui.CurrentNode.Rect;
-                gui.DrawRect(new Rect(rect.X, rect.Y + 2f, 2f, rect.H - 4f), Theme.Accent);
-            }
+            RenderHeaderOverride(gui, section.Target);
 
             if (active is not null) Toggle(gui, active, "inspector/header/active");
 
-            if (name is not null)
-            {
-                var current = name.GetValue() as string ?? string.Empty;
-                var edited = gui.TextInput(current, width: 0, height: Theme.Scale(20f),
-                    fontSize: Theme.Text(13),
-                    backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
-                    id: "inspector/header/name");
-
-                if (!string.Equals(edited, current, StringComparison.Ordinal)) name.SetValue(edited);
-            }
+            if (name is not null) RenderName(gui, name);
             else
             {
                 gui.DrawText(section.Title, Theme.Text(13), Theme.Ink, centerInRect: false);
             }
+            if (frameNodes.Count > 1) gui.DrawText($"{frameNodes.Count} Objects", Theme.Text(11), Theme.InkDim);
         }
 
         using (gui.Node(-1, -1, "inspector/header/fields").ExpandWidth().Direction(Axis.Vertical)
@@ -340,6 +291,25 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
                 DrawField(gui, rest[f], $"inspector/header/field{f}");
             DrawButtons(gui, section.Buttons, "inspector/header/button");
         }
+    }
+
+    void RenderHeaderOverride(Gui gui, object target)
+    {
+        if (gui.Pass != Pass.Pass2Render) return;
+        if (!overrides.IsOverridden(target, nameof(Node.Name)) && !overrides.IsOverridden(target, nameof(Node.IsActive)))
+            return;
+        var rect = gui.CurrentNode.Rect;
+        gui.DrawRect(new Rect(rect.X, rect.Y + 2f, 2f, rect.H - 4f), Theme.Accent);
+    }
+
+    static void RenderName(Gui gui, FormField name)
+    {
+        var current = name.HasMixedValue ? string.Empty : name.GetValue() as string ?? string.Empty;
+        var edited = gui.TextInput(current, width: 0, height: Theme.Scale(20f), fontSize: Theme.Text(13),
+            backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
+            id: "inspector/header/name", placeholder: name.HasMixedValue ? "—" : "");
+        if (gui.Pass == Pass.Pass2Render && !string.Equals(edited, current, StringComparison.Ordinal))
+            name.SetValue(edited);
     }
 
     void RenderSection(Gui gui, FormSection section, int index)
@@ -499,11 +469,14 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
 
     void MoveComponent(Component component, bool up)
     {
-        if (component.Node is not { } node) return;
-
-        undo.RecordObject(node, up ? "Move Component Up" : "Move Component Down");
-        if (up) inspector.MoveComponentUp(component);
-        else inspector.MoveComponentDown(component);
+        undo.BeginGesture();
+        try
+        {
+            foreach (var node in frameNodes)
+                undo.RecordObject(node, up ? "Move Component Up" : "Move Component Down");
+            inspector.MoveComponents(frameNodes, component, up);
+        }
+        finally { undo.EndGesture(); }
     }
 
     void OpenOverrideMenu(Gui gui, Action<FlyoutBuilder> build)
@@ -546,8 +519,9 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
     {
         using (gui.Node(Theme.Scale(16f), Theme.Scale(16f), id).BlockInput().Enter())
         {
-            var current = field.GetValue() is true;
-            var next = gui.Checkbox(current, size: Theme.Scale(14f));
+            var current = !field.HasMixedValue && field.GetValue() is true;
+            var next = gui.Checkbox(current, size: Theme.Scale(14f), mixed: field.HasMixedValue,
+                enabled: !field.IsReadOnly);
 
             if (gui.Pass == Pass.Pass2Render && next != current) field.SetValue(next);
         }
@@ -586,7 +560,7 @@ sealed class InspectorPanel(NodeInspectorController inspector, AssetManager asse
         gui.CascadeMenu(ref addOpen, addMenuAt, BuildAddComponentMenu);
 
     void BuildAddComponentMenu(FlyoutBuilder menu) =>
-        BuildComponentLevel(menu, [.. inspector.GetAvailableComponents()], depth: 0);
+        BuildComponentLevel(menu, [.. inspector.GetAvailableComponents(targets: frameNodes)], depth: 0);
 
     /// <summary>
     /// Emits one level of the component menu: types whose path ends here become items, and the rest are

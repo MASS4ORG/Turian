@@ -48,14 +48,26 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         if (ReferenceField.TryCreate(field) is not { } reference) return false;
 
         var result = gui.ObjectField(
-            picker.DisplayName(reference), $"{id}/ref",
+            field.HasMixedValue ? "—" : picker.DisplayName(reference), $"{id}/ref",
             accept: payload => payload is ReferenceDragPayload drop
                                && drop.Id != Guid.Empty
                                && !reference.IsReadOnly
                                && picker.Accepts(reference, drop.Id),
-            isEmpty: reference.IsEmpty,
+            isEmpty: !field.HasMixedValue && reference.IsEmpty,
             showClear: !reference.IsReadOnly);
 
+        HandleResult(result, reference, id);
+
+        if (openFieldId == id)
+        {
+            openField = reference;
+            if (gui.Pass == Pass.Pass2Render) openAnchor = gui.CurrentNode.Rect;
+        }
+        return true;
+    }
+
+    void HandleResult(ObjectFieldResult result, ReferenceField reference, string id)
+    {
         switch (result.Action)
         {
             case ObjectFieldAction.Drop when result.Payload is ReferenceDragPayload drop:
@@ -75,13 +87,6 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
                 break;
         }
 
-        if (openFieldId == id)
-        {
-            openField = reference;
-            if (gui.Pass == Pass.Pass2Render) openAnchor = gui.CurrentNode.Rect;
-        }
-
-        return true;
     }
 
     /// <summary>

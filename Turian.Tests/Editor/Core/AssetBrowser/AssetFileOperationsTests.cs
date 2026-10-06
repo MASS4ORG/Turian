@@ -102,6 +102,82 @@ public class AssetFileOperationsTests : IDisposable
     static Guid MetaId(string asset) =>
         Guid.Parse(JsonNode.Parse(File.ReadAllText($"{asset}.meta"))!["Id"]!.GetValue<string>());
 
+    AssetEntry Entry(string path, bool directory = false) => new(path, directory, null, Path.GetDirectoryName(path));
+
+    /// <summary>Deleting several files is one step that restores every original asset id.</summary>
+    [Fact]
+    public void MultiDeleteIsOneUndoStep()
+    {
+        var first = AddAsset("first.dataasset");
+        var second = AddAsset("second.dataasset");
+        var ids = new[] { MetaId(first), MetaId(second) };
+        Assert.True(operations.DeleteMany([Entry(first), Entry(second)]));
+        Assert.Single(undo.History.UndoSteps);
+        Assert.False(File.Exists(first));
+        Assert.False(File.Exists(second));
+        undo.Undo();
+        Assert.Equal(ids, new[] { MetaId(first), MetaId(second) });
+        undo.Redo();
+        Assert.False(File.Exists(first));
+        Assert.False(File.Exists(second));
+    }
+
+    /// <summary>Moving several assets preserves metadata, avoids name collisions and is undone together.</summary>
+    [Fact]
+    public void MultiMovePreservesIdsAndAvoidsCycles()
+    {
+        var first = AddAsset("first.dataasset");
+        var second = AddAsset("second.dataasset");
+        var id = MetaId(first);
+        var destination = Path.Combine(Assets, "Folder");
+        Directory.CreateDirectory(destination);
+        File.WriteAllText(Path.Combine(destination, "first.dataasset"), "existing");
+        Assert.True(operations.MoveMany([Entry(first), Entry(second)], destination));
+        Assert.Single(undo.History.UndoSteps);
+        Assert.Equal(id, MetaId(Path.Combine(destination, "first 1.dataasset")));
+        undo.Undo();
+        Assert.True(File.Exists(first));
+        Assert.True(File.Exists(second));
+        undo.Redo();
+        Assert.False(File.Exists(first));
+        Assert.False(operations.MoveMany([Entry(destination, directory: true)], Path.Combine(destination, "Inside")));
+        Assert.False(operations.MoveMany([], destination));
+    }
+
+    /// <summary>Duplicating multiple files restores the copies' own ids on redo.</summary>
+    [Fact]
+    public void MultiDuplicatePreservesCopiedIdsOnRedo()
+    {
+        var first = AddAsset("first.dataasset");
+        var second = AddAsset("second.dataasset");
+        Assert.True(operations.DuplicateMany([Entry(first), Entry(second)]));
+        Assert.Single(undo.History.UndoSteps);
+        var copy = Path.Combine(Assets, "first 1.dataasset");
+        var copiedId = MetaId(copy);
+        Assert.NotEqual(MetaId(first), copiedId);
+        undo.Undo();
+        Assert.False(File.Exists(copy));
+        undo.Redo();
+        Assert.Equal(copiedId, MetaId(copy));
+    }
+
+    /// <summary>A selected folder covers selected descendants, and failed batches roll back completed entries.</summary>
+    [Fact]
+    public void NestedSelectionAndFailedBatchAreHandled()
+    {
+        var folder = Path.Combine(Assets, "Folder");
+        Directory.CreateDirectory(folder);
+        var child = AddAsset(Path.Combine("Folder", "child.dataasset"));
+        Assert.Equal([Entry(folder, true)], AssetFileOperations.Roots([Entry(folder, true), Entry(child)]));
+        Assert.True(operations.DeleteMany([Entry(folder, true), Entry(child)]));
+        undo.Undo();
+        Assert.True(File.Exists(child));
+        var missing = Entry(Path.Combine(Assets, "missing.dataasset"));
+        Assert.False(operations.DeleteMany([Entry(child), missing]));
+        Assert.True(File.Exists(child));
+        Assert.False(operations.DeleteMany([]));
+    }
+
     /// <summary>A copy of a read-only brick asset is writable, has its own id, and carries it in its payload too.</summary>
     [Fact]
     public void CopyOfAReadOnlyAsset_IsTheProjectsOwn()

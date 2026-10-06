@@ -110,11 +110,15 @@ public sealed class ReferenceField
 
         // Assigning a fresh instance rather than mutating in place keeps undo and change notification
         // working the same way they do for every other field.
-        var value = Activator.CreateInstance(source.ValueType);
-        if (value is null) return false;
-
-        SetIdOn(value, id);
-        return source.SetValue(value);
+        var success = true;
+        foreach (var field in source.Sources)
+        {
+            var value = Activator.CreateInstance(field.ValueType);
+            if (value is null) return false;
+            SetIdOn(value, id);
+            success &= field.SetValue(value);
+        }
+        return success;
     }
 
     /// <summary>
@@ -126,10 +130,11 @@ public sealed class ReferenceField
     public bool SetTarget(object? target)
     {
         if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
-        if (source.Target is IdObject owner)
+        foreach (var field in source.Sources)
         {
-            if (source.CollectionMember is { } list) ObjectReferences.Forget(owner, list, source.CollectionIndex);
-            else ObjectReferences.Forget(owner, source.Name);
+            if (field.Target is not IdObject owner) continue;
+            if (field.CollectionMember is { } list) ObjectReferences.Forget(owner, list, field.CollectionIndex);
+            else ObjectReferences.Forget(owner, field.Name);
         }
 
         return source.SetValue(target);
