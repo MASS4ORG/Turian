@@ -61,7 +61,7 @@ public sealed class ExportUserCode(
     string GenerateCsProjFile()
     {
         var project = CsProjectGenerator.GenerateExecutable(Settings, Logger);
-        project.Save();
+        GeneratedProject.Save(project);
         return project.FullPath;
     }
 

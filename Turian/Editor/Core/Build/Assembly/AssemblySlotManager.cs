@@ -5,8 +5,8 @@ namespace Turian.Editor.Core;
 /// swapped in without leaving stale timestamped DLLs on disk.
 ///
 /// Strategy:
-///   - The <em>inactive</em> slot is always the "compile" target.
-///   - On a successful load the inactive slot becomes active.
+///   - Changed code is compiled into the <em>inactive</em> slot; unchanged code may reuse either slot.
+///   - On a successful load the selected slot becomes active.
 ///   - On a load failure the active slot is left unchanged (automatic revert).
 ///   - The current active slot name is persisted in <c>active_slot.txt</c> beside
 ///     the slot directories so it survives editor restarts.
@@ -97,8 +97,7 @@ public sealed class AssemblySlotManager
             LoadedAssembly = primary;
             UserAssemblies = userAssemblies;
 
-            // Flip the active slot and persist
-            activeSlot = activeSlot == slotA ? slotB : slotA;
+            activeSlot = Path.GetFileName(Path.GetDirectoryName(fullPath))!;
             PersistActiveSlot(activeSlot);
 
             Serializer.ResetOptions();

@@ -1,16 +1,11 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Extracts the source file and line a log message points at — the <c>path(line,col):</c> form the
-/// MSBuild logger emits and the <c>path:line:</c> form other tools use — so a double click in the
-/// Output panel can hand them to an editor that jumps there. The lookup is best effort: a message
-/// with no location does nothing, and a location whose file does not exist logs once instead of
-/// launching a bogus process.
+/// Extracts logged source locations and opens their files with the operating system's associated application.
+/// Missing source files are reported without launching an application.
 /// </summary>
 public static class LogSource
 {
-    static readonly string[] LineJumperEditors = ["code", "codium", "cursor", "zed"];
-
     static readonly Regex ParenForm = new(
         @"(?<path>.+)\((?<line>\d+)(?:,(?<col>\d+))?\)(?=:)", RegexOptions.Compiled);
 
@@ -70,9 +65,8 @@ public static class LogSource
     }
 
     /// <summary>
-    /// Opens the source a message points at, positioned on its line. Prefers an editor that accepts
-    /// source coordinates when one is on PATH; otherwise the file goes to the desktop's default
-    /// program. Silently ignores a message with no source location.
+    /// Opens the source file with the operating system's associated application.
+    /// Silently ignores a message with no source location.
     /// </summary>
     /// <param name="message">The rendered log message.</param>
     /// <param name="log">Where open failures are reported.</param>
@@ -88,7 +82,7 @@ public static class LogSource
             return;
         }
 
-        LaunchSource(path, TryParse(message)!.Value.Line, log, OnPath, Process.Start);
+        LaunchSource(path, log, Process.Start);
     }
 
     static void ReportMissing(string message, ILogger log)
@@ -97,21 +91,8 @@ public static class LogSource
             log.LogWarning("Output: {Path} is not a source file, cannot jump to line {Line}", source.Path, source.Line);
     }
 
-    internal static void LaunchSource(string path, int line, ILogger log, Func<string, bool> onPath,
-        Func<ProcessStartInfo, Process?> start)
-    {
-        var editor = LineJumperEditors.FirstOrDefault(onPath);
-        if (editor is not null && TryLaunch(EditorStartInfo(editor, path, line), log, start)) return;
+    internal static void LaunchSource(string path, ILogger log, Func<ProcessStartInfo, Process?> start) =>
         TryLaunch(new ProcessStartInfo(path) { UseShellExecute = true }, log, start);
-    }
-
-    internal static ProcessStartInfo EditorStartInfo(string editor, string path, int line)
-    {
-        var info = new ProcessStartInfo(editor) { UseShellExecute = false };
-        if (editor != "zed") info.ArgumentList.Add("--goto");
-        info.ArgumentList.Add($"{path}:{line}");
-        return info;
-    }
 
     static bool TryLaunch(ProcessStartInfo info, ILogger log, Func<ProcessStartInfo, Process?> start)
     {
@@ -127,13 +108,4 @@ public static class LogSource
         }
     }
 
-    static bool OnPath(string executable)
-    {
-        var path = Environment.GetEnvironmentVariable("PATH");
-        if (path is null) return false;
-
-        return path.Split(Path.PathSeparator)
-            .Select(dir => Path.Combine(dir, executable))
-            .Any(candidate => File.Exists(candidate) || File.Exists(candidate + ".exe"));
-    }
 }

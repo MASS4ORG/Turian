@@ -26,17 +26,25 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     /// <summary>Builds the playable runtime and starts it, returning the process handle.</summary>
     public async Task<PlayLaunchResult> ExecuteWithProcessAsync()
     {
+        var dllPath = await BuildAsync().ConfigureAwait(false);
+        var outputDir = Path.GetDirectoryName(dllPath)!;
+        return Launch(Path.Combine(outputDir, "project.exe"), dllPath, outputDir);
+    }
+
+    /// <summary>Builds or reuses the playable runtime without launching its window.</summary>
+    /// <returns>The prepared runtime assembly path.</returns>
+    public async Task<string> BuildAsync()
+    {
         var projectDirectory = Path.Combine(Settings.CacheAbsoluteDir, playSourceSubDir);
         var outputDir = Path.Combine(projectDirectory, "bin", "Debug", Settings.TargetFramework);
         var dllPath = Path.Combine(outputDir, "project.dll");
-        var exePath = Path.Combine(outputDir, "project.exe");
 
         if (userCodeDllPath is not null && IsPlayBuildUpToDate(dllPath, userCodeDllPath))
         {
             Logger.LogInformation("Play build skipped: inputs unchanged");
             CopyTypeManifestToOutput(outputDir);
             SyncAssetsToOutput(outputDir);
-            return Launch(exePath, dllPath, outputDir);
+            return dllPath;
         }
 
         var csprojFilePath = await SetupAsync(GeneratePlayCsProjFile).ConfigureAwait(false);
@@ -83,7 +91,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
             SavePlayBuildStamp(projectDirectory, userCodeDllPath);
 
         CopyTypeManifestToOutput(outputDir);
-        return Launch(exePath, dllPath, outputDir);
+        return dllPath;
     }
 
     PlayLaunchResult Launch(string exePath, string dllPath, string outputDir)
@@ -134,7 +142,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
             {
                 var dstCatalogDir = Path.Combine(outputDir, ".Cache");
                 Directory.CreateDirectory(dstCatalogDir);
-                File.Copy(srcCatalog, Path.Combine(dstCatalogDir, "assetCatalog.json"), overwrite: true);
+                PlayOutputSync.CopyFile(srcCatalog, Path.Combine(dstCatalogDir, "assetCatalog.json"));
             }
 
             Logger.LogDebug("Synced assets to play output: {Path}", dstAssets);
@@ -150,7 +158,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         Directory.CreateDirectory(dst);
         foreach (var file in Directory.GetFiles(src))
         {
-            File.Copy(file, Path.Combine(dst, Path.GetFileName(file)), overwrite: true);
+            PlayOutputSync.CopyFile(file, Path.Combine(dst, Path.GetFileName(file)));
         }
         foreach (var dir in Directory.GetDirectories(src))
         {
@@ -174,7 +182,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
 
         try
         {
-            File.Copy(src, dst, overwrite: true);
+            PlayOutputSync.CopyFile(src, dst);
             Logger.LogDebug("Copied user-code type manifest to play output: {Dst}", dst);
         }
         catch (Exception ex)
@@ -297,7 +305,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         var project = CsProjectGenerator.GeneratePlayableExecutable(Settings, Logger);
         var playDir = Path.Combine(Settings.CacheAbsoluteDir, playSourceSubDir);
         Directory.CreateDirectory(playDir);
-        project.Save();
+        GeneratedProject.Save(project);
         return project.FullPath;
     }
 }

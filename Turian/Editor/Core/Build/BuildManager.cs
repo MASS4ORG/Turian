@@ -347,7 +347,8 @@ public sealed class BuildManager : IDisposable
     {
         RequireProjectLoaded("compile");
 
-        var compiler = new CompileUserCode(settings, logger, slotManager.InactiveSlotDirectory, forceRecompile);
+        var compiler = new CompileUserCode(settings, logger, slotManager.InactiveSlotDirectory, forceRecompile,
+            slotManager.ActiveSlotDirectory);
         return await compiler.ExecuteAsync().ConfigureAwait(false);
     }
 

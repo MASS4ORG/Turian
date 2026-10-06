@@ -108,6 +108,12 @@ public sealed class AppearanceSettingsTests
         OpenSettings(frame);
         var editor = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
         Click(frame, editor.Rect.Center);
+        var list = Nodes(frame).Single(node => node.Id.StartsWith(editor.Id) && node.Id.EndsWith("/list"));
+        frame.Input.MousePosition.Returns(list.Rect.Center);
+        frame.Input.MouseWheelDelta.Returns(-50f);
+        frame.Draw();
+        frame.Input.MouseWheelDelta.Returns(0f);
+        frame.Draw();
         var option = Nodes(frame).Single(node => node.Id.EndsWith("/list/" + (frame.Themes.Themes.Count - 1)));
         Click(frame, option.Rect.Center);
         frame.Draw();

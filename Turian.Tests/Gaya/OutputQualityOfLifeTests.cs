@@ -108,44 +108,21 @@ public sealed class OutputQualityOfLifeTests
     public void MissingSourceStaysUnchanged() => Assert.Equal("hello",
         LogSource.LocationMessage(new LogLine(LogLevel.Information, DateTimeOffset.Now, "hello")));
 
-    /// <summary>Each editor receives its supported line syntax as literal process arguments.</summary>
-    [Theory]
-    [InlineData("code")]
-    [InlineData("codium")]
-    [InlineData("cursor")]
-    [InlineData("zed")]
-    public void EditorsReceiveSupportedSourceArguments(string editor)
+    /// <summary>Opening a diagnostic delegates the existing file to its OS association.</summary>
+    [Fact]
+    public void SourcesUseTheOperatingSystemAssociation()
     {
         var launches = new List<ProcessStartInfo>();
-        LogSource.LaunchSource("/project with spaces/Game.cs", 42, NullLogger.Instance, candidate => candidate == editor,
+        LogSource.LaunchSource("/project with spaces/Game.cs", NullLogger.Instance,
             info => { launches.Add(info); return null; });
         var launch = Assert.Single(launches);
-        Assert.Equal(editor, launch.FileName);
-        Assert.False(launch.UseShellExecute);
-        Assert.Equal(editor == "zed" ? ["/project with spaces/Game.cs:42"]
-            : new[] { "--goto", "/project with spaces/Game.cs:42" }, launch.ArgumentList);
-    }
-
-    /// <summary>The desktop fallback runs when no editor is available or the editor cannot launch.</summary>
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void EditorLaunchFailureUsesDesktopFallback(bool available)
-    {
-        var launches = new List<ProcessStartInfo>();
-        LogSource.LaunchSource("Game.cs", 7, NullLogger.Instance, _ => available, info =>
-        {
-            launches.Add(info);
-            if (!info.UseShellExecute) throw new InvalidOperationException("editor unavailable");
-            return null;
-        });
-        Assert.Equal(available ? 2 : 1, launches.Count);
-        Assert.True(launches[^1].UseShellExecute);
-        Assert.Equal("Game.cs", launches[^1].FileName);
+        Assert.Equal("/project with spaces/Game.cs", launch.FileName);
+        Assert.True(launch.UseShellExecute);
+        Assert.Empty(launch.ArgumentList);
     }
 
     /// <summary>A failed desktop launch is reported without interrupting the editor's render loop.</summary>
     [Fact]
-    public void DesktopLaunchFailureDoesNotEscape() => LogSource.LaunchSource("Game.cs", 7, NullLogger.Instance,
-        _ => false, _ => throw new InvalidOperationException("no association"));
+    public void DesktopLaunchFailureDoesNotEscape() => LogSource.LaunchSource("Game.cs", NullLogger.Instance,
+        _ => throw new InvalidOperationException("no association"));
 }

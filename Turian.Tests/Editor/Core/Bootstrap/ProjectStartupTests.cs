@@ -73,7 +73,7 @@ public sealed class ProjectStartupTests
             Assert.False(session.IsOpening);
             var saved = services.GetRequiredService<WorkspaceSessionStore>().Load(first);
             Assert.Contains(prefab.Id, saved.OpenAssetIds);
-            Assert.Contains(tasks.Snapshot(), task => task.Label == "Importing assets" && task.UnitsTotal > 0);
+            Assert.Contains(tasks.Snapshot(), task => task.Label == "Checking assets" && task.UnitsTotal > 0);
             Assert.Contains(tasks.Snapshot(), task => task.Label == "Indexing assets" && task.UnitsTotal > 0);
         }
         finally

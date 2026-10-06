@@ -278,12 +278,12 @@ public sealed partial class AssetImporter : IDisposable
             .ToArray();
         var batch = new List<(Asset Asset, string SourcePath)>();
 
-        logger.LogInformation("Importing {FileCount} files from {FolderPath}", files.Length, folderPath);
+        logger.LogInformation("Checking {FileCount} asset files in {FolderPath}", files.Length, folderPath);
 
         pendingBatch = batch;
         try
         {
-            using (var phase = progress.BeginChild(BackgroundTaskKind.Import, "Importing assets"))
+            using (var phase = progress.BeginChild(BackgroundTaskKind.Scan, "Checking assets"))
                 ImportFiles(files, phase);
 
             // The batch stays open here: a model reconfiguring its textures reimports them, and an
@@ -299,7 +299,8 @@ public sealed partial class AssetImporter : IDisposable
 
         PersistCacheCatalog();
 
-        logger.LogInformation("Asset import finished: {ImportedCount} assets from {FolderPath}", batch.Count, folderPath);
+        logger.LogInformation("Asset scan finished: {ChangedCount} changed or unindexed assets from {FolderPath}",
+            batch.Count, folderPath);
         ReportTextureCacheSize();
     }
 
@@ -312,7 +313,7 @@ public sealed partial class AssetImporter : IDisposable
             EnsureAssetImported(files[i], overwriteExisting: false);
             progress.Units(i + 1, files.Length);
             if ((i + 1) % importProgressInterval == 0 || i + 1 == files.Length)
-                logger.LogInformation("Asset import: {Imported}/{FileCount} files", i + 1, files.Length);
+                logger.LogDebug("Asset scan: {Checked}/{FileCount} files", i + 1, files.Length);
         }
     }
 
@@ -326,6 +327,7 @@ public sealed partial class AssetImporter : IDisposable
             progress.Report(0, Path.GetFileName(sourcePath));
             RegisterChildAssets(asset, sourcePath);
             RefreshPrefabComponentIndex(asset, ResolveImportedPrimaryPath(asset.Id));
+            SaveIndexStamp(asset.Id);
             progress.Units(i + 1, batch.Count);
         }
     }
