@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Added: Studio multi-selection, shared Inspector editing with mixed values and searchable tag/layer choices, group gizmos, and undoable batch scene and asset operations #82
+## [2.3.0] - 2026-10-06
+
+- Added: multi-selection and multi-object editing #82
 
 ## [2.2.0] - 2026-10-06
 
@@ -50,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/MASS4ORG/Turian/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/MASS4ORG/Turian/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/MASS4ORG/Turian/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/MASS4ORG/Turian/compare/v1.2.0...v2.0.0
