@@ -4,11 +4,11 @@ namespace Turian.Engine.Core;
 public sealed class LayerSlot
 {
     /// <summary>The stable identity of this slot in its layer space.</summary>
-    [ReadOnly]
+    [Hide]
     public Guid Id { get; init; }
 
     /// <summary>The fixed index scenes and prefabs store.</summary>
-    [ReadOnly]
+    [Hide]
     public int Index { get; init; }
 
     /// <summary>The editable display name.</summary>

@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace Turian.Tests;
 
 /// <summary> </summary>
 [CreateAssetMenu(fileName: "DataAssetTest", path: "DA/DataAssetTest")]

@@ -76,7 +76,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             return;
         }
 
-        if (Locked && gui.Pass == Pass.Pass2Render) RecordLockedSelection();
+        if (Locked) RecordLockedSelection();
 
         if (target is AssetInspection inspection)
         {
@@ -118,7 +118,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
 
     FormRenderContext CreateFormContext()
     {
-        drawers.Add(LayerDrawer.Handles, new LayerDrawer(layerFilter));
+        drawers.Add(TagDrawer.Handles, new TagDrawer(layerFilter, undo));
+        drawers.Add(LayerDrawer.Handles, new LayerDrawer(layerFilter, undo));
         referenceRegistration = drawers.Add(ReferenceDrawer.Handles, referenceDrawer);
         return new FormRenderContext
         {
