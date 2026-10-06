@@ -162,7 +162,7 @@ public sealed class LayerPersistenceTests
         var state = new LayerMaskState { GroupId = group.Id, Everything = true };
         var mask = state.Compile(layout);
         Assert.Equal(count, mask.ValueCount);
-        Assert.False(System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<CompiledLayerMask>());
+        Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<CompiledLayerMask>());
         for (var index = 0; index < 256; index++) Assert.Equal(index < count, mask.Contains((byte)index));
         var memberships = new NodeLayers();
         memberships[0] = (byte)(count - 1);

@@ -131,15 +131,15 @@ static class UserTraversalBenchmarks
 
     // Hand loops: the allocation-free list query with reused buffers.
 
-    static readonly List<Enemy> enemies = [];
-    static readonly List<Pickup> pickups = [];
-    static readonly Stack<Node> pending = new();
+    static readonly List<Enemy> Enemies = [];
+    static readonly List<Pickup> Pickups = [];
+    static readonly Stack<Node> Pending = new();
 
     static double LoopNearby(Scene s)
     {
-        s.Root.GetComponentsInChildren(enemies);
+        s.Root.GetComponentsInChildren(Enemies);
         var count = 0;
-        foreach (var enemy in enemies)
+        foreach (var enemy in Enemies)
             if (Near(enemy, s.Player))
                 count++;
         return count;
@@ -147,20 +147,20 @@ static class UserTraversalBenchmarks
 
     static double LoopHealth(Scene s)
     {
-        s.Root.GetComponentsInChildren(enemies);
+        s.Root.GetComponentsInChildren(Enemies);
         var sum = 0;
-        foreach (var enemy in enemies) sum += enemy.Health;
+        foreach (var enemy in Enemies) sum += enemy.Health;
         return sum;
     }
 
     static double LoopFind(Scene s)
     {
-        pending.Clear();
-        for (var i = s.Root.Children.Count - 1; i >= 0; i--) pending.Push(s.Root.Children[i]);
-        while (pending.TryPop(out var node))
+        Pending.Clear();
+        for (var i = s.Root.Children.Count - 1; i >= 0; i--) Pending.Push(s.Root.Children[i]);
+        while (Pending.TryPop(out var node))
         {
             if (node.Name == "Boss") return 1;
-            for (var i = node.Children.Count - 1; i >= 0; i--) pending.Push(node.Children[i]);
+            for (var i = node.Children.Count - 1; i >= 0; i--) Pending.Push(node.Children[i]);
         }
 
         return 0;
@@ -168,9 +168,9 @@ static class UserTraversalBenchmarks
 
     static double LoopNearest(Scene s)
     {
-        s.Root.GetComponentsInChildren(pickups);
+        s.Root.GetComponentsInChildren(Pickups);
         var best = float.MaxValue;
-        foreach (var pickup in pickups) best = MathF.Min(best, Distance(pickup, s.Player));
+        foreach (var pickup in Pickups) best = MathF.Min(best, Distance(pickup, s.Player));
         return best;
     }
 
@@ -178,10 +178,10 @@ static class UserTraversalBenchmarks
 
     static double LoopWeakest(Scene s)
     {
-        s.Root.GetComponentsInChildren(enemies);
-        enemies.Sort(static (a, b) => a.Health.CompareTo(b.Health));
+        s.Root.GetComponentsInChildren(Enemies);
+        Enemies.Sort(static (a, b) => a.Health.CompareTo(b.Health));
         var sum = 0;
-        for (var i = 0; i < Math.Min(10, enemies.Count); i++) sum += enemies[i].Health;
+        for (var i = 0; i < Math.Min(10, Enemies.Count); i++) sum += Enemies[i].Health;
         return sum;
     }
 }

@@ -9,7 +9,7 @@ public sealed class LayerInterningTests
     [Fact]
     public void CommonStorageIsTwentyFourBytes()
     {
-        Assert.Equal(16 + IntPtr.Size, System.Runtime.CompilerServices.Unsafe.SizeOf<NodeLayers>());
+        Assert.Equal(16 + IntPtr.Size, Unsafe.SizeOf<NodeLayers>());
         var memberships = new NodeLayers();
         for (var slot = 0; slot < NodeLayers.InlineCapacity; slot++) Assert.Equal(0, memberships[slot]);
         memberships[15] = 255;

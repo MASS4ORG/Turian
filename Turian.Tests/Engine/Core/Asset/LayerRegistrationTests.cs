@@ -62,7 +62,7 @@ public sealed class LayerRegistrationTests
     [Fact]
     public void AssetAndCodeRegistrationsCompose()
     {
-        var assetGroup = LayerTestData.Group();
+        var assetGroup = Group();
         var assetTag = new TagAsset { Name = "Player" };
         var builder = new LayerRegistrationBuilder().Include(assetGroup).Include(assetTag)
             .Group<Physics>(group => group.Default().Value<Water>()).Tag<Player>();

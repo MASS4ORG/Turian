@@ -1,1 +1,1 @@
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Turian.Tests")]
+[assembly: InternalsVisibleTo("Turian.Tests")]
