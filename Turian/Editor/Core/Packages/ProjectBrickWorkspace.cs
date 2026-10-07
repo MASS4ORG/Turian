@@ -125,3 +125,20 @@ public sealed class TurianProjectBricks(SettingsService settings, BackgroundTask
         return status == BackgroundTaskStatus.Completed;
     }
 }
+
+/// <summary>The studio's own bricks as Turian checks them: against both the engine and the Gaya platform.</summary>
+public static class TurianStudioBricks
+{
+    /// <summary>The hosts studio bricks state ranges for: the engine and the Gaya platform.</summary>
+    public static IReadOnlyDictionary<string, SemanticVersion> Hosts { get; } = new Dictionary<string, SemanticVersion>
+    {
+        [ProjectPackages.HostName] = ProjectPackages.EngineVersion,
+        ["gaya"] = ProjectPackages.GayaVersion,
+    };
+
+    /// <summary>The per-user studio bricks, taking bricks from the public registry too.</summary>
+    /// <param name="studioRoot">The studio folder; <c>~/.gaya/studio</c> when null.</param>
+    /// <returns>The workspace.</returns>
+    public static StudioBricks Workspace(string? studioRoot = null) =>
+        new(studioRoot ?? GayaConfig.StudioRoot, Hosts, publicRegistry: ProjectPackages.PublicRegistry);
+}

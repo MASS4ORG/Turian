@@ -137,6 +137,25 @@ public sealed class AppearanceSettingsTests
         Assert.Equal("gaya.light", restoredApp.Themes.CommittedColorTheme);
     }
 
+    /// <summary>The Browse button sits beside the theme dropdown and is safe where no Bricks panel is registered.</summary>
+    [Fact]
+    public void BrowseButtonListsThemeBricks()
+    {
+        using var frame = new GayaChromeTests.Frame();
+        using var shell = PluginHost.Load([], NullLogger.Instance);
+        frame.Panels.Register(shell.Panels.All.Single(panel => panel.Id == ShellPanels.Settings));
+        frame.Draw();
+        frame.Workbench.ShowPanel(ShellPanels.Settings);
+        frame.Draw();
+        frame.Draw();
+
+        var browse = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/browse");
+        var editor = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
+        Assert.True(browse.Rect.X >= editor.Rect.X && browse.Rect.X + browse.Rect.W <= editor.Rect.X + editor.Rect.W + 0.5f);
+        Click(frame, browse.Rect.Center);
+        Assert.Equal(BrickCategoryFilter.All, shell.Services.GetRequiredService<BricksPanel>().Category);
+    }
+
     /// <summary>The live checkbox switches native decorations and application buttons, then the bar moves the window.</summary>
     [Fact]
     public void AppearanceToggleSwitchesDecorationsButtonsAndDragging()

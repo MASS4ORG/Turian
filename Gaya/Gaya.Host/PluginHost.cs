@@ -194,7 +194,12 @@ public static class PluginHost
                 services.GetRequiredService<IEditorSettings>(),
                 services.GetRequiredService<ILogger>(),
                 services.GetService<IShellLocalization>(),
-                services.GetRequiredService<IThemeService>()))
+                services.GetRequiredService<IThemeService>(),
+                () =>
+                {
+                    services.GetService<BricksPanel>()?.Browse(BrickCategoryFilter.Themes);
+                    services.GetService<IShellHost>()?.ShowPanel(BricksPanel.PanelId);
+                }))
         { OpenByDefault = false });
 
         commands.Register(new CommandDescriptor(ShellCommands.Settings, "File: Settings…",

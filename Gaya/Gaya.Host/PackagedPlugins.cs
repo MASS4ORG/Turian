@@ -17,7 +17,7 @@ public sealed record StudioPackages(IReadOnlyList<ResolvedPackage> Packages, IRe
 public static class PackagedPlugins
 {
     /// <summary>The folder holding the studio manifest, lock file and embedded studio packages.</summary>
-    public static string StudioRoot => Path.Combine(UserConfigPath.Directory, "studio");
+    public static string StudioRoot => GayaConfig.StudioRoot;
 
     /// <summary>The folder, inside a package, holding its compiled plugin assemblies.</summary>
     public const string LibraryDirectoryName = StudioBricks.LibraryDirectoryName;

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Added (breaking): `.pss` color themes with hot reload #213
 - Changed: theme API renamed to `ThemeTokens`/`ColorTheme`

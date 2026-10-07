@@ -15,8 +15,9 @@ namespace Gaya.Host;
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
 /// <param name="themes">The themes available through the appearance dropdown.</param>
+/// <param name="browseThemes">Opens a list of installable themes; without it the Browse button is hidden.</param>
 sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
-    IThemeService themes) : IPanel
+    IThemeService themes, Action? browseThemes = null) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -298,6 +299,25 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             frameThemeSelection = next >= 0 && next != current ? available[next].Id : null;
         else if (frameThemeSelection is { } selected)
             field.SetValue(selected);
+
+        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse")) browseThemes();
+    }
+
+    /// <summary>The button beside the theme dropdown that lists installable themes.</summary>
+    bool BrowseButton(Gui gui, string id)
+    {
+        using (gui.Node(Theme.Scale(76f), Theme.Scale(Theme.RowHeight), id).BlockInput()
+                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        {
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+
+            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            gui.DrawText(T("Browse…"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
+            gui.Tooltip(gui.CurrentNode, T("Find themes to install as bricks."), maxWidth: 320);
+
+            return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
+        }
     }
 
     /// <summary>The button that puts a setting back the way the page declares it.</summary>

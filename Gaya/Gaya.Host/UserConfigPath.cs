@@ -8,18 +8,7 @@ namespace Gaya.Host;
 static class UserConfigPath
 {
     /// <summary>The per-user directory, created lazily by whatever writes into it.</summary>
-    public static string Directory
-    {
-        get
-        {
-            if (Environment.GetEnvironmentVariable("GAYA_CONFIG_HOME") is { Length: > 0 } directory)
-                return Path.GetFullPath(directory);
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (string.IsNullOrEmpty(home)) home = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-            return Path.Combine(string.IsNullOrEmpty(home) ? Path.GetTempPath() : home, ".gaya");
-        }
-    }
+    public static string Directory => GayaConfig.Directory;
 
     /// <summary>The absolute path of a per-user file.</summary>
     /// <param name="fileName">The file's name, e.g. <c>layout.json</c>.</param>
