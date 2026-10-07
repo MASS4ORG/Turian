@@ -22,7 +22,7 @@ public static class GuiColorBridge
     public static Core.Color ToEngine(this GuiColor color) =>
         Core.Color.FromSrgb(new Color32(color.R, color.G, color.B, color.A));
 
-    /// <inheritdoc cref="Gui.DrawText"/>
+    /// <inheritdoc cref="Gui.DrawText(string, float, Guinevere.Color?, Font?, float, bool, bool, TextEffects?, TextLayoutOptions?)"/>
     public static LayoutNode DrawText(
         this Gui gui,
         string text,

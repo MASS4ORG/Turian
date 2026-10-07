@@ -28,10 +28,12 @@
     <!-- Headless UI renders through the in-game UI brick, whose prebuilt assemblies run on the host's Guinevere and Skia. -->
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere" Version="5.*"/>
+        <PackageReference Include="MASS4.Guinevere" Version="6.*"/>
+        <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

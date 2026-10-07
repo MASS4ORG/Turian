@@ -9,6 +9,9 @@ public sealed class UiStyleSheetAsset : Asset
 {
     static readonly ConcurrentDictionary<Guid, StyleSheet> Cache = new();
 
+    /// <summary>How <c>.uss</c> sheets are parsed: their CSS-flavored <c>prop: value;</c> form is still accepted.</summary>
+    public static StyleSheetOptions ParseOptions { get; } = new() { AllowCssSyntax = true };
+
     /// <summary>
     /// Reads this stylesheet's artifact and returns the parsed <see cref="StyleSheet"/>, or
     /// <c>null</c> when the artifact is missing or unreadable. The result is cached.
@@ -26,7 +29,7 @@ public sealed class UiStyleSheetAsset : Asset
         {
             using var stream = provider.GetAssetStream();
             using var reader = new StreamReader(stream);
-            var sheet = StyleSheet.Parse(reader.ReadToEnd());
+            var sheet = StyleSheet.Parse(reader.ReadToEnd(), ParseOptions);
             Cache[Id] = sheet;
             return sheet;
         }
@@ -49,6 +52,6 @@ public sealed class UiStyleSheetAsset : Asset
     public static StyleSheet LoadContent(string absolutePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
-        return StyleSheet.Parse(File.ReadAllText(absolutePath));
+        return StyleSheet.Parse(File.ReadAllText(absolutePath), ParseOptions);
     }
 }

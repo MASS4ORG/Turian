@@ -34,7 +34,7 @@ public sealed class UiManagerFactory : IUiPresenterFactory, IUiDocumentPreview
         foreach (var source in document.StyleSheets)
         {
             var stylesheet = Path.GetFullPath(Path.Combine(baseDir, source));
-            if (File.Exists(stylesheet)) renderer.StyleSheets.Add(StyleSheet.Parse(File.ReadAllText(stylesheet)));
+            if (File.Exists(stylesheet)) renderer.StyleSheets.Add(StyleSheet.Parse(File.ReadAllText(stylesheet), UiStyleSheetAsset.ParseOptions));
             else Log.Logger.LogWarning("Stylesheet not found: {Path}", stylesheet);
         }
 

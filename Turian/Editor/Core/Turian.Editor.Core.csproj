@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Autoformers" Version="5.*"/>
+        <PackageReference Include="MASS4.Autoformers" Version="6.*"/>
     </ItemGroup>
 
     <!-- External libraries -->
