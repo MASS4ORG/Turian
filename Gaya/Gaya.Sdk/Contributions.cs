@@ -29,7 +29,21 @@ public interface IPanel
     /// <summary>Draws the panel body for this frame.</summary>
     /// <param name="gui">The Guinevere context.</param>
     void Render(Gui gui);
+
+    /// <summary>Draws optional widgets in the active panel's available tab-strip space.</summary>
+    /// <param name="gui">The GUI, already scoped to the available area; called in both passes.</param>
+    /// <param name="context">This panel's identity, bounds, focus and host services.</param>
+    void RenderHeader(Gui gui, PanelHeaderContext context) { }
 }
+
+/// <summary>Context for widgets owned by the active panel's tab strip.</summary>
+/// <param name="PanelId">The active panel instance's stable id.</param>
+/// <param name="Title">The panel instance's displayed title.</param>
+/// <param name="AvailableSpace">The screen-space area left over after the dock group's tabs.</param>
+/// <param name="IsFocused">Whether this panel owns the workbench focus.</param>
+/// <param name="Services">The host services used by this panel.</param>
+public readonly record struct PanelHeaderContext(
+    string PanelId, string Title, Rect AvailableSpace, bool IsFocused, IServiceProvider Services);
 
 /// <summary>A dockable panel contribution.</summary>
 /// <param name="Id">Stable unique id, e.g. <c>gaya.example.sceneTree</c>.</param>
@@ -284,24 +298,4 @@ public interface IChromeRegistry
     /// <summary>Removes a contribution; its cached instance is released before the next frame.</summary>
     /// <param name="chromeId">The contribution id.</param>
     void Remove(string chromeId);
-}
-
-/// <summary>
-/// A chrome contribution anchored to the tab strip of one specific panel, drawn in the width the
-/// panel group's tabs leave over — where an overflow or lock button belongs.
-/// </summary>
-/// <param name="Id">Stable unique id.</param>
-/// <param name="PanelId">The panel whose tab strip hosts the item; anything else leaves it hidden.</param>
-/// <param name="Factory">Builds the item; called once and cached.</param>
-public sealed record TabStripChromeDescriptor(
-    string Id,
-    string PanelId,
-    Func<IServiceProvider, IChromeItem> Factory);
-
-/// <summary>Registry of <see cref="TabStripChromeDescriptor"/> contributions.</summary>
-public interface ITabStripChromeRegistry
-{
-    /// <summary>Adds a chrome contribution to a panel's tab strip.</summary>
-    /// <param name="descriptor">The contribution.</param>
-    void Register(TabStripChromeDescriptor descriptor);
 }

@@ -61,6 +61,9 @@ public class CsProjectGeneratorTests
 
         // Assert
         Assert.Equal(expectedFilePath, project.FullPath);
+        var alias = Assert.Single(project.Items,
+            item => item.ItemType == "Using" && item.Include == "Gaya.EditorSettingAttribute");
+        Assert.Equal("EditorSettingAttribute", Assert.Single(alias.Metadata).Value);
     }
 
     /// <summary>

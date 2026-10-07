@@ -45,7 +45,7 @@ public sealed class GayaChromeTests
             if (identity is not null) registrations.AddSingleton(identity);
             var services = registrations.BuildServiceProvider();
             application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
-                new MenuRegistry(), Chrome, new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance),
+                new MenuRegistry(), Chrome, new ShortcutService(NullLogger.Instance),
                 new FocusTracker(), [], settings: settings, themes: themes);
             Workbench = new Workbench(application, null,
                 new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
@@ -381,11 +381,11 @@ public sealed class GayaChromeTests
         frame.Settings.Save();
         var restored = new EditorSettings(NullLogger.Instance, frame.Settings.PathFor(SettingsScope.User));
         var preferences = new AppearanceSettings();
-        restored.Register(SettingsPages.Describe(AppearanceSettings.PageId, preferences));
+        restored.Register(preferences);
         Assert.True(preferences.NativeTitlebar);
         using var restoredApp = new GayaApplication(new ServiceCollection().BuildServiceProvider(),
             new PanelRegistry(), new CommandRegistry(), new MenuRegistry(), new ChromeRegistry(),
-            new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
+            new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
             settings: restored);
         using var another = new Workbench(restoredApp, layoutStore: new WorkbenchLayoutStore(NullLogger.Instance,
             Path.Combine(Path.GetTempPath(), $"gaya-unused-layout-{Guid.NewGuid():N}.json")));

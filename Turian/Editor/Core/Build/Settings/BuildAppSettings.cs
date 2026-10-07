@@ -106,6 +106,7 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     /// List of internal engine packages
     /// </summary>
     public string[] InternalPackages => [
+        "Gaya/Gaya.Attributes/Gaya.Attributes",
         "Gaya/Gaya.Packages/Gaya.Packages",
         "Turian/Engine/Attributes/Turian.Engine.Attributes",
         "Turian/Engine/Core/Turian.Engine.Core"
@@ -116,6 +117,7 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     /// assembly (Attributes.dll, package MASS4.Attributes) is copied into Turian.Engine.Attributes' output.
     /// </summary>
     public (string, string)[] TurianPackages => [
+        ("Gaya/Gaya.Attributes", "Gaya.Attributes"),
         ("Turian/Engine/Attributes", "Attributes"),
         ("Gaya/Gaya.Packages", "Gaya.Packages"),
         ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),

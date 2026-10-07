@@ -14,6 +14,7 @@ public sealed class FrameRateTests
             Assert.Throws<ArgumentNullException>(() => FrameRateSettings.Register(null!));
             var settings = new EditorSettings(NullLogger.Instance, path);
             var performance = FrameRateSettings.Register(settings);
+            Assert.Equal("General/Performance", Assert.Single(settings.Pages).Path);
             Assert.Equal(60, performance.CapFps);
             Assert.Same(performance, FrameRateSettings.Register(settings));
             performance.CapFps = 0;

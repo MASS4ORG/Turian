@@ -12,7 +12,6 @@ public sealed class GayaApplication(
     CommandRegistry commands,
     MenuRegistry menus,
     ChromeRegistry chrome,
-    TabStripChromeRegistry tabStripChrome,
     ShortcutService shortcuts,
     FocusTracker focus,
     IReadOnlyList<string> loadedPluginIds,
@@ -40,9 +39,6 @@ public sealed class GayaApplication(
 
     /// <summary>Chrome contributions drawn outside the dock space.</summary>
     public ChromeRegistry Chrome { get; } = chrome;
-
-    /// <summary>Chrome contributions drawn inside a panel's tab strip.</summary>
-    public TabStripChromeRegistry TabStripChrome { get; } = tabStripChrome;
 
     /// <summary>Key sequences the workbench dispatches, with the user's overrides applied.</summary>
     public ShortcutService Shortcuts { get; } = shortcuts;
@@ -120,7 +116,6 @@ public static class PluginHost
         var commands = new CommandRegistry();
         var menus = new MenuRegistry();
         var chrome = new ChromeRegistry();
-        var tabStripChrome = new TabStripChromeRegistry();
         var shortcuts = new ShortcutService(logger, settings);
         var focus = new FocusTracker();
 
@@ -139,7 +134,7 @@ public static class PluginHost
         foreach (var (attr, type) in ordered)
         {
             var plugin = (IPlugin)Activator.CreateInstance(type)!;
-            var context = new PluginContext(services, panels, commands, menus, chrome, tabStripChrome,
+            var context = new PluginContext(services, panels, commands, menus, chrome,
                 shortcuts, settings, themes, logger, args);
             logger.LogDebug("Configuring plugin {PluginId} ({DisplayName})", attr.Id, attr.DisplayName);
             plugin.Configure(context);
@@ -163,7 +158,7 @@ public static class PluginHost
         }
 
         logger.LogInformation("Gaya loaded {Count} plugin(s): {Plugins}", loaded.Count, string.Join(", ", loaded));
-        return new GayaApplication(provider, panels, commands, menus, chrome, tabStripChrome, shortcuts,
+        return new GayaApplication(provider, panels, commands, menus, chrome, shortcuts,
             focus, loaded, [.. instances.Select(entry => entry.Plugin)], settings, themes, logger);
     }
 
@@ -281,7 +276,6 @@ public static class PluginHost
         ICommandRegistry commands,
         IMenuRegistry menus,
         IChromeRegistry chrome,
-        ITabStripChromeRegistry tabStripChrome,
         IShortcutRegistry shortcuts,
         ISettingsRegistry settings,
         IThemeTokenRegistry themes,
@@ -294,7 +288,6 @@ public static class PluginHost
         public ICommandRegistry Commands => commands;
         public IMenuRegistry Menus => menus;
         public IChromeRegistry Chrome => chrome;
-        public ITabStripChromeRegistry TabStripChrome => tabStripChrome;
         public IShortcutRegistry Shortcuts => shortcuts;
         public ISettingsRegistry Settings => settings;
         public ILogger Logger => logger;

@@ -7,12 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Added: Asset browser with split view by default, a compact toolbar, transparent Preview API thumbnails, scalable icons, zoom, breadcrumbs, name/type/label/favorite filters, persistent favorites, undoable desktop imports and shared drag-and-drop and context menus.
 - Added (breaking): `.pss` color themes with hot reload #213
-- Changed (breaking): Guinevere fluent effects use the `DrawSd…` API.
+- Changed (breaking): Guinevere fluent effects.
+- Changed (breaking): Gaya settings use class-level attributes as their sole configuration
+- Added: Asset browser revamp #68
 - Added: Theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Changed: Guinevere controls now use style sheets #218
+- Changed: Panels API delegate tab-strip area.
 
 ## [2.3.1] - 2026-10-07
 

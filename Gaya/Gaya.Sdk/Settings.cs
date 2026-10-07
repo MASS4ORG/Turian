@@ -14,35 +14,57 @@ public enum SettingsScope
 /// One page of editor settings: a plain object whose public members are the options. The studio
 /// reflects over <see cref="Target"/> to draw the page, and persists the same members between runs.
 /// </summary>
-/// <param name="Id">Stable unique id, e.g. <c>gaya.example.editorCamera</c>. Keys the stored values.</param>
-/// <param name="Path">
-/// '/'-separated place in the category tree, e.g. <c>Editor/Camera</c>. The last segment is the title.
-/// </param>
-/// <param name="Target">The settings object. Held for the life of the studio; edits write straight to it.</param>
-/// <param name="Scope">Which file the page is stored in.</param>
-/// <param name="Order">Sort order among sibling pages; ties fall back to the title.</param>
-public sealed record SettingsPageDescriptor(
-    string Id,
-    string Path,
-    object Target,
-    SettingsScope Scope = SettingsScope.User,
-    int Order = 0)
+public sealed class SettingsPageDescriptor
 {
+    /// <summary>Reads all page configuration from the target's class-level settings attribute.</summary>
+    public SettingsPageDescriptor(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var type = target.GetType();
+        var attribute = type.GetCustomAttribute<Gaya.EditorSettingAttribute>()
+                        ?? throw new ArgumentException("Settings classes must declare [EditorSetting].", nameof(target));
+        if (string.IsNullOrWhiteSpace(attribute.Path))
+            throw new ArgumentException("Settings classes must declare a category path.", nameof(target));
+        Target = target;
+        Id = attribute.IdFor(type);
+        Path = attribute.Path.Trim();
+        Scope = attribute.Workspace ? SettingsScope.Workspace : SettingsScope.User;
+        Order = attribute.Order;
+        Description = attribute.Description;
+        Hidden = attribute.Hidden;
+        Defaults = SettingsDefaults.Capture(target);
+    }
+
+    /// <summary>The stable id used to store this page's values.</summary>
+    public string Id { get; }
+
+    /// <summary>The category path declared by the settings class.</summary>
+    public string Path { get; }
+
+    /// <summary>The live settings instance shared by its consumers and editors.</summary>
+    public object Target { get; }
+
+    /// <summary>Where this page's values are persisted.</summary>
+    public SettingsScope Scope { get; }
+
+    /// <summary>The declared sort order among sibling pages.</summary>
+    public int Order { get; }
+
     /// <summary>A sentence drawn under the page title.</summary>
-    public string Description { get; init; } = "";
+    public string Description { get; }
 
     /// <summary>
     /// Whether the settings panel leaves this page out of its category list. For a page that only
     /// exists to be persisted — the shortcut overrides, which have an editor of their own.
     /// </summary>
-    public bool Hidden { get; init; }
+    public bool Hidden { get; }
 
     /// <summary>
     /// What each member held before anything was restored or edited — the values the class itself
     /// declares. Captured on construction, which is why a contributor hands over a freshly built
     /// object: it is what "revert to default" restores and what marks a member as modified.
     /// </summary>
-    public IReadOnlyDictionary<string, object?> Defaults { get; } = SettingsDefaults.Capture(Target);
+    public IReadOnlyDictionary<string, object?> Defaults { get; }
 
     /// <summary>The last segment of <see cref="Path"/> — what the category list and heading show.</summary>
     public string Title => Path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -98,8 +120,8 @@ public interface ISettingsRegistry
     /// Adds a page, restoring its persisted values into the target first. Re-registering an id
     /// replaces the earlier page, which is what a recompile does to every user-code page at once.
     /// </summary>
-    /// <param name="page">The page to add.</param>
-    void Register(SettingsPageDescriptor page);
+    /// <param name="target">The settings instance whose class declares its page configuration.</param>
+    void Register(object target);
 
     /// <summary>Removes a page, for a contributor whose set changes at runtime.</summary>
     /// <param name="pageId">The page to remove.</param>

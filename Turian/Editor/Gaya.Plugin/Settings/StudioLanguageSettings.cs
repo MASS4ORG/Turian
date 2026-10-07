@@ -16,10 +16,10 @@ public enum EditorLanguage : byte
 /// The language the editor's own interface is drawn in, kept in the user scope so it follows the
 /// user across projects. Defaults to <see cref="EditorLanguage.English"/>, as  <see cref="EditorLanguage"/> enum's default.
 /// </summary>
-[EditorSetting("General")]
+[Gaya.EditorSetting("General", Id = LocalizationBridge.PageId)]
 public sealed class StudioLanguageSettings
 {
     /// <summary>The language of the editor interface.</summary>
-    [EditorSetting("Language", Description = "The language of the editor interface.")]
+    [Gaya.EditorSetting("Language", Description = "The language of the editor interface.")]
     public EditorLanguage Language { get; set; } = EditorLanguage.English;
 }

@@ -248,7 +248,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     void OptionContent(Gui gui, SettingsPageDescriptor page, FormField field, string id, bool modified)
     {
-        var setting = field.Attribute<EditorSettingAttribute>();
+        var setting = field.Attribute<Gaya.EditorSettingAttribute>();
         var title = setting is { Path.Length: > 0 } ? setting.Path : field.Label;
         var description = setting?.Description ?? "";
         OptionHeading(gui, page, field, id, title, modified);
@@ -398,7 +398,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     bool Matches(FormField field)
     {
-        var setting = field.Attribute<EditorSettingAttribute>();
+        var setting = field.Attribute<Gaya.EditorSettingAttribute>();
         return Contains(field.Label) || Contains(setting?.Path ?? "") || Contains(setting?.Description ?? "");
     }
 

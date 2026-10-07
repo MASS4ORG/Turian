@@ -8,11 +8,25 @@ namespace Turian.Tests;
 public sealed class SettingsPanelTests
 {
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-    sealed class SamplePage
+    [Gaya.EditorSetting("Audio", Id = "sample", Order = -1)]
+    class SamplePage
     {
+        [Gaya.EditorSetting("Output Level", Description = "Playback loudness.")]
         public int Volume { get; set; } = 3;
         public bool Muted { get; set; }
     }
+
+    [Gaya.EditorSetting("Scene Viewer", Id = "root", Order = -10)]
+    sealed class RootPage : SamplePage;
+
+    [Gaya.EditorSetting("Scene Viewer/Gizmos", Id = "gizmos")]
+    sealed class GizmosPage : SamplePage;
+
+    [Gaya.EditorSetting("Scene Viewer/Gizmos/Colors", Id = "nested")]
+    sealed class ColorsPage : SamplePage;
+
+    [Gaya.EditorSetting("Scene Viewer/Grid", Id = "grid")]
+    sealed class GridPage : SamplePage;
 
     /// <summary>With no plugin loaded, the host contributes the panel, its File entry and its shortcut.</summary>
     [Fact]
@@ -36,7 +50,7 @@ public sealed class SettingsPanelTests
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
         var page = new SamplePage();
-        app.Settings.Register(new SettingsPageDescriptor("sample", "Audio", page, Order: -1));
+        app.Settings.Register(page);
         var changes = 0;
         app.Settings.Changed += () => changes++;
         var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);
@@ -68,10 +82,10 @@ public sealed class SettingsPanelTests
     public void TopLevelCategoryShowsRootAndNestedPages()
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
-        app.Settings.Register(new SettingsPageDescriptor("root", "Scene Viewer", new SamplePage(), Order: -10));
-        app.Settings.Register(new SettingsPageDescriptor("gizmos", "Scene Viewer/Gizmos", new SamplePage()));
-        app.Settings.Register(new SettingsPageDescriptor("nested", "Scene Viewer/Gizmos/Colors", new SamplePage()));
-        app.Settings.Register(new SettingsPageDescriptor("grid", "Scene Viewer/Grid", new SamplePage()));
+        app.Settings.Register(new RootPage());
+        app.Settings.Register(new GizmosPage());
+        app.Settings.Register(new ColorsPage());
+        app.Settings.Register(new GridPage());
         var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1));
@@ -113,6 +127,33 @@ public sealed class SettingsPanelTests
         var font = Font.FromFamilyName("sans-serif", 14);
         InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
         Assert.Null(Find(gui.RootNode!, "settings/heading/Scene Viewer"));
+    }
+
+    /// <summary>Search recognizes Gaya option metadata and ordinary member names without exposing other options.</summary>
+    [Theory]
+    [InlineData("Volume", true)]
+    [InlineData("Level", true)]
+    [InlineData("loudness", true)]
+    [InlineData("Muted", true)]
+    [InlineData("missing", false)]
+    public void SearchMatchesGayaOptionMetadata(string query, bool matches)
+    {
+        using var app = PluginHost.Load([], NullLogger.Instance);
+        foreach (var page in app.Settings.Pages.ToArray()) app.Settings.Remove(page.Id);
+        app.Settings.Register(new SamplePage());
+        var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);
+        panel.GetType().GetField("filter", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(panel, query);
+        var input = Substitute.For<IInputHandler>();
+        input.MousePosition.Returns(new Vector2(-1));
+        var gui = new Gui { Input = input };
+        using var surface = SKSurface.Create(new SKImageInfo(900, 600));
+        var font = Font.FromFamilyName("sans-serif", 14);
+
+        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+
+        Assert.Equal(matches, Find(gui.RootNode!, "settings/sample/field0/editor") is not null);
+        Assert.Null(Find(gui.RootNode!, "settings/sample/field1/editor"));
     }
 
     static LayoutNode? Find(LayoutNode node, string id)

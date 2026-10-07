@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>Stores independent transform snapping intervals without losing them when snapping is disabled.</summary>
-[EditorSetting("Scene Viewer/Transform")]
+[Gaya.EditorSetting("Scene Viewer/Transform", Id = "gaya.turian.sceneTransform")]
 public sealed class SceneToolSettings
 {
     /// <summary>Whether a group gizmo pivots around the selection centre rather than the active object.</summary>

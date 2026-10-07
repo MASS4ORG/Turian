@@ -350,6 +350,8 @@ public static class CsProjectGenerator
         private ProjectRootElement AddInternalDllReferences(IBuildAppSettings settings)
         {
             projectRoot.AddItemGroup().AddItem("Using", "MASS4.Attributes");
+            projectRoot.AddItemGroup().AddItem("Using", "Gaya.EditorSettingAttribute")
+                .AddMetadata("Alias", "EditorSettingAttribute", true);
             var itemGroup = projectRoot.AddItemGroup();
             var usesPublishedLibraries = IsPublishedDistribution();
             foreach (var turianPackage in settings.TurianPackages)

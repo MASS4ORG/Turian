@@ -59,7 +59,7 @@ sealed class UserPanelBridge : IDisposable
         foreach (var page in catalog.Pages)
         {
             panels.Register(new PanelDescriptor(page.Id, page.Name, PanelPlacement.Floating,
-                _ => new UserPanel(page))
+                _ => page.Target as IPanel ?? new UserPanel(page))
             {
                 OpenByDefault = false,
             });

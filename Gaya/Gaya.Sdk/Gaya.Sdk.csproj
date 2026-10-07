@@ -13,6 +13,10 @@
     </PropertyGroup>
 
     <!-- Internal libraries -->
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
+    </ItemGroup>
+
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
     </ItemGroup>

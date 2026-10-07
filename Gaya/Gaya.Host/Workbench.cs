@@ -28,7 +28,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     readonly AppearanceBridge appearanceBridge;
     readonly Dictionary<string, IPanel> panelInstances = [];
     readonly Dictionary<string, IChromeItem> chromeInstances = [];
-    readonly Dictionary<string, IChromeItem> tabStripChromeInstances = [];
     readonly HashSet<string> knownPanels = [];
     readonly Dictionary<string, ParkedPanel> parkedPanels = [];
     Dictionary<string, PanelDescriptor> descriptors;
@@ -228,6 +227,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         panelsRevision = app.Panels.Revision;
         var current = app.Panels.All;
+        ReleaseReplacedPanels(current);
 
         foreach (var goneId in descriptors.Keys.Except(current.Select(d => d.Id)).ToList())
         {
@@ -241,6 +241,17 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         descriptors = current.ToDictionary(descriptor => descriptor.Id);
 
         foreach (var descriptor in current) Reconcile(Layout, descriptor);
+    }
+
+    void ReleaseReplacedPanels(IReadOnlyList<PanelDescriptor> current)
+    {
+        foreach (var descriptor in current)
+        {
+            if (!descriptors.TryGetValue(descriptor.Id, out var previous)
+                || ReferenceEquals(previous, descriptor)) continue;
+            if (panelInstances.Remove(descriptor.Id, out var panel) && panel is IDisposable disposable)
+                disposable.Dispose();
+        }
     }
 
     /// <summary>Builds the initial arrangement from the declared placement of each panel that opens by default.</summary>
@@ -307,7 +318,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         // Plugins built outside this solution may contribute chrome items that own resources.
         // ReSharper disable SuspiciousTypeConversion.Global
         foreach (var item in chromeInstances.Values.OfType<IDisposable>()) item.Dispose();
-        foreach (var item in tabStripChromeInstances.Values.OfType<IDisposable>()) item.Dispose();
         // ReSharper restore SuspiciousTypeConversion.Global
     }
 

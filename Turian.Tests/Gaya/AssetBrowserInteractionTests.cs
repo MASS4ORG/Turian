@@ -261,13 +261,13 @@ public sealed class AssetBrowserInteractionTests
         Assert.Equal(AssetBrowserViewMode.Split, browser.Preferences.ViewMode);
         var settingsPath = Path.Combine(browser.Project, "preferences.json");
         var store = new EditorSettings(NullLogger.Instance, settingsPath);
-        store.Register(new SettingsPageDescriptor(AssetBrowserSettings.PageId, "Asset Browser", browser.Preferences));
+        store.Register(browser.Preferences);
         browser.Preferences.GridZoom = 160;
         store.NotifyChanged(AssetBrowserSettings.PageId);
         store.Save();
         var restored = new AssetBrowserSettings();
         new EditorSettings(NullLogger.Instance, settingsPath).Register(
-            new SettingsPageDescriptor(AssetBrowserSettings.PageId, "Asset Browser", restored));
+            restored);
         Assert.Equal(160, restored.GridZoom);
         Assert.Equal(AssetBrowserViewMode.Split, restored.ViewMode);
         Assert.True(restored.ShowFavoritesInTree);
@@ -276,20 +276,22 @@ public sealed class AssetBrowserInteractionTests
 
     /// <summary>The browser's overflow menu builds preferences and responds to pointer activation.</summary>
     [Fact]
-    public void ChromePreferencesRenderAndEditWithoutAWindow()
+    public void PanelHeaderPreferencesRenderAndEditWithoutAWindow()
     {
         using var browser = new AssetBrowserHarness();
         var store = Substitute.For<IEditorSettings>();
-        var chrome = new AssetBrowserChrome(browser.Preferences, store, Substitute.For<IShellHost>());
-        browser.Frame(chrome.Render);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = new PanelHeaderContext("gaya.turian.assets", "Assets", default, false, services);
+        void Header(Gui gui) => browser.Panel.RenderHeader(gui, context);
+        browser.Frame(Header);
         var button = browser.Find("gaya.turian.assets/tabMenu");
         browser.Input.MousePosition.Returns(button.Rect.Center);
         browser.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
-        browser.Frame(chrome.Render);
+        browser.Frame(Header);
         browser.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
-        browser.Frame(chrome.Render);
-        browser.Frame(chrome.Render);
-        var preferences = typeof(AssetBrowserChrome).GetMethod("Preferences", BindingFlags.NonPublic | BindingFlags.Static)!;
+        browser.Frame(Header);
+        browser.Frame(Header);
+        var preferences = typeof(AssetBrowserPanel).GetMethod("HeaderPreferences", BindingFlags.NonPublic | BindingFlags.Static)!;
         void Draw(Gui gui) => preferences.Invoke(null, [gui, browser.Preferences, store]);
         browser.Frame(Draw);
         browser.Input.MousePosition.Returns(new Vector2(10, 10));

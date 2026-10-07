@@ -170,28 +170,6 @@ public sealed class ChromeRegistry : IChromeRegistry
     }
 }
 
-/// <summary>In-memory <see cref="ITabStripChromeRegistry"/>.</summary>
-public sealed class TabStripChromeRegistry : ITabStripChromeRegistry
-{
-    readonly List<TabStripChromeDescriptor> chrome = [];
-
-    /// <inheritdoc />
-    public void Register(TabStripChromeDescriptor descriptor)
-    {
-        ArgumentNullException.ThrowIfNull(descriptor);
-        if (chrome.Any(item => item.Id == descriptor.Id))
-            throw new InvalidOperationException($"Duplicate tab strip chrome id '{descriptor.Id}'.");
-        chrome.Add(descriptor);
-    }
-
-    /// <summary>All registered tab strip chrome, in registration order.</summary>
-    public IReadOnlyList<TabStripChromeDescriptor> All => chrome;
-
-    /// <summary>Tab strip chrome for one panel, in registration order.</summary>
-    public IEnumerable<TabStripChromeDescriptor> For(string panelId) =>
-        chrome.Where(item => item.PanelId == panelId);
-}
-
 /// <summary>
 /// Which panel the workbench considers focused. The workbench sets it as the user clicks into a
 /// panel; panel-scoped shortcuts are matched against it.

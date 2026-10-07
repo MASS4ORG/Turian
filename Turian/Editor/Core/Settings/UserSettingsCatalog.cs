@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Discovers the settings pages user code contributes with <see cref="EditorSettingAttribute"/>: an
+/// Discovers the settings pages user code contributes with <see cref="Gaya.EditorSettingAttribute"/>: an
 /// annotated class with a public parameterless constructor becomes a page in the editor's settings.
 /// Framework-agnostic — it yields paths and instances, and a shell turns those into whatever its
 /// settings panel is made of.
@@ -94,7 +94,7 @@ public sealed class UserSettingsCatalog
             if (string.IsNullOrWhiteSpace(attribute.Path)) continue;
             if (Create(type, log) is not { } target) continue;
 
-            found.Add(new UserSettingsPage($"usercode.settings.{type.FullName}", attribute.Path.Trim(),
+            found.Add(new UserSettingsPage(attribute.IdFor(type), attribute.Path.Trim(),
                 target, attribute.Description, attribute.Order, attribute.Workspace));
         }
 
@@ -106,7 +106,7 @@ public sealed class UserSettingsCatalog
     /// that is no longer restored — is skipped rather than aborting the scan, matching how
     /// <c>TypeRegistry</c> treats the same failure.
     /// </summary>
-    static IEnumerable<(Type Type, EditorSettingAttribute Attribute)> AnnotatedTypes(
+    static IEnumerable<(Type Type, Gaya.EditorSettingAttribute Attribute)> AnnotatedTypes(
         Assembly assembly, ILogger log)
     {
         Type[] types;
@@ -126,10 +126,10 @@ public sealed class UserSettingsCatalog
 
         foreach (var type in types.Where(type => type is { IsClass: true, IsAbstract: false }))
         {
-            EditorSettingAttribute? attribute = null;
+            Gaya.EditorSettingAttribute? attribute = null;
             try
             {
-                attribute = type.GetCustomAttribute<EditorSettingAttribute>(inherit: false);
+                attribute = type.GetCustomAttribute<Gaya.EditorSettingAttribute>(inherit: false);
             }
             catch (Exception ex)
             {
