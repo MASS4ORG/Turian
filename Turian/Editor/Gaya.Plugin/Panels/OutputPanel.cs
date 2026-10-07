@@ -2,7 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// The console: the tail of the log buffer under a toolbar. A filter box narrows the
-/// messages, three toggles gate the error/warning/debug lanes, a Collapse toggle merges consecutive
+/// messages, independent severity and Studio toggles control visibility, a Collapse toggle merges consecutive
 /// duplicates behind a count badge, and the list follows the tail as long as it is pinned to the
 /// bottom. The entries list and its message detail sit above and below a drag divider, the detail
 /// always visible even with nothing selected. The detail shows the whole message — the stack traces
@@ -12,7 +12,7 @@ namespace Gaya.Plugin.Turian;
 /// the split leaves them. The preferences live in the … menu on the tab strip
 /// (<c>OutputPanelChrome</c>), not in a settings row of their own.
 /// </summary>
-sealed class OutputPanel(
+sealed partial class OutputPanel(
     ILogger log,
     OutputPanelSettings settings,
     OutputLogBridge bridge,
@@ -34,7 +34,9 @@ sealed class OutputPanel(
     bool collapse;
     bool showErrors = true;
     bool showWarnings = true;
-    bool showLog = true;
+    bool showLog = log.IsEnabled(LogLevel.Debug);
+    bool showInformation = true;
+    bool showStudio = true;
 
     int selectedIndex = -1;
     bool followTail = true;
@@ -79,6 +81,7 @@ sealed class OutputPanel(
                     Detail(gui);
             }
         }
+        gui.CascadeMenu(ref menuOpen, menuAt, menu => BuildContextMenu(menu, gui));
     }
 
     /// <summary>The filter box and the Collapse/severity toggles. The Clear button empties the log.</summary>
@@ -93,7 +96,9 @@ sealed class OutputPanel(
             gui.Checkbox(ref collapse, localization.T("Collapse"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
             gui.Checkbox(ref showErrors, localization.T("Errors"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
             gui.Checkbox(ref showWarnings, localization.T("Warnings"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref showInformation, localization.T("Information"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
             gui.Checkbox(ref showLog, localization.T("Debug"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
+            gui.Checkbox(ref showStudio, localization.T("Studio"), size: box, fontSize: Theme.Text(11f), spacing: 4f);
 
             filter = gui.TextInput(filter, width: 0, height: height, placeholder: localization.T("Filter output"),
                 fontSize: Theme.Text(12), padding: 5, id: filterId);
@@ -113,16 +118,15 @@ sealed class OutputPanel(
         {
             gui.ScrollY();
 
-            var snapshot = LogBuffer.Snapshot();
-            rows = LogView.Project(snapshot, filter, showErrors, showWarnings, showLog, collapse);
-            if (selectedIndex >= rows.Count) selectedIndex = -1;
+            if (gui.Pass == Pass.Pass1Build)
+            {
+                rows = LogView.Project(LogBuffer.Snapshot(), filter, showErrors, showWarnings, showLog, collapse,
+                    information: showInformation, studio: showStudio);
+                if (selectedIndex >= rows.Count) selectedIndex = -1;
+            }
 
             for (var index = 0; index < rows.Count; index++)
                 Row(gui, rows[index], index);
-
-            if (rows.Count == 0 && snapshot.Count > 0)
-                gui.DrawText("No log messages match the filter.", Theme.Text(11f), Theme.InkDim,
-                    centerInRect: false);
 
             if (gui.Pass == Pass.Pass2Render) FollowTail(gui);
         }
@@ -233,23 +237,7 @@ sealed class OutputPanel(
                 CountBadge(gui, row.Count, height);
             }
 
-            if (gui.Pass == Pass.Pass2Render && hovered && interactable.OnClick(out var clicks))
-            {
-                if (clicks >= 2)
-                {
-                    selectedIndex = index;
-                    LogSource.Open(row.Line.Text, log, settingsService.Settings?.ProjectAbsoluteDir);
-                }
-                else if (index == selectedIndex)
-                {
-                    // Clicking the selected row again dismisses its detail.
-                    selectedIndex = -1;
-                }
-                else
-                {
-                    selectedIndex = index;
-                }
-            }
+            if (gui.Pass == Pass.Pass2Render && hovered) HandleRowInput(gui, interactable, row, index);
         }
     }
 

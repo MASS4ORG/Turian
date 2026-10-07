@@ -34,14 +34,16 @@ public sealed class GayaChromeTests
         readonly GayaApplication application;
 
         /// <summary>Creates an isolated workbench with temporary settings and layout files.</summary>
-        public Frame(StudioTheme? theme = null)
+        public Frame(StudioTheme? theme = null, IWindowIdentity? identity = null)
         {
             Directory.CreateDirectory(directory);
             var settings = new EditorSettings(NullLogger.Instance, Path.Combine(directory, "settings.json"));
             var themes = new ThemeService();
-            var services = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
+            var registrations = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
                 .AddSingleton<IEditorSettings>(settings).AddSingleton<IThemeService>(themes)
-                .AddSingleton(Blocker).BuildServiceProvider();
+                .AddSingleton(Blocker);
+            if (identity is not null) registrations.AddSingleton(identity);
+            var services = registrations.BuildServiceProvider();
             application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
                 new MenuRegistry(), Chrome, new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance),
                 new FocusTracker(), [], settings: settings, themes: themes);
@@ -89,6 +91,15 @@ public sealed class GayaChromeTests
             Workbench.Render(Gui);
             Gui.Render();
             Gui.EndFrame();
+        }
+
+        /// <summary>Writes the workbench's offscreen surface for visual inspection.</summary>
+        public void Capture(string path)
+        {
+            using var image = surface.Snapshot();
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var file = File.Create(path);
+            data.SaveTo(file);
         }
 
         /// <summary>Releases the host and drawing surface and deletes its temporary files.</summary>

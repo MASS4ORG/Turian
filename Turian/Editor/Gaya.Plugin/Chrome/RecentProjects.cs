@@ -31,96 +31,160 @@ sealed class ProjectSwitcherChrome(
     ProjectSession session,
     ICommandDispatcher commands,
     IEditorSettings editorSettings,
-    UnsavedChangesGuard unsaved) : IChromeItem
+    UnsavedChangesGuard unsaved) : IChromeItem, IDisposable
 {
     readonly Dictionary<string, SKImage?> icons = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, string> titles = new(StringComparer.OrdinalIgnoreCase);
+    ProjectRow[] frameProjects = [];
+    sealed record ProjectRow(string Path, string Title, SKImage? Icon);
 
     bool open;
     Vector2 popupPosition;
 
+    static StudioTheme Theme => StudioTheme.Current;
+    static float RowHeight => Theme.Scale(26);
+    static float MenuWidth => Theme.Scale(340);
+
+    /// <inheritdoc />
     public void Render(Gui gui)
     {
-        var current = settings.Settings?.ProjectAbsoluteDir;
-        var theme = StudioTheme.Current;
-        var rowHeight = theme.Scale(theme.RowHeight);
+        RenderCurrent(gui);
+        if (gui.Pass == Pass.Pass1Build && open)
+            frameProjects = [.. recent.Paths.Where(Directory.Exists)
+                .Select(path => new ProjectRow(path, TitleFor(path), IconFor(path)))];
+        var close = false;
+        gui.Popup(ref open, () => close = RenderMenu(gui), width: MenuWidth,
+            height: (frameProjects.Length + 1) * RowHeight + Theme.Scale(22), position: popupPosition,
+            backgroundColor: Theme.Panel, borderColor: Theme.Border);
+        if (close) open = false;
+    }
 
-        using (gui.Node(theme.Scale(260), rowHeight, "project-switcher").Direction(Axis.Horizontal).Gap(4)
-                   .ContentAlignY(0.5f).Enter())
+    void RenderCurrent(Gui gui)
+    {
+        var project = settings.Settings;
+        var label = CurrentLabel(project);
+        using (gui.Node(-1, RowHeight, "project-switcher").Width(UnitValue.Fit)
+                   .Direction(Axis.Horizontal).Padding(8, 0).Gap(6).ContentAlignY(0.5f).Enter())
         {
             var anchor = gui.CurrentNode.Rect;
-            // A dot beside the name, like a dirty document tab, while anything in the project is unsaved.
-            var label = current is null ? "No project"
-                : unsaved.HasUnsavedChanges ? $"{Path.GetFileName(current)} \u25CF"
-                : Path.GetFileName(current);
-            var button = gui.GetInteractable();
-            if (current is not null && IconFor(current) is { } currentIcon) gui.Image(currentIcon, rowHeight, rowHeight);
-            using (gui.Node().Expand().Enter())
-                gui.DrawText(label, theme.Text(12), theme.InkDim, centerInRect: false);
-            if (gui.Pass == Pass.Pass2Render && button.OnClick())
-            {
-                popupPosition = new Vector2(anchor.X, anchor.Y + anchor.H);
-
-                // The open project's player settings may have been edited since its icon was read.
-                if (current is not null) icons.Remove(current);
-                open = true;
-            }
-
-            var projects = recent.Paths.Where(Directory.Exists).ToArray();
-            var close = false;
-            gui.Popup(ref open, () =>
-            {
-                using (gui.Node().Direction(Axis.Vertical).Gap(3).Enter())
-                {
-                    foreach (var project in projects)
-                    {
-                        using (gui.Node(theme.Scale(254), rowHeight, $"project-switcher/{project}")
-                                   .Direction(Axis.Horizontal).Gap(3).Enter())
-                        {
-                            var row = gui.CurrentNode;
-                            if (IconFor(project) is { } icon) gui.Image(icon, rowHeight, rowHeight);
-                            else using (gui.Node(rowHeight, rowHeight).Enter()) { }
-
-                            var labelWidth = theme.Scale(196) - rowHeight - theme.Scale(3);
-                            if (gui.Button(Path.GetFileName(project), width: labelWidth, height: rowHeight))
-                            {
-                                if (!string.Equals(project, current, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    unsaved.Leave(
-                                        "Some documents have unsaved changes. Save them before leaving the project?",
-                                        () => session.Open(project));
-                                }
-                                close = true;
-                            }
-
-                            if (gui.IconButton(EditorIcons.ArrowUpRightFromSquare, size: rowHeight))
-                            {
-                                OpenInNewInstance(project);
-                                close = true;
-                            }
-
-                            if (gui.IconButton(EditorIcons.Xmark, size: rowHeight))
-                            {
-                                if (recent.Remove(project))
-                                    editorSettings.NotifyChanged("gaya.turian.recentProjects");
-                                close = true;
-                            }
-
-                            gui.Tooltip(row, project, maxWidth: 1000);
-                        }
-                    }
-
-                    if (gui.Button("Open Project…", width: theme.Scale(254), height: rowHeight))
-                    {
-                        commands.Execute("gaya.turian.openProject");
-                        close = true;
-                    }
-                }
-            }, width: theme.Scale(286), height: (projects.Length + 1) * (rowHeight + theme.Scale(3)) + theme.Scale(13),
-                position: popupPosition,
-                backgroundColor: theme.Panel, borderColor: theme.Border);
-
-            if (close) open = false;
+            DrawCurrentIcon(gui, project);
+            gui.DrawText(label, Theme.Text(12), Theme.Ink, centerInRect: false);
+            gui.DrawText(EditorIcons.CaretDown, Theme.Text(9), Theme.InkDim);
+            if (gui.Pass != Pass.Pass2Render) return;
+            var interaction = gui.GetInteractable();
+            if (interaction.OnHover()) gui.DrawBackgroundRect(Theme.Hover, 2);
+            if (!interaction.OnClick()) return;
+            popupPosition = new Vector2(Math.Clamp(anchor.X, 0, Math.Max(0, gui.ScreenRect.W - MenuWidth)),
+                anchor.Y + anchor.H);
+            open = !open;
+            if (project is not null) titles.Remove(project.ProjectAbsoluteDir);
         }
+    }
+
+    string CurrentLabel(AppSettings? project)
+    {
+        if (project is null) return "No project";
+        var label = ProjectPresentation.Name(project);
+        return unsaved.HasUnsavedChanges ? $"{label} \u25CF" : label;
+    }
+
+    void DrawCurrentIcon(Gui gui, AppSettings? project)
+    {
+        if (project is not null && IconFor(project.ProjectAbsoluteDir) is { } icon)
+            gui.Image(icon, RowHeight, RowHeight);
+    }
+
+    string TitleFor(string path)
+    {
+        if (settings.Settings is { } current && string.Equals(current.ProjectAbsoluteDir, path,
+                StringComparison.OrdinalIgnoreCase)) return ProjectPresentation.Name(current);
+        if (!titles.TryGetValue(path, out var title)) titles[path] = title = ProjectPresentation.Name(path);
+        return title;
+    }
+
+    bool RenderMenu(Gui gui)
+    {
+        var close = false;
+        using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
+        {
+            foreach (var project in frameProjects) close |= RenderProjectRow(gui, project);
+            using (gui.Node(-1, Theme.Scale(6)).ExpandWidth().Enter())
+                gui.DrawBackgroundRect(Theme.Border);
+            using (gui.Node(-1, RowHeight, "project-switcher/open").ExpandWidth()
+                       .Padding(8, 0).ContentAlignY(0.5f).Enter())
+            {
+                gui.DrawText("Open Project…", Theme.Text(12), Theme.Ink, centerInRect: false);
+                if (ActivateMenuItem(gui))
+                {
+                    commands.Execute("gaya.turian.openProject");
+                    close = true;
+                }
+            }
+        }
+        return close;
+    }
+
+    bool RenderProjectRow(Gui gui, ProjectRow project)
+    {
+        var close = false;
+        using (gui.Node(-1, RowHeight, $"project-switcher/{project.Path}").ExpandWidth()
+                   .Direction(Axis.Horizontal).Gap(4).Enter())
+        {
+            var row = gui.CurrentNode;
+            using (gui.Node(-1, RowHeight, $"project-switcher/{project.Path}/open").ExpandWidth()
+                       .Direction(Axis.Horizontal).Gap(6).Padding(8, 0).ContentAlignY(0.5f).Enter())
+            {
+                if (project.Icon is { } icon) gui.Image(icon, RowHeight, RowHeight);
+                gui.DrawText(project.Title, Theme.Text(12), Theme.Ink, centerInRect: false);
+                if (ActivateMenuItem(gui))
+                {
+                    SwitchProject(project.Path);
+                    close = true;
+                }
+            }
+            if (MenuAction(gui, EditorIcons.ArrowUpRightFromSquare, $"{row.Id}/new-window"))
+            {
+                OpenInNewInstance(project.Path);
+                close = true;
+            }
+            if (MenuAction(gui, EditorIcons.Xmark, $"{row.Id}/remove"))
+            {
+                if (recent.Remove(project.Path)) editorSettings.NotifyChanged("gaya.turian.recentProjects");
+                close = true;
+            }
+            gui.Tooltip(row, project.Path, maxWidth: 1000);
+        }
+        return close;
+    }
+
+    void SwitchProject(string path)
+    {
+        if (string.Equals(path, settings.Settings?.ProjectAbsoluteDir, StringComparison.OrdinalIgnoreCase)) return;
+        unsaved.Leave("Some documents have unsaved changes. Save them before leaving the project?",
+            () => session.QueueOpen(path));
+    }
+
+    static bool ActivateMenuItem(Gui gui)
+    {
+        if (gui.Pass != Pass.Pass2Render) return false;
+        var interaction = gui.GetInteractable();
+        if (interaction.OnHover()) gui.DrawBackgroundRect(Theme.Hover, 2);
+        return interaction.OnClick();
+    }
+
+    static bool MenuAction(Gui gui, string icon, string id)
+    {
+        using (gui.Node(RowHeight, RowHeight, id).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        {
+            gui.DrawText(icon, Theme.Text(11), Theme.InkDim);
+            return ActivateMenuItem(gui);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        foreach (var image in icons.Values) image?.Dispose();
     }
 
     /// <summary>

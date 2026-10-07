@@ -47,6 +47,15 @@ public sealed class ImportedAssetManifest
     /// </summary>
     public string SourceHash { get; set; } = string.Empty;
 
+    /// <summary>Source length observed when its content hash was computed.</summary>
+    public long SourceLength { get; set; } = -1;
+
+    /// <summary>Source modification time observed when its content hash was computed.</summary>
+    public DateTime SourceLastWriteTimeUtc { get; set; }
+
+    /// <summary>Catalog entries created by this import, including its indexed child assets.</summary>
+    public List<Guid>? IndexedAssetIds { get; set; }
+
     /// <summary>
     /// Gets or sets the import settings hash.
     /// </summary>

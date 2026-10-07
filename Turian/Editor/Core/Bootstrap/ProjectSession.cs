@@ -4,7 +4,7 @@ namespace Turian.Editor.Core;
 /// Opens a project into the editor services: loads its settings, points the build manager and the
 /// asset catalog at it, and restores the documents that were open last time.
 /// </summary>
-public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBrickApplier
+public sealed partial class ProjectSession(IServiceProvider services, ILogger log) : IBrickApplier
 {
     /// <summary>The settings of the open project, or null when none has been opened.</summary>
     public AppSettings? Settings { get; private set; }
@@ -18,6 +18,14 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBr
     /// <returns>True if the project was valid and opened.</returns>
     public bool Open(string projectPath, string? openScene = null)
     {
+        if (!PrepareOpen(projectPath)) return false;
+        ImportAndCompile();
+        CompleteOpen(openScene);
+        return true;
+    }
+
+    bool PrepareOpen(string projectPath)
+    {
         if (!ProjectValidator.Report(ProjectValidator.Validate(projectPath), log)) return false;
 
         var directory = SettingsService.ResolveProjectDirectory(projectPath)!;
@@ -27,42 +35,52 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBr
         var loaded = SettingsService.Load(directory)!;
         ProjectSettingsLoader.LoadFromSources(loaded);
 
+        SaveSession();
+        services.GetRequiredService<BuildManager>().DisableHotReload();
+        services.GetRequiredService<AssetImporter>().StopMonitoring();
         var settingsService = services.GetRequiredService<SettingsService>();
         Settings = settingsService.Set(loaded);
 
         services.GetRequiredService<BuildManager>().UpdateSettings(Settings);
+        return true;
+    }
 
+    void ImportAndCompile(IProgressSink? progress = null)
+    {
+        progress ??= NullProgressSink.Instance;
+        progress.PlanChildren(5);
+        using (progress.BeginChild(BackgroundTaskKind.Scan, "Loading project packages")) LoadProjectPackages();
+        RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings!, progress);
+        services.GetRequiredService<AssetImporter>().StartMonitoring(progress);
+        using (progress.BeginChild(BackgroundTaskKind.Compile, "Compiling scripts")) CompileUserScripts();
+        using (progress.BeginChild(BackgroundTaskKind.Scan, "Starting file monitoring"))
+            services.GetRequiredService<BuildManager>().EnableHotReload();
+    }
+
+    void LoadProjectPackages()
+    {
         // The catalog names asset types by full name, and some of those live in bricks' prebuilt assemblies.
         try
         {
-            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log);
+            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log);
         }
         catch (Gaya.Packages.PackageException ex)
         {
             log.LogError(ex, "The project's packages could not be resolved; their types are unavailable");
         }
+    }
 
-        RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings);
-
-        // The importer may have been built before any project was open, so it is pointed at this one explicitly.
-        services.GetRequiredService<AssetImporter>().StartMonitoring();
-
+    void CompleteOpen(string? openScene)
+    {
         // String tables live in the asset catalog, so the project localization can only be loaded once
         // the catalog is indexed. Hosts that do not register a LocaleService simply skip this.
         if (services.GetService(typeof(LocaleService)) is LocaleService locale)
-            LocalizationLoader.Load(locale, Settings, services.GetRequiredService<AssetDatabase>());
+            LocalizationLoader.Load(locale, Settings!, services.GetRequiredService<AssetDatabase>());
 
-        log.LogInformation("Opened project {Project}", Settings.ProjectAbsoluteDir);
-
-        // Before any scene is read: a component whose type lives in the user assembly deserialises as
-        // MissingComponent when that assembly has not been loaded yet.
-        CompileUserScripts();
-        services.GetRequiredService<BuildManager>().EnableHotReload();
+        log.LogInformation("Opened project {Project}", Settings!.ProjectAbsoluteDir);
 
         RestoreSession(Settings);
         if (openScene is not null) OpenAsset(Settings, openScene);
-
-        return true;
     }
 
     /// <summary>
@@ -77,7 +95,7 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBr
     /// such as the individual meshes of a glTF live only in the catalog, so a rescan alone brings
     /// back the top-level assets and leaves those references dangling.
     /// </remarks>
-    void RestoreAssetCatalog(AssetDatabase database, AppSettings settings)
+    void RestoreAssetCatalog(AssetDatabase database, AppSettings settings, IProgressSink? progress = null)
     {
         if (database.LoadCatalogFromProject(settings.ProjectAbsoluteDir) is not AssetCatalogLoadStatus.Unreadable)
             return;
@@ -89,7 +107,7 @@ public sealed class ProjectSession(IServiceProvider services, ILogger log) : IBr
 
         try
         {
-            services.GetRequiredService<AssetImporter>().GenerateMetaFiles(settings.AssetsAbsoluteDir);
+            services.GetRequiredService<AssetImporter>().GenerateMetaFiles(settings.AssetsAbsoluteDir, progress);
             log.LogInformation("Asset catalog rebuilt: {RecordCount} records recovered", database.Assets.Count);
         }
         catch (Exception exception)

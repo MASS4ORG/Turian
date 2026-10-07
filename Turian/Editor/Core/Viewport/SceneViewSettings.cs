@@ -39,7 +39,7 @@ public sealed class SceneViewSettings
         LockedLayers = locked ? LockedLayers | bit : LockedLayers & ~bit;
     }
 
-    /// <summary>Gets or sets normalized linear RGB channels for the empty Scene background.</summary>
-    [EditorSetting("Empty Sky Color", Description = "Background color where no scene geometry is drawn.")]
-    public Vector3 EmptySkyColor { get; set; } = new(0.035f);
+    /// <summary>Gets or sets normalized linear RGB channels for empty pixels in Studio's Scene and Game views.</summary>
+    [EditorSetting("Empty Sky Color", Description = "Background color shared by the Scene and Game views.")]
+    public Vector3 EmptySkyColor { get; set; } = new(0.39f, 0.58f, 0.93f);
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: Studio startup and project switching show the workbench with a centered loading card, active phases, asset counts and elapsed time. Unchanged assets retain their imported files and child indexes across restarts; generated projects preserve timestamps, either assembly slot can supply cached code, and Build & Run copies only changed assets. Recent projects use menu rows and configured titles with a fitted current-project control; native windows use Gaya or project-specific Turian titles and icons, and Scene and Game views share their configured empty sky. Output separates Information and internal Studio messages and offers source files through the OS default application and copy actions, Inspector selection avoids diagnostic spam, and disabled hierarchy branches appear dimmed; dock tabs, compact menus, and initial window placement are corrected in Guinevere. OBJ/FBX imports preserve upward Y to prevent inverted models; caches regenerate on import, and scenes that compensated with negative Y scale should remove that compensation.
+- Fixed: release builds run again — the skip-shaders flag now reaches MSBuild, so the tag ships the committed .spv, and the release runners install glslc anyway.
+
 ## [2.3.0] - 2026-10-06
 
 - Added: multi-selection and multi-object editing #82

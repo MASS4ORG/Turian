@@ -75,7 +75,7 @@ public sealed partial class AssetImporter
             // A store package's meta is read-only; the import still applies the model's choice.
             if (importer.PackageRootOf(fullPath) is not { ReadOnly: true })
                 File.WriteAllText(metaFilePath, SerializeAssetMetadata(texture));
-            importer.ImportAssetToCache(texture, fullPath);
+            importer.ImportAssetToCache(texture, fullPath, out _);
         }
     }
 

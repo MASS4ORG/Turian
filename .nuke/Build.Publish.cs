@@ -64,6 +64,7 @@ sealed partial class Build
                             .SetProperty("UseAppHost", "false")
                             .SetProperty("SatelliteResourceLanguages", "en")
                             .SetProperty("NoLocalPackages", NoLocalPackages)
+                            .SetProperty("SkipShaders", SkipShaders)
                             .SetAuthors("Bruno Massa")
                             .SetVersion(Version)
                             .SetAssemblyVersion(Version)

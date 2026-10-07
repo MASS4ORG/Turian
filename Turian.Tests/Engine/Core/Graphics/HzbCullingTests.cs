@@ -130,15 +130,15 @@ public sealed class HzbCullingTests(VulkanFixture fixture) : IClassFixture<Vulka
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var vulkan = fixture.Vulkan;
         using var layout = new DescriptorSetLayoutBuilder(vulkan.Vk, vulkan.Device)
-            .AddBinding(0, Silk.NET.Vulkan.DescriptorType.UniformBuffer,
-                Silk.NET.Vulkan.ShaderStageFlags.VertexBit).Build();
+            .AddBinding(0, DescriptorType.UniformBuffer,
+                ShaderStageFlags.VertexBit).Build();
         using var pool = new DescriptorPoolBuilder(vulkan.Vk, vulkan.Device).SetMaxSets(1)
-            .AddPoolSize(Silk.NET.Vulkan.DescriptorType.UniformBuffer, 1).Build();
-        using var uniform = new global::Turian.Engine.Core.Buffer(vulkan, 128, 1,
-            Silk.NET.Vulkan.BufferUsageFlags.UniformBufferBit,
-            Silk.NET.Vulkan.MemoryPropertyFlags.HostVisibleBit | Silk.NET.Vulkan.MemoryPropertyFlags.HostCoherentBit);
-        Assert.Equal(Silk.NET.Vulkan.Result.Success, uniform.Map());
-        Silk.NET.Vulkan.DescriptorSet descriptor = default;
+            .AddPoolSize(DescriptorType.UniformBuffer, 1).Build();
+        using var uniform = new Engine.Core.Buffer(vulkan, 128, 1,
+            BufferUsageFlags.UniformBufferBit,
+            MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit);
+        Assert.Equal(Result.Success, uniform.Map());
+        DescriptorSet descriptor = default;
         Assert.True(new DescriptorSetWriter(vulkan.Vk, vulkan.Device, layout)
             .WriteBuffer(0, uniform.DescriptorInfo()).Build(pool, layout.GetDescriptorSetLayout(), ref descriptor));
         using var provider = new HzbCuller(vulkan, layout.GetDescriptorSetLayout());
@@ -170,34 +170,34 @@ public sealed class HzbCullingTests(VulkanFixture fixture) : IClassFixture<Vulka
         Assert.Throws<ObjectDisposedException>(() => provider.Record(new FrameInfo(), draws));
     }
 
-    static unsafe void Submit(Vulkan vulkan, Action<Silk.NET.Vulkan.CommandBuffer> record)
+    static unsafe void Submit(Vulkan vulkan, Action<CommandBuffer> record)
     {
-        Silk.NET.Vulkan.CommandBufferAllocateInfo allocation = new()
+        CommandBufferAllocateInfo allocation = new()
         {
-            SType = Silk.NET.Vulkan.StructureType.CommandBufferAllocateInfo,
+            SType = StructureType.CommandBufferAllocateInfo,
             CommandPool = vulkan.Device.CommandPool,
-            Level = Silk.NET.Vulkan.CommandBufferLevel.Primary,
+            Level = CommandBufferLevel.Primary,
             CommandBufferCount = 1
         };
-        Assert.Equal(Silk.NET.Vulkan.Result.Success,
+        Assert.Equal(Result.Success,
             vulkan.Vk.AllocateCommandBuffers(vulkan.Device.VkDevice, in allocation, out var command));
-        Silk.NET.Vulkan.CommandBufferBeginInfo begin = new()
+        CommandBufferBeginInfo begin = new()
         {
-            SType = Silk.NET.Vulkan.StructureType.CommandBufferBeginInfo,
-            Flags = Silk.NET.Vulkan.CommandBufferUsageFlags.OneTimeSubmitBit
+            SType = StructureType.CommandBufferBeginInfo,
+            Flags = CommandBufferUsageFlags.OneTimeSubmitBit
         };
-        Assert.Equal(Silk.NET.Vulkan.Result.Success, vulkan.Vk.BeginCommandBuffer(command, in begin));
+        Assert.Equal(Result.Success, vulkan.Vk.BeginCommandBuffer(command, in begin));
         record(command);
-        Assert.Equal(Silk.NET.Vulkan.Result.Success, vulkan.Vk.EndCommandBuffer(command));
-        Silk.NET.Vulkan.SubmitInfo submit = new()
+        Assert.Equal(Result.Success, vulkan.Vk.EndCommandBuffer(command));
+        SubmitInfo submit = new()
         {
-            SType = Silk.NET.Vulkan.StructureType.SubmitInfo,
+            SType = StructureType.SubmitInfo,
             CommandBufferCount = 1,
             PCommandBuffers = &command
         };
-        Assert.Equal(Silk.NET.Vulkan.Result.Success,
+        Assert.Equal(Result.Success,
             vulkan.Vk.QueueSubmit(vulkan.Device.GraphicsQueue, 1, in submit, default));
-        Assert.Equal(Silk.NET.Vulkan.Result.Success, vulkan.Vk.QueueWaitIdle(vulkan.Device.GraphicsQueue));
+        Assert.Equal(Result.Success, vulkan.Vk.QueueWaitIdle(vulkan.Device.GraphicsQueue));
         vulkan.Vk.FreeCommandBuffers(vulkan.Device.VkDevice, vulkan.Device.CommandPool, 1, in command);
     }
 }

@@ -9,6 +9,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian.Editor.Studio</RootNamespace>
         <AssemblyName>Turian.Editor.Studio</AssemblyName>
+        <ApplicationIcon>$(SolutionDir)/Gaya/Gaya.Host/Resources/logo.ico</ApplicationIcon>
     </PropertyGroup>
 
     <!-- Internal libraries -->

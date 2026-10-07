@@ -46,6 +46,17 @@ jobs:
         if: matrix.rid == 'win-x64'
         run: sudo apt-get update -yqq && sudo apt-get install -yqq nsis
 
+      # Shaders ship from the .spv committed in the tag (--skip-shaders), but glslc must still be
+      # reachable so an un-skipped shader build fails on the shader rather than on exit 127.
+      - name: Install glslc (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -yqq && sudo apt-get install -yqq glslc
+
+      # Homebrew's shaderc formula is the one that provides the glslc binary.
+      - name: Install glslc (macOS)
+        if: runner.os == 'macOS'
+        run: brew install shaderc
+
       - name: Pack ${{ matrix.rid }}
         shell: bash
         run: |

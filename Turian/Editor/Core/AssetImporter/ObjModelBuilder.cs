@@ -25,7 +25,7 @@ public static class ObjModelBuilder
                 var vertex = objFile.Vertices[vertexIndex - 1];
                 var positionOut = new Vector3(
                     vertex.Position.X,
-                    -vertex.Position.Y,
+                    vertex.Position.Y,
                     vertex.Position.Z
                 );
 
@@ -45,7 +45,7 @@ public static class ObjModelBuilder
 
                 var normalIndex = vFace.Normal;
                 var normal = objFile.VertexNormals[normalIndex - 1];
-                var normalOut = new Vector3(normal.X, -normal.Y, normal.Z);
+                var normalOut = new Vector3(normal.X, normal.Y, normal.Z);
 
                 var textureIndex = vFace.Texture;
                 var texture = objFile.TextureVertices[textureIndex - 1];

@@ -18,22 +18,22 @@ public static class LogBuffer
         while (Lines.TryDequeue(out _)) { }
     }
 
-    static void Add(LogLevel level, string text)
+    static void Add(LogLine line)
     {
-        Lines.Enqueue(new LogLine(level, DateTimeOffset.Now, text));
+        Lines.Enqueue(line);
         while (Lines.Count > capacity && Lines.TryDequeue(out _)) { }
     }
 
     sealed class BufferLoggerProvider : ILoggerProvider
     {
-        public ILogger CreateLogger(string categoryName) => new BufferLogger();
+        public ILogger CreateLogger(string categoryName) => new BufferLogger(categoryName);
 
         public void Dispose()
         {
         }
     }
 
-    sealed class BufferLogger : ILogger
+    sealed class BufferLogger(string category) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -47,7 +47,7 @@ public static class LogBuffer
 
             var message = formatter(state, exception);
             if (exception is not null) message = $"{message}{Environment.NewLine}{exception}";
-            Add(logLevel, message);
+            Add(LogOrigin.Capture(logLevel, message, category));
         }
     }
 }

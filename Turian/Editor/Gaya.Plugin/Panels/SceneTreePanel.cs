@@ -524,7 +524,7 @@ sealed class SceneTreePanel : IPanel
     static GuiColor? Tint(Node node, PrefabLink link)
     {
         var theme = StudioTheme.Current;
-        if (!node.IsActive) return theme.InkFaint;
+        if (!node.IsActiveInHierarchy) return theme.InkFaint;
         return link switch
         {
             PrefabLink.None => null,

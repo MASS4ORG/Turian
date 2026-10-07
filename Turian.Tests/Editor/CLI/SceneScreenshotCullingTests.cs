@@ -39,8 +39,8 @@ public sealed class SceneScreenshotCullingTests(VulkanFixture fixture) : IClassF
             var database = new AssetDatabase();
             if (useOcclusion)
             {
-                TypeRegistry.ScanAssembly(typeof(global::Turian.Engine.Hzb.HzbSettings).Assembly);
-                var settings = new global::Turian.Engine.Hzb.HzbSettings { Id = Guid.NewGuid(), Enabled = true };
+                TypeRegistry.ScanAssembly(typeof(Engine.Hzb.HzbSettings).Assembly);
+                var settings = new Engine.Hzb.HzbSettings { Id = Guid.NewGuid(), Enabled = true };
                 Directory.CreateDirectory(Path.Combine(directory.FullName, "Assets"));
                 var path = Path.Combine(directory.FullName, "Assets", "HzbSettings.dataasset");
                 File.WriteAllText(path, Serializer.Serialize(settings));

@@ -23,6 +23,7 @@ sealed partial class Build
                     .SetConfiguration(Config)
                     .SetProjectFile(Solution.Turian_Tests.Path)
                     .SetProperty("NoLocalPackages", NoLocalPackages)
+                    .SetProperty("SkipShaders", SkipShaders)
                     .SetApplicationArguments(
                         "--coverage",
                         "--coverage-settings", CoverageSettingsFile, // Excludes source generated files

@@ -25,6 +25,7 @@ sealed class GameViewport : IDisposable
     readonly SceneTreeController sceneTree;
     readonly PlayModeService playMode;
     readonly ILogger log;
+    readonly SceneViewSettings viewSettings;
 
     readonly HashSet<KeyboardKey> heldKeys = [];
     readonly HashSet<MouseButton> heldButtons = [];
@@ -44,14 +45,17 @@ sealed class GameViewport : IDisposable
     /// <param name="sceneTree">Supplies the edited hierarchy the stopped panel previews.</param>
     /// <param name="playMode">The session to display and forward input to.</param>
     /// <param name="log">Where an unusable device is reported.</param>
+    /// <param name="cameraSettings">Shared environment preferences used by both Studio viewports.</param>
     public GameViewport(
-        Vulkan vulkan, AssetDatabase assets, SceneTreeController sceneTree, PlayModeService playMode, ILogger log)
+        Vulkan vulkan, AssetDatabase assets, SceneTreeController sceneTree, PlayModeService playMode, ILogger log,
+        EditorCameraSettings? cameraSettings = null)
     {
         this.vulkan = vulkan;
         this.assets = assets;
         this.sceneTree = sceneTree;
         this.playMode = playMode;
         this.log = log;
+        viewSettings = cameraSettings?.View ?? new SceneViewSettings();
 
         playMode.StateChanged += OnPlayStateChanged;
     }
@@ -63,17 +67,8 @@ sealed class GameViewport : IDisposable
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
-
-        if (failure is not null)
-        {
-            gui.DrawText(failure, StudioTheme.Current.Text(12), StudioTheme.Current.Error, centerInRect: false);
-            return;
-        }
-
+        if (gui.Pass != Pass.Pass2Render || !PrepareFrame(gui)) return;
         var rect = gui.CurrentNode.Rect;
-        if (!EnsureService((uint)Math.Max(1f, rect.W), (uint)Math.Max(1f, rect.H))) return;
-
         var (root, camera) = ResolveSource();
         if (root is null || camera is null)
         {
@@ -83,15 +78,7 @@ sealed class GameViewport : IDisposable
             return;
         }
 
-        // Which camera is primary can change mid-session — a camera-cycling script reassigning
-        // Priority, say — so the aspect is re-applied whenever the camera differs from the one last
-        // resized, not only when the panel changes size.
-        if (camera is CameraComponent component && !ReferenceEquals(component, lastResizedCamera))
-        {
-            component.Resize(service!.Width, service.Height);
-            lastResizedCamera = component;
-        }
-
+        ResizeCamera(camera);
         ForwardInput(gui, rect);
 
         overlayRoot = root;
@@ -101,6 +88,27 @@ sealed class GameViewport : IDisposable
         frame?.Dispose();
         frame = Snapshot(pixels, service.Width, service.Height);
         if (frame is not null) gui.DrawImage(frame, rect);
+    }
+
+    bool PrepareFrame(Gui gui)
+    {
+        if (failure is not null)
+        {
+            gui.DrawText(failure, StudioTheme.Current.Text(12), StudioTheme.Current.Error, centerInRect: false);
+            return false;
+        }
+        var rect = gui.CurrentNode.Rect;
+        if (!EnsureService((uint)Math.Max(1f, rect.W), (uint)Math.Max(1f, rect.H))) return false;
+        service!.ClearColor = new Vector4(viewSettings.EmptySkyColor, 1f);
+        return true;
+    }
+
+    void ResizeCamera(ICamera camera)
+    {
+        // A primary-camera change needs a new aspect ratio even when the viewport size is unchanged.
+        if (camera is not CameraComponent component || ReferenceEquals(component, lastResizedCamera)) return;
+        component.Resize(service!.Width, service.Height);
+        lastResizedCamera = component;
     }
 
     /// <summary>

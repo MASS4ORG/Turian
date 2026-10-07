@@ -12,6 +12,8 @@ static class UserConfigPath
     {
         get
         {
+            if (Environment.GetEnvironmentVariable("GAYA_CONFIG_HOME") is { Length: > 0 } directory)
+                return Path.GetFullPath(directory);
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (string.IsNullOrEmpty(home)) home = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 

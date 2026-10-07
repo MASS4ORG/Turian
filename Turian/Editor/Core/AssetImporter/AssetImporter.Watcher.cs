@@ -18,47 +18,16 @@ public sealed partial class AssetImporter
 
     void EnsureAssetImported(string filePath, bool overwriteExisting)
     {
-        if (ShouldIgnorePath(filePath) || IsMetaFilePath(filePath))
-        {
-            return;
-        }
-
-        if (!File.Exists(filePath))
-        {
-            return;
-        }
+        if (!CanImportSource(filePath)) return;
 
         var metaFilePath = GetMetaFilePath(filePath);
 
         // A store package is shared and read-only: it must ship its metas, and its files never change.
-        if (PackageRootOf(filePath) is { ReadOnly: true })
-        {
-            if (File.Exists(metaFilePath)) RegisterExistingMetaFile(metaFilePath);
-            else logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", filePath);
-            return;
-        }
+        if (TryRegisterReadOnlyAsset(filePath, metaFilePath)) return;
 
         if (!overwriteExisting && File.Exists(metaFilePath))
         {
-            try
-            {
-                if (RegisterExistingMetaFile(metaFilePath))
-                {
-                    return;
-                }
-            }
-            catch (UnresolvableTypeIdException ex)
-            {
-                WarnUnavailableType(metaFilePath, ex);
-                return;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(
-                    ex,
-                    "Failed to register asset meta file {MetaFilePath}. Overwriting malformed metadata",
-                    metaFilePath);
-            }
+            if (TryRegisterMetadata(metaFilePath)) return;
         }
 
         Asset asset;
@@ -82,7 +51,7 @@ public sealed partial class AssetImporter
 
         File.WriteAllText(metaFilePath, metaJson);
 
-        ImportAssetToCache(asset, filePath);
+        ImportAssetToCache(asset, filePath, out _);
 
         logger.LogInformation(
             "Asset metadata {Action}: {MetaFilePath}",
@@ -90,6 +59,32 @@ public sealed partial class AssetImporter
             metaFilePath);
 
         FinishAssetImport(asset, filePath, notify: true);
+    }
+
+    bool TryRegisterMetadata(string path)
+    {
+        try { return RegisterExistingMetaFile(path); }
+        catch (UnresolvableTypeIdException ex)
+        {
+            WarnUnavailableType(path, ex);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to register asset meta file {MetaFilePath}. Overwriting malformed metadata", path);
+            return false;
+        }
+    }
+
+    bool CanImportSource(string path) =>
+        !ShouldIgnorePath(path) && !IsMetaFilePath(path) && File.Exists(path);
+
+    bool TryRegisterReadOnlyAsset(string path, string metaPath)
+    {
+        if (PackageRootOf(path) is not { ReadOnly: true }) return false;
+        if (File.Exists(metaPath)) RegisterExistingMetaFile(metaPath);
+        else logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", path);
+        return true;
     }
 
     /// <summary>
@@ -117,6 +112,7 @@ public sealed partial class AssetImporter
         RebuildDatabase();
         RegisterChildAssets(asset, sourceFilePath);
         RefreshPrefabComponentIndex(asset, ResolveImportedPrimaryPath(asset.Id));
+        SaveIndexStamp(asset.Id);
         PersistCacheCatalog();
 
         if (notify)
@@ -140,16 +136,8 @@ public sealed partial class AssetImporter
         }
 
         var assetPath = GetAssetPathFromMeta(metaFilePath);
-        if (PackageRootOf(assetPath) is not null && importOverrides.Get(asset.Id) is not null)
-        {
-            // The project's own import settings for a brick's asset; the settings hash below then differs, so it reimports.
-            asset = Serializer.LoadData<Asset>(importOverrides.Apply(asset.Id, SerializeAssetMetadata(asset))) ?? asset;
-        }
-
-        if (!string.IsNullOrWhiteSpace(assetPath))
-        {
-            asset.RelativePath = assetPath;
-        }
+        asset = ApplyImportOverrides(asset, assetPath);
+        asset.RelativePath = assetPath;
 
         if (!File.Exists(assetPath))
         {
@@ -158,10 +146,16 @@ public sealed partial class AssetImporter
             return false;
         }
 
-        ImportAssetToCache(asset, assetPath);
-
-        FinishAssetImport(asset, assetPath, notify: false);
+        var imported = ImportAssetToCache(asset, assetPath, out var indexValid);
+        if (imported || !indexValid)
+            FinishAssetImport(asset, assetPath, notify: false);
         return true;
+    }
+
+    Asset ApplyImportOverrides(Asset asset, string path)
+    {
+        if (PackageRootOf(path) is null || importOverrides.Get(asset.Id) is null) return asset;
+        return Serializer.LoadData<Asset>(importOverrides.Apply(asset.Id, SerializeAssetMetadata(asset))) ?? asset;
     }
 
     void NotifyAssetsChanged()
@@ -250,8 +244,9 @@ public sealed partial class AssetImporter
         return fallback;
     }
 
-    void ImportAssetToCache(Asset asset, string sourceFilePath)
+    bool ImportAssetToCache(Asset asset, string sourceFilePath, out bool indexValid)
     {
+        indexValid = false;
         ArgumentNullException.ThrowIfNull(asset);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceFilePath);
 
@@ -263,7 +258,6 @@ public sealed partial class AssetImporter
         var importDirectory = GetAssetImportDirectory(asset.Id);
         Directory.CreateDirectory(importDirectory);
 
-        var sourceHash = ComputeFileHash(sourceFilePath);
         var settingsHash = ComputeStringHash(SerializeAssetMetadata(asset));
         var manifestPath = Path.Combine(importDirectory, importManifestFileName);
 
@@ -271,14 +265,13 @@ public sealed partial class AssetImporter
         var importerVersion = importer?.Version ?? 1;
 
         var existingManifest = LoadManifest(manifestPath);
-        if (existingManifest is not null
-            && existingManifest.SourceHash == sourceHash
-            && existingManifest.SettingsHash == settingsHash
-            && existingManifest.PipelineVersion == pipelineVersion
-            && existingManifest.ImporterVersion == importerVersion
-            && File.Exists(Path.Combine(importDirectory, existingManifest.PrimaryArtifactFileName)))
+        var source = new FileInfo(sourceFilePath);
+        var sourceHash = SourceHash(existingManifest, source);
+        if (CanReuseImport(existingManifest, sourceHash, settingsHash, importerVersion, importDirectory))
         {
-            return;
+            UpdateSourceStamp(existingManifest!, source, manifestPath);
+            indexValid = HasCachedIndex(existingManifest!);
+            return false;
         }
 
         ClearImportDirectory(importDirectory);
@@ -307,6 +300,8 @@ public sealed partial class AssetImporter
             PipelineVersion = pipelineVersion,
             ImporterVersion = importerVersion,
             SourceHash = sourceHash,
+            SourceLength = source.Length,
+            SourceLastWriteTimeUtc = source.LastWriteTimeUtc,
             SettingsHash = settingsHash,
             PrimaryArtifactFileName = primaryArtifactOutputFileName,
             Artifacts = [.. artifacts],
@@ -320,6 +315,7 @@ public sealed partial class AssetImporter
             "Imported asset {AssetId} into cache: {PrimaryArtifactPath}",
             asset.Id,
             primaryArtifactPath);
+        return true;
     }
 
 }

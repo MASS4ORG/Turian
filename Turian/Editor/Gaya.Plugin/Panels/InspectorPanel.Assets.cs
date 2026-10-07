@@ -37,17 +37,8 @@ sealed partial class InspectorPanel
             builtAssets = frameAssets;
             builtComponents = 0;
             assetDirty = false;
-            LogAssetForm(inspection);
         }
 
-    }
-
-    void LogAssetForm(AssetInspection inspection)
-    {
-        var section = model.Sections.Count > 0 ? model.Sections[0] : null;
-        Log.Logger.LogDebug("asset model built for {Path} ({Type}), targetNull={Null}, fields={Fields}, buttons={Buttons}",
-            Path.GetFileName(inspection.AbsolutePath), inspection.Target?.GetType().FullName,
-            inspection.Target is null, section?.BodyFields.Count ?? -1, section?.Buttons.Count ?? -1);
     }
 
     void OnSelectedAssetEdited(object target)

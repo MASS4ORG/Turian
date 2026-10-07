@@ -145,9 +145,9 @@ public class FbxModelImporterTests
         }
     }
 
-    /// <summary>Verifies that geometry is mirrored onto the engine's Y-down world space.</summary>
+    /// <summary>Imported bounds retain both sides of the source model's upward Y axis.</summary>
     [Fact]
-    public void ImportToCache_MirrorsYAxis()
+    public void ImportToCache_PreservesSourceBounds()
     {
         var directory = Directory.CreateTempSubdirectory("turian-fbx-");
         try

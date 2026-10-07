@@ -1,9 +1,12 @@
+LogLevel minimumLevel;
+try { minimumLevel = StudioLogOptions.MinimumLevel(args); }
+catch (ArgumentException exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    return 2;
+}
 using var loggerFactory = LoggerFactory.Create(builder => builder
-#if DEBUG
-    .SetMinimumLevel(LogLevel.Debug)
-#else
-    .SetMinimumLevel(LogLevel.Information)
-#endif
+    .SetMinimumLevel(minimumLevel)
     .AddConsole()
     .AddProvider(LogBuffer.Provider));
 Log.Configure(loggerFactory);
@@ -75,7 +78,7 @@ Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 var gui = new Gui();
 WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
     Environment.SetEnvironmentVariable);
-var window = new GuiWindow(gui, 1600, 950, "Turian Studio");
+var window = new GuiWindow(gui, 1600, 950, "Gaya");
 var activeWorkbench = workbench;
 
 // Closing the window asks about unsaved work through the Exit command, which closes the window again once answered.

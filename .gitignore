@@ -26,7 +26,7 @@ coverage*.info
 *.coveragexml
 *.Build.props
 !Directory.Build.props
-Directory.Build.local.props
+*.local.props
 coverage/
 .nuke/temp
 .config/
@@ -58,3 +58,9 @@ AGENTS.md
 docs/internal
 Examples/
 Precast~/
+.scripts.cs
+.scripts-*.cs
+.scripts.sh
+.scripts-*.sh
+.scripts.py
+.scripts-*.py
