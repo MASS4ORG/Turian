@@ -24,6 +24,7 @@ sealed partial class AssetBrowserPanel
 
     void DrawPreview(Gui gui, AssetEntry entry, float size)
     {
+        TrackFileDropFolder(gui, entry);
         var image = !entry.IsDirectory
             ? thumbnails.RequestImage(entry, thumbnailRevisions.GetValueOrDefault(entry.AbsolutePath, "")) : null;
         if (image is not null)
@@ -38,7 +39,7 @@ sealed partial class AssetBrowserPanel
     {
         var theme = ThemeTokens.Current;
         var glyph = entry.IsDirectory ? EditorIcons.Folder : types.Resolve(entry.AbsolutePath)?.DefaultIcon ?? EditorIcons.File;
-        gui.DrawText(glyph, theme.Text(Math.Min(size, 32)), entry.IsDirectory ? theme.Folder : theme.InkDim);
+        gui.DrawText(glyph, size * 0.8f, entry.IsDirectory ? theme.Folder : theme.InkDim);
     }
 
     IEnumerable<AssetEntry> ChildrenOf(string? parentPath) => parentPath is null

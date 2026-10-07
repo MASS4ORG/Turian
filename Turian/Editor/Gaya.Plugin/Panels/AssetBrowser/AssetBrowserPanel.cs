@@ -139,6 +139,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
 
         using (gui.Node(-1, -1, "assets/browser").Expand().Direction(Axis.Vertical).Enter())
         {
+            gui.On<FileDropEvent>(OnFileDrop);
             Toolbar(gui);
             using (gui.Node(-1, -1, "assets/body").Expand().Direction(Axis.Horizontal).Enter()) Body(gui);
         }
@@ -266,7 +267,8 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
     {
         if (browserSettings.ShowFavoritesInTree && favorites is { Paths.Count: > 0 })
         {
-            rows.Add(new TreeItem("assets/favorites", "Favorites", 0, true, Icon: gui => gui.DrawText("★")));
+            rows.Add(new TreeItem("assets/favorites", "Favorites", 0, true,
+                Icon: gui => gui.DrawText(EditorIcons.Star)));
             foreach (var entry in entries.Where(entry => favorites.Paths.Contains(entry.AbsolutePath)))
                 rows.Add(new TreeItem(entry.AbsolutePath, DisplayName(entry.AbsolutePath), 1, Icon: IconFor(entry), Tag: entry));
         }

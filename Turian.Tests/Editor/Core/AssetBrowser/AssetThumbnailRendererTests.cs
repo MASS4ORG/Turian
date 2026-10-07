@@ -4,6 +4,81 @@ namespace Turian.Tests;
 [Collection(SerialTests.Name)]
 public sealed class AssetThumbnailRendererTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
+    /// <summary>Model and material providers draw geometry rather than only the viewer's clear color.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SceneThumbnailsContainGeometry(bool material)
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        var directory = Directory.CreateTempSubdirectory("turian-preview-pixels-");
+        var modelId = Guid.Empty;
+        try
+        {
+            var assetsFolder = Directory.CreateDirectory(Path.Combine(directory.FullName, "Assets")).FullName;
+            var path = Path.Combine(assetsFolder, material ? "swatch.material" : "quad.ammesh");
+            Asset asset;
+            if (material)
+            {
+                asset = new MaterialAsset { Id = Guid.NewGuid(), BaseColorFactor = new Vector4(1, 0, 0, 1) };
+                File.WriteAllText(path, Serializer.Serialize(asset));
+            }
+            else
+            {
+                asset = new ModelAsset { Id = Guid.NewGuid() };
+                modelId = asset.Id;
+                using var stream = File.Create(path);
+                MeshBlobWriter.Write(stream, new MeshBlobContent
+                {
+                    Vertices =
+                    [
+                        new(new(-0.5f, -0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
+                        new(new(0.5f, -0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
+                        new(new(0.5f, 0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
+                        new(new(-0.5f, 0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
+                    ],
+                    Indices = [0, 1, 2, 0, 2, 3],
+                    SubMeshes = [new SubMesh(0, 6, Bounds: new Bounds(new(-0.5f, -0.5f, 0), new(0.5f, 0.5f, 0)))],
+                    Bounds = new Bounds(new(-0.5f, -0.5f, 0), new(0.5f, 0.5f, 0)),
+                });
+            }
+            asset.RelativePath = path;
+            var database = new AssetDatabase();
+            Assert.True(database.RegisterAsset(asset, path));
+            using var build = new BuildManager(new AppSettings { ProjectAbsoluteDir = directory.FullName },
+                NullLogger.Instance);
+            var catalog = new AssetPreviewCatalog(build);
+            using var renderer = new AssetThumbnailRenderer(fixture.Vulkan, database, catalog);
+            using var image = renderer.Render(new AssetEntry(path, false, asset, directory.FullName), 64);
+            Assert.NotNull(image);
+            using var bitmap = SKBitmap.FromImage(image);
+            var background = bitmap.GetPixel(0, 0);
+            Assert.Equal(0, background.Alpha);
+            Assert.Equal(255, bitmap.GetPixel(32, 32).Alpha);
+            Assert.NotEqual(background, bitmap.GetPixel(32, 32));
+            Assert.True(bitmap.Pixels.Count(pixel => pixel != background) > 100);
+            using var inspector = new AssetPreviewView(fixture.Vulkan, database, catalog);
+            using var surface = SKSurface.Create(new SKImageInfo(180, 180));
+            var font = Font.FromFamilyName("sans-serif", 14);
+            var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+            try
+            {
+                InspectorFormsRenderingTests.Frame(gui, surface, font, current => inspector.Draw(current, asset));
+                InspectorFormsRenderingTests.Frame(gui, surface, font, current => inspector.Draw(current, asset));
+            }
+            finally { font.Dispose(); }
+            using var inspectorImage = surface.Snapshot();
+            using var inspectorPixels = SKBitmap.FromImage(inspectorImage);
+            Assert.Equal(0, inspectorPixels.GetPixel(0, 0).Alpha);
+            Assert.Equal(255, inspectorPixels.GetPixel(90, 90).Alpha);
+        }
+        finally
+        {
+            if (modelId != Guid.Empty) ModelAsset.InvalidateCacheEntry(modelId);
+            directory.Delete(recursive: true);
+        }
+    }
+
     /// <summary>Built-in texture previews are bounded, cached and use type icons for unsupported assets.</summary>
     [Fact]
     public void TexturePreviewIsDecodedAndBounded()

@@ -182,7 +182,8 @@ public sealed class MultiSelectionPanelTests
                 IEnumerable<LayoutNode> Descendants(LayoutNode node) =>
                     new[] { node }.Concat(node.Children.SelectMany(Descendants));
                 var rectangle = Descendants(gui.RootNode!).Single(node => node.Id == $"treeview/row{row}").Rect;
-                input.MousePosition.Returns(new Vector2(200, rectangle.Y + rectangle.H / 2));
+                input.MousePosition.Returns(new Vector2(rectangle.X + rectangle.W * 0.6f,
+                    rectangle.Y + rectangle.H / 2));
                 input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
                 input.IsMouseButtonDown(GMouseButton.Left).Returns(true);
                 Frame();

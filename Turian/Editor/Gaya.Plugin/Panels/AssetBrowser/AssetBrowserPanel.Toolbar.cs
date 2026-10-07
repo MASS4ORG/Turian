@@ -20,9 +20,14 @@ sealed partial class AssetBrowserPanel
     void Toolbar(Gui gui)
     {
         PrepareToolbar(gui);
-        NavigationToolbar(gui);
-        ToolsToolbar(gui);
-        CompactToolbar(gui);
+        using (gui.Node(-1, ThemeTokens.Current.Scale(26), "assets/toolbar").ExpandWidth()
+                   .Direction(Axis.Horizontal).ContentAlignY(0.5f).Gap(4).Enter())
+        {
+            if (gui.Pass == Pass.Pass2Render) toolbarWidth = gui.CurrentNode.Rect.W;
+            NavigationToolbar(gui);
+            ToolsToolbar(gui);
+        }
+        if (compactToolbar) FiltersToolbar(gui);
         SnapshotFilters(gui);
     }
 
@@ -31,7 +36,7 @@ sealed partial class AssetBrowserPanel
         var theme = ThemeTokens.Current;
         if (gui.Pass == Pass.Pass1Build)
         {
-            compactToolbar = toolbarWidth < theme.Scale(650);
+            compactToolbar = toolbarWidth < theme.Scale(850);
             if (breadcrumbsDirty) { breadcrumbs = BuildBreadcrumbs(); breadcrumbsDirty = false; }
             if (toolbarDataDirty)
             {
@@ -45,10 +50,10 @@ sealed partial class AssetBrowserPanel
     void NavigationToolbar(Gui gui)
     {
         var theme = ThemeTokens.Current;
-        using (gui.Node(-1, theme.Scale(24), "assets/navigation").ExpandWidth().Direction(Axis.Horizontal)
+        var width = Math.Min(toolbarWidth * (compactToolbar ? 0.4f : 0.3f), theme.Scale(400));
+        using (gui.Node(width, theme.Scale(24), "assets/navigation").Direction(Axis.Horizontal)
                    .ContentAlignY(0.5f).Gap(2).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) toolbarWidth = gui.CurrentNode.Rect.W;
             NavButton(gui, "←", "back", navigation.CanBack, () => { navigation.Back(); NavigationChanged(); });
             NavButton(gui, "→", "forward", navigation.CanForward, () => { navigation.Forward(); NavigationChanged(); });
             var parent = navigation.Current is { } current ? ParentOf(current) : null;
@@ -69,24 +74,25 @@ sealed partial class AssetBrowserPanel
         {
             SearchControl(gui);
             if (StudioControls.SmallTextButton(gui, "×", "assets/clearFilters", theme.Scale(22), "Clear filters")) ClearFilters();
-            if (!compactToolbar) FilterControls(gui);
-            ViewControls(gui);
-            if (!compactToolbar) ZoomControl(gui);
+            if (!compactToolbar) FilterGroup(gui);
         }
     }
 
-    void CompactToolbar(Gui gui)
+    void FiltersToolbar(Gui gui)
     {
         var theme = ThemeTokens.Current;
-        if (compactToolbar)
+        using (gui.Node(-1, theme.Scale(26), "assets/filters").ExpandWidth().Direction(Axis.Horizontal)
+                   .ContentAlignY(0.5f).Gap(4).Enter())
         {
-            using (gui.Node(-1, theme.Scale(26), "assets/filters").ExpandWidth().Direction(Axis.Horizontal)
-                       .ContentAlignY(0.5f).Gap(4).Enter())
-            {
-                FilterControls(gui);
-                ZoomControl(gui);
-            }
+            FilterGroup(gui);
         }
+    }
+
+    void FilterGroup(Gui gui)
+    {
+        FilterControls(gui);
+        FavoriteControl(gui);
+        ZoomControl(gui);
     }
 
     void SnapshotFilters(Gui gui)
@@ -121,26 +127,23 @@ sealed partial class AssetBrowserPanel
         }
     }
 
-    void ViewControls(Gui gui)
+    void FavoriteControl(Gui gui)
     {
         var theme = ThemeTokens.Current;
         var value = favoritesOnly;
         gui.Checkbox(ref value, "Fav", size: theme.Scale(13), fontSize: theme.Text(11), spacing: 3);
         if (value != favoritesOnly) { favoritesOnly = value; QueryChanged(); }
-        if (StudioControls.SmallTextButton(gui, browserSettings.ViewMode.ToString(), "assets/view", theme.Scale(42), "Cycle tree / split / grid"))
-        {
-            browserSettings.ViewMode = (AssetBrowserViewMode)(((int)browserSettings.ViewMode + 1) % 3);
-            editorSettings.NotifyChanged(AssetBrowserSettings.PageId);
-        }
     }
 
     void FilterControls(Gui gui)
     {
         var theme = ThemeTokens.Current;
-        var kinds = gui.MultiDropdown(typeOptions, filterTypes, display: TypeName, width: theme.Scale(90),
+        var width = compactToolbar ? Math.Clamp((toolbarWidth - theme.Scale(140)) / 2, theme.Scale(60),
+            theme.Scale(90)) : theme.Scale(90);
+        var kinds = gui.MultiDropdown(typeOptions, filterTypes, display: TypeName, width: width,
             height: theme.Scale(24), fontSize: theme.Text(11), placeholder: "Type");
         if (kinds.Changed) { filterTypes = kinds.Selected; QueryChanged(); }
-        var labels = gui.MultiDropdown(labelOptions, filterLabels, width: theme.Scale(90), height: theme.Scale(24),
+        var labels = gui.MultiDropdown(labelOptions, filterLabels, width: width, height: theme.Scale(24),
             fontSize: theme.Text(11), placeholder: "Labels");
         if (labels.Changed) { filterLabels = labels.Selected; QueryChanged(); }
     }
@@ -155,7 +158,7 @@ sealed partial class AssetBrowserPanel
     void ZoomControl(Gui gui)
     {
         var zoom = (float)Math.Clamp(browserSettings.GridZoom, 32, 256);
-        gui.Slider(ref zoom, 32, 256, step: 16, width: ThemeTokens.Current.Scale(80),
+        gui.Slider(ref zoom, 32, 256, step: 16, width: ThemeTokens.Current.Scale(compactToolbar ? 64 : 80),
             height: ThemeTokens.Current.Scale(24));
         if (gui.Pass == Pass.Pass2Render && (int)zoom != browserSettings.GridZoom) SetZoom((int)zoom);
     }

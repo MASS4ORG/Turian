@@ -22,7 +22,7 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
     {
         if (viewer is not null && viewer.Width == size) return;
         viewer?.Dispose();
-        viewer = new SceneViewerService(vulkan, assets, (uint)size, (uint)size);
+        viewer = new SceneViewerService(vulkan, assets, (uint)size, (uint)size) { ClearColor = Vector4.Zero };
     }
 
     SKImage? RenderProvider(Asset asset, IAssetPreviewProvider provider)
@@ -52,6 +52,7 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
     {
         if (provider is not IScenePreviewProvider sceneProvider) return null;
         var scene = sceneProvider.BuildPreview(asset, vulkan, assets);
+        AssetPreviewServices.Initialize(scene, vulkan, assets);
         viewer!.FrameBounds(scene.Bounds);
         return scene;
     }
@@ -73,7 +74,7 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
 
     static SKImage Snapshot(byte[] pixels, int width, int height)
     {
-        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul);
         var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
         try
         {

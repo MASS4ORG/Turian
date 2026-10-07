@@ -24,7 +24,7 @@ public sealed class AssetBrowserSettings
 
     /// <summary>The browser layout.</summary>
     [EditorSetting("View mode")]
-    public AssetBrowserViewMode ViewMode { get; set; } = AssetBrowserViewMode.Tree;
+    public AssetBrowserViewMode ViewMode { get; set; } = AssetBrowserViewMode.Split;
 
     /// <summary>The preview size in logical pixels.</summary>
     [EditorSetting("Grid zoom")]

@@ -254,7 +254,10 @@ public sealed class AssetBrowserInteractionTests
         browser.Click("treeview/row0");
         Assert.True(browser.Field<bool>("favoritesOnly"));
         browser.Panel.ClearFilters();
-        browser.Click("assets/view");
+        browser.Preferences.ViewMode = AssetBrowserViewMode.Split;
+        browser.Invoke("OnEditorSettingsChanged");
+        browser.Frame();
+        Assert.DoesNotContain(browser.Nodes(), node => node.Id == "assets/view");
         Assert.Equal(AssetBrowserViewMode.Split, browser.Preferences.ViewMode);
         var settingsPath = Path.Combine(browser.Project, "preferences.json");
         var store = new EditorSettings(NullLogger.Instance, settingsPath);

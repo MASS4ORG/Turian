@@ -18,7 +18,7 @@ sealed partial class AssetBrowserPanel
     void Grid(Gui gui)
     {
         if (gui.Pass == Pass.Pass1Build) PrepareGrid();
-        using (gui.Node(-1, -1, gridId).Expand().Direction(Axis.Vertical).Enter())
+        using (gui.Node(-1, -1, gridId).Expand().Direction(Axis.Vertical).AlignContent(0, 0).Enter())
         {
             GridScroll(gui);
             if (navigation.Current is { } current && byPath.GetValueOrDefault(current) is { } folder)
@@ -39,7 +39,8 @@ sealed partial class AssetBrowserPanel
         Spacer(gui, "assets/grid/top", gridWindow.FirstRow * cellHeight);
         for (var row = gridWindow.FirstRow; row < gridWindow.LastRow; row++)
         {
-            using (gui.Node(-1, cellHeight, $"assets/grid/row/{row}").ExpandWidth().Direction(Axis.Horizontal).Enter())
+            using (gui.Node(-1, cellHeight, $"assets/grid/row/{row}").ExpandWidth().Direction(Axis.Horizontal)
+                       .AlignContent(0, 0).Enter())
             {
                 for (var column = 0; column < gridWindow.Columns; column++)
                 {
@@ -90,7 +91,8 @@ sealed partial class AssetBrowserPanel
     bool GridCell(Gui gui, AssetEntry entry, int index)
     {
         var theme = ThemeTokens.Current;
-        using (gui.Node(cellWidth, cellHeight, "assets/tile/" + entry.AbsolutePath).Padding(4).Enter())
+        using (gui.Node(cellWidth, cellHeight, "assets/tile/" + entry.AbsolutePath).Padding(4)
+                   .Direction(Axis.Vertical).AlignContent(0, 0).Enter())
         {
             var clicked = false;
             if (gui.Pass == Pass.Pass2Render)
@@ -144,7 +146,7 @@ sealed partial class AssetBrowserPanel
             else
             {
                 gui.ClipContent();
-                gui.DrawText((favorites!.Paths.Contains(entry.AbsolutePath) ? "★ " : "") + DisplayName(entry.AbsolutePath),
+                gui.DrawText((favorites!.Paths.Contains(entry.AbsolutePath) ? EditorIcons.Star + " " : "") + DisplayName(entry.AbsolutePath),
                     ThemeTokens.Current.Text(11), ThemeTokens.Current.Ink,
                     wrapWidth: previewSize >= ThemeTokens.Current.Scale(96) ? cellWidth - 8 : 0, clip: true);
             }
@@ -218,6 +220,7 @@ sealed partial class AssetBrowserPanel
 
     static void Spacer(Gui gui, string id, float height)
     {
-        using (gui.Node(-1, Math.Max(0, height), id).ExpandWidth().Enter()) { }
+        if (height <= 0) return;
+        using (gui.Node(-1, height, id).ExpandWidth().Enter()) { }
     }
 }

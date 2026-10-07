@@ -18,7 +18,7 @@ sealed class AssetBrowserChrome(
     public void Render(Gui gui)
     {
         var theme = ThemeTokens.Current;
-        var contentHeight = theme.Scale(theme.RowHeight * 7f + 16f);
+        var contentHeight = theme.Scale(theme.RowHeight * 5f + 16f);
         var titleBar = theme.Scale(24f);
 
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, buttonId)
@@ -74,12 +74,7 @@ sealed class AssetBrowserChrome(
         var favorites = settings.ShowFavoritesInTree;
         gui.Checkbox(ref favorites, "Favorites in tree", size: box, fontSize: size);
         var mode = settings.ViewMode;
-        foreach (var option in Enum.GetValues<AssetBrowserViewMode>())
-        {
-            var selected = mode == option;
-            gui.Checkbox(ref selected, option.ToString(), size: box, fontSize: size);
-            if (selected && option != settings.ViewMode) mode = option;
-        }
+        gui.EnumDropdown(ref mode, width: theme.Scale(150), height: height, fontSize: size);
         var zoom = (float)Math.Clamp(settings.GridZoom, 32, 256);
         gui.Slider(ref zoom, 32, 256, width: theme.Scale(150), height: height, step: 16, showValue: true);
         if (value == settings.ShowFileExtensions && favorites == settings.ShowFavoritesInTree
