@@ -1,9 +1,11 @@
-namespace Turian.Editor.Core;
+using System.Numerics;
+using JeremyAnsel.Media.WavefrontObj;
+using Turian.Engine.Core;
+
+namespace Turian.Editor.Obj;
 
 /// <summary>
-/// Parses a Wavefront OBJ file into a <see cref="ModelBuilder"/>. OBJ import is editor-only: the
-/// runtime asset path bakes geometry into a <c>.ammesh</c> blob (see <see cref="ModelAssetImporter"/>)
-/// and never parses OBJ itself, so <c>JeremyAnsel.Media.WavefrontObj</c> is an editor dependency only.
+/// Parses Wavefront OBJ geometry for the editor brick's AMMESH bake.
 /// </summary>
 public static class ObjModelBuilder
 {

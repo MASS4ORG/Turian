@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed (breaking): Wavefront OBJ import is an optional `org.mass4.turian.obj` editor brick; existing metadata IDs and cooked caches remain valid #47
 - Added (breaking): `.pss` color themes with hot reload #213
 - Changed (breaking): Guinevere fluent effects.
 - Changed (breaking): Gaya settings use class-level attributes as their sole configuration

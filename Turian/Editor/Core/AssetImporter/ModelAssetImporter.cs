@@ -3,6 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Import 3d model assets with default model-specific import settings.
 /// </summary>
+[DefaultOption]
 public class ModelAssetImporter : IAssetImporter
 {
     static readonly string[] SupportedExtensions =
@@ -15,7 +16,7 @@ public class ModelAssetImporter : IAssetImporter
     ];
 
     /// <inheritdoc/>
-    /// <remarks>Cached OBJ geometry preserves the source's upward Y axis.</remarks>
+    /// <remarks>Matches the OBJ brick's bake version so existing cooked geometry can be reused.</remarks>
     public int Version => 3;
 
     /// <inheritdoc/>
@@ -44,24 +45,16 @@ public class ModelAssetImporter : IAssetImporter
     }
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Bakes <c>.obj</c> geometry into an <c>.ammesh</c> blob. The remaining extensions are
-    /// copied through unchanged.
-    /// </remarks>
+    /// <remarks>OBJ requires its editor brick; other recognized sources are copied to the cache.</remarks>
     public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
     {
-        if (!Path.GetExtension(sourcePath).Equals(".obj", StringComparison.OrdinalIgnoreCase))
+        if (Path.GetExtension(sourcePath).Equals(".obj", StringComparison.OrdinalIgnoreCase))
         {
-            return IAssetImporter.CopySourceToCache(sourcePath, importDirectory);
+            throw new NotSupportedException(
+                "OBJ import requires the org.mass4.turian.obj editor brick. Install builtin:org.mass4.turian.obj "
+                + "or convert the model to glTF/GLB or FBX, preserving its .meta asset ID and scene references.");
         }
 
-        var builder = ObjModelBuilder.Load(sourcePath);
-
-        var blobFileName = $"{IAssetImporter.PrimaryArtifactName}{MeshBlob.FileExtension}";
-        MeshBlobWriter.Save(
-            Path.Combine(importDirectory, blobFileName),
-            MeshBlobBaker.FromModelBuilder(builder, Path.GetFileNameWithoutExtension(sourcePath)));
-
-        return [blobFileName];
+        return IAssetImporter.CopySourceToCache(sourcePath, importDirectory);
     }
 }

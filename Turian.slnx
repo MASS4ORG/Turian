@@ -32,6 +32,7 @@
     <Project Path="Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj" />
   </Folder>
   <Folder Name="/Packages/">
+    <Project Path="Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj" />
   </Folder>
   <Project Path=".nuke/Build.csproj" />

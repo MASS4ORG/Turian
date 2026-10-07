@@ -176,6 +176,7 @@ public sealed partial class AssetImporter : IDisposable
                 IsLastResort = type.GetCustomAttributes(typeof(DefaultOptionAttribute), false).Length > 0
             })
             .OrderBy(static item => item.IsLastResort)
+            .ThenBy(static item => item.Type == typeof(GenericAssetImporter))
             .Select(static item => Activator.CreateInstance(item.Type) as IAssetImporter)
             .Where(static importer => importer is not null)
             .Cast<IAssetImporter>()];

@@ -1,3 +1,5 @@
+using Turian.Editor.Obj;
+
 namespace Turian.Tests;
 
 /// <summary>Checks asymmetric imported geometry and transforms against the camera's world-up convention.</summary>
@@ -28,7 +30,7 @@ public sealed class ModelOrientationTests
             });
             var camera = new EditorCamera { Position = new Vector3(0, 0, -5) };
             Assert.All(builder.Vertices, vertex => Assert.True(camera.Project(vertex.Position).Y < 0));
-            Assert.Equal(3, new ModelAssetImporter().Version);
+            Assert.Equal(3, new ObjModelImporter().Version);
         }
         finally { File.Delete(path); }
     }

@@ -26,7 +26,6 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
         <PackageReference Include="Silk.NET.Input" Version="2.23.0"/>
         <PackageReference Include="Silk.NET.Maths" Version="2.23.0"/>
