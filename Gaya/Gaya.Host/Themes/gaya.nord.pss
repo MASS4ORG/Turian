@@ -1,0 +1,23 @@
+// Nord: the polar-night greys and frost blues of the Nord palette by Arctic Ice Studio.
+@const theme-id = "gaya.nord";
+@const theme-name = "Nord";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #3b4252;
+$accent = #88c0d0;
+
+$surface-window = #2e3440;
+$surface-panel = #3b4252;
+$surface-chrome = #434c5e;
+$surface-field = #272c36;
+$surface-hover = #4c566a;
+$surface-editor-area = #242933;
+$border = #4c566a;
+$ink = #d8dee9;
+$ink-dim = #a9b2c1;
+$ink-faint = #7b88a1;
+$accent-fill = #3e4c64;
+$error = #bf616a;
+$warning = #ebcb8b;
+$folder = #d08770;

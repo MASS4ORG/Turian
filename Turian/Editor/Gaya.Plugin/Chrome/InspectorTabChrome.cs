@@ -21,7 +21,7 @@ sealed class InspectorTabChrome(
     {
         if (panels.Panel(panelId) is not InspectorPanel inspector) return;
 
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
 
         using (gui.Node(-1, -1, $"{panelId}/tabMenu").ExpandHeight().Direction(Axis.Horizontal)
                    .Gap(2f).Enter())
@@ -44,7 +44,7 @@ sealed class InspectorTabChrome(
             titleTextColor: theme.Ink);
     }
 
-    void LockButton(Gui gui, StudioTheme theme, InspectorPanel inspector)
+    void LockButton(Gui gui, ThemeTokens theme, InspectorPanel inspector)
     {
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{panelId}/lock")
                    .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
@@ -62,7 +62,7 @@ sealed class InspectorTabChrome(
         }
     }
 
-    void SettingsButton(Gui gui, StudioTheme theme)
+    void SettingsButton(Gui gui, ThemeTokens theme)
     {
         using (gui.Node(theme.Scale(theme.HeaderHeight), -1, $"{panelId}/settings")
                    .ExpandHeight().ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
@@ -72,7 +72,7 @@ sealed class InspectorTabChrome(
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
 
-            gui.DrawText("…", StudioTheme.Current.Scale(11f), hot || menuOpen ? theme.Ink : theme.InkDim);
+            gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || menuOpen ? theme.Ink : theme.InkDim);
 
             var anchor = gui.CurrentNode.Rect;
             if (interactable.OnClick())
@@ -86,7 +86,7 @@ sealed class InspectorTabChrome(
 
     static void Preferences(Gui gui, InspectorSettings settings, IEditorSettings editorSettings)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var value = settings.AutoExpandComponents;
 
         using (gui.Node(-1, theme.Scale(theme.RowHeight)).ExpandWidth().Direction(Axis.Horizontal)

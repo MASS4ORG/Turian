@@ -18,7 +18,7 @@ sealed class AssetBrowserChrome(
     /// <inheritdoc />
     public void Render(Gui gui)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var contentHeight = theme.Scale(theme.RowHeight + 8f);
         var titleBar = theme.Scale(24f);
 
@@ -30,7 +30,7 @@ sealed class AssetBrowserChrome(
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
 
-            gui.DrawText("…", StudioTheme.Current.Scale(11f), hot || menuOpen ? theme.Ink : theme.InkDim);
+            gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || menuOpen ? theme.Ink : theme.InkDim);
 
             var anchor = gui.CurrentNode.Rect;
             if (interactable.OnClick())
@@ -64,7 +64,7 @@ sealed class AssetBrowserChrome(
     /// </summary>
     static void Preferences(Gui gui, AssetBrowserSettings settings, IEditorSettings editorSettings)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var box = theme.Scale(13f);
         var height = theme.Scale(theme.RowHeight);
         var size = theme.Text(11f);

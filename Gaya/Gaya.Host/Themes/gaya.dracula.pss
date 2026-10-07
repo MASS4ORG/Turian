@@ -1,0 +1,23 @@
+// Dracula: the well-known dark-blue ground with purple focus and pastel signal colors.
+@const theme-id = "gaya.dracula";
+@const theme-name = "Dracula";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #21222c;
+$accent = #bd93f9;
+
+$surface-window = #282a36;
+$surface-panel = #21222c;
+$surface-chrome = #2f3241;
+$surface-field = #1b1c25;
+$surface-hover = #44475a;
+$surface-editor-area = #1b1c24;
+$border = #4a4e63;
+$ink = #f8f8f2;
+$ink-dim = #b0b6c9;
+$ink-faint = #6272a4;
+$accent-fill = #414763;
+$error = #ff5555;
+$warning = #ffb86c;
+$folder = #f1fa8c;

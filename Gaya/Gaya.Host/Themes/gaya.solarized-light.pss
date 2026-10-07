@@ -1,0 +1,24 @@
+// Solarized Light: the cream-paper half of the Solarized pair.
+@const theme-id = "gaya.solarized-light";
+@const theme-name = "Solarized Light";
+@const theme-kind = light;
+@import "gaya.base";
+
+$base = #fdf6e3;
+$accent = #268bd2;
+$contrast = -0.06;
+
+$surface-window = #eee8d5;
+$surface-panel = #fdf6e3;
+$surface-chrome = #e7e1cc;
+$surface-field = #fffbee;
+$surface-hover = #ddd6bf;
+$surface-editor-area = #f5f0dc;
+$border = #c9c1a5;
+$ink = #586e75;
+$ink-dim = #657b83;
+$ink-faint = #93a1a1;
+$accent-fill = #d3e5f2;
+$error = #dc322f;
+$warning = #b58900;
+$folder = #cb4b16;

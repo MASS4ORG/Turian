@@ -19,7 +19,7 @@ sealed class TagDrawer(LayerFilter layers, UndoService? undo = null) : IProperty
         var mixed = owners.Skip(1).Any(tags => !selected.ToHashSet(StringComparer.Ordinal).SetEquals(tags));
         var options = layers.Settings.Tags.Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Distinct(StringComparer.Ordinal).ToArray();
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var result = gui.MultiDropdown(options, selected, comparer: StringComparer.Ordinal, chips: !mixed,
             mixed: mixed, isMixed: tag => owners.Any(tags => tags.Contains(tag) != selected.Contains(tag)),
             width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),

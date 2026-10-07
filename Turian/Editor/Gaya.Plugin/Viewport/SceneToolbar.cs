@@ -3,7 +3,7 @@ namespace Gaya.Plugin.Turian;
 /// <summary>Groups Scene tools into compact buttons, menus and editable transform and camera popovers.</summary>
 sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 {
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
     static float Height => Theme.Scale(28f);
     bool transformMenu;
     bool viewMenu;

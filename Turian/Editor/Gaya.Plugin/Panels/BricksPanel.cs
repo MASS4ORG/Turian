@@ -37,7 +37,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
     Vector2 menuAt;
     int seenRevision = -1;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <inheritdoc />
     public void Render(Gui gui)

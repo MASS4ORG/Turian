@@ -20,8 +20,8 @@ sealed class UserPanel(UserPanelPage page) : IPanel
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(StudioTheme.Current.Scale(8f))
-                   .Padding(StudioTheme.Current.Scale(12f)).Enter())
+        using (gui.Node().Expand().Direction(Axis.Vertical).Gap(ThemeTokens.Current.Scale(8f))
+                   .Padding(ThemeTokens.Current.Scale(12f)).Enter())
         {
             TurianForms.ApplyStyle(gui);
             gui.ScrollY();

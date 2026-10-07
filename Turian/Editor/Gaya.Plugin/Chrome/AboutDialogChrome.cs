@@ -17,7 +17,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
     static readonly Lazy<SKImage?> Logo = new(LoadLogo);
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     bool isOpen;
 

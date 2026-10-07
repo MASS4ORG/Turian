@@ -147,7 +147,7 @@ sealed class SceneViewport : IDisposable
 
         if (failure is not null)
         {
-            gui.DrawText(failure, StudioTheme.Current.Text(12), StudioTheme.Current.Error, centerInRect: false);
+            gui.DrawText(failure, ThemeTokens.Current.Text(12), ThemeTokens.Current.Error, centerInRect: false);
             return;
         }
 
@@ -157,9 +157,18 @@ sealed class SceneViewport : IDisposable
         if (!EnsureService(width, height)) return;
 
         orientationWidget.Render(gui, controller, inspector.SelectedNode, cameraSettings.Gizmos);
+        ApplyGizmoTheme(ThemeTokens.Current);
         HandleInput(gui, rect);
         RenderFrame(gui, rect);
         DrawGestureFeedback(gui);
+    }
+
+    /// <summary>Takes the transform handle colors from the theme.</summary>
+    void ApplyGizmoTheme(ThemeTokens theme)
+    {
+        Gizmo.HoverColor = ViewportThemeTokens.Vector(theme, ViewportThemeTokens.GizmoHover, Gizmo.HoverColor);
+        Gizmo.CenterColor = ViewportThemeTokens.Vector(theme, ViewportThemeTokens.GizmoCenter, Gizmo.CenterColor);
+        Gizmo.DragColor = ViewportThemeTokens.Vector(theme, ViewportThemeTokens.GizmoDrag, Gizmo.DragColor);
     }
 
     void DrawGestureFeedback(Gui gui)
@@ -167,12 +176,12 @@ sealed class SceneViewport : IDisposable
         var text = Gizmo.IsDragging && Gizmo.HandleMode == TransformGizmoMode.Rotate
             ? $"{Gizmo.RotationDegrees:0.#}°" : string.Empty;
         using (gui.Node(120f, 24f, "scene/rotationFeedback").Absolute(12f, 12f).Enter())
-            gui.DrawText(text, StudioTheme.Current.Text(13), StudioTheme.Current.Ink, centerInRect: false);
+            gui.DrawText(text, ThemeTokens.Current.Text(13), ThemeTokens.Current.Ink, centerInRect: false);
         var pointer = gui.Input.MousePosition;
         using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
                    .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
             gui.DrawText(showGizmoCursor ? EditorIcons.Move : string.Empty,
-                StudioTheme.Current.Text(18), StudioTheme.Current.Ink);
+                ThemeTokens.Current.Text(18), ThemeTokens.Current.Ink);
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
@@ -404,7 +413,7 @@ sealed class SceneViewport : IDisposable
             previewService.Height);
 
         gui.DrawImage(previewFrame, target);
-        gui.DrawRectBorder(target, GuiColor.White);
+        gui.DrawRectBorder(target, ThemeTokens.Current.GetColor(ViewportThemeTokens.PreviewBorder, GuiColor.White));
     }
 
     /// <summary>
@@ -509,8 +518,8 @@ sealed class SceneViewport : IDisposable
         var start = Vector2.Clamp(Vector2.Min(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
         var end = Vector2.Clamp(Vector2.Max(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
         var rect = new Rect(viewport.X + start.X, viewport.Y + start.Y, end.X - start.X, end.Y - start.Y);
-        gui.DrawRect(rect, StudioTheme.Current.AccentFill);
-        gui.DrawRectBorder(rect, StudioTheme.Current.Accent);
+        gui.DrawRect(rect, ThemeTokens.Current.AccentFill);
+        gui.DrawRectBorder(rect, ThemeTokens.Current.Accent);
     }
 
     void DisposePreview()

@@ -82,16 +82,16 @@ public sealed class AppearanceSettingsTests
         AppearanceSettings.Register(restored, "gaya.turian.appearance");
         using var app = Application(restored);
         using var workbench = new Workbench(app, layoutStore: LayoutStore(path));
-        Assert.Equal("Light", workbench.Appearance.Theme);
+        Assert.Equal("gaya.light", workbench.Appearance.Theme);
         Assert.Equal(16, workbench.Appearance.TextSize);
         Assert.Equal(1.25f, workbench.Appearance.Zoom);
         Assert.True(workbench.NativeTitlebar);
-        Assert.Equal("Light", app.Themes.CommittedName);
+        Assert.Equal("gaya.light", app.Themes.CommittedColorTheme);
         Assert.Equal(16f, app.Themes.Current.Text(12));
         restored.Save();
         using var nextApp = Application(new EditorSettings(NullLogger.Instance, path));
         using var next = new Workbench(nextApp, layoutStore: LayoutStore(path));
-        Assert.Equal("Light", next.Appearance.Theme);
+        Assert.Equal("gaya.light", next.Appearance.Theme);
         Assert.Equal(16, next.Appearance.TextSize);
         Assert.True(next.NativeTitlebar);
         next.Appearance.TextSize = 2;
@@ -104,7 +104,11 @@ public sealed class AppearanceSettingsTests
     public void ThemeDropdownAndMenuShareThePersistedChoice()
     {
         using var frame = new GayaChromeTests.Frame();
-        frame.Themes.Register(StudioTheme.Dark with { Name = "Custom" });
+        frame.Themes.Register(new ThemeSource("""
+            @const theme-id = "test.custom";
+            @const theme-name = "Custom";
+            @import "gaya.base";
+            """));
         OpenSettings(frame);
         var editor = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
         Click(frame, editor.Rect.Center);
@@ -114,15 +118,15 @@ public sealed class AppearanceSettingsTests
         frame.Draw();
         frame.Input.MouseWheelDelta.Returns(0f);
         frame.Draw();
-        var option = Nodes(frame).Single(node => node.Id.EndsWith("/list/" + (frame.Themes.Themes.Count - 1)));
+        var option = Nodes(frame).Single(node => node.Id.EndsWith("/list/" + (frame.Themes.ColorThemes.Count - 1)));
         Click(frame, option.Rect.Center);
         frame.Draw();
-        Assert.Equal("Custom", frame.Themes.CommittedName);
-        Assert.Equal("Custom", frame.Workbench.Appearance.Theme);
-        frame.Themes.Apply("Light");
-        Assert.Equal("Light", frame.Workbench.Appearance.Theme);
-        frame.Themes.Preview("Dark");
-        Assert.Equal("Light", frame.Workbench.Appearance.Theme);
+        Assert.Equal("test.custom", frame.Themes.CommittedColorTheme);
+        Assert.Equal("test.custom", frame.Workbench.Appearance.Theme);
+        frame.Themes.ApplyColorTheme("gaya.light");
+        Assert.Equal("gaya.light", frame.Workbench.Appearance.Theme);
+        frame.Themes.PreviewColorTheme("gaya.dark");
+        Assert.Equal("gaya.light", frame.Workbench.Appearance.Theme);
         frame.Themes.EndFrame();
         frame.Themes.EndFrame();
         frame.Settings.Save();
@@ -130,7 +134,7 @@ public sealed class AppearanceSettingsTests
             frame.Settings.PathFor(SettingsScope.User)));
         using var restored = new Workbench(restoredApp, layoutStore: LayoutStore(
             frame.Settings.PathFor(SettingsScope.User)));
-        Assert.Equal("Light", restoredApp.Themes.CommittedName);
+        Assert.Equal("gaya.light", restoredApp.Themes.CommittedColorTheme);
     }
 
     /// <summary>The live checkbox switches native decorations and application buttons, then the bar moves the window.</summary>

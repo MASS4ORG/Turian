@@ -50,7 +50,7 @@ sealed partial class OutputPanel(
 
     IReadOnlyList<LogRow> rows = [];
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <inheritdoc />
     public void Render(Gui gui)

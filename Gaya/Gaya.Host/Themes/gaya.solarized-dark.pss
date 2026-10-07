@@ -1,0 +1,23 @@
+// Solarized Dark: Ethan Schoonover's classic, deep cyan-blue grounds with muted ink.
+@const theme-id = "gaya.solarized-dark";
+@const theme-name = "Solarized Dark";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #073642;
+$accent = #268bd2;
+
+$surface-window = #002b36;
+$surface-panel = #073642;
+$surface-chrome = #0a4854;
+$surface-field = #00252e;
+$surface-hover = #10515f;
+$surface-editor-area = #00212b;
+$border = #134f5c;
+$ink = #93a1a1;
+$ink-dim = #657b83;
+$ink-faint = #586e75;
+$accent-fill = #17475c;
+$error = #dc322f;
+$warning = #b58900;
+$folder = #cb4b16;

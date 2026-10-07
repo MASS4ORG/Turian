@@ -41,7 +41,7 @@ sealed class ProjectSwitcherChrome(
     bool open;
     Vector2 popupPosition;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
     static float RowHeight => Theme.Scale(26);
     static float MenuWidth => Theme.Scale(340);
 

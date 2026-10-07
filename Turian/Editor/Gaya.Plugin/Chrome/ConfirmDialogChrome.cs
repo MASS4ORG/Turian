@@ -11,7 +11,7 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
     const float footerHeight = 44f;
     const float buttonWidth = 150f;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     bool isOpen;
     string title = string.Empty;

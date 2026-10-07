@@ -38,12 +38,14 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     bool paletteOpen;
     DockTheme dockTheme;
     ControlPalette controlPalette;
+    int styleSheetsVersion = -1;
+    Gui? styledGui;
 
     /// <summary>Creates the workbench over an activated plugin set.</summary>
     /// <param name="app">The loaded plugins, services and registries.</param>
-    /// <param name="theme">An extra theme to offer and start with; the default one is used when null.</param>
+    /// <param name="theme">An extra theme sheet to offer and start with; the persisted one is used when null.</param>
     /// <param name="layoutStore">Where the dock layout is persisted; a default location is used when null.</param>
-    public Workbench(GayaApplication app, StudioTheme? theme = null, WorkbenchLayoutStore? layoutStore = null)
+    public Workbench(GayaApplication app, ThemeSource? theme = null, WorkbenchLayoutStore? layoutStore = null)
     {
         ArgumentNullException.ThrowIfNull(app);
         this.app = app;
@@ -53,9 +55,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         if (theme is not null)
         {
-            app.Themes.Register(theme);
-            app.Themes.Apply(theme.Name);
-            Appearance.Theme = theme.Name;
+            var info = app.Themes.Register(theme);
+            app.Themes.ApplyColorTheme(info.Id);
+            Appearance.Theme = info.Id;
         }
 
         appearanceBridge = new AppearanceBridge(Appearance, app.Themes, app.Settings);
@@ -92,7 +94,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     }
 
     /// <summary>The theme every part of the workbench is drawn with, preview included.</summary>
-    StudioTheme Theme => app.Themes.Current;
+    ThemeTokens Theme => app.Themes.Current;
 
     /// <summary>
     /// The shell language service a plugin contributes, or null when none does — the host has no
@@ -108,6 +110,17 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     {
         dockTheme = Theme.ToDockTheme();
         controlPalette = Theme.ToControlPalette();
+    }
+
+    /// <summary>Installs the active theme's sheets into the GUI, so styled widgets resolve against them.</summary>
+    void SyncStyleSheets(Gui gui)
+    {
+        if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui) return;
+
+        styleSheetsVersion = app.Themes.SheetsVersion;
+        styledGui = gui;
+        gui.StyleSheets.Clear();
+        foreach (var sheet in app.Themes.Sheets) gui.StyleSheets.Add(sheet);
     }
 
     /// <summary>
@@ -189,7 +202,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         }
 
         if (descriptor.DefaultPlacement == PanelPlacement.Floating)
-            layout.Float(panelId, new Rect(180, 140, Theme.LeftWidth, Theme.BottomHeight));
+            layout.Float(panelId, new Rect(180, 140, WorkbenchLayoutStore.DefaultLeftWidth, WorkbenchLayoutStore.DefaultBottomHeight));
         else
             layout.EnsurePanel(panelId, ZoneFor(descriptor.DefaultPlacement), FractionFor(descriptor.DefaultPlacement));
     }
@@ -248,7 +261,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         {
             if (descriptor.DefaultPlacement == PanelPlacement.Floating)
             {
-                layout.Float(descriptor.Id, new Rect(180, 140, Theme.LeftWidth, Theme.BottomHeight));
+                layout.Float(descriptor.Id, new Rect(180, 140, WorkbenchLayoutStore.DefaultLeftWidth, WorkbenchLayoutStore.DefaultBottomHeight));
                 continue;
             }
 
@@ -269,9 +282,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
     float FractionFor(PanelPlacement placement) => placement switch
     {
-        PanelPlacement.Left => Theme.LeftWidth / 1600f,
-        PanelPlacement.Right => Theme.RightWidth / 1600f,
-        PanelPlacement.Bottom => Theme.BottomHeight / 950f,
+        PanelPlacement.Left => WorkbenchLayoutStore.DefaultLeftWidth / 1600f,
+        PanelPlacement.Right => WorkbenchLayoutStore.DefaultRightWidth / 1600f,
+        PanelPlacement.Bottom => WorkbenchLayoutStore.DefaultBottomHeight / 950f,
         _ => 0.25f
     };
 
@@ -348,6 +361,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         var t = Theme;
         gui.ControlPalette = controlPalette;
+        SyncStyleSheets(gui);
         gui.DrawRect(gui.ScreenRect, t.Background);
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(t.Gap).Padding(t.Gap).Enter())

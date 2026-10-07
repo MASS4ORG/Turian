@@ -46,6 +46,7 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<ILogger>()));
 
         RegisterSettings(context);
+        ViewportThemeTokens.Register(context.Themes);
 
         context.Panels.Register(new PanelDescriptor(
             SceneTreePanelId, "Scene Tree", PanelPlacement.Left,

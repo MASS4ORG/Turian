@@ -19,7 +19,7 @@ public sealed partial class Workbench
                    .BlockInput().Enter())
         {
             gui.SetZIndex(10_000);
-            gui.DrawBackgroundRect(Color.FromArgb(90, 0, 0, 0));
+            gui.DrawBackgroundRect(Theme.Scrim);
             ProgressCard(gui, progress);
         }
     }

@@ -15,7 +15,7 @@ static class TurianForms
     /// </summary>
     public static void ApplyStyle(Gui gui)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         gui.CurrentNodeScope.Set(new ILayoutNodeScopeValue[]
         {
             ControlStyles.Value<ControlCompactHeight, float>(theme.Scale(theme.RowHeight)),

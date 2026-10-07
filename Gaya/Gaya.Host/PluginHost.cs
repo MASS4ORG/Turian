@@ -109,7 +109,7 @@ public static class PluginHost
         // Settings and themes are services as well as registries: a plugin contributes pages through
         // the context, and anything that reads a setting resolves the service.
         var settings = new EditorSettings(logger);
-        var themes = new ThemeService();
+        var themes = new ThemeService(logger);
         services.AddSingleton(AppearanceSettings.Register(settings, previousAppearancePageId));
         services.AddSingleton<IEditorSettings>(settings);
         services.AddSingleton<IThemeService>(themes);
@@ -137,7 +137,7 @@ public static class PluginHost
         {
             var plugin = (IPlugin)Activator.CreateInstance(type)!;
             var context = new PluginContext(services, panels, commands, menus, chrome, tabStripChrome,
-                shortcuts, settings, logger, args);
+                shortcuts, settings, themes, logger, args);
             logger.LogDebug("Configuring plugin {PluginId} ({DisplayName})", attr.Id, attr.DisplayName);
             plugin.Configure(context);
             loaded.Add(attr.Id);
@@ -254,9 +254,11 @@ public static class PluginHost
         ITabStripChromeRegistry tabStripChrome,
         IShortcutRegistry shortcuts,
         ISettingsRegistry settings,
+        IThemeTokenRegistry themes,
         ILogger logger,
         IReadOnlyList<string> commandLineArgs) : IPluginContext
     {
+        public IThemeTokenRegistry Themes => themes;
         public IServiceCollection Services => services;
         public IPanelRegistry Panels => panels;
         public ICommandRegistry Commands => commands;

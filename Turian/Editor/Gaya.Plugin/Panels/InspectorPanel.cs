@@ -19,7 +19,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     bool trackingEdits;
     IReadOnlyList<string> validationWarnings = [];
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     readonly HashSet<string> collapsed = [];
     readonly FormDrawers drawers = new(TurianForms.Drawers);

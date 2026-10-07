@@ -1,15 +1,15 @@
 namespace Gaya.Host;
 
 /// <summary>
-/// Projects a <see cref="StudioTheme"/> onto the palettes Guinevere's own controls and dock space
-/// read, so everything the workbench hosts follows the chosen theme.
+/// Projects a <see cref="ThemeTokens"/> snapshot onto the palettes Guinevere's own controls and dock space read, so
+/// everything the workbench hosts follows the chosen theme.
 /// </summary>
-public static class StudioThemeExtensions
+public static class ThemeTokensExtensions
 {
     /// <summary>The dock space's palette: tab strip, panel fill, splitters and their ink.</summary>
     /// <param name="theme">The theme to project.</param>
     /// <returns>A matching dock theme.</returns>
-    public static DockTheme ToDockTheme(this StudioTheme theme)
+    public static DockTheme ToDockTheme(this ThemeTokens theme)
     {
         ArgumentNullException.ThrowIfNull(theme);
 
@@ -35,7 +35,7 @@ public static class StudioThemeExtensions
     /// </summary>
     /// <param name="theme">The theme to project.</param>
     /// <returns>A matching control palette.</returns>
-    public static ControlPalette ToControlPalette(this StudioTheme theme)
+    public static ControlPalette ToControlPalette(this ThemeTokens theme)
     {
         ArgumentNullException.ThrowIfNull(theme);
 
@@ -46,7 +46,7 @@ public static class StudioThemeExtensions
             Surface = theme.Field,
             SurfaceHover = theme.Hover,
             SurfaceActive = theme.Chrome,
-            Popup = theme.Panel,
+            Popup = theme.Popup,
             Border = theme.Border,
             BorderActive = theme.InkFaint,
             Divider = theme.Border,
@@ -60,8 +60,8 @@ public static class StudioThemeExtensions
             Selected = theme.Accent,
             Negative = theme.Error,
             Warning = theme.Warning,
-            FocusRing = Color.FromArgb(128, theme.Accent),
-            TextSelection = Color.FromArgb(110, theme.Accent),
+            FocusRing = theme.FocusRing,
+            TextSelection = theme.Selection,
         };
     }
 }

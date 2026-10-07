@@ -14,9 +14,6 @@ public sealed partial class TransformGizmo
     Vector4 XColor => Settings.AxisColor(Vector3.UnitX);
     Vector4 YColor => Settings.AxisColor(Vector3.UnitY);
     Vector4 ZColor => Settings.AxisColor(Vector3.UnitZ);
-    static readonly Vector4 HoverColor = new(1f, 0.87f, 0.52f, 1f);
-    static readonly Vector4 CenterColor = new(0.86f, 0.89f, 0.95f, 1f);
-    static readonly Vector4 DragColor = Vector4.One;
 
     TransformGizmoAxis axis;
     TransformGizmoMode handleMode;
@@ -30,6 +27,15 @@ public sealed partial class TransformGizmo
     Vector3 dragY;
     Vector3 dragZ;
     TransformSelection? transformSelection;
+
+    /// <summary>Gets or sets the color of the handle under the pointer; the host sets it from the theme.</summary>
+    public Vector4 HoverColor { get; set; } = new(1f, 0.87f, 0.52f, 1f);
+
+    /// <summary>Gets or sets the color of the free-move center handle.</summary>
+    public Vector4 CenterColor { get; set; } = new(0.86f, 0.89f, 0.95f, 1f);
+
+    /// <summary>Gets or sets the color of the handle being dragged.</summary>
+    public Vector4 DragColor { get; set; } = Vector4.One;
 
     /// <summary>Gets or sets the displayed tool, including the combined transform tool.</summary>
     public TransformGizmoMode Mode { get; set; } = TransformGizmoMode.Translate;

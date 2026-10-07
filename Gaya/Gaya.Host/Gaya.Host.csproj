@@ -15,6 +15,7 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <EmbeddedResource Include="Resources/logo.png"/>
+        <EmbeddedResource Include="Themes/*.pss" LogicalName="Gaya.Host.Themes.%(Filename)%(Extension)"/>
     </ItemGroup>
 
     <ItemGroup>

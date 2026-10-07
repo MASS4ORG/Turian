@@ -34,6 +34,15 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
+    /// <summary>Width of the left dock column in a seeded layout.</summary>
+    public const float DefaultLeftWidth = 300f;
+
+    /// <summary>Width of the right dock column in a seeded layout.</summary>
+    public const float DefaultRightWidth = 340f;
+
+    /// <summary>Height of the bottom dock row in a seeded layout.</summary>
+    public const float DefaultBottomHeight = 240f;
+
     /// <summary>
     /// Where the layout is written: <c>~/.gaya/layout.json</c> unless the
     /// caller supplies its own path.

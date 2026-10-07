@@ -14,7 +14,7 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
     const float popupWidth = 460f;
     const float popupHeight = 220f;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
 
     bool listOpen;

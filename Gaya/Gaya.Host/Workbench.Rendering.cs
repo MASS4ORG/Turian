@@ -103,8 +103,8 @@ public sealed partial class Workbench
     sealed class BrokenChrome(string chromeId) : IChromeItem
     {
         public void Render(Gui gui) =>
-            gui.DrawText($"{chromeId} failed to load — see the log.", StudioTheme.Current.Text(12),
-                StudioTheme.Current.Error);
+            gui.DrawText($"{chromeId} failed to load — see the log.", ThemeTokens.Current.Text(12),
+                ThemeTokens.Current.Error);
     }
 
     DockPanelInfo? PanelInfo(string panelId) =>

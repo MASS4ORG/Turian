@@ -1,0 +1,24 @@
+// Ayu Light: the bright half of the Ayu pair, white panels, warm grey ink and an orange accent.
+@const theme-id = "gaya.ayu-light";
+@const theme-name = "Ayu Light";
+@const theme-kind = light;
+@import "gaya.base";
+
+$base = #fafafa;
+$accent = #ff9940;
+$contrast = -0.06;
+
+$surface-window = #f0f0f0;
+$surface-panel = #fafafa;
+$surface-chrome = #ebebeb;
+$surface-field = #ffffff;
+$surface-hover = #e1e1e1;
+$surface-editor-area = #eaeaea;
+$border = #d6d6d6;
+$ink = #5c6166;
+$ink-dim = #6c7176;
+$ink-faint = #8a9199;
+$accent-fill = #ffddb8;
+$error = #e65050;
+$warning = #f29718;
+$folder = #ff9940;

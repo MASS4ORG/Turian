@@ -14,7 +14,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     const float pickerWidth = 280f;
     const float pickerHeight = 240f;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     static float RowHeight => Theme.Scale(18f);
 

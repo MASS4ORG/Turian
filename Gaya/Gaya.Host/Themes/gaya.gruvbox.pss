@@ -1,0 +1,23 @@
+// Gruvbox Dark: retro-groove warm earthy greys with an orange accent.
+@const theme-id = "gaya.gruvbox";
+@const theme-name = "Gruvbox";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #32302f;
+$accent = #fe8019;
+
+$surface-window = #282828;
+$surface-panel = #32302f;
+$surface-chrome = #3c3836;
+$surface-field = #1d2021;
+$surface-hover = #504945;
+$surface-editor-area = #1a1a18;
+$border = #504945;
+$ink = #ebdbb2;
+$ink-dim = #bdae93;
+$ink-faint = #928374;
+$accent-fill = #5e4327;
+$error = #fb4934;
+$warning = #fabd2f;
+$folder = #fe8019;

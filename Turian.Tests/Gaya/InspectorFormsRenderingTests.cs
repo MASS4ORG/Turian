@@ -11,11 +11,11 @@ public sealed class InspectorFormsRenderingTests
         var child = new Node { Parent = parent };
         parent.Children.Add(child);
         var tint = typeof(SceneTreePanel).GetMethod("Tint", BindingFlags.Static | BindingFlags.NonPublic)!;
-        Assert.Equal(StudioTheme.Current.InkFaint, tint.Invoke(null, [child, PrefabLink.None]));
+        Assert.Equal(ThemeTokens.Current.InkFaint, tint.Invoke(null, [child, PrefabLink.None]));
         parent.IsActive = true;
         Assert.Null(tint.Invoke(null, [child, PrefabLink.None]));
-        Assert.Equal(StudioTheme.Current.Accent, tint.Invoke(null, [child, PrefabLink.Instance]));
-        Assert.Equal(StudioTheme.Current.Error, tint.Invoke(null, [child, PrefabLink.Missing]));
+        Assert.Equal(ThemeTokens.Current.Accent, tint.Invoke(null, [child, PrefabLink.Instance]));
+        Assert.Equal(ThemeTokens.Current.Error, tint.Invoke(null, [child, PrefabLink.Missing]));
     }
 
     /// <summary>Hierarchy modifier clicks keep their ordered selection when synchronized with the Inspector.</summary>
