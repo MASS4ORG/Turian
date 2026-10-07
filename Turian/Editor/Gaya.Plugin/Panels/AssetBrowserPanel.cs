@@ -1,11 +1,9 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// The project's asset folder as a tree. A click shows the asset's import settings in the inspector,
-/// a double click opens it the way its kind says it opens, and a right-click offers rename, delete,
-/// copy, paste and the New menu.
+/// Browses project and brick assets through a shared tree, folder grid and filtered results view.
 /// </summary>
-sealed class AssetBrowserPanel : IPanel
+sealed partial class AssetBrowserPanel : IPanel, IDisposable
 {
 
     readonly TreeViewState state = new() { MultiSelect = true };
@@ -20,18 +18,35 @@ sealed class AssetBrowserPanel : IPanel
     readonly AssetCreationCatalog creation;
     readonly AssetBrowserSettings browserSettings;
     readonly AssetTypeCatalog types;
-    readonly AssetPreviewCatalog previews;
     readonly PrefabAuthoring prefabs;
     readonly AssetFileOperations operations;
     readonly BrickAssetTree brickTree;
     readonly ConfirmDialogChrome confirm;
-    readonly Dictionary<string, SKImage?> textureThumbnails = new(StringComparer.OrdinalIgnoreCase);
+    readonly BricksController bricks;
+    readonly AssetRevealService reveal;
+    readonly FileDialogChrome? fileDialogs;
+    readonly IEditorSettings editorSettings;
+    readonly AssetThumbnailCache thumbnails;
+    readonly AssetThumbnailRenderer? thumbnailRenderer;
+    readonly AssetImporter? importer;
+    readonly AssetLabelService? labelService;
+    readonly AssetDatabase? database;
+    readonly AssetBrowserNavigation navigation = new();
+    AssetFavoritesStore? favorites;
+    readonly Dictionary<string, string> thumbnailRevisions = new(StringComparer.Ordinal);
+    readonly Dictionary<string, AssetEntry[]> children = new(StringComparer.Ordinal);
+    readonly Dictionary<string, AssetEntry> byPath = new(StringComparer.Ordinal);
+    AssetBrowserViewMode frameMode;
+    int scanDirty;
+    bool queryDirty = true;
+    bool treeDirty;
+    bool thumbnailDirty;
+    float split = 0.3f;
     IReadOnlyList<AssetEntry> entries = [];
     string? scannedRoot;
     string? inspectedId;
     IReadOnlyList<string> inspectedIds = [];
     Guid pendingReveal;
-    bool showExtensions;
     bool bricksChanged;
 
     bool menuOpen;
@@ -57,11 +72,18 @@ sealed class AssetBrowserPanel : IPanel
     /// <param name="bricks">Reports changes to the installed bricks.</param>
     /// <param name="confirm">Asks before an asset is copied out of a brick by dragging.</param>
     /// <param name="build">Supplies the loaded user assemblies a dragged script's component type is found in.</param>
+    /// <param name="thumbnailRenderer">Renders queued previews on the GUI thread.</param>
+    /// <param name="importer">Reports imported content changes.</param>
+    /// <param name="labelService">Persists undoable label edits.</param>
+    /// <param name="database">Provides imported thumbnail revision hashes.</param>
+    /// <param name="fileDialogs">Selects source files to import into the current folder.</param>
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
         AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations,
-        BricksController bricks, ConfirmDialogChrome confirm, BuildManager build)
+        BricksController bricks, ConfirmDialogChrome confirm, BuildManager build,
+        AssetThumbnailRenderer? thumbnailRenderer = null, AssetImporter? importer = null,
+        AssetLabelService? labelService = null, AssetDatabase? database = null, FileDialogChrome? fileDialogs = null)
     {
         this.build = build;
         ArgumentNullException.ThrowIfNull(reveal);
@@ -74,16 +96,25 @@ sealed class AssetBrowserPanel : IPanel
         this.creation = creation;
         this.browserSettings = browserSettings;
         this.types = types;
-        this.previews = previews;
         this.prefabs = prefabs;
         this.operations = operations;
         this.confirm = confirm;
+        this.bricks = bricks;
+        this.reveal = reveal;
+        this.fileDialogs = fileDialogs;
+        this.editorSettings = editorSettings;
+        this.thumbnailRenderer = thumbnailRenderer;
+        this.importer = importer;
+        this.labelService = labelService;
+        this.database = database;
+        thumbnails = new AssetThumbnailCache((entry, size) => thumbnailRenderer?.Render(entry, size));
         brickTree = new BrickAssetTree(fileSystem);
-        bricks.Changed += () => bricksChanged = true;
-        showExtensions = browserSettings.ShowFileExtensions;
+        bricks.Changed += OnBricksChanged;
 
-        reveal.Requested += assetId => pendingReveal = assetId;
+        reveal.Requested += OnReveal;
         operations.Changed += Refresh;
+        fileSystem.PathMoved += OnPathMoved;
+        if (importer is not null) importer.AssetsChanged += Refresh;
         editorSettings.Changed += OnEditorSettingsChanged;
     }
 
@@ -98,26 +129,57 @@ sealed class AssetBrowserPanel : IPanel
             return;
         }
 
-        if (gui.Pass == Pass.Pass1Build) PrepareTree(root);
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            PrepareTree(root);
+            frameMode = browserSettings.ViewMode;
+        }
         if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
         systemClipboard ??= gui.Platform.Require<IClipboard>();
 
-        gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
-            dropAccept: static payload => payload is ReferenceDragPayload { AssetPath: not null } or ScriptDragPayload { AssetPath: not null },
-            onDrop: OnDrop);
+        using (gui.Node(-1, -1, "assets/browser").Expand().Direction(Axis.Vertical).Enter())
+        {
+            Toolbar(gui);
+            using (gui.Node(-1, -1, "assets/body").Expand().Direction(Axis.Horizontal).Enter()) Body(gui);
+        }
 
-        if (gui.Pass == Pass.Pass2Render) InspectSelection();
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            InspectSelection();
+            thumbnails.Process();
+        }
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+        LabelPrompt(gui);
     }
+
+    void Body(Gui gui)
+    {
+        var mode = AssetQuery.IsActive(frameFilter) ? AssetBrowserViewMode.Grid : frameMode;
+        if (mode == AssetBrowserViewMode.Split)
+        {
+            using (gui.Node().ExpandWidth(split).ExpandHeight().Enter()) Tree(gui);
+            gui.Splitter(ref split, Axis.Horizontal, thickness: 3f, min: 0.15f);
+            using (gui.Node().ExpandWidth(1f - split).ExpandHeight().Enter()) Grid(gui);
+        }
+        else if (mode == AssetBrowserViewMode.Tree) Tree(gui);
+        else Grid(gui);
+    }
+
+    void Tree(Gui gui) => gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
+        dropAccept: BrowserPayload, onDrop: OnDrop);
 
     void PrepareTree(string root)
     {
-        if (root != scannedRoot || bricksChanged)
+        thumbnails.BeginFrame();
+        if (thumbnailDirty) { thumbnails.Clear(); thumbnailDirty = false; }
+        if (root != scannedRoot || bricksChanged || System.Threading.Interlocked.Exchange(ref scanDirty, 0) != 0)
         {
             bricksChanged = false;
             Rescan(root);
             Rebuild();
         }
+
+        if (treeDirty) { Rebuild(); treeDirty = false; }
 
         if (pendingReveal != Guid.Empty) RevealPending();
     }
@@ -140,10 +202,12 @@ sealed class AssetBrowserPanel : IPanel
         inspectedId = target.AbsolutePath;
         inspectedIds = state.SelectedIds;
         state.Reveal();
+        NavigateTo(target.IsDirectory ? target.AbsolutePath : target.ParentPath!);
+        ClearFilters();
+        gridReveal = true;
     }
 
-    string? ParentOf(string path) =>
-        entries.FirstOrDefault(entry => entry.AbsolutePath == path)?.ParentPath;
+    string? ParentOf(string path) => byPath.GetValueOrDefault(path)?.ParentPath;
 
     /// <summary>Re-reads the asset folder.</summary>
     /// <param name="root">The project's assets directory.</param>
@@ -154,401 +218,101 @@ sealed class AssetBrowserPanel : IPanel
             .. fileSystem.ScanDirectory(root).Select(entry => entry with { ParentPath = entry.ParentPath ?? root }),
             .. brickTree.Scan(projectRoot)];
         scannedRoot = root;
-        textureThumbnails.Clear();
+        byPath.Clear();
+        foreach (var entry in entries) byPath[entry.AbsolutePath] = entry;
+        BindFavorites(projectRoot, root);
+        IndexChildren();
+        IndexThumbnails();
+        queryDirty = true;
+        breadcrumbsDirty = true;
+        toolbarDataDirty = true;
+    }
+
+    void BindFavorites(string projectRoot, string root)
+    {
+        if (favorites is null || projectRoot != favoritesProject)
+        {
+            favoritesProject = projectRoot;
+            favorites = new AssetFavoritesStore(projectRoot);
+            navigation.Reset(root);
+        }
+        if (!entries.Any(entry => entry.IsDirectory && entry.AbsolutePath == navigation.Current)) navigation.Visit(root);
+    }
+
+    void IndexChildren()
+    {
+        children.Clear();
+        foreach (var group in entries.Where(entry => entry.ParentPath is not null).GroupBy(entry => entry.ParentPath!))
+            children[group.Key] = [.. group.OrderByDescending(entry => entry.IsDirectory)
+                .ThenBy(entry => Path.GetFileName(entry.AbsolutePath), StringComparer.OrdinalIgnoreCase)];
+    }
+
+    void IndexThumbnails()
+    {
+        thumbnails.Clear();
+        thumbnailRevisions.Clear();
+        foreach (var entry in entries.Where(entry => !entry.IsDirectory))
+            thumbnailRevisions[entry.AbsolutePath] = Revision(entry);
     }
 
     void Rebuild()
     {
         rows.Clear();
+        AppendFavorites();
         foreach (var entry in ChildrenOf(null)) Append(entry, depth: 0);
     }
 
-    /// <summary>
-    /// A file row carries its asset id, so it can be dropped on a reference field, and its path, so a folder row can
-    /// receive it; a folder row carries only its path.
-    /// </summary>
-    object? DragPayload(TreeItem item)
+    void AppendFavorites()
     {
-        if (item.Tag is not AssetEntry entry) return null;
-        var selected = SelectedEntries;
-        var carried = selected.Any(candidate => candidate.AbsolutePath == entry.AbsolutePath) ? selected : [entry];
-        if (carried.Count == 1 && entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            return ScriptPayload(entry);
-        return new ReferenceDragPayload(entry.AssetMetadata?.Id ?? Guid.Empty, item.Label,
-            entry.AbsolutePath, entry.IsDirectory)
-        { Entries = carried };
-    }
-
-    /// <summary>
-    /// Drops a brick's asset or folder on a project folder after asking: the copy gets new ids and no longer follows the
-    /// brick. Bricks are never a target, and project assets are not moved by dragging.
-    /// </summary>
-    void OnDrop(TreeItem target, object payload)
-    {
-        if (TryMoveSelection(target, payload)) return;
-        CopyBrickAsset(target, payload);
-    }
-
-    bool TryMoveSelection(TreeItem target, object payload)
-    {
-        if (payload is ReferenceDragPayload { Entries.Count: > 0 } dragged
-            && MoveDestination(target, dragged.Entries) is { } folder)
+        if (browserSettings.ShowFavoritesInTree && favorites is { Paths.Count: > 0 })
         {
-            operations.MoveMany(dragged.Entries, folder);
-            return true;
-        }
-        return false;
-    }
-
-    string? MoveDestination(TreeItem target, IReadOnlyList<AssetEntry> carried)
-    {
-        if (target.Tag is not AssetEntry { IsReadOnly: false } destination) return null;
-        return carried.All(entry => !entry.IsReadOnly) ? DirectoryFor(destination) : null;
-    }
-
-    void CopyBrickAsset(TreeItem target, object payload)
-    {
-        var (source, name, isDirectory) = payload switch
-        {
-            ReferenceDragPayload { AssetPath: { } path } reference => (path, reference.Name, reference.IsDirectory),
-            ScriptDragPayload { AssetPath: { } path } script => (path, script.Name, false),
-            _ => (null, "", false),
-        };
-        var project = settings.Settings?.ProjectAbsoluteDir ?? "";
-        if (BrickCopyDestination(target, source, project) is not { } directory) return;
-
-        var where = Path.GetRelativePath(project, directory).Replace('\\', '/');
-        confirm.Ask("Copy into project",
-            $"Copy '{name}' from a brick into {where}? The copy is your own: it gets new ids and does not change when the brick updates.",
-            "Copy", () => operations.Duplicate(source!, directory, isDirectory));
-    }
-
-    string? BrickCopyDestination(TreeItem target, string? source, string project)
-    {
-        if (source is null || target.Tag is not AssetEntry { IsReadOnly: false } entry) return null;
-        if (rows.Find(row => row.Id == source).Tag is not AssetEntry { IsReadOnly: true }) return null;
-        var directory = DirectoryFor(entry);
-        return directory is null || IsInside(Path.Combine(project, Packages.ProjectManifest.DirectoryName), directory)
-            ? null : directory;
-    }
-
-    static bool IsInside(string folder, string path) =>
-        path.Equals(folder, StringComparison.Ordinal)
-        || path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.Ordinal);
-
-    object? ScriptPayload(AssetEntry entry)
-    {
-        if (!entry.AbsolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) return null;
-
-        var name = Path.GetFileNameWithoutExtension(entry.AbsolutePath);
-        foreach (var assembly in build.LoadedAssemblies)
-        {
-            Type[] types;
-            try { types = assembly.GetTypes(); }
-            catch (ReflectionTypeLoadException ex) { types = [.. ex.Types.Where(t => t is not null).Cast<Type>()]; }
-            catch { continue; }
-
-            var component = types.FirstOrDefault(type =>
-                typeof(Component).IsAssignableFrom(type) && type.Name.Equals(name, StringComparison.Ordinal));
-            if (component is not null) return new ScriptDragPayload(component, name, entry.AbsolutePath);
-        }
-
-        return null;
-    }
-
-    void Append(AssetEntry entry, int depth)
-    {
-        rows.Add(new TreeItem(
-            entry.AbsolutePath,
-            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir, Packages.ProjectManifest.DirectoryName)
-                ? "Bricks" : DisplayName(entry.AbsolutePath),
-            depth,
-            entry.IsDirectory,
-            Icon: IconFor(entry),
-            Tag: entry,
-            Tint: entry.IsDirectory ? ThemeTokens.Current.Folder : null));
-
-        if (!entry.IsDirectory) return;
-
-        foreach (var child in ChildrenOf(entry.AbsolutePath)) Append(child, depth + 1);
-    }
-
-    /// <summary>
-    /// What a row draws before its label: a folder glyph, a real thumbnail for a texture (the source
-    /// file decoded directly — cheap enough for a small icon, and exactly what its preview would show
-    /// anyway), or the kind's default glyph for anything else, including asset types with a live
-    /// preview too costly to render per row today (a material or a model — see <see cref="AssetPreviewCatalog"/>).
-    /// </summary>
-    Action<Gui> IconFor(AssetEntry entry)
-    {
-        var theme = ThemeTokens.Current;
-        var size = theme.Scale(theme.RowHeight) - 4f;
-
-        if (entry.IsDirectory)
-            return gui => gui.DrawText(EditorIcons.Folder, theme.Text(13), theme.Folder);
-
-        var kind = types.Resolve(entry.AbsolutePath);
-        var hasTexturePreview = entry.AssetMetadata is { } asset &&
-                                 previews.GetProvider(asset.GetType()) is ITexturePreviewProvider;
-
-        if (hasTexturePreview && ThumbnailFor(entry.AbsolutePath) is { } thumbnail)
-            return gui => gui.Image(thumbnail, size, size);
-
-        var glyph = kind?.DefaultIcon ?? EditorIcons.File;
-        return gui => gui.DrawText(glyph, theme.Text(13), theme.InkDim);
-    }
-
-    /// <summary>
-    /// Decodes a texture file's own bytes for its browser icon — no GPU round-trip, since the source
-    /// image already is the preview. Cached per path; cleared on <see cref="Rescan"/> so a reimported
-    /// or replaced file picks up its new contents.
-    /// </summary>
-    SKImage? ThumbnailFor(string path)
-    {
-        if (textureThumbnails.TryGetValue(path, out var cached)) return cached;
-
-        SKImage? image;
-        try { image = SKImage.FromEncodedData(path); }
-        catch { image = null; }
-
-        textureThumbnails[path] = image;
-        return image;
-    }
-
-    IEnumerable<AssetEntry> ChildrenOf(string? parentPath) =>
-        entries
-            .Where(entry => entry.ParentPath == parentPath)
-            .OrderByDescending(entry => entry.IsDirectory)
-            .ThenBy(entry => Path.GetFileName(entry.AbsolutePath), StringComparer.OrdinalIgnoreCase);
-
-    void OnClick(TreeViewEvent e)
-    {
-        if (e.Item.Tag is not AssetEntry entry) return;
-
-        if (e.Button == MouseButton.Right)
-        {
-            if (!state.SelectedIds.Contains(entry.AbsolutePath)) state.SelectedId = entry.AbsolutePath;
-            InspectSelection();
-            menuEntry = entry;
-            menuAt = pointer;
-            menuOpen = true;
-            return;
-        }
-
-        if (e.Button != MouseButton.Left || entry.IsDirectory) return;
-
-        // Folding is the tree's own business; a double click here opens the asset.
-        if (e.ClickCount >= 2 && !entry.IsReadOnly) opener.Open(entry);
-        else InspectSelection();
-    }
-
-    void OnEmptyClick(MouseButton button)
-    {
-        if (button != MouseButton.Right) return;
-
-        menuEntry = null;
-        menuAt = pointer;
-        menuOpen = true;
-    }
-
-    void BuildContextMenu(FlyoutBuilder menu)
-    {
-        var entry = menuEntry;
-
-        BuildEditMenu(menu, entry);
-        BuildCopyMenu(menu, entry);
-        BuildCreationMenu(menu, entry);
-    }
-
-    void BuildEditMenu(FlyoutBuilder menu, AssetEntry? entry)
-    {
-        menu.Item("Rename", () => BeginRename(entry), enabled: entry is { IsReadOnly: false });
-        menu.Item("Delete", DeleteSelected, enabled: entry is { IsReadOnly: false, ParentPath: not null });
-        menu.Item("Duplicate", DuplicateSelected, enabled: entry is { IsReadOnly: false, ParentPath: not null });
-        menu.Separator();
-    }
-
-    void BuildCopyMenu(FlyoutBuilder menu, AssetEntry? entry)
-    {
-        menu.Item("Copy", () => Copy(entry), enabled: entry is not null);
-        menu.Item("Paste", () => Paste(entry), enabled: entry?.IsReadOnly != true && fileSystem.CanPaste());
-        menu.Separator();
-        menu.Item("Copy Path", () => CopyPath(entry, relative: false), "Ctrl+Alt+C", entry is not null);
-        menu.Item("Copy Relative Path", () => CopyPath(entry, relative: true), "Ctrl+Alt+Shift+C", entry is not null);
-        menu.Separator();
-    }
-
-    void BuildCreationMenu(FlyoutBuilder menu, AssetEntry? entry)
-    {
-        if (entry?.IsReadOnly != true)
-            menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0));
-
-        if (entry is { IsDirectory: false, IsReadOnly: false } prefab
-            && string.Equals(Path.GetExtension(prefab.AbsolutePath), ".prefab", StringComparison.OrdinalIgnoreCase))
-            menu.Item("Create Prefab Variant", () => CreateVariant(prefab));
-    }
-
-    void CreateVariant(AssetEntry prefab)
-    {
-        if (prefabs.CreateVariant(prefab.AbsolutePath) is null)
-            Log.Logger.LogWarning("Could not create a variant of {Prefab}", prefab.AbsolutePath);
-        Refresh();
-    }
-
-    /// <summary>
-    /// Emits one level of the New menu: kinds whose path ends here become items, and the rest are
-    /// gathered by their next path segment into a submenu that recurses.
-    /// </summary>
-    void BuildNewMenu(FlyoutBuilder menu, IReadOnlyList<AssetCreationKind> kinds, int depth)
-    {
-        foreach (var kind in kinds.Where(k => Segments(k).Length == depth + 1))
-        {
-            var created = kind;
-            menu.Item(Segments(kind)[depth], () => Create(created));
-        }
-
-        foreach (var group in kinds.Where(k => Segments(k).Length > depth + 1)
-                     .GroupBy(k => Segments(k)[depth], StringComparer.Ordinal))
-        {
-            var nested = group.ToList();
-            menu.Submenu(group.Key, sub => BuildNewMenu(sub, nested, depth + 1));
+            rows.Add(new TreeItem("assets/favorites", "Favorites", 0, true, Icon: gui => gui.DrawText("★")));
+            foreach (var entry in entries.Where(entry => favorites.Paths.Contains(entry.AbsolutePath)))
+                rows.Add(new TreeItem(entry.AbsolutePath, DisplayName(entry.AbsolutePath), 1, Icon: IconFor(entry), Tag: entry));
         }
     }
 
-    static string[] Segments(AssetCreationKind kind) =>
-        kind.MenuPath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    string? favoritesProject;
 
-    /// <summary>Whether a row is selected, so an edit has a target.</summary>
-    public bool HasSelection => Selected is not null;
-
-    /// <summary>Puts the selected row's path on the system clipboard. What the panel's Copy Path shortcuts run.</summary>
-    /// <param name="relative">Whether the path starts at the project folder instead of the file system root.</param>
-    public void CopySelectedPath(bool relative) => CopyPath(Selected, relative);
-
-    void CopyPath(AssetEntry? entry, bool relative)
+    string Revision(AssetEntry entry)
     {
-        if (entry is null || systemClipboard is null) return;
-
-        var path = relative && settings.Settings?.ProjectAbsoluteDir is { } project
-            ? Path.GetRelativePath(project, entry.AbsolutePath).Replace('\\', '/')
-            : entry.AbsolutePath;
-        systemClipboard.SetClipboardText(path);
+        var file = new FileInfo(entry.AbsolutePath);
+        var meta = new FileInfo(entry.AbsolutePath + ".meta");
+        var record = RecordFor(entry);
+        return $"{file.LastWriteTimeUtc.Ticks}:{file.Length}:{meta.LastWriteTimeUtc.Ticks}:"
+            + $"{record?.SourceHash}:{record?.SettingsHash}:{record?.ImporterVersion}";
     }
 
-    /// <summary>Deletes the selected asset or folder. What the panel's Delete shortcut runs.</summary>
-    public void DeleteSelected()
+    AssetRecord? RecordFor(AssetEntry entry)
     {
-        if (operations.DeleteMany(SelectedEntries))
-        {
-            state.SetSelection([]);
-            InspectSelection();
-        }
+        if (database is null || entry.AssetMetadata is null) return null;
+        database.TryGetAsset(entry.AssetMetadata.Id, out var record);
+        return record;
     }
 
-    /// <summary>Starts the in-place rename of the selected row. What the panel's F2 shortcut runs.</summary>
-    public void RenameSelected() => BeginRename(Selected);
-
-    /// <summary>Copies the selected asset beside itself. What the panel's Duplicate shortcut runs.</summary>
-    public void DuplicateSelected()
+    void OnPathMoved(string source, string destination)
     {
-        operations.DuplicateMany(SelectedEntries);
+        favorites?.Remap(source, destination);
+        navigation.Remap(source, destination);
+        state.SetSelection(state.SelectedIds.Select(path => AssetPathSegments.Remap(path, source, destination)),
+            state.SelectedId is { } selected ? AssetPathSegments.Remap(selected, source, destination) : null);
     }
 
-    /// <summary>The row the tree has selected, or null when nothing is.</summary>
-    AssetEntry? Selected =>
-        entries.FirstOrDefault(entry => entry.AbsolutePath == state.SelectedId);
+    void OnBricksChanged() => bricksChanged = true;
 
-    IReadOnlyList<AssetEntry> SelectedEntries =>
-        [.. state.SelectedIds.Select(id => entries.FirstOrDefault(entry => entry.AbsolutePath == id))
-            .OfType<AssetEntry>()];
+    void OnReveal(Guid assetId) => pendingReveal = assetId;
 
-    void InspectSelection()
+    /// <inheritdoc />
+    public void Dispose()
     {
-        if (state.SelectedId == inspectedId && state.SelectedIds.SequenceEqual(inspectedIds)) return;
-        inspectedId = state.SelectedId;
-        inspectedIds = state.SelectedIds;
-        var selected = SelectedEntries.Where(entry => !entry.IsDirectory)
-            .Select(entry => inspections.Inspect(entry)).OfType<AssetInspection>().ToArray();
-        inspector.SelectMany(selected, selected.FirstOrDefault(item => item.AbsolutePath == inspectedId));
+        operations.Changed -= Refresh;
+        bricks.Changed -= OnBricksChanged;
+        reveal.Requested -= OnReveal;
+        fileSystem.PathMoved -= OnPathMoved;
+        editorSettings.Changed -= OnEditorSettingsChanged;
+        if (importer is not null) importer.AssetsChanged -= Refresh;
+        thumbnails.Dispose();
+        thumbnailRenderer?.Dispose();
     }
 
-    void BeginRename(AssetEntry? entry)
-    {
-        if (entry is null || entry.IsReadOnly) return;
-
-        state.BeginRename(entry.AbsolutePath, DisplayName(entry.AbsolutePath));
-    }
-
-    void Rename(TreeItem item, string name)
-    {
-        if (item.Tag is not AssetEntry { IsReadOnly: false } entry || string.IsNullOrWhiteSpace(name)) return;
-
-        if (!entry.IsDirectory && !browserSettings.ShowFileExtensions &&
-            string.IsNullOrEmpty(Path.GetExtension(name)))
-            name += Path.GetExtension(entry.AbsolutePath);
-
-        operations.Rename(entry.AbsolutePath, entry.IsDirectory, name);
-    }
-
-    string DisplayName(string path)
-    {
-        var name = Path.GetFileName(path);
-        return browserSettings.ShowFileExtensions ? name : Path.GetFileNameWithoutExtension(name);
-    }
-
-    /// <summary>
-    /// Rebuilds the tree when the file-extension preference changes. The chrome's toggle reports the
-    /// page, which lands here through <see cref="IEditorSettings.Changed"/>; anything else on the
-    /// settings file that changed value to the same extensions flag is ignored.
-    /// </summary>
-    void OnEditorSettingsChanged()
-    {
-        if (browserSettings.ShowFileExtensions == showExtensions) return;
-
-        showExtensions = browserSettings.ShowFileExtensions;
-        Rebuild();
-    }
-
-    void Delete(AssetEntry? entry)
-    {
-        if (entry is null || entry.IsReadOnly) return;
-
-        operations.Delete(entry.AbsolutePath);
-    }
-
-    void Copy(AssetEntry? entry)
-    {
-        if (entry is null) return;
-
-        fileSystem.Copy(entry.AbsolutePath);
-    }
-
-    void Paste(AssetEntry? entry)
-    {
-        if (DirectoryFor(entry) is not { } directory) return;
-
-        operations.Paste(directory);
-    }
-
-    void Create(AssetCreationKind kind)
-    {
-        if (DirectoryFor(menuEntry) is not { } directory) return;
-
-        creation.Create(kind, directory);
-        Refresh();
-    }
-
-    /// <summary>The folder an operation targets: the row itself when it is one, otherwise its parent.</summary>
-    string? DirectoryFor(AssetEntry? entry) =>
-        entry is null
-            ? settings.Settings?.AssetsAbsoluteDir
-            : entry.IsDirectory ? entry.AbsolutePath : entry.ParentPath ?? settings.Settings?.AssetsAbsoluteDir;
-
-    void Refresh()
-    {
-        if (scannedRoot is not { } root) return;
-
-        Rescan(root);
-        Rebuild();
-    }
 }

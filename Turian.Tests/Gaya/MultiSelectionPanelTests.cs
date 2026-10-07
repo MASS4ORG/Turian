@@ -149,7 +149,7 @@ public sealed class MultiSelectionPanelTests
             var operations = new AssetFileOperations(files, undo);
             var reveal = new AssetRevealService();
             var confirm = new ConfirmDialogChrome(new StudioLocalization());
-            var panel = new AssetBrowserPanel(files, settings, null!,
+            using var panel = new AssetBrowserPanel(files, settings, null!,
                 new AssetInspectionService(importer, types, settings, loader, logger), selection,
                 reveal, new AssetCreationCatalog(files, settings, build, logger),
                 new AssetBrowserSettings(), Substitute.For<IEditorSettings>(), types,
@@ -179,7 +179,10 @@ public sealed class MultiSelectionPanelTests
             Frame();
             void ClickRow(int row)
             {
-                input.MousePosition.Returns(new Vector2(200, row * 20 + 10));
+                IEnumerable<LayoutNode> Descendants(LayoutNode node) =>
+                    new[] { node }.Concat(node.Children.SelectMany(Descendants));
+                var rectangle = Descendants(gui.RootNode!).Single(node => node.Id == $"treeview/row{row}").Rect;
+                input.MousePosition.Returns(new Vector2(200, rectangle.Y + rectangle.H / 2));
                 input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
                 input.IsMouseButtonDown(GMouseButton.Left).Returns(true);
                 Frame();

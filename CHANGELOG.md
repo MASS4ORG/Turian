@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Asset browser folder grid and split views, cached Preview API thumbnails, zoom, breadcrumbs, search and type/label/favorite filters, persistent favorites, shared drag-and-drop and context menus with undoable labels and clipboard transfers.
 - Added (breaking): `.pss` color themes with hot reload #213
 - Changed (breaking): Guinevere fluent effects use the `DrawSd…` API.
 - Added: Theme bricks from the command line #215

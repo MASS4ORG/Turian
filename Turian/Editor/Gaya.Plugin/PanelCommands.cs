@@ -44,6 +44,14 @@ static class PanelCommands
     {
         var panelId = GayaPlugin.AssetsPanelId;
 
+        AssetAction(context, KeyboardKey.C, "copy", "Copy", panel => panel.CopySelected(), KeyModifiers.Ctrl);
+        AssetAction(context, KeyboardKey.X, "cut", "Cut", panel => panel.CutSelected(), KeyModifiers.Ctrl);
+        AssetAction(context, KeyboardKey.V, "paste", "Paste", panel => panel.PasteSelected(), KeyModifiers.Ctrl);
+        AssetAction(context, KeyboardKey.A, "selectAll", "Select All", panel => panel.SelectAll(), KeyModifiers.Ctrl);
+        AssetAction(context, KeyboardKey.F, "search", "Search", panel => panel.FocusSearch(), KeyModifiers.Ctrl);
+        AssetAction(context, KeyboardKey.Slash, "searchSlash", "Search", panel => panel.FocusSearch());
+        AssetAction(context, KeyboardKey.Escape, "clearFilters", "Clear Filters", panel => panel.ClearFilters());
+
         Add(context, panelId, KeyboardKey.Delete, new CommandDescriptor(
             "gaya.turian.assets.delete", "Assets: Delete",
             services => Panel<AssetBrowserPanel>(services, panelId)?.DeleteSelected(),
@@ -74,6 +82,16 @@ static class PanelCommands
             services => Panel<AssetBrowserPanel>(services, panelId)?.HasSelection ?? false)
         { MenuLabel = "Copy Relative Path" }, KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift);
     }
+
+    static void AssetAction(IPluginContext context, KeyboardKey key, string id, string label,
+        Action<AssetBrowserPanel> action, KeyModifiers modifiers = KeyModifiers.None) =>
+        Add(context, GayaPlugin.AssetsPanelId, key, new CommandDescriptor(
+            "gaya.turian.assets." + id, "Assets: " + label,
+            services =>
+            {
+                if (Panel<AssetBrowserPanel>(services, GayaPlugin.AssetsPanelId) is { } panel) action(panel);
+            })
+        { MenuLabel = label }, modifiers);
 
     /// <summary>
     /// The viewport's transform and navigation bindings fire only while the Scene panel has focus.

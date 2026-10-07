@@ -27,4 +27,20 @@ public class AssetFileSystemRenameTests : IDisposable
         Assert.Equal(["Game"], Directory.GetDirectories(root).Select(Path.GetFileName));
         Assert.True(File.Exists(Path.Combine(root, "Game", "keep.txt")));
     }
+
+    /// <summary>Renaming a non-scene asset preserves its own extension and metadata identity.</summary>
+    [Theory]
+    [InlineData("renamed")]
+    [InlineData("renamed.txt")]
+    public void RenameFilePreservesItsExtension(string name)
+    {
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, "original.txt");
+        File.WriteAllText(path, "text");
+        var asset = new Asset { Id = Guid.NewGuid(), RelativePath = path };
+        Serializer.Save(path + ".meta", asset);
+        var renamed = fileSystem.Rename(path, false, name);
+        Assert.Equal(Path.Combine(root, "renamed.txt"), renamed);
+        Assert.Equal(asset.Id, Asset.Load(renamed + ".meta")!.Id);
+    }
 }

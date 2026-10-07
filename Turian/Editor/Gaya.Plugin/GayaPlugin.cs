@@ -138,7 +138,8 @@ public sealed class GayaPlugin : IPlugin
             "gaya.turian.assets.tabMenu", AssetsPanelId,
             sp => new AssetBrowserChrome(
                 sp.GetRequiredService<AssetBrowserSettings>(),
-                sp.GetRequiredService<IEditorSettings>())));
+                sp.GetRequiredService<IEditorSettings>(),
+                sp.GetRequiredService<IShellHost>())));
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,
@@ -158,7 +159,13 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetFileOperations>(),
                 sp.GetRequiredService<BricksController>(),
                 sp.GetRequiredService<ConfirmDialogChrome>(),
-                sp.GetRequiredService<BuildManager>())));
+                sp.GetRequiredService<BuildManager>(),
+                new AssetThumbnailRenderer(sp.GetRequiredService<Vulkan>(), sp.GetRequiredService<AssetDatabase>(),
+                    sp.GetRequiredService<AssetPreviewCatalog>()),
+                sp.GetRequiredService<AssetImporter>(),
+                new AssetLabelService(sp.GetRequiredService<AssetImporter>(), sp.GetRequiredService<UndoService>()),
+                sp.GetRequiredService<AssetDatabase>(),
+                sp.GetRequiredService<FileDialogChrome>())));
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
