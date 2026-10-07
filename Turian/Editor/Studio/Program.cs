@@ -16,13 +16,12 @@ Log.Configure(loggerFactory);
 BuildManager.MsBuildLocatorRegisterDefaults();
 
 // Built-in plugins are compiled in; the rest come from the studio packages the user installed.
-var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(PackagedPlugins.Load(
-    new Dictionary<string, Gaya.Packages.SemanticVersion>
-    {
-        [ProjectPackages.HostName] = ProjectPackages.EngineVersion,
-        ["gaya"] = ProjectPackages.GayaVersion,
-    },
-    Log.Logger));
+var hosts = new Dictionary<string, Gaya.Packages.SemanticVersion>
+{
+    [ProjectPackages.HostName] = ProjectPackages.EngineVersion,
+    ["gaya"] = ProjectPackages.GayaVersion,
+};
+var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(PackagedPlugins.Load(hosts, Log.Logger).Assemblies);
 var shell = new ShellHost();
 var dispatcher = new CommandDispatcher();
 var panelAccessor = new PanelAccessor();
@@ -32,6 +31,7 @@ using var app = PluginHost.Load(pluginAssemblies, Log.Logger,
         services.AddSingleton<IShellHost>(shell);
         services.AddSingleton<ICommandDispatcher>(dispatcher);
         services.AddSingleton<IPanelAccessor>(panelAccessor);
+        services.AddSingleton(PackagedPlugins.Workspace(hosts, publicRegistry: ProjectPackages.PublicRegistry));
     },
     args, previousAppearancePageId: "gaya.turian.appearance");
 using var workbench = new Workbench(app);

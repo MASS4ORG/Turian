@@ -227,7 +227,7 @@ public static class BrickService
     /// <exception cref="PackageException">The registry has no name, address or scope, or a key that is not an ed25519 public key.</exception>
     public static void AddRegistry(string projectRoot, ScopedRegistry registry)
     {
-        ValidateRegistry(registry);
+        BrickRegistries.Validate(registry);
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
@@ -236,27 +236,11 @@ public static class BrickService
         ProjectPackages.Invalidate(projectRoot);
     }
 
-    static void ValidateRegistry(ScopedRegistry registry)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace) || registry.Scopes.Count == 0
-            || registry.Scopes.Any(string.IsNullOrWhiteSpace))
-            throw new PackageException("A registry needs a name, an address and at least one scope.");
-        ValidateKeys(registry);
-    }
-
-    static void ValidateKeys(ScopedRegistry registry)
-    {
-        foreach (var key in registry.Keys) _ = SshSignature.ParsePublicKey(key);
-        if (registry.Keys.Count == 0 && !registry.AllowUnsigned)
-            throw new PackageException("A registry needs at least one trusted key (an OpenSSH public key), or must be marked to allow unsigned bricks.");
-    }
-
     /// <summary>Saves edited dependencies and registries, restoring the original manifest if resolution fails.</summary>
     public static PackageResolution SaveManifest(string projectRoot, ProjectManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        foreach (var registry in manifest.ScopedRegistries) ValidateRegistry(registry);
+        foreach (var registry in manifest.ScopedRegistries) BrickRegistries.Validate(registry);
         if (manifest.ScopedRegistries.Select(r => r.Name).Distinct(StringComparer.Ordinal).Count()
             != manifest.ScopedRegistries.Count)
             throw new PackageException("Registry names must be unique.");
@@ -296,29 +280,8 @@ public static class BrickService
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="query">Text the id must contain; every brick when empty.</param>
     /// <returns>The registry, id and newest version of each match; a registry that cannot be read is reported in place of its bricks.</returns>
-    public static async Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string projectRoot, string query)
-    {
-        var found = new List<(string, string, string)>();
-        foreach (var registry in Registries(projectRoot))
-        {
-            try
-            {
-                var index = await new RegistryClient(registry).GetIndexAsync().ConfigureAwait(false);
-                found.AddRange(index.Bricks.Where(b => b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    .Select(b => (registry.Name, b.Key, Newest(b.Value))));
-            }
-            catch (PackageException ex)
-            {
-                found.Add((registry.Name, $"(unavailable: {ex.Message})", string.Empty));
-            }
-        }
-
-        return found;
-    }
-
-    static string Newest(RegistryBrick brick) =>
-        brick.Versions.Where(v => !v.Value.Yanked && SemanticVersion.TryParse(v.Key, out _)).Select(static v => SemanticVersion.Parse(v.Key))
-            .OrderByDescending(static v => v).FirstOrDefault()?.ToString() ?? "(yanked)";
+    public static Task<IReadOnlyList<(string Registry, string Id, string Latest)>> SearchAsync(string projectRoot, string query) =>
+        BrickRegistries.SearchAsync(Registries(projectRoot), query);
 
     /// <summary>What the fork of a brick in the project changed since it was copied.</summary>
     /// <param name="projectRoot">The project folder.</param>

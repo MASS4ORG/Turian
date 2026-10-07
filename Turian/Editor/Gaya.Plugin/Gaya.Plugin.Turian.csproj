@@ -16,6 +16,7 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>

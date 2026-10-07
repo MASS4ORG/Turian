@@ -26,7 +26,7 @@ public sealed class PackagedPluginsTests : IDisposable
         Package("theme", "com.acme.theme", [PackageScope.Studio], assemblyName);
         Manifest(("com.acme.theme", "file:../../theme"));
 
-        var loaded = Assert.Single(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio));
+        var loaded = Assert.Single(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
 
         Assert.Equal(assemblyName, loaded.GetName().Name);
         Assert.Contains(loaded.GetTypes(), type => type.GetCustomAttribute<PluginAttribute>() is not null);
@@ -40,12 +40,12 @@ public sealed class PackagedPluginsTests : IDisposable
         Package("tool", "com.acme.tool", [], $"Acme.Tool{Guid.NewGuid():N}");
         Manifest(("com.acme.tool", "file:../../tool"));
 
-        Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio));
+        Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
     }
 
     /// <summary>Without a studio manifest nothing is loaded.</summary>
     [Fact]
-    public void NoManifestLoadsNothing() => Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio));
+    public void NoManifestLoadsNothing() => Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
 
     void Package(string folder, string id, List<PackageScope> scopes, string assemblyName)
     {

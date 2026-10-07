@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
 namespace Gaya.Host;
 
 /// <summary>
@@ -128,6 +130,7 @@ public static class PluginHost
 
         RegisterShellCommands(commands, shortcuts);
         RegisterSettingsPanel(panels, commands, menus, shortcuts);
+        RegisterBricksPanel(services, panels, commands, logger);
 
         var args = commandLineArgs ?? [];
         var loaded = new List<string>();
@@ -145,6 +148,7 @@ public static class PluginHost
         }
 
         var provider = services.BuildServiceProvider(validateScopes: true);
+        StudioThemeBricks.Bind(provider.GetRequiredService<StudioBricks>(), themes, logger);
 
         foreach (var (attr, plugin) in instances)
         {
@@ -199,6 +203,27 @@ public static class PluginHost
 
         menus.Add(new MenuItemDescriptor(MenuIds.File, ShellCommands.Settings, "2", 0));
         shortcuts.Add(new KeyBinding(ShellCommands.Settings, KeyboardKey.Comma, KeyModifiers.Ctrl));
+    }
+
+    /// <summary>
+    /// The Bricks panel, managing the studio's bricks and, when a plugin supplies <see cref="IProjectBricks"/>, the
+    /// open workspace's. Plugins add the background tasks, inspector and file dialogs it uses through services.
+    /// </summary>
+    static void RegisterBricksPanel(IServiceCollection services, PanelRegistry panels, CommandRegistry commands,
+        ILogger logger)
+    {
+        services.TryAddSingleton(_ => PackagedPlugins.Workspace(PackagedPlugins.DefaultHosts));
+        services.AddSingleton(sp => new BricksController(sp.GetRequiredService<StudioBricks>(),
+            sp.GetService<IProjectBricks>(), sp.GetService<IBrickTaskRunner>(), logger));
+        services.AddSingleton(sp => new BricksPanel(sp.GetRequiredService<BricksController>(),
+            sp.GetService<IBrickFileDialogs>(), sp.GetService<IBrickInspector>()));
+
+        panels.Register(new PanelDescriptor(BricksPanel.PanelId, "Bricks", PanelPlacement.Center,
+            sp => sp.GetRequiredService<BricksPanel>())
+        { OpenByDefault = false });
+
+        commands.Register(new CommandDescriptor(ShellCommands.Bricks, "View: Bricks",
+            sp => sp.GetRequiredService<IShellHost>().ShowPanel(BricksPanel.PanelId)));
     }
 
     static IEnumerable<(PluginAttribute Attr, Type Type)> Discover(IEnumerable<Assembly> assemblies)

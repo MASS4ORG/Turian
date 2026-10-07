@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Added (breaking): Studio color themes are `.pss` stylesheets. The 14 built-ins ship as embedded sheets with identical colors, and every token derives from three seeds (`$base`, `$accent`, `$contrast`) in `gaya.base`. Sheets dropped into `~/.gaya/themes` appear in View → Themes and Settings and reload on save; a broken sheet keeps the last valid theme and logs `file:line:col`. `~/.gaya/theme.user.pss` overrides any theme. New tokens: success/info/hint, selection, scrim, log levels, ANSI 0–15 and version-control states. Plugins declare their own tokens (`IPluginContext.Themes`), and the Scene view's gizmo and orientation colors are now themeable. Settings store theme ids (old names still load). Migration: `StudioTheme` becomes `ThemeTokens` (`ThemeTokens.Current`); `IThemeService.Apply`/`Preview`/`Themes`/`CommittedName` become `ApplyColorTheme`/`PreviewColorTheme`/`ColorThemes`/`CommittedColorTheme`; `Register(StudioTheme)` is obsolete for one release. #213
+- Added: Bricks panel moved to Gaya with studio/project scopes #214
+- Added (breaking): `.pss` color themes with hot reload #213
+- Changed: theme API renamed to `ThemeTokens`/`ColorTheme`
 
 ## [2.3.1] - 2026-10-07
 

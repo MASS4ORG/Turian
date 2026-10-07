@@ -1,20 +1,29 @@
-using Gaya.Packages;
-
-namespace Gaya.Plugin.Turian;
+namespace Gaya.Packages.Editor;
 
 /// <summary>
-/// The Bricks panel: one searchable list of every brick the project could use, grouped by how far it is from being
-/// used (in use, on this machine, available), and a second tab for the registries bricks come from. A checkbox turns
-/// a brick on or off for the project; selecting a row shows the brick or registry in the inspector, which is where its
-/// details and actions are. It draws <see cref="BricksController"/> and holds no logic of its own.
+/// The Bricks panel: one searchable list of every brick the studio or the open workspace could use, grouped by how
+/// far it is from being used (in use, on this machine, available), and a second tab for the registries bricks come
+/// from. A checkbox turns a brick on or off; selecting a row shows the brick or registry in the inspector, which is
+/// where its details and actions are. It draws <see cref="BricksController"/> and holds no logic of its own.
 /// </summary>
 /// <param name="controller">The bricks' state and actions.</param>
 /// <param name="dialogs">Asks for a folder or file to add a brick from; without it those menu items are inert.</param>
 /// <param name="inspector">Shows the selected brick or registry; without it selecting only highlights the row.</param>
-sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs = null,
-    NodeInspectorController? inspector = null) : IPanel
+public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? dialogs = null,
+    IBrickInspector? inspector = null) : IPanel
 {
+    /// <summary>The panel's id; File and Settings entries bring it to the front.</summary>
+    public const string PanelId = "gaya.bricks";
+
     const float rowHeight = 36f;
+
+    static readonly (BrickCategoryFilter Category, string Label, float Width)[] Categories =
+    [
+        (BrickCategoryFilter.All, "Everything", 72f),
+        (BrickCategoryFilter.Themes, "Themes", 58f),
+        (BrickCategoryFilter.IconThemes, "Icon Themes", 82f),
+        (BrickCategoryFilter.Fonts, "Fonts", 48f),
+    ];
 
     static readonly (BrickFilter Filter, string Label, float Width)[] Filters =
     [
@@ -31,6 +40,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
     Func<string, Task<bool>>? addAction;
     BrickFilter filter = BrickFilter.All;
     bool loaded;
+    bool scopeChosen;
     bool addMenuOpen;
     bool moreMenuOpen;
     Vector2 pointer;
@@ -38,6 +48,19 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
     int seenRevision = -1;
 
     static ThemeTokens Theme => ThemeTokens.Current;
+
+    /// <summary>The content category the brick list shows, such as themes only.</summary>
+    public BrickCategoryFilter Category { get; set; }
+
+    /// <summary>Shows the studio's bricks of one content category, as Settings' "Browse themes…" does.</summary>
+    /// <param name="category">The category to list.</param>
+    public void Browse(BrickCategoryFilter category)
+    {
+        scopeChosen = true;
+        controller.Scope = BrickScope.Studio;
+        controller.Tab = BricksTab.Bricks;
+        Category = category;
+    }
 
     /// <inheritdoc />
     public void Render(Gui gui)
@@ -47,18 +70,26 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         if (!loaded)
         {
             loaded = true;
+            if (!scopeChosen && !controller.HasProject && controller.HasStudio) controller.Scope = BrickScope.Studio;
             controller.Refresh();
             _ = controller.RefreshRegistriesAsync();
         }
 
         pointer = gui.Input.MousePosition;
-        RefreshInspector();
+        if (controller.Revision != seenRevision)
+        {
+            seenRevision = controller.Revision;
+            inspector?.Refresh(controller);
+        }
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(Theme.Gap).Padding(10f, 8f).Enter())
         {
-            if (!controller.HasProject)
+            Scopes(gui);
+            if (!controller.HasWorkspace)
             {
-                Line(gui, "Open a project to manage its bricks.", Theme.InkDim);
+                Line(gui, controller.Scope == BrickScope.Project
+                    ? "Open a project to manage its bricks."
+                    : "This application has no studio bricks.", Theme.InkDim);
                 return;
             }
 
@@ -80,34 +111,30 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         gui.CascadeMenu(ref moreMenuOpen, menuAt, BuildMoreMenu);
     }
 
-    void RefreshInspector()
-    {
-        if (inspector is null || controller.Revision == seenRevision) return;
-
-        seenRevision = controller.Revision;
-
-        // A registry being edited keeps its unsaved values until it is saved, removed or another is selected.
-        if (inspector.SelectedObject is not FormInspection inspection) return;
-        if (IsCurrentRegistry(inspection)) return;
-        if (inspection.Key == "bricks-settings")
-        {
-            if (!Equals(inspection.Context, controller.ProjectFolder)) inspector.Select(controller.InspectSettings());
-            return;
-        }
-
-        inspector.Select(controller.InspectSelection());
-    }
-
-    bool IsCurrentRegistry(FormInspection inspection) =>
-        Equals(inspection.Context, controller.ProjectFolder)
-        && inspection.Target is ScopedRegistry
-        && inspection.Key == $"registry:{controller.SelectedRegistry}"
-        && controller.Tab == BricksTab.Registries;
-
     void Show(Action select)
     {
         select();
-        inspector?.Select(controller.InspectSelection());
+        inspector?.ShowSelection(controller);
+    }
+
+    /// <summary>The Studio and Project scope chips, shown when the host has both.</summary>
+    void Scopes(Gui gui)
+    {
+        if (!controller.HasStudio) return;
+
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/scopes").ExpandWidth().Direction(Axis.Horizontal)
+                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        {
+            foreach (var (scope, label, width) in new[] { (BrickScope.Studio, "Studio", 56f), (BrickScope.Project, "Project", 60f) })
+            {
+                if (!Chip(gui, label, $"bricks/scope/{scope}", width, controller.Scope == scope) || controller.Scope == scope)
+                    continue;
+                scopeChosen = true;
+                controller.Scope = scope;
+                _ = controller.RefreshRegistriesAsync();
+                inspector?.ShowSelection(controller);
+            }
+        }
     }
 
     void Tabs(Gui gui)
@@ -198,6 +225,15 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
                 if (Chip(gui, label, $"bricks/filter/{value}", width, filter == value)) filter = value;
             }
         }
+
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/categories").ExpandWidth().Direction(Axis.Horizontal)
+                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        {
+            foreach (var (value, label, width) in Categories)
+            {
+                if (Chip(gui, label, $"bricks/category/{value}", width, Category == value)) Category = value;
+            }
+        }
     }
 
     void OpenMenu(ref bool open)
@@ -208,19 +244,18 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
 
     void BuildAddMenu(FlyoutBuilder menu)
     {
-        menu.Item("Add by name…", () => BeginAdd("Brick name, e.g. org.mass4.turian.ui", AddByName));
+        menu.Item("Add by name…", () => BeginAdd("Brick name, e.g. org.mass4.themes.nord", AddByName));
         menu.Item("Add from git URL…", () => BeginAdd("Git repository, optionally ending in #tag or #branch",
             url => controller.AddFromSourceAsync($"git+{url.Trim()}")));
         menu.Separator();
-        menu.Item("Add from folder…", () => Pick(FileDialogMode.SelectFolder, "Add a brick from a folder", []),
+        menu.Item("Add from folder…", () => Pick(folder: true, "Add a brick from a folder"), enabled: dialogs is not null);
+        menu.Item("Add from .brick file…", () => Pick(folder: false, "Add a brick from a .brick file"),
             enabled: dialogs is not null);
-        menu.Item("Add from .brick file…", () => Pick(FileDialogMode.OpenFile, "Add a brick from a .brick file",
-            [FileDialogFilter.Of("Bricks", ".brick")]), enabled: dialogs is not null);
     }
 
     void BuildMoreMenu(FlyoutBuilder menu)
     {
-        menu.Item("Bricks settings", () => inspector?.Select(controller.InspectSettings()));
+        menu.Item("Bricks settings", () => inspector?.ShowSettings(controller));
         menu.Item("Refresh registries", () => _ = controller.RefreshRegistriesAsync());
         menu.Item("Restore", () => _ = controller.RestoreAsync());
         menu.Item("Update all", () => _ = controller.UpdateAsync());
@@ -241,16 +276,10 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
             : controller.InstallAsync(id, null);
     }
 
-    void Pick(FileDialogMode mode, string title, IReadOnlyList<FileDialogFilter> accepted) =>
-        dialogs?.Show(new FileDialogRequest
+    void Pick(bool folder, string title) =>
+        dialogs?.Pick(folder, title, path =>
         {
-            Mode = mode,
-            Title = title,
-            Filters = accepted,
-            OnComplete = path =>
-            {
-                if (path is not null) _ = controller.AddFromSourceAsync($"file:{path}");
-            },
+            if (path is not null) _ = controller.AddFromSourceAsync($"file:{path}");
         });
 
     void AddRow(Gui gui)
@@ -281,7 +310,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
 
     void List(Gui gui)
     {
-        var shown = BrickCatalog.Filter(controller.Catalog, filter, search);
+        var shown = BrickCatalog.Filter(controller.Catalog, filter, search, Category);
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
         {
             gui.ScrollY();
@@ -333,7 +362,7 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
         }
     }
 
-    static void Line(Gui gui, string text, Guinevere.Color color)
+    static void Line(Gui gui, string text, Color color)
     {
         using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"bricks/line/{text}").ExpandWidth().ContentAlignY(0.5f).Enter())
         {
@@ -369,5 +398,21 @@ sealed class BricksPanel(BricksController controller, FileDialogChrome? dialogs 
     }
 
     bool Button(Gui gui, string label, string id, float width, string? tooltip = null) =>
-        StudioControls.SmallTextButton(gui, label, id, Theme.Scale(width), tooltip) && !controller.IsBusy;
+        SmallTextButton(gui, label, id, Theme.Scale(width), tooltip) && !controller.IsBusy;
+
+    static bool SmallTextButton(Gui gui, string label, string id, float width, string? tooltip)
+    {
+        using (gui.Node(width, Theme.Scale(Theme.RowHeight), id).BlockInput().ContentAlignX(0.5f).ContentAlignY(0.5f)
+                   .Enter())
+        {
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+
+            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            gui.DrawText(label, Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
+            if (tooltip is not null) gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);
+
+            return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
+        }
+    }
 }

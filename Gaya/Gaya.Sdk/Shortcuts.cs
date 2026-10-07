@@ -378,6 +378,9 @@ public static class ShellCommands
 
     /// <summary>Brings the Settings panel to the front.</summary>
     public const string Settings = "gaya.shell.settings";
+
+    /// <summary>Brings the Bricks panel to the front.</summary>
+    public const string Bricks = "gaya.shell.bricks";
 }
 
 /// <summary>Ids of the panels the workbench itself contributes, before any plugin is configured.</summary>

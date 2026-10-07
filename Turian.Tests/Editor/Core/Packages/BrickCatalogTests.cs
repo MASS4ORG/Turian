@@ -3,6 +3,8 @@ namespace Turian.Tests;
 /// <summary>The catalog that merges installed, built-in, stored and registry bricks into available, installed and enabled.</summary>
 public sealed class BrickCatalogTests : IDisposable
 {
+    static readonly string[] Reserved = ["gaya", ProjectPackages.HostName];
+
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-brick-catalog-{Guid.NewGuid():N}");
 
     /// <summary>Creates the scratch folder.</summary>
@@ -29,7 +31,7 @@ public sealed class BrickCatalogTests : IDisposable
         store.RecordOrigin(stored, "git+https://example.com/aside.git");
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
 
-        var catalog = BrickCatalog.Local([used], builtins, store).ToDictionary(b => b.Id);
+        var catalog = BrickCatalog.Local([used], builtins, store, Reserved).ToDictionary(b => b.Id);
 
         Assert.Equal(BrickState.Enabled, catalog["user.mateo.used"].State);
         Assert.Equal(BrickState.Installed, catalog["user.mateo.aside"].State);
@@ -51,7 +53,7 @@ public sealed class BrickCatalogTests : IDisposable
         Directory.Move(BrickService.New(root, "user.mateo.unknown"), unknown);
         store.RecordOrigin(folder, "git+https://example.com/stored.git#v1");
 
-        var catalog = BrickCatalog.Local([], null, store).ToDictionary(b => b.Id);
+        var catalog = BrickCatalog.Local([], null, store, Reserved).ToDictionary(b => b.Id);
 
         Assert.Equal("git+https://example.com/stored.git#v1", catalog["user.mateo.stored"].Origin);
         Assert.Equal("git+https://example.com/stored.git#v1", catalog["user.mateo.stored"].InstallSource);
@@ -71,7 +73,7 @@ public sealed class BrickCatalogTests : IDisposable
         var unrecorded = Path.Combine(store.Root, "user.mateo.old@sha256-2");
         Directory.Move(BrickService.New(root, "user.mateo.old"), unrecorded);
 
-        var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, store),
+        var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, store, Reserved),
             [("bricks.example", "user.mateo.old", "0.1.0")]).ToDictionary(b => b.Id);
 
         Assert.Equal("^0.1.0", catalog["user.mateo.fetched"].InstallSource);
@@ -84,7 +86,7 @@ public sealed class BrickCatalogTests : IDisposable
     public void RegistriesAddAvailableBricksAndUpdates()
     {
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
-        var local = BrickCatalog.Local([used], null, null);
+        var local = BrickCatalog.Local([used], null, null, Reserved);
 
         var catalog = BrickCatalog.WithRegistries(local,
             [("bricks.example", "user.mateo.used", "9.0.0"), ("bricks.example", "user.mateo.remote", "1.2.0")])
@@ -103,7 +105,7 @@ public sealed class BrickCatalogTests : IDisposable
         var builtins = Path.Combine(root, "builtins");
         _ = BrickService.New(builtins, "user.mateo.builtin");
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
-        var catalog = BrickCatalog.Local([used], builtins, null);
+        var catalog = BrickCatalog.Local([used], builtins, null, Reserved);
 
         Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Installed, null).Select(b => b.Id));
         Assert.Equal(["user.mateo.builtin"], BrickCatalog.Filter(catalog, BrickFilter.Available, null).Select(b => b.Id));
