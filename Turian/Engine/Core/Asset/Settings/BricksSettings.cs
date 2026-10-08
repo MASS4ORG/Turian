@@ -25,7 +25,7 @@ public sealed class BricksSettings : ProjectManifest
     {
         var manifest = string.IsNullOrWhiteSpace(projectFolder)
             ? new ProjectManifest()
-            : ProjectManifest.Load(projectFolder, includeUserOverride: false).Manifest;
+            : Load(projectFolder, includeUserOverride: false).Manifest;
         Dependencies = manifest.Dependencies;
         ScopedRegistries = manifest.ScopedRegistries;
     }

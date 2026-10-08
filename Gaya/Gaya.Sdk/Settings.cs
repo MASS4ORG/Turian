@@ -21,7 +21,7 @@ public sealed class SettingsPageDescriptor
     {
         ArgumentNullException.ThrowIfNull(target);
         var type = target.GetType();
-        var attribute = type.GetCustomAttribute<Gaya.EditorSettingAttribute>()
+        var attribute = type.GetCustomAttribute<EditorSettingAttribute>()
                         ?? throw new ArgumentException("Settings classes must declare [EditorSetting].", nameof(target));
         if (string.IsNullOrWhiteSpace(attribute.Path))
             throw new ArgumentException("Settings classes must declare a category path.", nameof(target));

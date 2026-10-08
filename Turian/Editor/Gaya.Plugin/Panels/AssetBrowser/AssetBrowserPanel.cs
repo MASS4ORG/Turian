@@ -173,7 +173,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
     {
         thumbnails.BeginFrame();
         if (thumbnailDirty) { thumbnails.Clear(); thumbnailDirty = false; }
-        if (root != scannedRoot || bricksChanged || System.Threading.Interlocked.Exchange(ref scanDirty, 0) != 0)
+        if (root != scannedRoot || bricksChanged || Interlocked.Exchange(ref scanDirty, 0) != 0)
         {
             bricksChanged = false;
             Rescan(root);

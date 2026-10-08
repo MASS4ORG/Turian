@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using static Turian.Tests.LayerTestData;
 
 namespace Turian.Tests;

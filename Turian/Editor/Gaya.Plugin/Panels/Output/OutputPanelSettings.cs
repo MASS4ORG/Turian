@@ -6,7 +6,7 @@ namespace Gaya.Plugin.Turian;
 /// from a recompile). Stored with the user as a hidden settings page, and bound by the panel's own
 /// settings row — the same object the Settings panel would edit if it were not hidden.
 /// </summary>
-[Gaya.EditorSetting("Studio/Output", Id = PageId, Hidden = true, Description = "How the Output console displays its entries and when it clears itself.")]
+[EditorSetting("Studio/Output", Id = PageId, Hidden = true, Description = "How the Output console displays its entries and when it clears itself.")]
 public sealed class OutputPanelSettings
 {
     /// <summary>The settings page's id, keying the stored values and the panel's change reports.</summary>

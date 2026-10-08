@@ -93,7 +93,7 @@ public struct NodeLayers
 
     readonly record struct Membership(int Slot, byte Index);
 
-    [System.Runtime.CompilerServices.InlineArray(InlineCapacity)]
+    [InlineArray(InlineCapacity)]
     struct LayerSlots
     {
         byte first;

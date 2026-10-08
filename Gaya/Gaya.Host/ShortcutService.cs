@@ -4,7 +4,7 @@ namespace Gaya.Host;
 /// The overrides the user's settings file stores: command id to key sequence, where an empty
 /// sequence means the user cleared the shortcut rather than never having touched it.
 /// </summary>
-[Gaya.EditorSetting("Editor/Shortcuts", Id = ShortcutService.PageId, Hidden = true)]
+[EditorSetting("Editor/Shortcuts", Id = ShortcutService.PageId, Hidden = true)]
 public sealed class ShortcutOverrides
 {
     /// <summary>Command id to the sequence bound to it, written the way a menu displays one.</summary>

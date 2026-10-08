@@ -4,7 +4,7 @@ namespace Gaya.Plugin.Turian;
 /// How the Scene view's free camera responds to input. Applied to the viewport's
 /// <c>SceneCameraController</c> every frame, so an edit is visible on the next drag.
 /// </summary>
-[Gaya.EditorSetting("Scene Viewer/Camera", Id = "gaya.turian.editorCamera")]
+[EditorSetting("Scene Viewer/Camera", Id = "gaya.turian.editorCamera")]
 public sealed class EditorCameraSettings
 {
     /// <summary>The shared grid preferences registered as a separate Scene Viewer settings page.</summary>
@@ -29,17 +29,17 @@ public sealed class EditorCameraSettings
     internal void NotifyChanged(string pageId) => Store?.NotifyChanged(pageId);
 
     /// <summary>Metres per second the camera flies at, before the Shift multiplier.</summary>
-    [Gaya.EditorSetting("Move Speed", Description = "Metres per second with the navigation shortcuts. Shift is four times this.")]
+    [EditorSetting("Move Speed", Description = "Metres per second with the navigation shortcuts. Shift is four times this.")]
     [Range(0.1f, 100f)]
     public float MoveSpeed { get; set; } = 5f;
 
     /// <summary>Radians of rotation per pixel of pointer travel.</summary>
-    [Gaya.EditorSetting("Look Sensitivity", Description = "Radians the view turns per pixel of pointer travel.")]
+    [EditorSetting("Look Sensitivity", Description = "Radians the view turns per pixel of pointer travel.")]
     [Range(0.0005f, 0.05f)]
     public float LookSensitivity { get; set; } = 0.005f;
 
     /// <summary>Fraction of the move speed one scroll notch dollies by.</summary>
-    [Gaya.EditorSetting("Zoom Fraction", Description = "Fraction of the move speed one scroll notch travels.")]
+    [EditorSetting("Zoom Fraction", Description = "Fraction of the move speed one scroll notch travels.")]
     [Range(0.01f, 1f)]
     public float ZoomFraction { get; set; } = 0.1f;
 

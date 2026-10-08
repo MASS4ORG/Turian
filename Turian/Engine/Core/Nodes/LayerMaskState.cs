@@ -90,7 +90,7 @@ public readonly struct CompiledLayerMask
         return new CompiledLayerMask(GroupSlot, ValueCount, updated);
     }
 
-    [System.Runtime.CompilerServices.InlineArray(4)]
+    [InlineArray(4)]
     struct MaskWords
     {
         ulong first;

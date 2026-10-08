@@ -1,14 +1,14 @@
 namespace Gaya.Host;
 
 /// <summary>Stores the desktop editor's frame rate limit.</summary>
-[Gaya.EditorSetting("General/Performance", Id = PageId)]
+[EditorSetting("General/Performance", Id = PageId)]
 public sealed class FrameRateSettings
 {
     /// <summary>The stable id of the performance settings page.</summary>
     public const string PageId = "gaya.performance";
 
     /// <summary>Gets or sets the maximum frames per second, with zero disabling the limit.</summary>
-    [Gaya.EditorSetting("Cap FPS", Description = "Maximum editor frames per second. Set to 0 for uncapped rendering.")]
+    [EditorSetting("Cap FPS", Description = "Maximum editor frames per second. Set to 0 for uncapped rendering.")]
     [Range(0, 1000)]
     public int CapFps
     {

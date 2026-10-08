@@ -12,25 +12,25 @@ public enum AssetBrowserViewMode
 }
 
 /// <summary>Persistent display options for the Asset Browser.</summary>
-[Gaya.EditorSetting("Asset Browser", Id = PageId)]
+[EditorSetting("Asset Browser", Id = PageId)]
 public sealed class AssetBrowserSettings
 {
     /// <summary>The settings page this object backs, for raise-changed notifications.</summary>
     public const string PageId = "gaya.turian.assetBrowser";
 
     /// <summary>Whether file extensions are included in asset tree labels.</summary>
-    [Gaya.EditorSetting("Show file extensions", Description = "Display extensions in the asset tree.")]
+    [EditorSetting("Show file extensions", Description = "Display extensions in the asset tree.")]
     public bool ShowFileExtensions { get; set; } = false;
 
     /// <summary>The browser layout.</summary>
-    [Gaya.EditorSetting("View mode")]
+    [EditorSetting("View mode")]
     public AssetBrowserViewMode ViewMode { get; set; } = AssetBrowserViewMode.Split;
 
     /// <summary>The preview size in logical pixels.</summary>
-    [Gaya.EditorSetting("Grid zoom")]
+    [EditorSetting("Grid zoom")]
     public int GridZoom { get; set; } = 64;
 
     /// <summary>Whether the tree includes a shortcut section for favorites.</summary>
-    [Gaya.EditorSetting("Favorites in tree")]
+    [EditorSetting("Favorites in tree")]
     public bool ShowFavoritesInTree { get; set; }
 }

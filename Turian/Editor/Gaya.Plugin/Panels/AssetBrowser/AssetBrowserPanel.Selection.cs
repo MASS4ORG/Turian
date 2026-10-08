@@ -149,6 +149,6 @@ sealed partial class AssetBrowserPanel
 
     void Refresh()
     {
-        System.Threading.Interlocked.Exchange(ref scanDirty, 1);
+        Interlocked.Exchange(ref scanDirty, 1);
     }
 }

@@ -1,6 +1,6 @@
 namespace Gaya.Plugin.Turian;
 
-[Gaya.EditorSetting("Studio/Recent Projects", Id = "gaya.turian.recentProjects", Hidden = true)]
+[EditorSetting("Studio/Recent Projects", Id = "gaya.turian.recentProjects", Hidden = true)]
 sealed class RecentProjectsSettings
 {
     List<string> paths = [];
