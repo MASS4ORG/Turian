@@ -26,6 +26,11 @@ sealed class GameViewport : IDisposable
     readonly PlayModeService playMode;
     readonly ILogger log;
     readonly SceneViewSettings viewSettings;
+    readonly FrameStatistics panelStatistics = new();
+
+    bool showStatistics;
+    bool statisticsVisible;
+    GameStatisticsDrawing? statisticsDrawing;
 
     readonly HashSet<KeyboardKey> heldKeys = [];
     readonly HashSet<MouseButton> heldButtons = [];
@@ -61,14 +66,41 @@ sealed class GameViewport : IDisposable
         playMode.StateChanged += OnPlayStateChanged;
     }
 
-    /// <summary>
-    /// Draws one frame into the current layout node. Everything happens in the render pass: the
-    /// node's rectangle — which sizes the offscreen target — is only resolved after layout.
-    /// </summary>
+    /// <summary>Whether the Game panel displays its own statistics overlay during Play.</summary>
+    public bool ShowStatistics
+    {
+        get => showStatistics;
+        set
+        {
+            if (showStatistics == value) return;
+            showStatistics = value;
+            panelStatistics.Clear();
+        }
+    }
+
+    /// <summary>Builds the panel overlay and draws the camera after layout resolves the viewport rectangle.</summary>
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass == Pass.Pass1Build) statisticsVisible = ShowStatistics && playMode.State == PlayState.Playing;
+        if (gui.Pass == Pass.Pass2Render) RenderViewport(gui);
+        RenderStatisticsOverlay(gui);
+    }
+
+    void RenderStatisticsOverlay(Gui gui)
+    {
+        if (!statisticsVisible) return;
+        using (gui.Node(-1, -1, "game/statistics").Expand().Absolute(0, 0).HitTestVisible(false).Enter())
+        {
+            gui.SetZIndex(1);
+            if (gui.Pass != Pass.Pass2Render || !ShowStatistics || panelStatistics.Count == 0) return;
+            statisticsDrawing ??= new GameStatisticsDrawing(panelStatistics, sceneTree);
+            gui.CurrentNode.DrawList.Add(statisticsDrawing);
+        }
+    }
+
+    void RenderViewport(Gui gui)
+    {
         if (!PrepareFrame(gui)) return;
         var rect = gui.CurrentNode.Rect;
         var (root, camera) = ResolveSource();
@@ -96,13 +128,15 @@ sealed class GameViewport : IDisposable
     {
         var target = playMode.State == PlayState.Playing ? RenderStatisticsTargets.Find(root) : null;
         statisticsTarget = target;
-        service!.CollectStatistics = target is not null;
+        var collectPanelStatistics = ShowStatistics && playMode.State == PlayState.Playing;
+        service!.CollectStatistics = target is not null || collectPanelStatistics;
         service.Render(root, interval, camera);
         if (target is not null)
         {
             target.SceneLoadMilliseconds = sceneTree.CurrentSceneLoadMilliseconds;
         }
         RenderStatisticsTargets.Record(target, service.FrameStats);
+        if (collectPanelStatistics) panelStatistics.Add(service.FrameStats);
     }
 
     bool PrepareFrame(Gui gui)
@@ -276,6 +310,7 @@ sealed class GameViewport : IDisposable
         _ = state;
         lastResizedCamera = null;
         statisticsTarget?.Statistics.Clear();
+        panelStatistics.Clear();
         ReleaseInput();
     }
 
@@ -312,5 +347,7 @@ sealed class GameViewport : IDisposable
         uiPresenter?.Dispose();
         uiPresenter = null;
         overlayRoot = null;
+        statisticsDrawing?.Dispose();
+        statisticsDrawing = null;
     }
 }
