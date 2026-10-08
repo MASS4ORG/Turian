@@ -17,6 +17,8 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
+        <ProjectReference Include="../CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
@@ -67,4 +69,5 @@
         <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
     </ItemGroup>
 
+    <Import Project="Build/Settings/RuntimeDependencies.targets"/>
 </Project>

@@ -22,6 +22,7 @@
     <ItemGroup>
         <ProjectReference Include="$(TurianDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(TurianDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(TurianDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -37,4 +38,5 @@
         <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.23.0"/>
     </ItemGroup>
 
+    <Import Project="../../Core/Build/Settings/RuntimeDependencies.targets"/>
 </Project>

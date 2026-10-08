@@ -27,15 +27,7 @@ sealed partial class Build
 
     static readonly string[] ReleaseProjectNames = ["Turian.Editor.CLI", "Turian.Editor.Studio"];
 
-    static readonly (string Directory, string Name)[] EngineLibraries =
-    [
-        ("Gaya/Gaya.Attributes", "Gaya.Attributes"),
-        ("Turian/Engine/Attributes", "Attributes"),
-        ("Gaya/Gaya.Packages", "Gaya.Packages"),
-        ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
-        ("Turian/Engine/Core", "Turian.Engine.Core")
-    ];
-
+    /// <summary>Publishes the editors and the runtime assemblies needed to compile and export user projects.</summary>
     public Target Publish => td =>
         td
             .DependsOn(Restore)
@@ -79,11 +71,16 @@ sealed partial class Build
                 (RootDirectory / "Turian/Editor/CSharp/CodeGenerator" / "bin" / Config / "netstandard2.0" /
                  "Turian.CSharp.CodeGenerator.dll").CopyToDirectory(libraryDirectory, ExistsPolicy.FileOverwrite);
 
-                foreach (var (directory, name) in EngineLibraries)
-                {
-                    var source = RootDirectory / directory / "bin" / Config / "net10.0" / $"{name}.dll";
-                    source.CopyToDirectory(libraryDirectory, ExistsPolicy.FileOverwrite);
-                }
+                _ = DotNetMSBuild(settings => settings
+                    .SetTargetPath(RootDirectory / "Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj")
+                    .SetTargets("CopyTurianRuntimeAssemblies")
+                    .SetConfiguration(Config)
+                    .SetRestore(true)
+                    .SetNodeReuse(false)
+                    .SetMaxCpuCount(1)
+                    .SetProperty("NoLocalPackages", NoLocalPackages)
+                    .SetProperty("RuntimeIdentifier", RuntimeIdentifier)
+                    .SetProperty("TurianRuntimeLibraryDirectory", libraryDirectory));
 
                 PublishBootstrap("turian-cli");
                 PublishBootstrap("turian-studio");

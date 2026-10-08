@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed (breaking): Wavefront OBJ import is an optional `org.mass4.turian.obj` editor brick; existing metadata IDs and cooked caches remain valid #47
 - Changed (breaking): Replace AMMESH with glTF 2.0 (GLB); migrate existing caches and preserve authoring assets
+- Changed: Generate game packages, resolved versions, assembly paths, target framework and release runtime library copies from the launcher build graph, removing duplicated build settings lists and stale versions
 - Added (breaking): `.pss` color themes with hot reload #213
 - Changed (breaking): Guinevere fluent effects.
 - Changed (breaking): Gaya settings use class-level attributes as their sole configuration

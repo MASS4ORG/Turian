@@ -1,0 +1,55 @@
+<Project>
+    <!-- The launcher graph contains Engine.Core and its runtime dependencies, without editor importers or tooling. -->
+    <Target Name="GetTurianRuntimeDependencies" DependsOnTargets="ResolveReferences"
+            Returns="@(_TurianRuntimeManifestLine)">
+        <ItemGroup>
+            <_TurianRuntimePackageAsset Include="@(RuntimeCopyLocalItems);@(NativeCopyLocalItems);@(RuntimeTargetsCopyLocalItems)"/>
+            <_TurianRuntimePackageAsset Remove="@(_TurianRuntimePackageAsset)"
+                                       Condition="'%(_TurianRuntimePackageAsset.NuGetPackageId)' == '' Or '%(_TurianRuntimePackageAsset.CopyToPublishDirectory)' == 'false'"/>
+            <_TurianRuntimeManifestLine Include="framework|$(TargetFramework)"/>
+            <_TurianRuntimeManifestLine Include="@(_TurianRuntimePackageAsset->'package|%(NuGetPackageId)|%(NuGetPackageVersion)')"/>
+            <_TurianRuntimeProjectAssembly Include="@(ReferenceCopyLocalPaths)"
+                                           Condition="'%(ReferenceCopyLocalPaths.ReferenceSourceTarget)' == 'ProjectReference' And '%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
+                <ProjectPath>$([MSBuild]::MakeRelative('$(SolutionDir)', '%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile)'))</ProjectPath>
+                <SourceDirectory>$([System.IO.Path]::GetDirectoryName('%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile)'))</SourceDirectory>
+            </_TurianRuntimeProjectAssembly>
+            <_TurianRuntimeProjectAssembly>
+                <RelativeDirectory>$([MSBuild]::MakeRelative('$(SolutionDir)', '%(_TurianRuntimeProjectAssembly.SourceDirectory)'))</RelativeDirectory>
+                <!-- External projects are copied beside the launcher; shipped distributions resolve every assembly from lib/. -->
+                <RelativeDirectory Condition="$([System.String]::Copy('%(_TurianRuntimeProjectAssembly.ProjectPath)').StartsWith('..'))">$([MSBuild]::MakeRelative('$(SolutionDir)', '$(MSBuildProjectDirectory)'))</RelativeDirectory>
+                <ProjectPath Condition="$([System.String]::Copy('%(_TurianRuntimeProjectAssembly.ProjectPath)').StartsWith('..'))"></ProjectPath>
+            </_TurianRuntimeProjectAssembly>
+            <_TurianRuntimeManifestLine Include="@(_TurianRuntimeProjectAssembly->'assembly|%(RelativeDirectory)|%(Filename)|%(ProjectPath)')"/>
+        </ItemGroup>
+        <RemoveDuplicates Inputs="@(_TurianRuntimeManifestLine)">
+            <Output TaskParameter="Filtered" ItemName="_TurianRuntimeManifestUniqueLine"/>
+        </RemoveDuplicates>
+        <ItemGroup>
+            <_TurianRuntimeManifestLine Remove="@(_TurianRuntimeManifestLine)"/>
+            <_TurianRuntimeManifestLine Include="@(_TurianRuntimeManifestUniqueLine)"/>
+        </ItemGroup>
+    </Target>
+
+    <!-- Release user-code compilation needs loose runtime assemblies even when the editor is bundled. -->
+    <Target Name="CopyTurianRuntimeAssemblies" DependsOnTargets="GetTurianRuntimeDependencies">
+        <Error Condition="'$(TurianRuntimeLibraryDirectory)' == ''"
+               Text="TurianRuntimeLibraryDirectory must specify the release library directory."/>
+        <Copy SourceFiles="@(_TurianRuntimeProjectAssembly)" DestinationFolder="$(TurianRuntimeLibraryDirectory)"
+              SkipUnchangedFiles="true"/>
+    </Target>
+
+    <Target Name="EmbedTurianRuntimeDependencies" BeforeTargets="AssignTargetPaths"
+            DependsOnTargets="ResolveProjectReferences" Condition="'$(MSBuildProjectName)' == 'Turian.Editor.Core'">
+        <MSBuild Projects="../CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj"
+                 Targets="GetTurianRuntimeDependencies" BuildInParallel="false">
+            <Output TaskParameter="TargetOutputs" ItemName="_TurianRuntimeManifest"/>
+        </MSBuild>
+        <WriteLinesToFile File="$(IntermediateOutputPath)Turian.RuntimeDependencies.txt"
+                          Lines="@(_TurianRuntimeManifest)" Overwrite="true" WriteOnlyWhenDifferent="true"/>
+        <ItemGroup>
+            <EmbeddedResource Include="$(IntermediateOutputPath)Turian.RuntimeDependencies.txt"
+                              LogicalName="Turian.RuntimeDependencies"/>
+            <FileWrites Include="$(IntermediateOutputPath)Turian.RuntimeDependencies.txt"/>
+        </ItemGroup>
+    </Target>
+</Project>
