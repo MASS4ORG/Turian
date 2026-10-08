@@ -3,11 +3,11 @@ using Turian.Engine.Core;
 
 namespace Turian.Editor.Obj;
 
-/// <summary>Imports Wavefront OBJ sources into the runtime's cooked AMMESH mesh container.</summary>
+/// <summary>Imports Wavefront OBJ sources into glTF 2 through the editor's Assimp converter.</summary>
 public sealed class ObjModelImporter : IAssetImporter
 {
     /// <inheritdoc/>
-    public int Version => 3;
+    public int Version => 4;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath) =>
@@ -27,10 +27,8 @@ public sealed class ObjModelImporter : IAssetImporter
     /// <inheritdoc/>
     public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
     {
-        var builder = ObjModelBuilder.Load(sourcePath);
-        var artifact = $"{IAssetImporter.PrimaryArtifactName}{MeshBlob.FileExtension}";
-        MeshBlobWriter.Save(Path.Combine(importDirectory, artifact),
-            MeshBlobBaker.FromModelBuilder(builder, Path.GetFileNameWithoutExtension(sourcePath)));
+        var artifact = $"{IAssetImporter.PrimaryArtifactName}.glb";
+        AssimpModelConverter.ConvertToGlb(sourcePath, Path.Combine(importDirectory, artifact));
         return [artifact];
     }
 }

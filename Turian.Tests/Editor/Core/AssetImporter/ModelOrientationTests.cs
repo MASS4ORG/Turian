@@ -22,7 +22,15 @@ public sealed class ModelOrientationTests
                 vn 0 1 0
                 f 1/1/1 2/2/1 3/3/1
                 """);
-            var builder = ObjModelBuilder.Load(path);
+            var directory = Directory.CreateTempSubdirectory("turian-orientation-");
+            ModelBuilder builder;
+            try
+            {
+                var importer = new ObjModelImporter();
+                var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(path), path, directory.FullName));
+                builder = ModelUtils.LoadGltfToBuilder(Path.Combine(directory.FullName, artifact));
+            }
+            finally { directory.Delete(recursive: true); }
             Assert.All(builder.Vertices, vertex =>
             {
                 Assert.True(vertex.Position.Y > 0);
@@ -30,7 +38,7 @@ public sealed class ModelOrientationTests
             });
             var camera = new EditorCamera { Position = new Vector3(0, 0, -5) };
             Assert.All(builder.Vertices, vertex => Assert.True(camera.Project(vertex.Position).Y < 0));
-            Assert.Equal(3, new ObjModelImporter().Version);
+            Assert.Equal(4, new ObjModelImporter().Version);
         }
         finally { File.Delete(path); }
     }
