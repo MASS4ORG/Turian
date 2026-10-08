@@ -95,8 +95,13 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
     {
         ArgumentNullException.ThrowIfNull(camera);
         ArgumentNullException.ThrowIfNull(node);
+        var target = RenderStatisticsTargets.Find(node);
+        standardSystem.CollectStatistics = target is not null;
+        var measurement = new RenderFrameMeasurement(target is not null);
         var commandBuffer = Renderer.BeginFrame();
-        if (commandBuffer is not null) RenderFrame(commandBuffer.Value, deltaTime, camera, node);
+        if (commandBuffer is null) return;
+        RenderFrame(commandBuffer.Value, deltaTime, camera, node);
+        RenderStatisticsTargets.Record(target, measurement.Complete(standardSystem.FrameStats));
     }
 
     void RenderFrame(CommandBuffer commandBuffer, double deltaTime, ICamera camera, Node node)

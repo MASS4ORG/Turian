@@ -28,7 +28,11 @@ public static partial class Program
         var reimportOption = ReimportOption();
         var loadUserCodeOption = LoadUserCodeOption();
         var framesOption = new Option<int>("--frames") { Description = "Frames to tick", DefaultValueFactory = _ => 60 };
-        var outputOption = new Option<string?>("--out") { Description = "PNG of the last frame; omit to run without rendering" };
+        var outputOption = new Option<string?>("--out") { Description = "Write the last rendered frame as PNG" };
+        var statisticsOption = new Option<string?>("--stats")
+        {
+            Description = "Write frame/load statistics as JSON; enables offscreen rendering",
+        };
         var widthOption = new Option<uint>("--width") { Description = "Output width in pixels", DefaultValueFactory = _ => 1280 };
         var heightOption = new Option<uint>("--height") { Description = "Output height in pixels", DefaultValueFactory = _ => 720 };
         var localeOption = LocaleOption();
@@ -36,7 +40,7 @@ public static partial class Program
         var cmd = new Command("playmode", "Run a play session headlessly, as the Studio's Play button does")
         {
             projectArg, sceneOption, reimportOption, loadUserCodeOption, framesOption, outputOption, widthOption, heightOption,
-            localeOption
+            localeOption, statisticsOption
         };
 
         cmd.SetAction(async (result, _) =>
@@ -45,7 +49,9 @@ public static partial class Program
             await PrepareProjectAsync(settings, result.GetValue(reimportOption), result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
 
             var output = result.GetValue(outputOption);
-            using var project = HeadlessProject.Open(settings, Log.Logger, withGraphics: output is not null);
+            var statistics = result.GetValue(statisticsOption);
+            using var project = HeadlessProject.Open(settings, Log.Logger,
+                withGraphics: output is not null || statistics is not null);
             var root = project.LoadScene(result.GetValue(sceneOption));
 
             var report = SceneReport.Collect(root, loadModels: true);
@@ -69,7 +75,7 @@ public static partial class Program
                 options,
                 report.Bounds,
                 result.GetValue(localeOption),
-                Log.Logger);
+                Log.Logger, statistics);
 
             return ok ? 0 : 1;
         });

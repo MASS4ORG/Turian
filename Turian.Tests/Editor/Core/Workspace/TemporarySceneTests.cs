@@ -90,6 +90,43 @@ public sealed class TemporarySceneTests : IDisposable
         Assert.True(document.IsDirty);
     }
 
+    /// <summary>A save publishes complete JSON while readers that already opened the file retain their snapshot.</summary>
+    [Fact]
+    public void SaveReplacesTheFileWithoutTruncatingExistingReaders()
+    {
+        var document = workspace.NewScene();
+        var path = document.Asset!.RelativePath;
+        var previous = File.ReadAllText(path);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        tree.CurrentSceneRoot!.Name = "Saved hierarchy";
+        tree.MarkAssetModified();
+        workspace.Save(document);
+        using var reader = new StreamReader(stream);
+        Assert.Equal(previous, reader.ReadToEnd());
+        Assert.Equal("Saved hierarchy", Serializer.Load<Node>(path)!.Name);
+        Assert.False(document.IsDirty);
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp"));
+    }
+
+    /// <summary>A failed replacement leaves neither an incomplete destination nor a temporary save artifact.</summary>
+    [Fact]
+    public void FailedReplacementCleansUpTemporaryFile()
+    {
+        var directory = Directory.CreateTempSubdirectory("turian-atomic-save-");
+        try
+        {
+            var destination = Directory.CreateDirectory(Path.Combine(directory.FullName, "destination"));
+            Assert.Throws<IOException>(() => AtomicFile.WriteAllText(destination.FullName, "complete content"));
+            Assert.Empty(directory.GetFiles("*.tmp"));
+            Assert.True(destination.Exists);
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
     /// <summary>Play mode runs a copy and restores the edited scene after stopping.</summary>
     [Fact]
     public void PlayModeUsesACopyOfTheTemporaryScene()

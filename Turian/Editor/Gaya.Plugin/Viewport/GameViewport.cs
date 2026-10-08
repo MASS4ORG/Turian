@@ -33,6 +33,7 @@ sealed class GameViewport : IDisposable
     SceneViewerService? service;
     IUiPresenter? uiPresenter;
     Node? overlayRoot;
+    IRenderStatisticsTarget? statisticsTarget;
     CameraComponent? lastResizedCamera;
     string? failure;
 
@@ -67,7 +68,8 @@ sealed class GameViewport : IDisposable
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render || !PrepareFrame(gui)) return;
+        if (gui.Pass != Pass.Pass2Render) return;
+        if (!PrepareFrame(gui)) return;
         var rect = gui.CurrentNode.Rect;
         var (root, camera) = ResolveSource();
         if (root is null || camera is null)
@@ -82,12 +84,25 @@ sealed class GameViewport : IDisposable
         ForwardInput(gui, rect);
 
         overlayRoot = root;
-        service!.Render(root, gui.Time.DeltaTime, camera);
-        service.CopyPixels(pixels);
+        RenderGameFrame(root, camera, gui.Time.DeltaTime);
+        service!.CopyPixels(pixels);
 
         frame?.Dispose();
         frame = Snapshot(pixels, service.Width, service.Height);
         if (frame is not null) gui.DrawImage(frame, rect);
+    }
+
+    void RenderGameFrame(Node root, ICamera camera, double interval)
+    {
+        var target = playMode.State == PlayState.Playing ? RenderStatisticsTargets.Find(root) : null;
+        statisticsTarget = target;
+        service!.CollectStatistics = target is not null;
+        service.Render(root, interval, camera);
+        if (target is not null)
+        {
+            target.SceneLoadMilliseconds = sceneTree.CurrentSceneLoadMilliseconds;
+        }
+        RenderStatisticsTargets.Record(target, service.FrameStats);
     }
 
     bool PrepareFrame(Gui gui)
@@ -124,7 +139,12 @@ sealed class GameViewport : IDisposable
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
-    IUiPresenter? UiPresenter() => uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, playMode.Locale);
+    IUiPresenter? UiPresenter()
+    {
+        uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, playMode.Locale);
+        if (uiPresenter is not null) uiPresenter.IsPlaying = playMode.State == PlayState.Playing;
+        return uiPresenter;
+    }
 
     /// <summary>Creates the renderer on the first frame and follows the node's size after that.</summary>
     bool EnsureService(uint width, uint height)
@@ -255,6 +275,7 @@ sealed class GameViewport : IDisposable
     {
         _ = state;
         lastResizedCamera = null;
+        statisticsTarget?.Statistics.Clear();
         ReleaseInput();
     }
 

@@ -22,6 +22,9 @@ public sealed partial class AssetDatabase
     /// </summary>
     public Dictionary<Guid, AssetRecord> Assets { get; private set; } = [];
 
+    /// <summary>Cold model and texture load durations for this database.</summary>
+    public AssetLoadStatistics LoadStatistics { get; } = new();
+
     /// <summary>
     /// The folders of the project's installed packages, whose assets the database indexes beside the project's
     /// own. Their records belong to the installing project, which is where their imports are cached.

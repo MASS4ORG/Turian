@@ -31,6 +31,10 @@ public sealed class SceneTreeController(
     /// </summary>
     public Node? CurrentSceneRoot => runtimeRoot ?? sceneRoot;
 
+    /// <summary>Wall time spent loading the edited scene, when its scene manager supplies timings.</summary>
+    public double? CurrentSceneLoadMilliseconds => sceneManager is SceneManager manager && EditorSceneRoot is { } root
+        ? manager.GetLoadMilliseconds(root) : null;
+
     /// <summary>Gets the scene root being edited, ignoring any running play session.</summary>
     public Node? EditorSceneRoot => sceneRoot;
 
@@ -196,7 +200,7 @@ public sealed class SceneTreeController(
                 : Path.Combine(settingsService.Settings!.ProjectAbsoluteDir, prefab.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var previous = File.Exists(path) ? File.ReadAllText(path) : null;
-            File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
+            AtomicFile.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
                 id => PrefabInstances.ReadPrefabJson(database, id)));
             if (prefab is not TemporaryScene) assetImporter.ReimportNow(path, overwriteExisting: true);
             RefreshInstances(prefab.Id, previous);

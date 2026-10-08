@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: scene-authored Frame Statistics HUD component for Play with rolling FPS, CPU timings, submitted draws/triangles, culling, material binds and allocations; scene/asset load durations and headless play JSON reports. Fixed camera transform updates and partial scene saves #59
 - Added: temporary prefab-backed scenes
 - Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
 - Changed (breaking): glTF 2.0 / GLB is now the internal mesh format

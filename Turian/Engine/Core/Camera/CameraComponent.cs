@@ -5,7 +5,6 @@ namespace Turian.Engine.Core;
 /// Supports both perspective and orthographic projection modes, physical camera parameters,
 /// temporal anti-aliasing jitter, and frustum culling operations.
 /// </summary>
-/// TODO: implement conditional Inspector fields (ShowIfAttribute)
 [DisallowMultipleComponent]
 [ComponentContextMenu("Rendering/Camera")]
 [TypeId("1e9919ae-f343-569f-8715-8aa2baab3e39")]
@@ -163,19 +162,14 @@ public class CameraComponent : Component, ICamera
     // ========= Transform-driven rotation =========
 
     /// <summary>
-    /// Gets or sets the camera's pitch rotation (X-axis) in radians. Clamped to ±89.9° to prevent
-    /// gimbal lock. Mirrors <see cref="Node"/>'s <c>Transform.Rotation.X</c> once attached — not
-    /// independently serialized, like <see cref="Position"/>, so a scene file's authoritative
-    /// <c>Transform.Orientation</c> is never second-guessed by a redundant scalar copy.
+    /// Gets or sets upward pitch in radians, clamped to ±89.9°.
+    /// Positive pitch maps to negative local X rotation; the node's orientation remains authoritative.
     /// </summary>
     [JsonIgnore]
     [Hide]
     public float Pitch
     {
-        // Transform.Rotation is Euler degrees (Transform.cs: Orientation.ToEulerDegrees()); this
-        // property's contract — and every caller's — is radians, so the conversion happens here
-        // rather than leaking degrees into a "radians" name.
-        get => Node is not null ? Node.Transform.Rotation.X * Mathf.DegreesToRadians : pitch;
+        get => Node is not null ? -Node.Transform.Rotation.X * Mathf.DegreesToRadians : pitch;
         set
         {
             var clamped = Math.Clamp(value, -Mathf.DegreesToRadians * 89.9f, Mathf.DegreesToRadians * 89.9f);
@@ -186,8 +180,7 @@ public class CameraComponent : Component, ICamera
                 return;
             }
 
-            Node.Rotation = Node.Rotation with { X = clamped * Mathf.RadiansToDegrees };
-            UpdateVectors();
+            Node.Rotation = Node.Rotation with { X = -clamped * Mathf.RadiansToDegrees };
         }
     }
 
@@ -210,7 +203,6 @@ public class CameraComponent : Component, ICamera
             }
 
             Node.Rotation = Node.Rotation with { Y = value * Mathf.RadiansToDegrees };
-            UpdateVectors();
         }
     }
 
@@ -219,42 +211,33 @@ public class CameraComponent : Component, ICamera
     /// <inheritdoc/>
     [JsonIgnore]
     [Hide]
-    public Vector3 Front { get; private set; } = Vector3.UnitZ;
+    public Vector3 Front => Vector3.Transform(Vector3.UnitZ, ViewOrientation);
 
     /// <inheritdoc/>
     [JsonIgnore]
     [Hide]
-    public Vector3 Right { get; private set; } = Vector3.UnitX;
+    public Vector3 Right => Vector3.Transform(-Vector3.UnitX, ViewOrientation);
 
     /// <inheritdoc/>
     [JsonIgnore]
     [Hide]
-    public Vector3 Up { get; private set; } = GlobalUp;
+    public Vector3 Up => Vector3.Transform(GlobalUp, ViewOrientation);
 
     /// <inheritdoc/>
     [JsonIgnore]
     [Hide]
     public Vector3 Position
     {
-        get => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Transform.Position;
-        set => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).Position = value;
+        get => (Node ?? throw new InvalidOperationException("Camera is not attached to a node.")).GlobalTransform.Position;
+        set
+        {
+            var node = Node ?? throw new InvalidOperationException("Camera is not attached to a node.");
+            node.GlobalTransform = node.GlobalTransform with { Position = value };
+        }
     }
 
-    // ========= Lifecycle =========
-
-    /// <inheritdoc/>
-    /// <remarks>
-    /// Deliberately does not push <see cref="Pitch"/>/<see cref="Yaw"/>'s pre-attach staging
-    /// fields onto <see cref="Node"/>'s <c>Transform.Rotation</c>: the Transform is already the
-    /// authoritative source (set directly by scene deserialization, the Inspector, or a script),
-    /// and overwriting it here previously clobbered a correctly-authored orientation whenever
-    /// those staging fields held anything else — as little as a units mismatch between a
-    /// hand-authored scene file's redundant Pitch/Yaw scalars and this property's radians
-    /// contract was enough to point a camera at the sky. This only recomputes the derived
-    /// <see cref="Front"/>/<see cref="Right"/>/<see cref="Up"/> vectors from whatever orientation
-    /// the Transform already carries.
-    /// </remarks>
-    public override void OnAttached() => UpdateVectors();
+    Quaternion ViewOrientation => Node?.GlobalTransform.Orientation
+        ?? Quaternion.CreateFromYawPitchRoll(yaw, -pitch, 0);
 
     // ========= Matrices =========
 
@@ -371,24 +354,6 @@ public class CameraComponent : Component, ICamera
             v /= v.W;
 
         return new Vector3(v.X, v.Y, v.Z);
-    }
-
-    void UpdateVectors()
-    {
-        var currentPitch = Pitch;
-        var currentYaw = Yaw;
-
-        // Convention: yaw=0, pitch=0 → Front = (0, 0, +1).
-        // yaw rotates clockwise around +Y when viewed from above; positive pitch tilts up.
-        Front = Vector3.Normalize(new Vector3
-        {
-            X = MathF.Sin(currentYaw) * MathF.Cos(currentPitch),
-            Y = MathF.Sin(currentPitch),
-            Z = MathF.Cos(currentYaw) * MathF.Cos(currentPitch)
-        });
-
-        Right = Vector3.Normalize(Vector3.Cross(Front, GlobalUp));
-        Up = Vector3.Normalize(Vector3.Cross(Right, Front));
     }
 
     void UpdateOrtho()

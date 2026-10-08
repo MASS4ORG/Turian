@@ -63,6 +63,16 @@ public sealed class SceneViewerService : IDisposable
     /// <summary>Gets the submitted and culled submesh counts from this viewer's latest frame.</summary>
     public RenderCullingStats CullingStats => standardSystem.CullingStats;
 
+    /// <summary>Enables CPU scopes, rendering-thread allocation accounting and standard geometry counters.</summary>
+    public bool CollectStatistics
+    {
+        get => standardSystem.CollectStatistics;
+        set => standardSystem.CollectStatistics = value;
+    }
+
+    /// <summary>Statistics from the latest completed instrumented render call.</summary>
+    public RenderFrameStats FrameStats { get; private set; }
+
     /// <summary>Enables the optional visibility Brick for this view.</summary>
     public bool UseOcclusionCulling
     {
@@ -148,6 +158,9 @@ public sealed class SceneViewerService : IDisposable
     {
         ArgumentNullException.ThrowIfNull(sceneRoot);
 
+        var measurement = new RenderFrameMeasurement(CollectStatistics);
+        FrameStats = default;
+
         var activeCamera = camera ?? Camera;
 
         Gizmos.Clear();
@@ -183,9 +196,12 @@ public sealed class SceneViewerService : IDisposable
             activeCamera.GetViewMatrix(),
             new Vector4(activeCamera.Front, 0));
         // Gathering fills the light slots, so it runs before the upload or lights reach the GPU a frame late.
+        measurement.BeginPreparation();
         standardSystem.Prepare(frameInfo, ubo);
         uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
         standardSystem.RecordBeforeRenderPass(frameInfo);
+
+        measurement.BeginSubmission();
 
         frameTarget.BeginRenderPass(cmd.Value, ClearColor);
 
@@ -197,6 +213,7 @@ public sealed class SceneViewerService : IDisposable
 
         frameTarget.EndRenderPass(cmd.Value);
         frameTarget.EndFrame();
+        FrameStats = measurement.Complete(standardSystem.FrameStats);
     }
 
     /// <summary>
@@ -245,6 +262,7 @@ public sealed class SceneViewerService : IDisposable
         // Recreate them so their pipelines point to the new render pass. The overlay texture is
         // re-supplied by the caller each frame, so it is not carried across.
         var useFrustumCulling = UseFrustumCulling;
+        var collectStatistics = CollectStatistics;
         var useOcclusionCulling = UseOcclusionCulling;
         var occlusionFactory = OcclusionCullingFactory;
         standardSystem.Dispose();
@@ -254,6 +272,7 @@ public sealed class SceneViewerService : IDisposable
         overlayUiSystem.Dispose();
         InitializeRenderSystems();
         UseFrustumCulling = useFrustumCulling;
+        CollectStatistics = collectStatistics;
         UseOcclusionCulling = useOcclusionCulling;
         OcclusionCullingFactory = occlusionFactory;
     }

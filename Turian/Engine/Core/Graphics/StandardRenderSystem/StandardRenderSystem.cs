@@ -44,6 +44,12 @@ public class StandardRenderSystem : IRenderSystem
     /// <summary>Gets the submitted and culled submesh counts from the latest prepared frame.</summary>
     public RenderCullingStats CullingStats { get; private set; }
 
+    /// <summary>Enables optional draw and material accounting for this view.</summary>
+    public bool CollectStatistics { get; set; }
+
+    /// <summary>Submitted standard geometry counts from the latest instrumented frame.</summary>
+    public RenderFrameStats FrameStats { get; private set; }
+
     /// <summary>
     /// .ctor
     /// </summary>
@@ -183,12 +189,15 @@ public class StandardRenderSystem : IRenderSystem
         Model? boundModel = null;
         MaterialResource? boundMaterial = null;
         var drawIndex = 0;
+        long triangles = 0;
+        var materialBinds = 0;
         foreach (ref readonly var draw in CollectionsMarshal.AsSpan(renderList.Draws))
         {
             if (!ReferenceEquals(draw.Material, boundMaterial))
             {
                 BindMaterial(commandBuffer, draw.Material);
                 boundMaterial = draw.Material;
+                if (CollectStatistics) materialBinds++;
             }
 
             if (!ReferenceEquals(draw.Model, boundModel))
@@ -215,7 +224,16 @@ public class StandardRenderSystem : IRenderSystem
             else
                 draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh);
             drawIndex++;
+            if (CollectStatistics) triangles += draw.Model.SubMeshes[draw.SubMesh].IndexCount / 3;
         }
+        FrameStats = CollectStatistics ? new RenderFrameStats
+        {
+            DrawCalls = drawIndex,
+            Triangles = triangles,
+            MaterialBinds = materialBinds,
+            Submeshes = CullingStats,
+            Indirect = indirect,
+        } : default;
     }
 
     unsafe void BindMaterial(CommandBuffer commandBuffer, MaterialResource material)

@@ -53,6 +53,7 @@ public class ModelAsset : Asset
             return null;
         }
 
+        using var timing = database.LoadStatistics.Measure(texture: false);
         try
         {
             using var assetStream = provider.GetAssetStream();

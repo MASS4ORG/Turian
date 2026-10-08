@@ -110,6 +110,7 @@ public class App : IDisposable
         sceneManager.BindServices(services);
 
         uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
+        if (uiPresenter is not null) uiPresenter.IsPlaying = true;
 
         LoadStartupScene(projectSettings);
         SetWindowIcon();

@@ -103,15 +103,7 @@ sealed class HeadlessProject : IDisposable
     /// <returns>The loaded root node.</returns>
     public Node LoadScene(string? sceneReference)
     {
-        var started = Stopwatch.GetTimestamp();
-        var root = LoadSceneRoot(sceneReference);
-
-        logger.LogInformation(
-            "Loaded scene '{SceneName}' in {Elapsed:F0} ms",
-            root.Name,
-            Stopwatch.GetElapsedTime(started).TotalMilliseconds);
-
-        return root;
+        return LoadSceneRoot(sceneReference);
     }
 
     Node LoadSceneRoot(string? sceneReference)
