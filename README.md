@@ -18,7 +18,7 @@
 ### Rendering
 - **Vulkan 1.3** renderer (Silk.NET) with metal-roughness materials, plus point and directional lights.
 - Modular render systems for PBR meshes, gizmos, and screen-space and world-space UI.
-- **glTF 2.0** and FBX model import, optional OBJ editor brick, with cooked AMMESH geometry, textures, materials and localization string tables. See [model import and format rationale](docs/Model-import.md).
+- 3D Model formars: **glTF 2.0** is native, FBX and OBJ imports with textures, materials and localization string tables.
 
 ### Turian Studio
 

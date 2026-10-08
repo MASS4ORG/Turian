@@ -45,6 +45,8 @@ sealed class HeadlessProject : IDisposable
                 + "so every asset it indexed is unavailable. Reimport the project to rebuild it.");
         }
 
+        AssetImporter.RepairCachedCatalog(Database, settings, logger);
+
         if (Database.Assets.Count == 0)
         {
             throw new InvalidOperationException(

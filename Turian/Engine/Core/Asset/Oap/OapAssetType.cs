@@ -13,7 +13,7 @@ public enum OapAssetType : byte
     /// <summary>A texture artifact (<c>.amtex</c> or a raw image).</summary>
     Texture = 1,
 
-    /// <summary>A mesh artifact (<c>.ammesh</c>).</summary>
+    /// <summary>A glTF 2 mesh artifact (<c>.glb</c> or <c>.gltf</c>).</summary>
     Mesh = 2,
 
     /// <summary>A material definition.</summary>

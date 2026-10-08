@@ -34,8 +34,7 @@ public class ModelAsset : Asset
     }
 
     /// <summary>
-    /// Gets the content of this model asset by reading the baked <c>.ammesh</c> blob
-    /// the importer wrote into the asset cache.
+    /// Gets the content of this model asset by reading its glTF 2 geometry and registered external buffers.
     /// The returned <see cref="Model"/> is owned by the cache — do not dispose it.
     /// </summary>
     /// <param name="vulkan">The Vulkan context used for loading the model.</param>
@@ -57,7 +56,8 @@ public class ModelAsset : Asset
         try
         {
             using var assetStream = provider.GetAssetStream();
-            var loaded = new Model(vulkan, MeshBlob.Read(assetStream).ToModelBuilder());
+            var loaded = new Model(vulkan, GltfModelReader.Read(assetStream,
+                (index, _) => ReadBuffer(database, AssetIdFactory.Derive(Id, $"buffer:{index}"))));
             ModelCache[cacheKey] = loaded;
             return loaded;
         }
@@ -66,6 +66,16 @@ public class ModelAsset : Asset
             Log.Logger.LogError(ex, "Failed to load model asset {AssetId} ({Path})", Id, ResolveProviderPath(provider));
             return null;
         }
+    }
+
+    static byte[] ReadBuffer(AssetDatabase database, Guid id)
+    {
+        if (!database.TryGetAssetProvider(id, out var provider) || provider is null)
+            throw new InvalidDataException($"Missing glTF buffer asset {id}.");
+        using var stream = provider.GetAssetStream();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
     }
 
     static string ResolveProviderPath(IAssetFileProvider provider) => provider switch

@@ -57,22 +57,22 @@ public class FbxModelImporterTests
         Assert.False(new ModelAssetImporter().IsValid("model.fbx"));
     }
 
-    MeshBlob ImportBlob(string importDirectory)
+    ModelBuilder ImportBlob(string importDirectory)
     {
         var artifacts = importer.ImportToCache(new ModelAsset(), FixturePath, importDirectory);
-        return MeshBlob.Load(Path.Combine(importDirectory, artifacts[0]));
+        return GltfModelReader.Load(Path.Combine(importDirectory, artifacts[0]));
     }
 
-    /// <summary>Verifies that the cache artifact is a mesh blob rather than a copy of the source.</summary>
+    /// <summary>Verifies that the cache artifact is glTF 2 binary geometry.</summary>
     [Fact]
-    public void ImportToCache_WritesMeshBlob()
+    public void ImportToCache_WritesGlb()
     {
         var directory = Directory.CreateTempSubdirectory("turian-fbx-");
         try
         {
             var artifacts = importer.ImportToCache(new ModelAsset(), FixturePath, directory.FullName);
 
-            Assert.Equal($"primary{MeshBlob.FileExtension}", Assert.Single(artifacts));
+            Assert.Equal("primary.glb", Assert.Single(artifacts));
             Assert.False(File.Exists(Path.Combine(directory.FullName, "primary.fbx")));
         }
         finally
@@ -93,7 +93,7 @@ public class FbxModelImporterTests
         {
             var blob = ImportBlob(directory.FullName);
 
-            var mesh = Assert.Single(blob.Meshes);
+            var mesh = Assert.Single(importer.CreateChildAssets(ParentAssetId, FixturePath, context).OfType<MeshAsset>());
             Assert.Equal(0u, mesh.SubMeshStart);
             Assert.Equal(2u, mesh.SubMeshCount);
             Assert.Equal(2, blob.SubMeshes.Count);
@@ -156,8 +156,8 @@ public class FbxModelImporterTests
 
             Assert.Contains(blob.Vertices, vertex => vertex.Position.Y > 0f);
             Assert.Contains(blob.Vertices, vertex => vertex.Position.Y < 0f);
-            Assert.Equal(-0.5f, blob.Bounds.Min.Y, 3);
-            Assert.Equal(0.5f, blob.Bounds.Max.Y, 3);
+            Assert.Equal(-0.5f, blob.SubMeshes[0].Bounds.Min.Y, 3);
+            Assert.Equal(0.5f, blob.SubMeshes[0].Bounds.Max.Y, 3);
         }
         finally
         {
@@ -256,6 +256,16 @@ public class FbxModelImporterTests
         Assert.NotNull(root);
         Assert.Equal("cube", root.Name);
         Assert.Single(root.Children);
+    }
+
+    /// <summary>The direct prefab API preserves the source hierarchy and stable mesh references.</summary>
+    [Fact]
+    public void BuildPrefabRootRetainsMeshReferences()
+    {
+        var root = importer.BuildPrefabRoot(ParentAssetId, FixturePath);
+        Assert.Equal("cube", root.Name);
+        var component = Assert.Single(Node.GetComponentsInChildren<ModelComponent>(root));
+        Assert.Equal(AssetIdFactory.Derive(ParentAssetId, "mesh:0"), component.Mesh?.AssetId);
     }
 
     /// <summary>Verifies that the mesh-bearing node carries a model component bound to its mesh asset.</summary>

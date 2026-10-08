@@ -52,7 +52,7 @@
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <!-- Model import (FBX, and any other format Assimp handles) is editor-side only:
-             the runtime consumes baked .ammesh blobs, so shipped games never link Assimp.
+             the runtime consumes glTF 2.0 geometry, so shipped games never link Assimp.
              Pulls in Ultz.Native.Assimp transitively for the native libassimp binaries. -->
         <PackageReference Include="Silk.NET.Assimp" Version="2.23.0"/>
     </ItemGroup>

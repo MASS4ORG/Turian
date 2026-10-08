@@ -11,13 +11,11 @@ public class ModelAssetImporter : IAssetImporter
         ".obj",
         ".dae",
         ".3ds",
-        ".blend",
         ".stl",
     ];
 
     /// <inheritdoc/>
-    /// <remarks>Matches the OBJ brick's bake version so existing cooked geometry can be reused.</remarks>
-    public int Version => 3;
+    public int Version => 4;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath)
@@ -45,7 +43,7 @@ public class ModelAssetImporter : IAssetImporter
     }
 
     /// <inheritdoc/>
-    /// <remarks>OBJ requires its editor brick; other recognized sources are copied to the cache.</remarks>
+    /// <remarks>OBJ requires its editor brick; supported interchange formats export through Assimp.</remarks>
     public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
     {
         if (Path.GetExtension(sourcePath).Equals(".obj", StringComparison.OrdinalIgnoreCase))
@@ -55,6 +53,12 @@ public class ModelAssetImporter : IAssetImporter
                 + "or convert the model to glTF/GLB or FBX, preserving its .meta asset ID and scene references.");
         }
 
-        return IAssetImporter.CopySourceToCache(sourcePath, importDirectory);
+        var extension = Path.GetExtension(sourcePath);
+        if (extension.Equals(".max", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".blend", StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException("Export native authoring files to glTF/GLB or FBX before importing.");
+        var artifact = $"{IAssetImporter.PrimaryArtifactName}.glb";
+        AssimpModelConverter.ConvertToGlb(sourcePath, Path.Combine(importDirectory, artifact));
+        return [artifact];
     }
 }

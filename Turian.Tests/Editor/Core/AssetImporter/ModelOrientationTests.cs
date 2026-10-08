@@ -28,7 +28,7 @@ public sealed class ModelOrientationTests
             {
                 var importer = new ObjModelImporter();
                 var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(path), path, directory.FullName));
-                builder = ModelUtils.LoadGltfToBuilder(Path.Combine(directory.FullName, artifact));
+                builder = GltfModelReader.Load(Path.Combine(directory.FullName, artifact));
             }
             finally { directory.Delete(recursive: true); }
             Assert.All(builder.Vertices, vertex =>
@@ -56,6 +56,6 @@ public sealed class ModelOrientationTests
         Assert.True(Vector3.Distance(Vector3.Transform(Vector3.UnitY, local),
             Vector3.Transform(Vector3.UnitY, Matrix4x4.CreateScale(scale)
                 * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(position))) < 1e-5f);
-        Assert.Equal(2, new FbxModelImporter().Version);
+        Assert.Equal(3, new FbxModelImporter().Version);
     }
 }

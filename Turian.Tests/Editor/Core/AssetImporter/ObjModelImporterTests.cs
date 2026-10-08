@@ -51,16 +51,27 @@ public sealed class ObjModelImporterTests : IDisposable
         Assert.Empty(Directory.GetFiles(project, "*", SearchOption.AllDirectories));
     }
 
-    /// <summary>Other recognized formats retain their copy-through behavior.</summary>
+    /// <summary>Other interchange formats export into runtime glTF geometry.</summary>
     [Fact]
     public void CoreFallbackCopiesOtherSources()
     {
-        var path = Path.Combine(project, "Assets", "mesh.dae");
-        File.WriteAllText(path, "source");
+        var path = Path.Combine(project, "Assets", "mesh.stl");
+        File.WriteAllText(path, """
+            solid triangle
+            facet normal 0 0 1
+            outer loop
+            vertex 0 0 0
+            vertex 1 0 0
+            vertex 0 1 0
+            endloop
+            endfacet
+            endsolid triangle
+            """);
         var importer = new ModelAssetImporter();
         Assert.True(importer.IsValid(path));
         var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(path), path, project));
-        Assert.Equal("source", File.ReadAllText(Path.Combine(project, artifact)));
+        Assert.Equal("primary.glb", artifact);
+        Assert.Equal(3, GltfModelReader.Load(Path.Combine(project, artifact)).Vertices.Length);
     }
 
     /// <summary>The brick outranks core fallbacks, retains metadata ids and exports only cooked geometry.</summary>
@@ -84,25 +95,24 @@ public sealed class ObjModelImporterTests : IDisposable
         Assert.IsType<ObjModelImporter>(importer.ImporterFor(path));
         Assert.Equal(asset.Id, Asset.Load(path + ".meta")!.Id);
         Assert.True(database.TryGetAsset(asset.Id, out var record));
-        Assert.EndsWith("primary.ammesh", record!.ImportedRelativePath);
-        var blob = MeshBlob.Load(record.ResolveContentPath());
+        Assert.EndsWith("primary.glb", record!.ImportedRelativePath);
+        var blob = GltfModelReader.Load(record.ResolveContentPath());
         Assert.Equal(3, blob.Vertices.Length);
         Assert.Equal(new uint[] { 0, 1, 2 }, blob.Indices);
         Assert.All(blob.Vertices, vertex => Assert.Equal(Vector3.One, vertex.Color));
-        Assert.Equal(new Vector2(0, -1), blob.Vertices[2].Uv);
-        Assert.Equal("mesh", Assert.Single(blob.Meshes).Name);
+        Assert.Equal(new Vector2(0, 0), blob.Vertices[2].Uv);
 
         var output = new OapArchiveBuilder(NullLogger.Instance)
             .BuildPackage(project, Path.Combine(project, "game.oap"));
         var reader = OapReader.OpenFile(output.OapFilePath);
         var entry = reader.FindById(asset.Id)!.Value;
         Assert.Equal(OapAssetType.Mesh, (OapAssetType)entry.AssetType);
-        Assert.Equal(blob.Indices, MeshBlob.Read(reader.ReadAsset(entry, verify: true)).Indices);
+        Assert.Equal(blob.Indices, GltfModelReader.Read(reader.ReadAsset(entry, verify: true)).Indices);
 
         var brick = Assert.Single(ProjectPackages.Resolve(project).Packages);
         Assert.True(brick.Manifest.EditorOnly);
         Assert.Empty(BrickAssemblies.RuntimeAssemblies(brick));
-        Assert.Contains(BrickAssemblies.EditorAssemblies(brick),
+        Assert.DoesNotContain(BrickAssemblies.EditorAssemblies(brick),
             p => Path.GetFileName(p) == "JeremyAnsel.Media.WavefrontObj.dll");
         var buildSettings = new BuildAppSettings { Title = "Game", ProjectAbsoluteDir = project };
         var executable = CsProjectGenerator.GenerateExecutable(buildSettings, NullLogger.Instance);
@@ -119,10 +129,10 @@ public sealed class ObjModelImporterTests : IDisposable
             + "\nf 1/1/1 2/2/1 3/3/1\n");
         var importer = new ObjModelImporter();
         var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(path), path, project));
-        var blob = MeshBlob.Load(Path.Combine(project, artifact));
+        var blob = GltfModelReader.Load(Path.Combine(project, artifact));
         Assert.Equal(Vector3.UnitX, blob.Vertices[0].Color);
         Assert.Equal(3, blob.Vertices.Length);
         Assert.Equal(new uint[] { 0, 1, 2, 0, 1, 2 }, blob.Indices);
-        Assert.Equal(new Bounds(new Vector3(0, 1, 0), new Vector3(1, 2, 0)), blob.Bounds);
+        Assert.Equal(new Bounds(new Vector3(0, 1, 0), new Vector3(1, 2, 0)), blob.SubMeshes[0].Bounds);
     }
 }

@@ -1,80 +1,19 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Imports FBX model assets through Assimp. Bakes the geometry into an <c>.ammesh</c> blob and
+/// Imports FBX model assets through Assimp into glTF 2.0 geometry and
 /// emits one <see cref="MeshAsset"/> per mesh-bearing node, one <see cref="MaterialAsset"/> per
 /// material, and a <see cref="Prefab"/> mirroring the node hierarchy. Textures referenced by the
 /// file are registered as assets in place and bound by their own ids.
 /// </summary>
 public sealed partial class FbxModelImporter : IAssetImporter
 {
-    // Ultz.Native.Assimp ships libassimp 5 and 6 side by side, under runtimes/<rid>/native.
-    // Resolving those by file name alone relies on the host's RID probing, which does not find
-    // them in every environment, so the full paths are tried first and version 6 before 5.
-    static readonly string[] NativeLibraryNames = BuildNativeLibraryNames();
-
-    static string[] BuildNativeLibraryNames()
-    {
-        string[] fileNames = OperatingSystem.IsWindows()
-            ? ["Assimp64.dll", "Assimp32.dll"]
-            : OperatingSystem.IsMacOS()
-                ? ["libassimp.6.dylib", "libassimp.5.dylib"]
-                : ["libassimp.so.6", "libassimp.so.5"];
-
-        var runtimes = Path.Combine(AppContext.BaseDirectory, "runtimes");
-        List<string> directories =
-        [
-            AppContext.BaseDirectory,
-            Path.Combine(runtimes, RuntimeInformation.RuntimeIdentifier, "native"),
-            Path.Combine(runtimes, PortableRuntimeIdentifier(), "native")
-        ];
-
-        List<string> candidates =
-        [
-            .. from directory in directories.Distinct()
-            from fileName in fileNames
-            let path = Path.Combine(directory, fileName)
-            where File.Exists(path)
-            select path,
-
-            .. fileNames
-        ];
-
-        // Anything installed system-wide, by name, as a last resort.
-        return [.. candidates];
-    }
-
-    static string PortableRuntimeIdentifier()
-    {
-        var platform = OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
-        var architecture = RuntimeInformation.ProcessArchitecture switch
-        {
-            Architecture.X64 => "x64",
-            Architecture.X86 => "x86",
-            Architecture.Arm64 => "arm64",
-            Architecture.Arm => "arm",
-            _ => RuntimeInformation.ProcessArchitecture.ToString().ToUpperInvariant(),
-        };
-
-        return $"{platform}-{architecture}";
-    }
-
-    const uint postProcessFlags = (uint)(
-        PostProcessSteps.Triangulate
-        | PostProcessSteps.CalculateTangentSpace
-        | PostProcessSteps.GenerateSmoothNormals
-        | PostProcessSteps.JoinIdenticalVertices
-        | PostProcessSteps.GenerateBoundingBoxes);
-
-    static readonly Lazy<AssimpApi> Assimp =
-        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
-
     readonly object syncRoot = new();
     string cacheKey = string.Empty;
     FbxImport? cached;
 
     /// <inheritdoc/>
-    public int Version => 2;
+    public int Version => 3;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath) =>
@@ -94,16 +33,15 @@ public sealed partial class FbxModelImporter : IAssetImporter
     /// <inheritdoc/>
     public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
     {
-        var import = Read(sourcePath, keepGeometry: true);
-
-        var blobFileName = $"{IAssetImporter.PrimaryArtifactName}{MeshBlob.FileExtension}";
-        MeshBlobWriter.Save(Path.Combine(importDirectory, blobFileName), import.Content);
+        var import = Read(sourcePath);
+        var blobFileName = $"{IAssetImporter.PrimaryArtifactName}.glb";
+        AssimpModelConverter.ConvertToGlb(sourcePath, Path.Combine(importDirectory, blobFileName));
 
         Log.Logger.LogInformation(
             "Imported FBX {Path}: {MeshCount} meshes, {SubMeshCount} submeshes, {MaterialCount} materials",
             sourcePath,
-            import.Content.Meshes.Count,
-            import.Content.SubMeshes.Count,
+            import.Meshes.Count,
+            import.SubMeshCount,
             import.Materials.Count);
 
         return [blobFileName];
@@ -118,7 +56,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var import = Read(filePath, keepGeometry: false);
+        var import = Read(filePath);
         var textureIds = ResolveTextures(import, filePath, context);
 
         for (var i = 0; i < import.Materials.Count; i++)
@@ -126,9 +64,9 @@ public sealed partial class FbxModelImporter : IAssetImporter
             yield return BuildMaterial(parentAssetId, filePath, import.Materials[i], i, textureIds);
         }
 
-        for (var i = 0; i < import.Content.Meshes.Count; i++)
+        for (var i = 0; i < import.Meshes.Count; i++)
         {
-            var mesh = import.Content.Meshes[i];
+            var mesh = import.Meshes[i];
             yield return new MeshAsset
             {
                 Id = AssetIdFactory.Derive(parentAssetId, $"mesh:{i}"),
@@ -155,7 +93,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
             return null;
         }
 
-        var import = Read(filePath, keepGeometry: false);
+        var import = Read(filePath);
         return Serializer.Serialize(BuildPrefabRoot(parentAssetId, import, Path.GetFileNameWithoutExtension(filePath)));
     }
 
@@ -165,7 +103,7 @@ public sealed partial class FbxModelImporter : IAssetImporter
     /// <param name="parentAssetId">Id of the model asset the meshes belong to.</param>
     /// <param name="filePath">Absolute path of the FBX file.</param>
     public Node BuildPrefabRoot(Guid parentAssetId, string filePath) =>
-        BuildPrefabRoot(parentAssetId, Read(filePath, keepGeometry: false), Path.GetFileNameWithoutExtension(filePath));
+        BuildPrefabRoot(parentAssetId, Read(filePath), Path.GetFileNameWithoutExtension(filePath));
 
     static Node BuildPrefabRoot(Guid parentAssetId, FbxImport import, string rootName)
     {

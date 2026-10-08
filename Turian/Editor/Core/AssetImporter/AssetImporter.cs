@@ -200,7 +200,7 @@ public sealed partial class AssetImporter : IDisposable
 
         lock (syncRoot)
         {
-            if (folderWatcher is not null
+            if (folderWatcher is { IsWatching: true }
                 && string.Equals(assetsRootPath, Path.GetFullPath(assetFolderPath), StringComparison.Ordinal))
             {
                 return;

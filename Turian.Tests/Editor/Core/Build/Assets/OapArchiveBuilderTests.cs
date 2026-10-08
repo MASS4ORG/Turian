@@ -8,13 +8,59 @@ public sealed class OapArchiveBuilderTests : IDisposable
 
     readonly ILogger logger = Substitute.For<ILogger>();
 
+    /// <summary>Runtime geometry extensions and asset metadata retain their archive type categories.</summary>
+    [Theory]
+    [InlineData("ModelImportAsset", "primary.GLB", OapAssetType.Mesh)]
+    [InlineData("ModelImportAsset", "primary.gltf", OapAssetType.Mesh)]
+    [InlineData("MeshAsset", "primary.bin", OapAssetType.Mesh)]
+    [InlineData("Asset", "primary.amtex", OapAssetType.Texture)]
+    [InlineData("TextureAsset", "primary.bin", OapAssetType.Texture)]
+    [InlineData("MaterialAsset", "primary.bin", OapAssetType.Material)]
+    [InlineData("Prefab", "primary.bin", OapAssetType.Prefab)]
+    [InlineData("SceneAsset", "primary.bin", OapAssetType.Scene)]
+    [InlineData("AudioAsset", "primary.bin", OapAssetType.Audio)]
+    [InlineData("SoundAsset", "primary.bin", OapAssetType.Audio)]
+    [InlineData("Asset", "primary.bin", OapAssetType.Other)]
+    [InlineData("", "primary.bin", OapAssetType.Unknown)]
+    public void BuildPackageClassifiesGeometryAndMetadata(string typeName, string artifact, OapAssetType expected)
+    {
+        var asset = AddCachedAsset("Assets/source", artifact, typeName, [1, 2, 3]);
+        WriteCatalog(asset);
+        var path = Path.Combine(projectRoot, "types.oap");
+        new OapArchiveBuilder(logger).BuildPackage(projectRoot, path);
+        Assert.Equal(expected, (OapAssetType)OapReader.OpenFile(path).EntryAt(0).AssetType);
+    }
+
+    /// <summary>Ordinary data can fall back to its source while unconverted model sources cannot ship.</summary>
+    [Theory]
+    [InlineData("Turian.Engine.Core.Asset", true)]
+    [InlineData("Turian.Engine.Core.ModelAsset", false)]
+    [InlineData("Turian.Editor.Core.ModelAssetMeta", false)]
+    [InlineData("Turian.Editor.Core.ModelImportAsset", false)]
+    public void BuildPackageSkipsUnconvertedModels(string typeName, bool included)
+    {
+        Directory.CreateDirectory(Path.Combine(projectRoot, "Assets"));
+        File.WriteAllBytes(Path.Combine(projectRoot, "Assets", "source.fbx"), [1, 2, 3]);
+        var record = new AssetRecord
+        {
+            AssetId = Guid.NewGuid(),
+            AssetTypeName = typeName,
+            SourceRelativePath = "Assets/source.fbx",
+        };
+        WriteCatalog(record);
+        var path = Path.Combine(projectRoot, "source-only.oap");
+        var output = new OapArchiveBuilder(logger).BuildPackage(projectRoot, path);
+        Assert.Equal(included ? 1 : 0, output.EntryCount);
+        Assert.Equal(included, OapReader.OpenFile(path).FindById(record.AssetId).HasValue);
+    }
+
     /// <summary>Every catalog asset is packed and verifies through the reader.</summary>
     [Fact]
     public void BuildPackage_PacksEveryAsset()
     {
         var texture = AddCachedAsset("Assets/hero.png", "primary.pc.amtex", "Turian.Engine.Core.TextureAsset",
             [1, 2, 3, 4, 5]);
-        var mesh = AddCachedAsset("Assets/ship.glb", "primary.ammesh", "Turian.Engine.Core.MeshAsset",
+        var mesh = AddCachedAsset("Assets/ship.glb", "primary.glb", "Turian.Engine.Core.MeshAsset",
             [.. Enumerable.Repeat((byte)0xAB, 300)]);
         WriteCatalog(texture, mesh);
 

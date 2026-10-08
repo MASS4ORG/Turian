@@ -41,17 +41,9 @@ public sealed partial class AssetImporter
             return;
         }
 
-        var metaJson = SerializeAssetMetadata(asset);
+        SaveAssetMetadata(asset, metaFilePath);
 
-        var metaDirectory = Path.GetDirectoryName(metaFilePath);
-        if (!string.IsNullOrWhiteSpace(metaDirectory))
-        {
-            Directory.CreateDirectory(metaDirectory);
-        }
-
-        File.WriteAllText(metaFilePath, metaJson);
-
-        ImportAssetToCache(asset, filePath, out _);
+        if (!TryImportAssetToCache(asset, filePath, out _, out _)) return;
 
         logger.LogInformation(
             "Asset metadata {Action}: {MetaFilePath}",
@@ -69,11 +61,18 @@ public sealed partial class AssetImporter
             WarnUnavailableType(path, ex);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
         {
             logger.LogWarning(ex, "Failed to register asset meta file {MetaFilePath}. Overwriting malformed metadata", path);
             return false;
         }
+    }
+
+    static void SaveAssetMetadata(Asset asset, string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+        File.WriteAllText(path, SerializeAssetMetadata(asset));
     }
 
     bool CanImportSource(string path) =>
@@ -146,7 +145,7 @@ public sealed partial class AssetImporter
             return false;
         }
 
-        var imported = ImportAssetToCache(asset, assetPath, out var indexValid);
+        if (!TryImportAssetToCache(asset, assetPath, out var imported, out var indexValid)) return true;
         if (imported || !indexValid)
             FinishAssetImport(asset, assetPath, notify: false);
         return true;
@@ -242,6 +241,22 @@ public sealed partial class AssetImporter
         var fallback = CreateDefaultAsset(filePath);
         ApplyTypedDefaults(fallback, filePath);
         return fallback;
+    }
+
+    bool TryImportAssetToCache(Asset asset, string sourceFilePath, out bool imported, out bool indexValid)
+    {
+        try
+        {
+            imported = ImportAssetToCache(asset, sourceFilePath, out indexValid);
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            logger.LogError(ex, "Failed to import asset {FilePath}: {Reason}", sourceFilePath, ex.Message);
+            imported = false;
+            indexValid = false;
+            return false;
+        }
     }
 
     bool ImportAssetToCache(Asset asset, string sourceFilePath, out bool indexValid)

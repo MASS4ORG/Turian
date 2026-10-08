@@ -6,6 +6,12 @@ const int linksPerAsset = 10;
 const int sceneNodes = 10_000;
 const int runs = 11;
 
+if (args.Contains("--mesh-formats"))
+{
+    MeshFormatBenchmarks.Run();
+    return;
+}
+
 if (args.Contains("--services"))
 {
     ServiceBenchmarks.Run();

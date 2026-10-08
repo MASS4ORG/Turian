@@ -16,7 +16,7 @@ public sealed class AssetThumbnailRendererTests(VulkanFixture fixture) : IClassF
         try
         {
             var assetsFolder = Directory.CreateDirectory(Path.Combine(directory.FullName, "Assets")).FullName;
-            var path = Path.Combine(assetsFolder, material ? "swatch.material" : "quad.ammesh");
+            var path = Path.Combine(assetsFolder, material ? "swatch.material" : "quad.glb");
             Asset asset;
             if (material)
             {
@@ -27,20 +27,13 @@ public sealed class AssetThumbnailRendererTests(VulkanFixture fixture) : IClassF
             {
                 asset = new ModelAsset { Id = Guid.NewGuid() };
                 modelId = asset.Id;
-                using var stream = File.Create(path);
-                MeshBlobWriter.Write(stream, new MeshBlobContent
-                {
-                    Vertices =
+                GltfGeometryFixture.Save(path,
                     [
                         new(new(-0.5f, -0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
                         new(new(0.5f, -0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
                         new(new(0.5f, 0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
                         new(new(-0.5f, 0.5f, 0), Vector3.One) { Normal = -Vector3.UnitZ },
-                    ],
-                    Indices = [0, 1, 2, 0, 2, 3],
-                    SubMeshes = [new SubMesh(0, 6, Bounds: new Bounds(new(-0.5f, -0.5f, 0), new(0.5f, 0.5f, 0)))],
-                    Bounds = new Bounds(new(-0.5f, -0.5f, 0), new(0.5f, 0.5f, 0)),
-                });
+                    ], [0, 1, 2, 0, 2, 3]);
             }
             asset.RelativePath = path;
             var database = new AssetDatabase();

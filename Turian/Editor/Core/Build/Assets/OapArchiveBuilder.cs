@@ -205,6 +205,20 @@ public sealed class OapArchiveBuilder(ILogger logger)
 
     static string ResolvePayloadPath(AssetRecord record, string projectRoot, string? target)
     {
+        var path = ResolveArtifactPath(record, projectRoot, target);
+        return IsNativeAuthoringDocument(path) || IsModelGeometry(record.AssetTypeName) && !IsGltfGeometry(path)
+            ? string.Empty : path;
+    }
+
+    static bool IsNativeAuthoringDocument(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".blend" or ".max";
+
+    static bool IsModelGeometry(string typeName) =>
+        typeName == typeof(ModelAsset).FullName || typeName == typeof(ModelImportAsset).FullName ||
+        typeName == typeof(ModelAssetMeta).FullName;
+
+    static string ResolveArtifactPath(AssetRecord record, string projectRoot, string? target)
+    {
         if (target is not null &&
             record.TargetArtifacts.TryGetValue(target, out var targetArtifact) &&
             !string.IsNullOrWhiteSpace(targetArtifact))
@@ -238,32 +252,26 @@ public sealed class OapArchiveBuilder(ILogger logger)
         }
 
         if (name.Contains("Mesh", StringComparison.OrdinalIgnoreCase) ||
-            payloadPath.EndsWith(".ammesh", StringComparison.OrdinalIgnoreCase))
+            IsGltfGeometry(payloadPath))
         {
             return OapAssetType.Mesh;
         }
 
-        if (name.Contains("Material", StringComparison.OrdinalIgnoreCase))
-        {
-            return OapAssetType.Material;
-        }
+        return ClassifyMetadataType(name);
+    }
 
-        if (name.Contains("Prefab", StringComparison.OrdinalIgnoreCase))
-        {
-            return OapAssetType.Prefab;
-        }
+    static bool IsGltfGeometry(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".glb" or ".gltf";
 
-        if (name.Contains("Scene", StringComparison.OrdinalIgnoreCase))
-        {
-            return OapAssetType.Scene;
-        }
-
-        if (name.Contains("Audio", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Sound", StringComparison.OrdinalIgnoreCase))
-        {
-            return OapAssetType.Audio;
-        }
-
+    static OapAssetType ClassifyMetadataType(string name)
+    {
+        ReadOnlySpan<(string Name, OapAssetType Type)> types =
+        [
+            ("Material", OapAssetType.Material), ("Prefab", OapAssetType.Prefab), ("Scene", OapAssetType.Scene),
+            ("Audio", OapAssetType.Audio), ("Sound", OapAssetType.Audio),
+        ];
+        foreach (var type in types)
+            if (name.Contains(type.Name, StringComparison.OrdinalIgnoreCase)) return type.Type;
         return string.IsNullOrWhiteSpace(name) ? OapAssetType.Unknown : OapAssetType.Other;
     }
 
