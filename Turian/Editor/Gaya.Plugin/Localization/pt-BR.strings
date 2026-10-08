@@ -43,6 +43,7 @@
     { "key": "Input", "source": "Input", "translation": "Entrada" },
     { "key": "Graphics", "source": "Graphics", "translation": "Gráficos" },
     { "key": "Keyboard Shortcuts…", "source": "Keyboard Shortcuts…", "translation": "Atalhos de teclado…" },
+    { "key": "New Scene", "source": "New Scene", "translation": "Nova cena" },
     { "key": "Scene Tree", "source": "Scene Tree", "translation": "Árvore de cena" },
     { "key": "Inspector", "source": "Inspector", "translation": "Inspetor" },
     { "key": "Scene", "source": "Scene", "translation": "Cena" },

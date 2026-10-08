@@ -10,6 +10,7 @@ public sealed class AssetWorkspace : IDisposable
 {
     readonly AssetManager assets;
     readonly List<AssetWrapper> documents = [];
+    int newSceneNumber;
 
     /// <summary>Creates a workspace over the asset manager, resetting when a project is loaded.</summary>
     /// <param name="assets">The asset manager this workspace drives.</param>
@@ -68,6 +69,10 @@ public sealed class AssetWorkspace : IDisposable
         return Find(asset) ?? Track(asset);
     }
 
+    /// <summary>Opens a new empty scene backed by a temporary prefab for this editing session.</summary>
+    /// <returns>The new scene document.</returns>
+    public AssetWrapper NewScene() => Open(new TemporaryScene($"Untitled {++newSceneNumber}"));
+
     /// <summary>Brings an already-open document to the front.</summary>
     public void Activate(AssetWrapper document)
     {
@@ -123,17 +128,15 @@ public sealed class AssetWorkspace : IDisposable
 
     /// <summary>The open documents' asset ids, for restoring the session next time.</summary>
     public WorkspaceSession Capture() =>
-        new(documents.Where(d => d.Asset is not null).Select(d => d.Asset!.Id).ToList(),
-            Active?.Asset?.Id);
+        new(documents.Where(d => d.Asset is not null and not TemporaryScene).Select(d => d.Asset!.Id).ToList(),
+            Active?.Asset is TemporaryScene ? null : Active?.Asset?.Id);
 
     /// <inheritdoc />
     public void Dispose()
     {
+        CloseAll();
         assets.AssetOpened -= OnAssetOpened;
         assets.AssetClosed -= OnAssetClosed;
-
-        foreach (var document in documents) document.Dispose();
-        documents.Clear();
     }
 
     void OnAssetOpened(Asset? asset)
@@ -170,6 +173,7 @@ public sealed class AssetWorkspace : IDisposable
 
         Closed?.Invoke(document);
         document.Dispose();
+        if (document.Asset is TemporaryScene temporary) temporary.Dispose();
 
         if (ReferenceEquals(Active, document)) SetActive(documents.LastOrDefault());
 

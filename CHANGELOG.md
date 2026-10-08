@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: temporary prefab-backed scenes
 - Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
 - Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
 - Added (breaking): `.pss` color themes with hot reload #213

@@ -287,6 +287,18 @@ static class StudioCommands
             ? Path.GetDirectoryName(project)
             : null;
 
+    /// <summary>Registers temporary scene creation in the File menu and the global keyboard shortcuts.</summary>
+    /// <param name="context">The plugin's command, menu and shortcut registries.</param>
+    public static void RegisterNewScene(IPluginContext context)
+    {
+        Add(context, MenuIds.File, "1", -1, new CommandDescriptor(
+            "gaya.turian.newScene", "File: New Scene",
+            sp => sp.GetRequiredService<AssetWorkspace>().NewScene(),
+            sp => !sp.GetRequiredService<PlayModeService>().IsActive)
+        { DynamicLabel = Localized("New Scene") });
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.newScene", KeyboardKey.N, KeyModifiers.Ctrl));
+    }
+
     static void Save(IServiceProvider services)
     {
         var workspace = services.GetRequiredService<AssetWorkspace>();

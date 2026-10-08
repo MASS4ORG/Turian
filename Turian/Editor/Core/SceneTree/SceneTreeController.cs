@@ -186,17 +186,19 @@ public sealed class SceneTreeController(
     public void SaveAsset(Asset asset)
     {
         ArgumentNullException.ThrowIfNull(asset);
-        if (asset is not Prefab prefab || settingsService.Settings is null) return;
+        if (asset is not Prefab prefab) return;
+        if (prefab is not TemporaryScene && settingsService.Settings is null) return;
         if (!loadedSceneRoots.TryGetValue(prefab.Id, out var root)) return;
 
         try
         {
-            var path = Path.Combine(settingsService.Settings.ProjectAbsoluteDir, prefab.RelativePath);
+            var path = prefab is TemporaryScene ? prefab.RelativePath
+                : Path.Combine(settingsService.Settings!.ProjectAbsoluteDir, prefab.RelativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             var previous = File.Exists(path) ? File.ReadAllText(path) : null;
             File.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
                 id => PrefabInstances.ReadPrefabJson(database, id)));
-            assetImporter.ReimportNow(path, overwriteExisting: true);
+            if (prefab is not TemporaryScene) assetImporter.ReimportNow(path, overwriteExisting: true);
             RefreshInstances(prefab.Id, previous);
         }
         catch (Exception ex)
@@ -384,7 +386,9 @@ public sealed class SceneTreeController(
 
     Node? TryLoadWithSceneManager(Prefab prefab)
     {
-        return sceneManager.LoadNodeAsync(prefab.Id).GetAwaiter().GetResult();
+        return prefab is TemporaryScene
+            ? sceneManager.LoadNodeAsync(prefab.RelativePath).GetAwaiter().GetResult()
+            : sceneManager.LoadNodeAsync(prefab.Id).GetAwaiter().GetResult();
     }
 
     Node? TryLoadSceneRootFromRelativePath(Prefab prefab)

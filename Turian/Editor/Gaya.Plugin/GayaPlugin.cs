@@ -26,6 +26,7 @@ public sealed class GayaPlugin : IPlugin
         RegisterBrickServices(context);
         RegisterDialogs(context);
         StudioCommands.Register(context);
+        StudioCommands.RegisterNewScene(context);
         PanelCommands.Register(context);
     }
 
