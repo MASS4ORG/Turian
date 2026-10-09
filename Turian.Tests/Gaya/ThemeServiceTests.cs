@@ -279,15 +279,20 @@ public sealed class ThemeServiceTests : IDisposable
         Assert.Equal(frame.Themes.Current, ThemeTokens.Current);
     }
 
-    /// <summary>The control palette keeps its previous projection of the theme.</summary>
+    /// <summary>The theme sheets give Guinevere's controls their tokens, and the dock space its metrics.</summary>
     [Fact]
-    public void ControlPaletteProjectsTheTokens()
+    public void ThemeSheetsDefineTheControlTokens()
     {
-        var tokens = Service().Current;
-        var palette = tokens.ToControlPalette();
-        Assert.Equal(tokens.Panel, palette.Popup);
-        Assert.Equal(tokens.FocusRing, palette.FocusRing);
-        Assert.Equal(tokens.Selection, palette.TextSelection);
+        var service = Service();
+        var tokens = service.Current;
+        var sheets = new StyleSheetCollection { ExcaliburStyles.DefaultSheet };
+        foreach (var sheet in service.Sheets) sheets.Add(sheet);
+
+        Assert.Equal(tokens.Popup, sheets.GetTokenColor("popup"));
+        Assert.Equal(tokens.Field, sheets.GetTokenColor("surface"));
+        Assert.Equal(tokens.Ink, sheets.GetTokenColor("text"));
+        Assert.Equal(tokens.FocusRing, sheets.GetTokenColor("focus-ring"));
+        Assert.Equal(tokens.Selection, sheets.GetTokenColor("text-selection"));
         Assert.Equal(tokens.Scale(tokens.HeaderHeight), tokens.ToDockTheme().TabHeight);
     }
 

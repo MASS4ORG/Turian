@@ -70,7 +70,7 @@ if (args is ["--script", _, ..])
 
 Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 
-// The workbench publishes the themed control palette onto the Gui every frame.
+// The workbench installs the theme's style sheets into the Gui every frame they change.
 var gui = new Gui();
 WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
     Environment.SetEnvironmentVariable);

@@ -27,8 +27,8 @@ $surface-hover = $surface-higher;
 $surface-active = $surface-highest;
 $surface-popup = $surface-panel;
 $surface-editor-area = shade($base, 1.9, 0.9);
-$scrim = rgba(0, 0, 0, 0.353);
-$shadow = rgba(0, 0, 0, 0.3);
+$scrim = rgba(0, 0, 0, 90);
+$shadow = rgba(0, 0, 0, 77);
 
 // Ink: the mono color of the base, blended down for secondary and disabled text
 $ink-mono = contrast-ink($base);
@@ -131,3 +131,19 @@ $focus-ring-width = 2;
 
 // Effects
 $transition-fast = 0.12;
+
+// Guinevere controls: the Excalibur default sheet's tokens that have no studio token of the same name
+$base-background = $surface-panel;
+$surface = $surface-field;
+$popup = $surface-popup;
+$border-active = $ink-faint;
+$accent-subtle = $accent-fill;
+$text = $ink;
+$text-dim = $ink-dim;
+$text-disabled = $ink-faint;
+$text-on-accent = $ink-on-accent;
+$selected = $accent;
+$positive = $success;
+$negative = $error;
+$text-selection = $selection;
+$overlay = $scrim;

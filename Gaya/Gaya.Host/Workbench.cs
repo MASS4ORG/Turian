@@ -37,7 +37,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     int savedRevision;
     bool paletteOpen;
     DockTheme dockTheme;
-    ControlPalette controlPalette;
     int styleSheetsVersion = -1;
     Gui? styledGui;
 
@@ -62,7 +61,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         appearanceBridge = new AppearanceBridge(Appearance, app.Themes, app.Settings);
         dockTheme = Theme.ToDockTheme();
-        controlPalette = Theme.ToControlPalette();
         app.Themes.Changed += OnThemeChanged;
         this.layoutStore = layoutStore ?? new WorkbenchLayoutStore(log);
         descriptors = app.Panels.All.ToDictionary(descriptor => descriptor.Id);
@@ -105,14 +103,13 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// <summary>Translates a piece of chrome text through the shell's language service, when there is one.</summary>
     string T(string text) => Shell?.T(text) ?? text;
 
-    /// <summary>Rebuilds the palettes the dock space and the built-in controls read.</summary>
-    void OnThemeChanged()
-    {
-        dockTheme = Theme.ToDockTheme();
-        controlPalette = Theme.ToControlPalette();
-    }
+    /// <summary>Rebuilds the metrics the dock space reads.</summary>
+    void OnThemeChanged() => dockTheme = Theme.ToDockTheme();
 
-    /// <summary>Installs the active theme's sheets into the GUI, so styled widgets resolve against them.</summary>
+    /// <summary>
+    /// Installs the active theme's sheets into the GUI over Guinevere's default control sheet, so styled widgets
+    /// resolve against them.
+    /// </summary>
     void SyncStyleSheets(Gui gui)
     {
         if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui) return;
@@ -121,6 +118,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         styledGui = gui;
         gui.StyleSheets.Clear();
         foreach (var sheet in app.Themes.Sheets) gui.StyleSheets.Add(sheet);
+        ExcaliburStyles.Ensure(gui);
     }
 
     /// <summary>
@@ -360,7 +358,6 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         HandleShortcuts(gui);
 
         var t = Theme;
-        gui.ControlPalette = controlPalette;
         SyncStyleSheets(gui);
         gui.DrawRect(gui.ScreenRect, t.Background);
 
