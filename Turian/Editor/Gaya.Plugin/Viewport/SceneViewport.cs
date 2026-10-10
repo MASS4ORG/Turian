@@ -180,8 +180,9 @@ sealed partial class SceneViewport : IDisposable
         var pointer = gui.Input.MousePosition;
         using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
                    .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
-            gui.DrawText(showGizmoCursor ? EditorIcons.Move : string.Empty,
-                ThemeTokens.Current.Text(18), ThemeTokens.Current.Ink);
+        {
+            if (showGizmoCursor) gui.ThemedIcon(Icons.SceneMove, ThemeTokens.Current.Text(18));
+        }
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>

@@ -507,17 +507,16 @@ sealed class SceneTreePanel : IPanel
     /// <summary>Prefab instance roots get an icon: plain, nested, variant, or a broken link when the prefab is gone.</summary>
     static Action<Gui>? PrefabIcon(PrefabLink link)
     {
-        var theme = ThemeTokens.Current;
-        var (glyph, color) = link switch
+        var icon = link switch
         {
-            PrefabLink.Instance => (EditorIcons.Cube, theme.Accent),
-            PrefabLink.NestedInstance => (EditorIcons.Cube, theme.InkDim),
-            PrefabLink.VariantInstance => (EditorIcons.Clone, theme.Accent),
-            PrefabLink.Missing => (EditorIcons.LinkSlash, theme.Error),
-            _ => (null, default),
+            PrefabLink.Instance => Icons.PrefabInstance,
+            PrefabLink.NestedInstance => Icons.PrefabNested,
+            PrefabLink.VariantInstance => Icons.PrefabVariant,
+            PrefabLink.Missing => Icons.PrefabMissing,
+            _ => null,
         };
 
-        return glyph is null ? null : gui => gui.DrawText(glyph, theme.Text(11), color);
+        return icon is null ? null : gui => gui.ThemedIcon(icon, ThemeTokens.Current.Text(11));
     }
 
     /// <summary>Inactive nodes are faint; nodes a prefab provides take the accent, like Unity's blue prefab rows.</summary>

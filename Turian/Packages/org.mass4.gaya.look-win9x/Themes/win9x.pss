@@ -1,0 +1,141 @@
+@const look-id = "org.mass4.look.win9x";
+@const look-name = "Windows 95/98";
+@const look-kind = light;
+@const look-theme-light = "org.mass4.theme.win-classic";
+@const look-theme-dark = "org.mass4.theme.win-classic";
+@import "guinevere.default";
+
+// Square corners everywhere the Material shape scale applies
+$md-shape-extra-small = 0;
+$md-shape-small = 0;
+$md-shape-medium = 0;
+$md-shape-large = 0;
+$md-shape-extra-large = 0;
+$control-indicator-size = 13;
+
+// Bevel colors derived from the face, so any color theme gets a matching 3D edge
+$win9x-face = $md-surface-container;
+$win9x-hilite = lighten($win9x-face, 0.9);
+$win9x-light = lighten($win9x-face, 0.6);
+$win9x-shadow = darken($win9x-face, 0.4);
+$win9x-dark = darken($win9x-face, 0.85);
+
+button, button.primary, button.outlined, button.elevated, button.segment, button.color-mode {
+    padding = 4 12;
+    background-color = $win9x-face;
+    color = $text;
+    font-weight = 400;
+    border-width = 1;
+    border-top-color = $win9x-light; border-left-color = $win9x-light;
+    border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    box-shadow = inset 1 1 0 0 $win9x-hilite, inset -1 -1 0 0 $win9x-shadow;
+    :hover(0) { background-color = $win9x-face; }
+    :active(0) {
+        background-color = $win9x-face; ripple = none; padding = 5 11 3 13;
+        border-top-color = $win9x-dark; border-left-color = $win9x-dark;
+        border-right-color = $win9x-light; border-bottom-color = $win9x-light;
+        box-shadow = inset 1 1 0 0 $win9x-shadow;
+    }
+    :focus(0) { background-color = $win9x-face; outline-width = 1; outline-style = dotted; outline-color = $text; outline-offset = -5; }
+    :checked(0) {
+        background-color = mix($win9x-face, $win9x-hilite, 50%); color = $text;
+        border-top-color = $win9x-dark; border-left-color = $win9x-dark;
+        border-right-color = $win9x-light; border-bottom-color = $win9x-light;
+        box-shadow = inset 1 1 0 0 $win9x-shadow;
+    }
+    :disabled(0) { background-color = $win9x-face; color = $text-disabled; text-shadow = 1 1 0 $win9x-hilite; }
+}
+
+button.text, button.icon {
+    padding = 2 6;
+    background-color = transparent; color = $text; border-width = 1;
+    border-color = transparent; box-shadow = none;
+    :hover(0) {
+        background-color = transparent;
+        border-top-color = $win9x-light; border-left-color = $win9x-light;
+        border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    }
+    :active(0) {
+        background-color = transparent; ripple = none; padding = 3 5 1 7;
+        border-top-color = $win9x-dark; border-left-color = $win9x-dark;
+        border-right-color = $win9x-light; border-bottom-color = $win9x-light;
+    }
+    :checked(0) { color = $text; background-color = mix($win9x-face, $win9x-hilite, 50%); }
+    :focus(0) { background-color = transparent; }
+}
+
+checkbox > indicator, radio > indicator, option > indicator {
+    background-color = $surface; color = $text; border-width = 1;
+    border-top-color = $win9x-shadow; border-left-color = $win9x-shadow;
+    border-right-color = $win9x-hilite; border-bottom-color = $win9x-hilite;
+    box-shadow = inset 1 1 0 0 $win9x-dark;
+    :checked { background-color = $surface; }
+    :mixed { background-color = $surface; }
+}
+radio dot { :checked { background-color = $text; } }
+checkbox:hover > indicator, radio:hover > indicator { background-color = $surface; }
+
+input, dropdown, object-field, file-list {
+    background-color = $surface; color = $text; border-width = 1;
+    border-top-color = $win9x-shadow; border-left-color = $win9x-shadow;
+    border-right-color = $win9x-hilite; border-bottom-color = $win9x-hilite;
+    box-shadow = inset 1 1 0 0 $win9x-dark;
+    :hover { border-top-color = $win9x-shadow; border-left-color = $win9x-shadow; }
+    :focus { border-width = 1; border-top-color = $win9x-shadow; border-left-color = $win9x-shadow; border-right-color = $win9x-hilite; border-bottom-color = $win9x-hilite; }
+    :open { border-width = 1; }
+}
+
+listbox, menu, popup, dialog, tabpanel, dock-window, toast {
+    background-color = $win9x-face; color = $text; border-width = 1;
+    border-top-color = $win9x-light; border-left-color = $win9x-light;
+    border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    box-shadow = inset 1 1 0 0 $win9x-hilite, inset -1 -1 0 0 $win9x-shadow;
+}
+tooltip { background-color = #ffffe1; color = #000000; border-width = 1; border-color = #000000; box-shadow = none; }
+
+option, menu-item, menu-title, tree-row, file-row, file-place {
+    :hover(0) { background-color = $selected; color = $text-on-accent; }
+    :highlighted { background-color = $selected; color = $text-on-accent; }
+    :open { background-color = $selected; color = $text-on-accent; }
+    :selected { background-color = $selected; color = $text-on-accent; }
+}
+appbar {
+    background = linear-gradient(to right, #000080, #1084d0); color = #ffffff; border-width = 1;
+    border-top-color = $win9x-light; border-left-color = $win9x-light;
+    border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+}
+menubar { background-color = transparent; color = #ffffff; }
+window-button { color = #ffffff; border-width = 1; border-radius = 0;
+    border-top-color = $win9x-light; border-left-color = $win9x-light; border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    background-color = $win9x-face; color = #000000;
+    :hover(0) { background-color = $win9x-face; } :active(0) { border-top-color = $win9x-dark; border-left-color = $win9x-dark; border-right-color = $win9x-light; border-bottom-color = $win9x-light; } }
+window-button > glyph-fill { background-color = transparent; }
+
+slider track { background-color = $surface; height = 4; border-width = 1; border-top-color = $win9x-shadow; border-left-color = $win9x-shadow; border-right-color = $win9x-hilite; border-bottom-color = $win9x-hilite; }
+slider fill { background-color = transparent; }
+slider thumb {
+    width = 11; height = 20; background-color = $win9x-face; border-width = 1; border-radius = 0;
+    border-top-color = $win9x-light; border-left-color = $win9x-light;
+    border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    box-shadow = inset 1 1 0 0 $win9x-hilite, inset -1 -1 0 0 $win9x-shadow;
+}
+progress { height = 16; background-color = $surface; border-radius = 0; border-width = 1; border-top-color = $win9x-shadow; border-left-color = $win9x-shadow; border-right-color = $win9x-hilite; border-bottom-color = $win9x-hilite; }
+progress fill { background-color = $selected; border-radius = 0; }
+
+toggle > track, toggle thumb { border-radius = 0; }
+
+tabstrip, tabbar { background-color = $win9x-face; border-radius = 0; }
+tabstrip > tab, tabbar > tab, tabbar.pill > tab {
+    background-color = darken($win9x-face, 0.06); color = $text; border-radius = 3 3 0 0; border-width = 1;
+    border-top-color = $win9x-light; border-left-color = $win9x-light; border-right-color = $win9x-dark; border-bottom-color = transparent;
+    :hover(0) { background-color = darken($win9x-face, 0.06); color = $text; }
+    :selected { background-color = $win9x-face; color = $text; }
+}
+
+dialog-title, popup-title { background = linear-gradient(to right, $accent, lighten($accent, 0.4)); color = $text-on-accent; border-radius = 0; }
+scrollbar { background-color = $win9x-light; }
+scrollbar > thumb {
+    background-color = $win9x-face; border-radius = 0; border-width = 1;
+    border-top-color = $win9x-light; border-left-color = $win9x-light; border-right-color = $win9x-dark; border-bottom-color = $win9x-dark;
+    :hover { background-color = $win9x-face; } :active { background-color = $win9x-face; }
+}

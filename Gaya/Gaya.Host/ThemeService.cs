@@ -23,9 +23,10 @@ public sealed partial class ThemeService : IThemeService
     readonly Dictionary<string, Compiled> compiled = new(StringComparer.OrdinalIgnoreCase);
     readonly Stopwatch pollClock = Stopwatch.StartNew();
 
-    string committed = ThemeCatalog.DefaultColorTheme;
-    string? preview;
-    bool previewRenewed;
+    readonly Selection color = new(ThemeCatalog.DefaultColorTheme);
+    readonly Selection look = new(ThemeCatalog.DefaultLook);
+    readonly Selection icons = new(ThemeCatalog.DefaultIconTheme);
+    readonly Selection[] selections;
     float textSize = ThemeTokens.Default.FontSize;
     float zoom = 1f;
     long fingerprint;
@@ -33,8 +34,18 @@ public sealed partial class ThemeService : IThemeService
     string? reportedError;
     IReadOnlyList<string>? queuedBrickFolders;
 
-    /// <summary>A compiled theme: its snapshot and the sheets Guinevere widgets resolve against.</summary>
-    sealed record Compiled(ThemeTokens Tokens, IReadOnlyList<StyleSheet> Sheets);
+    /// <summary>A compiled theme: its snapshot, the sheets Guinevere widgets resolve against and the look's base.</summary>
+    sealed record Compiled(ThemeTokens Tokens, IReadOnlyList<StyleSheet> Sheets, StyleSheet? Look,
+        ThemeDiagnostic? Skipped);
+
+    /// <summary>One independent choice: the committed id and the id shown while a menu row is hovered.</summary>
+    sealed class Selection(string defaultId)
+    {
+        public string Committed { get; set; } = defaultId;
+        public string? Preview { get; set; }
+        public bool Renewed { get; set; }
+        public string Shown => Preview ?? Committed;
+    }
 
     /// <summary>Creates the service over the built-in and user themes and publishes the default.</summary>
     /// <param name="log">Receives theme errors, located as <c>file:line:column</c>.</param>
@@ -43,6 +54,7 @@ public sealed partial class ThemeService : IThemeService
     public ThemeService(ILogger? log = null, ThemeCatalog? catalog = null, string? userSheetPath = null)
     {
         this.log = log ?? NullLogger.Instance;
+        selections = [color, look, icons];
         Catalog = catalog ?? new ThemeCatalog(this.log);
         UserSheetPath = userSheetPath ?? UserConfigPath.For("theme.user.pss");
         fingerprint = Catalog.Fingerprint();
@@ -60,16 +72,34 @@ public sealed partial class ThemeService : IThemeService
     public IReadOnlyList<ThemeInfo> ColorThemes => Catalog.ColorThemes;
 
     /// <inheritdoc />
+    public IReadOnlyList<ThemeInfo> Looks => Catalog.Looks;
+
+    /// <inheritdoc />
+    public IReadOnlyList<ThemeInfo> IconThemes => Catalog.IconThemes;
+
+    /// <inheritdoc />
     public ThemeTokens Current { get; private set; } = ThemeTokens.Default;
 
     /// <summary>The sheets behind <see cref="Current"/>, lowest priority first, for <c>gui.StyleSheets</c>.</summary>
     public IReadOnlyList<StyleSheet> Sheets { get; private set; } = [];
 
-    /// <summary>Incremented whenever <see cref="Sheets"/> changes.</summary>
+    /// <summary>
+    /// The showing look's complete base sheet for <c>ExcaliburStyles.SetBaseSheet</c>, or <c>null</c> for Guinevere's
+    /// own default look.
+    /// </summary>
+    public StyleSheet? Look { get; private set; }
+
+    /// <summary>Incremented whenever <see cref="Sheets"/> or <see cref="Look"/> changes.</summary>
     public int SheetsVersion { get; private set; }
 
     /// <inheritdoc />
-    public string CommittedColorTheme => committed;
+    public string CommittedColorTheme => color.Committed;
+
+    /// <inheritdoc />
+    public string CommittedLook => look.Committed;
+
+    /// <inheritdoc />
+    public string CommittedIconTheme => icons.Committed;
 
     /// <inheritdoc />
     public ThemeDiagnostic? Diagnostic { get; private set; }
@@ -122,26 +152,56 @@ public sealed partial class ThemeService : IThemeService
     }
 
     /// <inheritdoc />
-    public void ApplyColorTheme(string id)
+    public void ApplyColorTheme(string id) => Apply(color, id);
+
+    /// <inheritdoc />
+    public void PreviewColorTheme(string id) => Preview(color, id);
+
+    /// <inheritdoc />
+    public void ApplyLook(string id) => Apply(look, id);
+
+    /// <inheritdoc />
+    public void PreviewLook(string id) => Preview(look, id);
+
+    /// <inheritdoc />
+    public void ApplyIconTheme(string id) => Apply(icons, id);
+
+    /// <inheritdoc />
+    public void PreviewIconTheme(string id) => Preview(icons, id);
+
+    /// <inheritdoc />
+    public string? DefaultColorThemeFor(string lookId)
+    {
+        ArgumentNullException.ThrowIfNull(lookId);
+        if (Catalog.Find(lookId) is not { Category: ThemeCategories.Look } info) return null;
+
+        var dark = Catalog.Find(color.Committed)?.Kind is null or ThemeKind.Dark or ThemeKind.HighContrastDark;
+        var suggested = dark ? info.DefaultDarkTheme : info.DefaultLightTheme;
+        return suggested is not null && Catalog.Find(suggested) is { Category: ThemeCategories.ColorTheme } theme
+            ? theme.Id
+            : null;
+    }
+
+    void Apply(Selection selection, string id)
     {
         ArgumentNullException.ThrowIfNull(id);
         var resolved = Catalog.Find(id)?.Id ?? id;
-        if (string.Equals(committed, resolved, StringComparison.Ordinal) && preview is null) return;
+        if (string.Equals(selection.Committed, resolved, StringComparison.Ordinal) && selection.Preview is null) return;
 
-        committed = resolved;
-        preview = null;
+        selection.Committed = resolved;
+        selection.Preview = null;
         Publish();
     }
 
-    /// <inheritdoc />
-    public void PreviewColorTheme(string id)
+    void Preview(Selection selection, string id)
     {
         ArgumentNullException.ThrowIfNull(id);
-        previewRenewed = true;
+        selection.Renewed = true;
 
-        if (Catalog.Find(id) is not { } theme || string.Equals(preview, theme.Id, StringComparison.Ordinal)) return;
+        if (Catalog.Find(id) is not { } theme || string.Equals(selection.Preview, theme.Id, StringComparison.Ordinal))
+            return;
 
-        preview = theme.Id;
+        selection.Preview = theme.Id;
         Publish();
     }
 
@@ -170,16 +230,17 @@ public sealed partial class ThemeService : IThemeService
             ReloadIfChanged();
         }
 
-        if (previewRenewed)
+        var dropped = false;
+        foreach (var selection in selections)
         {
-            previewRenewed = false;
-            return;
+            var renewed = selection.Renewed;
+            selection.Renewed = false;
+            if (renewed || selection.Preview is null) continue;
+
+            selection.Preview = null;
+            dropped = true;
         }
-
-        if (preview is null) return;
-
-        preview = null;
-        Publish();
+        if (dropped) Publish();
     }
 
     /// <summary>Rescans the themes and recompiles when a user or brick sheet, or the override sheet, changed.</summary>
@@ -223,15 +284,20 @@ public sealed partial class ThemeService : IThemeService
 
     void Publish()
     {
-        var shown = Catalog.Find(preview ?? committed) ?? Catalog.Find(ThemeCatalog.DefaultColorTheme);
-        var result = shown is null ? null : Compile(shown);
+        var shown = Catalog.Find(color.Shown) ?? Catalog.Find(ThemeCatalog.DefaultColorTheme);
+        var shownLook = Catalog.Find(look.Shown) is { Category: ThemeCategories.Look } l ? l : null;
+        var shownIcons = Catalog.Find(icons.Shown) is { Category: ThemeCategories.IconTheme } i
+            ? i
+            : Catalog.Find(ThemeCatalog.DefaultIconTheme);
+        var result = shown is null ? null : Compile(shown, shownLook, shownIcons);
         if (result is null && Sheets.Count == 0 && shown?.Id != ThemeCatalog.DefaultColorTheme
             && Catalog.Find(ThemeCatalog.DefaultColorTheme) is { } fallback)
-            result = Compile(fallback);
+            result = Compile(fallback, shownLook, shownIcons);
 
         if (result is not null && !ReferenceEquals(result.Sheets, Sheets))
         {
             Sheets = result.Sheets;
+            Look = result.Look;
             SheetsVersion++;
         }
 
@@ -241,16 +307,33 @@ public sealed partial class ThemeService : IThemeService
         Changed?.Invoke();
     }
 
-    /// <summary>Compiles a theme, or returns <c>null</c> and reports the located error.</summary>
-    Compiled? Compile(ThemeInfo info)
+    /// <summary>
+    /// Compiles a color theme with a look and an icon theme, or returns <c>null</c> and reports the located error. A
+    /// look or icon theme that cannot be loaded is reported and skipped, so it never costs the user their colors.
+    /// </summary>
+    Compiled? Compile(ThemeInfo info, ThemeInfo? lookInfo, ThemeInfo? iconInfo)
     {
-        if (compiled.TryGetValue(info.Id, out var cached)) return cached;
+        var key = $"{info.Id}|{lookInfo?.Id}|{iconInfo?.Id}";
+        if (compiled.TryGetValue(key, out var cached))
+        {
+            Report(cached.Skipped);
+            return cached;
+        }
 
         try
         {
+            ThemeDiagnostic? skipped = null;
+            var lookSheet = LoadLook(lookInfo, ref skipped);
+            var iconSheet = LoadSheet(iconInfo, ref skipped);
+            var iconBase = iconInfo is not null && iconInfo.Id != ThemeCatalog.FallbackIconTheme
+                ? LoadSheet(Catalog.Find(ThemeCatalog.FallbackIconTheme), ref skipped)
+                : null;
+
             var sheets = new StyleSheetCollection();
             if (contributions.Count > 0) sheets.Add(Catalog.Parse(Declarations(contributions), "plugin tokens"));
             sheets.Add(Catalog.Load(info.Id));
+            if (iconBase is not null) sheets.Add(iconBase);
+            if (iconSheet is not null) sheets.Add(iconSheet);
             if (userTokens.Count > 0) sheets.Add(Catalog.Parse(Declarations(userTokens), "user settings"));
             if (File.Exists(UserSheetPath))
                 sheets.Add(Catalog.Parse(File.ReadAllText(UserSheetPath), UserSheetPath, new Uri(UserSheetPath)));
@@ -259,9 +342,9 @@ public sealed partial class ThemeService : IThemeService
             var tokens = ThemeCompiler.Compile(sheets, info, problems);
             foreach (var problem in problems) log.LogDebug("Theme {Theme}: {Problem}", info.Id, problem);
 
-            var result = new Compiled(tokens, [.. sheets]);
-            compiled[info.Id] = result;
-            Report(null);
+            var result = new Compiled(tokens, [.. sheets], lookSheet, skipped);
+            compiled[key] = result;
+            Report(skipped);
             return result;
         }
         catch (StyleSheetException ex)
@@ -273,6 +356,41 @@ public sealed partial class ThemeService : IThemeService
             Report(new ThemeDiagnostic(ex.Message, UserSheetPath, 0, 0));
         }
         return null;
+    }
+
+    /// <summary>
+    /// Loads a look as Guinevere's base sheet. The default look and any look that fails to parse or to validate as a
+    /// complete base sheet yield <c>null</c>, which leaves Guinevere's own default in place.
+    /// </summary>
+    StyleSheet? LoadLook(ThemeInfo? info, ref ThemeDiagnostic? skipped)
+    {
+        if (info is null || info.Id == ThemeCatalog.DefaultLook) return null;
+
+        var sheet = LoadSheet(info, ref skipped);
+        if (sheet is null) return null;
+
+        var errors = ExcaliburStyles.ValidateBaseSheet(sheet);
+        if (errors.Count == 0) return sheet;
+
+        skipped = new ThemeDiagnostic($"Look {info.Id} is not a complete base sheet: {string.Join("; ", errors)}",
+            info.Path ?? info.Id, 0, 0);
+        return null;
+    }
+
+    /// <summary>Loads an optional sheet, recording a located error in <paramref name="skipped"/> when it fails.</summary>
+    StyleSheet? LoadSheet(ThemeInfo? info, ref ThemeDiagnostic? skipped)
+    {
+        if (info is null) return null;
+
+        try
+        {
+            return Catalog.Load(info.Id);
+        }
+        catch (StyleSheetException ex)
+        {
+            skipped = new ThemeDiagnostic(ex.Message, ex.SourceName, ex.Line, ex.Column);
+            return null;
+        }
     }
 
     /// <summary>Records the error that kept the last valid theme, logging each distinct one once.</summary>
@@ -287,7 +405,7 @@ public sealed partial class ThemeService : IThemeService
 
         if (diagnostic.Message == reportedError) return;
         reportedError = diagnostic.Message;
-        log.LogError("Theme error, keeping the last valid theme: {Message}", diagnostic.Message);
+        log.LogError("Theme error: {Message}", diagnostic.Message);
     }
 
     static string Declarations(IReadOnlyDictionary<string, string> tokens) =>

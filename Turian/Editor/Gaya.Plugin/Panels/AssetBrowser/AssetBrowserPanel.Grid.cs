@@ -146,7 +146,7 @@ sealed partial class AssetBrowserPanel
             else
             {
                 gui.ClipContent();
-                gui.DrawText((favorites!.Paths.Contains(entry.AbsolutePath) ? EditorIcons.Star + " " : "") + DisplayName(entry.AbsolutePath),
+                gui.DrawText((favorites!.Paths.Contains(entry.AbsolutePath) ? "★ " : "") + DisplayName(entry.AbsolutePath),
                     ThemeTokens.Current.Text(11), ThemeTokens.Current.Ink,
                     wrapWidth: previewSize >= ThemeTokens.Current.Scale(96) ? cellWidth - 8 : 0, clip: true);
             }

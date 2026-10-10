@@ -10,7 +10,7 @@ static class TurianForms
     public static FormDrawers Drawers { get; } = CreateDrawers();
 
     /// <summary>
-    /// Sets Studio's row height, font size, label width, indent and fold glyphs on the current node, so every form
+    /// Sets Studio's row height, font size, label width and indent on the current node, so every form
     /// drawn beneath it matches the theme. Call once per frame inside the panel's root node.
     /// </summary>
     public static void ApplyStyle(Gui gui)
@@ -22,8 +22,6 @@ static class TurianForms
             ControlStyles.Value<ControlCompactFontSize, float>(theme.Text(12)),
             ControlStyles.Value<FormLabelWidth, float>(theme.Scale(96f)),
             ControlStyles.Value<FormIndent, float>(theme.Scale(12f)),
-            ControlStyles.Value<FormCaretOpen, string>(EditorIcons.CaretDown),
-            ControlStyles.Value<FormCaretClosed, string>(EditorIcons.CaretRight),
         });
     }
 

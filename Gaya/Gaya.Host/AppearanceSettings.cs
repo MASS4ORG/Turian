@@ -1,7 +1,7 @@
 namespace Gaya.Host;
 
-/// <summary>The workbench's theme, interface scale and desktop window decorations.</summary>
-[EditorSetting("Appearance", Id = PageId, Description = "Theme, interface size and window decorations.")]
+/// <summary>The workbench's look, color theme, icon theme, interface scale and desktop window decorations.</summary>
+[EditorSetting("Appearance", Id = PageId, Description = "Look, theme, icons, interface size and window decorations.")]
 public sealed class AppearanceSettings
 {
     int textSize = 12;
@@ -12,6 +12,14 @@ public sealed class AppearanceSettings
     /// <summary>The id of the committed color theme; names stored by older versions are still recognized.</summary>
     [EditorSetting("Theme", Description = "Colors used throughout the workbench.")]
     public string Theme { get; set; } = ThemeCatalog.DefaultColorTheme;
+
+    /// <summary>The id of the committed look, which shapes every control independently of the colors.</summary>
+    [EditorSetting("Look", Description = "Shape, borders and motion of controls. Choosing one applies its suggested theme.")]
+    public string Look { get; set; } = ThemeCatalog.DefaultLook;
+
+    /// <summary>The id of the committed icon theme.</summary>
+    [EditorSetting("Icons", Description = "The icon set used throughout the workbench.")]
+    public string IconTheme { get; set; } = ThemeCatalog.DefaultIconTheme;
 
     /// <summary>The workbench's base text size in points.</summary>
     [EditorSetting("Text Size", Description = "Base interface text size in points.")]

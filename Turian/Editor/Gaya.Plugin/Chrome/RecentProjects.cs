@@ -68,8 +68,8 @@ sealed class ProjectSwitcherChrome(
         {
             var anchor = gui.CurrentNode.Rect;
             DrawCurrentIcon(gui, project);
-            gui.DrawText(label, Theme.Text(12), Theme.Ink, centerInRect: false);
-            gui.DrawText(EditorIcons.CaretDown, Theme.Text(9), Theme.InkDim);
+            gui.DrawText(label, Theme.Text(12), centerInRect: false);
+            gui.ThemedIcon(Icons.CaretDown, Theme.Text(9), 0.7f);
             if (gui.Pass != Pass.Pass2Render) return;
             var interaction = gui.GetInteractable();
             if (interaction.OnHover()) gui.DrawBackgroundRect(Theme.Hover, 2);
@@ -142,12 +142,12 @@ sealed class ProjectSwitcherChrome(
                     close = true;
                 }
             }
-            if (MenuAction(gui, EditorIcons.ArrowUpRightFromSquare, $"{row.Id}/new-window"))
+            if (MenuAction(gui, Icons.External, $"{row.Id}/new-window"))
             {
                 OpenInNewInstance(project.Path);
                 close = true;
             }
-            if (MenuAction(gui, EditorIcons.Xmark, $"{row.Id}/remove"))
+            if (MenuAction(gui, Icons.Close, $"{row.Id}/remove"))
             {
                 if (recent.Remove(project.Path)) editorSettings.NotifyChanged("gaya.turian.recentProjects");
                 close = true;
@@ -176,7 +176,7 @@ sealed class ProjectSwitcherChrome(
     {
         using (gui.Node(RowHeight, RowHeight, id).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
-            gui.DrawText(icon, Theme.Text(11), Theme.InkDim);
+            gui.ThemedIcon(icon, Theme.Text(11), 0.7f);
             return ActivateMenuItem(gui);
         }
     }

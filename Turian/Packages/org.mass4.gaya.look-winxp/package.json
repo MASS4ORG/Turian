@@ -1,0 +1,12 @@
+{
+  "name": "org.mass4.gaya.look-winxp",
+  "version": "0.1.0",
+  "displayName": "Windows XP look",
+  "description": "Luna-style rounded controls with glossy gradients, plus the Luna color theme.",
+  "author": "MASS4",
+  "license": "MIT",
+  "scopes": ["studio"],
+  "engines": { "gaya": ">=0.0" },
+  "categories": ["gaya:look", "gaya:theme"],
+  "keywords": ["look", "retro", "windows", "luna"]
+}

@@ -56,12 +56,12 @@ public static partial class Program
 
         var kindOption = new Option<string>("--kind")
         {
-            Description = "code (an assembly definition and a script), or a content-only studio brick: theme, icon-theme, font-pack",
+            Description = "code (an assembly definition and a script), or a content-only studio brick: look, theme, icon-theme, font-pack",
             DefaultValueFactory = _ => "code",
         };
-        kindOption.AcceptOnlyFromAmong("code", "theme", "icon-theme", "font-pack");
+        kindOption.AcceptOnlyFromAmong("code", "look", "theme", "icon-theme", "font-pack");
 
-        var command = new Command("new", "Create a brick folder: code with a manifest, an assembly definition and a script, or a content-only theme, icon theme or font pack")
+        var command = new Command("new", "Create a brick folder: code with a manifest, an assembly definition and a script, or a content-only look, theme, icon theme or font pack")
         {
             idArg, pathOption, nameOption, licenseOption, kindOption,
         };
@@ -71,6 +71,8 @@ public static partial class Program
             var id = result.GetValue(idArg)!;
             var root = result.GetValue(kindOption) switch
             {
+                "look" => ContentBricks.New(parent, id, ContentBrickKind.Look, ProjectPackages.GayaVersion,
+                    result.GetValue(nameOption), result.GetValue(licenseOption)!),
                 "theme" => ContentBricks.New(parent, id, ContentBrickKind.Theme, ProjectPackages.GayaVersion,
                     result.GetValue(nameOption), result.GetValue(licenseOption)!),
                 "icon-theme" => ContentBricks.New(parent, id, ContentBrickKind.IconTheme, ProjectPackages.GayaVersion,

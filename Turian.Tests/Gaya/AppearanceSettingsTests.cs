@@ -172,7 +172,13 @@ public sealed class AppearanceSettingsTests
         window.PointerPosition.Returns(_ => position + frame.Input.MousePosition);
         frame.Gui.Platform.Register(window);
         OpenSettings(frame);
-        var checkbox = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field3/editor");
+        var first = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
+        frame.Input.MousePosition.Returns(first.Rect.Center);
+        frame.Input.MouseWheelDelta.Returns(-400f);
+        frame.Draw();
+        frame.Input.MouseWheelDelta.Returns(0f);
+        frame.Draw();
+        var checkbox = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field5/editor");
         Click(frame, checkbox.Rect.Position + new Vector2(6, checkbox.Rect.H / 2));
         frame.Draw();
         Assert.True(frame.Workbench.NativeTitlebar);

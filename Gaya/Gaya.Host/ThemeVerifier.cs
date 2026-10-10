@@ -81,6 +81,12 @@ public static class ThemeVerifier
         try
         {
             var sheet = catalog.Parse(text, file, new Uri(file));
+            if (info is { Category: ThemeCategories.Look })
+            {
+                findings.AddRange(ExcaliburStyles.ValidateBaseSheet(sheet)
+                    .Select(error => new ThemeFinding(ThemeFindingSeverity.Error, error, file)));
+                return findings;
+            }
             if (info is not { Category: ThemeCategories.ColorTheme }) return findings;
 
             var problems = new List<string>();

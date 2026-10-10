@@ -106,8 +106,8 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     void OnThemeChanged() => dockTheme = Theme.ToDockTheme();
 
     /// <summary>
-    /// Installs the active theme's sheets into the GUI over Guinevere's default control sheet, so styled widgets
-    /// resolve against them.
+    /// Installs the active theme's sheets into the GUI over the look's base sheet (Guinevere's default control sheet
+    /// for the default look), so styled widgets resolve against them.
     /// </summary>
     void SyncStyleSheets(Gui gui)
     {
@@ -115,9 +115,10 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         styleSheetsVersion = app.Themes.SheetsVersion;
         styledGui = gui;
+        if (!gui.IconDecoders.Contains(SvgIconDecoder.Instance)) gui.IconDecoders.Add(SvgIconDecoder.Instance);
         gui.StyleSheets.Clear();
         foreach (var sheet in app.Themes.Sheets) gui.StyleSheets.Add(sheet);
-        ExcaliburStyles.Ensure(gui);
+        ExcaliburStyles.SetBaseSheet(gui, app.Themes.Look);
     }
 
     /// <summary>

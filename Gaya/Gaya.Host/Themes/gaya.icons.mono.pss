@@ -1,0 +1,49 @@
+// Gaya's mono icon theme: Tabler Icons (MIT, see Icons/mono/LICENSE) drawn in the text color. It is also the base
+// layer of every other icon theme, which only needs to define the ids it changes.
+@const icon-theme-id = "gaya.icons.mono";
+@const icon-theme-name = "Mono";
+@const icon-theme-kind = any;
+
+icon { tint = true; color = $ink; }
+
+icon#scene\.select { src = url("Icons/mono/pointer.svg"); }
+icon#scene\.move { src = url("Icons/mono/arrows-move.svg"); }
+icon#scene\.rotate { src = url("Icons/mono/rotate-clockwise-2.svg"); }
+icon#scene\.scale { src = url("Icons/mono/arrows-diagonal.svg"); }
+icon#scene\.transform { src = url("Icons/mono/transform.svg"); }
+icon#scene\.frame { src = url("Icons/mono/focus-2.svg"); }
+icon#scene\.snap { src = url("Icons/mono/magnet.svg"); }
+icon#scene\.projection { src = url("Icons/mono/cube.svg"); }
+icon#scene\.node { src = url("Icons/mono/cube.svg"); color = $accent; }
+
+icon#play\.start { src = url("Icons/mono/player-play.svg"); }
+icon#play\.pause { src = url("Icons/mono/player-pause.svg"); }
+icon#play\.stop { src = url("Icons/mono/player-stop.svg"); }
+icon#play\.restart { src = url("Icons/mono/player-skip-back.svg"); }
+icon#play\.step { src = url("Icons/mono/player-track-next.svg"); }
+
+icon#ui\.caret-right { src = url("Icons/mono/caret-right.svg"); }
+icon#ui\.caret-down { src = url("Icons/mono/caret-down.svg"); }
+icon#ui\.close { src = url("Icons/mono/x.svg"); }
+icon#ui\.external { src = url("Icons/mono/external-link.svg"); }
+icon#ui\.revert { src = url("Icons/mono/arrow-back-up.svg"); }
+icon#ui\.lock { src = url("Icons/mono/lock.svg"); }
+icon#ui\.unlock { src = url("Icons/mono/lock-open.svg"); }
+icon#ui\.favorite { src = url("Icons/mono/star.svg"); }
+
+icon#asset\.folder { src = url("Icons/mono/folder.svg"); color = $folder; }
+icon#asset\.file { src = url("Icons/mono/file.svg"); }
+icon#asset\.scene { src = url("Icons/mono/movie.svg"); }
+icon#asset\.material { src = url("Icons/mono/palette.svg"); }
+icon#asset\.data { src = url("Icons/mono/database.svg"); }
+icon#asset\.image { src = url("Icons/mono/photo.svg"); }
+icon#asset\.model { src = url("Icons/mono/cube.svg"); }
+icon#asset\.script { src = url("Icons/mono/file-code.svg"); }
+icon#asset\.text { src = url("Icons/mono/file-text.svg"); }
+icon#asset\.ui-document { src = url("Icons/mono/app-window.svg"); }
+icon#asset\.style-sheet { src = url("Icons/mono/brush.svg"); }
+
+icon#prefab\.instance { src = url("Icons/mono/box.svg"); color = $accent; }
+icon#prefab\.nested { src = url("Icons/mono/box.svg"); color = $ink-dim; }
+icon#prefab\.variant { src = url("Icons/mono/copy.svg"); color = $accent; }
+icon#prefab\.missing { src = url("Icons/mono/unlink.svg"); color = $error; }

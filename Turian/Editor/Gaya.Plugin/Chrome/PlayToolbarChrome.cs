@@ -24,14 +24,14 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
         using (gui.Node(-1, ButtonSize, "play/buttons").Direction(Axis.Horizontal).Gap(3f)
                    .Padding(8f, 0f).ContentAlignY(0.5f).Enter())
         {
-            Button(gui, "play", playing ? EditorIcons.Stop : EditorIcons.Play, "gaya.turian.play", playing);
-            Button(gui, "startup", EditorIcons.Backward, "gaya.turian.playStartupScene", false);
-            Button(gui, "pause", paused ? EditorIcons.Play : EditorIcons.Pause, "gaya.turian.playPause", paused);
-            Button(gui, "step", EditorIcons.ForwardStep, "gaya.turian.playStep", false);
+            Button(gui, "play", playing ? Icons.PlayStop : Icons.PlayStart, "gaya.turian.play", playing);
+            Button(gui, "startup", Icons.PlayRestart, "gaya.turian.playStartupScene", false);
+            Button(gui, "pause", paused ? Icons.PlayStart : Icons.PlayPause, "gaya.turian.playPause", paused);
+            Button(gui, "step", Icons.PlayStep, "gaya.turian.playStep", false);
         }
     }
 
-    void Button(Gui gui, string id, string glyph, string commandId, bool active)
+    void Button(Gui gui, string id, string icon, string commandId, bool active)
     {
         using (gui.Node(ButtonSize, ButtonSize, $"play/{id}").ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
@@ -42,7 +42,7 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
             if (active) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
             else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
 
-            gui.DrawText(glyph, IconSize, enabled ? Theme.Ink : Theme.InkFaint);
+            gui.ThemedIcon(icon, IconSize, enabled ? 1f : 0.4f);
 
             if (hot && interactable.OnClick()) commands.Execute(commandId);
         }

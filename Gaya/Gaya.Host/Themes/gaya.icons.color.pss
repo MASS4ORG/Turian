@@ -1,0 +1,31 @@
+// Gaya's colored icon theme: Fluent Emoji Flat (MIT, see Icons/color/LICENSE) for assets, over the mono icons given a
+// hue. Ids it leaves out come from the mono theme underneath.
+@const icon-theme-id = "gaya.icons.color";
+@const icon-theme-name = "Color";
+@const icon-theme-kind = any;
+
+icon#scene\.select, icon#scene\.move, icon#scene\.rotate, icon#scene\.scale, icon#scene\.transform { color = $accent; }
+icon#scene\.frame, icon#scene\.projection { color = $info; }
+icon#scene\.snap { color = $warning; }
+icon#play\.start { color = $success; }
+icon#play\.pause { color = $warning; }
+icon#play\.stop { color = $error; }
+icon#play\.restart, icon#play\.step { color = $info; }
+icon#ui\.revert { color = $info; }
+icon#ui\.close { color = $error; }
+
+icon#ui\.favorite { src = url("Icons/color/star.svg"); tint = false; }
+icon#ui\.lock { src = url("Icons/color/locked.svg"); tint = false; }
+icon#ui\.unlock { src = url("Icons/color/unlocked.svg"); tint = false; }
+
+icon#asset\.folder { src = url("Icons/color/file_folder.svg"); tint = false; }
+icon#asset\.file { src = url("Icons/color/page_facing_up.svg"); tint = false; }
+icon#asset\.scene { src = url("Icons/color/clapper_board.svg"); tint = false; }
+icon#asset\.material { src = url("Icons/color/artist_palette.svg"); tint = false; }
+icon#asset\.data { src = url("Icons/color/file_cabinet.svg"); tint = false; }
+icon#asset\.image { src = url("Icons/color/framed_picture.svg"); tint = false; }
+icon#asset\.model { src = url("Icons/color/package.svg"); tint = false; }
+icon#asset\.script { src = url("Icons/color/scroll.svg"); tint = false; }
+icon#asset\.text { src = url("Icons/color/memo.svg"); tint = false; }
+icon#asset\.ui-document { src = url("Icons/color/window.svg"); tint = false; }
+icon#asset\.style-sheet { src = url("Icons/color/paintbrush.svg"); tint = false; }

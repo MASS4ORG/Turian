@@ -1,0 +1,104 @@
+@const look-id = "org.mass4.look.winxp";
+@const look-name = "Windows XP";
+@const look-kind = light;
+@const look-theme-light = "org.mass4.theme.luna";
+@const look-theme-dark = "org.mass4.theme.luna";
+@import "guinevere.default";
+
+// Small rounded corners instead of the Material pill and card shapes
+$md-shape-extra-small = 3;
+$md-shape-small = 3;
+$md-shape-medium = 4;
+$md-shape-large = 6;
+$md-shape-extra-large = 8;
+$md-shape-full = 3;
+$control-indicator-size = 13;
+
+$xp-face = $md-surface-container;
+$xp-edge = darken($md-surface-container, 0.65);
+$xp-top = lighten($xp-face, 0.85);
+$xp-bottom = darken($xp-face, 0.1);
+
+button, button.primary, button.outlined, button.elevated, button.segment, button.color-mode {
+    padding = 4 14;
+    background = linear-gradient(to bottom, $xp-top, $xp-face 80%, $xp-bottom);
+    color = $text; font-weight = 400; border-width = 1; border-color = $xp-edge; box-shadow = none;
+    :hover(0.08 ease-out) { background = linear-gradient(to bottom, lighten($accent, 0.9), lighten($accent, 0.8)); border-color = $accent; }
+    :active(0) { background = linear-gradient(to bottom, $xp-bottom, $xp-face); ripple = none; }
+    :focus { border-color = $accent; border-width = 2; outline-width = 0; }
+    :checked(0) { background = linear-gradient(to bottom, $xp-bottom, $xp-face); color = $text; }
+    :disabled(0) { background = $xp-face; color = $text-disabled; border-color = $border; }
+}
+button.text, button.icon {
+    padding = 2 6; background = none; background-color = transparent; border-color = transparent; box-shadow = none;
+    :hover(0.08 ease-out) { background = linear-gradient(to bottom, $xp-top, $xp-face); border-color = $xp-edge; }
+    :active(0) { ripple = none; background = linear-gradient(to bottom, $xp-bottom, $xp-face); }
+    :checked(0) { color = $text; background = linear-gradient(to bottom, $xp-bottom, $xp-face); border-color = $xp-edge; }
+}
+
+checkbox > indicator, radio > indicator, option > indicator {
+    background = linear-gradient(to bottom right, $xp-bottom, $surface 60%); color = $accent;
+    border-width = 1; border-color = $xp-edge;
+    :checked { background = linear-gradient(to bottom right, $xp-bottom, $surface 60%); border-color = $xp-edge; }
+    :mixed { background-color = $surface; border-color = $xp-edge; }
+}
+radio dot { :checked { background-color = $accent; } }
+checkbox:hover > indicator, radio:hover > indicator { border-color = $accent; }
+
+input, dropdown, object-field, file-list {
+    background-color = $surface; color = $text; border-width = 1; border-color = $xp-edge; box-shadow = none;
+    :hover { border-color = $xp-edge; }
+    :focus { border-color = $accent; border-width = 1; }
+    :open { border-color = $accent; border-width = 1; }
+}
+
+menu, listbox, popup, dialog, toast {
+    background-color = $surface; color = $text; border-width = 1; border-color = $xp-edge;
+    box-shadow = 2 2 4 0 #00000040;
+}
+tooltip { background-color = #ffffe1; color = #000000; border-width = 1; border-color = #000000; }
+appbar {
+    background = linear-gradient(to bottom, #3a93ff, #0058e6 12%, #0054e3 80%, #0a3fb8);
+    color = #ffffff; font-weight = 700; border-radius = 8 8 0 0;
+}
+menubar { background-color = transparent; color = #ffffff; }
+window-button { color = #ffffff; border-width = 1; border-color = #ffffff; border-radius = 3;
+    background = linear-gradient(to bottom, #5b8cf0, #2b5ad6);
+    :hover(0.08 ease-out) { background = linear-gradient(to bottom, #7aa5ff, #3f6fe8); }
+    :active(0) { background = linear-gradient(to bottom, #2b5ad6, #1d44b0); } }
+window-button > glyph-fill { background-color = transparent; }
+dock-grip, splitter { background-color = #7f9db9; }
+option, menu-item, menu-title, tree-row, file-row, file-place {
+    :hover(0) { background-color = $selected; color = $text-on-accent; }
+    :highlighted { background-color = $selected; color = $text-on-accent; }
+    :open { background-color = $selected; color = $text-on-accent; }
+    :selected { background-color = $selected; color = $text-on-accent; }
+}
+
+slider track { background-color = $surface; height = 4; border-width = 1; border-color = $xp-edge; border-radius = 2; }
+slider fill { background-color = transparent; }
+slider thumb {
+    width = 11; height = 20; border-radius = 3; border-width = 1; border-color = $xp-edge;
+    background = linear-gradient(to bottom, $xp-top, $xp-face 80%, $xp-bottom);
+}
+progress { height = 14; background-color = $surface; border-width = 1; border-color = $xp-edge; border-radius = 3; }
+progress fill { background = linear-gradient(to bottom, lighten($success, 0.5), $success 50%, darken($success, 0.15)); border-radius = 2; }
+
+tabstrip, tabbar { background-color = $xp-face; }
+tabstrip > tab, tabbar > tab, tabbar.pill > tab {
+    background = linear-gradient(to bottom, $xp-top, $xp-face); color = $text; border-radius = 3 3 0 0; border-width = 1; border-color = $xp-edge;
+    :hover(0.08 ease-out) { background = linear-gradient(to bottom, lighten($accent, 0.9), $xp-face); color = $text; }
+    :selected { background = linear-gradient(to bottom, $surface, $xp-face); color = $text; border-top-color = #e68b2c; border-top-width = 2; }
+}
+tabstrip { background-color = #d6dff7; }
+tabpanel { background-color = $surface; border-width = 1; border-color = $xp-edge; }
+
+dialog-title, popup-title {
+    background = linear-gradient(to bottom, lighten($accent, 0.25), $accent 15%, $accent 80%, darken($accent, 0.2));
+    color = $text-on-accent; border-radius = 6 6 0 0; font-weight = 700;
+}
+scrollbar { background-color = $xp-top; }
+scrollbar > thumb {
+    background = linear-gradient(to right, lighten($accent, 0.55), lighten($accent, 0.3)); border-radius = 3; border-width = 1; border-color = $accent;
+    :hover { background = linear-gradient(to right, lighten($accent, 0.7), lighten($accent, 0.45)); } :active { background-color = lighten($accent, 0.3); }
+}

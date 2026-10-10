@@ -7,20 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Improved: Studio renders on demand with live performance settings and background refreshes
-- Added: in-game UI supports GPU rendering on Vulkan.
-- Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
-- Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
-- Added (breaking): `.pss` color themes with hot reload #213
+- Changed (breaking): `.pss` color themes with hot reload #213
 - Changed (breaking): Guinevere fluent effects.
 - Changed (breaking): Gaya settings use class-level attributes as their sole configuration
+- Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
+- Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
 - Added: Asset browser revamp #68
 - Added: Theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Added: scene Frame Statistics HUD #59
 - Added: temporary scenes
+- Added: Icon sets (Mono, Color) #217
+- Added: Material 3 as default theme; classic OS themes as bricks #212
+- Added: in-game UI supports GPU rendering on Vulkan.
+- Improved: Panels API delegate tab-strip area.
+- Improved: Studio renders on demand
 - Changed: Guinevere controls now use style sheets #218
-- Changed: Panels API delegate tab-strip area.
 - Changed: project solution generator revamped
 
 ## [2.3.1] - 2026-10-07

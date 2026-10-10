@@ -1,0 +1,20 @@
+@const theme-id = "org.mass4.theme.win-classic";
+@const theme-name = "Windows Classic";
+@const theme-kind = light;
+@import "gaya.base";
+
+$base = #c0c0c0;
+$accent = #000080;
+$contrast = -0.06;
+$surface-window = #c0c0c0;
+$surface-panel = #c0c0c0;
+$surface-chrome = #c0c0c0;
+$surface-field = #ffffff;
+$surface-hover = #d4d0c8;
+$surface-active = #808080;
+$surface-high = #c0c0c0;
+$ink = #000000;
+$ink-dim = #404040;
+$ink-faint = #808080;
+$ink-on-accent = #ffffff;
+$border = #808080;

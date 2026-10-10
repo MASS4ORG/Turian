@@ -132,6 +132,44 @@ $focus-ring-width = 2;
 // Effects
 $transition-fast = 0.12;
 
+// Material color roles: the studio tokens under the names Guinevere's Material 3 controls read, so every control
+// follows the theme. The elevation ladder supplies the surface containers; the seeds supply the accent roles.
+$md-primary = $accent;
+$md-on-primary = $ink-on-accent;
+$md-primary-container = $accent-fill;
+$md-on-primary-container = $ink;
+$md-secondary = $ink-dim;
+$md-on-secondary = $surface-base;
+$md-secondary-container = $surface-highest;
+$md-on-secondary-container = $ink;
+$md-tertiary = $info;
+$md-on-tertiary = contrast-ink($info);
+$md-tertiary-container = $info-bg;
+$md-on-tertiary-container = $ink;
+$md-error = $error;
+$md-on-error = contrast-ink($error);
+$md-error-container = $error-bg;
+$md-on-error-container = $ink;
+$md-surface = $surface-base;
+$md-surface-dim = $surface-lower;
+$md-surface-bright = $surface-higher;
+$md-surface-container-lowest = $surface-lower;
+$md-surface-container-low = $surface-base;
+$md-surface-container = $surface-high;
+$md-surface-container-high = $surface-higher;
+$md-surface-container-highest = $surface-highest;
+$md-on-surface = $ink;
+$md-on-surface-variant = $ink-dim;
+$md-surface-variant = $surface-active;
+$md-outline = $border-strong;
+$md-outline-variant = $border;
+$md-inverse-surface = $ink;
+$md-inverse-on-surface = $surface-base;
+$md-inverse-primary = $accent;
+$md-success = $success;
+$md-warning = $warning;
+$md-info = $info;
+
 // Guinevere controls: the Excalibur default sheet's tokens that have no studio token of the same name
 $base-background = $surface-panel;
 $surface = $surface-field;

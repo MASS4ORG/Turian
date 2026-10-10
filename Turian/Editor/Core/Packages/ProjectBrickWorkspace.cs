@@ -140,5 +140,6 @@ public static class TurianStudioBricks
     /// <param name="studioRoot">The studio folder; <c>~/.gaya/studio</c> when null.</param>
     /// <returns>The workspace.</returns>
     public static StudioBricks Workspace(string? studioRoot = null) =>
-        new(studioRoot ?? GayaConfig.StudioRoot, Hosts, publicRegistry: ProjectPackages.PublicRegistry);
+        new(studioRoot ?? GayaConfig.StudioRoot, Hosts, publicRegistry: ProjectPackages.PublicRegistry,
+            builtinDirectory: ProjectPackages.BuiltinDirectory);
 }

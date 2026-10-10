@@ -1,0 +1,16 @@
+@const theme-id = "org.mass4.theme.luna";
+@const theme-name = "Luna";
+@const theme-kind = light;
+@import "gaya.base";
+
+$base = #ece9d8;
+$accent = #316ac5;
+$contrast = -0.06;
+$surface-window = #ece9d8;
+$surface-panel = #ece9d8;
+$surface-chrome = #ece9d8;
+$surface-field = #ffffff;
+$surface-high = #ece9d8;
+$ink = #000000;
+$ink-on-accent = #ffffff;
+$border = #7f9db9;

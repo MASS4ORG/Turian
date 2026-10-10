@@ -405,7 +405,7 @@ public sealed class GayaChromeTests
         var font = Font.FromFamilyName("sans-serif", 14);
         InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);
         var checkbox = Descendants(frame.Gui.RootNode!).Single(node =>
-            node.Id == $"settings/{AppearanceSettings.PageId}/field3/editor");
+            node.Id == $"settings/{AppearanceSettings.PageId}/field5/editor");
         frame.Input.MousePosition.Returns(checkbox.Rect.Position + new Vector2(6, checkbox.Rect.H / 2));
         frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
         InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);

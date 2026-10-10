@@ -39,8 +39,8 @@ sealed partial class InspectorPanel
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
 
-            gui.DrawText(Locked ? EditorIcons.Lock : EditorIcons.LockOpen, theme.Text(13),
-                Locked ? theme.Accent : hot ? theme.Ink : theme.InkDim);
+            gui.ThemedIcon(Locked ? Icons.Lock : Icons.Unlock, theme.Text(13), Locked || hot ? 1f : 0.7f,
+                Locked ? theme.Accent : null);
 
             if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())
                 Locked = !Locked;

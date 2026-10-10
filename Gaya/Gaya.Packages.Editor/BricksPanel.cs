@@ -20,6 +20,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     static readonly (BrickCategoryFilter Category, string Label, float Width)[] Categories =
     [
         (BrickCategoryFilter.All, "Everything", 72f),
+        (BrickCategoryFilter.Looks, "Looks", 48f),
         (BrickCategoryFilter.Themes, "Themes", 58f),
         (BrickCategoryFilter.IconThemes, "Icon Themes", 82f),
         (BrickCategoryFilter.Fonts, "Fonts", 48f),

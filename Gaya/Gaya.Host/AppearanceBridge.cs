@@ -10,6 +10,7 @@ sealed class AppearanceBridge : IDisposable
     readonly AppearanceSettings appearance;
     readonly IThemeService themes;
     readonly IEditorSettings settings;
+    bool applying;
 
     /// <summary>Binds the page to the theme service and applies what was stored.</summary>
     /// <param name="appearance">The page's settings object.</param>
@@ -33,20 +34,41 @@ sealed class AppearanceBridge : IDisposable
     /// <summary>Pushes the page's values onto the theme service. Both calls ignore a repeat.</summary>
     void Apply()
     {
-        themes.ApplyColorTheme(appearance.Theme);
-        themes.SetScale(appearance.TextSize, appearance.Zoom);
+        applying = true;
+        try
+        {
+            themes.ApplyLook(appearance.Look);
+            themes.ApplyColorTheme(appearance.Theme);
+            themes.ApplyIconTheme(appearance.IconTheme);
+            themes.SetScale(appearance.TextSize, appearance.Zoom);
+        }
+        finally
+        {
+            applying = false;
+        }
+        Remember();
     }
 
     /// <summary>
-    /// Records a theme committed from the menu. A preview leaves the committed id alone, so nothing
-    /// is stored while the pointer travels down the list.
+    /// Records a look, theme or icon theme committed from the menu. A preview leaves the committed ids alone, so
+    /// nothing is stored while the pointer travels down the list.
     /// </summary>
     void Remember()
     {
-        if (string.Equals(themes.CommittedColorTheme, appearance.Theme, StringComparison.Ordinal)) return;
+        if (applying) return;
 
-        appearance.Theme = themes.CommittedColorTheme;
-        settings.NotifyChanged(AppearanceSettings.PageId);
+        var changed = Update(appearance.Theme, themes.CommittedColorTheme, value => appearance.Theme = value);
+        changed |= Update(appearance.Look, themes.CommittedLook, value => appearance.Look = value);
+        changed |= Update(appearance.IconTheme, themes.CommittedIconTheme, value => appearance.IconTheme = value);
+        if (changed) settings.NotifyChanged(AppearanceSettings.PageId);
+    }
+
+    static bool Update(string stored, string committed, Action<string> store)
+    {
+        if (string.Equals(stored, committed, StringComparison.Ordinal)) return false;
+
+        store(committed);
+        return true;
     }
 
     /// <inheritdoc />

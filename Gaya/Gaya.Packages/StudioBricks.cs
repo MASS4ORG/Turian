@@ -9,8 +9,10 @@ namespace Gaya.Packages;
 /// <param name="hosts">Host → version, checked against each brick's <c>engines</c>.</param>
 /// <param name="store">The shared store; the default one when null.</param>
 /// <param name="publicRegistry">The registry every studio takes bricks from, or null.</param>
+/// <param name="builtinDirectory">The folder of the bricks that ship with the host, or null for none.</param>
 public sealed class StudioBricks(string root, IReadOnlyDictionary<string, SemanticVersion> hosts,
-    PackageStore? store = null, ScopedRegistry? publicRegistry = null) : IBrickWorkspace
+    PackageStore? store = null, ScopedRegistry? publicRegistry = null, string? builtinDirectory = null)
+    : IBrickWorkspace
 {
     /// <summary>The folder, inside a brick, holding its compiled plugin assemblies.</summary>
     public const string LibraryDirectoryName = "Precast~/lib";
@@ -30,7 +32,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", .. hosts.Keys.Where(host => host != "gaya")];
 
     /// <inheritdoc />
-    public string? BuiltinDirectory => null;
+    public string? BuiltinDirectory { get; } = builtinDirectory;
 
     /// <inheritdoc />
     public ScopedRegistry? PublicRegistry { get; } = publicRegistry;
@@ -176,6 +178,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     {
         Hosts = Hosts,
         Scope = PackageScope.Studio,
+        BuiltinDirectory = BuiltinDirectory,
         Registries = PublicRegistry is { } shared ? [shared] : [],
         ReservedCategoryPrefixes = ReservedCategoryPrefixes,
         Locked = locked,

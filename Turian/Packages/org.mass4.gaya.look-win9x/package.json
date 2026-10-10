@@ -1,0 +1,12 @@
+{
+  "name": "org.mass4.gaya.look-win9x",
+  "version": "0.1.0",
+  "displayName": "Windows 95/98 look",
+  "description": "Beveled gray controls with sunken fields and navy selections, plus the Windows Classic color theme.",
+  "author": "MASS4",
+  "license": "MIT",
+  "scopes": ["studio"],
+  "engines": { "gaya": ">=0.0" },
+  "categories": ["gaya:look", "gaya:theme"],
+  "keywords": ["look", "retro", "windows", "classic"]
+}

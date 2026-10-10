@@ -269,7 +269,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         if (browserSettings.ShowFavoritesInTree && favorites is { Paths.Count: > 0 })
         {
             rows.Add(new TreeItem("assets/favorites", "Favorites", 0, true,
-                Icon: gui => gui.DrawText(EditorIcons.Star)));
+                Icon: gui => gui.ThemedIcon(Icons.Favorite, ThemeTokens.Current.Text(12))));
             foreach (var entry in entries.Where(entry => favorites.Paths.Contains(entry.AbsolutePath)))
                 rows.Add(new TreeItem(entry.AbsolutePath, DisplayName(entry.AbsolutePath), 1, Icon: IconFor(entry), Tag: entry));
         }
