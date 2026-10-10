@@ -380,7 +380,6 @@ public sealed class GayaPlugin : IPlugin
         var projectPath = ProjectBootstrapper.ParseProjectArgument([.. args]);
         if (projectPath is null)
         {
-            log.LogInformation("No --project given; start with one to open a scene");
             return;
         }
 

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed (breaking): Guinevere color drawing bridges use direct primitive commands; fluent effects use the `DrawSd…` API.
 - Added: theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Added (breaking): `.pss` color themes with hot reload #213

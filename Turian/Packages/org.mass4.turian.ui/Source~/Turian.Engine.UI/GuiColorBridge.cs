@@ -36,17 +36,17 @@ public static class GuiColorBridge
         gui.DrawText(text, size, color?.ToGui(), font, wrapWidth, centerInRect, clip, effects);
 
     /// <inheritdoc cref="Gui.DrawRect(Rect, GuiColor, float, Corner)"/>
-    public static Shape DrawRect(this Gui gui, Rect rect, Core.Color color,
+    public static void DrawRect(this Gui gui, Rect rect, Core.Color color,
         float radius = 0.0f, Corner corners = Corner.All) =>
         gui.DrawRect(rect, color.ToGui(), radius, corners);
 
     /// <inheritdoc cref="Gui.DrawRectBorder(Rect, GuiColor, float, float, Corner)"/>
-    public static Shape DrawRectBorder(this Gui gui, Rect screenRect, Core.Color color, float thickness = 1f,
+    public static void DrawRectBorder(this Gui gui, Rect screenRect, Core.Color color, float thickness = 1f,
         float radius = 0.0f, Corner corners = Corner.All) =>
         gui.DrawRectBorder(screenRect, color.ToGui(), thickness, radius, corners);
 
     /// <inheritdoc cref="Gui.DrawBackgroundRect"/>
-    public static Shape DrawBackgroundRect(this Gui gui, Core.Color? color = null,
+    public static void DrawBackgroundRect(this Gui gui, Core.Color? color = null,
         float radius = 0.0f, Corner corners = Corner.All) =>
         gui.DrawBackgroundRect(color?.ToGui(), radius, corners);
 }
