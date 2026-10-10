@@ -147,6 +147,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         if (gui.Pass == Pass.Pass2Render)
         {
             InspectSelection();
+            if (thumbnails.PendingCount > 0) gui.RequestFrame();
             thumbnails.Process();
         }
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);

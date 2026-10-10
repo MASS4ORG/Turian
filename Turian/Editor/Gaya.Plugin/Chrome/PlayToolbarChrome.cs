@@ -16,6 +16,7 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
+        if (playMode.State == PlayState.Playing) gui.RequestFrame();
 
         var playing = playMode.IsActive;
         var paused = playMode.State == PlayState.Paused;

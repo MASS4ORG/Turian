@@ -82,6 +82,7 @@ sealed class GameViewport : IDisposable
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
+        if (playMode.State == PlayState.Playing) gui.RequestFrame();
         if (gui.Pass == Pass.Pass1Build) statisticsVisible = ShowStatistics && playMode.State == PlayState.Playing;
         if (gui.Pass == Pass.Pass2Render) RenderViewport(gui);
         RenderStatisticsOverlay(gui);

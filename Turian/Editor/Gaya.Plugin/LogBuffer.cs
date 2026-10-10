@@ -6,6 +6,9 @@ public static class LogBuffer
     const int capacity = 2000;
     static readonly ConcurrentQueue<LogLine> Lines = new();
 
+    /// <summary>Notifies listeners when log contents change, on the thread that wrote or cleared them.</summary>
+    public static event Action? Changed;
+
     /// <summary>The provider to add with <c>builder.AddProvider(LogBuffer.Provider)</c>.</summary>
     public static ILoggerProvider Provider { get; } = new BufferLoggerProvider();
 
@@ -16,12 +19,14 @@ public static class LogBuffer
     public static void Clear()
     {
         while (Lines.TryDequeue(out _)) { }
+        Changed?.Invoke();
     }
 
     static void Add(LogLine line)
     {
         Lines.Enqueue(line);
         while (Lines.Count > capacity && Lines.TryDequeue(out _)) { }
+        Changed?.Invoke();
     }
 
     sealed class BufferLoggerProvider : ILoggerProvider

@@ -25,6 +25,9 @@ public sealed class AssetThumbnailCache(Func<AssetEntry, int, SKImage?> render, 
     /// <summary>The number of retained thumbnail results, including unsupported previews.</summary>
     public int Count => images.Count;
 
+    /// <summary>The number of thumbnail requests awaiting production on the render thread.</summary>
+    public int PendingCount => pending.Count;
+
     /// <summary>Returns a cached image or schedules its production; requests are deduplicated.</summary>
     public SKImage? RequestImage(AssetEntry entry, string revision, int size = 128)
     {

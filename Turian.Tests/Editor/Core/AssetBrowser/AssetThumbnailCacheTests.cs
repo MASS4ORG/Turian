@@ -50,11 +50,14 @@ public sealed class AssetThumbnailCacheTests
         cache.RequestImage(first, "", 32);
         cache.RequestImage(second, "", 100);
         cache.RequestImage(third, "", 200);
+        Assert.Equal(3, cache.PendingCount);
         cache.Process(1);
+        Assert.Equal(2, cache.PendingCount);
         var image = cache.RequestImage(first, "", 64)!;
         Assert.Single(sizes);
         cache.Process();
         Assert.Equal([64, 128, 256], sizes);
+        Assert.Equal(0, cache.PendingCount);
         Assert.Equal(2, cache.Count);
         Assert.NotEqual(IntPtr.Zero, image.Handle);
         cache.BeginFrame();

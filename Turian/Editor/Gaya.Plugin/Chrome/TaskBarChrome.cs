@@ -26,6 +26,7 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
 
         tasks.Tick();
         var snapshot = tasks.Snapshot();
+        if (snapshot.Any(task => !task.IsFinished)) gui.RequestFrameIn(0.1);
 
         using (gui.Node(-1, Height).Expand().Direction(Axis.Horizontal).Gap(8).ContentAlignY(0.5f).Enter())
         {

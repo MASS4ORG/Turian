@@ -9,12 +9,12 @@ public static class UiRenderBackendFactory
         /// <summary>CPU SkiaSharp rasterization uploaded to a Vulkan texture each frame.</summary>
         CpuSkia,
 
-        /// <summary>GPU Skia sharing the engine's Vulkan device. Not implemented yet.</summary>
+        /// <summary>GPU Skia sharing the engine's Vulkan device, with CPU fallback when context creation fails.</summary>
         GpuSkia,
     }
 
     /// <summary>The backend used when a caller does not specify one.</summary>
-    public static Mode Default { get; set; } = Mode.CpuSkia;
+    public static Mode Default { get; set; } = Mode.GpuSkia;
 
     /// <summary>Creates a UI render backend of the requested (or default) kind.</summary>
     /// <param name="vulkan">The shared Vulkan context.</param>

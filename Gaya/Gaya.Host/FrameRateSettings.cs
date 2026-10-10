@@ -7,6 +7,10 @@ public sealed class FrameRateSettings
     /// <summary>The stable id of the performance settings page.</summary>
     public const string PageId = "gaya.performance";
 
+    /// <summary>Gets or sets whether idle windows wait for input or requested frames.</summary>
+    [EditorSetting("Render only when needed", Description = "Reduce idle CPU use while keeping active content smooth.")]
+    public bool RenderOnDemand { get; set; } = true;
+
     /// <summary>Gets or sets the maximum frames per second, with zero disabling the limit.</summary>
     [EditorSetting("Cap FPS", Description = "Maximum editor frames per second. Set to 0 for uncapped rendering.")]
     [Range(0, 1000)]
