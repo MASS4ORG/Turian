@@ -56,7 +56,9 @@ public sealed partial class Workbench
         }
 
         builder.Separator();
+        builder.Submenu(T("Looks"), BuildLookMenu);
         builder.Submenu(T("Themes"), BuildThemeMenu);
+        builder.Submenu(T("Icons"), BuildIconMenu);
 
         if (!app.Menus.ItemsFor(MenuIds.View).Any()) return;
 
@@ -77,6 +79,37 @@ public sealed partial class Workbench
                 () => string.Equals(app.Themes.CommittedColorTheme, id, StringComparison.OrdinalIgnoreCase),
                 _ => app.Themes.ApplyColorTheme(id),
                 onHover: () => app.Themes.PreviewColorTheme(id));
+        }
+    }
+
+    /// <summary>The looks as check items; committing one also applies the color theme it suggests.</summary>
+    void BuildLookMenu(FlyoutBuilder builder)
+    {
+        foreach (var look in app.Themes.Looks)
+        {
+            var id = look.Id;
+            builder.CheckItem(look.Name,
+                () => string.Equals(app.Themes.CommittedLook, id, StringComparison.OrdinalIgnoreCase),
+                _ =>
+                {
+                    var suggested = app.Themes.DefaultColorThemeFor(id);
+                    app.Themes.ApplyLook(id);
+                    if (suggested is not null) app.Themes.ApplyColorTheme(suggested);
+                },
+                onHover: () => app.Themes.PreviewLook(id));
+        }
+    }
+
+    /// <summary>The icon themes as check items, previewed on hover like the color themes.</summary>
+    void BuildIconMenu(FlyoutBuilder builder)
+    {
+        foreach (var icons in app.Themes.IconThemes)
+        {
+            var id = icons.Id;
+            builder.CheckItem(icons.Name,
+                () => string.Equals(app.Themes.CommittedIconTheme, id, StringComparison.OrdinalIgnoreCase),
+                _ => app.Themes.ApplyIconTheme(id),
+                onHover: () => app.Themes.PreviewIconTheme(id));
         }
     }
 

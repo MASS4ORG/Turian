@@ -3,9 +3,6 @@ namespace Gaya.Host;
 /// <summary>Projects the studio theme onto the controls the Settings panel draws with.</summary>
 static class SettingsStyle
 {
-    /// <summary>The Font Awesome rotate-left glyph, which the workbench font set includes.</summary>
-    public const string RevertIcon = "";
-
     static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <summary>The category tree's metrics, matching the studio's other trees.</summary>

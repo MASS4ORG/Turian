@@ -41,6 +41,9 @@ public enum BrickCategoryFilter
     /// <summary>Every brick.</summary>
     All,
 
+    /// <summary>Looks (<c>gaya:look</c>).</summary>
+    Looks,
+
     /// <summary>Color themes (<c>gaya:theme</c>).</summary>
     Themes,
 
@@ -196,6 +199,7 @@ public static class BrickCatalog
     /// <returns>The category, such as <c>gaya:theme</c>; empty for <see cref="BrickCategoryFilter.All"/>.</returns>
     public static string CategoryName(BrickCategoryFilter category) => category switch
     {
+        BrickCategoryFilter.Looks => "gaya:look",
         BrickCategoryFilter.Themes => "gaya:theme",
         BrickCategoryFilter.IconThemes => "gaya:icon-theme",
         BrickCategoryFilter.Fonts => "gaya:font-pack",

@@ -78,6 +78,10 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
                 frameInfo.CommandBuffer, pipelineLayout, ShaderStageFlags.VertexBit, 0,
                 (uint)sizeof(Matrix4x4), ref model);
 
+            var premultipliedSrgb = quad.Texture.IsPremultipliedSrgb ? 1 : 0;
+            vulkan.Vk.CmdPushConstants(frameInfo.CommandBuffer, pipelineLayout, ShaderStageFlags.FragmentBit,
+                (uint)sizeof(Matrix4x4), sizeof(int), ref premultipliedSrgb);
+
             vulkan.Vk.CmdDraw(frameInfo.CommandBuffer, 6, 1, 0, 0);
         }
     }
@@ -126,13 +130,17 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
             Size = (uint)sizeof(Matrix4x4),
         };
 
+        var ranges = stackalloc PushConstantRange[2];
+        ranges[0] = push;
+        ranges[1] = new PushConstantRange(ShaderStageFlags.FragmentBit, (uint)sizeof(Matrix4x4), sizeof(int));
+
         PipelineLayoutCreateInfo info = new()
         {
             SType = StructureType.PipelineLayoutCreateInfo,
             SetLayoutCount = 2,
             PSetLayouts = layouts,
-            PushConstantRangeCount = 1,
-            PPushConstantRanges = &push,
+            PushConstantRangeCount = 2,
+            PPushConstantRanges = ranges,
         };
 
         if (vulkan.Vk.CreatePipelineLayout(vulkan.Device.VkDevice, in info, null, out pipelineLayout) != Result.Success)

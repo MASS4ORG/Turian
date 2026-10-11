@@ -20,12 +20,17 @@ public enum ThemeOrigin
 /// <param name="Category">What the sheet provides, such as <see cref="ThemeCategories.ColorTheme"/>.</param>
 /// <param name="Origin">Where the sheet was found.</param>
 /// <param name="Path">The sheet's file, or <c>null</c> for embedded and code sheets.</param>
+/// <param name="DefaultDarkTheme">For a look: the color theme applied with it when the current theme is dark.</param>
+/// <param name="DefaultLightTheme">For a look: the color theme applied with it when the current theme is light.</param>
 public sealed record ThemeInfo(string Id, string Name, ThemeKind Kind, string Category, ThemeOrigin Origin,
-    string? Path);
+    string? Path, string? DefaultDarkTheme = null, string? DefaultLightTheme = null);
 
 /// <summary>The brick categories a theme sheet can belong to.</summary>
 public static class ThemeCategories
 {
+    /// <summary>A look: the complete base sheet that shapes every control, such as bevels, radii and motion.</summary>
+    public const string Look = "gaya:look";
+
     /// <summary>A color theme: surfaces, ink, accents and metrics.</summary>
     public const string ColorTheme = "gaya:theme";
 

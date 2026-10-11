@@ -28,7 +28,9 @@ sealed partial class Build
                         "--coverage",
                         "--coverage-settings", CoverageSettingsFile, // Excludes source generated files
                         "--coverage-output-format", "cobertura",
-                        "--coverage-output", CoverageResultFile)
+                        "--coverage-output", CoverageResultFile,
+                        "--report-xunit-trx", // Consumed by tools/slow-tests.cs
+                        "--results-directory", CoverageDirectory)
                 );
             });
 

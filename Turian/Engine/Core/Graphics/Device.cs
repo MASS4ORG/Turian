@@ -69,6 +69,15 @@ public unsafe partial class Device : IDisposable
     /// </summary>
     public Queue GraphicsQueue => graphicsQueue;
 
+    /// <summary>The Vulkan API version enabled for the instance.</summary>
+    public uint ApiVersion => Vk.Version12;
+
+    /// <summary>The extension names enabled when the Vulkan instance was created.</summary>
+    public IReadOnlyList<string> InstanceExtensions => instanceExtensions;
+
+    /// <summary>The extension names enabled on the logical device.</summary>
+    public IReadOnlyList<string> DeviceExtensions => deviceExtensions;
+
     /// <summary>
     /// Gets the present queue associated with this device.
     /// </summary>
@@ -108,6 +117,7 @@ public unsafe partial class Device : IDisposable
     ];
 
     Instance instance;
+    string[] instanceExtensions = [];
     KhrSurface khrSurface = null!;
     SurfaceKHR surface;
     PhysicalDevice physicalDevice;

@@ -14,6 +14,7 @@ public sealed unsafe class Texture : IDisposable
     ImageView view;
     Sampler sampler;
     bool disposed;
+    readonly bool borrowedImage;
 
     /// <summary>Image width in pixels.</summary>
     public uint Width { get; }
@@ -30,6 +31,9 @@ public sealed unsafe class Texture : IDisposable
     /// <summary>Bytes of device memory the image occupies across every mip level.</summary>
     public ulong SizeBytes { get; }
 
+    /// <summary>Whether sampled texels contain premultiplied sRGB color without hardware sRGB decoding.</summary>
+    public bool IsPremultipliedSrgb { get; }
+
     /// <summary>Combined image-sampler descriptor info for binding into a descriptor set.</summary>
     public DescriptorImageInfo DescriptorInfo => new()
     {
@@ -37,6 +41,27 @@ public sealed unsafe class Texture : IDisposable
         ImageView = view,
         Sampler = sampler,
     };
+
+    /// <summary>Wraps an existing single-level image and view, owning only the sampler.</summary>
+    /// <remarks>The caller keeps the image in shader-read layout while sampled and releases it after this texture.</remarks>
+    public Texture(Vulkan vulkan, uint width, uint height, Format format, Image image, ImageView view,
+        bool premultipliedSrgb = false)
+    {
+        ArgumentNullException.ThrowIfNull(vulkan);
+        ArgumentOutOfRangeException.ThrowIfZero(width);
+        ArgumentOutOfRangeException.ThrowIfZero(height);
+        this.vulkan = vulkan;
+        Width = width;
+        Height = height;
+        MipLevels = 1;
+        Format = format;
+        this.image = image;
+        this.view = view;
+        borrowedImage = true;
+        IsPremultipliedSrgb = premultipliedSrgb;
+        SizeBytes = TextureFormats.LevelSizeBytes(format, width, height);
+        CreateSampler(SamplerAddressMode.ClampToEdge);
+    }
 
     /// <summary>
     /// Creates a texture from pre-supplied mip levels, tightly packed and ordered largest first.
@@ -160,6 +185,7 @@ public sealed unsafe class Texture : IDisposable
     public void Update(ReadOnlySpan<byte> rgba)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
+        if (borrowedImage) throw new InvalidOperationException("Externally owned images cannot be uploaded");
         if (MipLevels != 1)
             throw new InvalidOperationException("Texture.Update requires a single-mip texture");
         if (rgba.Length != Width * Height * 4)
@@ -289,6 +315,7 @@ public sealed unsafe class Texture : IDisposable
 
         var dev = vulkan.Device.VkDevice;
         if (sampler.Handle != 0) vulkan.Vk.DestroySampler(dev, sampler, null);
+        if (borrowedImage) return;
         if (view.Handle != 0) vulkan.Vk.DestroyImageView(dev, view, null);
         if (image.Handle != 0) vulkan.Vk.DestroyImage(dev, image, null);
         if (memory.Handle != 0) vulkan.Vk.FreeMemory(dev, memory, null);

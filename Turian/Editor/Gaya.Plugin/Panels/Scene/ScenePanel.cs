@@ -81,10 +81,10 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             for (var i = 0; i < trail.Count; i++)
             {
                 if (Button(gui, trail[i].Title, $"scene/breadcrumb/{i}", selected: false)) returnTo = i;
-                gui.DrawText(EditorIcons.CaretRight, Theme.Text(10), Theme.InkFaint);
+                gui.ThemedIcon(Icons.CaretRight, Theme.Text(10), 0.5f);
             }
 
-            gui.DrawText(EditorIcons.Cube, Theme.Text(11), Theme.Accent);
+            gui.ThemedIcon(Icons.SceneNode, Theme.Text(11));
             gui.DrawText(workspace.Active?.Title ?? string.Empty, Theme.Text(11), Theme.Ink, centerInRect: false);
         }
 

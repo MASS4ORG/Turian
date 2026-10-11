@@ -10,6 +10,9 @@ public sealed class FrameRateLimiter
     long lastFrame;
     bool started;
 
+    /// <summary>Whether the live performance preferences enable on-demand rendering.</summary>
+    public bool RenderOnDemand => settings.RenderOnDemand;
+
     /// <summary>Creates a limiter that reads live preferences and sleeps between frames.</summary>
     public FrameRateLimiter(FrameRateSettings settings)
         : this(settings, Stopwatch.GetTimestamp, Stopwatch.Frequency,

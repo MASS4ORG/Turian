@@ -13,6 +13,7 @@ public sealed partial class Workbench
                 ? blocker.Progress ?? new UiBlockerProgress(blocker.Message)
                 : null;
         if (frameProgress is not { } progress) return;
+        gui.RequestFrame();
 
         using (gui.Node(gui.ScreenRect.W, gui.ScreenRect.H, "__uiBlocker")
                    .AbsoluteScreen(0, 0).Direction(Axis.Vertical).ContentAlignX(0.5f).ContentAlignY(0.5f)

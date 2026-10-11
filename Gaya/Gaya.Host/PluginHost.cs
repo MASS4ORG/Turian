@@ -190,9 +190,14 @@ public static class PluginHost
                 services.GetRequiredService<ILogger>(),
                 services.GetService<IShellLocalization>(),
                 services.GetRequiredService<IThemeService>(),
-                () =>
+                category =>
                 {
-                    services.GetService<BricksPanel>()?.Browse(BrickCategoryFilter.Themes);
+                    services.GetService<BricksPanel>()?.Browse(category switch
+                    {
+                        ThemeCategories.Look => BrickCategoryFilter.Looks,
+                        ThemeCategories.IconTheme => BrickCategoryFilter.IconThemes,
+                        _ => BrickCategoryFilter.Themes,
+                    });
                     services.GetService<IShellHost>()?.ShowPanel(BricksPanel.PanelId);
                 }))
         { OpenByDefault = false });

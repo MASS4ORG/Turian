@@ -16,12 +16,25 @@ public sealed partial class ThemeCatalog
     /// <summary>The id of the default color theme.</summary>
     public const string DefaultColorTheme = "gaya.dark";
 
+    /// <summary>The import id of Guinevere's own default base sheet, which a look can start from.</summary>
+    public const string GuinevereDefaultId = "guinevere.default";
+
+    /// <summary>The id of the default look, which leaves Guinevere's own base sheet in place.</summary>
+    public const string DefaultLook = "gaya.material";
+
+    /// <summary>The id of the default icon theme.</summary>
+    public const string DefaultIconTheme = "gaya.icons.color";
+
+    /// <summary>The icon theme under every other one, which supplies the ids a theme leaves out.</summary>
+    public const string FallbackIconTheme = "gaya.icons.mono";
+
     const string ResourcePrefix = "Gaya.Host.Themes.";
     const string Extension = ".pss";
 
-    /// <summary>The built-in color themes in menu order.</summary>
+    /// <summary>The built-in sheets in menu order.</summary>
     static readonly string[] BuiltInOrder =
     [
+        "gaya.material", "gaya.icons.color", "gaya.icons.mono",
         "gaya.dark", "gaya.light", "gaya.dark-contrast", "gaya.dracula", "gaya.monokai", "gaya.one-dark", "gaya.nord",
         "gaya.gruvbox", "gaya.tokyo-night", "gaya.catppuccin", "gaya.solarized-dark", "gaya.solarized-light",
         "gaya.ayu-dark", "gaya.ayu-light",
@@ -29,12 +42,16 @@ public sealed partial class ThemeCatalog
 
     static readonly (string Constant, string Category)[] IdConstants =
     [
+        ("look-id", ThemeCategories.Look),
         ("theme-id", ThemeCategories.ColorTheme),
         ("icon-theme-id", ThemeCategories.IconTheme),
         ("font-pack-id", ThemeCategories.FontPack),
     ];
 
     readonly ILogger log;
+    readonly string cacheFolder;
+    Uri? embeddedBase;
+    bool embeddedExtracted;
     readonly Dictionary<string, ThemeSource> registered = new(StringComparer.OrdinalIgnoreCase);
     readonly List<string> registeredOrder = [];
     IReadOnlyList<string> brickFolders = [];
@@ -46,10 +63,12 @@ public sealed partial class ThemeCatalog
     /// <summary>Scans the built-ins and the user's themes folder.</summary>
     /// <param name="log">Receives unreadable sheets and replaced ids.</param>
     /// <param name="userFolder">The user's themes folder; <c>~/.gaya/themes</c> when null.</param>
-    public ThemeCatalog(ILogger? log = null, string? userFolder = null)
+    /// <param name="cacheFolder">Where the built-in icon files are extracted; <c>~/.gaya/cache</c> when null.</param>
+    public ThemeCatalog(ILogger? log = null, string? userFolder = null, string? cacheFolder = null)
     {
         this.log = log ?? NullLogger.Instance;
         UserFolder = userFolder ?? UserConfigPath.For("themes");
+        this.cacheFolder = cacheFolder ?? UserConfigPath.For("cache");
         Refresh();
     }
 
@@ -64,6 +83,12 @@ public sealed partial class ThemeCatalog
 
     /// <summary>The selectable color themes.</summary>
     public IReadOnlyList<ThemeInfo> ColorThemes { get; private set; } = [];
+
+    /// <summary>The selectable looks.</summary>
+    public IReadOnlyList<ThemeInfo> Looks { get; private set; } = [];
+
+    /// <summary>The selectable icon themes.</summary>
+    public IReadOnlyList<ThemeInfo> IconThemes { get; private set; } = [];
 
     /// <summary>The folders scanned for brick sheets, each a brick's <c>Themes</c> folder.</summary>
     public IReadOnlyList<string> BrickFolders => brickFolders;
@@ -109,9 +134,14 @@ public sealed partial class ThemeCatalog
         var scanned = new List<Entry>();
         var index = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
 
+        if (!embeddedExtracted)
+        {
+            embeddedExtracted = true;
+            embeddedBase = EmbeddedIcons.Extract(cacheFolder, log);
+        }
         foreach (var name in EmbeddedResources())
             Add(scanned, index, ThemeOrigin.BuiltIn, name[ResourcePrefix.Length..^Extension.Length],
-                name[ResourcePrefix.Length..], null, () => ReadResource(name));
+                name[ResourcePrefix.Length..], null, () => ReadResource(name), embeddedBase);
         foreach (var path in SheetFiles(UserFolder))
             Add(scanned, index, ThemeOrigin.User, Path.GetFileNameWithoutExtension(path), path, path,
                 () => File.ReadAllText(path));
@@ -125,6 +155,8 @@ public sealed partial class ThemeCatalog
         byImportId = index;
         All = [.. scanned.Where(entry => entry.Info is not null).Select(entry => entry.Info!)];
         ColorThemes = [.. All.Where(info => info.Category == ThemeCategories.ColorTheme)];
+        Looks = [.. All.Where(info => info.Category == ThemeCategories.Look)];
+        IconThemes = [.. All.Where(info => info.Category == ThemeCategories.IconTheme)];
         Version++;
     }
 
@@ -188,8 +220,10 @@ public sealed partial class ThemeCatalog
             if (!constants.TryGetValue(constant, out var id) || id.Length == 0) continue;
             var prefix = constant[..^"id".Length];
             var name = constants.GetValueOrDefault(prefix + "name") ?? id;
-            return (new ThemeInfo(id, name, Kind(constants.GetValueOrDefault(prefix + "kind")), category, origin, path),
-                constants);
+            var info = new ThemeInfo(id, name, Kind(constants.GetValueOrDefault(prefix + "kind")), category, origin,
+                path, constants.GetValueOrDefault(prefix + "theme-dark"),
+                constants.GetValueOrDefault(prefix + "theme-light"));
+            return (info, constants);
         }
         return (null, constants);
     }
@@ -203,11 +237,14 @@ public sealed partial class ThemeCatalog
         _ => ThemeKind.Dark,
     };
 
-    StyleSheetText? Resolve(string id) =>
-        byImportId.TryGetValue(id, out var entry) ? new StyleSheetText(entry.Text, entry.SourceName, entry.BaseUri) : null;
+    StyleSheetText? Resolve(string id)
+    {
+        if (byImportId.TryGetValue(id, out var entry)) return new StyleSheetText(entry.Text, entry.SourceName, entry.BaseUri);
+        return id == GuinevereDefaultId ? new StyleSheetText(ExcaliburStyles.DefaultSheetText, id + Extension, null) : null;
+    }
 
     void Add(List<Entry> scanned, Dictionary<string, Entry> index, ThemeOrigin origin, string stem, string sourceName,
-        string? path, Func<string> read)
+        string? path, Func<string> read, Uri? baseUri = null)
     {
         string text;
         try
@@ -222,7 +259,7 @@ public sealed partial class ThemeCatalog
 
         var (info, _) = Describe(text, origin, path);
         var entry = new Entry(info, info?.Id ?? stem, sourceName,
-            text, path is null ? null : new Uri(Path.GetFullPath(path)));
+            text, path is null ? baseUri : new Uri(Path.GetFullPath(path)));
 
         if (index.TryGetValue(entry.ImportId, out var replaced))
         {

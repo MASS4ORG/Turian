@@ -6,6 +6,9 @@ public enum ContentBrickKind
     /// <summary>A color theme (<c>gaya:theme</c>).</summary>
     Theme,
 
+    /// <summary>A look: a complete base sheet shaping every control (<c>gaya:look</c>).</summary>
+    Look,
+
     /// <summary>An icon theme (<c>gaya:icon-theme</c>).</summary>
     IconTheme,
 
@@ -24,6 +27,7 @@ public static class ContentBricks
     /// <returns>The category, such as <c>gaya:theme</c>.</returns>
     public static string Category(ContentBrickKind kind) => kind switch
     {
+        ContentBrickKind.Look => "gaya:look",
         ContentBrickKind.IconTheme => "gaya:icon-theme",
         ContentBrickKind.FontPack => "gaya:font-pack",
         _ => "gaya:theme",
@@ -75,6 +79,19 @@ public static class ContentBricks
 
     static string Sheet(ContentBrickKind kind, string id, string name) => (kind switch
     {
+        ContentBrickKind.Look => $$"""
+            @const look-id = "{{id}}";
+            @const look-name = "{{name}}";
+            @const look-kind = dark;
+            @import "guinevere.default";
+
+            // Optional: the color themes applied with this look, by the kind of the current theme.
+            // @const look-theme-dark = "gaya.dark";
+            // @const look-theme-light = "gaya.light";
+
+            // A look is a complete base sheet: start from Guinevere's default and override shapes, borders and motion.
+            // button { border-radius = 0; }
+            """,
         ContentBrickKind.IconTheme => $$"""
             @const icon-theme-id = "{{id}}";
             @const icon-theme-name = "{{name}}";

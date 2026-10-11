@@ -4,12 +4,7 @@ namespace Turian.Engine.UI;
 /// Turns a Guinevere draw pass into an engine <see cref="Texture"/> that a render pass can
 /// composite — full-screen for a screen-space HUD, or on a quad for a world-space panel.
 ///
-/// <para>
-/// The shipping implementation rasterizes with CPU SkiaSharp and uploads the snapshot each
-/// frame (<see cref="CpuSkiaVulkanBackend"/>). The interface exists so a GPU-backed Skia
-/// renderer that shares the engine's Vulkan device — no readback — can replace it without
-/// touching the runtime or the render pass.
-/// </para>
+/// Both CPU rasterization and GPU Skia rendering expose the same sampleable texture to the compositor.
 /// </summary>
 public interface IUiRenderBackend : IDisposable
 {

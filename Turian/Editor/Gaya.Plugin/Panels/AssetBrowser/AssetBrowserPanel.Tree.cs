@@ -37,9 +37,8 @@ sealed partial class AssetBrowserPanel
 
     void DrawAssetIcon(Gui gui, AssetEntry entry, float size)
     {
-        var theme = ThemeTokens.Current;
-        var glyph = entry.IsDirectory ? EditorIcons.Folder : types.Resolve(entry.AbsolutePath)?.DefaultIcon ?? EditorIcons.File;
-        gui.DrawText(glyph, size * 0.8f, entry.IsDirectory ? theme.Folder : theme.InkDim);
+        var icon = entry.IsDirectory ? Icons.AssetFolder : types.Resolve(entry.AbsolutePath)?.DefaultIcon ?? Icons.AssetFile;
+        gui.ThemedIcon(icon, size * 0.8f, entry.IsDirectory ? 1f : 0.8f);
     }
 
     IEnumerable<AssetEntry> ChildrenOf(string? parentPath) => parentPath is null

@@ -14,10 +14,13 @@ namespace Gaya.Host;
 /// <param name="settings">The registered settings pages and their storage.</param>
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
-/// <param name="themes">The themes available through the appearance dropdown.</param>
-/// <param name="browseThemes">Opens a list of installable themes; without it the Browse button is hidden.</param>
+/// <param name="themes">The looks, themes and icon themes available through the appearance dropdowns.</param>
+/// <param name="browseThemes">
+/// Opens the installable bricks of a category, such as <see cref="ThemeCategories.Look"/>; without it the Browse
+/// buttons are hidden.
+/// </param>
 sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
-    IThemeService themes, Action? browseThemes = null) : IPanel
+    IThemeService themes, Action<string>? browseThemes = null) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -32,7 +35,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     SettingsScope scope = SettingsScope.User;
     float contentWidth = 360f;
     float measuredWidth;
-    string? frameThemeSelection;
+    readonly Dictionary<string, string> frameThemeSelections = [];
 
     static ThemeTokens Theme => ThemeTokens.Current;
 
@@ -278,27 +281,43 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     void FieldEditor(Gui gui, FormField field, string id)
     {
-        if (field.Target is AppearanceSettings && field.Name == nameof(AppearanceSettings.Theme))
-            ThemeEditor(gui, field, id);
+        if (field.Target is AppearanceSettings appearance && ThemeChoice(field.Name) is { } choice)
+            ThemeEditor(gui, field, id, appearance, choice.Available, choice.Committed, choice.Category);
         else
             gui.FormFieldEditor(field, id, FormContext);
     }
 
-    void ThemeEditor(Gui gui, FormField field, string id)
+    /// <summary>The sheets, committed id and brick category of an appearance field that picks a theme sheet.</summary>
+    (IReadOnlyList<ThemeInfo> Available, string Committed, string Category)? ThemeChoice(string name) => name switch
     {
-        var available = themes.ColorThemes;
+        nameof(AppearanceSettings.Theme) => (themes.ColorThemes, themes.CommittedColorTheme, ThemeCategories.ColorTheme),
+        nameof(AppearanceSettings.Look) => (themes.Looks, themes.CommittedLook, ThemeCategories.Look),
+        nameof(AppearanceSettings.IconTheme) => (themes.IconThemes, themes.CommittedIconTheme, ThemeCategories.IconTheme),
+        _ => null,
+    };
+
+    void ThemeEditor(Gui gui, FormField field, string id, AppearanceSettings appearance,
+        IReadOnlyList<ThemeInfo> available, string committed, string category)
+    {
         var names = available.Select(theme => theme.Name).ToArray();
-        var current = available.ToList().FindIndex(theme => string.Equals(theme.Id, themes.CommittedColorTheme,
+        var current = available.ToList().FindIndex(theme => string.Equals(theme.Id, committed,
             StringComparison.OrdinalIgnoreCase));
         // ReSharper disable once ExplicitCallerInfoArgument
         var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
             filePath: $"{id}/theme");
         if (gui.Pass == Pass.Pass1Build)
-            frameThemeSelection = next >= 0 && next != current ? available[next].Id : null;
-        else if (frameThemeSelection is { } selected)
+        {
+            if (next >= 0 && next != current) frameThemeSelections[id] = available[next].Id;
+            else frameThemeSelections.Remove(id);
+        }
+        else if (frameThemeSelections.Remove(id, out var selected))
+        {
+            if (category == ThemeCategories.Look && themes.DefaultColorThemeFor(selected) is { } paired)
+                appearance.Theme = paired;
             field.SetValue(selected);
+        }
 
-        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse")) browseThemes();
+        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse")) browseThemes(category);
     }
 
     /// <summary>The button beside the theme dropdown that lists installable themes.</summary>
@@ -330,7 +349,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
             if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
 
-            gui.DrawText(SettingsStyle.RevertIcon, Theme.Text(13), hot ? Theme.Ink : Theme.InkDim);
+            gui.Icon(gui.ResolveIcon(Icons.Revert), Theme.Text(13), opacity: hot ? 1f : 0.7f);
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

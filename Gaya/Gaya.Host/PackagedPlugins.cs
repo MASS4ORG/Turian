@@ -76,7 +76,8 @@ public static class PackagedPlugins
     public static IReadOnlyList<string> ThemeFolders(IEnumerable<ResolvedPackage> packages)
     {
         ArgumentNullException.ThrowIfNull(packages);
-        string[] categories = [ThemeCategories.ColorTheme, ThemeCategories.IconTheme, ThemeCategories.FontPack];
+        string[] categories =
+            [ThemeCategories.Look, ThemeCategories.ColorTheme, ThemeCategories.IconTheme, ThemeCategories.FontPack];
         return
         [
             .. packages.Where(package => package.Manifest.Categories.Any(categories.Contains))

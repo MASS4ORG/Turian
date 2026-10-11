@@ -156,6 +156,13 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
 
     bool ShouldRestorePackages(string csprojFilePath)
     {
+        // The stamp only records that a restore ran; a build passes --no-restore, so a missing or
+        // deleted assets file must force a restore regardless of the stamp.
+        if (!File.Exists(GetAssetsPath(csprojFilePath)))
+        {
+            return true;
+        }
+
         var restoreStampPath = GetRestoreStampPath(csprojFilePath);
         if (!File.Exists(restoreStampPath))
         {
@@ -210,6 +217,14 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
             ?? throw new InvalidOperationException("Could not determine generated project directory.");
 
         return Path.Combine(directory, restoreStampFileName);
+    }
+
+    static string GetAssetsPath(string csprojFilePath)
+    {
+        var directory = Path.GetDirectoryName(csprojFilePath)
+            ?? throw new InvalidOperationException("Could not determine generated project directory.");
+
+        return Path.Combine(directory, "obj", "project.assets.json");
     }
 
     // ── Validation ─────────────────────────────────────────────────────────────

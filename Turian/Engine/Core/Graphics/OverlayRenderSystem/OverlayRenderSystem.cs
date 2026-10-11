@@ -84,6 +84,9 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
         }
 
         pipeline!.Bind(frameInfo.CommandBuffer);
+        var premultipliedSrgb = tex.IsPremultipliedSrgb ? 1 : 0;
+        vulkan.Vk.CmdPushConstants(frameInfo.CommandBuffer, pipelineLayout, ShaderStageFlags.FragmentBit,
+            0, sizeof(int), ref premultipliedSrgb);
 
         var set = descriptorSet;
         vulkan.Vk.CmdBindDescriptorSets(
@@ -113,12 +116,14 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
         var layouts = stackalloc Silk.NET.Vulkan.DescriptorSetLayout[1];
         layouts[0] = setLayout.GetDescriptorSetLayout();
 
+        var push = new PushConstantRange(ShaderStageFlags.FragmentBit, 0, sizeof(int));
         PipelineLayoutCreateInfo info = new()
         {
             SType = StructureType.PipelineLayoutCreateInfo,
             SetLayoutCount = 1,
             PSetLayouts = layouts,
-            PushConstantRangeCount = 0,
+            PushConstantRangeCount = 1,
+            PPushConstantRanges = &push,
         };
 
         if (vulkan.Vk.CreatePipelineLayout(vulkan.Device.VkDevice, in info, null, out pipelineLayout) != Result.Success)

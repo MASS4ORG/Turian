@@ -25,7 +25,7 @@ public enum AssetActivation
 /// <param name="Extensions">Source extensions it claims, leading dot included.</param>
 /// <param name="Activation">What opening one of its files does.</param>
 /// <param name="DefaultIcon">
-/// The glyph the asset browser shows for a file of this kind when it has no live preview — either
+/// The icon id the asset browser shows for a file of this kind when it has no live preview — either
 /// because the kind never gets one (a script, a UI document) or because rendering one for every row
 /// would be too costly (a material or a model, until thumbnail generation and caching land).
 /// </param>
@@ -92,17 +92,17 @@ public sealed class AssetTypeCatalog
     /// </summary>
     static IEnumerable<AssetTypeDescriptor> BuiltIn =>
     [
-        new("turian.scene", "Scene", [".prefab"], AssetActivation.Edit, EditorIcons.Clapperboard),
-        new("turian.material", "Material", [".material"], AssetActivation.Inspect, EditorIcons.Palette),
-        new("turian.dataAsset", "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect, EditorIcons.Database),
+        new("turian.scene", "Scene", [".prefab"], AssetActivation.Edit, EditorIcons.Scene),
+        new("turian.material", "Material", [".material"], AssetActivation.Inspect, EditorIcons.Material),
+        new("turian.dataAsset", "Data Asset", [".dataasset", ".asset", ".data"], AssetActivation.Inspect, EditorIcons.Data),
         new("turian.texture", "Texture", [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".gif", ".webp", ".dds"],
             AssetActivation.ExternalProgram, EditorIcons.Image),
         new("turian.model", "Model", [".obj", ".fbx", ".gltf", ".glb", ".dae", ".blend"],
-            AssetActivation.ExternalProgram, EditorIcons.Cube),
-        new("turian.script", "Script", [".cs"], AssetActivation.ExternalProgram, EditorIcons.FileCode),
+            AssetActivation.ExternalProgram, EditorIcons.Model),
+        new("turian.script", "Script", [".cs"], AssetActivation.ExternalProgram, EditorIcons.Script),
         new("turian.text", "Text", [".txt", ".md", ".json", ".xml", ".csv", ".ini", ".strings"],
-            AssetActivation.ExternalProgram, EditorIcons.FileLines),
-        new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.WindowMaximize),
-        new("turian.uiStyleSheet", "UI Style Sheet", [".uss"], AssetActivation.ExternalProgram, EditorIcons.Brush),
+            AssetActivation.ExternalProgram, EditorIcons.Text),
+        new("turian.uiDocument", "UI Document", [".ui"], AssetActivation.ExternalProgram, EditorIcons.UiDocument),
+        new("turian.uiStyleSheet", "UI Style Sheet", [".uss"], AssetActivation.ExternalProgram, EditorIcons.StyleSheet),
     ];
 }

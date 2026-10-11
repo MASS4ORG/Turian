@@ -27,8 +27,9 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             gui.DrawBackgroundRect(Theme.Chrome);
             Tools(gui);
             Divider(gui, "tools");
-            if (Button(gui, EditorIcons.Frame, "frame", Hint("Frame selected", "frameSelected"))) frameSelected();
-            if (Button(gui, EditorIcons.Cube, "projection", "Toggle perspective / orthographic", viewport.IsOrthographic))
+            if (IconButton(gui, Icons.SceneFrame, "frame", Hint("Frame selected", "frameSelected"))) frameSelected();
+            if (IconButton(gui, Icons.SceneProjection, "projection", "Toggle perspective / orthographic",
+                    viewport.IsOrthographic))
                 viewport.ToggleProjection();
             Divider(gui, "view");
             Coordinates(gui);
@@ -43,16 +44,17 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 
     void Tools(Gui gui)
     {
-        Tool(gui, TransformGizmoMode.Select, EditorIcons.Select, "Select");
-        Tool(gui, TransformGizmoMode.Translate, EditorIcons.Move, "Move");
-        Tool(gui, TransformGizmoMode.Rotate, EditorIcons.Rotate, "Rotate");
-        Tool(gui, TransformGizmoMode.Scale, EditorIcons.Scale, "Scale");
-        Tool(gui, TransformGizmoMode.Combined, EditorIcons.Transform, "All transforms");
+        Tool(gui, TransformGizmoMode.Select, Icons.SceneSelect, "Select");
+        Tool(gui, TransformGizmoMode.Translate, Icons.SceneMove, "Move");
+        Tool(gui, TransformGizmoMode.Rotate, Icons.SceneRotate, "Rotate");
+        Tool(gui, TransformGizmoMode.Scale, Icons.SceneScale, "Scale");
+        Tool(gui, TransformGizmoMode.Combined, Icons.SceneTransform, "All transforms");
     }
 
     void Tool(Gui gui, TransformGizmoMode mode, string icon, string hint)
     {
-        if (Button(gui, icon, mode.ToString(), Hint(hint, mode.ToString().ToLowerInvariant()), viewport.Gizmo.Mode == mode))
+        if (IconButton(gui, icon, mode.ToString(), Hint(hint, mode.ToString().ToLowerInvariant()),
+                viewport.Gizmo.Mode == mode))
             viewport.Gizmo.Mode = mode;
     }
 
@@ -78,12 +80,13 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     void Snapping(Gui gui)
     {
         var settings = viewport.Settings.Tools;
-        if (Button(gui, EditorIcons.Magnet, "snap", "Toggle transform snapping", settings.SnapEnabled))
+        if (IconButton(gui, Icons.SceneSnap, "snap", "Toggle transform snapping", settings.SnapEnabled))
         {
             settings.SnapEnabled = !settings.SnapEnabled;
             Changed("sceneTransform");
         }
-        if (Button(gui, EditorIcons.CaretDown, "snapOptions", "Translation, rotation and scale snap intervals", width: 18f))
+        if (IconButton(gui, Icons.CaretDown, "snapOptions", "Translation, rotation and scale snap intervals",
+                width: 18f))
             OpenOptions(gui, camera: false);
     }
 
@@ -93,16 +96,30 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             gui.DrawBackgroundRect(Theme.Border);
     }
 
-    static bool Button(Gui gui, string label, string id, string hint, bool selected = false, float width = 24f)
+    static bool Button(Gui gui, string label, string id, string hint, bool selected = false, float width = 24f) =>
+        Button(gui, label, null, id, hint, selected, width);
+
+    static bool IconButton(Gui gui, string icon, string id, string hint, bool selected = false, float width = 24f) =>
+        Button(gui, "", icon, id, hint, selected, width);
+
+    static bool Button(Gui gui, string label, string? icon, string id, string hint, bool selected, float width,
+        string? trailingIcon = null)
     {
         using (gui.Node(Theme.Scale(width), Theme.Scale(22f), "scene/toolbar/" + id).BlockInput()
-                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+                   .Direction(Axis.Horizontal).Gap(Theme.Scale(3f)).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
             var inputPass = gui.Pass == Pass.Pass2Render;
             var hot = inputPass && gui.GetInteractable().OnHover();
             if (selected) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
             else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
-            gui.DrawText(label, Theme.Text(width > 30f ? 11f : 13f), selected ? Theme.Ink : Theme.InkDim);
+            var opacity = selected || hot ? 1f : 0.75f;
+            if (icon is not null) gui.ThemedIcon(icon, Theme.Text(13f), opacity);
+            else
+            {
+                using (gui.Node().Enter())
+                    gui.DrawText(label, Theme.Text(width > 30f ? 11f : 13f), selected ? Theme.Ink : Theme.InkDim);
+                if (trailingIcon is not null) gui.ThemedIcon(trailingIcon, Theme.Text(9f), opacity);
+            }
             gui.Tooltip(gui.CurrentNode, hint);
             return hot && gui.GetInteractable().OnClick();
         }
@@ -110,7 +127,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 
     void MenuButton(Gui gui, string title, ref bool open, ref Vector2 position)
     {
-        if (!Button(gui, title + " " + EditorIcons.CaretDown, title, title + " options", width: title.Length * 7f + 24f))
+        if (!Button(gui, title, null, title, title + " options", false, title.Length * 7f + 24f, Icons.CaretDown))
             return;
         open = !open;
         position = new Vector2(gui.CurrentNode.Rect.BottomRight.X - Theme.Scale(210f), gui.CurrentNode.Rect.BottomRight.Y);
@@ -229,7 +246,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             {
                 using (gui.Node().ExpandWidth().Enter())
                     gui.DrawText(camera ? "Camera" : "Snapping", Theme.Text(12), Theme.Ink);
-                if (Button(gui, EditorIcons.Xmark, "closeOptions", "Close options", width: 18f))
+                if (IconButton(gui, Icons.Close, "closeOptions", "Close options", width: 18f))
                     snapOptions = cameraOptions = false;
             }
             if (camera) CameraFields(gui);

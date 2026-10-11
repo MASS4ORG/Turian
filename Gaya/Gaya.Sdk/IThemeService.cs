@@ -37,6 +37,45 @@ public interface IThemeService : IThemeTokenRegistry
     /// <param name="id">The theme's id or name.</param>
     void PreviewColorTheme(string id);
 
+    /// <summary>Every selectable look, the default one first.</summary>
+    IReadOnlyList<ThemeInfo> Looks { get; }
+
+    /// <summary>The id of the committed look; it stays the requested id while that look is not available yet.</summary>
+    string CommittedLook { get; }
+
+    /// <summary>
+    /// Commits a look by id and persists the choice. The color theme is left alone; see
+    /// <see cref="DefaultColorThemeFor"/> to follow the look's own pairing.
+    /// </summary>
+    /// <param name="id">The look's id.</param>
+    void ApplyLook(string id);
+
+    /// <summary>Shows a look without committing it; renewed every frame like <see cref="PreviewColorTheme"/>.</summary>
+    /// <param name="id">The look's id.</param>
+    void PreviewLook(string id);
+
+    /// <summary>
+    /// The color theme a look suggests for the current theme's kind: its dark default when the committed color theme
+    /// is dark, its light default otherwise.
+    /// </summary>
+    /// <param name="lookId">The look's id.</param>
+    /// <returns>The suggested theme's id, or <c>null</c> when the look declares none or it is not available.</returns>
+    string? DefaultColorThemeFor(string lookId);
+
+    /// <summary>Every selectable icon theme, the default one first.</summary>
+    IReadOnlyList<ThemeInfo> IconThemes { get; }
+
+    /// <summary>The id of the committed icon theme; it stays the requested id while that theme is not available yet.</summary>
+    string CommittedIconTheme { get; }
+
+    /// <summary>Commits an icon theme by id and persists the choice.</summary>
+    /// <param name="id">The icon theme's id.</param>
+    void ApplyIconTheme(string id);
+
+    /// <summary>Shows an icon theme without committing it; renewed every frame like <see cref="PreviewColorTheme"/>.</summary>
+    /// <param name="id">The icon theme's id.</param>
+    void PreviewIconTheme(string id);
+
     /// <summary>Sets the user's base text size and UI zoom, applied over whatever theme is showing.</summary>
     /// <param name="textSize">Base font size in points.</param>
     /// <param name="zoom">Multiplies every measured length.</param>

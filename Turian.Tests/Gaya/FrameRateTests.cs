@@ -16,10 +16,13 @@ public sealed class FrameRateTests
             var performance = FrameRateSettings.Register(settings);
             Assert.Equal("General/Performance", Assert.Single(settings.Pages).Path);
             Assert.Equal(60, performance.CapFps);
+            Assert.True(performance.RenderOnDemand);
             Assert.Same(performance, FrameRateSettings.Register(settings));
             performance.CapFps = 0;
+            performance.RenderOnDemand = false;
             settings.Save();
             Assert.Equal(0, FrameRateSettings.Register(new EditorSettings(NullLogger.Instance, path)).CapFps);
+            Assert.False(FrameRateSettings.Register(new EditorSettings(NullLogger.Instance, path)).RenderOnDemand);
             performance.CapFps = -5;
             Assert.Equal(0, performance.CapFps);
             using var app = PluginHost.Load([], NullLogger.Instance);
@@ -27,6 +30,9 @@ public sealed class FrameRateTests
             Assert.NotNull(workbench.FrameRate);
             Assert.Contains(app.Settings.Pages, page => page.Id == FrameRateSettings.PageId);
             var limiter = new FrameRateLimiter(performance);
+            Assert.False(limiter.RenderOnDemand);
+            performance.RenderOnDemand = true;
+            Assert.True(limiter.RenderOnDemand);
             ((Action<TimeSpan>)typeof(FrameRateLimiter).GetField("delay", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .GetValue(limiter)!)(TimeSpan.Zero);
             Assert.Throws<ArgumentNullException>(() => new FrameRateLimiter(null!));

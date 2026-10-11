@@ -1,78 +1,38 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Font Awesome 6 Free Solid glyphs the editor draws. Text rendering falls back to the icon font for these
-/// private-use code points, so they can be passed anywhere a label is drawn.
+/// The icon ids of the asset kinds the editor core names, resolved by the studio through the active icon theme. They
+/// are the same strings as the asset ids of <c>Gaya.Sdk.Icons</c>, which the core cannot reference.
 /// </summary>
 public static class EditorIcons
 {
-    /// <summary>A favorite asset.</summary>
-    public const string Star = "\uf005";
+    /// <summary>An asset of no known kind.</summary>
+    public const string File = "asset.file";
 
-    /// <summary>Move along any axis.</summary>
-    public const string Move = "\uf0b2";
+    /// <summary>A scene.</summary>
+    public const string Scene = "asset.scene";
 
-    /// <summary>Pick an object.</summary>
-    public const string Select = "\uf245";
-    /// <summary>Rotate a transform.</summary>
-    public const string Rotate = "\uf2f1";
-    /// <summary>Scale a transform.</summary>
-    public const string Scale = "\uf424";
-    /// <summary>Use all transform operations.</summary>
-    public const string Transform = "\uf5b0";
-    /// <summary>Frame the selected object.</summary>
-    public const string Frame = "\uf05b";
-    /// <summary>Snap transform edits.</summary>
-    public const string Magnet = "\uf076";
+    /// <summary>A material.</summary>
+    public const string Material = "asset.material";
 
-    /// <summary>Play.</summary>
-    public const string Play = "\uf04b";
-    /// <summary>Pause.</summary>
-    public const string Pause = "\uf04c";
-    /// <summary>Stop.</summary>
-    public const string Stop = "\uf04d";
-    /// <summary>Rewind, for playing from the start.</summary>
-    public const string Backward = "\uf04a";
-    /// <summary>Advance one step.</summary>
-    public const string ForwardStep = "\uf051";
-    /// <summary>Closed fold arrow.</summary>
-    public const string CaretRight = "\uf0da";
-    /// <summary>Open fold arrow.</summary>
-    public const string CaretDown = "\uf0d7";
-    /// <summary>Close or remove.</summary>
-    public const string Xmark = "\uf00d";
-    /// <summary>Reset to default.</summary>
-    public const string RotateLeft = "\uf2ea";
-    /// <summary>Open elsewhere.</summary>
-    public const string ArrowUpRightFromSquare = "\uf08e";
-    /// <summary>Locked.</summary>
-    public const string Lock = "\uf023";
-    /// <summary>Unlocked.</summary>
-    public const string LockOpen = "\uf3c1";
-    /// <summary>Folder.</summary>
-    public const string Folder = "\uf07b";
-    /// <summary>Generic file.</summary>
-    public const string File = "\uf15b";
-    /// <summary>Scene.</summary>
-    public const string Clapperboard = "\ue131";
-    /// <summary>Material.</summary>
-    public const string Palette = "\uf53f";
-    /// <summary>Data asset.</summary>
-    public const string Database = "\uf1c0";
-    /// <summary>Image.</summary>
-    public const string Image = "\uf03e";
-    /// <summary>3D model or prefab.</summary>
-    public const string Cube = "\uf1b2";
-    /// <summary>Prefab variant.</summary>
-    public const string Clone = "\uf24d";
-    /// <summary>Broken link, such as an instance of a missing prefab.</summary>
-    public const string LinkSlash = "\uf127";
+    /// <summary>A data asset.</summary>
+    public const string Data = "asset.data";
+
+    /// <summary>An image.</summary>
+    public const string Image = "asset.image";
+
+    /// <summary>A 3D model or prefab.</summary>
+    public const string Model = "asset.model";
+
     /// <summary>Source code.</summary>
-    public const string FileCode = "\uf1c9";
-    /// <summary>Text file.</summary>
-    public const string FileLines = "\uf15c";
-    /// <summary>UI document.</summary>
-    public const string WindowMaximize = "\uf2d0";
-    /// <summary>Style sheet.</summary>
-    public const string Brush = "\uf55d";
+    public const string Script = "asset.script";
+
+    /// <summary>A text file.</summary>
+    public const string Text = "asset.text";
+
+    /// <summary>A UI document.</summary>
+    public const string UiDocument = "asset.ui-document";
+
+    /// <summary>A UI style sheet.</summary>
+    public const string StyleSheet = "asset.style-sheet";
 }

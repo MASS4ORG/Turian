@@ -1,0 +1,4 @@
+// The default look: Guinevere's own base sheet, with no rules of its own.
+@const look-id = "gaya.material";
+@const look-name = "Material 3";
+@const look-kind = dark;

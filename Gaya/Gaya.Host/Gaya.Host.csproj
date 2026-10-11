@@ -16,6 +16,7 @@
     <ItemGroup>
         <EmbeddedResource Include="Resources/logo.png"/>
         <EmbeddedResource Include="Themes/*.pss" LogicalName="Gaya.Host.Themes.%(Filename)%(Extension)"/>
+        <EmbeddedResource Include="Icons/**/*.svg;Icons/**/LICENSE" LogicalName="Gaya.Host.Icons/%(RecursiveDir)%(Filename)%(Extension)"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -28,12 +29,14 @@
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
         <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj"/>
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Svg/Guinevere.Svg.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*"/>
         <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*"/>
         <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
+        <PackageReference Include="MASS4.Guinevere.Svg" Version="6.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

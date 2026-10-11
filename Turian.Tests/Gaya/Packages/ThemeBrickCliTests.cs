@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Theme bricks from the command line: scaffold, verify, and install into the studio.</summary>
+[Trait("Category", "E2E")]
 public sealed class ThemeBrickCliTests : IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-theme-cli-{Guid.NewGuid():N}");

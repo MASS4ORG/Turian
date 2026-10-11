@@ -51,6 +51,7 @@ public sealed class LoadingProgressTests
         frame.Blocker.Progress.Returns(new UiBlockerProgress("Opening project", "Importing assets: bistro.fbx",
             0.42f, "42 / 100", TimeSpan.FromSeconds(12)));
         frame.Draw(() => frame.Blocker.IsBlocked.Returns(false));
+        Assert.Equal(0, frame.Gui.FrameWaitSeconds);
         var card = GayaChromeTests.Descendants(frame.Gui.RootNode!).Single(node => node.Id == "__uiBlocker/card");
         Assert.InRange(card.Rect.X + card.Rect.W / 2, 399, 401);
         Assert.InRange(card.Rect.Y + card.Rect.H / 2, 299, 301);

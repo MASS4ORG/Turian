@@ -75,6 +75,8 @@ var gui = new Gui();
 WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
     Environment.SetEnvironmentVariable);
 var window = new GuiWindow(gui, 1600, 950, "Gaya");
+window.Pacing.OnDemand = workbench.FrameRate.RenderOnDemand;
+using var frameRequests = new FrameRequestBridge(gui, app.Services);
 var activeWorkbench = workbench;
 
 // Closing the window asks about unsaved work through the Exit command, which closes the window again once answered.
@@ -100,6 +102,7 @@ try
     shell.ExitRequested += ApproveExit;
     window.RunGui(() =>
     {
+        window.Pacing.OnDemand = activeWorkbench.FrameRate.RenderOnDemand;
         if (gui.Pass == Pass.Pass1Build) activeWorkbench.FrameRate.Wait();
         activeWorkbench.Render(gui);
     });
@@ -107,6 +110,7 @@ try
 finally
 {
     shell.ExitRequested -= ApproveExit;
+    frameRequests.Dispose();
     window.Dispose();
 }
 

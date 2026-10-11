@@ -16,12 +16,13 @@ public unsafe partial class Device
             ApplicationVersion = new Version32(1, 0, 0),
             PEngineName = (byte*)Marshal.StringToHGlobalAnsi("No Engine"),
             EngineVersion = new Version32(1, 0, 0),
-            ApiVersion = Vk.Version12
+            ApiVersion = ApiVersion
         };
 
         InstanceCreateInfo createInfo = new() { SType = StructureType.InstanceCreateInfo, PApplicationInfo = &appInfo };
 
         var extensions = GetRequiredExtensions();
+        instanceExtensions = extensions;
         createInfo.EnabledExtensionCount = (uint)extensions.Length;
         createInfo.PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(extensions);
 

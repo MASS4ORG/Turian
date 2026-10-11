@@ -411,7 +411,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         {
             if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Panel, 3);
 
-            gui.DrawText(EditorIcons.Cube, Theme.Text(12), Theme.Accent);
+            gui.ThemedIcon(Icons.PrefabInstance, Theme.Text(12));
             gui.DrawText(name, Theme.Text(12), Theme.Ink, centerInRect: false);
             using (gui.Node().Expand().Enter()) { }
 
