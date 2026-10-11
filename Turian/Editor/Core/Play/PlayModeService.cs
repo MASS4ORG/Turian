@@ -292,7 +292,7 @@ public sealed class PlayModeService(
             .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
 
         if (editorServices.GetService(typeof(Vulkan)) is Vulkan vulkan)
-            services.AddSingleton(vulkan);
+            services.AddSingleton(vulkan).AddSingleton<IRenderDevice>(vulkan);
 
         AddProjectServices(services);
 

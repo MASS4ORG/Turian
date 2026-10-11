@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Holds the per-material descriptor set layout, allocation pool, and 1×1 fallback
 /// textures used by every <see cref="MaterialResource"/>. Constructed and owned by
-/// the render system; passed to <see cref="MaterialAsset.GetContent"/> when a draw
+/// the render system; passed to <see cref="MaterialAssetContent.GetContent(MaterialAsset, MaterialDescriptorContext)"/> when a draw
 /// requests a material.
 /// </summary>
 public sealed class MaterialDescriptorContext : IDisposable

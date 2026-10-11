@@ -4,7 +4,7 @@ namespace Turian.Engine.Core;
 /// Supplies keyboard and mouse state to gameplay code, decoupled from where the events come from.
 ///
 /// <para>
-/// The standalone runtime feeds this from Silk.NET (<see cref="SilkInputSource"/>); the Studio's
+/// The standalone runtime feeds this from Silk.NET (<c>SilkInputSource</c>); the Studio's
 /// in-editor play mode feeds it from Avalonia events raised by the Game panel. Inject it into
 /// components that need raw input; hosts without input may leave optional references unbound.
 /// </para>

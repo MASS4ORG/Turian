@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>A submesh candidate supplied to an optional GPU visibility pass in final draw order.</summary>
-public readonly record struct OcclusionDraw(Model Model, int SubMesh, Matrix4x4 ModelMatrix, Bounds WorldBounds);
+public readonly record struct OcclusionDraw(VulkanModel Model, int SubMesh, Matrix4x4 ModelMatrix, Bounds WorldBounds);
 
 /// <summary>Records visibility work before the color pass and supplies GPU-written indirect draw commands.</summary>
 public interface IOcclusionCuller : IDisposable

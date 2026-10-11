@@ -13,6 +13,7 @@
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Vulkan/Turian.Engine.Vulkan.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>

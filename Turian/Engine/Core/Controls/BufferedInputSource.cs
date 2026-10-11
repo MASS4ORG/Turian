@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// per-frame press/release edges.
 ///
 /// <para>
-/// The Studio's Game panel pushes translated Avalonia events here; <see cref="SilkInputSource"/>
+/// The Studio's Game panel pushes translated Avalonia events here; <c>SilkInputSource</c>
 /// pushes Silk.NET events here. Neither the interface nor gameplay code can tell the difference.
 /// </para>
 /// </summary>

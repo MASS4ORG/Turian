@@ -68,7 +68,7 @@ sealed class HeadlessProject : IDisposable
 
         if (Vulkan is not null)
         {
-            _ = registrations.AddSingleton(Vulkan);
+            _ = registrations.AddSingleton(Vulkan).AddSingleton<IRenderDevice>(Vulkan);
         }
 
         if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)

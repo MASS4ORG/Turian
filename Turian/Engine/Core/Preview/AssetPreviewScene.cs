@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// A throwaway scene built by an <see cref="IScenePreviewProvider"/> to render one asset preview.
+/// A throwaway scene built by an <c>IScenePreviewProvider</c> to render one asset preview.
 /// </summary>
 /// <param name="Root">The scene root; its children are rendered (lights, the previewed mesh, etc.).</param>
 /// <param name="Bounds">World-space bounds to frame the camera on.</param>

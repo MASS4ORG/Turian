@@ -15,6 +15,7 @@ public class MeshRenderSystem : IRenderSystem
     MeshPipeline pipeline = null!;
     PipelineLayout pipelineLayout;
     readonly List<MeshComponent> meshes = [];
+    readonly ExtMeshShader? extMeshShader;
 
     /// <summary>
     /// .ctor
@@ -29,6 +30,8 @@ public class MeshRenderSystem : IRenderSystem
     )
     {
         this.vulkan = vulkan;
+        if (vulkan.Vk.TryGetDeviceExtension(vulkan.Device.Instance, vulkan.Device.VkDevice, out ExtMeshShader ext))
+            extMeshShader = ext;
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }
@@ -70,7 +73,7 @@ public class MeshRenderSystem : IRenderSystem
                     StandardPushConstantData.SizeOf(),
                     ref push
                 );
-                component.Draw(frameInfo.CommandBuffer);
+                extMeshShader?.CmdDrawMeshTask(frameInfo.CommandBuffer, 1, 1, 1);
             }
         }
     }

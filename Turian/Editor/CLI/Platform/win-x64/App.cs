@@ -90,6 +90,7 @@ public class App : IDisposable
             .AddSingleton<LayerFilter>()
             .AddSingleton<IPhysicsQueries, PhysicsQueries>()
             .AddSingleton(vulkan)
+            .AddSingleton<IRenderDevice>(vulkan)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(sceneManager)
             .AddSingleton<IAssetLoader>(assetLoader)

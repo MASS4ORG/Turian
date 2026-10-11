@@ -15,6 +15,7 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Vulkan/Turian.Engine.Vulkan.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
         <ProjectReference Include="../CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj"

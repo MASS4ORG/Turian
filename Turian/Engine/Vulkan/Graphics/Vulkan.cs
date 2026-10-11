@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Represents a Vulkan graphics context and device manager.
 /// </summary>
-public class Vulkan
+public class Vulkan : IRenderDevice
 {
     /// <summary>
     /// Gets the Vulkan API instance.
@@ -43,4 +43,8 @@ public class Vulkan
 
         logger.Lap("startup", "Vulkan headless device ready");
     }
+
+    /// <inheritdoc />
+    public Model? GetModel(Guid modelAssetId, AssetDatabase assets) =>
+        new ModelAsset { Id = modelAssetId }.GetContent(this, assets);
 }

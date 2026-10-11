@@ -145,7 +145,7 @@ public class StandardRenderSystem : IRenderSystem
     {
         foreach (var component in renderList.Models)
         {
-            if (component.ModelInstance is { } model && component.Node is { } node)
+            if (component.ModelInstance is VulkanModel model && component.Node is { } node)
                 AddDraws(component, model, node.GlobalTransform);
         }
 
@@ -153,7 +153,7 @@ public class StandardRenderSystem : IRenderSystem
         CullingStats = CullingStats with { Submitted = renderList.Draws.Count };
     }
 
-    void AddDraws(ModelComponent component, Model model, Transform global)
+    void AddDraws(ModelComponent component, VulkanModel model, Transform global)
     {
         var start = 0;
         var last = model.SubMeshes.Count;
@@ -186,7 +186,7 @@ public class StandardRenderSystem : IRenderSystem
 
     void RecordDraws(CommandBuffer commandBuffer)
     {
-        Model? boundModel = null;
+        VulkanModel? boundModel = null;
         MaterialResource? boundMaterial = null;
         var drawIndex = 0;
         long triangles = 0;

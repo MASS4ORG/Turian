@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed (breaking): Gaya settings use class-level attributes as their sole configuration
 - Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
 - Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
+- Changed (breaking): Vulkan renderer moved out of core #62 #35
 - Added: Asset browser revamp #68
 - Added: Theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214

@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Per-material GPU resource: a descriptor set bound at set=1 holding the PBR factor
 /// UBO and the five PBR texture samplers. Built once per <see cref="MaterialAsset"/>
-/// from a fully-hydrated source asset; cached on <see cref="MaterialAsset.GetContent"/>.
+/// from a fully-hydrated source asset; cached on <see cref="MaterialAssetContent.GetContent(MaterialAsset, MaterialDescriptorContext)"/>.
 /// </summary>
 public sealed class MaterialResource : IDisposable
 {
@@ -15,7 +15,7 @@ public sealed class MaterialResource : IDisposable
 
     /// <summary>
     /// Builds a descriptor set for the given material. Texture references resolve through
-    /// <see cref="TextureAsset.GetContent"/>; empty or unresolved slots bind the matching
+    /// <see cref="TextureAssetContent.GetContent(TextureAsset, Vulkan, AssetDatabase)"/>; empty or unresolved slots bind the matching
     /// <see cref="DefaultTextures"/> entry.
     /// </summary>
     public MaterialResource(MaterialDescriptorContext context, MaterialAsset material)

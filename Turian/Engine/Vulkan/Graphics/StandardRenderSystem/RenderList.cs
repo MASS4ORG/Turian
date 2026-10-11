@@ -11,7 +11,7 @@ namespace Turian.Engine.Core;
 /// <param name="WorldBounds">The world-space bounds supplied to optional visibility passes.</param>
 /// <param name="RenderLayer">The owning node's rendering layer index.</param>
 readonly record struct DrawItem(
-    Model Model,
+    VulkanModel Model,
     int SubMesh,
     MaterialResource Material,
     Matrix4x4 ModelMatrix,
