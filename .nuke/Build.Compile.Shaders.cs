@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.
@@ -12,8 +12,7 @@ sealed partial class Build
     // The renderer creates a Vulkan 1.2 device, which consumes SPIR-V up to 1.5.
     [Parameter("spirv-version (default: spv1.5)")]
     readonly string SpirVVersion = "spv1.5";
-    readonly AbsolutePath EngineProjectDirectory =
-        RootDirectory / "Turian" / "Packages" / "org.mass4.turian.vulkan" / "Source~" / "Turian.Engine.Vulkan";
+    readonly AbsolutePath EngineProjectDirectory = RootDirectory / ShaderSourceDirectoryName;
 
     // Compiling shaders
     static readonly string[] ShaderPatterns =

@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 sealed partial class Build
 {
@@ -25,7 +25,7 @@ sealed partial class Build
 
                 foreach (var archive in ArtifactsDirectory.GlobFiles("*.zip", "*.deb", "*.exe"))
                 {
-                    var packageUrl = $"projects/{encodedProject}/packages/generic/turian/{Version}/{archive.Name}";
+                    var packageUrl = $"projects/{encodedProject}/packages/generic/{ProductName.ToLowerInvariant()}/{Version}/{archive.Name}";
                     using var content = new ByteArrayContent(await File.ReadAllBytesAsync(archive));
                     var response = await http.PutAsync(packageUrl, content);
                     response.EnsureSuccessStatusCode();

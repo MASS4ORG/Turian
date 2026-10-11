@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 sealed partial class Build
 {
@@ -19,7 +19,7 @@ sealed partial class Build
                 using var http = new HttpClient();
                 http.BaseAddress = new Uri("https://api.github.com/");
                 http.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
-                http.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
+                http.DefaultRequestHeaders.UserAgent.ParseAdd($"{ProductName}-NUKE-Build");
                 http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
                 var payload = JsonSerializer.Serialize(new
@@ -27,7 +27,7 @@ sealed partial class Build
                     tag_name = TagName,
                     name = TagName,
                     body = ReadChangelogSection(TagName) +
-                        (Environment.GetEnvironmentVariable("TURIAN_BUILD_RESULT") == "failure"
+                        (Environment.GetEnvironmentVariable($"{ProductName.ToUpperInvariant()}_BUILD_RESULT") == "failure"
                             ? "\n\nSome platform builds failed. Downloadable assets are available only for successful builds; see the publish workflow run."
                             : string.Empty),
                     draft = false,
@@ -46,7 +46,7 @@ sealed partial class Build
                 using var uploadHttp = new HttpClient();
                 uploadHttp.BaseAddress = new Uri("https://uploads.github.com/");
                 uploadHttp.DefaultRequestHeaders.Authorization = new("Bearer", GithubToken);
-                uploadHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Turian-NUKE-Build");
+                uploadHttp.DefaultRequestHeaders.UserAgent.ParseAdd($"{ProductName}-NUKE-Build");
                 uploadHttp.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
 
                 foreach (var archive in ArtifactsDirectory.GlobFiles("*.zip", "*.deb", "*.exe"))

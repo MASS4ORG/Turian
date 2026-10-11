@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.

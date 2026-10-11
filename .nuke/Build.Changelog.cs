@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.
@@ -8,7 +8,7 @@ sealed partial class Build
 {
     static AbsolutePath ChangelogFile => RootDirectory / "CHANGELOG.md";
 
-    const string unreleasedHeader = "## [Unreleased]";
+    const string UnreleasedHeader = "## [Unreleased]";
 
     static readonly (string Prefix, string Section)[] ChangelogSections =
     [
@@ -34,7 +34,7 @@ sealed partial class Build
             .Executes(() =>
             {
                 var grouped = CollectChangelogEntries();
-                var section = BuildChangelogSection(Version, grouped);
+                var section = BuildChangelogSection(Version, grouped, ReadUnreleasedBody());
                 WriteChangelogSection(section);
                 Log.Information("Updated {ChangelogFile} with version {Version}", ChangelogFile, Version);
             });
@@ -80,11 +80,37 @@ sealed partial class Build
         return grouped;
     }
 
-    static string BuildChangelogSection(string version, Dictionary<string, List<string>> grouped)
+    /// <summary>
+    /// The hand-written entries under "## [Unreleased]", or an empty string when there are none.
+    /// </summary>
+    static string ReadUnreleasedBody()
+    {
+        if (!ChangelogFile.FileExists())
+        {
+            return string.Empty;
+        }
+
+        var match = Regex.Match(
+            ChangelogFile.ReadAllText(),
+            $@"{Regex.Escape(UnreleasedHeader)}[^\n]*\n(?<body>.*?)(?=\n##\s|\n\[[^\]]+\]:|\z)",
+            RegexOptions.Singleline);
+        return match.Success ? match.Groups["body"].Value.Trim() : string.Empty;
+    }
+
+    /// <summary>
+    /// The new version section: the Unreleased entries when present, else the ones derived from commits.
+    /// </summary>
+    static string BuildChangelogSection(string version, Dictionary<string, List<string>> grouped, string unreleasedBody)
     {
         var builder = new StringBuilder();
         builder.AppendLine(CultureInfo.InvariantCulture, $"## [{version}] - {DateTime.UtcNow:yyyy-MM-dd}");
         builder.AppendLine();
+
+        if (unreleasedBody.Length > 0)
+        {
+            builder.Append(unreleasedBody);
+            return builder.ToString();
+        }
 
         // One line per change, "- Added: ...", grouped in the order sections are declared above.
         var orderedSections = ChangelogSections.Select(entry => entry.Section).Distinct();
@@ -116,13 +142,13 @@ sealed partial class Build
             .ToList();
         content = LinkDefinition().Replace(content, string.Empty).TrimEnd();
 
-        var replacement = $"{unreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}{Environment.NewLine}";
+        var replacement = $"{UnreleasedHeader}{Environment.NewLine}{Environment.NewLine}{section}{Environment.NewLine}";
 
         // Replace the whole old "## [Unreleased]" section (header + body up to the next "## "
         // heading or end of file), not just the header line, so stale Unreleased content doesn't
         // survive as an orphaned block below the newly inserted version section.
         var unreleasedSection = new Regex(
-            $@"{Regex.Escape(unreleasedHeader)}.*?(?=\n##\s|\z)",
+            $@"{Regex.Escape(UnreleasedHeader)}.*?(?=\n##\s|\z)",
             RegexOptions.Singleline);
 
         content = unreleasedSection.IsMatch(content)

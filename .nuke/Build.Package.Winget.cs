@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// Generates manifests for submission to the Winget community repository.

@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.
@@ -150,17 +150,14 @@ sealed partial class Build
         td
             .Executes(() =>
             {
-                // var lastCommmit = GitTasks.Git("log -1").FirstOrDefault().Text;
-                // var status = GitTasks.Git("status").FirstOrDefault().Text;
                 Log.Information("Current version:\t\t{Version}", CurrentVersion);
                 Log.Information("Current tag:\t\t{Version}", CurrentTag);
                 Log.Information("Next version:\t\t{Version}", Version);
             });
 
     /// <summary>
-    /// Stamps the release version into the <c>&lt;Version&gt;</c> of every tracked engine, editor and Gaya project,
-    /// so the committed csproj version matches the tag and local builds report it. Bricks keep the version of their
-    /// <c>package.json</c>; the build project is left alone.
+    /// Stamps the release version into every configured project with a <c>&lt;Version&gt;</c> element, so committed
+    /// project versions match the tag and local builds report it.
     /// </summary>
     public Target UpdateProjectVersions => td =>
         td
@@ -168,20 +165,18 @@ sealed partial class Build
             .OnlyWhenDynamic(() => HasNewCommits)
             .Executes(() =>
             {
-                var projects = Git("ls-files *.csproj", logOutput: false)
-                    .Select(output => output.Text)
-                    .Where(path => !path.StartsWith(".nuke/", StringComparison.Ordinal)
-                                   && !path.StartsWith("Turian/Packages/", StringComparison.Ordinal));
+                var projects = VersionedProjects
+                    .Where(project => project.Path.ReadAllText().Contains("<Version>", StringComparison.Ordinal));
                 foreach (var project in projects)
                 {
-                    var path = RootDirectory / project;
+                    var path = project.Path;
                     var text = File.ReadAllText(path);
                     var stamped = ProjectVersionRegex().Replace(text, $"<Version>{Version}</Version>", 1);
                     if (stamped == text) continue;
 
                     var bom = File.ReadAllBytes(path) is [0xEF, 0xBB, 0xBF, ..];
                     File.WriteAllText(path, stamped, new UTF8Encoding(bom));
-                    Log.Information("{Project}: version {Version}", project, Version);
+                    Log.Information("{Project}: version {Version}", project.Name, Version);
                 }
             });
 
