@@ -2,6 +2,7 @@ namespace Turian.Tests;
 
 /// <summary>Checks that unchanged build inputs preserve generated files and reuse either assembly slot.</summary>
 [Collection(SerialTests.Name)]
+[Trait("Category", "E2E")]
 public sealed class BuildReuseTests : IDisposable
 {
     readonly string root = Directory.CreateTempSubdirectory("turian-build-reuse-").FullName;

@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Checks generated-project restore targeting and failure propagation.</summary>
+[Trait("Category", "E2E")]
 public sealed class CompilerBaseTests : IDisposable
 {
     readonly string directory = Directory.CreateTempSubdirectory("turian-restore-").FullName;
@@ -25,6 +26,30 @@ public sealed class CompilerBaseTests : IDisposable
         Assert.Equal(project, await Compiler().Setup(project));
 
         Assert.True(File.Exists(Path.Combine(directory, "obj", "project.assets.json")));
+    }
+
+    /// <summary>A deleted assets file forces a restore even though the stamp says the inputs are unchanged.</summary>
+    [Fact]
+    public async Task MissingAssetsFileForcesRestore()
+    {
+        var project = Path.Combine(directory, "Fresh.csproj");
+        File.WriteAllText(project, """
+            <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework><NuGetAudit>false</NuGetAudit>
+            </PropertyGroup></Project>
+            """);
+        File.WriteAllText(Path.Combine(directory, "NuGet.Config"),
+            "<configuration><packageSources><clear /></packageSources></configuration>");
+
+        var compiler = Compiler();
+        Assert.Equal(project, await compiler.Setup(project));
+
+        var assets = Path.Combine(directory, "obj", "project.assets.json");
+        Assert.True(File.Exists(assets));
+        File.Delete(assets);
+
+        Assert.Equal(project, await compiler.Setup(project));
+        Assert.True(File.Exists(assets));
     }
 
     /// <summary>A failed restore prevents setup from returning projects for compilation or cache reuse.</summary>

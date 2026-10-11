@@ -2,6 +2,7 @@ namespace Turian.Tests;
 
 /// <summary>Checks deferred startup and cleanup without creating a desktop window.</summary>
 [Collection(SerialTests.Name)]
+[Trait("Category", "E2E")]
 public sealed class ProjectStartupTests
 {
     /// <summary>Queueing a project performs no load and duplicate startup requests are rejected.</summary>

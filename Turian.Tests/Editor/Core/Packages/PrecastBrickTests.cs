@@ -66,6 +66,7 @@ public sealed class PrecastBrickFixture : IAsyncLifetime
 
 /// <summary>How a project consumes a brick that ships precompiled assemblies.</summary>
 /// <param name="fixture">The precast brick shared by the class.</param>
+[Trait("Category", "E2E")]
 public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixture<PrecastBrickFixture>, IDisposable
 {
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-precast-project-{Guid.NewGuid():N}");

@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: Icon sets (Mono, Color) #217
 - Added: Material 3 as default theme; classic OS themes as bricks #212
 - Added: in-game UI supports GPU rendering on Vulkan.
+- Added: CI/CD test also emits a TRX report
 - Improved: Panels API delegate tab-strip area.
 - Improved: Studio renders on demand
+- Improved: "Build & Run" and "export" skip the redundant NuGet restore already done during setup.
 - Changed: Guinevere controls now use style sheets #218
 - Changed: project solution generator revamped
 

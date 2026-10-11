@@ -2,6 +2,7 @@ namespace Turian.Tests;
 
 /// <summary>Verifies that plugin startup defers project loading for an interactive host.</summary>
 [Collection(SerialTests.Name)]
+[Trait("Category", "E2E")]
 public sealed class StudioStartupLifecycleTests
 {
     /// <summary>The plugin queues startup, ticks it to completion and shuts down its services cleanly.</summary>

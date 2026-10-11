@@ -24,9 +24,10 @@ public sealed class ExportUserCode(
 
         var configName = configuration == BuildConfiguration.Release ? "Release" : "Debug";
 
+        // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
         var startInfo = new ProcessStartInfo(
             "dotnet",
-            $"publish \"{csprojFilePath}\" -o \"{exportOutputPath}\" -c {configName}")
+            $"publish \"{csprojFilePath}\" -o \"{exportOutputPath}\" -c {configName} --no-restore")
         {
             CreateNoWindow = true,
             UseShellExecute = false,

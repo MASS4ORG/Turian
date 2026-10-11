@@ -55,7 +55,8 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
 
         Logger.LogInformation("Building play runtime: {Project}", csprojFilePath);
 
-        var buildStartInfo = new ProcessStartInfo("dotnet", $"build \"{csprojFilePath}\" -c Debug")
+        // SetupAsync already restored this project, so skip the implicit restore of `dotnet build`.
+        var buildStartInfo = new ProcessStartInfo("dotnet", $"build \"{csprojFilePath}\" -c Debug --no-restore")
         {
             CreateNoWindow = true,
             UseShellExecute = false,

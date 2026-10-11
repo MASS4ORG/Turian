@@ -2,7 +2,7 @@ namespace Turian.Tests;
 
 /// <summary>Checks immediate background refresh requests and cleanup without opening a window.</summary>
 [Collection(SerialTests.Name)]
-public sealed class FrameRequestBridgeTests
+public sealed class FrameRequestBridgeTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
     /// <summary>Background logs, tasks, scene requests and settings wake the GUI until the bridge is disposed.</summary>
     [Fact]
@@ -39,11 +39,14 @@ public sealed class FrameRequestBridgeTests
             var tree = services.GetRequiredService<SceneTreeController>();
             tree.ShowRuntimeScene(new Node());
             Assert.True(wakes > count);
-            count = wakes;
-            var play = services.GetRequiredService<PlayModeService>();
-            Assert.True(play.Start());
-            Assert.True(wakes > count);
-            play.Stop();
+            if (fixture.Available)
+            {
+                count = wakes;
+                var play = services.GetRequiredService<PlayModeService>();
+                Assert.True(play.Start());
+                Assert.True(wakes > count);
+                play.Stop();
+            }
             bridge.Dispose();
             bridge.Dispose();
             count = wakes;

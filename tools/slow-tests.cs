@@ -5,8 +5,9 @@
 //   report     a .trx file, or a directory whose newest .trx is used (default: coverage/)
 //   --top      how many tests and classes to list (default: 15)
 //
-// Produce a report with:
-//   dotnet test --project Turian.Tests/Turian.Tests.csproj --report-trx --results-directory coverage
+// The NUKE `test` target writes coverage/<host>.trx (the newest is picked up automatically), so run `./build.sh test`
+// first. To produce one by hand:
+//   dotnet run --project Turian.Tests/Turian.Tests.csproj -- --report-xunit-trx --results-directory coverage
 
 using System.Globalization;
 using System.Xml.Linq;
