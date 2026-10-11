@@ -326,6 +326,24 @@ public sealed class BuildManager : IDisposable
                 return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
 
+    /// <summary>
+    /// Exports the project with <paramref name="profile"/>, active or not, into <c>Output/&lt;profile&gt;</c>: what
+    /// the Build Profiles window's Build does.
+    /// </summary>
+    /// <param name="profile">The profile to build.</param>
+    public Task<BuildTaskStatus> ExportAsync(ProjectBuildProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        return TaskRunner.EnqueueAsync(new DelegateTask(
+            name: "Export",
+            locksUi: true,
+            run: async _ =>
+            {
+                var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile);
+                return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
+            }));
+    }
+
     // ── Dispose ────────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>

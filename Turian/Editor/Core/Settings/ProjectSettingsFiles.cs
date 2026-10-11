@@ -110,6 +110,46 @@ public static class ProjectSettingsFiles
     }
 
     /// <summary>
+    /// Adds a build profile for <paramref name="target"/>, named after it and unique among the project's profiles,
+    /// as the Build Profiles window's Add does. The new profile is not made active.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="target">What the profile builds.</param>
+    /// <returns>Absolute path of the written asset.</returns>
+    public static string AddBuildProfile(IAppSettings project, BuildTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        var taken = BuildProfiles.List(project).Select(static p => p.Profile.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var name = target.ToString();
+        for (var index = 1; taken.Contains(name); index++)
+            name = $"{target} {index}";
+
+        return CreateBuildProfile(project, new BuildProfile { Name = name, Target = target });
+    }
+
+    /// <summary>
+    /// Makes a registered build profile the active one, as Unity's Switch Profile: Build &amp; Run, exports and play
+    /// mode follow it from now on. <c>null</c> builds the plain project.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="profileId">The profile's asset id, or <c>null</c> for none.</param>
+    /// <returns>False when the project has no project asset or does not register the profile.</returns>
+    public static bool SetActiveBuildProfile(IAppSettings project, Guid? profileId)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return false;
+        if (profileId is { } id && registry.BuildProfiles.All(r => r.AssetId != id)) return false;
+
+        registry.ActiveBuildProfile = profileId is { } active
+            ? new DataAssetReference<ProjectSettingsCollection>(active)
+            : null;
+        SaveProjectAsset(project, registry);
+        return true;
+    }
+
+    /// <summary>
     /// Gives a project that has no project asset one, registering what a search of its <c>Assets</c> folder finds:
     /// the settings asset each kind used so far, and every build profile. Duplicates a kind had are reported and
     /// stay unregistered.

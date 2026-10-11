@@ -150,6 +150,15 @@ static class StudioCommands
                 HasProject)
         { DynamicLabel = Localized("Export") });
 
+        Add(context, MenuIds.Project, "3", 8, new CommandDescriptor(
+                "gaya.turian.buildProfiles", "Run: Build Profiles…",
+                sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
+                HasProject)
+        { DynamicLabel = Localized("Build Profiles…") });
+
+        context.Shortcuts.Add(new KeyBinding("gaya.turian.buildProfiles", KeyboardKey.B,
+            KeyModifiers.Ctrl | KeyModifiers.Shift));
+
         AddProjectSettings<PlayerSettings>(context, "player", "Player", 0);
         AddProjectSettings<InputSettings>(context, "input", "Input", 1);
         AddProjectSettings<GraphicsSettings>(context, "graphics", "Graphics", 2);
@@ -411,8 +420,18 @@ static class StudioCommands
     static void Export(IServiceProvider services)
     {
         var build = services.GetRequiredService<BuildManager>();
+        RunExport(services.GetRequiredService<BackgroundTaskRunner>(), () => build.ExportAsync());
+    }
 
-        services.GetRequiredService<BackgroundTaskRunner>().Run(
+    /// <summary>Runs an export as a blocking background task that the status bar shows.</summary>
+    /// <param name="runner">The studio's background task runner.</param>
+    /// <param name="export">Starts the export.</param>
+    public static void RunExport(BackgroundTaskRunner runner, Func<Task<BuildTaskStatus>> export)
+    {
+        ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(export);
+
+        runner.Run(
             new BackgroundTaskSpec
             {
                 Label = "Export",
@@ -424,7 +443,7 @@ static class StudioCommands
             async (progress, _) =>
             {
                 progress.Report(0, "Packaging the project");
-                var status = await build.ExportAsync().ConfigureAwait(false);
+                var status = await export().ConfigureAwait(false);
                 if (status.State != BuildTaskState.Succeeded)
                     throw new InvalidOperationException(status.Message);
 

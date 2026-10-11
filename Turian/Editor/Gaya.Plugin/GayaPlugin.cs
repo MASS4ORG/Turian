@@ -162,6 +162,21 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<ICommandCatalog>(),
                 sp.GetRequiredService<IPanelAccessor>()))
         { OpenByDefault = false });
+
+        context.Panels.Register(new PanelDescriptor(
+            BuildProfilesPanelId, "Build Profiles", PanelPlacement.Center,
+            sp => new BuildProfilesPanel(
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<AssetInspectionService>(),
+                sp.GetRequiredService<AssetAutoSave>(),
+                sp.GetRequiredService<UndoService>(),
+                new ReferenceDrawer(
+                    sp.GetRequiredService<ReferencePicker>(),
+                    sp.GetRequiredService<NodeInspectorController>(),
+                    sp.GetRequiredService<AssetRevealService>()),
+                sp.GetRequiredService<BuildManager>(),
+                sp.GetRequiredService<BackgroundTaskRunner>()))
+        { OpenByDefault = false });
     }
 
     static void RegisterShellChrome(IPluginContext context)
@@ -232,6 +247,9 @@ public sealed class GayaPlugin : IPlugin
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
     public const string ShortcutsPanelId = "gaya.turian.shortcuts";
+
+    /// <summary>The Build Profiles window's id, which the Project menu's entry brings to the front.</summary>
+    public const string BuildProfilesPanelId = "gaya.turian.buildProfiles";
 
     /// <summary>The Bricks panel's id, which the Project menu's entry brings to the front.</summary>
     public const string BricksPanelId = BricksPanel.PanelId;

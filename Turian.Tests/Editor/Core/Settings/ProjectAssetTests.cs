@@ -140,6 +140,51 @@ public sealed class ProjectAssetTests : IDisposable
     }
 
     /// <summary>
+    /// The listing follows the project asset's order and marks the active profile; switching moves the mark, an
+    /// unregistered id is refused, none clears it, and a registered profile whose file is gone is left out.
+    /// </summary>
+    [Fact]
+    public void SwitchingProfilesMovesTheActiveMark()
+    {
+        Assert.Empty(BuildProfiles.List(Settings));
+        Assert.False(ProjectSettingsFiles.SetActiveBuildProfile(Settings, null));
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], [Guid.NewGuid()]);
+        ProjectSettingsFiles.CreateBuildProfile(Settings, new BuildProfile { Name = "Client" }, active: true);
+        ProjectSettingsFiles.CreateBuildProfile(Settings, new BuildProfile { Name = "Server" });
+
+        var listed = BuildProfiles.List(Settings);
+        Assert.Equal(["Client", "Server"], listed.Select(static p => p.Profile.Name));
+        Assert.Equal([true, false], listed.Select(static p => p.IsActive));
+
+        Assert.True(ProjectSettingsFiles.SetActiveBuildProfile(Settings, listed[1].Id));
+        Assert.Equal("Server", BuildProfiles.Active(BuildSettings)!.Name);
+        Assert.False(ProjectSettingsFiles.SetActiveBuildProfile(Settings, Guid.NewGuid()));
+        Assert.Equal([false, true], BuildProfiles.List(Settings).Select(static p => p.IsActive));
+
+        Assert.True(ProjectSettingsFiles.SetActiveBuildProfile(Settings, null));
+        Assert.Null(BuildProfiles.Active(BuildSettings));
+        Assert.DoesNotContain(BuildProfiles.List(Settings), static p => p.IsActive);
+    }
+
+    /// <summary>Added profiles are named after their target, numbered past names in use, and not made active.</summary>
+    [Fact]
+    public void AddedProfilesAreNamedAfterTheirTarget()
+    {
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], []);
+
+        ProjectSettingsFiles.AddBuildProfile(Settings, BuildTarget.Server);
+        var second = ProjectSettingsFiles.AddBuildProfile(Settings, BuildTarget.Server);
+        ProjectSettingsFiles.AddBuildProfile(Settings, BuildTarget.Client);
+
+        var listed = BuildProfiles.List(Settings);
+        Assert.Equal(["Server", "Server 1", "Client"], listed.Select(static p => p.Profile.Name));
+        Assert.Equal([BuildTarget.Server, BuildTarget.Server, BuildTarget.Client],
+            listed.Select(static p => p.Profile.Profile.Target));
+        Assert.Equal(Path.Combine(Assets, "Settings", "Build", "Server 1.dataasset"), second);
+        Assert.DoesNotContain(listed, static p => p.IsActive);
+    }
+
+    /// <summary>
     /// Opening stamps a project the engine has not saved or that an older engine saved; a project already at this
     /// version, or without a project asset, is left as it is.
     /// </summary>

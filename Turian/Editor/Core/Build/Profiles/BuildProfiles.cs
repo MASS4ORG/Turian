@@ -8,6 +8,12 @@ namespace Turian.Editor.Core;
 /// <param name="Profile">The profile.</param>
 public sealed record ProjectBuildProfile(string Name, string Path, BuildProfile Profile);
 
+/// <summary>A build profile the project asset registers, as the Build Profiles window lists it.</summary>
+/// <param name="Id">The profile's asset id.</param>
+/// <param name="Profile">The profile with its name and file.</param>
+/// <param name="IsActive">Whether Build &amp; Run, exports and play mode follow it.</param>
+public sealed record BuildProfileListing(Guid Id, ProjectBuildProfile Profile, bool IsActive);
+
 /// <summary>Finds a project's build profiles and decides which bricks each ships.</summary>
 public static class BuildProfiles
 {
@@ -32,6 +38,26 @@ public static class BuildProfiles
             .OfType<string>()
             .Select(path => Read(path, index))
             .OfType<ProjectBuildProfile>()];
+    }
+
+    /// <summary>
+    /// The build profiles the project's <see cref="ProjectAsset"/> registers, in its order, each with its id and
+    /// whether it is the active one; profiles whose file is gone or unreadable are left out.
+    /// </summary>
+    /// <param name="settings">The project settings.</param>
+    /// <returns>The profiles; none when the project has no project asset.</returns>
+    public static IReadOnlyList<BuildProfileListing> List(IAppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (ProjectAsset.Load(settings.AssetsAbsoluteDir) is not { } project) return [];
+
+        var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
+        var active = project.ActiveBuildProfile?.AssetId;
+        return [.. project.BuildProfiles.Where(static r => !r.IsEmpty).Select(static r => r.AssetId).Distinct()
+            .Select(id => index.PathOf(id) is { } path && Read(path, index) is { } profile
+                ? new BuildProfileListing(id, profile, id == active)
+                : null)
+            .OfType<BuildProfileListing>()];
     }
 
     /// <summary>The profile the project's <see cref="ProjectAsset"/> marks active.</summary>
