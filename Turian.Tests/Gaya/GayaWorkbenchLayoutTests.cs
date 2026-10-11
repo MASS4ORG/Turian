@@ -47,8 +47,7 @@ public class GayaWorkbenchLayoutTests : IDisposable
         services.AddSingleton<ILogger>(NullLogger.Instance);
 
         var application = new GayaApplication(services.BuildServiceProvider(), registry, new CommandRegistry(),
-            new MenuRegistry(), new ChromeRegistry(), new TabStripChromeRegistry(),
-            new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
+            new MenuRegistry(), new ChromeRegistry(), new ShortcutService(NullLogger.Instance), new FocusTracker(), [],
             settings: new EditorSettings(NullLogger.Instance, settingsPath));
         applications.Add(application);
         return application;

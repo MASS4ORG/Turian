@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>Controls the reference grid's plane, spacing, emphasis and origin axes.</summary>
-[EditorSetting("Scene Viewer/Grid")]
+[Gaya.EditorSetting("Scene Viewer/Grid", Id = "gaya.turian.sceneGrid")]
 public sealed class SceneGridSettings
 {
     /// <summary>Gets or sets whether the reference grid is visible.</summary>

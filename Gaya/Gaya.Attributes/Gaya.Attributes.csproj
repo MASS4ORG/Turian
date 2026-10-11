@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <AssemblyName>Gaya.Attributes</AssemblyName>
+        <PackageId>MASS4.Gaya.Attributes</PackageId>
+        <Description>UI-independent metadata for Gaya settings and contributions.</Description>
+    </PropertyGroup>
+</Project>

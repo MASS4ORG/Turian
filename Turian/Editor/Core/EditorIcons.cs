@@ -6,6 +6,9 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class EditorIcons
 {
+    /// <summary>A favorite asset.</summary>
+    public const string Star = "\uf005";
+
     /// <summary>Move along any axis.</summary>
     public const string Move = "\uf0b2";
 

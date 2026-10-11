@@ -10,7 +10,6 @@ namespace Gaya.Plugin.Turian;
 /// highlights a run and Ctrl+C copies just that, while a click copies the whole entry. Clicking a row
 /// selects it, a double click jumps to its source, and the row and detail jump together to wherever
 /// the split leaves them. The preferences live in the … menu on the tab strip
-/// (<c>OutputPanelChrome</c>), not in a settings row of their own.
 /// </summary>
 sealed partial class OutputPanel(
     ILogger log,

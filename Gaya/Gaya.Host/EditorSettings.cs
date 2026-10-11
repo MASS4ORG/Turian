@@ -54,13 +54,13 @@ public sealed class EditorSettings : IEditorSettings
     public string PathFor(SettingsScope scope) =>
         scope == SettingsScope.User ? user.Path : workspace?.Path ?? string.Empty;
 
-    internal void RestoreUserPage(SettingsPageDescriptor page) => user.Restore(page);
+    internal void RestoreUserPage(SettingsPageDescriptor page, string previousId) => user.Restore(page, previousId);
 
     /// <inheritdoc />
-    public void Register(SettingsPageDescriptor page)
-    {
-        ArgumentNullException.ThrowIfNull(page);
+    public void Register(object target) => RegisterPage(new SettingsPageDescriptor(target));
 
+    internal void RegisterPage(SettingsPageDescriptor page)
+    {
         Store(page.Scope)?.Restore(page);
 
         var existing = pages.FindIndex(registered => registered.Id == page.Id);

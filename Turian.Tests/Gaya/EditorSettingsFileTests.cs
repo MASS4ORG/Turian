@@ -5,6 +5,7 @@ public class EditorSettingsFileTests : IDisposable
 {
     readonly string path = Path.Combine(Path.GetTempPath(), $"gaya-settings-file-{Guid.NewGuid():N}.json");
 
+    [Gaya.EditorSetting("Language", Id = "test.language")]
     sealed class LanguagePage
     {
         public int Language { get; [UsedImplicitly] set; }
@@ -26,7 +27,7 @@ public class EditorSettingsFileTests : IDisposable
         var page = new LanguagePage();
         var settings = new EditorSettings(NullLogger.Instance, path);
 
-        settings.Register(new SettingsPageDescriptor("test.language", "Language", page));
+        settings.Register(page);
         settings.Save();
 
         Assert.Equal(1, page.Language);
@@ -42,7 +43,7 @@ public class EditorSettingsFileTests : IDisposable
         File.WriteAllText(path, original);
         var settings = new EditorSettings(NullLogger.Instance, path);
         var page = new LanguagePage();
-        settings.Register(new SettingsPageDescriptor("test.language", "Language", page));
+        settings.Register(page);
         page.Language = 2;
         settings.Save();
         var document = JsonNode.Parse(File.ReadAllText(path))!;
@@ -58,10 +59,10 @@ public class EditorSettingsFileTests : IDisposable
     {
         File.WriteAllText(path, """{"test.language":{"Language":1}}""");
         var older = new EditorSettings(NullLogger.Instance, path);
-        older.Register(new SettingsPageDescriptor("test.language", "Language", new LanguagePage()));
+        older.Register(new LanguagePage());
         var newer = new EditorSettings(NullLogger.Instance, path);
         var language = new LanguagePage();
-        newer.Register(new SettingsPageDescriptor("test.language", "Language", language));
+        newer.Register(language);
         language.Language = 2;
         newer.Save();
         older.Save();
@@ -76,7 +77,7 @@ public class EditorSettingsFileTests : IDisposable
     {
         File.WriteAllText(path, content);
         var settings = new EditorSettings(NullLogger.Instance, path);
-        settings.Register(new SettingsPageDescriptor("test.language", "Language", new LanguagePage()));
+        settings.Register(new LanguagePage());
         settings.Save();
         Assert.Equal(content, File.ReadAllText(path));
     }

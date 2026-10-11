@@ -5,7 +5,7 @@ namespace Gaya.Plugin.Turian;
 /// from the menu. Each is a fully independent <see cref="InspectorPanel"/> — its own fields, its own
 /// fold state, its own lock.
 /// </summary>
-sealed class InspectorInstances(IPanelRegistry panels, ITabStripChromeRegistry tabStripChrome)
+sealed class InspectorInstances(IPanelRegistry panels)
 {
     int count;
 
@@ -40,11 +40,5 @@ sealed class InspectorInstances(IPanelRegistry panels, ITabStripChromeRegistry t
                 sp.GetRequiredService<AssetDatabase>(),
                 sp.GetRequiredService<LayerFilter>())));
 
-        tabStripChrome.Register(new TabStripChromeDescriptor($"{panelId}.tabMenu", panelId,
-            sp => new InspectorTabChrome(
-                sp.GetRequiredService<IPanelAccessor>(),
-                sp.GetRequiredService<IEditorSettings>(),
-                sp.GetRequiredService<InspectorSettings>(),
-                panelId)));
     }
 }

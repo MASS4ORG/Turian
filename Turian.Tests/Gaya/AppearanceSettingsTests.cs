@@ -80,6 +80,9 @@ public sealed class AppearanceSettingsTests
             """);
         var restored = new EditorSettings(NullLogger.Instance, path);
         AppearanceSettings.Register(restored, "gaya.turian.appearance");
+        var defaults = Assert.Single(restored.Pages).Defaults;
+        Assert.Equal(12, defaults[nameof(AppearanceSettings.TextSize)]);
+        Assert.Equal(false, defaults[nameof(AppearanceSettings.NativeTitlebar)]);
         using var app = Application(restored);
         using var workbench = new Workbench(app, layoutStore: LayoutStore(path));
         Assert.Equal("gaya.light", workbench.Appearance.Theme);
@@ -192,7 +195,7 @@ public sealed class AppearanceSettingsTests
 
     static GayaApplication Application(EditorSettings settings) => new(new ServiceCollection().BuildServiceProvider(),
         new PanelRegistry(), new CommandRegistry(), new MenuRegistry(), new ChromeRegistry(),
-        new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance), new FocusTracker(), [], settings: settings);
+        new ShortcutService(NullLogger.Instance), new FocusTracker(), [], settings: settings);
 
     static WorkbenchLayoutStore LayoutStore(string path) => new(NullLogger.Instance, path + ".layout");
 

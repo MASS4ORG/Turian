@@ -15,8 +15,8 @@ public class StudioContributionsTests
         var context = Substitute.For<IPluginContext>();
         context.CommandLineArgs.Returns([]);
         context.Services.Returns(services);
-        context.Settings.When(registry => registry.Register(Arg.Any<SettingsPageDescriptor>()))
-            .Do(call => pages.Add(call.Arg<SettingsPageDescriptor>()));
+        context.Settings.When(registry => registry.Register(Arg.Any<object>()))
+            .Do(call => pages.Add(new SettingsPageDescriptor(call.Arg<object>())));
         new GayaPlugin().Configure(context);
         var page = Assert.Single(pages, item => item.Id == "gaya.turian.sceneGrid");
         var settings = Assert.IsType<SceneGridSettings>(page.Target);

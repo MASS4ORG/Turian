@@ -18,6 +18,20 @@ public sealed class GayaPlugin : IPlugin
 
         args = context.CommandLineArgs;
         log = context.Logger;
+        RegisterServices(context);
+        RegisterSettings(context);
+        ViewportThemeTokens.Register(context.Themes);
+        RegisterPanels(context);
+        RegisterShellChrome(context);
+        RegisterBrickServices(context);
+        RegisterDialogs(context);
+        StudioCommands.Register(context);
+        PanelCommands.Register(context);
+    }
+
+
+    static void RegisterServices(IPluginContext context)
+    {
         context.Services.AddEditorServices(context.Logger);
         context.Services.AddSingleton<IUiBlocker, BackgroundTaskUiBlocker>();
         context.Services.AddSingleton<IWindowIdentity, ProjectWindowIdentity>();
@@ -44,10 +58,10 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<PlayModeService>(),
             sp.GetRequiredService<BuildManager>(),
             sp.GetRequiredService<ILogger>()));
+    }
 
-        RegisterSettings(context);
-        ViewportThemeTokens.Register(context.Themes);
-
+    static void RegisterPanels(IPluginContext context)
+    {
         context.Panels.Register(new PanelDescriptor(
             SceneTreePanelId, "Scene Tree", PanelPlacement.Left,
             sp => new SceneTreePanel(
@@ -63,7 +77,7 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<StudioLocalization>(),
                 sp.GetRequiredService<AssetDatabase>())));
 
-        var inspectorInstances = new InspectorInstances(context.Panels, context.TabStripChrome);
+        var inspectorInstances = new InspectorInstances(context.Panels);
         inspectorInstances.RegisterInitial(InspectorPanelId);
         context.Services.AddSingleton(inspectorInstances);
 
@@ -104,6 +118,53 @@ public sealed class GayaPlugin : IPlugin
                     sp.GetRequiredService<ILogger>(),
                     sp.GetRequiredService<EditorCameraSettings>()))));
 
+        context.Panels.Register(new PanelDescriptor(
+            AssetsPanelId, "Assets", PanelPlacement.Bottom,
+            sp => new AssetBrowserPanel(
+                sp.GetRequiredService<AssetFileSystem>(),
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<AssetOpenService>(),
+                sp.GetRequiredService<AssetInspectionService>(),
+                sp.GetRequiredService<NodeInspectorController>(),
+                sp.GetRequiredService<AssetRevealService>(),
+                sp.GetRequiredService<AssetCreationCatalog>(),
+                sp.GetRequiredService<AssetBrowserSettings>(),
+                sp.GetRequiredService<IEditorSettings>(),
+                sp.GetRequiredService<AssetTypeCatalog>(),
+                sp.GetRequiredService<AssetPreviewCatalog>(),
+                sp.GetRequiredService<PrefabAuthoring>(),
+                sp.GetRequiredService<AssetFileOperations>(),
+                sp.GetRequiredService<BricksController>(),
+                sp.GetRequiredService<ConfirmDialogChrome>(),
+                sp.GetRequiredService<BuildManager>(),
+                new AssetThumbnailRenderer(sp.GetRequiredService<Vulkan>(), sp.GetRequiredService<AssetDatabase>(),
+                    sp.GetRequiredService<AssetPreviewCatalog>()),
+                sp.GetRequiredService<AssetImporter>(),
+                new AssetLabelService(sp.GetRequiredService<AssetImporter>(), sp.GetRequiredService<UndoService>()),
+                sp.GetRequiredService<AssetDatabase>(),
+                sp.GetRequiredService<FileDialogChrome>())));
+
+        context.Panels.Register(new PanelDescriptor(
+            OutputPanelId, "Output", PanelPlacement.Bottom,
+            sp => new OutputPanel(
+                sp.GetRequiredService<ILogger>(),
+                sp.GetRequiredService<OutputPanelSettings>(),
+                sp.GetRequiredService<OutputLogBridge>(),
+                sp.GetRequiredService<SettingsService>(),
+                sp.GetRequiredService<IFocusTracker>(),
+                sp.GetRequiredService<StudioLocalization>())));
+
+        context.Panels.Register(new PanelDescriptor(
+            ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
+            sp => new ShortcutsPanel(
+                sp.GetRequiredService<IShortcutService>(),
+                sp.GetRequiredService<ICommandCatalog>(),
+                sp.GetRequiredService<IPanelAccessor>()))
+        { OpenByDefault = false });
+    }
+
+    static void RegisterShellChrome(IPluginContext context)
+    {
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.projectSwitcher", ChromeSlot.MenuBar,
             sp => new ProjectSwitcherChrome(
@@ -127,57 +188,14 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<StudioLocalization>()),
             DocumentTabsChrome.Height));
 
-        context.TabStripChrome.Register(new TabStripChromeDescriptor(
-            "gaya.turian.output.tabMenu", OutputPanelId,
-            sp => new OutputPanelChrome(
-                sp.GetRequiredService<OutputPanelSettings>(),
-                sp.GetRequiredService<IEditorSettings>(),
-                sp.GetRequiredService<StudioLocalization>())));
+        context.Chrome.Register(new ChromeDescriptor(
+            "gaya.turian.taskBar", ChromeSlot.StatusBar,
+            sp => new TaskBarChrome(sp.GetRequiredService<BackgroundTaskManager>()),
+            TaskBarChrome.Height));
+    }
 
-        context.TabStripChrome.Register(new TabStripChromeDescriptor(
-            "gaya.turian.assets.tabMenu", AssetsPanelId,
-            sp => new AssetBrowserChrome(
-                sp.GetRequiredService<AssetBrowserSettings>(),
-                sp.GetRequiredService<IEditorSettings>())));
-
-        context.Panels.Register(new PanelDescriptor(
-            AssetsPanelId, "Assets", PanelPlacement.Bottom,
-            sp => new AssetBrowserPanel(
-                sp.GetRequiredService<AssetFileSystem>(),
-                sp.GetRequiredService<SettingsService>(),
-                sp.GetRequiredService<AssetOpenService>(),
-                sp.GetRequiredService<AssetInspectionService>(),
-                sp.GetRequiredService<NodeInspectorController>(),
-                sp.GetRequiredService<AssetRevealService>(),
-                sp.GetRequiredService<AssetCreationCatalog>(),
-                sp.GetRequiredService<AssetBrowserSettings>(),
-                sp.GetRequiredService<IEditorSettings>(),
-                sp.GetRequiredService<AssetTypeCatalog>(),
-                sp.GetRequiredService<AssetPreviewCatalog>(),
-                sp.GetRequiredService<PrefabAuthoring>(),
-                sp.GetRequiredService<AssetFileOperations>(),
-                sp.GetRequiredService<BricksController>(),
-                sp.GetRequiredService<ConfirmDialogChrome>(),
-                sp.GetRequiredService<BuildManager>())));
-
-        context.Panels.Register(new PanelDescriptor(
-            OutputPanelId, "Output", PanelPlacement.Bottom,
-            sp => new OutputPanel(
-                sp.GetRequiredService<ILogger>(),
-                sp.GetRequiredService<OutputPanelSettings>(),
-                sp.GetRequiredService<OutputLogBridge>(),
-                sp.GetRequiredService<SettingsService>(),
-                sp.GetRequiredService<IFocusTracker>(),
-                sp.GetRequiredService<StudioLocalization>())));
-
-        context.Panels.Register(new PanelDescriptor(
-            ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
-            sp => new ShortcutsPanel(
-                sp.GetRequiredService<IShortcutService>(),
-                sp.GetRequiredService<ICommandCatalog>(),
-                sp.GetRequiredService<IPanelAccessor>()))
-        { OpenByDefault = false });
-
+    static void RegisterBrickServices(IPluginContext context)
+    {
         // The Bricks panel belongs to the host; the project's bricks, tasks, inspector and dialogs plug into it.
         context.Services.AddSingleton<IProjectBricks>(sp => sp.GetRequiredService<TurianProjectBricks>());
         context.Services.AddSingleton<IBrickTaskRunner>(sp => sp.GetRequiredService<TurianProjectBricks>());
@@ -185,7 +203,10 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<NodeInspectorController>(), sp.GetRequiredService<SettingsService>()));
         context.Services.AddSingleton<IBrickFileDialogs>(sp => new BrickFileDialogs(
             sp.GetRequiredService<FileDialogChrome>()));
+    }
 
+    static void RegisterDialogs(IPluginContext context)
+    {
         context.Services.AddSingleton<FileDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.fileDialog", ChromeSlot.Overlay,
@@ -206,14 +227,6 @@ public sealed class GayaPlugin : IPlugin
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.aboutDialog", ChromeSlot.Overlay,
             sp => sp.GetRequiredService<AboutDialogChrome>()));
-
-        context.Chrome.Register(new ChromeDescriptor(
-            "gaya.turian.taskBar", ChromeSlot.StatusBar,
-            sp => new TaskBarChrome(sp.GetRequiredService<BackgroundTaskManager>()),
-            TaskBarChrome.Height));
-
-        StudioCommands.Register(context);
-        PanelCommands.Register(context);
     }
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
@@ -274,25 +287,16 @@ public sealed class GayaPlugin : IPlugin
         var output = new OutputPanelSettings();
         context.Services.AddSingleton(output);
 
-        context.Settings.Register(SettingsPages.Describe(LocalizationBridge.PageId, language));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.editorCamera", camera));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGrid", grid));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneViewer", camera.View));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneGizmos", camera.Gizmos));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.sceneTransform", camera.Tools));
-        context.Settings.Register(SettingsPages.Describe(AssetBrowserSettings.PageId, assetBrowser));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.inspector", inspector));
-        context.Settings.Register(SettingsPages.Describe("gaya.turian.recentProjects", recent) with
-        {
-            Path = "Studio/Recent Projects",
-            Hidden = true,
-        });
-        // The Output console's preferences are edited in its own header, so the page only exists for
-        // persistence — it never needs an entry in the Settings panel.
-        context.Settings.Register(SettingsPages.Describe(OutputPanelSettings.PageId, output) with
-        {
-            Hidden = true,
-        });
+        context.Settings.Register(language);
+        context.Settings.Register(camera);
+        context.Settings.Register(grid);
+        context.Settings.Register(camera.View);
+        context.Settings.Register(camera.Gizmos);
+        context.Settings.Register(camera.Tools);
+        context.Settings.Register(assetBrowser);
+        context.Settings.Register(inspector);
+        context.Settings.Register(recent);
+        context.Settings.Register(output);
     }
 
     /// <summary>

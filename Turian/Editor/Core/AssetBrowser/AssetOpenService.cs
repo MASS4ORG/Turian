@@ -70,4 +70,25 @@ public sealed class AssetOpenService(
             log.LogWarning(ex, "No program opened {Path}", absolutePath);
         }
     }
+
+    /// <summary>Shows an asset in the desktop file manager, selecting the file when supported.</summary>
+    public void ShowInFileManager(string absolutePath)
+    {
+        var start = FileManagerCommand(absolutePath);
+        try { Process.Start(start)?.Dispose(); }
+        catch (Exception ex) { log.LogWarning(ex, "Could not show {Path} in the file manager", absolutePath); }
+    }
+
+    /// <summary>Builds a file-manager command with paths kept separate from executable arguments.</summary>
+    public static ProcessStartInfo FileManagerCommand(string absolutePath)
+    {
+        var folder = Directory.Exists(absolutePath) ? absolutePath : Path.GetDirectoryName(absolutePath)!;
+        var start = new ProcessStartInfo(FileManagerExecutable());
+        if (OperatingSystem.IsMacOS() && File.Exists(absolutePath)) start.ArgumentList.Add("-R");
+        start.ArgumentList.Add(OperatingSystem.IsMacOS() ? absolutePath : folder);
+        return start;
+    }
+
+    static string FileManagerExecutable() => OperatingSystem.IsWindows() ? "explorer.exe"
+        : OperatingSystem.IsMacOS() ? "open" : "xdg-open";
 }

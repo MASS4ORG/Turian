@@ -67,36 +67,23 @@ public sealed partial class Workbench
         return item;
     }
 
-    /// <summary>
-    /// Draws into the width a dock group's tabs leave over whatever its active panel registered — the
-    /// output console's settings menu is the one consumer today. Called from both passes so the node
-    /// the dock reserves for the actions exists even when no panel contributes one.
-    /// </summary>
+    /// <summary>Offers the active panel its dock group's remaining tab-strip space in both GUI passes.</summary>
     void RenderTabStripActions(DockTabStrip strip, Gui gui)
     {
         var panelId = strip.ActivePanelId;
-        if (panelId is null) return;
-
-        foreach (var item in app.TabStripChrome.For(panelId))
-            ResolveTabStripChrome(item).Render(gui);
-    }
-
-    IChromeItem ResolveTabStripChrome(TabStripChromeDescriptor descriptor)
-    {
-        if (tabStripChromeInstances.TryGetValue(descriptor.Id, out var item)) return item;
+        if (panelId is null || !descriptors.TryGetValue(panelId, out var descriptor)) return;
 
         try
         {
-            item = descriptor.Factory(app.Services);
+            TrackFocus(gui, panelId);
+            var context = new PanelHeaderContext(panelId, T(descriptor.Title), strip.FreeArea,
+                app.Focus.ActivePanelId == panelId, app.Services);
+            Resolve(descriptor).RenderHeader(gui, context);
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Tab strip chrome {ChromeId} could not be created", descriptor.Id);
-            item = new BrokenChrome(descriptor.Id);
+            log.LogError(ex, "Panel {PanelId} header could not be rendered", panelId);
         }
-
-        tabStripChromeInstances[descriptor.Id] = item;
-        return item;
     }
 
     /// <summary>Stands in for chrome whose factory threw, matching how a broken panel is handled.</summary>

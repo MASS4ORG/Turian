@@ -41,6 +41,25 @@ public sealed partial class AssetFileOperations
             () => (trash = files.MoveToTrash(created!)) is not null);
     }));
 
+    /// <summary>Copies selected entries into a destination as one undo step.</summary>
+    public bool CopyIntoMany(IEnumerable<AssetEntry> selection, string directory) =>
+        RecordBatch("Paste", CopyRoots(selection).Select(entry =>
+        {
+            string? created = null;
+            string? trash = null;
+            return new FileEdit(() => created is null
+                ? (created = files.Duplicate(entry.AbsolutePath, directory, entry.IsDirectory)) is not null
+                : files.MoveTo(trash!, created, entry.IsDirectory),
+                () => (trash = files.MoveToTrash(created!)) is not null);
+        }));
+
+    static IEnumerable<AssetEntry> CopyRoots(IEnumerable<AssetEntry> selection)
+    {
+        var entries = selection.Where(entry => entry.ParentPath is not null).DistinctBy(entry => entry.AbsolutePath).ToArray();
+        return entries.Where(entry => !entries.Any(parent => parent.IsDirectory && parent != entry
+            && Inside(parent.AbsolutePath, entry.AbsolutePath)));
+    }
+
     /// <summary>Returns writable entries whose selected parent directories already cover no other selected entry.</summary>
     public static IReadOnlyList<AssetEntry> Roots(IEnumerable<AssetEntry> selection)
     {

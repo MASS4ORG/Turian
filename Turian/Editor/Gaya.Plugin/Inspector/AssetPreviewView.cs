@@ -43,7 +43,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
 
         try
         {
-            service = new SceneViewerService(vulkan, assets, previewSize, previewSize);
+            service = new SceneViewerService(vulkan, assets, previewSize, previewSize) { ClearColor = Vector4.Zero };
             return true;
         }
         catch (Exception)
@@ -60,22 +60,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
             ? textureProvider.GetPreviewTexture(asset, vulkan, assets)
             : null;
 
-        var root = emptyRoot;
-        if (provider is IScenePreviewProvider sceneProvider)
-        {
-            if (sceneAssetId != asset.Id || sceneProviderType != provider.GetType())
-            {
-                scene?.OwnedResources?.Dispose();
-                scene = sceneProvider.BuildPreview(asset, vulkan, assets);
-                sceneAssetId = asset.Id;
-                sceneProviderType = provider.GetType();
-                svc.FrameBounds(scene.Value.Bounds);
-            }
-
-            root = scene!.Value.Root;
-        }
-
-        svc.Render(root, deltaTime);
+        svc.Render(SceneRoot(asset, provider), deltaTime);
 
         if (pixels.Length != svc.Width * svc.Height * 4) pixels = new byte[svc.Width * svc.Height * 4];
         svc.CopyPixels(pixels);
@@ -83,6 +68,21 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
         frame?.Dispose();
         frame = Snapshot(pixels, svc.Width, svc.Height);
         if (frame is not null) gui.DrawImage(frame, rect);
+    }
+
+    Node SceneRoot(Asset asset, IAssetPreviewProvider provider)
+    {
+        if (provider is not IScenePreviewProvider sceneProvider) return emptyRoot;
+        if (sceneAssetId != asset.Id || sceneProviderType != provider.GetType())
+        {
+            scene?.OwnedResources?.Dispose();
+            scene = sceneProvider.BuildPreview(asset, vulkan, assets);
+            AssetPreviewServices.Initialize(scene.Value, vulkan, assets);
+            sceneAssetId = asset.Id;
+            sceneProviderType = provider.GetType();
+            service!.FrameBounds(scene.Value.Bounds);
+        }
+        return scene!.Value.Root;
     }
 
     /// <summary>
@@ -93,7 +93,7 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
     {
         if (width == 0 || height == 0) return null;
 
-        var info = new SKImageInfo((int)width, (int)height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        var info = new SKImageInfo((int)width, (int)height, SKColorType.Bgra8888, SKAlphaType.Premul);
         var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
         try
         {

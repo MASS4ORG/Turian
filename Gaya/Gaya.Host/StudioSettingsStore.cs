@@ -24,11 +24,12 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     /// whatever the class initialised them to, so adding an option never invalidates a stored file.
     /// </summary>
     /// <param name="page">The page to restore.</param>
-    public void Restore(SettingsPageDescriptor page)
+    /// <param name="previousId">An earlier storage id used when migrating the same settings object.</param>
+    public void Restore(SettingsPageDescriptor page, string? previousId = null)
     {
         ArgumentNullException.ThrowIfNull(page);
 
-        if (Load()?[page.Id] is JsonObject values) RestoreMembers(page, values);
+        if (Load()?[previousId ?? page.Id] is JsonObject values) RestoreMembers(page, values);
         restored[page.Id] = SerializePage(page)?.DeepClone();
     }
 

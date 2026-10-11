@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>Controls the environment shown by the editor's Scene view.</summary>
-[EditorSetting("Scene Viewer")]
+[Gaya.EditorSetting("Scene Viewer", Id = "gaya.turian.sceneViewer")]
 public sealed class SceneViewSettings
 {
     /// <summary>The rendering layers shown by the Scene view.</summary>
@@ -40,6 +40,6 @@ public sealed class SceneViewSettings
     }
 
     /// <summary>Gets or sets normalized linear RGB channels for empty pixels in Studio's Scene and Game views.</summary>
-    [EditorSetting("Empty Sky Color", Description = "Background color shared by the Scene and Game views.")]
+    [Gaya.EditorSetting("Empty Sky Color", Description = "Background color shared by the Scene and Game views.")]
     public Vector3 EmptySkyColor { get; set; } = new(0.39f, 0.58f, 0.93f);
 }

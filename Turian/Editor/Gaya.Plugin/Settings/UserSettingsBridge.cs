@@ -1,7 +1,7 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Publishes the settings pages user code contributes with <c>[SettingsPage]</c> into the editor's
+/// Publishes the settings pages user code contributes with <c>[EditorSetting]</c> into the editor's
 /// settings, and re-publishes them whenever a recompile swaps the user assembly. The discovery itself
 /// is framework-agnostic and lives in <see cref="UserSettingsCatalog"/>; this only maps pages onto
 /// Gaya contributions.
@@ -43,11 +43,7 @@ sealed class UserSettingsBridge : IDisposable
 
         foreach (var page in catalog.Pages)
         {
-            settings.Register(new SettingsPageDescriptor(page.Id, page.Path, page.Target,
-                page.Workspace ? SettingsScope.Workspace : SettingsScope.User, page.Order)
-            {
-                Description = page.Description,
-            });
+            settings.Register(page.Target);
 
             published.Add(page.Id);
         }

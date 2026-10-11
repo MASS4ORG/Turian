@@ -14,6 +14,9 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
 
     ClipboardEntry? clipboard;
 
+    /// <summary>Reports a successful move so browser navigation and favorites follow undo and redo.</summary>
+    public event Action<string, string>? PathMoved;
+
     /// <summary>
     /// The default folder name to use when creating new folders.
     /// </summary>
@@ -73,8 +76,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
                     else DuplicateAssetWithNewMetadata(src, dest);
                     break;
                 case ClipboardOp.Cut:
-                    if (isDir) Directory.Move(src, dest);
-                    else MoveAssetPreservingMetadata(src, dest);
+                    MoveEntry(src, dest, isDir);
                     clipboard = null;
                     break;
                 default:
@@ -151,7 +153,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
     /// </summary>
     public string? Rename(string absolutePath, bool isDirectory, string newName)
     {
-        if (!TryNormalizeName(newName, isDirectory ? string.Empty : sceneExtension, out var name))
+        if (!TryNormalizeName(newName, isDirectory ? string.Empty : Path.GetExtension(absolutePath), out var name))
             return null;
 
         try
@@ -160,26 +162,10 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
             if (string.IsNullOrWhiteSpace(parent)) return null;
 
             var dest = BuildRenameDestinationPath(parent, absolutePath, name, isDirectory);
-            var currentDisplay = isDirectory
-                ? Path.GetFileName(absolutePath)
-                : Path.GetFileNameWithoutExtension(absolutePath);
-
-            if (string.Equals(currentDisplay, name, StringComparison.Ordinal)
-                || string.Equals(absolutePath, dest, StringComparison.Ordinal))
+            if (string.Equals(absolutePath, dest, StringComparison.Ordinal))
                 return dest;
 
-            // A change of letter case only: where the file system ignores case the target already "exists" as the
-            // source itself, so the move goes through a temporary name.
-            if (string.Equals(absolutePath, dest, StringComparison.OrdinalIgnoreCase) && PathExists(dest))
-            {
-                var temporary = Path.Combine(parent, $".rename-{Guid.NewGuid():N}{Path.GetExtension(dest)}");
-                MoveEntry(absolutePath, temporary, isDirectory);
-                MoveEntry(temporary, dest, isDirectory);
-            }
-            else
-            {
-                MoveEntry(absolutePath, dest, isDirectory);
-            }
+            MoveRenamed(absolutePath, dest, parent, isDirectory);
 
             return dest;
         }
@@ -188,6 +174,18 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
             Log.Logger.LogError(ex, "Failed to rename {Path}", absolutePath);
             return null;
         }
+    }
+
+    void MoveRenamed(string source, string destination, string parent, bool isDirectory)
+    {
+        // Case-insensitive file systems need a temporary name for a change of letter case.
+        if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase) && PathExists(destination))
+        {
+            var temporary = Path.Combine(parent, $".rename-{Guid.NewGuid():N}{Path.GetExtension(destination)}");
+            MoveEntry(source, temporary, isDirectory);
+            MoveEntry(temporary, destination, isDirectory);
+        }
+        else MoveEntry(source, destination, isDirectory);
     }
 
     /// <summary>
@@ -367,10 +365,11 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
     static void RenameAssetPreservingMetadata(string src, string dest)
         => MoveAssetPreservingMetadata(src, dest);
 
-    static void MoveEntry(string src, string dest, bool isDirectory)
+    void MoveEntry(string src, string dest, bool isDirectory)
     {
         if (isDirectory) Directory.Move(src, dest);
         else RenameAssetPreservingMetadata(src, dest);
+        PathMoved?.Invoke(src, dest);
     }
 
     // The copy is the project's own: writable even when the source is a read-only brick file, with the source's

@@ -92,9 +92,6 @@ public interface IPluginContext
     /// <summary>Contributions to the strips outside the dock space.</summary>
     IChromeRegistry Chrome { get; }
 
-    /// <summary>Chrome contributions drawn inside a panel's own tab strip, in the space the tabs leave over.</summary>
-    ITabStripChromeRegistry TabStripChrome { get; }
-
     /// <summary>Editor-wide settings pages this plugin contributes.</summary>
     ISettingsRegistry Settings { get; }
 
