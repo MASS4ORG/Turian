@@ -9,8 +9,9 @@ sealed partial class Build
     [Parameter("skip-shaders (default: false)")]
     readonly bool SkipShaders;
 
-    [Parameter("spirv-version (default: spv1.6)")]
-    readonly string SpirVVersion = "spv1.6";
+    // The renderer creates a Vulkan 1.2 device, which consumes SPIR-V up to 1.5.
+    [Parameter("spirv-version (default: spv1.5)")]
+    readonly string SpirVVersion = "spv1.5";
     readonly AbsolutePath EngineProjectDirectory =
         RootDirectory / "Turian" / "Packages" / "org.mass4.turian.vulkan" / "Source~" / "Turian.Engine.Vulkan";
 
@@ -46,7 +47,7 @@ sealed partial class Build
                         var output = $"{shader}.spv";
                         var process = ProcessTasks.StartProcess(
                             "glslc",
-                            $"\"{shader}\" -o \"{output}\" --target-spv={SpirVVersion}"
+                            $"\"{shader}\" -o \"{output}\" --target-env=vulkan1.2 --target-spv={SpirVVersion}"
                         );
                         _ = process.AssertZeroExitCode();
                     }

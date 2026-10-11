@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed: Guinevere controls now use style sheets #218
 - Changed: project solution generator revamped
 - Fixed: local builds report the engine version from the csproj `Version`, which releases stamp
+- Fixed: shaders compile to SPIR-V 1.5, which Vulkan 1.2 devices load
 
 ## [2.3.1] - 2026-10-07
 
