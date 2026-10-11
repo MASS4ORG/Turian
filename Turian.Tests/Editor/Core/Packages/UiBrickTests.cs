@@ -30,6 +30,32 @@ public sealed class UiBrickTests : IDisposable
         Assert.Contains("SkiaSharp", brick.Manifest.Nuget.Keys);
     }
 
+    /// <summary>
+    /// The manifest pins the NuGet versions the prebuilt assemblies were compiled against, so a game restoring them
+    /// can load what the brick references.
+    /// </summary>
+    [Fact]
+    public void ManifestPackagesMatchPrecastReferences()
+    {
+        var brick = Install(brickId);
+
+        foreach (var path in BrickAssemblies.RuntimeAssemblies(brick))
+        {
+            using var pe = new System.Reflection.PortableExecutable.PEReader(File.OpenRead(path));
+            var metadata = System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe);
+            foreach (var handle in metadata.AssemblyReferences)
+            {
+                var reference = metadata.GetAssemblyReference(handle);
+                var name = metadata.GetString(reference.Name);
+                if (!brick.Manifest.Nuget.TryGetValue(name, out var pinned)) continue;
+
+                var package = Version.Parse(pinned);
+                Assert.True(reference.Version.Major == package.Major && reference.Version.Minor == package.Minor,
+                    $"{Path.GetFileName(path)} references {name} {reference.Version}; the manifest pins {pinned}");
+            }
+        }
+    }
+
     /// <summary>The generated project of a game references the brick's assemblies and NuGet packages, and only when installed.</summary>
     [Fact]
     public void GeneratedProjectsReferenceTheBrick()

@@ -6,12 +6,12 @@
   "author": "MASS4",
   "license": "MPL-2.0",
   "nuget": {
-    "SkiaSharp": "4.152.1",
-    "SkiaSharp.NativeAssets.Linux": "4.152.1",
-    "SkiaSharp.NativeAssets.macOS": "4.152.1",
-    "SkiaSharp.NativeAssets.Win32": "4.152.1",
-    "SkiaSharp.Views.Desktop.Common": "4.152.1",
-    "SkiaSharp.Vulkan.SharpVk": "4.152.1"
+    "SkiaSharp": "4.153.1",
+    "SkiaSharp.NativeAssets.Linux": "4.153.1",
+    "SkiaSharp.NativeAssets.macOS": "4.153.1",
+    "SkiaSharp.NativeAssets.Win32": "4.153.1",
+    "SkiaSharp.Views.Desktop.Common": "4.153.1",
+    "SkiaSharp.Vulkan.SharpVk": "4.153.1"
   },
   "categories": [
     "turian:ui"
