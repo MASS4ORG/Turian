@@ -158,6 +158,37 @@ sealed partial class Build
             });
 
     /// <summary>
+    /// Stamps the release version into the <c>&lt;Version&gt;</c> of every tracked engine, editor and Gaya project,
+    /// so the committed csproj version matches the tag and local builds report it. Bricks keep the version of their
+    /// <c>package.json</c>; the build project is left alone.
+    /// </summary>
+    public Target UpdateProjectVersions => td =>
+        td
+            .DependsOn(CheckNewCommits)
+            .OnlyWhenDynamic(() => HasNewCommits)
+            .Executes(() =>
+            {
+                var projects = Git("ls-files *.csproj", logOutput: false)
+                    .Select(output => output.Text)
+                    .Where(path => !path.StartsWith(".nuke/", StringComparison.Ordinal)
+                                   && !path.StartsWith("Turian/Packages/", StringComparison.Ordinal));
+                foreach (var project in projects)
+                {
+                    var path = RootDirectory / project;
+                    var text = File.ReadAllText(path);
+                    var stamped = ProjectVersionRegex().Replace(text, $"<Version>{Version}</Version>", 1);
+                    if (stamped == text) continue;
+
+                    var bom = File.ReadAllBytes(path) is [0xEF, 0xBB, 0xBF, ..];
+                    File.WriteAllText(path, stamped, new UTF8Encoding(bom));
+                    Log.Information("{Project}: version {Version}", project, Version);
+                }
+            });
+
+    [GeneratedRegex(@"<Version>[^<]*</Version>")]
+    private static partial Regex ProjectVersionRegex();
+
+    /// <summary>
     /// Checks if there are new commits since the last tag.
     /// If there are no new commits, the whole publish process is skipped.
     /// </summary>

@@ -8,7 +8,7 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 public static partial class BuildInfo
 {
-    /// <summary>The version this build was compiled at, from <c>git describe</c>.</summary>
+    /// <summary>The version this build was compiled at, from the project's <c>Version</c>.</summary>
     public static string Version => SVersion;
 
     /// <summary>The contributors listed in <c>docs/CONTRIBUTORS.md</c>, one per line.</summary>

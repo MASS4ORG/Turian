@@ -3,7 +3,7 @@ namespace Turian.CSharp.CodeGenerator;
 /// <summary>
 /// Generates <c>Gaya.Plugin.Turian.BuildInfo</c>: the version this build was compiled at, the
 /// compilation date, and the contributor list parsed from <c>CONTRIBUTORS.md</c>. The consuming
-/// project supplies the version through the <c>GitDescribe</c> MSBuild property (exposed to the
+/// project supplies the version through its <c>Version</c> MSBuild property (exposed to the
 /// generator via <c>CompilerVisibleProperty</c>) and adds <c>CONTRIBUTORS.md</c> as an additional
 /// file. Consumed by the About dialog.
 /// </summary>
@@ -45,7 +45,7 @@ public class BuildInfoGenerator : IIncrementalGenerator
             .Where(file => Path.GetFileName(file.Path) == "CONTRIBUTORS.md");
 
         var version = context.AnalyzerConfigOptionsProvider
-            .Select((options, _) => options.GlobalOptions.TryGetValue("build_property.GitDescribe", out var value)
+            .Select((options, _) => options.GlobalOptions.TryGetValue("build_property.Version", out var value)
                 && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : "dev");
