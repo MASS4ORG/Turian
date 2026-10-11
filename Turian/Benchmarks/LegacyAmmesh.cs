@@ -1,11 +1,16 @@
-namespace Turian.Engine.Core;
+using System.Buffers.Binary;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace Turian.Benchmarks.Legacy;
 
 /// <summary>
 /// Reads the <c>.ammesh</c> binary mesh container: a 12-byte header followed by a
 /// binary manifest chunk and a payload chunk holding the vertex streams and the
 /// index buffer. Attribute semantics and component types are glTF 2.0's.
 /// </summary>
-public sealed class MeshBlob
+sealed class LegacyAmmesh
 {
     /// <summary>File extension of the container.</summary>
     public const string FileExtension = ".ammesh";
@@ -31,25 +36,25 @@ public sealed class MeshBlob
     /// <summary>
     /// Layout of the interleaved <see cref="Vertex"/> stream, which is always stream 0.
     /// </summary>
-    public static IReadOnlyList<MeshBlobAttribute> VertexStreamAttributes { get; } =
+    public static IReadOnlyList<LegacyAttribute> VertexStreamAttributes { get; } =
     [
-        new(MeshAttributeSemantic.Position, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Position))),
-        new(MeshAttributeSemantic.Color0, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Color))),
-        new(MeshAttributeSemantic.Normal, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Normal))),
-        new(MeshAttributeSemantic.TexCoord0, ComponentTypeFloat, 2, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Uv))),
-        new(MeshAttributeSemantic.Tangent, ComponentTypeFloat, 4, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Tangent))),
+        new(LegacySemantic.Position, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Position))),
+        new(LegacySemantic.Color0, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Color))),
+        new(LegacySemantic.Normal, ComponentTypeFloat, 3, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Normal))),
+        new(LegacySemantic.TexCoord0, ComponentTypeFloat, 2, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Uv))),
+        new(LegacySemantic.Tangent, ComponentTypeFloat, 4, (uint)Marshal.OffsetOf<Vertex>(nameof(Vertex.Tangent))),
     ];
 
     /// <summary>
     /// Layout of the optional secondary UV stream, which is always stream 1 when present.
     /// </summary>
-    public static IReadOnlyList<MeshBlobAttribute> TexCoord1StreamAttributes { get; } =
+    public static IReadOnlyList<LegacyAttribute> TexCoord1StreamAttributes { get; } =
     [
-        new(MeshAttributeSemantic.TexCoord1, ComponentTypeFloat, 2, 0),
+        new(LegacySemantic.TexCoord1, ComponentTypeFloat, 2, 0),
     ];
 
     /// <summary>The stream descriptors as they were written.</summary>
-    public IReadOnlyList<MeshBlobStream> Streams { get; private init; } = [];
+    public IReadOnlyList<LegacyStream> Streams { get; private init; } = [];
 
     /// <summary>The interleaved vertices decoded from stream 0.</summary>
     public Vertex[] Vertices { get; private init; } = [];
@@ -64,18 +69,18 @@ public sealed class MeshBlob
     public IReadOnlyList<SubMesh> SubMeshes { get; private init; } = [];
 
     /// <summary>The mesh table; one entry per <see cref="MeshAsset"/> the file produces.</summary>
-    public IReadOnlyList<MeshBlobMesh> Meshes { get; private init; } = [];
+    public IReadOnlyList<LegacyMesh> Meshes { get; private init; } = [];
 
     /// <summary>Axis-aligned bounds covering every mesh in the file.</summary>
     public Bounds Bounds { get; private init; }
 
     /// <summary>Reads a mesh blob from a file.</summary>
     /// <param name="path">Absolute path of the <c>.ammesh</c> file.</param>
-    public static MeshBlob Load(string path) => Read(File.ReadAllBytes(path));
+    public static LegacyAmmesh Load(string path) => Read(File.ReadAllBytes(path));
 
     /// <summary>Reads a mesh blob from a stream, consuming it to the end.</summary>
     /// <param name="stream">The stream positioned at the container header.</param>
-    public static MeshBlob Read(Stream stream)
+    public static LegacyAmmesh Read(Stream stream)
     {
         ArgumentNullException.ThrowIfNull(stream);
 
@@ -86,7 +91,7 @@ public sealed class MeshBlob
 
     /// <summary>Reads a mesh blob from an in-memory container.</summary>
     /// <param name="data">The complete container bytes.</param>
-    public static MeshBlob Read(ReadOnlySpan<byte> data)
+    public static LegacyAmmesh Read(ReadOnlySpan<byte> data)
     {
         if (data.Length < 12)
         {
@@ -158,12 +163,12 @@ public sealed class MeshBlob
         SubMeshes = [.. SubMeshes],
     };
 
-    static MeshBlob ReadManifest(ReadOnlySpan<byte> manifest, ReadOnlySpan<byte> payload)
+    static LegacyAmmesh ReadManifest(ReadOnlySpan<byte> manifest, ReadOnlySpan<byte> payload)
     {
         var cursor = 0;
 
         var streamCount = ReadUInt32(manifest, ref cursor);
-        var streams = new MeshBlobStream[streamCount];
+        var streams = new LegacyStream[streamCount];
         var streamRanges = new (uint Offset, uint Length)[streamCount];
 
         for (var i = 0; i < streamCount; i++)
@@ -174,17 +179,17 @@ public sealed class MeshBlob
             var byteLength = ReadUInt32(manifest, ref cursor);
             var attributeCount = ReadUInt32(manifest, ref cursor);
 
-            var attributes = new MeshBlobAttribute[attributeCount];
+            var attributes = new LegacyAttribute[attributeCount];
             for (var a = 0; a < attributeCount; a++)
             {
-                attributes[a] = new MeshBlobAttribute(
-                    (MeshAttributeSemantic)ReadUInt32(manifest, ref cursor),
+                attributes[a] = new LegacyAttribute(
+                    (LegacySemantic)ReadUInt32(manifest, ref cursor),
                     ReadUInt32(manifest, ref cursor),
                     ReadUInt32(manifest, ref cursor),
                     ReadUInt32(manifest, ref cursor));
             }
 
-            streams[i] = new MeshBlobStream(vertexCount, byteStride, attributes);
+            streams[i] = new LegacyStream(vertexCount, byteStride, attributes);
             streamRanges[i] = (byteOffset, byteLength);
         }
 
@@ -209,13 +214,13 @@ public sealed class MeshBlob
         }
 
         var meshCount = ReadUInt32(manifest, ref cursor);
-        var meshes = new MeshBlobMesh[meshCount];
+        var meshes = new LegacyMesh[meshCount];
         for (var i = 0; i < meshCount; i++)
         {
             var subMeshStart = ReadUInt32(manifest, ref cursor);
             var meshSubMeshCount = ReadUInt32(manifest, ref cursor);
             var bounds = ReadBounds(manifest, ref cursor);
-            meshes[i] = new MeshBlobMesh(ReadString(manifest, ref cursor), subMeshStart, meshSubMeshCount, bounds);
+            meshes[i] = new LegacyMesh(ReadString(manifest, ref cursor), subMeshStart, meshSubMeshCount, bounds);
         }
 
         var fileBounds = ReadBounds(manifest, ref cursor);
@@ -228,11 +233,11 @@ public sealed class MeshBlob
             var (offset, length) = streamRanges[i];
             var slice = payload.Slice((int)offset, (int)length);
 
-            if (streams[i].Attributes.Any(static attribute => attribute.Semantic == MeshAttributeSemantic.Position))
+            if (streams[i].Attributes.Any(static attribute => attribute.Semantic == LegacySemantic.Position))
             {
                 vertices = DecodeVertices(streams[i], slice);
             }
-            else if (streams[i].Attributes.Any(static attribute => attribute.Semantic == MeshAttributeSemantic.TexCoord1))
+            else if (streams[i].Attributes.Any(static attribute => attribute.Semantic == LegacySemantic.TexCoord1))
             {
                 texCoord1 = [.. MemoryMarshal.Cast<byte, Vector2>(slice)];
             }
@@ -242,7 +247,7 @@ public sealed class MeshBlob
             ? []
             : MemoryMarshal.Cast<byte, uint>(payload.Slice((int)indexByteOffset, (int)(indexCount * sizeof(uint)))).ToArray();
 
-        return new MeshBlob
+        return new LegacyAmmesh
         {
             Streams = streams,
             Vertices = vertices,
@@ -254,7 +259,7 @@ public sealed class MeshBlob
         };
     }
 
-    static Vertex[] DecodeVertices(MeshBlobStream stream, ReadOnlySpan<byte> data)
+    static Vertex[] DecodeVertices(LegacyStream stream, ReadOnlySpan<byte> data)
     {
         var count = (int)stream.VertexCount;
         if (count == 0)
@@ -292,23 +297,23 @@ public sealed class MeshBlob
         return vertices;
     }
 
-    static void Assign(ref Vertex vertex, MeshAttributeSemantic semantic, ReadOnlySpan<float> components)
+    static void Assign(ref Vertex vertex, LegacySemantic semantic, ReadOnlySpan<float> components)
     {
         switch (semantic)
         {
-            case MeshAttributeSemantic.Position:
+            case LegacySemantic.Position:
                 vertex.Position = new Vector3(components[0], components[1], components[2]);
                 break;
-            case MeshAttributeSemantic.Normal:
+            case LegacySemantic.Normal:
                 vertex.Normal = new Vector3(components[0], components[1], components[2]);
                 break;
-            case MeshAttributeSemantic.Color0:
+            case LegacySemantic.Color0:
                 vertex.Color = new Vector3(components[0], components[1], components[2]);
                 break;
-            case MeshAttributeSemantic.TexCoord0:
+            case LegacySemantic.TexCoord0:
                 vertex.Uv = new Vector2(components[0], components[1]);
                 break;
-            case MeshAttributeSemantic.Tangent:
+            case LegacySemantic.Tangent:
                 vertex.Tangent = new Vector4(components[0], components[1], components[2], components[3]);
                 break;
         }
@@ -349,4 +354,63 @@ public sealed class MeshBlob
     /// </summary>
     /// <param name="length">Length of the preceding run of bytes.</param>
     public static int Padding(int length) => (4 - (length & 3)) & 3;
+}
+
+
+/// <summary>
+/// A vertex stream: a run of equally sized elements holding one or more attributes.
+/// </summary>
+/// <param name="VertexCount">Number of elements in the stream.</param>
+/// <param name="ByteStride">Size of one element in bytes.</param>
+/// <param name="Attributes">The attributes packed into each element.</param>
+sealed record LegacyStream(uint VertexCount, uint ByteStride, IReadOnlyList<LegacyAttribute> Attributes);
+
+
+/// <summary>
+/// One entry of a mesh blob's mesh table. Each entry becomes a <see cref="MeshAsset"/>.
+/// </summary>
+/// <param name="Name">Name of the source node the submeshes came from.</param>
+/// <param name="SubMeshStart">Index of the first submesh belonging to this mesh.</param>
+/// <param name="SubMeshCount">Number of consecutive submeshes belonging to this mesh.</param>
+/// <param name="Bounds">Axis-aligned bounds covering the mesh's submeshes.</param>
+sealed record LegacyMesh(string Name, uint SubMeshStart, uint SubMeshCount, Bounds Bounds);
+
+
+/// <summary>
+/// One attribute inside a vertex-stream element.
+/// </summary>
+/// <param name="Semantic">What the attribute means.</param>
+/// <param name="ComponentType">glTF 2.0 component type constant; <c>5126</c> is <c>FLOAT</c>.</param>
+/// <param name="ComponentCount">Components per element: 2, 3 or 4.</param>
+/// <param name="ByteOffset">Offset of the attribute from the start of the element.</param>
+readonly record struct LegacyAttribute(
+    LegacySemantic Semantic,
+    uint ComponentType,
+    uint ComponentCount,
+    uint ByteOffset);
+
+
+/// <summary>
+/// A vertex attribute semantic. Each value maps one-to-one onto a glTF 2.0
+/// mesh-primitive attribute name.
+/// </summary>
+enum LegacySemantic
+{
+    /// <summary>glTF <c>POSITION</c>.</summary>
+    Position = 0,
+
+    /// <summary>glTF <c>NORMAL</c>.</summary>
+    Normal = 1,
+
+    /// <summary>glTF <c>TANGENT</c>.</summary>
+    Tangent = 2,
+
+    /// <summary>glTF <c>TEXCOORD_0</c>.</summary>
+    TexCoord0 = 3,
+
+    /// <summary>glTF <c>TEXCOORD_1</c>.</summary>
+    TexCoord1 = 4,
+
+    /// <summary>glTF <c>COLOR_0</c>.</summary>
+    Color0 = 5,
 }

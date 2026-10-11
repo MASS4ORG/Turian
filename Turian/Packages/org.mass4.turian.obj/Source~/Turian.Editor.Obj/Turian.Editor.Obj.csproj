@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Turian.Editor.Obj</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
+    </ItemGroup>
+
+    <Target Name="PrecastEditorAssembly" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <ItemGroup>
+            <PrecastFile Include="$(TargetPath)"/>
+        </ItemGroup>
+        <Delete Files="$(SolutionDir)/Turian/Packages/org.mass4.turian.obj/Precast~/editor/JeremyAnsel.Media.WavefrontObj.dll"/>
+        <Copy SourceFiles="@(PrecastFile)"
+              DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.obj/Precast~/editor"/>
+    </Target>
+
+</Project>

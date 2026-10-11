@@ -5,6 +5,24 @@ public class GltfModelImporterTests
 {
     readonly GltfModelImporter importer = new();
 
+    /// <summary>Dependency discovery failures retain the copied source geometry without inventing companion bytes.</summary>
+    [Theory]
+    [InlineData("{invalid-json}")]
+    [InlineData("{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"uri\":\"missing.bin\",\"byteLength\":12}]}")]
+    public void ImportToCacheRetainsPrimaryWhenDependenciesCannotBeCopied(string json)
+    {
+        var directory = Directory.CreateTempSubdirectory("turian-gltf-dependencies-");
+        try
+        {
+            var source = Path.Combine(directory.FullName, "model.gltf");
+            File.WriteAllText(source, json);
+            var cache = Directory.CreateDirectory(Path.Combine(directory.FullName, "cache")).FullName;
+            var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(source), source, cache));
+            Assert.Equal(json, File.ReadAllText(Path.Combine(cache, artifact)));
+        }
+        finally { directory.Delete(recursive: true); }
+    }
+
     /// <summary>Verifies that IsValid correctly recognises supported and unsupported extensions.</summary>
     [Theory]
     [InlineData("model.gltf", true)]

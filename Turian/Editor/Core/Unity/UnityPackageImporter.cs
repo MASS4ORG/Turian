@@ -157,6 +157,7 @@ public static class UnityPackageImporter
             .Where(static t => typeof(IAssetImporter).IsAssignableFrom(t) && t is { IsInterface: false, IsAbstract: false }
                                && t.GetConstructor(Type.EmptyTypes) is not null)
             .OrderBy(static t => t.GetCustomAttribute<DefaultOptionAttribute>() is not null)
+            .ThenBy(static t => t == typeof(GenericAssetImporter))
             .Select(static t => (IAssetImporter)Activator.CreateInstance(t)!),
     ];
 }

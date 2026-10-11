@@ -14,7 +14,7 @@ public sealed class OapAssetFileProviderTests : IDisposable
         var payload = "mesh blob bytes"u8.ToArray();
 
         var writer = new OapWriter();
-        writer.Add(id, payload, "meshes/ship.ammesh");
+        writer.Add(id, payload, "meshes/ship.glb");
         File.WriteAllBytes(packagePath, writer.Serialize());
 
         var provider = new OapAssetFileProvider(packagePath, AssetRecord.CreatePrimaryContentKey(id));

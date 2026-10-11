@@ -6,7 +6,7 @@ sealed partial class AssetBrowserPanel
     {
         rows.Add(new TreeItem(
             entry.AbsolutePath,
-            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir, Packages.ProjectManifest.DirectoryName)
+            entry.AbsolutePath == Path.Combine(settings.Settings!.ProjectAbsoluteDir, ProjectManifest.DirectoryName)
                 ? "Bricks" : DisplayName(entry.AbsolutePath),
             depth,
             entry.IsDirectory,

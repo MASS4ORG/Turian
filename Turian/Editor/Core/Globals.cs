@@ -26,7 +26,6 @@ global using System.Threading.Tasks;
 global using System.Xml.Linq;
 global using Autoformers;
 global using Codeuctivity;
-global using JeremyAnsel.Media.WavefrontObj;
 global using MASS4.Attributes;
 global using Microsoft.Build.Construction;
 global using Microsoft.Build.Locator;

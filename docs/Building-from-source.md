@@ -43,3 +43,9 @@ dotnet run --project Turian/Editor/CLI -- screenshot ../TurianExamples/example-0
 
 - **Shader Compilation Failed**: Ensure `glslc` is in your PATH.
 - **Vulkan Device Lost**: Ensure your drivers support Vulkan 1.3.
+
+## Generated game dependencies
+
+Building `Turian.Editor.Core` builds the launcher and generates `obj/<configuration>/<framework>/Turian.RuntimeDependencies.txt` with resolved framework, runtime, and native package versions plus assembly references, embedding it in the editor.
+
+`BuildAppSettings` uses this snapshot for project generation. It uses the launcher graph (excluding build-only packages), keeps local paths relative, and resolves external assemblies from launcher output. Published editors load internal assemblies from `lib/`. The list contains resolved runtime packages (including transitive and native dependencies). Release packaging copies runtime assemblies to `lib/` using the same graph.

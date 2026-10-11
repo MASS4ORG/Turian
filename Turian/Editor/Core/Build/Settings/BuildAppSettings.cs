@@ -67,67 +67,33 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     }
 
     /// <summary>
-    /// List of external packages
+    /// Names of the runtime packages resolved for the game launcher.
     /// </summary>
-    public string[] Packages => [
-        "Microsoft.Extensions.Logging",
-        "Silk.NET",
-        "StbImageSharp",
-        "System.Composition",
-        "System.Text.Json",
-    ];
+    public string[] Packages => [.. RuntimeDependencies.Current.Packages.Select(static package => package.Item1)];
 
     /// <summary>
-    /// Packages the generated game project references.
+    /// Exact NuGet packages and versions resolved for the engine and game launcher by this editor's build.
     /// </summary>
     /// <remarks>
-    /// The engine assemblies come in as bare <c>&lt;Reference HintPath&gt;</c> entries, not project
-    /// references, so NuGet dependencies do not flow transitively: <b>every package
-    /// <c>Turian.Engine.Core</c> references must be listed here</b> or the game fails at
-    /// runtime the first time it reaches the code that needs it.
+    /// Generated projects reference engine DLLs directly, so this build-generated manifest supplies their NuGet
+    /// dependencies without requiring the editor's source checkout or shipping its tooling dependencies.
     /// </remarks>
-    public (string, string)[] PackageReferences => [
-        ("Microsoft.Extensions.Hosting", "10.0.5"),
-        ("Microsoft.Extensions.Logging.Abstractions", "10.0.12"),
-        ("Silk.NET.Input.Extensions", "2.23.0"),
-        ("Silk.NET.Vulkan.Extensions.EXT", "2.23.0"),
-        ("Silk.NET.Input", "2.23.0"),
-        ("Silk.NET.Maths", "2.23.0"),
-        ("Silk.NET.Vulkan", "2.23.0"),
-        ("Silk.NET.Vulkan.Extensions.KHR", "2.23.0"),
-        ("Silk.NET.Windowing.Common", "2.23.0"),
-        ("Silk.NET.Windowing.Glfw", "2.23.0"),
-        ("StbImageSharp", "2.30.16"),
-        ("System.Composition", "10.0.0"),
-        ("System.IO.Hashing", "10.0.12"),
-    ];
+    public (string, string)[] PackageReferences => [.. RuntimeDependencies.Current.Packages];
 
     /// <summary>
-    /// List of internal engine packages
+    /// Runtime project paths relative to the checkout root, excluding file extensions.
     /// </summary>
-    public string[] InternalPackages => [
-        "Gaya/Gaya.Attributes/Gaya.Attributes",
-        "Gaya/Gaya.Packages/Gaya.Packages",
-        "Turian/Engine/Attributes/Turian.Engine.Attributes",
-        "Turian/Engine/Core/Turian.Engine.Core"
-    ];
+    public string[] InternalPackages => [.. RuntimeDependencies.Current.Projects];
 
     /// <summary>
-    /// The engine assemblies user code references, as (folder, assembly name) pairs. The Guinevere attributes
-    /// assembly (Attributes.dll, package MASS4.Attributes) is copied into Turian.Engine.Attributes' output.
+    /// Runtime assemblies as (source folder, assembly name) pairs, derived from the launcher reference graph.
     /// </summary>
-    public (string, string)[] TurianPackages => [
-        ("Gaya/Gaya.Attributes", "Gaya.Attributes"),
-        ("Turian/Engine/Attributes", "Attributes"),
-        ("Gaya/Gaya.Packages", "Gaya.Packages"),
-        ("Turian/Engine/Attributes", "Turian.Engine.Attributes"),
-        ("Turian/Engine/Core", "Turian.Engine.Core")
-    ];
+    public (string, string)[] TurianPackages => [.. RuntimeDependencies.Current.Assemblies];
 
     /// <summary>
     /// The target Framework
     /// </summary>
-    public string TargetFramework => "net10.0";
+    public string TargetFramework => RuntimeDependencies.Current.TargetFramework;
 
     /// <summary>
     /// The target SDK

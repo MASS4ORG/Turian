@@ -18,6 +18,7 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CLI/Turian.Editor.CLI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
@@ -42,6 +43,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="$(SolutionDir)/Turian/Editor/CLI/Platform/obj/project.assets.json"
+                          LogicalName="Turian.Tests.RuntimeLauncherAssets" />
         <Compile Include="$(SolutionDir)/Turian/Editor/Studio/WindowPlatform.cs" Link="Studio/WindowPlatform.cs" />
         <None Update="Fixtures/**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -1,3 +1,5 @@
+using Turian.Editor.Obj;
+
 namespace Turian.Tests;
 
 /// <summary>Checks asymmetric imported geometry and transforms against the camera's world-up convention.</summary>
@@ -20,7 +22,15 @@ public sealed class ModelOrientationTests
                 vn 0 1 0
                 f 1/1/1 2/2/1 3/3/1
                 """);
-            var builder = ObjModelBuilder.Load(path);
+            var directory = Directory.CreateTempSubdirectory("turian-orientation-");
+            ModelBuilder builder;
+            try
+            {
+                var importer = new ObjModelImporter();
+                var artifact = Assert.Single(importer.ImportToCache(importer.CreateAsset(path), path, directory.FullName));
+                builder = GltfModelReader.Load(Path.Combine(directory.FullName, artifact));
+            }
+            finally { directory.Delete(recursive: true); }
             Assert.All(builder.Vertices, vertex =>
             {
                 Assert.True(vertex.Position.Y > 0);
@@ -28,7 +38,7 @@ public sealed class ModelOrientationTests
             });
             var camera = new EditorCamera { Position = new Vector3(0, 0, -5) };
             Assert.All(builder.Vertices, vertex => Assert.True(camera.Project(vertex.Position).Y < 0));
-            Assert.Equal(3, new ModelAssetImporter().Version);
+            Assert.Equal(4, new ObjModelImporter().Version);
         }
         finally { File.Delete(path); }
     }
@@ -46,6 +56,6 @@ public sealed class ModelOrientationTests
         Assert.True(Vector3.Distance(Vector3.Transform(Vector3.UnitY, local),
             Vector3.Transform(Vector3.UnitY, Matrix4x4.CreateScale(scale)
                 * Matrix4x4.CreateFromQuaternion(rotation) * Matrix4x4.CreateTranslation(position))) < 1e-5f);
-        Assert.Equal(2, new FbxModelImporter().Version);
+        Assert.Equal(3, new FbxModelImporter().Version);
     }
 }

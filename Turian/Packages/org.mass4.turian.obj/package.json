@@ -1,0 +1,11 @@
+{
+  "name": "org.mass4.turian.obj",
+  "version": "1.0.0",
+  "displayName": "Wavefront OBJ importer",
+  "description": "Editor-only Wavefront OBJ import into glTF 2.0 geometry.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "editorOnly": true,
+  "categories": ["turian:importers"],
+  "keywords": ["obj", "mesh", "importer"]
+}

@@ -3,6 +3,32 @@ namespace Turian.Tests;
 /// <summary>Tests for the GLTF parser in ModelUtils.</summary>
 public class GltfParserTests
 {
+    /// <summary>Verifies the file API loads GLB geometry and resolves escaped external buffer paths.</summary>
+    [Fact]
+    public void LoadGltfToBuilder_ExternalBuffersAndGlb_PreservePositions()
+    {
+        var directory = Directory.CreateTempSubdirectory("turian-model-api-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "triangle.glb");
+            GltfGeometryFixture.Save(path,
+                [new(Vector3.Zero, Vector3.One), new(Vector3.UnitX, Vector3.One), new(Vector3.UnitY, Vector3.One)],
+                [0, 1, 2]);
+            Assert.Equal(new uint[] { 0, 1, 2 }, ModelUtils.LoadGltfToBuilder(path).Indices);
+            float[] positions = [0, 0, 0, 1, 0, 0, 0, 1, 0];
+            var json = JsonNode.Parse(MakeGltfJson(positions))!;
+            json["buffers"]![0]!["uri"] = "triangle%20data.bin";
+            File.WriteAllBytes(Path.Combine(directory.FullName, "triangle data.bin"), FloatsToBytes(positions));
+            var builder = ModelUtils.ParseGltf(json.ToJsonString(), null, directory.FullName);
+            Assert.Equal(new[] { Vector3.Zero, Vector3.UnitX, Vector3.UnitY },
+                builder.Vertices.Select(vertex => vertex.Position));
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     static string MakeGltfJson(float[] positions, uint[]? indices = null, float[]? normals = null, float[]? uvs = null)
     {
         var posBytes = FloatsToBytes(positions);
@@ -232,9 +258,9 @@ public class GltfParserTests
         Assert.Equal(2, builder.SubMeshes[0].MaterialIndex);
     }
 
-    /// <summary>Verifies that primitives whose POSITION accessor has no bufferView (Draco-compressed) are skipped without throwing.</summary>
+    /// <summary>Verifies that unsupported bufferless geometry produces a clear error.</summary>
     [Fact]
-    public void ParseGltf_PositionAccessorWithoutBufferView_SkipsPrimitive()
+    public void ParseGltf_PositionAccessorWithoutBufferView_RejectsPrimitive()
     {
         var json = @"{
             ""asset"":{""version"":""2.0""},
@@ -242,10 +268,7 @@ public class GltfParserTests
             ""accessors"":[{""componentType"":5126,""count"":3,""type"":""VEC3""}]
         }";
 
-        var builder = ModelUtils.ParseGltf(json, null);
-
-        Assert.Empty(builder.Vertices);
-        Assert.Empty(builder.Indices);
+        Assert.Throws<NotSupportedException>(() => ModelUtils.ParseGltf(json, null));
     }
 
     /// <summary>Verifies that multiple meshes are combined into a single model.</summary>

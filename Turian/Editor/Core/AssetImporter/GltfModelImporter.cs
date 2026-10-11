@@ -14,11 +14,8 @@ public class GltfModelImporter : IAssetImporter
     const string imageFragment = "#image:";
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Version 2 bakes the geometry into <c>.ammesh</c>; version 3 stores embedded images as
-    /// child payloads and binds external ones to their own assets.
-    /// </remarks>
-    public int Version => 3;
+    /// <remarks>Source geometry is retained unchanged and external buffers are addressable child assets.</remarks>
+    public int Version => 4;
 
     /// <inheritdoc/>
     public bool IsValid(string filePath)
@@ -48,18 +45,11 @@ public class GltfModelImporter : IAssetImporter
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Bakes the geometry into an <c>.ammesh</c> blob and copies the buffers and images a
-    /// <c>.gltf</c> file references into the cache.
+    /// Copies source geometry unchanged and retains any companion files needed by loose-file loading.
     /// </remarks>
     public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
     {
-        var blobFileName = $"{IAssetImporter.PrimaryArtifactName}{MeshBlob.FileExtension}";
-        var content = MeshBlobBaker.FromModelBuilder(
-            ModelUtils.LoadGltfToBuilder(sourcePath),
-            Path.GetFileNameWithoutExtension(sourcePath));
-        MeshBlobWriter.Save(Path.Combine(importDirectory, blobFileName), content);
-
-        List<string> artifacts = [blobFileName];
+        List<string> artifacts = [.. IAssetImporter.CopySourceToCache(sourcePath, importDirectory)];
         if (Path.GetExtension(sourcePath).Equals(".gltf", StringComparison.OrdinalIgnoreCase))
         {
             artifacts.AddRange(CopyDependencies(sourcePath, importDirectory));
@@ -85,6 +75,8 @@ public class GltfModelImporter : IAssetImporter
 
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
+
+        foreach (var buffer in ExternalBuffers(parentAssetId, filePath, root)) yield return buffer;
 
         // Map glTF texture index → image index (textures[].source)
         var textureToImage = BuildTextureToImageMap(root);
@@ -119,12 +111,40 @@ public class GltfModelImporter : IAssetImporter
     /// <remarks>An embedded image's payload is its encoded bytes, decoded like any image file.</remarks>
     public byte[]? CreateChildAssetBinaryContent(Guid parentAssetId, Asset child, string filePath)
     {
+        if (child.RelativePath.Contains("#buffer:", StringComparison.Ordinal))
+            return LoadExternalBuffer(filePath, child.RelativePath);
         if (child is not TextureAsset texture) return null;
 
         var fragment = texture.RelativePath.LastIndexOf(imageFragment, StringComparison.Ordinal);
         return fragment >= 0 && int.TryParse(texture.RelativePath.AsSpan(fragment + imageFragment.Length), out var index)
             ? ModelUtils.LoadGltfEmbeddedImage(filePath, index)
             : null;
+    }
+
+    static IEnumerable<Asset> ExternalBuffers(Guid parentId, string sourcePath, JsonElement root)
+    {
+        if (!root.TryGetProperty("buffers", out var buffers)) yield break;
+        for (var i = 0; i < buffers.GetArrayLength(); i++)
+        {
+            if (!buffers[i].TryGetProperty("uri", out var value)) continue;
+            var uri = value.GetString();
+            if (string.IsNullOrEmpty(uri) || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+            yield return new Asset
+            {
+                Id = AssetIdFactory.Derive(parentId, $"buffer:{i}"),
+                RelativePath = $"{Path.GetFileName(sourcePath)}#buffer:{i}",
+            };
+        }
+    }
+
+    static byte[] LoadExternalBuffer(string sourcePath, string childPath)
+    {
+        var index = int.Parse(childPath.AsSpan(childPath.LastIndexOf(':') + 1), CultureInfo.InvariantCulture);
+        var json = Path.GetExtension(sourcePath).Equals(".glb", StringComparison.OrdinalIgnoreCase)
+            ? ModelUtils.LoadJsonFromGlb(sourcePath) : File.ReadAllText(sourcePath);
+        using var doc = JsonDocument.Parse(json);
+        var uri = doc.RootElement.GetProperty("buffers")[index].GetProperty("uri").GetString()!;
+        return File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(sourcePath)!, Uri.UnescapeDataString(uri)));
     }
 
     /// <summary>
@@ -297,14 +317,14 @@ public class GltfModelImporter : IAssetImporter
 
         foreach (var uri in uris)
         {
-            var src = Path.Combine(sourceDir, uri);
+            var src = Path.Combine(sourceDir, Uri.UnescapeDataString(uri));
             if (!File.Exists(src))
             {
                 Log.Logger.LogWarning("glTF referenced file not found, skipping: {Path}", src);
                 continue;
             }
 
-            var dest = Path.Combine(importDirectory, uri);
+            var dest = Path.Combine(importDirectory, Uri.UnescapeDataString(uri));
             var destDir = Path.GetDirectoryName(dest);
             if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
             File.Copy(src, dest, overwrite: true);

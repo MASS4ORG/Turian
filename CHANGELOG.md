@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
+- Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
 - Added (breaking): `.pss` color themes with hot reload #213
 - Changed (breaking): Guinevere fluent effects.
 - Changed (breaking): Gaya settings use class-level attributes as their sole configuration
@@ -15,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Changed: Guinevere controls now use style sheets #218
 - Changed: Panels API delegate tab-strip area.
+- Changed: project solution generator revamped
 
 ## [2.3.1] - 2026-10-07
 

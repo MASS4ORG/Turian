@@ -1,7 +1,7 @@
 namespace Gaya.Host;
 
 /// <summary>The workbench's theme, interface scale and desktop window decorations.</summary>
-[Gaya.EditorSetting("Appearance", Id = PageId, Description = "Theme, interface size and window decorations.")]
+[EditorSetting("Appearance", Id = PageId, Description = "Theme, interface size and window decorations.")]
 public sealed class AppearanceSettings
 {
     int textSize = 12;
@@ -10,11 +10,11 @@ public sealed class AppearanceSettings
     public const string PageId = "gaya.appearance";
 
     /// <summary>The id of the committed color theme; names stored by older versions are still recognized.</summary>
-    [Gaya.EditorSetting("Theme", Description = "Colors used throughout the workbench.")]
+    [EditorSetting("Theme", Description = "Colors used throughout the workbench.")]
     public string Theme { get; set; } = ThemeCatalog.DefaultColorTheme;
 
     /// <summary>The workbench's base text size in points.</summary>
-    [Gaya.EditorSetting("Text Size", Description = "Base interface text size in points.")]
+    [EditorSetting("Text Size", Description = "Base interface text size in points.")]
     [Range(9, 24)]
     public int TextSize
     {
@@ -23,12 +23,12 @@ public sealed class AppearanceSettings
     }
 
     /// <summary>Multiplies the measured sizes of rows, tabs, buttons and toolbars.</summary>
-    [Gaya.EditorSetting("Zoom", Description = "Scales button, row and tab heights.")]
+    [EditorSetting("Zoom", Description = "Scales button, row and tab heights.")]
     [Range(0.6f, 2f)]
     public float Zoom { get; set; } = 1f;
 
     /// <summary>Whether the operating system supplies the title bar and window buttons.</summary>
-    [Gaya.EditorSetting("Native Title Bar",
+    [EditorSetting("Native Title Bar",
         Description = "Use operating system decorations. Disable for application window controls and dragging.")]
     public bool NativeTitlebar { get; set; }
 

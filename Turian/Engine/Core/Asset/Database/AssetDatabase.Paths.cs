@@ -136,6 +136,12 @@ public sealed partial class AssetDatabase
 
     static string? ResolveImportedRelativePathFromCache(Guid assetId, string? importedAssetsRoot)
     {
+        var directory = GetAssetCacheDirectory(assetId, importedAssetsRoot);
+        return directory is null ? null : ReadManifestPrimary(directory) ?? FindPrimaryArtifact(directory);
+    }
+
+    static string? GetAssetCacheDirectory(Guid assetId, string? importedAssetsRoot)
+    {
         if (assetId == Guid.Empty || string.IsNullOrWhiteSpace(importedAssetsRoot) || !Directory.Exists(importedAssetsRoot))
         {
             return null;
@@ -147,6 +153,11 @@ public sealed partial class AssetDatabase
             return null;
         }
 
+        return assetImportDirectory;
+    }
+
+    static string? FindPrimaryArtifact(string assetImportDirectory)
+    {
         // An importer that bakes per-target variants names them primary.<target>.<ext>; prefer the
         // running platform's, and fall back to plain alphabetical order for single-artifact assets.
         var preferredFiles = Directory
@@ -162,6 +173,40 @@ public sealed partial class AssetDatabase
                 .FirstOrDefault();
 
         return selectedFile;
+    }
+
+    static string? ReadManifestPrimary(string directory)
+    {
+        var manifestPath = Path.Combine(directory, "import.json");
+        if (!File.Exists(manifestPath)) return null;
+        try
+        {
+            using var stream = File.OpenRead(manifestPath);
+            using var document = JsonDocument.Parse(stream);
+            return ResolveManifestPrimary(directory, document.RootElement);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    static string? ResolveManifestPrimary(string directory, JsonElement manifest)
+    {
+        if (ManifestPrimaryFileName(manifest) is not { } fileName) return null;
+        var path = Path.Combine(directory, fileName);
+        if (ArtifactTarget(path) is { } target && target != TextureBuildTarget.Current) return null;
+        return File.Exists(path) ? path : null;
+    }
+
+    static string? ManifestPrimaryFileName(JsonElement manifest)
+    {
+        if (manifest.ValueKind != JsonValueKind.Object) return null;
+        if (!manifest.TryGetProperty("PrimaryArtifactFileName", out var property)
+            || property.ValueKind != JsonValueKind.String) return null;
+        var fileName = property.GetString();
+        if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName) return null;
+        return fileName;
     }
 
     static string ResolveImportedRelativePath(

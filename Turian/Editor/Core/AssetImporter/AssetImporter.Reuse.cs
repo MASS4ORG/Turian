@@ -3,8 +3,13 @@ namespace Turian.Editor.Core;
 public sealed partial class AssetImporter
 {
     bool HasCachedIndex(ImportedAssetManifest manifest) =>
-        manifest.IndexedAssetIds is not null && manifest.IndexedAssetIds.All(id =>
+        HasCurrentPrimary(manifest) && manifest.IndexedAssetIds is not null && manifest.IndexedAssetIds.All(id =>
             assetDatabase.TryGetAsset(id, out var record) && record is not null && File.Exists(record.ResolveContentPath()));
+
+    bool HasCurrentPrimary(ImportedAssetManifest manifest) =>
+        assetDatabase.TryGetAsset(manifest.AssetId, out var record) && record is not null
+        && string.Equals(Path.GetFileName(record.ImportedRelativePath), manifest.PrimaryArtifactFileName,
+            StringComparison.Ordinal);
 
     void SaveIndexStamp(Guid assetId)
     {

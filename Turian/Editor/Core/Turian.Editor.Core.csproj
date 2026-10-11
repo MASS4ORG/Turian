@@ -17,6 +17,8 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
+        <ProjectReference Include="../CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
@@ -52,10 +54,9 @@
             <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <!-- Model import (FBX, and any other format Assimp handles) is editor-side only:
-             the runtime consumes baked .ammesh blobs, so shipped games never link Assimp.
+             the runtime consumes glTF 2.0 geometry, so shipped games never link Assimp.
              Pulls in Ultz.Native.Assimp transitively for the native libassimp binaries. -->
         <PackageReference Include="Silk.NET.Assimp" Version="2.23.0"/>
-        <PackageReference Include="JeremyAnsel.Media.WavefrontObj" Version="3.0.82" />
     </ItemGroup>
 
     <ItemGroup>
@@ -68,4 +69,5 @@
         <AssemblyMetadata Include="TurianBuiltinPackages" Value="$([System.IO.Path]::GetFullPath('$(SolutionDir)/Turian/Packages'))"/>
     </ItemGroup>
 
+    <Import Project="Build/Settings/RuntimeDependencies.targets"/>
 </Project>
