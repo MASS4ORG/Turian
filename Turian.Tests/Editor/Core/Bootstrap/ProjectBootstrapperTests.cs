@@ -36,6 +36,26 @@ public sealed class ProjectBootstrapperTests : IDisposable
         Assert.Contains("global using Silk.NET.Input;", globals, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A new project gets a project asset stamped with this engine, registering its settings and an active Client
+    /// build profile.
+    /// </summary>
+    [Fact]
+    public async Task RegistersSettingsAndAClientProfile()
+    {
+        var project = await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "Game"));
+        var settings = new BuildAppSettings { ProjectAbsoluteDir = project! };
+
+        var asset = ProjectAsset.Load(settings.AssetsAbsoluteDir)!;
+
+        Assert.Equal(ProjectSettingsFiles.EngineVersionStamp, asset.EngineVersion);
+        Assert.Equal(4, asset.Settings.Count);
+        Assert.Equal(["PlayerSettings", "InputSettings", "GraphicsSettings", "TagsAndLayersSettings"],
+            ProjectSettingsLoader.FindSources(settings.AssetsAbsoluteDir).Select(static s => s.Kind.Name));
+        Assert.Equal("Client", BuildProfiles.Active(settings)!.Name);
+        Assert.Empty(ProjectValidator.Validate(project));
+    }
+
     /// <summary>A new project installs the default built-in packages, which ship beside the engine.</summary>
     [Fact]
     public async Task InstallsDefaultBuiltins()

@@ -13,38 +13,80 @@ public static class BuildProfiles
 {
     static readonly Guid ProfileTypeId = Guid.Parse(BuildProfile.TypeIdValue);
 
-    /// <summary>The build profiles under the project's <c>Assets</c> folder, in name order.</summary>
+    /// <summary>
+    /// The build profiles the project's <see cref="ProjectAsset"/> registers, in its order; a project not yet given
+    /// one has every profile under its <c>Assets</c> folder, by name.
+    /// </summary>
     /// <param name="settings">The project settings.</param>
     /// <returns>The profiles; none when the project declares none.</returns>
     public static IReadOnlyList<ProjectBuildProfile> Discover(IBuildAppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!Directory.Exists(settings.AssetsAbsoluteDir)) return [];
+        if (ProjectAsset.Load(settings.AssetsAbsoluteDir) is not { } project)
+            return Search(settings.AssetsAbsoluteDir);
 
-        return [.. ProjectSettingsLoader.DataAssetSources(settings.AssetsAbsoluteDir)
+        var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
+        return [.. project.BuildProfiles.Where(static r => !r.IsEmpty)
+            .Select(r => index.PathOf(r.AssetId))
+            .OfType<string>()
+            .Select(path => Read(path, index))
+            .OfType<ProjectBuildProfile>()];
+    }
+
+    /// <summary>The profile the project's <see cref="ProjectAsset"/> marks active.</summary>
+    /// <param name="settings">The project settings.</param>
+    /// <returns>The profile, or <c>null</c> when none is active or it cannot be read.</returns>
+    public static ProjectBuildProfile? Active(IBuildAppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (ProjectAsset.Load(settings.AssetsAbsoluteDir)?.ActiveBuildProfile is not { IsEmpty: false } active)
+            return null;
+
+        var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
+        return index.PathOf(active.AssetId) is { } path ? Read(path, index) : null;
+    }
+
+    /// <summary>
+    /// Every build profile under <paramref name="assetsDirectory"/>, by name: what migrating a project registers.
+    /// </summary>
+    /// <param name="assetsDirectory">The project's <c>Assets</c> folder.</param>
+    /// <returns>The profiles found.</returns>
+    public static IReadOnlyList<ProjectBuildProfile> Search(string assetsDirectory)
+    {
+        var index = new AssetSourceIndex(Path.GetDirectoryName(Path.GetFullPath(assetsDirectory))!);
+        return [.. ProjectSettingsLoader.DataAssetSources(assetsDirectory)
             .Where(static path => AssemblyGraph.PeekTypeId(path) == ProfileTypeId)
-            .Select(static path => (Path: path, Profile: DataAsset.LoadContent(path, database: null) as BuildProfile))
-            .Where(static entry => entry.Profile is not null)
-            .Select(static entry => new ProjectBuildProfile(
-                string.IsNullOrWhiteSpace(entry.Profile!.Name)
-                    ? System.IO.Path.GetFileNameWithoutExtension(entry.Path)
-                    : entry.Profile.Name.Trim(),
-                entry.Path, entry.Profile))
+            .Select(path => Read(path, index))
+            .OfType<ProjectBuildProfile>()
             .OrderBy(static entry => entry.Name, StringComparer.OrdinalIgnoreCase)];
     }
+
+    // Through the index, so a profile can be a variant of another.
+    static ProjectBuildProfile? Read(string path, AssetSourceIndex index) =>
+        index.LoadFile(path) is BuildProfile profile
+            ? new ProjectBuildProfile(
+                string.IsNullOrWhiteSpace(profile.Name)
+                    ? System.IO.Path.GetFileNameWithoutExtension(path)
+                    : profile.Name.Trim(),
+                path, profile)
+            : null;
 
     /// <summary>The profile named <paramref name="name"/>, ignoring case.</summary>
     /// <param name="settings">The project settings.</param>
     /// <param name="name">A profile name.</param>
     /// <returns>The profile.</returns>
-    /// <exception cref="InvalidOperationException">No profile has that name; the message lists the ones that exist.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// No profile has that name; the message lists the ones that exist.
+    /// </exception>
     public static ProjectBuildProfile Find(IBuildAppSettings settings, string name)
     {
         var profiles = Discover(settings);
         return profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
                ?? throw new InvalidOperationException(profiles.Count == 0
                    ? $"The project has no build profile named '{name}'; it declares none."
-                   : $"The project has no build profile named '{name}'. Profiles: {string.Join(", ", profiles.Select(static p => p.Name))}.");
+                   : $"The project has no build profile named '{name}'. "
+                     + $"Profiles: {string.Join(", ", profiles.Select(static p => p.Name))}.");
     }
 
     /// <summary>
@@ -71,7 +113,9 @@ public static class BuildProfiles
         return [.. shipped.Where(b => !excluded.Contains(b.Id))];
     }
 
-    /// <summary>Whether any of <paramref name="bricks"/> provides a game player, which a client build needs to open a window.</summary>
+    /// <summary>
+    /// Whether any of <paramref name="bricks"/> provides a game player, which a client build needs to open a window.
+    /// </summary>
     /// <param name="bricks">The shipped bricks.</param>
     /// <returns>True when a client-only brick, such as the renderer, is among them.</returns>
     public static bool HasPlayer(IEnumerable<ResolvedPackage> bricks) =>

@@ -11,10 +11,18 @@ public sealed record PlayLaunchResult(Process Process, string RuntimePath);
 /// Builds a debug runtime host for the current project and launches it as a child process.
 /// Play mode always uses <see cref="BuildConfiguration.Debug"/>.
 /// </summary>
-public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? userCodeDllPath = null)
+public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? userCodeDllPath = null,
+    ProjectBuildProfile? profile = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
     const string playSourceSubDir = "Play";
+
+    /// <inheritdoc />
+    protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
+
+    // Changes when another profile becomes active or the active one is edited, which the play build depends on.
+    string ProfileKey =>
+        profile is null ? string.Empty : $"{profile.Path}|{File.GetLastWriteTimeUtc(profile.Path).Ticks}";
 
     /// <summary>Builds the playable runtime and starts it; returns the runtime path.</summary>
     public async Task<string> ExecuteAsync()
@@ -56,7 +64,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         Logger.LogInformation("Building play runtime: {Project}", csprojFilePath);
 
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet build`.
-        var buildStartInfo = new ProcessStartInfo("dotnet", $"build \"{csprojFilePath}\" -c Debug --no-restore")
+        var buildStartInfo = new ProcessStartInfo("dotnet", BuildArguments(csprojFilePath))
         {
             CreateNoWindow = true,
             UseShellExecute = false,
@@ -253,21 +261,32 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
             return false;
         }
 
-        if (!string.Equals(stamp.SourceFingerprint, ucManifest.SourceFingerprint, StringComparison.Ordinal))
+        if (StampMismatch(stamp, ucManifest) is { } reason)
         {
-            Logger.LogDebug("Play build cache miss: source fingerprint changed");
-            return false;
-        }
-
-        if (!string.Equals(stamp.SettingsFingerprint, ucManifest.SettingsFingerprint, StringComparison.Ordinal))
-        {
-            Logger.LogDebug("Play build cache miss: settings fingerprint changed");
+            Logger.LogDebug("Play build cache miss: {Reason} changed", reason);
             return false;
         }
 
         Logger.LogDebug("Play build cache hit: play output is still valid at {Path}", outputDllPath);
         return true;
     }
+
+    // The active profile's symbols reach the play project through TurianDefines; %3B escapes MSBuild's separator.
+    string BuildArguments(string csprojFilePath) =>
+        $"build \"{csprojFilePath}\" -c Debug --no-restore"
+        + (profile?.Profile.Symbols is { Count: > 0 } defines
+            ? $" -p:TurianDefines={string.Join("%3B", defines)}"
+            : string.Empty);
+
+    // What the last play build was made from that differs now, or null when nothing does.
+    string? StampMismatch(PlayBuildStamp stamp, UserCodeCompileCacheManifest manifest) =>
+        !string.Equals(stamp.SourceFingerprint, manifest.SourceFingerprint, StringComparison.Ordinal)
+            ? "source fingerprint"
+            : !string.Equals(stamp.SettingsFingerprint, manifest.SettingsFingerprint, StringComparison.Ordinal)
+                ? "settings fingerprint"
+                : !string.Equals(stamp.ProfileKey ?? string.Empty, ProfileKey, StringComparison.Ordinal)
+                    ? "the active build profile"
+                    : null;
 
     void SavePlayBuildStamp(string projectDirectory, string ucDllPath)
     {
@@ -278,6 +297,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         {
             SourceFingerprint = ucManifest.SourceFingerprint,
             SettingsFingerprint = ucManifest.SettingsFingerprint,
+            ProfileKey = ProfileKey,
         };
 
         try
@@ -303,7 +323,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
 
     string GeneratePlayCsProjFile()
     {
-        var project = CsProjectGenerator.GeneratePlayableExecutable(Settings, Logger);
+        var project = CsProjectGenerator.GeneratePlayableExecutable(Settings, Logger, profile?.Profile);
         var playDir = Path.Combine(Settings.CacheAbsoluteDir, playSourceSubDir);
         Directory.CreateDirectory(playDir);
         GeneratedProject.Save(project);
@@ -320,4 +340,7 @@ public sealed class PlayBuildStamp
     public string? SourceFingerprint { get; set; }
     /// <summary>Gets or sets the settings fingerprint from the last successful user code compilation.</summary>
     public string? SettingsFingerprint { get; set; }
+
+    /// <summary>Gets or sets the active build profile the play build followed, empty for none.</summary>
+    public string? ProfileKey { get; set; }
 }

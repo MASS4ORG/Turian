@@ -19,7 +19,7 @@ static class Program
         Log.Logger.Lap("startup", "types registered");
 
         var context = new GamePlayerContext(projectPath, logger, static services => services.BuildServiceProvider(),
-#if DEBUG
+#if DEBUG || DEVELOPMENT_BUILD
             Development: true);
 #else
             Development: false);

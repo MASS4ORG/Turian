@@ -1,13 +1,190 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Writes a project's settings assets. New projects get one per built-in kind under
-/// <c>Assets/Settings</c>, and an older project that still has a <c>project.data</c> is converted to that
-/// layout when it is opened.
+/// Writes a project's settings assets and its <see cref="ProjectAsset"/>, which registers them. New projects get
+/// one per built-in kind under <c>Assets/Settings</c>; an older project is converted when it is opened: a
+/// <c>project.data</c> into settings assets, and a project without a project asset into one.
 /// </summary>
 public static class ProjectSettingsFiles
 {
     const string extension = ".dataasset";
+
+    /// <summary>The engine version a project records: without build metadata such as the commit.</summary>
+    public static string EngineVersionStamp =>
+        new Gaya.Packages.SemanticVersion(ProjectPackages.EngineVersion.Major, ProjectPackages.EngineVersion.Minor,
+            ProjectPackages.EngineVersion.Patch, ProjectPackages.EngineVersion.Prerelease).ToString();
+
+    /// <summary>
+    /// Writes the project asset, registering <paramref name="settings"/> and <paramref name="buildProfiles"/> in
+    /// order, stamped with this engine's version.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="settings">Asset ids of the settings in force, at most one per kind.</param>
+    /// <param name="buildProfiles">Asset ids of the build profiles.</param>
+    /// <param name="activeBuildProfile">The id of the active profile, or <c>null</c> for none.</param>
+    /// <returns>Absolute path of the written asset.</returns>
+    public static string CreateProjectAsset(IAppSettings project, IEnumerable<Guid> settings,
+        IEnumerable<Guid> buildProfiles, Guid? activeBuildProfile = null)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        var asset = new ProjectAsset
+        {
+            EngineVersion = EngineVersionStamp,
+            Settings = [.. settings.Select(static id => new DataAssetReference<ProjectSettingsAsset>(id))],
+            BuildProfiles =
+                [.. buildProfiles.Select(static id => new DataAssetReference<ProjectSettingsCollection>(id))],
+            ActiveBuildProfile = activeBuildProfile is { } active
+                ? new DataAssetReference<ProjectSettingsCollection>(active)
+                : null,
+        };
+        return SaveProjectAsset(project, asset);
+    }
+
+    /// <summary>
+    /// Registers a newly created asset in the project asset: a build profile always, a settings asset when its kind
+    /// has none registered yet. A second settings asset of a kind stays unregistered, for a build profile to use
+    /// as an override. Projects without a project asset are left unchanged.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="asset">The created payload.</param>
+    /// <param name="assetId">The created asset's id.</param>
+    /// <returns>True when the project asset changed.</returns>
+    public static bool RegisterCreated(IAppSettings project, DataAsset asset, Guid assetId)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(asset);
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return false;
+
+        switch (asset)
+        {
+            case BuildProfile:
+                registry.BuildProfiles.Add(new DataAssetReference<ProjectSettingsCollection>(assetId));
+                break;
+            case ProjectSettingsAsset settings when ProjectSettingsLoader.FindSources(project.AssetsAbsoluteDir)
+                .All(s => s.Kind != settings.GetType()):
+                registry.Settings.Add(new DataAssetReference<ProjectSettingsAsset>(assetId));
+                break;
+            default:
+                return false;
+        }
+
+        SaveProjectAsset(project, registry);
+        return true;
+    }
+
+    /// <summary>
+    /// Writes a build profile into <c>Assets/Settings/Build</c>, named after the profile, and registers it in the
+    /// project asset.
+    /// </summary>
+    /// <param name="project">The project.</param>
+    /// <param name="profile">The profile; its <see cref="BuildProfile.Name"/> names the file.</param>
+    /// <param name="active">Whether builds without a named profile follow it from now on.</param>
+    /// <returns>Absolute path of the written asset.</returns>
+    public static string CreateBuildProfile(IAppSettings project, BuildProfile profile, bool active = false)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var directory = Path.Combine(project.AssetsAbsoluteDir, ProjectSettingsLoader.PreferredFolderName, "Build");
+        Directory.CreateDirectory(directory);
+        var name = string.IsNullOrWhiteSpace(profile.Name) ? "BuildProfile" : profile.Name.Trim();
+        var path = UniquePath(directory, name);
+        var meta = new DataAssetAsset
+        {
+            Id = Guid.NewGuid(),
+            RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
+        };
+        profile.Id = meta.Id;
+        Serializer.Save<DataAsset>(path, profile);
+        Serializer.Save($"{path}.meta", meta);
+        RegisterCreated(project, profile, meta.Id);
+
+        if (active && ProjectAsset.Load(project.AssetsAbsoluteDir) is { } registry)
+        {
+            registry.ActiveBuildProfile = new DataAssetReference<ProjectSettingsCollection>(meta.Id);
+            SaveProjectAsset(project, registry);
+        }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Gives a project that has no project asset one, registering what a search of its <c>Assets</c> folder finds:
+    /// the settings asset each kind used so far, and every build profile. Duplicates a kind had are reported and
+    /// stay unregistered.
+    /// </summary>
+    /// <param name="projectDirectory">The project folder.</param>
+    /// <returns>True when the project asset was created.</returns>
+    public static bool MigrateToProjectAsset(string projectDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+        var project = SettingsService.Load(projectDirectory);
+        if (project is null || File.Exists(ProjectAsset.PathIn(project.AssetsAbsoluteDir))) return false;
+
+        var found = ProjectSettingsLoader.Search(project.AssetsAbsoluteDir);
+        LogDuplicates(projectDirectory, found);
+        var profiles = BuildProfiles.Search(project.AssetsAbsoluteDir)
+            .Select(static p => Asset.Load($"{p.Path}.meta")?.Id).OfType<Guid>();
+        var settings = found.DistinctBy(static s => s.Kind).Select(static s => s.AssetId);
+        var path = CreateProjectAsset(project, settings, profiles);
+        Log.Logger.LogInformation("Registered the project's settings and build profiles in {Path}",
+            Path.GetRelativePath(projectDirectory, path));
+        return true;
+    }
+
+    static void LogDuplicates(string projectDirectory, IReadOnlyList<ProjectSettingsSource> found)
+    {
+        foreach (var kind in found.GroupBy(static s => s.Kind).Where(static g => g.Count() > 1))
+            Log.Logger.LogWarning("{Kind}: registered {Used}; {Ignored} left unregistered", kind.Key.Name,
+                Path.GetRelativePath(projectDirectory, kind.First().SourcePath),
+                string.Join(", ", kind.Skip(1).Select(s => Path.GetRelativePath(projectDirectory, s.SourcePath))));
+    }
+
+    /// <summary>
+    /// Stamps the project asset with this engine's version when it records an older one or none: what opening a
+    /// project with a newer engine does once it has been upgraded.
+    /// </summary>
+    /// <param name="projectDirectory">The project folder.</param>
+    /// <returns>The version the project recorded before, or <c>null</c> when nothing changed.</returns>
+    public static string? RecordEngineVersion(string projectDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+        var project = SettingsService.Load(projectDirectory);
+        if (project is null || ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return null;
+
+        var current = ProjectPackages.EngineVersion;
+        if (Gaya.Packages.SemanticVersion.TryParse(registry.EngineVersion, out var recorded) && recorded >= current)
+            return null;
+
+        var previous = registry.EngineVersion ?? string.Empty;
+        registry.EngineVersion = EngineVersionStamp;
+        SaveProjectAsset(project, registry);
+        return previous;
+    }
+
+    // A data asset's payload id is its asset id, so the meta file decides it.
+    static string SaveProjectAsset(IAppSettings project, ProjectAsset asset)
+    {
+        var path = ProjectAsset.PathIn(project.AssetsAbsoluteDir);
+        Directory.CreateDirectory(project.AssetsAbsoluteDir);
+        if (File.Exists($"{path}.meta") && Asset.Load($"{path}.meta") is { } meta)
+        {
+            asset.Id = meta.Id;
+        }
+        else
+        {
+            asset.Id = Guid.NewGuid();
+            Serializer.Save($"{path}.meta", new DataAssetAsset
+            {
+                Id = asset.Id,
+                RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
+            });
+        }
+
+        Serializer.Save<DataAsset>(path, asset);
+        return path;
+    }
 
     /// <summary>
     /// Writes a settings asset into <c>Assets/Settings</c> and puts it in force.
@@ -31,9 +208,11 @@ public static class ProjectSettingsFiles
             Id = Guid.NewGuid(),
             RelativePath = Path.GetRelativePath(project.ProjectAbsoluteDir, path),
         };
+        settings.Id = meta.Id;
 
         Serializer.Save<DataAsset>(path, settings);
         Serializer.Save($"{path}.meta", meta);
+        RegisterCreated(project, settings, meta.Id);
 
         project.Loaded.Use(settings);
         return path;

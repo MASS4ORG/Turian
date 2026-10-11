@@ -113,10 +113,12 @@ public sealed class AssetCreationCatalog
         {
             RelativePath = Path.GetRelativePath(appSettings.ProjectAbsoluteDir, assetPath)
         };
+        payload.Id = meta.Id;
 
         Directory.CreateDirectory(targetDirectory);
         Serializer.SaveAsync(assetPath, payload).GetAwaiter().GetResult();
         Serializer.SaveAsync(assetPath + ".meta", meta).GetAwaiter().GetResult();
+        ProjectSettingsFiles.RegisterCreated(appSettings, payload, meta.Id);
         return true;
     }
 

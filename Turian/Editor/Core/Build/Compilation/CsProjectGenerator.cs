@@ -182,8 +182,12 @@ public static class CsProjectGenerator
     /// <summary>
     /// Generate a debug executable project used by play mode.
     /// </summary>
-    public static ProjectRootElement GeneratePlayableExecutable(IBuildAppSettings settings, ILogger logger) =>
-        GenerateExecutable(settings, logger, ExecutableGenerationMode.Play);
+    /// <param name="settings">The project settings.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="profile">The active build profile, or <c>null</c> for a client.</param>
+    public static ProjectRootElement GeneratePlayableExecutable(IBuildAppSettings settings, ILogger logger,
+        BuildProfile? profile = null) =>
+        GenerateExecutable(settings, logger, ExecutableGenerationMode.Play, profile);
 
     /// <summary>
     /// The Turian checkout root: the nearest ancestor of this assembly that contains a
@@ -309,6 +313,8 @@ public static class CsProjectGenerator
             if (executable)
             {
                 group.AddProperty("AllowUnsafeBlocks", "true");
+                // The launcher reads DEVELOPMENT_BUILD from a build profile's symbols.
+                group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
 
                 var icon = Path.Combine(settings.CacheAbsoluteDir, ProjectIcon.IcoFileName);
                 if (File.Exists(icon)) group.AddProperty("ApplicationIcon", icon);

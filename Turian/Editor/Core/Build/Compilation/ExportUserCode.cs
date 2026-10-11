@@ -14,6 +14,9 @@ public sealed class ExportUserCode(
     static readonly string[] ArtifactExtensionsToDelete =
         [".pdb", ".xml", ".deps.json"];
 
+    /// <inheritdoc />
+    protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
+
     /// <summary>Publishes the project and returns the export output directory.</summary>
     public async Task<string> ExecuteAsync()
     {

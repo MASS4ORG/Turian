@@ -29,8 +29,12 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         if (!ProjectValidator.Report(ProjectValidator.Validate(projectPath), log)) return false;
 
         var directory = SettingsService.ResolveProjectDirectory(projectPath)!;
-        if (ProjectSettingsFiles.MigrateLegacyProject(directory))
+        var migrated = ProjectSettingsFiles.MigrateLegacyProject(directory);
+        if (ProjectSettingsFiles.MigrateToProjectAsset(directory) || migrated)
             ProjectValidator.Report(ProjectValidator.Validate(directory), log);
+        if (ProjectSettingsFiles.RecordEngineVersion(directory) is { } previous)
+            log.LogInformation("Upgraded the project from Turian {Previous} to {Current}",
+                previous.Length == 0 ? "(unrecorded)" : previous, ProjectSettingsFiles.EngineVersionStamp);
 
         var loaded = SettingsService.Load(directory)!;
         ProjectSettingsLoader.LoadFromSources(loaded);

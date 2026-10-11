@@ -53,6 +53,8 @@ public sealed class ProjectBootstrapper
 
             var settings = new AppSettings { Title = title, ProjectAbsoluteDir = Path.GetFullPath(projectDirectory) };
 
+            // Written first, so each settings asset below registers itself in it.
+            ProjectSettingsFiles.CreateProjectAsset(settings, [], []);
             ProjectSettingsFiles.Create(settings, new PlayerSettings
             {
                 ProductName = title,
@@ -64,6 +66,7 @@ public sealed class ProjectBootstrapper
             ProjectSettingsFiles.Create(settings, new InputSettings());
             ProjectSettingsFiles.Create(settings, new GraphicsSettings());
             ProjectSettingsFiles.Create(settings, new TagsAndLayersSettings());
+            ProjectSettingsFiles.CreateBuildProfile(settings, new BuildProfile { Name = "Client" }, active: true);
 
             new Gaya.Packages.ProjectManifest
             {

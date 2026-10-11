@@ -283,7 +283,7 @@ public sealed class BuildManager : IDisposable
                 // Compile user library first; pass the DLL path so PlayUserCode can cache the play build
                 var userCodeDllPath = await CompileIntoInactiveSlot(forceRecompile: false).ConfigureAwait(false);
 
-                var playUserCode = new PlayUserCode(settings, logger, userCodeDllPath);
+                var playUserCode = new PlayUserCode(settings, logger, userCodeDllPath, BuildProfiles.Active(settings));
                 var launchResult = await playUserCode.ExecuteWithProcessAsync().ConfigureAwait(false);
 
                 var proc = launchResult.Process;
@@ -310,11 +310,11 @@ public sealed class BuildManager : IDisposable
     // ── Export ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Exports the project as standalone packaged games: one per build profile it declares, each into
-    /// <c>Output/&lt;profile&gt;</c>, or a client for this machine when it declares none.
+    /// Exports the project as a standalone packaged game, following the active build profile into
+    /// <c>Output/&lt;profile&gt;</c>, or as a client for this machine when none is active.
     /// </summary>
     /// <param name="configuration">
-    /// Override the build configuration of a project without profiles. Defaults to <see cref="BuildConfiguration.Release"/>.
+    /// Override the build configuration without an active profile. Defaults to <see cref="BuildConfiguration.Release"/>.
     /// </param>
     public Task<BuildTaskStatus> ExportAsync(BuildConfiguration configuration = BuildConfiguration.Release) =>
         TaskRunner.EnqueueAsync(new DelegateTask(
@@ -322,15 +322,8 @@ public sealed class BuildManager : IDisposable
             locksUi: true,
             run: async _ =>
             {
-                var profiles = BuildProfiles.Discover(settings);
-                var exporters = profiles.Count == 0
-                    ? [new ExportUserCode(settings, logger, configuration)]
-                    : profiles.Select(profile => new ExportUserCode(settings, logger, configuration, profile)).ToList();
-
-                var outputs = new List<string>();
-                foreach (var exporter in exporters)
-                    outputs.Add(await exporter.ExecuteAsync().ConfigureAwait(false));
-                return $"Exported to: {string.Join(", ", outputs)}";
+                var exporter = new ExportUserCode(settings, logger, configuration, BuildProfiles.Active(settings));
+                return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
 
     // ── Dispose ────────────────────────────────────────────────────────────────

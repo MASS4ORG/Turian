@@ -129,7 +129,8 @@ public static partial class Program
     {
         var profileOption = new Option<string[]>("--profile")
         {
-            Description = "Build profile to export, into Output/<profile>; repeat it to build a client and a server in one run"
+            Description = "Build profile to export, into Output/<profile>; repeat it to build several in one run. "
+                          + "Without it, the project's active profile"
         };
         var cmd = new Command("export", "Build and export as a standalone packaged game")
         {
@@ -154,7 +155,7 @@ public static partial class Program
 
             if (profiles.Count == 0)
             {
-                await new ExportUserCode(settings, Log.Logger, config).ExecuteAsync();
+                await new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings)).ExecuteAsync();
                 return;
             }
 

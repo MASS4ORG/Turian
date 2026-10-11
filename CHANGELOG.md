@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
 - Changed (breaking): Vulkan renderer moved out of core into a brick #62 #35
 - Added: build profiles and platforms; headless dedicated server builds
+- Added: `Assets/Project.dataasset` registers settings and build profiles and records the engine version
 - Added: Asset browser revamp #68
 - Added: Theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
