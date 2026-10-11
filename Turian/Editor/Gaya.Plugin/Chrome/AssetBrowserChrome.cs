@@ -50,11 +50,7 @@ sealed class AssetBrowserChrome(
             height: contentHeight,
             title: "Assets",
             position: menuPosition,
-            titleBarHeight: titleBar,
-            backgroundColor: theme.Panel,
-            borderColor: theme.Border,
-            titleBarColor: theme.Chrome,
-            titleTextColor: theme.Ink);
+            titleBarHeight: titleBar);
     }
 
     /// <summary>

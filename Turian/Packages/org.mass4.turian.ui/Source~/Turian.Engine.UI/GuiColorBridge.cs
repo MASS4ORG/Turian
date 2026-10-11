@@ -45,7 +45,7 @@ public static class GuiColorBridge
         float radius = 0.0f, Corner corners = Corner.All) =>
         gui.DrawRectBorder(screenRect, color.ToGui(), thickness, radius, corners);
 
-    /// <inheritdoc cref="Gui.DrawBackgroundRect"/>
+    /// <inheritdoc cref="Gui.DrawBackgroundRect(GuiColor?, float, Corner)"/>
     public static void DrawBackgroundRect(this Gui gui, Core.Color? color = null,
         float radius = 0.0f, Corner corners = Corner.All) =>
         gui.DrawBackgroundRect(color?.ToGui(), radius, corners);

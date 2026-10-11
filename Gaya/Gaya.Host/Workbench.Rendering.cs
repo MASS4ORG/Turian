@@ -181,11 +181,10 @@ public sealed partial class Workbench
         }
 
         using (gui.AppBar(height: height, windowControls: !frameNativeTitlebar,
-                   nativeTitlebar: frameNativeTitlebar, backgroundColor: t.Chrome,
-                   resizable: true, minimumWindowSize: new Vector2(640, 400)))
+                   nativeTitlebar: frameNativeTitlebar, resizable: true, minimumWindowSize: new Vector2(640, 400)))
         {
             using (gui.Node(-1, height, "menubar").Direction(Axis.Horizontal).Enter())
-                gui.MenuBar(BuildMenus, height, t.Chrome, t.Ink, t.Hover, t.Text(13f), padding: 10f);
+                gui.MenuBar(BuildMenus, height, fontSize: t.Text(13f));
 
             gui.Node().ExpandWidth();
             foreach (var item in ChromeFor(ChromeSlot.MenuBar))

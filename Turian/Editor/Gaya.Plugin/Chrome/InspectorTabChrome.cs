@@ -37,11 +37,7 @@ sealed class InspectorTabChrome(
             height: theme.Scale(theme.RowHeight + 8f),
             title: "Inspector",
             position: menuPosition,
-            titleBarHeight: theme.Scale(24f),
-            backgroundColor: theme.Panel,
-            borderColor: theme.Border,
-            titleBarColor: theme.Chrome,
-            titleTextColor: theme.Ink);
+            titleBarHeight: theme.Scale(24f));
     }
 
     void LockButton(Gui gui, ThemeTokens theme, InspectorPanel inspector)

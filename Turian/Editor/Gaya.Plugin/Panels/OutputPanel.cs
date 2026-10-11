@@ -74,8 +74,7 @@ sealed partial class OutputPanel(
                     Entries(gui);
 
                 gui.Splitter(ref split, Axis.Vertical,
-                    thickness: Theme.Scale(2f), min: 0.25f,
-                    color: Theme.Border, hoverColor: Theme.Hover);
+                    thickness: Theme.Scale(2f), min: 0.25f);
 
                 using (gui.Node().ExpandWidth().ExpandHeight(1f - split).Enter())
                     Detail(gui);
@@ -262,8 +261,8 @@ sealed partial class OutputPanel(
             }
 
             var row = rows[selectedIndex];
-            gui.WrappedLabel(row.Line.Text, size, MeasureFont(gui, size), LevelColor(row.Line.Level),
-                GuiColor.FromArgb(80, Theme.Accent), settings.Monospace ? Mono(size) : null);
+            gui.WrappedLabel(row.Line.Text, size, MeasureFont(gui, size),
+                drawFont: settings.Monospace ? Mono(size) : null);
         }
     }
 

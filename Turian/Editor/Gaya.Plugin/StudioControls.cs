@@ -25,13 +25,6 @@ static class StudioControls
     {
         Height = height,
         FontSize = Theme.Text(Theme.FontSize),
-        Strip = Theme.Chrome,
-        Active = Theme.Panel,
-        Tab = Theme.Background,
-        Hover = Theme.Hover,
-        Ink = Theme.Ink,
-        InkDim = Theme.InkDim,
-        Accent = Theme.Accent,
         IconSize = Theme.Scale(12f),
     };
 

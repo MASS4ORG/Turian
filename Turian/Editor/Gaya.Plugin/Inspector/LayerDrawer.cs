@@ -55,8 +55,6 @@ sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IProper
         var theme = ThemeTokens.Current;
         if (gui.Pass == Pass.Pass2Render && frameSelections.TryGetValue(id, out var selection)) current = selection;
         var next = gui.Dropdown(labels, current, width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
-            backgroundColor: theme.Field, borderColor: theme.Border, textColor: theme.Ink,
-            dropdownColor: theme.Field, hoverColor: theme.Hover, selectedColor: theme.AccentFill,
             placeholder: "—", enabled: enabled, filePath: $"{id}/layer");
         if (gui.Pass == Pass.Pass1Build) frameSelections[id] = next;
         else frameSelections.Remove(id);

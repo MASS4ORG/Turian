@@ -52,11 +52,7 @@ sealed class OutputPanelChrome(
             height: contentHeight,
             title: localization.T("Output"),
             position: menuPosition,
-            titleBarHeight: titleBar,
-            backgroundColor: theme.Panel,
-            borderColor: theme.Border,
-            titleBarColor: theme.Chrome,
-            titleTextColor: theme.Ink);
+            titleBarHeight: titleBar);
     }
 
     /// <summary>

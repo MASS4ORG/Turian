@@ -290,11 +290,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         var names = available.Select(theme => theme.Name).ToArray();
         var current = available.ToList().FindIndex(theme => string.Equals(theme.Id, themes.CommittedColorTheme,
             StringComparison.OrdinalIgnoreCase));
-        var style = gui.ControlStyle;
         // ReSharper disable once ExplicitCallerInfoArgument
         var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
-            backgroundColor: style.Surface, borderColor: style.Border, textColor: style.Text,
-            dropdownColor: style.Popup, filePath: $"{id}/theme");
+            filePath: $"{id}/theme");
         if (gui.Pass == Pass.Pass1Build)
             frameThemeSelection = next >= 0 && next != current ? available[next].Id : null;
         else if (frameThemeSelection is { } selected)

@@ -302,7 +302,7 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     {
         var current = name.HasMixedValue ? string.Empty : name.GetValue() as string ?? string.Empty;
         var edited = gui.TextInput(current, width: 0, height: Theme.Scale(20f), fontSize: Theme.Text(13),
-            backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
+            padding: 4,
             id: "inspector/header/name", placeholder: name.HasMixedValue ? "—" : "");
         if (gui.Pass == Pass.Pass2Render && !string.Equals(edited, current, StringComparison.Ordinal))
             name.SetValue(edited);

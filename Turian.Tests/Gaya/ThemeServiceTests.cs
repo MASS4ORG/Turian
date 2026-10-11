@@ -264,7 +264,7 @@ public sealed class ThemeServiceTests : IDisposable
     {
         using var frame = new GayaChromeTests.Frame();
         frame.Draw();
-        Assert.Equal(frame.Themes.Sheets.Count, frame.Gui.StyleSheets.Count);
+        Assert.All(frame.Themes.Sheets, sheet => Assert.Contains(sheet, frame.Gui.StyleSheets));
         Assert.Equal(frame.Themes.Current.Panel, frame.Gui.StyleSheets.GetTokenColor("surface-panel"));
 
         frame.Themes.PreviewColorTheme("gaya.nord");

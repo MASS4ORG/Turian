@@ -7,17 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Changed (breaking): Guinevere color drawing bridges use direct primitive commands; fluent effects use the `DrawSd…` API.
-- Added: theme bricks from the command line #215
-- Added: Bricks panel moved to Gaya with studio/project scopes #214
 - Added (breaking): `.pss` color themes with hot reload #213
-- Changed: theme API renamed to `ThemeTokens`/`ColorTheme`
-- Changed: Guinevere controls take their colors from the theme sheets #218
+- Changed (breaking): Guinevere fluent effects use the `DrawSd…` API.
+- Added: Theme bricks from the command line #215
+- Added: Bricks panel moved to Gaya with studio/project scopes #214
+- Changed: Guinevere controls now use style sheets #218
 
 ## [2.3.1] - 2026-10-07
 
-- Improved: Studio startup and project switching show the workbench with a centered loading card, active phases, asset counts and elapsed time. Unchanged assets retain their imported files and child indexes across restarts; generated projects preserve timestamps, either assembly slot can supply cached code, and Build & Run copies only changed assets. Recent projects use menu rows and configured titles with a fitted current-project control; native windows use Gaya or project-specific Turian titles and icons, and Scene and Game views share their configured empty sky. Output separates Information and internal Studio messages and offers source files through the OS default application and copy actions, Inspector selection avoids diagnostic spam, and disabled hierarchy branches appear dimmed; dock tabs, compact menus, and initial window placement are corrected in Guinevere. OBJ/FBX imports preserve upward Y to prevent inverted models; caches regenerate on import, and scenes that compensated with negative Y scale should remove that compensation.
-- Fixed: release builds run again — the skip-shaders flag now reaches MSBuild, so the tag ships the committed .spv, and the release runners install glslc anyway.
+- Improved: improved asset caching for startup and "Build & Run".
+- Recent projects use menu rows and configured titles with a fitted current-project control; native windows use Gaya or project-specific Turian titles and icons, and 
+- Added: Scene and Game views share their configured empty sky. 
+- Changed: Output filter for internal Studio messages.
+- Changed: Disabled hierarchy branches appear dimmed.
+- Fixed: release builds run again: the `release` job runners install glslc.
 
 ## [2.3.0] - 2026-10-06
 
@@ -25,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0] - 2026-10-06
 
-- Added: tags and layers
+- Added: tags and layers #91
 
 ## [2.1.0] - 2026-10-04
 
@@ -36,9 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2026-10-03
 
 - Added: collapsable main menu and windowless
-- Added: collapsable main menu and windowless
 - Added: identity, content overlay and runtime save contracts #63 #197
-- Added: add the BRICKS plugin system #79
+- Added: BRICKS plugin system #79
 - Added: dependency injection and DataAsset services #44
 - Changed: struct Transform and allocation-free scene traversal #32 #132 #58
 - Changed: send form generator to Guinevere: Autoformer #194

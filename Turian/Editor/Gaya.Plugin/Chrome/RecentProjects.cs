@@ -54,8 +54,7 @@ sealed class ProjectSwitcherChrome(
                 .Select(path => new ProjectRow(path, TitleFor(path), IconFor(path)))];
         var close = false;
         gui.Popup(ref open, () => close = RenderMenu(gui), width: MenuWidth,
-            height: (frameProjects.Length + 1) * RowHeight + Theme.Scale(22), position: popupPosition,
-            backgroundColor: Theme.Panel, borderColor: Theme.Border);
+            height: (frameProjects.Length + 1) * RowHeight + Theme.Scale(22), position: popupPosition);
         if (close) open = false;
     }
 
