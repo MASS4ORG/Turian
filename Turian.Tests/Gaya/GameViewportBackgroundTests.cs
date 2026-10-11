@@ -27,6 +27,8 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
         var viewer = (SceneViewerService)typeof(GameViewport).GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(viewport)!;
         Assert.Equal(new Vector4(preferences.View.EmptySkyColor, 1f), viewer.ClearColor);
+        Assert.False(viewer.CollectStatistics);
+        Assert.DoesNotContain(Descendants(gui.RootNode!), node => node.Id.Contains("statistics"));
         Assert.Equal("", (string?)typeof(GameViewport).GetField("failure", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(viewport) ?? "");
         var pixels = new byte[viewer.Width * viewer.Height * 4];
@@ -66,4 +68,7 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
             typeof(GameViewport).GetField("failure", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport));
         InspectorFormsRenderingTests.Frame(gui, surface, font, viewport.Render);
     }
+
+    static IEnumerable<LayoutNode> Descendants(LayoutNode node) =>
+        new[] { node }.Concat(node.Children.SelectMany(Descendants));
 }

@@ -16,6 +16,9 @@ public sealed class UiManager : IUiPresenter
     readonly IInputSource? inputSource;
     /// <summary>The locale used to draw UI documents for the current host/session.</summary>
     public LocaleService? Locale { get; set; }
+
+    /// <inheritdoc />
+    public bool IsPlaying { get; set; }
     readonly List<UiDocumentComponent> found = [];
     readonly Dictionary<Guid, CachedRenderer> renderers = [];
     readonly Dictionary<Guid, WorldPanel> worldPanels = [];
@@ -164,9 +167,14 @@ public sealed class UiManager : IUiPresenter
         return quads;
     }
 
-    static bool IsDrawable(UiDocumentComponent panel) =>
-        (panel.OnBuild is not null || !panel.Document.IsEmpty)
-        && panel is { IsActive: true, IsAttached: true, Node.IsActive: true };
+    bool IsDrawable(UiDocumentComponent panel) =>
+        (!panel.PlayModeOnly || IsPlaying) && HasContent(panel) && IsActive(panel);
+
+    static bool HasContent(UiDocumentComponent panel) =>
+        panel.OnBuild is not null || panel.Document is { IsEmpty: false };
+
+    static bool IsActive(UiDocumentComponent panel) =>
+        panel is { IsActive: true, IsAttached: true, Node.IsActive: true };
 
     /// <summary>The panel's code-built UI, or its document's renderer after ticking the document's controller.</summary>
     Action<Gui>? ResolveBuild(UiDocumentComponent panel, float deltaTime)
@@ -376,6 +384,7 @@ public sealed class UiManager : IUiPresenter
 
     static void Collect(Node node, List<UiDocumentComponent> into)
     {
+        if (!node.IsActive) return;
         foreach (var component in node.Components)
             if (component is UiDocumentComponent ui)
                 into.Add(ui);

@@ -46,11 +46,12 @@ public partial class SceneManager
     async Task<Node> LoadNodeFromProviderAsync(IAssetFileProvider provider, string sourceDescription)
     {
         ArgumentNullException.ThrowIfNull(provider);
+        var started = Stopwatch.GetTimestamp();
 
         try
         {
             using var stream = provider.GetAssetStream();
-            return await DeserializeNodeAsync(stream, sourceDescription).ConfigureAwait(false);
+            return RecordLoad(await DeserializeNodeAsync(stream, sourceDescription).ConfigureAwait(false), started);
         }
         catch (Exception ex) when (ex is not FileNotFoundException)
         {
@@ -62,10 +63,11 @@ public partial class SceneManager
 
     async Task<Node> LoadNodeFromFileAsync(string absolutePath)
     {
+        var started = Stopwatch.GetTimestamp();
         try
         {
             using var stream = File.OpenRead(absolutePath);
-            return await DeserializeNodeAsync(stream, absolutePath).ConfigureAwait(false);
+            return RecordLoad(await DeserializeNodeAsync(stream, absolutePath).ConfigureAwait(false), started);
         }
         catch (Exception ex) when (ex is not FileNotFoundException)
         {

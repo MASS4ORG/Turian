@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: Asset browser revamp #68
 - Added: Theme bricks from the command line #215
 - Added: Bricks panel moved to Gaya with studio/project scopes #214
+- Added: scene Frame Statistics HUD #59
+- Added: temporary scenes
 - Changed: Guinevere controls now use style sheets #218
 - Changed: Panels API delegate tab-strip area.
 - Changed: project solution generator revamped

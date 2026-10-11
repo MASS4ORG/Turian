@@ -6,7 +6,7 @@ namespace Gaya.Plugin.Turian;
 /// StudioA's <c>SceneViewerControl</c>: every navigation and gizmo decision still belongs to
 /// <see cref="SceneCameraController"/> and <see cref="TransformGizmo"/> in <c>Editor.Core</c>.
 /// </summary>
-sealed class SceneViewport : IDisposable
+sealed partial class SceneViewport : IDisposable
 {
     /// <summary>Pointer travel, in pixels, under which a press-release still counts as a click.</summary>
     const float clickDragThreshold = 4f;

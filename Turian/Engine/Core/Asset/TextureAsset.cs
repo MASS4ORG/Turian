@@ -97,6 +97,7 @@ public class TextureAsset : Asset
             return null;
         }
 
+        using var timing = database.LoadStatistics.Measure(texture: true);
         try
         {
             using var stream = provider.GetAssetStream();

@@ -10,6 +10,9 @@ public interface IUiPresenter : IDisposable
     /// <summary>Resolves localized text; <c>null</c> shows authored text. Hosts update it as the session changes.</summary>
     LocaleService? Locale { get; set; }
 
+    /// <summary>Whether this viewport renders a running game, allowing panels restricted to Play mode.</summary>
+    bool IsPlaying { get => false; set { } }
+
     /// <summary>
     /// Renders the screen-space interface found under <paramref name="root"/>. A fault in a document or controller is
     /// logged and yields <c>null</c> rather than blanking the frame.

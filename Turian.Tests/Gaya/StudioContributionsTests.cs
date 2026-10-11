@@ -79,6 +79,39 @@ public class StudioContributionsTests
         Assert.All(studioShortcuts, binding => Assert.Contains(binding.CommandId, ids));
     }
 
+    /// <summary>Ctrl+N opens a temporary scene through the File menu command and is disabled during play.</summary>
+    [Fact]
+    public void NewSceneCommandCreatesATemporaryTab()
+    {
+        var contributions = Configure();
+        var command = Assert.Single(contributions.Commands, item => item.Id == "gaya.turian.newScene");
+        Assert.Contains(contributions.Menus, item => item.CommandId == command.Id && item.MenuId == MenuIds.File);
+        var binding = Assert.Single(contributions.Shortcuts, item => item.CommandId == command.Id);
+        Assert.Equal(new KeyStroke(KeyboardKey.N, KeyModifiers.Ctrl), binding.Stroke);
+
+        var database = new AssetDatabase();
+        using var workspace = new AssetWorkspace(new AssetManager(), new SettingsService());
+        var host = Substitute.For<IPlaySceneHost>();
+        host.CurrentSceneRoot.Returns(new Node());
+        using var provider = new ServiceCollection()
+            .AddSingleton(workspace)
+            .AddSingleton(sp => new PlayModeService(host, database, sp, NullLogger.Instance))
+            .BuildServiceProvider();
+        Assert.True(command.CanExecute!(provider));
+        command.Execute(provider);
+        Assert.IsType<TemporaryScene>(workspace.Active!.Asset);
+        var play = provider.GetRequiredService<PlayModeService>();
+        try
+        {
+            Assert.True(play.Start());
+            Assert.False(command.CanExecute(provider));
+        }
+        finally
+        {
+            play.Stop();
+        }
+    }
+
     /// <summary>Configuring twice yields the same contributions, so a reloaded plugin registers identically.</summary>
     [Fact]
     public void ConfigureIsRepeatable()

@@ -23,6 +23,10 @@ public class UiDocumentComponent : Component
     /// <summary>Where the UI is drawn. Defaults to a full-screen overlay.</summary>
     public UiRenderMode Mode { get; set; } = UiRenderMode.ScreenSpaceOverlay;
 
+    /// <summary>Whether this panel is excluded from editor previews and the Scene viewer.</summary>
+    [JsonIgnore, Hide]
+    public virtual bool PlayModeOnly => false;
+
     /// <summary>
     /// Draw order among screen-space panels: lower values are composited first (further back).
     /// </summary>
@@ -41,7 +45,7 @@ public class UiDocumentComponent : Component
     /// Builds the UI each frame. Invoked once per layout pass and once per render pass, so it must
     /// be idempotent (the standard immediate-mode contract). Not serialized — set it in code.
     /// </summary>
-    [JsonIgnore]
+    [JsonIgnore, Hide]
     public Action<Gui>? OnBuild { get; set; }
 
     /// <summary>

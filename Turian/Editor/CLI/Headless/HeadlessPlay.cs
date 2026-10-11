@@ -18,6 +18,7 @@ static class HeadlessPlay
     /// <param name="bounds">World bounds, used when the scene has no camera to render through.</param>
     /// <param name="locale">Locale to force for the session, or <c>null</c> to use the project's default.</param>
     /// <param name="logger">The logger progress is reported through.</param>
+    /// <param name="statisticsPath">Optional JSON report that enables offscreen rendering.</param>
     /// <returns><c>true</c> when the session started, ticked and stopped without throwing.</returns>
     public static bool Run(
         HeadlessProject project,
@@ -27,12 +28,14 @@ static class HeadlessPlay
         ScreenshotOptions options,
         Bounds bounds,
         string? locale,
-        ILogger logger)
+        ILogger logger,
+        string? statisticsPath = null)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(frames);
 
         var host = new HeadlessPlayHost(root, null);
         var editorServices = BuildEditorServices(project);
@@ -47,50 +50,10 @@ static class HeadlessPlay
         PlayRenderer? renderer = null;
         try
         {
-            if (outputPath is not null && project.Vulkan is not null)
-            {
-                renderer = new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Locale, options.Width,
-                    options.Height);
-            }
-
-            var stats = new RenderStats();
-            for (var frame = 0; frame < frames; frame++)
-            {
-                var started = Stopwatch.GetTimestamp();
-                play.Tick();
-
-                if (renderer is not null && play.PlayRoot is { } playRoot)
-                {
-                    // Render through the session's own camera so this exercises the same path the
-                    // Game panel takes, falling back to the offscreen camera when the scene has none.
-                    var camera = play.ActiveCamera;
-                    var renderStarted = Stopwatch.GetTimestamp();
-                    var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                    renderer.Render(playRoot, 1.0 / 60.0, camera);
-                    stats.Add(Stopwatch.GetElapsedTime(renderStarted).TotalMilliseconds,
-                        GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
-                }
-
-                if (frame == 0 || frame == frames - 1)
-                {
-                    logger.LogInformation(
-                        "Play frame {Frame}/{Frames}: {Elapsed:F1} ms",
-                        frame + 1,
-                        frames,
-                        Stopwatch.GetElapsedTime(started).TotalMilliseconds);
-                }
-            }
-
+            renderer = CreateRenderer(project, play, options, outputPath is not null || statisticsPath is not null);
+            var stats = RunFrames(play, renderer, frames, logger);
             stats.Report(logger);
-
-            if (renderer is not null && outputPath is not null)
-            {
-                var pixels = new byte[renderer.Width * renderer.Height * 4];
-                renderer.CopyPixels(pixels);
-                PngWriter.Save(outputPath, pixels, renderer.Width, renderer.Height);
-                logger.LogInformation("Wrote {Width}×{Height} play frame: {OutputPath}", renderer.Width, renderer.Height, outputPath);
-            }
-
+            SaveOutputs(project, root, renderer, stats, outputPath, statisticsPath, logger);
             return true;
         }
         finally
@@ -99,6 +62,49 @@ static class HeadlessPlay
             play.Stop();
             _ = bounds;
         }
+    }
+
+    static PlayRenderer? CreateRenderer(HeadlessProject project, PlayModeService play, ScreenshotOptions options,
+        bool requested)
+    {
+        if (!requested || project.Vulkan is null) return null;
+        return new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Locale,
+            options.Width, options.Height);
+    }
+
+    static RenderStats RunFrames(PlayModeService play, PlayRenderer? renderer, int frames, ILogger logger)
+    {
+        var stats = new RenderStats();
+        for (var frame = 0; frame < frames; frame++)
+        {
+            var started = Stopwatch.GetTimestamp();
+            var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+            play.Tick();
+            if (renderer is not null && play.PlayRoot is { } playRoot)
+                renderer.Render(playRoot, 1.0 / 60.0, play.ActiveCamera);
+            var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            stats.AddFrame(elapsed, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore, renderer?.FrameStats);
+            if (frame == 0 || frame == frames - 1)
+                logger.LogInformation("Play frame {Frame}/{Frames}: {Elapsed:F1} ms", frame + 1, frames, elapsed);
+        }
+        return stats;
+    }
+
+    static void SaveOutputs(HeadlessProject project, Node root, PlayRenderer? renderer, RenderStats stats,
+        string? outputPath, string? statisticsPath, ILogger logger)
+    {
+        if (statisticsPath is not null)
+        {
+            stats.WriteJson(statisticsPath, project.SceneManager.GetLoadMilliseconds(root),
+                project.Database.LoadStatistics.Snapshot);
+            logger.LogInformation("Wrote frame statistics: {StatisticsPath}", statisticsPath);
+        }
+        if (renderer is null || outputPath is null) return;
+        var pixels = new byte[renderer.Width * renderer.Height * 4];
+        renderer.CopyPixels(pixels);
+        PngWriter.Save(outputPath, pixels, renderer.Width, renderer.Height);
+        logger.LogInformation("Wrote {Width}×{Height} play frame: {OutputPath}",
+            renderer.Width, renderer.Height, outputPath);
     }
 
     /// <summary>
@@ -116,7 +122,9 @@ static class HeadlessPlay
             Vulkan vulkan, AssetDatabase assets, IInputSource inputSource, LocaleService? locale, uint width, uint height)
         {
             uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
+            if (uiPresenter is not null) uiPresenter.IsPlaying = true;
             viewer = new SceneViewerService(vulkan, assets, width, height);
+            viewer.CollectStatistics = true;
             if (uiPresenter is null) return;
 
             viewer.OverlaySource = (w, h, dt) =>
@@ -129,10 +137,14 @@ static class HeadlessPlay
 
         public uint Height => viewer.Height;
 
+        /// <summary>The viewer's completed render-call measurements.</summary>
+        public RenderFrameStats FrameStats => viewer.FrameStats;
+
         public void Render(Node playRoot, double deltaTime, ICamera? activeCamera)
         {
             overlayRoot = playRoot;
             viewer.Render(playRoot, deltaTime, activeCamera);
+            RenderStatisticsTargets.Record(RenderStatisticsTargets.Find(playRoot), viewer.FrameStats);
         }
 
         public void CopyPixels(byte[] destination) => viewer.CopyPixels(destination);
