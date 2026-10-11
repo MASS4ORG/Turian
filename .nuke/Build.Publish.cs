@@ -72,7 +72,7 @@ sealed partial class Build
                  "Turian.CSharp.CodeGenerator.dll").CopyToDirectory(libraryDirectory, ExistsPolicy.FileOverwrite);
 
                 _ = DotNetMSBuild(settings => settings
-                    .SetTargetPath(RootDirectory / "Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj")
+                    .SetTargetPath(RootDirectory / "Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.Desktop.csproj")
                     .SetTargets("CopyTurianRuntimeAssemblies")
                     .SetConfiguration(Config)
                     .SetRestore(true)

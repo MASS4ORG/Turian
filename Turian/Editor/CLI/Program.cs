@@ -127,15 +127,22 @@ public static partial class Program
         Argument<FileSystemInfo> projectArg,
         Option<BuildConfiguration> configOption)
     {
+        var profileOption = new Option<string[]>("--profile")
+        {
+            Description = "Build profile to export, into Output/<profile>; repeat it to build several in one run. "
+                          + "Without it, the project's active profile"
+        };
         var cmd = new Command("export", "Build and export as a standalone packaged game")
         {
-            projectArg, configOption
+            projectArg, configOption, profileOption
         };
 
         cmd.SetAction(async (result, _) =>
         {
             var settings = CreateSettings(result.GetValue(projectArg)!);
             var config = result.GetValue(configOption);
+            var profiles = (result.GetValue(profileOption) ?? [])
+                .Select(name => BuildProfiles.Find(settings, name)).ToList();
             Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
 
             await PrepareProjectAsync(settings, reimport: true, loadUserCode: false).ConfigureAwait(false);
@@ -146,8 +153,17 @@ public static partial class Program
             var compiler = new CompileUserCode(settings, Log.Logger, slotDir);
             await compiler.ExecuteAsync();
 
-            var exporter = new ExportUserCode(settings, Log.Logger, config);
-            await exporter.ExecuteAsync();
+            if (profiles.Count == 0)
+            {
+                await new ExportUserCode(settings, Log.Logger, config, BuildProfiles.Active(settings)).ExecuteAsync();
+                return;
+            }
+
+            foreach (var profile in profiles)
+            {
+                Log.Logger.LogInformation("Build profile {Profile}: {Target}", profile.Name, profile.Profile.Target);
+                await new ExportUserCode(settings, Log.Logger, config, profile).ExecuteAsync();
+            }
         });
 
         return cmd;

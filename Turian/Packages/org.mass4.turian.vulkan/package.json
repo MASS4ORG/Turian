@@ -1,0 +1,27 @@
+{
+  "name": "org.mass4.turian.vulkan",
+  "version": "1.0.0",
+  "displayName": "Vulkan Renderer",
+  "description": "The Vulkan render backend, window and window input that client builds play in.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "clientOnly": true,
+  "nuget": {
+    "Silk.NET.Input": "2.23.0",
+    "Silk.NET.Input.Extensions": "2.23.0",
+    "Silk.NET.Vulkan": "2.23.0",
+    "Silk.NET.Vulkan.Extensions.EXT": "2.23.0",
+    "Silk.NET.Vulkan.Extensions.KHR": "2.23.0",
+    "Silk.NET.Windowing.Common": "2.23.0",
+    "Silk.NET.Windowing.Glfw": "2.23.0",
+    "StbImageSharp": "2.30.16"
+  },
+  "categories": [
+    "turian:graphics"
+  ],
+  "keywords": [
+    "vulkan",
+    "renderer",
+    "window"
+  ]
+}

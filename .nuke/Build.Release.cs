@@ -25,10 +25,10 @@ sealed partial class Build
     readonly string GithubToken;
 
     /// <summary>
-    /// Commits the changelog once before creating the release tag.
+    /// Commits the changelog and the project versions once before creating the release tag.
     /// </summary>
     public Target CreateReleaseCommit => td => td
-        .DependsOn(UpdateChangelog)
+        .DependsOn(UpdateChangelog, UpdateProjectVersions)
         .OnlyWhenDynamic(() => HasNewCommits)
         .Executes(() =>
         {

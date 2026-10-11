@@ -7,17 +7,17 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class PreviewQuadMesh
 {
-    static readonly ConcurrentDictionary<nint, Model> Cache = new();
+    static readonly ConcurrentDictionary<nint, VulkanModel> Cache = new();
 
     /// <summary>Gets the shared unit quad model for <paramref name="vulkan"/>, building it if needed.</summary>
-    public static Model Get(Vulkan vulkan)
+    public static VulkanModel Get(Vulkan vulkan)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
 
         return Cache.GetOrAdd(vulkan.Device.VkDevice.Handle, static (_, v) => Build(v), vulkan);
     }
 
-    static Model Build(Vulkan vulkan)
+    static VulkanModel Build(Vulkan vulkan)
     {
         const float h = 0.5f;
         var normal = new Vector3(0f, 0f, -1f);
@@ -34,6 +34,6 @@ public static class PreviewQuadMesh
             Indices = [0, 1, 2, 0, 2, 3],
         };
 
-        return new Model(vulkan, builder);
+        return new VulkanModel(vulkan, builder);
     }
 }

@@ -117,7 +117,8 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
 
         var project = Path.Combine(root, "project");
         Directory.CreateDirectory(Path.Combine(project, "Assets"));
-        var brick = BrickService.Add(project, "user.mateo.inventory", $"file:{packed.Path}").Packages.Single();
+        var brick = BrickService.Add(project, "user.mateo.inventory", $"file:{packed.Path}").Packages
+            .Single(static p => p.Id == "user.mateo.inventory");
 
         Assert.False(BrickAssemblies.IsPrecast(brick));
         Assert.Contains(CsProjectGenerator.DiscoverAssemblies(new BuildAppSettings { Title = "Game", ProjectAbsoluteDir = project }).Definitions,

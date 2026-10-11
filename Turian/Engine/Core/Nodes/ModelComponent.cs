@@ -45,7 +45,7 @@ public class ModelComponent : Component, IDisposable
 
     /// <summary>The render device bound to this scene, or <c>null</c> in a non-rendering host.</summary>
     [InjectService(Optional = true), JsonIgnore]
-    public Vulkan? RenderDevice { get; private set; }
+    public IRenderDevice? RenderDevice { get; private set; }
 
     /// <summary>The asset database the model and mesh are read from, or <c>null</c> outside a project.</summary>
     [InjectService(Optional = true), JsonIgnore]
@@ -57,8 +57,8 @@ public class ModelComponent : Component, IDisposable
     /// <remarks>
     /// Caches the resolved model, keyed by the asset id it was built from, so pointing
     /// <see cref="Model"/> or <see cref="Mesh"/> somewhere else — the inspector assigning one, a
-    /// script swapping one mid-session — takes effect on the next frame. Returns null while Vulkan is
-    /// still initializing, and retries then. A load that reaches the asset and fails is attempted once
+    /// script swapping one mid-session — takes effect on the next frame. Returns null in a host without a
+    /// render device. A load that reaches the asset and fails is attempted once
     /// per id: the component returns null from then on, until the reference changes again.
     /// </remarks>
     [JsonIgnore, Hide]
@@ -80,9 +80,9 @@ public class ModelComponent : Component, IDisposable
             if (model is not null) return model;
             if (loadFailed || modelAssetId == Guid.Empty) return null;
 
-            if (RenderDevice is not { } vulkan || Assets is not { } assets) return null;
+            if (RenderDevice is not { } device || Assets is not { } assets) return null;
 
-            model = new ModelAsset { Id = modelAssetId }.GetContent(vulkan, assets);
+            model = device.GetModel(modelAssetId, assets);
             loadFailed = model is null;
             return model;
         }

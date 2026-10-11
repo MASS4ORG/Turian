@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <Version>2.3.1</Version>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -22,24 +23,12 @@
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
-    <!-- Feeds the About panel's BuildInfo: the version string comes from git, CONTRIBUTORS.md is
+    <!-- Feeds the About panel's BuildInfo: the version string is this project's Version, CONTRIBUTORS.md is
          parsed at compile time by BuildInfoGenerator. -->
     <ItemGroup>
         <AdditionalFiles Include="$(SolutionDir)/docs/CONTRIBUTORS.md"/>
-        <CompilerVisibleProperty Include="GitDescribe"/>
+        <CompilerVisibleProperty Include="Version"/>
     </ItemGroup>
-
-    <Target Name="ResolveGitDescribe" BeforeTargets="CoreCompile;GenerateMSBuildEditorConfigFileShouldRun">
-        <Exec Command="git describe --tags --always --dirty" ConsoleToMSBuild="true" IgnoreExitCode="true"
-              StandardOutputImportance="low" WorkingDirectory="$(SolutionDir)">
-            <Output TaskParameter="ConsoleOutput" ItemName="_GitDescribeLines"/>
-            <Output TaskParameter="ExitCode" PropertyName="_GitDescribeExitCode"/>
-        </Exec>
-        <PropertyGroup>
-            <GitDescribe Condition="'$(_GitDescribeExitCode)' == '0' And '@(_GitDescribeLines)' != ''">@(_GitDescribeLines)</GitDescribe>
-            <GitDescribe Condition="'$(GitDescribe)' == ''">dev</GitDescribe>
-        </PropertyGroup>
-    </Target>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>

@@ -18,7 +18,12 @@ public static partial class Program
         var directory = SettingsService.ResolveProjectDirectory(info.FullName)
                         ?? throw new DirectoryNotFoundException($"{info.FullName} is not a project folder.");
         ProjectSettingsFiles.MigrateLegacyProject(directory);
-        ProjectValidator.Report(ProjectValidator.Validate(directory), Log.Logger);
+        ProjectSettingsFiles.MigrateToProjectAsset(directory);
+        if (!ProjectValidator.Report(ProjectValidator.Validate(directory), Log.Logger))
+            throw new InvalidOperationException($"{directory} cannot be opened by this version of Turian.");
+        if (ProjectSettingsFiles.RecordEngineVersion(directory) is { } previous)
+            Log.Logger.LogInformation("Upgraded the project from Turian {Previous} to {Current}",
+                previous.Length == 0 ? "(unrecorded)" : previous, ProjectSettingsFiles.EngineVersionStamp);
 
         var s = ReadSettings(directory);
         ProjectSettingsLoader.LoadFromSources(s);

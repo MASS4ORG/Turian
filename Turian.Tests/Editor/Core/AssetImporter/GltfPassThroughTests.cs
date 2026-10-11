@@ -51,6 +51,23 @@ public sealed class GltfPassThroughTests(VulkanFixture fixture) : IClassFixture<
         finally { ModelAsset.InvalidateCacheEntry(project.Asset.Id); }
     }
 
+    /// <summary>A host without a render device reads geometry and external buffers from loose files and OAP.</summary>
+    [Fact]
+    public void GeometryReadsWithoutARenderDevice()
+    {
+        using var project = new Project(true);
+        var database = project.Import();
+        Assert.Equal(new uint[] { 0, 1, 2 }, project.Asset.ReadGeometry(database)!.Value.Indices);
+        new OapArchiveBuilder(NullLogger.Instance).Build(project.Root, project.Export);
+        var runtime = new AssetDatabase();
+        runtime.LoadRuntimeCatalog(project.Export);
+        var geometry = project.Asset.ReadGeometry(runtime)!.Value;
+        Assert.Equal(new Bounds(Vector3.Zero, Vector3.One), Assert.Single(geometry.GetBoundedSubMeshes()).Bounds);
+        runtime.Assets.Remove(AssetIdFactory.Derive(project.Asset.Id, "buffer:0"));
+        Assert.Throws<InvalidDataException>(() => project.Asset.ReadGeometry(runtime));
+        Assert.Null(new ModelAsset { Id = Guid.NewGuid() }.ReadGeometry(runtime));
+    }
+
     /// <summary>Native authoring files require an explicit interchange export.</summary>
     [Theory]
     [InlineData("file.max")]

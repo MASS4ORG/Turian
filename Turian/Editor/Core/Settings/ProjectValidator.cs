@@ -16,9 +16,10 @@ public enum ProjectIssueSeverity
 public sealed record ProjectIssue(ProjectIssueSeverity Severity, string Message);
 
 /// <summary>
-/// Checks a folder before it is opened as a project. With no project file to vouch for it, a folder is a
-/// project when it holds an <c>Assets</c> folder; the rest is about its settings assets, which nothing
-/// lists and so can be duplicated or left unreadable without anyone noticing.
+/// Checks a folder before it is opened as a project. A folder is a project when it holds an <c>Assets</c> folder;
+/// the rest is about its <see cref="ProjectAsset"/>: the engine version that saved it, and the settings it
+/// registers, which can be missing, registered twice or unreadable. A project not yet given a project asset is
+/// checked for the duplicates a search of its settings would meet.
 /// </summary>
 public static class ProjectValidator
 {
@@ -33,8 +34,9 @@ public static class ProjectValidator
         if (SettingsService.ResolveProjectDirectory(path) is not { } directory)
             return [new(ProjectIssueSeverity.Error, $"{path} is not a project: it has no Assets folder.")];
 
-        var issues = new List<ProjectIssue>();
-        var sources = ProjectSettingsLoader.FindSources(Path.Combine(directory, SettingsService.AssetsFolderName));
+        var assets = Path.Combine(directory, SettingsService.AssetsFolderName);
+        var issues = ProjectAssetIssues(directory, assets);
+        var sources = ProjectSettingsLoader.FindSources(assets);
 
         foreach (var kind in sources.GroupBy(static source => source.Kind).Where(static group => group.Count() > 1))
         {
@@ -59,7 +61,43 @@ public static class ProjectValidator
             }
         }
 
+        return [.. issues.OrderByDescending(static issue => issue.Severity)];
+    }
+
+    // The project asset's own issues: the engine version that saved it, and registered settings without a file.
+    static List<ProjectIssue> ProjectAssetIssues(string directory, string assets)
+    {
+        if (ProjectAsset.Load(assets) is not { } project) return [];
+
+        var index = new AssetSourceIndex(directory);
+        List<ProjectIssue> issues = [.. project.Settings.Where(r => !r.IsEmpty && index.PathOf(r.AssetId) is null)
+            .Select(r => new ProjectIssue(ProjectIssueSeverity.Warning,
+                $"{ProjectAsset.FileName} registers settings {r.AssetId}, which has no file."))];
+        if (EngineVersionIssue(project) is { } versionIssue) issues.Insert(0, versionIssue);
         return issues;
+    }
+
+    /// <summary>
+    /// How the engine that saved the project compares with this one: a newer major version cannot be opened, a
+    /// newer minor one may hold data this engine drops, and an older one is upgraded when opened.
+    /// </summary>
+    static ProjectIssue? EngineVersionIssue(ProjectAsset project)
+    {
+        if (!Gaya.Packages.SemanticVersion.TryParse(project.EngineVersion, out var saved)) return null;
+
+        var current = ProjectPackages.EngineVersion;
+        if (saved.Major > current.Major)
+            return new(ProjectIssueSeverity.Error,
+                $"The project was saved by Turian {saved}; this is Turian {current}. "
+                + $"Open it with Turian {saved.Major} or newer.");
+        if (saved > current)
+            return new(ProjectIssueSeverity.Warning,
+                $"The project was saved by the newer Turian {saved}; "
+                + $"what this Turian {current} does not know is lost when saving.");
+        return saved < current
+            ? new(ProjectIssueSeverity.Warning,
+                $"The project was saved by Turian {saved}; opening it upgrades it to Turian {current}.")
+            : null;
     }
 
     /// <summary>Logs each issue at its severity.</summary>

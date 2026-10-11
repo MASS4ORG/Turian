@@ -1,16 +1,21 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Publishes the user project as a standalone executable and packages assets.
+/// Publishes the user project as a standalone executable and packages assets. A build profile chooses the target,
+/// platform, configuration and script symbols, and exports into <c>Output/&lt;profile&gt;</c>.
 /// </summary>
 public sealed class ExportUserCode(
     IAppSettings settings,
     ILogger logger,
-    BuildConfiguration configuration = BuildConfiguration.Release)
+    BuildConfiguration configuration = BuildConfiguration.Release,
+    ProjectBuildProfile? profile = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
     static readonly string[] ArtifactExtensionsToDelete =
         [".pdb", ".xml", ".deps.json"];
+
+    /// <inheritdoc />
+    protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
 
     /// <summary>Publishes the project and returns the export output directory.</summary>
     public async Task<string> ExecuteAsync()
@@ -18,22 +23,31 @@ public sealed class ExportUserCode(
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
 
-        var exportOutputPath = ExportOutputDir(Settings.ProjectAbsoluteDir, "Output");
+        var exportOutputPath = ExportOutputDir(Settings.ProjectAbsoluteDir,
+            profile is null ? "Output" : Path.Combine("Output", profile.Name.SanitizeFilename(' ')));
         Logger.LogInformation("Export output path: {Path}", exportOutputPath);
         EnsureDirectory(exportOutputPath + Path.DirectorySeparatorChar);
+        if (RunsHeadlessByAccident(Settings.ProjectAbsoluteDir, profile?.Profile))
+            Logger.LogWarning(
+                "No render brick is installed, so this client build runs headless. Add {Brick} to play it in a window",
+                ProjectPackages.RenderBrick);
 
-        var configName = configuration == BuildConfiguration.Release ? "Release" : "Debug";
+        var configName = (profile?.Profile.Configuration ?? configuration) == BuildConfiguration.Release
+            ? "Release"
+            : "Debug";
 
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
-        var startInfo = new ProcessStartInfo(
-            "dotnet",
-            $"publish \"{csprojFilePath}\" -o \"{exportOutputPath}\" -c {configName} --no-restore")
+        var startInfo = new ProcessStartInfo("dotnet")
         {
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        var context = new BuildPlatformContext(csprojFilePath, exportOutputPath, configName, profile?.Profile);
+        foreach (var argument in BuildPlatforms.For(profile?.Profile).PublishArguments(context))
+            startInfo.ArgumentList.Add(argument);
+        WithoutLocatorEnvironment(startInfo);
 
         using var process = new Process();
         process.StartInfo = startInfo;
@@ -48,7 +62,7 @@ public sealed class ExportUserCode(
         }
 
         CleanArtifacts(exportOutputPath);
-        RenameExecutable(Settings, csprojFilePath, exportOutputPath);
+        RenameExecutable(Settings, csprojFilePath, exportOutputPath, profile?.Profile.RuntimeIdentifier);
         CopyProjectSettings(exportOutputPath);
         WriteTypeManifest(exportOutputPath);
         PackageAssets(exportOutputPath);
@@ -59,12 +73,29 @@ public sealed class ExportUserCode(
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
+
     string GenerateCsProjFile()
     {
-        var project = CsProjectGenerator.GenerateExecutable(Settings, Logger);
+        var project = CsProjectGenerator.GenerateExecutable(Settings, Logger, ExecutableGenerationMode.Export,
+            profile?.Profile);
         GeneratedProject.Save(project);
         return project.FullPath;
     }
+
+    /// <summary>The executable's extension for the target runtime: <c>.exe</c> on Windows, none elsewhere.</summary>
+    /// <param name="runtimeIdentifier">The build's runtime identifier; empty for this machine's.</param>
+    internal static string ExecutableExtension(string? runtimeIdentifier) =>
+        (string.IsNullOrWhiteSpace(runtimeIdentifier)
+            ? OperatingSystem.IsWindows()
+            : runtimeIdentifier.Trim().StartsWith("win", StringComparison.OrdinalIgnoreCase))
+            ? ".exe"
+            : string.Empty;
+
+    /// <summary>A client build without a render brick opens no window: the game runs the headless player.</summary>
+    internal static bool RunsHeadlessByAccident(string projectRoot, BuildProfile? profile) =>
+        (profile?.Target ?? BuildTarget.Client) == BuildTarget.Client
+        && !BuildProfiles.HasPlayer(BuildProfiles.ShippingBricks(ProjectPackages.ResolveOrEmpty(projectRoot),
+            BuildTarget.Client));
 
     /// <summary>
     /// Removes PDB, XML documentation, and other dotnet build artifacts from the
@@ -93,9 +124,10 @@ public sealed class ExportUserCode(
         Logger.LogInformation("Removed {Count} build artifact(s) from export output", removed);
     }
 
-    static void RenameExecutable(BuildAppSettings settings, string csprojFilePath, string exportOutputPath)
+    static void RenameExecutable(BuildAppSettings settings, string csprojFilePath, string exportOutputPath,
+        string? runtimeIdentifier)
     {
-        var extension = OperatingSystem.IsWindows() ? ".exe" : string.Empty;
+        var extension = ExecutableExtension(runtimeIdentifier);
         var exportedExePath = Path.Combine(
             exportOutputPath,
             $"{Path.GetFileNameWithoutExtension(csprojFilePath)}{extension}");
@@ -133,7 +165,7 @@ public sealed class ExportUserCode(
     {
         var manifest = UserCodeTypeManifestGenerator.Generate(
             Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly,
-            CsProjectGenerator.DiscoverAssemblies(Settings));
+            CsProjectGenerator.DiscoverAssemblies(Settings), profile?.Profile.Target ?? BuildTarget.Client);
         UserCodeTypeManifest.Save(manifest, Path.Combine(exportOutputPath, $"{Settings.TitleToPathFriendly}.dll"));
     }
 

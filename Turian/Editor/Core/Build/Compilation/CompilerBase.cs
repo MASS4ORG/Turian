@@ -14,6 +14,9 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     /// <summary>Logger instance.</summary>
     protected readonly ILogger Logger = logger;
 
+    /// <summary>Settings replacing the project's of the same kind in this build, such as a build profile's.</summary>
+    protected virtual ProjectSettingsCollection? SettingsOverrides => null;
+
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -36,9 +39,10 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(generateCsProjFiles);
 
+        if (SettingsOverrides is { } overrides) ProjectSettingsLoader.LoadFromSources(Settings, overrides);
         ValidateStartupSceneSettings();
         ProjectSettingsLoader.WriteIndex(Settings.AssetsAbsoluteDir,
-            Path.Combine(Settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName));
+            Path.Combine(Settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName), SettingsOverrides);
         ProjectIcon.Write(Settings, Settings.CacheAbsoluteDir);
 
         if (!MSBuildLocator.IsRegistered)

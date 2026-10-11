@@ -58,7 +58,7 @@ public sealed class GizmoRenderingTests(VulkanFixture fixture) : IClassFixture<V
     public void AllTools_RenderOnCubeAndShowRotationFeedback()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var cube = ModelUtils.CreateCubeModel6(fixture.Vulkan);
+        using var cube = CubeModels.CreateCubeModel6(fixture.Vulkan);
         var node = new Node { Name = "Cube" };
         node.AddComponent(new ModelComponent { ModelOverride = cube });
         var scene = new Node();

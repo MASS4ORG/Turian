@@ -34,6 +34,7 @@ public static class EditorServices
         services.AddSingleton<WorkspaceSessionStore>();
         services.AddSingleton<SceneDocumentBinder>();
         services.AddSingleton(sp => new Vulkan(sp.GetRequiredService<ILogger>()));
+        services.AddSingleton<IRenderDevice>(sp => sp.GetRequiredService<Vulkan>());
         services.AddSingleton<PlayModeService>();
 
         return services.AddInternalServices(

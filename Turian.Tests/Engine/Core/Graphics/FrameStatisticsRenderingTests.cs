@@ -51,7 +51,7 @@ public sealed class FrameStatisticsRenderingTests(VulkanFixture fixture) : IClas
     public void NonIndexedTrianglesAreCounted()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var model = new Model(fixture.Vulkan, new ModelBuilder
+        using var model = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new(-1, -1, 0), Vector3.One), new(new(1, -1, 0), Vector3.One),
                 new(new(0, 1, 0), Vector3.One)],

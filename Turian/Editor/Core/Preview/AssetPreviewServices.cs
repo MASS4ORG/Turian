@@ -10,7 +10,8 @@ public static class AssetPreviewServices
     sealed class Services(Vulkan vulkan, AssetDatabase assets) : IServiceProvider
     {
         /// <inheritdoc />
-        public object? GetService(Type serviceType) => serviceType == typeof(Vulkan) ? vulkan
+        public object? GetService(Type serviceType) =>
+            serviceType == typeof(Vulkan) || serviceType == typeof(IRenderDevice) ? vulkan
             : serviceType == typeof(AssetDatabase) ? assets : null;
     }
 }

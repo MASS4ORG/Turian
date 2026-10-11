@@ -96,7 +96,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var quad = PreviewQuadMesh.Get(fixture.Vulkan);
-        var slotted = new Model(fixture.Vulkan, new ModelBuilder
+        var slotted = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new(-0.5f, -0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
                     new(new(0.5f, -0.5f, 0f), Vector3.One) { Normal = -Vector3.UnitZ },
@@ -187,7 +187,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
     public void FrustumCullingTracksSubmeshesAndModelReplacement()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var model = new Model(fixture.Vulkan, new ModelBuilder
+        using var model = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new(-1f, -1f, 0f), Vector3.One), new(new(1f, -1f, 0f), Vector3.One),
                 new(new(0f, 1f, 0f), Vector3.One), new(new(999f, -1f, 0f), Vector3.One),
@@ -234,7 +234,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
     public void WorldBoundsCacheTracksSelectedRange()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var model = new Model(fixture.Vulkan, new ModelBuilder
+        using var model = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new Vector3(-1f), Vector3.One), new(new Vector3(2f), Vector3.One)],
             Indices = [0, 1],
@@ -267,7 +267,7 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
     public void MeshReferenceCullsOnlyItsSelectedRange()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var model = new Model(fixture.Vulkan, new ModelBuilder
+        using var model = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new(-1f, -1f, 0f), Vector3.One), new(new(1f, -1f, 0f), Vector3.One),
                 new(new(0f, 1f, 0f), Vector3.One), new(new(999f, -1f, 0f), Vector3.One),

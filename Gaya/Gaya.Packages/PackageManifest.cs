@@ -100,6 +100,12 @@ public sealed class PackageManifest
     public bool CompileTimeOnly { get; set; }
 
     /// <summary>
+    /// Only client builds ship the package, as a renderer or window does: server builds leave it out, together with
+    /// every package depending on it.
+    /// </summary>
+    public bool ClientOnly { get; set; }
+
+    /// <summary>
     /// What the package is, for discovery: <c>prefix:name</c> strings, where the prefix is a package id this one
     /// is or depends on, or a host's reserved prefix. Hosts act on the ones they know and keep the rest.
     /// </summary>
@@ -187,8 +193,7 @@ public sealed class PackageManifest
         foreach (var id in Dependencies.Keys.Concat(DevDependencies.Keys).Where(static id => !PackageId.IsValid(id)))
             throw new PackageException($"{path}: dependency '{id}' is not a valid package id.");
 
-        if (EditorOnly && CompileTimeOnly)
-            throw new PackageException($"{path}: a package cannot be both editor-only and compile-time-only.");
+        ValidateShipping(path);
 
         foreach (var category in Categories)
         {
@@ -200,6 +205,17 @@ public sealed class PackageManifest
                 throw new PackageException(
                     $"{path}: category '{category}' uses prefix '{prefix}', which is neither this package, one of its dependencies nor a reserved prefix.");
         }
+    }
+
+    // Where a package ships: editor-only, compile-time-only and client-only exclude each other where they conflict.
+    void ValidateShipping(string path)
+    {
+        if (EditorOnly && CompileTimeOnly)
+            throw new PackageException($"{path}: a package cannot be both editor-only and compile-time-only.");
+
+        if (ClientOnly && (EditorOnly || CompileTimeOnly))
+            throw new PackageException(
+                $"{path}: a client-only package ships in games, so it cannot be editor- or compile-time-only.");
     }
 }
 

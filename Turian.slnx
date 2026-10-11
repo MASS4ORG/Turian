@@ -16,7 +16,7 @@
     <Project Path="Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj" />
   </Folder>
   <Folder Name="/Editor/Platform/">
-    <Project Path="Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj" />
+    <Project Path="Turian/Editor/CLI/Platform/Turian.Editor.Build.Platform.Desktop.csproj" />
   </Folder>
   <Folder Name="/Gaya/">
     <Project Path="Gaya/Gaya.Packages/Gaya.Packages.csproj" />
@@ -34,6 +34,7 @@
   <Folder Name="/Packages/">
     <Project Path="Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj" />
+    <Project Path="Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj" />
   </Folder>
   <Project Path=".nuke/Build.csproj" />
   <Project Path="Turian/Benchmarks/Turian.Benchmarks.csproj" />

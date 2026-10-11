@@ -91,7 +91,7 @@ public sealed class HzbCullingTests(VulkanFixture fixture) : IClassFixture<Vulka
     public void NonIndexedModelsUseIndirectCommands()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
-        using var triangle = new Model(fixture.Vulkan, new ModelBuilder
+        using var triangle = new VulkanModel(fixture.Vulkan, new ModelBuilder
         {
             Vertices = [new(new(-1, -1, 0), Vector3.One), new(new(1, -1, 0), Vector3.One),
                 new(new(0, 1, 0), Vector3.One)],

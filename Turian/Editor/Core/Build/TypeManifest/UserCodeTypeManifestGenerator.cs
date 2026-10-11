@@ -10,6 +10,15 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class UserCodeTypeManifestGenerator
 {
+    // The bricks whose types a game registers: those it ships, and the editor-only ones a Play build may meet.
+    static List<Gaya.Packages.ResolvedPackage> ManifestBricks(string? projectRoot, BuildTarget target)
+    {
+        var resolved = ProjectPackages.ResolveOrEmpty(projectRoot);
+        var shipped = BuildProfiles.ShippingBricks(resolved, target).Select(static b => b.Id).ToHashSet(StringComparer.Ordinal);
+        return [.. resolved.Where(brick => !brick.Manifest.CompileTimeOnly
+                                           && (brick.Manifest.EditorOnly || shipped.Contains(brick.Id)))];
+    }
+
     /// <summary>
     /// Generates a manifest by scanning <paramref name="assetsDirectory"/> recursively for
     /// <c>.cs</c> files that declare a class.
@@ -18,13 +27,13 @@ public static class UserCodeTypeManifestGenerator
     /// <param name="logger">Receives parse and meta-file problems.</param>
     /// <param name="assemblyName">The user assembly the types compile into, recorded so a runtime can load it.</param>
     /// <param name="graph">The project's assemblies; each type records the one other than the default it is in.</param>
+    /// <param name="target">What the game runs as; a server lists none of the bricks it leaves out.</param>
     public static UserCodeTypeManifest Generate(string assetsDirectory, ILogger logger, string? assemblyName = null,
-        AssemblyGraph? graph = null)
+        AssemblyGraph? graph = null, BuildTarget target = BuildTarget.Client)
     {
         ArgumentNullException.ThrowIfNull(logger);
 
-        var bricks = ProjectPackages.ResolveOrEmpty(Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)))
-            .Where(static brick => !brick.Manifest.CompileTimeOnly).ToList();
+        var bricks = ManifestBricks(Path.GetDirectoryName(Path.GetFullPath(assetsDirectory)), target);
         var manifest = new UserCodeTypeManifest
         {
             AssemblyName = assemblyName,

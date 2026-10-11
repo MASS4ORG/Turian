@@ -1,17 +1,11 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Represents a 3D model for rendering using Vulkan graphics API.
+/// A renderable model: the submesh layout and bounds every host can read, with the GPU buffers owned by the
+/// render backend that created it.
 /// </summary>
-public class Model : IDisposable
+public abstract class Model : IDisposable
 {
-    readonly Vulkan vulkan;
-    Buffer vertexBuffer = null!;
-    readonly uint vertexCount;
-    readonly bool hasIndexBuffer;
-    Buffer indexBuffer = null!;
-    readonly uint indexCount;
-
     /// <summary>
     /// The submeshes that make up this model. Each submesh covers a contiguous
     /// range of the shared index buffer and may carry its own material.
@@ -22,141 +16,21 @@ public class Model : IDisposable
     /// <summary>Gets the model-space bounds enclosing all submeshes.</summary>
     public Bounds Bounds { get; }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="Model"/> class.
-    /// </summary>
-    /// <param name="vulkan">The Vulkan context.</param>
-    /// <param name="builder">A model builder for creating the model.</param>
-    public Model(Vulkan vulkan, ModelBuilder builder)
+    /// <summary>Takes the submesh layout and bounds of <paramref name="builder"/>.</summary>
+    /// <param name="builder">The geometry the backend uploads.</param>
+    protected Model(ModelBuilder builder)
     {
-        this.vulkan = vulkan;
-        vertexCount = (uint)builder.Vertices.Length;
-        CreateVertexBuffers(builder.Vertices);
-        indexCount = (uint)builder.Indices.Length;
-        if (indexCount > 0)
-        {
-            hasIndexBuffer = true;
-            CreateIndexBuffers(builder.Indices);
-        }
-
         SubMeshes = builder.GetBoundedSubMeshes();
         Bounds = SubMeshes.Aggregate(Bounds.Empty, static (bounds, sub) => bounds.Encapsulate(sub.Bounds));
     }
 
-    void CreateVertexBuffers(Vertex[] vertices)
-    {
-        var instanceSize = (ulong)Vertex.SizeOf();
-        var bufferSize = instanceSize * (ulong)vertices.Length;
-
-        using Buffer stagingBuffer =
-            new(
-                vulkan,
-                instanceSize,
-                vertexCount,
-                BufferUsageFlags.TransferSrcBit,
-                MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit
-            );
-        _ = stagingBuffer.Map();
-        stagingBuffer.WriteToBuffer(vertices);
-
-        vertexBuffer = new(
-            vulkan,
-            instanceSize,
-            vertexCount,
-            BufferUsageFlags.VertexBufferBit | BufferUsageFlags.TransferDstBit,
-            MemoryPropertyFlags.DeviceLocalBit
-        );
-
-        vulkan.Device.CopyBuffer(stagingBuffer.VkBuffer, vertexBuffer.VkBuffer, bufferSize);
-    }
-
-    void CreateIndexBuffers(uint[] indices)
-    {
-        var instanceSize = (ulong)Unsafe.SizeOf<uint>();
-        var bufferSize = instanceSize * (ulong)indices.Length;
-
-        using Buffer stagingBuffer =
-            new(
-                vulkan,
-                instanceSize,
-                indexCount,
-                BufferUsageFlags.TransferSrcBit,
-                MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit
-            );
-        _ = stagingBuffer.Map();
-        stagingBuffer.WriteToBuffer(indices);
-
-        indexBuffer = new(
-            vulkan,
-            instanceSize,
-            indexCount,
-            BufferUsageFlags.IndexBufferBit | BufferUsageFlags.TransferDstBit,
-            MemoryPropertyFlags.DeviceLocalBit
-        );
-
-        vulkan.Device.CopyBuffer(stagingBuffer.VkBuffer, indexBuffer.VkBuffer, bufferSize);
-    }
-
-    /// <summary>
-    /// Binds the model's vertex and index buffers to a Vulkan command buffer for rendering.
-    /// </summary>
-    /// <param name="commandBuffer">The Vulkan command buffer.</param>
-    public unsafe void Bind(CommandBuffer commandBuffer)
-    {
-        var vertexBufferHandle = vertexBuffer.VkBuffer;
-        ulong offset = 0;
-        vulkan.Vk.CmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBufferHandle, &offset);
-
-        if (hasIndexBuffer)
-        {
-            vulkan.Vk.CmdBindIndexBuffer(commandBuffer, indexBuffer.VkBuffer, 0, IndexType.Uint32);
-        }
-    }
-
-    /// <summary>
-    /// Draws all submeshes of the model. Equivalent to calling
-    /// <see cref="DrawSubMesh"/> for each entry in <see cref="SubMeshes"/>.
-    /// </summary>
-    /// <param name="commandBuffer">The Vulkan command buffer.</param>
-    public void Draw(CommandBuffer commandBuffer)
-    {
-        for (var i = 0; i < SubMeshes.Count; i++)
-            DrawSubMesh(commandBuffer, i);
-    }
-
-    /// <summary>
-    /// Draws the submesh at <paramref name="index"/>. Bind the model and the submesh's
-    /// material descriptor sets first.
-    /// </summary>
-    public void DrawSubMesh(CommandBuffer commandBuffer, int index)
-    {
-        var sub = SubMeshes[index];
-        if (hasIndexBuffer)
-        {
-            vulkan.Vk.CmdDrawIndexed(commandBuffer, sub.IndexCount, 1, sub.IndexStart, 0, 0);
-        }
-        else
-        {
-            vulkan.Vk.CmdDraw(commandBuffer, sub.IndexCount, 1, sub.IndexStart, 0);
-        }
-    }
-
-    /// <summary>Draws one GPU-written command; indexed and non-indexed models use a common 20-byte stride.</summary>
-    public void DrawSubMeshIndirect(CommandBuffer commandBuffer, Silk.NET.Vulkan.Buffer commands, ulong offset)
-    {
-        if (hasIndexBuffer)
-            vulkan.Vk.CmdDrawIndexedIndirect(commandBuffer, commands, offset, 1, 20);
-        else
-            vulkan.Vk.CmdDrawIndirect(commandBuffer, commands, offset, 1, 20);
-    }
-
-    /// <summary>
-    /// Releases the resources held by the model.
-    /// </summary>
+    /// <summary>Releases the backend resources held by the model.</summary>
     public void Dispose()
     {
-        vertexBuffer.Dispose();
-        if (hasIndexBuffer) indexBuffer.Dispose();
+        Dispose(true);
         GC.SuppressFinalize(this);
     }
+
+    /// <summary>Releases the backend resources; <paramref name="disposing"/> is false from a finalizer.</summary>
+    protected abstract void Dispose(bool disposing);
 }

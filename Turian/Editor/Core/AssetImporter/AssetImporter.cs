@@ -274,7 +274,8 @@ public sealed partial class AssetImporter : IDisposable
         var files = Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories)
             .Concat(string.Equals(folderPath, assetsRootPath, StringComparison.Ordinal)
                 ? packageRoots.Where(p => Directory.Exists(p.Root))
-                    .SelectMany(p => Directory.GetFiles(p.Root, "*", SearchOption.AllDirectories))
+                    .SelectMany(p => Directory.GetFiles(p.Root, "*", SearchOption.AllDirectories)
+                        .Where(file => !AssetDatabase.IsInTildeFolder(file, p.Root)))
                 : [])
             .ToArray();
         var batch = new List<(Asset Asset, string SourcePath)>();

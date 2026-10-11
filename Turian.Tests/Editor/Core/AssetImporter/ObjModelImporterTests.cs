@@ -109,7 +109,7 @@ public sealed class ObjModelImporterTests : IDisposable
         Assert.Equal(OapAssetType.Mesh, (OapAssetType)entry.AssetType);
         Assert.Equal(blob.Indices, GltfModelReader.Read(reader.ReadAsset(entry, verify: true)).Indices);
 
-        var brick = Assert.Single(ProjectPackages.Resolve(project).Packages);
+        var brick = Assert.Single(ProjectPackages.Resolve(project).Packages, static p => p.Id == "org.mass4.turian.obj");
         Assert.True(brick.Manifest.EditorOnly);
         Assert.Empty(BrickAssemblies.RuntimeAssemblies(brick));
         Assert.DoesNotContain(BrickAssemblies.EditorAssemblies(brick),

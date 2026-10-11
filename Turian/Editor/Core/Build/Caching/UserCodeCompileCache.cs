@@ -5,7 +5,8 @@ namespace Turian.Editor.Core;
 ///
 /// <para>
 /// The manifest represents the exact editor-side inputs that affect the generated user assembly:
-/// source files under <c>Assets/</c>, project settings, package references, engine assembly, and build configuration.
+/// source files under <c>Assets/</c>, project settings, the active build profile's script symbols, package references,
+/// engine assembly, and build configuration.
 /// If all tracked inputs match and the output assembly still exists, recompilation can be skipped.
 /// </para>
 /// </summary>
@@ -31,11 +32,7 @@ public sealed class UserCodeCompileCache(ILogger logger)
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyOutputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(csprojFilePath);
 
-        var sourceFiles = EnumerateSourceFiles(settings.AssetsAbsoluteDir)
-            .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
-                .SelectMany(static package => EnumerateSourceFiles(package.RootPath)));
-
-        var sourceEntries = sourceFiles
+        var sourceEntries = ProjectSourceFiles(settings)
             .Select(path => CreateSourceEntry(settings.ProjectAbsoluteDir, path))
             .OrderBy(static entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -261,6 +258,13 @@ public sealed class UserCodeCompileCache(ILogger logger)
             manifestFileName);
     }
 
+    // A brick's ~ folders, such as Source~ with its build output, are never compiled with the project.
+    static IEnumerable<string> ProjectSourceFiles(IBuildAppSettings settings) =>
+        EnumerateSourceFiles(settings.AssetsAbsoluteDir)
+            .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
+                .SelectMany(static package => EnumerateSourceFiles(package.RootPath)
+                    .Where(path => !AssetDatabase.IsInTildeFolder(path, package.RootPath))));
+
     static IEnumerable<string> EnumerateSourceFiles(string assetsAbsoluteDir)
     {
         if (string.IsNullOrWhiteSpace(assetsAbsoluteDir) || !Directory.Exists(assetsAbsoluteDir))
@@ -336,6 +340,10 @@ public sealed class UserCodeCompileCache(ILogger logger)
         {
             builder.Append(package.Item1).Append('|').Append(package.Item2).AppendLine();
         }
+
+        // Switching or editing the active build profile changes what the scripts compile with.
+        foreach (var symbol in BuildProfiles.ActiveSymbols(settings))
+            builder.Append("define|").AppendLine(symbol);
 
         return ComputeStringHash(builder.ToString());
     }

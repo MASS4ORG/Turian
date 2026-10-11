@@ -96,7 +96,10 @@ public static class BrickService
         }
         var removed = ProjectBricks.Remove(projectRoot, id);
         ProjectPackages.Invalidate(projectRoot);
-        return removed;
+        if (!ProjectPackages.DefaultDependencies.ContainsKey(id)) return removed;
+
+        ProjectPackages.OptOutOfDefault(projectRoot, id);
+        return true;
     }
 
     /// <summary>
@@ -109,7 +112,7 @@ public static class BrickService
     public static void Disable(string projectRoot, string id)
     {
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        if (!before.Dependencies.ContainsKey(id))
+        if (!before.Dependencies.ContainsKey(id) && !ProjectPackages.DefaultDependencies.ContainsKey(id))
         {
             var needers = List(projectRoot).Where(p => p.Manifest.Dependencies.ContainsKey(id)).Select(p => p.Id).ToArray();
             throw new PackageException(needers.Length > 0
@@ -118,7 +121,8 @@ public static class BrickService
         }
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        _ = manifest.Dependencies.Remove(id);
+        if (ProjectPackages.DefaultDependencies.ContainsKey(id)) manifest.Dependencies[id] = null;
+        else _ = manifest.Dependencies.Remove(id);
         manifest.Save(projectRoot);
         ProjectPackages.Invalidate(projectRoot);
         try

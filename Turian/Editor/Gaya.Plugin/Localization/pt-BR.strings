@@ -25,6 +25,7 @@
     { "key": "Reimport Assets", "source": "Reimport Assets", "translation": "Reimportar recursos" },
     { "key": "Step Frame", "source": "Step Frame", "translation": "Avançar quadro" },
     { "key": "Export", "source": "Export", "translation": "Exportar" },
+    { "key": "Build Profiles…", "source": "Build Profiles…", "translation": "Perfis de build…" },
     { "key": "Exit", "source": "Exit", "translation": "Sair" },
     { "key": "Help", "source": "Help", "translation": "Ajuda" },
     { "key": "About Turian Studio", "source": "About Turian Studio", "translation": "Sobre o Turian Studio" },
