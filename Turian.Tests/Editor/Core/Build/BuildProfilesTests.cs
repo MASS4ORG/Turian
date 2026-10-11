@@ -112,10 +112,23 @@ public sealed class BuildProfilesTests : IDisposable
             or "Silk.NET.Vulkan" or "SkiaSharp");
         Assert.Contains(serverProject.Targets, static t => t.Name == "VerifyServerDependencies");
         Assert.Contains(serverProject.Properties, static p => p is { Name: "RuntimeIdentifier", Value: "linux-arm64" });
+        Assert.Contains(serverProject.Properties, static p => p is { Name: "OutputType", Value: "Exe" });
+        Assert.Contains(clientProject.Properties, static p => p is { Name: "OutputType", Value: "WinExe" });
         Assert.Contains(Items(clientProject), static i => i.Include == "Turian.Engine.Vulkan");
         Assert.Contains(Items(clientProject), static i => i.Include == "Silk.NET.Vulkan");
         Assert.DoesNotContain(clientProject.Targets, static t => t.Name == "VerifyServerDependencies");
         Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(serverProject.FullPath)!, "Program.cs")));
+    }
+
+    /// <summary>The executable is named for the target runtime, so a Windows game exported elsewhere still ends in .exe.</summary>
+    [Fact]
+    public void ExecutablesAreNamedForTheTargetRuntime()
+    {
+        Assert.Equal(".exe", ExportUserCode.ExecutableExtension("win-arm64"));
+        Assert.Equal(".exe", ExportUserCode.ExecutableExtension(" WIN-x64 "));
+        Assert.Equal("", ExportUserCode.ExecutableExtension("linux-arm64"));
+        Assert.Equal("", ExportUserCode.ExecutableExtension("osx-arm64"));
+        Assert.Equal(OperatingSystem.IsWindows() ? ".exe" : "", ExportUserCode.ExecutableExtension(null));
     }
 
     /// <summary>Script projects take the profile's symbols and keep brick packages from flowing into a game.</summary>

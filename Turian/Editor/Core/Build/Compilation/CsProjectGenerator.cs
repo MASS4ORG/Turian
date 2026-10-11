@@ -166,7 +166,8 @@ public static class CsProjectGenerator
         var projectRoot = ProjectRootElement.Create(csprojFilePath);
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot
-            .AddProjectInfo(settings, isExecutable, mode, profile?.RuntimeIdentifier)
+            .AddProjectInfo(settings, isExecutable, mode, profile?.RuntimeIdentifier,
+                console: profile?.Target == BuildTarget.Server)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
             .AddBrickReferences(settings, shipping: true, target: profile?.Target ?? BuildTarget.Client)
@@ -302,10 +303,12 @@ public static class CsProjectGenerator
         private ProjectRootElement AddProjectInfo(IBuildAppSettings settings,
             bool executable,
             ExecutableGenerationMode mode = ExecutableGenerationMode.Export,
-            string? runtimeIdentifier = null)
+            string? runtimeIdentifier = null,
+            bool console = false)
         {
             var group = projectRoot.AddPropertyGroup();
-            group.AddProperty("OutputType", executable ? "WinExe" : "Library");
+            // A server keeps its console on Windows, for its log and Ctrl+C; a game's window has none.
+            group.AddProperty("OutputType", !executable ? "Library" : console ? "Exe" : "WinExe");
             group.AddProperty("TargetFramework", settings.TargetFramework);
             group.AddProperty("ImplicitUsings", "disable");
             group.AddProperty("Nullable", "enable");

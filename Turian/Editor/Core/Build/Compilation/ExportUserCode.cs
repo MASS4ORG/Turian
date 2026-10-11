@@ -62,7 +62,7 @@ public sealed class ExportUserCode(
         }
 
         CleanArtifacts(exportOutputPath);
-        RenameExecutable(Settings, csprojFilePath, exportOutputPath);
+        RenameExecutable(Settings, csprojFilePath, exportOutputPath, profile?.Profile.RuntimeIdentifier);
         CopyProjectSettings(exportOutputPath);
         WriteTypeManifest(exportOutputPath);
         PackageAssets(exportOutputPath);
@@ -82,7 +82,15 @@ public sealed class ExportUserCode(
         return project.FullPath;
     }
 
-    /// <summary>A client build without a render brick opens no window; it runs the headless player instead.</summary>
+    /// <summary>The executable's extension for the target runtime: <c>.exe</c> on Windows, none elsewhere.</summary>
+    /// <param name="runtimeIdentifier">The build's runtime identifier; empty for this machine's.</param>
+    internal static string ExecutableExtension(string? runtimeIdentifier) =>
+        (string.IsNullOrWhiteSpace(runtimeIdentifier)
+            ? OperatingSystem.IsWindows()
+            : runtimeIdentifier.Trim().StartsWith("win", StringComparison.OrdinalIgnoreCase))
+            ? ".exe"
+            : string.Empty;
+
     /// <summary>A client build without a render brick opens no window: the game runs the headless player.</summary>
     internal static bool RunsHeadlessByAccident(string projectRoot, BuildProfile? profile) =>
         (profile?.Target ?? BuildTarget.Client) == BuildTarget.Client
@@ -116,9 +124,10 @@ public sealed class ExportUserCode(
         Logger.LogInformation("Removed {Count} build artifact(s) from export output", removed);
     }
 
-    static void RenameExecutable(BuildAppSettings settings, string csprojFilePath, string exportOutputPath)
+    static void RenameExecutable(BuildAppSettings settings, string csprojFilePath, string exportOutputPath,
+        string? runtimeIdentifier)
     {
-        var extension = OperatingSystem.IsWindows() ? ".exe" : string.Empty;
+        var extension = ExecutableExtension(runtimeIdentifier);
         var exportedExePath = Path.Combine(
             exportOutputPath,
             $"{Path.GetFileNameWithoutExtension(csprojFilePath)}{extension}");
