@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved: "Build & Run" and "export" skip the redundant NuGet restore already done during setup.
 - Changed: Guinevere controls now use style sheets #218
 - Changed: project solution generator revamped
+- Added: editor script compilation and IDE projects use the active build profile's symbols
 - Fixed: local builds report the engine version from the csproj `Version`, which releases stamp
 - Fixed: shaders compile to SPIR-V 1.5, which Vulkan 1.2 devices load
 

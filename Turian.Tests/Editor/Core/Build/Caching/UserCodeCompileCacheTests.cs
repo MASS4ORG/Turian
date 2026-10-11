@@ -254,6 +254,36 @@ public sealed class UserCodeCompileCacheTests : IDisposable
             Assert.DoesNotContain(".Cache", f.RelativePath, StringComparison.OrdinalIgnoreCase));
     }
 
+    // ── Active build profile ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Activating a profile with symbols, or editing its symbols, misses the cache, so scripts recompile with them.
+    /// </summary>
+    [Fact]
+    public void IsAssemblyUpToDate_ActiveProfileSymbolsChanged_ReturnsFalse()
+    {
+        WriteSourceFile("Script.cs", "class Script {}");
+        File.WriteAllText(assemblyPath, "fake-dll");
+        ProjectSettingsFiles.CreateProjectAsset(settings, [], []);
+        var plain = cache.CreateManifest(settings, assemblyPath, csprojPath);
+        cache.SaveManifest(tempRoot, assemblyPath, plain);
+        Assert.True(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+
+        var profile = new BuildProfile { Name = "Server", Target = BuildTarget.Server };
+        var path = ProjectSettingsFiles.CreateBuildProfile(settings, profile, active: true);
+        var server = cache.CreateManifest(settings, assemblyPath, csprojPath);
+
+        Assert.False(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+        Assert.NotEqual(plain.SettingsFingerprint, server.SettingsFingerprint);
+
+        cache.SaveManifest(tempRoot, assemblyPath, server);
+        Assert.True(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+        profile.ScriptingDefines = "DEMO";
+        Serializer.Save<DataAsset>(path, profile);
+
+        Assert.False(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     string WriteSourceFile(string name, string content)

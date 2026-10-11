@@ -39,7 +39,10 @@ public static class CsProjectGenerator
         return GenerateUserCode(settings, logger, DiscoverAssemblies(settings));
     }
 
-    /// <summary>The default assembly's project: every script outside an assembly definition.</summary>
+    /// <summary>
+    /// The default assembly's project: every script outside an assembly definition, compiled with the active build
+    /// profile's symbols.
+    /// </summary>
     /// <param name="settings">The project settings.</param>
     /// <param name="logger">The logger.</param>
     /// <param name="graph">The project's assemblies.</param>
@@ -49,13 +52,19 @@ public static class CsProjectGenerator
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(graph);
+        return GenerateUserCode(settings, graph, BuildProfiles.ActiveSymbols(settings));
+    }
+
+    static ProjectRootElement GenerateUserCode(IBuildAppSettings settings, AssemblyGraph graph,
+        IReadOnlyList<string> symbols)
+    {
         var csprojFilePath = UserCodeCsProjFullPath(settings);
         var isExecutable = false;
 
         var projectRoot = ProjectRootElement.Create(csprojFilePath);
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot
-            .AddProjectInfo(settings, executable: isExecutable)
+            .AddProjectInfo(settings, executable: isExecutable, symbols: symbols)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
             .AddBrickReferences(settings)
@@ -68,7 +77,7 @@ public static class CsProjectGenerator
 
     /// <summary>
     /// Every project the user code compiles through: one per assembly definition, each after the ones it
-    /// references, then the default assembly's.
+    /// references, then the default assembly's. All compile with the active build profile's symbols.
     /// </summary>
     /// <param name="settings">The project settings.</param>
     /// <param name="logger">The logger.</param>
@@ -79,9 +88,12 @@ public static class CsProjectGenerator
         ILogger logger,
         AssemblyGraph graph)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(graph);
-        return [.. graph.Definitions.Select(assembly => GenerateAssemblyDefinition(settings, graph, assembly)),
-            GenerateUserCode(settings, logger, graph)];
+        var symbols = BuildProfiles.ActiveSymbols(settings);
+        return [.. graph.Definitions.Select(assembly => GenerateAssemblyDefinition(settings, graph, assembly, symbols)),
+            GenerateUserCode(settings, graph, symbols)];
     }
 
     /// <summary>The project's assemblies, read from the assembly definitions under its <c>Assets</c> folder.</summary>
@@ -97,11 +109,12 @@ public static class CsProjectGenerator
     static ProjectRootElement GenerateAssemblyDefinition(
         IBuildAppSettings settings,
         AssemblyGraph graph,
-        ProjectAssembly assembly)
+        ProjectAssembly assembly,
+        IReadOnlyList<string> symbols)
     {
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
-        projectRoot.AddProjectInfo(settings, executable: false).AddTurianDir();
+        projectRoot.AddProjectInfo(settings, executable: false, symbols: symbols).AddTurianDir();
         if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
         projectRoot
             .AddNugetPackageReferences(settings)
@@ -304,7 +317,8 @@ public static class CsProjectGenerator
             bool executable,
             ExecutableGenerationMode mode = ExecutableGenerationMode.Export,
             string? runtimeIdentifier = null,
-            bool console = false)
+            bool console = false,
+            IReadOnlyList<string>? symbols = null)
         {
             var group = projectRoot.AddPropertyGroup();
             // A server keeps its console on Windows, for its log and Ctrl+C; a game's window has none.
@@ -343,6 +357,9 @@ public static class CsProjectGenerator
             else
             {
                 group.AddProperty("GenerateDocumentationFile", "true");
+                // The editor's compile and the IDE use the active profile's symbols; a build passing
+                // -p:TurianDefines, global and so stronger, uses its own profile's instead.
+                if (symbols is { Count: > 0 }) group.AddProperty("TurianDefines", string.Join(';', symbols));
                 // A build profile passes its script symbols, such as TURIAN_SERVER, as the TurianDefines property.
                 group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
                 // The XML docs feed inspector tooltips; they are optional, so undocumented members are not warned about.

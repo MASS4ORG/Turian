@@ -94,6 +94,53 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Same(desktop.GetType(), BuildPlatforms.For(new BuildProfile { Target = BuildTarget.Server }).GetType());
     }
 
+    /// <summary>A profile without symbols still passes them, empty, so the active profile's do not leak in.</summary>
+    [Fact]
+    public void ProfilesWithoutSymbolsReplaceTheActiveProfiles()
+    {
+        Assert.Equal("-p:TurianDefines=", BuildPlatforms.Find(null).PublishArguments(
+            new BuildPlatformContext("game.csproj", "out", "Release", new BuildProfile()))[^1]);
+    }
+
+    /// <summary>
+    /// The editor's script projects, which the IDE opens too, compile with the active profile's symbols, defined
+    /// before the constants that read them; with no active profile they define none.
+    /// </summary>
+    [Fact]
+    public void EditorScriptProjectsFollowTheActiveProfile()
+    {
+        Install();
+        ProjectSettingsFiles.CreateProjectAsset(Settings, [], []);
+        Directory.CreateDirectory(Path.Combine(Assets, "Shared"));
+        var definition = Path.Combine(Assets, "Shared", "Acme.Shared.dataasset");
+        var id = Guid.NewGuid();
+        File.WriteAllText(definition,
+            $$"""{ "__TypeId": "{{AssemblyDefinition.TypeIdValue}}", "Name": "Acme.Shared", "Id": "{{id}}" }""");
+        File.WriteAllText(definition + ".meta", $$"""
+            { "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c",
+              "RelativePath": "Assets/Shared/Acme.Shared.dataasset", "Id": "{{id}}" }
+            """);
+        Assert.All(CsProjectGenerator.GenerateUserCodeProjects(Settings, NullLogger.Instance,
+                CsProjectGenerator.DiscoverAssemblies(Settings)),
+            static p => Assert.DoesNotContain(p.Properties, static q => q.Name == "TurianDefines"));
+
+        ProjectSettingsFiles.CreateBuildProfile(Settings,
+            new BuildProfile { Name = "Server", Target = BuildTarget.Server, ScriptingDefines = "DEMO" }, active: true);
+        var projects = CsProjectGenerator.GenerateUserCodeProjects(Settings, NullLogger.Instance,
+            CsProjectGenerator.DiscoverAssemblies(Settings));
+
+        Assert.Equal(2, projects.Count);
+        Assert.All(projects, static project =>
+        {
+            var names = project.Properties.Select(static p => p.Name).ToList();
+            Assert.Contains(project.Properties,
+                static p => p is { Name: "TurianDefines", Value: "TURIAN_SERVER;DEMO" });
+            Assert.True(names.IndexOf("TurianDefines") < names.IndexOf("DefineConstants"));
+        });
+        Assert.Contains(CsProjectGenerator.GenerateUserCode(Settings, NullLogger.Instance).Properties,
+            static p => p is { Name: "TurianDefines", Value: "TURIAN_SERVER;DEMO" });
+    }
+
     /// <summary>
     /// A server runtime project references no client-only brick or package, fails a build that would still ship one,
     /// and pins the profile's runtime identifier; a client project keeps the renderer.

@@ -48,6 +48,15 @@ public static class BuildProfiles
     }
 
     /// <summary>
+    /// The script symbols of the active profile, which the editor compiles scripts with and the IDE reads them
+    /// with, as Unity's active build profile defines.
+    /// </summary>
+    /// <param name="settings">The project settings.</param>
+    /// <returns>The symbols; none when no profile is active.</returns>
+    public static IReadOnlyList<string> ActiveSymbols(IBuildAppSettings settings) =>
+        Active(settings)?.Profile.Symbols ?? [];
+
+    /// <summary>
     /// Every build profile under <paramref name="assetsDirectory"/>, by name: what migrating a project registers.
     /// </summary>
     /// <param name="assetsDirectory">The project's <c>Assets</c> folder.</param>

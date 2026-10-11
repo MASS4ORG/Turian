@@ -274,8 +274,8 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     // The active profile's symbols reach the play project through TurianDefines; %3B escapes MSBuild's separator.
     string BuildArguments(string csprojFilePath) =>
         $"build \"{csprojFilePath}\" -c Debug --no-restore"
-        + (profile?.Profile.Symbols is { Count: > 0 } defines
-            ? $" -p:TurianDefines={string.Join("%3B", defines)}"
+        + (profile is not null
+            ? $" -p:TurianDefines={string.Join("%3B", profile.Profile.Symbols)}"
             : string.Empty);
 
     // What the last play build was made from that differs now, or null when nothing does.

@@ -121,9 +121,10 @@ sealed class DesktopBuildPlatform : IBuildPlatform
         ArgumentNullException.ThrowIfNull(context);
         List<string> arguments =
             ["publish", context.ProjectFile, "-o", context.OutputDirectory, "-c", context.Configuration, "--no-restore"];
-        // The profile's script symbols reach every script project the runtime project references.
-        if (context.Profile?.Symbols is { Count: > 0 } symbols)
-            arguments.Add($"-p:TurianDefines={string.Join("%3B", symbols)}");
+        // The profile's script symbols reach every script project the runtime project references, even none, so
+        // they replace the active profile's that the script projects default to.
+        if (context.Profile is { } profile)
+            arguments.Add($"-p:TurianDefines={string.Join("%3B", profile.Symbols)}");
         return arguments;
     }
 }
