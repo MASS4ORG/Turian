@@ -53,7 +53,7 @@ public sealed class SceneViewerService : IDisposable
     GlobalUbo ubo = null!;
     Buffer uboBuffer = null!;
     Buffer sboBuffer = null!;
-    SboMeshTest sboMeshTest = default;
+    SboMeshTest sboMeshTest = new();
     StandardRenderSystem standardSystem = null!;
     IRenderSystem meshSystem = null!;
     GizmoRenderSystem gizmoSystem = null!;

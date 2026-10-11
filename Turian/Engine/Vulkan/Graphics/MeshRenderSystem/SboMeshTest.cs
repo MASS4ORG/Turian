@@ -40,8 +40,8 @@ public struct SboMeshTest
     }
 
     /// <summary>
-    /// Gets the size of the <see cref="StandardPushConstantData"/> struct.
+    /// Gets the size of the <see cref="SboMeshTest"/> struct.
     /// </summary>
-    /// <returns>The size of the <see cref="StandardPushConstantData"/> struct in bytes.</returns>
-    public static uint SizeOf() => (uint)Unsafe.SizeOf<StandardPushConstantData>();
+    /// <returns>The size of the <see cref="SboMeshTest"/> struct in bytes.</returns>
+    public static uint SizeOf() => (uint)Unsafe.SizeOf<SboMeshTest>();
 }

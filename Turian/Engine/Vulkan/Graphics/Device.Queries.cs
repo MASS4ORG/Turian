@@ -190,7 +190,23 @@ public unsafe partial class Device
                && sync2Features.Synchronization2;
     }
 
-    bool CheckDeviceExtensionsSupport(PhysicalDevice candidateDevice)
+    bool CheckDeviceExtensionsSupport(PhysicalDevice candidateDevice) =>
+        requiredDeviceExtensions.All(AvailableDeviceExtensions(candidateDevice).Contains);
+
+    bool SupportsMeshShading(PhysicalDevice candidateDevice)
+    {
+        if (!AvailableDeviceExtensions(candidateDevice).Contains(meshShaderExtension)) return false;
+
+        var meshFeatures = new PhysicalDeviceMeshShaderFeaturesEXT
+        {
+            SType = StructureType.PhysicalDeviceMeshShaderFeaturesExt
+        };
+        var features2 = new PhysicalDeviceFeatures2 { SType = StructureType.PhysicalDeviceFeatures2, PNext = &meshFeatures };
+        vk.GetPhysicalDeviceFeatures2(candidateDevice, &features2);
+        return meshFeatures.TaskShader && meshFeatures.MeshShader;
+    }
+
+    HashSet<string?> AvailableDeviceExtensions(PhysicalDevice candidateDevice)
     {
         uint extentionsCount = 0;
         _ = vk.EnumerateDeviceExtensionProperties(candidateDevice, (byte*)null, ref extentionsCount, null);
@@ -206,11 +222,7 @@ public unsafe partial class Device
             );
         }
 
-        var availableExtensionNames = availableExtensions
-                                      .Select(extension => Marshal.PtrToStringAnsi((IntPtr)extension.ExtensionName))
-                                      .ToHashSet();
-
-        return deviceExtensions.All(availableExtensionNames.Contains);
+        return [.. availableExtensions.Select(extension => Marshal.PtrToStringAnsi((IntPtr)extension.ExtensionName))];
     }
 
     string[] GetRequiredExtensions()

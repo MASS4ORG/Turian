@@ -79,6 +79,12 @@ public unsafe partial class Device : IDisposable
     public IReadOnlyList<string> DeviceExtensions => deviceExtensions;
 
     /// <summary>
+    /// Whether task and mesh shaders are enabled. Optional: a device without <c>VK_EXT_mesh_shader</c> still runs,
+    /// and mesh-shaded systems then record nothing.
+    /// </summary>
+    public bool SupportsMeshShaders => supportsMeshShaders;
+
+    /// <summary>
     /// Gets the present queue associated with this device.
     /// </summary>
     public Queue PresentQueue => presentQueue;
@@ -107,14 +113,16 @@ public unsafe partial class Device : IDisposable
     readonly bool enableValidationLayers = false;
     readonly string[] validationLayers = ["VK_LAYER_KHRONOS_validation"];
 
-    readonly string[] deviceExtensions =
+    const string meshShaderExtension = "VK_EXT_mesh_shader";
+
+    readonly string[] requiredDeviceExtensions =
     [
         KhrSwapchain.ExtensionName,
         KhrSynchronization2.ExtensionName,
-        "VK_EXT_mesh_shader",
-        //"VK_KHR_spirv_1_4",
-        //"VK_KHR_shader_float_controls",
     ];
+
+    string[] deviceExtensions = [];
+    bool supportsMeshShaders;
 
     Instance instance;
     string[] instanceExtensions = [];

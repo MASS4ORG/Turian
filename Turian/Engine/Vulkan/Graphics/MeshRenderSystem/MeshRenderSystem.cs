@@ -12,7 +12,7 @@ public class MeshRenderSystem : IRenderSystem
     const string fragShaderPath = "testMesh.frag.spv";
     const string rendererName = "Mesh2Renderer";
 
-    MeshPipeline pipeline = null!;
+    MeshPipeline? pipeline;
     PipelineLayout pipelineLayout;
     readonly List<MeshComponent> meshes = [];
     readonly ExtMeshShader? extMeshShader;
@@ -30,8 +30,12 @@ public class MeshRenderSystem : IRenderSystem
     )
     {
         this.vulkan = vulkan;
-        if (vulkan.Vk.TryGetDeviceExtension(vulkan.Device.Instance, vulkan.Device.VkDevice, out ExtMeshShader ext))
-            extMeshShader = ext;
+        // Without mesh shading the pipeline cannot even be built, so the system then records nothing.
+        if (!vulkan.Device.SupportsMeshShaders
+            || !vulkan.Vk.TryGetDeviceExtension(vulkan.Device.Instance, vulkan.Device.VkDevice, out ExtMeshShader ext))
+            return;
+
+        extMeshShader = ext;
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }
@@ -39,6 +43,8 @@ public class MeshRenderSystem : IRenderSystem
     /// <inheritdoc />
     public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
+        if (pipeline is null || extMeshShader is null) return;
+
         pipeline.Bind(frameInfo.CommandBuffer);
 
         var descriptorSet = frameInfo.GlobalDescriptorSet;
@@ -73,7 +79,7 @@ public class MeshRenderSystem : IRenderSystem
                     StandardPushConstantData.SizeOf(),
                     ref push
                 );
-                extMeshShader?.CmdDrawMeshTask(frameInfo.CommandBuffer, 1, 1, 1);
+                extMeshShader.CmdDrawMeshTask(frameInfo.CommandBuffer, 1, 1, 1);
             }
         }
     }
@@ -81,8 +87,9 @@ public class MeshRenderSystem : IRenderSystem
     /// <inheritdoc />
     public unsafe void Dispose()
     {
-        pipeline.Dispose();
-        vulkan.Vk.DestroyPipelineLayout(vulkan.Device.VkDevice, pipelineLayout, null);
+        pipeline?.Dispose();
+        if (pipelineLayout.Handle != 0)
+            vulkan.Vk.DestroyPipelineLayout(vulkan.Device.VkDevice, pipelineLayout, null);
         GC.SuppressFinalize(this);
     }
 

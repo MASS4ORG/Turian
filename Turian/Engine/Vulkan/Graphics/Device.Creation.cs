@@ -178,11 +178,22 @@ public unsafe partial class Device
 
         // PhysicalDeviceFeatures deviceFeatures = new() { SamplerAnisotropy = true, };
 
+        // Mesh shading needs its features enabled alongside the extension; devices without it skip both.
+        var meshShading = SupportsMeshShading(candidatePhysicalDevice);
+        var meshFeatures = new PhysicalDeviceMeshShaderFeaturesEXT
+        {
+            SType = StructureType.PhysicalDeviceMeshShaderFeaturesExt,
+            TaskShader = Vk.True,
+            MeshShader = Vk.True
+        };
+        var extensions = meshShading ? [.. requiredDeviceExtensions, meshShaderExtension] : requiredDeviceExtensions;
+
         // Enable Synchronization 2 to eliminate a validation layer error, thanks gpt4!
         var sync2Features = new PhysicalDeviceSynchronization2FeaturesKHR
         {
             SType = StructureType.PhysicalDeviceSynchronization2FeaturesKhr,
-            Synchronization2 = Vk.True
+            Synchronization2 = Vk.True,
+            PNext = meshShading ? &meshFeatures : null
         };
 
         var features2 = new PhysicalDeviceFeatures2
@@ -198,8 +209,8 @@ public unsafe partial class Device
             QueueCreateInfoCount = (uint)uniqueQueueFamilies.Length,
             PQueueCreateInfos = queueCreateInfos,
             PNext = &features2,
-            EnabledExtensionCount = (uint)deviceExtensions.Length,
-            PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(deviceExtensions)
+            EnabledExtensionCount = (uint)extensions.Length,
+            PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(extensions)
         };
 
         if (enableValidationLayers)
@@ -228,6 +239,8 @@ public unsafe partial class Device
 
         _ = SilkMarshal.Free((nint)createInfo.PpEnabledExtensionNames);
 
+        deviceExtensions = extensions;
+        supportsMeshShaders = meshShading;
         return logicalDevice;
     }
 

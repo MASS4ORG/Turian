@@ -66,19 +66,31 @@ public sealed class GpuAssetCacheTests(VulkanFixture fixture) : IClassFixture<Vu
     }
 
     /// <summary>
-    /// The mesh render system records mesh components without awakening them against a device, and a camera that
-    /// excludes their rendering layer leaves the frame empty.
+    /// On a device with mesh shading, a mesh component is drawn without being awakened against the device, and a
+    /// camera that excludes its rendering layer leaves the frame empty.
     /// </summary>
     [Fact]
-    public void MeshRenderSystemRecordsMeshComponents()
+    public void MeshComponentDrawsThroughTheMeshRenderSystem()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        Assert.SkipUnless(fixture.Vulkan.Device.SupportsMeshShaders, "no mesh shading on this device");
+
+        var empty = CenterColor(new Node());
+        var drawn = CenterColor(MeshScene(renderLayer: 0));
+        var excluded = CenterColor(MeshScene(renderLayer: 31));
+
+        Assert.NotEqual(empty, drawn);
+        Assert.Equal(empty, excluded);
+    }
+
+    /// <summary>Mesh shading is enabled exactly when the device lists its extension.</summary>
+    [Fact]
+    public void MeshShadingFollowsTheEnabledExtension()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
 
-        var empty = CenterColor(new Node());
-        _ = CenterColor(MeshScene(renderLayer: 0));
-        var excluded = CenterColor(MeshScene(renderLayer: 31));
-
-        Assert.Equal(empty, excluded);
+        Assert.Equal(fixture.Vulkan.Device.SupportsMeshShaders,
+            fixture.Vulkan.Device.DeviceExtensions.Contains("VK_EXT_mesh_shader"));
     }
 
     // The default editor camera sits at the origin looking down +Z; the scaled triangle covers the view's center.
