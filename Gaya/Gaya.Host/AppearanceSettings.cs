@@ -9,9 +9,9 @@ public sealed class AppearanceSettings
     /// <summary>The id of the appearance page in the settings API.</summary>
     public const string PageId = "gaya.appearance";
 
-    /// <summary>The name of the committed theme.</summary>
+    /// <summary>The id of the committed color theme; names stored by older versions are still recognized.</summary>
     [EditorSetting("Theme", Description = "Colors used throughout the workbench.")]
-    public string Theme { get; set; } = "Dark";
+    public string Theme { get; set; } = ThemeCatalog.DefaultColorTheme;
 
     /// <summary>The workbench's base text size in points.</summary>
     [EditorSetting("Text Size", Description = "Base interface text size in points.")]

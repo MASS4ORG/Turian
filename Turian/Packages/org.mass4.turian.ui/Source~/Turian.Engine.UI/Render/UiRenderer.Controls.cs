@@ -29,7 +29,7 @@ public sealed partial class UiRenderer
     static string? NonEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
-    /// A button is a styled node with a label: <see cref="Gui.StyledNode"/> already paints the box and
+    /// A button is a styled node with a label: <c>gui.StyledNode</c> already paints the box and
     /// re-resolves it for <c>:hover</c> and <c>:active</c>, so the whole appearance comes from the
     /// document's <c>.uss</c> rather than from a fixed control palette.
     /// </summary>

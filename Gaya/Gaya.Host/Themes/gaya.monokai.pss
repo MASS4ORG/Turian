@@ -1,0 +1,23 @@
+// Monokai: the classic Sublime Text palette, with Monokai Pro's pink as the accent.
+@const theme-id = "gaya.monokai";
+@const theme-name = "Monokai";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #212220;
+$accent = #ff6188;
+
+$surface-window = #272822;
+$surface-panel = #212220;
+$surface-chrome = #31322c;
+$surface-field = #1b1c18;
+$surface-hover = #49483e;
+$surface-editor-area = #1d1e19;
+$border = #3e3d35;
+$ink = #f8f8f2;
+$ink-dim = #c4c4b8;
+$ink-faint = #75715e;
+$accent-fill = #45443b;
+$error = #f92672;
+$warning = #e6db74;
+$folder = #fd971f;

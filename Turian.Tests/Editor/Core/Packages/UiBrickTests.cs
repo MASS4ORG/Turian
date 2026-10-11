@@ -22,7 +22,7 @@ public sealed class UiBrickTests : IDisposable
     {
         var brick = Install(brickId);
 
-        Assert.Equal(["Guinevere", "Turian.Engine.UI"],
+        Assert.Equal(["Guinevere.Styling", "Guinevere", "Turian.Engine.UI"],
             BrickAssemblies.RuntimeAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
         Assert.Equal(["Turian.Editor.UI"],
             BrickAssemblies.EditorAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
@@ -53,7 +53,7 @@ public sealed class UiBrickTests : IDisposable
 
         var manifest = UserCodeTypeManifestGenerator.Generate(Path.Combine(project, "Assets"), NullLogger.Instance);
 
-        Assert.Equal(["Guinevere", "Turian.Engine.UI"], manifest.PrecastAssemblies.Order());
+        Assert.Equal(["Guinevere", "Guinevere.Styling", "Turian.Engine.UI"], manifest.PrecastAssemblies.Order());
     }
 
     /// <summary>Loading a brick registers its types once, and the presenter factory is then found without naming the UI.</summary>

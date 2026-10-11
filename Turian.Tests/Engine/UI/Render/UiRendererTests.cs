@@ -267,7 +267,7 @@ public sealed class UiRendererTests
               </VisualElement>
             </UI>
             """,
-            r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }")));
+            r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }", UiStyleSheetAsset.ParseOptions)));
 
         var reddish = 0;
         for (var y = 0; y < h; y++)

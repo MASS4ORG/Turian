@@ -39,7 +39,7 @@ sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IProper
         var options = slots.Select(slot => slot.Index).ToArray();
         var selected = options.Where(masks[0].Contains).ToArray();
         var labels = slots.ToDictionary(slot => slot.Index, slot => $"{slot.Index}: {slot.Name}");
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var result = gui.MultiDropdown(options, selected, display: index => labels[index],
             mixed: field.HasMixedValue,
             isMixed: index => masks.Any(mask => mask.Contains(index) != masks[0].Contains(index)),
@@ -52,11 +52,9 @@ sealed class LayerDrawer(LayerFilter layers, UndoService? undo = null) : IProper
 
     int Dropdown(Gui gui, string[] labels, int current, string id, bool enabled)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         if (gui.Pass == Pass.Pass2Render && frameSelections.TryGetValue(id, out var selection)) current = selection;
         var next = gui.Dropdown(labels, current, width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
-            backgroundColor: theme.Field, borderColor: theme.Border, textColor: theme.Ink,
-            dropdownColor: theme.Field, hoverColor: theme.Hover, selectedColor: theme.AccentFill,
             placeholder: "—", enabled: enabled, filePath: $"{id}/layer");
         if (gui.Pass == Pass.Pass1Build) frameSelections[id] = next;
         else frameSelections.Remove(id);

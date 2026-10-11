@@ -1,0 +1,23 @@
+// Ayu Dark: Ike Ku's dark theme, near-black blue grounds with its golden-orange accent.
+@const theme-id = "gaya.ayu-dark";
+@const theme-name = "Ayu Dark";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #0d1017;
+$accent = #e6b673;
+
+$surface-window = #0a0e14;
+$surface-panel = #0d1017;
+$surface-chrome = #151a24;
+$surface-field = #070a10;
+$surface-hover = #1f2430;
+$surface-editor-area = #04070c;
+$border = #232834;
+$ink = #bfbfbf;
+$ink-dim = #8a9099;
+$ink-faint = #626a73;
+$accent-fill = #3a2e1b;
+$error = #ff3333;
+$warning = #ffb454;
+$folder = #ff8f40;

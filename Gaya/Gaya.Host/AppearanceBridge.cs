@@ -33,19 +33,19 @@ sealed class AppearanceBridge : IDisposable
     /// <summary>Pushes the page's values onto the theme service. Both calls ignore a repeat.</summary>
     void Apply()
     {
-        themes.Apply(appearance.Theme);
+        themes.ApplyColorTheme(appearance.Theme);
         themes.SetScale(appearance.TextSize, appearance.Zoom);
     }
 
     /// <summary>
-    /// Records a theme committed from the menu. A preview leaves the committed name alone, so nothing
+    /// Records a theme committed from the menu. A preview leaves the committed id alone, so nothing
     /// is stored while the pointer travels down the list.
     /// </summary>
     void Remember()
     {
-        if (string.Equals(themes.CommittedName, appearance.Theme, StringComparison.Ordinal)) return;
+        if (string.Equals(themes.CommittedColorTheme, appearance.Theme, StringComparison.Ordinal)) return;
 
-        appearance.Theme = themes.CommittedName;
+        appearance.Theme = themes.CommittedColorTheme;
         settings.NotifyChanged(AppearanceSettings.PageId);
     }
 

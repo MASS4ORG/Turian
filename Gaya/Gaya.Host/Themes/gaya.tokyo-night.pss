@@ -1,0 +1,23 @@
+// Tokyo Night: Enkia's blue-lit Tokyo palette, deep navy chrome and bright blue-violet ink.
+@const theme-id = "gaya.tokyo-night";
+@const theme-name = "Tokyo Night";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #16161e;
+$accent = #7aa2f7;
+
+$surface-window = #1a1b26;
+$surface-panel = #16161e;
+$surface-chrome = #1f2335;
+$surface-field = #131520;
+$surface-hover = #292e42;
+$surface-editor-area = #101017;
+$border = #2f3549;
+$ink = #c0caf5;
+$ink-dim = #a6aecb;
+$ink-faint = #565f89;
+$accent-fill = #283452;
+$error = #f7768e;
+$warning = #e0af68;
+$folder = #ff9e64;

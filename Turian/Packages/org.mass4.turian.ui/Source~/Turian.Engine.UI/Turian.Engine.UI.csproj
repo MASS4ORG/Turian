@@ -11,10 +11,12 @@
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere" Version="5.*"/>
+        <PackageReference Include="MASS4.Guinevere" Version="6.*"/>
+        <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
     </ItemGroup>
 
     <!-- Internal libraries -->
@@ -31,6 +33,7 @@
         <ItemGroup>
             <PrecastFile Include="$(TargetPath)"/>
             <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'Guinevere.dll'"/>
+            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'Guinevere.Styling.dll'"/>
         </ItemGroup>
         <Copy SourceFiles="@(PrecastFile)" DestinationFolder="$(PrecastDirectory)"/>
     </Target>

@@ -2,12 +2,12 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// The palettes the studio hands to Guinevere's compound controls. They carry their own colors and
-/// metrics rather than reading <see cref="StudioTheme"/>, so every tree and tab strip in the studio
+/// metrics rather than reading <see cref="ThemeTokens"/>, so every tree and tab strip in the studio
 /// is themed from one place instead of each panel repeating the projection.
 /// </summary>
 static class StudioControls
 {
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <summary>The tree palette shared by the scene tree, the asset browser and the settings list.</summary>
     public static TreeViewTheme Tree() => new()
@@ -25,13 +25,6 @@ static class StudioControls
     {
         Height = height,
         FontSize = Theme.Text(Theme.FontSize),
-        Strip = Theme.Chrome,
-        Active = Theme.Panel,
-        Tab = Theme.Background,
-        Hover = Theme.Hover,
-        Ink = Theme.Ink,
-        InkDim = Theme.InkDim,
-        Accent = Theme.Accent,
         IconSize = Theme.Scale(12f),
     };
 

@@ -102,7 +102,7 @@ public sealed class LayerDrawerTests
         host.Open();
         var list = host.List;
         Assert.NotNull(host.Gui.GetScrollState(list.Id));
-        Assert.True(list.Rect.H <= StudioTheme.Current.Scale(StudioTheme.Current.RowHeight) * 6 + 0.01f);
+        Assert.True(list.Rect.H <= ThemeTokens.Current.Scale(ThemeTokens.Current.RowHeight) * 6 + 0.01f);
         Assert.True(list.Rect.BottomRight.Y <= 260);
         host.Save("/tmp/turian-layer-picker-top.png");
         host.ScrollToEnd();

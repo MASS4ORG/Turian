@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added (breaking): `.pss` color themes with hot reload #213
+- Changed (breaking): Guinevere fluent effects use the `DrawSd…` API.
+- Added: Theme bricks from the command line #215
+- Added: Bricks panel moved to Gaya with studio/project scopes #214
+- Changed: Guinevere controls now use style sheets #218
+
 ## [2.3.1] - 2026-10-07
+
+- Improved: improved asset caching for startup and "Build & Run".
+- Recent projects use menu rows and configured titles with a fitted current-project control; native windows use Gaya or project-specific Turian titles and icons, and 
+- Added: Scene and Game views share their configured empty sky. 
+- Changed: Output filter for internal Studio messages.
+- Changed: Disabled hierarchy branches appear dimmed.
+- Fixed: release builds run again: the `release` job runners install glslc.
 
 ## [2.3.0] - 2026-10-06
 
@@ -15,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0] - 2026-10-06
 
-- Added: tags and layers
+- Added: tags and layers #91
 
 ## [2.1.0] - 2026-10-04
 
@@ -26,9 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2026-10-03
 
 - Added: collapsable main menu and windowless
-- Added: collapsable main menu and windowless
 - Added: identity, content overlay and runtime save contracts #63 #197
-- Added: add the BRICKS plugin system #79
+- Added: BRICKS plugin system #79
 - Added: dependency injection and DataAsset services #44
 - Changed: struct Transform and allocation-free scene traversal #32 #132 #58
 - Changed: send form generator to Guinevere: Autoformer #194

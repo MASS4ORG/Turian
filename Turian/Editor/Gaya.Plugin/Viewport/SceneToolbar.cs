@@ -3,7 +3,7 @@ namespace Gaya.Plugin.Turian;
 /// <summary>Groups Scene tools into compact buttons, menus and editable transform and camera popovers.</summary>
 sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 {
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
     static float Height => Theme.Scale(28f);
     bool transformMenu;
     bool viewMenu;
@@ -267,8 +267,7 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             string edited;
             using (gui.Node(Theme.Scale(80f), Theme.Scale(22f), "scene/options/value/" + id).Enter())
                 edited = gui.TextInput(text, width: Theme.Scale(80f), height: Theme.Scale(22f), fontSize: Theme.Text(11),
-                    backgroundColor: Theme.Field, borderColor: Theme.Border, textColor: Theme.Ink, padding: 4,
-                    id: "scene/options/input/" + id, alignX: 1f);
+                    padding: 4, id: "scene/options/input/" + id, alignX: 1f);
             if (gui.Pass == Pass.Pass2Render && edited != text
                 && float.TryParse(edited, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
                 && float.IsFinite(parsed))

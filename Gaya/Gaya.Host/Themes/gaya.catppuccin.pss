@@ -1,0 +1,23 @@
+// Catppuccin Mocha: the pastel-on-dark palette, warm dark grounds and lavender-blue ink.
+@const theme-id = "gaya.catppuccin";
+@const theme-name = "Catppuccin";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #1e1e2e;
+$accent = #89b4fa;
+
+$surface-window = #11111b;
+$surface-panel = #1e1e2e;
+$surface-chrome = #181825;
+$surface-field = #313244;
+$surface-hover = #45475a;
+$surface-editor-area = #11111b;
+$border = #414458;
+$ink = #cdd6f4;
+$ink-dim = #a6adc8;
+$ink-faint = #6c7086;
+$accent-fill = #3a4a71;
+$error = #f38ba8;
+$warning = #f9e2af;
+$folder = #fab387;

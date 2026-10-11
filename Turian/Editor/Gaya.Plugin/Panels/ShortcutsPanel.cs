@@ -19,7 +19,7 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
     string? capturing;
     KeyStroke first = KeyStroke.None;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <inheritdoc />
     public void Render(Gui gui)

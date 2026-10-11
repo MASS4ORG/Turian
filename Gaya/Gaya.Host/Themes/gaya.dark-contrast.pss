@@ -1,0 +1,23 @@
+// A high-contrast dark theme: black grounds, white ink, visible borders.
+@const theme-id = "gaya.dark-contrast";
+@const theme-name = "Dark Contrast";
+@const theme-kind = high-contrast-dark;
+@import "gaya.base";
+
+$base = #000000;
+$accent = #00b4ff;
+
+$surface-window = #000000;
+$surface-panel = #000000;
+$surface-chrome = #0e0e0e;
+$surface-field = #000000;
+$surface-hover = #2c2c2c;
+$surface-editor-area = #000000;
+$border = #767676;
+$ink = #ffffff;
+$ink-dim = #d6d6d6;
+$ink-faint = #a3a3a3;
+$accent-fill = #005294;
+$error = #ff8080;
+$warning = #ffd45c;
+$folder = #ffde80;

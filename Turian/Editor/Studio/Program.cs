@@ -16,13 +16,8 @@ Log.Configure(loggerFactory);
 BuildManager.MsBuildLocatorRegisterDefaults();
 
 // Built-in plugins are compiled in; the rest come from the studio packages the user installed.
-var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(PackagedPlugins.Load(
-    new Dictionary<string, Gaya.Packages.SemanticVersion>
-    {
-        [ProjectPackages.HostName] = ProjectPackages.EngineVersion,
-        ["gaya"] = ProjectPackages.GayaVersion,
-    },
-    Log.Logger));
+var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }
+    .Concat(PackagedPlugins.Load(TurianStudioBricks.Hosts, Log.Logger).Assemblies);
 var shell = new ShellHost();
 var dispatcher = new CommandDispatcher();
 var panelAccessor = new PanelAccessor();
@@ -32,6 +27,7 @@ using var app = PluginHost.Load(pluginAssemblies, Log.Logger,
         services.AddSingleton<IShellHost>(shell);
         services.AddSingleton<ICommandDispatcher>(dispatcher);
         services.AddSingleton<IPanelAccessor>(panelAccessor);
+        services.AddSingleton(TurianStudioBricks.Workspace());
     },
     args, previousAppearancePageId: "gaya.turian.appearance");
 using var workbench = new Workbench(app);
@@ -74,7 +70,7 @@ if (args is ["--script", _, ..])
 
 Log.Logger.LogInformation("Turian Studio (Gaya) starting");
 
-// The workbench publishes the themed control palette onto the Gui every frame.
+// The workbench installs the theme's style sheets into the Gui every frame they change.
 var gui = new Gui();
 WindowPlatform.Configure(OperatingSystem.IsLinux(), Environment.GetEnvironmentVariable,
     Environment.SetEnvironmentVariable);

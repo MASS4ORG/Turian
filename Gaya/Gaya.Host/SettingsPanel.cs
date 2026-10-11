@@ -15,8 +15,9 @@ namespace Gaya.Host;
 /// <param name="log">Receives file and form failures.</param>
 /// <param name="localization">Translates the panel's strings; null leaves them in English.</param>
 /// <param name="themes">The themes available through the appearance dropdown.</param>
+/// <param name="browseThemes">Opens a list of installable themes; without it the Browse button is hidden.</param>
 sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocalization? localization,
-    IThemeService themes) : IPanel
+    IThemeService themes, Action? browseThemes = null) : IPanel
 {
     const float categoryWidth = 210f;
     const float editorWidth = 280f;
@@ -33,7 +34,7 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     float measuredWidth;
     string? frameThemeSelection;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     FormRenderContext? formContext;
 
@@ -285,17 +286,36 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     void ThemeEditor(Gui gui, FormField field, string id)
     {
-        var names = themes.Themes.Select(theme => theme.Name).ToArray();
-        var current = Array.IndexOf(names, field.GetValue() as string);
-        var style = gui.ControlStyle;
+        var available = themes.ColorThemes;
+        var names = available.Select(theme => theme.Name).ToArray();
+        var current = available.ToList().FindIndex(theme => string.Equals(theme.Id, themes.CommittedColorTheme,
+            StringComparison.OrdinalIgnoreCase));
         // ReSharper disable once ExplicitCallerInfoArgument
         var next = gui.Dropdown(names, current, width: 0, height: Theme.Scale(Theme.RowHeight), fontSize: Theme.Text(12),
-            backgroundColor: style.Surface, borderColor: style.Border, textColor: style.Text,
-            dropdownColor: style.Popup, filePath: $"{id}/theme");
+            filePath: $"{id}/theme");
         if (gui.Pass == Pass.Pass1Build)
-            frameThemeSelection = next >= 0 && next != current ? names[next] : null;
+            frameThemeSelection = next >= 0 && next != current ? available[next].Id : null;
         else if (frameThemeSelection is { } selected)
             field.SetValue(selected);
+
+        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse")) browseThemes();
+    }
+
+    /// <summary>The button beside the theme dropdown that lists installable themes.</summary>
+    bool BrowseButton(Gui gui, string id)
+    {
+        using (gui.Node(Theme.Scale(76f), Theme.Scale(Theme.RowHeight), id).BlockInput()
+                   .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        {
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+
+            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            gui.DrawText(T("Browse…"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
+            gui.Tooltip(gui.CurrentNode, T("Find themes to install as bricks."), maxWidth: 320);
+
+            return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
+        }
     }
 
     /// <summary>The button that puts a setting back the way the page declares it.</summary>

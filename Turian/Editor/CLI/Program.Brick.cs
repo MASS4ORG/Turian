@@ -12,13 +12,18 @@ public static partial class Program
             DefaultValueFactory = _ => new DirectoryInfo("./"),
         };
 
-        return new Command("brick", "Manage a project's bricks (packages): add, remove, list, restore, update, embed; author, verify and pack your own")
+        var studioOption = new Option<bool>("--studio")
+        {
+            Description = "Manage the studio's own bricks (~/.gaya/studio/Bricks) instead of a project's",
+        };
+
+        return new Command("brick", "Manage a project's or the studio's bricks (packages): add, remove, list, restore, update, embed; author, verify and pack your own")
         {
             BrickNewCommand(),
-            BrickAddCommand(projectOption),
-            BrickRemoveCommand(projectOption),
-            BrickListCommand(projectOption),
-            BrickRestoreCommand(projectOption),
+            BrickAddCommand(projectOption, studioOption),
+            BrickRemoveCommand(projectOption, studioOption),
+            BrickListCommand(projectOption, studioOption),
+            BrickRestoreCommand(projectOption, studioOption),
             BrickUpdateCommand(projectOption),
             BrickEmbedCommand(projectOption),
             BrickCopyCommand(projectOption),
@@ -49,20 +54,37 @@ public static partial class Program
             DefaultValueFactory = _ => "MIT",
         };
 
-        var command = new Command("new", "Create a brick folder with a manifest, an assembly definition and a script")
+        var kindOption = new Option<string>("--kind")
         {
-            idArg, pathOption, nameOption, licenseOption,
+            Description = "code (an assembly definition and a script), or a content-only studio brick: theme, icon-theme, font-pack",
+            DefaultValueFactory = _ => "code",
+        };
+        kindOption.AcceptOnlyFromAmong("code", "theme", "icon-theme", "font-pack");
+
+        var command = new Command("new", "Create a brick folder: code with a manifest, an assembly definition and a script, or a content-only theme, icon theme or font pack")
+        {
+            idArg, pathOption, nameOption, licenseOption, kindOption,
         };
         command.SetAction(result => RunBrick(() =>
         {
-            var root = BrickService.New(result.GetValue(pathOption)!.FullName, result.GetValue(idArg)!,
-                result.GetValue(nameOption), result.GetValue(licenseOption)!);
+            var parent = result.GetValue(pathOption)!.FullName;
+            var id = result.GetValue(idArg)!;
+            var root = result.GetValue(kindOption) switch
+            {
+                "theme" => ContentBricks.New(parent, id, ContentBrickKind.Theme, ProjectPackages.GayaVersion,
+                    result.GetValue(nameOption), result.GetValue(licenseOption)!),
+                "icon-theme" => ContentBricks.New(parent, id, ContentBrickKind.IconTheme, ProjectPackages.GayaVersion,
+                    result.GetValue(nameOption), result.GetValue(licenseOption)!),
+                "font-pack" => ContentBricks.New(parent, id, ContentBrickKind.FontPack, ProjectPackages.GayaVersion,
+                    result.GetValue(nameOption), result.GetValue(licenseOption)!),
+                _ => BrickService.New(parent, id, result.GetValue(nameOption), result.GetValue(licenseOption)!),
+            };
             Console.WriteLine($"Created {root}");
         }));
         return command;
     }
 
-    static Command BrickAddCommand(Option<DirectoryInfo> projectOption)
+    static Command BrickAddCommand(Option<DirectoryInfo> projectOption, Option<bool> studioOption)
     {
         var idArg = new Argument<string>("id") { Description = "Brick id" };
         var sourceArg = new Argument<string?>("source")
@@ -71,10 +93,22 @@ public static partial class Program
             Arity = ArgumentArity.ZeroOrOne,
         };
 
-        var command = new Command("add", "Install a brick into the project") { idArg, sourceArg, projectOption };
+        var command = new Command("add", "Install a brick into the project, or into the studio with --studio")
+        {
+            idArg, sourceArg, projectOption, studioOption,
+        };
         command.SetAction(result => RunBrick(() =>
         {
             var id = result.GetValue(idArg)!;
+            if (result.GetValue(studioOption))
+            {
+                var studio = TurianStudioBricks.Workspace();
+                studio.Add(id, result.GetValue(sourceArg));
+                var added = studio.Resolve().First(p => p.Id == id);
+                Console.WriteLine($"Installed {added.Id} {added.Version} ({added.Source}) into the studio");
+                return;
+            }
+
             var resolution = BrickService.Add(result.GetValue(projectOption)!.FullName, id, result.GetValue(sourceArg));
             var brick = resolution.Packages.First(p => p.Id == id);
             Console.WriteLine($"Installed {brick.Id} {brick.Version} ({brick.Source})");
@@ -82,14 +116,26 @@ public static partial class Program
         return command;
     }
 
-    static Command BrickRemoveCommand(Option<DirectoryInfo> projectOption)
+    static Command BrickRemoveCommand(Option<DirectoryInfo> projectOption, Option<bool> studioOption)
     {
         var idArg = new Argument<string>("id") { Description = "Brick id" };
 
-        var command = new Command("remove", "Remove a brick from the project's manifest") { idArg, projectOption };
+        var command = new Command("remove", "Remove a brick from the project's manifest, or the studio's with --studio")
+        {
+            idArg, projectOption, studioOption,
+        };
         command.SetAction(result => RunBrick(() =>
         {
             var id = result.GetValue(idArg)!;
+            if (result.GetValue(studioOption))
+            {
+                var studio = TurianStudioBricks.Workspace();
+                if (!studio.Remove(id)) throw new PackageException($"The studio's manifest does not declare {id}.");
+                studio.Restore();
+                Console.WriteLine($"Removed {id} from the studio");
+                return;
+            }
+
             var project = result.GetValue(projectOption)!.FullName;
             if (!BrickService.Remove(project, id))
                 throw new PackageException($"The project's manifest does not declare {id}.");
@@ -102,12 +148,18 @@ public static partial class Program
         return command;
     }
 
-    static Command BrickListCommand(Option<DirectoryInfo> projectOption)
+    static Command BrickListCommand(Option<DirectoryInfo> projectOption, Option<bool> studioOption)
     {
-        var command = new Command("list", "List the bricks the project resolves to") { projectOption };
+        var command = new Command("list", "List the bricks the project, or the studio with --studio, resolves to")
+        {
+            projectOption, studioOption,
+        };
         command.SetAction(result => RunBrick(() =>
         {
-            foreach (var brick in BrickService.List(result.GetValue(projectOption)!.FullName))
+            var bricks = result.GetValue(studioOption)
+                ? TurianStudioBricks.Workspace().Resolve()
+                : BrickService.List(result.GetValue(projectOption)!.FullName);
+            foreach (var brick in bricks)
             {
                 var direct = brick.Depth == 1 ? "*" : " ";
                 Console.WriteLine($"{direct} {brick.Id} {brick.Version} [{brick.Origin}] {brick.Source}");
@@ -116,18 +168,28 @@ public static partial class Program
         return command;
     }
 
-    static Command BrickRestoreCommand(Option<DirectoryInfo> projectOption)
+    static Command BrickRestoreCommand(Option<DirectoryInfo> projectOption, Option<bool> studioOption)
     {
         var lockedOption = new Option<bool>("--locked")
         {
             Description = "Install exactly what the lock file records and fail when the manifest has drifted (CI)",
         };
 
-        var command = new Command("restore", "Fetch every brick the project needs into the store") { projectOption, lockedOption };
+        var command = new Command("restore", "Fetch every brick the project, or the studio with --studio, needs into the store")
+        {
+            projectOption, lockedOption, studioOption,
+        };
         command.SetAction(result => RunBrick(() =>
         {
-            var resolution = BrickService.Restore(result.GetValue(projectOption)!.FullName,
-                result.GetValue(lockedOption) || Environment.GetEnvironmentVariable("CI") == "true");
+            var locked = result.GetValue(lockedOption) || Environment.GetEnvironmentVariable("CI") == "true";
+            if (result.GetValue(studioOption))
+            {
+                var studio = TurianStudioBricks.Workspace().ResolveAll(locked);
+                Console.WriteLine($"Restored {studio.Packages.Count} studio brick(s)");
+                return;
+            }
+
+            var resolution = BrickService.Restore(result.GetValue(projectOption)!.FullName, locked);
             Console.WriteLine($"Restored {resolution.Packages.Count} brick(s)");
         }));
         return command;

@@ -34,7 +34,7 @@ public sealed class GayaChromeTests
         readonly GayaApplication application;
 
         /// <summary>Creates an isolated workbench with temporary settings and layout files.</summary>
-        public Frame(StudioTheme? theme = null, IWindowIdentity? identity = null)
+        public Frame(float? zoom = null, IWindowIdentity? identity = null)
         {
             Directory.CreateDirectory(directory);
             var settings = new EditorSettings(NullLogger.Instance, Path.Combine(directory, "settings.json"));
@@ -47,9 +47,9 @@ public sealed class GayaChromeTests
             application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
                 new MenuRegistry(), Chrome, new TabStripChromeRegistry(), new ShortcutService(NullLogger.Instance),
                 new FocusTracker(), [], settings: settings, themes: themes);
-            Workbench = new Workbench(application, theme,
+            Workbench = new Workbench(application, null,
                 new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
-            if (theme is not null) application.Themes.SetScale(theme.FontSize, theme.Zoom);
+            if (zoom is { } scale) application.Themes.SetScale(ThemeTokens.Default.FontSize, scale);
             Input.MousePosition.Returns(new Vector2(-1, -1));
             Input.PrevMousePosition.Returns(new Vector2(-1, -1));
             Gui.Input = Input;
@@ -309,7 +309,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void CompactMenuAndOverlaysDoNotReserveExtraBarWidth()
     {
-        using var frame = new Frame(StudioTheme.Dark with { Name = "Small", Zoom = 0.6f });
+        using var frame = new Frame(zoom: 0.6f);
         frame.Chrome.Register(Descriptor("overlay", ChromeSlot.Overlay));
         frame.Draw();
         var nodes = Descendants(frame.Gui.RootNode!).ToList();

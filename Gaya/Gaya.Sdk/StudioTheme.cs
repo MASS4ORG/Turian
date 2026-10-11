@@ -1,15 +1,10 @@
 namespace Gaya.Sdk;
 
 /// <summary>
-/// A named set of colors and metrics the whole studio is drawn with — chrome, dock space, panels and
-/// the controls inside them. Panels read <see cref="Current"/> instead of holding colors of their
-/// own, so switching a theme repaints everything on the next frame.
+/// The legacy C# theme record: fifteen colors and the studio metrics. Themes are now <c>.pss</c> sheets compiled
+/// into <see cref="ThemeTokens"/>; this record only feeds <see cref="IThemeService.Register(StudioTheme)"/>.
 /// </summary>
-/// <remarks>
-/// <see cref="TextScale"/> and <see cref="Zoom"/> are the user's two size knobs, applied through
-/// <see cref="Text"/> and <see cref="Scale"/>: text scales on its own, and everything a control
-/// measures — row, tab and button heights — scales with the zoom.
-/// </remarks>
+[Obsolete("Themes are .pss sheets compiled into ThemeTokens; StudioTheme is removed in the next release.")]
 public sealed record StudioTheme
 {
     /// <summary>The name shown in the View menu and persisted in the appearance settings.</summary>
@@ -395,10 +390,4 @@ public sealed record StudioTheme
         Dracula, Monokai, OneDark, Nord, Gruvbox, TokyoNight, Catppuccin,
         SolarizedDark, SolarizedLight, AyuDark, AyuLight,
     ];
-
-    /// <summary>
-    /// The theme everything draws with right now. An ambient value rather than an injected service:
-    /// the drawers that need it are static, and every panel in the process shares one theme anyway.
-    /// </summary>
-    public static StudioTheme Current { get; set; } = Dark;
 }

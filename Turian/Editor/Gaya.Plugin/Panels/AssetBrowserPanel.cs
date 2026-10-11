@@ -266,7 +266,7 @@ sealed class AssetBrowserPanel : IPanel
             entry.IsDirectory,
             Icon: IconFor(entry),
             Tag: entry,
-            Tint: entry.IsDirectory ? StudioTheme.Current.Folder : null));
+            Tint: entry.IsDirectory ? ThemeTokens.Current.Folder : null));
 
         if (!entry.IsDirectory) return;
 
@@ -281,7 +281,7 @@ sealed class AssetBrowserPanel : IPanel
     /// </summary>
     Action<Gui> IconFor(AssetEntry entry)
     {
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         var size = theme.Scale(theme.RowHeight) - 4f;
 
         if (entry.IsDirectory)

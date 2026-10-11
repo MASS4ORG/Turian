@@ -62,9 +62,17 @@ public sealed class InspectorMembershipTests
         static IEnumerable<LayoutNode> Descendants(LayoutNode node) =>
             new[] { node }.Concat(node.Children.SelectMany(Descendants));
 
-        internal LayoutNode Find(string widget, string suffix) => Nodes.Single(node =>
-            node.Id.Contains($"/{widget}:", StringComparison.Ordinal)
-            && node.Id.EndsWith(suffix, StringComparison.Ordinal));
+        internal LayoutNode Find(string widget, string suffix)
+        {
+            var ownerId = widget switch
+            {
+                "tags" => "inspector/header/field1/editor",
+                "layer-mask" => "inspector/section1/field0/editor",
+                _ => throw new ArgumentOutOfRangeException(nameof(widget)),
+            };
+            var owner = Nodes.Single(node => node.Id == ownerId);
+            return Descendants(owner).Single(node => node.Id.EndsWith(suffix, StringComparison.Ordinal));
+        }
 
         internal void Click(LayoutNode node)
         {

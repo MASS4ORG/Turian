@@ -1,0 +1,149 @@
+// Gaya base theme: defines every studio token. Themes start with @import "gaya.base"; and override what they need.
+// Most tokens derive from the three seeds, so a theme that sets only $base, $accent and $contrast is complete.
+
+// Seeds
+$base = #232323;
+$accent = #8c8c8c;
+$contrast = 0.3;
+
+// Elevation ladder (Godot): positive offsets darken, negative ones brighten, scaled by $contrast
+$surface-lowest = shade($base, 1.7, 0.9);
+$surface-lower = shade($base, 1.1, 0.9);
+$surface-low = shade($base, 0.8);
+$surface-base = $base;
+$surface-high = shade($base, -1.3, 0.8);
+$surface-higher = shade($base, -1.5, 0.8);
+$surface-highest = shade($base, -2.2, 0.6);
+$button = shade($base, -2.0);
+$button-hover = shade($base, -2.9);
+$button-pressed = shade($base, -3.2);
+
+// Surfaces
+$surface-window = $surface-lower;
+$surface-panel = $surface-base;
+$surface-chrome = $surface-high;
+$surface-field = $surface-lowest;
+$surface-hover = $surface-higher;
+$surface-active = $surface-highest;
+$surface-popup = $surface-panel;
+$surface-editor-area = shade($base, 1.9, 0.9);
+$scrim = rgba(0, 0, 0, 90);
+$shadow = rgba(0, 0, 0, 77);
+
+// Ink: the mono color of the base, blended down for secondary and disabled text
+$ink-mono = contrast-ink($base);
+$ink = mix($base, $ink-mono, 0.82);
+$ink-dim = mix($base, $ink-mono, 0.55);
+$ink-faint = mix($base, $ink-mono, 0.38);
+$ink-on-accent = contrast-ink($accent);
+$link = $accent;
+
+// Lines
+$border = $surface-highest;
+$border-strong = $ink-faint;
+$divider = $border;
+$focus-ring = alpha($accent, 0.502);
+
+// Accent
+$accent-hover = mix($accent, $ink-mono, 0.15);
+$accent-fill = mix($surface-panel, $accent, 0.25);
+$selection = alpha($accent, 0.4314);
+$selection-ink = $ink;
+
+// Semantic: foreground, background and border
+$error = #d67676;
+$warning = #ebbe6e;
+$success = #8bc58b;
+$info = #6fa8dc;
+$hint = $ink-dim;
+$error-bg = mix($surface-panel, $error, 0.15);
+$error-border = mix($surface-panel, $error, 0.5);
+$warning-bg = mix($surface-panel, $warning, 0.15);
+$warning-border = mix($surface-panel, $warning, 0.5);
+$success-bg = mix($surface-panel, $success, 0.15);
+$success-border = mix($surface-panel, $success, 0.5);
+$info-bg = mix($surface-panel, $info, 0.15);
+$info-border = mix($surface-panel, $info, 0.5);
+$hint-bg = mix($surface-panel, $hint, 0.15);
+$hint-border = mix($surface-panel, $hint, 0.5);
+
+// Version control states
+$created = #73c991;
+$modified = #e2c08d;
+$deleted = #e06c6c;
+$renamed = #6fb3d2;
+$conflict = #e4676b;
+$ignored = $ink-faint;
+$created-bg = mix($surface-panel, $created, 0.15);
+$created-border = mix($surface-panel, $created, 0.5);
+$modified-bg = mix($surface-panel, $modified, 0.15);
+$modified-border = mix($surface-panel, $modified, 0.5);
+$deleted-bg = mix($surface-panel, $deleted, 0.15);
+$deleted-border = mix($surface-panel, $deleted, 0.5);
+$renamed-bg = mix($surface-panel, $renamed, 0.15);
+$renamed-border = mix($surface-panel, $renamed, 0.5);
+$conflict-bg = mix($surface-panel, $conflict, 0.15);
+$conflict-border = mix($surface-panel, $conflict, 0.5);
+$ignored-bg = mix($surface-panel, $ignored, 0.15);
+$ignored-border = mix($surface-panel, $ignored, 0.5);
+
+// Domain
+$folder = #e2c076;
+$log-debug = $ink-faint;
+$log-info = $ink;
+$log-warning = $warning;
+$log-error = $error;
+
+// Terminal
+$ansi-0 = #000000;
+$ansi-1 = #cd3131;
+$ansi-2 = #0dbc79;
+$ansi-3 = #e5e510;
+$ansi-4 = #2472c8;
+$ansi-5 = #bc3fbc;
+$ansi-6 = #11a8cd;
+$ansi-7 = #e5e5e5;
+$ansi-8 = #666666;
+$ansi-9 = #f14c4c;
+$ansi-10 = #23d18b;
+$ansi-11 = #f5f543;
+$ansi-12 = #3b8eea;
+$ansi-13 = #d670d6;
+$ansi-14 = #29b8db;
+$ansi-15 = #e5e5e5;
+
+// Metrics
+$font-size = 12;
+$font-size-small = 11;
+$font-size-large = 13;
+$font-size-title = 16;
+$menu-height = 30;
+$status-height = 24;
+$header-height = 24;
+$row-height = 20;
+$gap = 6;
+$padding = 6;
+$spacing = 4;
+$radius = 4;
+$radius-small = 3;
+$border-width = 1;
+$focus-ring-width = 2;
+
+// Effects
+$transition-fast = 0.12;
+
+// Guinevere controls: the Excalibur default sheet's tokens that have no studio token of the same name
+$base-background = $surface-panel;
+$surface = $surface-field;
+$popup = $surface-popup;
+$border-active = $ink-faint;
+$accent-subtle = $accent-fill;
+$text = $ink;
+$text-dim = $ink-dim;
+$text-disabled = $ink-faint;
+$text-on-accent = $ink-on-accent;
+$selected = $accent;
+$positive = $success;
+$negative = $error;
+$text-selection = $selection;
+$overlay = $scrim;

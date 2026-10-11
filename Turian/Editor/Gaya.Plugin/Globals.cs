@@ -11,6 +11,8 @@ global using System.Runtime.CompilerServices;
 global using System.Runtime.InteropServices;
 global using System.Text.RegularExpressions;
 global using Autoformers;
+global using Gaya.Packages;
+global using Gaya.Packages.Editor;
 global using Gaya.Sdk;
 global using Guinevere;
 global using MASS4.Attributes;

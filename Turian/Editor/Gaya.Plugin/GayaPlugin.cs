@@ -46,6 +46,7 @@ public sealed class GayaPlugin : IPlugin
             sp.GetRequiredService<ILogger>()));
 
         RegisterSettings(context);
+        ViewportThemeTokens.Register(context.Themes);
 
         context.Panels.Register(new PanelDescriptor(
             SceneTreePanelId, "Scene Tree", PanelPlacement.Left,
@@ -177,11 +178,13 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<IPanelAccessor>()))
         { OpenByDefault = false });
 
-        context.Panels.Register(new PanelDescriptor(
-            BricksPanelId, "Bricks", PanelPlacement.Center,
-            sp => new BricksPanel(sp.GetRequiredService<BricksController>(), sp.GetRequiredService<FileDialogChrome>(),
-                sp.GetRequiredService<NodeInspectorController>()))
-        { OpenByDefault = false });
+        // The Bricks panel belongs to the host; the project's bricks, tasks, inspector and dialogs plug into it.
+        context.Services.AddSingleton<IProjectBricks>(sp => sp.GetRequiredService<TurianProjectBricks>());
+        context.Services.AddSingleton<IBrickTaskRunner>(sp => sp.GetRequiredService<TurianProjectBricks>());
+        context.Services.AddSingleton<IBrickInspector>(sp => new TurianBrickInspector(
+            sp.GetRequiredService<NodeInspectorController>(), sp.GetRequiredService<SettingsService>()));
+        context.Services.AddSingleton<IBrickFileDialogs>(sp => new BrickFileDialogs(
+            sp.GetRequiredService<FileDialogChrome>()));
 
         context.Services.AddSingleton<FileDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
@@ -217,7 +220,7 @@ public sealed class GayaPlugin : IPlugin
     public const string ShortcutsPanelId = "gaya.turian.shortcuts";
 
     /// <summary>The Bricks panel's id, which the Project menu's entry brings to the front.</summary>
-    public const string BricksPanelId = "gaya.turian.bricks";
+    public const string BricksPanelId = BricksPanel.PanelId;
 
     /// <summary>The Inspector's id, which Project Settings brings to the front.</summary>
     public const string InspectorPanelId = "gaya.turian.inspector";
@@ -377,7 +380,6 @@ public sealed class GayaPlugin : IPlugin
         var projectPath = ProjectBootstrapper.ParseProjectArgument([.. args]);
         if (projectPath is null)
         {
-            log.LogInformation("No --project given; start with one to open a scene");
             return;
         }
 

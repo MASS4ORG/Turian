@@ -41,7 +41,7 @@ public sealed class UiStyleSheetAssetImporter : IAssetImporter
 
         try
         {
-            _ = StyleSheet.Parse(File.ReadAllText(sourcePath));
+            _ = StyleSheet.Parse(File.ReadAllText(sourcePath), UiStyleSheetAsset.ParseOptions);
         }
         catch (FormatException ex)
         {

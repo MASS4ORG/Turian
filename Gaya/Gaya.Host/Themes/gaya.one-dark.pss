@@ -1,0 +1,23 @@
+// One Dark: Atom's editor palette, the classic #282C34 grey with its soft blue accent.
+@const theme-id = "gaya.one-dark";
+@const theme-name = "One Dark";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #282c34;
+$accent = #61afef;
+
+$surface-window = #21252b;
+$surface-panel = #282c34;
+$surface-chrome = #2c313c;
+$surface-field = #1b1e23;
+$surface-hover = #3a3f4b;
+$surface-editor-area = #181a1f;
+$border = #3e4451;
+$ink = #abb2bf;
+$ink-dim = #828c99;
+$ink-faint = #5c6370;
+$accent-fill = #2c3e52;
+$error = #e06c75;
+$warning = #e5c07b;
+$folder = #d19a66;

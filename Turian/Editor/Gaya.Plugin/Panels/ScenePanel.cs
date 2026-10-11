@@ -9,7 +9,7 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
     NodeInspectorController inspector, AssetWorkspace workspace, PrefabStage prefabStage)
     : IPanel, IDisposable
 {
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     static float ToolbarHeight => Theme.Scale(26f);
     readonly SceneToolbar toolbar = new(viewport, () =>

@@ -14,9 +14,9 @@ public sealed class BricksControllerTests : IDisposable
     {
         project = new ProjectBootstrapper().CreateAsync(Path.Combine(root, "game")).GetAwaiter().GetResult()!;
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
-        controller = new BricksController(settings, new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
-            applier, NullLogger.Instance)
-        { Store = new PackageStore(Path.Combine(root, "store")) };
+        controller = TestBricks.Controller(settings, new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
+            applier);
+        controller.Store = new PackageStore(Path.Combine(root, "store"));
     }
 
     /// <inheritdoc/>
@@ -47,8 +47,8 @@ public sealed class BricksControllerTests : IDisposable
     [Fact]
     public async Task WithoutAProjectNothingRuns()
     {
-        var closed = new BricksController(new SettingsService(), new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
-            applier, NullLogger.Instance);
+        var closed = TestBricks.Controller(new SettingsService(), new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
+            applier);
 
         closed.Refresh();
         Assert.False(closed.HasProject);
@@ -317,7 +317,7 @@ public sealed class BricksControllerTests : IDisposable
     public async Task SettingsSaveAndRollback()
     {
         controller.Refresh();
-        var form = controller.InspectSettings()!;
+        var form = controller.InspectSettings(settings)!;
         var bricks = Assert.IsType<BricksSettings>(form.Target);
         Assert.Same(settings.Settings!.Bricks, bricks);
         bricks.Dependencies.Remove("org.mass4.turian.cameras");
@@ -364,7 +364,7 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         controller.Selected = "org.mass4.turian.ui";
         var brick = Assert.IsType<FormInspection>(controller.InspectSelection());
-        var form = controller.InspectSettings()!;
+        var form = controller.InspectSettings(settings)!;
         settings.Set(new AppSettings { ProjectAbsoluteDir = Path.Combine(root, "other") });
         foreach (var button in brick.Model.Sections.SelectMany(s => s.Buttons).Concat(form.Model.Sections[0].Buttons))
         {

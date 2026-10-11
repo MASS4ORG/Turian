@@ -1,0 +1,23 @@
+// The studio's own dark theme, and the default: neutral greys with no color cast, so the chrome never fights game content for attention.
+@const theme-id = "gaya.dark";
+@const theme-name = "Dark";
+@const theme-kind = dark;
+@import "gaya.base";
+
+$base = #232323;
+$accent = #8c8c8c;
+
+$surface-window = #1a1a1a;
+$surface-panel = #232323;
+$surface-chrome = #2b2b2b;
+$surface-field = #161616;
+$surface-hover = #383838;
+$surface-editor-area = #101010;
+$border = #3a3a3a;
+$ink = #d6d6d6;
+$ink-dim = #909090;
+$ink-faint = #6b6b6b;
+$accent-fill = #3e3e3e;
+$error = #d67676;
+$warning = #ebbe6e;
+$folder = #e2c076;

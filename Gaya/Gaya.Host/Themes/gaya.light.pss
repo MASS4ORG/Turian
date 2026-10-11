@@ -1,0 +1,24 @@
+// The studio's own light theme: the same neutral greys flipped.
+@const theme-id = "gaya.light";
+@const theme-name = "Light";
+@const theme-kind = light;
+@import "gaya.base";
+
+$base = #f7f7f7;
+$accent = #3d3d3d;
+$contrast = -0.06;
+
+$surface-window = #e5e5e5;
+$surface-panel = #f7f7f7;
+$surface-chrome = #efefef;
+$surface-field = #ffffff;
+$surface-hover = #e0e0e0;
+$surface-editor-area = #dfdfdf;
+$border = #cfcfcf;
+$ink = #242424;
+$ink-dim = #5f5f5f;
+$ink-faint = #8f8f8f;
+$accent-fill = #dcdcdc;
+$error = #b03030;
+$warning = #9b6c0c;
+$folder = #b08a2e;

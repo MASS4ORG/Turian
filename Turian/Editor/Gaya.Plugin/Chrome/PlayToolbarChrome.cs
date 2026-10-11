@@ -7,7 +7,7 @@ namespace Gaya.Plugin.Turian;
 /// </summary>
 sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService playMode) : IChromeItem
 {
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     static float ButtonSize => Theme.Scale(24f);
     static float IconSize => Theme.Scale(13f);

@@ -26,7 +26,7 @@ sealed class FileDialogChrome : IChromeItem
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        var theme = StudioTheme.Current;
+        var theme = ThemeTokens.Current;
         gui.FileDialog(state, theme.Scale(dialogWidth), theme.Scale(dialogHeight),
             theme.Text(theme.FontSize + 1f));
     }

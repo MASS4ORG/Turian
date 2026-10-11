@@ -1,6 +1,6 @@
 using Gaya.Packages;
 
-namespace Turian.Editor.Core;
+namespace Gaya.Packages.Editor;
 
 /// <summary>
 /// How far a brick is from being used: known from a repository (<see cref="Available"/>), present on this machine
@@ -33,8 +33,24 @@ public enum BrickFilter
     /// <summary>Installed bricks with a newer version available.</summary>
     Updates,
 
-    /// <summary>Bricks that ship with the engine.</summary>
+    /// <summary>Bricks that ship with the host.</summary>
     BuiltIn,
+}
+
+/// <summary>Which kind of content a brick provides, from its <c>categories</c>.</summary>
+public enum BrickCategoryFilter
+{
+    /// <summary>Every brick.</summary>
+    All,
+
+    /// <summary>Color themes (<c>gaya:theme</c>).</summary>
+    Themes,
+
+    /// <summary>Icon themes (<c>gaya:icon-theme</c>).</summary>
+    IconThemes,
+
+    /// <summary>Font packs (<c>gaya:font-pack</c>).</summary>
+    Fonts,
 }
 
 /// <summary>One brick as the catalog lists it, whether or not the project installs it.</summary>
@@ -50,7 +66,7 @@ public enum BrickFilter
 /// client itself recorded or configured. Nothing the brick says about itself counts.
 /// </param>
 /// <param name="InstallSource">The value to declare to install it; null for a built-in brick or when no origin is known.</param>
-/// <param name="IsBuiltin">Whether the brick ships with the engine.</param>
+/// <param name="IsBuiltin">Whether the brick ships with the host.</param>
 public sealed record CatalogBrick(string Id, string? DisplayName, string? Description, string? Author, BrickState State,
     string? InstalledVersion, string? LatestVersion, string? Origin, string? InstallSource, bool IsBuiltin)
 {
@@ -73,15 +89,21 @@ public sealed record CatalogBrick(string Id, string? DisplayName, string? Descri
 /// </summary>
 public static class BrickCatalog
 {
-    /// <summary>The catalog from sources that need no network: the project, the built-in bricks and the shared store.</summary>
-    /// <param name="installed">What the project resolves: every brick it uses.</param>
-    /// <param name="builtinDirectory">The folder of the bricks that ship with the engine.</param>
+    /// <summary>
+    /// The catalog from sources that need no network: the workspace, the host's built-in bricks and the shared store,
+    /// keeping only bricks that accept the workspace's scope.
+    /// </summary>
+    /// <param name="installed">What the workspace resolves: every brick it uses.</param>
+    /// <param name="builtinDirectory">The folder of the bricks that ship with the host.</param>
     /// <param name="store">The shared store, or null.</param>
+    /// <param name="reserved">Category prefixes only hosts may use, passed when reading manifests.</param>
+    /// <param name="scope">The workspace's scope.</param>
     /// <returns>One entry per brick id, by id.</returns>
     public static IReadOnlyList<CatalogBrick> Local(IReadOnlyList<ResolvedPackage> installed, string? builtinDirectory,
-        PackageStore? store)
+        PackageStore? store, IReadOnlyCollection<string> reserved, PackageScope scope = PackageScope.Project)
     {
         ArgumentNullException.ThrowIfNull(installed);
+        ArgumentNullException.ThrowIfNull(reserved);
 
         var bricks = new Dictionary<string, CatalogBrick>(StringComparer.Ordinal);
 
@@ -94,12 +116,12 @@ public static class BrickCatalog
             { Manifest = package.Manifest };
         }
 
-        foreach (var manifest in BuiltinBricks(builtinDirectory))
+        foreach (var manifest in BuiltinBricks(builtinDirectory, reserved).Where(m => m.EffectiveScopes.Contains(scope)))
             Offer(bricks, manifest, $"builtin:{manifest.Name}", null, stored: false);
 
         if (store is not null)
         {
-            foreach (var (folder, manifest) in store.Packages(["gaya", ProjectPackages.HostName]))
+            foreach (var (folder, manifest) in store.Packages(reserved).Where(p => p.Manifest.EffectiveScopes.Contains(scope)))
             {
                 var origin = store.ReadOrigin(folder);
                 Offer(bricks, manifest, origin, InstallSourceOf(origin, manifest), stored: true);
@@ -142,12 +164,14 @@ public static class BrickCatalog
         return Newer(withOrigin, version) ? withOrigin with { LatestVersion = latest } : withOrigin;
     }
 
-    /// <summary>Narrows a catalog to a filter and a search text.</summary>
+    /// <summary>Narrows a catalog to a filter, a content category and a search text.</summary>
     /// <param name="bricks">The catalog.</param>
     /// <param name="filter">Which group to keep.</param>
     /// <param name="search">Text the id, name or author must contain; everything when empty.</param>
+    /// <param name="category">Which kind of content to keep; registry-only entries match only <see cref="BrickCategoryFilter.All"/>.</param>
     /// <returns>The matching bricks, in order.</returns>
-    public static IReadOnlyList<CatalogBrick> Filter(IEnumerable<CatalogBrick> bricks, BrickFilter filter, string? search)
+    public static IReadOnlyList<CatalogBrick> Filter(IEnumerable<CatalogBrick> bricks, BrickFilter filter, string? search,
+        BrickCategoryFilter category = BrickCategoryFilter.All)
     {
         ArgumentNullException.ThrowIfNull(bricks);
 
@@ -161,11 +185,24 @@ public static class BrickCatalog
                     BrickFilter.BuiltIn => b.IsBuiltin,
                     _ => true,
                 })
+                .Where(b => category == BrickCategoryFilter.All
+                            || b.Manifest?.Categories.Contains(CategoryName(category), StringComparer.Ordinal) == true)
                 .Where(b => string.IsNullOrWhiteSpace(search)
                             || new[] { b.Id, b.DisplayName, b.Author }.Any(text =>
                                 text?.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase) == true)),
         ];
     }
+
+    /// <summary>The manifest category a filter keeps.</summary>
+    /// <param name="category">The filter.</param>
+    /// <returns>The category, such as <c>gaya:theme</c>; empty for <see cref="BrickCategoryFilter.All"/>.</returns>
+    public static string CategoryName(BrickCategoryFilter category) => category switch
+    {
+        BrickCategoryFilter.Themes => "gaya:theme",
+        BrickCategoryFilter.IconThemes => "gaya:icon-theme",
+        BrickCategoryFilter.Fonts => "gaya:font-pack",
+        _ => "",
+    };
 
     // A registry brick is declared by version range; the registry itself is how the client fetches it again.
     static string? InstallSourceOf(string? origin, PackageManifest manifest) =>
@@ -203,7 +240,7 @@ public static class BrickCatalog
     static bool Newer(CatalogBrick known, SemanticVersion version) =>
         known.LatestVersion is not { } latest || !SemanticVersion.TryParse(latest, out var have) || version > have;
 
-    static IEnumerable<PackageManifest> BuiltinBricks(string? directory)
+    static IEnumerable<PackageManifest> BuiltinBricks(string? directory, IReadOnlyCollection<string> reserved)
     {
         if (directory is null || !Directory.Exists(directory)) yield break;
 
@@ -212,7 +249,7 @@ public static class BrickCatalog
             PackageManifest manifest;
             try
             {
-                manifest = PackageManifest.Load(folder, ["gaya", ProjectPackages.HostName]);
+                manifest = PackageManifest.Load(folder, reserved);
             }
             catch (PackageException)
             {

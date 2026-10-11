@@ -3,6 +3,8 @@ global using System.Reflection;
 global using System.Text.Json;
 global using System.Text.Json.Nodes;
 global using Autoformers;
+global using Gaya.Packages;
+global using Gaya.Packages.Editor;
 global using Gaya.Sdk;
 global using Guinevere;
 global using MASS4.Attributes;

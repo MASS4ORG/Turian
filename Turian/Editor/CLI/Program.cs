@@ -36,7 +36,8 @@ public static partial class Program
             BrickCommand(),
             VariantCommand(),
             ImportCommand(),
-            UiCommand()
+            UiCommand(),
+            ThemeCommand()
         };
 
         return await root.Parse(args).InvokeAsync();

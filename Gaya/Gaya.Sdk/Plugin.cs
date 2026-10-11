@@ -98,6 +98,9 @@ public interface IPluginContext
     /// <summary>Editor-wide settings pages this plugin contributes.</summary>
     ISettingsRegistry Settings { get; }
 
+    /// <summary>Theme tokens this plugin declares with defaults, which themes may override.</summary>
+    IThemeTokenRegistry Themes { get; }
+
     /// <summary>Logger scoped with the plugin id.</summary>
     ILogger Logger { get; }
 

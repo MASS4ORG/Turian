@@ -114,7 +114,7 @@ public sealed partial class UiRenderer
     /// The effective value of style property <paramref name="name"/> for a leaf element: the inline
     /// <c>style="…"</c> declaration if present, otherwise the value the active <c>.uss</c> sheets
     /// resolve for the element's type / classes / id. Containers get this through
-    /// <see cref="Gui.StyledNode"/>; leaves (text, buttons, fields) have no node and read it here.
+    /// <c>gui.StyledNode</c>; leaves (text, buttons, fields) have no node and read it here.
     /// </summary>
     string Style(Gui gui, UiElement el, string name)
     {

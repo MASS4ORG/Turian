@@ -15,21 +15,25 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <EmbeddedResource Include="Resources/logo.png"/>
+        <EmbeddedResource Include="Themes/*.pss" LogicalName="Gaya.Host.Themes.%(Filename)%(Extension)"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
         <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="5.*"/>
-        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="5.*"/>
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*"/>
+        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*"/>
+        <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
     </ItemGroup>
 
     <!-- External libraries -->

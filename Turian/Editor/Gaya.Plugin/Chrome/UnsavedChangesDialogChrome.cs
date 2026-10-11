@@ -11,7 +11,7 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
     const float footerHeight = 44f;
     const float buttonWidth = 110f;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     bool isOpen;
     string message = string.Empty;

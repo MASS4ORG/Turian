@@ -70,13 +70,13 @@ public sealed partial class Workbench
     /// </summary>
     void BuildThemeMenu(FlyoutBuilder builder)
     {
-        foreach (var studioTheme in app.Themes.Themes)
+        foreach (var theme in app.Themes.ColorThemes)
         {
-            var name = studioTheme.Name;
-            builder.CheckItem(name,
-                () => string.Equals(app.Themes.CommittedName, name, StringComparison.OrdinalIgnoreCase),
-                _ => app.Themes.Apply(name),
-                onHover: () => app.Themes.Preview(name));
+            var id = theme.Id;
+            builder.CheckItem(theme.Name,
+                () => string.Equals(app.Themes.CommittedColorTheme, id, StringComparison.OrdinalIgnoreCase),
+                _ => app.Themes.ApplyColorTheme(id),
+                onHover: () => app.Themes.PreviewColorTheme(id));
         }
     }
 
@@ -190,7 +190,7 @@ public sealed partial class Workbench
     sealed class BrokenPanel(string panelId) : IPanel
     {
         public void Render(Gui gui) =>
-            gui.DrawText($"{panelId} failed to load — see the log.", StudioTheme.Current.Text(12),
-                StudioTheme.Current.Error);
+            gui.DrawText($"{panelId} failed to load — see the log.", ThemeTokens.Current.Text(12),
+                ThemeTokens.Current.Error);
     }
 }

@@ -73,7 +73,7 @@ sealed class GameViewport : IDisposable
         if (root is null || camera is null)
         {
             ReleaseInput();
-            gui.DrawText("No camera in the scene.", StudioTheme.Current.Text(12), StudioTheme.Current.InkDim,
+            gui.DrawText("No camera in the scene.", ThemeTokens.Current.Text(12), ThemeTokens.Current.InkDim,
                 centerInRect: false);
             return;
         }
@@ -94,7 +94,7 @@ sealed class GameViewport : IDisposable
     {
         if (failure is not null)
         {
-            gui.DrawText(failure, StudioTheme.Current.Text(12), StudioTheme.Current.Error, centerInRect: false);
+            gui.DrawText(failure, ThemeTokens.Current.Text(12), ThemeTokens.Current.Error, centerInRect: false);
             return false;
         }
         var rect = gui.CurrentNode.Rect;

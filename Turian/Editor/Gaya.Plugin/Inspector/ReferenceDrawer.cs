@@ -14,7 +14,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     const float pickerWidth = 280f;
     const float pickerHeight = 240f;
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     static float RowHeight => Theme.Scale(18f);
 
@@ -121,8 +121,7 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         var open = true;
         gui.Popup(ref open, () => PickerContent(gui, reference), pickerWidth, pickerHeight,
             $"Select {reference.TargetType.Name}",
-            PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight),
-            backgroundColor: Theme.Panel, borderColor: Theme.Border, titleBarColor: Theme.Border, titleTextColor: Theme.Ink);
+            PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight));
 
         if (open) return;
 

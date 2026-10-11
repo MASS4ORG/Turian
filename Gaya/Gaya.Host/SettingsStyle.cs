@@ -6,7 +6,7 @@ static class SettingsStyle
     /// <summary>The Font Awesome rotate-left glyph, which the workbench font set includes.</summary>
     public const string RevertIcon = "";
 
-    static StudioTheme Theme => StudioTheme.Current;
+    static ThemeTokens Theme => ThemeTokens.Current;
 
     /// <summary>The category tree's metrics, matching the studio's other trees.</summary>
     public static TreeViewTheme Tree() => new()

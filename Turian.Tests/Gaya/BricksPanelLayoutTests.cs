@@ -19,9 +19,9 @@ public sealed class BricksPanelLayoutTests : IDisposable
             "Inventory with a very long display name");
         var settings = new SettingsService();
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
-        var controller = new BricksController(settings,
+        var controller = TestBricks.Controller(settings,
             new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
-            Substitute.For<IBrickApplier>(), NullLogger.Instance);
+            Substitute.For<IBrickApplier>());
         var panel = new BricksPanel(controller);
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1, -1));
@@ -62,11 +62,11 @@ public sealed class BricksPanelLayoutTests : IDisposable
     public void InspectorDraftsFollowTheirProject()
     {
         var settings = new SettingsService();
-        var controller = new BricksController(settings,
+        var controller = TestBricks.Controller(settings,
             new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
-            Substitute.For<IBrickApplier>(), NullLogger.Instance);
+            Substitute.For<IBrickApplier>());
         var selection = new NodeInspectorController(new AssetManager());
-        var panel = new BricksPanel(controller, inspector: selection);
+        var panel = new BricksPanel(controller, inspector: new TurianBrickInspector(selection, settings));
         var gui = new Gui { Input = Substitute.For<IInputHandler>() };
         using var surface = SKSurface.Create(new SKImageInfo(640, 480));
         var font = Font.FromFamilyName("sans-serif", 14);
@@ -83,7 +83,7 @@ public sealed class BricksPanelLayoutTests : IDisposable
         Render();
         Assert.Same(registry, selection.SelectedObject);
         Assert.Equal("unsaved", ((ScopedRegistry)registry.Target).Name);
-        selection.Select(controller.InspectSettings());
+        selection.Select(controller.InspectSettings(settings));
         controller.Refresh();
         Render();
         var original = selection.SelectedObject;
