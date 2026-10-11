@@ -7,31 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Changed (breaking): `.pss` color themes with hot reload #213
-- Changed (breaking): Guinevere fluent effects.
-- Changed (breaking): Gaya settings use class-level attributes as their sole configuration
-- Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
-- Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
-- Changed (breaking): Vulkan renderer moved out of core into a brick #62 #35
-- Added: build profiles and platforms; headless dedicated server builds
-- Added: `Assets/Project.dataasset` registers settings and build profiles and records the engine version
-- Added: Asset browser revamp #68
-- Added: Theme bricks from the command line #215
-- Added: Bricks panel moved to Gaya with studio/project scopes #214
-- Added: scene Frame Statistics HUD #59
-- Added: temporary scenes
-- Added: Icon sets (Mono, Color) #217
-- Added: Material 3 as default theme; classic OS themes as bricks #212
-- Added: in-game UI supports GPU rendering on Vulkan.
-- Added: CI/CD test also emits a TRX report
-- Added: Build Profiles window
-- Improved: Panels API delegate tab-strip area.
-- Improved: Studio renders on demand
-- Improved: "Build & Run" and "export" skip the redundant NuGet restore already done during setup.
-- Changed: Guinevere controls now use style sheets #218
-- Changed: project solution generator revamped
-- Fixed: local builds report the engine version from the csproj `Version`
-- Fixed: shaders compile to SPIR-V 1.5, which Vulkan 1.2 devices load
+## [3.0.0] - 2026-10-11
+
+- Added: Vulkan renderer brick, headless player, build profiles and project asset #35 #62
+- Added: temporary scenes and frame statistics HUD with Game panel overlay #59
+- Changed: GPU-rendered UI and on-demand Studio pacing, Material 3 default theme, classic OS themes and icon sets #212, #217
+- Changed: OBJ import as editor brick, glTF/GLB internal mesh format, exporting process revamp #47
+- Changed: asset browser revamp, class-attribute Gaya settings and panel-owned headers #68
+- Changed: .pss theme API, theme bricks and theme sheets (#213, #214, #215, #218)
 
 ## [2.3.1] - 2026-10-07
 
@@ -86,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v2.3.1...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/MASS4ORG/Turian/compare/v2.3.1...v3.0.0
 [2.3.1]: https://github.com/MASS4ORG/Turian/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/MASS4ORG/Turian/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/MASS4ORG/Turian/compare/v2.1.0...v2.2.0
