@@ -22,6 +22,7 @@
     "scopes": { "type": "array", "items": { "enum": ["project", "studio", "game"] } },
     "editorOnly": { "type": "boolean" },
     "compileTimeOnly": { "type": "boolean" },
+    "clientOnly": { "type": "boolean", "description": "Server builds leave the package out, with every package depending on it." },
     "categories": { "type": "array", "items": { "type": "string", "pattern": "^[^:]+:.+$" } },
     "upstream": { "type": "string", "description": "For an embedded fork: id@version (commit or hash) it was copied from." },
     "precast": {

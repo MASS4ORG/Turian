@@ -85,7 +85,9 @@ public class RuntimeDependenciesTests
         Assert.Equal(resolved["Microsoft.Extensions.Hosting"], packages["Microsoft.Extensions.Hosting"]);
         Assert.All(settings.PackageReferences, package => Assert.Equal(resolved[package.Item1], package.Item2));
         Assert.Contains("Microsoft.Extensions.DependencyInjection.Abstractions", packages.Keys);
-        Assert.Contains("Ultz.Native.GLFW", packages.Keys);
+        // The renderer and window come from the render brick, so the launcher graph carries no native graphics.
+        Assert.DoesNotContain("Ultz.Native.GLFW", packages.Keys);
+        Assert.DoesNotContain("Silk.NET.Vulkan", packages.Keys);
         Assert.DoesNotContain(packages.Keys, static name => name.StartsWith("Silk.NET.Assimp", StringComparison.Ordinal));
         Assert.DoesNotContain(packages.Keys, static name => name.StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal));
         Assert.DoesNotContain("System.Composition", packages.Keys);

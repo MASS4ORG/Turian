@@ -102,6 +102,12 @@ public sealed record PackageResolverOptions
 
     /// <summary>Package ids whose git refs are fetched again instead of staying at their locked commit; null for all.</summary>
     public IReadOnlySet<string>? Update { get; init; } = new HashSet<string>();
+
+    /// <summary>
+    /// Id → source of the packages every project gets without declaring them, such as a host's renderer. A project
+    /// declaring the id, or mapping it to <c>null</c> to opt out, decides for itself.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> DefaultDependencies { get; init; } = new Dictionary<string, string>();
 }
 
 /// <summary>
@@ -140,6 +146,11 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
                      .OrderBy(static d => d.Key, StringComparer.Ordinal))
             queue.Enqueue((id, PackageSource.Parse(spec!, packagesDirectory), spec!, "the project", 1));
+
+        foreach (var (id, spec) in options.DefaultDependencies
+                     .Where(d => !manifest.Dependencies.ContainsKey(d.Key) && !overridden.Contains(d.Key))
+                     .OrderBy(static d => d.Key, StringComparer.Ordinal))
+            queue.Enqueue((id, PackageSource.Parse(spec, packagesDirectory), spec, "the host's defaults", 1));
 
         async Task DrainAsync()
         {

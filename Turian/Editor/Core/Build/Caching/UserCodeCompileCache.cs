@@ -31,11 +31,7 @@ public sealed class UserCodeCompileCache(ILogger logger)
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyOutputPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(csprojFilePath);
 
-        var sourceFiles = EnumerateSourceFiles(settings.AssetsAbsoluteDir)
-            .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
-                .SelectMany(static package => EnumerateSourceFiles(package.RootPath)));
-
-        var sourceEntries = sourceFiles
+        var sourceEntries = ProjectSourceFiles(settings)
             .Select(path => CreateSourceEntry(settings.ProjectAbsoluteDir, path))
             .OrderBy(static entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -260,6 +256,13 @@ public sealed class UserCodeCompileCache(ILogger logger)
             manifestDirectoryName,
             manifestFileName);
     }
+
+    // A brick's ~ folders, such as Source~ with its build output, are never compiled with the project.
+    static IEnumerable<string> ProjectSourceFiles(IBuildAppSettings settings) =>
+        EnumerateSourceFiles(settings.AssetsAbsoluteDir)
+            .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
+                .SelectMany(static package => EnumerateSourceFiles(package.RootPath)
+                    .Where(path => !AssetDatabase.IsInTildeFolder(path, package.RootPath))));
 
     static IEnumerable<string> EnumerateSourceFiles(string assetsAbsoluteDir)
     {

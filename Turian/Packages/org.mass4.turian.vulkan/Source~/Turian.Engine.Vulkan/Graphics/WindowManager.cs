@@ -85,6 +85,33 @@ public class WindowManager : IDisposable
         frameCount = 0;
     }
 
+    /// <summary>Gives the window the PNG icon at <paramref name="path"/>, when the file exists.</summary>
+    /// <param name="path">The icon a game's build wrote beside it.</param>
+    public void SetIcon(string path)
+    {
+        if (TryLoadIcon(Window, path, out var window, out var icon)) window.SetWindowIcon(ref icon);
+    }
+
+    /// <summary>Reads the icon at <paramref name="path"/> when <paramref name="view"/> is a window and it exists.</summary>
+    internal static bool TryLoadIcon(IView view, string path,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IWindow? window, out RawImage icon)
+    {
+        window = view as IWindow;
+        icon = LoadIcon(path) ?? default;
+        return window is not null && File.Exists(path);
+    }
+
+    /// <summary>Decodes the PNG at <paramref name="path"/> into a window icon.</summary>
+    /// <param name="path">The icon file.</param>
+    /// <returns>The icon, or <c>null</c> when there is no file.</returns>
+    internal static RawImage? LoadIcon(string path)
+    {
+        if (!File.Exists(path)) return null;
+
+        var image = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
+        return new RawImage(image.Width, image.Height, image.Data);
+    }
+
     /// <summary>
     /// Runs the application's main loop.
     /// </summary>

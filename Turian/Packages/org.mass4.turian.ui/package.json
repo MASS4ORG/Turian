@@ -5,6 +5,9 @@
   "description": "Guinevere-based .ui documents, .uss style sheets, data binding and screen and world-space panels.",
   "author": "MASS4",
   "license": "MPL-2.0",
+  "dependencies": {
+    "org.mass4.turian.vulkan": "builtin:org.mass4.turian.vulkan"
+  },
   "nuget": {
     "SkiaSharp": "4.153.1",
     "SkiaSharp.NativeAssets.Linux": "4.153.1",

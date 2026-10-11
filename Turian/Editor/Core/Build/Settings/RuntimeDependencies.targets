@@ -40,7 +40,7 @@
 
     <Target Name="EmbedTurianRuntimeDependencies" BeforeTargets="AssignTargetPaths"
             DependsOnTargets="ResolveProjectReferences" Condition="'$(MSBuildProjectName)' == 'Turian.Editor.Core'">
-        <MSBuild Projects="../CLI/Platform/Turian.Editor.Build.Platform.win-x64.csproj"
+        <MSBuild Projects="../CLI/Platform/Turian.Editor.Build.Platform.Desktop.csproj"
                  Targets="GetTurianRuntimeDependencies" BuildInParallel="false">
             <Output TaskParameter="TargetOutputs" ItemName="_TurianRuntimeManifest"/>
         </MSBuild>

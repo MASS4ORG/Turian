@@ -44,7 +44,8 @@ public sealed class ProjectBootstrapperTests : IDisposable
 
         var packages = ProjectPackages.Resolve(project!).Packages;
 
-        Assert.Equal(ProjectPackages.DefaultBuiltins, packages.Select(static p => p.Id));
+        Assert.Equal(ProjectPackages.DefaultBuiltins.Order(StringComparer.Ordinal),
+            packages.Select(static p => p.Id).Order(StringComparer.Ordinal));
         Assert.All(packages, static p => Assert.Equal(PackageOrigin.Builtin, p.Origin));
     }
 }

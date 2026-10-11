@@ -88,7 +88,7 @@ public sealed class BricksControllerTests : IDisposable
 
         Assert.NotNull(controller.Error);
         Assert.DoesNotContain("user.mateo.missing", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
-        Assert.Equal(2, controller.Rows.Count);
+        Assert.Equal(ProjectPackages.DefaultBuiltins.Count, controller.Rows.Count);
     }
 
     /// <summary>Details say what a brick needs and what requires it.</summary>

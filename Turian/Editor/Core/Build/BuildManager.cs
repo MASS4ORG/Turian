@@ -310,10 +310,11 @@ public sealed class BuildManager : IDisposable
     // ── Export ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Exports the project as a standalone packaged game.
+    /// Exports the project as standalone packaged games: one per build profile it declares, each into
+    /// <c>Output/&lt;profile&gt;</c>, or a client for this machine when it declares none.
     /// </summary>
     /// <param name="configuration">
-    /// Override the build configuration.  Defaults to <see cref="BuildConfiguration.Release"/>.
+    /// Override the build configuration of a project without profiles. Defaults to <see cref="BuildConfiguration.Release"/>.
     /// </param>
     public Task<BuildTaskStatus> ExportAsync(BuildConfiguration configuration = BuildConfiguration.Release) =>
         TaskRunner.EnqueueAsync(new DelegateTask(
@@ -321,9 +322,15 @@ public sealed class BuildManager : IDisposable
             locksUi: true,
             run: async _ =>
             {
-                var exporter = new ExportUserCode(settings, logger, configuration);
-                var outputPath = await exporter.ExecuteAsync().ConfigureAwait(false);
-                return $"Exported to: {outputPath}";
+                var profiles = BuildProfiles.Discover(settings);
+                var exporters = profiles.Count == 0
+                    ? [new ExportUserCode(settings, logger, configuration)]
+                    : profiles.Select(profile => new ExportUserCode(settings, logger, configuration, profile)).ToList();
+
+                var outputs = new List<string>();
+                foreach (var exporter in exporters)
+                    outputs.Add(await exporter.ExecuteAsync().ConfigureAwait(false));
+                return $"Exported to: {string.Join(", ", outputs)}";
             }));
 
     // ── Dispose ────────────────────────────────────────────────────────────────

@@ -8,7 +8,7 @@
     </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Vulkan/Turian.Engine.Vulkan.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
         <EmbeddedResource Include="Shaders/*.spv"/>
         <InternalsVisibleTo Include="Turian.Tests"/>
     </ItemGroup>

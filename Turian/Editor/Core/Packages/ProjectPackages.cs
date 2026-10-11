@@ -18,7 +18,18 @@ public static class ProjectPackages
     public static string BuiltinDirectory { get; } = FindBuiltinDirectory();
 
     /// <summary>The built-in packages a new project installs.</summary>
-    public static IReadOnlyList<string> DefaultBuiltins { get; } = ["org.mass4.turian.cameras", "org.mass4.turian.ui"];
+    public static IReadOnlyList<string> DefaultBuiltins { get; } =
+        [RenderBrick, "org.mass4.turian.cameras", "org.mass4.turian.ui"];
+
+    /// <summary>The built-in render brick: the Vulkan renderer and window client builds play in.</summary>
+    public const string RenderBrick = "org.mass4.turian.vulkan";
+
+    /// <summary>
+    /// The bricks every project uses without declaring them; a project opts out by mapping the id to <c>null</c> in
+    /// its manifest, which removing or disabling the brick does.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> DefaultDependencies { get; } =
+        new Dictionary<string, string> { [RenderBrick] = $"builtin:{RenderBrick}" };
 
     static readonly Lock CacheLock = new();
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];
@@ -103,17 +114,33 @@ public static class ProjectPackages
         }
     }
 
-    /// <summary>The package folders of a project, dependencies first; none when it declares no packages.</summary>
+    /// <summary>
+    /// The package folders of a project, dependencies first: the <see cref="DefaultDependencies"/> even when it
+    /// declares no packages; none for a folder that is not a project.
+    /// </summary>
     /// <param name="projectRoot">The project folder, or empty for none.</param>
     /// <returns>The resolved packages.</returns>
     public static IReadOnlyList<ResolvedPackage> ResolveOrEmpty(string? projectRoot)
     {
-        if (string.IsNullOrWhiteSpace(projectRoot)) return [];
+        if (string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, "Assets"))) return [];
 
         ProjectManifest.MigrateLegacyLayout(projectRoot);
-        return Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName))
-            ? Resolve(projectRoot).Packages
-            : [];
+        return Resolve(projectRoot).Packages;
+    }
+
+    /// <summary>
+    /// Records that the project leaves out a default brick it no longer declares, so it is not added back.
+    /// </summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="id">The brick id.</param>
+    internal static void OptOutOfDefault(string projectRoot, string id)
+    {
+        if (!DefaultDependencies.ContainsKey(id)) return;
+
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        manifest.Dependencies[id] = null;
+        manifest.Save(projectRoot);
+        Invalidate(projectRoot);
     }
 
     /// <summary>The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with MASS4's signing key.</summary>
@@ -141,6 +168,7 @@ public static class ProjectPackages
             ReservedCategoryPrefixes = ["gaya", HostName],
             Locked = locked,
             Update = update,
+            DefaultDependencies = DefaultDependencies,
         });
 
     static string FindBuiltinDirectory()

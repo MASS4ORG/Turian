@@ -223,7 +223,7 @@ public sealed class AssemblyGraph
     public static bool IsDefinitionFile(string path) => PeekTypeId(path) is { } id
                                                         && (id == DefinitionTypeId || id == ReferenceTypeId);
 
-    static Guid? PeekTypeId(string path)
+    internal static Guid? PeekTypeId(string path)
     {
         try
         {

@@ -35,4 +35,10 @@
     <ItemGroup>
         <EmbeddedResource Include="**/*.spv"/>
     </ItemGroup>
+
+    <!-- The brick ships this assembly prebuilt in Precast~/lib; games load it from there. -->
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <Copy SourceFiles="$(TargetPath)"
+              DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Precast~/lib"/>
+    </Target>
 </Project>

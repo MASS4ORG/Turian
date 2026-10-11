@@ -11,7 +11,8 @@ sealed partial class Build
 
     [Parameter("spirv-version (default: spv1.6)")]
     readonly string SpirVVersion = "spv1.6";
-    readonly AbsolutePath EngineProjectDirectory = RootDirectory / "Turian" / "Engine";
+    readonly AbsolutePath EngineProjectDirectory =
+        RootDirectory / "Turian" / "Packages" / "org.mass4.turian.vulkan" / "Source~" / "Turian.Engine.Vulkan";
 
     // Compiling shaders
     static readonly string[] ShaderPatterns =

@@ -5,5 +5,8 @@
   "description": "Optional current-frame hierarchical depth visibility for the 3D renderer.",
   "author": "MASS4",
   "license": "MPL-2.0",
+  "dependencies": {
+    "org.mass4.turian.vulkan": "builtin:org.mass4.turian.vulkan"
+  },
   "categories": ["turian:graphics"]
 }

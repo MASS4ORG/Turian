@@ -22,21 +22,12 @@
     <ItemGroup>
         <ProjectReference Include="$(TurianDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(TurianDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
-        <ProjectReference Include="$(TurianDir)/Turian/Engine/Vulkan/Turian.Engine.Vulkan.csproj"/>
         <ProjectReference Include="$(TurianDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
     </ItemGroup>
 
-    <!-- External libraries -->
+    <!-- External libraries. The renderer and window come from the game's render brick, never from the launcher. -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-        <PackageReference Include="Silk.NET.Input" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Maths" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Vulkan" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Windowing.Common" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Windowing.Glfw" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Input.Extensions" Version="2.23.0"/>
-        <PackageReference Include="Silk.NET.Vulkan.Extensions.EXT" Version="2.23.0"/>
     </ItemGroup>
 
     <Import Project="../../Core/Build/Settings/RuntimeDependencies.targets"/>

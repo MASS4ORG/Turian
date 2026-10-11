@@ -15,6 +15,8 @@ public sealed class AssetImportProgressTests
         {
             File.WriteAllText(Path.Combine(assets, "one.txt"), "one");
             File.WriteAllText(Path.Combine(assets, "two.txt"), "two");
+            // Opts out of the default render brick, so the scan holds only the project's two files.
+            new ProjectManifest { Dependencies = { [ProjectPackages.RenderBrick] = null } }.Save(root);
             var settings = new SettingsService();
             var database = new AssetDatabase();
             using var importer = new AssetImporter(NullLogger.Instance, database, settings);

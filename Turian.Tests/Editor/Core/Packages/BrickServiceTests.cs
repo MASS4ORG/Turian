@@ -16,6 +16,8 @@ public sealed class BrickServiceTests : IDisposable
         Directory.Delete(root, recursive: true);
     }
 
+    static bool IsDeclared(ResolvedPackage package) => !ProjectPackages.DefaultDependencies.ContainsKey(package.Id);
+
     /// <summary>A new brick passes verification and names its assembly after the id.</summary>
     [Fact]
     public void NewBrickIsSound()
@@ -38,7 +40,7 @@ public sealed class BrickServiceTests : IDisposable
 
         var resolution = ProjectPackages.Resolve(folder);
 
-        Assert.Empty(resolution.Packages);
+        Assert.Equal(ProjectPackages.DefaultDependencies.Keys, resolution.Packages.Select(static p => p.Id));
         Assert.Empty(Directory.EnumerateFileSystemEntries(folder));
     }
 
@@ -95,8 +97,8 @@ public sealed class BrickServiceTests : IDisposable
 
         var resolution = BrickService.Add(project, "user.mateo.inventory", $"file:{packed.Path}");
 
-        Assert.Equal("user.mateo.inventory", Assert.Single(resolution.Packages).Id);
-        Assert.Single(BrickService.List(project));
+        Assert.Equal("user.mateo.inventory", Assert.Single(resolution.Packages, IsDeclared).Id);
+        Assert.Single(BrickService.List(project), IsDeclared);
         Assert.Throws<PackageException>(() => BrickService.Add(project, "user.mateo.missing", "file:../nowhere"));
         Assert.DoesNotContain("user.mateo.missing", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
         Assert.True(BrickService.Remove(project, "user.mateo.inventory"));

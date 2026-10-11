@@ -35,7 +35,7 @@ public sealed class BrickAssetCopyTests : IDisposable
     [Fact]
     public void ListsTheImportableAssets()
     {
-        var brick = BrickService.List(project).Single();
+        var brick = BrickService.List(project).Single(static b => b.Id == "user.mateo.stats");
 
         Assert.Equal(["Runtime/Hero.dataasset", "Runtime/Icon.png"], BrickAssetCopy.Assets(brick));
     }

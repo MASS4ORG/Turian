@@ -79,7 +79,8 @@ public sealed class UiBrickTests : IDisposable
 
         var manifest = UserCodeTypeManifestGenerator.Generate(Path.Combine(project, "Assets"), NullLogger.Instance);
 
-        Assert.Equal(["Guinevere", "Guinevere.Styling", "Turian.Engine.UI"], manifest.PrecastAssemblies.Order());
+        Assert.Equal(["Guinevere", "Guinevere.Styling", "Turian.Engine.UI", "Turian.Engine.Vulkan"],
+            manifest.PrecastAssemblies.Order());
     }
 
     /// <summary>Loading a brick registers its types once, and the presenter factory is then found without naming the UI.</summary>
