@@ -148,6 +148,19 @@ public static class BuildProfiles
         return [.. shipped.Where(b => !excluded.Contains(b.Id))];
     }
 
+    /// <summary>Fails an export when a shipped brick does not list <paramref name="platform"/> among its platforms.</summary>
+    /// <param name="shipped">The bricks the build ships.</param>
+    /// <param name="platform">The build platform's id.</param>
+    /// <exception cref="InvalidOperationException">A shipped brick does not support the platform; names every one.</exception>
+    public static void EnsureSupported(IEnumerable<ResolvedPackage> shipped, string platform)
+    {
+        var unsupported = shipped.Where(b => !b.Manifest.SupportsPlatform(platform)).Select(static b => b.Id).ToList();
+        if (unsupported.Count > 0)
+            throw new InvalidOperationException(
+                $"The {platform} platform cannot ship these bricks: {string.Join(", ", unsupported)}. "
+                + "Remove them from the project or build for a platform they support.");
+    }
+
     /// <summary>
     /// Whether any of <paramref name="bricks"/> provides a game player, which a client build needs to open a window.
     /// </summary>

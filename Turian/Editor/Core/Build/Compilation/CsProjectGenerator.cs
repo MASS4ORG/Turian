@@ -185,7 +185,7 @@ public static class CsProjectGenerator
             .AddTurianDir()
             .AddInternalDllReferences(settings)
             .AddBrickReferences(settings, shipping: true, target: profile?.Target ?? BuildTarget.Client,
-                packages: platform.Dependencies.Packages)
+                packages: platform.Dependencies.Packages, platform: platform.Id)
             .AddUserProject(settings)
             .AddNugetPackageReferences(platform.Dependencies.Packages)
             .AddAssetsDir(settings)
@@ -390,9 +390,10 @@ public static class CsProjectGenerator
         /// </summary>
         private ProjectRootElement AddBrickReferences(IBuildAppSettings settings, bool shipping = false,
             bool editor = false, BuildTarget target = BuildTarget.Client,
-            IReadOnlyList<(string, string)>? packages = null)
+            IReadOnlyList<(string, string)>? packages = null, string platform = BuildPlatforms.Desktop)
         {
             var bricks = ReferencedBricks(settings, shipping, target);
+            if (shipping) BuildProfiles.EnsureSupported(bricks, platform);
 
             var references = projectRoot.AddItemGroup();
             // An editor-only assembly may also use what the bricks' editor assemblies offer.
@@ -401,7 +402,7 @@ public static class CsProjectGenerator
             foreach (var path in paths)
                 references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
 
-            AddBrickPackages(references, packages ?? settings.PackageReferences, bricks, shipping);
+            AddBrickPackages(references, packages ?? settings.PackageReferences, bricks, shipping, platform);
             return projectRoot;
         }
 
@@ -460,10 +461,10 @@ public static class CsProjectGenerator
 
     // The engine's own packages are already referenced; a script project keeps brick packages to itself.
     static void AddBrickPackages(ProjectItemGroupElement references, IReadOnlyList<(string, string)> declaredPackages,
-        IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping)
+        IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping, string platform)
     {
         var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, version) in bricks.SelectMany(static b => b.Manifest.Nuget).DistinctBy(static p => p.Key))
+        foreach (var (id, version) in bricks.SelectMany(b => b.Manifest.NugetFor(platform)).DistinctBy(static p => p.Key))
         {
             if (!declared.Add(id)) continue;
             var package = references.AddItem("PackageReference", id);

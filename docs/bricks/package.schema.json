@@ -18,6 +18,8 @@
     },
     "devDependencies": { "type": "object", "additionalProperties": { "type": "string" } },
     "nuget": { "type": "object", "additionalProperties": { "type": "string" }, "description": "NuGet package id -> exact version, for the prebuilt assemblies." },
+    "platformNuget": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }, "description": "Platform id -> NuGet package id -> exact version, added to nuget for builds of that platform." },
+    "platforms": { "type": "array", "items": { "type": "string" }, "description": "Build platform ids the brick supports, such as desktop. Absent or empty means every platform; exporting for another platform fails." },
     "engines": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Host name -> version range, e.g. { \"turian\": \">=1.0 <2\" }." },
     "scopes": { "type": "array", "items": { "enum": ["project", "studio", "game"] } },
     "editorOnly": { "type": "boolean" },
