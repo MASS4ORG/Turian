@@ -82,6 +82,9 @@ public class DataAssetAsset : Asset
 
     DataAsset? ReadPayload(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
+        // Without a project folder, such as in a built game's packaged content, only the imported copy exists.
+        if (string.IsNullOrEmpty(projectPath)) return provider is null ? null : ReadImported(readBase, provider);
+
         var sourcePath = Path.Combine(projectPath, RelativePath);
         if (File.Exists(sourcePath))
         {
@@ -91,6 +94,11 @@ public class DataAssetAsset : Asset
         if (provider is null) return DataAsset.LoadContent(sourcePath, Id, readBase);
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
+        return ReadImported(readBase, provider);
+    }
+
+    DataAsset? ReadImported(Func<Guid, string?> readBase, IAssetFileProvider provider)
+    {
         using var reader = new StreamReader(provider.GetAssetStream());
         return Serializer.LoadData<DataAsset>(
             DataAssetVariants.Flatten(reader.ReadToEnd(), readBase, Id));

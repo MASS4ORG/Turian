@@ -57,23 +57,6 @@ public unsafe partial class Device
         }
     }
 
-    void CreateSurface()
-    {
-        if (!vk.TryGetInstanceExtension(instance, out khrSurface))
-        {
-            throw new NotSupportedException("KHR_surface extension not found.");
-        }
-
-        if (window?.VkSurface is null)
-        {
-            throw new VulkanException("window.VkSurface is null and shouldn't be!");
-        }
-
-        surface = window.VkSurface
-                        .Create<AllocationCallbacks>(instance.ToHandle(), null)
-                        .ToSurface();
-    }
-
     void CreateLogicalDevice()
     {
         uint deviceCount = 0;
@@ -99,7 +82,7 @@ public unsafe partial class Device
                 {
                     device = CreateLogicalDevice(deviceToTry);
                     physicalDevice = deviceToTry;
-                    msaaSamples = GetMaxUsableSampleCount();
+                    msaaSamples = GetMaxUsableSampleCount(requestedMsaaSamples);
                     found = true;
                     break;
                 }
@@ -157,6 +140,7 @@ public unsafe partial class Device
         }.Distinct().ToArray();
 
         graphicsFamilyIndex = indices.GraphicsFamily.Value;
+        presentFamilyIndex = indices.PresentFamily.Value;
 
         using var mem = GlobalMemory.Allocate(
             uniqueQueueFamilies.Length * sizeof(DeviceQueueCreateInfo)
@@ -188,10 +172,10 @@ public unsafe partial class Device
         };
         var extensions = meshShading ? [.. requiredDeviceExtensions, meshShaderExtension] : requiredDeviceExtensions;
 
-        // Enable Synchronization 2 to eliminate a validation layer error, thanks gpt4!
-        var sync2Features = new PhysicalDeviceSynchronization2FeaturesKHR
+        // Core Synchronization 2 (Vulkan 1.3); the renderer's barrier and image-layout usage requires it.
+        var sync2Features = new PhysicalDeviceVulkan13Features
         {
-            SType = StructureType.PhysicalDeviceSynchronization2FeaturesKhr,
+            SType = StructureType.PhysicalDeviceVulkan13Features,
             Synchronization2 = Vk.True,
             PNext = meshShading ? &meshFeatures : null
         };

@@ -111,6 +111,88 @@ public sealed class OapMountSetTests : IDisposable
             () => OapMountSet.ForBasePackage(basePath)).Message, StringComparison.Ordinal);
     }
 
+    /// <summary>An unchanged package reuses the cached mount; a replaced one rebuilds it while the old mount keeps
+    /// reading the bytes it opened.</summary>
+    [Fact]
+    public void ReplacedPackageRebuildsMountAndOldMountKeepsItsBytes()
+    {
+        var basePath = Package("base.oap", "base", "old");
+        using var first = OapMountSet.ForBasePackage(basePath)!;
+        Assert.Same(first, OapMountSet.ForBasePackage(basePath));
+
+        Package("base.oap", "base", "new-content");
+        File.SetLastWriteTimeUtc(basePath, DateTime.UtcNow.AddMinutes(1));
+        using var second = OapMountSet.ForBasePackage(basePath)!;
+
+        Assert.NotSame(first, second);
+        Assert.Throws<InvalidDataException>(first.EnsureUnchanged);
+        second.EnsureUnchanged();
+        Assert.Equal("old", ReadWinner(first));
+        Assert.Equal("new-content", ReadWinner(second));
+    }
+
+    /// <summary>A new overlay changes the package list, so the cached mount is rebuilt with it.</summary>
+    [Fact]
+    public void AddedOverlayRebuildsMount()
+    {
+        var basePath = Package("base.oap", "base", "base");
+        using var first = OapMountSet.ForBasePackage(basePath)!;
+
+        Package("overlays/patch.oap", "patch", "patch");
+        using var second = OapMountSet.ForBasePackage(basePath)!;
+
+        Assert.Single(first.Readers);
+        Assert.Equal("patch", ReadWinner(second));
+    }
+
+    /// <summary>A missing base package yields no mount.</summary>
+    [Fact]
+    public void MissingBaseReturnsNull() => Assert.Null(OapMountSet.ForBasePackage(Path.Combine(root, "none.oap")));
+
+    /// <summary>Mounting needs only the content contract, so a non-file location such as APK assets works.</summary>
+    [Fact]
+    public void MountsFromNonFileContentDirectory()
+    {
+        var directory = new MemoryContentDirectory();
+        directory.Add("data/game.oap", PackageBytes("base", "base"));
+        directory.Add("data/overlays/mod.oap", PackageBytes("mod", "mod"));
+
+        using var mounts = OapMountSet.ForBasePackage(directory, "data/game.oap")!;
+
+        Assert.Equal(["mod", "base"], mounts.Readers.Select(reader => OapManifest.TryParse(reader.Manifest)!.Name));
+        Assert.True(mounts.TryResolveById(assetId, out var reader, out var entry));
+        using var stream = reader.OpenAssetStream(entry);
+        Assert.Equal("mod", new StreamReader(stream).ReadToEnd());
+        Assert.Same(mounts, OapMountSet.ForBasePackage(directory, "data/game.oap"));
+    }
+
+    /// <summary>A package that fails to parse releases every source the mount opened.</summary>
+    [Fact]
+    public void InvalidPackageDisposesOpenedSources()
+    {
+        var directory = new MemoryContentDirectory();
+        directory.Add("game.oap", PackageBytes("base", "base"));
+        directory.Add("overlays/bad.oap", [1, 2, 3]);
+
+        Assert.Throws<OapTruncatedException>(() => OapMountSet.ForBasePackage(directory, "game.oap"));
+        Assert.All(directory.Opened, source => Assert.True(source.Disposed));
+    }
+
+    string ReadWinner(OapMountSet mounts)
+    {
+        Assert.True(mounts.TryResolveById(assetId, out var reader, out var entry));
+        using var stream = reader.OpenAssetStream(entry);
+        return new StreamReader(stream).ReadToEnd();
+    }
+
+    byte[] PackageBytes(string name, string content)
+    {
+        var writer = new OapWriter();
+        writer.Add(assetId, Encoding.UTF8.GetBytes(content), "asset.txt");
+        writer.SetManifest(JsonSerializer.Serialize(new { name }));
+        return writer.Serialize();
+    }
+
     string Package(string relativePath, string name, string content, params string[] requires) =>
         PackageWithManifest(relativePath, content, JsonSerializer.Serialize(new { name, requires }));
 

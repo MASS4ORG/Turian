@@ -8,16 +8,16 @@ namespace Turian.Engine.Core;
 /// </remarks>
 /// <param name="vk">The Vulkan context.</param>
 /// <param name="device">The Vulkan device.</param>
-/// <param name="window">The window where rendering will take place.</param>
+/// <param name="surfaceHost">The host whose surface rendering presents to.</param>
 /// <param name="useFifo">Specifies whether to use FIFO presentation mode.</param>
-public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDisposable
+public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bool useFifo) : IDisposable
 {
-    // Swap chain and related data
-    SwapChain swapChain = null!;
-    CommandBuffer[] commandBuffers = null!;
+    // Swap chain and related data; there is no swap chain while the surface is lost.
+    SwapChain? swapChain;
+    CommandBuffer[] commandBuffers = [];
+    SurfaceLifecycle lifecycle = null!;
 
     // Rendering-related state
-    bool framebufferResized;
     uint currentImageIndex;
     int currentFrameIndex;
     bool isFrameStarted;
@@ -31,17 +31,17 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
     /// The swap chain represents the sequence of images that will be presented to the screen
     /// and is an essential part of the rendering process.
     /// </remarks>
-    public SwapChain SwapChain => swapChain;
+    public SwapChain SwapChain => swapChain!;
 
     /// <summary>
     /// Gets the image format used by the swap chain.
     /// </summary>
-    public Format SwapChainImageFormat => swapChain.SwapChainImageFormat;
+    public Format SwapChainImageFormat => SwapChain.SwapChainImageFormat;
 
     /// <summary>
     /// Gets the depth format used by the swap chain.
     /// </summary>
-    public Format SwapChainDepthFormat => swapChain.SwapChainDepthFormat;
+    public Format SwapChainDepthFormat => SwapChain.SwapChainDepthFormat;
 
     /// <summary>
     /// Gets whether a rendering frame has been started.
@@ -52,13 +52,21 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
     /// Gets the render pass associated with the swap chain.
     /// </summary>
     /// <returns>The render pass used by the swap chain.</returns>
-    public RenderPass SwapChainRenderPass => swapChain.RenderPass;
+    public RenderPass SwapChainRenderPass => SwapChain.RenderPass;
 
     /// <summary>
     /// Gets the aspect ratio of the swap chain's images.
     /// </summary>
     /// <returns>The aspect ratio of the swap chain images.</returns>
-    public float AspectRatio => swapChain.AspectRatio;
+    public float AspectRatio => SwapChain.AspectRatio;
+
+    /// <summary>Gets whether the host's surface is lost, during which every frame is skipped.</summary>
+    public bool IsSurfaceLost => lifecycle?.IsSurfaceLost ?? false;
+
+    /// <summary>
+    /// Raised after a rebuilt swap chain changed formats, so pipelines built for the old render pass are rebuilt.
+    /// </summary>
+    public event Action? RenderPassChanged;
 
     /// <summary>
     /// Gets the current command buffer for rendering.
@@ -81,17 +89,23 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
         set
         {
             useFifo = value;
-            swapChain.UseFifo = value;
+            if (swapChain is not null) swapChain.UseFifo = value;
         }
     }
 
     /// <summary>
-    /// Initializes the renderer by recreating the swap chain and creating command buffers.
+    /// Initializes the renderer by following the host's surface events, creating the swap chain and command buffers.
     /// </summary>
+    /// <exception cref="VulkanException">The surface has no drawable area to build the first swap chain for.</exception>
     public void Initialize()
     {
-        RecreateSwapChain(true);
+        lifecycle = new SurfaceLifecycle(surfaceHost, this);
+        lifecycle.FormatChanged += OnFormatChanged;
         CreateCommandBuffers();
+        if (!lifecycle.TryPrepare())
+        {
+            throw new VulkanException("Vulkan: the surface has no drawable area to create a swap chain for");
+        }
     }
 
     /// <summary>
@@ -99,29 +113,26 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
     /// </summary>
     /// <returns>
     /// A <see cref="CommandBuffer"/> for recording rendering commands.
-    /// Returns <c>null</c> if the swap chain needs to be recreated.
+    /// Returns <c>null</c> while the surface is lost or empty, or when the swap chain had to be rebuilt.
     /// </returns>
     public CommandBuffer? BeginFrame()
     {
         Debug.Assert(!isFrameStarted, "Can't call beginFrame while already in progress!");
 
-        var result = swapChain.AcquireNextImage(ref currentImageIndex);
-
-        if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr || framebufferResized)
-        {
-            framebufferResized = false;
-            RecreateSwapChain();
-            return null;
-        }
-        else if (result != Result.Success)
-        {
-            throw new VulkanException("failed to acquire next swapchain image");
-        }
+        if (!TryAcquire()) return null;
 
         isFrameStarted = true;
 
         var commandBuffer = CurrentCommandBuffer;
+        BeginRecording(commandBuffer);
+        return commandBuffer;
+    }
 
+    bool TryAcquire() => lifecycle.TryPrepare() && lifecycle.HandleResult(
+        swapChain!.AcquireNextImage(ref currentImageIndex), "failed to acquire next swapchain image");
+
+    void BeginRecording(CommandBuffer commandBuffer)
+    {
         CommandBufferBeginInfo beginInfo = new() { SType = StructureType.CommandBufferBeginInfo };
 
         var resultVulkan = vk.BeginCommandBuffer(commandBuffer, in beginInfo);
@@ -129,8 +140,6 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
         {
             throw new VulkanException($"Vulkan: failed to begin recording command buffer: {resultVulkan}");
         }
-
-        return commandBuffer;
     }
 
     /// <summary>
@@ -148,16 +157,8 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
             throw new VulkanException($"Vulkan: failed to record command buffer: {resultVulkan}");
         }
 
-        var result = swapChain.SubmitCommandBuffers(commandBuffer, currentImageIndex);
-        if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr || framebufferResized)
-        {
-            framebufferResized = false;
-            RecreateSwapChain();
-        }
-        else if (result != Result.Success)
-        {
-            throw new VulkanException("failed to submit command buffers");
-        }
+        var result = swapChain!.SubmitCommandBuffers(commandBuffer, currentImageIndex);
+        _ = lifecycle.HandleResult(result, "failed to submit command buffers");
 
         // No DeviceWaitIdle here — SwapChain.SubmitCommandBuffers uses inFlightFences
         // and AcquireNextImage waits on them, so frames-in-flight pipelining is correct.
@@ -186,9 +187,9 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
             new()
             {
                 SType = StructureType.RenderPassBeginInfo,
-                RenderPass = swapChain.RenderPass,
-                Framebuffer = swapChain.GetFrameBufferAt(currentImageIndex),
-                RenderArea = { Offset = { X = 0, Y = 0 }, Extent = swapChain.SwapChainExtent, }
+                RenderPass = SwapChain.RenderPass,
+                Framebuffer = SwapChain.GetFrameBufferAt(currentImageIndex),
+                RenderArea = { Offset = { X = 0, Y = 0 }, Extent = SwapChain.SwapChainExtent, }
             };
 
         ClearValue[] clearValues =
@@ -222,12 +223,12 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
             {
                 X = 0.0f,
                 Y = 0.0f,
-                Width = swapChain.SwapChainExtent.Width,
-                Height = swapChain.SwapChainExtent.Height,
+                Width = SwapChain.SwapChainExtent.Width,
+                Height = SwapChain.SwapChainExtent.Height,
                 MinDepth = 0.0f,
                 MaxDepth = 1.0f,
             };
-        Rect2D scissor = new(new Offset2D(), swapChain.SwapChainExtent);
+        Rect2D scissor = new(new Offset2D(), SwapChain.SwapChainExtent);
         vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
         vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
     }
@@ -251,50 +252,16 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
     }
 
     /// <summary>
-    /// Recreates the swap chain, handling changes in window size or format.
-    /// </summary>
-    public void RecreateSwapChain(bool forceCreateSwapChain = false)
-    {
-        _ = vk.DeviceWaitIdle(device.VkDevice); // Wait until the device is idle
-
-        var frameBufferSize = window.FramebufferSize;
-        while (frameBufferSize.X == 0 || frameBufferSize.Y == 0)
-        {
-            frameBufferSize = window.FramebufferSize;
-            window.DoEvents();
-        }
-
-        if (forceCreateSwapChain)
-        {
-            swapChain = new SwapChain(vk, device, GetWindowExtents(), useFifo);
-        }
-        else
-        {
-            var oldImageFormat = swapChain.SwapChainImageFormat;
-            var oldDepthFormat = swapChain.SwapChainDepthFormat;
-
-            swapChain.Dispose();
-            swapChain = new SwapChain(vk, device, GetWindowExtents(), useFifo);
-
-            if (swapChain.SwapChainImageFormat != oldImageFormat || swapChain.SwapChainDepthFormat != oldDepthFormat)
-            {
-                throw new VulkanException("Swap chain image(or depth) format has changed!");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Disposes of the renderer and its resources.
+    /// Disposes of the renderer's swap chain and command buffers and stops following the host's surface events.
     /// </summary>
     public void Dispose()
     {
+        lifecycle?.Dispose();
+        ISwapChainTarget target = this;
+        target.WaitIdle();
+        target.DestroySwapChain();
         FreeCommandBuffers();
         GC.SuppressFinalize(this);
-    }
-
-    Extent2D GetWindowExtents()
-    {
-        return new Extent2D((uint)window.FramebufferSize.X, (uint)window.FramebufferSize.Y);
     }
 
     unsafe void FreeCommandBuffers()
@@ -309,12 +276,13 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
             );
         }
 
-        Array.Clear(commandBuffers);
+        commandBuffers = [];
     }
 
+    // One buffer per frame in flight, indexed by FrameIndex, so they outlive swap chain rebuilds.
     unsafe void CreateCommandBuffers()
     {
-        commandBuffers = new CommandBuffer[swapChain.ImageCount()];
+        commandBuffers = new CommandBuffer[SwapChain.MaxFramesInFlight];
 
         CommandBufferAllocateInfo allocInfo = new()
         {

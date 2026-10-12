@@ -18,7 +18,7 @@ public unsafe partial class Device
         PopulateDebugMessengerCreateInfo(ref createInfo);
 
         if (
-            debugUtils!.CreateDebugUtilsMessenger(instance, in createInfo, null, out _)
+            debugUtils!.CreateDebugUtilsMessenger(instance, in createInfo, null, out debugMessenger)
             != Result.Success
         )
         {
@@ -171,15 +171,23 @@ public unsafe partial class Device
 
         vk.GetPhysicalDeviceFeatures(candidateDevice, out var supportedFeatures);
 
-        PhysicalDeviceSynchronization2FeaturesKHR sync2Features =
-            new()
-            {
-                SType = StructureType.PhysicalDeviceSynchronization2FeaturesKhr,
-                Synchronization2 = Vk.True
-            };
+        vk.GetPhysicalDeviceProperties(candidateDevice, out var properties);
+        if (properties.ApiVersion < Vk.Version13)
+        {
+            Log.Logger.LogWarning(
+                "Rejecting GPU '{0}': it supports Vulkan {1}.{2} but the engine requires 1.3",
+                GetStringFromBytePointer(properties.DeviceName, 50).Trim(),
+                properties.ApiVersion >> 22,
+                (properties.ApiVersion >> 12) & 0x3FF
+            );
+            return false;
+        }
+
+        PhysicalDeviceVulkan13Features vulkan13Features =
+            new() { SType = StructureType.PhysicalDeviceVulkan13Features, Synchronization2 = Vk.True };
 
         PhysicalDeviceFeatures2 deviceFeatures2 =
-            new() { SType = StructureType.PhysicalDeviceFeatures2, PNext = &sync2Features };
+            new() { SType = StructureType.PhysicalDeviceFeatures2, PNext = &vulkan13Features };
 
         vk.GetPhysicalDeviceFeatures2(candidateDevice, &deviceFeatures2);
 
@@ -187,7 +195,7 @@ public unsafe partial class Device
                && extensionsSupported
                && swapChainAdequate
                && supportedFeatures.SamplerAnisotropy
-               && sync2Features.Synchronization2;
+               && vulkan13Features.Synchronization2;
     }
 
     bool CheckDeviceExtensionsSupport(PhysicalDevice candidateDevice) =>
@@ -232,11 +240,7 @@ public unsafe partial class Device
             return enableValidationLayers ? [ExtDebugUtils.ExtensionName] : [];
         }
 
-        var glfwExtensions = window!.VkSurface!.GetRequiredExtensions(out var glfwExtensionCount);
-        var extensions = SilkMarshal.PtrToStringArray(
-            (nint)glfwExtensions,
-            (int)glfwExtensionCount
-        );
+        string[] extensions = [.. surfaceHost!.RequiredInstanceExtensions];
 
         if (enableValidationLayers)
         {
@@ -263,7 +267,31 @@ public unsafe partial class Device
         return validationLayers.All(availableLayerNames.Contains);
     }
 
-    SampleCountFlags GetMaxUsableSampleCount()
+    static readonly SampleCountFlags[] SampleCountCandidates =
+    [
+        SampleCountFlags.Count64Bit,
+        SampleCountFlags.Count32Bit,
+        SampleCountFlags.Count16Bit,
+        SampleCountFlags.Count8Bit,
+        SampleCountFlags.Count4Bit,
+        SampleCountFlags.Count2Bit
+    ];
+
+    /// <summary>The highest sample count the device supports that is at most <paramref name="requested"/>.</summary>
+    /// <param name="requested">The sample count asked for; a non-power-of-two falls to the next lower count.</param>
+    /// <param name="supported">The sample counts the device's color and depth attachments both support.</param>
+    /// <returns>The chosen count, or 1× when nothing higher is supported.</returns>
+    internal static SampleCountFlags ClampSampleCount(int requested, SampleCountFlags supported)
+    {
+        foreach (var candidate in SampleCountCandidates)
+        {
+            if ((uint)candidate <= (uint)requested && supported.HasFlag(candidate)) return candidate;
+        }
+
+        return SampleCountFlags.Count1Bit;
+    }
+
+    SampleCountFlags GetMaxUsableSampleCount(int requested)
     {
         vk.GetPhysicalDeviceProperties(physicalDevice, out var physicalDeviceProperties);
 
@@ -271,16 +299,7 @@ public unsafe partial class Device
             physicalDeviceProperties.Limits.FramebufferColorSampleCounts
             & physicalDeviceProperties.Limits.FramebufferDepthSampleCounts;
 
-        return counts switch
-        {
-            var c when (c & SampleCountFlags.Count64Bit) != 0 => SampleCountFlags.Count64Bit,
-            var c when (c & SampleCountFlags.Count32Bit) != 0 => SampleCountFlags.Count32Bit,
-            var c when (c & SampleCountFlags.Count16Bit) != 0 => SampleCountFlags.Count16Bit,
-            var c when (c & SampleCountFlags.Count8Bit) != 0 => SampleCountFlags.Count8Bit,
-            var c when (c & SampleCountFlags.Count4Bit) != 0 => SampleCountFlags.Count4Bit,
-            var c when (c & SampleCountFlags.Count2Bit) != 0 => SampleCountFlags.Count2Bit,
-            _ => SampleCountFlags.Count1Bit
-        };
+        return ClampSampleCount(requested, counts);
     }
 
     Format FindSupportedFormat(
@@ -309,11 +328,17 @@ public unsafe partial class Device
         throw new VulkanException("failed to find supported format!");
     }
 
-    /// <inheritdoc/>
+    /// <summary>Destroys the command pool, logical device, surface, debug messenger and instance, in that order.</summary>
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+
         vk.DestroyCommandPool(device, commandPool, null);
         vk.DestroyDevice(device, null);
+        DestroySurface();
+        if (debugMessenger.Handle != 0) debugUtils.DestroyDebugUtilsMessenger(instance, debugMessenger, null);
+        vk.DestroyInstance(instance, null);
         GC.SuppressFinalize(this);
     }
 }

@@ -59,7 +59,7 @@ public sealed class ProjectBootstrapper
             {
                 ProductName = title,
                 Author = Environment.UserName,
-                ApplicationIdentifier = $"com.turian.{SanitizeIdentifierSegment(title)}",
+                ApplicationIdentifier = $"com.turian.{ApplicationIdentifiers.SanitizeSegment(title)}",
                 Version = "0.1.0",
                 StartupScene = new AssetReference<Prefab>(sceneMeta)
             });
@@ -103,16 +103,6 @@ public sealed class ProjectBootstrapper
         return index >= 0 && index < args.Length - 1
             ? Path.GetFullPath(args[index + 1])
             : null;
-    }
-
-    /// <summary>Strips non-alphanumeric chars for use in an application identifier.</summary>
-    public static string SanitizeIdentifierSegment(string value)
-    {
-        var chars = value
-            .Select(ch => char.IsLetterOrDigit(ch) ? char.ToLower(ch, CultureInfo.InvariantCulture) : '-')
-            .ToArray();
-        var sanitized = new string(chars).Trim('-');
-        return string.IsNullOrWhiteSpace(sanitized) ? "game" : sanitized;
     }
 
     static Node CreateDefaultScene()

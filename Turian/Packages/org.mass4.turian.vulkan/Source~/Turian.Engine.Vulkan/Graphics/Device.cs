@@ -70,7 +70,7 @@ public unsafe partial class Device : IDisposable
     public Queue GraphicsQueue => graphicsQueue;
 
     /// <summary>The Vulkan API version enabled for the instance.</summary>
-    public uint ApiVersion => Vk.Version12;
+    public uint ApiVersion => Vk.Version13;
 
     /// <summary>The extension names enabled when the Vulkan instance was created.</summary>
     public IReadOnlyList<string> InstanceExtensions => instanceExtensions;
@@ -105,9 +105,17 @@ public unsafe partial class Device : IDisposable
     public SwapChainSupportDetails QuerySwapChainSupport =>
         QuerySwapChainSupportInternal(physicalDevice);
 
+    static long lastId;
+
+    /// <summary>
+    /// A process-unique id for keying per-device caches. Vulkan handles are reused once a device and its instance
+    /// are destroyed, so a cache keyed by handle would hand a new device another device's GPU objects.
+    /// </summary>
+    public long Id { get; } = Interlocked.Increment(ref lastId);
+
     readonly Vk vk;
-    readonly IView? window;
-    bool IsHeadless => window is null;
+    readonly ISurfaceHost? surfaceHost;
+    bool IsHeadless => surfaceHost is null;
 
     ExtDebugUtils debugUtils = null!;
     readonly bool enableValidationLayers = false;
@@ -118,7 +126,6 @@ public unsafe partial class Device : IDisposable
     readonly string[] requiredDeviceExtensions =
     [
         KhrSwapchain.ExtensionName,
-        KhrSynchronization2.ExtensionName,
     ];
 
     string[] deviceExtensions = [];
@@ -133,8 +140,12 @@ public unsafe partial class Device : IDisposable
     float maxSamplerAnisotropy = 1f;
     ulong deviceLocalMemoryBytes;
     SampleCountFlags msaaSamples = SampleCountFlags.Count1Bit;
+    readonly int requestedMsaaSamples;
     Silk.NET.Vulkan.Device device;
     uint graphicsFamilyIndex;
+    uint presentFamilyIndex;
+    DebugUtilsMessengerEXT debugMessenger;
+    bool disposed;
     Queue graphicsQueue;
     Queue presentQueue;
     CommandPool commandPool;
@@ -143,11 +154,14 @@ public unsafe partial class Device : IDisposable
     /// Initializes a new instance of the <see cref="Device"/> class.
     /// </summary>
     /// <param name="vk">The Vulkan instance.</param>
-    /// <param name="window">The window view. Pass <c>null</c> for headless (editor) mode.</param>
-    public Device(Vk vk, IView? window = null)
+    /// <param name="surfaceHost">The host presented to. Pass <c>null</c> for headless (editor) mode.</param>
+    /// <param name="requestedMsaaSamples">The MSAA sample count to request, capped at the device's maximum.</param>
+    public Device(Vk vk, ISurfaceHost? surfaceHost = null,
+        int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples)
     {
         this.vk = vk;
-        this.window = window;
+        this.surfaceHost = surfaceHost;
+        this.requestedMsaaSamples = requestedMsaaSamples;
         CreateInstance();
         SetupDebugMessenger();
         if (!IsHeadless) CreateSurface();

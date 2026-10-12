@@ -70,7 +70,7 @@ public partial class SwapChain
         creatInfo = creatInfo with
         {
             PreTransform = swapChainSupport.Capabilities.CurrentTransform,
-            CompositeAlpha = CompositeAlphaFlagsKHR.OpaqueBitKhr,
+            CompositeAlpha = ChooseCompositeAlpha(swapChainSupport.Capabilities.SupportedCompositeAlpha),
             PresentMode = presentMode,
             Clipped = true,
         };

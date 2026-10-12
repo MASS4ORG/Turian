@@ -49,8 +49,14 @@ public sealed class GpuAssetCacheTests(VulkanFixture fixture) : IClassFixture<Vu
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var database = new AssetDatabase();
-        var path = Path.Combine(directory.CreateSubdirectory("Assets").FullName, "texture.amtex");
-        TextureBlobWriter.Save(path, new TextureBlobContent(Format.R8G8B8A8Unorm, 2, 2, false, [new byte[16]]));
+        var path = Path.Combine(directory.CreateSubdirectory("Assets").FullName, "texture.ktx2");
+        Ktx2Writer.Save(path, new Ktx2Texture
+        {
+            Format = Ktx2VkFormat.R8G8B8A8Unorm,
+            Width = 2,
+            Height = 2,
+            Levels = [new byte[16]],
+        });
         var texture = new TextureAsset { Id = Guid.NewGuid(), RelativePath = path };
         Assert.True(database.RegisterAsset(texture, path));
         MaterialAsset.ClearCache();

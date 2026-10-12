@@ -19,11 +19,16 @@ public sealed class AssetLoadStatisticsTests(VulkanFixture fixture) : IClassFixt
             Assert.Null(asset.GetContent(fixture.Vulkan, database));
             Assert.Equal(default, database.LoadStatistics.Snapshot);
             var assets = Directory.CreateDirectory(Path.Combine(directory.FullName, "Assets"));
-            var path = Path.Combine(assets.FullName, baked ? "texture.amtex" : "texture.png");
+            var path = Path.Combine(assets.FullName, baked ? "texture.ktx2" : "texture.png");
             asset.RelativePath = path;
             if (baked)
-                TextureBlobWriter.Save(path, new TextureBlobContent(Format.R8G8B8A8Unorm, 2, 2, false,
-                    [new byte[16]]));
+                Ktx2Writer.Save(path, new Ktx2Texture
+                {
+                    Format = Ktx2VkFormat.R8G8B8A8Unorm,
+                    Width = 2,
+                    Height = 2,
+                    Levels = [new byte[16]],
+                });
             else
             {
                 using var bitmap = new SKBitmap(2, 2);

@@ -33,7 +33,7 @@ public static class EditorServices
         services.AddSingleton<AssetWorkspace>();
         services.AddSingleton<WorkspaceSessionStore>();
         services.AddSingleton<SceneDocumentBinder>();
-        services.AddSingleton(sp => new Vulkan(sp.GetRequiredService<ILogger>()));
+        services.AddSingleton(sp => new Vulkan(sp.GetRequiredService<ILogger>(), sp.GetService<IAppSettings>()));
         services.AddSingleton<IRenderDevice>(sp => sp.GetRequiredService<Vulkan>());
         services.AddSingleton<PlayModeService>();
 

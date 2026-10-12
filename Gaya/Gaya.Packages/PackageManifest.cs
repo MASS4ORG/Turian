@@ -87,6 +87,17 @@ public sealed class PackageManifest
     [Tooltip("NuGet libraries referenced by generated consumer projects.")]
     public Dictionary<string, string> Nuget { get; set; } = [];
 
+    /// <summary>
+    /// NuGet packages only one platform needs: platform id → (package id → exact version). They add to
+    /// <see cref="Nuget"/> for builds of that platform.
+    /// </summary>
+    [Tooltip("NuGet libraries referenced only when building for the named platform.")]
+    public Dictionary<string, Dictionary<string, string>> PlatformNuget { get; set; } = [];
+
+    /// <summary>The platform ids the package supports, such as <c>desktop</c>; every platform when empty.</summary>
+    [Tooltip("Build platforms the brick supports; empty means all.")]
+    public List<string> Platforms { get; set; } = [];
+
     /// <summary>Host → the host versions the package works with (<c>"my-app": "&gt;=1.2 &lt;2"</c>).</summary>
     public Dictionary<string, VersionRange> Engines { get; set; } = [];
 
@@ -125,6 +136,26 @@ public sealed class PackageManifest
 
     /// <summary>Samples the user can copy into the project.</summary>
     public List<PackageSample> Samples { get; set; } = [];
+
+    /// <summary>Whether the package supports building for <paramref name="platform"/>.</summary>
+    /// <param name="platform">A platform id, ignoring case.</param>
+    /// <returns>True when the package lists no platforms or lists this one.</returns>
+    public bool SupportsPlatform(string platform) =>
+        Platforms.Count == 0 || Platforms.Contains(platform, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The NuGet packages a build for <paramref name="platform"/> needs: the common ones plus that platform's.</summary>
+    /// <param name="platform">A platform id, ignoring case.</param>
+    /// <returns>Package id → exact version.</returns>
+    public IReadOnlyDictionary<string, string> NugetFor(string platform)
+    {
+        var merged = new Dictionary<string, string>(Nuget);
+        foreach (var (_, extra) in PlatformNuget.Where(p => string.Equals(p.Key, platform, StringComparison.OrdinalIgnoreCase)))
+        {
+            foreach (var (package, version) in extra) merged[package] = version;
+        }
+
+        return merged;
+    }
 
     /// <summary>The scopes the package supports, defaulting to the project.</summary>
     [JsonIgnore]
@@ -194,6 +225,9 @@ public sealed class PackageManifest
             throw new PackageException($"{path}: dependency '{id}' is not a valid package id.");
 
         ValidateShipping(path);
+
+        if (Platforms.Concat(PlatformNuget.Keys).Any(static p => string.IsNullOrWhiteSpace(p)))
+            throw new PackageException($"{path}: platform ids cannot be empty.");
 
         foreach (var category in Categories)
         {

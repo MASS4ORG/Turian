@@ -33,9 +33,26 @@ public sealed class PlayerFrames(
         return created;
     }
 
+    bool paused;
+    bool resumed;
+
+    /// <summary>
+    /// Gets or sets whether the game is paused because its surface is lost: frames neither tick nor render, and the
+    /// first frame after resuming ticks with no elapsed time, so the paused interval never reaches the game.
+    /// </summary>
+    public bool Paused
+    {
+        get => paused;
+        set
+        {
+            if (paused && !value) resumed = true;
+            paused = value;
+        }
+    }
+
     /// <summary>
     /// Runs one frame: closes the window once the game quits, otherwise ticks it, then renders the overlay and
-    /// every loaded root with its primary camera.
+    /// every loaded root with its primary camera. Does nothing else while <see cref="Paused"/>.
     /// </summary>
     /// <param name="deltaTime">Seconds since the previous frame.</param>
     public void Frame(double deltaTime)
@@ -44,6 +61,13 @@ public sealed class PlayerFrames(
         {
             close();
             return;
+        }
+
+        if (Paused) return;
+        if (resumed)
+        {
+            resumed = false;
+            deltaTime = 0;
         }
 
         runtime.Ticker.Tick(deltaTime);

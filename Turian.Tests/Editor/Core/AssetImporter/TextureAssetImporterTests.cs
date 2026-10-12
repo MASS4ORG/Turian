@@ -97,9 +97,9 @@ public sealed class TextureAssetImporterTests : IDisposable
     {
         _ = ImportDds("Antenna_Metal_Normal.dds", "ATI2", 16, 16, mipMapCount: 5, blockBytes: 16, out var artifacts);
 
-        var blob = TextureBlob.Load(Path.Combine(workingDirectory, artifacts[0]));
+        var blob = Ktx2Reader.Load(Path.Combine(workingDirectory, artifacts[0]));
 
-        Assert.Equal(Format.BC5UnormBlock, blob.Format);
+        Assert.Equal(Ktx2VkFormat.Bc5UnormBlock, blob.Format);
         Assert.Equal(16u, blob.Width);
         Assert.Equal(5, blob.Levels.Count);
         Assert.False(blob.IsSrgb);
@@ -117,7 +117,7 @@ public sealed class TextureAssetImporterTests : IDisposable
         asset.ImportSettings.MaxResolution = 4;
 
         var artifacts = Import(asset, "Antenna_Metal_BaseColor.dds", DdsFixture.Build("DXT1", 16, 16, 5, 8));
-        var blob = TextureBlob.Load(Path.Combine(workingDirectory, artifacts[0]));
+        var blob = Ktx2Reader.Load(Path.Combine(workingDirectory, artifacts[0]));
 
         // 16 -> 8 -> 4: two levels skipped, three of the original five remain.
         Assert.Equal(4u, blob.Width);
@@ -135,7 +135,7 @@ public sealed class TextureAssetImporterTests : IDisposable
         asset.ImportSettings.PerTarget[TextureBuildTarget.Pc] = new TextureTargetSettings { MaxResolution = 8 };
 
         var artifacts = Import(asset, "Antenna_Metal_BaseColor.dds", DdsFixture.Build("DXT1", 16, 16, 5, 8));
-        var blob = TextureBlob.Load(Path.Combine(workingDirectory, artifacts[0]));
+        var blob = Ktx2Reader.Load(Path.Combine(workingDirectory, artifacts[0]));
 
         Assert.Equal(8u, blob.Width);
     }
@@ -149,7 +149,7 @@ public sealed class TextureAssetImporterTests : IDisposable
         asset.ImportSettings.MaxResolution = 64;
 
         var artifacts = Import(asset, "Antenna_Metal_BaseColor.dds", DdsFixture.Build("DXT1", 16, 16, 5, 8));
-        var blob = TextureBlob.Load(Path.Combine(workingDirectory, artifacts[0]));
+        var blob = Ktx2Reader.Load(Path.Combine(workingDirectory, artifacts[0]));
 
         Assert.Equal(16u, blob.Width);
         Assert.Equal(5, blob.Levels.Count);
@@ -164,7 +164,7 @@ public sealed class TextureAssetImporterTests : IDisposable
         asset.ImportSettings.MaxResolution = 1;
 
         var artifacts = Import(asset, "Antenna_Metal_BaseColor.dds", DdsFixture.Build("DXT1", 16, 16, 3, 8));
-        var blob = TextureBlob.Load(Path.Combine(workingDirectory, artifacts[0]));
+        var blob = Ktx2Reader.Load(Path.Combine(workingDirectory, artifacts[0]));
 
         Assert.Single(blob.Levels);
         Assert.Equal(4u, blob.Width);

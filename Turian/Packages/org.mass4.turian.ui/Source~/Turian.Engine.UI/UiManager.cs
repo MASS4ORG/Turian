@@ -317,23 +317,12 @@ public sealed class UiManager : IUiPresenter
     }
 
     /// <summary>Instantiates the named <see cref="UiController"/> from any loaded assembly, or <c>null</c>.</summary>
-    static UiController? CreateController(string? typeName)
+    internal static UiController? CreateController(string? typeName)
     {
         if (string.IsNullOrWhiteSpace(typeName)) return null;
 
+        // The user and brick assemblies are loaded by name at startup from the type manifest.
         var type = ResolveType(typeName);
-        if (type is null)
-        {
-            // In a standalone game the user assembly is a project reference and loads only when a
-            // user type is first touched; nothing forces that here. Probe the app directory.
-            foreach (var dll in Directory.EnumerateFiles(AppContext.BaseDirectory, "*.dll"))
-            {
-                try { Assembly.LoadFrom(dll); }
-                catch (Exception ex) when (ex is BadImageFormatException or FileLoadException) { }
-            }
-            type = ResolveType(typeName);
-        }
-
         if (type is null || !typeof(UiController).IsAssignableFrom(type))
         {
             Log.Logger.LogWarning("UI controller type '{Type}' was not found or is not a UiController", typeName);

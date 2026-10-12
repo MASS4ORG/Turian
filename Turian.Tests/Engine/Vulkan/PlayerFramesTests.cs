@@ -96,6 +96,36 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.Equal(0, runtime.Ticker.UnscaledElapsedSeconds);
     }
 
+    /// <summary>
+    /// While the surface is lost frames neither tick nor render, the first frame after resuming ticks no time, and
+    /// quitting still closes the window.
+    /// </summary>
+    [Fact]
+    public void PausedFramesSkipTickingAndResumeWithoutTheGap()
+    {
+        var runtime = Runtime();
+        AddCamera(runtime.Scenes.PersistentRoot);
+        var frames = Frames(runtime, null);
+
+        frames.Paused = true;
+        frames.Frame(0.5);
+        Assert.Empty(rendered);
+        Assert.Equal(0, runtime.Ticker.UnscaledElapsedSeconds);
+
+        frames.Paused = false;
+        frames.Frame(30);
+        Assert.Equal(0, runtime.Ticker.UnscaledElapsedSeconds);
+        Assert.Single(rendered);
+
+        frames.Frame(0.25);
+        Assert.Equal(0.25, runtime.Ticker.UnscaledElapsedSeconds);
+
+        frames.Paused = true;
+        PlayerFrames.KeyPressed(Key.Escape);
+        frames.Frame(0.1);
+        Assert.Equal(1, closed);
+    }
+
     /// <summary>Resizing gives the active scene's cameras the framebuffer's aspect, and does nothing without one.</summary>
     [Fact]
     public void ResizeUpdatesTheActiveScenesCameras()
@@ -130,24 +160,26 @@ public sealed class PlayerFramesTests : IDisposable
     [Fact]
     public void WindowIconsLoadFromTheBuiltPng()
     {
-        var path = Path.Combine(project, PlayerSettings.BuiltIconFileName);
-        Assert.Null(WindowManager.LoadIcon(path));
+        var path = PlayerSettings.BuiltIconFileName;
+        var content = new FileContentDirectory(project);
+        Assert.Null(GlfwSurfaceHost.LoadIcon(content, path));
 
         using (var bitmap = new SKBitmap(4, 2))
         using (var image = SKImage.FromBitmap(bitmap))
         using (var png = image.Encode(SKEncodedImageFormat.Png, 100))
-            File.WriteAllBytes(path, png.ToArray());
+            File.WriteAllBytes(Path.Combine(project, path), png.ToArray());
 
-        var icon = WindowManager.LoadIcon(path);
+        var icon = GlfwSurfaceHost.LoadIcon(content, path);
         Assert.Equal(4, icon!.Value.Width);
         Assert.Equal(2, icon.Value.Height);
 
         var window = Substitute.For<Silk.NET.Windowing.IWindow>();
-        Assert.True(WindowManager.TryLoadIcon(window, path, out var target, out var loaded));
+        Assert.True(GlfwSurfaceHost.TryLoadIcon(window, content, path, out var target, out var loaded));
         Assert.Same(window, target);
         Assert.Equal(4, loaded.Width);
-        Assert.False(WindowManager.TryLoadIcon(Substitute.For<Silk.NET.Windowing.IView>(), path, out _, out _));
-        Assert.False(WindowManager.TryLoadIcon(window, Path.Combine(project, "missing.png"), out _, out _));
+        Assert.False(GlfwSurfaceHost.TryLoadIcon(Substitute.For<Silk.NET.Windowing.IView>(), content, path, out _,
+            out _));
+        Assert.False(GlfwSurfaceHost.TryLoadIcon(window, content, "missing.png", out _, out _));
     }
 
     /// <summary>Disposing the frame loop releases the interface presenter it was given.</summary>

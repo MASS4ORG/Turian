@@ -5,11 +5,18 @@ namespace Turian.Engine.Core;
 /// <param name="Logger">The game's logger.</param>
 /// <param name="BuildServices">Builds the scene service provider; the launcher owns the container implementation.</param>
 /// <param name="Development">Whether this is a development build, which shows diagnostics such as frame rate.</param>
+/// <param name="Content">Where the game's packaged content is read from, such as APK assets; <c>null</c> reads
+/// <paramref name="ProjectDirectory"/> from disk.</param>
 public sealed record GamePlayerContext(
     string ProjectDirectory,
     ILogger Logger,
     Func<IServiceCollection, IServiceProvider> BuildServices,
-    bool Development = false);
+    bool Development = false,
+    IContentDirectory? Content = null)
+{
+    /// <summary>The game's packaged content: <see cref="Content"/>, else the project folder on disk.</summary>
+    public IContentDirectory ContentDirectory => Content ?? new FileContentDirectory(ProjectDirectory);
+}
 
 /// <summary>
 /// Runs a game until it quits: owns the loop and, for a client, the window, renderer and input. A render brick

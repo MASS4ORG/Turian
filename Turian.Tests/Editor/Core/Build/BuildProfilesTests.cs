@@ -49,6 +49,51 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.False(BuildProfiles.HasPlayer(BuildProfiles.ShippingBricks(bricks, BuildTarget.Server)));
     }
 
+    static ResolvedPackage Brick(string id, params string[] platforms) =>
+        new(id, new PackageManifest { Name = id, Platforms = [.. platforms] }, "/", PackageOrigin.Builtin, "", null, null, 1, false);
+
+    /// <summary>A brick without a platform list ships everywhere; one with a list ships only on those platforms.</summary>
+    [Fact]
+    public void PlatformAllowListFailsExportNamingTheBricks()
+    {
+        BuildProfiles.EnsureSupported([Brick("a.any"), Brick("a.desktop", "Desktop")], BuildPlatforms.Desktop);
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            BuildProfiles.EnsureSupported([Brick("a.any"), Brick("a.desktop", "desktop"), Brick("a.xr", "xr")], "android"));
+        Assert.Contains("a.desktop, a.xr", error.Message);
+        Assert.DoesNotContain("a.any", error.Message);
+    }
+
+    /// <summary>Platform NuGet entries add to the common ones, overriding a version, for that platform only.</summary>
+    [Fact]
+    public void PlatformNugetAddsToTheCommonPackages()
+    {
+        var manifest = new PackageManifest
+        {
+            Nuget = { ["Common"] = "1.0.0", ["Shared"] = "1.0.0" },
+            PlatformNuget = { ["android"] = new() { ["Native"] = "2.0.0", ["Shared"] = "1.1.0" } },
+        };
+
+        Assert.Equal(["Common", "Shared"], manifest.NugetFor("desktop").Keys.Order());
+        var android = manifest.NugetFor("Android");
+        Assert.Equal(["Common", "Native", "Shared"], android.Keys.Order());
+        Assert.Equal("1.1.0", android["Shared"]);
+    }
+
+    /// <summary>Platform lists round-trip through the manifest text, and an empty platform id is rejected.</summary>
+    [Fact]
+    public void PlatformFieldsRoundTripAndValidate()
+    {
+        var json = """{"name":"a.b","version":"1.0.0","platforms":["desktop"],"platformNuget":{"desktop":{"X":"1.0.0"}}}""";
+        var manifest = PackageManifest.Parse(json, "package.json");
+        Assert.Equal(["desktop"], manifest.Platforms);
+        Assert.Equal("1.0.0", manifest.NugetFor("desktop")["X"]);
+        Assert.Equal(["desktop"], PackageManifest.Parse(manifest.ToJson(), "package.json").Platforms);
+
+        Assert.Throws<PackageException>(() =>
+            PackageManifest.Parse("""{"name":"a.b","version":"1.0.0","platforms":[" "]}""", "package.json"));
+    }
+
     /// <summary>Profiles are found by name or file name, in name order; an unknown name lists the existing ones.</summary>
     [Fact]
     public void ProfilesAreFoundByName()
@@ -87,9 +132,11 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.True(Directory.Exists(desktop.LauncherDirectory));
         Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(() => BuildPlatforms.Find("android")).Message);
         Assert.Equal(["publish", "game.csproj", "-o", "out", "-c", "Release", "--no-restore"],
-            desktop.PublishArguments(new BuildPlatformContext("game.csproj", "out", "Release", null)));
+            desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release", null)));
         Assert.Equal("-p:TurianDefines=TURIAN_SERVER%3BDEMO",
-            desktop.PublishArguments(new BuildPlatformContext("game.csproj", "out", "Release",
+            desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release",
                 new BuildProfile { Target = BuildTarget.Server, ScriptingDefines = "DEMO" }))[^1]);
         Assert.Same(desktop.GetType(), BuildPlatforms.For(new BuildProfile { Target = BuildTarget.Server }).GetType());
     }
@@ -99,7 +146,8 @@ public sealed class BuildProfilesTests : IDisposable
     public void ProfilesWithoutSymbolsReplaceTheActiveProfiles()
     {
         Assert.Equal("-p:TurianDefines=", BuildPlatforms.Find(null).PublishArguments(
-            new BuildPlatformContext("game.csproj", "out", "Release", new BuildProfile()))[^1]);
+            new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release", new BuildProfile()))[^1]);
     }
 
     /// <summary>
@@ -171,11 +219,11 @@ public sealed class BuildProfilesTests : IDisposable
     [Fact]
     public void ExecutablesAreNamedForTheTargetRuntime()
     {
-        Assert.Equal(".exe", ExportUserCode.ExecutableExtension("win-arm64"));
-        Assert.Equal(".exe", ExportUserCode.ExecutableExtension(" WIN-x64 "));
-        Assert.Equal("", ExportUserCode.ExecutableExtension("linux-arm64"));
-        Assert.Equal("", ExportUserCode.ExecutableExtension("osx-arm64"));
-        Assert.Equal(OperatingSystem.IsWindows() ? ".exe" : "", ExportUserCode.ExecutableExtension(null));
+        Assert.Equal(".exe", DesktopBuildPlatform.ExecutableExtension("win-arm64"));
+        Assert.Equal(".exe", DesktopBuildPlatform.ExecutableExtension(" WIN-x64 "));
+        Assert.Equal("", DesktopBuildPlatform.ExecutableExtension("linux-arm64"));
+        Assert.Equal("", DesktopBuildPlatform.ExecutableExtension("osx-arm64"));
+        Assert.Equal(OperatingSystem.IsWindows() ? ".exe" : "", DesktopBuildPlatform.ExecutableExtension(null));
     }
 
     /// <summary>Script projects take the profile's symbols and keep brick packages from flowing into a game.</summary>

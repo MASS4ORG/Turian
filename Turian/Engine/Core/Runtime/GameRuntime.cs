@@ -7,9 +7,11 @@ namespace Turian.Engine.Core;
 /// </summary>
 public sealed class GameRuntime
 {
-    GameRuntime(string projectDirectory, AssetDatabase assets, AppSettings settings, SceneManager scenes)
+    GameRuntime(string projectDirectory, IContentDirectory content, AssetDatabase assets, AppSettings settings,
+        SceneManager scenes)
     {
         ProjectDirectory = projectDirectory;
+        Content = content;
         Assets = assets;
         Settings = settings;
         Scenes = scenes;
@@ -17,6 +19,9 @@ public sealed class GameRuntime
 
     /// <summary>The folder the game runs from.</summary>
     public string ProjectDirectory { get; }
+
+    /// <summary>Where the game's packaged content is read from.</summary>
+    public IContentDirectory Content { get; }
 
     /// <summary>The game's asset catalog.</summary>
     public AssetDatabase Assets { get; }
@@ -61,17 +66,18 @@ public sealed class GameRuntime
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(input);
 
+        var content = context.ContentDirectory;
         var assets = new AssetDatabase();
-        LoadCatalog(assets, context.ProjectDirectory);
+        LoadCatalog(assets, content, context.ProjectDirectory);
         var loader = new RuntimeAssetLoader(assets);
         var settings = new AppSettings
         {
             ProjectAbsoluteDir = context.ProjectDirectory,
             Title = Path.GetFileName(context.ProjectDirectory),
         };
-        ProjectSettingsLoader.Load(settings, loader);
+        ProjectSettingsLoader.Load(settings, loader, content);
 
-        var runtime = new GameRuntime(context.ProjectDirectory, assets, settings, new SceneManager(assets));
+        var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
         runtime.BindServices(context, loader, input, addServices);
         return runtime;
     }
@@ -131,11 +137,11 @@ public sealed class GameRuntime
     }
 
     // A built game ships its runtime catalog in Content/; a game run from its project reads the editor's cache.
-    static void LoadCatalog(AssetDatabase assets, string projectDirectory)
+    static void LoadCatalog(AssetDatabase assets, IContentDirectory content, string projectDirectory)
     {
-        if (File.Exists(Path.Combine(projectDirectory, "Content", "assetCatalog.json")))
-            assets.LoadRuntimeCatalog(projectDirectory);
-        else if (File.Exists(Path.Combine(projectDirectory, ".Cache", "assetCatalog.json")))
+        if (content.Exists(AssetDatabase.RuntimeCatalogPath))
+            assets.LoadRuntimeCatalog(content);
+        else if (content.Exists(".Cache/assetCatalog.json"))
             assets.LoadCatalogFromProject(projectDirectory);
         else
             assets.BuildDatabase(Path.Combine(projectDirectory, "Assets"));

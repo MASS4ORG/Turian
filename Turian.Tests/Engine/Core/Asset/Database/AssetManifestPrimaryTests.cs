@@ -35,7 +35,9 @@ public sealed class AssetManifestPrimaryTests : IDisposable
     public void DatabaseRebuildRetainsCurrentTextureTargetPreference()
     {
         var (database, asset, cache) = CreateArtifacts();
-        var otherTarget = TextureBuildTarget.Current == "windows" ? "linux" : "windows";
+        var otherTarget = TextureBuildTarget.Current == TextureBuildTarget.Pc
+            ? TextureBuildTarget.Android
+            : TextureBuildTarget.Pc;
         var current = $"primary.{TextureBuildTarget.Current}.texture";
         var other = $"primary.{otherTarget}.texture";
         File.WriteAllText(Path.Combine(cache, current), "current");

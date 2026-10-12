@@ -9,8 +9,9 @@ public sealed partial class AssetDatabase
 {
     const string cacheDirectoryName = ".Cache";
     const string cacheCatalogFileName = "assetCatalog.json";
-    const string runtimeContentDirectoryName = "Content";
-    const string runtimeCatalogFileName = "assetCatalog.json";
+
+    /// <summary>Where a built game's runtime catalog lives, relative to its content root.</summary>
+    public const string RuntimeCatalogPath = "Content/assetCatalog.json";
 
     readonly object syncRoot = new();
 
@@ -24,6 +25,12 @@ public sealed partial class AssetDatabase
 
     /// <summary>Cold model and texture load durations for this database.</summary>
     public AssetLoadStatistics LoadStatistics { get; } = new();
+
+    /// <summary>
+    /// The packaged content a runtime catalog was read from, which its records' payloads are read through;
+    /// <c>null</c> when the database indexes a project.
+    /// </summary>
+    public IContentDirectory? Content { get; private set; }
 
     /// <summary>
     /// The folders of the project's installed packages, whose assets the database indexes beside the project's
@@ -60,6 +67,7 @@ public sealed partial class AssetDatabase
             lock (syncRoot)
             {
                 Assets.Clear();
+                Content = null;
             }
 
             return;
@@ -74,6 +82,7 @@ public sealed partial class AssetDatabase
         lock (syncRoot)
         {
             Assets = rebuiltAssets;
+            Content = null;
         }
     }
 
@@ -99,6 +108,7 @@ public sealed partial class AssetDatabase
         lock (syncRoot)
         {
             Assets = loadedAssets;
+            Content = null;
         }
 
         return status;
@@ -111,16 +121,25 @@ public sealed partial class AssetDatabase
     public void LoadRuntimeCatalog(string runtimeRootPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runtimeRootPath);
+        LoadRuntimeCatalog(new FileContentDirectory(runtimeRootPath));
+    }
 
-        var runtimeRoot = Path.GetFullPath(runtimeRootPath);
-        var catalogPath = Path.Combine(runtimeRoot, runtimeContentDirectoryName, runtimeCatalogFileName);
-        var catalog = ReadCatalog(catalogPath);
+    /// <summary>
+    /// Loads the runtime catalog from a built game's content and replaces the current database contents; the
+    /// records' payloads are then read through <paramref name="content"/>.
+    /// </summary>
+    /// <param name="content">The game's content root, holding <see cref="RuntimeCatalogPath"/>.</param>
+    public void LoadRuntimeCatalog(IContentDirectory content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
 
-        var loadedAssets = NormalizeCatalogRecords(runtimeRoot, catalog.Records);
+        var catalog = ReadCatalog(content, RuntimeCatalogPath);
+        var loadedAssets = NormalizeCatalogRecords(content.Id, catalog.Records);
 
         lock (syncRoot)
         {
             Assets = loadedAssets;
+            Content = content;
         }
     }
 
@@ -165,6 +184,7 @@ public sealed partial class AssetDatabase
         lock (syncRoot)
         {
             Assets = loadedAssets.ToDictionary(static kvp => kvp.Key, static kvp => CloneRecord(kvp.Value));
+            Content = null;
         }
     }
 

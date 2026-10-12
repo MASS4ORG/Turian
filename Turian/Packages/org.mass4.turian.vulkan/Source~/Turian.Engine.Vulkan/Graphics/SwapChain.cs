@@ -107,7 +107,7 @@ public partial class SwapChain : IDisposable
     Fence[] imagesInFlight = null!;
     int currentFrame;
     Format swapChainImageFormat;
-    readonly SwapChain? oldSwapChain = null!;
+    SwapChain? oldSwapChain;
 
     /// <summary>
     /// Gets the image count of the swap chain.
@@ -122,16 +122,21 @@ public partial class SwapChain : IDisposable
     /// <param name="device">The device object.</param>
     /// <param name="extent">The extent of the swap chain.</param>
     /// <param name="useFifo">Whether to use Fifo for the swap chain.</param>
-    public SwapChain(Vk vk, Device device, Extent2D extent, bool useFifo)
+    /// <param name="oldSwapChain">
+    /// The swap chain being replaced on the same surface, which the driver may reuse; the caller disposes it after.
+    /// </param>
+    public SwapChain(Vk vk, Device device, Extent2D extent, bool useFifo, SwapChain? oldSwapChain = null)
     {
         ArgumentNullException.ThrowIfNull(device);
 
         this.vk = vk;
         this.device = device;
+        this.oldSwapChain = oldSwapChain;
         UseFifo = useFifo;
         vkDevice = device.VkDevice;
         windowExtent = extent;
         Initialize();
+        this.oldSwapChain = null;
     }
 
     /// <summary>

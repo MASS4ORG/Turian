@@ -61,6 +61,8 @@ public sealed class UiFontResolver
                         continue;
                     }
 
+                    // Packaged content has no source fonts; a project prefers its live source file.
+                    if (database.Content is not null) return FromDatabaseStream(record.AssetId);
                     var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
                     return File.Exists(absolute) ? FromFile(absolute) : FromDatabaseStream(record.AssetId);
                 }

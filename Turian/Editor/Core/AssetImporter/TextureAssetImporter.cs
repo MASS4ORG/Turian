@@ -1,14 +1,14 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Importer for image files. Bakes one <c>.amtex</c> container per build target holding exactly
+/// Importer for image files. Bakes one KTX2 container per build target holding exactly
 /// what the GPU samples: DDS block data passes through untouched with its mip chain, while source
 /// formats the GPU cannot sample decode to RGBA8 and generate mips at load.
 /// </summary>
 public class TextureAssetImporter : IAssetImporter
 {
     /// <inheritdoc/>
-    public int Version => 1;
+    public int Version => 2;
 
     /// <inheritdoc/>
     public IReadOnlyList<string> BuildTargets => TextureBuildTarget.Implemented;
@@ -73,7 +73,7 @@ public class TextureAssetImporter : IAssetImporter
         {
             var content = Bake(source, texture, target, sourcePath);
             var fileName = ArtifactFileName(target);
-            TextureBlobWriter.Save(Path.Combine(importDirectory, fileName), content);
+            Ktx2Writer.Save(Path.Combine(importDirectory, fileName), content);
             artifacts.Add(fileName);
         }
 
@@ -86,14 +86,14 @@ public class TextureAssetImporter : IAssetImporter
     /// </summary>
     /// <param name="target">A key from <see cref="TextureBuildTarget"/>.</param>
     public static string ArtifactFileName(string target) =>
-        $"{IAssetImporter.PrimaryArtifactName}.{target}{TextureBlob.FileExtension}";
+        $"{IAssetImporter.PrimaryArtifactName}.{target}{Ktx2Reader.FileExtension}";
 
     /// <summary>
-    /// Produces the blob for one target. Only <see cref="TextureBuildTarget.Pc"/> has an encoder:
+    /// Produces the texture for one target. Only <see cref="TextureBuildTarget.Pc"/> has an encoder:
     /// it keeps BC blocks as they are. ETC2 and ASTC encoders hook in here, transcoding the decoded
     /// pixels before the container is written.
     /// </summary>
-    static TextureBlobContent Bake(byte[] source, TextureAsset texture, string target, string sourcePath)
+    static Ktx2Texture Bake(byte[] source, TextureAsset texture, string target, string sourcePath)
     {
         var maxResolution = texture.ImportSettings.ResolveMaxResolution(target);
 
@@ -101,7 +101,13 @@ public class TextureAssetImporter : IAssetImporter
         {
             var dds = DdsReader.Read(source, texture.IsSrgb);
             var (width, height, levels) = ApplyMaxResolution(dds.Width, dds.Height, dds.Levels, maxResolution);
-            return new TextureBlobContent(dds.Format, width, height, texture.IsSrgb, levels);
+            return new Ktx2Texture
+            {
+                Format = (Ktx2VkFormat)dds.Format,
+                Width = width,
+                Height = height,
+                Levels = levels,
+            };
         }
 
         var image = ImageResult.FromMemory(source, ColorComponents.RedGreenBlueAlpha)
@@ -109,13 +115,13 @@ public class TextureAssetImporter : IAssetImporter
 
         // Uncompressed sources carry no mip chain, so there is nothing to skip; the GPU generates
         // the chain at load and MaxResolution is left to a resampling step this importer does not do.
-        var format = texture.IsSrgb ? Format.R8G8B8A8Srgb : Format.R8G8B8A8Unorm;
-        return new TextureBlobContent(
-            format,
-            (uint)image.Width,
-            (uint)image.Height,
-            texture.IsSrgb,
-            [image.Data]);
+        return new Ktx2Texture
+        {
+            Format = texture.IsSrgb ? Ktx2VkFormat.R8G8B8A8Srgb : Ktx2VkFormat.R8G8B8A8Unorm,
+            Width = (uint)image.Width,
+            Height = (uint)image.Height,
+            Levels = [image.Data],
+        };
     }
 
     /// <summary>

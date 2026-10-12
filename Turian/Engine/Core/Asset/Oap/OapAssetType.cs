@@ -10,7 +10,7 @@ public enum OapAssetType : byte
     /// <summary>Category is unknown or not set.</summary>
     Unknown = 0,
 
-    /// <summary>A texture artifact (<c>.amtex</c> or a raw image).</summary>
+    /// <summary>A texture artifact (<c>.ktx2</c> or a raw image).</summary>
     Texture = 1,
 
     /// <summary>A glTF 2 mesh artifact (<c>.glb</c> or <c>.gltf</c>).</summary>

@@ -338,9 +338,7 @@ public sealed class SceneViewerService : IDisposable
 
     void InitializeGlobalSetLayout()
     {
-        var stages =
-            ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit |
-            ShaderStageFlags.MeshBitExt | ShaderStageFlags.TaskBitExt;
+        var stages = ShaderStages.GlobalSet(vulkan.Device.SupportsMeshShaders);
 
         globalSetLayout = new DescriptorSetLayoutBuilder(vulkan.Vk, vulkan.Device)
             .AddBinding(0, DescriptorType.UniformBuffer, stages)

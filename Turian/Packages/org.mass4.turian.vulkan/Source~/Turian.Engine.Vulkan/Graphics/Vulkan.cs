@@ -16,17 +16,18 @@ public class Vulkan : IRenderDevice
     public Device Device { get; init; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Vulkan"/> class with the specified window manager and logger.
+    /// Initializes a new instance of the <see cref="Vulkan"/> class presenting to a surface host.
     /// </summary>
-    /// <param name="windowManager">The window manager used for creating the Vulkan device.</param>
+    /// <param name="surfaceHost">The host whose surface the device presents to.</param>
     /// <param name="logger">The logger used for reporting startup progress.</param>
-    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="windowManager"/> is <c>null</c>.</exception>
-    public Vulkan(WindowManager windowManager, ILogger logger)
+    /// <param name="settings">The project settings the device reads its MSAA sample count from, or <c>null</c>.</param>
+    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="surfaceHost"/> is <c>null</c>.</exception>
+    public Vulkan(ISurfaceHost surfaceHost, ILogger logger, IAppSettings? settings = null)
     {
-        ArgumentNullException.ThrowIfNull(windowManager);
+        ArgumentNullException.ThrowIfNull(surfaceHost);
 
         Vk = Vk.GetApi();
-        Device = new Device(Vk, windowManager.Window);
+        Device = new Device(Vk, surfaceHost, RequestedMsaaSamples(settings));
 
         logger.Lap("startup", "got vk");
     }
@@ -36,13 +37,17 @@ public class Vulkan : IRenderDevice
     /// Use this in the editor process where rendering goes to offscreen targets, not a swapchain.
     /// </summary>
     /// <param name="logger">The logger used for reporting startup progress.</param>
-    public Vulkan(ILogger logger)
+    /// <param name="settings">The project settings the device reads its MSAA sample count from, or <c>null</c>.</param>
+    public Vulkan(ILogger logger, IAppSettings? settings = null)
     {
         Vk = Vk.GetApi();
-        Device = new Device(Vk);
+        Device = new Device(Vk, requestedMsaaSamples: RequestedMsaaSamples(settings));
 
         logger.Lap("startup", "Vulkan headless device ready");
     }
+
+    static int RequestedMsaaSamples(IAppSettings? settings) =>
+        settings?.Get<GraphicsSettings>().MsaaSamples ?? GraphicsSettings.DefaultMsaaSamples;
 
     /// <inheritdoc />
     public Model? GetModel(Guid modelAssetId, AssetDatabase assets) =>

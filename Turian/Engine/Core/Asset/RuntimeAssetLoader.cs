@@ -61,7 +61,9 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        var content = metadata.GetContent(record.ProjectRootPath, ReadBaseFromSession, GetProvider(assetId));
+        // Packaged content has no sources to prefer over the imported copy.
+        var projectPath = assetDatabase.Content is null ? record.ProjectRootPath : string.Empty;
+        var content = metadata.GetContent(projectPath, ReadBaseFromSession, GetProvider(assetId));
         if (content is not null) await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
         return content as TData;
     }
@@ -73,15 +75,23 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         if (record.StorageKind != AssetStorageKind.Oap)
             return assetDatabase.TryGetAssetProvider(assetId, out var provider) ? provider : null;
 
-        var path = record.ResolveContentPath();
-        return new OapAssetFileProvider(path, record.PrimaryContentKey, GetSessionMount(path));
+        var content = assetDatabase.Content;
+        var path = PackagePath(record, content);
+        var mount = GetSessionMount(path, content);
+        return content is null
+            ? new OapAssetFileProvider(path, record.PrimaryContentKey, mount)
+            : new OapAssetFileProvider(content, path, record.PrimaryContentKey, mount);
     }
 
-    OapMountSet GetSessionMount(string path)
+    // A runtime catalog names packages inside its content root; a project names package files on disk.
+    static string PackagePath(AssetRecord record, IContentDirectory? content) =>
+        content is null ? record.ResolveContentPath() : AssetDatabase.ContentPath(record.ImportedRelativePath);
+
+    OapMountSet GetSessionMount(string path, IContentDirectory? content)
     {
         lock (gate)
         {
-            sessionMounts ??= CaptureMounts();
+            sessionMounts ??= CaptureMounts(content);
 
             if (!sessionMounts.TryGetValue(path, out var mount) || mount is null)
                 throw new FileNotFoundException("OAP content is absent from this session.", path);
@@ -89,13 +99,16 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         }
     }
 
-    Dictionary<string, OapMountSet?> CaptureMounts() =>
+    Dictionary<string, OapMountSet?> CaptureMounts(IContentDirectory? content) =>
         assetDatabase.GetAssetsSnapshot()
             .Where(static asset => asset.StorageKind == AssetStorageKind.Oap)
-            .Select(static asset => asset.ResolveContentPath())
+            .Select(asset => PackagePath(asset, content))
             .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(static candidate => candidate, OapMountSet.ForBasePackage,
+            .ToDictionary(static candidate => candidate,
+                candidate => content is null
+                    ? OapMountSet.ForBasePackage(candidate)
+                    : OapMountSet.ForBasePackage(content, candidate),
                 StringComparer.OrdinalIgnoreCase);
 
     string? ReadBaseFromSession(Guid assetId)
@@ -203,17 +216,27 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             return null;
         }
 
-        if (MetaPath(record) is not { } metaPath)
+        var asset = assetDatabase.Content is { } content ? LoadMeta(content, record) : LoadMeta(record);
+        if (asset is null)
         {
             return CreateFromRecord(record);
         }
 
-        var asset = Asset.Load(metaPath);
-        if (asset is not null)
-        {
-            asset.RelativePath = record.SourceRelativePath;
-        }
+        asset.RelativePath = record.SourceRelativePath;
         return asset;
+    }
+
+    static Asset? LoadMeta(AssetRecord record) => MetaPath(record) is { } metaPath ? Asset.Load(metaPath) : null;
+
+    // A built game normally ships without meta files; one present in its content still describes the asset.
+    static Asset? LoadMeta(IContentDirectory content, AssetRecord record)
+    {
+        if (string.IsNullOrWhiteSpace(record.MetaRelativePath) || Path.IsPathRooted(record.MetaRelativePath)
+            || record.MetaRelativePath.StartsWith("..", StringComparison.Ordinal))
+            return null;
+
+        var metaPath = AssetDatabase.ContentPath(record.MetaRelativePath);
+        return content.Exists(metaPath) ? Serializer.LoadData<Asset>(content.ReadAllText(metaPath)) : null;
     }
 
     // The record's existing meta file, or null when the game ships without it.

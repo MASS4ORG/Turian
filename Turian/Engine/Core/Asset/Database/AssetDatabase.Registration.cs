@@ -193,7 +193,7 @@ public sealed partial class AssetDatabase
                 return false;
             }
 
-            provider = CreateProvider(record);
+            provider = CreateProvider(record, Content);
             return provider is not null;
         }
     }

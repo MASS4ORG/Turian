@@ -20,6 +20,10 @@
         <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>

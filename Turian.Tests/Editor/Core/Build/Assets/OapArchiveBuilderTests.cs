@@ -13,7 +13,7 @@ public sealed class OapArchiveBuilderTests : IDisposable
     [InlineData("ModelImportAsset", "primary.GLB", OapAssetType.Mesh)]
     [InlineData("ModelImportAsset", "primary.gltf", OapAssetType.Mesh)]
     [InlineData("MeshAsset", "primary.bin", OapAssetType.Mesh)]
-    [InlineData("Asset", "primary.amtex", OapAssetType.Texture)]
+    [InlineData("Asset", "primary.ktx2", OapAssetType.Texture)]
     [InlineData("TextureAsset", "primary.bin", OapAssetType.Texture)]
     [InlineData("MaterialAsset", "primary.bin", OapAssetType.Material)]
     [InlineData("Prefab", "primary.bin", OapAssetType.Prefab)]
@@ -58,7 +58,7 @@ public sealed class OapArchiveBuilderTests : IDisposable
     [Fact]
     public void BuildPackage_PacksEveryAsset()
     {
-        var texture = AddCachedAsset("Assets/hero.png", "primary.pc.amtex", "Turian.Engine.Core.TextureAsset",
+        var texture = AddCachedAsset("Assets/hero.png", "primary.pc.ktx2", "Turian.Engine.Core.TextureAsset",
             [1, 2, 3, 4, 5]);
         var mesh = AddCachedAsset("Assets/ship.glb", "primary.glb", "Turian.Engine.Core.MeshAsset",
             [.. Enumerable.Repeat((byte)0xAB, 300)]);

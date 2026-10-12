@@ -56,6 +56,8 @@ public sealed class UiImageResolver
                     continue;
                 }
 
+                // Packaged content has no source images; a project prefers its live source file.
+                if (database.Content is not null) return DecodeFromDatabase(record.AssetId);
                 var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
                 return File.Exists(absolute) ? Decode(absolute) : DecodeFromDatabase(record.AssetId);
             }
@@ -94,10 +96,10 @@ public sealed class UiImageResolver
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
             var bytes = buffer.ToArray();
-            if (!TextureBlob.IsTextureBlob(bytes)) return SKImage.FromEncodedData(bytes);
+            if (!Ktx2Reader.IsKtx2(bytes)) return SKImage.FromEncodedData(bytes);
 
-            var blob = TextureBlob.Read(bytes);
-            if (blob.Format is not (Format.R8G8B8A8Srgb or Format.R8G8B8A8Unorm)
+            var blob = Ktx2Reader.Read(bytes);
+            if (blob.Format is not (Ktx2VkFormat.R8G8B8A8Srgb or Ktx2VkFormat.R8G8B8A8Unorm)
                 || blob.Levels.Count == 0)
             {
                 Log.Logger.LogWarning("UI image {AssetId} uses unsupported texture format {Format}", assetId, blob.Format);

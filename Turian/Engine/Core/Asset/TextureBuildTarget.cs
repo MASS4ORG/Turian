@@ -21,7 +21,7 @@ public static class TextureBuildTarget
     public const string Ios = "ios";
 
     /// <summary>The target the running process consumes.</summary>
-    public static string Current => Pc;
+    public static string Current => OperatingSystem.IsAndroid() ? Android : Pc;
 
     /// <summary>The targets an import actually bakes an artifact for.</summary>
     public static IReadOnlyList<string> Implemented { get; } = [Pc];

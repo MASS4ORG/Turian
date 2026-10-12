@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 public class InputManager : IDisposable
 {
-    readonly List<Key> keysDown = [];
+    List<Key> keysDown = [];
 
     /// <summary>
     /// Event that is raised when a key is pressed.
@@ -20,12 +20,12 @@ public class InputManager : IDisposable
     /// <summary>
     /// Initializes a new instance of the InputManager class.
     /// </summary>
-    /// <param name="windowManager">The window manager associated with the application.</param>
+    /// <param name="surfaceHost">The host whose input devices are read.</param>
     /// <param name="logger">The logger used for logging.</param>
-    public InputManager(WindowManager windowManager, ILogger logger)
+    public InputManager(ISurfaceHost surfaceHost, ILogger logger)
     {
-        ArgumentNullException.ThrowIfNull(windowManager);
-        Input = windowManager.Window.CreateInput();
+        ArgumentNullException.ThrowIfNull(surfaceHost);
+        Input = surfaceHost.CreateInput();
         Input.ConnectionChanged += Connect;
         logger.Lap("run", "got camera and controls");
     }
@@ -89,7 +89,7 @@ public class InputManager : IDisposable
 
     void KeyboardOnKeyUp(IKeyboard arg1, Key arg2, int _)
     {
-        keysDown.RemoveAt(keysDown.IndexOf(arg2));
+        keysDown.Remove(arg2);
     }
 
     void KeyboardOnKeyDown(IKeyboard arg1, Key arg2, int _)

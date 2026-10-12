@@ -59,16 +59,15 @@ public static class CsProjectGenerator
         IReadOnlyList<string> symbols)
     {
         var csprojFilePath = UserCodeCsProjFullPath(settings);
-        var isExecutable = false;
 
         var projectRoot = ProjectRootElement.Create(csprojFilePath);
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot
-            .AddProjectInfo(settings, executable: isExecutable, symbols: symbols)
+            .AddLibraryInfo(settings, symbols)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
             .AddBrickReferences(settings)
-            .AddNugetPackageReferences(settings)
+            .AddNugetPackageReferences(settings.PackageReferences)
             .AddAssemblyReferences(settings, graph.Default.References);
         projectRoot.AddCsFiles(settings, graph.ExcludedDirectories(graph.Default));
 
@@ -114,10 +113,10 @@ public static class CsProjectGenerator
     {
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
-        projectRoot.AddProjectInfo(settings, executable: false, symbols: symbols).AddTurianDir();
+        projectRoot.AddLibraryInfo(settings, symbols).AddTurianDir();
         if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
         projectRoot
-            .AddNugetPackageReferences(settings)
+            .AddNugetPackageReferences(settings.PackageReferences)
             .AddAssemblyReferences(settings, assembly.References);
 
         var group = projectRoot.AddPropertyGroup();
@@ -174,21 +173,25 @@ public static class CsProjectGenerator
             mode == ExecutableGenerationMode.Play ? "Play" : settings.ExportSourceSubDir,
             "project.csproj");
 
-        const bool isExecutable = true;
+        var platform = BuildPlatforms.For(profile);
+        // ConfigureProject only reads the settings, profile and mode; the output and configuration are the
+        // publish-time context the caller builds.
+        var context = new BuildPlatformContext(settings, logger, csprojFilePath, string.Empty, string.Empty, profile, mode);
 
         var projectRoot = ProjectRootElement.Create(csprojFilePath);
         projectRoot.Sdk = settings.TargetSdk;
+        platform.ConfigureProject(projectRoot, context);
         projectRoot
-            .AddProjectInfo(settings, isExecutable, mode, profile?.RuntimeIdentifier,
-                console: profile?.Target == BuildTarget.Server)
             .AddTurianDir()
             .AddInternalDllReferences(settings)
-            .AddBrickReferences(settings, shipping: true, target: profile?.Target ?? BuildTarget.Client)
+            .AddBrickReferences(settings, shipping: true, target: profile?.Target ?? BuildTarget.Client,
+                packages: platform.Dependencies.Packages, platform: platform.Id)
             .AddUserProject(settings)
-            .AddNugetPackageReferences(settings)
+            .AddNugetPackageReferences(platform.Dependencies.Packages)
             .AddAssetsDir(settings)
-            .CopyLauncherFiles(BuildPlatforms.For(profile));
-        if (profile?.Target == BuildTarget.Server) projectRoot.AddServerVerification(settings);
+            .CopyLauncherFiles(platform);
+        if (profile?.Target == BuildTarget.Server)
+            projectRoot.AddServerVerification(settings, platform.Dependencies.Packages);
 
         return projectRoot;
     }
@@ -313,58 +316,22 @@ public static class CsProjectGenerator
             return projectRoot;
         }
 
-        private ProjectRootElement AddProjectInfo(IBuildAppSettings settings,
-            bool executable,
-            ExecutableGenerationMode mode = ExecutableGenerationMode.Export,
-            string? runtimeIdentifier = null,
-            bool console = false,
+        private ProjectRootElement AddLibraryInfo(IBuildAppSettings settings,
             IReadOnlyList<string>? symbols = null)
         {
             var group = projectRoot.AddPropertyGroup();
-            // A server keeps its console on Windows, for its log and Ctrl+C; a game's window has none.
-            group.AddProperty("OutputType", !executable ? "Library" : console ? "Exe" : "WinExe");
+            group.AddProperty("OutputType", "Library");
             group.AddProperty("TargetFramework", settings.TargetFramework);
             group.AddProperty("ImplicitUsings", "disable");
             group.AddProperty("Nullable", "enable");
-
-            if (executable)
-            {
-                group.AddProperty("AllowUnsafeBlocks", "true");
-                // The launcher reads DEVELOPMENT_BUILD from a build profile's symbols.
-                group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
-
-                var icon = Path.Combine(settings.CacheAbsoluteDir, ProjectIcon.IcoFileName);
-                if (File.Exists(icon)) group.AddProperty("ApplicationIcon", icon);
-
-                if (mode == ExecutableGenerationMode.Export)
-                {
-                    group.AddProperty("DebugType", "None");
-                    group.AddProperty("DebugSymbols", "false");
-                    group.AddProperty("PublishSingleFile", "true");
-                    group.AddProperty("SelfContained", "true");
-                    // In the project rather than on the command line, so restore resolves the same runtime packs.
-                    if (!string.IsNullOrWhiteSpace(runtimeIdentifier))
-                        group.AddProperty("RuntimeIdentifier", runtimeIdentifier.Trim());
-                }
-                else
-                {
-                    group.AddProperty("DebugType", "portable");
-                    group.AddProperty("DebugSymbols", "true");
-                    group.AddProperty("PublishSingleFile", "false");
-                    group.AddProperty("SelfContained", "false");
-                }
-            }
-            else
-            {
-                group.AddProperty("GenerateDocumentationFile", "true");
-                // The editor's compile and the IDE use the active profile's symbols; a build passing
-                // -p:TurianDefines, global and so stronger, uses its own profile's instead.
-                if (symbols is { Count: > 0 }) group.AddProperty("TurianDefines", string.Join(';', symbols));
-                // A build profile passes its script symbols, such as TURIAN_SERVER, as the TurianDefines property.
-                group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
-                // The XML docs feed inspector tooltips; they are optional, so undocumented members are not warned about.
-                group.AddProperty("NoWarn", "$(NoWarn);CS1591");
-            }
+            group.AddProperty("GenerateDocumentationFile", "true");
+            // The editor's compile and the IDE use the active profile's symbols; a build passing
+            // -p:TurianDefines, global and so stronger, uses its own profile's instead.
+            if (symbols is { Count: > 0 }) group.AddProperty("TurianDefines", string.Join(';', symbols));
+            // A build profile passes its script symbols, such as TURIAN_SERVER, as the TurianDefines property.
+            group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
+            // The XML docs feed inspector tooltips; they are optional, so undocumented members are not warned about.
+            group.AddProperty("NoWarn", "$(NoWarn);CS1591");
 
             return projectRoot;
         }
@@ -422,9 +389,11 @@ public static class CsProjectGenerator
         /// those its own bricks bring.
         /// </summary>
         private ProjectRootElement AddBrickReferences(IBuildAppSettings settings, bool shipping = false,
-            bool editor = false, BuildTarget target = BuildTarget.Client)
+            bool editor = false, BuildTarget target = BuildTarget.Client,
+            IReadOnlyList<(string, string)>? packages = null, string platform = BuildPlatforms.Desktop)
         {
             var bricks = ReferencedBricks(settings, shipping, target);
+            if (shipping) BuildProfiles.EnsureSupported(bricks, platform);
 
             var references = projectRoot.AddItemGroup();
             // An editor-only assembly may also use what the bricks' editor assemblies offer.
@@ -433,7 +402,7 @@ public static class CsProjectGenerator
             foreach (var path in paths)
                 references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
 
-            AddBrickPackages(references, settings, bricks, shipping);
+            AddBrickPackages(references, packages ?? settings.PackageReferences, bricks, shipping, platform);
             return projectRoot;
         }
 
@@ -441,14 +410,15 @@ public static class CsProjectGenerator
         /// Fails a server build that would still copy a client-only brick's assembly or package, as when a script
         /// uses the renderer outside <c>#if !TURIAN_SERVER</c>.
         /// </summary>
-        private ProjectRootElement AddServerVerification(IBuildAppSettings settings)
+        private ProjectRootElement AddServerVerification(IBuildAppSettings settings,
+            IReadOnlyList<(string, string)> declaredPackages)
         {
             var resolved = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir);
             var kept = BuildProfiles.ShippingBricks(resolved, BuildTarget.Server).Select(static b => b.Id).ToHashSet();
             var leftOut = BuildProfiles.ShippingBricks(resolved, BuildTarget.Client).Where(b => !kept.Contains(b.Id)).ToList();
             var assemblies = leftOut.SelectMany(BrickAssemblies.RuntimeAssemblies).Select(Path.GetFileNameWithoutExtension);
             // A package the engine itself needs, such as the input enums' windowing abstractions, ships anyway.
-            var engine = settings.PackageReferences.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var engine = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var packages = leftOut.SelectMany(static b => b.Manifest.Nuget.Keys)
                 .Where(id => !engine.Contains(id)).Distinct(StringComparer.OrdinalIgnoreCase);
             var conditions = assemblies.Select(static name => $"'%(ReferenceCopyLocalPaths.Filename)' == '{name}'")
@@ -468,10 +438,10 @@ public static class CsProjectGenerator
             return projectRoot;
         }
 
-        private ProjectRootElement AddNugetPackageReferences(IBuildAppSettings settings)
+        private ProjectRootElement AddNugetPackageReferences(IReadOnlyList<(string, string)> packages)
         {
             var itemGroup = projectRoot.AddItemGroup();
-            foreach (var package in settings.PackageReferences)
+            foreach (var package in packages)
             {
                 itemGroup.AddItem("PackageReference", package.Item1)
                     .AddMetadata("Version", package.Item2, true);
@@ -490,11 +460,11 @@ public static class CsProjectGenerator
     }
 
     // The engine's own packages are already referenced; a script project keeps brick packages to itself.
-    static void AddBrickPackages(ProjectItemGroupElement references, IBuildAppSettings settings,
-        IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping)
+    static void AddBrickPackages(ProjectItemGroupElement references, IReadOnlyList<(string, string)> declaredPackages,
+        IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping, string platform)
     {
-        var declared = settings.PackageReferences.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, version) in bricks.SelectMany(static b => b.Manifest.Nuget).DistinctBy(static p => p.Key))
+        var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, version) in bricks.SelectMany(b => b.Manifest.NugetFor(platform)).DistinctBy(static p => p.Key))
         {
             if (!declared.Add(id)) continue;
             var package = references.AddItem("PackageReference", id);

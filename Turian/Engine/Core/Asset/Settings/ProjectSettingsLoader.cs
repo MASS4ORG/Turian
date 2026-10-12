@@ -99,9 +99,28 @@ public static class ProjectSettingsLoader
     public static void Load(IAppSettings settings, IAssetLoader? loader)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        if (string.IsNullOrWhiteSpace(settings.ProjectAbsoluteDir))
+        {
+            LoadFromSources(settings);
+            return;
+        }
 
-        var indexPath = Path.Combine(settings.ProjectAbsoluteDir, IndexFileName);
-        if (!File.Exists(indexPath))
+        Load(settings, loader, new FileContentDirectory(settings.ProjectAbsoluteDir));
+    }
+
+    /// <summary>
+    /// Reads the settings a built game lists in <see cref="IndexFileName"/> at the root of its content. Content
+    /// without the index is read from the project's sources instead.
+    /// </summary>
+    /// <param name="settings">The project whose settings are loaded.</param>
+    /// <param name="loader">Resolves the asset metadata by id.</param>
+    /// <param name="content">The game's content root.</param>
+    public static void Load(IAppSettings settings, IAssetLoader? loader, IContentDirectory content)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(content);
+
+        if (!content.Exists(IndexFileName))
         {
             LoadFromSources(settings);
             return;
@@ -110,7 +129,7 @@ public static class ProjectSettingsLoader
         settings.Loaded.Clear();
         if (loader is null) return;
 
-        foreach (var assetId in ReadIndex(indexPath))
+        foreach (var assetId in ReadIndex(content.ReadAllText(IndexFileName)))
         {
             try
             {
@@ -232,9 +251,9 @@ public static class ProjectSettingsLoader
         return null;
     }
 
-    static IEnumerable<Guid> ReadIndex(string indexPath)
+    static IEnumerable<Guid> ReadIndex(string indexJson)
     {
-        using var document = JsonDocument.Parse(File.ReadAllText(indexPath));
+        using var document = JsonDocument.Parse(indexJson);
 
         return document.RootElement.TryGetProperty("Settings", out var ids)
             ? [.. ids.EnumerateArray().Select(static id => id.GetGuid())]
