@@ -3,7 +3,7 @@ namespace Turian.Tests;
 /// <summary>Round-trip and layout tests for the KTX2 writer and reader.</summary>
 public class Ktx2RoundTripTests
 {
-    /// <summary>Every format with a descriptor, the ones the importer bakes and passes through.</summary>
+    /// <summary>Every format with a descriptor.</summary>
     public static TheoryData<Ktx2VkFormat> Formats() =>
         [.. Enum.GetValues<Ktx2VkFormat>().Where(Ktx2DataFormat.IsSupported)];
 
@@ -161,6 +161,32 @@ public class Ktx2RoundTripTests
         {
             File.Delete(path);
         }
+    }
+
+    /// <summary>
+    /// The writer reproduces each fixture byte for byte, so CI running <c>ktx validate</c> on the fixtures also
+    /// validates writer output. Regenerate a fixture with <see cref="BuildTexture"/> at 8x8 with four levels.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Formats))]
+    public void Write_ReproducesTheValidatedFixture(Ktx2VkFormat format)
+    {
+        var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ktx2", $"{format}{Ktx2Reader.FileExtension}");
+
+        Assert.Equal(File.ReadAllBytes(fixture), Write(BuildTexture(format, 8, 8, levelCount: 4)));
+    }
+
+    /// <summary>Each fixture reads back with its format, extent and full mip chain.</summary>
+    [Theory]
+    [MemberData(nameof(Formats))]
+    public void Read_Fixture_ReportsItsShape(Ktx2VkFormat format)
+    {
+        var read = Ktx2Reader.Load(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures", "ktx2", $"{format}{Ktx2Reader.FileExtension}"));
+
+        Assert.Equal(format, read.Format);
+        Assert.Equal((8u, 8u), (read.Width, read.Height));
+        Assert.Equal(4, read.Levels.Count);
     }
 
     /// <summary>The engine casts the container's format to Vulkan's, so every value must match its namesake.</summary>

@@ -19,7 +19,11 @@ public static class Ktx2DataFormat
     const byte modelBc3 = 130;
     const byte modelBc4 = 131;
     const byte modelBc5 = 132;
+    const byte modelBc6H = 133;
     const byte modelBc7 = 134;
+    const byte modelEtc2 = 161;
+    const byte modelAstc = 162;
+    const byte channelEtc2Color = 2;
 
     const byte channelAlpha = 15;
     const byte qualifierLinear = 0x10;
@@ -35,6 +39,8 @@ public static class Ktx2DataFormat
 
     static readonly Dictionary<Ktx2VkFormat, Layout> layouts = new()
     {
+        [Ktx2VkFormat.R8Unorm] = Rgbsda(1, Numeric.Unorm),
+        [Ktx2VkFormat.R8G8Unorm] = Rgbsda(2, Numeric.Unorm),
         [Ktx2VkFormat.R8G8B8A8Unorm] = Rgbsda(4, Numeric.Unorm),
         [Ktx2VkFormat.R8G8B8A8Srgb] = Rgbsda(4, Numeric.Srgb),
         [Ktx2VkFormat.Bc1RgbUnormBlock] = Block(modelBc1A, 8, Numeric.Unorm, At(0, 0, 64)),
@@ -50,7 +56,21 @@ public static class Ktx2DataFormat
         [Ktx2VkFormat.Bc5UnormBlock] = Block(modelBc5, 16, Numeric.Unorm, At(0, 0, 64), At(1, 64, 64)),
         [Ktx2VkFormat.Bc5SnormBlock] = Block(modelBc5, 16, Numeric.Snorm, At(0, 0, 64), At(1, 64, 64)),
         [Ktx2VkFormat.Bc7UnormBlock] = Block(modelBc7, 16, Numeric.Unorm, At(0, 0, 128)),
+        [Ktx2VkFormat.Bc6hUfloatBlock] = Block(modelBc6H, 16, Numeric.Ufloat, At(0, 0, 128)),
+        [Ktx2VkFormat.Bc6hSfloatBlock] = Block(modelBc6H, 16, Numeric.Sfloat, At(0, 0, 128)),
         [Ktx2VkFormat.Bc7SrgbBlock] = Block(modelBc7, 16, Numeric.Srgb, At(0, 0, 128)),
+        [Ktx2VkFormat.Etc2R8G8B8UnormBlock] = Block(modelEtc2, 8, Numeric.Unorm, At(channelEtc2Color, 0, 64)),
+        [Ktx2VkFormat.Etc2R8G8B8SrgbBlock] = Block(modelEtc2, 8, Numeric.Srgb, At(channelEtc2Color, 0, 64)),
+        [Ktx2VkFormat.Etc2R8G8B8A8UnormBlock] =
+            Block(modelEtc2, 16, Numeric.Unorm, At(channelAlpha, 0, 64), At(channelEtc2Color, 64, 64)),
+        [Ktx2VkFormat.Etc2R8G8B8A8SrgbBlock] =
+            Block(modelEtc2, 16, Numeric.Srgb, At(channelAlpha, 0, 64), At(channelEtc2Color, 64, 64)),
+        [Ktx2VkFormat.Astc4x4UnormBlock] = Astc(4, Numeric.Unorm),
+        [Ktx2VkFormat.Astc4x4SrgbBlock] = Astc(4, Numeric.Srgb),
+        [Ktx2VkFormat.Astc6x6UnormBlock] = Astc(6, Numeric.Unorm),
+        [Ktx2VkFormat.Astc6x6SrgbBlock] = Astc(6, Numeric.Srgb),
+        [Ktx2VkFormat.Astc8x8UnormBlock] = Astc(8, Numeric.Unorm),
+        [Ktx2VkFormat.Astc8x8SrgbBlock] = Astc(8, Numeric.Srgb),
     };
 
     /// <summary>Whether a descriptor can be built for <paramref name="format"/>, so a writer can emit it.</summary>
@@ -165,6 +185,9 @@ public static class Ktx2DataFormat
 
     static Layout Block(byte model, byte bytes, Numeric numeric, params Sample[] samples) =>
         new(model, 4, 4, bytes, numeric, samples);
+
+    static Layout Astc(byte blockExtent, Numeric numeric) =>
+        new(modelAstc, blockExtent, blockExtent, 16, numeric, [At(0, 0, 128)]);
 
     static Sample At(byte channel, ushort bitOffset, byte bitLength) => new(channel, bitOffset, bitLength);
 }

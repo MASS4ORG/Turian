@@ -9,6 +9,12 @@ public enum Ktx2VkFormat : uint
     /// <summary>No format; KTX2 uses it for Basis Universal payloads, which need transcoding.</summary>
     Undefined = 0,
 
+    /// <summary>One 8-bit linear channel.</summary>
+    R8Unorm = 9,
+
+    /// <summary>Two 8-bit linear channels.</summary>
+    R8G8Unorm = 16,
+
     /// <summary>Four 8-bit linear channels.</summary>
     R8G8B8A8Unorm = 37,
 
@@ -51,9 +57,45 @@ public enum Ktx2VkFormat : uint
     /// <summary>BC5 two channels, signed.</summary>
     Bc5SnormBlock = 142,
 
+    /// <summary>BC6H high dynamic range color, unsigned float.</summary>
+    Bc6hUfloatBlock = 143,
+
+    /// <summary>BC6H high dynamic range color, signed float.</summary>
+    Bc6hSfloatBlock = 144,
+
     /// <summary>BC7 color and alpha, linear.</summary>
     Bc7UnormBlock = 145,
 
     /// <summary>BC7 color and alpha, sRGB.</summary>
     Bc7SrgbBlock = 146,
+
+    /// <summary>ETC2 opaque color, linear.</summary>
+    Etc2R8G8B8UnormBlock = 147,
+
+    /// <summary>ETC2 opaque color, sRGB.</summary>
+    Etc2R8G8B8SrgbBlock = 148,
+
+    /// <summary>ETC2 color with EAC alpha, linear.</summary>
+    Etc2R8G8B8A8UnormBlock = 151,
+
+    /// <summary>ETC2 color with EAC alpha, sRGB.</summary>
+    Etc2R8G8B8A8SrgbBlock = 152,
+
+    /// <summary>ASTC 4x4 blocks, linear.</summary>
+    Astc4x4UnormBlock = 157,
+
+    /// <summary>ASTC 4x4 blocks, sRGB.</summary>
+    Astc4x4SrgbBlock = 158,
+
+    /// <summary>ASTC 6x6 blocks, linear.</summary>
+    Astc6x6UnormBlock = 165,
+
+    /// <summary>ASTC 6x6 blocks, sRGB.</summary>
+    Astc6x6SrgbBlock = 166,
+
+    /// <summary>ASTC 8x8 blocks, linear.</summary>
+    Astc8x8UnormBlock = 171,
+
+    /// <summary>ASTC 8x8 blocks, sRGB.</summary>
+    Astc8x8SrgbBlock = 172,
 }
