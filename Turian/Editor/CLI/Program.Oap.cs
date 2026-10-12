@@ -79,7 +79,7 @@ public static partial class Program
 
         cmd.SetAction(result =>
         {
-            var reader = OapReader.OpenFile(Path.GetFullPath(result.GetValue(packageArg)!));
+            using var reader = OapReader.OpenFile(Path.GetFullPath(result.GetValue(packageArg)!));
             var passphrase = result.GetValue(keyOption);
             if (!string.IsNullOrEmpty(passphrase))
             {
@@ -119,7 +119,7 @@ public static partial class Program
 
         cmd.SetAction(result =>
         {
-            var reader = OapReader.OpenFile(Path.GetFullPath(result.GetValue(packageArg)!));
+            using var reader = OapReader.OpenFile(Path.GetFullPath(result.GetValue(packageArg)!));
             Log.Logger.LogInformation("{Count} asset(s):", reader.Count);
             for (var i = 0; i < reader.Count; i++)
             {
@@ -149,7 +149,7 @@ public static partial class Program
         cmd.SetAction(result =>
         {
             var path = Path.GetFullPath(result.GetValue(packageArg)!);
-            var reader = OapReader.OpenFile(path);
+            using var reader = OapReader.OpenFile(path);
             var header = reader.Header;
 
             Log.Logger.LogInformation("OAP package : {Path}", path);

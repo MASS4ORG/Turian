@@ -4,87 +4,156 @@ namespace Turian.Engine.Core;
 /// An ordered set of mounted Open Asset Packages, highest priority first. An asset is
 /// resolved by walking the mounts in order and taking the first hit, so an overlay
 /// package (DLC, patch, mod) placed ahead of the base package overrides it while
-/// everything absent from the overlay falls through.
+/// everything absent from the overlay falls through. The set owns its packages' sources, so its
+/// readers keep the bytes they mounted even when a newer build replaces a package.
 /// </summary>
-public sealed class OapMountSet
+public sealed class OapMountSet : IDisposable
 {
+    const string OverlayFolder = "overlays";
+
     static readonly ConcurrentDictionary<string, WeakReference<OapMountSet>> Cache =
         new(StringComparer.OrdinalIgnoreCase);
 
-    readonly string basePackagePath;
-    readonly string fingerprint;
+    readonly IContentDirectory directory;
+    readonly IReadOnlyList<string> packages;
+    readonly IReadOnlyList<ContentIdentity> identities;
 
-    OapMountSet(IReadOnlyList<OapReader> readers, string basePackagePath, string fingerprint)
+    OapMountSet(IReadOnlyList<OapReader> readers, IContentDirectory directory, IReadOnlyList<string> packages,
+        IReadOnlyList<ContentIdentity> identities)
     {
         Readers = readers;
-        this.basePackagePath = basePackagePath;
-        this.fingerprint = fingerprint;
+        this.directory = directory;
+        this.packages = packages;
+        this.identities = identities;
     }
 
     /// <summary>Gets the mounted readers, highest priority first.</summary>
     public IReadOnlyList<OapReader> Readers { get; }
 
     /// <summary>
-    /// Gets or resolves the mount set for a base package, layering any overlay packages
-    /// found in a sibling <c>overlays</c> directory. Dependents win over their requirements;
-    /// unrelated overlays are sorted by name, with later names winning.
-    /// The result is cached and rebuilt when any package file changes on disk.
+    /// Gets or resolves the mount set for a base package file, layering any overlay packages
+    /// found in a sibling <c>overlays</c> directory.
     /// </summary>
-    /// <param name="basepackagePath">The absolute path to the base <c>.oap</c> file.</param>
+    /// <param name="basepackagePath">The path to the base <c>.oap</c> file.</param>
     /// <returns>The mount set, or <see langword="null"/> when the base package is missing.</returns>
     public static OapMountSet? ForBasePackage(string basepackagePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(basepackagePath);
 
         var fullPath = Path.GetFullPath(basepackagePath);
-        if (!File.Exists(fullPath))
+        var directory = new FileContentDirectory(Path.GetDirectoryName(fullPath) ?? fullPath);
+        return ForBasePackage(directory, Path.GetFileName(fullPath));
+    }
+
+    /// <summary>
+    /// Gets or resolves the mount set for a base package in a content location, layering any overlay
+    /// packages in its <c>overlays</c> folder. Dependents win over their requirements; unrelated overlays
+    /// are sorted by name, with later names winning. The result is cached and rebuilt when the identity of
+    /// any package changes.
+    /// </summary>
+    /// <param name="directory">The location holding the base package and its <c>overlays</c> folder.</param>
+    /// <param name="basePackage">The base package path relative to <paramref name="directory"/>.</param>
+    /// <returns>The mount set, or <see langword="null"/> when the base package is missing.</returns>
+    public static OapMountSet? ForBasePackage(IContentDirectory directory, string basePackage)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(basePackage);
+
+        var cacheKey = directory.Id + "|" + basePackage;
+        if (directory.Probe(basePackage) is null)
         {
-            Cache.TryRemove(fullPath, out _);
+            Cache.TryRemove(cacheKey, out _);
             return null;
         }
 
-        var packagePaths = DiscoverPackages(fullPath);
-        var fingerprint = BuildFingerprint(packagePaths);
-
-        if (Cache.TryGetValue(fullPath, out var reference) &&
-            reference.TryGetTarget(out var cached) && cached.fingerprint == fingerprint)
+        var packages = DiscoverPackages(directory, basePackage);
+        if (Cache.TryGetValue(cacheKey, out var reference) &&
+            reference.TryGetTarget(out var cached) && cached.IsCurrent(directory, packages))
         {
             return cached;
         }
 
-        var readers = OpenReaders(packagePaths);
-        readers = OrderByRequirements(readers);
-        WarnAboutConflicts(readers);
-        var mountSet = new OapMountSet(readers, fullPath, fingerprint);
-        if (Cache.Count > 64) Cache.Clear();
-        Cache[fullPath] = new WeakReference<OapMountSet>(mountSet);
-        return mountSet;
+        var readers = OpenReaders(directory, packages);
+        try
+        {
+            var identities = readers.Select(static reader => reader.Identity!.Value).ToArray();
+            var ordered = OrderByRequirements(readers);
+            WarnAboutConflicts(ordered);
+            var mountSet = new OapMountSet(ordered, directory, packages, identities);
+            if (Cache.Count > 64) Cache.Clear();
+            Cache[cacheKey] = new WeakReference<OapMountSet>(mountSet);
+            return mountSet;
+        }
+        catch
+        {
+            foreach (var reader in readers) reader.Dispose();
+            throw;
+        }
     }
 
-    static List<OapReader> OpenReaders(IReadOnlyCollection<string> packagePaths)
+    /// <summary>Rejects package changes while a runtime session uses this mount, so one session never mixes
+    /// content from two builds.</summary>
+    public void EnsureUnchanged()
+    {
+        if (!IsCurrent(directory, DiscoverPackages(directory, packages[^1])))
+            throw new InvalidDataException(
+                $"OAP content changed during the active session at '{identities[^1].Id}'; start a new content session.");
+    }
+
+    /// <summary>Releases the mounted packages' sources.</summary>
+    public void Dispose()
+    {
+        foreach (var reader in Readers) reader.Dispose();
+    }
+
+    // Compares probed identities with the mounted ones, so detecting a change never opens or reads a package.
+    bool IsCurrent(IContentDirectory location, IReadOnlyList<string> current)
+    {
+        if (current.Count != identities.Count) return false;
+        for (var i = 0; i < current.Count; i++)
+            if (!string.Equals(current[i], packages[i], StringComparison.Ordinal) ||
+                location.Probe(current[i]) != identities[i])
+                return false;
+        return true;
+    }
+
+    static List<OapReader> OpenReaders(IContentDirectory directory, IReadOnlyCollection<string> packages)
     {
         var key = OapRuntimeKey.Current;
-        var readers = new List<OapReader>(packagePaths.Count);
-        foreach (var path in packagePaths)
+        var readers = new List<OapReader>(packages.Count);
+        try
         {
-            var reader = OapReader.OpenFile(path);
-            if (key is not null && (reader.Header.Flags & OapFlags.Encrypted) != 0)
+            foreach (var package in packages)
             {
-                reader.SetKey(key);
-            }
+                var reader = OpenReader(directory.Open(package));
+                if (key is not null && (reader.Header.Flags & OapFlags.Encrypted) != 0)
+                {
+                    reader.SetKey(key);
+                }
 
-            readers.Add(reader);
+                readers.Add(reader);
+            }
         }
+        catch
+        {
+            foreach (var reader in readers) reader.Dispose();
+            throw;
+        }
+
         return readers;
     }
 
-    /// <summary>Rejects package changes while a runtime session uses this mount.</summary>
-    public void EnsureUnchanged()
+    static OapReader OpenReader(IContentSource source)
     {
-        if (!File.Exists(basePackagePath) ||
-            BuildFingerprint(DiscoverPackages(basePackagePath)) != fingerprint)
-            throw new InvalidDataException(
-                $"OAP content changed during the active session at '{basePackagePath}'; start a new content session.");
+        try
+        {
+            return OapReader.Open(source, ownsSource: true);
+        }
+        catch
+        {
+            source.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Resolves an asset by its id across the mounted packages.</summary>
@@ -131,36 +200,14 @@ public sealed class OapMountSet
         return false;
     }
 
-    static List<string> DiscoverPackages(string basePackagePath)
+    static List<string> DiscoverPackages(IContentDirectory directory, string basePackage)
     {
-        var packages = new List<string> { basePackagePath };
+        var folder = basePackage.LastIndexOf('/') is var slash and >= 0 ? basePackage[..slash] + "/" : "";
 
-        var overlayDir = Path.Combine(Path.GetDirectoryName(basePackagePath) ?? ".", "overlays");
-        if (Directory.Exists(overlayDir))
-        {
-            var overlays = Directory
-                .EnumerateFiles(overlayDir, "*" + OapFormat.FileExtension, SearchOption.TopDirectoryOnly)
-                .OrderBy(static p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase);
-
-            // Later-named overlays win, so they must appear first (highest priority).
-            packages.InsertRange(0, overlays.Reverse());
-        }
-
+        // Later-named overlays win, so they must appear first (highest priority).
+        var packages = directory.List(folder + OverlayFolder, OapFormat.FileExtension).Reverse().ToList();
+        packages.Add(basePackage);
         return packages;
-    }
-
-    static string BuildFingerprint(IEnumerable<string> paths)
-    {
-        var builder = new StringBuilder();
-        foreach (var path in paths)
-        {
-            var info = new FileInfo(path);
-            builder.Append(path).Append('|')
-                .Append(info.Length).Append('|')
-                .Append(info.LastWriteTimeUtc.Ticks).Append(';');
-        }
-
-        return builder.ToString();
     }
 
     static List<OapReader> OrderByRequirements(IReadOnlyList<OapReader> readers)

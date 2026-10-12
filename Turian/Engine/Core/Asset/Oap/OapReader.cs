@@ -4,13 +4,14 @@ namespace Turian.Engine.Core;
 /// Random-access reader for an Open Asset Package. The header, index, string table
 /// and manifest are parsed once at open time; asset blobs are located purely through
 /// the index and read (and decrypted / decompressed) on demand. A package opened from
-/// a file never loads more than the section being read, so a multi-gigabyte package
-/// can be mounted cheaply.
+/// an <see cref="IContentSource"/> never loads more than the section being read, so a
+/// multi-gigabyte package can be mounted cheaply.
 /// </summary>
-public sealed class OapReader
+public sealed class OapReader : IDisposable
 {
     readonly byte[]? memory;
-    readonly string? filePath;
+    readonly IContentSource? source;
+    readonly bool ownsSource;
     readonly long backingLength;
     readonly byte[] stringTable;
     readonly byte[]? manifestBytes;
@@ -18,7 +19,8 @@ public sealed class OapReader
 
     OapReader(
         byte[]? memory,
-        string? filePath,
+        IContentSource? source,
+        bool ownsSource,
         long backingLength,
         OapHeader header,
         OapIndexEntry[] entries,
@@ -26,7 +28,8 @@ public sealed class OapReader
         byte[]? manifestBytes)
     {
         this.memory = memory;
-        this.filePath = filePath;
+        this.source = source;
+        this.ownsSource = ownsSource;
         this.backingLength = backingLength;
         Header = header;
         Entries = entries;
@@ -46,6 +49,9 @@ public sealed class OapReader
     /// <summary>Gets a value indicating whether the index is sorted by <c>asset_id</c>.</summary>
     public bool IsSortedIndex => (Header.Flags & OapFlags.SortedIndex) != 0;
 
+    /// <summary>Gets the identity of the backing content, or <see langword="null"/> for an in-memory package.</summary>
+    public ContentIdentity? Identity => source?.Identity;
+
     /// <summary>Opens a package held entirely in memory. The array is referenced, not copied.</summary>
     /// <param name="bytes">The complete <c>.oap</c> bytes.</param>
     /// <returns>An open reader.</returns>
@@ -55,35 +61,49 @@ public sealed class OapReader
         var (header, entries, stringTable, manifest) = Parse(
             bytes.LongLength,
             (offset, count) => [.. bytes.AsSpan((int)offset, count)]);
-        return new OapReader(bytes, filePath: null, bytes.LongLength, header, entries, stringTable, manifest);
+        return new OapReader(bytes, source: null, ownsSource: false, bytes.LongLength, header, entries, stringTable,
+            manifest);
     }
 
-    /// <summary>Opens a package backed by a file, reading only its metadata sections.</summary>
-    /// <param name="path">The absolute path to the <c>.oap</c> file.</param>
+    /// <summary>Opens a package over a content source, reading only its metadata sections.</summary>
+    /// <param name="source">The package content; it must stay open while the reader is used.</param>
+    /// <param name="ownsSource">Whether disposing the reader disposes <paramref name="source"/>.</param>
     /// <returns>An open reader.</returns>
+    public static OapReader Open(IContentSource source, bool ownsSource = false)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var (header, entries, stringTable, manifest) = Parse(
+            source.Length,
+            (offset, count) => ReadSection(source, offset, count));
+        return new OapReader(memory: null, source, ownsSource, source.Length, header, entries, stringTable, manifest);
+    }
+
+    /// <summary>Opens a package file for tools and tests; the reader owns the file handle.</summary>
+    /// <param name="path">The path to the <c>.oap</c> file.</param>
+    /// <returns>An open reader.</returns>
+    /// <exception cref="FileNotFoundException">The package does not exist.</exception>
     public static OapReader OpenFile(string path)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        if (!File.Exists(path))
+        var source = FileContentSource.Open(path);
+        try
         {
-            throw new FileNotFoundException("OAP package was not found.", path);
+            return Open(source, ownsSource: true);
         }
-
-        var length = new FileInfo(path).Length;
-
-        var (header, entries, stringTable, manifest) = Parse(
-            length,
-            (offset, count) => ReadFileSection(path, offset, count));
-
-        return new OapReader(memory: null, path, length, header, entries, stringTable, manifest);
+        catch
+        {
+            source.Dispose();
+            throw;
+        }
     }
 
-    static byte[] ReadFileSection(string path, long offset, int count)
+    static byte[] ReadSection(IContentSource source, long offset, int count)
     {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         var buffer = new byte[count];
-        stream.Position = offset;
-        stream.ReadExactly(buffer);
+        if (source.ReadAt(offset, buffer) != count)
+        {
+            throw new OapTruncatedException("OAP range read runs past the end of the package.");
+        }
+
         return buffer;
     }
 
@@ -258,39 +278,27 @@ public sealed class OapReader
     /// <summary>
     /// Opens a readable stream over an asset's plaintext bytes. For a stored,
     /// unencrypted asset this is a bounded window over the package with no copy and no
-    /// full-file load; otherwise the asset is decoded into memory first.
+    /// full-file load; otherwise the asset is decoded into memory first. The stream
+    /// borrows the reader's source, so it must be disposed before the reader.
     /// </summary>
     /// <param name="entry">The index entry to read.</param>
     /// <returns>A readable stream the caller disposes.</returns>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "Ownership of the FileStream transfers to the returned SubStream, which disposes it.")]
     public Stream OpenAssetStream(OapIndexEntry entry)
     {
         if (entry is { Compression: OapCompression.Store, Encryption: OapEncryption.None })
         {
-            if (memory is not null)
-            {
-                return new MemoryStream(memory, (int)entry.DataOffset, (int)entry.StoredSize, writable: false);
-            }
-
-            FileStream? file = null;
-            try
-            {
-                file = new FileStream(filePath!, FileMode.Open, FileAccess.Read, FileShare.Read);
-                file.Position = (long)entry.DataOffset;
-                var sub = new SubStream(file, (long)entry.StoredSize);
-                file = null; // ownership transferred
-                return sub;
-            }
-            finally
-            {
-                file?.Dispose();
-            }
+            return memory is not null
+                ? new MemoryStream(memory, (int)entry.DataOffset, (int)entry.StoredSize, writable: false)
+                : source!.OpenRead((long)entry.DataOffset, (long)entry.StoredSize);
         }
 
         return new MemoryStream(ReadAsset(entry, verify: false), writable: false);
+    }
+
+    /// <summary>Releases the backing source when the reader owns it.</summary>
+    public void Dispose()
+    {
+        if (ownsSource) source?.Dispose();
     }
 
     byte[] ReadRange(long offset, int length)
@@ -300,16 +308,7 @@ public sealed class OapReader
             throw new OapTruncatedException("OAP range read runs past the end of the package.");
         }
 
-        if (memory is not null)
-        {
-            return [.. memory.AsSpan((int)offset, length)];
-        }
-
-        using var stream = new FileStream(filePath!, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var buffer = new byte[length];
-        stream.Position = offset;
-        stream.ReadExactly(buffer);
-        return buffer;
+        return memory is not null ? [.. memory.AsSpan((int)offset, length)] : ReadSection(source!, offset, length);
     }
 
     static (OapHeader Header, OapIndexEntry[] Entries, byte[] StringTable, byte[]? Manifest) Parse(

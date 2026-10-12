@@ -258,7 +258,10 @@ public sealed class OapWriter
             Directory.CreateDirectory(directory);
         }
 
-        File.WriteAllBytes(path, Serialize());
+        // Replacing by rename leaves sessions that still read the previous package on its old bytes.
+        var temporary = path + ".tmp";
+        File.WriteAllBytes(temporary, Serialize());
+        File.Move(temporary, path, overwrite: true);
     }
 
     sealed class PendingAsset
