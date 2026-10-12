@@ -1,7 +1,7 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Uploads <see cref="TextureAsset"/> artifacts to Vulkan: an <c>.amtex</c> container goes up as-is, block
+/// Uploads <see cref="TextureAsset"/> artifacts to Vulkan: a KTX2 container goes up as-is, block
 /// compression and mip chain intact, while any other payload is decoded to RGBA8 first. The resulting
 /// <see cref="Texture"/> is cached per asset and device.
 /// </summary>
@@ -45,12 +45,12 @@ public static class TextureAssetContent
                 var bytes = buffer.ToArray();
 
                 Texture texture;
-                if (TextureBlob.IsTextureBlob(bytes))
+                if (Ktx2Reader.IsKtx2(bytes))
                 {
-                    // The blob already carries the format, the resolution the import settings capped it
+                    // The container already carries the format, the resolution the import settings capped it
                     // to, and the mip chain, so nothing is recomputed or decompressed here.
-                    var blob = TextureBlob.Read(bytes);
-                    texture = new Texture(vulkan, blob.Format, blob.Width, blob.Height, blob.Levels);
+                    var ktx = Ktx2Reader.Read(bytes);
+                    texture = new Texture(vulkan, (Format)ktx.Format, ktx.Width, ktx.Height, ktx.Levels);
                 }
                 else
                 {

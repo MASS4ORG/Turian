@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: OAP reader and mount set read through `IContentSource` #243
 - Changed: built games read their catalog, settings index, type manifest and packages through a content root #244
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
+- Changed (breaking): KTX2 replaces .amtex as the cooked texture container #31
 
 ## [3.0.0] - 2026-10-11
 

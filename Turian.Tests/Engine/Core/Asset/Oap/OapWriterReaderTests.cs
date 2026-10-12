@@ -120,12 +120,12 @@ public class OapWriterReaderTests
     {
         var writer = new OapWriter();
         var id = Guid.NewGuid();
-        writer.Add(id, "payload"u8, "textures/hero/albedo.amtex");
+        writer.Add(id, "payload"u8, "textures/hero/albedo.ktx2");
         writer.SetManifest("{\"name\":\"core\",\"version\":\"1.0.0\"}");
 
         var reader = OapReader.Open(writer.Serialize());
 
-        var entry = reader.FindByPath("textures/hero/albedo.amtex");
+        var entry = reader.FindByPath("textures/hero/albedo.ktx2");
         Assert.NotNull(entry);
         Assert.Equal(id, entry.Value.AssetId);
         Assert.Equal(

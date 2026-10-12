@@ -246,7 +246,7 @@ public sealed class OapArchiveBuilder(ILogger logger)
     {
         var name = assetTypeName;
         if (name.Contains("Texture", StringComparison.OrdinalIgnoreCase) ||
-            payloadPath.EndsWith(".amtex", StringComparison.OrdinalIgnoreCase))
+            payloadPath.EndsWith(Ktx2Reader.FileExtension, StringComparison.OrdinalIgnoreCase))
         {
             return OapAssetType.Texture;
         }

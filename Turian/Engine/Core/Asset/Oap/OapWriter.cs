@@ -70,7 +70,7 @@ public sealed class OapWriter
     /// </summary>
     /// <param name="id">The 128-bit asset identifier (primary key).</param>
     /// <param name="data">The plaintext asset bytes.</param>
-    /// <param name="virtualPath">A human-readable path such as <c>textures/hero.amtex</c>. May be empty.</param>
+    /// <param name="virtualPath">A human-readable path such as <c>textures/hero.ktx2</c>. May be empty.</param>
     /// <param name="assetType">An application-defined category byte (0 = unknown).</param>
     /// <param name="compression">How to compress the asset.</param>
     /// <param name="encryption">The encryption codec; requires a key set via <see cref="SetKey"/>.</param>
