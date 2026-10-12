@@ -39,11 +39,13 @@ public sealed class VulkanPlayer : IGamePlayer
         try
         {
             window.Resized += size => frames.Resize(size.X, size.Y);
+            window.SurfaceLost += () => frames.Paused = true;
+            window.SurfaceRestored += () => frames.Paused = false;
             input.OnKeyPressed += PlayerFrames.KeyPressed;
 
             runtime.LoadStartupScene();
             window.Title = runtime.ProductName;
-            window.SetIcon(Path.Combine(runtime.ProjectDirectory, PlayerSettings.BuiltIconFileName));
+            window.SetIcon(runtime.Content, PlayerSettings.BuiltIconFileName);
             frames.Resize(window.FramebufferSize.X, window.FramebufferSize.Y);
             context.Logger.Lap("startup", "objects loaded");
 
@@ -57,11 +59,11 @@ public sealed class VulkanPlayer : IGamePlayer
         finally
         {
             frames.Dispose();
-            window.Dispose();
             renderer.Dispose();
             inputSource.Dispose();
             input.Dispose();
             vulkan.Device.Dispose();
+            window.Dispose();
         }
     }
 }

@@ -7,9 +7,9 @@ namespace Turian.Engine.Core;
 /// </summary>
 public static class TextureAssetContent
 {
-    // Keyed by (assetId, deviceHandle) so one texture never uploads twice per device.
+    // Keyed by (assetId, Device.Id) so one texture never uploads twice per device.
     // The cache owns the Texture lifetime — callers must not dispose the returned instance.
-    static readonly ConcurrentDictionary<(Guid, nint), Texture> TextureCache = new();
+    static readonly ConcurrentDictionary<(Guid, long), Texture> TextureCache = new();
 
     static long _uploadedBytes;
 
@@ -27,7 +27,7 @@ public static class TextureAssetContent
             ArgumentNullException.ThrowIfNull(vulkan);
             ArgumentNullException.ThrowIfNull(database);
 
-            var cacheKey = (asset.Id, vulkan.Device.VkDevice.Handle);
+            var cacheKey = (asset.Id, vulkan.Device.Id);
             if (TextureCache.TryGetValue(cacheKey, out var cached))
                 return cached;
 

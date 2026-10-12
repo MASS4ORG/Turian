@@ -105,6 +105,14 @@ public unsafe partial class Device : IDisposable
     public SwapChainSupportDetails QuerySwapChainSupport =>
         QuerySwapChainSupportInternal(physicalDevice);
 
+    static long lastId;
+
+    /// <summary>
+    /// A process-unique id for keying per-device caches. Vulkan handles are reused once a device and its instance
+    /// are destroyed, so a cache keyed by handle would hand a new device another device's GPU objects.
+    /// </summary>
+    public long Id { get; } = Interlocked.Increment(ref lastId);
+
     readonly Vk vk;
     readonly ISurfaceHost? surfaceHost;
     bool IsHeadless => surfaceHost is null;
@@ -135,6 +143,9 @@ public unsafe partial class Device : IDisposable
     readonly int requestedMsaaSamples;
     Silk.NET.Vulkan.Device device;
     uint graphicsFamilyIndex;
+    uint presentFamilyIndex;
+    DebugUtilsMessengerEXT debugMessenger;
+    bool disposed;
     Queue graphicsQueue;
     Queue presentQueue;
     CommandPool commandPool;

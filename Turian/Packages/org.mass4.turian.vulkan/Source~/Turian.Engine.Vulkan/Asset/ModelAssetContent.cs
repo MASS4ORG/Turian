@@ -3,9 +3,9 @@ namespace Turian.Engine.Core;
 /// <summary>Uploads <see cref="ModelAsset"/> geometry to Vulkan and caches the result per asset and device.</summary>
 public static class ModelAssetContent
 {
-    // Keyed by (assetId, deviceHandle) so the same GUID is never loaded twice per Vulkan device.
+    // Keyed by (assetId, Device.Id) so the same GUID is never loaded twice per Vulkan device.
     // Cache owns the Model lifetime — callers must not dispose the returned instance.
-    static readonly ConcurrentDictionary<(Guid, nint), VulkanModel> ModelCache = new();
+    static readonly ConcurrentDictionary<(Guid, long), VulkanModel> ModelCache = new();
 
     extension(ModelAsset asset)
     {
@@ -20,7 +20,7 @@ public static class ModelAssetContent
         {
             ArgumentNullException.ThrowIfNull(vulkan);
             ArgumentNullException.ThrowIfNull(database);
-            var cacheKey = (asset.Id, vulkan.Device.VkDevice.Handle);
+            var cacheKey = (asset.Id, vulkan.Device.Id);
             if (ModelCache.TryGetValue(cacheKey, out var cached))
                 return cached;
 

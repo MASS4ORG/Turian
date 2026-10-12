@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: OAP reader and mount set read through `IContentSource` #243
 - Changed: built games read their catalog, settings index, type manifest and packages through a content root #244
 - Changed: the Vulkan brick renders through an `ISurfaceHost`; GLFW is one implementation #245
+- Added: the renderer survives surface loss and restore #246
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
 - Changed (breaking): KTX2 replaces .amtex as the cooked texture container #31
 - Added: KTX2 data format descriptors and validated fixtures #247

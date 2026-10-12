@@ -18,7 +18,7 @@ public unsafe partial class Device
         PopulateDebugMessengerCreateInfo(ref createInfo);
 
         if (
-            debugUtils!.CreateDebugUtilsMessenger(instance, in createInfo, null, out _)
+            debugUtils!.CreateDebugUtilsMessenger(instance, in createInfo, null, out debugMessenger)
             != Result.Success
         )
         {
@@ -328,11 +328,17 @@ public unsafe partial class Device
         throw new VulkanException("failed to find supported format!");
     }
 
-    /// <inheritdoc/>
+    /// <summary>Destroys the command pool, logical device, surface, debug messenger and instance, in that order.</summary>
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+
         vk.DestroyCommandPool(device, commandPool, null);
         vk.DestroyDevice(device, null);
+        DestroySurface();
+        if (debugMessenger.Handle != 0) debugUtils.DestroyDebugUtilsMessenger(instance, debugMessenger, null);
+        vk.DestroyInstance(instance, null);
         GC.SuppressFinalize(this);
     }
 }

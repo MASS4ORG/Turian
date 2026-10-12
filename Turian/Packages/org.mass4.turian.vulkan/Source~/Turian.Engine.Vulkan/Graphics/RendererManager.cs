@@ -157,18 +157,36 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
     /// </summary>
     public void Dispose()
     {
+        Renderer.RenderPassChanged -= RebuildRenderSystems;
         Renderer.Dispose();
         globalSetLayout.Dispose();
         globalPool.Dispose();
         sboMeshTestBuffer.Dispose();
+        DisposeRenderSystems();
 
+        GC.SuppressFinalize(this);
+    }
+
+    void DisposeRenderSystems()
+    {
         foreach (var item in renderSystems)
         {
             OnRender -= item.Render;
             item.Dispose();
         }
 
-        GC.SuppressFinalize(this);
+        renderSystems.Clear();
+    }
+
+    // Pipelines are built against the swap chain's render pass, so a new image or depth format needs new ones.
+    void RebuildRenderSystems()
+    {
+        var occlusion = UseOcclusionCulling;
+        var overlay = OverlayTexture;
+        DisposeRenderSystems();
+        InitializeRenderSystems();
+        UseOcclusionCulling = occlusion;
+        OverlayTexture = overlay;
     }
 
     void InitializeTestBuffer()
@@ -260,6 +278,7 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
     {
         Renderer = new Renderer(vulkan.Vk, vulkan.Device, surfaceHost, useFifo);
         Renderer.Initialize();
+        Renderer.RenderPassChanged += RebuildRenderSystems;
         logger.Lap("startup", "got renderer");
     }
 

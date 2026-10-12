@@ -75,11 +75,13 @@ public sealed class GlfwSurfaceHostTests
         window.StateChanged += Raise.Event<Action<WindowState>>(WindowState.Normal);
         window.StateChanged += Raise.Event<Action<WindowState>>(WindowState.Minimized);
         Assert.True(host.IsSurfaceLost);
+        Assert.True(window.IsEventDriven);
         window.StateChanged += Raise.Event<Action<WindowState>>(WindowState.Minimized);
         window.StateChanged += Raise.Event<Action<WindowState>>(WindowState.Maximized);
 
         Assert.Equal(["lost", "restored"], events);
         Assert.False(host.IsSurfaceLost);
+        Assert.False(window.IsEventDriven);
         host.Dispose();
     }
 

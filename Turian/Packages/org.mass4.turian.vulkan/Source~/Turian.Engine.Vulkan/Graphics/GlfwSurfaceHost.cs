@@ -97,7 +97,10 @@ public class GlfwSurfaceHost : ISurfaceHost
     /// <summary>Gets whether the window is minimized, which the host reports as a lost surface.</summary>
     public bool IsSurfaceLost { get; private set; }
 
-    /// <summary>Reports minimizing as a lost surface and leaving the minimized state as a restored one.</summary>
+    /// <summary>
+    /// Reports minimizing as a lost surface and leaving the minimized state as a restored one. While minimized the
+    /// window is event driven, so the frame pump blocks on platform events instead of spinning.
+    /// </summary>
     /// <param name="state">The window's new state.</param>
     internal void OnStateChanged(WindowState state)
     {
@@ -105,6 +108,7 @@ public class GlfwSurfaceHost : ISurfaceHost
         if (minimized == IsSurfaceLost) return;
 
         IsSurfaceLost = minimized;
+        Window.IsEventDriven = minimized;
         if (minimized) SurfaceLost?.Invoke();
         else SurfaceRestored?.Invoke();
     }
@@ -117,7 +121,7 @@ public class GlfwSurfaceHost : ISurfaceHost
     public unsafe void DestroySurface(Vk vk, Instance instance, SurfaceKHR surface)
     {
         ArgumentNullException.ThrowIfNull(vk);
-        if (surface.Handle == 0 || !vk.TryGetInstanceExtension(instance, out KhrSurface khrSurface)) return;
+        if (!vk.TryGetInstanceExtension(instance, out KhrSurface khrSurface)) return;
 
         khrSurface.DestroySurface(instance, surface, null);
     }
@@ -166,30 +170,33 @@ public class GlfwSurfaceHost : ISurfaceHost
         frameCount = 0;
     }
 
-    /// <summary>Gives the window the PNG icon at <paramref name="path"/>, when the file exists.</summary>
-    /// <param name="path">The icon a game's build wrote beside it.</param>
-    public void SetIcon(string path)
+    /// <summary>Gives the window the PNG icon at <paramref name="path"/> in the game's content, when it exists.</summary>
+    /// <param name="content">The game's content root.</param>
+    /// <param name="path">The icon a game's build wrote, relative to <paramref name="content"/>.</param>
+    public void SetIcon(IContentDirectory content, string path)
     {
-        if (TryLoadIcon(Window, path, out var window, out var icon)) window.SetWindowIcon(ref icon);
+        if (TryLoadIcon(Window, content, path, out var window, out var icon)) window.SetWindowIcon(ref icon);
     }
 
     /// <summary>Reads the icon at <paramref name="path"/> when <paramref name="view"/> is a window and it exists.</summary>
-    internal static bool TryLoadIcon(IView view, string path,
+    internal static bool TryLoadIcon(IView view, IContentDirectory content, string path,
         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IWindow? window, out RawImage icon)
     {
         window = view as IWindow;
-        icon = LoadIcon(path) ?? default;
-        return window is not null && File.Exists(path);
+        var loaded = window is null ? null : LoadIcon(content, path);
+        icon = loaded ?? default;
+        return loaded is not null;
     }
 
     /// <summary>Decodes the PNG at <paramref name="path"/> into a window icon.</summary>
-    /// <param name="path">The icon file.</param>
-    /// <returns>The icon, or <c>null</c> when there is no file.</returns>
-    internal static RawImage? LoadIcon(string path)
+    /// <param name="content">The game's content root.</param>
+    /// <param name="path">The icon, relative to <paramref name="content"/>.</param>
+    /// <returns>The icon, or <c>null</c> when there is none.</returns>
+    internal static RawImage? LoadIcon(IContentDirectory content, string path)
     {
-        if (!File.Exists(path)) return null;
+        if (!content.Exists(path)) return null;
 
-        var image = ImageResult.FromMemory(File.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
+        var image = ImageResult.FromMemory(content.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
         return new RawImage(image.Width, image.Height, image.Data);
     }
 

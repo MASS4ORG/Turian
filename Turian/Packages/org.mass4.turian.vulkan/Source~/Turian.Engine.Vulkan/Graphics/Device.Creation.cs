@@ -140,6 +140,7 @@ public unsafe partial class Device
         }.Distinct().ToArray();
 
         graphicsFamilyIndex = indices.GraphicsFamily.Value;
+        presentFamilyIndex = indices.PresentFamily.Value;
 
         using var mem = GlobalMemory.Allocate(
             uniqueQueueFamilies.Length * sizeof(DeviceQueueCreateInfo)
