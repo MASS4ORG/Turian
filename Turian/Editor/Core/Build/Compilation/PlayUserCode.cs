@@ -64,7 +64,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         Logger.LogInformation("Building play runtime: {Project}", csprojFilePath);
 
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet build`.
-        var buildStartInfo = new ProcessStartInfo("dotnet", BuildArguments(csprojFilePath))
+        var buildStartInfo = new ProcessStartInfo(DotnetLocator.Find(), BuildArguments(csprojFilePath))
         {
             CreateNoWindow = true,
             UseShellExecute = false,
@@ -115,7 +115,7 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         }
         else if (File.Exists(dllPath))
         {
-            fileName = "dotnet";
+            fileName = DotnetLocator.Find();
             arguments = $"\"{dllPath}\"";
             runtimePath = dllPath;
         }

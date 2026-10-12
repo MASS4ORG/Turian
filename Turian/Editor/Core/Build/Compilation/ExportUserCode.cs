@@ -40,7 +40,7 @@ public sealed class ExportUserCode(
             profile?.Profile);
 
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
-        var startInfo = new ProcessStartInfo("dotnet")
+        var startInfo = new ProcessStartInfo(DotnetLocator.Find())
         {
             CreateNoWindow = true,
             UseShellExecute = false,

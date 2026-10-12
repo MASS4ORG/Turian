@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added(android): the renderer survives surface loss and restore #246
 - Added: KTX2 data format descriptors and validated fixtures #247 #248
 - Added: application identifier sanitizer (for Java-package) #250
+- Added: dotnet locator #251
 - Changed: KTX2 replaces .amtex as the cooked texture container #31
 - Changed: OAP and content discovery contracts #242 #243 #244
 - Changed: platform-specific export steps #236

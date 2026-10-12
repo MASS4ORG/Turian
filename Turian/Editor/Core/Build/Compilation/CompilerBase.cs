@@ -107,7 +107,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         Logger.LogInformation("Restoring packages: {Path}", csprojFilePath);
 
-        var startInfo = new ProcessStartInfo("dotnet")
+        var startInfo = new ProcessStartInfo(DotnetLocator.Find())
         {
             CreateNoWindow = true,
             UseShellExecute = false,
