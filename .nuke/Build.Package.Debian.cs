@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// Produces independently installable Debian packages for the shared runtime, CLI, and Studio.
@@ -61,7 +61,7 @@ sealed partial class Build
 
     void AddStudioDesktopEntry(AbsolutePath packageRoot)
     {
-        var flatpakDirectory = Solution.Build.Directory / "packaging" / "flatpak";
+        var flatpakDirectory = BuildProjectDirectory / "packaging" / "flatpak";
         (flatpakDirectory / "org.MASS4.Turian.desktop").Copy(
             packageRoot / "usr" / "share" / "applications" / "org.MASS4.Turian.desktop", ExistsPolicy.FileOverwrite);
         (flatpakDirectory / "org.MASS4.Turian.svg").Copy(
@@ -74,7 +74,7 @@ sealed partial class Build
     {
         var documentationDirectory = packageRoot / "usr" / "share" / "doc" / packageName;
         documentationDirectory.CreateDirectory();
-        (RootDirectory / "LICENSE.md").Copy(documentationDirectory / "copyright", ExistsPolicy.FileOverwrite);
+        (RootDirectory / "docs" / "LICENSE.md").Copy(documentationDirectory / "copyright", ExistsPolicy.FileOverwrite);
         (packageRoot / "DEBIAN").CreateDirectory();
         (packageRoot / "DEBIAN" / "control").WriteAllText($"""
             Package: {packageName}

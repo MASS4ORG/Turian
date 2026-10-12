@@ -1,13 +1,13 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>Builds a local Flatpak bundle for the Studio editor.</summary>
 sealed partial class Build
 {
     const string flatpakAppId = "org.MASS4.Turian";
-    AbsolutePath FlatpakManifest => Solution.Build.Directory / "packaging" / "flatpak" / $"{flatpakAppId}.yml";
+    AbsolutePath FlatpakManifest => BuildProjectDirectory / "packaging" / "flatpak" / $"{flatpakAppId}.yml";
     AbsolutePath FlatpakBuildDirectory => RootDirectory / ".flatpak-build";
     AbsolutePath FlatpakRepository => RootDirectory / ".flatpak-repo";
-    AbsolutePath FlatpakBundle => ArtifactsDirectory / $"Turian-{Version}-x86_64.flatpak";
+    AbsolutePath FlatpakBundle => ArtifactsDirectory / $"{ProductName}-{Version}-x86_64.flatpak";
 
     public Target Flatpak => td => td
         .Executes(() =>

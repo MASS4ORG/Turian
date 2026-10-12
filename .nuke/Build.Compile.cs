@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.
@@ -6,18 +6,11 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
-    /// <summary>
-    /// Builds against the published packages even when Directory.Build.local.props points at local checkouts;
-    /// switching modes needs a fresh restore. Pack and publish refuse or warn without it (Directory.Build.targets).
-    /// </summary>
-    [Parameter("Build against the published packages, ignoring local checkouts from Directory.Build.local.props")]
-    readonly bool NoLocalPackages;
-
     Target Clean => td => td
         .Executes(() =>
         {
             Solution.AllProjects
-                .Where(project => project.Path != RootDirectory / ".nuke/Build.csproj")
+                .Where(project => project.Path != BuildProjectDirectory / "Build.csproj")
                 .SelectMany(project => new[]
                 {
                     project.Directory / "bin",
@@ -32,38 +25,45 @@ sealed partial class Build
         });
 
     Target Restore => td => td
-        .DependsOn(Clean)
         .Executes(() =>
         {
-            _ = DotNetRestore(s => s
-                .SetProjectFile(Solution)
-                .SetProperty("NoLocalPackages", NoLocalPackages));
+            _ = DotNetRestore(s => WithMsBuildProperties(s.SetProjectFile(Solution)));
         });
 
     Target Compile => td => td
-        .DependsOn(CompileShaders)
-        .After(Restore)
+        .DependsOn(Restore)
         .Executes(() =>
         {
             Log.Debug("Config {Config}", Config);
 
-            DotNetBuild(settings => settings
-                .SetNoLogo(true)
-                .SetProjectFile(Solution)
-                .SetConfiguration(Config)
-                .SetProperty("NoLocalPackages", NoLocalPackages)
-                .SetProperty("SkipShaders", SkipShaders)
-                .EnableNoRestore()
-            );
+            // A project opts out with <ExcludeFromBuild>true</ExcludeFromBuild>; then the projects are built one by one.
+            var excluded = Solution.AllProjects
+                .Where(project => project.Path.FileExists()
+                                  && project.Path.ReadAllText().Contains("<ExcludeFromBuild>true", StringComparison.Ordinal))
+                .ToList();
+            if (excluded.Count == 0)
+            {
+                _ = DotNetBuild(settings => WithMsBuildProperties(settings
+                    .SetNoLogo(true)
+                    .SetProjectFile(Solution)
+                    .SetConfiguration(Config)
+                    .EnableNoRestore()));
+            }
+            else
+            {
+                foreach (var project in Solution.AllProjects.Except(excluded))
+                {
+                    _ = DotNetBuild(settings => WithMsBuildProperties(settings
+                        .SetNoLogo(true)
+                        .SetProjectFile(project)
+                        .SetConfiguration(Config)
+                        .EnableNoRestore()));
+                }
+            }
 
-            var studioOutputDirectory = Solution.Editor.Turian_Editor_Studio.Directory / "bin" / Config / "net10.0";
-            var platformSourceDirectory = Solution.Editor.Turian_Editor_CLI.Directory / "Platform";
-            var platformTargetDirectory = studioOutputDirectory / "Platform";
-
-            Log.Information("Copying platform assets from {Source} to {Target}", platformSourceDirectory, platformTargetDirectory);
-
-            platformSourceDirectory.CreateDirectory();
-            platformTargetDirectory.DeleteDirectory();
-            platformSourceDirectory.CopyToDirectory(studioOutputDirectory);
+            OnCompiled();
         });
+
+    /// <summary>Runs after a successful build, for project specific follow-up steps.</summary>
+    partial void OnCompiled();
 }

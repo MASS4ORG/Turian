@@ -12,13 +12,23 @@ env:
   NUKE_TELEMETRY_OPTOUT: "1"
   IGNORE_NORMALISATION_GIT_HEAD_MOVE: "1"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -47,6 +57,8 @@ jobs:
   # Validate all release formats on one runner without tagging or pushing.
   package:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:

@@ -1,3 +1,5 @@
+Copyright (c) 2025-2026 Bruno Massa
+
 Mozilla Public License Version 2.0
 ==================================
 

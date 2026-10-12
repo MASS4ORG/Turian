@@ -133,7 +133,7 @@
         },
         "GithubRepository": {
           "type": "string",
-          "description": "GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)"
+          "description": "GitHub owner/repo path (default: MASS4ORG/Turian)"
         },
         "GithubToken": {
           "type": "string",
@@ -142,7 +142,7 @@
         },
         "GitlabProjectPath": {
           "type": "string",
-          "description": "GitLab group/project path, e.g. turian/Turian (default: turian/Turian)"
+          "description": "GitLab group/project path (default: MASS4ORG/Turian)"
         },
         "GitlabToken": {
           "type": "string",
@@ -153,11 +153,12 @@
           "type": "boolean",
           "description": "Build against the published packages, ignoring local checkouts from Directory.Build.local.props"
         },
-        "NugetApiKey": {
+        "NuGetApiKey": {
           "type": "string",
-          "description": "NuGet API key used by PushNuGet. Absent = pack only"
+          "description": "NuGet API key used by PushNuGet. Absent = pack only",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "NugetSource": {
+        "NuGetSource": {
           "type": "string",
           "description": "NuGet feed to push to (default: nuget.org)"
         },
@@ -169,17 +170,21 @@
           "type": "string",
           "description": "publish-directory (default: ./.publish/{runtimeIdentifier})"
         },
+        "PublishReadyToRun": {
+          "type": "boolean",
+          "description": "publish-ready-to-run (default: false)"
+        },
         "PublishSelfContained": {
           "type": "boolean",
-          "description": "publish-self-contained (default: false)"
+          "description": "publish-self-contained (default: set by the project)"
         },
         "PublishSingleFile": {
           "type": "boolean",
-          "description": "publish-single-file (default: false)"
+          "description": "publish-single-file (default: set by the project)"
         },
         "PublishTrimmed": {
           "type": "boolean",
-          "description": "publish-trimmed (default: false)"
+          "description": "publish-trimmed (default: set by the project)"
         },
         "ReleaseBranch": {
           "type": "string",

@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// This is the main build file for the project.
@@ -7,11 +7,11 @@ namespace Turian.NUKE;
 /// </summary>
 sealed partial class Build
 {
-    [Parameter("GitLab group/project path, e.g. turian/Turian (default: turian/Turian)")]
-    readonly string GitlabProjectPath = "turian/Turian";
+    [Parameter($"GitLab group/project path (default: {DefaultGitlabProjectPath})")]
+    readonly string GitlabProjectPath = DefaultGitlabProjectPath;
 
-    [Parameter("GitHub owner/repo path, e.g. MASS4ORG/Turian (default: MASS4ORG/Turian)")]
-    readonly string GithubRepository = "MASS4ORG/Turian";
+    [Parameter($"GitHub owner/repo path (default: {DefaultGithubRepository})")]
+    readonly string GithubRepository = DefaultGithubRepository;
 
     [Parameter("Branch the release commit is pushed to (default: main)")]
     readonly string ReleaseBranch = "main";
@@ -25,15 +25,17 @@ sealed partial class Build
     readonly string GithubToken;
 
     /// <summary>
-    /// Commits the changelog and the project versions once before creating the release tag.
+    /// Commits the changelog and whatever <see cref="ReleaseCommitDependencies"/> change once before creating the
+    /// release tag.
     /// </summary>
     public Target CreateReleaseCommit => td => td
-        .DependsOn(UpdateChangelog, UpdateProjectVersions)
+        .DependsOn(UpdateChangelog)
+        .DependsOn(ReleaseCommitDependencies)
         .OnlyWhenDynamic(() => HasNewCommits)
         .Executes(() =>
         {
-            RunGit("set release bot name", "config", "user.name", "Turian Bot");
-            RunGit("set release bot email", "config", "user.email", "massa+turian@brunomassa.com");
+            RunGit("set release bot name", "config", "user.name", $"{ProductName} Bot");
+            RunGit("set release bot email", "config", "user.email", ReleaseBotEmail);
             RunGit("commit changelog", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-am", $"chore(release): {Version}");
         });
 

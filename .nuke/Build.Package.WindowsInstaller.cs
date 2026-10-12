@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 /// <summary>
 /// Builds the Windows installer included with regular Windows releases.
@@ -7,7 +7,7 @@ namespace Turian.NUKE;
 sealed partial class Build
 {
     AbsolutePath WindowsInstallerFile =>
-        ArtifactsDirectory / $"Turian-{Version}-win-x64-setup.exe";
+        ArtifactsDirectory / $"{ProductName}-{Version}-win-x64-setup.exe";
 
     public Target WindowsInstaller => td => td
         .DependsOn(Publish)
@@ -16,7 +16,7 @@ sealed partial class Build
         {
             ArtifactsDirectory.CreateDirectory();
             WindowsInstallerFile.DeleteFile();
-            var script = Solution.Build.Directory / "packaging" / "windows" / "Turian.nsi";
+            var script = BuildProjectDirectory / "packaging" / "windows" / "Turian.nsi";
             ProcessTasks.StartProcess("makensis",
                     $"-V2 -DVERSION={Version} -DSOURCE_DIR=\"{PublishDir}\" " +
                     $"-DOUTPUT_FILE=\"{WindowsInstallerFile}\" \"{script}\"")

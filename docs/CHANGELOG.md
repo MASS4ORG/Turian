@@ -2,19 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
+
 ## [3.0.0] - 2026-10-11
 
-- Added: Vulkan renderer brick, headless player, build profiles and project asset #35 #62
-- Added: temporary scenes and frame statistics HUD with Game panel overlay #59
-- Changed: GPU-rendered UI and on-demand Studio pacing, Material 3 default theme, classic OS themes and icon sets #212, #217
-- Changed: OBJ import as editor brick, glTF/GLB internal mesh format, exporting process revamp #47
-- Changed: asset browser revamp, class-attribute Gaya settings and panel-owned headers #68
-- Changed: .pss theme API, theme bricks and theme sheets (#213, #214, #215, #218)
+- Changed (breaking): `.pss` color themes with hot reload #213
+- Changed (breaking): Guinevere fluent effects.
+- Changed (breaking): Gaya settings use class-level attributes as their sole configuration
+- Changed (breaking): Wavefront OBJ import is an optional editor-only brick #47
+- Changed (breaking): glTF 2.0 / GLB is now the internal mesh format
+- Changed (breaking): Vulkan renderer moved out of core into a brick #62 #35
+- Added: build profiles and platforms; headless dedicated server builds
+- Added: `Assets/Project.dataasset` registers settings and build profiles and records the engine version
+- Added: Asset browser revamp #68
+- Added: Theme bricks from the command line #215
+- Added: Bricks panel moved to Gaya with studio/project scopes #214
+- Added: scene Frame Statistics HUD #59
+- Added: temporary scenes
+- Added: Icon sets (Mono, Color) #217
+- Added: Material 3 as default theme; classic OS themes as bricks #212
+- Added: in-game UI supports GPU rendering on Vulkan.
+- Added: the `test` build target also emits a TRX report
+- Added: Build Profiles window
+- Improved: Panels API delegate tab-strip area.
+- Improved: Studio renders on demand
+- Improved: "Build & Run" and "export" skip the redundant NuGet restore already done during setup.
+- Changed: Guinevere controls now use style sheets #218
+- Changed: project solution generator revamped
+- Fixed: local builds report the engine version from the csproj `Version`
+- Fixed: shaders compile to SPIR-V 1.5, which Vulkan 1.2 devices load
 
 ## [2.3.1] - 2026-10-07
 

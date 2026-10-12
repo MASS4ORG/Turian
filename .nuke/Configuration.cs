@@ -1,4 +1,4 @@
-namespace Turian.NUKE;
+namespace Build;
 
 [TypeConverter(typeof(TypeConverter<ConfigurationOptions>))]
 public class ConfigurationOptions : Enumeration

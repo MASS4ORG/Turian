@@ -69,7 +69,7 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
             Link(gui, "Documentation", "https://Turian.MASS4.org/");
             Link(gui, "Blog", "https://Turian.MASS4.org/blog");
-            Link(gui, "Changelog", "https://github.com/MASS4ORG/Turian/blob/main/CHANGELOG.md");
+            Link(gui, "Changelog", "https://github.com/MASS4ORG/Turian/blob/main/docs/CHANGELOG.md");
             Link(gui, "Discord", "https://discord.com/channels/1104509879269457982/1104509879865057342");
             Link(gui, "Matrix", "https://matrix.to/#/!yyiCIgJgQDezXOaEgK:matrix.org?via=matrix.org");
             Link(gui, "Issues", "https://github.com/MASS4ORG/Turian/issues");

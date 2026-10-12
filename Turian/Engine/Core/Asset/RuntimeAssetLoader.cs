@@ -41,7 +41,8 @@ public sealed class RuntimeAssetLoader : IAssetLoader
 
             if (!inflight.TryGetValue(assetId, out task!))
             {
-                task = LoadCoreAsync(assetId);
+                // The worker's cleanup takes gate after its task has been registered.
+                task = Task.Run(() => LoadCore(assetId));
                 inflight[assetId] = task;
             }
         }
@@ -156,11 +157,11 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         }
     }
 
-    async Task<Asset?> LoadCoreAsync(Guid assetId)
+    Asset? LoadCore(Guid assetId)
     {
         try
         {
-            var asset = await Task.Run(() => LoadFromDisk(assetId)).ConfigureAwait(false);
+            var asset = LoadFromDisk(assetId);
 
             lock (gate)
             {
