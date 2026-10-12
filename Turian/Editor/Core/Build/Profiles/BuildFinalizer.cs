@@ -95,7 +95,12 @@ static class BuildFinalizer
         var packResult = packBuilder.Build(
             context.Settings.ProjectAbsoluteDir,
             context.OutputDirectory,
-            new OapPackOptions { Name = context.Settings.TitleToPathFriendly, Version = "1.0.0" });
+            new OapPackOptions
+            {
+                Name = context.Settings.TitleToPathFriendly,
+                Version = "1.0.0",
+                Target = BuildPlatforms.For(context.Profile).TextureTarget,
+            });
 
         context.Logger.LogInformation(
             "Packaged {Count} assets → {PackPath}",

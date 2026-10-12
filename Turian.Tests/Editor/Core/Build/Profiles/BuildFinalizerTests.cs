@@ -109,6 +109,33 @@ public sealed class BuildFinalizerTests : IDisposable
         Assert.False(File.Exists(Path.Combine(output, "Game.oap")));
     }
 
+    /// <summary>Export packs the artifact baked for the platform's texture target instead of the asset's primary one.</summary>
+    [Fact]
+    public void PackageAssetsPacksThePlatformsTextureTarget()
+    {
+        var output = Path.Combine(project, "Output");
+        Directory.CreateDirectory(output);
+        var id = Guid.NewGuid();
+        var cache = Path.Combine(".Cache", "Assets", "by-guid", id.ToString("N"));
+        Directory.CreateDirectory(Path.Combine(project, cache));
+        File.WriteAllBytes(Path.Combine(project, cache, "primary.other.ktx2"), [1]);
+        File.WriteAllBytes(Path.Combine(project, cache, "primary.pc.ktx2"), [2]);
+        var record = new AssetRecord
+        {
+            AssetId = id,
+            AssetTypeName = "Turian.Engine.Core.TextureAsset",
+            SourceRelativePath = "Assets/hero.png",
+            ImportedRelativePath = Path.Combine(cache, "primary.other.ktx2"),
+            TargetArtifacts = { [TextureBuildTarget.Pc] = Path.Combine(cache, "primary.pc.ktx2") },
+        };
+        Serializer.Save(Path.Combine(project, ".Cache", "assetCatalog.json"), new AssetCatalog { Records = [record] });
+
+        BuildFinalizer.PackageAssets(Context(output, "project.csproj"));
+
+        var reader = OapReader.OpenFile(Directory.GetFiles(output, "*.oap", SearchOption.AllDirectories).Single());
+        Assert.Equal([2], reader.ReadAsset(reader.FindById(id)!.Value));
+    }
+
     /// <summary>The desktop platform reports its texture target, runtime identifiers, toolchain and executable extension.</summary>
     [Fact]
     public void DesktopPlatformDescribesItsTargets()
