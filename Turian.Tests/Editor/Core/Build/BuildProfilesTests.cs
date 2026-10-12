@@ -87,9 +87,11 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.True(Directory.Exists(desktop.LauncherDirectory));
         Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(() => BuildPlatforms.Find("android")).Message);
         Assert.Equal(["publish", "game.csproj", "-o", "out", "-c", "Release", "--no-restore"],
-            desktop.PublishArguments(new BuildPlatformContext("game.csproj", "out", "Release", null)));
+            desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release", null)));
         Assert.Equal("-p:TurianDefines=TURIAN_SERVER%3BDEMO",
-            desktop.PublishArguments(new BuildPlatformContext("game.csproj", "out", "Release",
+            desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release",
                 new BuildProfile { Target = BuildTarget.Server, ScriptingDefines = "DEMO" }))[^1]);
         Assert.Same(desktop.GetType(), BuildPlatforms.For(new BuildProfile { Target = BuildTarget.Server }).GetType());
     }
@@ -99,7 +101,8 @@ public sealed class BuildProfilesTests : IDisposable
     public void ProfilesWithoutSymbolsReplaceTheActiveProfiles()
     {
         Assert.Equal("-p:TurianDefines=", BuildPlatforms.Find(null).PublishArguments(
-            new BuildPlatformContext("game.csproj", "out", "Release", new BuildProfile()))[^1]);
+            new BuildPlatformContext(Settings, NullLogger.Instance,
+                "game.csproj", "out", "Release", new BuildProfile()))[^1]);
     }
 
     /// <summary>
@@ -171,11 +174,11 @@ public sealed class BuildProfilesTests : IDisposable
     [Fact]
     public void ExecutablesAreNamedForTheTargetRuntime()
     {
-        Assert.Equal(".exe", ExportUserCode.ExecutableExtension("win-arm64"));
-        Assert.Equal(".exe", ExportUserCode.ExecutableExtension(" WIN-x64 "));
-        Assert.Equal("", ExportUserCode.ExecutableExtension("linux-arm64"));
-        Assert.Equal("", ExportUserCode.ExecutableExtension("osx-arm64"));
-        Assert.Equal(OperatingSystem.IsWindows() ? ".exe" : "", ExportUserCode.ExecutableExtension(null));
+        Assert.Equal(".exe", DesktopBuildPlatform.ExecutableExtension("win-arm64"));
+        Assert.Equal(".exe", DesktopBuildPlatform.ExecutableExtension(" WIN-x64 "));
+        Assert.Equal("", DesktopBuildPlatform.ExecutableExtension("linux-arm64"));
+        Assert.Equal("", DesktopBuildPlatform.ExecutableExtension("osx-arm64"));
+        Assert.Equal(OperatingSystem.IsWindows() ? ".exe" : "", DesktopBuildPlatform.ExecutableExtension(null));
     }
 
     /// <summary>Script projects take the profile's symbols and keep brick packages from flowing into a game.</summary>

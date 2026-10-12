@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: `IBuildPlatform` owns the platform-specific export steps #236
 - Changed: Vulkan swapchain composite alpha and surface format are chosen from the surface's supported values #239
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
 

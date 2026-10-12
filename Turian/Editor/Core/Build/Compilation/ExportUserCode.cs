@@ -11,9 +11,6 @@ public sealed class ExportUserCode(
     ProjectBuildProfile? profile = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
-    static readonly string[] ArtifactExtensionsToDelete =
-        [".pdb", ".xml", ".deps.json"];
-
     /// <inheritdoc />
     protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
 
@@ -35,6 +32,9 @@ public sealed class ExportUserCode(
         var configName = (profile?.Profile.Configuration ?? configuration) == BuildConfiguration.Release
             ? "Release"
             : "Debug";
+        var platform = BuildPlatforms.For(profile?.Profile);
+        var context = new BuildPlatformContext(Settings, Logger, csprojFilePath, exportOutputPath, configName,
+            profile?.Profile);
 
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
         var startInfo = new ProcessStartInfo("dotnet")
@@ -44,8 +44,7 @@ public sealed class ExportUserCode(
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        var context = new BuildPlatformContext(csprojFilePath, exportOutputPath, configName, profile?.Profile);
-        foreach (var argument in BuildPlatforms.For(profile?.Profile).PublishArguments(context))
+        foreach (var argument in platform.PublishArguments(context))
             startInfo.ArgumentList.Add(argument);
         WithoutLocatorEnvironment(startInfo);
 
@@ -61,14 +60,10 @@ public sealed class ExportUserCode(
             throw new InvalidOperationException("Export failed.");
         }
 
-        CleanArtifacts(exportOutputPath);
-        RenameExecutable(Settings, csprojFilePath, exportOutputPath, profile?.Profile.RuntimeIdentifier);
-        CopyProjectSettings(exportOutputPath);
-        WriteTypeManifest(exportOutputPath);
-        PackageAssets(exportOutputPath);
+        var artifact = await platform.FinalizeAsync(context, CancellationToken.None).ConfigureAwait(false);
 
         Logger.LogInformation("Export succeeded");
-        return exportOutputPath;
+        return artifact.OutputDirectory;
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
@@ -82,111 +77,9 @@ public sealed class ExportUserCode(
         return project.FullPath;
     }
 
-    /// <summary>The executable's extension for the target runtime: <c>.exe</c> on Windows, none elsewhere.</summary>
-    /// <param name="runtimeIdentifier">The build's runtime identifier; empty for this machine's.</param>
-    internal static string ExecutableExtension(string? runtimeIdentifier) =>
-        (string.IsNullOrWhiteSpace(runtimeIdentifier)
-            ? OperatingSystem.IsWindows()
-            : runtimeIdentifier.Trim().StartsWith("win", StringComparison.OrdinalIgnoreCase))
-            ? ".exe"
-            : string.Empty;
-
     /// <summary>A client build without a render brick opens no window: the game runs the headless player.</summary>
     internal static bool RunsHeadlessByAccident(string projectRoot, BuildProfile? profile) =>
         (profile?.Target ?? BuildTarget.Client) == BuildTarget.Client
         && !BuildProfiles.HasPlayer(BuildProfiles.ShippingBricks(ProjectPackages.ResolveOrEmpty(projectRoot),
             BuildTarget.Client));
-
-    /// <summary>
-    /// Removes PDB, XML documentation, and other dotnet build artifacts from the
-    /// export output directory that are not needed at runtime.
-    /// </summary>
-    void CleanArtifacts(string outputDirectory)
-    {
-        var removed = 0;
-        foreach (var file in Directory.EnumerateFiles(outputDirectory, "*", SearchOption.AllDirectories))
-        {
-            var ext = Path.GetExtension(file);
-            if (ArtifactExtensionsToDelete.Contains(ext, StringComparer.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    File.Delete(file);
-                    removed++;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Could not delete artifact: {File}", file);
-                }
-            }
-        }
-
-        Logger.LogInformation("Removed {Count} build artifact(s) from export output", removed);
-    }
-
-    static void RenameExecutable(BuildAppSettings settings, string csprojFilePath, string exportOutputPath,
-        string? runtimeIdentifier)
-    {
-        var extension = ExecutableExtension(runtimeIdentifier);
-        var exportedExePath = Path.Combine(
-            exportOutputPath,
-            $"{Path.GetFileNameWithoutExtension(csprojFilePath)}{extension}");
-
-        var newExePath = Path.Combine(exportOutputPath, $"{settings.TitleToPathFriendly}{extension}");
-
-        if (File.Exists(exportedExePath))
-            File.Move(exportedExePath, newExePath, overwrite: true);
-    }
-
-    /// <summary>Copies the settings index — how the game finds its settings and its folder — and the icon.</summary>
-    void CopyProjectSettings(string exportOutputPath)
-    {
-        foreach (var fileName in new[] { ProjectSettingsLoader.IndexFileName, ProjectIcon.PngFileName })
-        {
-            var sourcePath = Path.Combine(Settings.CacheAbsoluteDir, fileName);
-            if (!File.Exists(sourcePath))
-            {
-                if (fileName == ProjectSettingsLoader.IndexFileName)
-                    Logger.LogWarning("Project settings index not found at {Path}. Skipping its copy", sourcePath);
-                continue;
-            }
-
-            var destinationPath = Path.Combine(exportOutputPath, fileName);
-            File.Copy(sourcePath, destinationPath, overwrite: true);
-            Logger.LogInformation("Copied {File} to export output: {Path}", fileName, destinationPath);
-        }
-    }
-
-    /// <summary>
-    /// Writes the manifest the game registers user components through; without it every component
-    /// declared in the project's scripts loads as a <see cref="MissingComponent"/>.
-    /// </summary>
-    void WriteTypeManifest(string exportOutputPath)
-    {
-        var manifest = UserCodeTypeManifestGenerator.Generate(
-            Settings.AssetsAbsoluteDir, Logger, Settings.TitleToPathFriendly,
-            CsProjectGenerator.DiscoverAssemblies(Settings), profile?.Profile.Target ?? BuildTarget.Client);
-        UserCodeTypeManifest.Save(manifest, Path.Combine(exportOutputPath, $"{Settings.TitleToPathFriendly}.dll"));
-    }
-
-    void PackageAssets(string exportOutputPath)
-    {
-        var cacheCatalogPath = Path.Combine(Settings.ProjectAbsoluteDir, ".Cache", "assetCatalog.json");
-        if (!File.Exists(cacheCatalogPath))
-        {
-            Logger.LogWarning("Asset catalog not found at {Path}. Skipping asset packaging", cacheCatalogPath);
-            return;
-        }
-
-        var packBuilder = new OapArchiveBuilder(Logger);
-        var packResult = packBuilder.Build(
-            Settings.ProjectAbsoluteDir,
-            exportOutputPath,
-            new OapPackOptions { Name = Settings.TitleToPathFriendly, Version = "1.0.0" });
-
-        Logger.LogInformation(
-            "Packaged {Count} assets → {PackPath}",
-            packResult.EntryCount,
-            packResult.OapFilePath);
-    }
 }

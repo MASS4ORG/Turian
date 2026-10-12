@@ -1,14 +1,22 @@
 namespace Turian.Editor.Core;
 
 /// <summary>The dependency graph resolved by MSBuild for the game launcher shipped with this editor.</summary>
-sealed class RuntimeDependencies
+public sealed class RuntimeDependencies
 {
+    /// <summary>The graph of the desktop launcher this editor ships, the default platform's.</summary>
     internal static RuntimeDependencies Current { get; } = Load();
 
-    internal string TargetFramework { get; private set; } = string.Empty;
-    internal (string, string)[] Packages { get; private set; } = [];
-    internal (string, string)[] Assemblies { get; private set; } = [];
-    internal string[] Projects { get; private set; } = [];
+    /// <summary>The target framework the launcher and its engine assemblies build for.</summary>
+    public string TargetFramework { get; private set; } = string.Empty;
+
+    /// <summary>The NuGet packages and versions the launcher resolves.</summary>
+    public IReadOnlyList<(string, string)> Packages { get; private set; } = [];
+
+    /// <summary>The runtime assemblies as (source folder, assembly name) pairs.</summary>
+    public IReadOnlyList<(string, string)> Assemblies { get; private set; } = [];
+
+    /// <summary>The runtime project paths relative to the checkout root, without file extensions.</summary>
+    public IReadOnlyList<string> Projects { get; private set; } = [];
 
     static RuntimeDependencies Load()
     {
