@@ -99,7 +99,7 @@ public unsafe partial class Device
                 {
                     device = CreateLogicalDevice(deviceToTry);
                     physicalDevice = deviceToTry;
-                    msaaSamples = GetMaxUsableSampleCount();
+                    msaaSamples = GetMaxUsableSampleCount(requestedMsaaSamples);
                     found = true;
                     break;
                 }

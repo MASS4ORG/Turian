@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 public class InputManager : IDisposable
 {
-    readonly List<Key> keysDown = [];
+    List<Key> keysDown = [];
 
     /// <summary>
     /// Event that is raised when a key is pressed.
@@ -89,7 +89,7 @@ public class InputManager : IDisposable
 
     void KeyboardOnKeyUp(IKeyboard arg1, Key arg2, int _)
     {
-        keysDown.RemoveAt(keysDown.IndexOf(arg2));
+        keysDown.Remove(arg2);
     }
 
     void KeyboardOnKeyDown(IKeyboard arg1, Key arg2, int _)

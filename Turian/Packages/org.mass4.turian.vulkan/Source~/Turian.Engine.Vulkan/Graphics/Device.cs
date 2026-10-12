@@ -132,6 +132,7 @@ public unsafe partial class Device : IDisposable
     float maxSamplerAnisotropy = 1f;
     ulong deviceLocalMemoryBytes;
     SampleCountFlags msaaSamples = SampleCountFlags.Count1Bit;
+    readonly int requestedMsaaSamples;
     Silk.NET.Vulkan.Device device;
     uint graphicsFamilyIndex;
     Queue graphicsQueue;
@@ -143,10 +144,12 @@ public unsafe partial class Device : IDisposable
     /// </summary>
     /// <param name="vk">The Vulkan instance.</param>
     /// <param name="window">The window view. Pass <c>null</c> for headless (editor) mode.</param>
-    public Device(Vk vk, IView? window = null)
+    /// <param name="requestedMsaaSamples">The MSAA sample count to request, capped at the device's maximum.</param>
+    public Device(Vk vk, IView? window = null, int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples)
     {
         this.vk = vk;
         this.window = window;
+        this.requestedMsaaSamples = requestedMsaaSamples;
         CreateInstance();
         SetupDebugMessenger();
         if (!IsHeadless) CreateSurface();

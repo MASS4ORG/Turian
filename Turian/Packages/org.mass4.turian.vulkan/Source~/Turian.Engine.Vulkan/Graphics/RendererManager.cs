@@ -190,11 +190,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
 
     void InitializeGlobalSetLayout(uint frames)
     {
-        var shaderuse =
-            ShaderStageFlags.VertexBit
-            | ShaderStageFlags.FragmentBit
-            | ShaderStageFlags.MeshBitExt
-            | ShaderStageFlags.TaskBitExt;
+        var shaderuse = ShaderStages.GlobalSet(vulkan.Device.SupportsMeshShaders);
         globalSetLayout = new DescriptorSetLayoutBuilder(vulkan.Vk, vulkan.Device)
             .AddBinding(0, DescriptorType.UniformBuffer, shaderuse)
             .AddBinding(1, DescriptorType.StorageBuffer, shaderuse)

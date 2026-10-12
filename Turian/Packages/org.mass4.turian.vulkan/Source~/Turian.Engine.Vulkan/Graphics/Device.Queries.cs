@@ -271,7 +271,31 @@ public unsafe partial class Device
         return validationLayers.All(availableLayerNames.Contains);
     }
 
-    SampleCountFlags GetMaxUsableSampleCount()
+    static readonly SampleCountFlags[] SampleCountCandidates =
+    [
+        SampleCountFlags.Count64Bit,
+        SampleCountFlags.Count32Bit,
+        SampleCountFlags.Count16Bit,
+        SampleCountFlags.Count8Bit,
+        SampleCountFlags.Count4Bit,
+        SampleCountFlags.Count2Bit
+    ];
+
+    /// <summary>The highest sample count the device supports that is at most <paramref name="requested"/>.</summary>
+    /// <param name="requested">The sample count asked for; a non-power-of-two falls to the next lower count.</param>
+    /// <param name="supported">The sample counts the device's color and depth attachments both support.</param>
+    /// <returns>The chosen count, or 1× when nothing higher is supported.</returns>
+    internal static SampleCountFlags ClampSampleCount(int requested, SampleCountFlags supported)
+    {
+        foreach (var candidate in SampleCountCandidates)
+        {
+            if ((uint)candidate <= (uint)requested && supported.HasFlag(candidate)) return candidate;
+        }
+
+        return SampleCountFlags.Count1Bit;
+    }
+
+    SampleCountFlags GetMaxUsableSampleCount(int requested)
     {
         vk.GetPhysicalDeviceProperties(physicalDevice, out var physicalDeviceProperties);
 
@@ -279,16 +303,7 @@ public unsafe partial class Device
             physicalDeviceProperties.Limits.FramebufferColorSampleCounts
             & physicalDeviceProperties.Limits.FramebufferDepthSampleCounts;
 
-        return counts switch
-        {
-            var c when (c & SampleCountFlags.Count64Bit) != 0 => SampleCountFlags.Count64Bit,
-            var c when (c & SampleCountFlags.Count32Bit) != 0 => SampleCountFlags.Count32Bit,
-            var c when (c & SampleCountFlags.Count16Bit) != 0 => SampleCountFlags.Count16Bit,
-            var c when (c & SampleCountFlags.Count8Bit) != 0 => SampleCountFlags.Count8Bit,
-            var c when (c & SampleCountFlags.Count4Bit) != 0 => SampleCountFlags.Count4Bit,
-            var c when (c & SampleCountFlags.Count2Bit) != 0 => SampleCountFlags.Count2Bit,
-            _ => SampleCountFlags.Count1Bit
-        };
+        return ClampSampleCount(requested, counts);
     }
 
     Format FindSupportedFormat(

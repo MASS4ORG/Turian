@@ -15,11 +15,14 @@ public sealed class VulkanPlayer : IGamePlayer
         Application.BeginSession(headless: false);
 
         var window = new WindowManager { ShowStats = context.Development };
-        var vulkan = new Vulkan(window, context.Logger);
         var input = new InputManager(window, context.Logger);
         var inputSource = new SilkInputSource(input);
-        var runtime = GameRuntime.Start(context, inputSource,
-            services => services.AddSingleton(vulkan).AddSingleton<IRenderDevice>(vulkan));
+        var runtime = GameRuntime.Start(context, inputSource, services =>
+        {
+            services.AddSingleton(sp => new Vulkan(window, context.Logger, sp.GetService<IAppSettings>()));
+            services.AddSingleton<IRenderDevice>(sp => sp.GetRequiredService<Vulkan>());
+        });
+        var vulkan = runtime.Services.GetRequiredService<Vulkan>();
         window.Initialize();
         var renderer = new RendererManager(window, vulkan, runtime.Assets, context.Logger);
         renderer.Initialize();
