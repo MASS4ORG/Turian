@@ -82,6 +82,11 @@ public interface IBuildPlatform
     /// <returns>The toolchain status.</returns>
     BuildPlatformStatus CheckToolchain();
 
+    /// <summary>Checks the project's settings against what the platform requires, before an export starts.</summary>
+    /// <param name="settings">The project settings.</param>
+    /// <returns>What the user must fix, or <c>null</c> when the settings are acceptable.</returns>
+    string? ValidateSettings(IAppSettings settings) => null;
+
     /// <summary>Finishes a published build: strips artifacts, names the executable, and places content.</summary>
     /// <param name="context">The published project, output, configuration and profile.</param>
     /// <param name="cancellationToken">A token to cancel the finalize step.</param>

@@ -17,6 +17,9 @@ public sealed class ExportUserCode(
     /// <summary>Publishes the project and returns the export output directory.</summary>
     public async Task<string> ExecuteAsync()
     {
+        if (BuildPlatforms.For(profile?.Profile).ValidateSettings(Settings) is { } invalid)
+            throw new InvalidOperationException(invalid);
+
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
 
