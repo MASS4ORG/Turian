@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: Vulkan 1.3 and use core synchronization2 #237
 - Changed: the MSAA sample count is a graphics setting #240
 - Fixed: mesh and task shader stages only when the device enables mesh shading #238  #241
+- Added: `IContentSource` contract for packaged #242
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
 
 ## [3.0.0] - 2026-10-11
