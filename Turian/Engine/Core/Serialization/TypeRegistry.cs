@@ -232,9 +232,25 @@ public static class TypeRegistry
     /// </summary>
     public static void RegisterFromManifest(string manifestPath, ILogger logger)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+        var fullPath = Path.GetFullPath(manifestPath);
+        RegisterFromManifest(new FileContentDirectory(Path.GetDirectoryName(fullPath)!), Path.GetFileName(fullPath),
+            logger);
+    }
+
+    /// <summary>
+    /// Registers every entry of the <c>usercode.typeids.json</c> manifest in <paramref name="content"/>, such as
+    /// a game's packaged assets, by searching all currently loaded assemblies.
+    /// </summary>
+    /// <param name="content">The location holding the manifest.</param>
+    /// <param name="manifest">The manifest path relative to <paramref name="content"/>.</param>
+    /// <param name="logger">Receives registration progress and failures.</param>
+    public static void RegisterFromManifest(IContentDirectory content, string manifest, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(logger);
 
-        using var doc = ReadManifest(manifestPath, logger);
+        using var doc = ReadManifest(content, manifest, logger);
         if (doc is null || !doc.RootElement.TryGetProperty("Types", out var typesArray)) return;
 
         // A single-file game bundles the user assembly, so there is no DLL above to load; it is
@@ -251,22 +267,23 @@ public static class TypeRegistry
             typesArray.GetArrayLength());
     }
 
-    static JsonDocument? ReadManifest(string manifestPath, ILogger logger)
+    static JsonDocument? ReadManifest(IContentDirectory content, string manifest, ILogger logger)
     {
-        if (!File.Exists(manifestPath))
+        if (!content.Exists(manifest))
         {
-            logger.LogDebug("User-code type manifest not found at {Path}; user types will not be registered",
-                manifestPath);
+            logger.LogDebug("User-code type manifest not found at {Path} in {Content}; user types will not be registered",
+                manifest, content.Id);
             return null;
         }
 
         try
         {
-            return JsonDocument.Parse(File.ReadAllText(manifestPath));
+            return JsonDocument.Parse(content.ReadAllText(manifest));
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to parse user-code type manifest at {Path}", manifestPath);
+            logger.LogWarning(ex, "Failed to parse user-code type manifest at {Path} in {Content}", manifest,
+                content.Id);
             return null;
         }
     }

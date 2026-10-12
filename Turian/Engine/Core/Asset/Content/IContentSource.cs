@@ -44,7 +44,7 @@ public interface IContentSource : IDisposable
 /// </summary>
 public interface IContentDirectory
 {
-    /// <summary>A stable name for the location, used in identities and diagnostics.</summary>
+    /// <summary>A stable name unique to the location, used in identities, mount caches and diagnostics.</summary>
     string Id { get; }
 
     /// <summary>Gets the current identity of content without opening it, so a mount set can detect changes.</summary>

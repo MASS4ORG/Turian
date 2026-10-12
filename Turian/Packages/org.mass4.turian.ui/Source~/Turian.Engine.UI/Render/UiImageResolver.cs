@@ -56,6 +56,8 @@ public sealed class UiImageResolver
                     continue;
                 }
 
+                // Packaged content has no source images; a project prefers its live source file.
+                if (database.Content is not null) return DecodeFromDatabase(record.AssetId);
                 var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
                 return File.Exists(absolute) ? Decode(absolute) : DecodeFromDatabase(record.AssetId);
             }

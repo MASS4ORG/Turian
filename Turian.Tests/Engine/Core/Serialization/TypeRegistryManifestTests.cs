@@ -39,6 +39,25 @@ public sealed class TypeRegistryManifestTests : IDisposable
         Assert.False(TypeRegistry.TryGetType(unknownId, out _));
     }
 
+    /// <summary>A manifest packaged in non-file content, such as APK assets, registers its types.</summary>
+    [Fact]
+    public void RegistersFromPackagedContent()
+    {
+        var id = Guid.NewGuid();
+        var content = new MemoryContentDirectory();
+        content.Add("usercode.typeids.json", $$"""
+            { "Types": [ { "FullyQualifiedName": "{{typeof(ManifestTarget).FullName}}", "TypeId": "{{id}}",
+              "Assembly": "{{typeof(ManifestTarget).Assembly.GetName().Name}}" } ] }
+            """);
+
+        TypeRegistry.RegisterFromManifest(content, "usercode.typeids.json", NullLogger.Instance);
+        PrecastAssemblies.Load(content, "usercode.typeids.json", NullLogger.Instance);
+        PrecastAssemblies.Load(content, "missing.json", NullLogger.Instance);
+
+        Assert.True(TypeRegistry.TryGetType(id, out var type));
+        Assert.Equal(typeof(ManifestTarget), type);
+    }
+
     /// <summary>A missing, unreadable or type-less manifest registers nothing and does not throw.</summary>
     [Theory]
     [InlineData(null)]

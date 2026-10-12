@@ -16,10 +16,25 @@ public static class PrecastAssemblies
     /// <param name="logger">Receives assemblies that cannot be loaded.</param>
     public static void Load(string manifestPath, ILogger logger)
     {
-        ArgumentNullException.ThrowIfNull(logger);
-        if (!File.Exists(manifestPath)) return;
+        ArgumentException.ThrowIfNullOrWhiteSpace(manifestPath);
+        var fullPath = Path.GetFullPath(manifestPath);
+        Load(new FileContentDirectory(Path.GetDirectoryName(fullPath)!), Path.GetFileName(fullPath), logger);
+    }
 
-        using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+    /// <summary>
+    /// Loads each assembly the manifest in <paramref name="content"/> lists by name and registers its
+    /// <see cref="TypeIdAttribute"/> types. A missing manifest or list loads nothing.
+    /// </summary>
+    /// <param name="content">The location holding the manifest, such as the folder beside the game.</param>
+    /// <param name="manifest">The manifest path relative to <paramref name="content"/>.</param>
+    /// <param name="logger">Receives assemblies that cannot be loaded.</param>
+    public static void Load(IContentDirectory content, string manifest, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(logger);
+        if (!content.Exists(manifest)) return;
+
+        using var document = JsonDocument.Parse(content.ReadAllText(manifest));
         if (!document.RootElement.TryGetProperty(ManifestProperty, out var names)) return;
 
         foreach (var name in names.EnumerateArray().Select(static e => e.GetString()).OfType<string>())

@@ -10,7 +10,7 @@ sealed class MemoryContentDirectory : IContentDirectory
     public List<MemoryContentSource> Opened { get; } = [];
 
     /// <inheritdoc />
-    public string Id => "memory";
+    public string Id { get; } = $"memory-{Guid.NewGuid():N}";
 
     /// <summary>Adds or replaces content, bumping its version.</summary>
     public void Add(string path, byte[] bytes)
@@ -50,7 +50,7 @@ sealed class MemoryContentDirectory : IContentDirectory
     }
 
     ContentIdentity Identity(string path) =>
-        new("memory:" + path, versions[path].ToString(CultureInfo.InvariantCulture));
+        new(Id + ":" + path, versions[path].ToString(CultureInfo.InvariantCulture));
 }
 
 /// <summary>An <see cref="IContentSource"/> over a byte array.</summary>

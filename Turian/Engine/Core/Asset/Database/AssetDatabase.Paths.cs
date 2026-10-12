@@ -3,14 +3,36 @@ namespace Turian.Engine.Core;
 public sealed partial class AssetDatabase
 {
 
-    static IAssetFileProvider? CreateProvider(AssetRecord record)
+    static IAssetFileProvider? CreateProvider(AssetRecord record, IContentDirectory? content)
     {
         return record.StorageKind switch
         {
+            AssetStorageKind.Oap when content is not null && !string.IsNullOrWhiteSpace(record.ImportedRelativePath)
+                => new OapAssetFileProvider(content, ContentPath(record.ImportedRelativePath), record.PrimaryContentKey),
             AssetStorageKind.LooseFile => CreateLooseFileProvider(record),
             AssetStorageKind.Oap => CreateOapFileProvider(record),
             _ => CreateLooseFileProvider(record)
         };
+    }
+
+    /// <summary>A catalog's relative path as a content path, which always uses <c>/</c> separators.</summary>
+    /// <param name="relativePath">The path relative to the content root.</param>
+    /// <returns>The content path.</returns>
+    public static string ContentPath(string relativePath) => relativePath.Replace('\\', '/');
+
+    static AssetCatalog ReadCatalog(IContentDirectory content, string path)
+    {
+        if (!content.Exists(path)) return new AssetCatalog();
+
+        try
+        {
+            return Serializer.LoadData<AssetCatalog>(content.ReadAllText(path)) ?? new AssetCatalog();
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            Log.Logger.LogError(exception, "Runtime asset catalog {Path} in {Content} is unreadable", path, content.Id);
+            return new AssetCatalog();
+        }
     }
 
     static IAssetFileProvider? CreateLooseFileProvider(AssetRecord record)
