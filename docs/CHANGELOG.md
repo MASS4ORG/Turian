@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
+
 ## [3.0.0] - 2026-10-11
 
 - Changed (breaking): `.pss` color themes with hot reload #213

@@ -68,6 +68,26 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.NotNull(await loader.LoadAsync<DataAssetAsset>(metadata.Id));
     }
 
+    /// <summary>Fast failed loads are removed before a repaired asset is requested again.</summary>
+    [Fact]
+    public async Task Loader_RetriesFastFailedLoads()
+    {
+        var metaPath = $"{sourcePath}.meta";
+        var valid = File.ReadAllText(metaPath);
+        var loader = new RuntimeAssetLoader(database);
+
+        for (var attempt = 0; attempt < 4096; attempt++)
+        {
+            File.WriteAllText(metaPath, "{");
+            await Assert.ThrowsAnyAsync<JsonException>(() => loader.LoadAsync<Asset>(metadata.Id));
+            Assert.False(loader.TryGetLoaded<Asset>(metadata.Id, out _));
+            File.WriteAllText(metaPath, valid);
+
+            Assert.NotNull(await loader.LoadAsync<DataAssetAsset>(metadata.Id));
+            loader.Release(metadata.Id);
+        }
+    }
+
     /// <summary>Verifies that every load of an id through one loader shares one payload.</summary>
     [Fact]
     public async Task Loader_SharesPayloadAcrossReferences()
