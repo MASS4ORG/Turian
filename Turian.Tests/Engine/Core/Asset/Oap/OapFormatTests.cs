@@ -24,12 +24,13 @@ public class OapFormatTests
         Assert.Equal(id.ToByteArray(bigEndian: true)[0], buffer[0]);
     }
 
-    /// <summary>The header serialises and parses back to an equal value.</summary>
+    /// <summary>The header serialises and parses back to an equal value, stamped with this format version.</summary>
     [Fact]
     public void Header_RoundTrips()
     {
         var header = new OapHeader
         {
+            Minor = OapFormat.FormatMinor,
             Flags = OapFlags.SortedIndex | OapFlags.HasManifest,
             EntryCount = 3,
             IndexOffset = 1024,

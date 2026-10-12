@@ -178,6 +178,27 @@ public sealed class OapMountSetTests : IDisposable
         Assert.All(directory.Opened, source => Assert.True(source.Disposed));
     }
 
+    /// <summary>An overlay tombstone removes the base asset by id and by path; a higher overlay restores it.</summary>
+    [Fact]
+    public void TombstoneHidesLowerPackagesUntilAHigherOneAddsTheAssetBack()
+    {
+        var basePath = Package("base.oap", "base", "base");
+        var patch = new OapWriter();
+        patch.AddTombstone(assetId, "asset.txt");
+        patch.SetManifest(JsonSerializer.Serialize(new { name = "patch", requires = new[] { "base" } }));
+        patch.WriteToFile(Path.Combine(root, "overlays", "a-patch.oap"));
+
+        using (var mounts = OapMountSet.ForBasePackage(basePath)!)
+        {
+            Assert.False(mounts.TryResolveById(assetId, out _, out _));
+            Assert.False(mounts.TryResolveByPath("asset.txt", out _, out _));
+        }
+
+        Package("overlays/b-mod.oap", "mod", "restored", "patch");
+        using var restored = OapMountSet.ForBasePackage(basePath)!;
+        Assert.Equal("restored", ReadWinner(restored));
+    }
+
     string ReadWinner(OapMountSet mounts)
     {
         Assert.True(mounts.TryResolveById(assetId, out var reader, out var entry));

@@ -63,11 +63,53 @@ public class OapCompressionTests
         Assert.Equal(OapCompression.Store, codec);
     }
 
-    /// <summary>The reserved zstd codec is rejected.</summary>
+    /// <summary>Zstandard round-trips, and <see cref="OapCompressionCodec.Best"/> picks it when it is smaller.</summary>
     [Fact]
-    public void Zstd_IsRejected()
+    public void Zstd_RoundTripsAndWinsOnCompressibleData()
+    {
+        var data = Encoding.UTF8.GetBytes(string.Concat(Enumerable.Repeat("zstandard ", 2000)));
+
+        var (codec, stored) = OapCompressionCodec.Best(data, OapCompression.Zstd);
+
+        Assert.Equal(OapCompression.Zstd, codec);
+        Assert.True(stored.Length < data.Length / 10);
+        Assert.Equal(data, OapCompressionCodec.Decompress(OapCompression.Zstd, stored, data.Length));
+    }
+
+    /// <summary>A frame larger than the 8 MiB window limit still decodes, because the writer caps the window.</summary>
+    [Fact]
+    public void Zstd_LargeInputStaysWithinTheWindowLimit()
+    {
+        var data = new byte[12 * 1024 * 1024];
+        new Random(7).NextBytes(data.AsSpan(0, 4096));
+        for (var i = 4096; i < data.Length; i++) data[i] = data[i % 4096];
+
+        var stored = OapCompressionCodec.Compress(OapCompression.Zstd, data, level: 3);
+
+        Assert.Equal(data, OapCompressionCodec.Decompress(OapCompression.Zstd, stored, data.Length));
+    }
+
+    /// <summary>A truncated frame or a wrong expected length is reported as corrupt data.</summary>
+    [Fact]
+    public void Zstd_CorruptFrameIsReported()
+    {
+        var data = Encoding.UTF8.GetBytes(string.Concat(Enumerable.Repeat("frame ", 500)));
+        var stored = OapCompressionCodec.Compress(OapCompression.Zstd, data);
+
+        Assert.Throws<OapCorruptDataException>(
+            () => OapCompressionCodec.Decompress(OapCompression.Zstd, stored, data.Length + 1));
+        Assert.Throws<OapCorruptDataException>(
+            () => OapCompressionCodec.Decompress(OapCompression.Zstd, stored.AsSpan(0, stored.Length - 4),
+                data.Length));
+    }
+
+    /// <summary>An unknown codec value is rejected rather than returned undecoded.</summary>
+    [Fact]
+    public void UnknownCodec_IsRejected()
     {
         Assert.Throws<OapUnsupportedCompressionException>(
-            () => OapCompressionCodec.Compress(OapCompression.Zstd, "data"u8));
+            () => OapCompressionCodec.Compress((OapCompression)9, "data"u8));
+        Assert.Throws<OapUnsupportedCompressionException>(
+            () => OapCompressionCodec.Decompress((OapCompression)9, "data"u8, 4));
     }
 }

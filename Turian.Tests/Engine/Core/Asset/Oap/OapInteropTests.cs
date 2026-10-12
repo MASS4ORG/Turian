@@ -62,6 +62,34 @@ public class OapInteropTests
         Assert.Contains("\"name\":\"sample\"", manifest, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The 1.1 conformance package (<c>testdata/v1.1</c>): every codec, chunking, both ciphers, alignment and a
+    /// tombstone decode to the shipped source files, and ranges of the encrypted chunked asset match.
+    /// </summary>
+    [Fact]
+    public void Version11Package_DecodesEveryFeature()
+    {
+        var sources = Path.Combine(FixtureDir, "v1.1", "features");
+        using var reader = OapReader.OpenFile(Path.Combine(FixtureDir, "v1.1", "features.oap"));
+        reader.SetKey(OapCrypto.DeriveKey("oap-1.1"));
+
+        Assert.Equal(7, reader.Count);
+        Assert.Equal(1, reader.Header.Minor);
+        Assert.True((reader.Header.Flags & OapFlags.HasTombstones) != 0);
+        foreach (var entry in reader.Entries.Where(static e => !e.IsTombstone))
+            Assert.Equal(File.ReadAllBytes(Path.Combine(sources, reader.VirtualPath(entry))), reader.ReadAsset(entry));
+
+        Assert.True(reader.FindByPath("removed.txt")!.Value.IsTombstone);
+        Assert.Equal(0ul, reader.FindByPath("large-aligned.bin")!.Value.DataOffset % 4096);
+
+        var encrypted = reader.FindByPath("encrypted-chunked.bin")!.Value;
+        Assert.True(encrypted.IsChunked);
+        var expected = File.ReadAllBytes(Path.Combine(sources, "encrypted-chunked.bin"));
+        var range = new byte[300];
+        Assert.Equal(300, reader.ReadAssetRange(encrypted, 4000, range));
+        Assert.Equal(expected[4000..4300], range);
+    }
+
     /// <summary>An in-memory open of the same bytes agrees with the file-backed open.</summary>
     [Fact]
     public void CanonicalPackage_InMemoryMatchesFileBacked()

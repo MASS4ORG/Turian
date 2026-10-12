@@ -31,6 +31,7 @@ global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Logging.Abstractions;
 global using NSubstitute;
+global using OpenAssetPackage;
 global using Silk.NET.Vulkan;
 global using SkiaSharp;
 global using Turian.Editor.Core;

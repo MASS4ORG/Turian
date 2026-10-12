@@ -20,5 +20,6 @@ global using MASS4.Attributes;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Logging.Abstractions;
+global using OpenAssetPackage;
 global using Silk.NET.Input;
 global using ReadOnlyAttribute = MASS4.Attributes.ReadOnlyAttribute;

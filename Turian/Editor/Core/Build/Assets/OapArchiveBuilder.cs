@@ -11,8 +11,20 @@ public sealed class OapPackOptions
     /// <summary>Gets or sets the package version string written into the manifest.</summary>
     public string Version { get; set; } = "1.0.0";
 
-    /// <summary>Gets or sets how each asset is compressed.</summary>
-    public OapCompressChoice Compression { get; set; } = OapCompressChoice.Auto;
+    /// <summary>Gets or sets how each asset is compressed; by default the smaller of storing and Zstandard.</summary>
+    public OapCompressChoice Compression { get; set; } = OapCompressChoice.Smallest(OapCompression.Zstd);
+
+    /// <summary>Gets or sets where blobs start, so large ones can be memory mapped or read with direct I/O.</summary>
+    public OapAlignment Alignment { get; set; } = OapAlignment.Default;
+
+    /// <summary>
+    /// Gets or sets the size from which audio assets are chunked into independently compressed blocks, so they can be
+    /// streamed; 0 disables chunking. Chunking applies only when <see cref="Compression"/> uses a codec.
+    /// </summary>
+    public long StreamingChunkThreshold { get; set; } = 1024 * 1024;
+
+    /// <summary>Gets or sets the block size of chunked assets.</summary>
+    public int StreamingBlockSize { get; set; } = 64 * 1024;
 
     /// <summary>
     /// Gets or sets a passphrase; when set, every asset is encrypted with ChaCha20 and the
@@ -119,6 +131,39 @@ public sealed class OapArchiveBuilder(ILogger logger)
 
     List<AssetRecord> Pack(string projectRoot, string oapFilePath, string packageName, OapPackOptions options)
     {
+        var sourceCatalog = LoadSourceCatalog(projectRoot);
+        var (writer, encryption) = CreateWriter(options);
+        var childrenByParent = ChildrenByParent(sourceCatalog.Records);
+
+        var packed = new List<AssetRecord>();
+        foreach (var record in LoadOrder(sourceCatalog.Records))
+        {
+            if (record.AssetId == Guid.Empty || IsSourceCodeRecord(record)) continue;
+            var deps = childrenByParent.TryGetValue(record.AssetId, out var children) ? children : [];
+            if (TryAdd(writer, record, projectRoot, options, encryption, deps)) packed.Add(record);
+        }
+
+        writer.SetManifest(BuildManifest(packageName, options));
+        writer.WriteToFile(oapFilePath);
+        return packed;
+    }
+
+    static (OapWriter Writer, OapEncryption Encryption) CreateWriter(OapPackOptions options)
+    {
+        var writer = new OapWriter { Alignment = options.Alignment };
+        if (string.IsNullOrEmpty(options.Passphrase)) return (writer, OapEncryption.None);
+
+        writer.SetKey(OapCrypto.DeriveKey(options.Passphrase));
+        return (writer, OapEncryption.ChaCha20);
+    }
+
+    static Dictionary<Guid, Guid[]> ChildrenByParent(IEnumerable<AssetRecord> records) => records
+        .Where(static r => r.ParentAssetId != Guid.Empty)
+        .GroupBy(static r => r.ParentAssetId)
+        .ToDictionary(static g => g.Key, static g => g.Select(static r => r.AssetId).ToArray());
+
+    static AssetCatalog LoadSourceCatalog(string projectRoot)
+    {
         if (!Directory.Exists(projectRoot))
         {
             throw new DirectoryNotFoundException($"Project root was not found: {projectRoot}");
@@ -132,57 +177,48 @@ public sealed class OapArchiveBuilder(ILogger logger)
                 sourceCatalogPath);
         }
 
-        var sourceCatalog = Serializer.Load<AssetCatalog>(sourceCatalogPath) ?? new AssetCatalog();
-
-        var writer = new OapWriter();
-        var encryption = OapEncryption.None;
-        if (!string.IsNullOrEmpty(options.Passphrase))
-        {
-            writer.SetKey(OapCrypto.DeriveKey(options.Passphrase));
-            encryption = OapEncryption.ChaCha20;
-        }
-
-        var childrenByParent = sourceCatalog.Records
-            .Where(static r => r.ParentAssetId != Guid.Empty)
-            .GroupBy(static r => r.ParentAssetId)
-            .ToDictionary(static g => g.Key, static g => g.Select(static r => r.AssetId).ToArray());
-
-        var packed = new List<AssetRecord>();
-        foreach (var record in sourceCatalog.Records.OrderBy(static r => r.AssetId))
-        {
-            if (record.AssetId == Guid.Empty || IsSourceCodeRecord(record))
-            {
-                continue;
-            }
-
-            var payloadPath = ResolvePayloadPath(record, projectRoot, options.Target);
-            if (string.IsNullOrWhiteSpace(payloadPath) || !File.Exists(payloadPath))
-            {
-                logger.LogWarning(
-                    "Skipping asset {AssetId}: imported payload could not be resolved ({ImportedRelativePath})",
-                    record.AssetId,
-                    record.ImportedRelativePath);
-                continue;
-            }
-
-            var deps = childrenByParent.TryGetValue(record.AssetId, out var children) ? children : [];
-
-            writer.Add(
-                record.AssetId,
-                File.ReadAllBytes(payloadPath),
-                virtualPath: NormalizeVirtualPath(record.ImportedRelativePath),
-                assetType: (byte)ClassifyAssetType(record.AssetTypeName, payloadPath),
-                compression: options.Compression,
-                encryption: encryption,
-                dependencies: deps);
-
-            packed.Add(record);
-        }
-
-        writer.SetManifest(BuildManifest(packageName, options));
-        writer.WriteToFile(oapFilePath);
-        return packed;
+        return Serializer.Load<AssetCatalog>(sourceCatalogPath) ?? new AssetCatalog();
     }
+
+    bool TryAdd(OapWriter writer, AssetRecord record, string projectRoot, OapPackOptions options,
+        OapEncryption encryption, Guid[] deps)
+    {
+        var payloadPath = ResolvePayloadPath(record, projectRoot, options.Target);
+        if (string.IsNullOrWhiteSpace(payloadPath) || !File.Exists(payloadPath))
+        {
+            logger.LogWarning(
+                "Skipping asset {AssetId}: imported payload could not be resolved ({ImportedRelativePath})",
+                record.AssetId,
+                record.ImportedRelativePath);
+            return false;
+        }
+
+        var payload = File.ReadAllBytes(payloadPath);
+        var assetType = ClassifyAssetType(record.AssetTypeName, payloadPath);
+        writer.Add(
+            record.AssetId,
+            payload,
+            virtualPath: NormalizeVirtualPath(record.ImportedRelativePath),
+            assetType: (byte)assetType,
+            compression: CompressionFor(assetType, payload.Length, options),
+            encryption: encryption,
+            dependencies: deps);
+        return true;
+    }
+
+    // Blobs are written in this order: each parent asset followed by its children (a model and its meshes,
+    // materials and textures), so loading one reads one contiguous stretch of the package.
+    static IEnumerable<AssetRecord> LoadOrder(IEnumerable<AssetRecord> records) => records
+        .OrderBy(static r => r.ParentAssetId == Guid.Empty ? r.AssetId : r.ParentAssetId)
+        .ThenBy(static r => r.ParentAssetId != Guid.Empty)
+        .ThenBy(static r => r.AssetId);
+
+    static OapCompressChoice CompressionFor(OapAssetType type, long length, OapPackOptions options) =>
+        type == OapAssetType.Audio && options.StreamingChunkThreshold > 0 && length >= options.StreamingChunkThreshold
+        && options.Compression.Codec != OapCompression.Store
+            ? OapCompressChoice.Chunked(options.Compression.Codec, options.StreamingBlockSize,
+                options.Compression.Level)
+            : options.Compression;
 
     static string ResolvePackageName(string? requested, string projectRoot)
     {

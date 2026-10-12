@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace OpenAssetPackage;
 
 /// <summary>
 /// Per-asset encryption for OAP blobs (spec §5.2). Encryption is applied to the
@@ -53,7 +53,8 @@ public static class OapCrypto
     }
 
     /// <summary>
-    /// Encrypts or decrypts <paramref name="buffer"/> in place with <paramref name="codec"/>.
+    /// Encrypts or decrypts <paramref name="buffer"/> in place with <paramref name="codec"/>. Both ciphers are
+    /// positional (spec §5.2), so a range of a blob is transformed on its own by passing where it starts.
     /// A no-op for <see cref="OapEncryption.None"/>.
     /// </summary>
     /// <param name="codec">The cipher to apply.</param>
@@ -61,13 +62,16 @@ public static class OapCrypto
     /// <param name="assetId">The 16 raw asset-id bytes.</param>
     /// <param name="contentCrc32">The plaintext CRC-32 from the index entry.</param>
     /// <param name="buffer">The bytes to transform in place.</param>
+    /// <param name="position">The offset of <paramref name="buffer"/>'s first byte within the stored blob.</param>
     public static void Apply(
         OapEncryption codec,
         ReadOnlySpan<byte> key,
         ReadOnlySpan<byte> assetId,
         uint contentCrc32,
-        Span<byte> buffer)
+        Span<byte> buffer,
+        long position = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(position);
         switch (codec)
         {
             case OapEncryption.None:
@@ -78,7 +82,8 @@ public static class OapCrypto
                     var nonce = NonceFor(assetId, contentCrc32);
                     for (var i = 0; i < buffer.Length; i++)
                     {
-                        buffer[i] ^= (byte)(key[i % key.Length] ^ nonce[i % nonce.Length]);
+                        var at = position + i;
+                        buffer[i] ^= (byte)(key[(int)(at % key.Length)] ^ nonce[(int)(at % nonce.Length)]);
                     }
 
                     return;
@@ -87,7 +92,7 @@ public static class OapCrypto
             case OapEncryption.ChaCha20:
                 {
                     var nonce = NonceFor(assetId, contentCrc32);
-                    ChaCha20Xor(key, nonce, buffer);
+                    ChaCha20Xor(key, nonce, buffer, position);
                     return;
                 }
 
@@ -106,13 +111,15 @@ public static class OapCrypto
 
     /// <summary>
     /// XORs <paramref name="buffer"/> in place with the RFC&#160;8439 ChaCha20 keystream for
-    /// <paramref name="key"/> and <paramref name="nonce"/>, block counter starting at 0.
-    /// Exposed for testing against the RFC vectors.
+    /// <paramref name="key"/> and <paramref name="nonce"/>, starting <paramref name="position"/> bytes into a
+    /// keystream whose block counter begins at 0. Exposed for testing against the RFC vectors.
     /// </summary>
     /// <param name="key">The 32-byte key.</param>
     /// <param name="nonce">The 12-byte nonce.</param>
     /// <param name="buffer">The bytes to transform in place.</param>
-    internal static void ChaCha20Xor(ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce, Span<byte> buffer)
+    /// <param name="position">The keystream offset of <paramref name="buffer"/>'s first byte.</param>
+    internal static void ChaCha20Xor(ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce, Span<byte> buffer,
+        long position = 0)
     {
         if (key.Length != KeyLength)
         {
@@ -143,7 +150,8 @@ public static class OapCrypto
         Span<byte> keystream = stackalloc byte[64];
 
         var offset = 0;
-        uint counter = 0;
+        var counter = checked((uint)(position / 64));
+        var skip = (int)(position % 64);
         while (offset < buffer.Length)
         {
             initial[12] = counter++;
@@ -166,13 +174,14 @@ public static class OapCrypto
                 BinaryPrimitives.WriteUInt32LittleEndian(keystream[(i * 4)..], working[i] + initial[i]);
             }
 
-            var block = Math.Min(64, buffer.Length - offset);
+            var block = Math.Min(64 - skip, buffer.Length - offset);
             for (var i = 0; i < block; i++)
             {
-                buffer[offset + i] ^= keystream[i];
+                buffer[offset + i] ^= keystream[skip + i];
             }
 
             offset += block;
+            skip = 0;
         }
     }
 

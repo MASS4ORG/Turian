@@ -17,9 +17,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: Vulkan renderer enhancements #237 #239 #245
 - Changed: the MSAA sample count is a graphics setting #240
 - Changed: UI brick resolves controller types from loaded assemblies #249
+- Changed: OAP 1.1 packages (Zstandard, streamable chunked blobs, tombstones, aligned blobs) in a standalone library #133
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
 - Fixed: mesh and task shader stages only when the device enables mesh shading #238
 - Fixed: a KeyUp without a matching KeyDown no longer throws #241
+- Fixed: `oap pack --store` stores assets instead of compressing them #133
 
 ## [3.0.0] - 2026-10-11
 

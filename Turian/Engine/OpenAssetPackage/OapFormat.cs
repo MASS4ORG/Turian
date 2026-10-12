@@ -1,8 +1,8 @@
-namespace Turian.Engine.Core;
+namespace OpenAssetPackage;
 
 /// <summary>
 /// On-disk constants and structures for the Open Asset Package (<c>.oap</c>) container
-/// format, version 1.0. This type is the single source of truth for the byte-level
+/// format, version 1.1. This type is the single source of truth for the byte-level
 /// layout described in the OAP specification; it performs no I/O.
 /// </summary>
 /// <remarks>
@@ -22,7 +22,7 @@ public static class OapFormat
     public const ushort FormatMajor = 1;
 
     /// <summary>Minor format version emitted by this implementation.</summary>
-    public const ushort FormatMinor = 0;
+    public const ushort FormatMinor = 1;
 
     /// <summary>Fixed size of the file header, in bytes.</summary>
     public const int HeaderSize = 64;
@@ -35,6 +35,9 @@ public static class OapFormat
 
     /// <summary>Number of leading header bytes covered by the header CRC-32.</summary>
     public const int HeaderCrcCoverage = 60;
+
+    /// <summary>Bit of the <c>compression</c> byte marking a chunked blob (spec §5.3).</summary>
+    public const byte ChunkedBit = 0x80;
 
     /// <summary>
     /// Maps a <see cref="System.Guid"/> to the 16 raw bytes stored in an index entry, using
@@ -62,7 +65,7 @@ public static class OapFormat
     public static uint Crc32(ReadOnlySpan<byte> data) => System.IO.Hashing.Crc32.HashToUInt32(data);
 }
 
-/// <summary>Compression codec applied to a single asset blob (OAP spec §5.1).</summary>
+/// <summary>Compression codec applied to an asset blob or to each block of a chunked blob (OAP spec §5.1).</summary>
 public enum OapCompression : byte
 {
     /// <summary>No compression; the stored bytes are the plaintext.</summary>
@@ -71,7 +74,7 @@ public enum OapCompression : byte
     /// <summary>Raw DEFLATE stream (RFC&#160;1951), with no zlib or gzip wrapper.</summary>
     Deflate = 1,
 
-    /// <summary>Reserved for Zstandard. Not emitted by a v1 writer; rejected on read.</summary>
+    /// <summary>One Zstandard frame (RFC&#160;8878) with a window of at most 8&#160;MiB and no dictionary.</summary>
     Zstd = 2
 }
 
@@ -102,12 +105,29 @@ public enum OapFlags : uint
     HasManifest = 1 << 1,
 
     /// <summary>At least one asset is encrypted. Informational only.</summary>
-    Encrypted = 1 << 2
+    Encrypted = 1 << 2,
+
+    /// <summary>At least one index entry is a tombstone. Informational only.</summary>
+    HasTombstones = 1 << 3
+}
+
+/// <summary>Index entry flag bits (OAP spec §4.1.1).</summary>
+[Flags]
+public enum OapEntryFlags : byte
+{
+    /// <summary>No flags set.</summary>
+    None = 0,
+
+    /// <summary>The entry removes its asset from the packages layered below this one (spec §4.3).</summary>
+    Tombstone = 1 << 0
 }
 
 /// <summary>In-memory view of the 64-byte OAP file header.</summary>
 public readonly record struct OapHeader
 {
+    /// <summary>Gets the minor version read from the file; always written as <see cref="OapFormat.FormatMinor"/>.</summary>
+    public ushort Minor { get; init; }
+
     /// <summary>Gets the header flag bits.</summary>
     public OapFlags Flags { get; init; }
 
@@ -133,8 +153,8 @@ public readonly record struct OapHeader
     public uint ManifestSize { get; init; }
 
     /// <summary>
-    /// Serialises this header into a 64-byte buffer, computing and appending
-    /// <c>header_crc32</c> over the first 60 bytes.
+    /// Serialises this header into a 64-byte buffer with this implementation's version, computing and
+    /// appending <c>header_crc32</c> over the first 60 bytes.
     /// </summary>
     /// <param name="destination">A span of at least <see cref="OapFormat.HeaderSize"/> bytes.</param>
     public void Write(Span<byte> destination)
@@ -191,6 +211,7 @@ public readonly record struct OapHeader
 
         return new OapHeader
         {
+            Minor = BinaryPrimitives.ReadUInt16LittleEndian(data[6..8]),
             Flags = (OapFlags)BinaryPrimitives.ReadUInt32LittleEndian(data[8..12]),
             EntryCount = BinaryPrimitives.ReadUInt32LittleEndian(data[12..16]),
             IndexOffset = BinaryPrimitives.ReadUInt64LittleEndian(data[16..24]),
@@ -221,14 +242,23 @@ public readonly record struct OapIndexEntry
     /// <summary>Gets the CRC-32 of the uncompressed, unencrypted asset bytes.</summary>
     public uint ContentCrc32 { get; init; }
 
-    /// <summary>Gets the compression codec applied to the plaintext.</summary>
+    /// <summary>Gets the codec applied to the plaintext, or to each block when <see cref="IsChunked"/>.</summary>
     public OapCompression Compression { get; init; }
+
+    /// <summary>Gets a value indicating whether the blob is split into independently compressed blocks.</summary>
+    public bool IsChunked { get; init; }
 
     /// <summary>Gets the application-defined category byte (0 = unknown).</summary>
     public byte AssetType { get; init; }
 
     /// <summary>Gets the encryption codec applied to the compressed blob.</summary>
     public OapEncryption Encryption { get; init; }
+
+    /// <summary>Gets the entry flag bits.</summary>
+    public OapEntryFlags Flags { get; init; }
+
+    /// <summary>Gets a value indicating whether the entry removes its asset from lower packages.</summary>
+    public bool IsTombstone => (Flags & OapEntryFlags.Tombstone) != 0;
 
     /// <summary>Gets the offset into the string table of this entry's virtual path.</summary>
     public uint VirtualPathOffset { get; init; }
@@ -254,10 +284,10 @@ public readonly record struct OapIndexEntry
         BinaryPrimitives.WriteUInt64LittleEndian(buffer[24..], StoredSize);
         BinaryPrimitives.WriteUInt64LittleEndian(buffer[32..], UncompressedSize);
         BinaryPrimitives.WriteUInt32LittleEndian(buffer[40..], ContentCrc32);
-        buffer[44] = (byte)Compression;
+        buffer[44] = (byte)((byte)Compression | (IsChunked ? OapFormat.ChunkedBit : 0));
         buffer[45] = AssetType;
         buffer[46] = (byte)Encryption;
-        buffer[47] = 0; // entry_flags, reserved
+        buffer[47] = (byte)Flags;
         BinaryPrimitives.WriteUInt32LittleEndian(buffer[48..], VirtualPathOffset);
         BinaryPrimitives.WriteUInt16LittleEndian(buffer[52..], VirtualPathLength);
         BinaryPrimitives.WriteUInt16LittleEndian(buffer[54..], DependencyCount);
@@ -282,9 +312,11 @@ public readonly record struct OapIndexEntry
             StoredSize = BinaryPrimitives.ReadUInt64LittleEndian(data[24..32]),
             UncompressedSize = BinaryPrimitives.ReadUInt64LittleEndian(data[32..40]),
             ContentCrc32 = BinaryPrimitives.ReadUInt32LittleEndian(data[40..44]),
-            Compression = (OapCompression)data[44],
+            Compression = (OapCompression)(data[44] & ~OapFormat.ChunkedBit),
+            IsChunked = (data[44] & OapFormat.ChunkedBit) != 0,
             AssetType = data[45],
             Encryption = (OapEncryption)data[46],
+            Flags = (OapEntryFlags)data[47],
             VirtualPathOffset = BinaryPrimitives.ReadUInt32LittleEndian(data[48..52]),
             VirtualPathLength = BinaryPrimitives.ReadUInt16LittleEndian(data[52..54]),
             DependencyCount = BinaryPrimitives.ReadUInt16LittleEndian(data[54..56]),

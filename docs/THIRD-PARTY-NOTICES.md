@@ -6,6 +6,7 @@ Turian uses third-party software distributed under its respective licenses. The 
 - [Silk.NET](https://github.com/dotnet/Silk.NET) — MIT
 - [SkiaSharp](https://github.com/mono/SkiaSharp) — MIT
 - [StbImageSharp](https://github.com/StbSharp/StbImageSharp) — MIT
+- [ZstdSharp](https://github.com/oleg-st/ZstdSharp) — MIT (a port of Zstandard, BSD-3-Clause)
 - Microsoft.Extensions, MSBuild, NuGet, and Roslyn — MIT
 - [NSubstitute](https://github.com/nsubstitute/NSubstitute) — BSD-3-Clause
 - xUnit.net and test tooling — see package license metadata

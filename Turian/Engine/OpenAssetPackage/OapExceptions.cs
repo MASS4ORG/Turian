@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace OpenAssetPackage;
 
 /// <summary>
 /// Base type for every error raised while reading or writing an Open Asset Package.

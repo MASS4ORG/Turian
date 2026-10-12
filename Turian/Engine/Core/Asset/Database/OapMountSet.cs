@@ -73,10 +73,9 @@ public sealed class OapMountSet : IDisposable
             return cached;
         }
 
-        var readers = OpenReaders(directory, packages);
+        var (readers, identities) = OpenReaders(directory, packages);
         try
         {
-            var identities = readers.Select(static reader => reader.Identity!.Value).ToArray();
             var ordered = OrderByRequirements(readers);
             WarnAboutConflicts(ordered);
             var mountSet = new OapMountSet(ordered, directory, packages, identities);
@@ -117,15 +116,19 @@ public sealed class OapMountSet : IDisposable
         return true;
     }
 
-    static List<OapReader> OpenReaders(IContentDirectory directory, IReadOnlyCollection<string> packages)
+    static (List<OapReader> Readers, ContentIdentity[] Identities) OpenReaders(IContentDirectory directory,
+        IReadOnlyList<string> packages)
     {
         var key = OapRuntimeKey.Current;
         var readers = new List<OapReader>(packages.Count);
+        var identities = new ContentIdentity[packages.Count];
         try
         {
-            foreach (var package in packages)
+            for (var i = 0; i < packages.Count; i++)
             {
-                var reader = OpenReader(directory.Open(package));
+                var source = directory.Open(packages[i]);
+                identities[i] = source.Identity;
+                var reader = OpenReader(source);
                 if (key is not null && (reader.Header.Flags & OapFlags.Encrypted) != 0)
                 {
                     reader.SetKey(key);
@@ -140,7 +143,7 @@ public sealed class OapMountSet : IDisposable
             throw;
         }
 
-        return readers;
+        return (readers, identities);
     }
 
     static OapReader OpenReader(IContentSource source)
@@ -156,43 +159,35 @@ public sealed class OapMountSet : IDisposable
         }
     }
 
-    /// <summary>Resolves an asset by its id across the mounted packages.</summary>
+    /// <summary>
+    /// Resolves an asset by its id across the mounted packages. The highest package holding the id decides: a
+    /// tombstone there removes the asset even when a lower package still has it.
+    /// </summary>
     /// <param name="id">The asset id.</param>
     /// <param name="reader">The package the asset was found in.</param>
     /// <param name="entry">The resolved index entry.</param>
     /// <returns><see langword="true"/> when a package holds the asset.</returns>
-    public bool TryResolveById(Guid id, out OapReader reader, out OapIndexEntry entry)
-    {
-        foreach (var candidate in Readers)
-        {
-            if (candidate.FindById(id) is { } found)
-            {
-                reader = candidate;
-                entry = found;
-                return true;
-            }
-        }
+    public bool TryResolveById(Guid id, out OapReader reader, out OapIndexEntry entry) =>
+        TryResolve(candidate => candidate.FindById(id), out reader, out entry);
 
-        reader = null!;
-        entry = default;
-        return false;
-    }
-
-    /// <summary>Resolves an asset by its virtual path across the mounted packages.</summary>
+    /// <summary>Resolves an asset by its virtual path across the mounted packages, honoring tombstones.</summary>
     /// <param name="virtualPath">The virtual path.</param>
     /// <param name="reader">The package the asset was found in.</param>
     /// <param name="entry">The resolved index entry.</param>
     /// <returns><see langword="true"/> when a package holds the asset.</returns>
-    public bool TryResolveByPath(string virtualPath, out OapReader reader, out OapIndexEntry entry)
+    public bool TryResolveByPath(string virtualPath, out OapReader reader, out OapIndexEntry entry) =>
+        TryResolve(candidate => candidate.FindByPath(virtualPath), out reader, out entry);
+
+    bool TryResolve(Func<OapReader, OapIndexEntry?> find, out OapReader reader, out OapIndexEntry entry)
     {
         foreach (var candidate in Readers)
         {
-            if (candidate.FindByPath(virtualPath) is { } found)
-            {
-                reader = candidate;
-                entry = found;
-                return true;
-            }
+            if (find(candidate) is not { } found) continue;
+            if (found.IsTombstone) break;
+
+            reader = candidate;
+            entry = found;
+            return true;
         }
 
         reader = null!;
@@ -306,7 +301,7 @@ public sealed class OapMountSet : IDisposable
         {
             foreach (var entry in readers[i].Entries)
             {
-                if (owners.TryAdd(entry.AssetId, i) || owners[entry.AssetId] == i) continue;
+                if (!IsOverride(owners, entry, i)) continue;
                 if (conflicts++ == 0) firstConflict = entry.AssetId;
             }
         }
@@ -316,6 +311,10 @@ public sealed class OapMountSet : IDisposable
                 "{Count} OAP asset override(s) occur across mounted packages (first: {AssetId}); highest-priority mount wins",
                 conflicts, firstConflict);
     }
+
+    // An asset another mount already holds; tombstones remove rather than override, so they never count.
+    static bool IsOverride(Dictionary<Guid, int> owners, OapIndexEntry entry, int mount) =>
+        !entry.IsTombstone && !owners.TryAdd(entry.AssetId, mount) && owners[entry.AssetId] != mount;
 
 }
 
@@ -360,69 +359,4 @@ public static class OapRuntimeKey
     /// <summary>Derives and sets the runtime key from a passphrase.</summary>
     /// <param name="passphrase">The passphrase.</param>
     public static void SetPassphrase(string passphrase) => Set(OapCrypto.DeriveKey(passphrase));
-}
-
-/// <summary>
-/// The conventional fields of an OAP manifest (opaque UTF-8 JSON in the container).
-/// Unknown fields are ignored and preserved verbatim in the package.
-/// </summary>
-/// <param name="Name">The package name.</param>
-/// <param name="Version">The package version string.</param>
-/// <param name="Generator">The tool that produced the package.</param>
-/// <param name="Requires">Names of other packages that must be mounted alongside this one.</param>
-public sealed record OapManifest(string Name, string Version, string Generator, IReadOnlyList<string> Requires)
-{
-    /// <summary>Parses a manifest blob, returning <see langword="null"/> when it is absent or not JSON.</summary>
-    /// <param name="bytes">The manifest bytes, or <see langword="null"/>.</param>
-    /// <returns>The parsed manifest, or <see langword="null"/>.</returns>
-    public static OapManifest? TryParse(ReadOnlyMemory<byte>? bytes)
-    {
-        if (bytes is not { } blob || blob.Length == 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(blob);
-            var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return null;
-            }
-
-            var requires = ParseRequires(root);
-            if (requires is null) return null;
-
-            return new OapManifest(
-                GetString(root, "name"),
-                GetString(root, "version"),
-                GetString(root, "generator"),
-                requires);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    static List<string>? ParseRequires(JsonElement root)
-    {
-        var requires = new List<string>();
-        if (!root.TryGetProperty("requires", out var values)) return requires;
-        if (values.ValueKind != JsonValueKind.Array) return null;
-        foreach (var item in values.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.String ||
-                item.GetString() is not { } value || string.IsNullOrWhiteSpace(value))
-                return null;
-            requires.Add(value);
-        }
-        return requires;
-    }
-
-    static string GetString(JsonElement element, string property) =>
-        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? string.Empty
-            : string.Empty;
 }

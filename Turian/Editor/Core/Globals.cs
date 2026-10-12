@@ -35,6 +35,7 @@ global using Microsoft.CodeAnalysis.CSharp.Syntax;
 global using Microsoft.CodeAnalysis.MSBuild;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
+global using OpenAssetPackage;
 global using Silk.NET.Vulkan;
 global using SkiaSharp;
 global using StbImageSharp;

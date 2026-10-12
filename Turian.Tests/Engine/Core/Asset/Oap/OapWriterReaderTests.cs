@@ -15,7 +15,6 @@ public class OapWriterReaderTests
         var borrowed = new MemoryContentSource(bytes, new ContentIdentity("a", "1"));
         using (var reader = OapReader.Open(borrowed))
         {
-            Assert.Equal(borrowed.Identity, reader.Identity);
             Assert.Equal("payload"u8.ToArray(), reader.ReadAsset(reader.FindById(id)!.Value));
         }
 
