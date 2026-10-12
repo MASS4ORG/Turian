@@ -36,6 +36,16 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
         public override void OnUpdate(float deltaTime) => Updates++;
     }
 
+    /// <summary>Controllers resolve from the loaded assemblies by full name; an unknown name yields none.</summary>
+    [Fact]
+    public void ControllersResolveFromLoadedAssembliesOnly()
+    {
+        Assert.IsType<CountingController>(UiManager.CreateController(typeof(CountingController).FullName));
+        Assert.Null(UiManager.CreateController("Missing.Controller"));
+        Assert.Null(UiManager.CreateController(typeof(UiManagerTests).FullName));
+        Assert.Null(UiManager.CreateController(null));
+    }
+
     static (Node Root, UiDocumentComponent Panel) Scene(UiDocumentComponent panel, params Component[] extra)
     {
         var root = new Node { Name = "Root" };

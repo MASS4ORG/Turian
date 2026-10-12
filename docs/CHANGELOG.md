@@ -6,20 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Changed: `IBuildPlatform` owns the platform-specific export steps #236
-- Changed: Vulkan swapchain composite alpha and surface format are chosen from the surface's supported values #239
-- Changed: Vulkan 1.3 and use core synchronization2 #237
+- Added(android): the renderer survives surface loss and restore #246
+- Added: KTX2 data format descriptors and validated fixtures #247 #248
+- Changed: KTX2 replaces .amtex as the cooked texture container #31
+- Changed: OAP and content discovery contracts #242 #243 #244
+- Changed: platform-specific export steps #236
+- Changed: Vulkan renderer enhancements #237 #239 #245
 - Changed: the MSAA sample count is a graphics setting #240
-- Fixed: mesh and task shader stages only when the device enables mesh shading #238  #241
-- Added: `IContentSource` contract for packaged #242
-- Changed: OAP reader and mount set read through `IContentSource` #243
-- Changed: built games read their catalog, settings index, type manifest and packages through a content root #244
-- Changed: the Vulkan brick renders through an `ISurfaceHost`; GLFW is one implementation #245
-- Added: the renderer survives surface loss and restore #246
+- Changed: UI brick resolves controller types from loaded assemblies #249
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
-- Changed (breaking): KTX2 replaces .amtex as the cooked texture container #31
-- Added: KTX2 data format descriptors and validated fixtures #247
-- Added: brick manifest `platforms` allow-list and `platformNuget`; export fails for unsupported bricks #248
+- Fixed: mesh and task shader stages only when the device enables mesh shading #238  #241
 
 ## [3.0.0] - 2026-10-11
 
