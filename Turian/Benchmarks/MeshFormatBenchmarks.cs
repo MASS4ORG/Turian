@@ -1,13 +1,12 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Turian.Benchmarks.Legacy;
 
 /// <summary>Measures geometry decoding without file I/O or GPU upload.</summary>
 static class MeshFormatBenchmarks
 {
     const int samples = 9;
 
-    /// <summary>Reports equivalent AMMESH, interleaved GLB, and planar GLB geometry loads.</summary>
+    /// <summary>Reports equivalent interleaved GLB and planar GLB geometry loads.</summary>
     public static void Run()
     {
         Console.WriteLine($"{RuntimeInformation.FrameworkDescription}; {RuntimeInformation.OSDescription}; " +
@@ -23,13 +22,11 @@ static class MeshFormatBenchmarks
                 Tangent = new Vector4(1, 0, 0, 1),
             }).ToArray();
             var indices = Enumerable.Range(0, count).Select(i => (uint)i).ToArray();
-            var ammesh = MeshFormatFixtures.Ammesh(vertices, indices);
             var interleaved = MeshFormatFixtures.Glb(vertices, indices, planar: false);
             var planar = MeshFormatFixtures.Glb(vertices, indices, planar: true);
             var planarWithoutColor = MeshFormatFixtures.Glb(vertices, indices, planar: true, omitColor: true);
             var cases = new (string Name, byte[] Bytes, Func<ModelBuilder> Load)[]
             {
-                ("AMMESH baseline", ammesh, () => LegacyAmmesh.Read(ammesh).ToModelBuilder()),
                 ("GLB interleaved", interleaved, () => GltfModelReader.Read(interleaved)),
                 ("GLB planar", planar, () => GltfModelReader.Read(planar)),
                 ("GLB planar without color", planarWithoutColor, () => GltfModelReader.Read(planarWithoutColor)),

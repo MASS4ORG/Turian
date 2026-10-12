@@ -16,4 +16,4 @@ Run in Release configuration with .NET 10 to compare results.
 dotnet run -c Release --property:TieredCompilation=false --project Turian/Benchmarks -- --mesh-formats
 ```
 
-Compares identical AMMESH and GLB geometry across nine warmed samples, reporting load time, file size and allocations. Excludes I/O, materials and GPU upload; AMMESH exists only as a benchmark baseline.
+Compares identical interleaved and planar GLB geometry across nine warmed samples, reporting load time, file size and allocations. Excludes I/O, materials and GPU upload.

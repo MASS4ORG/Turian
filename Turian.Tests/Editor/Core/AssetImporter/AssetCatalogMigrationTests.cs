@@ -2,7 +2,7 @@ using Turian.Editor.CLI;
 
 namespace Turian.Tests;
 
-/// <summary>Checks startup recovery of obsolete model catalogs and interrupted child indexing.</summary>
+/// <summary>Checks startup recovery of missing model artifacts and interrupted child indexing.</summary>
 [Collection(SerialTests.Name)]
 public sealed class AssetCatalogMigrationTests : IDisposable
 {
@@ -11,13 +11,11 @@ public sealed class AssetCatalogMigrationTests : IDisposable
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(root, recursive: true);
 
-    /// <summary>Headless startup repairs both legacy artifacts and interrupted current imports before resolving models.</summary>
+    /// <summary>Headless startup repairs missing artifacts and interrupted imports before resolving models.</summary>
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void OpeningRepairsLegacyCatalogAndMissingModelChildren(bool legacyManifest, bool legacyFileExists)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OpeningRepairsMissingArtifactAndModelChildren(bool staleManifest)
     {
         var assets = Directory.CreateDirectory(Path.Combine(root, "Assets")).FullName;
         var source = Path.Combine(assets, "cube.fbx");
@@ -32,20 +30,19 @@ public sealed class AssetCatalogMigrationTests : IDisposable
         var manifestPath = Path.Combine(directory, "import.json");
         var manifest = Serializer.Load<ImportedAssetManifest>(manifestPath)!;
         var importTime = manifest.ImportedAtUtc;
-        var obsolete = Path.Combine(directory, "primary.ammesh");
-        if (legacyFileExists) File.Copy(parent.ResolveContentPath(), obsolete);
-        if (legacyManifest)
+        var missing = Path.Combine(directory, "missing.bin");
+        if (staleManifest)
         {
             File.Delete(parent.ResolveContentPath());
             manifest.ImporterVersion = 1;
-            manifest.PrimaryArtifactFileName = "primary.ammesh";
-            manifest.Artifacts = ["primary.ammesh"];
+            manifest.PrimaryArtifactFileName = "missing.bin";
+            manifest.Artifacts = ["missing.bin"];
         }
         manifest.IndexedAssetIds = null;
         Serializer.Save(manifestPath, manifest);
         Directory.Delete(Path.Combine(directory, "children"), recursive: true);
-        database.Assets[parent.AssetId].ImportedRelativePath = Path.GetRelativePath(root, obsolete);
-        database.Assets[parent.AssetId].Artifacts = [Path.GetRelativePath(root, obsolete)];
+        database.Assets[parent.AssetId].ImportedRelativePath = Path.GetRelativePath(root, missing);
+        database.Assets[parent.AssetId].Artifacts = [Path.GetRelativePath(root, missing)];
         database.SaveCatalog(root);
 
         var settings = new BuildAppSettings { ProjectAbsoluteDir = root };
@@ -57,7 +54,7 @@ public sealed class AssetCatalogMigrationTests : IDisposable
             .Select(record => record.AssetId).Order().ToArray());
         Assert.All(project.Database.GetChildAssets(parent.AssetId), record => Assert.True(File.Exists(record.ResolveContentPath())));
         Assert.NotNull(Serializer.Load<ImportedAssetManifest>(manifestPath)!.IndexedAssetIds);
-        if (!legacyManifest)
+        if (!staleManifest)
             Assert.Equal(importTime, Serializer.Load<ImportedAssetManifest>(manifestPath)!.ImportedAtUtc);
         Assert.False(AssetImporter.RepairCachedCatalog(project.Database, settings, NullLogger.Instance));
         var persisted = new AssetDatabase();
