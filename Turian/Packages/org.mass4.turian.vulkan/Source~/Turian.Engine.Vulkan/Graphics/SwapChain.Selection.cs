@@ -2,21 +2,50 @@ namespace Turian.Engine.Core;
 
 public partial class SwapChain
 {
-    static SurfaceFormatKHR ChooseSwapSurfaceFormat(
+    static readonly Format[] PreferredSrgbFormats = [Format.B8G8R8A8Srgb, Format.R8G8B8A8Srgb];
+
+    static readonly CompositeAlphaFlagsKHR[] CompositeAlphaPreference =
+    [
+        CompositeAlphaFlagsKHR.OpaqueBitKhr,
+        CompositeAlphaFlagsKHR.InheritBitKhr,
+        CompositeAlphaFlagsKHR.PreMultipliedBitKhr,
+        CompositeAlphaFlagsKHR.PostMultipliedBitKhr,
+    ];
+
+    internal static SurfaceFormatKHR ChooseSwapSurfaceFormat(
         IReadOnlyList<SurfaceFormatKHR> availableFormats
     )
     {
-        foreach (var availableFormat in availableFormats)
+        foreach (var preferredFormat in PreferredSrgbFormats)
         {
-            if (
-                availableFormat is { Format: Format.B8G8R8A8Srgb, ColorSpace: ColorSpaceKHR.SpaceSrgbNonlinearKhr }
-            )
+            foreach (var availableFormat in availableFormats)
             {
-                return availableFormat;
+                if (
+                    availableFormat.Format == preferredFormat
+                    && availableFormat.ColorSpace == ColorSpaceKHR.SpaceSrgbNonlinearKhr
+                )
+                {
+                    return availableFormat;
+                }
             }
         }
 
         return availableFormats[0];
+    }
+
+    internal static CompositeAlphaFlagsKHR ChooseCompositeAlpha(
+        CompositeAlphaFlagsKHR supportedCompositeAlpha
+    )
+    {
+        foreach (var candidate in CompositeAlphaPreference)
+        {
+            if (supportedCompositeAlpha.HasFlag(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return CompositeAlphaFlagsKHR.OpaqueBitKhr;
     }
 
     PresentModeKHR ChoosePresentMode(IReadOnlyList<PresentModeKHR> availablePresentModes)
