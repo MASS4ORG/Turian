@@ -171,15 +171,23 @@ public unsafe partial class Device
 
         vk.GetPhysicalDeviceFeatures(candidateDevice, out var supportedFeatures);
 
-        PhysicalDeviceSynchronization2FeaturesKHR sync2Features =
-            new()
-            {
-                SType = StructureType.PhysicalDeviceSynchronization2FeaturesKhr,
-                Synchronization2 = Vk.True
-            };
+        vk.GetPhysicalDeviceProperties(candidateDevice, out var properties);
+        if (properties.ApiVersion < Vk.Version13)
+        {
+            Log.Logger.LogWarning(
+                "Rejecting GPU '{0}': it supports Vulkan {1}.{2} but the engine requires 1.3",
+                GetStringFromBytePointer(properties.DeviceName, 50).Trim(),
+                properties.ApiVersion >> 22,
+                (properties.ApiVersion >> 12) & 0x3FF
+            );
+            return false;
+        }
+
+        PhysicalDeviceVulkan13Features vulkan13Features =
+            new() { SType = StructureType.PhysicalDeviceVulkan13Features, Synchronization2 = Vk.True };
 
         PhysicalDeviceFeatures2 deviceFeatures2 =
-            new() { SType = StructureType.PhysicalDeviceFeatures2, PNext = &sync2Features };
+            new() { SType = StructureType.PhysicalDeviceFeatures2, PNext = &vulkan13Features };
 
         vk.GetPhysicalDeviceFeatures2(candidateDevice, &deviceFeatures2);
 
@@ -187,7 +195,7 @@ public unsafe partial class Device
                && extensionsSupported
                && swapChainAdequate
                && supportedFeatures.SamplerAnisotropy
-               && sync2Features.Synchronization2;
+               && vulkan13Features.Synchronization2;
     }
 
     bool CheckDeviceExtensionsSupport(PhysicalDevice candidateDevice) =>

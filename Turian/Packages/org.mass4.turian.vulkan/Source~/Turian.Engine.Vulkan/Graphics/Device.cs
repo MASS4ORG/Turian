@@ -70,7 +70,7 @@ public unsafe partial class Device : IDisposable
     public Queue GraphicsQueue => graphicsQueue;
 
     /// <summary>The Vulkan API version enabled for the instance.</summary>
-    public uint ApiVersion => Vk.Version12;
+    public uint ApiVersion => Vk.Version13;
 
     /// <summary>The extension names enabled when the Vulkan instance was created.</summary>
     public IReadOnlyList<string> InstanceExtensions => instanceExtensions;
@@ -118,7 +118,6 @@ public unsafe partial class Device : IDisposable
     readonly string[] requiredDeviceExtensions =
     [
         KhrSwapchain.ExtensionName,
-        KhrSynchronization2.ExtensionName,
     ];
 
     string[] deviceExtensions = [];

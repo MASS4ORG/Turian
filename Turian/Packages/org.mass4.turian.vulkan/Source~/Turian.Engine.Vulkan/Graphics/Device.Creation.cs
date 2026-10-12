@@ -188,10 +188,10 @@ public unsafe partial class Device
         };
         var extensions = meshShading ? [.. requiredDeviceExtensions, meshShaderExtension] : requiredDeviceExtensions;
 
-        // Enable Synchronization 2 to eliminate a validation layer error, thanks gpt4!
-        var sync2Features = new PhysicalDeviceSynchronization2FeaturesKHR
+        // Core Synchronization 2 (Vulkan 1.3); the renderer's barrier and image-layout usage requires it.
+        var sync2Features = new PhysicalDeviceVulkan13Features
         {
-            SType = StructureType.PhysicalDeviceSynchronization2FeaturesKhr,
+            SType = StructureType.PhysicalDeviceVulkan13Features,
             Synchronization2 = Vk.True,
             PNext = meshShading ? &meshFeatures : null
         };
