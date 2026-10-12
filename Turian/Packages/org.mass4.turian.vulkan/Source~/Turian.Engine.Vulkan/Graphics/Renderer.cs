@@ -8,9 +8,9 @@ namespace Turian.Engine.Core;
 /// </remarks>
 /// <param name="vk">The Vulkan context.</param>
 /// <param name="device">The Vulkan device.</param>
-/// <param name="window">The window where rendering will take place.</param>
+/// <param name="surfaceHost">The host whose surface rendering presents to.</param>
 /// <param name="useFifo">Specifies whether to use FIFO presentation mode.</param>
-public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDisposable
+public class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bool useFifo) : IDisposable
 {
     // Swap chain and related data
     SwapChain swapChain = null!;
@@ -257,12 +257,8 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
     {
         _ = vk.DeviceWaitIdle(device.VkDevice); // Wait until the device is idle
 
-        var frameBufferSize = window.FramebufferSize;
-        while (frameBufferSize.X == 0 || frameBufferSize.Y == 0)
-        {
-            frameBufferSize = window.FramebufferSize;
-            window.DoEvents();
-        }
+        var frameBufferSize = surfaceHost.FramebufferSize;
+        if (frameBufferSize.X == 0 || frameBufferSize.Y == 0) return;
 
         if (forceCreateSwapChain)
         {
@@ -294,7 +290,8 @@ public class Renderer(Vk vk, Device device, IView window, bool useFifo) : IDispo
 
     Extent2D GetWindowExtents()
     {
-        return new Extent2D((uint)window.FramebufferSize.X, (uint)window.FramebufferSize.Y);
+        var size = surfaceHost.FramebufferSize;
+        return new Extent2D((uint)size.X, (uint)size.Y);
     }
 
     unsafe void FreeCommandBuffers()

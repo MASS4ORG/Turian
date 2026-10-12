@@ -131,23 +131,23 @@ public sealed class PlayerFramesTests : IDisposable
     public void WindowIconsLoadFromTheBuiltPng()
     {
         var path = Path.Combine(project, PlayerSettings.BuiltIconFileName);
-        Assert.Null(WindowManager.LoadIcon(path));
+        Assert.Null(GlfwSurfaceHost.LoadIcon(path));
 
         using (var bitmap = new SKBitmap(4, 2))
         using (var image = SKImage.FromBitmap(bitmap))
         using (var png = image.Encode(SKEncodedImageFormat.Png, 100))
             File.WriteAllBytes(path, png.ToArray());
 
-        var icon = WindowManager.LoadIcon(path);
+        var icon = GlfwSurfaceHost.LoadIcon(path);
         Assert.Equal(4, icon!.Value.Width);
         Assert.Equal(2, icon.Value.Height);
 
         var window = Substitute.For<Silk.NET.Windowing.IWindow>();
-        Assert.True(WindowManager.TryLoadIcon(window, path, out var target, out var loaded));
+        Assert.True(GlfwSurfaceHost.TryLoadIcon(window, path, out var target, out var loaded));
         Assert.Same(window, target);
         Assert.Equal(4, loaded.Width);
-        Assert.False(WindowManager.TryLoadIcon(Substitute.For<Silk.NET.Windowing.IView>(), path, out _, out _));
-        Assert.False(WindowManager.TryLoadIcon(window, Path.Combine(project, "missing.png"), out _, out _));
+        Assert.False(GlfwSurfaceHost.TryLoadIcon(Substitute.For<Silk.NET.Windowing.IView>(), path, out _, out _));
+        Assert.False(GlfwSurfaceHost.TryLoadIcon(window, Path.Combine(project, "missing.png"), out _, out _));
     }
 
     /// <summary>Disposing the frame loop releases the interface presenter it was given.</summary>

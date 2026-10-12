@@ -240,11 +240,7 @@ public unsafe partial class Device
             return enableValidationLayers ? [ExtDebugUtils.ExtensionName] : [];
         }
 
-        var glfwExtensions = window!.VkSurface!.GetRequiredExtensions(out var glfwExtensionCount);
-        var extensions = SilkMarshal.PtrToStringArray(
-            (nint)glfwExtensions,
-            (int)glfwExtensionCount
-        );
+        string[] extensions = [.. surfaceHost!.RequiredInstanceExtensions];
 
         if (enableValidationLayers)
         {

@@ -4,13 +4,13 @@ namespace Turian.Engine.Core;
 /// Manages rendering operations, including initializing the renderer, handling render systems, and rendering frames.
 /// </summary>
 /// <remarks>
-/// Initializes the renderer manager with the specified window manager, Vulkan context, and logger.
+/// Initializes the renderer manager with the specified surface host, Vulkan context, and logger.
 /// </remarks>
-/// <param name="windowManager">The window manager responsible for the rendering surface.</param>
+/// <param name="surfaceHost">The host responsible for the rendering surface.</param>
 /// <param name="vulkan">The Vulkan context used for rendering.</param>
 /// <param name="assets">The asset database materials and textures are read from.</param>
 /// <param name="logger">The logger for recording initialization steps.</param>
-public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDatabase assets, ILogger logger)
+public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatabase assets, ILogger logger)
     : IDisposable
 {
     // set to true to force FIFO swapping
@@ -66,7 +66,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
     Buffer sboMeshTestBuffer = null!;
     SboMeshTest sboMeshTest = new();
     FrameInfo frameInfo;
-    readonly WindowManager windowManager = windowManager;
+    readonly ISurfaceHost surfaceHost = surfaceHost;
     readonly Vulkan vulkan = vulkan;
     readonly ILogger logger = logger;
 
@@ -144,7 +144,6 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
     {
         foreach (var system in renderSystems)
             system.Prepare(frameInfo, ubo);
-        windowManager.CullingStats = CullingStats;
     }
 
     void RecordBeforeRenderPass()
@@ -259,7 +258,7 @@ public class RendererManager(WindowManager windowManager, Vulkan vulkan, AssetDa
 
     void InitializeRenderer()
     {
-        Renderer = new Renderer(vulkan.Vk, vulkan.Device, windowManager.Window, useFifo);
+        Renderer = new Renderer(vulkan.Vk, vulkan.Device, surfaceHost, useFifo);
         Renderer.Initialize();
         logger.Lap("startup", "got renderer");
     }

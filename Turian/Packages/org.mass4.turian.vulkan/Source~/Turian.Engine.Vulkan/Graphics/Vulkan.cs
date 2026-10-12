@@ -16,18 +16,18 @@ public class Vulkan : IRenderDevice
     public Device Device { get; init; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Vulkan"/> class with the specified window manager and logger.
+    /// Initializes a new instance of the <see cref="Vulkan"/> class presenting to a surface host.
     /// </summary>
-    /// <param name="windowManager">The window manager used for creating the Vulkan device.</param>
+    /// <param name="surfaceHost">The host whose surface the device presents to.</param>
     /// <param name="logger">The logger used for reporting startup progress.</param>
     /// <param name="settings">The project settings the device reads its MSAA sample count from, or <c>null</c>.</param>
-    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="windowManager"/> is <c>null</c>.</exception>
-    public Vulkan(WindowManager windowManager, ILogger logger, IAppSettings? settings = null)
+    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="surfaceHost"/> is <c>null</c>.</exception>
+    public Vulkan(ISurfaceHost surfaceHost, ILogger logger, IAppSettings? settings = null)
     {
-        ArgumentNullException.ThrowIfNull(windowManager);
+        ArgumentNullException.ThrowIfNull(surfaceHost);
 
         Vk = Vk.GetApi();
-        Device = new Device(Vk, windowManager.Window, RequestedMsaaSamples(settings));
+        Device = new Device(Vk, surfaceHost, RequestedMsaaSamples(settings));
 
         logger.Lap("startup", "got vk");
     }

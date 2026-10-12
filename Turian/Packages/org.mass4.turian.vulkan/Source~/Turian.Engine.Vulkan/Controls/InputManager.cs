@@ -20,12 +20,12 @@ public class InputManager : IDisposable
     /// <summary>
     /// Initializes a new instance of the InputManager class.
     /// </summary>
-    /// <param name="windowManager">The window manager associated with the application.</param>
+    /// <param name="surfaceHost">The host whose input devices are read.</param>
     /// <param name="logger">The logger used for logging.</param>
-    public InputManager(WindowManager windowManager, ILogger logger)
+    public InputManager(ISurfaceHost surfaceHost, ILogger logger)
     {
-        ArgumentNullException.ThrowIfNull(windowManager);
-        Input = windowManager.Window.CreateInput();
+        ArgumentNullException.ThrowIfNull(surfaceHost);
+        Input = surfaceHost.CreateInput();
         Input.ConnectionChanged += Connect;
         logger.Lap("run", "got camera and controls");
     }

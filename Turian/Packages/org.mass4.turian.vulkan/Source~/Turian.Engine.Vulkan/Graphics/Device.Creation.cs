@@ -57,23 +57,6 @@ public unsafe partial class Device
         }
     }
 
-    void CreateSurface()
-    {
-        if (!vk.TryGetInstanceExtension(instance, out khrSurface))
-        {
-            throw new NotSupportedException("KHR_surface extension not found.");
-        }
-
-        if (window?.VkSurface is null)
-        {
-            throw new VulkanException("window.VkSurface is null and shouldn't be!");
-        }
-
-        surface = window.VkSurface
-                        .Create<AllocationCallbacks>(instance.ToHandle(), null)
-                        .ToSurface();
-    }
-
     void CreateLogicalDevice()
     {
         uint deviceCount = 0;

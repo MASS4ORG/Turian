@@ -106,8 +106,8 @@ public unsafe partial class Device : IDisposable
         QuerySwapChainSupportInternal(physicalDevice);
 
     readonly Vk vk;
-    readonly IView? window;
-    bool IsHeadless => window is null;
+    readonly ISurfaceHost? surfaceHost;
+    bool IsHeadless => surfaceHost is null;
 
     ExtDebugUtils debugUtils = null!;
     readonly bool enableValidationLayers = false;
@@ -143,12 +143,13 @@ public unsafe partial class Device : IDisposable
     /// Initializes a new instance of the <see cref="Device"/> class.
     /// </summary>
     /// <param name="vk">The Vulkan instance.</param>
-    /// <param name="window">The window view. Pass <c>null</c> for headless (editor) mode.</param>
+    /// <param name="surfaceHost">The host presented to. Pass <c>null</c> for headless (editor) mode.</param>
     /// <param name="requestedMsaaSamples">The MSAA sample count to request, capped at the device's maximum.</param>
-    public Device(Vk vk, IView? window = null, int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples)
+    public Device(Vk vk, ISurfaceHost? surfaceHost = null,
+        int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples)
     {
         this.vk = vk;
-        this.window = window;
+        this.surfaceHost = surfaceHost;
         this.requestedMsaaSamples = requestedMsaaSamples;
         CreateInstance();
         SetupDebugMessenger();
