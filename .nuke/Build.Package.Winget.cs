@@ -63,7 +63,7 @@ sealed partial class Build
                 License: MPL-2.0
                 ShortDescription: .NET game engine editor and command-line tools
                 PackageUrl: https://github.com/MASS4ORG/Turian
-                LicenseUrl: https://github.com/MASS4ORG/Turian/blob/main/LICENSE.md
+                LicenseUrl: https://github.com/MASS4ORG/Turian/blob/main/docs/LICENSE.md
                 ManifestType: defaultLocale
                 ManifestVersion: 1.12.0
                 """ + "\n");

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MASS4ORG/Turian/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/MASS4ORG/Turian/actions/workflows/build-and-test.yml)
 [![Release](https://img.shields.io/github/v/release/MASS4ORG/Turian)](https://github.com/MASS4ORG/Turian/releases/latest)
-[![License: MPL-2.0](https://img.shields.io/github/license/MASS4ORG/Turian)](LICENSE.md)
+[![License: MPL-2.0](https://img.shields.io/github/license/MASS4ORG/Turian)](docs/LICENSE.md)
 
 **Turian** is a component-based 3D game engine, fully in **.NET/C#**, with a Unity-style workflow. Its editor, Turian Studio, is built on the [Gaya](Gaya/) platform and drawn with [Guinevere](https://github.com/MASS4ORG/Guinevere).
 
@@ -77,4 +77,4 @@ Turian is an independent project. If you find it valuable, consider supporting i
 
 ## License
 
-Turian is licensed under the [Mozilla Public License 2.0](LICENSE.md), the same license as **Firefox**. Games you make with Turian are yours, under any license you choose; only changes to the engine's own files are shared back. See the [license page](https://turian.mass4.org/docs/about/license/) for details.
+Turian is licensed under the [Mozilla Public License 2.0](docs/LICENSE.md), the same license as **Firefox**. Games you make with Turian are yours, under any license you choose; only changes to the engine's own files are shared back. See the [license page](https://turian.mass4.org/docs/about/license/) for details.

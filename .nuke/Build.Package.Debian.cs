@@ -74,7 +74,7 @@ sealed partial class Build
     {
         var documentationDirectory = packageRoot / "usr" / "share" / "doc" / packageName;
         documentationDirectory.CreateDirectory();
-        (RootDirectory / "LICENSE.md").Copy(documentationDirectory / "copyright", ExistsPolicy.FileOverwrite);
+        (RootDirectory / "docs" / "LICENSE.md").Copy(documentationDirectory / "copyright", ExistsPolicy.FileOverwrite);
         (packageRoot / "DEBIAN").CreateDirectory();
         (packageRoot / "DEBIAN" / "control").WriteAllText($"""
             Package: {packageName}
