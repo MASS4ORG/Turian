@@ -1,67 +1,19 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using Turian.Benchmarks.Legacy;
 
 /// <summary>Creates identical uncompressed geometry in each measured container and buffer layout.</summary>
 static class MeshFormatFixtures
 {
     static readonly string[] names = ["POSITION", "COLOR_0", "NORMAL", "TEXCOORD_0", "TANGENT"];
 
-    /// <summary>Writes the baseline container with one interleaved stream and one submesh.</summary>
-    internal static byte[] Ammesh(Vertex[] vertices, uint[] indices)
-    {
-        var vertexBytes = MemoryMarshal.AsBytes(vertices.AsSpan());
-        var indexBytes = MemoryMarshal.AsBytes(indices.AsSpan());
-        var bounds = CalculateBounds(vertices);
-        using var manifest = new MemoryStream();
-        using (var writer = new BinaryWriter(manifest, System.Text.Encoding.UTF8, leaveOpen: true))
-        {
-            writer.Write(1u);
-            writer.Write((uint)vertices.Length);
-            writer.Write(Vertex.SizeOf());
-            writer.Write(0u);
-            writer.Write((uint)vertexBytes.Length);
-            writer.Write((uint)LegacyAmmesh.VertexStreamAttributes.Count);
-            foreach (var attribute in LegacyAmmesh.VertexStreamAttributes)
-            {
-                writer.Write((uint)attribute.Semantic);
-                writer.Write(attribute.ComponentType);
-                writer.Write(attribute.ComponentCount);
-                writer.Write(attribute.ByteOffset);
-            }
-            writer.Write(5125u);
-            writer.Write((uint)indices.Length);
-            writer.Write((uint)vertexBytes.Length);
-            writer.Write((uint)indexBytes.Length);
-            writer.Write(1u);
-            writer.Write(0u);
-            writer.Write((uint)indices.Length);
-            writer.Write(-1);
-            WriteBounds(writer, bounds);
-            writer.Write(1u);
-            writer.Write(0u);
-            writer.Write(1u);
-            WriteBounds(writer, bounds);
-            writer.Write(4u);
-            writer.Write("mesh"u8);
-            WriteBounds(writer, bounds);
-        }
-        using var container = new MemoryStream();
-        using (var writer = new BinaryWriter(container, System.Text.Encoding.UTF8, leaveOpen: true))
-        {
-            writer.Write(LegacyAmmesh.Magic);
-            writer.Write(LegacyAmmesh.Version);
-            writer.Write((uint)(28 + manifest.Length + vertexBytes.Length + indexBytes.Length));
-            writer.Write((uint)manifest.Length);
-            writer.Write(LegacyAmmesh.ManifestChunkType);
-            writer.Write(manifest.GetBuffer().AsSpan(0, (int)manifest.Length));
-            writer.Write((uint)(vertexBytes.Length + indexBytes.Length));
-            writer.Write(LegacyAmmesh.PayloadChunkType);
-            writer.Write(vertexBytes);
-            writer.Write(indexBytes);
-        }
-        return container.ToArray();
-    }
+    static readonly (int Offset, int Components)[] layout =
+    [
+        ((int)Marshal.OffsetOf<Vertex>(nameof(Vertex.Position)), 3),
+        ((int)Marshal.OffsetOf<Vertex>(nameof(Vertex.Color)), 3),
+        ((int)Marshal.OffsetOf<Vertex>(nameof(Vertex.Normal)), 3),
+        ((int)Marshal.OffsetOf<Vertex>(nameof(Vertex.Uv)), 2),
+        ((int)Marshal.OffsetOf<Vertex>(nameof(Vertex.Tangent)), 4),
+    ];
 
     /// <summary>Writes a glTF 2.0 binary container with either interleaved or separate attribute arrays.</summary>
     internal static byte[] Glb(Vertex[] vertices, uint[] indices, bool planar, bool omitColor = false)
@@ -74,13 +26,13 @@ static class MeshFormatFixtures
         for (var i = 0; i < names.Length; i++)
         {
             if (omitColor && i == 1) continue;
-            var attribute = LegacyAmmesh.VertexStreamAttributes[i];
+            var attribute = layout[i];
             var viewIndex = planar ? views.Count : 0;
-            var accessorOffset = planar ? 0 : (int)attribute.ByteOffset;
+            var accessorOffset = planar ? 0 : attribute.Offset;
             if (planar)
             {
                 var offset = (int)binary.Position;
-                WriteAttribute(binary, vertices, (int)attribute.ByteOffset, (int)attribute.ComponentCount);
+                WriteAttribute(binary, vertices, attribute.Offset, attribute.Components);
                 views.Add(View(offset, (int)binary.Position - offset));
             }
             else if (i == 0)
@@ -97,7 +49,7 @@ static class MeshFormatFixtures
                 ["byteOffset"] = accessorOffset,
                 ["componentType"] = 5126,
                 ["count"] = vertices.Length,
-                ["type"] = attribute.ComponentCount == 2 ? "VEC2" : attribute.ComponentCount == 3 ? "VEC3" : "VEC4",
+                ["type"] = attribute.Components == 2 ? "VEC2" : attribute.Components == 3 ? "VEC3" : "VEC4",
             });
         }
         accessors[0]["min"] = new[] { bounds.Min.X, bounds.Min.Y, bounds.Min.Z };
@@ -177,15 +129,5 @@ static class MeshFormatFixtures
         var bounds = Bounds.Empty;
         foreach (var vertex in vertices) bounds = bounds.Encapsulate(vertex.Position);
         return bounds;
-    }
-
-    static void WriteBounds(BinaryWriter writer, Bounds bounds)
-    {
-        writer.Write(bounds.Min.X);
-        writer.Write(bounds.Min.Y);
-        writer.Write(bounds.Min.Z);
-        writer.Write(bounds.Max.X);
-        writer.Write(bounds.Max.Y);
-        writer.Write(bounds.Max.Z);
     }
 }

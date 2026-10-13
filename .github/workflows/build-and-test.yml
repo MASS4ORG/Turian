@@ -46,24 +46,6 @@ jobs:
           chmod +x ./build.sh
           ./build.sh Restore Compile TestReport --configuration "Debug" --no-local-packages --verbosity minimal
 
-      # KTX-Software's validator runs in CI only and is never shipped. The fixtures are byte-identical to writer
-      # output (Ktx2RoundTripTests), so this also validates what the texture importer writes.
-      - name: Validate KTX2 fixtures
-        env:
-          KTX_VERSION: "4.4.2"
-          KTX_SHA1: "c6b08c817f8c8dd299deccae4f2fbb8d55e9acd2"
-        run: |
-          archive="$RUNNER_TEMP/KTX-Software-$KTX_VERSION-Linux-x86_64.tar.bz2"
-          curl -fsSL -o "$archive" \
-            "https://github.com/KhronosGroup/KTX-Software/releases/download/v$KTX_VERSION/KTX-Software-$KTX_VERSION-Linux-x86_64.tar.bz2"
-          echo "$KTX_SHA1  $archive" | sha1sum -c -
-          mkdir -p "$RUNNER_TEMP/ktx"
-          tar -xjf "$archive" -C "$RUNNER_TEMP/ktx" --strip-components=1
-          export LD_LIBRARY_PATH="$RUNNER_TEMP/ktx/lib"
-          for file in Turian.Tests/Fixtures/ktx2/*.ktx2; do
-            "$RUNNER_TEMP/ktx/bin/ktx" validate --warnings-as-errors "$file"
-          done
-
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7

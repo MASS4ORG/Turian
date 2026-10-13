@@ -146,6 +146,55 @@ public sealed class OapArchiveBuilderTests : IDisposable
         Assert.Equal(Enumerable.Repeat((byte)0x7F, 128).ToArray(), reader.ReadAsset(entry));
     }
 
+    /// <summary>
+    /// Packages default to Zstandard and aligned blobs; large audio is chunked for streaming, and children are
+    /// written right after their parent.
+    /// </summary>
+    [Fact]
+    public void BuildPackage_ChunksLargeAudioAndGroupsChildrenWithTheirParent()
+    {
+        var music = AddCachedAsset("Assets/music.wav", "primary.bin", "AudioAsset",
+            [.. Enumerable.Range(0, 300_000).Select(static i => (byte)(i % 7))]);
+        var model = AddCachedAsset("Assets/ship.glb", "primary.glb", "Turian.Engine.Core.MeshAsset",
+            [.. Enumerable.Repeat((byte)0x11, 500)]);
+        var child = AddCachedAsset("Assets/ship.glb", "child.bin", "MaterialAsset",
+            [.. Enumerable.Repeat((byte)0x22, 500)]);
+        child.ParentAssetId = model.AssetId;
+        var other = AddCachedAsset("Assets/other.txt", "primary.bin", "Asset", [.. Enumerable.Repeat((byte)0x33, 500)]);
+        WriteCatalog(music, model, child, other);
+
+        var outputPath = Path.Combine(projectRoot, "stream.oap");
+        new OapArchiveBuilder(logger).BuildPackage(projectRoot, outputPath,
+            new OapPackOptions { StreamingChunkThreshold = 100_000 });
+
+        using var reader = OapReader.OpenFile(outputPath);
+        var musicEntry = reader.FindById(music.AssetId)!.Value;
+        Assert.True(musicEntry.IsChunked);
+        Assert.Equal(OapCompression.Zstd, musicEntry.Compression);
+        Assert.All(reader.Entries, entry => Assert.Equal(0ul, entry.DataOffset % 16));
+        Assert.Equal(OapCompression.Zstd, reader.FindById(other.AssetId)!.Value.Compression);
+        Assert.False(reader.FindById(other.AssetId)!.Value.IsChunked);
+
+        var modelEntry = reader.FindById(model.AssetId)!.Value;
+        var childEntry = reader.FindById(child.AssetId)!.Value;
+        var between = reader.Entries.Where(e =>
+            e.DataOffset > modelEntry.DataOffset && e.DataOffset < childEntry.DataOffset);
+        Assert.True(childEntry.DataOffset > modelEntry.DataOffset);
+        Assert.Empty(between);
+    }
+
+    /// <summary>Packing fails clearly without a project folder or without an imported asset cache.</summary>
+    [Fact]
+    public void BuildPackage_RequiresProjectAndImportedCache()
+    {
+        var builder = new OapArchiveBuilder(logger);
+        var output = Path.Combine(projectRoot, "out.oap");
+
+        Assert.Throws<DirectoryNotFoundException>(() => builder.BuildPackage(projectRoot, output));
+        Directory.CreateDirectory(projectRoot);
+        Assert.Throws<FileNotFoundException>(() => builder.BuildPackage(projectRoot, output));
+    }
+
     AssetRecord AddCachedAsset(string sourceRelative, string artifactName, string typeName, byte[] payload)
     {
         var id = Guid.NewGuid();

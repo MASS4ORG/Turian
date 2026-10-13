@@ -6,7 +6,7 @@ This optional editor brick imports `.obj` sources into `primary.glb` through the
 
 Run `turian-cli brick add <project> org.mass4.turian.obj builtin:org.mass4.turian.obj`, or add `"org.mass4.turian.obj": "builtin:org.mass4.turian.obj"` to the project's `Bricks/manifest.json` dependencies. Reopen the project after changing its bricks. In a source checkout, build the solution first to generate this brick's editor payload.
 
-Keep existing `.obj.meta` files: their asset type, IDs and import settings stay valid. Importer version 4 invalidates AMMESH caches and creates GLB geometry from the source. Rebuild exported games after reimporting. Without this brick, the editor reports an unsupported OBJ import with installation/conversion guidance.
+Keep existing `.obj.meta` files: their asset type, IDs and import settings stay valid. Importer version 4 invalidates older model caches and creates GLB geometry from the source. Rebuild exported games after reimporting. Without this brick, the editor reports an unsupported OBJ import with installation/conversion guidance.
 
 To migrate away from OBJ, export the source to glTF/GLB or FBX, move its `.meta` alongside the replacement source, and retain its asset ID. Verify the reimport and scene references before deleting the old source. Code that called `ObjModelBuilder` should use the shared `AssimpModelConverter.ConvertToGlb` and `GltfModelReader` APIs.
 

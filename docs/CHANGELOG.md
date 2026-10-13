@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: windowed and headless players quit on Ctrl+C or SIGTERM; a second interrupt terminates a hung game.
+- Added: camera background color controls the Game view and exported game's clear color.
 - Added(android): the renderer survives surface loss and restore #246
 - Added: KTX2 format #247
 - Added: brick manifest platform allow-list and per-platform NuGet #248
@@ -17,9 +19,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: Vulkan renderer enhancements #237 #239 #245
 - Changed: the MSAA sample count is a graphics setting #240
 - Changed: UI brick resolves controller types from loaded assemblies #249
+- Changed: OAP 1.1 packages (Zstandard, streamable chunked blobs, tombstones, aligned blobs) #133
+- Changed: KTX2 and OAP libraries live in their own repositories and are referenced through local paths #133
+- Removed: last .ammesh leftovers (catalog repair check, benchmark baseline)
 - Fixed: asset loads reliably retry after failed metadata reads without retaining completed tasks.
 - Fixed: mesh and task shader stages only when the device enables mesh shading #238
 - Fixed: a KeyUp without a matching KeyDown no longer throws #241
+- Fixed: `oap pack --store` stores assets instead of compressing them #133
 
 ## [3.0.0] - 2026-10-11
 

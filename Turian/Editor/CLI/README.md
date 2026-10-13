@@ -19,7 +19,7 @@ The Game panel header also has a **Stats** button, off by default for each panel
 Capture Bistro measurements without opening a window:
 
 ```sh
-dotnet run --project Turian/Editor/CLI -- playmode ../Turian-examples/example-02-bistro --frames 120 --stats /tmp/bistro-stats.json
+dotnet run --project Turian/Editor/CLI -- playmode path/to/example-02-bistro --frames 120 --stats /tmp/bistro-stats.json
 ```
 
 `--stats` enables offscreen rendering even when `--out` is omitted. Add `--out /tmp/bistro.png` to save the final image. Use an already imported project; asset import/compilation and device creation are outside the measured scene load. The JSON report includes scene read/deserialization/prefab expansion/awake time, cold model and texture decode/upload attempt counts and accumulated times, each frame's actual tick-and-render wall time, managed allocations and render preparation/submission scopes. The first frame can include material and texture loading; inspect the samples and median alongside the mean. Fixed simulation delta time is never used to calculate headless performance FPS.

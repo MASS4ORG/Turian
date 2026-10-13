@@ -17,6 +17,11 @@ public static partial class Program
         var outputArg = new Argument<string>("Output") { Description = "Destination .oap file path" };
         var nameOption = new Option<string?>("--name") { Description = "Package name written into the manifest" };
         var storeOption = new Option<bool>("--store") { Description = "Disable compression; store every asset verbatim" };
+        var codecOption = new Option<OapCompression>("--codec")
+        {
+            Description = "Codec tried against storing each asset: Zstd (default) or Deflate (readable by OAP 1.0)",
+            DefaultValueFactory = _ => OapCompression.Zstd
+        };
         var keyOption = new Option<string?>("--key")
         {
             Description = "Encrypt every asset with ChaCha20 using this passphrase (never stored in the package)"
@@ -33,7 +38,7 @@ public static partial class Program
 
         var cmd = new Command("pack", "Pack a project's imported assets into a .oap package")
         {
-            projectArg, outputArg, nameOption, storeOption, keyOption, targetOption, requiresOption
+            projectArg, outputArg, nameOption, storeOption, codecOption, keyOption, targetOption, requiresOption
         };
 
         cmd.SetAction(async (result, _) =>
@@ -48,7 +53,7 @@ public static partial class Program
                 Name = result.GetValue(nameOption),
                 Compression = result.GetValue(storeOption)
                     ? OapCompressChoice.Fixed(OapCompression.Store)
-                    : OapCompressChoice.Auto,
+                    : OapCompressChoice.Smallest(result.GetValue(codecOption)),
                 Passphrase = result.GetValue(keyOption),
                 Target = result.GetValue(targetOption)
             };
@@ -90,6 +95,7 @@ public static partial class Program
             for (var i = 0; i < reader.Count; i++)
             {
                 var entry = reader.EntryAt(i);
+                if (entry.IsTombstone) continue;
                 var relative = SafeRelativePath(reader.VirtualPath(entry), entry.AssetId);
                 var destination = Path.GetFullPath(Path.Combine(outDir, relative));
                 if (!destination.StartsWith(outDir, StringComparison.Ordinal))
@@ -125,10 +131,12 @@ public static partial class Program
             {
                 var entry = reader.EntryAt(i);
                 Log.Logger.LogInformation(
-                    "  {Id}  type={Type,-8} {Compression,-8} {Encryption,-9} {Uncompressed,10} -> {Stored,-10}  {Path}",
+                    "  {Id}  type={Type,-8} {Compression,-15} {Encryption,-9} {Uncompressed,10} -> {Stored,-10}"
+                    + "  {Path}",
                     entry.AssetId.ToString("D"),
                     (OapAssetType)entry.AssetType,
-                    entry.Compression,
+                    entry.IsTombstone ? "tombstone"
+                    : entry.IsChunked ? $"{entry.Compression}-chunked" : $"{entry.Compression}",
                     entry.Encryption,
                     entry.UncompressedSize,
                     entry.StoredSize,
@@ -153,7 +161,8 @@ public static partial class Program
             var header = reader.Header;
 
             Log.Logger.LogInformation("OAP package : {Path}", path);
-            Log.Logger.LogInformation("  format    : {Major}.{Minor}", OapFormat.FormatMajor, OapFormat.FormatMinor);
+            Log.Logger.LogInformation("  format    : {Major}.{Minor}", OapFormat.FormatMajor, header.Minor);
+            Log.Logger.LogInformation("  hash      : {Hash}", reader.PackageHash);
             Log.Logger.LogInformation("  assets    : {Count}", header.EntryCount);
             Log.Logger.LogInformation("  flags     : {Flags}", header.Flags);
             Log.Logger.LogInformation("  index     : offset {Offset}, {Size} bytes", header.IndexOffset, header.IndexSize);
@@ -205,6 +214,7 @@ public static partial class Program
             for (var i = 0; i < reader.Count; i++)
             {
                 var entry = reader.EntryAt(i);
+                if (entry.IsTombstone) continue;
                 try
                 {
                     _ = reader.ReadAsset(entry, verify: true);

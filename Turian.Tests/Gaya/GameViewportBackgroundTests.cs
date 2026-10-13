@@ -1,12 +1,15 @@
 namespace Turian.Tests;
 
-/// <summary>Checks that Game view uses the Scene view's background preference in its rendered pixels.</summary>
+/// <summary>Checks that the Game view clears with the scene camera's background, as the built game does.</summary>
 [Collection(SerialTests.Name)]
 public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
-    /// <summary>The game preview shares the light blue default and follows live sky color edits.</summary>
+    /// <summary>
+    /// The game preview clears with the camera's light blue default and follows live edits of it; the Scene view's
+    /// sky preference does not reach it.
+    /// </summary>
     [Fact]
-    public void GamePreviewUsesSharedSkyPreference()
+    public void GamePreviewUsesTheCameraBackground()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var assets = new AssetManager();
@@ -14,7 +17,8 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
         var tree = new SceneTreeController(assets, new SettingsService(), null!, Substitute.For<IAssetLoader>(),
             Substitute.For<ISceneManager>(), database);
         var root = new Node();
-        root.AddComponent(new CameraComponent());
+        var camera = new CameraComponent();
+        root.AddComponent(camera);
         typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(tree, root);
         using var services = new ServiceCollection().BuildServiceProvider();
         var play = new PlayModeService(Substitute.For<IPlaySceneHost>(), database, services, NullLogger.Instance);
@@ -26,7 +30,7 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
         InspectorFormsRenderingTests.Frame(gui, surface, font, viewport.Render);
         var viewer = (SceneViewerService)typeof(GameViewport).GetField("service", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(viewport)!;
-        Assert.Equal(new Vector4(preferences.View.EmptySkyColor, 1f), viewer.ClearColor);
+        Assert.Equal((Vector4)camera.BackgroundColor, viewer.ClearColor);
         Assert.False(viewer.CollectStatistics);
         Assert.DoesNotContain(Descendants(gui.RootNode!), node => node.Id.Contains("statistics"));
         Assert.Equal("", (string?)typeof(GameViewport).GetField("failure", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -36,7 +40,8 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
         Assert.True(pixels[0] > pixels[1]);
         Assert.True(pixels[1] > pixels[2]);
         Assert.InRange(pixels[0], (byte)240, (byte)255);
-        preferences.View.EmptySkyColor = new Vector3(0.1f, 0.2f, 0.3f);
+        preferences.View.EmptySkyColor = new Vector3(0.9f, 0f, 0f);
+        camera.BackgroundColor = new Color(0.1f, 0.2f, 0.3f, 1f);
         InspectorFormsRenderingTests.Frame(gui, surface, font, viewport.Render);
         Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 1f), viewer.ClearColor);
         viewer.CopyPixels(pixels);

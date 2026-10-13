@@ -116,6 +116,11 @@ sealed class GameViewport : IDisposable
         ResizeCamera(camera);
         ForwardInput(gui, rect);
 
+        // As in the built game; a view without a scene camera keeps the Scene view's sky.
+        service!.ClearColor = camera is CameraComponent cameraComponent
+            ? (Vector4)cameraComponent.BackgroundColor
+            : new Vector4(viewSettings.EmptySkyColor, 1f);
+
         overlayRoot = root;
         RenderGameFrame(root, camera, gui.Time.DeltaTime);
         service!.CopyPixels(pixels);
@@ -149,7 +154,6 @@ sealed class GameViewport : IDisposable
         }
         var rect = gui.CurrentNode.Rect;
         if (!EnsureService((uint)Math.Max(1f, rect.W), (uint)Math.Max(1f, rect.H))) return false;
-        service!.ClearColor = new Vector4(viewSettings.EmptySkyColor, 1f);
         return true;
     }
 
