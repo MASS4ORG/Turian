@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: camera background color controls the Game view and exported game's clear color.
 - Added(android): the renderer survives surface loss and restore #246
 - Added: KTX2 format #247
 - Added: brick manifest platform allow-list and per-platform NuGet #248

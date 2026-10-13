@@ -117,6 +117,9 @@ public class CameraComponent : Component, ICamera
         }
     } = 40f;
 
+    /// <summary>The color the frame clears to before this camera renders, as Unity's <c>Camera.backgroundColor</c>.</summary>
+    public Color BackgroundColor { get; set; } = new(0.39f, 0.58f, 0.93f, 1f);
+
     /// <summary>Gets or sets how the camera determines its aspect ratio.</summary>
     [Hide]
     public AspectMode AspectMode { get; set; } = AspectMode.Viewport;

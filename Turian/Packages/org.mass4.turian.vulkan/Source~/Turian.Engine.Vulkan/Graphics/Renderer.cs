@@ -172,7 +172,8 @@ public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bo
     /// Begins a render pass for the swap chain.
     /// </summary>
     /// <param name="commandBuffer">The command buffer for rendering.</param>
-    public unsafe void BeginSwapChainRenderPass(CommandBuffer commandBuffer)
+    /// <param name="clearColor">The linear RGBA color to clear the frame with; near-black when <c>null</c>.</param>
+    public unsafe void BeginSwapChainRenderPass(CommandBuffer commandBuffer, Vector4? clearColor = null)
     {
         Debug.Assert(
             isFrameStarted,
@@ -192,31 +193,18 @@ public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bo
                 RenderArea = { Offset = { X = 0, Y = 0 }, Extent = SwapChain.SwapChainExtent, }
             };
 
-        ClearValue[] clearValues =
-        [
-            new()
-            {
-                Color = new()
-                {
-                    Float32_0 = 0.01f,
-                    Float32_1 = 0.01f,
-                    Float32_2 = 0.01f,
-                    Float32_3 = 1
-                },
-            },
+        var clearValues = stackalloc ClearValue[2]
+        {
+            new() { Color = ClearColor(clearColor) },
             new()
             {
                 DepthStencil = new() { Depth = 1, Stencil = 0 }
             }
-        ];
+        };
 
-        fixed (ClearValue* clearValuesPtr = clearValues)
-        {
-            renderPassInfo.ClearValueCount = (uint)clearValues.Length;
-            renderPassInfo.PClearValues = clearValuesPtr;
-
-            vk.CmdBeginRenderPass(commandBuffer, &renderPassInfo, SubpassContents.Inline);
-        }
+        renderPassInfo.ClearValueCount = 2;
+        renderPassInfo.PClearValues = clearValues;
+        vk.CmdBeginRenderPass(commandBuffer, &renderPassInfo, SubpassContents.Inline);
 
         Viewport viewport =
             new()
@@ -231,6 +219,19 @@ public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bo
         Rect2D scissor = new(new Offset2D(), SwapChain.SwapChainExtent);
         vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
         vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
+    }
+
+    /// <summary>Encodes normalized linear RGBA channels for the Vulkan clear command.</summary>
+    internal static ClearColorValue ClearColor(Vector4? clearColor)
+    {
+        var color = Vector4.Clamp(clearColor ?? new Vector4(0.01f, 0.01f, 0.01f, 1f), Vector4.Zero, Vector4.One);
+        return new ClearColorValue
+        {
+            Float32_0 = color.X,
+            Float32_1 = color.Y,
+            Float32_2 = color.Z,
+            Float32_3 = color.W,
+        };
     }
 
     /// <summary>

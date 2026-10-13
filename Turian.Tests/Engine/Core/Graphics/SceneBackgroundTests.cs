@@ -26,4 +26,27 @@ public sealed class SceneBackgroundTests(VulkanFixture fixture) : IClassFixture<
         Assert.Equal(0, pixels[1]);
         Assert.InRange(pixels[0], (byte)185, (byte)190);
     }
+
+    /// <summary>A camera's background color, used as the clear color, fills an empty frame.</summary>
+    [Fact]
+    public void CameraBackgroundColorReachesTheFrame()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), 32, 32);
+
+        var cameraComponent = new CameraComponent { BackgroundColor = new Color(1f, 0f, 0f, 1f) };
+        new Node().AddComponent(cameraComponent);
+        viewer.ClearColor = (Vector4)cameraComponent.BackgroundColor;
+
+        var scene = new Node();
+
+        var pixels = new byte[32 * 32 * 4];
+        viewer.Render(scene, 0.016, cameraComponent);
+        viewer.CopyPixels(pixels);
+
+        Assert.Equal(0, pixels[0]);
+        Assert.Equal(0, pixels[1]);
+        Assert.Equal(255, pixels[2]);
+        Assert.Equal(255, pixels[3]);
+    }
 }

@@ -39,7 +39,7 @@ public sealed class SceneViewSettings
         LockedLayers = locked ? LockedLayers | bit : LockedLayers & ~bit;
     }
 
-    /// <summary>Gets or sets normalized linear RGB channels for empty pixels in Studio's Scene and Game views.</summary>
-    [Gaya.EditorSetting("Empty Sky Color", Description = "Background color shared by the Scene and Game views.")]
+    /// <summary>Gets or sets normalized linear RGB channels for empty pixels in Studio's Scene view.</summary>
+    [Gaya.EditorSetting("Empty Sky Color", Description = "Background color for the Scene view.")]
     public Vector3 EmptySkyColor { get; set; } = new(0.39f, 0.58f, 0.93f);
 }

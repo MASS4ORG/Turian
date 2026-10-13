@@ -128,7 +128,7 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
         uboBuffers[frameIndex].WriteBytesToBuffer(ubos[frameIndex].AsBytes());
         RecordBeforeRenderPass();
 
-        Renderer.BeginSwapChainRenderPass(commandBuffer);
+        Renderer.BeginSwapChainRenderPass(commandBuffer, CameraBackground(camera));
         if (OnRender is not null)
         {
             OnRender(frameInfo, ref ubos[frameIndex]);
@@ -138,6 +138,10 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
 
         Renderer.EndFrame();
     }
+
+    /// <summary>Uses an authored camera background when the camera exposes one.</summary>
+    internal static Vector4? CameraBackground(ICamera camera) =>
+        camera is CameraComponent component ? (Vector4)component.BackgroundColor : null;
 
     // Gathering fills the light slots, so it runs before the upload or lights reach the GPU late.
     void PrepareSystems(GlobalUbo ubo)
