@@ -16,6 +16,7 @@ global using System.Text.Json;
 global using System.Text.Json.Nodes;
 global using System.Text.Json.Serialization;
 global using System.Threading;
+global using Ktx2;
 global using MASS4.Attributes;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;

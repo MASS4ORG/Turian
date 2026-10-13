@@ -22,6 +22,7 @@ global using Gaya.Packages.Editor;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
 global using Guinevere;
+global using Ktx2;
 global using MASS4.Attributes;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;

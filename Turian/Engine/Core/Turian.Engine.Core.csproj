@@ -20,13 +20,26 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Engine/OpenAssetPackage/OpenAssetPackage.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj" />
+    </ItemGroup>
+
+    <!-- Engine-independent libraries, each in its own repository; the local checkout is used while unpublished. -->
+    <ItemGroup Condition="'$(OapLocalPath)' != ''">
+        <ProjectReference Include="$(OapLocalPath)/csharp/src/OpenAssetPackage/OpenAssetPackage.csproj"/>
+    </ItemGroup>
+    <ItemGroup Condition="'$(OapLocalPath)' == ''">
+        <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*"/>
+    </ItemGroup>
+    <ItemGroup Condition="'$(Ktx2LocalPath)' != ''">
+        <ProjectReference Include="$(Ktx2LocalPath)/src/Ktx2/Ktx2.csproj"/>
+    </ItemGroup>
+    <ItemGroup Condition="'$(Ktx2LocalPath)' == ''">
+        <PackageReference Include="MASS4.Ktx2" Version="1.*"/>
     </ItemGroup>
 
     <!-- External libraries -->
