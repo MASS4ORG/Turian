@@ -5,6 +5,12 @@ namespace Turian.Tests.Turian.Editor.Build;
 /// </summary>
 public class CsProjectGeneratorTests
 {
+#if DEBUG
+    const string Configuration = "Debug";
+#else
+    const string Configuration = "Release";
+#endif
+
     readonly IBuildAppSettings settings;
     readonly ILogger logger;
 
@@ -130,7 +136,7 @@ public class CsProjectGeneratorTests
             "$(TurianDir)",
             settings.TurianPackages[0].Item1,
             "bin",
-            "Debug",
+            Configuration,
             settings.TargetFramework,
             $"{settings.TurianPackages[0].Item2}.dll"
         );
@@ -163,7 +169,7 @@ public class CsProjectGeneratorTests
             "$(TurianDir)",
             settings.TurianPackages[0].Item1,
             "bin",
-            "Debug",
+            Configuration,
             settings.TargetFramework,
             $"{settings.TurianPackages[0].Item2}.dll"
         );
@@ -181,5 +187,15 @@ public class CsProjectGeneratorTests
 
         // Assert
         Assert.NotNull(packageReferenceLine);
+    }
+
+    /// <summary>The code generator analyzer is taken from the running build configuration.</summary>
+    [Fact]
+    public void GenerateShouldReferenceAnalyzerOfRunningConfiguration()
+    {
+        var project = CsProjectGenerator.GenerateUserCode(settings, logger);
+
+        var analyzer = project.Items.Single(i => i.ItemType == "Analyzer").Include;
+        Assert.Contains(Path.Combine("bin", Configuration, "netstandard2.0"), analyzer, StringComparison.Ordinal);
     }
 }

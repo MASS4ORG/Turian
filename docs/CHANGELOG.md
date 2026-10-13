@@ -6,7 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Fixed: windowed and headless players quit on Ctrl+C or SIGTERM; a second interrupt terminates a hung game.
 - Added: camera background color controls the Game view and exported game's clear color.
 - Added(android): the renderer survives surface loss and restore #246
 - Added: KTX2 format #247
@@ -27,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: a KeyUp without a matching KeyDown no longer throws #241
 - Fixed: `oap pack --store` stores assets instead of compressing them #133
 - Fixed: install glslc in release-check
+- Fixed: windowed and headless players quit on Ctrl+C or SIGTERM; a second interrupt terminates a hung game.
 
 ## [3.0.0] - 2026-10-11
 

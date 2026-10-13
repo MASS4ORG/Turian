@@ -26,6 +26,13 @@ public static class CsProjectGenerator
 {
     const string codeGeneratorName = "Turian.CSharp.CodeGenerator";
 
+    // The engine and editor assemblies are built together, so references follow the running configuration.
+#if DEBUG
+    const string BuildConfiguration = "Debug";
+#else
+    const string BuildConfiguration = "Release";
+#endif
+
     /// <summary>
     /// Generate a brand new .csproj file
     /// </summary>
@@ -366,7 +373,7 @@ public static class CsProjectGenerator
                                 "$(TurianDir)",
                                 turianPackage.Item1,
                                 "bin",
-                                "Debug",
+                                BuildConfiguration,
                                 settings.TargetFramework,
                                 $"{turianPackage.Item2}.dll"),
                         true);
@@ -376,8 +383,8 @@ public static class CsProjectGenerator
             itemGroup.AddItem("Analyzer",
                 usesPublishedLibraries
                     ? Path.Combine("$(TurianDir)", "lib", $"{codeGeneratorName}.dll")
-                    : Path.Combine("$(TurianDir)", "Turian", "Editor", "CSharp", "CodeGenerator", "bin", "Debug",
-                        "netstandard2.0", $"{codeGeneratorName}.dll"));
+                    : Path.Combine("$(TurianDir)", "Turian", "Editor", "CSharp", "CodeGenerator", "bin",
+                        BuildConfiguration, "netstandard2.0", $"{codeGeneratorName}.dll"));
 
             return projectRoot;
         }

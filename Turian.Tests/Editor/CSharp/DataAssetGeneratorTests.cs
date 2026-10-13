@@ -185,8 +185,13 @@ public sealed partial class DataAssetGeneratorTests
         var root = AppContext.BaseDirectory;
         while (Directory.GetFiles(root, "*.slnx").Length == 0) root = Directory.GetParent(root)!.FullName;
 
+#if DEBUG
+        const string configuration = "Debug";
+#else
+        const string configuration = "Release";
+#endif
         var assembly = Assembly.LoadFrom(Path.Combine(root, "Turian", "Editor", "CSharp", "CodeGenerator", "bin",
-            "Debug", "netstandard2.0", "Turian.CSharp.CodeGenerator.dll"));
+            configuration, "netstandard2.0", "Turian.CSharp.CodeGenerator.dll"));
         return (T)Activator.CreateInstance(assembly.GetType(typeName, throwOnError: true)!)!;
     }
 }
