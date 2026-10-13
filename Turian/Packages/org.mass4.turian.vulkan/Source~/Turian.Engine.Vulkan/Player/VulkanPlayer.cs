@@ -4,7 +4,8 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// Plays a client build: opens a GLFW surface host, renders each loaded scene's primary camera with Vulkan, routes
-/// window input to the game and composites the installed interface package's overlay.
+/// window input to the game and composites the installed interface package's overlay. Ends its loop on
+/// <see cref="Application.Quit"/>, Ctrl+C or SIGTERM.
 /// </summary>
 public sealed class VulkanPlayer : IGamePlayer
 {
@@ -14,6 +15,7 @@ public sealed class VulkanPlayer : IGamePlayer
         ArgumentNullException.ThrowIfNull(context);
         Application.BeginSession(headless: false);
 
+        using var interrupt = Application.QuitOnInterrupt();
         var window = new GlfwSurfaceHost { ShowStats = context.Development };
         var input = new InputManager(window, context.Logger);
         var inputSource = new SilkInputSource(input);
