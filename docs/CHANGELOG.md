@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: mesh and task shader stages only when the device enables mesh shading #238
 - Fixed: a KeyUp without a matching KeyDown no longer throws #241
 - Fixed: `oap pack --store` stores assets instead of compressing them #133
+- Fixed: install glslc in release-check
 
 ## [3.0.0] - 2026-10-11
 
