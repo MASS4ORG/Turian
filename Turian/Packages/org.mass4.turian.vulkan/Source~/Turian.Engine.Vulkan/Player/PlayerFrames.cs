@@ -100,7 +100,11 @@ public sealed class PlayerFrames(
     }
 
     /// <summary>Releases the interface presenter.</summary>
-    public void Dispose() => presenter?.Dispose();
+    public void Dispose()
+    {
+        runtime.Ticker.Async.Dispose();
+        presenter?.Dispose();
+    }
 
     void RenderOverlay(double deltaTime)
     {

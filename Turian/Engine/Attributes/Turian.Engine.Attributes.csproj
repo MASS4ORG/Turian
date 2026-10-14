@@ -11,12 +11,12 @@
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" />
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj"  Condition="'$(GuinevereLocalPath)' != ''"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Attributes" Version="6.*" />
+    <ItemGroup>
+        <PackageReference Include="MASS4.Attributes" Version="6.*"  Condition="'$(GuinevereLocalPath)' == ''"/>
     </ItemGroup>
 
     <ItemGroup>

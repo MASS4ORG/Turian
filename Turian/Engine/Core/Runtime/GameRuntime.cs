@@ -87,7 +87,13 @@ public sealed class GameRuntime
     {
         if (Settings.Get<PlayerSettings>().StartupScene is not { IsEmpty: false } startupScene) return;
 
-        StartupRoot = Scenes.LoadSceneAsync(startupScene.AssetId).GetAwaiter().GetResult().RootNode;
+        var load = Scenes.LoadSceneAsync(startupScene.AssetId);
+        while (!load.IsCompleted)
+        {
+            Ticker.Async.PumpPostedWork();
+            Thread.Sleep(1);
+        }
+        StartupRoot = load.GetAwaiter().GetResult().RootNode;
     }
 
     void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource input,
@@ -103,6 +109,7 @@ public sealed class GameRuntime
             .AddSingleton<ISceneManager>(Scenes)
             .AddSingleton(loader)
             .AddSingleton(clock)
+            .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input)
             .AddSingleton(Actions)
             .AddSingleton<IInputActions>(Actions)
@@ -114,6 +121,7 @@ public sealed class GameRuntime
         Services = context.BuildServices(registrations);
         Ticker = new SceneTicker(Scenes, clock)
         {
+            Async = Services.GetRequiredService<GameLoopScheduler>(),
             Simulation = Services.GetService<SimulationSession>(),
             InputSource = input,
             Actions = Actions,

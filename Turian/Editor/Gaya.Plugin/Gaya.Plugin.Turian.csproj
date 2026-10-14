@@ -30,14 +30,14 @@
         <CompilerVisibleProperty Include="Version"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj"/>
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*"/>
-        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*"/>
+    <ItemGroup>
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
 
     <!-- External libraries -->

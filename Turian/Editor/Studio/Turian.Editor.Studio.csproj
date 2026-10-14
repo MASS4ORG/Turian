@@ -26,16 +26,16 @@
                           ReferenceOutputAssembly="false" Private="false"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Scripting/Guinevere.Scripting.csproj"/>
         <ProjectReference Include="$(GuinevereLocalPath)/Integrations/Guinevere.Vulkan.SilkNET/Guinevere.Vulkan.SilkNET.csproj"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere" Version="6.*"/>
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*"/>
+    <ItemGroup>
+        <PackageReference Include="MASS4.Guinevere" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
         <PackageReference Include="MASS4.Guinevere.Scripting" Version="6.*"/>
         <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="6.*"/>
     </ItemGroup>

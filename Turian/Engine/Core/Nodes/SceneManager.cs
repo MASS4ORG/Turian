@@ -142,6 +142,7 @@ public partial class SceneManager : ISceneManager
         }
 
         var root = await LoadNodeAsync(sceneAssetId).ConfigureAwait(false);
+        await ReturnToSceneThread();
         return TrackLoadedScene(sceneAssetId, root, setActive: true);
     }
 
@@ -173,6 +174,7 @@ public partial class SceneManager : ISceneManager
         }
 
         var root = await LoadNodeAsync(absolutePath).ConfigureAwait(false);
+        await ReturnToSceneThread();
         return TrackLoadedScene(syntheticId, root, setActive: true);
     }
 
@@ -253,6 +255,7 @@ public partial class SceneManager : ISceneManager
     public async Task<Node> InstantiateAsync(string absolutePath, Node? parent = null)
     {
         var root = await LoadNodeAsync(absolutePath).ConfigureAwait(false);
+        await ReturnToSceneThread();
         return AttachInstantiatedRoot(root, parent);
     }
 

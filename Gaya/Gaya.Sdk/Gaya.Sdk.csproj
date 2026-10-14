@@ -18,12 +18,12 @@
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj"/>
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj" Condition="'$(GuinevereLocalPath)' != ''"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere" Version="6.*"/>
+    <ItemGroup>
+        <PackageReference Include="MASS4.Guinevere" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''"/>
     </ItemGroup>
 
     <!-- External libraries -->
