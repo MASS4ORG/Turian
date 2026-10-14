@@ -121,6 +121,7 @@ public sealed class PlayModeService(
         {
             Async = playServices.GetRequiredService<GameLoopScheduler>(),
             Simulation = playServices.GetService<SimulationSession>(),
+            Systems = [.. playServices.GetServices<IFixedTickSystem>()],
             InputSource = Input,
             Actions = playServices.GetService<InputActionService>(),
         };
@@ -355,12 +356,12 @@ public sealed class PlayModeService(
         {
             if (buildManager.ActiveUserAssembly is { } userAssembly)
             {
-                services.AddEngineModules(userAssembly);
+                services.AddEngineModules([.. EngineServiceModules.Graph(userAssembly)]);
             }
         }
         else if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
-            services.AddEngineModules(gameType.Assembly);
+            services.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }
 
         var provider = services.BuildServiceProvider();

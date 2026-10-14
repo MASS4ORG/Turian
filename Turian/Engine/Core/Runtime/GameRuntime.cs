@@ -120,7 +120,7 @@ public sealed class GameRuntime
         addServices?.Invoke(registrations);
         if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
-            registrations.AddEngineModules(gameType.Assembly);
+            registrations.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }
 
         Services = context.BuildServices(registrations);
@@ -128,6 +128,7 @@ public sealed class GameRuntime
         {
             Async = Services.GetRequiredService<GameLoopScheduler>(),
             Simulation = Services.GetService<SimulationSession>(),
+            Systems = [.. Services.GetServices<IFixedTickSystem>()],
             InputSource = input,
             Actions = Actions,
         };

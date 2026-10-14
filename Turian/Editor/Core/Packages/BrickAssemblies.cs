@@ -117,6 +117,7 @@ public static class BrickAssemblies
             foreach (var brick in installed)
             {
                 RegisterTypes(brick, logger);
+                RegisterModules(brick);
             }
         }
 
@@ -280,6 +281,16 @@ public static class BrickAssemblies
         catch (Exception ex) when (ex is IOException or BadImageFormatException or FileLoadException)
         {
             return null;
+        }
+    }
+
+    // Games scan loaded bricks for engine modules, including bricks their own code never names.
+    static void RegisterModules(ResolvedPackage brick)
+    {
+        var names = RuntimeAssemblies(brick).Select(static path => Path.GetFileNameWithoutExtension(path)).ToHashSet();
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => names.Contains(a.GetName().Name)))
+        {
+            PrecastAssemblies.Register(assembly);
         }
     }
 

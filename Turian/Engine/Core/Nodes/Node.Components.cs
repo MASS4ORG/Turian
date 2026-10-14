@@ -268,12 +268,37 @@ public partial class Node
         return component is not null && RemoveComponent(component);
     }
 
+    static long transformStamps;
+    long transformStamp;
+
+    /// <summary>
+    /// A value that changes whenever the global transform of this node may have changed: its own transform, its
+    /// parent, or an ancestor's transform. Systems compare it with a stored copy to skip unchanged nodes.
+    /// </summary>
+    [JsonIgnore, Hide]
+    public long TransformVersion
+    {
+        get
+        {
+            // Stamps come from one process-wide counter, so the newest stamp on the ancestor chain is new after any
+            // change along it.
+            var version = transformStamp;
+            for (var ancestor = Parent; ancestor is not null; ancestor = ancestor.Parent)
+            {
+                version = Math.Max(version, ancestor.transformStamp);
+            }
+
+            return version;
+        }
+    }
+
     /// <summary>
     /// Marks the cached global transform of this node and its descendants as stale.
     /// </summary>
     public void InvalidateGlobalTransformCache()
     {
         isGlobalTransformDirty = true;
+        transformStamp = Interlocked.Increment(ref transformStamps);
         // Indexing avoids the boxed enumerator Collection<T> allocates per foreach.
         for (var i = 0; i < Children.Count; i++)
         {

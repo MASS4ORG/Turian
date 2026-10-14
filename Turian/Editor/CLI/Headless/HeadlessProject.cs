@@ -71,7 +71,7 @@ sealed class HeadlessProject : IDisposable
 
         if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
-            registrations.AddEngineModules(gameType.Assembly);
+            registrations.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }
 
         services = registrations.BuildServiceProvider();

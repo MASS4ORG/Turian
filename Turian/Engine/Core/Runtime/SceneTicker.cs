@@ -37,6 +37,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
     public SimulationSession? Simulation { get; init; }
 
+    /// <summary>Session systems run after the components of every fixed tick, in list order.</summary>
+    public IReadOnlyList<IFixedTickSystem> Systems { get; init; } = [];
+
     /// <summary>
     /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
     /// </summary>
@@ -93,6 +96,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Clock.AdvanceWithCompletion(unscaledDeltaTime,
             (tick, interval) => RunFixedTick(roots, tick, interval), PublishCompletedTick);
 
+        RunAfterFixedTicks();
         RunUpdate(roots, (float)deltaTime);
         Async.DrainUpdate();
         RunLateUpdate(roots, (float)deltaTime);
@@ -126,6 +130,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
         Clock.Step((tick, interval) => RunFixedTick(roots, tick, interval));
         PublishCompletedTick();
+        RunAfterFixedTicks();
         RunUpdate(roots, (float)deltaTime);
         Async.DrainUpdate();
         RunLateUpdate(roots, (float)deltaTime);
@@ -151,7 +156,26 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         }
 
         RunFixedUpdate(roots, (float)interval);
+        foreach (var system in Systems)
+        {
+            system.FixedTick(tick, interval);
+        }
+
         simulation?.RunTick(tick, interval);
+    }
+
+    void RunAfterFixedTicks()
+    {
+        if (Systems.Count == 0)
+        {
+            return;
+        }
+
+        var alpha = Math.Clamp(Clock.AccumulatorSeconds / Clock.FixedDeltaTime, 0d, 1d);
+        foreach (var system in Systems)
+        {
+            system.AfterFixedTicks(alpha);
+        }
     }
 
     void PublishCompletedTick()
