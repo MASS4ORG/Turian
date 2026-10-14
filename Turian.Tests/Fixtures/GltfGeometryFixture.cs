@@ -24,7 +24,7 @@ static class GltfGeometryFixture
                 new { buffer = 0, byteLength = vertexBytes.Length, byteStride = Vertex.SizeOf() },
                 new { buffer = 0, byteOffset = vertexBytes.Length, byteLength = indexBytes.Length },
             },
-            accessors = new object[]
+            accessors = new[]
             {
                 new { bufferView = 0, componentType = 5126, count = vertices.Length, type = "VEC3",
                     min = new[] { bounds.Min.X, bounds.Min.Y, bounds.Min.Z },

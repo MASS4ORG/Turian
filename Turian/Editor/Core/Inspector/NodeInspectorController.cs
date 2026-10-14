@@ -25,8 +25,6 @@ public sealed class NodeInspectorController
     /// </summary>
     public object? SelectedObject => Selection.ActiveObject;
 
-    Node? selectedNode => SelectedNode;
-
     /// <summary>Raised after selection or component list changes.</summary>
     public event Action? SelectionChanged;
 
@@ -130,14 +128,14 @@ public sealed class NodeInspectorController
     public void ClearSelection() => Select(null);
 
     /// <summary>
-    /// Instantiates and attaches <paramref name="componentType"/> to <see cref="selectedNode"/>.
+    /// Instantiates and attaches <paramref name="componentType"/> to <see cref="SelectedNode"/>.
     /// </summary>
     /// <param name="componentType">The type of component to add to the selected node.</param>
     /// <returns>True if the component was successfully added; otherwise, false.</returns>
     public bool AddComponent(Type componentType)
     {
         ArgumentNullException.ThrowIfNull(componentType);
-        if (selectedNode is null)
+        if (SelectedNode is null)
         {
             return false;
         }
@@ -147,7 +145,7 @@ public sealed class NodeInspectorController
             return false;
         }
 
-        if (!ComponentRegistry.CanAddTo(selectedNode, componentType))
+        if (!ComponentRegistry.CanAddTo(SelectedNode, componentType))
         {
             return false;
         }
@@ -159,7 +157,7 @@ public sealed class NodeInspectorController
                 return false;
             }
 
-            selectedNode.AddComponent(instance);
+            SelectedNode.AddComponent(instance);
             NotifyNodeChanged();
             return true;
         }
@@ -265,14 +263,14 @@ public sealed class NodeInspectorController
     public bool RemoveComponent(Component component)
     {
         ArgumentNullException.ThrowIfNull(component);
-        if (selectedNode is null)
+        if (SelectedNode is null)
         {
             return false;
         }
 
         try
         {
-            if (!selectedNode.RemoveComponent(component))
+            if (!SelectedNode.RemoveComponent(component))
             {
                 return false;
             }
@@ -293,19 +291,19 @@ public sealed class NodeInspectorController
     /// <param name="component">The component to move up.</param>
     public void MoveComponentUp(Component component)
     {
-        if (selectedNode is null)
+        if (SelectedNode is null)
         {
             return;
         }
 
-        var idx = selectedNode.Components.IndexOf(component);
+        var idx = SelectedNode.Components.IndexOf(component);
         if (idx <= 0)
         {
             return;
         }
 
-        selectedNode.Components.RemoveAt(idx);
-        selectedNode.Components.Insert(idx - 1, component);
+        SelectedNode.Components.RemoveAt(idx);
+        SelectedNode.Components.Insert(idx - 1, component);
         NotifyNodeChanged();
     }
 
@@ -315,19 +313,19 @@ public sealed class NodeInspectorController
     /// <param name="component">The component to move down.</param>
     public void MoveComponentDown(Component component)
     {
-        if (selectedNode is null)
+        if (SelectedNode is null)
         {
             return;
         }
 
-        var idx = selectedNode.Components.IndexOf(component);
-        if (idx < 0 || idx >= selectedNode.Components.Count - 1)
+        var idx = SelectedNode.Components.IndexOf(component);
+        if (idx < 0 || idx >= SelectedNode.Components.Count - 1)
         {
             return;
         }
 
-        selectedNode.Components.RemoveAt(idx);
-        selectedNode.Components.Insert(idx + 1, component);
+        SelectedNode.Components.RemoveAt(idx);
+        SelectedNode.Components.Insert(idx + 1, component);
         NotifyNodeChanged();
     }
 
@@ -387,9 +385,9 @@ public sealed class NodeInspectorController
     /// </summary>
     void NotifyNodeChanged()
     {
-        if (selectedNode is not null)
+        if (SelectedNode is not null)
         {
-            assetManager.RefreshNode(selectedNode);
+            assetManager.RefreshNode(SelectedNode);
             assetManager.UpdateSelectedNode();
         }
 

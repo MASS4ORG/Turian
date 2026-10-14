@@ -292,6 +292,7 @@ sealed partial class AssetBrowserPanel
             return;
         }
 
+        // Integer division selects the row on purpose.
         var top = index / gridWindow.Columns * cellHeight;
         var offset = gui.GetScrollState(gridId)?.ScrollOffset.Y ?? 0;
         if (top < offset)

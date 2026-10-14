@@ -181,7 +181,7 @@ public unsafe partial class Device
         if (properties.ApiVersion < Vk.Version13)
         {
             Log.Logger.LogWarning(
-                "Rejecting GPU '{0}': it supports Vulkan {1}.{2} but the engine requires 1.3",
+                "Rejecting GPU '{DeviceName}': it supports Vulkan {Major}.{Minor} but the engine requires 1.3",
                 GetStringFromBytePointer(properties.DeviceName, 50).Trim(),
                 properties.ApiVersion >> 22,
                 (properties.ApiVersion >> 12) & 0x3FF

@@ -3,8 +3,8 @@ namespace Build;
 /// <summary>Builds a local Flatpak bundle for the Studio editor.</summary>
 sealed partial class Build
 {
-    const string flatpakAppId = "org.MASS4.Turian";
-    AbsolutePath FlatpakManifest => BuildProjectDirectory / "packaging" / "flatpak" / $"{flatpakAppId}.yml";
+    const string FlatpakAppId = "org.MASS4.Turian";
+    AbsolutePath FlatpakManifest => BuildProjectDirectory / "packaging" / "flatpak" / $"{FlatpakAppId}.yml";
     AbsolutePath FlatpakBuildDirectory => RootDirectory / ".flatpak-build";
     AbsolutePath FlatpakRepository => RootDirectory / ".flatpak-repo";
     AbsolutePath FlatpakBundle => ArtifactsDirectory / $"{ProductName}-{Version}-x86_64.flatpak";
@@ -21,7 +21,7 @@ sealed partial class Build
                     $"\"{FlatpakBuildDirectory}\" \"{FlatpakManifest}\"")
                 .AssertZeroExitCode();
             ProcessTasks.StartProcess("flatpak",
-                    $"build-bundle \"{FlatpakRepository}\" \"{FlatpakBundle}\" {flatpakAppId}")
+                    $"build-bundle \"{FlatpakRepository}\" \"{FlatpakBundle}\" {FlatpakAppId}")
                 .AssertZeroExitCode();
         });
 }

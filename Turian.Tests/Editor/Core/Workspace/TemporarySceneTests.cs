@@ -32,7 +32,6 @@ public sealed class TemporarySceneTests : IDisposable
         workspace.Dispose();
         binder.Dispose();
         services.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>New scenes have independent identities and tabs, and never enter the saved asset session.</summary>

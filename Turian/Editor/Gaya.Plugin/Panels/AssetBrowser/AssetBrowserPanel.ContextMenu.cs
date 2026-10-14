@@ -11,7 +11,7 @@ sealed partial class AssetBrowserPanel
         var rules = AssetContextMenu.Rules(selection, destination, CanPaste,
             path => importer?.ImporterFor(path) is not null);
         BuildOpenMenu(menu, entry, selection, rules, destination is not null);
-        BuildTransferMenu(menu, entry, selection, rules);
+        BuildTransferMenu(menu, entry, rules);
         BuildMetadataMenu(menu, selection, rules);
         BuildCreationMenu(menu, entry);
         menu.Item("Import…", () => ImportFile(DirectoryFor(entry)!), enabled: rules.CanCreate && fileDialogs is not null);
@@ -44,7 +44,7 @@ sealed partial class AssetBrowserPanel
         menu.Separator();
     }
 
-    void BuildTransferMenu(FlyoutBuilder menu, AssetEntry? entry, IReadOnlyList<AssetEntry> selection, AssetMenuRules rules)
+    void BuildTransferMenu(FlyoutBuilder menu, AssetEntry? entry, AssetMenuRules rules)
     {
         menu.Item("Rename", () => BeginRename(entry), "F2", rules.CanRename);
         menu.Item("Delete", DeleteSelected, "Del", rules.Writable);

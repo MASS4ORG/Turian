@@ -207,7 +207,7 @@ public class StandardRenderSystem : IRenderSystem
         var modelOrder = renderList.OrderOf(model);
         for (var i = start; i < last; i++)
         {
-            if (UseFrustumCulling && !GeometryUtility.TestPlanesAABB(frustumPlanes, cached.Bounds[i - start]))
+            if (UseFrustumCulling && !GeometryUtility.TestPlanesAabb(frustumPlanes, cached.Bounds[i - start]))
             {
                 CullingStats = CullingStats with { Culled = CullingStats.Culled + 1 };
                 continue;

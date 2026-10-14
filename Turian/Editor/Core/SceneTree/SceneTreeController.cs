@@ -412,21 +412,13 @@ public sealed class SceneTreeController(
         try
         {
             var root = TryLoadWithSceneManager(prefab);
-            if (root is not null)
-            {
-                loadedSceneRoots[prefab.Id] = root;
-                Log.Logger.LogDebug(
-                    "SceneTree loaded prefab root {NodeId} for asset {AssetId} at {RelativePath}",
-                    root.Id,
-                    prefab.Id,
-                    prefab.RelativePath);
-                return root;
-            }
-
-            Log.Logger.LogWarning(
-                "SceneManager could not load scene asset {AssetId} at {RelativePath}. Trying path fallback",
+            loadedSceneRoots[prefab.Id] = root;
+            Log.Logger.LogDebug(
+                "SceneTree loaded prefab root {NodeId} for asset {AssetId} at {RelativePath}",
+                root.Id,
                 prefab.Id,
                 prefab.RelativePath);
+            return root;
         }
         catch (Exception ex)
         {
@@ -446,7 +438,7 @@ public sealed class SceneTreeController(
         return fallbackRoot;
     }
 
-    Node? TryLoadWithSceneManager(Prefab prefab)
+    Node TryLoadWithSceneManager(Prefab prefab)
     {
         return prefab is TemporaryScene
             ? sceneManager.LoadNodeAsync(prefab.RelativePath).GetAwaiter().GetResult()

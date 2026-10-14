@@ -335,7 +335,7 @@ public sealed class InspectorFormsRenderingTests
         Frame(gui, surface, font, panel.Render);
         Frame(gui, surface, font, panel.Render);
 
-        var ids = Descendants(gui.RootNode!).Select(static n => n.Id).OfType<string>().ToList();
+        var ids = Descendants(gui.RootNode!).Select(static n => n.Id).ToList();
         Assert.Contains(ids, static id => id.EndsWith("/pos", StringComparison.Ordinal));
         Assert.Contains(ids, static id => id.EndsWith("/scale", StringComparison.Ordinal));
         Assert.Contains("inspector/section1", ids);

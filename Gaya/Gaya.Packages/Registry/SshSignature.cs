@@ -25,7 +25,7 @@ public static class SshSignature
             if (parts is [algorithm, _, ..])
             {
                 var reader = new Reader(Convert.FromBase64String(parts[1]));
-                if (reader.ReadString() is var algorithm && Encoding.ASCII.GetString(algorithm) == SshSignature.algorithm
+                if (reader.ReadString() is var blobAlgorithm && Encoding.ASCII.GetString(blobAlgorithm) == algorithm
                     && reader.ReadString() is { Length: Ed25519.PublicKeyLength } key)
                 {
                     return key;

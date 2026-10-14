@@ -114,17 +114,15 @@ public static class LogSource
     internal static void LaunchSource(string path, ILogger log, Func<ProcessStartInfo, Process?> start) =>
         TryLaunch(new ProcessStartInfo(path) { UseShellExecute = true }, log, start);
 
-    static bool TryLaunch(ProcessStartInfo info, ILogger log, Func<ProcessStartInfo, Process?> start)
+    static void TryLaunch(ProcessStartInfo info, ILogger log, Func<ProcessStartInfo, Process?> start)
     {
         try
         {
             start(info)?.Dispose();
-            return true;
         }
         catch (Exception ex)
         {
             log.LogWarning(ex, "Output: could not open {File}", info.FileName);
-            return false;
         }
     }
 

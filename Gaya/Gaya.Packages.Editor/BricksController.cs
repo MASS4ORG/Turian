@@ -369,7 +369,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
                 catch (PackageException ex)
                 {
                     failure = ex.Message;
-                    log.LogError("{Label} failed: {Message}", label, ex.Message);
+                    log.LogError(ex, "{Label} failed: {Message}", label, ex.Message);
                     throw;
                 }
 

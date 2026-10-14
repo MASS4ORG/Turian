@@ -25,7 +25,7 @@ public sealed class OutputLogBridgeTests
             var host = Substitute.For<IPlaySceneHost>();
             host.CurrentSceneRoot.Returns(root);
             var play = new PlayModeService(host, new AssetDatabase(), editorServices, NullLogger.Instance);
-            var bridge = new OutputLogBridge(new OutputPanelSettings(), play, build, NullLogger.Instance);
+            var bridge = new OutputLogBridge(new OutputPanelSettings(), play, build);
             var logger = LogBuffer.Provider.CreateLogger("Editor");
             logger.LogInformation("old editor message");
 

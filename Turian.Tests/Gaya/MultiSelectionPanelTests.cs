@@ -175,7 +175,7 @@ public sealed class MultiSelectionPanelTests
                 new AssetInspectionService(importer, types, settings, loader, logger), selection,
                 reveal, new AssetCreationCatalog(files, settings, build, logger),
                 new AssetBrowserSettings(), Substitute.For<IEditorSettings>(), types,
-                new AssetPreviewCatalog(build), null!, operations,
+                null!, operations,
                 new BricksController(null, null, null, logger), confirm, build);
             var state = (TreeViewState)typeof(AssetBrowserPanel)
                 .GetField("state", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;

@@ -21,7 +21,7 @@ public static partial class GltfModelReader
         var indices = SparseAccessor(root, indexDescription, type, 1, count, buffers);
         var values = SparseAccessor(root, sparse.GetProperty("values"), original.ComponentType,
             original.Components, count, buffers);
-        var elementSize = original.Components * original.ComponentSize;
+        var elementSize = original.Components * original.ComponentByteSize;
         var dense = new byte[checked(original.Count * elementSize)];
         CopyDenseBase(original, dense, elementSize);
         ApplySparse(indices, values, dense, original.Count, elementSize);

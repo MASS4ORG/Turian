@@ -206,7 +206,7 @@ public static class PluginHost
             services => services.GetRequiredService<IShellHost>().ShowPanel(ShellPanels.Settings))
         { DynamicLabel = services => services.GetService<IShellLocalization>()?.T("Settings…") ?? "Settings…" });
 
-        menus.Add(new MenuItemDescriptor(MenuIds.File, ShellCommands.Settings, "2", 0));
+        menus.Add(new MenuItemDescriptor(MenuIds.File, ShellCommands.Settings, "2"));
         shortcuts.Add(new KeyBinding(ShellCommands.Settings, KeyboardKey.Comma, KeyModifiers.Ctrl));
     }
 

@@ -441,7 +441,7 @@ public static class CsProjectGenerator
         /// Fails a server build that would still copy a client-only brick's assembly or package, as when a script
         /// uses the renderer outside <c>#if !TURIAN_SERVER</c>.
         /// </summary>
-        private ProjectRootElement AddServerVerification(IBuildAppSettings settings,
+        private void AddServerVerification(IBuildAppSettings settings,
             IReadOnlyList<(string, string)> declaredPackages)
         {
             var resolved = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir);
@@ -457,7 +457,7 @@ public static class CsProjectGenerator
                 .ToList();
             if (conditions.Count == 0)
             {
-                return projectRoot;
+                return;
             }
 
             var target = projectRoot.AddTarget("VerifyServerDependencies");
@@ -469,7 +469,6 @@ public static class CsProjectGenerator
             error.SetParameter("Text",
                 "This server build would ship client-only files: @(_TurianClientOnly->'%(Filename)%(Extension)'). "
                 + "Guard script code that uses the renderer, window or in-game UI with #if !TURIAN_SERVER.");
-            return projectRoot;
         }
 
         private ProjectRootElement AddNugetPackageReferences(IReadOnlyList<(string, string)> packages)

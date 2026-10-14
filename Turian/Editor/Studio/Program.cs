@@ -101,6 +101,7 @@ window.CloseRequested = () =>
     return exitApproved;
 };
 
+// The window and the bridge are disposed only after RunGui returns, so the frame callback never sees them disposed.
 try
 {
     shell.ExitRequested += ApproveExit;

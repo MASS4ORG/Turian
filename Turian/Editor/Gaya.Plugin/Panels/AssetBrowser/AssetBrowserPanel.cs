@@ -66,7 +66,6 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
     /// <param name="browserSettings">Controls asset-name presentation.</param>
     /// <param name="editorSettings">Reports preference edits, so the tree rebuilds when the extensions toggle flips.</param>
     /// <param name="types">Resolves a file's kind, for its default icon when it has no live preview.</param>
-    /// <param name="previews">Answers whether a row's asset has a live preview, and of which kind.</param>
     /// <param name="prefabs">Creates prefab variants.</param>
     /// <param name="operations">Renames, deletes, duplicates and pastes as undoable steps.</param>
     /// <param name="bricks">Reports changes to the installed bricks.</param>
@@ -80,7 +79,7 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
     public AssetBrowserPanel(AssetFileSystem fileSystem, SettingsService settings, AssetOpenService opener,
         AssetInspectionService inspections, NodeInspectorController inspector, AssetRevealService reveal,
         AssetCreationCatalog creation, AssetBrowserSettings browserSettings, IEditorSettings editorSettings,
-        AssetTypeCatalog types, AssetPreviewCatalog previews, PrefabAuthoring prefabs, AssetFileOperations operations,
+        AssetTypeCatalog types, PrefabAuthoring prefabs, AssetFileOperations operations,
         BricksController bricks, ConfirmDialogChrome confirm, BuildManager build,
         AssetThumbnailRenderer? thumbnailRenderer = null, AssetImporter? importer = null,
         AssetLabelService? labelService = null, AssetDatabase? database = null, FileDialogChrome? fileDialogs = null)

@@ -94,7 +94,7 @@ public sealed class PanelHeaderInteractionTests
             services, NullLogger.Instance);
         var preferences = new OutputPanelSettings();
         var panel = new OutputPanel(NullLogger.Instance, preferences,
-            new OutputLogBridge(preferences, play, build, NullLogger.Instance), new SettingsService(),
+            new OutputLogBridge(preferences, play, build), new SettingsService(),
             Substitute.For<IFocusTracker>(), new StudioLocalization());
         using var frame = new HeaderFrame(panel, GayaPlugin.OutputPanelId);
         frame.Click("gaya.turian.output/tabMenu");

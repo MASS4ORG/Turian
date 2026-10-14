@@ -242,7 +242,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         {
             if (Button(gui, "+", "bricks/add", 28f, "Add a brick by name, from a git repository, a folder or a .brick file."))
             {
-                OpenMenu(ref addMenuOpen);
+                OpenMenu(out addMenuOpen);
             }
 
             using (gui.Node(-1, height, "bricks/search").Expand().Enter())
@@ -253,7 +253,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
 
             if (Button(gui, "…", "bricks/more", 28f, "Refresh the registries, restore the project's bricks, or update them all."))
             {
-                OpenMenu(ref moreMenuOpen);
+                OpenMenu(out moreMenuOpen);
             }
         }
 
@@ -282,7 +282,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         }
     }
 
-    void OpenMenu(ref bool open)
+    void OpenMenu(out bool open)
     {
         menuAt = pointer;
         open = true;

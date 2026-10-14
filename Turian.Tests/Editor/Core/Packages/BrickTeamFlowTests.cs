@@ -138,7 +138,7 @@ public sealed class BrickTeamFlowTests : IDisposable
         File.Delete(Path.Combine(folder, "Runtime", "LevelsComponent.cs"));
         File.Delete(Path.Combine(folder, "Runtime", "LevelsComponent.cs.meta"));
         File.WriteAllText(Path.Combine(folder, "Runtime", "Door.cs"), "namespace Mateo.Levels;\npublic class Door : Turian.Engine.Core.Component\n{\n    public void Open() { }\n}\n");
-        Meta(Path.Combine(folder, "Runtime", "Door.cs"), "2af5e114-fb34-54c7-8f14-04aed6c7eb74");
+        Meta(Path.Combine(folder, "Runtime", "Door.cs"));
         File.WriteAllBytes(Path.Combine(folder, "Runtime", "Level.bin"), [1, 2, 3, 4, 5, 6, 7, 8]);
         Meta(Path.Combine(folder, "Runtime", "Level.bin"));
         File.WriteAllText(Path.Combine(folder, "Runtime", "Notes.txt"), "line one\nline two\nline three\n");

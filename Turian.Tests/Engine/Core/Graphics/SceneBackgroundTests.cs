@@ -34,7 +34,7 @@ public sealed class SceneBackgroundTests(VulkanFixture fixture) : IClassFixture<
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), 32, 32);
 
-        var cameraComponent = new CameraComponent { BackgroundColor = new Color(1f, 0f, 0f, 1f) };
+        var cameraComponent = new CameraComponent { BackgroundColor = new Color(1f, 0f, 0f) };
         new Node().AddComponent(cameraComponent);
         viewer.ClearColor = (Vector4)cameraComponent.BackgroundColor;
 

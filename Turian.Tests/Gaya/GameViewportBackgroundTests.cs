@@ -41,7 +41,7 @@ public sealed class GameViewportBackgroundTests(VulkanFixture fixture) : IClassF
         Assert.True(pixels[1] > pixels[2]);
         Assert.InRange(pixels[0], (byte)240, (byte)255);
         preferences.View.EmptySkyColor = new Vector3(0.9f, 0f, 0f);
-        camera.BackgroundColor = new Color(0.1f, 0.2f, 0.3f, 1f);
+        camera.BackgroundColor = new Color(0.1f, 0.2f, 0.3f);
         InspectorFormsRenderingTests.Frame(gui, surface, font, viewport.Render);
         Assert.Equal(new Vector4(0.1f, 0.2f, 0.3f, 1f), viewer.ClearColor);
         viewer.CopyPixels(pixels);

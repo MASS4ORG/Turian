@@ -22,10 +22,10 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", ProjectPackages.HostName];
 
     /// <inheritdoc />
-    public string? BuiltinDirectory => ProjectPackages.BuiltinDirectory;
+    public string BuiltinDirectory => ProjectPackages.BuiltinDirectory;
 
     /// <inheritdoc />
-    public ScopedRegistry? PublicRegistry => ProjectPackages.PublicRegistry;
+    public ScopedRegistry PublicRegistry => ProjectPackages.PublicRegistry;
 
     /// <inheritdoc />
     public bool SupportsForks => true;

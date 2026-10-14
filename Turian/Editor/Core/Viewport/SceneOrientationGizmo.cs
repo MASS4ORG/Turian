@@ -32,7 +32,7 @@ public static class SceneOrientationGizmo
     {
         var depth = Vector3.Dot(direction, camera.Front);
         var perspective = camera.IsOrthographic ? 1f : 1f / (1f + depth * 0.3f);
-        return new Marker(direction, Project(camera, direction) * 25f * perspective, depth, Label(direction))
+        return new Marker(direction, Project(camera, direction) * 25f * perspective, depth, AxisLabel(direction))
         {
             Radius = 8f * perspective
         };
@@ -82,7 +82,7 @@ public static class SceneOrientationGizmo
         new(Vector3.Dot(direction, camera.Right),
             Vector3.Dot(direction, camera.Up) * MathF.Sign(camera.GetProjectionMatrix().M22));
 
-    static string Label(Vector3 direction)
+    static string AxisLabel(Vector3 direction)
     {
         var letter = MathF.Abs(direction.X) > 0.5f ? "X" : MathF.Abs(direction.Y) > 0.5f ? "Y" : "Z";
         return Vector3.Dot(direction, Vector3.One) > 0f ? letter : "−" + letter;

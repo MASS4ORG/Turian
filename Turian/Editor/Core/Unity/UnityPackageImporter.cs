@@ -12,8 +12,6 @@ public sealed record UnityImportTarget(string Folder, string MetaRoot);
 /// </summary>
 public static class UnityPackageImporter
 {
-    static readonly string[] TextureExtensions = [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".psd", ".gif", ".hdr"];
-
     static readonly (string[] Extensions, string Reason)[] Skipped =
     [
         ([".cs"], "C# written against UnityEngine; port the script to Turian's Component API"),

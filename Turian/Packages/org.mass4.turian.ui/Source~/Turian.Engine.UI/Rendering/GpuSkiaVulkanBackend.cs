@@ -144,7 +144,7 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
                                 ?? throw new VulkanException("Skia could not wrap the UI render target");
             surface.Canvas.Clear(SKColors.Transparent);
             try { draw(surface.Canvas); }
-            finally { context!.Flush(true, false); }
+            finally { context!.Flush(); }
         }
         finally
         {

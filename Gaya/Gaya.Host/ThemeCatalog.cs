@@ -278,7 +278,7 @@ public sealed partial class ThemeCatalog
             return new StyleSheetText(entry.Text, entry.SourceName, entry.BaseUri);
         }
 
-        return id == GuinevereDefaultId ? new StyleSheetText(ExcaliburStyles.DefaultSheetText, id + Extension, null) : null;
+        return id == GuinevereDefaultId ? new StyleSheetText(ExcaliburStyles.DefaultSheetText, id + Extension) : null;
     }
 
     void Add(List<Entry> scanned, Dictionary<string, Entry> index, ThemeOrigin origin, string stem, string sourceName,

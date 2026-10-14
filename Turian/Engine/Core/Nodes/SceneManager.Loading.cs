@@ -106,7 +106,7 @@ public partial class SceneManager
         }
         else
         {
-            root.Awake(null, services, allowMissingServices);
+            root.Awake(null, services, missingServicesAllowed);
         }
 
         return root;
@@ -233,7 +233,7 @@ public partial class SceneManager
         }
         else
         {
-            clone.Awake(null, services, allowMissingServices);
+            clone.Awake(null, services, missingServicesAllowed);
         }
 
         return clone;

@@ -36,7 +36,7 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
             batch.Model = model;
             batch.LastSeen = retired.Frame;
             var submeshes = model.SubMeshes.Count * component.Count;
-            if (!frustum.IsEmpty && !GeometryUtility.TestPlanesAABB(frustum, component.WorldBounds))
+            if (!frustum.IsEmpty && !GeometryUtility.TestPlanesAabb(frustum, component.WorldBounds))
             {
                 stats = stats with { Culled = stats.Culled + submeshes };
                 continue;

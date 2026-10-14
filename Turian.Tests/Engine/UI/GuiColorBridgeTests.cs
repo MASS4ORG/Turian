@@ -9,8 +9,8 @@ public sealed class GuiColorBridgeTests
     [Fact]
     public void DirectCommandsPreserveEngineColorsAndAlpha()
     {
-        var fill = EngineColor.FromSrgb(new Color32(128, 64, 32, 255));
-        var border = EngineColor.FromSrgb(new Color32(0, 0, 255, 255));
+        var fill = EngineColor.FromSrgb(new Color32(128, 64, 32));
+        var border = EngineColor.FromSrgb(new Color32(0, 0, 255));
         var background = EngineColor.FromSrgb(new Color32(10, 20, 30, 128));
         Action<Gui, Rect, EngineColor, float, Corner> drawRect = GuiColorBridge.DrawRect;
         Action<Gui, Rect, EngineColor, float, float, Corner> drawBorder =

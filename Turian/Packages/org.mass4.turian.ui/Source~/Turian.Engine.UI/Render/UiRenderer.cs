@@ -219,7 +219,7 @@ public sealed partial class UiRenderer
         }
 
         active = Math.Clamp(active, 0, tabs.Count - 1);
-        var next = active;
+        int next;
 
         var node = gui.StyledNode(el.Tag, el.Classes, el.Name);
         ApplyAttributeSize(node, el);

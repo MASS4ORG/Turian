@@ -10,7 +10,6 @@ namespace Gaya.Plugin.Turian;
 public sealed class OutputLogBridge
 {
     readonly OutputPanelSettings settings;
-    readonly ILogger log;
     readonly BuildManager build;
 
     Assembly? lastAssembly;
@@ -22,18 +21,14 @@ public sealed class OutputLogBridge
     /// <param name="settings">The Output console's settings, read while ticking.</param>
     /// <param name="playMode">The play session whose start may clear the console.</param>
     /// <param name="build">The build manager whose tasks and assembly swaps may clear the console.</param>
-    /// <param name="log">Where each applied clear is reported.</param>
-    public OutputLogBridge(OutputPanelSettings settings, PlayModeService playMode, BuildManager build,
-        ILogger log)
+    public OutputLogBridge(OutputPanelSettings settings, PlayModeService playMode, BuildManager build)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(playMode);
         ArgumentNullException.ThrowIfNull(build);
-        ArgumentNullException.ThrowIfNull(log);
 
         this.settings = settings;
         this.build = build;
-        this.log = log;
 
         lastAssembly = build.ActiveUserAssembly;
 
@@ -56,13 +51,13 @@ public sealed class OutputLogBridge
         if (settings.ClearOnPlay && pendingPlay)
         {
             pendingPlay = false;
-            Apply("Play");
+            Apply();
         }
 
         if (settings.ClearOnBuild && pendingBuild)
         {
             pendingBuild = false;
-            Apply("Build");
+            Apply();
         }
 
         if (settings.ClearOnRecompile)
@@ -80,7 +75,7 @@ public sealed class OutputLogBridge
         }
 
         lastAssembly = current;
-        Apply("Recompile");
+        Apply();
     }
 
     void OnPlayState(PlayState state)
@@ -99,7 +94,7 @@ public sealed class OutputLogBridge
         }
     }
 
-    void Apply(string reason)
+    void Apply()
     {
         LogBuffer.Clear();
         Interlocked.Increment(ref generation);

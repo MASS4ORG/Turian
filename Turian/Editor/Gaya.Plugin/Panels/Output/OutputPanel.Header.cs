@@ -56,24 +56,24 @@ sealed partial class OutputPanel
     {
         var theme = ThemeTokens.Current;
         var box = theme.Scale(13f);
-        var rowHeight = theme.Scale(theme.RowHeight);
+        var entryHeight = theme.Scale(theme.RowHeight);
         var size = theme.Text(11f);
         var changed = false;
 
         using (gui.Node().Direction(Axis.Vertical).Gap(theme.Scale(2f)).Enter())
         {
-            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), box, size, rowHeight,
+            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), box, size, entryHeight,
                 () => settings.ShowTimestamp, value => settings.ShowTimestamp = value);
-            changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, rowHeight,
+            changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, entryHeight,
                 () => settings.Monospace, value => settings.Monospace = value);
-            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, entryHeight,
                 () => settings.ClearOnPlay, value => settings.ClearOnPlay = value);
-            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, entryHeight,
                 () => settings.ClearOnBuild, value => settings.ClearOnBuild = value);
-            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), box, size, entryHeight,
                 () => settings.ClearOnRecompile, value => settings.ClearOnRecompile = value);
 
-            using (gui.Node(-1, rowHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
+            using (gui.Node(-1, entryHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
                        .Direction(Axis.Horizontal).Gap(theme.Scale(6f)).ContentAlignY(0.5f).Enter())
             {
                 gui.DrawText(localization.T("Entry lines"), size, theme.InkDim);

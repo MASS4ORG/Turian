@@ -9,7 +9,6 @@ namespace Gaya.Plugin.Turian;
 public sealed class GayaPlugin : IPlugin
 {
     IReadOnlyList<string> args = [];
-    ILogger log = Log.Logger;
 
     /// <inheritdoc />
     public void Configure(IPluginContext context)
@@ -17,7 +16,6 @@ public sealed class GayaPlugin : IPlugin
         ArgumentNullException.ThrowIfNull(context);
 
         args = context.CommandLineArgs;
-        log = context.Logger;
         RegisterServices(context);
         RegisterSettings(context);
         ViewportThemeTokens.Register(context.Themes);
@@ -57,8 +55,7 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton(sp => new OutputLogBridge(
             sp.GetRequiredService<OutputPanelSettings>(),
             sp.GetRequiredService<PlayModeService>(),
-            sp.GetRequiredService<BuildManager>(),
-            sp.GetRequiredService<ILogger>()));
+            sp.GetRequiredService<BuildManager>()));
     }
 
     static void RegisterPanels(IPluginContext context)
@@ -132,7 +129,6 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetBrowserSettings>(),
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<AssetTypeCatalog>(),
-                sp.GetRequiredService<AssetPreviewCatalog>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
                 sp.GetRequiredService<AssetFileOperations>(),
                 sp.GetRequiredService<BricksController>(),

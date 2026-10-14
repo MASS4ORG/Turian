@@ -50,7 +50,7 @@ public sealed class CompileUserCode(
         using var workspace = MSBuildWorkspace.Create();
         await OpenProjects(workspace, csprojFilePaths).ConfigureAwait(false);
 
-        int errorCount = 0, warningCount = 0;
+        var warningCount = 0;
         var solution = workspace.CurrentSolution;
         foreach (var projectId in solution.GetProjectDependencyGraph().GetTopologicallySortedProjects())
         {
@@ -62,7 +62,6 @@ public sealed class CompileUserCode(
                 FileMode.Create, FileAccess.Write, FileShare.None);
             var result = compilation.Emit(fs);
             var (errors, warnings) = CompilationDiagnosticsReporter.Report(result.Diagnostics, Logger);
-            errorCount += errors;
             warningCount += warnings;
 
             if (!result.Success)

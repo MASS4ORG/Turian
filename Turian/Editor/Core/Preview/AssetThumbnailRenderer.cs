@@ -20,7 +20,7 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
             return null;
         }
 
-        if (provider.GetType() == typeof(TextureAssetPreviewProvider) && Decode(entry.AbsolutePath, size) is { } decoded)
+        if (provider is TextureAssetPreviewProvider && Decode(entry.AbsolutePath, size) is { } decoded)
         {
             return decoded;
         }

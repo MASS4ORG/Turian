@@ -98,7 +98,7 @@ public sealed class BrickForkTests : IDisposable
     [Fact]
     public void BinaryAndDeleteAgainstEditConflict()
     {
-        File.WriteAllBytes(Path.Combine(fork, "Runtime", "Icon.bin"), [9, 0, 9]);
+        File.WriteAllBytes(Path.Combine(fork, "Runtime", "Icon.bin"), "\t\0\t"u8);
         File.WriteAllBytes(Path.Combine(release, "Runtime", "Icon.bin"), [7, 0, 7]);
         Write(fork, "Runtime/Unused.txt", "edited by the fork\n");
         File.Delete(Path.Combine(release, "Runtime", "Unused.txt"));
@@ -106,7 +106,7 @@ public sealed class BrickForkTests : IDisposable
         var result = BrickFork.Rebase(original, release, fork);
 
         Assert.Equal(["Runtime/Icon.bin", "Runtime/Unused.txt"], result.Conflicts);
-        Assert.Equal([9, 0, 9], File.ReadAllBytes(Path.Combine(fork, "Runtime", "Icon.bin")));
+        Assert.Equal("\t\0\t"u8, File.ReadAllBytes(Path.Combine(fork, "Runtime", "Icon.bin")));
         Assert.Equal("edited by the fork\n", File.ReadAllText(Path.Combine(fork, "Runtime", "Unused.txt")));
     }
 

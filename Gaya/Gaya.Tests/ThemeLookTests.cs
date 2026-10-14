@@ -51,8 +51,8 @@ public sealed class ThemeLookTests : IDisposable
         service.ApplyLook("test.square");
 
         Assert.NotNull(service.Look);
-        var base_ = new StyleSheetCollection { service.Look };
-        Assert.StartsWith("0", base_.Resolve(new StyleTarget("button", null, [])).Get("border-radius"));
+        var baseSheets = new StyleSheetCollection { service.Look };
+        Assert.StartsWith("0", baseSheets.Resolve(new StyleTarget("button", null, [])).Get("border-radius"));
         Assert.True(service.SheetsVersion > version);
         Assert.Null(service.Diagnostic);
 

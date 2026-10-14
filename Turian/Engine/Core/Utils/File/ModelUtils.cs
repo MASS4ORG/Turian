@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>
 /// Utility class for loading and creating 3D models.
 /// </summary>
-public static partial class ModelUtils
+public static class ModelUtils
 {
     /// <summary>
     /// Loads the content of an embedded resource as a string.

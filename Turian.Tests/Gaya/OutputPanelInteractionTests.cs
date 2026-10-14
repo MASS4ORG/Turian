@@ -18,7 +18,7 @@ public sealed class OutputPanelInteractionTests
             var play = new PlayModeService(Substitute.For<IPlaySceneHost>(), new AssetDatabase(),
                 services, NullLogger.Instance);
             var settings = new OutputPanelSettings { ClearOnRecompile = false };
-            var bridge = new OutputLogBridge(settings, play, build, NullLogger.Instance);
+            var bridge = new OutputLogBridge(settings, play, build);
             var focus = Substitute.For<IFocusTracker>();
             focus.ActivePanelId.Returns(GayaPlugin.OutputPanelId);
             var panel = new OutputPanel(NullLogger.Instance, settings, bridge, new SettingsService(),

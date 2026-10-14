@@ -29,7 +29,11 @@ public sealed class SurfaceLifecycleTests
 
         public event Action? SurfaceRestored;
 
-        public event Action? Closing;
+        public event Action? Closing
+        {
+            add { }
+            remove { }
+        }
 
         public int Subscribers => (Resized?.GetInvocationList().Length ?? 0)
             + (SurfaceLost?.GetInvocationList().Length ?? 0) + (SurfaceRestored?.GetInvocationList().Length ?? 0);
@@ -43,8 +47,6 @@ public sealed class SurfaceLifecycleTests
         public void Lose() => SurfaceLost?.Invoke();
 
         public void Restore() => SurfaceRestored?.Invoke();
-
-        public void RequestClose() => Closing?.Invoke();
 
         public SurfaceKHR CreateSurface(Vk vk, Instance instance) => default;
 

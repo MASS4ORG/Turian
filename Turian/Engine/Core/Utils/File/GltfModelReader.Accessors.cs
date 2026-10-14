@@ -5,10 +5,10 @@ public static partial class GltfModelReader
     readonly record struct Accessor(ReadOnlyMemory<byte> Data, int Offset, int Stride, int Count,
         int Components, int ComponentType, bool Normalized, JsonElement Description)
     {
-        internal int ComponentSize => ComponentType switch { 5120 or 5121 => 1, 5122 or 5123 => 2, _ => 4 };
+        internal int ComponentByteSize => ComponentType switch { 5120 or 5121 => 1, 5122 or 5123 => 2, _ => 4 };
 
         internal ReadOnlySpan<byte> Element(int index) => Data.Span.Slice(Offset + index * Stride,
-            Components * ComponentSize);
+            Components * ComponentByteSize);
 
         internal Vector4 Vector(int index)
         {
@@ -28,7 +28,7 @@ public static partial class GltfModelReader
             values.Clear();
             for (var component = 0; component < Components; component++)
             {
-                values[component] = Float(bytes[(component * ComponentSize)..]);
+                values[component] = Float(bytes[(component * ComponentByteSize)..]);
             }
 
             return new(values[0], values[1], values[2], values[3]);
@@ -131,7 +131,7 @@ public static partial class GltfModelReader
 
     static void ValidateAccessor(Accessor accessor)
     {
-        var size = accessor.Components * accessor.ComponentSize;
+        var size = accessor.Components * accessor.ComponentByteSize;
         var end = accessor.Offset + Math.Max(0L, accessor.Count - 1L) * accessor.Stride;
         if (accessor.Count > 0)
         {

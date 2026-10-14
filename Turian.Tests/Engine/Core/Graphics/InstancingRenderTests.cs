@@ -13,7 +13,7 @@ public sealed class InstancingRenderTests(VulkanFixture fixture) : IClassFixture
 
     sealed class FixedDevice(Model model) : IRenderDevice
     {
-        public Model? GetModel(Guid modelAssetId, AssetDatabase assets) => model;
+        public Model GetModel(Guid modelAssetId, AssetDatabase assets) => model;
     }
 
     VulkanModel NewQuad() => new(fixture.Vulkan, new ModelBuilder

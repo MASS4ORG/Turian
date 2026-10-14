@@ -25,7 +25,7 @@ public sealed class AssetCacheReuseTests : IDisposable
         var artifactTime = File.GetLastWriteTimeUtc(artifact);
         var progress = Substitute.For<IProgressSink>();
         var indexing = Substitute.For<IProgressScope>();
-        progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets", 1).Returns(indexing);
+        progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets").Returns(indexing);
         Scan(progress);
         indexing.Received().Units(0, 0);
         Assert.Equal(original.ImportedAtUtc, Serializer.Load<ImportedAssetManifest>(manifestPath)!.ImportedAtUtc);

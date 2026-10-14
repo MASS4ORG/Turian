@@ -314,7 +314,7 @@ sealed class SceneTreePanel : IPanel
     /// <summary>Removes the selected node. What the panel's Delete shortcut runs.</summary>
     public void DeleteSelected() => RestructureSelection(() =>
     {
-        operations.Delete(inspector.SelectedNodes);
+        Operations.Delete(inspector.SelectedNodes);
         Invalidate();
     });
 
@@ -324,7 +324,7 @@ sealed class SceneTreePanel : IPanel
     /// <summary>Clones the selected node beside itself. What the panel's Duplicate shortcut runs.</summary>
     public void DuplicateSelected()
     {
-        var clones = operations.Duplicate(inspector.SelectedNodes);
+        var clones = Operations.Duplicate(inspector.SelectedNodes);
         if (clones.Count == 0)
         {
             return;
@@ -369,17 +369,6 @@ sealed class SceneTreePanel : IPanel
         Invalidate();
     }
 
-    /// <summary>Deletes a node, asking first to unpack the prefab instance that provides it.</summary>
-    void Delete(Node? node)
-    {
-        if (node is null || node.Parent is null)
-        {
-            return;
-        }
-
-        Restructure(node, () => DeleteNow(node));
-    }
-
     /// <summary>
     /// Runs a change to where <paramref name="node"/> sits in the hierarchy. A node its prefab provides must stay where
     /// the prefab puts it, as in Unity, so the instance is unpacked first when the user agrees.
@@ -418,29 +407,6 @@ sealed class SceneTreePanel : IPanel
             });
     }
 
-    void Reparent(Node node, Node target)
-    {
-        if (ReferenceEquals(node, target) || node.Parent is not { } parent)
-        {
-            return;
-        }
-
-        for (var ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
-        {
-            if (ReferenceEquals(ancestor, node))
-            {
-                return;
-            }
-        }
-
-        undo.RecordObject(parent, "Reparent");
-        undo.RecordObject(target, "Reparent");
-        sceneTree.DetachNode(node);
-        sceneTree.AttachNode(node, target, target.Children.Count);
-        sceneTree.MarkAssetModified();
-        Invalidate();
-    }
-
     void MoveBy(Node node, int offset)
     {
         if (node.Parent is not { } parent)
@@ -467,24 +433,6 @@ sealed class SceneTreePanel : IPanel
         && overrides.DiffFor(node)?.Added.Contains(node.Id) != true
             ? instance
             : null;
-
-    void DeleteNow(Node node)
-    {
-        if (node.Parent is not { } parent)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(inspector.SelectedNode, node))
-        {
-            inspector.ClearSelection();
-        }
-
-        undo.RecordObject(parent, "Delete");
-        sceneTree.DetachNode(node);
-        sceneTree.MarkAssetModified();
-        Invalidate();
-    }
 
     /// <summary>Saves the node as a prefab beside the open scene; the node becomes an instance of it.</summary>
     void CreatePrefab(Node? node)
@@ -558,12 +506,12 @@ sealed class SceneTreePanel : IPanel
         inspector.Select(node);
     }
 
-    NodeSelectionOperations operations => selectionOperations ??= new(sceneTree, inspector, undo);
+    NodeSelectionOperations Operations => selectionOperations ??= new(sceneTree, inspector, undo);
     NodeSelectionOperations? selectionOperations;
 
     void PullSelection()
     {
-        var nodes = state.SelectedIds.Select(key => nodesByKey.GetValueOrDefault(key)).OfType<Node>().ToArray();
+        var nodes = state.SelectedIds.Select(id => nodesByKey.GetValueOrDefault(id)).OfType<Node>().ToArray();
         var active = state.SelectedId is { } key ? nodesByKey.GetValueOrDefault(key) : null;
         if (nodes.SequenceEqual(syncedNodes) && ReferenceEquals(active, syncedSelection))
         {
@@ -590,7 +538,7 @@ sealed class SceneTreePanel : IPanel
 
         RestructureSelection(() =>
         {
-            operations.Reparent(inspector.SelectedNodes, target);
+            Operations.Reparent(inspector.SelectedNodes, target);
             Invalidate();
         });
     }

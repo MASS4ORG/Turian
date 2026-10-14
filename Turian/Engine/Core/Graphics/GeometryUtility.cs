@@ -34,7 +34,7 @@ public static class GeometryUtility
     }
 
     /// <summary>Returns whether a box intersects every plane; unknown bounds stay visible.</summary>
-    public static bool TestPlanesAABB(ReadOnlySpan<Plane> planes, Bounds bounds)
+    public static bool TestPlanesAabb(ReadOnlySpan<Plane> planes, Bounds bounds)
     {
         if (bounds.IsEmpty)
         {
