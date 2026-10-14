@@ -35,7 +35,7 @@ public sealed class CpuSkiaVulkanBackendTests : IClassFixture<VulkanFixture>
 
         Assert.NotNull(backend.Texture);
         Assert.Equal((4, 4), backend.Size);
-        Assert.Equal(4u, backend.Texture!.Width);
+        Assert.Equal(4u, backend.Texture.Width);
         Assert.Equal(4u, backend.Texture.Height);
         Assert.Equal(1u, backend.Texture.MipLevels);
         Assert.Equal(Format.R8G8B8A8Srgb, backend.Texture.Format);

@@ -129,7 +129,7 @@ public sealed class HzbCullingTests(VulkanFixture fixture) : IClassFixture<Vulka
 
     /// <summary>A provider retains separate frame slots and rebuilds its depth resources when the runtime size changes.</summary>
     [Fact]
-    public unsafe void ProviderSupportsFrameSlotsAndTargetResize()
+    public void ProviderSupportsFrameSlotsAndTargetResize()
     {
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var vulkan = fixture.Vulkan;

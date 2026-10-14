@@ -113,7 +113,7 @@ public sealed class TypeRegistryManifestTests : IDisposable
             var assembly = System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(
                 new AssemblyName($"{prefix}.{Guid.NewGuid():N}"),
                 System.Reflection.Emit.AssemblyBuilderAccess.Run);
-            return assembly.DefineDynamicModule("Main").DefineType(name).CreateType()!;
+            return assembly.DefineDynamicModule("Main").DefineType(name).CreateType();
         }
     }
 }

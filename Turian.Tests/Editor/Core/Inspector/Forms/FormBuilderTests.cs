@@ -342,7 +342,7 @@ public class FormBuilderTests
         var section = InspectorForms.BuildForNode(node).Sections[1];
 
         Assert.NotNull(section.EnabledField);
-        Assert.True(section.EnabledField!.SetValue(false));
+        Assert.True(section.EnabledField.SetValue(false));
         Assert.False(component.IsActive);
         Assert.DoesNotContain(section.BodyFields, static field => field.Name == nameof(Component.IsActive));
     }

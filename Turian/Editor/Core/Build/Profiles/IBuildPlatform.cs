@@ -230,7 +230,7 @@ sealed class DesktopBuildPlatform : IBuildPlatform
             // In the project rather than on the command line, so restore resolves the same runtime packs.
             if (!string.IsNullOrWhiteSpace(context.Profile?.RuntimeIdentifier))
             {
-                group.AddProperty("RuntimeIdentifier", context.Profile!.RuntimeIdentifier!.Trim());
+                group.AddProperty("RuntimeIdentifier", context.Profile.RuntimeIdentifier.Trim());
             }
         }
         else

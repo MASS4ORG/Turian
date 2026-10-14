@@ -70,7 +70,7 @@ public class AssetFileOperationsTests : IDisposable
     {
         var path = AddAsset("old.dataasset");
 
-        var renamed = operations.Rename(path, isDirectory: false, "new.dataasset")!;
+        var renamed = operations.Rename(path, isDirectory: false, "new.dataasset");
         Assert.True(File.Exists(renamed));
 
         undo.Undo();
@@ -91,7 +91,7 @@ public class AssetFileOperationsTests : IDisposable
         Directory.CreateDirectory(folder);
 
         files.Cut(path);
-        var pasted = operations.Paste(folder)!;
+        var pasted = operations.Paste(folder);
         Assert.True(File.Exists(pasted));
 
         undo.Undo();

@@ -39,7 +39,7 @@ public sealed class FirstPartyThemeBrickTests
     [Fact]
     public void StudioCatalogOffersTheBricksAsBuiltIn()
     {
-        var packages = Path.GetDirectoryName(BrickFolder("org.mass4.gaya.look-winxp"))!;
+        var packages = Path.GetDirectoryName(BrickFolder("org.mass4.gaya.look-winxp"));
         var studio = new StudioBricks(Path.Combine(Path.GetTempPath(), $"studio-{Guid.NewGuid():N}"),
             PackagedPlugins.DefaultHosts, builtinDirectory: packages);
 

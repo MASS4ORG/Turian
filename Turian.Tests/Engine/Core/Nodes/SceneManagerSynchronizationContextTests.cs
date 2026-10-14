@@ -52,7 +52,7 @@ public class SceneManagerSynchronizationContextTests
             Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Loading the scene deadlocked.");
             Assert.Null(failure);
             Assert.NotNull(root);
-            Assert.Equal("SceneRoot", root!.Name);
+            Assert.Equal("SceneRoot", root.Name);
         }
         finally
         {

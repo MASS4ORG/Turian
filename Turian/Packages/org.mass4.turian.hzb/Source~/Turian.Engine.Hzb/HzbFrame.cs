@@ -1,6 +1,6 @@
 namespace Turian.Engine.Hzb;
 
-sealed unsafe class HzbFrame : IDisposable
+sealed class HzbFrame : IDisposable
 {
     readonly DescriptorPool pool;
     readonly GpuCandidate[] candidates;

@@ -420,7 +420,7 @@ public class PlayModeServiceTests : IDisposable
 
         Assert.NotNull(ServiceCachingComponent.ResolvedAtAwake);
         Assert.Same(service.Input, ServiceCachingComponent.InputResolvedAtAwake);
-        Assert.NotNull(ServiceCachingComponent.ResolvedAtAwake!.LoadedScenes);
+        Assert.NotNull(ServiceCachingComponent.ResolvedAtAwake.LoadedScenes);
 
         service.Stop();
 
