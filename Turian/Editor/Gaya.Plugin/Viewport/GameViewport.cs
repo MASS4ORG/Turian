@@ -72,7 +72,11 @@ sealed class GameViewport : IDisposable
         get => showStatistics;
         set
         {
-            if (showStatistics == value) return;
+            if (showStatistics == value)
+            {
+                return;
+            }
+
             showStatistics = value;
             panelStatistics.Clear();
         }
@@ -82,19 +86,39 @@ sealed class GameViewport : IDisposable
     /// <param name="gui">The GUI for this frame.</param>
     public void Render(Gui gui)
     {
-        if (playMode.State == PlayState.Playing) gui.RequestFrame();
-        if (gui.Pass == Pass.Pass1Build) statisticsVisible = ShowStatistics && playMode.State == PlayState.Playing;
-        if (gui.Pass == Pass.Pass2Render) RenderViewport(gui);
+        if (playMode.State == PlayState.Playing)
+        {
+            gui.RequestFrame();
+        }
+
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            statisticsVisible = ShowStatistics && playMode.State == PlayState.Playing;
+        }
+
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            RenderViewport(gui);
+        }
+
         RenderStatisticsOverlay(gui);
     }
 
     void RenderStatisticsOverlay(Gui gui)
     {
-        if (!statisticsVisible) return;
+        if (!statisticsVisible)
+        {
+            return;
+        }
+
         using (gui.Node(-1, -1, "game/statistics").Expand().Absolute(0, 0).HitTestVisible(false).Enter())
         {
             gui.SetZIndex(1);
-            if (gui.Pass != Pass.Pass2Render || !ShowStatistics || panelStatistics.Count == 0) return;
+            if (gui.Pass != Pass.Pass2Render || !ShowStatistics || panelStatistics.Count == 0)
+            {
+                return;
+            }
+
             statisticsDrawing ??= new GameStatisticsDrawing(panelStatistics, sceneTree);
             gui.CurrentNode.DrawList.Add(statisticsDrawing);
         }
@@ -102,7 +126,11 @@ sealed class GameViewport : IDisposable
 
     void RenderViewport(Gui gui)
     {
-        if (!PrepareFrame(gui)) return;
+        if (!PrepareFrame(gui))
+        {
+            return;
+        }
+
         var rect = gui.CurrentNode.Rect;
         var (root, camera) = ResolveSource();
         if (root is null || camera is null)
@@ -127,7 +155,10 @@ sealed class GameViewport : IDisposable
 
         frame?.Dispose();
         frame = Snapshot(pixels, service.Width, service.Height);
-        if (frame is not null) gui.DrawImage(frame, rect);
+        if (frame is not null)
+        {
+            gui.DrawImage(frame, rect);
+        }
     }
 
     void RenderGameFrame(Node root, ICamera camera, double interval)
@@ -142,7 +173,10 @@ sealed class GameViewport : IDisposable
             target.SceneLoadMilliseconds = sceneTree.CurrentSceneLoadMilliseconds;
         }
         RenderStatisticsTargets.Record(target, service.FrameStats);
-        if (collectPanelStatistics) panelStatistics.Add(service.FrameStats);
+        if (collectPanelStatistics)
+        {
+            panelStatistics.Add(service.FrameStats);
+        }
     }
 
     bool PrepareFrame(Gui gui)
@@ -153,14 +187,22 @@ sealed class GameViewport : IDisposable
             return false;
         }
         var rect = gui.CurrentNode.Rect;
-        if (!EnsureService((uint)Math.Max(1f, rect.W), (uint)Math.Max(1f, rect.H))) return false;
+        if (!EnsureService((uint)Math.Max(1f, rect.W), (uint)Math.Max(1f, rect.H)))
+        {
+            return false;
+        }
+
         return true;
     }
 
     void ResizeCamera(ICamera camera)
     {
         // A primary-camera change needs a new aspect ratio even when the viewport size is unchanged.
-        if (camera is not CameraComponent component || ReferenceEquals(component, lastResizedCamera)) return;
+        if (camera is not CameraComponent component || ReferenceEquals(component, lastResizedCamera))
+        {
+            return;
+        }
+
         component.Resize(service!.Width, service.Height);
         lastResizedCamera = component;
     }
@@ -171,7 +213,10 @@ sealed class GameViewport : IDisposable
     /// </summary>
     (Node? Root, ICamera? Camera) ResolveSource()
     {
-        if (playMode.IsActive) return (playMode.PlayRoot, playMode.ActiveCamera);
+        if (playMode.IsActive)
+        {
+            return (playMode.PlayRoot, playMode.ActiveCamera);
+        }
 
         var root = sceneTree.EditorSceneRoot;
         return (root, root is null ? null : CameraComponent.FindPrimary(root));
@@ -181,7 +226,11 @@ sealed class GameViewport : IDisposable
     IUiPresenter? UiPresenter()
     {
         uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, playMode.Locale);
-        if (uiPresenter is not null) uiPresenter.IsPlaying = playMode.State == PlayState.Playing;
+        if (uiPresenter is not null)
+        {
+            uiPresenter.IsPlaying = playMode.State == PlayState.Playing;
+        }
+
         return uiPresenter;
     }
 
@@ -212,8 +261,16 @@ sealed class GameViewport : IDisposable
             return false;
         }
 
-        if (uiPresenter is { } presenter) presenter.Locale = playMode.Locale;
-        if (pixels.Length != width * height * 4) pixels = new byte[width * height * 4];
+        if (uiPresenter is { } presenter)
+        {
+            presenter.Locale = playMode.Locale;
+        }
+
+        if (pixels.Length != width * height * 4)
+        {
+            pixels = new byte[width * height * 4];
+        }
+
         return true;
     }
 
@@ -237,7 +294,10 @@ sealed class GameViewport : IDisposable
         var interactable = gui.GetInteractable();
         var hovered = interactable.OnHover();
 
-        if (hovered && interactable.OnClick()) gui.RequestFocus(FocusReason.Mouse);
+        if (hovered && interactable.OnClick())
+        {
+            gui.RequestFocus(FocusReason.Mouse);
+        }
 
         // Escape hands the keyboard back to the Studio, so a misbehaving session never traps it.
         if (gui.HasFocus() && input.IsKeyPressed(KeyboardKey.Escape))
@@ -250,7 +310,10 @@ sealed class GameViewport : IDisposable
         if (hovered)
         {
             playMode.Input.PushMouseMove(new Vector2(input.MousePosition.X - rect.X, input.MousePosition.Y - rect.Y));
-            if (input.MouseWheelDelta != 0f) playMode.Input.PushMouseScroll(input.MouseWheelDelta);
+            if (input.MouseWheelDelta != 0f)
+            {
+                playMode.Input.PushMouseScroll(input.MouseWheelDelta);
+            }
         }
 
         DiffButtons(input, hovered);
@@ -262,8 +325,15 @@ sealed class GameViewport : IDisposable
         foreach (var button in GuinevereInputMap.Buttons)
         {
             var down = active && input.IsMouseButtonDown(button);
-            if (down == heldButtons.Contains(button)) continue;
-            if (GuinevereInputMap.ToSilkMouseButton(button) is not { } mapped) continue;
+            if (down == heldButtons.Contains(button))
+            {
+                continue;
+            }
+
+            if (GuinevereInputMap.ToSilkMouseButton(button) is not { } mapped)
+            {
+                continue;
+            }
 
             if (down)
             {
@@ -283,8 +353,15 @@ sealed class GameViewport : IDisposable
         foreach (var key in GuinevereInputMap.Keys)
         {
             var down = active && input.IsKeyDown(key);
-            if (down == heldKeys.Contains(key)) continue;
-            if (GuinevereInputMap.ToSilkKey(key) is not { } mapped) continue;
+            if (down == heldKeys.Contains(key))
+            {
+                continue;
+            }
+
+            if (GuinevereInputMap.ToSilkKey(key) is not { } mapped)
+            {
+                continue;
+            }
 
             if (down)
             {
@@ -302,7 +379,10 @@ sealed class GameViewport : IDisposable
     /// <summary>Otherwise a key held while clicking away, or while play stops, stays down forever.</summary>
     void ReleaseInput()
     {
-        if (heldKeys.Count == 0 && heldButtons.Count == 0) return;
+        if (heldKeys.Count == 0 && heldButtons.Count == 0)
+        {
+            return;
+        }
 
         heldKeys.Clear();
         heldButtons.Clear();
@@ -325,7 +405,10 @@ sealed class GameViewport : IDisposable
     /// </summary>
     static SKImage? Snapshot(byte[] buffer, uint width, uint height)
     {
-        if (width == 0 || height == 0) return null;
+        if (width == 0 || height == 0)
+        {
+            return null;
+        }
 
         var info = new SKImageInfo((int)width, (int)height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);

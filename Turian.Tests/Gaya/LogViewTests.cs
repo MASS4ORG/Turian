@@ -52,7 +52,7 @@ public class LogViewTests
         var rows = LogView.Project(lines, "TEXTURE", true, true, true, collapse: false);
 
         Assert.Equal(2, rows.Count);
-        Assert.All(rows, row => Assert.Contains("texture", row.Line.Text, StringComparison.OrdinalIgnoreCase));
+        Assert.All(rows, static row => Assert.Contains("texture", row.Line.Text, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>A toggle switch removes one severity lane; the others stay.</summary>
@@ -69,7 +69,7 @@ public class LogViewTests
         var rows = LogView.Project(lines, "", errors: false, warnings: true, log: true, collapse: false);
 
         Assert.Equal(2, rows.Count);
-        Assert.DoesNotContain(rows, row => row.Line.Level == LogLevel.Error);
+        Assert.DoesNotContain(rows, static row => row.Line.Level == LogLevel.Error);
     }
 
     /// <summary>Collapse merges consecutive duplicates into one row whose count says how many it hides.</summary>
@@ -107,7 +107,7 @@ public class LogViewTests
         var rows = LogView.Project(lines, "", true, true, true, collapse: true);
 
         Assert.Equal(3, rows.Count);
-        Assert.All(rows, row => Assert.Equal(1, row.Count));
+        Assert.All(rows, static row => Assert.Equal(1, row.Count));
     }
 
     /// <summary>
@@ -142,7 +142,7 @@ public class LogViewTests
 
         var rows = LogView.Project(lines, "", true, true, true, collapse: false);
 
-        Assert.Equal(new[] { 0, 1 }, rows.Select(row => row.RawIndex));
+        Assert.Equal(new[] { 0, 1 }, rows.Select(static row => row.RawIndex));
     }
 
     /// <summary>One line keeps the whole single-line message and caps a multi-line one to its first line.</summary>

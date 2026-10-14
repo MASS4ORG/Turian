@@ -24,13 +24,22 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
         ArgumentNullException.ThrowIfNull(gui);
 
         var provider = asset is null ? null : catalog.GetProvider(asset.GetType());
-        if (provider is null || asset is null) return;
+        if (provider is null || asset is null)
+        {
+            return;
+        }
 
         using (gui.Node(previewSize, previewSize, "inspector/asset/preview").Enter())
         {
-            if (gui.Pass != Pass.Pass2Render) return;
+            if (gui.Pass != Pass.Pass2Render)
+            {
+                return;
+            }
 
-            if (!EnsureService()) return;
+            if (!EnsureService())
+            {
+                return;
+            }
 
             var rect = gui.CurrentNode.Rect;
             Render(gui, rect, asset, provider, gui.Time.DeltaTime);
@@ -39,7 +48,10 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
 
     bool EnsureService()
     {
-        if (service is not null) return true;
+        if (service is not null)
+        {
+            return true;
+        }
 
         try
         {
@@ -62,17 +74,28 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
 
         svc.Render(SceneRoot(asset, provider), deltaTime);
 
-        if (pixels.Length != svc.Width * svc.Height * 4) pixels = new byte[svc.Width * svc.Height * 4];
+        if (pixels.Length != svc.Width * svc.Height * 4)
+        {
+            pixels = new byte[svc.Width * svc.Height * 4];
+        }
+
         svc.CopyPixels(pixels);
 
         frame?.Dispose();
         frame = Snapshot(pixels, svc.Width, svc.Height);
-        if (frame is not null) gui.DrawImage(frame, rect);
+        if (frame is not null)
+        {
+            gui.DrawImage(frame, rect);
+        }
     }
 
     Node SceneRoot(Asset asset, IAssetPreviewProvider provider)
     {
-        if (provider is not IScenePreviewProvider sceneProvider) return emptyRoot;
+        if (provider is not IScenePreviewProvider sceneProvider)
+        {
+            return emptyRoot;
+        }
+
         if (sceneAssetId != asset.Id || sceneProviderType != provider.GetType())
         {
             scene?.OwnedResources?.Dispose();
@@ -91,7 +114,10 @@ sealed class AssetPreviewView(Vulkan vulkan, AssetDatabase assets, AssetPreviewC
     /// </summary>
     static SKImage? Snapshot(byte[] buffer, uint width, uint height)
     {
-        if (width == 0 || height == 0) return null;
+        if (width == 0 || height == 0)
+        {
+            return null;
+        }
 
         var info = new SKImageInfo((int)width, (int)height, SKColorType.Bgra8888, SKAlphaType.Premul);
         var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);

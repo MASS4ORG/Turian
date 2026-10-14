@@ -16,7 +16,11 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
     /// <summary>Subscribes to the connected keyboards and mice. Safe to call more than once.</summary>
     public void Initialize()
     {
-        if (subscribed) return;
+        if (subscribed)
+        {
+            return;
+        }
+
         subscribed = true;
 
         foreach (var keyboard in input.Keyboards)
@@ -37,7 +41,10 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
         {
             gamepad.ButtonDown += OnPadDown;
             gamepad.ButtonUp += OnPadUp;
-            if (gamepad.IsConnected) state.PushGamepadConnected(gamepad.Index);
+            if (gamepad.IsConnected)
+            {
+                state.PushGamepadConnected(gamepad.Index);
+            }
         }
 
         input.ConnectionChanged += OnConnectionChanged;
@@ -95,7 +102,10 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
     /// </summary>
     public void NewFrame()
     {
-        foreach (var gamepad in input.Gamepads.Where(pad => pad.IsConnected)) PollAxes(gamepad);
+        foreach (var gamepad in input.Gamepads.Where(static pad => pad.IsConnected))
+        {
+            PollAxes(gamepad);
+        }
 
         state.NewFrame();
     }
@@ -119,9 +129,11 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
         }
 
         foreach (var trigger in gamepad.Triggers)
+        {
             state.PushGamepadAxis(gamepad.Index,
                 trigger.Index == 0 ? GamepadAxis.LeftTrigger : GamepadAxis.RightTrigger,
                 Deaden(trigger.Position));
+        }
     }
 
     static float Deaden(float value) => Math.Abs(value) < deadZone ? 0f : value;
@@ -148,7 +160,10 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
 
     void OnConnectionChanged(IInputDevice device, bool connected)
     {
-        if (device is not IGamepad gamepad) return;
+        if (device is not IGamepad gamepad)
+        {
+            return;
+        }
 
         if (connected)
         {
@@ -165,18 +180,28 @@ public sealed class SilkInputSource(InputManager inputManager) : IInputSource, I
 
     void OnPadDown(IGamepad gamepad, Button button)
     {
-        if (Map(button.Name) is { } mapped) state.PushGamepadButtonDown(gamepad.Index, mapped);
+        if (Map(button.Name) is { } mapped)
+        {
+            state.PushGamepadButtonDown(gamepad.Index, mapped);
+        }
     }
 
     void OnPadUp(IGamepad gamepad, Button button)
     {
-        if (Map(button.Name) is { } mapped) state.PushGamepadButtonUp(gamepad.Index, mapped);
+        if (Map(button.Name) is { } mapped)
+        {
+            state.PushGamepadButtonUp(gamepad.Index, mapped);
+        }
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (!subscribed) return;
+        if (!subscribed)
+        {
+            return;
+        }
+
         subscribed = false;
 
         foreach (var keyboard in input.Keyboards)

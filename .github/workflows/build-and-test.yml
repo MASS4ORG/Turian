@@ -20,6 +20,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  analyzer-audit:
+    runs-on: ubuntu-26.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Restore published dependencies
+        run: dotnet restore Turian.slnx -p:NoLocalPackages=true
+      - name: Verify analyzer reporting
+        run: dotnet run .analyzers/verify.cs
+      - name: Collect pending analyzer groups
+        continue-on-error: true
+        run: dotnet build Turian.slnx --no-restore --no-incremental -p:Mass4AnalyzerAudit=true -p:NoLocalPackages=true -p:SkipShaders=true -p:CI=true
+      - name: Summarize unique occurrences
+        if: always()
+        continue-on-error: true
+        run: dotnet run .analyzers/summarize.cs artifacts/analyzers artifacts/analyzers/occurrences.txt
+      - name: Upload analyzer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: analyzer-audit
+          path: artifacts/analyzers/
+          retention-days: 7
+
   test:
     runs-on: ubuntu-26.04
     permissions:
@@ -32,7 +59,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # glslc: shader compilation (CompileShaders). fontconfig/dejavu: SkiaSharp text rendering
       # at test-run time (Guinevere UI); the ubuntu-latest image ships neither.
@@ -82,7 +109,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Install packaging tools
         run: |

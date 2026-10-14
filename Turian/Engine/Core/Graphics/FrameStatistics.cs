@@ -24,14 +24,22 @@ public sealed class FrameStatistics
     public void Add(RenderFrameStats stats)
     {
         var now = Stopwatch.GetTimestamp();
-        if (lastTimestamp != 0) Add((now - lastTimestamp) / (double)Stopwatch.Frequency, stats);
+        if (lastTimestamp != 0)
+        {
+            Add((now - lastTimestamp) / (double)Stopwatch.Frequency, stats);
+        }
+
         lastTimestamp = now;
     }
 
     /// <summary>Adds a completed render and the actual frame interval, in seconds.</summary>
     public void Add(double intervalSeconds, RenderFrameStats stats)
     {
-        if (!double.IsFinite(intervalSeconds) || intervalSeconds <= 0) return;
+        if (!double.IsFinite(intervalSeconds) || intervalSeconds <= 0)
+        {
+            return;
+        }
+
         samples[next] = (intervalSeconds * 1000, stats);
         next = (next + 1) % samples.Length;
         count = Math.Min(count + 1, samples.Length);
@@ -147,24 +155,40 @@ public sealed class FrameStatistics
         /// <summary>Appends a literal without allocating.</summary>
         public void Append(ReadOnlySpan<char> text)
         {
-            if (text.TryCopyTo(buffer[written..])) written += text.Length;
-            else failed = true;
+            if (text.TryCopyTo(buffer[written..]))
+            {
+                written += text.Length;
+            }
+            else
+            {
+                failed = true;
+            }
         }
 
         /// <summary>Appends an integer without boxing.</summary>
         public void Append(long value)
         {
             if (value.TryFormat(buffer[written..], out var length, provider: CultureInfo.InvariantCulture))
+            {
                 written += length;
-            else failed = true;
+            }
+            else
+            {
+                failed = true;
+            }
         }
 
         /// <summary>Appends a fixed-precision floating point value without boxing.</summary>
         public void Append(double value, ReadOnlySpan<char> format)
         {
             if (value.TryFormat(buffer[written..], out var length, format, CultureInfo.InvariantCulture))
+            {
                 written += length;
-            else failed = true;
+            }
+            else
+            {
+                failed = true;
+            }
         }
     }
 }

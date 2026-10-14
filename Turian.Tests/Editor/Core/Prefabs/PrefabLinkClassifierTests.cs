@@ -21,7 +21,11 @@ public class PrefabLinkClassifierTests
     static Node Scene(params Node[] children)
     {
         var scene = new Node { Name = "Scene" };
-        foreach (var child in children) scene.Children.Add(child);
+        foreach (var child in children)
+        {
+            scene.Children.Add(child);
+        }
+
         scene.Awake(null);
         return scene;
     }

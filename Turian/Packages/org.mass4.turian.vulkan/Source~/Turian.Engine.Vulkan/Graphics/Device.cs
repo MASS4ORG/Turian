@@ -171,7 +171,11 @@ public unsafe partial class Device : IDisposable
         this.requestedMsaaSamples = requestedMsaaSamples;
         CreateInstance();
         SetupDebugMessenger();
-        if (!IsHeadless) CreateSurface();
+        if (!IsHeadless)
+        {
+            CreateSurface();
+        }
+
         CreateLogicalDevice();
         CreateCommandPool();
 
@@ -242,8 +246,7 @@ public unsafe partial class Device : IDisposable
             }
         }
 
-        MemoryRequirements memRequirements;
-        vk.GetBufferMemoryRequirements(device, buffer, out memRequirements);
+        vk.GetBufferMemoryRequirements(device, buffer, out var memRequirements);
 
         MemoryAllocateInfo allocateInfo = new()
         {
@@ -306,7 +309,9 @@ public unsafe partial class Device : IDisposable
         };
 
         if (vk.CreateImage(device, in info, null, out image) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to create image");
+        }
 
         vk.GetImageMemoryRequirements(device, image, out var req);
         MemoryAllocateInfo alloc = new()
@@ -317,7 +322,9 @@ public unsafe partial class Device : IDisposable
         };
 
         if (vk.AllocateMemory(device, in alloc, null, out memory) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to allocate image memory");
+        }
 
         _ = vk.BindImageMemory(device, image, memory, 0);
     }
@@ -395,7 +402,10 @@ public unsafe partial class Device : IDisposable
     /// <param name="regions">One copy region per mip level.</param>
     public void CopyBufferToImage(Silk.NET.Vulkan.Buffer src, Image dst, ReadOnlySpan<BufferImageCopy> regions)
     {
-        if (regions.IsEmpty) return;
+        if (regions.IsEmpty)
+        {
+            return;
+        }
 
         var cmd = BeginSingleTimeCommands();
         fixed (BufferImageCopy* pRegions = regions)

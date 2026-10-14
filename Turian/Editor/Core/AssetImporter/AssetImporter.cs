@@ -153,13 +153,15 @@ public sealed partial class AssetImporter : IDisposable
 
     readonly BuildManager? build;
 
-    IEnumerable<Assembly> LoadedAssemblies => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+    IEnumerable<ReflectionAssembly> LoadedAssemblies => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
 
     /// <summary>Rebuilds the importer list when assemblies have loaded since it was made.</summary>
     void RefreshImporters()
     {
         if (LoadedAssemblies.Count() != importerAssemblyCount)
+        {
             assetImporters = BuildImporterList();
+        }
     }
 
     List<IAssetImporter> BuildImporterList()
@@ -170,7 +172,7 @@ public sealed partial class AssetImporter : IDisposable
             .Where(static type =>
                 typeof(IAssetImporter).IsAssignableFrom(type)
                 && type is { IsInterface: false, IsAbstract: false })
-            .Select(type => new
+            .Select(static type => new
             {
                 Type = type,
                 IsLastResort = type.GetCustomAttributes(typeof(DefaultOptionAttribute), false).Length > 0
@@ -182,7 +184,7 @@ public sealed partial class AssetImporter : IDisposable
             .Cast<IAssetImporter>()];
     }
 
-    static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    static IEnumerable<Type> GetLoadableTypes(ReflectionAssembly assembly)
     {
         try
         {
@@ -196,7 +198,10 @@ public sealed partial class AssetImporter : IDisposable
 
     void InitializeForAssetsRoot(string assetFolderPath, IProgressSink? progress = null)
     {
-        if (!HasAssetsFolder(assetFolderPath)) return;
+        if (!HasAssetsFolder(assetFolderPath))
+        {
+            return;
+        }
 
         lock (syncRoot)
         {
@@ -229,8 +234,16 @@ public sealed partial class AssetImporter : IDisposable
 
     bool HasAssetsFolder(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return false;
-        if (Directory.Exists(path)) return true;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        if (Directory.Exists(path))
+        {
+            return true;
+        }
+
         logger.LogWarning("Unable to initialize asset importer. Asset folder does not exist: {AssetFolderPath}", path);
         return false;
     }
@@ -286,13 +299,17 @@ public sealed partial class AssetImporter : IDisposable
         try
         {
             using (var phase = progress.BeginChild(BackgroundTaskKind.Scan, "Checking assets"))
+            {
                 ImportFiles(files, phase);
+            }
 
             // The batch stays open here: a model reconfiguring its textures reimports them, and an
             // immediate rebuild would reseed the database from the on-disk catalog, discarding the
             // children registered so far. Those reimports append to the batch and are handled below.
             using (var phase = progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets"))
+            {
                 IndexImportedAssets(batch, phase);
+            }
         }
         finally
         {
@@ -315,7 +332,9 @@ public sealed partial class AssetImporter : IDisposable
             EnsureAssetImported(files[i], overwriteExisting: false);
             progress.Units(i + 1, files.Length);
             if ((i + 1) % importProgressInterval == 0 || i + 1 == files.Length)
+            {
                 logger.LogDebug("Asset scan: {Checked}/{FileCount} files", i + 1, files.Length);
+            }
         }
     }
 
@@ -346,19 +365,28 @@ public sealed partial class AssetImporter : IDisposable
 
         foreach (var record in assetDatabase.Assets.Values)
         {
-            if (record.AssetTypeName != typeof(TextureAsset).FullName) continue;
+            if (record.AssetTypeName != typeof(TextureAsset).FullName)
+            {
+                continue;
+            }
 
             foreach (var artifact in record.TargetArtifacts.Values)
             {
                 var path = Path.Combine(record.ProjectRootPath, artifact);
-                if (!File.Exists(path)) continue;
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
 
                 bytes += new FileInfo(path).Length;
                 count++;
             }
         }
 
-        if (count == 0) return;
+        if (count == 0)
+        {
+            return;
+        }
 
         logger.LogInformation(
             "Texture cache: {Megabytes:F1} MiB across {Count} baked textures",
@@ -370,7 +398,11 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
-            if (disposed) return;
+            if (disposed)
+            {
+                return;
+            }
+
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -402,7 +434,11 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
-            if (disposed) return;
+            if (disposed)
+            {
+                return;
+            }
+
             if (ShouldIgnorePath(e.FullPath))
             {
                 return;
@@ -432,7 +468,11 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
-            if (disposed) return;
+            if (disposed)
+            {
+                return;
+            }
+
             if (IsMetaFilePath(e.FullPath))
             {
                 if (ShouldIgnoreMetaPath(e.FullPath))
@@ -457,7 +497,11 @@ public sealed partial class AssetImporter : IDisposable
     {
         lock (syncRoot)
         {
-            if (disposed) return;
+            if (disposed)
+            {
+                return;
+            }
+
             if (!ShouldHandleRename(e.OldFullPath, e.FullPath))
             {
                 return;

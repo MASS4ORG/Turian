@@ -118,7 +118,9 @@ public static class BrickCatalog
         }
 
         foreach (var manifest in BuiltinBricks(builtinDirectory, reserved).Where(m => m.EffectiveScopes.Contains(scope)))
+        {
             Offer(bricks, manifest, $"builtin:{manifest.Name}", null, stored: false);
+        }
 
         if (store is not null)
         {
@@ -145,7 +147,10 @@ public static class BrickCatalog
         var merged = bricks.ToDictionary(static b => b.Id, StringComparer.Ordinal);
         foreach (var (registry, id, latest) in found)
         {
-            if (!PackageId.IsValid(id) || !SemanticVersion.TryParse(latest, out var version)) continue;
+            if (!PackageId.IsValid(id) || !SemanticVersion.TryParse(latest, out var version))
+            {
+                continue;
+            }
 
             merged[id] = merged.TryGetValue(id, out var known)
                 ? Offered(known, latest, registry, version)
@@ -213,7 +218,10 @@ public static class BrickCatalog
     static void Offer(Dictionary<string, CatalogBrick> bricks, PackageManifest manifest, string? origin,
         string? installSource, bool stored)
     {
-        if (manifest.Version is not { } version) return;
+        if (manifest.Version is not { } version)
+        {
+            return;
+        }
 
         if (!bricks.TryGetValue(manifest.Name, out var known))
         {
@@ -224,7 +232,10 @@ public static class BrickCatalog
             return;
         }
 
-        if (!Newer(known, version)) return;
+        if (!Newer(known, version))
+        {
+            return;
+        }
 
         // A brick in use keeps the source it came from, and a built-in brick wins over the same id elsewhere.
         bricks[manifest.Name] = known.State == BrickState.Enabled || known.IsBuiltin
@@ -244,7 +255,10 @@ public static class BrickCatalog
 
     static IEnumerable<PackageManifest> BuiltinBricks(string? directory, IReadOnlyCollection<string> reserved)
     {
-        if (directory is null || !Directory.Exists(directory)) yield break;
+        if (directory is null || !Directory.Exists(directory))
+        {
+            yield break;
+        }
 
         foreach (var folder in Directory.EnumerateDirectories(directory))
         {

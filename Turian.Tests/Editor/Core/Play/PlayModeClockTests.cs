@@ -118,7 +118,7 @@ public sealed class PlayModeClockTests
                          }
                          """;
             var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path));
+                .Select(static path => MetadataReference.CreateFromFile(path));
             var syntax = CSharpSyntaxTree.ParseText(source, cancellationToken: TestContext.Current.CancellationToken);
             var compilation = CSharpCompilation.Create("ClockGame", [syntax], references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

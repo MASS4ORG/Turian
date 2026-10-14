@@ -53,7 +53,10 @@ public sealed class FrameStatisticsHudTests(VulkanFixture fixture) : IClassFixtu
         void Frame() => InspectorFormsRenderingTests.Frame(gui, surface, font, current =>
         {
             toolbar.Render(current);
-            using (current.Node(800, 400, "viewport").Enter()) viewport.Render(current);
+            using (current.Node(800, 400, "viewport").Enter())
+            {
+                viewport.Render(current);
+            }
         });
     }
 

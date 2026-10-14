@@ -65,7 +65,11 @@ public sealed class TypeRegistryManifestTests : IDisposable
     [InlineData("{}")]
     public void UnusableManifestIsIgnored(string? content)
     {
-        if (content is not null) File.WriteAllText(Manifest, content);
+        if (content is not null)
+        {
+            File.WriteAllText(Manifest, content);
+        }
+
         var count = TypeRegistry.Count;
 
         TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance);
@@ -87,8 +91,15 @@ public sealed class TypeRegistryManifestTests : IDisposable
         var assemblyName = missingAssembly ? "Missing.Example" : current.Assembly.GetName().Name;
         var entry = new JsonObject { ["FullyQualifiedName"] = name, ["TypeId"] = id.ToString() };
         var manifest = new JsonObject { ["Types"] = new JsonArray(entry) };
-        if (defaultAssembly) manifest["AssemblyName"] = assemblyName;
-        else entry["Assembly"] = assemblyName;
+        if (defaultAssembly)
+        {
+            manifest["AssemblyName"] = assemblyName;
+        }
+        else
+        {
+            entry["Assembly"] = assemblyName;
+        }
+
         File.WriteAllText(Manifest, manifest.ToJsonString());
 
         TypeRegistry.RegisterFromManifest(Manifest, NullLogger.Instance);

@@ -64,7 +64,13 @@ public sealed partial class GameLoopScheduler : IDisposable
     /// <summary>The number of registered operations, including completed values awaiting consumption.</summary>
     public int OutstandingCount
     {
-        get { lock (gate) return outstanding.Count; }
+        get
+        {
+            lock (gate)
+            {
+                return outstanding.Count;
+            }
+        }
     }
 
     /// <summary>Installs this session's synchronization context until the returned scope is disposed.</summary>
@@ -118,7 +124,10 @@ public sealed partial class GameLoopScheduler : IDisposable
     {
         lock (gate)
         {
-            if (!stopped) ready.Enqueue(new ReadyWork(callback, state, owner, default));
+            if (!stopped)
+            {
+                ready.Enqueue(new ReadyWork(callback, state, owner, default));
+            }
         }
     }
 
@@ -128,36 +137,59 @@ public sealed partial class GameLoopScheduler : IDisposable
     internal void RequireMainThread()
     {
         if (!IsMainThread)
+        {
             throw new InvalidOperationException("Gameplay phases must run on the session's game thread.");
+        }
     }
 
     void RequireIdle()
     {
         RequireMainThread();
-        if (draining) throw new InvalidOperationException("Gameplay phase drains cannot be reentered.");
+        if (draining)
+        {
+            throw new InvalidOperationException("Gameplay phase drains cannot be reentered.");
+        }
     }
 
     void Drain(Queue<OperationLease> queue, bool includeReady)
     {
         RequireIdle();
-        if (stopped) return;
+        if (stopped)
+        {
+            return;
+        }
+
         using var scope = EnterContext();
         draining = true;
         try
         {
-            if (includeReady) DrainReady();
+            if (includeReady)
+            {
+                DrainReady();
+            }
+
             var count = queue.Count;
             for (var i = 0; i < count; i++)
             {
                 var lease = queue.Dequeue();
-                if (!lease.IsPending) continue;
-                if (!lease.Operation!.TryComplete(lease.Generation)) queue.Enqueue(lease);
+                if (!lease.IsPending)
+                {
+                    continue;
+                }
+
+                if (!lease.Operation!.TryComplete(lease.Generation))
+                {
+                    queue.Enqueue(lease);
+                }
             }
         }
         finally
         {
             draining = false;
-            if (stopped) Dispose();
+            if (stopped)
+            {
+                Dispose();
+            }
         }
     }
 
@@ -168,11 +200,22 @@ public sealed partial class GameLoopScheduler : IDisposable
         {
             if (work.Lease.Operation is { } operation)
             {
-                if (work.Lease.IsPending) operation.TryComplete(work.Lease.Generation);
-                else operation.InvokeContinuation(work.Lease.Generation);
+                if (work.Lease.IsPending)
+                {
+                    operation.TryComplete(work.Lease.Generation);
+                }
+                else
+                {
+                    operation.InvokeContinuation(work.Lease.Generation);
+                }
+
                 continue;
             }
-            if (stopped || IsDestroyed(work.Owner)) continue;
+            if (stopped || IsDestroyed(work.Owner))
+            {
+                continue;
+            }
+
             try { work.Callback!(work.State); }
             catch (Exception ex) { Report(ex, work.Owner); }
         }
@@ -187,7 +230,10 @@ public sealed partial class GameLoopScheduler : IDisposable
         finally
         {
             draining = false;
-            if (stopped) Dispose();
+            if (stopped)
+            {
+                Dispose();
+            }
         }
     }
 
@@ -212,14 +258,19 @@ public sealed partial class GameLoopScheduler : IDisposable
         {
             outstanding.Remove(operation);
             operation.Clear();
-            if (!stopped) pool.Push(operation);
+            if (!stopped)
+            {
+                pool.Push(operation);
+            }
         }
     }
 
     static void ValidateDuration(double seconds)
     {
         if (!double.IsFinite(seconds) || seconds < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(seconds), "Duration must be finite and non-negative.");
+        }
     }
 
     readonly record struct ReadyWork(SendOrPostCallback? Callback, object? State, Component? Owner,

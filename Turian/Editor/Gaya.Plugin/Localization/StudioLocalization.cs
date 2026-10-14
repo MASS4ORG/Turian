@@ -37,7 +37,7 @@ sealed class StudioLocalization : IShellLocalization
 
     /// <summary>The locales this shell ships tables for, plus the English source.</summary>
     public IReadOnlyList<string> AvailableLocales =>
-        ["en", .. embeddedLocales.Select(LocaleOfResource).Where(name => !string.Equals(name, "en", StringComparison.OrdinalIgnoreCase))];
+        ["en", .. embeddedLocales.Select(LocaleOfResource).Where(static name => !string.Equals(name, "en", StringComparison.OrdinalIgnoreCase))];
 
     /// <summary>Translates a shell string by its English source; the source passes through untranslated.</summary>
     /// <param name="source">The authored English string.</param>

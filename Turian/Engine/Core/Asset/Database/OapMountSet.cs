@@ -79,13 +79,21 @@ public sealed class OapMountSet : IDisposable
             var ordered = OrderByRequirements(readers);
             WarnAboutConflicts(ordered);
             var mountSet = new OapMountSet(ordered, directory, packages, identities);
-            if (Cache.Count > 64) Cache.Clear();
+            if (Cache.Count > 64)
+            {
+                Cache.Clear();
+            }
+
             Cache[cacheKey] = new WeakReference<OapMountSet>(mountSet);
             return mountSet;
         }
         catch
         {
-            foreach (var reader in readers) reader.Dispose();
+            foreach (var reader in readers)
+            {
+                reader.Dispose();
+            }
+
             throw;
         }
     }
@@ -95,24 +103,38 @@ public sealed class OapMountSet : IDisposable
     public void EnsureUnchanged()
     {
         if (!IsCurrent(directory, DiscoverPackages(directory, packages[^1])))
+        {
             throw new InvalidDataException(
                 $"OAP content changed during the active session at '{identities[^1].Id}'; start a new content session.");
+        }
     }
 
     /// <summary>Releases the mounted packages' sources.</summary>
     public void Dispose()
     {
-        foreach (var reader in Readers) reader.Dispose();
+        foreach (var reader in Readers)
+        {
+            reader.Dispose();
+        }
     }
 
     // Compares probed identities with the mounted ones, so detecting a change never opens or reads a package.
     bool IsCurrent(IContentDirectory location, IReadOnlyList<string> current)
     {
-        if (current.Count != identities.Count) return false;
+        if (current.Count != identities.Count)
+        {
+            return false;
+        }
+
         for (var i = 0; i < current.Count; i++)
+        {
             if (!string.Equals(current[i], packages[i], StringComparison.Ordinal) ||
                 location.Probe(current[i]) != identities[i])
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 
@@ -139,7 +161,11 @@ public sealed class OapMountSet : IDisposable
         }
         catch
         {
-            foreach (var reader in readers) reader.Dispose();
+            foreach (var reader in readers)
+            {
+                reader.Dispose();
+            }
+
             throw;
         }
 
@@ -182,8 +208,15 @@ public sealed class OapMountSet : IDisposable
     {
         foreach (var candidate in Readers)
         {
-            if (find(candidate) is not { } found) continue;
-            if (found.IsTombstone) break;
+            if (find(candidate) is not { } found)
+            {
+                continue;
+            }
+
+            if (found.IsTombstone)
+            {
+                break;
+            }
 
             reader = candidate;
             entry = found;
@@ -216,8 +249,13 @@ public sealed class OapMountSet : IDisposable
     {
         var byName = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var i = 0; i < manifests.Count; i++)
+        {
             if (manifests[i] is { Name.Length: > 0 } manifest && !byName.TryAdd(manifest.Name, i))
+            {
                 throw new InvalidOperationException($"Multiple OAP packages are named '{manifest.Name}'.");
+            }
+        }
+
         return byName;
     }
 
@@ -230,11 +268,19 @@ public sealed class OapMountSet : IDisposable
         {
             ordered.Add(readers[index]);
             foreach (var dependency in dependencies[index])
-                if (--dependents[dependency] == 0) ready.Enqueue(dependency, dependency);
+            {
+                if (--dependents[dependency] == 0)
+                {
+                    ready.Enqueue(dependency, dependency);
+                }
+            }
         }
 
         if (ordered.Count != readers.Count)
+        {
             throw new InvalidOperationException("OAP package requirements form a cycle.");
+        }
+
         return ordered;
     }
 
@@ -242,8 +288,13 @@ public sealed class OapMountSet : IDisposable
     {
         var dependents = new int[dependencies.Count];
         foreach (var packageDependencies in dependencies)
+        {
             foreach (var dependency in packageDependencies)
+            {
                 dependents[dependency]++;
+            }
+        }
+
         return dependents;
     }
 
@@ -251,7 +302,13 @@ public sealed class OapMountSet : IDisposable
     {
         var ready = new PriorityQueue<int, int>();
         for (var i = 0; i < dependents.Count; i++)
-            if (dependents[i] == 0) ready.Enqueue(i, i);
+        {
+            if (dependents[i] == 0)
+            {
+                ready.Enqueue(i, i);
+            }
+        }
+
         return ready;
     }
 
@@ -262,7 +319,9 @@ public sealed class OapMountSet : IDisposable
         {
             manifests[i] = OapManifest.TryParse(readers[i].Manifest);
             if (readers[i].Manifest is { Length: > 0 } && manifests[i] is null)
+            {
                 throw new InvalidOperationException($"OAP mount {i} has an invalid manifest.");
+            }
         }
         return manifests;
     }
@@ -275,16 +334,25 @@ public sealed class OapMountSet : IDisposable
             var manifest = manifests[i];
             var resolved = new List<int>();
             if (manifest is not null)
+            {
                 foreach (var required in manifest.Requires)
                 {
                     if (!byName.TryGetValue(required, out var dependency))
+                    {
                         throw new InvalidOperationException(
                             $"OAP package '{manifest.Name}' requires '{required}', which is not mounted.");
+                    }
+
                     if (i == manifests.Count - 1)
+                    {
                         throw new InvalidOperationException(
                             $"Base OAP package '{manifest.Name}' cannot require overlay '{required}'.");
+                    }
+
                     resolved.Add(dependency);
                 }
+            }
+
             dependencies[i] = [.. resolved.Distinct()];
         }
         return dependencies;
@@ -292,7 +360,10 @@ public sealed class OapMountSet : IDisposable
 
     static void WarnAboutConflicts(IReadOnlyList<OapReader> readers)
     {
-        if (readers.Count < 2) return;
+        if (readers.Count < 2)
+        {
+            return;
+        }
 
         var owners = new Dictionary<Guid, int>();
         var conflicts = 0;
@@ -301,15 +372,24 @@ public sealed class OapMountSet : IDisposable
         {
             foreach (var entry in readers[i].Entries)
             {
-                if (!IsOverride(owners, entry, i)) continue;
-                if (conflicts++ == 0) firstConflict = entry.AssetId;
+                if (!IsOverride(owners, entry, i))
+                {
+                    continue;
+                }
+
+                if (conflicts++ == 0)
+                {
+                    firstConflict = entry.AssetId;
+                }
             }
         }
 
         if (conflicts > 0)
+        {
             Log.Logger.LogWarning(
                 "{Count} OAP asset override(s) occur across mounted packages (first: {AssetId}); highest-priority mount wins",
                 conflicts, firstConflict);
+        }
     }
 
     // An asset another mount already holds; tombstones remove rather than override, so they never count.

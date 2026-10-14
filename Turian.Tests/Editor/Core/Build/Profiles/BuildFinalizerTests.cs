@@ -30,7 +30,9 @@ public sealed class BuildFinalizerTests : IDisposable
         var output = Path.Combine(project, "Output");
         Directory.CreateDirectory(output);
         foreach (var file in new[] { "Game.pdb", "Game.xml", "Game.deps.json", "Game.dll", "project" })
+        {
             File.WriteAllText(Path.Combine(output, file), string.Empty);
+        }
 
         var artifact = await new DesktopBuildPlatform().FinalizeAsync(Context(output, "project.csproj"),
             CancellationToken.None);

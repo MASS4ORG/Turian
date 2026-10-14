@@ -21,11 +21,17 @@ public static class Serializer
         get
         {
             var options = _jsonOptions;
-            if (options is not null) return options;
+            if (options is not null)
+            {
+                return options;
+            }
 
             lock (OptionsGate)
             {
-                if (_jsonOptions is not null) return _jsonOptions;
+                if (_jsonOptions is not null)
+                {
+                    return _jsonOptions;
+                }
 
                 options = new JsonSerializerOptions
                 {
@@ -58,7 +64,9 @@ public static class Serializer
                 {
                     var converterType = typeof(ObjectJsonSerializer<>).MakeGenericType(derivedType);
                     if (Activator.CreateInstance(converterType) is JsonConverter converterInstance)
+                    {
                         options.Converters.Add(converterInstance);
+                    }
                 }
 
                 options.Converters.Add(new ObjectJsonSerializerFactory());

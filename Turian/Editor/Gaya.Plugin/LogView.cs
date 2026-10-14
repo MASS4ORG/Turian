@@ -50,7 +50,10 @@ public static class LogView
         for (var index = 0; index < lines.Count; index++)
         {
             var line = lines[index];
-            if (!Matches(line, filter, errors, warnings, log, information, studio)) continue;
+            if (!Matches(line, filter, errors, warnings, log, information, studio))
+            {
+                continue;
+            }
 
             if (!collapse || rows.Count == 0 || !SameEvent(rows[^1].Line, line))
             {
@@ -92,7 +95,10 @@ public static class LogView
         }
 
         var lines = text.Split('\n');
-        if (lines.Length <= lineCount) return text;
+        if (lines.Length <= lineCount)
+        {
+            return text;
+        }
 
         return string.Join('\n', lines.Take(lineCount)) + "…";
     }

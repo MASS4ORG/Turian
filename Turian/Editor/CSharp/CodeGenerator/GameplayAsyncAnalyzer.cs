@@ -24,16 +24,18 @@ public sealed class GameplayAsyncAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         context.RegisterSymbolAction(AnalyzeMethod, SymbolKind.Method);
         context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
-        context.RegisterOperationAction(AnalyzeInvocation, Microsoft.CodeAnalysis.OperationKind.Invocation);
-        context.RegisterOperationAction(AnalyzeAnonymousFunction, Microsoft.CodeAnalysis.OperationKind.AnonymousFunction);
-        context.RegisterOperationAction(AnalyzeLocalFunction, Microsoft.CodeAnalysis.OperationKind.LocalFunction);
+        context.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
+        context.RegisterOperationAction(AnalyzeAnonymousFunction, OperationKind.AnonymousFunction);
+        context.RegisterOperationAction(AnalyzeLocalFunction, OperationKind.LocalFunction);
     }
 
     static void AnalyzeMethod(SymbolAnalysisContext context)
     {
         var method = (IMethodSymbol)context.Symbol;
         if (UnsafeMethod(method))
+        {
             context.ReportDiagnostic(Diagnostic.Create(AsyncVoid, method.Locations.FirstOrDefault()));
+        }
     }
 
     static void AnalyzeField(SymbolAnalysisContext context)
@@ -41,7 +43,9 @@ public sealed class GameplayAsyncAnalyzer : DiagnosticAnalyzer
         var field = (IFieldSymbol)context.Symbol;
         if (IsComponent(field.ContainingType) && field.Type.Name == "ValueTask" &&
             field.Type.ContainingNamespace?.ToDisplayString() == "System.Threading.Tasks")
+        {
             context.ReportDiagnostic(Diagnostic.Create(StoredValue, field.Locations.FirstOrDefault(), field.Name));
+        }
     }
 
     static void AnalyzeInvocation(OperationAnalysisContext context)
@@ -50,21 +54,27 @@ public sealed class GameplayAsyncAnalyzer : DiagnosticAnalyzer
         if (invocation.TargetMethod.Name == "Delay" &&
             invocation.TargetMethod.ContainingType.ToDisplayString() == "System.Threading.Tasks.Task" &&
             IsComponent(context.ContainingSymbol.ContainingType))
+        {
             context.ReportDiagnostic(Diagnostic.Create(Delay, invocation.Syntax.GetLocation()));
+        }
     }
 
     static void AnalyzeAnonymousFunction(OperationAnalysisContext context)
     {
         var function = (Microsoft.CodeAnalysis.Operations.IAnonymousFunctionOperation)context.Operation;
         if (UnsafeMethod(function.Symbol))
+        {
             context.ReportDiagnostic(Diagnostic.Create(AsyncVoid, function.Syntax.GetLocation()));
+        }
     }
 
     static void AnalyzeLocalFunction(OperationAnalysisContext context)
     {
         var function = (Microsoft.CodeAnalysis.Operations.ILocalFunctionOperation)context.Operation;
         if (UnsafeMethod(function.Symbol))
+        {
             context.ReportDiagnostic(Diagnostic.Create(AsyncVoid, function.Syntax.GetLocation()));
+        }
     }
 
     static bool UnsafeMethod(IMethodSymbol method)
@@ -73,7 +83,13 @@ public sealed class GameplayAsyncAnalyzer : DiagnosticAnalyzer
     static bool IsComponent(INamedTypeSymbol? type)
     {
         for (; type is not null; type = type.BaseType)
-            if (type.ToDisplayString() == "Turian.Engine.Core.Component") return true;
+        {
+            if (type.ToDisplayString() == "Turian.Engine.Core.Component")
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 }

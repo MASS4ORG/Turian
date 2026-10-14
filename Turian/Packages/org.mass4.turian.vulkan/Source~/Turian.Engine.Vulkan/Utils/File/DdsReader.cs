@@ -145,13 +145,40 @@ public static class DdsReader
 
     static Format FromFourCc(uint fourCc, bool isSrgb)
     {
-        if (fourCc == FourCc("DXT1")) return isSrgb ? Format.BC1RgbaSrgbBlock : Format.BC1RgbaUnormBlock;
-        if (fourCc == FourCc("DXT3")) return isSrgb ? Format.BC2SrgbBlock : Format.BC2UnormBlock;
-        if (fourCc == FourCc("DXT5")) return isSrgb ? Format.BC3SrgbBlock : Format.BC3UnormBlock;
-        if (fourCc == FourCc("ATI1") || fourCc == FourCc("BC4U")) return Format.BC4UnormBlock;
-        if (fourCc == FourCc("BC4S")) return Format.BC4SNormBlock;
-        if (fourCc == FourCc("ATI2") || fourCc == FourCc("BC5U")) return Format.BC5UnormBlock;
-        if (fourCc == FourCc("BC5S")) return Format.BC5SNormBlock;
+        if (fourCc == FourCc("DXT1"))
+        {
+            return isSrgb ? Format.BC1RgbaSrgbBlock : Format.BC1RgbaUnormBlock;
+        }
+
+        if (fourCc == FourCc("DXT3"))
+        {
+            return isSrgb ? Format.BC2SrgbBlock : Format.BC2UnormBlock;
+        }
+
+        if (fourCc == FourCc("DXT5"))
+        {
+            return isSrgb ? Format.BC3SrgbBlock : Format.BC3UnormBlock;
+        }
+
+        if (fourCc == FourCc("ATI1") || fourCc == FourCc("BC4U"))
+        {
+            return Format.BC4UnormBlock;
+        }
+
+        if (fourCc == FourCc("BC4S"))
+        {
+            return Format.BC4SNormBlock;
+        }
+
+        if (fourCc == FourCc("ATI2") || fourCc == FourCc("BC5U"))
+        {
+            return Format.BC5UnormBlock;
+        }
+
+        if (fourCc == FourCc("BC5S"))
+        {
+            return Format.BC5SNormBlock;
+        }
 
         var code = new string([(char)(fourCc & 0xFF), (char)((fourCc >> 8) & 0xFF), (char)((fourCc >> 16) & 0xFF), (char)((fourCc >> 24) & 0xFF)]);
         throw new InvalidDataException($"Unsupported DDS fourCC '{code}'");

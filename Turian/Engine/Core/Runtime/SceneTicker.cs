@@ -69,12 +69,16 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     public void Tick(double deltaTime)
     {
         if (!double.IsFinite(deltaTime) || deltaTime < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
+        }
 
         var unscaledDeltaTime = deltaTime;
         var scaledDeltaTime = Clock.IsPaused ? 0d : deltaTime * TimeScale;
         if (!double.IsFinite(scaledDeltaTime))
+        {
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Scaled delta time must be finite.");
+        }
 
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(scaledDeltaTime, unscaledDeltaTime);
@@ -108,7 +112,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     public void StepFrame(double deltaTime)
     {
         if (!double.IsFinite(deltaTime) || deltaTime < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
+        }
 
         using var asyncContext = Async.EnterContext();
         Async.BeginFrame(deltaTime, deltaTime);
@@ -133,14 +139,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     List<Node> CollectRoots() =>
         [.. sceneManager.LoadedScenes
-            .Select(scene => scene.RootNode)
+            .Select(static scene => scene.RootNode)
             .Prepend(sceneManager.PersistentRoot)];
 
     void RunFixedTick(List<Node> roots, long tick, double interval)
     {
         var simulation = Simulation;
         if (simulation is not null && !ReferenceEquals(simulation.Clock, Clock))
+        {
             throw new InvalidOperationException("The scene and simulation must share one clock.");
+        }
+
         RunFixedUpdate(roots, (float)interval);
         simulation?.RunTick(tick, interval);
     }
@@ -158,7 +167,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             node.OnFixedUpdate(fixedDeltaTime);
             foreach (var component in node.Components)
             {
-                if (!component.IsActive) continue;
+                if (!component.IsActive)
+                {
+                    continue;
+                }
+
                 try
                 {
                     component.OnFixedUpdate(fixedDeltaTime);
@@ -178,7 +191,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             node.OnUpdate(deltaTime);
             foreach (var component in node.Components)
             {
-                if (!component.IsActive) continue;
+                if (!component.IsActive)
+                {
+                    continue;
+                }
+
                 try
                 {
                     component.EnsureStarted();
@@ -199,7 +216,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             node.OnLateUpdate(deltaTime);
             foreach (var component in node.Components)
             {
-                if (!component.IsActive) continue;
+                if (!component.IsActive)
+                {
+                    continue;
+                }
+
                 try
                 {
                     component.OnLateUpdate(deltaTime);
@@ -219,7 +240,10 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// </summary>
     static void LogComponentException(Component component, string callback, Exception ex)
     {
-        if (!FailedCallbacks.GetOrCreateValue(component).Add(callback)) return;
+        if (!FailedCallbacks.GetOrCreateValue(component).Add(callback))
+        {
+            return;
+        }
 
         Log.Logger.LogError(ex, "{Component} on {Node} threw in {Callback}",
             component.GetType().Name, component.Node?.Name, callback);
@@ -234,7 +258,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         var nodes = new List<Node>();
         foreach (var root in roots)
         {
-            if (!root.IsActive) continue;
+            if (!root.IsActive)
+            {
+                continue;
+            }
+
             nodes.Add(root);
             nodes.AddRange(Node.GetChildren(root));
         }

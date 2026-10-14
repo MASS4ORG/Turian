@@ -6,7 +6,11 @@ public sealed class UiTextEffectsTests
     static Func<string, string> Style(params (string Key, string Value)[] pairs)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (k, v) in pairs) map[k] = v;
+        foreach (var (k, v) in pairs)
+        {
+            map[k] = v;
+        }
+
         return name => map.TryGetValue(name, out var v) ? v : string.Empty;
     }
 

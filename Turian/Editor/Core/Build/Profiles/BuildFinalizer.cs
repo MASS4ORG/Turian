@@ -17,7 +17,10 @@ static class BuildFinalizer
         foreach (var file in Directory.EnumerateFiles(context.OutputDirectory, "*", SearchOption.AllDirectories))
         {
             var ext = Path.GetExtension(file);
-            if (!ArtifactExtensionsToDelete.Contains(ext, StringComparer.OrdinalIgnoreCase)) continue;
+            if (!ArtifactExtensionsToDelete.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
 
             try
             {
@@ -43,7 +46,9 @@ static class BuildFinalizer
         var newExePath = Path.Combine(context.OutputDirectory, $"{context.Settings.TitleToPathFriendly}{extension}");
 
         if (File.Exists(exportedExePath))
+        {
             File.Move(exportedExePath, newExePath, overwrite: true);
+        }
     }
 
     /// <summary>Copies the settings index — how the game finds its settings and folder — and the icon.</summary>
@@ -56,7 +61,10 @@ static class BuildFinalizer
             if (!File.Exists(sourcePath))
             {
                 if (fileName == ProjectSettingsLoader.IndexFileName)
+                {
                     context.Logger.LogWarning("Project settings index not found at {Path}. Skipping its copy", sourcePath);
+                }
+
                 continue;
             }
 

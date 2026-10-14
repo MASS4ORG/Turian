@@ -10,10 +10,21 @@ public static class StudioLogOptions
     {
         for (var index = 0; index < arguments.Count; index++)
         {
-            if (arguments[index] != "--log-level") continue;
-            if (++index == arguments.Count) throw new ArgumentException("--log-level requires a logging level.");
+            if (arguments[index] != "--log-level")
+            {
+                continue;
+            }
+
+            if (++index == arguments.Count)
+            {
+                throw new ArgumentException("--log-level requires a logging level.");
+            }
+
             if (Enum.GetNames<LogLevel>().Contains(arguments[index], StringComparer.OrdinalIgnoreCase))
+            {
                 return Enum.Parse<LogLevel>(arguments[index], ignoreCase: true);
+            }
+
             throw new ArgumentException($"Unknown logging level '{arguments[index]}'.");
         }
         return LogLevel.Information;

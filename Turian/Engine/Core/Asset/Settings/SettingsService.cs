@@ -32,7 +32,10 @@ public class SettingsService
     /// <returns>The project, or null when the path is not one.</returns>
     public static AppSettings? Load(string path)
     {
-        if (ResolveProjectDirectory(path) is not { } directory) return null;
+        if (ResolveProjectDirectory(path) is not { } directory)
+        {
+            return null;
+        }
 
         return new AppSettings
         {
@@ -64,7 +67,10 @@ public class SettingsService
     /// <returns>The absolute project folder, or null when the path is not a project.</returns>
     public static string? ResolveProjectDirectory(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
 
         var full = Path.GetFullPath(path);
         var directory = Directory.Exists(full)

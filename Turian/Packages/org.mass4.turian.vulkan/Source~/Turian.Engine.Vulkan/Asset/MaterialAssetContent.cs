@@ -26,7 +26,9 @@ public static class MaterialAssetContent
 
             var cacheKey = (asset.Id, context);
             if (ResourceCache.TryGetValue(cacheKey, out var cached))
+            {
                 return cached;
+            }
 
             // An AssetReference resolves to identity only; the factors and texture references
             // come from the artifact the importer wrote. Without one there is no material here,
@@ -55,7 +57,9 @@ public static class MaterialAssetContent
             foreach (var key in ResourceCache.Keys.Where(k => k.Item1 == assetId).ToList())
             {
                 if (ResourceCache.TryRemove(key, out var resource))
+                {
                     resource.Dispose();
+                }
             }
         }
 
@@ -66,7 +70,10 @@ public static class MaterialAssetContent
         public static void ClearCache()
         {
             foreach (var (_, resource) in ResourceCache)
+            {
                 resource.Dispose();
+            }
+
             ResourceCache.Clear();
         }
 
@@ -83,7 +90,9 @@ public static class MaterialAssetContent
             foreach (var key in ResourceCache.Keys.Where(k => k.Item2 == context).ToList())
             {
                 if (ResourceCache.TryRemove(key, out var resource))
+                {
                     resource.Dispose();
+                }
             }
         }
     }

@@ -7,16 +7,26 @@ public sealed partial class TransformGizmo
 
     HandleHit HitTest(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
-        if (viewportSize.X <= 0f || viewportSize.Y <= 0f) return Miss;
+        if (viewportSize.X <= 0f || viewportSize.Y <= 0f)
+        {
+            return Miss;
+        }
+
         var anchor = PivotPosition;
         var scale = ComputeGizmoScale(camera, anchor, viewportSize);
         var best = Miss;
         if (Mode != TransformGizmoMode.Rotate)
+        {
             best = HitLinearHandles(screenPos, camera, viewportSize, anchor, scale);
+        }
+
         if (Mode is TransformGizmoMode.Rotate or TransformGizmoMode.Combined)
         {
             var ring = HitRotationRing(screenPos, camera, viewportSize, anchor, scale * rotationRadius);
-            if (ring.Distance < best.Distance) best = ring;
+            if (ring.Distance < best.Distance)
+            {
+                best = ring;
+            }
         }
         return best;
     }
@@ -25,14 +35,24 @@ public sealed partial class TransformGizmo
     {
         var centerMode = Mode == TransformGizmoMode.Translate ? TransformGizmoMode.Translate : TransformGizmoMode.Scale;
         var centerDistance = Vector2.Distance(screenPos, WorldToPixel(anchor, camera, viewportSize));
-        if (centerDistance < centerHitRadiusPx) return new HandleHit(TransformGizmoAxis.Center, centerMode, 0f);
+        if (centerDistance < centerHitRadiusPx)
+        {
+            return new HandleHit(TransformGizmoAxis.Center, centerMode, 0f);
+        }
+
         var best = Miss;
         if (Displays(TransformGizmoMode.Translate))
+        {
             best = HitLinearTool(screenPos, camera, viewportSize, anchor, scale, TransformGizmoMode.Translate);
+        }
+
         if (Displays(TransformGizmoMode.Scale))
         {
             var hit = HitLinearTool(screenPos, camera, viewportSize, anchor, scale, TransformGizmoMode.Scale);
-            if (hit.Distance < best.Distance) best = hit;
+            if (hit.Distance < best.Distance)
+            {
+                best = hit;
+            }
         }
         return best;
     }
@@ -41,7 +61,11 @@ public sealed partial class TransformGizmo
         TransformGizmoMode operation)
     {
         var plane = HitPlaneHandles(screenPos, camera, viewportSize, anchor, scale, operation);
-        if (plane.Axis != TransformGizmoAxis.None) return plane;
+        if (plane.Axis != TransformGizmoAxis.None)
+        {
+            return plane;
+        }
+
         var (x, y, z) = GetAxes();
         var best = Miss;
         Consider(TransformGizmoAxis.X, x);
@@ -57,9 +81,16 @@ public sealed partial class TransformGizmo
                 ? 1.25f : 0.13f;
             var start = WorldToPixel(anchor + direction * scale * startLength, camera, viewportSize);
             var end = WorldToPixel(anchor + direction * scale * length, camera, viewportSize);
-            if (Vector2.DistanceSquared(start, end) < 16f) return;
+            if (Vector2.DistanceSquared(start, end) < 16f)
+            {
+                return;
+            }
+
             var distance = DistToSegment(screenPos, start, end);
-            if (distance < best.Distance) best = new HandleHit(candidate, operation, distance);
+            if (distance < best.Distance)
+            {
+                best = new HandleHit(candidate, operation, distance);
+            }
         }
     }
 
@@ -67,9 +98,21 @@ public sealed partial class TransformGizmo
         TransformGizmoMode operation)
     {
         var (x, y, z) = GetAxes();
-        if (Contains(x, y)) return new HandleHit(TransformGizmoAxis.Xy, operation, 0f);
-        if (Contains(x, z)) return new HandleHit(TransformGizmoAxis.Xz, operation, 0f);
-        if (Contains(y, z)) return new HandleHit(TransformGizmoAxis.Yz, operation, 0f);
+        if (Contains(x, y))
+        {
+            return new HandleHit(TransformGizmoAxis.Xy, operation, 0f);
+        }
+
+        if (Contains(x, z))
+        {
+            return new HandleHit(TransformGizmoAxis.Xz, operation, 0f);
+        }
+
+        if (Contains(y, z))
+        {
+            return new HandleHit(TransformGizmoAxis.Yz, operation, 0f);
+        }
+
         return Miss;
 
         bool Contains(Vector3 a, Vector3 b)
@@ -92,7 +135,10 @@ public sealed partial class TransformGizmo
         void Consider(TransformGizmoAxis candidate, Vector3 normal)
         {
             var distance = DistanceToRing(screenPos, camera, viewportSize, anchor, normal, radius);
-            if (distance < best.Distance) best = new HandleHit(candidate, TransformGizmoMode.Rotate, distance);
+            if (distance < best.Distance)
+            {
+                best = new HandleHit(candidate, TransformGizmoMode.Rotate, distance);
+            }
         }
     }
 

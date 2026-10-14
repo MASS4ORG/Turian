@@ -34,8 +34,15 @@ public sealed class SceneGizmoSettingsTests
         var pointer = size * 0.5f - new Vector2(0, 60);
         gizmo.ProcessPointerMove(pointer, camera, size);
         Assert.Equal(TransformGizmoAxis.Y, gizmo.Axis);
-        if (select) gizmo.Mode = TransformGizmoMode.Select;
-        else gizmo.Settings.Visible = false;
+        if (select)
+        {
+            gizmo.Mode = TransformGizmoMode.Select;
+        }
+        else
+        {
+            gizmo.Settings.Visible = false;
+        }
+
         gizmo.ProcessPointerMove(pointer, camera, size);
         Assert.Equal(TransformGizmoAxis.None, gizmo.Axis);
         gizmo.ProcessPointerDown(pointer, camera, size);
@@ -63,7 +70,13 @@ public sealed class SceneGizmoSettingsTests
         Assert.Equal(1, gizmo.SnapTranslation);
         Assert.Equal(15, gizmo.SnapRotation);
         Assert.Equal(0.1f, gizmo.SnapScale);
-        if (mode == TransformGizmoMode.Translate) Assert.Equal(1f / 3f, gizmo.SelectedNode.Position.Y, 4);
-        else Assert.Equal(1.1f, gizmo.SelectedNode.Scale.Y, 4);
+        if (mode == TransformGizmoMode.Translate)
+        {
+            Assert.Equal(1f / 3f, gizmo.SelectedNode.Position.Y, 4);
+        }
+        else
+        {
+            Assert.Equal(1.1f, gizmo.SelectedNode.Scale.Y, 4);
+        }
     }
 }

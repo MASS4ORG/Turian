@@ -11,12 +11,22 @@ public partial class Node
     /// <returns>The matching node, or <c>null</c> when none is found.</returns>
     public static Node? FindById(Node? root, Guid id)
     {
-        if (root is null) return null;
-        if (root.Id == id) return root;
+        if (root is null)
+        {
+            return null;
+        }
+
+        if (root.Id == id)
+        {
+            return root;
+        }
 
         foreach (var child in root.Children)
         {
-            if (FindById(child, id) is { } found) return found;
+            if (FindById(child, id) is { } found)
+            {
+                return found;
+            }
         }
 
         return null;
@@ -79,8 +89,12 @@ public partial class Node
     {
         var children = node.Children;
         for (var i = children.Count - 1; i >= 0; i--)
+        {
             if (children[i].IsActive)
+            {
                 pending.Push(children[i]);
+            }
+        }
     }
 
     /// <summary>

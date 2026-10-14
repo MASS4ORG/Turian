@@ -133,7 +133,9 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         var (manifest, overridden) = ProjectManifest.Load(projectRoot, includeUserOverride: !options.Locked);
         var existingLock = LockFile.Load(projectRoot);
         if (options.Locked && existingLock is null)
+        {
             throw new PackageException($"{projectRoot} has no {LockFile.FileName} to install from.");
+        }
 
         var resolved = new Dictionary<string, ResolvedPackage>(StringComparer.Ordinal);
         var constraints = new List<(string Id, VersionRange Range, string RequiredBy, int Depth)>();
@@ -141,16 +143,22 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         var queue = new Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)>();
 
         foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
+        {
             queue.Enqueue((embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1));
+        }
 
         foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
                      .OrderBy(static d => d.Key, StringComparer.Ordinal))
+        {
             queue.Enqueue((id, PackageSource.Parse(spec!, packagesDirectory), spec!, "the project", 1));
+        }
 
         foreach (var (id, spec) in options.DefaultDependencies
                      .Where(d => !manifest.Dependencies.ContainsKey(d.Key) && !overridden.Contains(d.Key))
                      .OrderBy(static d => d.Key, StringComparer.Ordinal))
+        {
             queue.Enqueue((id, PackageSource.Parse(spec, packagesDirectory), spec, "the host's defaults", 1));
+        }
 
         async Task DrainAsync()
         {
@@ -162,7 +170,10 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                     continue;
                 }
 
-                if (resolved.ContainsKey(next.Id)) continue;
+                if (resolved.ContainsKey(next.Id))
+                {
+                    continue;
+                }
 
                 var package = await MaterializeAsync(next.Id, next.Source, next.Spec, next.Depth,
                     overridden.Contains(next.Id), existingLock, cancellationToken).ConfigureAwait(false);
@@ -174,7 +185,9 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         {
             resolved[package.Id] = package;
             foreach (var (id, spec) in package.Manifest.Dependencies.OrderBy(static d => d.Key, StringComparer.Ordinal))
+            {
                 queue.Enqueue((id, PackageSource.Parse(spec, package.RootPath), spec, package.Id, package.Depth + 1));
+            }
         }
 
         await DrainAsync().ConfigureAwait(false);
@@ -186,32 +199,50 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
             var progressed = false;
             foreach (var group in constraints.Where(c => !resolved.ContainsKey(c.Id)).GroupBy(static c => c.Id).ToList())
             {
-                if (registries.FirstOrDefault(r => r.Serves(group.Key)) is not { } registry) continue;
+                if (registries.FirstOrDefault(r => r.Serves(group.Key)) is not { } registry)
+                {
+                    continue;
+                }
 
-                if (!clients.TryGetValue(registry.Name, out var client)) clients[registry.Name] = client = new RegistryClient(registry, options.Http);
+                if (!clients.TryGetValue(registry.Name, out var client))
+                {
+                    clients[registry.Name] = client = new RegistryClient(registry, options.Http);
+                }
+
                 AddPackage(await MaterializeFromRegistryAsync(client, group.Key, [.. group], existingLock, cancellationToken).ConfigureAwait(false));
                 progressed = true;
             }
 
-            if (!progressed) break;
+            if (!progressed)
+            {
+                break;
+            }
+
             await DrainAsync().ConfigureAwait(false);
         }
 
         foreach (var (id, range, requiredBy, _) in constraints)
         {
             if (!resolved.TryGetValue(id, out var package))
+            {
                 throw new PackageException(
                     $"{requiredBy} requires {id} {range}, which nothing provides; add it to {ProjectManifest.DirectoryName}/{ProjectManifest.FileName}.");
+            }
+
             if (!range.IsSatisfiedBy(package.Version))
+            {
                 throw new PackageException(
                     $"{requiredBy} requires {id} {range}, but {package.Version} is installed (from {package.Source}).");
+            }
         }
 
         var ordered = DependencyOrder(resolved);
         var lockFile = ToLock(ordered);
         if (options.Locked && existingLock!.Serialize() != lockFile.Serialize())
+        {
             throw new PackageException(
                 $"{ProjectManifest.DirectoryName}/{ProjectManifest.FileName} no longer matches {LockFile.FileName}; resolve without --locked and commit the lock file.");
+        }
 
         return new PackageResolution(ordered, lockFile);
     }
@@ -232,12 +263,16 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         {
             var stored = store.PackagePath(id, store.ArchiveFolderName(locked!.Integrity!));
             if (Directory.Exists(stored))
+            {
                 return Finish(id, stored, locked.Integrity!, locked.SignedBy, registry, depth);
+            }
         }
 
         var index = await client.GetIndexAsync(cancellationToken).ConfigureAwait(false);
         if (!index.Bricks.TryGetValue(id, out var brick))
+        {
             throw new PackageException($"{asked[0].RequiredBy} requires {id}, which {registry.Name} does not serve.");
+        }
 
         var (version, entry) = keepLocked
             ? PickLocked(brick, id, locked!.Version!)
@@ -245,7 +280,9 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
 
         var signer = RegistryTrust.Verify(registry, id, version, entry);
         if (keepLocked && locked!.SignedBy is { } pinned && signer != pinned)
+        {
             throw new PackageException($"{id} {version} is now signed by a different key than {LockFile.FileName} records.");
+        }
 
         var downloads = Path.Combine(store.Root, ".downloads");
         var file = await client.DownloadAsync(id, version, entry, downloads, cancellationToken).ConfigureAwait(false);
@@ -264,9 +301,16 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
     ResolvedPackage Finish(string id, string folder, string integrity, string? signer, ScopedRegistry registry, int depth)
     {
         var manifest = PackageManifest.Load(folder, options.ReservedCategoryPrefixes);
-        if (manifest.Name != id) throw new PackageException($"{registry.Name} served '{manifest.Name}' as {id}.");
+        if (manifest.Name != id)
+        {
+            throw new PackageException($"{registry.Name} served '{manifest.Name}' as {id}.");
+        }
+
         if (!manifest.EffectiveScopes.Contains(options.Scope))
+        {
             throw new PackageException($"{id} cannot be installed with scope {options.Scope}; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");
+        }
+
         CheckEngines(manifest);
 
         return new ResolvedPackage(id, manifest, folder, PackageOrigin.Registry, $"registry:{registry.Name}", null, integrity, depth, false, signer);
@@ -328,7 +372,11 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
             case GitSource git:
                 var commit = await store.ResolveCommitAsync(git, cancellationToken).ConfigureAwait(false);
                 var root = store.PackagePath(id, commit);
-                if (!Directory.Exists(root)) root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                if (!Directory.Exists(root))
+                {
+                    root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                }
+
                 fetched = new FetchedPackage(root, commit, PackageStore.ComputeIntegrity(root));
                 break;
             default:
@@ -349,24 +397,43 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         switch (source)
         {
             case FileSource file:
-                if (!Directory.Exists(file.Path)) throw new PackageException($"{id}: folder {file.Path} does not exist.");
+                if (!Directory.Exists(file.Path))
+                {
+                    throw new PackageException($"{id}: folder {file.Path} does not exist.");
+                }
+
                 root = file.Path;
                 origin = spec == "embedded" ? PackageOrigin.Embedded : PackageOrigin.File;
                 break;
 
             case ArchiveSource archive:
-                if (!File.Exists(archive.Path)) throw new PackageException($"{id}: file {archive.Path} does not exist.");
+                if (!File.Exists(archive.Path))
+                {
+                    throw new PackageException($"{id}: file {archive.Path} does not exist.");
+                }
+
                 (root, integrity) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
                 store.RecordOrigin(root, archive.ToString());
                 if (options.Locked && existingLock?.Dependencies.GetValueOrDefault(id) is { Integrity: { } pinned } && pinned != integrity)
+                {
                     throw new PackageException($"{id}: {archive.Path} does not match the integrity in {LockFile.FileName}.");
+                }
+
                 origin = PackageOrigin.Archive;
                 break;
 
             case BuiltinSource builtin:
-                if (builtin.Id != id) throw new PackageException($"{id}: {spec} names another package.");
+                if (builtin.Id != id)
+                {
+                    throw new PackageException($"{id}: {spec} names another package.");
+                }
+
                 root = options.BuiltinDirectory is { } builtins ? Path.Combine(builtins, id) : "";
-                if (!Directory.Exists(root)) throw new PackageException($"{id} is not a built-in package of this host.");
+                if (!Directory.Exists(root))
+                {
+                    throw new PackageException($"{id} is not a built-in package of this host.");
+                }
+
                 origin = PackageOrigin.Builtin;
                 break;
 
@@ -378,7 +445,11 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
 
                 root = store.PackagePath(id, commit);
                 var checkedOut = !Directory.Exists(root);
-                if (checkedOut) root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                if (checkedOut)
+                {
+                    root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
+                }
+
                 store.RecordOrigin(root, git.ToString());
 
                 // Hashing a large package is slow, so an unchanged store folder is trusted unless installing locked.
@@ -386,7 +457,10 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
                     ? known
                     : PackageStore.ComputeIntegrity(root);
                 if (keepLocked && locked!.Integrity is { } expected && expected != integrity)
+                {
                     throw new PackageException($"{id}: store folder {root} does not match the integrity in {LockFile.FileName}.");
+                }
+
                 origin = PackageOrigin.Git;
                 break;
 
@@ -396,10 +470,16 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
 
         var manifest = PackageManifest.Load(root, options.ReservedCategoryPrefixes);
         if (manifest.Name != id)
+        {
             throw new PackageException($"{spec} holds package '{manifest.Name}', not '{id}'.");
+        }
+
         if (!manifest.EffectiveScopes.Contains(options.Scope))
+        {
             throw new PackageException(
                 $"{id} cannot be installed with scope {options.Scope}; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");
+        }
+
         CheckEngines(manifest);
 
         return new ResolvedPackage(id, manifest, root, origin, spec, commit, integrity, depth, isOverridden);
@@ -407,28 +487,42 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
 
     void CheckEngines(PackageManifest manifest)
     {
-        if (manifest.Engines.Count == 0) return;
+        if (manifest.Engines.Count == 0)
+        {
+            return;
+        }
 
         var known = manifest.Engines.Where(e => options.Hosts.ContainsKey(e.Key)).ToList();
         if (known.Count == 0)
+        {
             throw new PackageException($"{manifest.Name} targets {string.Join(", ", manifest.Engines.Keys)}, none of which is this host.");
+        }
 
         foreach (var (host, range) in known)
         {
             var version = options.Hosts[host];
             if (!range.IsSatisfiedBy(version))
+            {
                 throw new PackageException($"{manifest.Name} {manifest.Version} requires {host} {range}; this is {version}.");
+            }
         }
     }
 
     static IEnumerable<(string Id, string Path)> EmbeddedPackages(string packagesDirectory,
         IReadOnlyCollection<string> reservedCategoryPrefixes)
     {
-        if (!Directory.Exists(packagesDirectory)) yield break;
+        if (!Directory.Exists(packagesDirectory))
+        {
+            yield break;
+        }
 
         foreach (var directory in Directory.EnumerateDirectories(packagesDirectory).Order(StringComparer.Ordinal))
         {
-            if (!File.Exists(Path.Combine(directory, PackageManifest.FileName))) continue;
+            if (!File.Exists(Path.Combine(directory, PackageManifest.FileName)))
+            {
+                continue;
+            }
+
             yield return (PackageManifest.Load(directory, reservedCategoryPrefixes).Name, directory);
         }
     }
@@ -440,13 +534,27 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
 
         void Visit(ResolvedPackage package)
         {
-            if (!visited.Add(package.Id)) return;
+            if (!visited.Add(package.Id))
+            {
+                return;
+            }
+
             foreach (var id in package.Manifest.Dependencies.Keys.Order(StringComparer.Ordinal))
-                if (resolved.TryGetValue(id, out var dependency)) Visit(dependency);
+            {
+                if (resolved.TryGetValue(id, out var dependency))
+                {
+                    Visit(dependency);
+                }
+            }
+
             ordered.Add(package);
         }
 
-        foreach (var package in resolved.Values.OrderBy(static p => p.Id, StringComparer.Ordinal)) Visit(package);
+        foreach (var package in resolved.Values.OrderBy(static p => p.Id, StringComparer.Ordinal))
+        {
+            Visit(package);
+        }
+
         return ordered;
     }
 

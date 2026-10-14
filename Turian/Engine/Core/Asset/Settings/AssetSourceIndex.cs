@@ -17,7 +17,10 @@ public sealed class AssetSourceIndex(string projectDirectory)
     public string? PathOf(Guid assetId)
     {
         catalog ??= ReadCatalog();
-        if (catalog.TryGetValue(assetId, out var path) && File.Exists(path)) return path;
+        if (catalog.TryGetValue(assetId, out var path) && File.Exists(path))
+        {
+            return path;
+        }
 
         metas ??= ReadMetas();
         return metas.GetValueOrDefault(assetId);
@@ -50,11 +53,17 @@ public sealed class AssetSourceIndex(string projectDirectory)
     {
         var assets = Path.Combine(projectDirectory, "Assets");
         var found = new Dictionary<Guid, string>();
-        if (!Directory.Exists(assets)) return found;
+        if (!Directory.Exists(assets))
+        {
+            return found;
+        }
 
         foreach (var meta in Directory.EnumerateFiles(assets, "*.meta", SearchOption.AllDirectories))
         {
-            if (PeekId(meta) is { } id) found.TryAdd(id, meta[..^".meta".Length]);
+            if (PeekId(meta) is { } id)
+            {
+                found.TryAdd(id, meta[..^".meta".Length]);
+            }
         }
 
         return found;

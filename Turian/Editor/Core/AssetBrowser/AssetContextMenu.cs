@@ -21,7 +21,7 @@ public static class AssetContextMenu
     }
 
     static bool Writable(IReadOnlyList<AssetEntry> selection) => selection.Count > 0
-        && selection.All(entry => !entry.IsReadOnly && entry.ParentPath is not null);
+        && selection.All(static entry => !entry.IsReadOnly && entry.ParentPath is not null);
 
     static bool Labelable(AssetEntry entry) => !entry.IsDirectory && entry.AssetMetadata is not null;
 

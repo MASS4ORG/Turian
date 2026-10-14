@@ -16,10 +16,21 @@ sealed partial class InspectorPanel
             TurianForms.ApplyStyle(gui);
             gui.ScrollY();
             RenderAssetName(gui, inspection);
-            if (frameAssets.Count == 1) preview.Draw(gui, inspection.Metadata);
-            if (model.Sections.Count == 0) return;
+            if (frameAssets.Count == 1)
+            {
+                preview.Draw(gui, inspection.Metadata);
+            }
+
+            if (model.Sections.Count == 0)
+            {
+                return;
+            }
+
             RenderAssetFields(gui, inspection);
-            if (!inspection.IsPayload) RenderAssetActions(gui);
+            if (!inspection.IsPayload)
+            {
+                RenderAssetActions(gui);
+            }
         }
         referenceDrawer.DrawPendingPicker(gui);
         ApplyAssetRequests();
@@ -43,17 +54,21 @@ sealed partial class InspectorPanel
 
     void OnSelectedAssetEdited(object target)
     {
-        foreach (var item in frameAssets.Where(item => ReferenceEquals(item.Target, target))) OnAssetEdited(item);
+        foreach (var item in frameAssets.Where(item => ReferenceEquals(item.Target, target)))
+        {
+            OnAssetEdited(item);
+        }
     }
 
     void RenderAssetName(Gui gui, AssetInspection inspection)
     {
         using (gui.Node(-1, Theme.Scale(24f), "inspector/asset/name").ExpandWidth()
                    .Padding(6, 2).ContentAlignY(0.5f).Enter())
+        {
             gui.DrawText(frameAssets.Count > 1 ? $"{frameAssets.Count} Assets" : Path.GetFileName(inspection.AbsolutePath),
                 Theme.Text(13), Theme.Ink,
                 centerInRect: false);
-
+        }
     }
 
     void RenderAssetFields(Gui gui, AssetInspection inspection)
@@ -61,7 +76,11 @@ sealed partial class InspectorPanel
         using (gui.Node(-1, Theme.Scale(22f), "inspector/asset/header").ExpandWidth()
                    .Padding(6, 0).ContentAlignY(0.5f).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Panel, 3);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(Theme.Panel, 3);
+            }
+
             gui.DrawText(inspection.Title, Theme.Text(12), Theme.Ink, centerInRect: false);
         }
 
@@ -70,7 +89,10 @@ sealed partial class InspectorPanel
         {
             var fields = model.Sections[0].BodyFields;
             for (var f = 0; f < fields.Count; f++)
+            {
                 gui.FormField(fields[f], $"inspector/asset/field{f}", FormContext);
+            }
+
             DrawButtons(gui, model.Sections[0].Buttons, "inspector/asset/button");
         }
 
@@ -82,8 +104,15 @@ sealed partial class InspectorPanel
         {
             applyRequested = false;
             var applied = true;
-            foreach (var item in frameAssets) applied &= inspections.Apply(item);
-            if (applied) assetDirty = false;
+            foreach (var item in frameAssets)
+            {
+                applied &= inspections.Apply(item);
+            }
+
+            if (applied)
+            {
+                assetDirty = false;
+            }
         }
 
         if (revertRequested)
@@ -104,7 +133,10 @@ sealed partial class InspectorPanel
             lockedAssets = refreshed;
             lockedTarget = active ?? refreshed.FirstOrDefault();
         }
-        else inspector.SelectMany(refreshed, active);
+        else
+        {
+            inspector.SelectMany(refreshed, active);
+        }
     }
 
     /// <summary>Apply writes the edit and reimports; revert re-reads what is on disk.</summary>
@@ -115,8 +147,15 @@ sealed partial class InspectorPanel
         {
             using (gui.Node().Expand().Enter()) { }
 
-            if (TextButton(gui, "Revert", "inspector/asset/revert", assetDirty)) revertRequested = true;
-            if (TextButton(gui, "Apply", "inspector/asset/apply", assetDirty)) applyRequested = true;
+            if (TextButton(gui, "Revert", "inspector/asset/revert", assetDirty))
+            {
+                revertRequested = true;
+            }
+
+            if (TextButton(gui, "Apply", "inspector/asset/apply", assetDirty))
+            {
+                applyRequested = true;
+            }
         }
     }
 

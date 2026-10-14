@@ -138,9 +138,16 @@ public sealed class OapArchiveBuilder(ILogger logger)
         var packed = new List<AssetRecord>();
         foreach (var record in LoadOrder(sourceCatalog.Records))
         {
-            if (record.AssetId == Guid.Empty || IsSourceCodeRecord(record)) continue;
+            if (record.AssetId == Guid.Empty || IsSourceCodeRecord(record))
+            {
+                continue;
+            }
+
             var deps = childrenByParent.TryGetValue(record.AssetId, out var children) ? children : [];
-            if (TryAdd(writer, record, projectRoot, options, encryption, deps)) packed.Add(record);
+            if (TryAdd(writer, record, projectRoot, options, encryption, deps))
+            {
+                packed.Add(record);
+            }
         }
 
         writer.SetManifest(BuildManifest(packageName, options));
@@ -151,7 +158,10 @@ public sealed class OapArchiveBuilder(ILogger logger)
     static (OapWriter Writer, OapEncryption Encryption) CreateWriter(OapPackOptions options)
     {
         var writer = new OapWriter { Alignment = options.Alignment };
-        if (string.IsNullOrEmpty(options.Passphrase)) return (writer, OapEncryption.None);
+        if (string.IsNullOrEmpty(options.Passphrase))
+        {
+            return (writer, OapEncryption.None);
+        }
 
         writer.SetKey(OapCrypto.DeriveKey(options.Passphrase));
         return (writer, OapEncryption.ChaCha20);
@@ -226,7 +236,7 @@ public sealed class OapArchiveBuilder(ILogger logger)
             ? new DirectoryInfo(projectRoot).Name
             : requested;
 
-        var cleaned = new string([.. name.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)]);
+        var cleaned = new string([.. name.Trim().Select(static c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)]);
         return string.IsNullOrWhiteSpace(cleaned) ? "assets" : cleaned;
     }
 
@@ -307,7 +317,13 @@ public sealed class OapArchiveBuilder(ILogger logger)
             ("Audio", OapAssetType.Audio), ("Sound", OapAssetType.Audio),
         ];
         foreach (var type in types)
-            if (name.Contains(type.Name, StringComparison.OrdinalIgnoreCase)) return type.Type;
+        {
+            if (name.Contains(type.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return type.Type;
+            }
+        }
+
         return string.IsNullOrWhiteSpace(name) ? OapAssetType.Unknown : OapAssetType.Other;
     }
 

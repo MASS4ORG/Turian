@@ -57,29 +57,42 @@ sealed class RenderList
         InstancedModels.Clear();
         Draws.Clear();
         for (var i = 0; i < roots.Count; i++)
+        {
             Collect(roots[i], cullingMask ?? LayerMask.Everything);
+        }
     }
 
     void Collect(Node node, LayerMask cullingMask)
     {
         // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
-        if (!node.IsActive || node.IsDestroyed) return;
+        if (!node.IsActive || node.IsDestroyed)
+        {
+            return;
+        }
 
         if (cullingMask.Contains(node.RenderLayer))
         {
             var components = node.Components;
             for (var i = 0; i < components.Count; i++)
+            {
                 Add(components[i]);
+            }
         }
 
         var children = node.Children;
         for (var i = 0; i < children.Count; i++)
+        {
             Collect(children[i], cullingMask);
+        }
     }
 
     void Add(Component component)
     {
-        if (!component.IsActive) return;
+        if (!component.IsActive)
+        {
+            return;
+        }
+
         switch (component)
         {
             case ModelComponent model:
@@ -124,7 +137,11 @@ sealed class RenderList
         CollectionsMarshal.AsSpan(Draws).Sort(static (a, b) =>
         {
             var order = a.SortKey.CompareTo(b.SortKey);
-            if (order == 0) order = a.SubMesh.CompareTo(b.SubMesh);
+            if (order == 0)
+            {
+                order = a.SubMesh.CompareTo(b.SubMesh);
+            }
+
             return order != 0 ? order : a.Sequence.CompareTo(b.Sequence);
         });
 
@@ -140,7 +157,10 @@ sealed class RenderList
                && ReferenceEquals(draws[end].Model, first.Model)
                && draws[end].SubMesh == first.SubMesh
                && ReferenceEquals(draws[end].Material, first.Material))
+        {
             end++;
+        }
+
         return end - start;
     }
 

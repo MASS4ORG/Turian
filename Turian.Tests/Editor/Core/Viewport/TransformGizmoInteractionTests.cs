@@ -118,8 +118,8 @@ public sealed class TransformGizmoInteractionTests
         Assert.Equal(TransformGizmoAxis.Z, gizmo.Axis);
         var drawing = new Gizmos();
         gizmo.Draw(drawing, camera, Viewport);
-        Assert.Contains(drawing.OverlayLines, line => line.A == Vector3.Zero);
-        Assert.Contains(drawing.OverlayLines, line => line.Thickness == 6f);
+        Assert.Contains(drawing.OverlayLines, static line => line.A == Vector3.Zero);
+        Assert.Contains(drawing.OverlayLines, static line => line.Thickness == 6f);
         gizmo.ClearHover();
         Assert.Equal(TransformGizmoAxis.None, gizmo.Axis);
         gizmo.ProcessPointerDown(Pixel(camera, new Vector3(radius * 0.8f, -radius * 0.6f, 0)), camera, Viewport);

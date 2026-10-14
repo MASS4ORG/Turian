@@ -12,7 +12,10 @@ public sealed class AssetBrowserFileDropTests
         using var browser = new AssetBrowserHarness(AssetBrowserViewMode.Split);
         void Draw(Gui gui)
         {
-            using (gui.Node(800, 500, "centered").AlignContent(0.5f, 0.5f).Enter()) browser.Panel.Render(gui);
+            using (gui.Node(800, 500, "centered").AlignContent(0.5f, 0.5f).Enter())
+            {
+                browser.Panel.Render(gui);
+            }
         }
         browser.Frame(Draw);
         browser.Frame(Draw);
@@ -52,7 +55,7 @@ public sealed class AssetBrowserFileDropTests
         var search = browser.Find("assets/searchField").Rect;
         Assert.Equal(navigation.Y, search.Y, precision: 2);
         Assert.True(search.X >= navigation.X + navigation.W);
-        Assert.Equal(compact, browser.Nodes().Any(node => node.Id == "assets/filters"));
+        Assert.Equal(compact, browser.Nodes().Any(static node => node.Id == "assets/filters"));
         Assert.InRange(browser.Find("assets/grid").Rect.Y, 0, compact ? 52 : 26);
     }
 

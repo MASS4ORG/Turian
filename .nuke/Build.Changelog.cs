@@ -113,7 +113,7 @@ sealed partial class Build
         }
 
         // One line per change, "- Added: ...", grouped in the order sections are declared above.
-        var orderedSections = ChangelogSections.Select(entry => entry.Section).Distinct();
+        var orderedSections = ChangelogSections.Select(static entry => entry.Section).Distinct();
         foreach (var section in orderedSections)
         {
             if (!grouped.TryGetValue(section, out var entries))

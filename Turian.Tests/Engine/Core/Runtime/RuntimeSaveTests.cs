@@ -58,7 +58,10 @@ public sealed class RuntimeSaveTests
         }
         finally
         {
-            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 

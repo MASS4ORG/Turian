@@ -46,18 +46,18 @@ public sealed class SettingsMetadataTests
     public void UserAndBuiltInRegistrationReadTheSameMetadata()
     {
         var pages = UserSettingsCatalog.Scan(typeof(CustomPage).Assembly, NullLogger.Instance);
-        var discovered = Assert.Single(pages, page => page.Target is CustomPage);
+        var discovered = Assert.Single(pages, static page => page.Target is CustomPage);
         var descriptor = new SettingsPageDescriptor(discovered.Target);
         Assert.Equal(descriptor.Id, discovered.Id);
         Assert.Equal(descriptor.Path, discovered.Path);
         Assert.Equal(descriptor.Description, discovered.Description);
         Assert.Equal(descriptor.Order, discovered.Order);
         Assert.True(discovered.Workspace);
-        var automatic = Assert.Single(pages, page => page.Target is AutomaticPage);
+        var automatic = Assert.Single(pages, static page => page.Target is AutomaticPage);
         Assert.Equal($"usercode.settings.{typeof(AutomaticPage).FullName}", automatic.Id);
         Assert.Equal(automatic.Id, new SettingsPageDescriptor(automatic.Target).Id);
         Assert.Equal(SettingsScope.User, new SettingsPageDescriptor(automatic.Target).Scope);
-        Assert.DoesNotContain(pages, page => page.Target is EmptyPathPage or UnannotatedPage);
+        Assert.DoesNotContain(pages, static page => page.Target is EmptyPathPage or UnannotatedPage);
     }
 
     /// <summary>Discovery retains available settings types and contains assembly inspection failures.</summary>
@@ -65,7 +65,7 @@ public sealed class SettingsMetadataTests
     public void DiscoveryContainsAssemblyLoadFailures()
     {
         var assembly = Substitute.For<Assembly>();
-        assembly.GetTypes().Returns(_ => throw new ReflectionTypeLoadException(
+        assembly.GetTypes().Returns(static _ => throw new ReflectionTypeLoadException(
             [typeof(AutomaticPage), null], [new TypeLoadException("Unavailable project dependency")]));
 
         var page = Assert.Single(UserSettingsCatalog.Scan(assembly, NullLogger.Instance));
@@ -74,7 +74,7 @@ public sealed class SettingsMetadataTests
         Assert.Equal("User/Automatic", page.Path);
         var unavailable = Substitute.For<Assembly>();
         unavailable.GetName().Returns(new AssemblyName("Unavailable"));
-        unavailable.GetTypes().Returns(_ => throw new NotSupportedException("Unavailable assembly metadata"));
+        unavailable.GetTypes().Returns(static _ => throw new NotSupportedException("Unavailable assembly metadata"));
         Assert.Empty(UserSettingsCatalog.Scan(unavailable, NullLogger.Instance));
     }
 
@@ -82,9 +82,9 @@ public sealed class SettingsMetadataTests
     [Fact]
     public void InvalidSettingsCannotEnterTheRegistry()
     {
-        Assert.Throws<ArgumentNullException>(() => new SettingsPageDescriptor(null!));
-        Assert.Throws<ArgumentException>(() => new SettingsPageDescriptor(new UnannotatedPage()));
-        Assert.Throws<ArgumentException>(() => new SettingsPageDescriptor(new EmptyPathPage()));
-        Assert.Throws<ArgumentNullException>(() => new Gaya.EditorSettingAttribute().IdFor(null!));
+        Assert.Throws<ArgumentNullException>(static () => new SettingsPageDescriptor(null!));
+        Assert.Throws<ArgumentException>(static () => new SettingsPageDescriptor(new UnannotatedPage()));
+        Assert.Throws<ArgumentException>(static () => new SettingsPageDescriptor(new EmptyPathPage()));
+        Assert.Throws<ArgumentNullException>(static () => new Gaya.EditorSettingAttribute().IdFor(null!));
     }
 }

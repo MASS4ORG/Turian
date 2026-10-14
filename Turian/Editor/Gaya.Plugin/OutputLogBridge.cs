@@ -65,13 +65,19 @@ public sealed class OutputLogBridge
             Apply("Build");
         }
 
-        if (settings.ClearOnRecompile) CheckRecompile();
+        if (settings.ClearOnRecompile)
+        {
+            CheckRecompile();
+        }
     }
 
     void CheckRecompile()
     {
         var current = build.ActiveUserAssembly;
-        if (ReferenceEquals(current, lastAssembly)) return;
+        if (ReferenceEquals(current, lastAssembly))
+        {
+            return;
+        }
 
         lastAssembly = current;
         Apply("Recompile");
@@ -79,13 +85,18 @@ public sealed class OutputLogBridge
 
     void OnPlayState(PlayState state)
     {
-        if (state == PlayState.Playing) pendingPlay = true;
+        if (state == PlayState.Playing)
+        {
+            pendingPlay = true;
+        }
     }
 
     void OnBuildTask(BuildTaskStatus status)
     {
         if (status is { State: BuildTaskState.Succeeded, TaskName: "Play" or "Export" })
+        {
             pendingBuild = true;
+        }
     }
 
     void Apply(string reason)

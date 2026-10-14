@@ -30,7 +30,7 @@ public sealed class LayerAssetsTests
         Assert.Contains($"\"$ref\": \"{group.Id}\"", json);
         Assert.DoesNotContain("\"Name\": \"Physics\"", json);
         var loaded = Assert.IsType<NodeLayerSettings>(Serializer.LoadData<DataAsset>(json));
-        Assert.Contains(loaded.Validate(), error => error.Contains("unresolved", StringComparison.Ordinal));
+        Assert.Contains(loaded.Validate(), static error => error.Contains("unresolved", StringComparison.Ordinal));
         Assert.Contains(group.Id.ToString(), Serializer.Serialize<DataAsset>(loaded));
 
         var loadedGroup = Assert.IsType<LayerGroupAsset>(
@@ -66,15 +66,15 @@ public sealed class LayerAssetsTests
         var master = new NodeLayerSettings { Groups = [null!], Tags = [null!] };
         Assert.Equal(2, master.Validate().Count);
         master.Groups = [new LayerGroupAsset { Name = "Physics", Values = [null!] }];
-        Assert.Contains(master.Validate(), error => error.Contains("unresolved value", StringComparison.Ordinal));
-        Assert.Contains(master.Validate(), error => error.Contains("default", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("unresolved value", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("default", StringComparison.Ordinal));
         master.Groups[0].Values = null!;
-        Assert.Contains(master.Validate(), error => error.Contains("manifest cannot be null", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("manifest cannot be null", StringComparison.Ordinal));
         master.Groups = null!;
-        Assert.Contains(master.Validate(), error => error.Contains("manifests cannot be null", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("manifests cannot be null", StringComparison.Ordinal));
         master.Groups = [];
         master.Tags = null!;
-        Assert.Contains(master.Validate(), error => error.Contains("manifests cannot be null", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("manifests cannot be null", StringComparison.Ordinal));
     }
 
     /// <summary>A default from another group is invalid even if it has the same display name.</summary>
@@ -89,7 +89,7 @@ public sealed class LayerAssetsTests
             DefaultValue = new LayerValueAsset { Name = "Default" },
         };
         var master = new NodeLayerSettings { Groups = [group] };
-        Assert.Contains(master.Validate(), error => error.Contains("default must reference", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("default must reference", StringComparison.Ordinal));
         group.DefaultValue = value;
         Assert.Empty(master.Validate());
     }
@@ -114,10 +114,10 @@ public sealed class LayerAssetsTests
         master.Groups[2].Name = " ";
         master.Tags.Add(new TagAsset());
         var errors = master.Validate();
-        Assert.Contains(errors, error => error == "Group name cannot be empty.");
-        Assert.Contains(errors, error => error == "Tag name cannot be empty.");
+        Assert.Contains(errors, static error => error == "Group name cannot be empty.");
+        Assert.Contains(errors, static error => error == "Tag name cannot be empty.");
         value.Name = "";
-        Assert.Contains(master.Validate(), error => error.Contains("value name cannot be empty", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("value name cannot be empty", StringComparison.Ordinal));
     }
 
     /// <summary>Identities are nonempty and unique across all groups, values, tags, and the master.</summary>
@@ -131,23 +131,23 @@ public sealed class LayerAssetsTests
             Groups = [group],
             Tags = [new TagAsset { Id = value.Id, Name = "Player" }, new TagAsset { Name = "Enemy" }],
         };
-        Assert.Contains(master.Validate(), error => error.Contains("already used by", StringComparison.Ordinal));
+        Assert.Contains(master.Validate(), static error => error.Contains("already used by", StringComparison.Ordinal));
         master.Tags[0].Id = Guid.Empty;
         group.Id = Guid.Empty;
         value.Id = Guid.Empty;
         master.Id = Guid.Empty;
-        Assert.Equal(4, master.Validate().Count(error => error.Contains("identity cannot be empty", StringComparison.Ordinal)));
+        Assert.Equal(4, master.Validate().Count(static error => error.Contains("identity cannot be empty", StringComparison.Ordinal)));
     }
 
     /// <summary>Capacity violations are explicit validation failures rather than truncated manifests.</summary>
     [Fact]
     public void OversizedManifestsAreRejected()
     {
-        var values = Enumerable.Range(0, 257).Select(i => new LayerValueAsset { Name = $"Value{i}" }).ToList();
+        var values = Enumerable.Range(0, 257).Select(static i => new LayerValueAsset { Name = $"Value{i}" }).ToList();
         var master = new NodeLayerSettings
         {
             Groups = [new LayerGroupAsset { Name = "Physics", Values = values, DefaultValue = values[0] }],
-            Tags = [.. Enumerable.Range(0, 65_537).Select(i => new TagAsset { Name = $"Tag{i}" })],
+            Tags = [.. Enumerable.Range(0, 65_537).Select(static i => new TagAsset { Name = $"Tag{i}" })],
         };
         Assert.Equal(2, master.Validate().Count);
     }

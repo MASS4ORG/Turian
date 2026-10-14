@@ -24,7 +24,7 @@ public static partial class LocalizationSourceExtractor
         ArgumentNullException.ThrowIfNull(sourceFiles);
         return sourceFiles
             .SelectMany(File.ReadLines)
-            .SelectMany(line => TranslationCallRegex().Matches(line).Select(match => match.Groups["text"].Value))
+            .SelectMany(static line => TranslationCallRegex().Matches(line).Select(static match => match.Groups["text"].Value))
             .Select(Regex.Unescape)
             .Where(static text => text.Length > 0)
             .Distinct(StringComparer.Ordinal)

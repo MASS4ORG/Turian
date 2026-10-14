@@ -27,8 +27,15 @@ sealed class UnsavedChangesGuard(
 
         dialog.Ask(localization.T(question), choice =>
         {
-            if (choice == UnsavedChanges.Save) unsaved.SaveAll();
-            else unsaved.DiscardAll();
+            if (choice == UnsavedChanges.Save)
+            {
+                unsaved.SaveAll();
+            }
+            else
+            {
+                unsaved.DiscardAll();
+            }
+
             proceed();
         });
     }

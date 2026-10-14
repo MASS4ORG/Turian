@@ -18,7 +18,9 @@ public sealed class ExportUserCode(
     public async Task<string> ExecuteAsync()
     {
         if (BuildPlatforms.For(profile?.Profile).ValidateSettings(Settings) is { } invalid)
+        {
             throw new InvalidOperationException(invalid);
+        }
 
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
@@ -28,9 +30,11 @@ public sealed class ExportUserCode(
         Logger.LogInformation("Export output path: {Path}", exportOutputPath);
         EnsureDirectory(exportOutputPath + Path.DirectorySeparatorChar);
         if (RunsHeadlessByAccident(Settings.ProjectAbsoluteDir, profile?.Profile))
+        {
             Logger.LogWarning(
                 "No render brick is installed, so this client build runs headless. Add {Brick} to play it in a window",
                 ProjectPackages.RenderBrick);
+        }
 
         var configName = (profile?.Profile.Configuration ?? configuration) == BuildConfiguration.Release
             ? "Release"
@@ -48,7 +52,10 @@ public sealed class ExportUserCode(
             RedirectStandardError = true
         };
         foreach (var argument in platform.PublishArguments(context))
+        {
             startInfo.ArgumentList.Add(argument);
+        }
+
         WithoutLocatorEnvironment(startInfo);
 
         using var process = new Process();

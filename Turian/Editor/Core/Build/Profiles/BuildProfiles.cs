@@ -28,9 +28,15 @@ public static class BuildProfiles
     public static IReadOnlyList<ProjectBuildProfile> Discover(IBuildAppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (!Directory.Exists(settings.AssetsAbsoluteDir)) return [];
+        if (!Directory.Exists(settings.AssetsAbsoluteDir))
+        {
+            return [];
+        }
+
         if (ProjectAsset.Load(settings.AssetsAbsoluteDir) is not { } project)
+        {
             return Search(settings.AssetsAbsoluteDir);
+        }
 
         var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
         return [.. project.BuildProfiles.Where(static r => !r.IsEmpty)
@@ -49,7 +55,10 @@ public static class BuildProfiles
     public static IReadOnlyList<BuildProfileListing> List(IAppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (ProjectAsset.Load(settings.AssetsAbsoluteDir) is not { } project) return [];
+        if (ProjectAsset.Load(settings.AssetsAbsoluteDir) is not { } project)
+        {
+            return [];
+        }
 
         var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
         var active = project.ActiveBuildProfile?.AssetId;
@@ -67,7 +76,9 @@ public static class BuildProfiles
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (ProjectAsset.Load(settings.AssetsAbsoluteDir)?.ActiveBuildProfile is not { IsEmpty: false } active)
+        {
             return null;
+        }
 
         var index = new AssetSourceIndex(settings.ProjectAbsoluteDir);
         return index.PathOf(active.AssetId) is { } path ? Read(path, index) : null;
@@ -102,7 +113,7 @@ public static class BuildProfiles
         index.LoadFile(path) is BuildProfile profile
             ? new ProjectBuildProfile(
                 string.IsNullOrWhiteSpace(profile.Name)
-                    ? System.IO.Path.GetFileNameWithoutExtension(path)
+                    ? Path.GetFileNameWithoutExtension(path)
                     : profile.Name.Trim(),
                 path, profile)
             : null;
@@ -135,14 +146,19 @@ public static class BuildProfiles
     {
         ArgumentNullException.ThrowIfNull(bricks);
         var shipped = bricks.Where(static b => !b.Manifest.EditorOnly && !b.Manifest.CompileTimeOnly).ToList();
-        if (target == BuildTarget.Client) return shipped;
+        if (target == BuildTarget.Client)
+        {
+            return shipped;
+        }
 
         // Resolution lists dependencies first, so one pass sees every dependency's verdict before its dependents.
         var excluded = new HashSet<string>(StringComparer.Ordinal);
         foreach (var brick in shipped)
         {
             if (brick.Manifest.ClientOnly || brick.Manifest.Dependencies.Keys.Any(excluded.Contains))
+            {
                 excluded.Add(brick.Id);
+            }
         }
 
         return [.. shipped.Where(b => !excluded.Contains(b.Id))];
@@ -156,9 +172,11 @@ public static class BuildProfiles
     {
         var unsupported = shipped.Where(b => !b.Manifest.SupportsPlatform(platform)).Select(static b => b.Id).ToList();
         if (unsupported.Count > 0)
+        {
             throw new InvalidOperationException(
                 $"The {platform} platform cannot ship these bricks: {string.Join(", ", unsupported)}. "
                 + "Remove them from the project or build for a platform they support.");
+        }
     }
 
     /// <summary>

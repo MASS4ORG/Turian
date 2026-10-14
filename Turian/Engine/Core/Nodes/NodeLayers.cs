@@ -16,7 +16,11 @@ public struct NodeLayers
         readonly get
         {
             ArgumentOutOfRangeException.ThrowIfNegative(groupSlot);
-            if (groupSlot < InlineCapacity) return slots[groupSlot];
+            if (groupSlot < InlineCapacity)
+            {
+                return slots[groupSlot];
+            }
+
             var index = Find(overflow, groupSlot);
             return index < 0 ? (byte)0 : overflow![index].Index;
         }
@@ -37,10 +41,18 @@ public struct NodeLayers
         var index = Find(overflow, slot);
         if (index < 0)
         {
-            if (value != 0) Insert(~index, new Membership(slot, value));
+            if (value != 0)
+            {
+                Insert(~index, new Membership(slot, value));
+            }
+
             return;
         }
-        if (overflow![index].Index == value) return;
+        if (overflow![index].Index == value)
+        {
+            return;
+        }
+
         if (value == 0)
         {
             Remove(index);
@@ -84,9 +96,19 @@ public struct NodeLayers
         {
             var middle = start + (end - start) / 2;
             var key = entries[middle].Slot;
-            if (key == slot) return middle;
-            if (key < slot) start = middle + 1;
-            else end = middle - 1;
+            if (key == slot)
+            {
+                return middle;
+            }
+
+            if (key < slot)
+            {
+                start = middle + 1;
+            }
+            else
+            {
+                end = middle - 1;
+            }
         }
         return ~start;
     }

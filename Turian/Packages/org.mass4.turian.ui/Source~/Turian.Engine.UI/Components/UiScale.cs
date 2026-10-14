@@ -45,7 +45,9 @@ public readonly record struct UiScale(int PixelWidth, int PixelHeight, float Can
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(framebufferHeight);
 
         if (mode != UiScaleMode.ScaleWithScreenSize || referenceWidth <= 0 || referenceHeight <= 0)
+        {
             return new UiScale(framebufferWidth, framebufferHeight, 1f);
+        }
 
         var logWidth = MathF.Log2((float)framebufferWidth / referenceWidth);
         var logHeight = MathF.Log2((float)framebufferHeight / referenceHeight);

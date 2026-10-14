@@ -29,7 +29,7 @@ public sealed class PackagedPluginsTests : IDisposable
         var loaded = Assert.Single(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
 
         Assert.Equal(assemblyName, loaded.GetName().Name);
-        Assert.Contains(loaded.GetTypes(), type => type.GetCustomAttribute<PluginAttribute>() is not null);
+        Assert.Contains(loaded.GetTypes(), static type => type.GetCustomAttribute<PluginAttribute>() is not null);
         Assert.True(File.Exists(Path.Combine(studio, "Bricks", LockFile.FileName)));
     }
 

@@ -107,23 +107,23 @@ public sealed class StudioBricksTests : IDisposable
         Assert.True(await controller.AddFromSourceAsync(Source("sunset")));
         frame.Draw();
 
-        Assert.Equal(["com.acme.sunset"], controller.Rows.Select(row => row.Id));
-        Assert.Contains(frame.Nodes(), node => node.Id == "bricks/row/com.acme.sunset");
-        Assert.Contains(frame.Nodes(), node => node.Id == "bricks/category/Themes");
+        Assert.Equal(["com.acme.sunset"], controller.Rows.Select(static row => row.Id));
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/row/com.acme.sunset");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/category/Themes");
 
         panel.Category = BrickCategoryFilter.Fonts;
         frame.Draw();
-        Assert.DoesNotContain(frame.Nodes(), node => node.Id == "bricks/row/com.acme.sunset");
+        Assert.DoesNotContain(frame.Nodes(), static node => node.Id == "bricks/row/com.acme.sunset");
         panel.Browse(BrickCategoryFilter.Themes);
         frame.Draw();
-        Assert.Contains(frame.Nodes(), node => node.Id == "bricks/row/com.acme.sunset");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/row/com.acme.sunset");
 
         controller.Scope = BrickScope.Project;
         frame.Draw();
         Assert.False(controller.HasWorkspace);
         Assert.False(await controller.InstallAsync("x", null));
         Assert.Equal("Open a project first.", controller.Error);
-        Assert.Contains(frame.Nodes(), node => node.Id == "bricks/scope/Studio");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/scope/Studio");
     }
 
     /// <summary>Installing a content-only theme brick makes its theme selectable without a restart.</summary>

@@ -29,7 +29,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public PackageScope Scope => PackageScope.Studio;
 
     /// <inheritdoc />
-    public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", .. hosts.Keys.Where(host => host != "gaya")];
+    public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", .. hosts.Keys.Where(static host => host != "gaya")];
 
     /// <inheritdoc />
     public string? BuiltinDirectory { get; } = builtinDirectory;
@@ -56,10 +56,17 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public PackageResolution ResolveAll(bool locked = false)
     {
         ProjectManifest.MigrateLegacyLayout(Root);
-        if (!HasManifest) return new PackageResolution([], new LockFile());
+        if (!HasManifest)
+        {
+            return new PackageResolution([], new LockFile());
+        }
 
         var resolution = Resolver(locked, new HashSet<string>()).ResolveAsync(Root).GetAwaiter().GetResult();
-        if (!resolution.UsesUserOverride && !locked) resolution.Lock.Save(Root);
+        if (!resolution.UsesUserOverride && !locked)
+        {
+            resolution.Lock.Save(Root);
+        }
+
         return resolution;
     }
 
@@ -92,7 +99,10 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     {
         var (manifest, _) = ProjectManifest.Load(Root, includeUserOverride: false);
         if (!manifest.Dependencies.ContainsKey(id))
+        {
             throw new PackageException($"The studio does not declare {id}.");
+        }
+
         Rollback(() =>
         {
             _ = manifest.Dependencies.Remove(id);
@@ -107,10 +117,17 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public void Update(IReadOnlyCollection<string> ids)
     {
         ArgumentNullException.ThrowIfNull(ids);
-        if (!HasManifest) return;
+        if (!HasManifest)
+        {
+            return;
+        }
+
         var resolution = Resolver(locked: false, ids.Count > 0 ? ids.ToHashSet(StringComparer.Ordinal) : null)
             .ResolveAsync(Root).GetAwaiter().GetResult();
-        if (!resolution.UsesUserOverride) resolution.Lock.Save(Root);
+        if (!resolution.UsesUserOverride)
+        {
+            resolution.Lock.Save(Root);
+        }
     }
 
     /// <inheritdoc />
@@ -147,7 +164,11 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public bool RemoveRegistry(string name)
     {
         var (manifest, _) = ProjectManifest.Load(Root, includeUserOverride: false);
-        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0) return false;
+        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0)
+        {
+            return false;
+        }
+
         manifest.Save(Root);
         return true;
     }
@@ -156,7 +177,11 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public void SaveManifest(ProjectManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        foreach (var registry in manifest.ScopedRegistries) BrickRegistries.Validate(registry);
+        foreach (var registry in manifest.ScopedRegistries)
+        {
+            BrickRegistries.Validate(registry);
+        }
+
         Rollback(() => manifest.Save(Root), Resolve);
     }
 
@@ -197,8 +222,15 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
         }
         catch (PackageException)
         {
-            if (before is null) File.Delete(path);
-            else File.WriteAllText(path, before);
+            if (before is null)
+            {
+                File.Delete(path);
+            }
+            else
+            {
+                File.WriteAllText(path, before);
+            }
+
             throw;
         }
     }
@@ -215,11 +247,20 @@ public static class BrickRegistries
         ArgumentNullException.ThrowIfNull(registry);
         if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace) || registry.Scopes.Count == 0
             || registry.Scopes.Any(string.IsNullOrWhiteSpace))
+        {
             throw new PackageException("A registry needs a name, an address and at least one scope.");
-        foreach (var key in registry.Keys) _ = SshSignature.ParsePublicKey(key);
+        }
+
+        foreach (var key in registry.Keys)
+        {
+            _ = SshSignature.ParsePublicKey(key);
+        }
+
         if (registry.Keys.Count == 0 && !registry.AllowUnsigned)
+        {
             throw new PackageException(
                 "A registry needs at least one trusted key (an OpenSSH public key), or must be marked to allow unsigned bricks.");
+        }
     }
 
     /// <summary>Finds bricks in <paramref name="registries"/> whose id contains <paramref name="query"/>.</summary>
@@ -249,7 +290,7 @@ public static class BrickRegistries
     }
 
     static string Newest(RegistryBrick brick) =>
-        brick.Versions.Where(v => !v.Value.Yanked && SemanticVersion.TryParse(v.Key, out _))
+        brick.Versions.Where(static v => !v.Value.Yanked && SemanticVersion.TryParse(v.Key, out _))
             .Select(static v => SemanticVersion.Parse(v.Key)).OrderByDescending(static v => v).FirstOrDefault()
             ?.ToString() ?? "(yanked)";
 }

@@ -11,17 +11,25 @@ public static partial class AssimpModelConverter
         var root = JsonNode.Parse(data.AsSpan(20, jsonLength))!.AsObject();
         var tangents = TangentAccessorIndices(root);
         if (tangents.Count == 0)
+        {
             return;
+        }
+
         var accessors = root["accessors"]!.AsArray();
         if (!tangents.Any(index => accessors[index]!["type"]!.GetValue<string>() == "VEC3"))
+        {
             return;
+        }
 
         var binaryOffset = 28 + jsonLength;
         using var binary = new MemoryStream();
         binary.Write(data.AsSpan(binaryOffset));
         var sourceMeshes = TangentMeshes(scene);
         if (sourceMeshes.Count != tangents.Count)
+        {
             throw new InvalidDataException("Assimp tangent export does not match its source meshes.");
+        }
+
         for (var i = 0; i < tangents.Count; i++)
         {
             var accessor = accessors[tangents[i]]!.AsObject();
@@ -36,11 +44,21 @@ public static partial class AssimpModelConverter
     {
         var indices = new SortedSet<int>();
         if (root["meshes"] is not JsonArray meshes)
+        {
             return [];
+        }
+
         foreach (var mesh in meshes)
+        {
             foreach (var primitive in mesh!["primitives"]!.AsArray())
+            {
                 if (primitive!["attributes"]!["TANGENT"] is { } tangent)
+                {
                     indices.Add(tangent.GetValue<int>());
+                }
+            }
+        }
+
         return [.. indices];
     }
 
@@ -51,7 +69,9 @@ public static partial class AssimpModelConverter
         {
             var mesh = scene->MMeshes[i];
             if (mesh->MNumFaces > 0 && mesh->MTangents is not null)
+            {
                 meshes.Add((nint)mesh);
+            }
         }
         return meshes;
     }
@@ -59,11 +79,20 @@ public static partial class AssimpModelConverter
     static unsafe void RepairTangentAccessor(JsonObject root, JsonObject accessor, Stream binary, AssimpMesh* mesh)
     {
         if (accessor["type"]!.GetValue<string>() != "VEC3")
+        {
             return;
+        }
+
         if (accessor["count"]!.GetValue<uint>() != mesh->MNumVertices)
+        {
             throw new InvalidDataException("Assimp tangent export has an unexpected vertex count.");
+        }
+
         if (mesh->MNormals is null || mesh->MBitangents is null)
+        {
             throw new InvalidDataException("Assimp tangents require normals and bitangents for glTF handedness.");
+        }
+
         var views = root["bufferViews"]!.AsArray();
         accessor["bufferView"] = views.Count;
         accessor["byteOffset"] = 0;
@@ -90,7 +119,10 @@ public static partial class AssimpModelConverter
             var bitangentVector = new Vector3(bitangent.X, bitangent.Y, bitangent.Z);
             var sign = Vector3.Dot(Vector3.Cross(normalVector, xyz), bitangentVector) < 0 ? -1f : 1f;
             if (xyz.LengthSquared() > 0)
+            {
                 xyz = Vector3.Normalize(xyz);
+            }
+
             var value = new Vector4(xyz, sign);
             BinaryPrimitives.WriteSingleLittleEndian(bytes, value.X);
             BinaryPrimitives.WriteSingleLittleEndian(bytes[4..], value.Y);
@@ -114,7 +146,10 @@ public static partial class AssimpModelConverter
         output.Write(header);
         output.Write(json);
         for (var i = json.Length; i < paddedLength; i++)
+        {
             output.WriteByte(32);
+        }
+
         Span<byte> binaryHeader = stackalloc byte[8];
         BinaryPrimitives.WriteUInt32LittleEndian(binaryHeader, checked((uint)binary.Length));
         BinaryPrimitives.WriteUInt32LittleEndian(binaryHeader[4..], 0x004e4942);

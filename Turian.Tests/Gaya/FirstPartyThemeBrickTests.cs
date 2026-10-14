@@ -12,7 +12,7 @@ public sealed class FirstPartyThemeBrickTests
     {
         var findings = ThemeVerifier.Verify(BrickFolder(brick));
 
-        Assert.DoesNotContain(findings, finding => finding.Severity == ThemeFindingSeverity.Error);
+        Assert.DoesNotContain(findings, static finding => finding.Severity == ThemeFindingSeverity.Error);
     }
 
     /// <summary>A look from a brick applies as the base sheet and pairs with its own dark and light themes.</summary>
@@ -31,7 +31,7 @@ public sealed class FirstPartyThemeBrickTests
         Assert.NotNull(service.Look);
         Assert.Null(service.Diagnostic);
         Assert.Equal(darkTheme, service.DefaultColorThemeFor(look));
-        Assert.All(service.Looks.Concat(service.ColorThemes), info => Assert.NotNull(info));
+        Assert.All(service.Looks.Concat(service.ColorThemes), static info => Assert.NotNull(info));
         ThemeTokens.Current = ThemeTokens.Default;
     }
 
@@ -47,7 +47,7 @@ public sealed class FirstPartyThemeBrickTests
             PackageScope.Studio);
         var looks = BrickCatalog.Filter(catalog, BrickFilter.BuiltIn, null, BrickCategoryFilter.Looks);
 
-        Assert.Equal(["org.mass4.gaya.look-win9x", "org.mass4.gaya.look-winxp"], looks.Select(b => b.Id).Order());
+        Assert.Equal(["org.mass4.gaya.look-win9x", "org.mass4.gaya.look-winxp"], looks.Select(static b => b.Id).Order());
     }
 
     static string BrickFolder(string brick)
@@ -56,7 +56,10 @@ public sealed class FirstPartyThemeBrickTests
              directory = directory.Parent)
         {
             var path = Path.Combine(directory.FullName, "Turian", "Packages", brick);
-            if (Directory.Exists(path)) return path;
+            if (Directory.Exists(path))
+            {
+                return path;
+            }
         }
         throw new DirectoryNotFoundException(brick);
     }

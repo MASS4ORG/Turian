@@ -45,7 +45,10 @@ public sealed class LockFile
     {
         ProjectManifest.MigrateLegacyLayout(projectRoot);
         var path = Path.Combine(projectRoot, ProjectManifest.DirectoryName, FileName);
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path))
+        {
+            return null;
+        }
 
         try
         {
@@ -65,7 +68,10 @@ public sealed class LockFile
         var directory = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
         var path = Path.Combine(directory, FileName);
         var json = Serialize();
-        if (File.Exists(path) && File.ReadAllText(path) == json) return false;
+        if (File.Exists(path) && File.ReadAllText(path) == json)
+        {
+            return false;
+        }
 
         Directory.CreateDirectory(directory);
         File.WriteAllText(path, json);

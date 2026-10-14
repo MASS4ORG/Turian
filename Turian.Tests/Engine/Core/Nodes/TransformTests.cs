@@ -57,8 +57,12 @@ public class TransformTests
         var actual = transform.Matrix4X4();
 
         for (var row = 0; row < 4; row++)
+        {
             for (var column = 0; column < 4; column++)
+            {
                 Assert.Equal(expected[row, column], actual[row, column], 4);
+            }
+        }
     }
 
     /// <summary>The model matrix places a local point where <see cref="Transform.AddParent"/> does.</summary>

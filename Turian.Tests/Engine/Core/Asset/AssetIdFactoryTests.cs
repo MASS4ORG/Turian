@@ -41,7 +41,7 @@ public class AssetIdFactoryTests
     [Fact]
     public void Derive_EmptySlot_Throws()
     {
-        Assert.Throws<ArgumentException>(() =>
+        Assert.Throws<ArgumentException>(static () =>
             AssetIdFactory.Derive(Guid.NewGuid(), ""));
     }
 }

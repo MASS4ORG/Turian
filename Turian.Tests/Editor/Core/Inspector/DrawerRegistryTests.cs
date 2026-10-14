@@ -40,7 +40,7 @@ public class DrawerRegistryTests
     {
         var field = InspectorForms.Build(new TooltippedTarget()).Sections[0].Fields.Single();
 
-        Assert.Contains(field.Metadata!.RenderingHints, hint => hint is TooltipAttribute);
+        Assert.Contains(field.Metadata!.RenderingHints, static hint => hint is TooltipAttribute);
         Assert.Equal("Explains the value", field.Attribute<TooltipAttribute>()?.Text);
     }
 
@@ -104,7 +104,14 @@ public class DrawerRegistryTests
 
     static void Collect(LayoutNode node, HashSet<string> ids)
     {
-        if (node.Id is { } id) ids.Add(id);
-        foreach (var child in node.Children) Collect(child, ids);
+        if (node.Id is { } id)
+        {
+            ids.Add(id);
+        }
+
+        foreach (var child in node.Children)
+        {
+            Collect(child, ids);
+        }
     }
 }

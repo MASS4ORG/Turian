@@ -21,7 +21,10 @@ public unsafe partial class Device
     /// </summary>
     public void DestroySurface()
     {
-        if (!HasSurface) return;
+        if (!HasSurface)
+        {
+            return;
+        }
 
         surfaceHost!.DestroySurface(vk, instance, surface);
         surface = default;
@@ -31,7 +34,10 @@ public unsafe partial class Device
     /// <exception cref="VulkanException">The present queue cannot present to the new surface.</exception>
     public void RecreateSurface()
     {
-        if (HasSurface) return;
+        if (HasSurface)
+        {
+            return;
+        }
 
         surface = surfaceHost!.CreateSurface(vk, instance);
         EnsurePresentSupport();

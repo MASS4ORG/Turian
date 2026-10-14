@@ -29,7 +29,11 @@ sealed class FrameStatisticsDrawing(FrameStatisticsHudComponent component) : IDr
 
     void PrepareGlyphs(float size)
     {
-        if (font.Size == size && glyphs[0] is not null) return;
+        if (font.Size == size && glyphs[0] is not null)
+        {
+            return;
+        }
+
         font.Size = size;
         Span<char> character = stackalloc char[1];
         for (var i = 0; i < glyphs.Length; i++)
@@ -46,7 +50,11 @@ sealed class FrameStatisticsDrawing(FrameStatisticsHudComponent component) : IDr
         foreach (var character in line)
         {
             var index = character - 32;
-            if ((uint)index >= glyphs.Length) continue;
+            if ((uint)index >= glyphs.Length)
+            {
+                continue;
+            }
+
             canvas.DrawText(glyphs[index], x, y, ink);
             x += advances[index];
         }
@@ -58,6 +66,9 @@ sealed class FrameStatisticsDrawing(FrameStatisticsHudComponent component) : IDr
         background.Dispose();
         ink.Dispose();
         font.Dispose();
-        foreach (var glyph in glyphs) glyph?.Dispose();
+        foreach (var glyph in glyphs)
+        {
+            glyph?.Dispose();
+        }
     }
 }

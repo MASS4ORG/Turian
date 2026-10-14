@@ -14,12 +14,26 @@ sealed partial class AssetBrowserPanel
 
     void OnDrop(TreeItem target, object payload)
     {
-        if (target.Tag is not AssetEntry destination) return;
-        var sources = rows.Select(row => row.Tag).OfType<AssetEntry>().ToArray();
+        if (target.Tag is not AssetEntry destination)
+        {
+            return;
+        }
+
+        var sources = rows.Select(static row => row.Tag).OfType<AssetEntry>().ToArray();
         var request = AssetDropPolicy.Resolve(destination, payload, sources);
-        if (request is null) return;
-        if (!request.Copy) operations.MoveMany(request.Entries, request.Directory);
-        else ConfirmBrickCopy(request);
+        if (request is null)
+        {
+            return;
+        }
+
+        if (!request.Copy)
+        {
+            operations.MoveMany(request.Entries, request.Directory);
+        }
+        else
+        {
+            ConfirmBrickCopy(request);
+        }
     }
 
     void ConfirmBrickCopy(AssetDrop request)

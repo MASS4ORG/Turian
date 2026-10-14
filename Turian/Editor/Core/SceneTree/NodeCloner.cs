@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Deep-clones a <see cref="Node"/> hierarchy, assigning fresh <see cref="System.Guid"/> IDs
+/// Deep-clones a <see cref="Node"/> hierarchy, assigning fresh <see cref="Guid"/> IDs
 /// and wiring parent/child references. Does not touch any UI state.
 /// </summary>
 public static class NodeCloner
@@ -31,7 +31,10 @@ public static class NodeCloner
         var json = Serializer.Serialize(source);
         var clone = Serializer.LoadData<Node>(json, loader);
 
-        if (awake) clone?.Awake(null);
+        if (awake)
+        {
+            clone?.Awake(null);
+        }
 
         return clone;
     }
@@ -66,7 +69,7 @@ public static class NodeCloner
 
         foreach (var prop in source.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p is { CanRead: true, CanWrite: true }
+            .Where(static p => p is { CanRead: true, CanWrite: true }
                         && p.GetIndexParameters().Length == 0
                         && p.GetMethod?.GetParameters().Length == 0
                         && p.Name is not (nameof(Node.Children) or nameof(Node.Parent) or nameof(Node.Name)
@@ -94,7 +97,11 @@ public static class NodeCloner
         if (type.IsArray) { clone = ((Array)value).Clone(); return true; }
 
         var method = type.GetMethod("MemberwiseClone", BindingFlags.Instance | BindingFlags.NonPublic);
-        if (method is null) return false;
+        if (method is null)
+        {
+            return false;
+        }
+
         try { clone = method.Invoke(value, null); return clone is not null; }
         catch { return false; }
     }

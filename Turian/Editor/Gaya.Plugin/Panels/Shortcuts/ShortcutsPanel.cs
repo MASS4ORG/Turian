@@ -48,8 +48,10 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
                    .Gap(Theme.Gap).Enter())
         {
             using (gui.Node(-1, height, "shortcuts/header/filter").Expand().Enter())
+            {
                 filter = gui.TextInput(filter, width: 0, height: height, placeholder: "Search commands",
                     fontSize: Theme.Text(12), padding: 5, id: "shortcuts/filter");
+            }
 
             if (StudioControls.SmallTextButton(gui, "Reset All", "shortcuts/resetAll", Theme.Scale(80f)))
             {
@@ -73,7 +75,9 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
             GroupHeader(gui, ShortcutContexts.IsGlobal(group.Key) ? "Global" : panels.Title(group.Key));
 
             foreach (var entry in group)
+            {
                 Row(gui, entry);
+            }
         }
     }
 
@@ -81,7 +85,9 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
     {
         using (gui.Node(-1, Theme.Scale(rowHeight), $"shortcuts/group/{label}").ExpandWidth()
                    .ContentAlignY(0.5f).Margin(0f, Theme.Scale(6f), 0f, 0f).Enter())
+        {
             gui.DrawText(label.ToUpperInvariant(), Theme.Text(10f), Theme.InkDim, centerInRect: false);
+        }
     }
 
     void Row(Gui gui, ShortcutEntry entry)
@@ -94,11 +100,15 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
                    .ContentAlignY(0.5f).Enter())
         {
             if (gui.Pass == Pass.Pass2Render && gui.GetInteractable().OnHover())
+            {
                 gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
 
             using (gui.Node(-1, height, $"{id}/label").Expand().ContentAlignY(0.5f).Enter())
+            {
                 gui.DrawText(Title(entry.CommandId), Theme.Text(12f),
                     clashes ? Theme.Error : Theme.Ink, centerInRect: false);
+            }
 
             Chord(gui, entry, $"{id}/chord", height);
 
@@ -128,8 +138,15 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
             {
                 gui.DrawBackgroundRect(listening ? Theme.Accent : hot ? Theme.Border : Theme.Chrome, 3f);
 
-                if (hot && interactable.OnClick()) Begin(entry.CommandId);
-                if (listening) Capture(gui, entry.CommandId);
+                if (hot && interactable.OnClick())
+                {
+                    Begin(entry.CommandId);
+                }
+
+                if (listening)
+                {
+                    Capture(gui, entry.CommandId);
+                }
             }
 
             gui.DrawText(Label(entry, listening), Theme.Text(12f),
@@ -139,7 +156,11 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
 
     string Label(ShortcutEntry entry, bool listening)
     {
-        if (!listening) return entry.Display.Length > 0 ? entry.Display : "—";
+        if (!listening)
+        {
+            return entry.Display.Length > 0 ? entry.Display : "—";
+        }
+
         return first.IsNone ? "Press a key…" : $"{first}, …";
     }
 
@@ -158,7 +179,11 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
             return;
         }
 
-        if (KeyStroke.Read(gui.Input) is not { } stroke) return;
+        if (KeyStroke.Read(gui.Input) is not { } stroke)
+        {
+            return;
+        }
+
         BindStroke(commandId, stroke);
     }
 
@@ -180,8 +205,14 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
             return;
         }
 
-        if (first.IsNone) shortcuts.Rebind(commandId, stroke);
-        else shortcuts.Rebind(commandId, first, stroke);
+        if (first.IsNone)
+        {
+            shortcuts.Rebind(commandId, stroke);
+        }
+        else
+        {
+            shortcuts.Rebind(commandId, first, stroke);
+        }
 
         Cancel();
     }
@@ -190,13 +221,18 @@ sealed class ShortcutsPanel(IShortcutService shortcuts, ICommandCatalog commands
     void Footer(Gui gui)
     {
         var conflicts = shortcuts.Conflicts;
-        if (conflicts.Count == 0) return;
+        if (conflicts.Count == 0)
+        {
+            return;
+        }
 
         using (gui.Node(-1, Theme.Scale(rowHeight), "shortcuts/conflicts").ExpandWidth()
                    .ContentAlignY(0.5f).Enter())
+        {
             gui.DrawText(
                 $"{conflicts.Count} conflict(s): {string.Join(", ", conflicts.Take(3).Select(Describe))}",
                 Theme.Text(11f), Theme.Error, centerInRect: false);
+        }
     }
 
     string Describe(ShortcutConflict conflict) =>

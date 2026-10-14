@@ -144,7 +144,11 @@ public class TextureAssetImporter : IAssetImporter
         while (skip < levels.Count - 1)
         {
             var (levelWidth, levelHeight) = TextureFormats.LevelExtent(width, height, skip);
-            if (Math.Max(levelWidth, levelHeight) <= maxResolution) break;
+            if (Math.Max(levelWidth, levelHeight) <= maxResolution)
+            {
+                break;
+            }
+
             skip++;
         }
 

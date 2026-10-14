@@ -27,7 +27,9 @@ public static class SshSignature
                 var reader = new Reader(Convert.FromBase64String(parts[1]));
                 if (reader.ReadString() is var algorithm && Encoding.ASCII.GetString(algorithm) == SshSignature.algorithm
                     && reader.ReadString() is { Length: Ed25519.PublicKeyLength } key)
+                {
                     return key;
+                }
             }
         }
         catch (FormatException)
@@ -60,11 +62,21 @@ public static class SshSignature
         try
         {
             var reader = new Reader(Decode(armoredSignature));
-            if (Encoding.ASCII.GetString(reader.ReadBytes(magic.Length)) != magic || reader.ReadUInt32() != 1) return false;
+            if (Encoding.ASCII.GetString(reader.ReadBytes(magic.Length)) != magic || reader.ReadUInt32() != 1)
+            {
+                return false;
+            }
 
             var signedBy = new Reader(reader.ReadString());
-            if (Encoding.ASCII.GetString(signedBy.ReadString()) != algorithm || !signedBy.ReadString().AsSpan().SequenceEqual(key)) return false;
-            if (Encoding.UTF8.GetString(reader.ReadString()) != @namespace) return false;
+            if (Encoding.ASCII.GetString(signedBy.ReadString()) != algorithm || !signedBy.ReadString().AsSpan().SequenceEqual(key))
+            {
+                return false;
+            }
+
+            if (Encoding.UTF8.GetString(reader.ReadString()) != @namespace)
+            {
+                return false;
+            }
 
             var reserved = reader.ReadString();
             var hashName = Encoding.ASCII.GetString(reader.ReadString());
@@ -76,7 +88,10 @@ public static class SshSignature
             };
 
             var signature = new Reader(reader.ReadString());
-            if (hashed is null || Encoding.ASCII.GetString(signature.ReadString()) != algorithm) return false;
+            if (hashed is null || Encoding.ASCII.GetString(signature.ReadString()) != algorithm)
+            {
+                return false;
+            }
 
             var raw = signature.ReadString();
             var signedData = Concatenate(Encoding.ASCII.GetBytes(magic), Write(Encoding.UTF8.GetBytes(@namespace)),

@@ -33,7 +33,9 @@ public class MeshRenderSystem : IRenderSystem
         // Without mesh shading the pipeline cannot even be built, so the system then records nothing.
         if (!vulkan.Device.SupportsMeshShaders
             || !vulkan.Vk.TryGetDeviceExtension(vulkan.Device.Instance, vulkan.Device.VkDevice, out ExtMeshShader ext))
+        {
             return;
+        }
 
         extMeshShader = ext;
         CreatePipelineLayout(globalSetLayout);
@@ -43,7 +45,10 @@ public class MeshRenderSystem : IRenderSystem
     /// <inheritdoc />
     public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
-        if (pipeline is null || extMeshShader is null) return;
+        if (pipeline is null || extMeshShader is null)
+        {
+            return;
+        }
 
         pipeline.Bind(frameInfo.CommandBuffer);
 
@@ -64,7 +69,11 @@ public class MeshRenderSystem : IRenderSystem
             frameInfo.Nodes[n].GetComponentsInChildren(meshes);
             foreach (var component in meshes)
             {
-                if (component.Node is not { } node || !frameInfo.Camera.CullingMask.Contains(node.RenderLayer)) continue;
+                if (component.Node is not { } node || !frameInfo.Camera.CullingMask.Contains(node.RenderLayer))
+                {
+                    continue;
+                }
+
                 StandardPushConstantData push = new()
                 {
                     ModelMatrix = component.TransformationMatrix(),
@@ -89,7 +98,10 @@ public class MeshRenderSystem : IRenderSystem
     {
         pipeline?.Dispose();
         if (pipelineLayout.Handle != 0)
+        {
             vulkan.Vk.DestroyPipelineLayout(vulkan.Device.VkDevice, pipelineLayout, null);
+        }
+
         GC.SuppressFinalize(this);
     }
 

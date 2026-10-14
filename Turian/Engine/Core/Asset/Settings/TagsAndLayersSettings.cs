@@ -73,23 +73,47 @@ public sealed class TagsAndLayersSettings : ProjectSettingsAsset
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var name in names)
         {
-            if (string.IsNullOrWhiteSpace(name)) yield return $"{space} names cannot be empty.";
-            else if (!seen.Add(name)) yield return $"{space} name '{name}' is duplicated.";
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                yield return $"{space} names cannot be empty.";
+            }
+            else if (!seen.Add(name))
+            {
+                yield return $"{space} name '{name}' is duplicated.";
+            }
         }
     }
 
     static IEnumerable<string> ValidateLayers(List<LayerSlot> layers, string space)
     {
-        foreach (var warning in ValidateNames(layers.Select(layer => layer.Name), space)) yield return warning;
+        foreach (var warning in ValidateNames(layers.Select(static layer => layer.Name), space))
+        {
+            yield return warning;
+        }
+
         var indices = new HashSet<int>();
         var ids = new HashSet<Guid>();
         foreach (var layer in layers)
         {
-            if ((uint)layer.Index >= 32) yield return $"{space} layer index {layer.Index} must be between 0 and 31.";
-            if (!indices.Add(layer.Index)) yield return $"{space} layer index {layer.Index} is duplicated.";
-            if (layer.Id == Guid.Empty || !ids.Add(layer.Id)) yield return $"{space} layer identity is empty or duplicated.";
+            if ((uint)layer.Index >= 32)
+            {
+                yield return $"{space} layer index {layer.Index} must be between 0 and 31.";
+            }
+
+            if (!indices.Add(layer.Index))
+            {
+                yield return $"{space} layer index {layer.Index} is duplicated.";
+            }
+
+            if (layer.Id == Guid.Empty || !ids.Add(layer.Id))
+            {
+                yield return $"{space} layer identity is empty or duplicated.";
+            }
         }
 
-        if (Find(layers, 0) is not { Name: "Default" }) yield return $"{space} layer 0 must be named Default.";
+        if (Find(layers, 0) is not { Name: "Default" })
+        {
+            yield return $"{space} layer 0 must be named Default.";
+        }
     }
 }

@@ -23,8 +23,8 @@ public sealed class LayerMaskTests
         Assert.Equal(unchecked((int)0x80000001), (int)both);
         Assert.Equal(LayerMask.Everything, (LayerMask)(-1));
         Assert.Equal(high, LayerMask.FromLayer(31));
-        Assert.Throws<ArgumentOutOfRangeException>(() => LayerMask.FromLayer(-1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => LayerMask.FromLayer(32));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => LayerMask.FromLayer(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => LayerMask.FromLayer(32));
         Assert.Equal(both, JsonSerializer.Deserialize<LayerMask>(JsonSerializer.Serialize(both)));
         Assert.Equal(LayerMask.Everything, JsonSerializer.Deserialize<LayerMask>("-1"));
     }

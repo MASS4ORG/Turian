@@ -76,7 +76,10 @@ public sealed class PlayModeService(
     /// <returns><c>true</c> if a session started; <c>false</c> when no scene is open or the copy failed.</returns>
     public bool Start(string? localeOverride)
     {
-        if (State != PlayState.Stopped) return false;
+        if (State != PlayState.Stopped)
+        {
+            return false;
+        }
 
         var editorRoot = sceneTree.CurrentSceneRoot;
         if (editorRoot is null)
@@ -137,7 +140,11 @@ public sealed class PlayModeService(
     /// <summary>Freezes the running session. No-op unless currently playing.</summary>
     public void Pause()
     {
-        if (State != PlayState.Playing) return;
+        if (State != PlayState.Playing)
+        {
+            return;
+        }
+
         Input.Clear();
         ticker!.Clock.IsPaused = true;
         SetState(PlayState.Paused);
@@ -146,7 +153,11 @@ public sealed class PlayModeService(
     /// <summary>Resumes a paused session. No-op unless currently paused.</summary>
     public void Resume()
     {
-        if (State != PlayState.Paused) return;
+        if (State != PlayState.Paused)
+        {
+            return;
+        }
+
         ticker!.Clock.IsPaused = false;
         // Discard the time spent paused, otherwise the first frame back replays it all at once.
         lastTickSeconds = clock.Elapsed.TotalSeconds;
@@ -156,7 +167,11 @@ public sealed class PlayModeService(
     /// <summary>Advances a paused session by exactly one frame. No-op unless currently paused.</summary>
     public void StepFrame()
     {
-        if (State != PlayState.Paused) return;
+        if (State != PlayState.Paused)
+        {
+            return;
+        }
+
         RunGuarded(() => ticker!.StepFrame());
         FollowActiveScene();
     }
@@ -167,7 +182,10 @@ public sealed class PlayModeService(
     /// </summary>
     public void Stop()
     {
-        if (State == PlayState.Stopped) return;
+        if (State == PlayState.Stopped)
+        {
+            return;
+        }
 
         ticker?.Async.Dispose();
         PlayRoot = null;
@@ -197,8 +215,15 @@ public sealed class PlayModeService(
     /// </remarks>
     public void Tick()
     {
-        if (State == PlayState.Paused) ticker?.Async.PumpCancellation();
-        if (State != PlayState.Playing) return;
+        if (State == PlayState.Paused)
+        {
+            ticker?.Async.PumpCancellation();
+        }
+
+        if (State != PlayState.Playing)
+        {
+            return;
+        }
 
         var now = clock.Elapsed.TotalSeconds;
         var deltaTime = now - lastTickSeconds;
@@ -214,8 +239,16 @@ public sealed class PlayModeService(
     /// <param name="deltaTime">The time elapsed since the previous frame, in seconds.</param>
     public void Tick(double deltaTime)
     {
-        if (State == PlayState.Paused) ticker?.Async.PumpCancellation();
-        if (State != PlayState.Playing) return;
+        if (State == PlayState.Paused)
+        {
+            ticker?.Async.PumpCancellation();
+        }
+
+        if (State != PlayState.Playing)
+        {
+            return;
+        }
+
         RunGuarded(() => ticker!.Tick(deltaTime));
         FollowActiveScene();
     }
@@ -226,10 +259,16 @@ public sealed class PlayModeService(
     /// </summary>
     void FollowActiveScene()
     {
-        if (State == PlayState.Stopped) return;
+        if (State == PlayState.Stopped)
+        {
+            return;
+        }
 
         var activeRoot = playSceneManager?.ActiveScene?.RootNode;
-        if (activeRoot is null || ReferenceEquals(activeRoot, PlayRoot)) return;
+        if (activeRoot is null || ReferenceEquals(activeRoot, PlayRoot))
+        {
+            return;
+        }
 
         PlayRoot = activeRoot;
         sceneTree.ShowRuntimeScene(activeRoot);
@@ -245,21 +284,29 @@ public sealed class PlayModeService(
         _ = playServices.GetRequiredService<SimulationClock>();
         var sceneManager = playServices.GetRequiredService<ISceneManager>();
         if (sceneManager is SceneManager concreteSceneManager)
+        {
             concreteSceneManager.BindServices(playServices);
+        }
+
         if (localeOverride is not null && playServices.GetService<LocaleService>() is { } locale)
+        {
             locale.SetLocale(localeOverride);
+        }
+
         return sceneManager;
     }
 
     void AddProjectServices(IServiceCollection services)
     {
         var settings = ProjectSettings();
-        services.AddSingleton<IAppSettings>(settings ?? new AppSettings());
+        services.AddSingleton(settings ?? new AppSettings());
         services.AddSingleton<LayerFilter>();
         services.AddSingleton<IPhysicsQueries, PhysicsQueries>();
         services.AddSingleton(new SimulationClock(settings?.Get<TimeSettings>()));
         if (settings is not null)
+        {
             services.AddSingleton(_ => LocalizationLoader.Create(settings, assetDatabase));
+        }
     }
 
     /// <summary>
@@ -298,14 +345,18 @@ public sealed class PlayModeService(
             .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
 
         if (editorServices.GetService(typeof(Vulkan)) is Vulkan vulkan)
+        {
             services.AddSingleton(vulkan).AddSingleton<IRenderDevice>(vulkan);
+        }
 
         AddProjectServices(services);
 
         if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
         {
             if (buildManager.ActiveUserAssembly is { } userAssembly)
+            {
                 services.AddEngineModules(userAssembly);
+            }
         }
         else if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
@@ -325,15 +376,20 @@ public sealed class PlayModeService(
     {
         // The project's own settings live on SettingsService; the container's IAppSettings is a blank
         // instance the editor keeps for anything that needs the type before a project is opened.
-        if (ProjectSettings() is not { } settings) return;
+        if (ProjectSettings() is not { } settings)
+        {
+            return;
+        }
 
         var maps = InputActionsLoader.Resolve(settings, provider.GetService<IAssetLoader>());
 
         provider.GetRequiredService<InputActionService>().Load(maps);
 
         if (maps is not null)
+        {
             logger.LogInformation("Input actions: {MapCount} map(s), {ActionCount} action(s) in force",
                 maps.Maps.Count, maps.Actions.Count());
+        }
     }
 
     /// <summary>
@@ -344,7 +400,9 @@ public sealed class PlayModeService(
     IAppSettings? ProjectSettings()
     {
         if (editorServices.GetService(typeof(SettingsService)) is SettingsService { Settings: { } loaded })
+        {
             return loaded;
+        }
 
         return editorServices.GetService(typeof(IAppSettings)) is IAppSettings
         { ProjectAbsoluteDir.Length: > 0 } settings
@@ -364,10 +422,17 @@ public sealed class PlayModeService(
 
     void SetState(PlayState newState)
     {
-        if (State == newState) return;
+        if (State == newState)
+        {
+            return;
+        }
+
         State = newState;
         if (editorServices.GetService(typeof(BuildManager)) is BuildManager buildManager)
+        {
             buildManager.SetPlaying(newState != PlayState.Stopped);
+        }
+
         StateChanged?.Invoke(newState);
     }
 }

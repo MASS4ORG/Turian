@@ -26,7 +26,7 @@ public sealed class UiDocumentComponentTests
             ScaleMode = UiScaleMode.ScaleWithScreenSize,
             ReferenceResolution = new Int2(1280, 720),
             PanelSize = new Int2(800, 600),
-            OnBuild = _ => { },
+            OnBuild = static _ => { },
         };
 
         var json = JsonSerializer.Serialize(component, options);
@@ -45,7 +45,7 @@ public sealed class UiDocumentComponentTests
     public void Json_HasTypeIdAndNoBuilder()
     {
         var options = Options();
-        var json = JsonSerializer.Serialize(new UiDocumentComponent { OnBuild = _ => { } }, options);
+        var json = JsonSerializer.Serialize(new UiDocumentComponent { OnBuild = static _ => { } }, options);
 
         Assert.Contains("__TypeId", json, StringComparison.Ordinal);
         Assert.DoesNotContain("OnBuild", json, StringComparison.Ordinal);

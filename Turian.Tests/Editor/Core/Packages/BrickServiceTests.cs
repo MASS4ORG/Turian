@@ -12,7 +12,10 @@ public sealed class BrickServiceTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -75,11 +78,11 @@ public sealed class BrickServiceTests : IDisposable
 
         var issues = BrickVerifier.Verify(folder);
 
-        Assert.Contains(issues, i => i.Contains("NoMeta.txt has no .meta", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("Orphan.png.meta has no asset", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("Orphan.png.meta has no valid Id", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("reuses the id", StringComparison.Ordinal));
-        Assert.DoesNotContain(issues, i => i.Contains("Free.txt", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("NoMeta.txt has no .meta", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("Orphan.png.meta has no asset", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("Orphan.png.meta has no valid Id", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("reuses the id", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, static i => i.Contains("Free.txt", StringComparison.Ordinal));
     }
 
     /// <summary>A brick that fails verification is not packed; a sound one is installed into a project from its file.</summary>

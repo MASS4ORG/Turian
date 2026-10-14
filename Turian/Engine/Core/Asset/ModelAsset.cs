@@ -16,7 +16,9 @@ public class ModelAsset : Asset
     {
         ArgumentNullException.ThrowIfNull(database);
         if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
+        {
             return null;
+        }
 
         using var assetStream = provider.GetAssetStream();
         return GltfModelReader.Read(assetStream,
@@ -26,7 +28,10 @@ public class ModelAsset : Asset
     static byte[] ReadBuffer(AssetDatabase database, Guid id)
     {
         if (!database.TryGetAssetProvider(id, out var provider) || provider is null)
+        {
             throw new InvalidDataException($"Missing glTF buffer asset {id}.");
+        }
+
         using var stream = provider.GetAssetStream();
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);

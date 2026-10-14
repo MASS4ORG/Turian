@@ -174,6 +174,9 @@ public sealed class UiImageResolverTests : IDisposable
         Assert.True(database.RegisterAsset(asset, path));
         using var image = new UiImageResolver(database).Resolve($"asset://{asset.Id}");
         Assert.Equal(supported, image is not null);
-        if (image is not null) Assert.Equal(4, image.Width);
+        if (image is not null)
+        {
+            Assert.Equal(4, image.Width);
+        }
     }
 }

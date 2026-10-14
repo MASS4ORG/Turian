@@ -124,5 +124,5 @@ public sealed class OutputQualityOfLifeTests
     /// <summary>A failed desktop launch is reported without interrupting the editor's render loop.</summary>
     [Fact]
     public void DesktopLaunchFailureDoesNotEscape() => LogSource.LaunchSource("Game.cs", NullLogger.Instance,
-        _ => throw new InvalidOperationException("no association"));
+        static _ => throw new InvalidOperationException("no association"));
 }

@@ -233,7 +233,10 @@ public sealed partial class AssetImporter
         var fullPath = Path.GetFullPath(path);
         foreach (var package in packageRoots)
         {
-            if (AssetDatabase.IsUnderDirectory(fullPath, package.Root)) return package;
+            if (AssetDatabase.IsUnderDirectory(fullPath, package.Root))
+            {
+                return package;
+            }
         }
 
         if (assetsRootPath is not null && AssetDatabase.IsUnderDirectory(fullPath, assetsRootPath))
@@ -243,7 +246,9 @@ public sealed partial class AssetImporter
                  directory = Path.GetDirectoryName(directory))
             {
                 if (File.Exists(Path.Combine(directory, Gaya.Packages.PackageManifest.FileName)))
+                {
                     return (directory, ReadOnly: false);
+                }
             }
         }
 

@@ -34,7 +34,10 @@ public sealed class VersionRange
     public static bool TryParse(string? text, [NotNullWhen(true)] out VersionRange? range)
     {
         range = null;
-        if (text is null) return false;
+        if (text is null)
+        {
+            return false;
+        }
 
         var sets = new List<IReadOnlyList<(string, SemanticVersion)>>();
         foreach (var alternative in text.Split("||"))
@@ -42,7 +45,10 @@ public sealed class VersionRange
             var comparators = new List<(string, SemanticVersion)>();
             foreach (var token in alternative.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (!TryExpand(token, comparators)) return false;
+                if (!TryExpand(token, comparators))
+                {
+                    return false;
+                }
             }
 
             sets.Add(comparators);
@@ -78,12 +84,18 @@ public sealed class VersionRange
 
     static bool TryExpand(string token, List<(string, SemanticVersion)> comparators)
     {
-        if (token is "*" or "x" or "X") return true;
+        if (token is "*" or "x" or "X")
+        {
+            return true;
+        }
 
         var op = token.StartsWith(">=") || token.StartsWith("<=") ? token[..2]
             : token[0] is '>' or '<' or '=' or '^' or '~' ? token[..1]
             : string.Empty;
-        if (!TryParsePartial(token[op.Length..], out var version, out var given)) return false;
+        if (!TryParsePartial(token[op.Length..], out var version, out var given))
+        {
+            return false;
+        }
 
         switch (op)
         {
@@ -113,16 +125,25 @@ public sealed class VersionRange
     static bool TryParsePartial(string text, [NotNullWhen(true)] out SemanticVersion? version, out int given)
     {
         given = 3;
-        if (SemanticVersion.TryParse(text, out version)) return true;
+        if (SemanticVersion.TryParse(text, out version))
+        {
+            return true;
+        }
 
         var parts = text.Split('.');
         given = parts.TakeWhile(static p => p is not ("x" or "X" or "*")).Count();
-        if (given is 0 or > 2 || parts.Length > 3) return false;
+        if (given is 0 or > 2 || parts.Length > 3)
+        {
+            return false;
+        }
 
         var numbers = new int[3];
         for (var i = 0; i < given; i++)
         {
-            if (!int.TryParse(parts[i], NumberStyles.None, CultureInfo.InvariantCulture, out numbers[i])) return false;
+            if (!int.TryParse(parts[i], NumberStyles.None, CultureInfo.InvariantCulture, out numbers[i]))
+            {
+                return false;
+            }
         }
 
         version = new SemanticVersion(numbers[0], numbers[1], numbers[2]);

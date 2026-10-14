@@ -25,8 +25,16 @@ public static class DotnetLocator
         var executable = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
 
         var roots = new List<string>();
-        if (!string.IsNullOrWhiteSpace(preferredRoot)) roots.Add(preferredRoot);
-        if (environment(RootVariable) is { Length: > 0 } dotnetRoot) roots.Add(dotnetRoot);
+        if (!string.IsNullOrWhiteSpace(preferredRoot))
+        {
+            roots.Add(preferredRoot);
+        }
+
+        if (environment(RootVariable) is { Length: > 0 } dotnetRoot)
+        {
+            roots.Add(dotnetRoot);
+        }
+
         roots.AddRange((environment("PATH") ?? string.Empty)
             .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
@@ -34,13 +42,22 @@ public static class DotnetLocator
         foreach (var root in roots)
         {
             var candidate = Path.Combine(root, executable);
-            if (!File.Exists(candidate)) continue;
+            if (!File.Exists(candidate))
+            {
+                continue;
+            }
 
             checkedRoots.Add(root);
-            if (requiredSdkMajor is not { } major || HasSdk(InstallationRoot(candidate), major)) return candidate;
+            if (requiredSdkMajor is not { } major || HasSdk(InstallationRoot(candidate), major))
+            {
+                return candidate;
+            }
         }
 
-        if (requiredSdkMajor is not { } required) return "dotnet";
+        if (requiredSdkMajor is not { } required)
+        {
+            return "dotnet";
+        }
 
         throw new InvalidOperationException(checkedRoots.Count == 0
             ? $"No dotnet executable was found, and the build needs the .NET {required} SDK."

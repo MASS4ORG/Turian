@@ -11,7 +11,10 @@ sealed partial class AssetBrowserPanel
 
     void CopyPath(AssetEntry? entry, bool relative)
     {
-        if (entry is null || systemClipboard is null) return;
+        if (entry is null || systemClipboard is null)
+        {
+            return;
+        }
 
         var path = relative && settings.Settings?.ProjectAbsoluteDir is { } project
             ? Path.GetRelativePath(project, entry.AbsolutePath).Replace('\\', '/')
@@ -43,7 +46,7 @@ sealed partial class AssetBrowserPanel
 
     /// <summary>Whether the internal clipboard has transferable assets.</summary>
     public bool CanPaste => clipboardEntries.Count > 0
-        && clipboardEntries.All(entry => File.Exists(entry.AbsolutePath) || Directory.Exists(entry.AbsolutePath))
+        && clipboardEntries.All(static entry => File.Exists(entry.AbsolutePath) || Directory.Exists(entry.AbsolutePath))
         || fileSystem.CanPaste();
 
     /// <summary>Copies selected paths into the asset clipboard.</summary>
@@ -51,7 +54,10 @@ sealed partial class AssetBrowserPanel
     {
         clipboardEntries = SelectedEntries;
         clipboardCut = false;
-        if (clipboardEntries.Count == 1) fileSystem.Copy(clipboardEntries[0].AbsolutePath);
+        if (clipboardEntries.Count == 1)
+        {
+            fileSystem.Copy(clipboardEntries[0].AbsolutePath);
+        }
     }
 
     /// <summary>Cuts writable selected assets for an undoable paste.</summary>
@@ -59,7 +65,10 @@ sealed partial class AssetBrowserPanel
     {
         clipboardEntries = AssetFileOperations.Roots(SelectedEntries);
         clipboardCut = true;
-        if (clipboardEntries.Count == 1) fileSystem.Cut(clipboardEntries[0].AbsolutePath);
+        if (clipboardEntries.Count == 1)
+        {
+            fileSystem.Cut(clipboardEntries[0].AbsolutePath);
+        }
     }
 
     /// <summary>Pastes into the selected directory or the current folder.</summary>
@@ -68,20 +77,30 @@ sealed partial class AssetBrowserPanel
     void PasteSelection(AssetEntry? entry)
     {
         var directory = DirectoryFor(entry);
-        if (directory is null || entries.FirstOrDefault(candidate => candidate.AbsolutePath == directory)?.IsReadOnly != false) return;
+        if (directory is null || entries.FirstOrDefault(candidate => candidate.AbsolutePath == directory)?.IsReadOnly != false)
+        {
+            return;
+        }
+
         if (clipboardEntries.Count <= 1) { operations.Paste(directory); return; }
         if (clipboardCut)
         {
-            if (operations.MoveMany(clipboardEntries, directory)) clipboardEntries = [];
+            if (operations.MoveMany(clipboardEntries, directory))
+            {
+                clipboardEntries = [];
+            }
         }
-        else operations.CopyIntoMany(clipboardEntries, directory);
+        else
+        {
+            operations.CopyIntoMany(clipboardEntries, directory);
+        }
     }
 
     /// <summary>Selects every asset currently displayed by the focused view.</summary>
     public void SelectAll()
     {
         var visible = frameMode == AssetBrowserViewMode.Tree && !AssetQuery.IsActive(frameFilter)
-            ? rows.Where(row => row.Tag is AssetEntry).Select(row => row.Id) : gridIds;
+            ? rows.Where(static row => row.Tag is AssetEntry).Select(static row => row.Id) : gridIds;
         state.SetSelection(visible);
     }
 
@@ -95,7 +114,11 @@ sealed partial class AssetBrowserPanel
 
     void InspectSelection()
     {
-        if (state.SelectedId == inspectedId && state.SelectedIds.SequenceEqual(inspectedIds)) return;
+        if (state.SelectedId == inspectedId && state.SelectedIds.SequenceEqual(inspectedIds))
+        {
+            return;
+        }
+
         inspectedId = state.SelectedId;
         inspectedIds = state.SelectedIds;
         var selected = SelectedEntries.Where(entry => !entry.IsDirectory)
@@ -105,7 +128,10 @@ sealed partial class AssetBrowserPanel
 
     void BeginRename(AssetEntry? entry)
     {
-        if (entry is null || entry.IsReadOnly || entry.ParentPath is null) return;
+        if (entry is null || entry.IsReadOnly || entry.ParentPath is null)
+        {
+            return;
+        }
 
         state.BeginRename(entry.AbsolutePath, DisplayName(entry.AbsolutePath));
         renameFocusRequested = true;
@@ -115,11 +141,16 @@ sealed partial class AssetBrowserPanel
 
     void Rename(TreeItem item, string name)
     {
-        if (item.Tag is not AssetEntry { IsReadOnly: false } entry || string.IsNullOrWhiteSpace(name)) return;
+        if (item.Tag is not AssetEntry { IsReadOnly: false } entry || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
 
         if (!entry.IsDirectory && !browserSettings.ShowFileExtensions &&
             string.IsNullOrEmpty(Path.GetExtension(name)))
+        {
             name += Path.GetExtension(entry.AbsolutePath);
+        }
 
         operations.Rename(entry.AbsolutePath, entry.IsDirectory, name);
     }
@@ -135,7 +166,10 @@ sealed partial class AssetBrowserPanel
 
     void Create(AssetCreationKind kind)
     {
-        if (DirectoryFor(menuEntry) is not { } directory) return;
+        if (DirectoryFor(menuEntry) is not { } directory)
+        {
+            return;
+        }
 
         creation.Create(kind, directory);
         Refresh();

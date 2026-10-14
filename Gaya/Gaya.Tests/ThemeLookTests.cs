@@ -37,7 +37,7 @@ public sealed class ThemeLookTests : IDisposable
         Assert.Equal(ThemeCategories.Look, material.Category);
         Assert.Equal(ThemeCatalog.DefaultLook, service.CommittedLook);
         Assert.Null(service.Look);
-        Assert.DoesNotContain(service.ColorThemes, theme => theme.Category == ThemeCategories.Look);
+        Assert.DoesNotContain(service.ColorThemes, static theme => theme.Category == ThemeCategories.Look);
     }
 
     /// <summary>A look from any source becomes the base sheet and swaps back to the default.</summary>
@@ -147,7 +147,7 @@ public sealed class ThemeLookTests : IDisposable
     {
         var service = Service();
         service.Register(new ThemeSource(Icons("test.icons")));
-        Assert.Contains(service.IconThemes, theme => theme.Id == "test.icons");
+        Assert.Contains(service.IconThemes, static theme => theme.Id == "test.icons");
 
         service.ApplyIconTheme("test.icons");
 
@@ -186,7 +186,7 @@ public sealed class ThemeLookTests : IDisposable
         service.SetBrickFolders([brick]);
 
         Assert.NotNull(service.Look);
-        var info = Assert.Single(service.Looks, look => look.Id == "test.square");
+        var info = Assert.Single(service.Looks, static look => look.Id == "test.square");
         Assert.Equal(ThemeOrigin.Brick, info.Origin);
         Assert.Equal("test.night", info.DefaultDarkTheme);
         Assert.Equal("test.day", info.DefaultLightTheme);
@@ -222,15 +222,19 @@ public sealed class ThemeLookTests : IDisposable
 
         var findings = ThemeVerifier.Verify(folder);
 
-        Assert.All(findings, finding => Assert.EndsWith("partial.pss", finding.Source));
-        Assert.Contains(findings, finding => finding.Severity == ThemeFindingSeverity.Error);
+        Assert.All(findings, static finding => Assert.EndsWith("partial.pss", finding.Source));
+        Assert.Contains(findings, static finding => finding.Severity == ThemeFindingSeverity.Error);
     }
 
     /// <summary>The glyph the service's sheets give the <c>test.id</c> icon, or null when no icon theme defines it.</summary>
     static string? Glyph(ThemeService service)
     {
         var sheets = new StyleSheetCollection();
-        foreach (var sheet in service.Sheets) sheets.Add(sheet);
+        foreach (var sheet in service.Sheets)
+        {
+            sheets.Add(sheet);
+        }
+
         return sheets.Resolve(new StyleTarget("icon", "test.id", [])).Get("glyph");
     }
 

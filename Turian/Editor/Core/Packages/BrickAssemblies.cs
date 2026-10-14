@@ -57,7 +57,10 @@ public static class BrickAssemblies
             {
                 try
                 {
-                    if (!loaded.Add(AssemblyName.GetAssemblyName(path).Name)) continue;
+                    if (!loaded.Add(AssemblyName.GetAssemblyName(path).Name))
+                    {
+                        continue;
+                    }
 
                     TypeRegistry.ScanAssembly(AssemblyLoadContext.Default.LoadFromAssemblyPath(path));
                     loadedAny = true;
@@ -68,7 +71,10 @@ public static class BrickAssemblies
                 }
             }
 
-            foreach (var brick in installed) RegisterTypes(brick, logger);
+            foreach (var brick in installed)
+            {
+                RegisterTypes(brick, logger);
+            }
         }
 
         return loadedAny;
@@ -80,7 +86,10 @@ public static class BrickAssemblies
     public static IReadOnlyList<UserCodeTypeEntry> PrecastTypes(ResolvedPackage brick)
     {
         var path = Path.Combine(brick.RootPath, PrecastFolder, TypesFile);
-        if (!File.Exists(path) || !IsPrecast(brick)) return [];
+        if (!File.Exists(path) || !IsPrecast(brick))
+        {
+            return [];
+        }
 
         try
         {
@@ -97,12 +106,21 @@ public static class BrickAssemblies
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         foreach (var entry in PrecastTypes(brick))
         {
-            if (TypeRegistry.TryGetType(entry.TypeId, out _)) continue;
+            if (TypeRegistry.TryGetType(entry.TypeId, out _))
+            {
+                continue;
+            }
 
             var type = assemblies.Where(a => entry.Assembly is null || a.GetName().Name == entry.Assembly)
                 .Select(a => a.GetType(entry.FullyQualifiedName)).FirstOrDefault(static t => t is not null);
-            if (type is null) logger.LogWarning("Brick {Brick}: type {Type} is not in its prebuilt assemblies", brick.Id, entry.FullyQualifiedName);
-            else TypeRegistry.Register(entry.TypeId, type);
+            if (type is null)
+            {
+                logger.LogWarning("Brick {Brick}: type {Type} is not in its prebuilt assemblies", brick.Id, entry.FullyQualifiedName);
+            }
+            else
+            {
+                TypeRegistry.Register(entry.TypeId, type);
+            }
         }
     }
 

@@ -31,7 +31,11 @@ public static class InputBindingStore
 
         try
         {
-            if (Path.GetDirectoryName(path) is { Length: > 0 } directory) Directory.CreateDirectory(directory);
+            if (Path.GetDirectoryName(path) is { Length: > 0 } directory)
+            {
+                Directory.CreateDirectory(directory);
+            }
+
             File.WriteAllText(path, JsonSerializer.Serialize(service.CaptureOverrides(), JsonOptions));
             return true;
         }
@@ -53,7 +57,10 @@ public static class InputBindingStore
 
         try
         {
-            if (!File.Exists(path)) return false;
+            if (!File.Exists(path))
+            {
+                return false;
+            }
 
             var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
             service.ApplyOverrides(stored);

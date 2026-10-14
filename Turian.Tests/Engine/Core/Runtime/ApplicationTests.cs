@@ -1,6 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-
 namespace Turian.Tests;
 
 /// <summary>Process-level quit control shared by the players: quitting on Ctrl+C and SIGTERM.</summary>
@@ -66,7 +63,10 @@ public sealed class ApplicationTests
             Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
             foreach (var dependency in Directory.EnumerateFiles(
                          Path.GetDirectoryName(typeof(Application).Assembly.Location)!, "*.dll"))
+            {
                 File.CreateSymbolicLink(Path.Combine(directory.FullName, Path.GetFileName(dependency)), dependency);
+            }
+
             File.Copy(Path.ChangeExtension(typeof(ApplicationTests).Assembly.Location, ".runtimeconfig.json"),
                 Path.ChangeExtension(assembly, ".runtimeconfig.json"));
 

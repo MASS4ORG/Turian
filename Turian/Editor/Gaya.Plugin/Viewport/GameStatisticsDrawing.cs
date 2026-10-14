@@ -30,7 +30,11 @@ sealed class GameStatisticsDrawing(FrameStatistics statistics, SceneTreeControll
 
     void PrepareGlyphs()
     {
-        if (glyphs[0] is not null) return;
+        if (glyphs[0] is not null)
+        {
+            return;
+        }
+
         Span<char> character = stackalloc char[1];
         for (var i = 0; i < glyphs.Length; i++)
         {
@@ -45,7 +49,11 @@ sealed class GameStatisticsDrawing(FrameStatistics statistics, SceneTreeControll
         foreach (var character in line)
         {
             var index = character - 32;
-            if ((uint)index >= glyphs.Length) continue;
+            if ((uint)index >= glyphs.Length)
+            {
+                continue;
+            }
+
             canvas.DrawText(glyphs[index], x, y, ink);
             x += advances[index];
         }
@@ -57,6 +65,9 @@ sealed class GameStatisticsDrawing(FrameStatistics statistics, SceneTreeControll
         background.Dispose();
         ink.Dispose();
         font.Dispose();
-        foreach (var glyph in glyphs) glyph?.Dispose();
+        foreach (var glyph in glyphs)
+        {
+            glyph?.Dispose();
+        }
     }
 }

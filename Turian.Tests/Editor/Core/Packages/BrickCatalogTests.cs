@@ -14,7 +14,10 @@ public sealed class BrickCatalogTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -31,7 +34,7 @@ public sealed class BrickCatalogTests : IDisposable
         store.RecordOrigin(stored, "git+https://example.com/aside.git");
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
 
-        var catalog = BrickCatalog.Local([used], builtins, store, Reserved).ToDictionary(b => b.Id);
+        var catalog = BrickCatalog.Local([used], builtins, store, Reserved).ToDictionary(static b => b.Id);
 
         Assert.Equal(BrickState.Enabled, catalog["user.mateo.used"].State);
         Assert.Equal(BrickState.Installed, catalog["user.mateo.aside"].State);
@@ -53,7 +56,7 @@ public sealed class BrickCatalogTests : IDisposable
         Directory.Move(BrickService.New(root, "user.mateo.unknown"), unknown);
         store.RecordOrigin(folder, "git+https://example.com/stored.git#v1");
 
-        var catalog = BrickCatalog.Local([], null, store, Reserved).ToDictionary(b => b.Id);
+        var catalog = BrickCatalog.Local([], null, store, Reserved).ToDictionary(static b => b.Id);
 
         Assert.Equal("git+https://example.com/stored.git#v1", catalog["user.mateo.stored"].Origin);
         Assert.Equal("git+https://example.com/stored.git#v1", catalog["user.mateo.stored"].InstallSource);
@@ -74,7 +77,7 @@ public sealed class BrickCatalogTests : IDisposable
         Directory.Move(BrickService.New(root, "user.mateo.old"), unrecorded);
 
         var catalog = BrickCatalog.WithRegistries(BrickCatalog.Local([], null, store, Reserved),
-            [("bricks.example", "user.mateo.old", "0.1.0")]).ToDictionary(b => b.Id);
+            [("bricks.example", "user.mateo.old", "0.1.0")]).ToDictionary(static b => b.Id);
 
         Assert.Equal("^0.1.0", catalog["user.mateo.fetched"].InstallSource);
         Assert.Equal("^0.1.0", catalog["user.mateo.old"].InstallSource);
@@ -90,7 +93,7 @@ public sealed class BrickCatalogTests : IDisposable
 
         var catalog = BrickCatalog.WithRegistries(local,
             [("bricks.example", "user.mateo.used", "9.0.0"), ("bricks.example", "user.mateo.remote", "1.2.0")])
-            .ToDictionary(b => b.Id);
+            .ToDictionary(static b => b.Id);
 
         Assert.True(catalog["user.mateo.used"].HasUpdate);
         Assert.Equal(BrickState.Available, catalog["user.mateo.remote"].State);
@@ -107,9 +110,9 @@ public sealed class BrickCatalogTests : IDisposable
         var used = Resolved(BrickService.New(root, "user.mateo.used"));
         var catalog = BrickCatalog.Local([used], builtins, null, Reserved);
 
-        Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Installed, null).Select(b => b.Id));
-        Assert.Equal(["user.mateo.builtin"], BrickCatalog.Filter(catalog, BrickFilter.Available, null).Select(b => b.Id));
-        Assert.Equal(["user.mateo.builtin"], BrickCatalog.Filter(catalog, BrickFilter.All, "BUILTIN").Select(b => b.Id));
+        Assert.Equal(["user.mateo.used"], BrickCatalog.Filter(catalog, BrickFilter.Installed, null).Select(static b => b.Id));
+        Assert.Equal(["user.mateo.builtin"], BrickCatalog.Filter(catalog, BrickFilter.Available, null).Select(static b => b.Id));
+        Assert.Equal(["user.mateo.builtin"], BrickCatalog.Filter(catalog, BrickFilter.All, "BUILTIN").Select(static b => b.Id));
         Assert.Empty(BrickCatalog.Filter(catalog, BrickFilter.Updates, null));
     }
 

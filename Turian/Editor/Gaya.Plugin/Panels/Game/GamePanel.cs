@@ -14,10 +14,16 @@ sealed class GamePanel(GameViewport viewport) : IPanel, IDisposable
                    .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
-            if (gui.Pass == Pass.Pass2Render && interactable.OnHover()) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && interactable.OnHover())
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
+
             gui.DrawText("Stats", theme.Text(11), viewport.ShowStatistics ? theme.Accent : theme.InkDim);
             if (gui.Pass == Pass.Pass2Render && interactable.OnClick())
+            {
                 viewport.ShowStatistics = !viewport.ShowStatistics;
+            }
         }
     }
 
@@ -27,7 +33,9 @@ sealed class GamePanel(GameViewport viewport) : IPanel, IDisposable
         ArgumentNullException.ThrowIfNull(gui);
 
         using (gui.Node().Expand().Enter())
+        {
             viewport.Render(gui);
+        }
     }
 
     /// <inheritdoc />

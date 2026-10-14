@@ -114,7 +114,11 @@ public sealed class HzbCullingTests(VulkanFixture fixture) : IClassFixture<Vulka
         using var first = Viewer();
         using var second = Viewer(63, 65);
         Pixels(first, scene, true);
-        for (var i = 0; i < 70; i++) Add(scene, quad, new Vector3(0, 0, 8 + i), Vector3.One);
+        for (var i = 0; i < 70; i++)
+        {
+            Add(scene, quad, new Vector3(0, 0, 8 + i), Vector3.One);
+        }
+
         Assert.Equal(Pixels(first, scene, false), Pixels(first, scene, true));
         Pixels(first, scene, true);
         Assert.Equal(new RenderCullingStats(1, 70), first.OcclusionStats);

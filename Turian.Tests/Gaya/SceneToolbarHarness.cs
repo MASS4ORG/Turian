@@ -25,7 +25,7 @@ sealed class SceneToolbarHarness : IDisposable
         var play = new PlayModeService(Substitute.For<IPlaySceneHost>(), database, services, NullLogger.Instance);
         Viewport = new SceneViewport(null!, database, tree, inspector, null!, play, Settings,
             NullLogger.Instance, undo, new LocaleService());
-        Toolbar = new SceneToolbar(Viewport, () => { });
+        Toolbar = new SceneToolbar(Viewport, static () => { });
         Input.MousePosition.Returns(new Vector2(-1));
         Input.GetTypedCharacters().Returns(string.Empty);
         Gui = new Gui { Input = Input };
@@ -34,7 +34,10 @@ sealed class SceneToolbarHarness : IDisposable
 
     internal void Frame() => InspectorFormsRenderingTests.Frame(Gui, surface, font, current =>
     {
-        using (current.Node(800, 500).Direction(Axis.Vertical).Enter()) Toolbar.Render(current);
+        using (current.Node(800, 500).Direction(Axis.Vertical).Enter())
+        {
+            Toolbar.Render(current);
+        }
     });
 
     internal IEnumerable<LayoutNode> Nodes() => Descendants(Gui.RootNode!);

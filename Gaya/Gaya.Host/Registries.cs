@@ -17,8 +17,14 @@ public sealed class PanelRegistry : IPanelRegistry
         ArgumentNullException.ThrowIfNull(descriptor);
 
         var existing = panels.FindIndex(p => p.Id == descriptor.Id);
-        if (existing >= 0) panels[existing] = descriptor;
-        else panels.Add(descriptor);
+        if (existing >= 0)
+        {
+            panels[existing] = descriptor;
+        }
+        else
+        {
+            panels.Add(descriptor);
+        }
 
         Revision++;
     }
@@ -26,7 +32,10 @@ public sealed class PanelRegistry : IPanelRegistry
     /// <inheritdoc />
     public void Remove(string panelId)
     {
-        if (panels.RemoveAll(p => p.Id == panelId) > 0) Revision++;
+        if (panels.RemoveAll(p => p.Id == panelId) > 0)
+        {
+            Revision++;
+        }
     }
 
     /// <summary>All registered panels, in registration order.</summary>
@@ -53,7 +62,7 @@ public sealed class CommandRegistry : ICommandRegistry, ICommandCatalog
     public void Remove(string commandId) => commands.Remove(commandId);
 
     /// <summary>All commands, ordered by title.</summary>
-    public IReadOnlyList<CommandDescriptor> All => commands.Values.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase).ToList();
+    public IReadOnlyList<CommandDescriptor> All => commands.Values.OrderBy(static c => c.Title, StringComparer.OrdinalIgnoreCase).ToList();
 
     /// <summary>Looks a command up by id.</summary>
     public bool TryGet(string id, out CommandDescriptor descriptor) => commands.TryGetValue(id, out descriptor!);
@@ -79,8 +88,14 @@ public sealed class MenuRegistry : IMenuRegistry
         // Replacing in place keeps the contributor's ordering when it re-registers, which is what a
         // recompile does to every user-code item at once.
         var existing = items.FindIndex(i => i.MenuId == item.MenuId && i.CommandId == item.CommandId);
-        if (existing >= 0) items[existing] = item;
-        else items.Add(item);
+        if (existing >= 0)
+        {
+            items[existing] = item;
+        }
+        else
+        {
+            items.Add(item);
+        }
     }
 
     /// <inheritdoc />
@@ -95,12 +110,12 @@ public sealed class MenuRegistry : IMenuRegistry
 
     /// <summary>Top-level menus declared beyond the well-known ones, in their declared order.</summary>
     public IEnumerable<(string MenuId, string Label)> DeclaredMenus =>
-        declared.OrderBy(entry => entry.Value.Order)
-                .ThenBy(entry => entry.Value.Label, StringComparer.OrdinalIgnoreCase)
-                .Select(entry => (entry.Key, entry.Value.Label));
+        declared.OrderBy(static entry => entry.Value.Order)
+                .ThenBy(static entry => entry.Value.Label, StringComparer.OrdinalIgnoreCase)
+                .Select(static entry => (entry.Key, entry.Value.Label));
 
     /// <summary>Distinct menu ids that have at least one item, in first-seen order.</summary>
-    public IReadOnlyList<string> MenuIdsInUse => items.Select(i => i.MenuId).Distinct().ToList();
+    public IReadOnlyList<string> MenuIdsInUse => items.Select(static i => i.MenuId).Distinct().ToList();
 
     /// <summary>Items under <paramref name="menuId"/>, sorted by group then order.</summary>
     public IEnumerable<MenuItemDescriptor> ItemsFor(string menuId) =>
@@ -124,7 +139,10 @@ public sealed class ChromeRegistry : IChromeRegistry
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         if (chrome.Any(item => item.Id == descriptor.Id))
+        {
             throw new InvalidOperationException($"Duplicate chrome id '{descriptor.Id}'.");
+        }
+
         chrome.Add(descriptor);
         Changed();
         versions[descriptor.Id] = Revision;
@@ -135,7 +153,11 @@ public sealed class ChromeRegistry : IChromeRegistry
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         var index = chrome.FindIndex(item => item.Id == descriptor.Id);
-        if (index < 0) throw new KeyNotFoundException($"Chrome id '{descriptor.Id}' is not registered.");
+        if (index < 0)
+        {
+            throw new KeyNotFoundException($"Chrome id '{descriptor.Id}' is not registered.");
+        }
+
         chrome[index] = descriptor;
         Changed();
         versions[descriptor.Id] = Revision;
@@ -144,7 +166,11 @@ public sealed class ChromeRegistry : IChromeRegistry
     /// <inheritdoc />
     public void Remove(string chromeId)
     {
-        if (chrome.RemoveAll(item => item.Id == chromeId) == 0) return;
+        if (chrome.RemoveAll(item => item.Id == chromeId) == 0)
+        {
+            return;
+        }
+
         versions.Remove(chromeId);
         Changed();
     }
@@ -163,7 +189,11 @@ public sealed class ChromeRegistry : IChromeRegistry
     /// <summary>Chrome for a slot, in <see cref="ChromeDescriptor.Order"/> then registration order.</summary>
     public IEnumerable<ChromeDescriptor> For(ChromeSlot slot)
     {
-        if (slots.TryGetValue(slot, out var items)) return items;
+        if (slots.TryGetValue(slot, out var items))
+        {
+            return items;
+        }
+
         items = Array.AsReadOnly(chrome.Where(item => item.Slot == slot).OrderBy(item => item.Order).ToArray());
         slots[slot] = items;
         return items;
@@ -186,7 +216,10 @@ public sealed class FocusTracker : IFocusTracker
     public void Focus(string panelId)
     {
         var next = panelId;
-        if (next == ActivePanelId) return;
+        if (next == ActivePanelId)
+        {
+            return;
+        }
 
         ActivePanelId = next;
         Changed?.Invoke(next);

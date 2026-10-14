@@ -22,11 +22,16 @@ public static class PrefabInstanceRefresh
 
         var json = Serializer.Serialize(root);
         if (previousJson is null || !json.Contains(nameof(Node.PrefabInstance), StringComparison.Ordinal))
+        {
             return null;
+        }
 
         var compact = PrefabInstances.Compact(json, id => id == prefabId ? previousJson : loadPrefab(id));
         var rebuilt = Serializer.LoadData<Node>(PrefabInstances.Expand(compact, loadPrefab), loader);
-        if (rebuilt is null || Serializer.Serialize(rebuilt) == json) return null;
+        if (rebuilt is null || Serializer.Serialize(rebuilt) == json)
+        {
+            return null;
+        }
 
         rebuilt.Awake(null);
         return rebuilt;

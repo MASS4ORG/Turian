@@ -134,8 +134,8 @@ public class FormBuilderTests
     {
         var model = InspectorForms.Build(new Target());
 
-        Assert.Contains(model.Sections[0].Fields, field => field.Name == nameof(Target.Speed));
-        Assert.Contains(model.Sections[0].Fields, field => field.Name == nameof(Target.Label));
+        Assert.Contains(model.Sections[0].Fields, static field => field.Name == nameof(Target.Speed));
+        Assert.Contains(model.Sections[0].Fields, static field => field.Name == nameof(Target.Label));
     }
 
     /// <summary>Hidden, read-only and non-public members are left out.</summary>
@@ -143,7 +143,7 @@ public class FormBuilderTests
     public void HiddenReadOnlyAndNonPublicMembersAreSkipped()
     {
         var model = InspectorForms.Build(new Target());
-        var names = model.Sections[0].Fields.Select(field => field.Name).ToList();
+        var names = model.Sections[0].Fields.Select(static field => field.Name).ToList();
 
         Assert.DoesNotContain(nameof(Target.Hidden), names);
         Assert.DoesNotContain(nameof(Target.Input), names);
@@ -157,7 +157,7 @@ public class FormBuilderTests
     {
         var model = InspectorForms.Build(new Target());
 
-        Assert.Contains(model.Sections[0].Fields, field => field.Name == Target.RevealedMemberName);
+        Assert.Contains(model.Sections[0].Fields, static field => field.Name == Target.RevealedMemberName);
         Assert.Equal(false, Field(model, Target.RevealedMemberName).GetValue());
     }
 
@@ -255,13 +255,13 @@ public class FormBuilderTests
         var metadata = Field(InspectorForms.Build(new OrderedTarget()),
             nameof(OrderedTarget.First)).Metadata!;
 
-        Assert.Contains(metadata.Layout, attribute => attribute is SetOrderAttribute);
-        Assert.Contains(metadata.Validation, attribute => attribute is RangeAttribute);
-        Assert.Contains(metadata.Validation, attribute => attribute is ReadOnlyAttribute);
-        Assert.Contains(metadata.RenderingHints, attribute => attribute is NumericUpDownAttribute);
+        Assert.Contains(metadata.Layout, static attribute => attribute is SetOrderAttribute);
+        Assert.Contains(metadata.Validation, static attribute => attribute is RangeAttribute);
+        Assert.Contains(metadata.Validation, static attribute => attribute is ReadOnlyAttribute);
+        Assert.Contains(metadata.RenderingHints, static attribute => attribute is NumericUpDownAttribute);
         Assert.Equal([1, 2], metadata.GetAttributes<CustomHintAttribute>()
-            .Select(attribute => attribute.Number));
-        Assert.Equal(2, metadata.Attributes.Count(attribute => attribute is CustomHintAttribute));
+            .Select(static attribute => attribute.Number));
+        Assert.Equal(2, metadata.Attributes.Count(static attribute => attribute is CustomHintAttribute));
     }
 
     /// <summary>Explicit priority sorts members while preserving reflection order for ties.</summary>
@@ -269,7 +269,7 @@ public class FormBuilderTests
     public void MemberPrioritySortsStablyWithoutReorderingTies()
     {
         var names = InspectorForms.Build(new OrderedTarget()).Sections[0].Fields
-            .Select(field => field.Name);
+            .Select(static field => field.Name);
 
         Assert.Equal([nameof(OrderedTarget.First), nameof(OrderedTarget.DefaultFirst),
             nameof(OrderedTarget.DefaultSecond), nameof(OrderedTarget.Last)], names);
@@ -286,7 +286,7 @@ public class FormBuilderTests
         Assert.Equal(nameof(UnsafeTarget.Valid), fields[0].Name);
         Assert.Equal(0, fields[0].GetValue());
         Assert.Equal([nameof(UnsafeTarget.Valid)],
-            InspectorReflector.GetDisplayableMembers(target).Select(member => member.Name));
+            InspectorReflector.GetDisplayableMembers(target).Select(static member => member.Name));
     }
 
     /// <summary>Overridden members retain inheritable attributes and shared metadata cannot be reordered.</summary>
@@ -295,7 +295,7 @@ public class FormBuilderTests
     {
         var metadata = FormBuilder.EditableMetadata(typeof(OverriddenTarget));
 
-        Assert.DoesNotContain(metadata, member => member.Member.Name == nameof(OverriddenTarget.Hidden));
+        Assert.DoesNotContain(metadata, static member => member.Member.Name == nameof(OverriddenTarget.Hidden));
         var ordered = Assert.Single(metadata);
         Assert.Equal(-4, ordered.Priority);
         Assert.NotNull(ordered.GetAttribute<RangeAttribute>());
@@ -321,7 +321,7 @@ public class FormBuilderTests
     {
         var node = new Node { Name = "Old" };
         var model = InspectorForms.BuildForNode(node);
-        var name = model.Sections[0].Fields.Single(f => f.Name == nameof(Node.Name));
+        var name = model.Sections[0].Fields.Single(static f => f.Name == nameof(Node.Name));
 
         Assert.True(name.SetValue("New"));
 
@@ -344,7 +344,7 @@ public class FormBuilderTests
         Assert.NotNull(section.EnabledField);
         Assert.True(section.EnabledField!.SetValue(false));
         Assert.False(component.IsActive);
-        Assert.DoesNotContain(section.BodyFields, field => field.Name == nameof(Component.IsActive));
+        Assert.DoesNotContain(section.BodyFields, static field => field.Name == nameof(Component.IsActive));
     }
 
     /// <summary>A list member is editable entry by entry, and may grow and shrink.</summary>

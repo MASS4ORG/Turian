@@ -26,7 +26,10 @@ public static class ProjectIcon
     /// <returns>Absolute path of the image, or null when the project names none or it is missing.</returns>
     public static string? FindSource(string projectDirectory)
     {
-        if (SettingsService.Load(projectDirectory) is not { } project) return null;
+        if (SettingsService.Load(projectDirectory) is not { } project)
+        {
+            return null;
+        }
 
         ProjectSettingsLoader.LoadFromSources(project);
         return FindSource(project);
@@ -39,8 +42,15 @@ public static class ProjectIcon
     {
         ArgumentNullException.ThrowIfNull(project);
 
-        if (project.Get<PlayerSettings>().Icon is not { IsEmpty: false } icon) return null;
-        if (!Directory.Exists(project.AssetsAbsoluteDir)) return null;
+        if (project.Get<PlayerSettings>().Icon is not { IsEmpty: false } icon)
+        {
+            return null;
+        }
+
+        if (!Directory.Exists(project.AssetsAbsoluteDir))
+        {
+            return null;
+        }
 
         return Directory.EnumerateFiles(project.AssetsAbsoluteDir, "*.meta", SearchOption.AllDirectories)
             .Select(static meta => meta[..^".meta".Length])
@@ -111,7 +121,10 @@ public static class ProjectIcon
             offset += png.Length;
         }
 
-        foreach (var (_, png) in entries) writer.Write(png);
+        foreach (var (_, png) in entries)
+        {
+            writer.Write(png);
+        }
 
         writer.Flush();
         return stream.ToArray();
@@ -127,8 +140,10 @@ public static class ProjectIcon
 
         surface.Canvas.Clear(SKColors.Transparent);
         using (var source = SKImage.FromBitmap(image))
+        {
             surface.Canvas.DrawImage(source, SKRect.Create((size - width) / 2, (size - height) / 2, width, height),
                 new SKSamplingOptions(SKCubicResampler.Mitchell));
+        }
 
         using var snapshot = surface.Snapshot();
         using var data = snapshot.Encode(SKEncodedImageFormat.Png, 100);

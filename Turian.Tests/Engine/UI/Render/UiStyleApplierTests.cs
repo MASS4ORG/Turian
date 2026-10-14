@@ -81,7 +81,7 @@ public sealed class UiStyleApplierTests
     [Fact]
     public void UnknownDeclarations_AreIgnored()
     {
-        var ex = Record.Exception(() => BuildNode(new Dictionary<string, string>
+        var ex = Record.Exception(static () => BuildNode(new Dictionary<string, string>
         {
             ["background-color"] = "#123456",
             ["transition"] = "all 0.2s",

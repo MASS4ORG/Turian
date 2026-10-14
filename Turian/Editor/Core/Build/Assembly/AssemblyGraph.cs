@@ -74,7 +74,10 @@ public sealed class AssemblyGraph
              directory is not null;
              directory = Path.GetDirectoryName(directory))
         {
-            if (byDirectory.TryGetValue(directory, out var owner)) return owner;
+            if (byDirectory.TryGetValue(directory, out var owner))
+            {
+                return owner;
+            }
         }
 
         return Default;
@@ -113,7 +116,10 @@ public sealed class AssemblyGraph
         {
             var (definitions, references) = ReadSources(package.RootPath);
             // An editor-only package ships nothing, whatever its definitions say.
-            if (package.Manifest.EditorOnly) definitions.ForEach(static d => d.Definition.EditorOnly = true);
+            if (package.Manifest.EditorOnly)
+            {
+                definitions.ForEach(static d => d.Definition.EditorOnly = true);
+            }
 
             // A brick with a prebuilt payload is not compiled: its assemblies are referenced as they are. Its
             // definitions still count, so an assembly of the project can name one of them.
@@ -142,9 +148,15 @@ public sealed class AssemblyGraph
             var name = AssemblyName(definition, path);
 
             if (string.Equals(name, defaultName, StringComparison.OrdinalIgnoreCase))
+            {
                 throw Conflict($"Assembly definition {path} uses the default assembly name '{defaultName}'.");
+            }
+
             if (!nodes.TryAdd(name, (definition, path)))
+            {
                 throw Conflict($"Assembly name '{name}' is defined by both {nodes[name].Path} and {path}.");
+            }
+
             ClaimDirectory(directories, path);
 
             names[id] = name;
@@ -154,7 +166,9 @@ public sealed class AssemblyGraph
         foreach (var (reference, path) in referenceFiles)
         {
             if (reference.Definition is not { IsEmpty: false } target || !names.TryGetValue(target.AssetId, out var name))
+            {
                 throw Conflict($"Assembly definition reference {path} does not point to an assembly definition.");
+            }
 
             ClaimDirectory(directories, path);
             (extraDirectories.TryGetValue(name, out var list) ? list : extraDirectories[name] = []).Add(
@@ -172,9 +186,14 @@ public sealed class AssemblyGraph
             foreach (var reference in assembly.References.Select(r => assemblies[r]))
             {
                 if (!assembly.EditorOnly && reference.EditorOnly)
+                {
                     throw Conflict($"Assembly '{assembly.Name}' ships in games but references editor-only '{reference.Name}'.");
+                }
+
                 if (assembly.NoEngineReferences && !reference.NoEngineReferences)
+                {
                     throw Conflict($"Assembly '{assembly.Name}' has no engine references but references '{reference.Name}', which does.");
+                }
             }
         }
 
@@ -195,7 +214,9 @@ public sealed class AssemblyGraph
         foreach (var package in sourcePackages)
         {
             if (graph.Scripts(package.RootPath).FirstOrDefault(script => graph.AssemblyFor(script).IsDefault) is { } stray)
+            {
                 throw Conflict($"Script {stray} in package {package.Id} is not under an assembly definition.");
+            }
         }
 
         return graph;
@@ -228,7 +249,10 @@ public sealed class AssemblyGraph
         try
         {
             var reader = new Utf8JsonReader(File.ReadAllBytes(path));
-            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return null;
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
 
             while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
             {
@@ -261,7 +285,10 @@ public sealed class AssemblyGraph
                      .Order(StringComparer.Ordinal))
         {
             var typeId = PeekTypeId(path);
-            if (typeId != DefinitionTypeId && typeId != ReferenceTypeId) continue;
+            if (typeId != DefinitionTypeId && typeId != ReferenceTypeId)
+            {
+                continue;
+            }
 
             switch (DataAsset.LoadContent(path, database: null))
             {
@@ -283,7 +310,9 @@ public sealed class AssemblyGraph
     {
         var directory = Path.GetDirectoryName(path)!;
         if (!directories.TryAdd(directory, path))
+        {
             throw Conflict($"Folder {directory} holds two assembly definitions or references: {directories[directory]} and {path}.");
+        }
     }
 
     static string AssemblyName(AssemblyDefinition definition, string path) =>
@@ -301,12 +330,20 @@ public sealed class AssemblyGraph
         foreach (var reference in definition.References.Where(static r => r is { IsEmpty: false }))
         {
             if (!names.TryGetValue(reference.AssetId, out var referenced))
+            {
                 throw Conflict($"Assembly '{name}' references {reference.AssetId}, which is not an assembly definition.");
+            }
+
             if (referenced == name)
+            {
                 throw Conflict($"Assembly '{name}' references itself.");
+            }
 
             // A prebuilt assembly is referenced as a file by every project, not as a project of the graph.
-            if (!precastNames.Contains(referenced) && !references.Contains(referenced)) references.Add(referenced);
+            if (!precastNames.Contains(referenced) && !references.Contains(referenced))
+            {
+                references.Add(referenced);
+            }
         }
 
         return new ProjectAssembly(
@@ -329,20 +366,30 @@ public sealed class AssemblyGraph
         {
             if (state.TryGetValue(assembly.Name, out var done))
             {
-                if (done) return;
+                if (done)
+                {
+                    return;
+                }
+
                 throw Conflict($"Assembly references form a cycle: {string.Join(" → ", path.Append(assembly.Name))}.");
             }
 
             state[assembly.Name] = false;
             path.Add(assembly.Name);
-            foreach (var reference in assembly.References) Visit(assemblies[reference], path);
+            foreach (var reference in assembly.References)
+            {
+                Visit(assemblies[reference], path);
+            }
+
             path.RemoveAt(path.Count - 1);
             state[assembly.Name] = true;
             ordered.Add(assembly);
         }
 
         foreach (var assembly in assemblies.Values.OrderBy(static a => a.Name, StringComparer.Ordinal))
+        {
             Visit(assembly, []);
+        }
 
         return ordered;
     }

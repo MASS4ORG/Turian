@@ -17,15 +17,23 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
     /// <inheritdoc />
     public RenderCullingStats CompletedStats { get; private set; }
     /// <inheritdoc />
-    public ulong AllocatedBytes => (target?.Bytes ?? 0) + frames.Values.Aggregate(0UL, (sum, frame) => sum + frame.Bytes);
+    public ulong AllocatedBytes => (target?.Bytes ?? 0) + frames.Values.Aggregate(0UL, static (sum, frame) => sum + frame.Bytes);
 
     /// <inheritdoc />
     public bool Record(FrameInfo frame, ReadOnlySpan<OcclusionDraw> draws)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (draws.IsEmpty || frame.ViewportWidth == 0 || frame.ViewportHeight == 0) return false;
+        if (draws.IsEmpty || frame.ViewportWidth == 0 || frame.ViewportHeight == 0)
+        {
+            return false;
+        }
+
         supported ??= CheckSupport();
-        if (!supported.Value) return false;
+        if (!supported.Value)
+        {
+            return false;
+        }
+
         EnsureTarget(frame.ViewportWidth, frame.ViewportHeight);
         var slot = FrameSlot(frame.FrameIndex, draws.Length);
         CompletedStats = slot.ReadCounts();
@@ -40,10 +48,18 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
 
     bool CheckSupport()
     {
-        if (!SupportsComputeQueue() || !SupportsPyramidFormat()) return false;
+        if (!SupportsComputeQueue() || !SupportsPyramidFormat())
+        {
+            return false;
+        }
+
         foreach (var format in new[] { Format.D32Sfloat, Format.D16Unorm })
         {
-            if (!SupportsDepthFormat(format)) continue;
+            if (!SupportsDepthFormat(format))
+            {
+                continue;
+            }
+
             depthFormat = format;
             return true;
         }
@@ -56,7 +72,10 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
         vulkan.Vk.GetPhysicalDeviceQueueFamilyProperties(vulkan.Device.VkPhysicalDevice, ref count, null);
         var queues = new QueueFamilyProperties[count];
         fixed (QueueFamilyProperties* properties = queues)
+        {
             vulkan.Vk.GetPhysicalDeviceQueueFamilyProperties(vulkan.Device.VkPhysicalDevice, ref count, properties);
+        }
+
         return (queues[vulkan.Device.GraphicsFamilyIndex].QueueFlags & QueueFlags.ComputeBit) != 0;
     }
 
@@ -91,8 +110,16 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
 
     void EnsureTarget(uint width, uint height)
     {
-        if (target?.Width == width && target.Height == height) return;
-        if (reductionSet is null) InitializePipelines();
+        if (target?.Width == width && target.Height == height)
+        {
+            return;
+        }
+
+        if (reductionSet is null)
+        {
+            InitializePipelines();
+        }
+
         if (target is not null)
         {
             HzbPipelines.Check(vulkan.Vk.DeviceWaitIdle(vulkan.Device.VkDevice));
@@ -105,7 +132,11 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
     {
         if (frames.TryGetValue(index, out var slot))
         {
-            if (slot.Capacity >= count) return slot;
+            if (slot.Capacity >= count)
+            {
+                return slot;
+            }
+
             slot.Dispose();
         }
         slot = new HzbFrame(vulkan, Math.Max(64, count), cullSet!, target!.PyramidInfo);
@@ -130,7 +161,11 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
 
     void ReleaseTarget()
     {
-        foreach (var frame in frames.Values) frame.Dispose();
+        foreach (var frame in frames.Values)
+        {
+            frame.Dispose();
+        }
+
         frames.Clear();
         target?.Dispose();
         target = null;
@@ -139,7 +174,11 @@ sealed unsafe class HzbCuller(Vulkan vulkan, Silk.NET.Vulkan.DescriptorSetLayout
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         ReleaseTarget();
         vulkan.Vk.DestroyPipeline(vulkan.Device.VkDevice, basePipeline, null);

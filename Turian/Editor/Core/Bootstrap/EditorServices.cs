@@ -15,7 +15,7 @@ public static class EditorServices
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton(logger);
-        services.AddSingleton<IAppSettings>(_ => new AppSettings());
+        services.AddSingleton<IAppSettings>(static _ => new AppSettings());
         services.AddSingleton<SettingsService>();
         services.AddSingleton<ProjectBootstrapper>();
         services.AddSingleton<BuildManager>();
@@ -27,14 +27,14 @@ public static class EditorServices
 
         // A forwarding factory, not a second registration: the play host must be the same instance
         // the scene tree uses.
-        services.AddSingleton<IPlaySceneHost>(sp => sp.GetRequiredService<SceneTreeController>());
+        services.AddSingleton<IPlaySceneHost>(static sp => sp.GetRequiredService<SceneTreeController>());
 
         services.AddSingleton<AssetFileSystem>();
         services.AddSingleton<AssetWorkspace>();
         services.AddSingleton<WorkspaceSessionStore>();
         services.AddSingleton<SceneDocumentBinder>();
-        services.AddSingleton(sp => new Vulkan(sp.GetRequiredService<ILogger>(), sp.GetService<IAppSettings>()));
-        services.AddSingleton<IRenderDevice>(sp => sp.GetRequiredService<Vulkan>());
+        services.AddSingleton(static sp => new Vulkan(sp.GetRequiredService<ILogger>(), sp.GetService<IAppSettings>()));
+        services.AddSingleton<IRenderDevice>(static sp => sp.GetRequiredService<Vulkan>());
         services.AddSingleton<PlayModeService>();
 
         return services.AddInternalServices(

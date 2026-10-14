@@ -27,6 +27,6 @@ public sealed class MsaaSampleCountTests
         SampleCountFlags expected
     )
     {
-        Assert.Equal(expected, global::Turian.Engine.Core.Device.ClampSampleCount(requested, supported));
+        Assert.Equal(expected, Engine.Core.Device.ClampSampleCount(requested, supported));
     }
 }

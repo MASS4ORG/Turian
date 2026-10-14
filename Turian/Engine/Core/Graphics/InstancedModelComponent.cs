@@ -91,8 +91,15 @@ public class InstancedModelComponent : Component, IDisposable
                 loadedModelAssetId = modelAssetId;
             }
 
-            if (model is not null || loadFailed || modelAssetId == Guid.Empty) return model;
-            if (RenderDevice is not { } device || Assets is not { } assets) return null;
+            if (model is not null || loadFailed || modelAssetId == Guid.Empty)
+            {
+                return model;
+            }
+
+            if (RenderDevice is not { } device || Assets is not { } assets)
+            {
+                return null;
+            }
 
             model = device.GetModel(modelAssetId, assets);
             loadFailed = model is null;
@@ -100,7 +107,7 @@ public class InstancedModelComponent : Component, IDisposable
         }
     }
 
-    /// <summary>Gets the id of the model asset drawn, or <see cref="System.Guid.Empty"/> when none is set.</summary>
+    /// <summary>Gets the id of the model asset drawn, or <see cref="Guid.Empty"/> when none is set.</summary>
     [JsonIgnore, Hide]
     public Guid ModelAssetId => Model is { IsEmpty: false } reference ? reference.AssetId : Guid.Empty;
 
@@ -111,14 +118,25 @@ public class InstancedModelComponent : Component, IDisposable
         get
         {
             var source = ModelInstance;
-            if (boundsVersion == Version && ReferenceEquals(boundsModel, source)) return localBounds;
+            if (boundsVersion == Version && ReferenceEquals(boundsModel, source))
+            {
+                return localBounds;
+            }
+
             boundsModel = source;
             boundsVersion = Version;
             localBounds = Bounds.Empty;
-            if (source is null) return localBounds;
+            if (source is null)
+            {
+                return localBounds;
+            }
+
             foreach (var instance in instances)
+            {
                 localBounds = localBounds.Encapsulate(
                     ModelBoundsUtility.ToWorldBounds(source.Bounds, instance.Transform.Matrix4X4()));
+            }
+
             return localBounds;
         }
     }
@@ -133,9 +151,17 @@ public class InstancedModelComponent : Component, IDisposable
     /// <param name="index">The zero-based instance index.</param>
     public Bounds GetInstanceWorldBounds(int index)
     {
-        if (ModelInstance is not { } source) return Bounds.Empty;
+        if (ModelInstance is not { } source)
+        {
+            return Bounds.Empty;
+        }
+
         var matrix = instances[index].Transform.Matrix4X4();
-        if (Node is { } node) matrix *= node.GlobalTransform.Matrix4X4();
+        if (Node is { } node)
+        {
+            matrix *= node.GlobalTransform.Matrix4X4();
+        }
+
         return ModelBoundsUtility.ToWorldBounds(source.Bounds, matrix);
     }
 
@@ -185,8 +211,16 @@ public class InstancedModelComponent : Component, IDisposable
     {
         start = 0;
         end = instances.Count;
-        if (syncedVersion == Version) return false;
-        if (syncedVersion < dirtySince) return true;
+        if (syncedVersion == Version)
+        {
+            return false;
+        }
+
+        if (syncedVersion < dirtySince)
+        {
+            return true;
+        }
+
         start = Math.Min(dirtyStart, end);
         end = Math.Min(dirtyEnd, end);
         return true;

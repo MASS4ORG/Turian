@@ -33,7 +33,10 @@ public sealed class AssetImporterLifetimeTests : IDisposable
         var before = SnapshotCache();
         var notifications = 0;
         importer.AssetsChanged += () => notifications++;
-        if (dispose) importer.Dispose();
+        if (dispose)
+        {
+            importer.Dispose();
+        }
 
         FileSystemEventArgs notification;
         if (change == WatcherChangeTypes.Renamed)
@@ -44,7 +47,10 @@ public sealed class AssetImporterLifetimeTests : IDisposable
         else
         {
             var name = change == WatcherChangeTypes.Created ? "New.dataasset" : "Base.dataasset";
-            if (change == WatcherChangeTypes.Deleted) File.Delete(source);
+            if (change == WatcherChangeTypes.Deleted)
+            {
+                File.Delete(source);
+            }
             else
             {
                 content.Name = "Changed";
@@ -57,16 +63,29 @@ public sealed class AssetImporterLifetimeTests : IDisposable
         typeof(AssetImporter).GetMethod($"OnWatcher{change}", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(importer, [notification]);
 
-        if (dispose) Assert.Equal(before, SnapshotCache());
-        else Assert.NotEqual(before, SnapshotCache());
-        if (dispose) Assert.Equal(0, notifications);
-        else Assert.True(notifications > 0);
+        if (dispose)
+        {
+            Assert.Equal(before, SnapshotCache());
+        }
+        else
+        {
+            Assert.NotEqual(before, SnapshotCache());
+        }
+
+        if (dispose)
+        {
+            Assert.Equal(0, notifications);
+        }
+        else
+        {
+            Assert.True(notifications > 0);
+        }
     }
 
     (string Path, string Content)[] SnapshotCache() =>
         [.. Directory.EnumerateFiles(Path.Combine(project, ".Cache"), "*", SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal)
-            .Select(path => (path, Convert.ToBase64String(File.ReadAllBytes(path))))];
+            .Select(static path => (path, Convert.ToBase64String(File.ReadAllBytes(path))))];
 
     /// <summary>Deleting an asset's metadata evicts its cache; source-script events leave imported assets alone.</summary>
     [Theory]
@@ -86,7 +105,13 @@ public sealed class AssetImporterLifetimeTests : IDisposable
         typeof(AssetImporter).GetMethod("OnWatcherDeleted", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(importer, [new FileSystemEventArgs(WatcherChangeTypes.Deleted, assets, name)]);
 
-        if (removesAsset) Assert.NotEqual(before, SnapshotCache());
-        else Assert.Equal(before, SnapshotCache());
+        if (removesAsset)
+        {
+            Assert.NotEqual(before, SnapshotCache());
+        }
+        else
+        {
+            Assert.Equal(before, SnapshotCache());
+        }
     }
 }

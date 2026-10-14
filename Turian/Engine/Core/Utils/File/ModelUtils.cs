@@ -157,7 +157,9 @@ public static partial class ModelUtils
         var root = doc.RootElement;
 
         if (!root.TryGetProperty("images", out var images) || imageIndex < 0 || imageIndex >= images.GetArrayLength())
+        {
             return null;
+        }
 
         var image = images[imageIndex];
         if (image.TryGetProperty("uri", out var uriElem))
@@ -167,7 +169,9 @@ public static partial class ModelUtils
         }
 
         if (!image.TryGetProperty("bufferView", out var viewIndex) || !root.TryGetProperty("bufferViews", out var views))
+        {
             return null;
+        }
 
         var view = views[viewIndex.GetInt32()];
         var buffers = LoadGltfBuffers(root, isGlb ? LoadBinaryChunkFromGlb(path) : null, Path.GetDirectoryName(path));
@@ -182,7 +186,10 @@ public static partial class ModelUtils
     static List<byte[]> LoadGltfBuffers(JsonElement root, byte[]? embeddedBinary, string? basePath)
     {
         var buffers = new List<byte[]>();
-        if (!root.TryGetProperty("buffers", out var buffersElem)) return buffers;
+        if (!root.TryGetProperty("buffers", out var buffersElem))
+        {
+            return buffers;
+        }
 
         foreach (var buf in buffersElem.EnumerateArray())
         {

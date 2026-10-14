@@ -33,9 +33,16 @@ public static partial class Program
 
                 if (result.GetValue(brickOption) is { } id)
                 {
-                    if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid brick id (lowercase reverse-DNS, e.g. user.you.crates).");
+                    if (!PackageId.IsValid(id))
+                    {
+                        throw new PackageException($"'{id}' is not a valid brick id (lowercase reverse-DNS, e.g. user.you.crates).");
+                    }
+
                     var root = Path.Combine((result.GetValue(outOption) ?? new DirectoryInfo("./")).FullName, id);
-                    if (Directory.Exists(root)) throw new PackageException($"{root} already exists.");
+                    if (Directory.Exists(root))
+                    {
+                        throw new PackageException($"{root} already exists.");
+                    }
 
                     Directory.CreateDirectory(root);
                     new PackageManifest { Name = id, Version = SemanticVersion.Parse("0.1.0"), DisplayName = name, License = "UNLICENSED" }.Save(root);
@@ -53,9 +60,21 @@ public static partial class Program
                 }
 
                 var report = UnityPackageImporter.Import(file.FullName, target);
-                foreach (var entry in report.Converted) Console.WriteLine($"{entry.Source} -> {entry.Target}{(entry.Note is null ? string.Empty : $"  ({entry.Note})")}");
-                foreach (var entry in report.Skipped) Console.Error.WriteLine($"skipped {entry.Source}: {entry.Note}");
-                foreach (var note in report.Notes) Console.WriteLine(note);
+                foreach (var entry in report.Converted)
+                {
+                    Console.WriteLine($"{entry.Source} -> {entry.Target}{(entry.Note is null ? string.Empty : $"  ({entry.Note})")}");
+                }
+
+                foreach (var entry in report.Skipped)
+                {
+                    Console.Error.WriteLine($"skipped {entry.Source}: {entry.Note}");
+                }
+
+                foreach (var note in report.Notes)
+                {
+                    Console.WriteLine(note);
+                }
+
                 Console.WriteLine($"Imported {report.Converted.Count} asset(s) into {where}; skipped {report.Skipped.Count}.");
                 Console.WriteLine(UnityPackageImporter.LicenseNotice);
                 return 0;

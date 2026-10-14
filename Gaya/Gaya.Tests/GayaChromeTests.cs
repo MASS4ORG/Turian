@@ -27,7 +27,7 @@ public sealed class GayaChromeTests
     }
 
     static ChromeDescriptor Descriptor(string id, ChromeSlot slot = ChromeSlot.MenuBar, int order = 0) =>
-        new(id, slot, _ => new Item(), Order: order);
+        new(id, slot, static _ => new Item(), Order: order);
 
     /// <summary>Slot snapshots stay cached until registrations change and preserve ties in registration order.</summary>
     [Fact]
@@ -150,8 +150,15 @@ public sealed class GayaChromeTests
         frame.Chrome.Register(new ChromeDescriptor("item", ChromeSlot.MenuBar, _ => old));
         frame.Draw(() =>
         {
-            if (replace) frame.Chrome.Replace(new ChromeDescriptor("item", ChromeSlot.Overlay, _ => next));
-            else frame.Chrome.Remove("item");
+            if (replace)
+            {
+                frame.Chrome.Replace(new ChromeDescriptor("item", ChromeSlot.Overlay, _ => next));
+            }
+            else
+            {
+                frame.Chrome.Remove("item");
+            }
+
             frame.Chrome.Register(new ChromeDescriptor("added", ChromeSlot.Toolbar, _ => new Item()));
         });
         Assert.Equal(2, old.Renders);
@@ -173,7 +180,9 @@ public sealed class GayaChromeTests
         frame.Chrome.Register(new ChromeDescriptor("mutator", ChromeSlot.MenuBar, _ => new Item(gui =>
         {
             if (gui.Pass == Pass.Pass1Build)
+            {
                 frame.Chrome.Replace(new ChromeDescriptor("target", ChromeSlot.StatusBar, _ => next));
+            }
         })));
         frame.Draw();
         Assert.Equal(2, old.Renders);
@@ -267,12 +276,22 @@ public sealed class GayaChromeTests
         frame.Draw();
         var bar = frame.Gui.RootNode!.Children[0].Children[0];
         Assert.Equal(expected ? 1 : 4, bar.Children.Count);
-        if (!expected) window.Received(1).DrawWindowTitlebar(false);
-        else window.DidNotReceive().DrawWindowTitlebar(false);
+        if (!expected)
+        {
+            window.Received(1).DrawWindowTitlebar(false);
+        }
+        else
+        {
+            window.DidNotReceive().DrawWindowTitlebar(false);
+        }
+
         frame.Workbench.NativeTitlebar = true;
         frame.Draw();
         Assert.Single(frame.Gui.RootNode!.Children[0].Children[0].Children);
-        if (!expected) window.Received(1).DrawWindowTitlebar(true);
+        if (!expected)
+        {
+            window.Received(1).DrawWindowTitlebar(true);
+        }
     }
 
     /// <summary>A persisted window page is visible in the settings API and changing it takes effect next frame.</summary>
@@ -314,11 +333,11 @@ public sealed class GayaChromeTests
     {
         using var frame = new WorkbenchFrame();
         using var shell = PluginHost.Load([], NullLogger.Instance);
-        var panel = shell.Panels.All.Single(item => item.Id == ShellPanels.Settings).Factory(frame.Services);
+        var panel = shell.Panels.All.Single(static item => item.Id == ShellPanels.Settings).Factory(frame.Services);
         using var surface = SKSurface.Create(new SKImageInfo(900, 600));
         var font = Font.FromFamilyName("sans-serif", 14);
         WorkbenchFrame.Render(frame.Gui, surface, font, panel.Render);
-        var checkbox = Descendants(frame.Gui.RootNode!).Single(node =>
+        var checkbox = Descendants(frame.Gui.RootNode!).Single(static node =>
             node.Id == $"settings/{AppearanceSettings.PageId}/field5/editor");
         frame.Input.MousePosition.Returns(checkbox.Rect.Position + new Vector2(6, checkbox.Rect.H / 2));
         frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);

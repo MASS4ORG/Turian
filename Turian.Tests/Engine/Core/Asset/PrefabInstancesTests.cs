@@ -38,7 +38,11 @@ public class PrefabInstancesTests
     static Node Scene(params Node[] children)
     {
         var scene = new Node { Name = "Scene" };
-        foreach (var child in children) scene.Children.Add(child);
+        foreach (var child in children)
+        {
+            scene.Children.Add(child);
+        }
+
         return scene;
     }
 
@@ -92,7 +96,7 @@ public class PrefabInstancesTests
         Assert.Equal(bulb.Id, reloaded.Children[0].Id);
         Assert.Equal(5f, reloaded.Children[0].GetComponent<LightComponent>()!.Intensity);
         Assert.Null(reloaded.Children[0].GetComponent<MeshComponent>());
-        Assert.Equal(new[] { "Bulb", "Shade" }, reloaded.Children.Select(child => child.Name));
+        Assert.Equal(new[] { "Bulb", "Shade" }, reloaded.Children.Select(static child => child.Name));
     }
 
     /// <summary>A prefab edit reaches saved instances, except where an instance overrides the edited value.</summary>
@@ -362,7 +366,10 @@ public class PrefabInstancesTests
 
         var changes = PrefabInstances.ApplyMember(roomId, nestedLight.Id, nameof(LightComponent.Intensity),
             JsonValue.Create(8f), Load);
-        foreach (var (id, json) in changes) prefabs[id] = json;
+        foreach (var (id, json) in changes)
+        {
+            prefabs[id] = json;
+        }
 
         Assert.Contains(lampId, changes.Keys);
         Assert.DoesNotContain("Overrides", prefabs[roomId], StringComparison.Ordinal);

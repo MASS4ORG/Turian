@@ -53,12 +53,21 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
         // Descriptions wrap to the page's width, which is only resolved in the render pass. Both
         // passes have to agree on it, so what this frame wraps to is what the last one measured.
-        if (gui.Pass == Pass.Pass1Build) contentWidth = measuredWidth;
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            contentWidth = measuredWidth;
+        }
 
         var pages = Visible();
         if (selectedId is null || pages.All(page => !SameCategory(page, selectedId)))
+        {
             Select(pages.FirstOrDefault() is { } first ? TopLevel(first) : null);
-        if (gui.Pass == Pass.Pass1Build) frameSelectedId = selectedId;
+        }
+
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            frameSelectedId = selectedId;
+        }
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
@@ -68,7 +77,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             {
                 using (gui.Node(Theme.Scale(categoryWidth)).ExpandHeight().Direction(Axis.Vertical)
                            .Gap(4f).Padding(6f).Enter())
+                {
                     Categories(gui, pages);
+                }
 
                 using (gui.Node().Expand().Direction(Axis.Vertical).Gap(Theme.Scale(8f))
                            .Padding(Theme.Scale(16f), Theme.Scale(12f)).Enter())
@@ -109,7 +120,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
             if (gui.Pass == Pass.Pass2Render)
             {
-                if (hot && !selected) gui.DrawBackgroundRect(Theme.Hover);
+                if (hot && !selected)
+                {
+                    gui.DrawBackgroundRect(Theme.Hover);
+                }
 
                 if (selected)
                 {
@@ -141,11 +155,18 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
+
             gui.DrawText(T("Open settings.json"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim,
                 centerInRect: false);
 
-            if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick()) OpenJson();
+            if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())
+            {
+                OpenJson();
+            }
         }
 
         gui.TreeView(categories, Rows(pages), SettingsStyle.Tree(), OnCategoryClick);
@@ -163,7 +184,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     void OnCategoryClick(TreeViewEvent clicked)
     {
-        if (clicked.Item.Tag is string category) Select(category);
+        if (clicked.Item.Tag is string category)
+        {
+            Select(category);
+        }
     }
 
     /// <summary>Selects a category, keeping the left-hand highlight on the same row.</summary>
@@ -177,7 +201,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     void Category(Gui gui, IReadOnlyList<SettingsPageDescriptor> pages)
     {
         if (gui.Pass == Pass.Pass2Render)
+        {
             measuredWidth = Math.Max(120f, gui.CurrentNode.Rect.W - Theme.Scale(40f));
+        }
 
         if (frameSelectedId is null)
         {
@@ -195,7 +221,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             for (var depth = 1; depth < segments.Length; depth++)
             {
                 var path = string.Join('/', segments[..(depth + 1)]);
-                if (headings.Add(path)) Heading(gui, path, segments[depth], depth);
+                if (headings.Add(path))
+                {
+                    Heading(gui, path, segments[depth], depth);
+                }
             }
             Page(gui, page);
         }
@@ -205,27 +234,36 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     {
         using (gui.Node(-1, Theme.Scale(depth == 0 ? 32f : 28f), "settings/heading/" + path)
                    .ExpandWidth().Margin(0, depth == 0 ? 0 : 8f).ContentAlignY(0.5f).Enter())
+        {
             gui.DrawText(T(title), Theme.Text(Math.Max(13f, 20f - depth * 3f)), Theme.Ink, centerInRect: false);
+        }
     }
 
     /// <summary>Renders a contributed page's description and options beneath its section heading.</summary>
     void Page(Gui gui, SettingsPageDescriptor page)
     {
         if (page.Description.Length > 0)
+        {
             gui.DrawText(T(page.Description), Theme.Text(12), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);
+        }
 
         var fields = Form(page).Sections.SelectMany(section => section.BodyFields).ToList();
         var shown = fields.Where(field => MatchesFilter(page, field)).ToList();
 
-        for (var i = 0; i < shown.Count; i++) Option(gui, page, shown[i], $"settings/{page.Id}/field{i}");
+        for (var i = 0; i < shown.Count; i++)
+        {
+            Option(gui, page, shown[i], $"settings/{page.Id}/field{i}");
+        }
     }
 
     /// <summary>Why the right-hand side is empty, which is not the same question in every scope.</summary>
     string EmptyMessage()
     {
         if (scope == SettingsScope.Workspace && !settings.HasWorkspace)
+        {
             return T("Open a project to edit the settings stored with it.");
+        }
 
         return T(filter.Length > 0 ? "No setting matches the filter." : "Nothing is registered in this scope.");
     }
@@ -241,11 +279,17 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         using (gui.Node(-1, -1, id).ExpandWidth().Direction(Axis.Horizontal).Gap(8f).Margin(0, 6f).Enter())
         {
             using (gui.Node(markerWidth, -1, $"{id}/marker").ExpandHeight().Enter())
+            {
                 if (gui.Pass == Pass.Pass2Render && modified)
+                {
                     gui.DrawBackgroundRect(Theme.Accent, 1.5f);
+                }
+            }
 
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(3f).Enter())
+            {
                 OptionContent(gui, page, field, id, modified);
+            }
         }
     }
 
@@ -257,8 +301,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
         OptionHeading(gui, page, field, id, title, modified);
 
         if (description.Length > 0)
+        {
             gui.DrawText(T(description), Theme.Text(11f), Theme.InkDim, wrapWidth: contentWidth,
                 centerInRect: false);
+        }
 
         using (gui.Node(Theme.Scale(editorWidth), Theme.Scale(Theme.RowHeight), $"{id}/editor")
                    .Direction(Axis.Horizontal).Gap(4f).Enter())
@@ -274,7 +320,11 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
                    .Direction(Axis.Horizontal).Gap(6f).ContentAlignY(0.5f).Enter())
         {
             gui.DrawText(T(title), Theme.Text(13f), Theme.Ink, centerInRect: false);
-            if (modified && RevertButton(gui, $"{id}/revert")) Revert(page, field);
+            if (modified && RevertButton(gui, $"{id}/revert"))
+            {
+                Revert(page, field);
+            }
+
             using (gui.Node().Expand().Enter()) { }
         }
     }
@@ -282,9 +332,13 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     void FieldEditor(Gui gui, FormField field, string id)
     {
         if (field.Target is AppearanceSettings appearance && ThemeChoice(field.Name) is { } choice)
+        {
             ThemeEditor(gui, field, id, appearance, choice.Available, choice.Committed, choice.Category);
+        }
         else
+        {
             gui.FormFieldEditor(field, id, FormContext);
+        }
     }
 
     /// <summary>The sheets, committed id and brick category of an appearance field that picks a theme sheet.</summary>
@@ -307,17 +361,29 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             filePath: $"{id}/theme");
         if (gui.Pass == Pass.Pass1Build)
         {
-            if (next >= 0 && next != current) frameThemeSelections[id] = available[next].Id;
-            else frameThemeSelections.Remove(id);
+            if (next >= 0 && next != current)
+            {
+                frameThemeSelections[id] = available[next].Id;
+            }
+            else
+            {
+                frameThemeSelections.Remove(id);
+            }
         }
         else if (frameThemeSelections.Remove(id, out var selected))
         {
             if (category == ThemeCategories.Look && themes.DefaultColorThemeFor(selected) is { } paired)
+            {
                 appearance.Theme = paired;
+            }
+
             field.SetValue(selected);
         }
 
-        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse")) browseThemes(category);
+        if (browseThemes is not null && BrowseButton(gui, $"{id}/browse"))
+        {
+            browseThemes(category);
+        }
     }
 
     /// <summary>The button beside the theme dropdown that lists installable themes.</summary>
@@ -329,7 +395,11 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            }
+
             gui.DrawText(T("Browse…"), Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
             gui.Tooltip(gui.CurrentNode, T("Find themes to install as bricks."), maxWidth: 320);
 
@@ -347,7 +417,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
 
             gui.Icon(gui.ResolveIcon(Icons.Revert), Theme.Text(13), opacity: hot ? 1f : 0.7f);
 
@@ -361,7 +434,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
 
     void Revert(SettingsPageDescriptor page, FormField field)
     {
-        if (!page.Defaults.TryGetValue(field.Name, out var original)) return;
+        if (!page.Defaults.TryGetValue(field.Name, out var original))
+        {
+            return;
+        }
 
         field.SetValue(original);
         settings.NotifyChanged(page.Id);
@@ -374,7 +450,9 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     FormModel Form(SettingsPageDescriptor page)
     {
         if (forms.TryGetValue(page.Id, out var cached) && ReferenceEquals(cached.Target, page.Target))
+        {
             return cached.Model;
+        }
 
         var pageId = page.Id;
         var model = FormBuilder.Build(page.Target, new FormOptions
@@ -390,11 +468,15 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     void ReportFailure(FormFailure failure)
     {
         if (failure.Kind == FormFailureKind.Action)
+        {
             log.LogError(failure.Exception, "Settings: {Member} failed on {Target}", failure.Member,
                 failure.Target.GetType().Name);
+        }
         else
+        {
             log.LogDebug(failure.Exception, "Settings: {Kind} of {Member} failed on {Target}", failure.Kind,
                 failure.Member, failure.Target.GetType().Name);
+        }
     }
 
     /// <summary>
@@ -405,7 +487,10 @@ sealed class SettingsPanel(IEditorSettings settings, ILogger log, IShellLocaliza
     IReadOnlyList<SettingsPageDescriptor> Visible()
     {
         var inScope = settings.Pages.Where(page => !page.Hidden).Where(page => page.Scope == scope).ToList();
-        if (filter.Length == 0) return inScope;
+        if (filter.Length == 0)
+        {
+            return inScope;
+        }
 
         return [.. inScope.Where(page => Contains(page.Path) || Contains(page.Description)
             || Form(page).Sections.SelectMany(section => section.BodyFields).Any(Matches))];

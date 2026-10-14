@@ -75,7 +75,10 @@ sealed partial class Build
     {
         for (var directory = project.Directory; directory.ToString().StartsWith(RootDirectory, StringComparison.Ordinal); directory = directory.Parent)
         {
-            if ((directory / "package.json").FileExists()) return true;
+            if ((directory / "package.json").FileExists())
+            {
+                return true;
+            }
         }
 
         return false;

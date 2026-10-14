@@ -45,7 +45,11 @@ public sealed class InspectorMembershipTests
                 null!, null!, new InspectorSettings(), null!, null!, Undo, null!, null!, null!, database,
                 new LayerFilter(project));
             panel.Locked = locked;
-            if (locked) selection.Select(root);
+            if (locked)
+            {
+                selection.Select(root);
+            }
+
             Input.MousePosition.Returns(new Vector2(-1));
             Input.GetTypedCharacters().Returns("");
             Gui = new Gui { Input = Input };

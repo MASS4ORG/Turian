@@ -38,7 +38,10 @@ public static class Application
     /// <returns>Whether to cancel the default termination.</returns>
     internal static bool Interrupt()
     {
-        if (quit.IsCancellationRequested) return false;
+        if (quit.IsCancellationRequested)
+        {
+            return false;
+        }
 
         Quit();
         return true;

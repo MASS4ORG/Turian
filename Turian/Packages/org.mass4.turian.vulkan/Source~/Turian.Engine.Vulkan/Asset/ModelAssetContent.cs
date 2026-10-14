@@ -22,7 +22,9 @@ public static class ModelAssetContent
             ArgumentNullException.ThrowIfNull(database);
             var cacheKey = (asset.Id, vulkan.Device.Id);
             if (ModelCache.TryGetValue(cacheKey, out var cached))
+            {
                 return cached;
+            }
 
             if (!database.TryGetAssetProvider(asset.Id, out var provider) || provider is null)
             {
@@ -32,7 +34,11 @@ public static class ModelAssetContent
             using var timing = database.LoadStatistics.Measure(texture: false);
             try
             {
-                if (asset.ReadGeometry(database) is not { } geometry) return null;
+                if (asset.ReadGeometry(database) is not { } geometry)
+                {
+                    return null;
+                }
+
                 var loaded = new VulkanModel(vulkan, geometry);
                 ModelCache[cacheKey] = loaded;
                 return loaded;
@@ -57,7 +63,9 @@ public static class ModelAssetContent
             foreach (var key in ModelCache.Keys.Where(k => k.Item1 == assetId).ToList())
             {
                 if (ModelCache.TryRemove(key, out var model))
+                {
                     model.Dispose();
+                }
             }
         }
 
@@ -67,7 +75,10 @@ public static class ModelAssetContent
         public static void ClearCache()
         {
             foreach (var (_, model) in ModelCache)
+            {
                 model.Dispose();
+            }
+
             ModelCache.Clear();
         }
     }

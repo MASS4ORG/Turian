@@ -50,8 +50,15 @@ public sealed class SshKeygenSigner(string privateKeyPath) : IBrickSigner
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        if (workingDirectory is not null) start.WorkingDirectory = workingDirectory;
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        if (workingDirectory is not null)
+        {
+            start.WorkingDirectory = workingDirectory;
+        }
+
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
 
         try
         {
@@ -108,7 +115,9 @@ public static class RegistryPublisher
         var index = File.Exists(indexPath) ? RegistryIndex.Parse(File.ReadAllText(indexPath)) : new RegistryIndex();
 
         if (index.Bricks.TryGetValue(id, out var existing) && existing.Versions.ContainsKey(version))
+        {
             throw new PackageException($"{id} {version} is already published; versions are immutable, publish a new one.");
+        }
 
         var publisherKey = publisherSigner?.PublicKey;
         var publisherFingerprint = publisherKey is null ? null : SshSignature.Fingerprint(publisherKey);
@@ -122,7 +131,10 @@ public static class RegistryPublisher
         var target = Path.Combine(location, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         File.Copy(brickFile, target);
-        if (File.Exists($"{brickFile}.sha256")) File.Copy($"{brickFile}.sha256", $"{target}.sha256");
+        if (File.Exists($"{brickFile}.sha256"))
+        {
+            File.Copy($"{brickFile}.sha256", $"{target}.sha256");
+        }
 
         var registryKey = registrySigner.PublicKey;
         var entry = new RegistryVersion
@@ -142,7 +154,11 @@ public static class RegistryPublisher
             entry.PublisherKey = publisherKey;
         }
 
-        if (existing is null) index.Bricks[id] = existing = new RegistryBrick();
+        if (existing is null)
+        {
+            index.Bricks[id] = existing = new RegistryBrick();
+        }
+
         existing.Versions[version] = entry;
         index.GeneratedAt = DateTimeOffset.UtcNow;
 
@@ -162,7 +178,9 @@ public static class RegistryPublisher
         var indexPath = Path.Combine(LocationOf(registryRoot), "index.json");
         var index = File.Exists(indexPath) ? RegistryIndex.Parse(File.ReadAllText(indexPath)) : new RegistryIndex();
         if (!index.Bricks.TryGetValue(id, out var brick) || !brick.Versions.TryGetValue(version, out var entry))
+        {
             throw new PackageException($"The registry has no {id} {version}.");
+        }
 
         entry.Yanked = true;
         index.GeneratedAt = DateTimeOffset.UtcNow;
@@ -177,17 +195,30 @@ public static class RegistryPublisher
         if (owner.Count > 0)
         {
             var (ownedPrefix, ownedBy) = (owner[0].Key, owner[0].Value.Key);
-            if (publisherFingerprint is null) throw new PackageException($"{ownedPrefix} is owned by a publisher; sign with their key (a publisher key is required).");
+            if (publisherFingerprint is null)
+            {
+                throw new PackageException($"{ownedPrefix} is owned by a publisher; sign with their key (a publisher key is required).");
+            }
+
             if (ownedBy != publisherFingerprint)
+            {
                 throw new PackageException($"{ownedPrefix} is owned by another publisher key ({ownedBy}); {publisherFingerprint} cannot publish {id}.");
+            }
+
             return;
         }
 
         var prefix = claim ?? Personal(id)
                      ?? throw new PackageException($"{id} is not owned by anyone yet; claim its prefix (for example {string.Join('.', id.Split('.').Take(2))}) with a publisher key.");
         if (id != prefix && !id.StartsWith(prefix + ".", StringComparison.Ordinal))
+        {
             throw new PackageException($"{id} is not under the prefix {prefix} being claimed.");
-        if (publisherFingerprint is null) throw new PackageException($"Claiming {prefix} needs a publisher key, which owns it from then on.");
+        }
+
+        if (publisherFingerprint is null)
+        {
+            throw new PackageException($"Claiming {prefix} needs a publisher key, which owns it from then on.");
+        }
 
         index.Claims[prefix] = new RegistryClaim { Key = publisherFingerprint };
     }
@@ -204,7 +235,9 @@ public static class RegistryPublisher
         var keys = File.Exists(path) ? RegistryKeys.Parse(File.ReadAllText(path)) : new RegistryKeys();
         var fingerprint = SshSignature.Fingerprint(registryKey);
         if (keys.Keys.All(k => SshSignature.Fingerprint(k.PublicKey) != fingerprint))
+        {
             keys.Keys.Add(new RegistryKey { Id = fingerprint, PublicKey = registryKey });
+        }
 
         File.WriteAllText(path, JsonSerializer.Serialize(keys, PackageJson.Options));
     }

@@ -41,7 +41,7 @@ public sealed class BrickForkTests : IDisposable
 
         Assert.Equal(
             [("Runtime/New.txt", ForkChange.Added), ("Runtime/Stats.txt", ForkChange.Modified), ("Runtime/Unused.txt", ForkChange.Removed)],
-            differences.Select(d => (d.Path, d.Change)));
+            differences.Select(static d => (d.Path, d.Change)));
     }
 
     /// <summary>Files the fork left alone follow the new release: updated, added and removed.</summary>

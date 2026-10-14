@@ -56,7 +56,10 @@ public class ModelAssetImporter : IAssetImporter
         var extension = Path.GetExtension(sourcePath);
         if (extension.Equals(".max", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".blend", StringComparison.OrdinalIgnoreCase))
+        {
             throw new NotSupportedException("Export native authoring files to glTF/GLB or FBX before importing.");
+        }
+
         var artifact = $"{IAssetImporter.PrimaryArtifactName}.glb";
         AssimpModelConverter.ConvertToGlb(sourcePath, Path.Combine(importDirectory, artifact));
         return [artifact];

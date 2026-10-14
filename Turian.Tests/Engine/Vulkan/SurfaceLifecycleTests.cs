@@ -287,10 +287,10 @@ public sealed class SurfaceLifecycleTests
         }
 
         Assert.True(lifecycle.TryPrepare());
-        Assert.Equal(100, target.Calls.Count(c => c == "destroy surface"));
-        Assert.Equal(100, target.Calls.Count(c => c == "create surface"));
-        Assert.Equal(101, target.Calls.Count(c => c.StartsWith("swapchain ", StringComparison.Ordinal)));
-        Assert.Equal(100, target.Calls.Count(c => c == "destroy swapchain"));
+        Assert.Equal(100, target.Calls.Count(static c => c == "destroy surface"));
+        Assert.Equal(100, target.Calls.Count(static c => c == "create surface"));
+        Assert.Equal(101, target.Calls.Count(static c => c.StartsWith("swapchain ", StringComparison.Ordinal)));
+        Assert.Equal(100, target.Calls.Count(static c => c == "destroy swapchain"));
     }
 
     /// <summary>Disposing stops following the host, and the constructor rejects missing arguments.</summary>

@@ -16,7 +16,11 @@ public sealed partial class AssetFileOperations
     public bool MoveMany(IEnumerable<AssetEntry> selection, string directory)
     {
         var entries = Roots(selection).ToArray();
-        if (entries.Any(entry => Inside(entry.AbsolutePath, directory))) return false;
+        if (entries.Any(entry => Inside(entry.AbsolutePath, directory)))
+        {
+            return false;
+        }
+
         return RecordBatch("Move", entries.Where(entry => Path.GetDirectoryName(entry.AbsolutePath) != directory)
             .Select(entry =>
             {
@@ -72,7 +76,11 @@ public sealed partial class AssetFileOperations
     bool RecordBatch(string label, IEnumerable<FileEdit> edits)
     {
         var actions = edits.ToArray();
-        if (actions.Length == 0) return false;
+        if (actions.Length == 0)
+        {
+            return false;
+        }
+
         return Record(label, () => ApplyBatch(actions), () => RevertBatch(actions));
     }
 
@@ -80,8 +88,16 @@ public sealed partial class AssetFileOperations
     {
         for (var i = 0; i < actions.Count; i++)
         {
-            if (actions[i].Apply()) continue;
-            for (var done = i - 1; done >= 0; done--) actions[done].Revert();
+            if (actions[i].Apply())
+            {
+                continue;
+            }
+
+            for (var done = i - 1; done >= 0; done--)
+            {
+                actions[done].Revert();
+            }
+
             return false;
         }
         return true;
@@ -91,8 +107,16 @@ public sealed partial class AssetFileOperations
     {
         for (var i = actions.Count - 1; i >= 0; i--)
         {
-            if (actions[i].Revert()) continue;
-            for (var done = i + 1; done < actions.Count; done++) actions[done].Apply();
+            if (actions[i].Revert())
+            {
+                continue;
+            }
+
+            for (var done = i + 1; done < actions.Count; done++)
+            {
+                actions[done].Apply();
+            }
+
             return false;
         }
         return true;
@@ -106,7 +130,10 @@ public sealed partial class AssetFileOperations
         var candidate = Path.Combine(directory, name);
         var index = 1;
         while (File.Exists(candidate) || Directory.Exists(candidate))
+        {
             candidate = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(name)} {index++}{Path.GetExtension(name)}");
+        }
+
         return candidate;
     }
 }

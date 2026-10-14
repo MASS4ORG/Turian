@@ -11,7 +11,10 @@ public sealed class LightGizmoDrawer : IGizmoDrawer
     public void DrawGizmos(Gizmos gizmos, Component component)
     {
         ArgumentNullException.ThrowIfNull(gizmos);
-        if (component is not LightComponent light || light.Node is null) return;
+        if (component is not LightComponent light || light.Node is null)
+        {
+            return;
+        }
 
         var color = light.Color;
         gizmos.Color = new Vector4(color.X, color.Y, color.Z, 1f);

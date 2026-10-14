@@ -30,7 +30,9 @@ public sealed class PanelHeaderInteractionTests
         internal void Draw() => InspectorFormsRenderingTests.Frame(Gui, surface, font, gui =>
         {
             using (gui.Node(-1, 24, "panel/header").ExpandWidth().Direction(Axis.Horizontal).Enter())
+            {
                 panel.RenderHeader(gui, new PanelHeaderContext(id, id, gui.CurrentNode.Rect, false, services));
+            }
         });
 
         internal LayoutNode Find(string nodeId) => Nodes(Gui.RootNode!).Single(node => node.Id == nodeId);

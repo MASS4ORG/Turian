@@ -19,13 +19,15 @@ public static class LocalizationExchange
         ArgumentNullException.ThrowIfNull(xml);
 
         var root = XDocument.Parse(xml).Root ?? throw new InvalidDataException("XLIFF has no root element.");
-        var file = root.Descendants().FirstOrDefault(e => e.Name.LocalName == "file")
+        var file = root.Descendants().FirstOrDefault(static e => e.Name.LocalName == "file")
                    ?? throw new InvalidDataException("XLIFF has no file element.");
         var locale = (string?)file.Attribute("target-language") ?? (string?)file.Attribute("source-language") ?? "en";
         var table = new StringTable(locale);
 
-        foreach (var unit in root.Descendants().Where(e => e.Name.LocalName == "trans-unit"))
+        foreach (var unit in root.Descendants().Where(static e => e.Name.LocalName == "trans-unit"))
+        {
             table.Add(ReadTransUnit(unit));
+        }
 
         return table;
     }
@@ -60,7 +62,7 @@ public static class LocalizationExchange
             new XAttribute("source-language", "en"),
             new XAttribute("target-language", table.Locale),
             new XAttribute("datatype", "plaintext"),
-            new XElement("body", table.Entries.Select(entry =>
+            new XElement("body", table.Entries.Select(static entry =>
                 new XElement("trans-unit",
                     new XAttribute("id", entry.Key),
                     new XElement("source", entry.Source),
@@ -84,15 +86,21 @@ public static class LocalizationExchange
         ArgumentNullException.ThrowIfNull(csv);
 
         var rows = ParseCsv(csv).ToList();
-        if (rows.Count == 0) throw new InvalidDataException("CSV is empty.");
+        if (rows.Count == 0)
+        {
+            throw new InvalidDataException("CSV is empty.");
+        }
 
-        var header = rows[0].Select((value, index) => (value, index))
-            .ToDictionary(pair => pair.value, pair => pair.index, StringComparer.OrdinalIgnoreCase);
+        var header = rows[0].Select(static (value, index) => (value, index))
+            .ToDictionary(static pair => pair.value, static pair => pair.index, StringComparer.OrdinalIgnoreCase);
         var table = new StringTable(locale);
 
         foreach (var row in rows.Skip(1))
         {
-            if (!header.TryGetValue("key", out var keyIndex) || keyIndex >= row.Count) continue;
+            if (!header.TryGetValue("key", out var keyIndex) || keyIndex >= row.Count)
+            {
+                continue;
+            }
 
             var translation = Value(row, header, "translation");
             table.Add(new StringTableEntry
@@ -147,7 +155,10 @@ public static class LocalizationExchange
                     value.Append('"');
                     reader.Read();
                 }
-                else quoted = !quoted;
+                else
+                {
+                    quoted = !quoted;
+                }
             }
             else if (ch == ',' && !quoted)
             {
@@ -156,13 +167,24 @@ public static class LocalizationExchange
             }
             else if ((ch == '\n' || ch == '\r') && !quoted)
             {
-                if (ch == '\r' && reader.Peek() == '\n') reader.Read();
+                if (ch == '\r' && reader.Peek() == '\n')
+                {
+                    reader.Read();
+                }
+
                 fields.Add(value.ToString());
                 value.Clear();
-                if (fields.Any(static field => field.Length > 0)) yield return fields.ToArray();
+                if (fields.Any(static field => field.Length > 0))
+                {
+                    yield return fields.ToArray();
+                }
+
                 fields.Clear();
             }
-            else value.Append(ch);
+            else
+            {
+                value.Append(ch);
+            }
         }
 
         if (value.Length > 0 || fields.Count > 0)

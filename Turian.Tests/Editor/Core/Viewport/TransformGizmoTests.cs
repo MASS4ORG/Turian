@@ -158,7 +158,7 @@ public class TransformGizmoTests
         gizmo.Draw(g, camera, Viewport);
 
         Assert.Equal(3 * 64, g.LineCount);
-        Assert.All(g.OverlayLines, line => Assert.Equal(4f, line.Thickness));
+        Assert.All(g.OverlayLines, static line => Assert.Equal(4f, line.Thickness));
     }
 
     /// <summary>With no node selected the gizmo draws nothing.</summary>

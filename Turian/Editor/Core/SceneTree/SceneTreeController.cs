@@ -51,7 +51,10 @@ public sealed class SceneTreeController(
     public void ShowRuntimeScene(Node root)
     {
         ArgumentNullException.ThrowIfNull(root);
-        if (ReferenceEquals(runtimeRoot, root)) return;
+        if (ReferenceEquals(runtimeRoot, root))
+        {
+            return;
+        }
 
         runtimeRoot = root;
         SceneLoaded?.Invoke(runtimeRoot);
@@ -64,7 +67,10 @@ public sealed class SceneTreeController(
     /// </summary>
     public void ShowEditorScene()
     {
-        if (runtimeRoot is null) return;
+        if (runtimeRoot is null)
+        {
+            return;
+        }
 
         runtimeRoot = null;
         SceneLoaded?.Invoke(sceneRoot);
@@ -107,7 +113,10 @@ public sealed class SceneTreeController(
         loadedSceneRoots.Remove(assetId);
         selectedNodeIdsByAssetId.Remove(assetId);
 
-        if (CurrentAsset?.Id != assetId) return;
+        if (CurrentAsset?.Id != assetId)
+        {
+            return;
+        }
 
         // Closing the open scene empties the tree; a host that closed a background tab keeps its view.
         CurrentAsset = null;
@@ -135,7 +144,10 @@ public sealed class SceneTreeController(
     /// </summary>
     public void RebindLoadedScenes()
     {
-        if (loadedSceneRoots.Count == 0) return;
+        if (loadedSceneRoots.Count == 0)
+        {
+            return;
+        }
 
         var assetIds = loadedSceneRoots.Keys.ToArray();
         foreach (var assetId in assetIds)
@@ -154,7 +166,9 @@ public sealed class SceneTreeController(
                 SceneRebuilt?.Invoke(assetId, oldRoot, newRoot);
 
                 if (CurrentAsset?.Id == assetId)
+                {
                     sceneRoot = newRoot;
+                }
             }
             catch (Exception ex)
             {
@@ -190,9 +204,20 @@ public sealed class SceneTreeController(
     public void SaveAsset(Asset asset)
     {
         ArgumentNullException.ThrowIfNull(asset);
-        if (asset is not Prefab prefab) return;
-        if (prefab is not TemporaryScene && settingsService.Settings is null) return;
-        if (!loadedSceneRoots.TryGetValue(prefab.Id, out var root)) return;
+        if (asset is not Prefab prefab)
+        {
+            return;
+        }
+
+        if (prefab is not TemporaryScene && settingsService.Settings is null)
+        {
+            return;
+        }
+
+        if (!loadedSceneRoots.TryGetValue(prefab.Id, out var root))
+        {
+            return;
+        }
 
         try
         {
@@ -202,7 +227,11 @@ public sealed class SceneTreeController(
             var previous = File.Exists(path) ? File.ReadAllText(path) : null;
             AtomicFile.WriteAllText(path, PrefabInstances.Compact(Serializer.Serialize(root),
                 id => PrefabInstances.ReadPrefabJson(database, id)));
-            if (prefab is not TemporaryScene) assetImporter.ReimportNow(path, overwriteExisting: true);
+            if (prefab is not TemporaryScene)
+            {
+                assetImporter.ReimportNow(path, overwriteExisting: true);
+            }
+
             RefreshInstances(prefab.Id, previous);
         }
         catch (Exception ex)
@@ -220,17 +249,26 @@ public sealed class SceneTreeController(
         var refreshed = false;
         foreach (var (assetId, root) in loadedSceneRoots.ToList())
         {
-            if (assetId == prefabId) continue;
+            if (assetId == prefabId)
+            {
+                continue;
+            }
 
             try
             {
                 if (PrefabInstanceRefresh.Rebuild(root, prefabId, previousJson,
                         id => PrefabInstances.ReadPrefabJson(database, id), assetLoader) is not { } rebuilt)
+                {
                     continue;
+                }
 
                 loadedSceneRoots[assetId] = rebuilt;
                 SceneRebuilt?.Invoke(assetId, root, rebuilt);
-                if (ReferenceEquals(sceneRoot, root)) sceneRoot = rebuilt;
+                if (ReferenceEquals(sceneRoot, root))
+                {
+                    sceneRoot = rebuilt;
+                }
+
                 refreshed = true;
             }
             catch (Exception ex)
@@ -239,7 +277,10 @@ public sealed class SceneTreeController(
             }
         }
 
-        if (!refreshed) return;
+        if (!refreshed)
+        {
+            return;
+        }
 
         SceneLoaded?.Invoke(CurrentSceneRoot);
         SelectionRestoreRequested?.Invoke(RememberedSelection());
@@ -251,7 +292,10 @@ public sealed class SceneTreeController(
     public void SelectNode(Node? node)
     {
         if (CurrentAsset is not null && node is not null)
+        {
             selectedNodeIdsByAssetId[CurrentAsset.Id] = node.Id;
+        }
+
         assetManager.OpenNode(node);
     }
 
@@ -312,10 +356,15 @@ public sealed class SceneTreeController(
     /// </summary>
     public void MarkAssetModified()
     {
-        if (IsShowingRuntimeScene) return;
+        if (IsShowingRuntimeScene)
+        {
+            return;
+        }
 
         if (CurrentAsset is not null)
+        {
             assetManager.AlterAsset(CurrentAsset);
+        }
     }
 
     /// <summary>Notifies listeners that <paramref name="node"/> changed in-place.</summary>
@@ -324,7 +373,9 @@ public sealed class SceneTreeController(
         assetManager.RefreshNode(node);
         if (node is not null && assetManager.GetSelectedNodeForAsset(CurrentAsset) is { } sel
             && ReferenceEquals(sel, node))
+        {
             assetManager.UpdateSelectedNode();
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -335,11 +386,18 @@ public sealed class SceneTreeController(
 
     static Node? FindNodeById(Node current, Guid id)
     {
-        if (current.Id == id) return current;
+        if (current.Id == id)
+        {
+            return current;
+        }
+
         foreach (var child in current.Children)
         {
             var found = FindNodeById(child, id);
-            if (found is not null) return found;
+            if (found is not null)
+            {
+                return found;
+            }
         }
         return null;
     }
@@ -469,7 +527,7 @@ public sealed class SceneTreeController(
 }
 
 /// <summary>Options for framing a node in the viewport.</summary>
-public record struct FrameNodeOptions
+public readonly record struct FrameNodeOptions
 {
     /// <summary>
     /// When <c>true</c>, the viewport camera should also match the target node's orientation

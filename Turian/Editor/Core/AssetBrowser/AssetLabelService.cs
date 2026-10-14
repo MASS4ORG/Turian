@@ -7,19 +7,27 @@ public sealed class AssetLabelService(AssetImporter importer, UndoService undo)
 
     /// <summary>Returns the distinct labels currently carried by browser assets.</summary>
     public static IReadOnlyList<string> Collect(IEnumerable<AssetEntry> entries) =>
-        [.. entries.SelectMany(entry => entry.AssetMetadata?.Labels ?? [])
+        [.. entries.SelectMany(static entry => entry.AssetMetadata?.Labels ?? [])
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
 
     /// <summary>Adds or removes a label on writable selected assets as one undoable edit.</summary>
     public bool Set(IEnumerable<AssetEntry> selection, string label, bool present)
     {
         label = label.Trim();
-        if (label.Length == 0) return false;
+        if (label.Length == 0)
+        {
+            return false;
+        }
+
         try
         {
             var edits = selection.Where(CanEdit).DistinctBy(entry => entry.AbsolutePath)
                 .Select(entry => Prepare(entry, label, present)).ToArray();
-            if (edits.Length == 0) return false;
+            if (edits.Length == 0)
+            {
+                return false;
+            }
+
             undo.Perform("Asset labels", [], () => WriteAll(edits, before: false), () => WriteAll(edits, before: true),
                 document: UndoService.ProjectDocument);
             return true;
@@ -56,7 +64,11 @@ public sealed class AssetLabelService(AssetImporter importer, UndoService undo)
         }
         catch
         {
-            for (var i = completed - 1; i >= 0; i--) Write(edits[i], !before);
+            for (var i = completed - 1; i >= 0; i--)
+            {
+                Write(edits[i], !before);
+            }
+
             throw;
         }
     }

@@ -32,12 +32,18 @@ public static class Ed25519
     /// <returns>True when the signature is valid for the message under the key.</returns>
     public static bool Verify(ReadOnlySpan<byte> publicKey, ReadOnlySpan<byte> message, ReadOnlySpan<byte> signature)
     {
-        if (publicKey.Length != PublicKeyLength || signature.Length != SignatureLength) return false;
+        if (publicKey.Length != PublicKeyLength || signature.Length != SignatureLength)
+        {
+            return false;
+        }
 
         var a = Decode(publicKey);
         var r = Decode(signature[..32]);
         var s = new BigInteger(signature[32..], isUnsigned: true, isBigEndian: false);
-        if (a is null || r is null || s >= L) return false;
+        if (a is null || r is null || s >= L)
+        {
+            return false;
+        }
 
         var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA512);
         hash.AppendData(signature[..32]);
@@ -68,11 +74,21 @@ public static class Ed25519
     static BigInteger? RecoverX(BigInteger y, int sign)
     {
         var x2 = Mod((y * y - 1) * Inverse(D * y * y + 1));
-        if (x2.IsZero) return sign == 1 ? null : BigInteger.Zero;
+        if (x2.IsZero)
+        {
+            return sign == 1 ? null : BigInteger.Zero;
+        }
 
         var x = BigInteger.ModPow(x2, (P + 3) / 8, P);
-        if (!Mod(x * x - x2).IsZero) x = Mod(x * SqrtMinusOne);
-        if (!Mod(x * x - x2).IsZero) return null;
+        if (!Mod(x * x - x2).IsZero)
+        {
+            x = Mod(x * SqrtMinusOne);
+        }
+
+        if (!Mod(x * x - x2).IsZero)
+        {
+            return null;
+        }
 
         return (x.IsEven ? 0 : 1) != sign ? P - x : x;
     }
@@ -82,7 +98,10 @@ public static class Ed25519
         var value = new BigInteger(bytes, isUnsigned: true, isBigEndian: false);
         var sign = (int)(value >> 255);
         var y = value & ((BigInteger.One << 255) - 1);
-        if (y >= P || RecoverX(y, sign) is not { } x) return null;
+        if (y >= P || RecoverX(y, sign) is not { } x)
+        {
+            return null;
+        }
 
         return new Point(x, y, 1, Mod(x * y));
     }
@@ -106,7 +125,11 @@ public static class Ed25519
         var addend = point;
         for (; !scalar.IsZero; scalar >>= 1)
         {
-            if (!scalar.IsEven) result = Add(result, addend);
+            if (!scalar.IsEven)
+            {
+                result = Add(result, addend);
+            }
+
             addend = Add(addend, addend);
         }
 

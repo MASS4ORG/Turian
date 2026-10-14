@@ -27,10 +27,10 @@ public sealed class AssemblySlotManager
     public string? LoadedAssemblyPath { get; private set; }
 
     /// <summary>The assembly at <see cref="LoadedAssemblyPath"/>, or <c>null</c> if nothing is loaded.</summary>
-    public Assembly? LoadedAssembly { get; private set; }
+    public ReflectionAssembly? LoadedAssembly { get; private set; }
 
     /// <summary>The assemblies compiled from the project's scripts, <see cref="LoadedAssembly"/> last.</summary>
-    public IReadOnlyList<Assembly> UserAssemblies { get; private set; } = [];
+    public IReadOnlyList<ReflectionAssembly> UserAssemblies { get; private set; } = [];
 
     /// <param name="slotRootDirectory">
     /// Directory that will contain the <c>SlotA/</c> and <c>SlotB/</c> subdirectories.
@@ -78,7 +78,7 @@ public sealed class AssemblySlotManager
 
             // Every assembly the compile wrote to the slot: the definitions first, the default one last.
             var fullPath = Path.GetFullPath(assemblyPath);
-            var userAssemblies = new List<Assembly>();
+            var userAssemblies = new List<ReflectionAssembly>();
             foreach (var path in Directory.EnumerateFiles(Path.GetDirectoryName(fullPath)!, "*.dll")
                          .Where(path => !string.Equals(Path.GetFullPath(path), fullPath, StringComparison.Ordinal))
                          .Order(StringComparer.Ordinal))
@@ -134,14 +134,17 @@ public sealed class AssemblySlotManager
     }
 
     /// <summary>Returns all assemblies currently loaded in the active context.</summary>
-    public IEnumerable<Assembly> LoadedAssemblies =>
+    public IEnumerable<ReflectionAssembly> LoadedAssemblies =>
         loadContext?.Assemblies ?? [];
 
     // -------------------------------------------------------------------------
 
     void UnloadCurrentContext()
     {
-        if (loadContext is null) return;
+        if (loadContext is null)
+        {
+            return;
+        }
 
         try
         {
@@ -178,7 +181,9 @@ public sealed class AssemblySlotManager
             {
                 var text = File.ReadAllText(ActiveSlotFilePath).Trim();
                 if (text == slotA || text == slotB)
+                {
                     return text;
+                }
             }
         }
         catch { /* ignore – default to SlotA */ }

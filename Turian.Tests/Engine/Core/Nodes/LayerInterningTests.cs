@@ -11,7 +11,11 @@ public sealed class LayerInterningTests
     {
         Assert.Equal(16 + IntPtr.Size, Unsafe.SizeOf<NodeLayers>());
         var memberships = new NodeLayers();
-        for (var slot = 0; slot < NodeLayers.InlineCapacity; slot++) Assert.Equal(0, memberships[slot]);
+        for (var slot = 0; slot < NodeLayers.InlineCapacity; slot++)
+        {
+            Assert.Equal(0, memberships[slot]);
+        }
+
         memberships[15] = 255;
         var copy = memberships;
         copy[15] = 1;
@@ -58,7 +62,7 @@ public sealed class LayerInterningTests
     {
         var settings = new NodeLayerSettings
         {
-            Groups = [.. Enumerable.Range(0, 300).Select(index => Group($"Group{index}", 256))],
+            Groups = [.. Enumerable.Range(0, 300).Select(static index => Group($"Group{index}", 256))],
         };
         var registry = Registry(settings);
         Assert.Equal(300, registry.GroupCount);
@@ -86,11 +90,11 @@ public sealed class LayerInterningTests
     {
         var settings = new NodeLayerSettings
         {
-            Tags = [.. Enumerable.Range(0, 65_536).Select(index => new TagAsset { Name = $"Tag{index}" })],
+            Tags = [.. Enumerable.Range(0, 65_536).Select(static index => new TagAsset { Name = $"Tag{index}" })],
         };
         var registry = Registry(settings);
         Assert.Equal(65_536, registry.TagCount);
-        var sorted = settings.Tags.OrderBy(tag => tag.Id).ToArray();
+        var sorted = settings.Tags.OrderBy(static tag => tag.Id).ToArray();
         for (var index = 0; index < sorted.Length; index++)
         {
             Assert.True(registry.TryGetTagId(sorted[index].Id, out var actualIndex));
@@ -192,8 +196,8 @@ public sealed class LayerInterningTests
         Assert.False(empty.TryGetTagId(Guid.NewGuid(), out _));
         Assert.False(empty.TryGetGroupSlot(Guid.NewGuid(), out _));
         Assert.False(empty.TryGetLayerIndex(Guid.NewGuid(), Guid.NewGuid(), out _));
-        Assert.Throws<InvalidOperationException>(() => Registry(new NodeLayerSettings { Groups = [null!] }));
-        Assert.Throws<ArgumentNullException>(() => new LayerInterningService(null!));
+        Assert.Throws<InvalidOperationException>(static () => Registry(new NodeLayerSettings { Groups = [null!] }));
+        Assert.Throws<ArgumentNullException>(static () => new LayerInterningService(null!));
     }
 
     /// <summary>Inline writes, sparse reads and unchanged assignments, and typed lookups allocate no memory.</summary>

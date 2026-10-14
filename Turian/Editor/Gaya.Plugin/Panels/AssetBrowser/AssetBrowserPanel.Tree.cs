@@ -14,9 +14,15 @@ sealed partial class AssetBrowserPanel
             Tag: entry,
             Tint: entry.IsDirectory ? ThemeTokens.Current.Folder : null));
 
-        if (!entry.IsDirectory) return;
+        if (!entry.IsDirectory)
+        {
+            return;
+        }
 
-        foreach (var child in ChildrenOf(entry.AbsolutePath)) Append(child, depth + 1);
+        foreach (var child in ChildrenOf(entry.AbsolutePath))
+        {
+            Append(child, depth + 1);
+        }
     }
 
     Action<Gui> IconFor(AssetEntry entry) => gui => DrawPreview(gui, entry,
@@ -32,7 +38,10 @@ sealed partial class AssetBrowserPanel
             var scale = size / Math.Max(image.Width, image.Height);
             gui.Image(image, image.Width * scale, image.Height * scale);
         }
-        else DrawAssetIcon(gui, entry, size);
+        else
+        {
+            DrawAssetIcon(gui, entry, size);
+        }
     }
 
     void DrawAssetIcon(Gui gui, AssetEntry entry, float size)
@@ -42,7 +51,7 @@ sealed partial class AssetBrowserPanel
     }
 
     IEnumerable<AssetEntry> ChildrenOf(string? parentPath) => parentPath is null
-        ? entries.Where(entry => entry.ParentPath is null)
+        ? entries.Where(static entry => entry.ParentPath is null)
         : children.GetValueOrDefault(parentPath) ?? [];
 
     void OnClick(TreeViewEvent e)
@@ -53,11 +62,18 @@ sealed partial class AssetBrowserPanel
             QueryChanged();
             return;
         }
-        if (e.Item.Tag is not AssetEntry entry) return;
+        if (e.Item.Tag is not AssetEntry entry)
+        {
+            return;
+        }
 
         if (e.Button == MouseButton.Right) { TreeContextMenu(entry); return; }
 
-        if (e.Button != MouseButton.Left) return;
+        if (e.Button != MouseButton.Left)
+        {
+            return;
+        }
+
         if (entry.IsDirectory)
         {
             NavigateTo(entry.AbsolutePath);
@@ -69,13 +85,23 @@ sealed partial class AssetBrowserPanel
 
     void TreeActivation(AssetEntry entry, int clicks)
     {
-        if (clicks >= 2 && !entry.IsReadOnly) opener.Open(entry);
-        else InspectSelection();
+        if (clicks >= 2 && !entry.IsReadOnly)
+        {
+            opener.Open(entry);
+        }
+        else
+        {
+            InspectSelection();
+        }
     }
 
     void TreeContextMenu(AssetEntry entry)
     {
-        if (!state.SelectedIds.Contains(entry.AbsolutePath)) state.SelectedId = entry.AbsolutePath;
+        if (!state.SelectedIds.Contains(entry.AbsolutePath))
+        {
+            state.SelectedId = entry.AbsolutePath;
+        }
+
         InspectSelection();
         menuEntry = entry;
         menuAt = pointer;
@@ -84,7 +110,10 @@ sealed partial class AssetBrowserPanel
 
     void OnEmptyClick(MouseButton button)
     {
-        if (button != MouseButton.Right) return;
+        if (button != MouseButton.Right)
+        {
+            return;
+        }
 
         menuEntry = null;
         menuAt = pointer;

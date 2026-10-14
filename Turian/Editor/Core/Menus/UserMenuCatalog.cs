@@ -18,7 +18,7 @@ public sealed class UserMenuCatalog
     readonly ILogger log;
 
     readonly List<UserMenuCommand> commands = [];
-    Assembly? scanned;
+    ReflectionAssembly? scanned;
     bool scannedOnce;
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
@@ -55,27 +55,36 @@ public sealed class UserMenuCatalog
     public void EnsureRefreshed()
     {
         var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned)) return;
+        if (scannedOnce && ReferenceEquals(current, scanned))
+        {
+            return;
+        }
 
         scanned = current;
         scannedOnce = true;
         Rescan(current);
     }
 
-    void Rescan(Assembly? assembly)
+    void Rescan(ReflectionAssembly? assembly)
     {
         var previous = commands.Count;
         commands.Clear();
 
         if (assembly is not null)
         {
-            foreach (var userAssembly in buildManager.ActiveUserAssemblies) commands.AddRange(Scan(userAssembly, log));
+            foreach (var userAssembly in buildManager.ActiveUserAssemblies)
+            {
+                commands.AddRange(Scan(userAssembly, log));
+            }
         }
 
         log.LogDebug("User menu: {Count} item(s) from {Assembly}", commands.Count,
             assembly?.GetName().Name ?? "no user assembly");
 
-        if (previous != 0 || commands.Count != 0) Changed?.Invoke();
+        if (previous != 0 || commands.Count != 0)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
@@ -85,7 +94,7 @@ public sealed class UserMenuCatalog
     /// <param name="assembly">The assembly to scan.</param>
     /// <param name="log">Where a skipped method is reported.</param>
     /// <returns>One entry per usable annotated method, in reflection order.</returns>
-    public static IReadOnlyList<UserMenuCommand> Scan(Assembly assembly, ILogger log)
+    public static IReadOnlyList<UserMenuCommand> Scan(ReflectionAssembly assembly, ILogger log)
     {
         ArgumentNullException.ThrowIfNull(assembly);
         ArgumentNullException.ThrowIfNull(log);
@@ -94,9 +103,20 @@ public sealed class UserMenuCatalog
 
         foreach (var method in AnnotatedMethods(assembly, log))
         {
-            if (method.GetCustomAttribute<MenuItemAttribute>(inherit: false) is not { } attribute) continue;
-            if (string.IsNullOrWhiteSpace(attribute.Path)) continue;
-            if (!TryBind(method, log, out var invoke)) continue;
+            if (method.GetCustomAttribute<MenuItemAttribute>(inherit: false) is not { } attribute)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(attribute.Path))
+            {
+                continue;
+            }
+
+            if (!TryBind(method, log, out var invoke))
+            {
+                continue;
+            }
 
             found.Add(new UserMenuCommand(attribute.Path.Trim(), Identify(method), invoke));
         }
@@ -109,7 +129,7 @@ public sealed class UserMenuCatalog
     /// load — a component referencing a package that is no longer restored — is skipped rather than
     /// aborting the scan, matching how <c>TypeRegistry</c> treats the same failure.
     /// </summary>
-    static IEnumerable<MethodInfo> AnnotatedMethods(Assembly assembly, ILogger log)
+    static IEnumerable<MethodInfo> AnnotatedMethods(ReflectionAssembly assembly, ILogger log)
     {
         Type[] types;
         try
@@ -118,7 +138,7 @@ public sealed class UserMenuCatalog
         }
         catch (ReflectionTypeLoadException ex)
         {
-            types = [.. ex.Types.Where(type => type is not null)!];
+            types = [.. ex.Types.Where(static type => type is not null)!];
         }
         catch (Exception ex)
         {
@@ -151,7 +171,10 @@ public sealed class UserMenuCatalog
                     log.LogWarning(ex, "User menu: could not read the attributes on {Method}", method.Name);
                 }
 
-                if (annotated) yield return method;
+                if (annotated)
+                {
+                    yield return method;
+                }
             }
         }
     }

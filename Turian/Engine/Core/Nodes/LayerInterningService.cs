@@ -33,12 +33,20 @@ public sealed class LayerInterningService
         }
 
         var errors = master.Validate();
-        if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        if (errors.Count != 0)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        }
+
         PhysicsGroupId = master.PhysicsGroup?.Id ?? Guid.Empty;
         RenderingGroupId = master.RenderingGroup?.Id ?? Guid.Empty;
-        groupIds = [.. master.Groups.Select(group => group.Id)];
+        groupIds = [.. master.Groups.Select(static group => group.Id)];
         layerIds = new Guid[groupIds.Length][];
-        for (var slot = 0; slot < groupIds.Length; slot++) IndexGroup(master.Groups[slot], slot);
+        for (var slot = 0; slot < groupIds.Length; slot++)
+        {
+            IndexGroup(master.Groups[slot], slot);
+        }
+
         tagIds = IndexTags(master.Tags);
         Fingerprint = LayerLayoutFingerprint.Compute(groupIds, layerIds, tagIds, PhysicsGroupId, RenderingGroupId);
         WarnOverflowGroup(master.PhysicsGroup, "Physics");
@@ -58,7 +66,9 @@ public sealed class LayerInterningService
     public void RequireCompatibleLayout(string fingerprint)
     {
         if (!string.Equals(Fingerprint, fingerprint, StringComparison.Ordinal))
+        {
             throw new InvalidDataException("Layer layout fingerprints do not match; runtime indices cannot be shared.");
+        }
     }
 
     /// <summary>The number of groups in this session layout.</summary>
@@ -79,7 +89,11 @@ public sealed class LayerInterningService
     {
         index = 0;
         if (!groupSlots.TryGetValue(groupId, out var slot)
-            || !layers.TryGetValue(valueId, out var value) || value.Slot != slot) return false;
+            || !layers.TryGetValue(valueId, out var value) || value.Slot != slot)
+        {
+            return false;
+        }
+
         index = value.Index;
         return true;
     }
@@ -110,7 +124,11 @@ public sealed class LayerInterningService
 
     internal byte ResolveLayer(LayerReference reference)
     {
-        if (TryGetLayerIndex(reference.GroupId, reference.ValueId, out var index)) return index;
+        if (TryGetLayerIndex(reference.GroupId, reference.ValueId, out var index))
+        {
+            return index;
+        }
+
         WarnMissing(reference);
         return 0;
     }
@@ -118,27 +136,33 @@ public sealed class LayerInterningService
     internal void WarnMissing(LayerReference reference)
     {
         if (warned.TryAdd(reference, 0))
+        {
             Log.Logger.LogWarning("Layer reference {GroupId}/{ValueId} is missing in the session layout",
                 reference.GroupId, reference.ValueId);
+        }
     }
 
     internal void WarnMissingTag(Guid id)
     {
         if (warned.TryAdd(new LayerReference(Guid.Empty, id), 0))
+        {
             Log.Logger.LogWarning("Tag reference {TagId} is missing in the session layout", id);
+        }
     }
 
     void WarnOverflowGroup(LayerGroupAsset? group, string consumer)
     {
         if (group is not null && groupSlots[group.Id] >= NodeLayers.InlineCapacity)
+        {
             Log.Logger.LogWarning("{Consumer} group {GroupId} uses overflow slot {Slot}; place it in the first {Count} "
                 + "groups for per-frame membership reads", consumer, group.Id, groupSlots[group.Id],
                 NodeLayers.InlineCapacity);
+        }
     }
 
     Guid[] IndexTags(List<TagAsset> values)
     {
-        var ordered = values.OrderBy(tag => tag.Id).ToArray();
+        var ordered = values.OrderBy(static tag => tag.Id).ToArray();
         var ids = new Guid[ordered.Length];
         for (var index = 0; index < ordered.Length; index++)
         {
@@ -155,6 +179,9 @@ public sealed class LayerInterningService
         var ids = new List<Guid> { group.DefaultValue!.Id };
         ids.AddRange(group.Values.Where(value => value.Id != group.DefaultValue.Id).Select(value => value.Id));
         layerIds[slot] = [.. ids];
-        for (var index = 0; index < ids.Count; index++) layers.Add(ids[index], (slot, (byte)index));
+        for (var index = 0; index < ids.Count; index++)
+        {
+            layers.Add(ids[index], (slot, (byte)index));
+        }
     }
 }

@@ -23,7 +23,10 @@ public sealed class AssetManifestPrimaryTests : IDisposable
     public void DatabaseRebuildUsesManifestPrimary(string? manifest, string expected)
     {
         var (database, asset, cache) = CreateArtifacts();
-        if (manifest is not null) File.WriteAllText(Path.Combine(cache, "import.json"), manifest);
+        if (manifest is not null)
+        {
+            File.WriteAllText(Path.Combine(cache, "import.json"), manifest);
+        }
 
         database.BuildDatabase(Path.Combine(root, "Assets"));
 

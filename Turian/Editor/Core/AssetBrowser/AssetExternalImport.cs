@@ -7,7 +7,10 @@ public sealed class AssetExternalImport(AssetFileOperations operations)
     public bool Import(AssetEntry destination, IEnumerable<string> paths)
     {
         if (!destination.IsDirectory || destination.IsReadOnly || !Directory.Exists(destination.AbsolutePath))
+        {
             return false;
+        }
+
         var sources = paths.Where(Path.IsPathFullyQualified).Select(Path.GetFullPath).Distinct()
             .Select(Source).OfType<AssetEntry>().Where(entry => !ContainsDestination(entry, destination.AbsolutePath));
         return operations.CopyIntoMany(sources, destination.AbsolutePath);
@@ -15,8 +18,16 @@ public sealed class AssetExternalImport(AssetFileOperations operations)
 
     static AssetEntry? Source(string path)
     {
-        if (path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) return null;
-        if (!File.Exists(path) && !Directory.Exists(path)) return null;
+        if (path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!File.Exists(path) && !Directory.Exists(path))
+        {
+            return null;
+        }
+
         return new AssetEntry(path, Directory.Exists(path), null, Path.GetDirectoryName(path));
     }
 

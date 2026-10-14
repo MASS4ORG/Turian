@@ -35,7 +35,10 @@ public sealed class SceneOrientationWidgetTests
         InspectorFormsRenderingTests.Frame(gui, surface, font, current =>
         {
             widget.Render(current, controller, target);
-            if (current.Pass == Pass.Pass1Build) Assert.Equal(before, camera.Orientation);
+            if (current.Pass == Pass.Pass1Build)
+            {
+                Assert.Equal(before, camera.Orientation);
+            }
         });
         Assert.True(camera.IsOrthographic);
         Assert.True(Vector3.Dot(camera.Front, -axis) > 0.99999f);

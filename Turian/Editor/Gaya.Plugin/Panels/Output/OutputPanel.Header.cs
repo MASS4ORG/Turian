@@ -20,7 +20,10 @@ sealed partial class OutputPanel
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
 
             gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || headerMenuOpen ? theme.Ink : theme.InkDim);
 
@@ -75,14 +78,22 @@ sealed partial class OutputPanel
             {
                 gui.DrawText(localization.T("Entry lines"), size, theme.InkDim);
                 if (StudioControls.SmallTextButton(gui, "−", "gaya.turian.output/tabMenu/minus", theme.Scale(20f)))
+                {
                     changed |= StepEntryLines(settings, settings.EntryLines - 1);
+                }
+
                 gui.DrawText(settings.EntryLines.ToString(CultureInfo.InvariantCulture), size, theme.Ink);
                 if (StudioControls.SmallTextButton(gui, "+", "gaya.turian.output/tabMenu/plus", theme.Scale(20f)))
+                {
                     changed |= StepEntryLines(settings, settings.EntryLines + 1);
+                }
             }
         }
 
-        if (changed) editorSettings.NotifyChanged(OutputPanelSettings.PageId);
+        if (changed)
+        {
+            editorSettings.NotifyChanged(OutputPanelSettings.PageId);
+        }
     }
 
     /// <summary>Draws one checkbox for a settings member and reports whether the click changed it.</summary>
@@ -94,7 +105,10 @@ sealed partial class OutputPanel
         {
             var value = get();
             gui.Checkbox(ref value, label, size: box, fontSize: size, spacing: 6f);
-            if (value == get()) return false;
+            if (value == get())
+            {
+                return false;
+            }
 
             set(value);
         }
@@ -104,7 +118,10 @@ sealed partial class OutputPanel
 
     static bool StepEntryLines(OutputPanelSettings settings, int value)
     {
-        if (value == settings.EntryLines) return false;
+        if (value == settings.EntryLines)
+        {
+            return false;
+        }
 
         settings.EntryLines = value;
         return true;

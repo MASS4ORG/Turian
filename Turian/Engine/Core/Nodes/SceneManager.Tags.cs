@@ -6,7 +6,13 @@ public partial class SceneManager
     public Node? FindWithTag(string? tag)
     {
         foreach (var scene in LoadedScenes)
-            if (scene.RootNode.FindWithTag(tag) is { } found) return found;
+        {
+            if (scene.RootNode.FindWithTag(tag) is { } found)
+            {
+                return found;
+            }
+        }
+
         return PersistentRoot.FindWithTag(tag);
     }
 

@@ -55,11 +55,11 @@ public sealed class GroundGridTests
         Assert.Equal(Vector4.One, drawing.Color);
         Assert.False(drawing.DepthTest);
         Assert.Equal(7f, drawing.Thickness);
-        Assert.Equal(3, drawing.WorldLines.Count(line => line.Color.X != line.Color.Y));
+        Assert.Equal(3, drawing.WorldLines.Count(static line => line.Color.X != line.Color.Y));
         settings.ShowPlaneAxes = settings.ShowNormalAxis = false;
         drawing.Clear();
         GroundGrid.Draw(drawing, Vector3.Zero, settings);
-        Assert.All(drawing.WorldLines, line => Assert.Equal(line.Color.X, line.Color.Y));
+        Assert.All(drawing.WorldLines, static line => Assert.Equal(line.Color.X, line.Color.Y));
         settings.Visible = false;
         drawing.Clear();
         GroundGrid.Draw(drawing, Vector3.Zero, settings);

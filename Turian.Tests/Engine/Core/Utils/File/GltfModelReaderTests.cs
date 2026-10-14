@@ -108,7 +108,10 @@ public class GltfModelReaderTests
             var size = i == 3 ? 8 : i == 4 ? 16 : 12;
             views.Add(new JsonObject { ["buffer"] = 0, ["byteOffset"] = data.Count, ["byteLength"] = size * 3 });
             for (var vertex = 0; vertex < 3; vertex++)
+            {
                 data.AddRange(source.AsSpan(vertex * (int)Vertex.SizeOf() + offset, size).ToArray());
+            }
+
             accessor["bufferView"] = i;
             accessor["byteOffset"] = 0;
         }
@@ -118,9 +121,12 @@ public class GltfModelReaderTests
         json["bufferViews"] = views;
         json["buffers"]![0]!["byteLength"] = data.Count;
         if (omitColor)
+        {
             ((JsonObject)json["meshes"]![0]!["primitives"]![0]!["attributes"]!).Remove("COLOR_0");
+        }
+
         var builder = Read(json, [.. data]);
-        Assert.Equal(omitColor ? Triangle.Select(v => v with { Color = Vector3.One }) : Triangle, builder.Vertices);
+        Assert.Equal(omitColor ? Triangle.Select(static v => v with { Color = Vector3.One }) : Triangle, builder.Vertices);
         Assert.Equal(new Bounds(Vector3.Zero, new Vector3(1, 2, 3)), builder.SubMeshes[0].Bounds);
     }
 
@@ -140,7 +146,10 @@ public class GltfModelReaderTests
         var (json, bytes) = Packed();
         using var storage = new MemoryStream();
         using (var compressor = new GZipStream(storage, CompressionMode.Compress, leaveOpen: true))
+        {
             compressor.Write(Glb(json, bytes));
+        }
+
         storage.Position = 0;
         using var decompressor = new GZipStream(storage, CompressionMode.Decompress);
         Assert.Equal(Triangle, GltfModelReader.Read(decompressor).Vertices);
@@ -160,8 +169,8 @@ public class GltfModelReaderTests
 
         Assert.Equal(6, builder.Vertices.Length);
         Assert.Equal(new uint[] { 0, 1, 2, 3, 4, 5 }, builder.Indices);
-        Assert.Equal(new int?[] { 7, 2 }, builder.SubMeshes.Select(s => s.MaterialIndex));
-        Assert.Equal(new uint[] { 0, 3 }, builder.SubMeshes.Select(s => s.IndexStart));
+        Assert.Equal(new int?[] { 7, 2 }, builder.SubMeshes.Select(static s => s.MaterialIndex));
+        Assert.Equal(new uint[] { 0, 3 }, builder.SubMeshes.Select(static s => s.IndexStart));
     }
 
     /// <summary>Verifies that scene traversal duplicates instances and excludes unused meshes.</summary>
@@ -177,7 +186,7 @@ public class GltfModelReaderTests
             new JsonObject { ["mesh"] = 0 }, new JsonObject { ["mesh"] = 1 });
         var builder = Read(json, bytes);
         Assert.Equal(9, builder.Vertices.Length);
-        Assert.Equal(new int?[] { 5, null, 5 }, builder.SubMeshes.Select(s => s.MaterialIndex));
+        Assert.Equal(new int?[] { 5, null, 5 }, builder.SubMeshes.Select(static s => s.MaterialIndex));
     }
 
     /// <summary>Verifies external URI resolution and base64 buffers without an import rewrite.</summary>
@@ -276,13 +285,17 @@ public class GltfModelReaderTests
             var color = bytes.AsSpan(offset + i * (int)Vertex.SizeOf(), 3 * size);
             color.Clear();
             if (size == 1)
+            {
                 color[0] = (byte)max;
+            }
             else
+            {
                 BinaryPrimitives.WriteUInt16LittleEndian(color, (ushort)max);
+            }
         }
         var builder = Read(json, bytes);
-        Assert.All(builder.Vertices, v => Assert.Equal(Vector3.UnitX, v.Color));
-        Assert.Equal(Triangle.Select(v => v.Position), builder.Vertices.Select(v => v.Position));
+        Assert.All(builder.Vertices, static v => Assert.Equal(Vector3.UnitX, v.Color));
+        Assert.Equal(Triangle.Select(static v => v.Position), builder.Vertices.Select(static v => v.Position));
     }
 
     /// <summary>Verifies normalized signed minimum components clamp to negative one.</summary>
@@ -301,11 +314,15 @@ public class GltfModelReaderTests
             var normal = bytes.AsSpan(offset + i * (int)Vertex.SizeOf(), 3 * size);
             normal.Clear();
             if (size == 1)
+            {
                 normal[0] = 128;
+            }
             else
+            {
                 BinaryPrimitives.WriteInt16LittleEndian(normal, short.MinValue);
+            }
         }
-        Assert.All(Read(json, bytes).Vertices, v => Assert.Equal(-Vector3.UnitX, v.Normal));
+        Assert.All(Read(json, bytes).Vertices, static v => Assert.Equal(-Vector3.UnitX, v.Normal));
     }
 
     /// <summary>Verifies float RGBA colors retain RGB in the engine's vertex layout.</summary>
@@ -327,7 +344,7 @@ public class GltfModelReaderTests
             ["attributes"] = new JsonObject { ["POSITION"] = 0 },
         };
         var builder = Read(json, bytes);
-        Assert.All(builder.Vertices, v =>
+        Assert.All(builder.Vertices, static v =>
         {
             Assert.Equal(Vector3.One, v.Color);
             Assert.Equal(Vector3.UnitY, v.Normal);
@@ -403,11 +420,17 @@ public class GltfModelReaderTests
         var (json, bytes) = Packed();
         var values = new byte[36];
         for (var i = 0; i < 3; i++)
+        {
             MemoryMarshal.Write(values.AsSpan(i * 12), in Triangle[i].Position);
+        }
+
         var sparseIndexOffset = bytes.Length;
         var indexBytes = new byte[(3 * size + 3) & ~3];
         for (var i = 0; i < 3; i++)
+        {
             indexBytes[i * size] = (byte)i;
+        }
+
         bytes = [.. bytes, .. indexBytes, .. values];
         json["buffers"]![0]!["byteLength"] = bytes.Length;
         var views = (JsonArray)json["bufferViews"]!;

@@ -53,7 +53,10 @@ public sealed class GizmoRenderSystem : IRenderSystem
         var overlayVertexCount = gizmos.OverlayLines.Count * verticesPerLine
             + gizmos.OverlayTriangles.Count * verticesPerTriangle;
         var totalVertexCount = worldVertexCount + overlayVertexCount;
-        if (totalVertexCount == 0) return;
+        if (totalVertexCount == 0)
+        {
+            return;
+        }
 
         EnsureCapacity(totalVertexCount);
         UploadVertices(frameInfo.Camera);
@@ -143,7 +146,11 @@ public sealed class GizmoRenderSystem : IRenderSystem
 
     void AppendTriangles(IReadOnlyList<GizmoTriangle> triangles, ICamera camera, ref int cursor)
     {
-        if (triangles.Count == 0) return;
+        if (triangles.Count == 0)
+        {
+            return;
+        }
+
         var sorted = triangles.ToArray();
         Array.Sort(sorted, (a, b) => Depth(b).CompareTo(Depth(a)));
         foreach (var triangle in sorted)
@@ -162,7 +169,10 @@ public sealed class GizmoRenderSystem : IRenderSystem
 
     void EnsureCapacity(int requiredVertexCount)
     {
-        if (requiredVertexCount <= capacity) return;
+        if (requiredVertexCount <= capacity)
+        {
+            return;
+        }
 
         var newCapacity = Math.Max(initialCapacity, Math.Max(capacity * 2, requiredVertexCount));
         if (newCapacity > maxVertices)

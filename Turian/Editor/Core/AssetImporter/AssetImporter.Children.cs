@@ -13,7 +13,9 @@ public sealed partial class AssetImporter
         foreach (var record in snapshot)
         {
             if (!IsPrefabTypeName(record.AssetTypeName))
+            {
                 continue;
+            }
 
             var prefabAsset = new Prefab { Id = record.AssetId };
             RefreshPrefabComponentIndex(prefabAsset, ResolveImportedPrimaryPath(record.AssetId));

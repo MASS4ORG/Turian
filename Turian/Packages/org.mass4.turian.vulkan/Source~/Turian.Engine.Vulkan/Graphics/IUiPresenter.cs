@@ -80,7 +80,10 @@ public static class UiPresenters
         var assemblies = AppDomain.CurrentDomain.GetAssemblies();
         lock (CacheLock)
         {
-            if (assemblies.Length == _scannedAssemblies) return _found;
+            if (assemblies.Length == _scannedAssemblies)
+            {
+                return _found;
+            }
 
             _scannedAssemblies = assemblies.Length;
             _found = Find(assemblies);
@@ -101,7 +104,10 @@ public static class UiPresenters
         foreach (var assembly in assemblies)
         {
             if (assembly.IsDynamic || assembly.GetCustomAttribute<UiPresenterFactoryAttribute>() is not { } attribute)
+            {
                 continue;
+            }
+
             return (IUiPresenterFactory)Activator.CreateInstance(attribute.FactoryType)!;
         }
 

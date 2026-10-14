@@ -21,7 +21,10 @@ public sealed class ProjectSessionHotReloadTests
             var completed = new TaskCompletionSource<BuildTaskStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             build.TaskRunner.TaskCompleted += status =>
             {
-                if (status.TaskName == "Compile & Load") completed.TrySetResult(status);
+                if (status.TaskName == "Compile & Load")
+                {
+                    completed.TrySetResult(status);
+                }
             };
 
             var source = Path.Combine(project, "Assets", "Game.cs");
@@ -34,7 +37,10 @@ public sealed class ProjectSessionHotReloadTests
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
         }
     }
 }

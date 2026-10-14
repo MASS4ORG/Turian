@@ -45,7 +45,7 @@ public sealed class AssemblyGraphTests : IDisposable
         Assert.Equal("Acme.Inventory.Editor", graph.AssemblyFor(Script("Inventory", "Editor", "Menu.cs")).Name);
         Assert.Equal(defaultName, graph.AssemblyFor(Script("Player.cs")).Name);
 
-        var inventory = graph.Definitions.Single(a => a.Name == "Acme.Inventory");
+        var inventory = graph.Definitions.Single(static a => a.Name == "Acme.Inventory");
         Assert.Equal([Path.Combine(assetsDirectory, "Inventory", "Editor")], graph.ExcludedDirectories(inventory));
         Assert.Equal(2, graph.ExcludedDirectories(graph.Default).Count());
     }
@@ -71,7 +71,7 @@ public sealed class AssemblyGraphTests : IDisposable
         var items = Define("Items", "A.Items", references: [core]);
         Define("Shop", "M.Shop", references: [items, core]);
 
-        var names = AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions.Select(a => a.Name).ToList();
+        var names = AssemblyGraph.Discover(assetsDirectory, defaultName).Definitions.Select(static a => a.Name).ToList();
 
         Assert.True(names.IndexOf("Z.Core") < names.IndexOf("A.Items"));
         Assert.True(names.IndexOf("A.Items") < names.IndexOf("M.Shop"));
@@ -190,13 +190,13 @@ public sealed class AssemblyGraphTests : IDisposable
         var inventory = projects[0];
         Assert.Equal(Path.Combine(projectDirectory, ".Cache", "Assemblies", "Acme.Inventory", "Acme.Inventory.csproj"),
             inventory.FullPath);
-        Assert.Contains(inventory.Properties, p => p is { Name: "AssemblyName", Value: "Acme.Inventory" });
-        Assert.Contains(inventory.Items, i => i.ItemType == "Compile" && i.Include == "../../../Assets/Inventory/**/*.cs");
+        Assert.Contains(inventory.Properties, static p => p is { Name: "AssemblyName", Value: "Acme.Inventory" });
+        Assert.Contains(inventory.Items, static i => i.ItemType == "Compile" && i.Include == "../../../Assets/Inventory/**/*.cs");
 
         var game = projects[1];
-        Assert.Contains(game.Items, i => i.ItemType == "ProjectReference"
+        Assert.Contains(game.Items, static i => i.ItemType == "ProjectReference"
                                         && i.Include == "../Assemblies/Acme.Inventory/Acme.Inventory.csproj");
-        Assert.Contains(game.Items, i => i.ItemType == "Compile" && i.Exclude.Contains("../../Assets/Inventory/**"));
+        Assert.Contains(game.Items, static i => i.ItemType == "Compile" && i.Exclude.Contains("../../Assets/Inventory/**"));
     }
 
     /// <summary>A definition reference adds its folder to the definition's assembly, and out of the default.</summary>
@@ -252,8 +252,8 @@ public sealed class AssemblyGraphTests : IDisposable
         var math = CsProjectGenerator.GenerateUserCodeProjects(settings, NullLogger.Instance,
             CsProjectGenerator.DiscoverAssemblies(settings))[0];
 
-        Assert.DoesNotContain(math.Items, i => i.ItemType is "Reference" or "Analyzer");
-        Assert.DoesNotContain(math.Items, i => i.ItemType == "Using" && i.Include == "MASS4.Attributes");
+        Assert.DoesNotContain(math.Items, static i => i.ItemType is "Reference" or "Analyzer");
+        Assert.DoesNotContain(math.Items, static i => i.ItemType == "Using" && i.Include == "MASS4.Attributes");
     }
 
     /// <summary>Definitions stored with legacy type identifiers still partition the source graph.</summary>
@@ -333,7 +333,7 @@ public sealed class AssemblyGraphTests : IDisposable
             ["EditorOnly"] = editorOnly,
             ["AutoReferenced"] = autoReferenced,
             ["NoEngineReferences"] = noEngineReferences,
-            ["References"] = new JsonArray([.. (references ?? []).Select(r => (JsonNode)new JsonObject { ["AssetId"] = r })]),
+            ["References"] = new JsonArray([.. (references ?? []).Select(static r => (JsonNode)new JsonObject { ["AssetId"] = r })]),
             ["Id"] = assetId,
         };
         File.WriteAllText(path, json.ToJsonString());

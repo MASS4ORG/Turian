@@ -343,7 +343,9 @@ public sealed class UserCodeCompileCache(ILogger logger)
 
         // Switching or editing the active build profile changes what the scripts compile with.
         foreach (var symbol in BuildProfiles.ActiveSymbols(settings))
+        {
             builder.Append("define|").AppendLine(symbol);
+        }
 
         return ComputeStringHash(builder.ToString());
     }

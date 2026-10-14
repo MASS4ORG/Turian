@@ -121,9 +121,13 @@ public unsafe class DescriptorSetWriter(Vk vk, Device device, DescriptorSetLayou
                 writesPtr[i].DstSet = set;
                 var slot = infoSlots[i];
                 if (slot.IsImage)
+                {
                     writesPtr[i].PImageInfo = &imagePtr[slot.Index];
+                }
                 else
+                {
                     writesPtr[i].PBufferInfo = &bufferPtr[slot.Index];
+                }
             }
 
             vk.UpdateDescriptorSets(device.VkDevice, (uint)writesArray.Length, writesPtr, 0, null);

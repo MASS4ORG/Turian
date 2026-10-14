@@ -15,8 +15,11 @@ public sealed class SimulationSessionTests
         var world = new SimulationTestWorld();
         var session = Create(world);
         using (var document = JsonDocument.Parse("{\"amount\":12}"))
+        {
             Assert.Equal(SimulationCommandStatus.Accepted,
                 session.Schedule(Producer, 1, "add", document.RootElement, targetTick: 2).Status);
+        }
+
         var earlier = session.Schedule(Producer, 2, "add", Payload(), targetTick: 1);
         var rejected = session.Schedule(Producer, 3, "unknown", Payload(), targetTick: 1);
         Assert.Equal(2, earlier.Command!.AuthoritySequence);
@@ -75,7 +78,11 @@ public sealed class SimulationSessionTests
             Assert.Throws<InvalidOperationException>(() => session.Step());
             Assert.Throws<InvalidOperationException>(() => session.Advance(0));
             Assert.Throws<InvalidOperationException>(() => session.CaptureState());
-            if (tick != 1) return;
+            if (tick != 1)
+            {
+                return;
+            }
+
             Assert.Equal(SimulationCommandStatus.Invalid,
                 session.Schedule(Producer, 2, "add", Payload(), targetTick: tick).Status);
             Assert.Equal(2, session.Schedule(Producer, 2, "add", Payload()).Command!.TargetTick);
@@ -98,9 +105,14 @@ public sealed class SimulationSessionTests
         var world = new SimulationTestWorld();
         var session = Create(world);
         if (commandFailure)
+        {
             session.Schedule(Producer, 1, "add", JsonSerializer.SerializeToElement(new { wrong = 1 }));
+        }
         else
+        {
             world.OnTick = _ => throw new InvalidOperationException("system failure");
+        }
+
         Assert.ThrowsAny<Exception>(() => session.Step());
         Assert.True(session.Clock.IsFaulted);
         Assert.Equal(0, session.Clock.TickIndex);
@@ -166,9 +178,13 @@ public sealed class SimulationSessionTests
             Assert.Throws<InvalidOperationException>(() => current.Step());
             Assert.Throws<InvalidOperationException>(() => current.Advance(0));
             if (tick == 1)
+            {
                 Assert.Equal(2, current.Schedule(Producer, 2, "add", Payload()).Command!.TargetTick);
+            }
             else
+            {
                 current.Clock.IsPaused = true;
+            }
         };
         Assert.Equal(2, session.Advance(0.03));
         Assert.Equal(new long[] { 1, 2 }, observed);

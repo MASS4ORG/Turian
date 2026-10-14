@@ -19,7 +19,10 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
         node.AddComponent(new ModelComponent { ModelOverride = quad });
         node.Parent = root;
         root.Children.Add(node);
-        if (!withLight) return root;
+        if (!withLight)
+        {
+            return root;
+        }
 
         var light = new Node { Position = new Vector3(0, 0, 2) };
         light.AddComponent(LightComponent.CreatePointLight(20f, Vector4.One));

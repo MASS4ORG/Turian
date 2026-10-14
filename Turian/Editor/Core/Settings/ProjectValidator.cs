@@ -29,10 +29,14 @@ public static class ProjectValidator
     public static IReadOnlyList<ProjectIssue> Validate(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !(Directory.Exists(path) || File.Exists(path)))
+        {
             return [new(ProjectIssueSeverity.Error, $"{path} does not exist.")];
+        }
 
         if (SettingsService.ResolveProjectDirectory(path) is not { } directory)
+        {
             return [new(ProjectIssueSeverity.Error, $"{path} is not a project: it has no Assets folder.")];
+        }
 
         var assets = Path.Combine(directory, SettingsService.AssetsFolderName);
         var issues = ProjectAssetIssues(directory, assets);
@@ -51,8 +55,10 @@ public static class ProjectValidator
             try
             {
                 if (DataAsset.LoadContent(source.SourcePath, database: null) is not ProjectSettingsAsset)
+                {
                     issues.Add(new(ProjectIssueSeverity.Warning,
                         $"{Relative(directory, source.SourcePath)} could not be read as {source.Kind.Name}."));
+                }
             }
             catch (Exception ex) when (ex is IOException or JsonException)
             {
@@ -67,13 +73,20 @@ public static class ProjectValidator
     // The project asset's own issues: the engine version that saved it, and registered settings without a file.
     static List<ProjectIssue> ProjectAssetIssues(string directory, string assets)
     {
-        if (ProjectAsset.Load(assets) is not { } project) return [];
+        if (ProjectAsset.Load(assets) is not { } project)
+        {
+            return [];
+        }
 
         var index = new AssetSourceIndex(directory);
         List<ProjectIssue> issues = [.. project.Settings.Where(r => !r.IsEmpty && index.PathOf(r.AssetId) is null)
             .Select(r => new ProjectIssue(ProjectIssueSeverity.Warning,
                 $"{ProjectAsset.FileName} registers settings {r.AssetId}, which has no file."))];
-        if (EngineVersionIssue(project) is { } versionIssue) issues.Insert(0, versionIssue);
+        if (EngineVersionIssue(project) is { } versionIssue)
+        {
+            issues.Insert(0, versionIssue);
+        }
+
         return issues;
     }
 
@@ -83,17 +96,26 @@ public static class ProjectValidator
     /// </summary>
     static ProjectIssue? EngineVersionIssue(ProjectAsset project)
     {
-        if (!Gaya.Packages.SemanticVersion.TryParse(project.EngineVersion, out var saved)) return null;
+        if (!Gaya.Packages.SemanticVersion.TryParse(project.EngineVersion, out var saved))
+        {
+            return null;
+        }
 
         var current = ProjectPackages.EngineVersion;
         if (saved.Major > current.Major)
+        {
             return new(ProjectIssueSeverity.Error,
                 $"The project was saved by Turian {saved}; this is Turian {current}. "
                 + $"Open it with Turian {saved.Major} or newer.");
+        }
+
         if (saved > current)
+        {
             return new(ProjectIssueSeverity.Warning,
                 $"The project was saved by the newer Turian {saved}; "
                 + $"what this Turian {current} does not know is lost when saving.");
+        }
+
         return saved < current
             ? new(ProjectIssueSeverity.Warning,
                 $"The project was saved by Turian {saved}; opening it upgrades it to Turian {current}.")
@@ -110,8 +132,16 @@ public static class ProjectValidator
         ArgumentNullException.ThrowIfNull(log);
 
         foreach (var issue in issues)
-            if (issue.Severity == ProjectIssueSeverity.Error) log.LogError("Project: {Message}", issue.Message);
-            else log.LogWarning("Project: {Message}", issue.Message);
+        {
+            if (issue.Severity == ProjectIssueSeverity.Error)
+            {
+                log.LogError("Project: {Message}", issue.Message);
+            }
+            else
+            {
+                log.LogWarning("Project: {Message}", issue.Message);
+            }
+        }
 
         return issues.All(static issue => issue.Severity != ProjectIssueSeverity.Error);
     }

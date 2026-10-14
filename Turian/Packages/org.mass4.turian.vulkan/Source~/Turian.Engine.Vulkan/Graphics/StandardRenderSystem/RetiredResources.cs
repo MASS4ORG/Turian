@@ -12,7 +12,10 @@ sealed class RetiredResources : IDisposable
     /// <param name="resource">The resource, or null for nothing.</param>
     public void Retire(IDisposable? resource)
     {
-        if (resource is not null) pending.Add((resource, Frame));
+        if (resource is not null)
+        {
+            pending.Add((resource, Frame));
+        }
     }
 
     /// <summary>Advances one frame and disposes the resources no frame in flight can still use.</summary>
@@ -21,7 +24,11 @@ sealed class RetiredResources : IDisposable
         Frame++;
         for (var i = pending.Count - 1; i >= 0; i--)
         {
-            if (Frame - pending[i].Frame <= SwapChain.MaxFramesInFlight) continue;
+            if (Frame - pending[i].Frame <= SwapChain.MaxFramesInFlight)
+            {
+                continue;
+            }
+
             pending[i].Resource.Dispose();
             pending.RemoveAt(i);
         }
@@ -30,7 +37,11 @@ sealed class RetiredResources : IDisposable
     /// <summary>Disposes everything still queued; the caller has waited for the device to go idle.</summary>
     public void Dispose()
     {
-        foreach (var (resource, _) in pending) resource.Dispose();
+        foreach (var (resource, _) in pending)
+        {
+            resource.Dispose();
+        }
+
         pending.Clear();
     }
 }

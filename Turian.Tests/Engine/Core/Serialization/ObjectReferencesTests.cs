@@ -39,7 +39,10 @@ public sealed class ObjectReferencesTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
+        if (Directory.Exists(projectRoot))
+        {
+            Directory.Delete(projectRoot, recursive: true);
+        }
     }
 
     /// <summary>Verifies that scene references are written as ids and resolve to the loaded objects.</summary>

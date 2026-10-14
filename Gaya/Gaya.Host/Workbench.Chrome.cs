@@ -13,9 +13,16 @@ public sealed partial class Workbench
 
         foreach (var item in items.Where(item => SegmentsFrom(item, depth).Length == 0))
         {
-            if (!app.Commands.TryGet(item.CommandId, out var command)) continue;
+            if (!app.Commands.TryGet(item.CommandId, out var command))
+            {
+                continue;
+            }
 
-            if (previousGroup is not null && item.Group != previousGroup) builder.Separator();
+            if (previousGroup is not null && item.Group != previousGroup)
+            {
+                builder.Separator();
+            }
+
             previousGroup = item.Group;
 
             var commandId = item.CommandId;
@@ -37,7 +44,10 @@ public sealed partial class Workbench
     /// <summary>The part of an item's submenu path still to be walked at this depth.</summary>
     static string[] SegmentsFrom(MenuItemDescriptor item, int depth)
     {
-        if (item.Path.Length == 0) return [];
+        if (item.Path.Length == 0)
+        {
+            return [];
+        }
 
         var segments = item.Path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         return depth >= segments.Length ? [] : segments[depth..];
@@ -60,7 +70,10 @@ public sealed partial class Workbench
         builder.Submenu(T("Themes"), BuildThemeMenu);
         builder.Submenu(T("Icons"), BuildIconMenu);
 
-        if (!app.Menus.ItemsFor(MenuIds.View).Any()) return;
+        if (!app.Menus.ItemsFor(MenuIds.View).Any())
+        {
+            return;
+        }
 
         builder.Separator();
         BuildItems(builder, [.. app.Menus.ItemsFor(MenuIds.View)], depth: 0);
@@ -94,7 +107,10 @@ public sealed partial class Workbench
                 {
                     var suggested = app.Themes.DefaultColorThemeFor(id);
                     app.Themes.ApplyLook(id);
-                    if (suggested is not null) app.Themes.ApplyColorTheme(suggested);
+                    if (suggested is not null)
+                    {
+                        app.Themes.ApplyColorTheme(suggested);
+                    }
                 },
                 onHover: () => app.Themes.PreviewLook(id));
         }
@@ -120,9 +136,16 @@ public sealed partial class Workbench
     /// <param name="panelId">The panel to show.</param>
     public void ShowPanel(string panelId)
     {
-        if (!descriptors.TryGetValue(panelId, out var descriptor)) return;
+        if (!descriptors.TryGetValue(panelId, out var descriptor))
+        {
+            return;
+        }
 
-        if (!Layout.Contains(panelId)) Place(Layout, descriptor);
+        if (!Layout.Contains(panelId))
+        {
+            Place(Layout, descriptor);
+        }
+
         Layout.Activate(panelId);
     }
 
@@ -133,10 +156,19 @@ public sealed partial class Workbench
     /// <param name="panelId">The panel to toggle.</param>
     public void TogglePanel(string panelId)
     {
-        if (!descriptors.TryGetValue(panelId, out var descriptor)) return;
+        if (!descriptors.TryGetValue(panelId, out var descriptor))
+        {
+            return;
+        }
 
-        if (Layout.Contains(panelId)) Layout.Remove(panelId);
-        else Place(Layout, descriptor);
+        if (Layout.Contains(panelId))
+        {
+            Layout.Remove(panelId);
+        }
+        else
+        {
+            Place(Layout, descriptor);
+        }
     }
 
     void CommandPalette(Gui gui)
@@ -160,7 +192,11 @@ public sealed partial class Workbench
                         using (gui.Node(-1, t.Scale(22f)).ExpandWidth().Enter())
                         {
                             var hot = gui.GetInteractable().OnHover();
-                            if (hot) gui.DrawBackgroundRect(t.Hover, 3f);
+                            if (hot)
+                            {
+                                gui.DrawBackgroundRect(t.Hover, 3f);
+                            }
+
                             if (hot && gui.GetInteractable().OnClick())
                             {
                                 paletteOpen = false;
@@ -188,13 +224,19 @@ public sealed partial class Workbench
             gui.DrawBackgroundRect(t.Chrome);
 
             foreach (var item in items)
+            {
                 using (gui.Node(-1, height, $"chrome/StatusBar/{item.Id}").Expand().Enter())
+                {
                     ResolveChrome(item).Render(gui);
+                }
+            }
 
             using (gui.Node(t.Scale(statusSummaryWidth), height).ContentAlignY(0.5f).Enter())
+            {
                 gui.DrawText(
                     $"{gui.Time.SmoothFps:0} fps   ·   Gaya",
                     t.Text(12), t.InkDim);
+            }
         }
     }
 
@@ -203,7 +245,10 @@ public sealed partial class Workbench
 
     IPanel Resolve(PanelDescriptor descriptor)
     {
-        if (panelInstances.TryGetValue(descriptor.Id, out var panel)) return panel;
+        if (panelInstances.TryGetValue(descriptor.Id, out var panel))
+        {
+            return panel;
+        }
 
         try
         {

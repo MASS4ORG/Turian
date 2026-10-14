@@ -12,14 +12,19 @@ sealed class SimulationCommandQueue
         this.limits = limits ?? new SimulationCommandLimits();
         if (this.limits.MaximumPending <= 0 || this.limits.MaximumProducers <= 0 ||
             this.limits.MaximumPayloadBytes <= 0 || this.limits.MaximumFutureTicks <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(limits), "Command limits must be positive.");
+        }
     }
 
     internal SimulationCommandAdmission Schedule(Guid producer, long sequence, string kind, int version,
         JsonElement payload, long targetTick, long boundary)
     {
         if (lastSequence == long.MaxValue)
+        {
             return new(SimulationCommandStatus.LimitExceeded, null);
+        }
+
         var command = new SimulationCommand
         {
             Producer = producer,
@@ -36,13 +41,26 @@ sealed class SimulationCommandQueue
     internal SimulationCommandAdmission Accept(SimulationCommand command, long boundary)
     {
         var status = Check(command, boundary);
-        if (status != SimulationCommandStatus.Accepted) return new(status, null);
+        if (status != SimulationCommandStatus.Accepted)
+        {
+            return new(status, null);
+        }
+
         if (producers.TryGetValue(command.Producer, out var cursor) && command.ProducerSequence <= cursor)
+        {
             return new(SimulationCommandStatus.DuplicateOrStale, null);
+        }
+
         if (IsAtCapacity(command.Producer))
+        {
             return new(SimulationCommandStatus.LimitExceeded, null);
+        }
+
         if (lastSequence == long.MaxValue || command.AuthoritySequence != lastSequence + 1)
+        {
             return new(SimulationCommandStatus.Invalid, null);
+        }
+
         var owned = command with { Payload = command.Payload.Clone() };
         pending.Add(owned);
         producers[owned.Producer] = owned.ProducerSequence;
@@ -61,8 +79,8 @@ sealed class SimulationCommandQueue
     internal SimulationCommandsState CaptureState() => new()
     {
         LastAuthoritySequence = lastSequence,
-        Pending = [.. pending.OrderBy(command => command.TargetTick).ThenBy(command => command.AuthoritySequence)],
-        Producers = [.. producers.OrderBy(entry => entry.Key).Select(entry => new SimulationProducerState
+        Pending = [.. pending.OrderBy(static command => command.TargetTick).ThenBy(static command => command.AuthoritySequence)],
+        Producers = [.. producers.OrderBy(static entry => entry.Key).Select(static entry => new SimulationProducerState
         {
             Producer = entry.Key,
             Sequence = entry.Value
@@ -74,7 +92,11 @@ sealed class SimulationCommandQueue
         ValidateMetadata(state);
         var cursors = ReadCursors(state.Producers);
         var commands = ReadPending(state, cursors, boundary);
-        foreach (var entry in cursors) producers.Add(entry.Key, entry.Value);
+        foreach (var entry in cursors)
+        {
+            producers.Add(entry.Key, entry.Value);
+        }
+
         pending.AddRange(commands);
         lastSequence = state.LastAuthoritySequence;
     }
@@ -82,11 +104,17 @@ sealed class SimulationCommandQueue
     void ValidateMetadata(SimulationCommandsState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        if (lastSequence != 0) throw new InvalidOperationException("Restore requires a fresh command queue.");
+        if (lastSequence != 0)
+        {
+            throw new InvalidOperationException("Restore requires a fresh command queue.");
+        }
+
         if (state.LastAuthoritySequence < 0 || state.Pending is null || state.Producers is null ||
             state.Pending.Length > limits.MaximumPending || state.Producers.Length > limits.MaximumProducers ||
             state.Producers.LongLength > state.LastAuthoritySequence)
+        {
             throw new InvalidDataException("Command checkpoint metadata or limits are invalid.");
+        }
     }
 
     static Dictionary<Guid, long> ReadCursors(SimulationProducerState[] entries)
@@ -96,7 +124,9 @@ sealed class SimulationCommandQueue
         {
             if (entry is null || entry.Producer == Guid.Empty || entry.Sequence <= 0 ||
                 !cursors.TryAdd(entry.Producer, entry.Sequence))
+            {
                 throw new InvalidDataException("Command producer cursors are invalid.");
+            }
         }
         return cursors;
     }
@@ -111,7 +141,10 @@ sealed class SimulationCommandQueue
             ValidatePending(command, state.LastAuthoritySequence, cursors, boundary);
             if (!authoritySequences.Add(command.AuthoritySequence) ||
                 !requestIds.Add((command.Producer, command.ProducerSequence)))
+            {
                 throw new InvalidDataException("Command checkpoint contains duplicate identities.");
+            }
+
             commands.Add(command with { Payload = command.Payload.Clone() });
         }
         return [.. commands];
@@ -122,15 +155,23 @@ sealed class SimulationCommandQueue
         if (command is null || Check(command, boundary) != SimulationCommandStatus.Accepted ||
             command.AuthoritySequence > last || !cursors.TryGetValue(command.Producer, out var cursor) ||
             command.ProducerSequence > cursor)
+        {
             throw new InvalidDataException("A pending command is incompatible with its checkpoint.");
+        }
     }
 
     SimulationCommandStatus Check(SimulationCommand command, long boundary)
     {
         if (!HasValidIdentity(command) || !HasValidPayload(command))
+        {
             return SimulationCommandStatus.Invalid;
+        }
+
         if (command.TargetTick <= boundary || command.TargetTick - boundary > limits.MaximumFutureTicks)
+        {
             return SimulationCommandStatus.Invalid;
+        }
+
         return Encoding.UTF8.GetByteCount(command.Payload.GetRawText()) > limits.MaximumPayloadBytes
             ? SimulationCommandStatus.LimitExceeded : SimulationCommandStatus.Accepted;
     }

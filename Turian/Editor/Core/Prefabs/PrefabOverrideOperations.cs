@@ -37,10 +37,15 @@ public sealed class PrefabOverrideOperations(
         ArgumentNullException.ThrowIfNull(target);
 
         if (Expectation(target) is not { } expected || Find(expected.Content, target.Id) is not { } prefabObject)
+        {
             return false;
+        }
 
         undo.RecordObject(target, revertLabel);
-        if (!SetMember(target, member, prefabObject[member])) return false;
+        if (!SetMember(target, member, prefabObject[member]))
+        {
+            return false;
+        }
 
         SceneChanged();
         return true;
@@ -52,7 +57,11 @@ public sealed class PrefabOverrideOperations(
     {
         ArgumentNullException.ThrowIfNull(component);
 
-        if (DiffFor(component) is not { } diff) return;
+        if (DiffFor(component) is not { } diff)
+        {
+            return;
+        }
+
         if (diff.Added.Contains(component.Id) && component.Node is { } owner)
         {
             undo.RecordObject(owner, revertLabel);
@@ -62,7 +71,9 @@ public sealed class PrefabOverrideOperations(
         }
 
         foreach (var (_, member) in diff.Overrides.Where(entry => entry.Object == component.Id).ToList())
+        {
             RevertMember(component, member);
+        }
     }
 
     /// <summary>
@@ -73,7 +84,10 @@ public sealed class PrefabOverrideOperations(
     {
         ArgumentNullException.ThrowIfNull(instanceRoot);
 
-        if (Expectation(instanceRoot) is not { } expected) return;
+        if (Expectation(instanceRoot) is not { } expected)
+        {
+            return;
+        }
 
         var diff = PrefabInstances.Diff(Serializer.Serialize(instanceRoot), LoadPrefab);
 
@@ -81,7 +95,9 @@ public sealed class PrefabOverrideOperations(
         foreach (var (id, member) in diff.Overrides)
         {
             if (!objects.TryGetValue(id, out var target) || Find(expected.Content, id) is not { } prefabObject)
+            {
                 continue;
+            }
 
             undo.RecordObject(target, revertLabel);
             SetMember(target, member, prefabObject[member]);
@@ -104,7 +120,9 @@ public sealed class PrefabOverrideOperations(
             || Expectation(target) is not { } expected
             || !expected.SourceIds.TryGetValue(target.Id, out var sourceId)
             || !TryMemberValue(target, member, expected.SourceIds, out var value))
+        {
             return false;
+        }
 
         Write(PrefabInstances.ApplyMember(link.Source.AssetId, sourceId, member, value, LoadPrefab), [target]);
         return true;
@@ -116,9 +134,15 @@ public sealed class PrefabOverrideOperations(
     {
         ArgumentNullException.ThrowIfNull(component);
 
-        if (DiffFor(component) is not { } diff) return;
+        if (DiffFor(component) is not { } diff)
+        {
+            return;
+        }
+
         foreach (var (_, member) in diff.Overrides.Where(entry => entry.Object == component.Id).ToList())
+        {
             ApplyMember(component, member);
+        }
     }
 
     /// <summary>Rewrites the instance's prefab to match the instance, additions and removals included.</summary>
@@ -131,7 +155,9 @@ public sealed class PrefabOverrideOperations(
         if (instanceRoot.PrefabInstance is not { } link
             || PrefabInstances.ApplyAll(Serializer.Serialize(instanceRoot), link.Source.AssetId, LoadPrefab)
                 is not { } content)
+        {
             return false;
+        }
 
         Write(new Dictionary<Guid, string> { [link.Source.AssetId] = content }, ObjectsById(instanceRoot).Values);
         return true;
@@ -146,7 +172,11 @@ public sealed class PrefabOverrideOperations(
 
         foreach (var node in completely ? Descendants(instanceRoot) : [instanceRoot])
         {
-            if (node.PrefabInstance is null) continue;
+            if (node.PrefabInstance is null)
+            {
+                continue;
+            }
+
             undo.RecordObject(node, completely ? "Unpack Prefab Completely" : "Unpack Prefab");
             node.PrefabInstance = null;
         }
@@ -195,7 +225,9 @@ public sealed class PrefabOverrideOperations(
         {
             if (ReadId(prefabNode) is not { } nodeId || !present.TryGetValue(nodeId, out var owner)
                 || owner is not Node node)
+            {
                 return;
+            }
 
             var children = Items(prefabNode, nameof(Node.Children)).ToList();
             for (var i = 0; i < children.Count; i++)
@@ -218,7 +250,9 @@ public sealed class PrefabOverrideOperations(
             {
                 if (ReadId(components[i]) is not { } componentId || present.ContainsKey(componentId)
                     || RestoreComponent(components[i]) is not { } component)
+                {
                     continue;
+                }
 
                 undo.RecordObject(node, revertLabel);
                 node.Components.Insert(Math.Min(i, node.Components.Count), component);
@@ -237,7 +271,9 @@ public sealed class PrefabOverrideOperations(
         };
 
         if (Serializer.LoadData<Node>(holder.ToJsonString(), loader) is not { } node || node.Components.Count == 0)
+        {
             return null;
+        }
 
         var component = node.Components[0];
         node.Components.Clear();
@@ -266,7 +302,10 @@ public sealed class PrefabOverrideOperations(
         {
             foreach (var (prefabId, content) in contents)
             {
-                if (PathOf(prefabId) is not { } path) continue;
+                if (PathOf(prefabId) is not { } path)
+                {
+                    continue;
+                }
 
                 var previous = File.Exists(path) ? File.ReadAllText(path) : null;
                 written.Add((prefabId, path, previous));
@@ -277,8 +316,14 @@ public sealed class PrefabOverrideOperations(
         {
             foreach (var (prefabId, path, previous) in Enumerable.Reverse(written))
             {
-                if (previous is null) File.Delete(path);
-                else WriteFile(prefabId, path, previous, File.Exists(path) ? File.ReadAllText(path) : null);
+                if (previous is null)
+                {
+                    File.Delete(path);
+                }
+                else
+                {
+                    WriteFile(prefabId, path, previous, File.Exists(path) ? File.ReadAllText(path) : null);
+                }
             }
 
             throw;
@@ -299,15 +344,25 @@ public sealed class PrefabOverrideOperations(
 
     bool SetMember(IdObject target, string member, JsonNode? json)
     {
-        if (MemberNamed(target.GetType(), member) is not { } info) return false;
+        if (MemberNamed(target.GetType(), member) is not { } info)
+        {
+            return false;
+        }
 
         var type = info is PropertyInfo property ? property.PropertyType : ((FieldInfo)info).FieldType;
         var value = ObjectReferences.IsReferenceMember(type, allowSceneObjects: true)
             ? ResolveReferences(json, type)
             : json?.Deserialize(type, Serializer.JsonOptions);
 
-        if (info is PropertyInfo writable) writable.SetValue(target, value);
-        else ((FieldInfo)info).SetValue(target, value);
+        if (info is PropertyInfo writable)
+        {
+            writable.SetValue(target, value);
+        }
+        else
+        {
+            ((FieldInfo)info).SetValue(target, value);
+        }
+
         return true;
     }
 
@@ -316,7 +371,10 @@ public sealed class PrefabOverrideOperations(
         out JsonNode? json)
     {
         json = null;
-        if (MemberNamed(target.GetType(), member) is not { } info) return false;
+        if (MemberNamed(target.GetType(), member) is not { } info)
+        {
+            return false;
+        }
 
         var type = info is PropertyInfo property ? property.PropertyType : ((FieldInfo)info).FieldType;
         var value = info is PropertyInfo readable ? readable.GetValue(target) : ((FieldInfo)info).GetValue(target);
@@ -343,12 +401,20 @@ public sealed class PrefabOverrideOperations(
             if (type.IsArray)
             {
                 var result = Array.CreateInstance(elementType, resolved.Count);
-                for (var i = 0; i < resolved.Count; i++) result.SetValue(resolved[i], i);
+                for (var i = 0; i < resolved.Count; i++)
+                {
+                    result.SetValue(resolved[i], i);
+                }
+
                 return result;
             }
 
             var list = (IList)Activator.CreateInstance(type)!;
-            foreach (var item in resolved) list.Add(item);
+            foreach (var item in resolved)
+            {
+                list.Add(item);
+            }
+
             return list;
         }
 
@@ -359,10 +425,15 @@ public sealed class PrefabOverrideOperations(
     {
         if (json?[ObjectReferences.RefProperty] is not JsonValue value || !value.TryGetValue<string>(out var text)
             || !Guid.TryParse(text, out var id))
+        {
             return null;
+        }
 
         if (sceneTree.EditorSceneRoot is { } root && ObjectsById(root).TryGetValue(id, out var sceneObject))
+        {
             return sceneObject;
+        }
+
         return loader.LoadContentAsync<DataAsset>(id).GetAwaiter().GetResult();
     }
 
@@ -383,7 +454,10 @@ public sealed class PrefabOverrideOperations(
         foreach (var node in Descendants(root))
         {
             objects.TryAdd(node.Id, node);
-            foreach (var component in node.Components) objects.TryAdd(component.Id, component);
+            foreach (var component in node.Components)
+            {
+                objects.TryAdd(component.Id, component);
+            }
         }
 
         return objects;
@@ -393,9 +467,19 @@ public sealed class PrefabOverrideOperations(
 
     static JsonObject? Find(JsonObject root, Guid id)
     {
-        if (ReadId(root) == id) return root;
+        if (ReadId(root) == id)
+        {
+            return root;
+        }
+
         foreach (var component in Items(root, nameof(Node.Components)))
-            if (ReadId(component) == id) return component;
+        {
+            if (ReadId(component) == id)
+            {
+                return component;
+            }
+        }
+
         return Items(root, nameof(Node.Children)).Select(child => Find(child, id)).FirstOrDefault(found => found is not null);
     }
 

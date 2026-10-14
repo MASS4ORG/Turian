@@ -92,7 +92,11 @@ void ApproveExit()
 
 window.CloseRequested = () =>
 {
-    if (exitApproved || !dispatcher.CanExecute(exitCommand)) return true;
+    if (exitApproved || !dispatcher.CanExecute(exitCommand))
+    {
+        return true;
+    }
+
     dispatcher.Execute(exitCommand);
     return exitApproved;
 };
@@ -103,7 +107,11 @@ try
     window.RunGui(() =>
     {
         window.Pacing.OnDemand = activeWorkbench.FrameRate.RenderOnDemand;
-        if (gui.Pass == Pass.Pass1Build) activeWorkbench.FrameRate.Wait();
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            activeWorkbench.FrameRate.Wait();
+        }
+
         activeWorkbench.Render(gui);
     });
 }
@@ -139,7 +147,9 @@ static void DumpFrame(Workbench workbench, string path, int width, int height)
     canvas.Flush();
 
     if (Environment.GetEnvironmentVariable("GV_TREE") is not null)
+    {
         DumpTree(gui.RootNode!, 0);
+    }
 
     using var image = surface.Snapshot();
     using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -159,5 +169,7 @@ static void DumpTree(LayoutNode n, int depth)
     var id = n.Id.Length > 60 ? "…" + n.Id[^58..] : n.Id;
     Console.Error.WriteLine($"{new string(' ', depth * 2)}[{r.X:0},{r.Y:0} {r.W:0}x{r.H:0}] kids={n.Children.Count} {id}");
     foreach (var c in n.Children)
+    {
         DumpTree(c, depth + 1);
+    }
 }

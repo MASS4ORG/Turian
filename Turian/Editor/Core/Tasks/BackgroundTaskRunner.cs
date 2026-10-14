@@ -28,7 +28,11 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
         ArgumentNullException.ThrowIfNull(work);
 
         var id = tasks.Submit(spec, out var created);
-        if (created) _ = Task.Run(() => ExecuteAsync(id, spec, work));
+        if (created)
+        {
+            _ = Task.Run(() => ExecuteAsync(id, spec, work));
+        }
+
         return id;
     }
 
@@ -60,7 +64,10 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
         ArgumentNullException.ThrowIfNull(work);
 
         var id = tasks.Submit(spec, out var created);
-        if (!created) return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
+        if (!created)
+        {
+            return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
+        }
 
         await ExecuteAsync(id, spec, work).ConfigureAwait(false);
         return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
@@ -70,7 +77,10 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
     {
         do
         {
-            if (!await WaitForDependenciesAsync(id).ConfigureAwait(false)) return;
+            if (!await WaitForDependenciesAsync(id).ConfigureAwait(false))
+            {
+                return;
+            }
 
             tasks.Start(id);
             using var cts = new CancellationTokenSource();
@@ -80,8 +90,14 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
             {
                 using var progress = tasks.ProgressFor(id);
                 await work(progress, cts.Token).ConfigureAwait(false);
-                if (tasks.IsCancelRequested(id)) tasks.Cancel(id);
-                else tasks.Complete(id);
+                if (tasks.IsCancelRequested(id))
+                {
+                    tasks.Cancel(id);
+                }
+                else
+                {
+                    tasks.Complete(id);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -110,7 +126,10 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
         while (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked })
         {
             tasks.ResolveDependencies();
-            if (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked }) await Task.Delay(PollInterval).ConfigureAwait(false);
+            if (tasks.Get(id) is { Status: BackgroundTaskStatus.Blocked })
+            {
+                await Task.Delay(PollInterval).ConfigureAwait(false);
+            }
         }
 
         return tasks.Get(id) is { IsActive: true };
@@ -119,7 +138,10 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
     IDisposable PollForCancellation(long id, CancellationTokenSource cts) => new Timer(
         _ =>
         {
-            if (tasks.IsCancelRequested(id)) CancelQuietly(cts);
+            if (tasks.IsCancelRequested(id))
+            {
+                CancelQuietly(cts);
+            }
         },
         null, CancelPollInterval, CancelPollInterval);
 

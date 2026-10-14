@@ -56,7 +56,10 @@ public static class ProjectPackages
 
         lock (CacheLock)
         {
-            if (Cache.TryGetValue(projectRoot, out var cached) && cached.Stamp == stamp) return cached.Resolution;
+            if (Cache.TryGetValue(projectRoot, out var cached) && cached.Stamp == stamp)
+            {
+                return cached.Resolution;
+            }
         }
 
         return ResolveUncached(projectRoot, locked, new HashSet<string>());
@@ -83,10 +86,14 @@ public static class ProjectPackages
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
 
         if (resolution.UsesUserOverride)
+        {
             Log.Logger.LogInformation("Packages resolved with {File}; the lock file is left unchanged",
                 ProjectManifest.UserFileName);
+        }
         else if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
+        {
             resolution.Lock.Save(projectRoot);
+        }
 
         lock (CacheLock)
         {
@@ -122,7 +129,10 @@ public static class ProjectPackages
     /// <returns>The resolved packages.</returns>
     public static IReadOnlyList<ResolvedPackage> ResolveOrEmpty(string? projectRoot)
     {
-        if (string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, "Assets"))) return [];
+        if (string.IsNullOrWhiteSpace(projectRoot) || !Directory.Exists(Path.Combine(projectRoot, "Assets")))
+        {
+            return [];
+        }
 
         ProjectManifest.MigrateLegacyLayout(projectRoot);
         return Resolve(projectRoot).Packages;
@@ -135,7 +145,10 @@ public static class ProjectPackages
     /// <param name="id">The brick id.</param>
     internal static void OptOutOfDefault(string projectRoot, string id)
     {
-        if (!DefaultDependencies.ContainsKey(id)) return;
+        if (!DefaultDependencies.ContainsKey(id))
+        {
+            return;
+        }
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         manifest.Dependencies[id] = null;
@@ -175,7 +188,10 @@ public static class ProjectPackages
     {
         // Beside the assembly, not AppContext.BaseDirectory: the turian-cli/turian-studio launchers load the engine from lib/.
         var published = Path.Combine(Path.GetDirectoryName(typeof(ProjectPackages).Assembly.Location) ?? AppContext.BaseDirectory, "packages");
-        if (Directory.Exists(published)) return published;
+        if (Directory.Exists(published))
+        {
+            return published;
+        }
 
         return typeof(ProjectPackages).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
             .FirstOrDefault(static a => a.Key == "TurianBuiltinPackages")?.Value ?? published;
@@ -197,7 +213,10 @@ public static class ProjectPackages
     static SemanticVersion ReadVersion(Assembly assembly)
     {
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (SemanticVersion.TryParse(informational, out var version)) return version;
+        if (SemanticVersion.TryParse(informational, out var version))
+        {
+            return version;
+        }
 
         var fallback = assembly.GetName().Version ?? new Version(0, 0, 0);
         return new SemanticVersion(fallback.Major, fallback.Minor, Math.Max(fallback.Build, 0));

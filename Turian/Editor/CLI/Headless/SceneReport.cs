@@ -52,19 +52,35 @@ sealed class SceneReport
         void Walk(Node node)
         {
             nodes++;
-            if (node.IsActive) activeNodes++;
+            if (node.IsActive)
+            {
+                activeNodes++;
+            }
 
             foreach (var component in node.Components)
             {
                 var name = component.GetType().Name;
                 components[name] = components.GetValueOrDefault(name) + 1;
 
-                if (component is LightComponent) lights++;
-                if (component is not ModelComponent model) continue;
+                if (component is LightComponent)
+                {
+                    lights++;
+                }
+
+                if (component is not ModelComponent model)
+                {
+                    continue;
+                }
 
                 var local = ModelBoundsUtility.ComputeLocalBounds(model, loadModels, out var isResolved);
-                if (isResolved) resolved++;
-                else unresolved++;
+                if (isResolved)
+                {
+                    resolved++;
+                }
+                else
+                {
+                    unresolved++;
+                }
 
                 if (!local.IsEmpty)
                 {

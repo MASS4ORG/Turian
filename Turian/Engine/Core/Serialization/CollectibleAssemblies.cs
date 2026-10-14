@@ -19,7 +19,9 @@ public static class CollectibleAssemblies
     {
         ArgumentNullException.ThrowIfNull(assemblies);
         foreach (var assembly in assemblies)
+        {
             Released.AddOrUpdate(assembly, Marker);
+        }
 
         TypeRegistry.ReleaseCollectible();
         GeneratedSerializers.ReleaseCollectible();
@@ -51,7 +53,11 @@ public static class CollectibleAssemblies
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentNullException.ThrowIfNull(typeOf);
         foreach (var key in cache.Keys)
+        {
             if (typeOf(key) is { } type && IsReleased(type))
+            {
                 cache.TryRemove(key, out _);
+            }
+        }
     }
 }

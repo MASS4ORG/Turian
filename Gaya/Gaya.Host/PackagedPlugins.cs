@@ -89,7 +89,10 @@ public static class PackagedPlugins
     static IEnumerable<Assembly> LoadAssemblies(ResolvedPackage package, ILogger logger)
     {
         var library = Path.Combine(package.RootPath, LibraryDirectoryName);
-        if (!Directory.Exists(library)) yield break;
+        if (!Directory.Exists(library))
+        {
+            yield break;
+        }
 
         foreach (var path in Directory.EnumerateFiles(library, "*.dll").Order(StringComparer.Ordinal))
         {
@@ -103,7 +106,10 @@ public static class PackagedPlugins
                 logger.LogError(ex, "Studio package {Package}: {Assembly} could not be loaded", package.Id, path);
             }
 
-            if (assembly is not null) yield return assembly;
+            if (assembly is not null)
+            {
+                yield return assembly;
+            }
         }
     }
 
@@ -111,7 +117,11 @@ public static class PackagedPlugins
     {
         var assembly = typeof(PackageResolver).Assembly;
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (SemanticVersion.TryParse(informational, out var version)) return version;
+        if (SemanticVersion.TryParse(informational, out var version))
+        {
+            return version;
+        }
+
         var fallback = assembly.GetName().Version ?? new Version(0, 0, 0);
         return new SemanticVersion(fallback.Major, fallback.Minor, Math.Max(fallback.Build, 0));
     }

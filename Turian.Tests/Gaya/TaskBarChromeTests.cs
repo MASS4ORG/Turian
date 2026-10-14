@@ -21,10 +21,19 @@ public sealed class TaskBarChromeTests
         {
             var id = tasks.Begin(BackgroundTaskKind.Import, "Importing assets");
             tasks.SetProgress(id, 0.5f);
-            if (completed) tasks.Complete(id);
+            if (completed)
+            {
+                tasks.Complete(id);
+            }
         }
         frame.Draw();
-        if (hasTask && !completed) Assert.InRange(frame.Gui.FrameWaitSeconds, 0, 0.1);
-        else Assert.Equal(double.PositiveInfinity, frame.Gui.FrameWaitSeconds);
+        if (hasTask && !completed)
+        {
+            Assert.InRange(frame.Gui.FrameWaitSeconds, 0, 0.1);
+        }
+        else
+        {
+            Assert.Equal(double.PositiveInfinity, frame.Gui.FrameWaitSeconds);
+        }
     }
 }

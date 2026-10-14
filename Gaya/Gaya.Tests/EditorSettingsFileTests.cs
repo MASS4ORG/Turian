@@ -5,7 +5,7 @@ public class EditorSettingsFileTests : IDisposable
 {
     readonly string path = Path.Combine(Path.GetTempPath(), $"gaya-settings-file-{Guid.NewGuid():N}.json");
 
-    [Gaya.EditorSetting("Language", Id = "test.language")]
+    [EditorSetting("Language", Id = "test.language")]
     sealed class LanguagePage
     {
         public int Language { get; [UsedImplicitly] set; }
@@ -14,14 +14,22 @@ public class EditorSettingsFileTests : IDisposable
     /// <summary>Deletes the file.</summary>
     public void Dispose()
     {
-        if (File.Exists(path)) File.Delete(path);
-        if (File.Exists(path + ".bak")) File.Delete(path + ".bak");
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
+        if (File.Exists(path + ".bak"))
+        {
+            File.Delete(path + ".bak");
+        }
+
         GC.SuppressFinalize(this);
     }
 
     /// <summary>A stored value is read back, rewritten in one step, and no temporary file is left behind.</summary>
     [Fact]
-    public void Save_KeepsStoredValuesAndLeavesNoTemporaryFile()
+    public void SaveKeepsStoredValuesAndLeavesNoTemporaryFile()
     {
         File.WriteAllText(path, """{ "test.language": { "Language": 1 } }""");
         var page = new LanguagePage();

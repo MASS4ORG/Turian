@@ -15,7 +15,10 @@ public sealed class SceneDocumentBinder(
     /// <summary>Subscribes to the asset manager. Calling it twice does nothing.</summary>
     public void Attach()
     {
-        if (attached) return;
+        if (attached)
+        {
+            return;
+        }
 
         assets.AssetOpened += sceneTree.OpenAsset;
         assets.AssetSaved += sceneTree.SaveAsset;
@@ -26,7 +29,10 @@ public sealed class SceneDocumentBinder(
     /// <inheritdoc />
     public void Dispose()
     {
-        if (!attached) return;
+        if (!attached)
+        {
+            return;
+        }
 
         assets.AssetOpened -= sceneTree.OpenAsset;
         assets.AssetSaved -= sceneTree.SaveAsset;
@@ -39,6 +45,9 @@ public sealed class SceneDocumentBinder(
         sceneTree.CloseAsset(asset.Id);
 
         // The inspector was showing a node from a hierarchy that no longer exists.
-        if (sceneTree.CurrentSceneRoot is null) inspector.ClearSelection();
+        if (sceneTree.CurrentSceneRoot is null)
+        {
+            inspector.ClearSelection();
+        }
     }
 }

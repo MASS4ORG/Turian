@@ -19,9 +19,16 @@ public abstract class Component : IdObject
             {
                 var created = new CancellationTokenSource();
                 source = Interlocked.CompareExchange(ref destruction, created, null) ?? created;
-                if (!ReferenceEquals(source, created)) created.Dispose();
+                if (!ReferenceEquals(source, created))
+                {
+                    created.Dispose();
+                }
             }
-            if (destructionStarted && !source.IsCancellationRequested) source.Cancel();
+            if (destructionStarted && !source.IsCancellationRequested)
+            {
+                source.Cancel();
+            }
+
             return source.Token;
         }
     }
@@ -39,12 +46,22 @@ public abstract class Component : IdObject
         get;
         set
         {
-            if (field == value) return;
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
             if (IsAttached)
             {
-                if (value) OnEnable();
-                else OnDisable();
+                if (value)
+                {
+                    OnEnable();
+                }
+                else
+                {
+                    OnDisable();
+                }
             }
         }
     } = true;
@@ -84,7 +101,9 @@ public abstract class Component : IdObject
         ArgumentNullException.ThrowIfNull(node);
 
         if (Node is not null && !ReferenceEquals(Node, node))
+        {
             OnDetached();
+        }
 
         Node = node; // backing field via property
         SceneServiceInjector.Inject(this, node.Services, node.AllowMissingServices);
@@ -97,7 +116,9 @@ public abstract class Component : IdObject
         }
 
         if (IsActive)
+        {
             OnEnable();
+        }
     }
 
     /// <summary>
@@ -105,7 +126,10 @@ public abstract class Component : IdObject
     /// </summary>
     public void Detach()
     {
-        if (Node is null) return;
+        if (Node is null)
+        {
+            return;
+        }
 
         destructionStarted = true;
         try { destruction?.Cancel(); }
@@ -124,7 +148,11 @@ public abstract class Component : IdObject
     /// </summary>
     public void EnsureStarted()
     {
-        if (IsStarted) return;
+        if (IsStarted)
+        {
+            return;
+        }
+
         IsStarted = true;
         OnStart();
     }
@@ -198,6 +226,6 @@ public abstract class Component : IdObject
         return componentType
             .GetCustomAttributes(typeof(RequireComponentAttribute))
             .OfType<RequireComponentAttribute>()
-            .Select(a => a.ComponentType);
+            .Select(static a => a.ComponentType);
     }
 }

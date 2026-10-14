@@ -1,7 +1,7 @@
 namespace Turian.Engine.UI;
 
 /// <summary>
-/// Converts between the engine's linear-light <see cref="Turian.Engine.Core.Color"/> and <see cref="GuiColor"/>
+/// Converts between the engine's linear-light <see cref="Core.Color"/> and <see cref="GuiColor"/>
 /// (Guinevere's packed sRGB color), and lets the editor pass engine colors straight to the
 /// Guinevere draw calls it actually uses. Neither assembly can reference the other's color type
 /// directly — the engine can't depend on Guinevere, and Guinevere can't depend on the engine —
@@ -22,7 +22,7 @@ public static class GuiColorBridge
     public static Core.Color ToEngine(this GuiColor color) =>
         Core.Color.FromSrgb(new Color32(color.R, color.G, color.B, color.A));
 
-    /// <inheritdoc cref="Gui.DrawText(string, float, Guinevere.Color?, Font?, float, bool, bool, TextEffects?, TextLayoutOptions?)"/>
+    /// <inheritdoc cref="Gui.DrawText(string, float, GuiColor?, Font?, float, bool, bool, TextEffects?, TextLayoutOptions?)"/>
     public static LayoutNode DrawText(
         this Gui gui,
         string text,

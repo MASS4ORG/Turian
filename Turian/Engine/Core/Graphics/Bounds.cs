@@ -45,7 +45,10 @@ public readonly record struct Bounds(Vector3 Min, Vector3 Max)
     public bool TryIntersect(Ray ray, out float distance)
     {
         distance = 0f;
-        if (IsEmpty) return false;
+        if (IsEmpty)
+        {
+            return false;
+        }
 
         var tMin = 0f;
         var tMax = float.PositiveInfinity;
@@ -60,18 +63,28 @@ public readonly record struct Bounds(Vector3 Min, Vector3 Max)
             if (MathF.Abs(direction) < 1e-9f)
             {
                 // Parallel to this axis's slab: a miss unless the origin already lies within it.
-                if (origin < min || origin > max) return false;
+                if (origin < min || origin > max)
+                {
+                    return false;
+                }
+
                 continue;
             }
 
             var inv = 1f / direction;
             var t1 = (min - origin) * inv;
             var t2 = (max - origin) * inv;
-            if (t1 > t2) (t1, t2) = (t2, t1);
+            if (t1 > t2)
+            {
+                (t1, t2) = (t2, t1);
+            }
 
             tMin = MathF.Max(tMin, t1);
             tMax = MathF.Min(tMax, t2);
-            if (tMin > tMax) return false;
+            if (tMin > tMax)
+            {
+                return false;
+            }
         }
 
         distance = tMin;

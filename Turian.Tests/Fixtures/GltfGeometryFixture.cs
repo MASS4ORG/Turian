@@ -10,7 +10,11 @@ static class GltfGeometryFixture
         var vertexBytes = MemoryMarshal.AsBytes(vertices.AsSpan()).ToArray();
         var indexBytes = MemoryMarshal.AsBytes(indices.AsSpan()).ToArray();
         var bounds = Bounds.Empty;
-        foreach (var vertex in vertices) bounds = bounds.Encapsulate(vertex.Position);
+        foreach (var vertex in vertices)
+        {
+            bounds = bounds.Encapsulate(vertex.Position);
+        }
+
         var json = new
         {
             asset = new { version = "2.0" },
@@ -46,7 +50,11 @@ static class GltfGeometryFixture
         writer.Write((uint)padded);
         writer.Write(0x4e4f534au);
         writer.Write(text);
-        for (var i = text.Length; i < padded; i++) writer.Write((byte)' ');
+        for (var i = text.Length; i < padded; i++)
+        {
+            writer.Write((byte)' ');
+        }
+
         writer.Write((uint)(vertexBytes.Length + indexBytes.Length));
         writer.Write(0x004e4942u);
         writer.Write(vertexBytes);

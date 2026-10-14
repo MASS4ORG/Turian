@@ -22,7 +22,7 @@ public sealed class HeadlessStatisticsTests(VulkanFixture fixture) : IClassFixtu
             Assert.True(database.RegisterAsset(scene));
             database.SaveCatalog(directory.FullName);
             var argument = new System.CommandLine.Argument<FileSystemInfo>("ProjectPath");
-            var factory = typeof(global::Turian.Editor.CLI.Program)
+            var factory = typeof(Program)
                 .GetMethod("PlayModeCommand", BindingFlags.Static | BindingFlags.NonPublic)!;
             var command = (System.CommandLine.Command)factory.Invoke(null, [argument])!;
             var root = new System.CommandLine.RootCommand { command };
@@ -91,8 +91,16 @@ public sealed class HeadlessStatisticsTests(VulkanFixture fixture) : IClassFixtu
                 Assert.Equal(0, first.GetProperty("rendering").GetProperty("drawCalls").GetInt32());
                 Assert.True(first.GetProperty("rendering").GetProperty("submitMilliseconds").GetDouble() > 0);
             }
-            else Assert.Equal(JsonValueKind.Null, first.GetProperty("rendering").ValueKind);
-            if (png) Assert.True(File.Exists(imagePath));
+            else
+            {
+                Assert.Equal(JsonValueKind.Null, first.GetProperty("rendering").ValueKind);
+            }
+
+            if (png)
+            {
+                Assert.True(File.Exists(imagePath));
+            }
+
             Assert.True(HeadlessPlay.Run(project, root, 1, null, options, default, null, NullLogger.Instance));
         }
         finally

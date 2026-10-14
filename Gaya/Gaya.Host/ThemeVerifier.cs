@@ -69,8 +69,12 @@ public static class ThemeVerifier
         var known = catalog.Load(ThemeCatalog.BaseId).Variables.Keys.ToHashSet(StringComparer.Ordinal);
 
         var findings = new List<ThemeFinding>();
-        foreach (var file in files) findings.AddRange(VerifyFile(catalog, file, known));
-        return [.. findings.OrderBy(finding => finding.Severity)];
+        foreach (var file in files)
+        {
+            findings.AddRange(VerifyFile(catalog, file, known));
+        }
+
+        return [.. findings.OrderBy(static finding => finding.Severity)];
     }
 
     static IEnumerable<ThemeFinding> VerifyFile(ThemeCatalog catalog, string file, IReadOnlySet<string> known)
@@ -87,7 +91,10 @@ public static class ThemeVerifier
                     .Select(error => new ThemeFinding(ThemeFindingSeverity.Error, error, file)));
                 return findings;
             }
-            if (info is not { Category: ThemeCategories.ColorTheme }) return findings;
+            if (info is not { Category: ThemeCategories.ColorTheme })
+            {
+                return findings;
+            }
 
             var problems = new List<string>();
             var tokens = ThemeCompiler.Compile([sheet], info, problems);
@@ -112,7 +119,7 @@ public static class ThemeVerifier
         StyleSheet.Parse(text, new StyleSheetOptions
         {
             SourceName = file,
-            ImportResolver = _ => new StyleSheetText(""),
+            ImportResolver = static _ => new StyleSheetText(""),
         }).Variables.Keys;
 
     static IEnumerable<ThemeFinding> Contrast(ThemeTokens tokens, string file)
@@ -120,11 +127,16 @@ public static class ThemeVerifier
         foreach (var (ink, surface, minimum) in ContrastPairs)
         {
             if (!tokens.Colors.TryGetValue(ink, out var front) || !tokens.Colors.TryGetValue(surface, out var back))
+            {
                 continue;
+            }
+
             var ratio = ContrastRatio(front, back);
             if (ratio < minimum)
+            {
                 yield return new ThemeFinding(ThemeFindingSeverity.Warning,
                     $"${ink} on ${surface} has contrast {ratio:0.00}:1, below {minimum:0.0}:1", file);
+            }
         }
     }
 
@@ -135,7 +147,11 @@ public static class ThemeVerifier
     public static double ContrastRatio(Color a, Color b)
     {
         var (light, dark) = (Luminance(a), Luminance(b));
-        if (light < dark) (light, dark) = (dark, light);
+        if (light < dark)
+        {
+            (light, dark) = (dark, light);
+        }
+
         return (light + 0.05) / (dark + 0.05);
     }
 

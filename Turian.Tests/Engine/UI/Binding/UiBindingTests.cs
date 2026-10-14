@@ -117,7 +117,7 @@ public sealed class UiBindingTests
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(x, y));
         input.PrevMousePosition.Returns(new Vector2(x, y));
-        input.IsMouseButtonPressed(Arg.Any<MouseButton>()).Returns(pressed);
+        input.IsMouseButtonPressed(Arg.Any<GMouseButton>()).Returns(pressed);
         return input;
     }
 

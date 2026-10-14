@@ -1,7 +1,7 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Custom logger for MSBuild that forwards logs to <see cref="Microsoft.Extensions.Logging.ILogger"/>.
+/// Custom logger for MSBuild that forwards logs to <see cref="ILogger"/>.
 /// </summary>
 /// <remarks>
 /// Initializes a new instance of the <see cref="MsBuildForwardingLogger"/> class.

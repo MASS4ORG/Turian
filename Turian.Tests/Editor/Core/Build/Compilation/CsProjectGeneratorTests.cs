@@ -49,8 +49,8 @@ public class CsProjectGeneratorTests
         settings.TargetFramework.Returns("net10.0");
         settings.TargetSdk.Returns("Microsoft.NET.Sdk");
         var project = CsProjectGenerator.GenerateExecutable(settings, logger, mode);
-        Assert.Contains(project.Items, item => item.ItemType == "Using" && item.Include == "MASS4.Attributes");
-        Assert.Equal(selfContained, project.Properties.Single(p => p.Name == "SelfContained").Value);
+        Assert.Contains(project.Items, static item => item.ItemType == "Using" && item.Include == "MASS4.Attributes");
+        Assert.Equal(selfContained, project.Properties.Single(static p => p.Name == "SelfContained").Value);
     }
 
     /// <summary>
@@ -68,7 +68,7 @@ public class CsProjectGeneratorTests
         // Assert
         Assert.Equal(expectedFilePath, project.FullPath);
         var alias = Assert.Single(project.Items,
-            item => item.ItemType == "Using" && item.Include == "Gaya.EditorSettingAttribute");
+            static item => item.ItemType == "Using" && item.Include == "Gaya.EditorSettingAttribute");
         Assert.Equal("EditorSettingAttribute", Assert.Single(alias.Metadata).Value);
     }
 
@@ -195,7 +195,7 @@ public class CsProjectGeneratorTests
     {
         var project = CsProjectGenerator.GenerateUserCode(settings, logger);
 
-        var analyzer = project.Items.Single(i => i.ItemType == "Analyzer").Include;
+        var analyzer = project.Items.Single(static i => i.ItemType == "Analyzer").Include;
         Assert.Contains(Path.Combine("bin", Configuration, "netstandard2.0"), analyzer, StringComparison.Ordinal);
     }
 }

@@ -44,7 +44,10 @@ public sealed class InputActionService(IInputSource source) : IInputActions
     /// <param name="asset">The maps to use, or null to unbind everything.</param>
     public void Load(InputActionsAsset? asset)
     {
-        foreach (var action in Asset?.Actions ?? []) action.Reset();
+        foreach (var action in Asset?.Actions ?? [])
+        {
+            action.Reset();
+        }
 
         Asset = asset;
         BindingsChanged?.Invoke();
@@ -76,11 +79,19 @@ public sealed class InputActionService(IInputSource source) : IInputActions
     public void SetMapEnabled(string name, bool enabled)
     {
         if (Asset?.Maps.Find(actionMap => string.Equals(actionMap.Name, name, StringComparison.OrdinalIgnoreCase))
-            is not { } map) return;
+            is not { } map)
+        {
+            return;
+        }
 
         map.Enabled = enabled;
         if (!enabled)
-            foreach (var action in map.Actions) action.Reset();
+        {
+            foreach (var action in map.Actions)
+            {
+                action.Reset();
+            }
+        }
     }
 
     /// <summary>
@@ -89,14 +100,27 @@ public sealed class InputActionService(IInputSource source) : IInputActions
     /// </summary>
     public void Update()
     {
-        if (Asset is null) return;
-        if (Rebind is { IsComplete: false }) Rebind.Update(source);
+        if (Asset is null)
+        {
+            return;
+        }
+
+        if (Rebind is { IsComplete: false })
+        {
+            Rebind.Update(source);
+        }
 
         foreach (var map in Asset.Maps)
         {
-            if (!map.Enabled) continue;
+            if (!map.Enabled)
+            {
+                continue;
+            }
 
-            foreach (var action in map.Actions) action.Update(source);
+            foreach (var action in map.Actions)
+            {
+                action.Update(source);
+            }
         }
     }
 
@@ -130,12 +154,21 @@ public sealed class InputActionService(IInputSource source) : IInputActions
     public Dictionary<string, string> CaptureOverrides()
     {
         var overrides = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (Asset is null) return overrides;
+        if (Asset is null)
+        {
+            return overrides;
+        }
 
         foreach (var map in Asset.Maps)
+        {
             foreach (var action in map.Actions)
+            {
                 for (var i = 0; i < action.Bindings.Count; i++)
+                {
                     overrides[$"{map.Name}/{action.Name}/{i}"] = action.Bindings[i].Path;
+                }
+            }
+        }
 
         return overrides;
     }
@@ -144,14 +177,32 @@ public sealed class InputActionService(IInputSource source) : IInputActions
     /// <param name="overrides">Paths keyed by <c>Map/Action/index</c>.</param>
     public void ApplyOverrides(IReadOnlyDictionary<string, string>? overrides)
     {
-        if (Asset is null || overrides is null) return;
+        if (Asset is null || overrides is null)
+        {
+            return;
+        }
 
         foreach (var (key, path) in overrides)
         {
-            if (key.Split('/') is not [var mapName, var name, var index]) continue;
-            if (!int.TryParse(index, out var slot)) continue;
-            if (Asset.Find($"{mapName}/{name}") is not { } action) continue;
-            if (slot < 0 || slot >= action.Bindings.Count) continue;
+            if (key.Split('/') is not [var mapName, var name, var index])
+            {
+                continue;
+            }
+
+            if (!int.TryParse(index, out var slot))
+            {
+                continue;
+            }
+
+            if (Asset.Find($"{mapName}/{name}") is not { } action)
+            {
+                continue;
+            }
+
+            if (slot < 0 || slot >= action.Bindings.Count)
+            {
+                continue;
+            }
 
             action.Bindings[slot].Path = path;
         }
@@ -194,7 +245,10 @@ public sealed class InputRebind
     public bool Update(IInputSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        if (IsComplete) return true;
+        if (IsComplete)
+        {
+            return true;
+        }
 
         if (source.WasKeyPressed(Key.Escape))
         {
@@ -205,14 +259,23 @@ public sealed class InputRebind
 
         foreach (var control in InputControl.All())
         {
-            if (control.Kind == InputControlKind.Key && IsModifier((Key)control.Code)) continue;
-            if (!source.WentDown(control)) continue;
+            if (control.Kind == InputControlKind.Key && IsModifier((Key)control.Code))
+            {
+                continue;
+            }
+
+            if (!source.WentDown(control))
+            {
+                continue;
+            }
 
             Captured = control;
             IsComplete = true;
 
             if (bindingIndex >= 0 && bindingIndex < action.Bindings.Count)
+            {
                 action.Bindings[bindingIndex].Path = control.ToString();
+            }
 
             changed();
             return true;

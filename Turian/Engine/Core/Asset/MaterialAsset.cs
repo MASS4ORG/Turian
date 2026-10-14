@@ -56,7 +56,9 @@ public class MaterialAsset : Asset
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var loaded = Serializer.LoadData<MaterialAsset>(reader.ReadToEnd());
             if (loaded is not null)
+            {
                 loaded.Id = assetId;
+            }
 
             return loaded;
         }

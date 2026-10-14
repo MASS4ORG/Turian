@@ -257,7 +257,7 @@ public sealed class AssetBrowserInteractionTests
         browser.Preferences.ViewMode = AssetBrowserViewMode.Split;
         browser.Invoke("OnEditorSettingsChanged");
         browser.Frame();
-        Assert.DoesNotContain(browser.Nodes(), node => node.Id == "assets/view");
+        Assert.DoesNotContain(browser.Nodes(), static node => node.Id == "assets/view");
         Assert.Equal(AssetBrowserViewMode.Split, browser.Preferences.ViewMode);
         var settingsPath = Path.Combine(browser.Project, "preferences.json");
         var store = new EditorSettings(NullLogger.Instance, settingsPath);

@@ -14,7 +14,10 @@ public sealed class ProjectSettingsSet
     public T Get<T>()
         where T : ProjectSettingsAsset, new()
     {
-        if (byType.TryGetValue(typeof(T), out var found)) return (T)found;
+        if (byType.TryGetValue(typeof(T), out var found))
+        {
+            return (T)found;
+        }
 
         var defaults = new T();
         byType[typeof(T)] = defaults;
@@ -34,7 +37,10 @@ public sealed class ProjectSettingsSet
     public void UseAll(ProjectSettingsSet other)
     {
         ArgumentNullException.ThrowIfNull(other);
-        foreach (var settings in other.byType.Values) Use(settings);
+        foreach (var settings in other.byType.Values)
+        {
+            Use(settings);
+        }
     }
 
     /// <summary>Forgets every kind, so each reads as its defaults again.</summary>

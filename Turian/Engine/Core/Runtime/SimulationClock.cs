@@ -17,7 +17,10 @@ public sealed class SimulationClock
         ValidateDuration(settings.FixedDeltaTime, nameof(settings));
         if ((float)settings.FixedDeltaTime <= 0 || !float.IsFinite((float)settings.FixedDeltaTime) ||
             settings.MaxTicksPerFrame <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(settings), "Tick interval and frame budget must be positive.");
+        }
+
         FixedDeltaTime = settings.FixedDeltaTime;
         MaxTicksPerFrame = settings.MaxTicksPerFrame;
     }
@@ -132,7 +135,10 @@ public sealed class SimulationClock
         EnsureIdle();
         ArgumentNullException.ThrowIfNull(state);
         if (started)
+        {
             throw new InvalidOperationException("Restore requires a fresh simulation clock.");
+        }
+
         ValidateState(state);
         TickIndex = state.TickIndex;
         TimeScale = state.TimeScale;
@@ -148,20 +154,27 @@ public sealed class SimulationClock
     void EnsureIdle()
     {
         if (stepping || IsFaulted)
+        {
             throw new InvalidOperationException("The simulation clock is executing a tick or has faulted.");
+        }
     }
 
     void ValidateState(SimulationClockState state)
     {
         if (state.Version != SimulationClockState.CurrentVersion || state.TickIndex < 0 ||
             state.FixedDeltaTime != FixedDeltaTime)
+        {
             throw new InvalidDataException("The saved clock version, tick or fixed interval is incompatible.");
+        }
+
         ValidateDuration(state.TimeScale, nameof(state));
     }
 
     static void ValidateDuration(double value, string name)
     {
         if (!double.IsFinite(value) || value < 0)
+        {
             throw new ArgumentOutOfRangeException(name, "Time values must be finite and non-negative.");
+        }
     }
 }

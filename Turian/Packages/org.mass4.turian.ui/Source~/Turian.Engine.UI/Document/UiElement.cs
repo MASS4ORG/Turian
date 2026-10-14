@@ -54,8 +54,12 @@ public sealed class UiElement
     {
         yield return this;
         foreach (var child in Children)
+        {
             foreach (var d in child.DescendantsAndSelf())
+            {
                 yield return d;
+            }
+        }
     }
 
     /// <summary>Finds the first descendant (or self) with the given <c>name</c>.</summary>

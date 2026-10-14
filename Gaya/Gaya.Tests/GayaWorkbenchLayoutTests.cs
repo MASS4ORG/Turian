@@ -18,9 +18,21 @@ public class GayaWorkbenchLayoutTests : IDisposable
     /// <summary>Disposes the applications the test created and deletes its layout and settings files.</summary>
     public void Dispose()
     {
-        foreach (var application in applications) application.Dispose();
-        if (File.Exists(layoutPath)) File.Delete(layoutPath);
-        if (File.Exists(settingsPath)) File.Delete(settingsPath);
+        foreach (var application in applications)
+        {
+            application.Dispose();
+        }
+
+        if (File.Exists(layoutPath))
+        {
+            File.Delete(layoutPath);
+        }
+
+        if (File.Exists(settingsPath))
+        {
+            File.Delete(settingsPath);
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -32,16 +44,18 @@ public class GayaWorkbenchLayoutTests : IDisposable
     }
 
     static PanelDescriptor Panel(string id, PanelPlacement placement, bool openByDefault = true) =>
-        new(id, id, placement, _ => new StubPanel()) { OpenByDefault = openByDefault };
+        new(id, id, placement, static _ => new StubPanel()) { OpenByDefault = openByDefault };
 
     GayaApplication Application(params (string Id, PanelPlacement Placement)[] panels) =>
-        Application([.. panels.Select(panel => Panel(panel.Id, panel.Placement))]);
+        Application([.. panels.Select(static panel => Panel(panel.Id, panel.Placement))]);
 
     GayaApplication Application(params PanelDescriptor[] panels)
     {
         var registry = new PanelRegistry();
         foreach (var descriptor in panels)
+        {
             registry.Register(descriptor);
+        }
 
         var services = new ServiceCollection();
         services.AddSingleton<ILogger>(NullLogger.Instance);

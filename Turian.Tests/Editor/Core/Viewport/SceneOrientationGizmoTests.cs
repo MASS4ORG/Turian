@@ -85,15 +85,18 @@ public sealed class SceneOrientationGizmoTests
         camera.LookIn(new Vector3(3, 2, 4), Vector3.UnitY);
         var markers = SceneOrientationGizmo.Markers(camera);
         Assert.Equal(6, markers.Length);
-        Assert.Equal(3, markers.Count(marker => !marker.Label.StartsWith('−')));
-        Assert.Equal(markers.OrderByDescending(marker => marker.Depth), markers);
+        Assert.Equal(3, markers.Count(static marker => !marker.Label.StartsWith('−')));
+        Assert.Equal(markers.OrderByDescending(static marker => marker.Depth), markers);
         foreach (var marker in markers)
+        {
             Assert.Equal(marker.Direction, SceneOrientationGizmo.HitTest(camera, marker.Offset));
+        }
+
         Assert.Equal(Vector3.Zero, SceneOrientationGizmo.HitTest(camera, Vector2.Zero));
         Assert.Null(SceneOrientationGizmo.HitTest(camera, new Vector2(100)));
         Assert.Equal(3, SceneOrientationGizmo.Faces(camera).Length);
         camera.LookIn(Vector3.UnitZ, Vector3.UnitY);
-        Assert.True(SceneOrientationGizmo.Markers(camera).Single(marker => marker.Direction == Vector3.UnitY)
+        Assert.True(SceneOrientationGizmo.Markers(camera).Single(static marker => marker.Direction == Vector3.UnitY)
             .Offset.Y < 0f);
         Assert.Single(SceneOrientationGizmo.Faces(camera));
         Assert.Equal(Vector3.Zero, SceneOrientationGizmo.HitTest(camera, Vector2.Zero));
@@ -106,8 +109,8 @@ public sealed class SceneOrientationGizmoTests
         var camera = new EditorCamera();
         camera.LookIn(new Vector3(3, 2, 4), Vector3.UnitY);
         var markers = SceneOrientationGizmo.Markers(camera);
-        var near = markers.Single(marker => marker.Direction == -Vector3.UnitY);
-        var far = markers.Single(marker => marker.Direction == Vector3.UnitY);
+        var near = markers.Single(static marker => marker.Direction == -Vector3.UnitY);
+        var far = markers.Single(static marker => marker.Direction == Vector3.UnitY);
         Assert.True(near.Radius > far.Radius);
         Assert.True(near.Offset.Length() > far.Offset.Length());
         var outside = far.Offset + Vector2.Normalize(far.Offset) * (far.Radius + 3);
@@ -116,9 +119,9 @@ public sealed class SceneOrientationGizmoTests
         Assert.Equal(far.Direction, SceneOrientationGizmo.HitTest(camera, inside));
         camera.IsOrthographic = true;
         markers = SceneOrientationGizmo.Markers(camera);
-        Assert.Single(markers.Select(marker => marker.Radius).Distinct());
+        Assert.Single(markers.Select(static marker => marker.Radius).Distinct());
         Assert.True(SceneOrientationGizmo.Faces(camera)
-            .SelectMany(face => new[] { face.A, face.B, face.C, face.D })
-            .All(point => point.Length() < 10f));
+            .SelectMany(static face => new[] { face.A, face.B, face.C, face.D })
+            .All(static point => point.Length() < 10f));
     }
 }

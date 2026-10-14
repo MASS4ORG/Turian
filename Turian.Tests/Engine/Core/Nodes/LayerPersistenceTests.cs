@@ -20,21 +20,21 @@ public sealed class LayerPersistenceTests
         {
             var settings = new NodeLayerSettings
             {
-                Groups = [.. Enumerable.Range(0, 18).Select(index => Group($"Group{index}"))],
+                Groups = [.. Enumerable.Range(0, 18).Select(static index => Group($"Group{index}"))],
             };
             settings.PhysicsGroup = settings.Groups[15];
             settings.RenderingGroup = settings.Groups[0];
             Registry(settings);
-            Assert.DoesNotContain(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == "Log");
+            Assert.DoesNotContain(logger.ReceivedCalls(), static call => call.GetMethodInfo().Name == "Log");
             settings.PhysicsGroup = settings.Groups[16];
             settings.RenderingGroup = settings.Groups[17];
             settings.PhysicsGroup.Name = "Renamed";
             var layout = Registry(settings);
-            var warnings = logger.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "Log").ToArray();
+            var warnings = logger.ReceivedCalls().Where(static call => call.GetMethodInfo().Name == "Log").ToArray();
             Assert.Equal(2, warnings.Length);
-            Assert.All(warnings, call => Assert.Equal(LogLevel.Warning, call.GetArguments()[0]));
-            Assert.Contains(warnings, call => call.GetArguments()[2]!.ToString()!.Contains("Physics", StringComparison.Ordinal));
-            Assert.Contains(warnings, call => call.GetArguments()[2]!.ToString()!.Contains("Rendering", StringComparison.Ordinal));
+            Assert.All(warnings, static call => Assert.Equal(LogLevel.Warning, call.GetArguments()[0]));
+            Assert.Contains(warnings, static call => call.GetArguments()[2]!.ToString()!.Contains("Physics", StringComparison.Ordinal));
+            Assert.Contains(warnings, static call => call.GetArguments()[2]!.ToString()!.Contains("Rendering", StringComparison.Ordinal));
             Assert.True(layout.TryGetGroupSlot(settings.PhysicsGroup.Id, out var slot));
             Assert.Equal(16, slot);
         }
@@ -92,7 +92,7 @@ public sealed class LayerPersistenceTests
         Assert.Equal(2, memberships[0]);
         Assert.Equal(water, layout.GetLayerId(0, memberships[0]));
         Assert.Equal([state.Tags[0]], restored.Tags);
-        Assert.Equal([0], restored.ResolveTags(layout).Select(id => (int)id));
+        Assert.Equal([0], restored.ResolveTags(layout).Select(static id => (int)id));
         Assert.Contains(group.Id.ToString(), saved);
         Assert.Contains(water.ToString(), saved);
         Assert.DoesNotContain("GroupSlot", saved);
@@ -126,7 +126,7 @@ public sealed class LayerPersistenceTests
                 Assert.Empty(state.ResolveTags(layout));
                 Assert.False(mask.Compile(layout).Contains(0));
             }
-            Assert.Equal(2, logger.ReceivedCalls().Count(call => call.GetMethodInfo().Name == "Log"));
+            Assert.Equal(2, logger.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "Log"));
             var restoredState = Serializer.LoadData<NodeLayerState>(Serializer.Serialize(state))!;
             var restoredMask = Serializer.LoadData<LayerMaskState>(Serializer.Serialize(mask))!;
             Assert.Equal(water.Id, restoredState.Layers[0].ValueId);
@@ -163,7 +163,11 @@ public sealed class LayerPersistenceTests
         var mask = state.Compile(layout);
         Assert.Equal(count, mask.ValueCount);
         Assert.False(RuntimeHelpers.IsReferenceOrContainsReferences<CompiledLayerMask>());
-        for (var index = 0; index < 256; index++) Assert.Equal(index < count, mask.Contains((byte)index));
+        for (var index = 0; index < 256; index++)
+        {
+            Assert.Equal(index < count, mask.Contains((byte)index));
+        }
+
         var memberships = new NodeLayers();
         memberships[0] = (byte)(count - 1);
         Assert.True(mask.Includes(memberships));
@@ -178,10 +182,10 @@ public sealed class LayerPersistenceTests
     [Fact]
     public void RuntimeCacheSerializationIsRejected()
     {
-        Assert.Throws<NotSupportedException>(() => JsonSerializer.Serialize(new NodeLayers()));
-        Assert.Throws<NotSupportedException>(() => JsonSerializer.Deserialize<NodeLayers>("{}"));
-        Assert.Throws<NotSupportedException>(() => JsonSerializer.Serialize(default(CompiledLayerMask)));
-        Assert.Throws<NotSupportedException>(() => JsonSerializer.Deserialize<CompiledLayerMask>("{}"));
+        Assert.Throws<NotSupportedException>(static () => JsonSerializer.Serialize(new NodeLayers()));
+        Assert.Throws<NotSupportedException>(static () => JsonSerializer.Deserialize<NodeLayers>("{}"));
+        Assert.Throws<NotSupportedException>(static () => JsonSerializer.Serialize(default(CompiledLayerMask)));
+        Assert.Throws<NotSupportedException>(static () => JsonSerializer.Deserialize<CompiledLayerMask>("{}"));
     }
 
     /// <summary>Malformed identity states fail before they can bind invalid or duplicate memberships.</summary>
@@ -229,7 +233,13 @@ public sealed class LayerPersistenceTests
         var before = GC.GetAllocatedBytesForCurrentThread();
         var matches = 0;
         for (var index = 0; index < 10_000; index++)
-            if (mask.Includes(memberships)) matches++;
+        {
+            if (mask.Includes(memberships))
+            {
+                matches++;
+            }
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         Assert.Equal(10_000, matches);
         Assert.Equal(0, allocated);

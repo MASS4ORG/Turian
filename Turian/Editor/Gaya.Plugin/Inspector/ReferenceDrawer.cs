@@ -45,7 +45,10 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        if (ReferenceField.TryCreate(field) is not { } reference) return false;
+        if (ReferenceField.TryCreate(field) is not { } reference)
+        {
+            return false;
+        }
 
         var result = gui.ObjectField(
             field.HasMixedValue ? "—" : picker.DisplayName(reference), $"{id}/ref",
@@ -61,7 +64,10 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
         if (openFieldId == id)
         {
             openField = reference;
-            if (gui.Pass == Pass.Pass2Render) openAnchor = gui.CurrentNode.Rect;
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                openAnchor = gui.CurrentNode.Rect;
+            }
         }
         return true;
     }
@@ -96,7 +102,10 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     /// </summary>
     void Reveal(ReferenceField reference)
     {
-        if (reference.IsEmpty) return;
+        if (reference.IsEmpty)
+        {
+            return;
+        }
 
         if (reference.Kind == ReferenceKind.Asset)
         {
@@ -104,7 +113,10 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
             return;
         }
 
-        if (picker.FindNode(reference.CurrentId) is { } node) inspector.Select(node);
+        if (picker.FindNode(reference.CurrentId) is { } node)
+        {
+            inspector.Select(node);
+        }
     }
 
     /// <summary>
@@ -116,14 +128,20 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        if (openFieldId is null || openField is not { } reference) return;
+        if (openFieldId is null || openField is not { } reference)
+        {
+            return;
+        }
 
         var open = true;
         gui.Popup(ref open, () => PickerContent(gui, reference), pickerWidth, pickerHeight,
             $"Select {reference.TargetType.Name}",
             PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight));
 
-        if (open) return;
+        if (open)
+        {
+            return;
+        }
 
         openFieldId = null;
         openField = null;
@@ -148,7 +166,10 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
 
                 foreach (var candidate in picker.Candidates(reference, search))
                 {
-                    if (!CandidateRow(gui, candidate.Name, candidate.Detail, candidate.Id.ToString())) continue;
+                    if (!CandidateRow(gui, candidate.Name, candidate.Detail, candidate.Id.ToString()))
+                    {
+                        continue;
+                    }
 
                     picker.Assign(reference, candidate.Id);
                     openFieldId = null;
@@ -164,10 +185,16 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
                    .ExpandWidth().Direction(Axis.Horizontal).Gap(6).Padding(4, 0).ContentAlignY(0.5f).Enter())
         {
             var interactable = gui.GetInteractable();
-            if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.AccentFill, 2);
+            if (interactable.OnHover())
+            {
+                gui.DrawBackgroundRect(Theme.AccentFill, 2);
+            }
 
             gui.DrawText(name, Theme.Text(12), Theme.Ink, centerInRect: false);
-            if (detail.Length > 0) gui.DrawText(detail, Theme.Text(10), Theme.InkDim, centerInRect: false);
+            if (detail.Length > 0)
+            {
+                gui.DrawText(detail, Theme.Text(10), Theme.InkDim, centerInRect: false);
+            }
 
             return interactable.OnClick();
         }

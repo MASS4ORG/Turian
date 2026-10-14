@@ -7,7 +7,11 @@ public sealed partial class TransformGizmo
     {
         ArgumentNullException.ThrowIfNull(gizmos);
         ArgumentNullException.ThrowIfNull(camera);
-        if (!CanInteract) return;
+        if (!CanInteract)
+        {
+            return;
+        }
+
         var state = (gizmos.DepthTest, gizmos.Matrix, gizmos.Color, gizmos.Thickness);
         try
         {
@@ -15,9 +19,15 @@ public sealed partial class TransformGizmo
             gizmos.Matrix = Matrix4x4.Identity;
             var anchor = PivotPosition;
             var scale = ComputeGizmoScale(camera, anchor, viewportSize);
-            if (Mode != TransformGizmoMode.Rotate) DrawLinearHandles(gizmos, anchor, scale);
+            if (Mode != TransformGizmoMode.Rotate)
+            {
+                DrawLinearHandles(gizmos, anchor, scale);
+            }
+
             if (Mode is TransformGizmoMode.Rotate or TransformGizmoMode.Combined)
+            {
                 DrawRotationHandles(gizmos, camera, viewportSize, anchor, scale);
+            }
         }
         finally
         {
@@ -105,7 +115,11 @@ public sealed partial class TransformGizmo
 
     Vector4 HandleColor(TransformGizmoAxis target, TransformGizmoMode operation, Vector4 color)
     {
-        if (axis != target || handleMode != operation) return color;
+        if (axis != target || handleMode != operation)
+        {
+            return color;
+        }
+
         return isDragging ? DragColor : HoverColor;
     }
 
@@ -116,10 +130,17 @@ public sealed partial class TransformGizmo
         DrawRing(gizmos, camera, anchor, x, radius, XColor, TransformGizmoAxis.X);
         DrawRing(gizmos, camera, anchor, y, radius, YColor, TransformGizmoAxis.Y);
         DrawRing(gizmos, camera, anchor, z, radius, ZColor, TransformGizmoAxis.Z);
-        if (axis == TransformGizmoAxis.None || handleMode != TransformGizmoMode.Rotate) return;
+        if (axis == TransformGizmoAxis.None || handleMode != TransformGizmoMode.Rotate)
+        {
+            return;
+        }
+
         gizmos.Color = isDragging ? DragColor : HoverColor;
         gizmos.Thickness = 2f;
-        if (isDragging) DrawRotationSweep(gizmos, radius);
+        if (isDragging)
+        {
+            DrawRotationSweep(gizmos, radius);
+        }
         else
         {
             var normal = axis == TransformGizmoAxis.X ? x : axis == TransformGizmoAxis.Y ? y : z;
@@ -132,7 +153,11 @@ public sealed partial class TransformGizmo
         TransformGizmoAxis target)
     {
         var selected = axis == target && handleMode == TransformGizmoMode.Rotate;
-        if (selected && isDragging) normal = rotationAxis;
+        if (selected && isDragging)
+        {
+            normal = rotationAxis;
+        }
+
         var (u, v) = RingBasis(normal, anchor, camera);
         var halfAngle = RingHalfAngle(normal, anchor, camera);
         gizmos.Color = HandleColor(target, TransformGizmoMode.Rotate, color);

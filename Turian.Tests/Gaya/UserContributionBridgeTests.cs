@@ -23,7 +23,7 @@ public sealed class UserContributionBridgeTests
         var catalog = new UserSettingsCatalog(build, NullLogger.Instance);
         var pages = (IList<UserSettingsPage>)catalog.Pages;
         var discovered = UserSettingsCatalog.Scan(typeof(SettingsMetadataTests.CustomPage).Assembly,
-            NullLogger.Instance).Single(page => page.Target is SettingsMetadataTests.CustomPage);
+            NullLogger.Instance).Single(static page => page.Target is SettingsMetadataTests.CustomPage);
         var directory = Directory.CreateTempSubdirectory("gaya-user-settings-").FullName;
         try
         {

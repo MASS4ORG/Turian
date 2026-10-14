@@ -7,7 +7,7 @@ namespace Turian.Editor.Core;
 ///
 /// <para>
 /// Extends <see cref="ProjectDirectoryWatcher"/> which manages the underlying
-/// <see cref="System.IO.FileSystemWatcher"/> lifecycle (Start / Stop / Dispose).
+/// <see cref="FileSystemWatcher"/> lifecycle (Start / Stop / Dispose).
 /// </para>
 /// </summary>
 public sealed class SourceFileWatcher : ProjectDirectoryWatcher
@@ -51,7 +51,11 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileCreated(FileSystemEventArgs e)
     {
-        if (!IsSource(e.FullPath)) return;
+        if (!IsSource(e.FullPath))
+        {
+            return;
+        }
+
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -59,7 +63,11 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileChanged(FileSystemEventArgs e)
     {
-        if (!IsSource(e.FullPath)) return;
+        if (!IsSource(e.FullPath))
+        {
+            return;
+        }
+
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -67,7 +75,11 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileDeleted(FileSystemEventArgs e)
     {
-        if (!IsSource(e.FullPath)) return;
+        if (!IsSource(e.FullPath))
+        {
+            return;
+        }
+
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -75,7 +87,11 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
     /// <inheritdoc/>
     protected override void OnFileRenamed(RenamedEventArgs e)
     {
-        if (!IsSource(e.FullPath) && !IsSource(e.OldFullPath)) return;
+        if (!IsSource(e.FullPath) && !IsSource(e.OldFullPath))
+        {
+            return;
+        }
+
         Logger.LogDebug("Source change detected: {ChangeType} {Path}", e.ChangeType, e.FullPath);
         ResetDebounce();
     }
@@ -108,9 +124,13 @@ public sealed class SourceFileWatcher : ProjectDirectoryWatcher
         lock (timerLock)
         {
             if (debounceTimer is null)
+            {
                 debounceTimer = new Timer(FireSourceChanged, null, debounce, Timeout.InfiniteTimeSpan);
+            }
             else
+            {
                 debounceTimer.Change(debounce, Timeout.InfiniteTimeSpan);
+            }
         }
     }
 

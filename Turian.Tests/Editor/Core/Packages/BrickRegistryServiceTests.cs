@@ -12,7 +12,10 @@ public sealed class BrickRegistryServiceTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 

@@ -15,7 +15,7 @@ public sealed class AssetBrowserQueryTests
             Entry("/Assets/Folder/deep.png"), new AssetEntry("/Assets", true, null, null) };
         Assert.Equal(["/Assets/Folder", "/Assets/a.png", "/Assets/z.png"],
             AssetQuery.Apply(entries, "/Assets", new AssetFilter(), catalog, new HashSet<string>())
-                .Select(entry => entry.AbsolutePath));
+                .Select(static entry => entry.AbsolutePath));
     }
 
     /// <summary>Name, type, every label and favorites intersect across the project.</summary>
@@ -33,7 +33,7 @@ public sealed class AssetBrowserQueryTests
             FavoritesOnly = true
         };
         Assert.Equal([wanted], AssetQuery.Apply(entries, "/Assets", filter, catalog,
-            entries.Select(entry => entry.AbsolutePath).ToHashSet()));
+            entries.Select(static entry => entry.AbsolutePath).ToHashSet()));
         Assert.Empty(AssetQuery.Apply(entries, "/Assets", filter, catalog, new HashSet<string>()));
         Assert.True(AssetQuery.Matches(entries[3], filter, catalog, new HashSet<string>(), keepFolders: true));
     }
@@ -79,7 +79,11 @@ public sealed class AssetBrowserQueryTests
         navigation.Visit("/Assets/Other");
         Assert.False(navigation.CanForward);
         Assert.Equal("/Assets/Folder2", AssetPathSegments.Remap("/Assets/Folder2", "/Assets/Folder", "/else"));
-        for (var i = 0; i < 40; i++) navigation.Visit($"/Assets/{i}");
+        for (var i = 0; i < 40; i++)
+        {
+            navigation.Visit($"/Assets/{i}");
+        }
+
         var backCount = 0;
         while (navigation.CanBack) { navigation.Back(); backCount++; }
         Assert.Equal(31, backCount);
@@ -91,7 +95,7 @@ public sealed class AssetBrowserQueryTests
     {
         var entries = new[] { new AssetEntry("/Brick", true, null, null),
             new AssetEntry("/Brick/Textures", true, null, "/Brick") };
-        Assert.Equal(["Brick", "Textures"], AssetPathSegments.Build("/Brick/Textures", entries).Select(segment => segment.Name));
+        Assert.Equal(["Brick", "Textures"], AssetPathSegments.Build("/Brick/Textures", entries).Select(static segment => segment.Name));
         Assert.Empty(AssetPathSegments.Build("/unknown", entries));
     }
 

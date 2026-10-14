@@ -49,7 +49,10 @@ public static partial class GltfModelReader
     static (ReadOnlyMemory<byte> Json, ReadOnlyMemory<byte> Binary) SplitContainer(ReadOnlyMemory<byte> data)
     {
         if (data.Length < 4 || BinaryPrimitives.ReadUInt32LittleEndian(data.Span) != GlbMagic)
+        {
             return (data, default);
+        }
+
         ValidateGlbHeader(data);
         return ReadChunks(data);
     }
@@ -58,7 +61,9 @@ public static partial class GltfModelReader
     {
         if (data.Length < 20 || BinaryPrimitives.ReadUInt32LittleEndian(data.Span[4..]) != 2 ||
             BinaryPrimitives.ReadUInt32LittleEndian(data.Span[8..]) != data.Length)
+        {
             throw new InvalidDataException("Invalid glTF 2.0 binary header.");
+        }
     }
 
     static (ReadOnlyMemory<byte> Json, ReadOnlyMemory<byte> Binary) ReadChunks(ReadOnlyMemory<byte> data)
@@ -82,13 +87,22 @@ public static partial class GltfModelReader
     static (uint Type, ReadOnlyMemory<byte> Data) ReadChunk(ReadOnlyMemory<byte> data, int offset)
     {
         if (data.Length - offset < 8)
+        {
             throw new InvalidDataException("Truncated GLB chunk header.");
+        }
+
         var length = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(data.Span[offset..]));
         var type = BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(offset + 4)..]);
         if (length % 4 != 0 || length > data.Length - offset - 8)
+        {
             throw new InvalidDataException("Invalid GLB chunk length.");
+        }
+
         if (offset == 12 && type != JsonChunk)
+        {
             throw new InvalidDataException("The first GLB chunk must contain JSON.");
+        }
+
         return (type, data.Slice(offset + 8, length));
     }
 
@@ -96,7 +110,10 @@ public static partial class GltfModelReader
         Func<int, string, byte[]>? resolver)
     {
         if (!root.TryGetProperty("buffers", out var descriptions))
+        {
             return [];
+        }
+
         var buffers = new ReadOnlyMemory<byte>[descriptions.GetArrayLength()];
         for (var i = 0; i < buffers.Length; i++)
         {
@@ -105,7 +122,10 @@ public static partial class GltfModelReader
                 ? ResolveBuffer(i, uri.GetString()!, resolver) : binary;
             var length = description.GetProperty("byteLength").GetInt32();
             if (length < 0 || data.Length < length)
+            {
                 throw new InvalidDataException($"glTF buffer {i} is shorter than its declared length.");
+            }
+
             buffers[i] = data[..length];
         }
         return buffers;
@@ -114,11 +134,17 @@ public static partial class GltfModelReader
     static ReadOnlyMemory<byte> ResolveBuffer(int index, string uri, Func<int, string, byte[]>? resolver)
     {
         if (!uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
             return resolver?.Invoke(index, uri)
                 ?? throw new InvalidDataException($"External glTF buffer '{uri}' requires a resolver.");
+        }
+
         var comma = uri.IndexOf(',', StringComparison.Ordinal);
         if (comma < 0 || !uri[..comma].EndsWith(";base64", StringComparison.OrdinalIgnoreCase))
+        {
             throw new NotSupportedException("glTF data buffers must use base64 encoding.");
+        }
+
         return Convert.FromBase64String(uri[(comma + 1)..]);
     }
 

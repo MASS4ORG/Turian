@@ -96,13 +96,13 @@ public sealed class BuildManager : IDisposable
     // ── Assembly management ────────────────────────────────────────────────────
 
     /// <summary>The default user assembly: every script outside an assembly definition.</summary>
-    public Assembly? ActiveUserAssembly => slotManager.LoadedAssembly;
+    public ReflectionAssembly? ActiveUserAssembly => slotManager.LoadedAssembly;
 
     /// <summary>Every user assembly in force: the default one and one per assembly definition.</summary>
-    public IReadOnlyList<Assembly> ActiveUserAssemblies => slotManager.UserAssemblies;
+    public IReadOnlyList<ReflectionAssembly> ActiveUserAssemblies => slotManager.UserAssemblies;
 
     /// <summary>All assemblies visible to the editor (entry + user assemblies).</summary>
-    public IEnumerable<Assembly> LoadedAssemblies =>
+    public IEnumerable<ReflectionAssembly> LoadedAssemblies =>
         AppDomain.CurrentDomain.GetAssemblies()
             .Concat(slotManager.LoadedAssemblies)
             .Distinct();
@@ -202,7 +202,9 @@ public sealed class BuildManager : IDisposable
         studioIsActive = isActive;
 
         if (isActive && !wasActive)
+        {
             FlushPendingHotReload("Studio reactivated");
+        }
     }
 
     /// <summary>
@@ -210,7 +212,7 @@ public sealed class BuildManager : IDisposable
     /// and flushed once play stops.
     /// </summary>
     /// <remarks>
-    /// Swapping the user assembly mid-session would unload the <see cref="System.Runtime.Loader.AssemblyLoadContext"/>
+    /// Swapping the user assembly mid-session would unload the <see cref="AssemblyLoadContext"/>
     /// that the live scene's components were created from, leaving dangling instances.
     /// </remarks>
     public void SetPlaying(bool playing)
@@ -219,12 +221,17 @@ public sealed class BuildManager : IDisposable
         isPlaying = playing;
 
         if (!playing && wasPlaying)
+        {
             FlushPendingHotReload("Play stopped");
+        }
     }
 
     void FlushPendingHotReload(string reason)
     {
-        if (!pendingHotReload || !studioIsActive || isPlaying) return;
+        if (!pendingHotReload || !studioIsActive || isPlaying)
+        {
+            return;
+        }
 
         pendingHotReload = false;
         logger.LogInformation("{Reason}. Flushing deferred hot-reload compilation", reason);
@@ -250,7 +257,9 @@ public sealed class BuildManager : IDisposable
                 var assemblyPath = await CompileIntoInactiveSlot(forceRecompile).ConfigureAwait(false);
 
                 if (!slotManager.TrySwapAndLoad(assemblyPath))
+                {
                     throw new InvalidOperationException("Assembly swap failed. Previous assembly retained.");
+                }
 
                 return $"Loaded: {assemblyPath}";
             }));
@@ -296,9 +305,13 @@ public sealed class BuildManager : IDisposable
             })).ConfigureAwait(false);
 
         if (status.State == BuildTaskState.Succeeded)
+        {
             OnPlayStarted?.Invoke(status.Message);
+        }
         else
+        {
             OnPlayFailure?.Invoke(status.Message);
+        }
     }
 
     /// <summary>Stops the running play process.</summary>
@@ -349,7 +362,11 @@ public sealed class BuildManager : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
 
         DisableHotReload();
@@ -377,14 +394,22 @@ public sealed class BuildManager : IDisposable
         lock (playProcessLock)
         {
             if (playProcess is { HasExited: false })
+            {
                 target = playProcess;
+            }
             else
+            {
                 playProcess = null;
+            }
         }
 
         if (target is null)
         {
-            if (notify) OnPlayStopped?.Invoke("Play is not running.");
+            if (notify)
+            {
+                OnPlayStopped?.Invoke("Play is not running.");
+            }
+
             return;
         }
 
@@ -397,11 +422,16 @@ public sealed class BuildManager : IDisposable
             lock (playProcessLock)
             {
                 if (ReferenceEquals(playProcess, target))
+                {
                     playProcess = null;
+                }
             }
 
             logger.LogInformation("Play process stopped");
-            if (notify) OnPlayStopped?.Invoke("Play stopped.");
+            if (notify)
+            {
+                OnPlayStopped?.Invoke("Play stopped.");
+            }
         }
         catch (Exception ex)
         {
@@ -416,13 +446,18 @@ public sealed class BuildManager : IDisposable
 
     void OnPlayProcessExited(object? sender, EventArgs e)
     {
-        if (sender is not Process proc) return;
+        if (sender is not Process proc)
+        {
+            return;
+        }
 
         proc.Exited -= OnPlayProcessExited;
         lock (playProcessLock)
         {
             if (ReferenceEquals(playProcess, proc))
+            {
                 playProcess = null;
+            }
         }
 
         logger.LogInformation("Play process exited with code {Code}", proc.ExitCode);

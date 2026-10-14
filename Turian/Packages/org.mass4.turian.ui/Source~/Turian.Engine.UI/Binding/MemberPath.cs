@@ -10,12 +10,19 @@ public static class MemberPath
     /// <param name="path">A dotted member path; an empty path returns <paramref name="root"/>.</param>
     public static object? Read(object? root, string path)
     {
-        if (string.IsNullOrEmpty(path)) return root;
+        if (string.IsNullOrEmpty(path))
+        {
+            return root;
+        }
 
         var current = root;
         foreach (var name in path.Split('.'))
         {
-            if (current is null) return null;
+            if (current is null)
+            {
+                return null;
+            }
+
             current = ReadMember(current, name);
         }
 
@@ -29,14 +36,20 @@ public static class MemberPath
     /// <returns><c>true</c> when the assignment succeeded.</returns>
     public static bool TryWrite(object? root, string path, object? value)
     {
-        if (root is null || string.IsNullOrEmpty(path)) return false;
+        if (root is null || string.IsNullOrEmpty(path))
+        {
+            return false;
+        }
 
         var segments = path.Split('.');
         var target = root;
         for (var i = 0; i < segments.Length - 1; i++)
         {
             target = ReadMember(target, segments[i]);
-            if (target is null) return false;
+            if (target is null)
+            {
+                return false;
+            }
         }
 
         var last = segments[^1];
@@ -80,20 +93,39 @@ public static class MemberPath
         }
 
         var type = obj.GetType();
-        if (type.GetProperty(name, flags) is { } prop) return prop.GetValue(obj);
-        if (type.GetField(name, flags) is { } field) return field.GetValue(obj);
+        if (type.GetProperty(name, flags) is { } prop)
+        {
+            return prop.GetValue(obj);
+        }
+
+        if (type.GetField(name, flags) is { } field)
+        {
+            return field.GetValue(obj);
+        }
+
         return null;
     }
 
     static object? Coerce(object? value, Type targetType)
     {
-        if (value is null) return null;
+        if (value is null)
+        {
+            return null;
+        }
+
         var t = Nullable.GetUnderlyingType(targetType) ?? targetType;
-        if (t.IsInstanceOfType(value)) return value;
+        if (t.IsInstanceOfType(value))
+        {
+            return value;
+        }
 
         try
         {
-            if (t.IsEnum && value is string es) return Enum.Parse(t, es, ignoreCase: true);
+            if (t.IsEnum && value is string es)
+            {
+                return Enum.Parse(t, es, ignoreCase: true);
+            }
+
             return Convert.ChangeType(value, t, CultureInfo.InvariantCulture);
         }
         catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException)

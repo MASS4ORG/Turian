@@ -89,7 +89,10 @@ static class PanelCommands
             "gaya.turian.assets." + id, "Assets: " + label,
             services =>
             {
-                if (Panel<AssetBrowserPanel>(services, GayaPlugin.AssetsPanelId) is { } panel) action(panel);
+                if (Panel<AssetBrowserPanel>(services, GayaPlugin.AssetsPanelId) is { } panel)
+                {
+                    action(panel);
+                }
             })
         { MenuLabel = label }, modifiers);
 
@@ -119,7 +122,10 @@ static class PanelCommands
             $"gaya.turian.viewport.{id}", $"Scene View: {label} Tool",
             services =>
             {
-                if (Panel<ScenePanel>(services, panelId) is { } panel) panel.Gizmo.Mode = mode;
+                if (Panel<ScenePanel>(services, panelId) is { } panel)
+                {
+                    panel.Gizmo.Mode = mode;
+                }
             })
         { MenuLabel = $"{label} Tool" });
 

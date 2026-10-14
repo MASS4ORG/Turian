@@ -24,9 +24,15 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
         foreach (var component in components)
         {
             if (component.ModelInstance is not VulkanModel model || component.Node is null || component.Count == 0)
+            {
                 continue;
+            }
+
             if (!batches.TryGetValue(component, out var batch))
+            {
                 batches[component] = batch = new InstanceBatch(component);
+            }
+
             batch.Model = model;
             batch.LastSeen = retired.Frame;
             var submeshes = model.SubMeshes.Count * component.Count;
@@ -60,16 +66,28 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
             pending |= batch.Pending;
         }
 
-        if (!pending) return;
+        if (!pending)
+        {
+            return;
+        }
+
         var slot = frameIndex % staging.Length;
-        if (total > 0) EnsureStaging(slot, total);
+        if (total > 0)
+        {
+            EnsureStaging(slot, total);
+        }
+
         var instances = total > 0 ? staging[slot]!.AsSpan<InstanceData>() : [];
         Barrier(commandBuffer, PipelineStageFlags.VertexShaderBit, PipelineStageFlags.TransferBit, 0,
             AccessFlags.TransferWriteBit);
         var offset = 0;
         foreach (var batch in Visible)
         {
-            if (!batch.Pending) continue;
+            if (!batch.Pending)
+            {
+                continue;
+            }
+
             var count = batch.UploadEnd - batch.UploadStart;
             if (count > 0)
             {
@@ -113,7 +131,11 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
     bool EnsureCapacity(InstanceBatch batch)
     {
         var count = batch.Component.Count;
-        if (batch.Buffer is { } current && current.Capacity >= count) return false;
+        if (batch.Buffer is { } current && current.Capacity >= count)
+        {
+            return false;
+        }
+
         retired.Retire(batch.Buffer);
         var capacity = InstanceBuffer.Grow(batch.Buffer?.Capacity ?? 0, count);
         batch.Buffer = new InstanceBuffer(vulkan, layout, capacity, hostVisible: false);
@@ -162,7 +184,11 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
     {
         var current = staging[slot];
         var capacity = current is null ? 0 : (int)current.InstanceCount;
-        if (capacity >= count) return;
+        if (capacity >= count)
+        {
+            return;
+        }
+
         retired.Retire(current);
         var buffer = new Buffer(vulkan, InstanceData.Size, (uint)InstanceBuffer.Grow(capacity, count),
             BufferUsageFlags.TransferSrcBit, MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit);
@@ -192,7 +218,10 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
         unseen.Clear();
         foreach (var (component, batch) in batches)
         {
-            if (retired.Frame - batch.LastSeen > SwapChain.MaxFramesInFlight) unseen.Add(component);
+            if (retired.Frame - batch.LastSeen > SwapChain.MaxFramesInFlight)
+            {
+                unseen.Add(component);
+            }
         }
 
         foreach (var component in unseen)
@@ -205,10 +234,18 @@ sealed unsafe class InstanceBatches(Vulkan vulkan, DescriptorSetLayout layout, R
     /// <summary>Releases every buffer; the caller has waited for the device to go idle.</summary>
     public void Dispose()
     {
-        foreach (var batch in batches.Values) batch.Buffer?.Dispose();
+        foreach (var batch in batches.Values)
+        {
+            batch.Buffer?.Dispose();
+        }
+
         batches.Clear();
         Visible.Clear();
-        foreach (var buffer in staging) buffer?.Dispose();
+        foreach (var buffer in staging)
+        {
+            buffer?.Dispose();
+        }
+
         Array.Clear(staging);
     }
 }

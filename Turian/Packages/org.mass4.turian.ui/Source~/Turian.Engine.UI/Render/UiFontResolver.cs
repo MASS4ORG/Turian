@@ -17,17 +17,23 @@ public sealed class UiFontResolver
     public UiFontResolver(AssetDatabase? database, params string[] roots)
     {
         this.database = database;
-        this.roots = [.. roots.Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r))];
+        this.roots = [.. roots.Where(static r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r))];
     }
 
     /// <summary>Resolves <paramref name="reference"/> to a base font, or <c>null</c>.</summary>
     /// <param name="reference">A font path, <c>asset://&lt;guid&gt;</c>, or family name.</param>
     public Font? Resolve(string reference)
     {
-        if (string.IsNullOrWhiteSpace(reference)) return null;
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return null;
+        }
 
         var key = reference.Trim().Trim('"', '\'');
-        if (cache.TryGetValue(key, out var cached)) return cached;
+        if (cache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
 
         var font = Load(key);
         cache[key] = font;
@@ -42,7 +48,10 @@ public sealed class UiFontResolver
             return FromDatabaseStream(assetId);
         }
 
-        if (LooksLikePath(reference)) return LoadPath(reference.Replace('\\', '/'));
+        if (LooksLikePath(reference))
+        {
+            return LoadPath(reference.Replace('\\', '/'));
+        }
 
         try
         {
@@ -64,7 +73,11 @@ public sealed class UiFontResolver
     {
         if (FindAsset(normalized) is { } record)
         {
-            if (database!.Content is not null) return FromDatabaseStream(record.AssetId);
+            if (database!.Content is not null)
+            {
+                return FromDatabaseStream(record.AssetId);
+            }
+
             var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
             return File.Exists(absolute) ? FromFile(absolute) : FromDatabaseStream(record.AssetId);
         }
@@ -72,7 +85,10 @@ public sealed class UiFontResolver
         foreach (var root in roots)
         {
             var absolute = Path.GetFullPath(Path.Combine(root, normalized));
-            if (File.Exists(absolute)) return FromFile(absolute);
+            if (File.Exists(absolute))
+            {
+                return FromFile(absolute);
+            }
         }
 
         return null;
@@ -96,7 +112,9 @@ public sealed class UiFontResolver
     Font? FromDatabaseStream(Guid assetId)
     {
         if (database is null || !database.TryGetAssetProvider(assetId, out var provider) || provider is null)
+        {
             return null;
+        }
 
         try
         {

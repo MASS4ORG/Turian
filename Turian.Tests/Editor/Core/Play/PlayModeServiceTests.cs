@@ -454,8 +454,8 @@ public class PlayModeServiceTests : IDisposable
 
         var playRoot = playMode.PlayRoot ?? throw new InvalidOperationException("Play mode did not create a root node.");
         var runningCameras = Node.GetComponentsInChildren<CameraComponent>(playRoot).ToList();
-        var runningA = runningCameras.Single(c => c.Node is { Name: "CamA" });
-        var runningB = runningCameras.Single(c => c.Node is { Name: "CamB" });
+        var runningA = runningCameras.Single(static c => c.Node is { Name: "CamA" });
+        var runningB = runningCameras.Single(static c => c.Node is { Name: "CamB" });
 
         Assert.Same(runningA, playMode.ActiveCamera);
 

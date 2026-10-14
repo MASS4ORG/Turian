@@ -43,7 +43,10 @@ static class UserTraversalBenchmarks
         {
             var expected = bcl(scene);
             if (loops(scene) != expected)
+            {
                 throw new InvalidOperationException($"{name}: variants disagree");
+            }
+
             Console.WriteLine($"{name,-36} {Cell(bcl, scene),20} {Cell(loops, scene),20}");
         }
     }
@@ -59,9 +62,21 @@ static class UserTraversalBenchmarks
                 Name = i == nodeCount - 1 ? "Boss" : $"Node {i}",
                 Position = new Vector3(random.NextSingle() * 20 - 10, 0, random.NextSingle() * 20 - 10),
             };
-            if (i % 20 == 0) node.AddComponent(new Enemy { Health = random.Next(1, 100) });
-            if (i % 50 == 7) node.AddComponent(new Pickup());
-            if (i is >= 21 and <= 84) node.AddComponent(new Squad());
+            if (i % 20 == 0)
+            {
+                node.AddComponent(new Enemy { Health = random.Next(1, 100) });
+            }
+
+            if (i % 50 == 7)
+            {
+                node.AddComponent(new Pickup());
+            }
+
+            if (i is >= 21 and <= 84)
+            {
+                node.AddComponent(new Squad());
+            }
+
             if (i > 0)
             {
                 var parent = nodes[(i - 1) / 4];
@@ -77,7 +92,11 @@ static class UserTraversalBenchmarks
 
     static string Cell(Query query, Scene scene)
     {
-        for (var i = 0; i < 3; i++) query(scene);
+        for (var i = 0; i < 3; i++)
+        {
+            query(scene);
+        }
+
         var times = new List<double>(runs);
         for (var i = 0; i < runs; i++)
         {
@@ -103,9 +122,9 @@ static class UserTraversalBenchmarks
 
     static double BclNearby(Scene s) => s.Root.GetComponentsInChildren<Enemy>().Count(e => Near(e, s.Player));
 
-    static double BclHealth(Scene s) => s.Root.GetComponentsInChildren<Enemy>().Sum(e => e.Health);
+    static double BclHealth(Scene s) => s.Root.GetComponentsInChildren<Enemy>().Sum(static e => e.Health);
 
-    static double BclFind(Scene s) => Node.GetChildren(s.Root).FirstOrDefault(n => n.Name == "Boss") is null ? 0 : 1;
+    static double BclFind(Scene s) => Node.GetChildren(s.Root).FirstOrDefault(static n => n.Name == "Boss") is null ? 0 : 1;
 
     static double BclNearest(Scene s) =>
         Distance(s.Root.GetComponentsInChildren<Pickup>().MinBy(p => Distance(p, s.Player))!, s.Player);
@@ -117,7 +136,11 @@ static class UserTraversalBenchmarks
         {
             for (var node = leaf.Parent; node is not null; node = node.Parent)
             {
-                if (!node.HasComponent<Squad>()) continue;
+                if (!node.HasComponent<Squad>())
+                {
+                    continue;
+                }
+
                 found++;
                 break;
             }
@@ -127,7 +150,7 @@ static class UserTraversalBenchmarks
     }
 
     static double BclWeakest(Scene s) =>
-        s.Root.GetComponentsInChildren<Enemy>().OrderBy(e => e.Health).Take(10).Sum(e => e.Health);
+        s.Root.GetComponentsInChildren<Enemy>().OrderBy(static e => e.Health).Take(10).Sum(static e => e.Health);
 
     // Hand loops: the allocation-free list query with reused buffers.
 
@@ -140,8 +163,13 @@ static class UserTraversalBenchmarks
         s.Root.GetComponentsInChildren(Enemies);
         var count = 0;
         foreach (var enemy in Enemies)
+        {
             if (Near(enemy, s.Player))
+            {
                 count++;
+            }
+        }
+
         return count;
     }
 
@@ -149,18 +177,33 @@ static class UserTraversalBenchmarks
     {
         s.Root.GetComponentsInChildren(Enemies);
         var sum = 0;
-        foreach (var enemy in Enemies) sum += enemy.Health;
+        foreach (var enemy in Enemies)
+        {
+            sum += enemy.Health;
+        }
+
         return sum;
     }
 
     static double LoopFind(Scene s)
     {
         Pending.Clear();
-        for (var i = s.Root.Children.Count - 1; i >= 0; i--) Pending.Push(s.Root.Children[i]);
+        for (var i = s.Root.Children.Count - 1; i >= 0; i--)
+        {
+            Pending.Push(s.Root.Children[i]);
+        }
+
         while (Pending.TryPop(out var node))
         {
-            if (node.Name == "Boss") return 1;
-            for (var i = node.Children.Count - 1; i >= 0; i--) Pending.Push(node.Children[i]);
+            if (node.Name == "Boss")
+            {
+                return 1;
+            }
+
+            for (var i = node.Children.Count - 1; i >= 0; i--)
+            {
+                Pending.Push(node.Children[i]);
+            }
         }
 
         return 0;
@@ -170,7 +213,11 @@ static class UserTraversalBenchmarks
     {
         s.Root.GetComponentsInChildren(Pickups);
         var best = float.MaxValue;
-        foreach (var pickup in Pickups) best = MathF.Min(best, Distance(pickup, s.Player));
+        foreach (var pickup in Pickups)
+        {
+            best = MathF.Min(best, Distance(pickup, s.Player));
+        }
+
         return best;
     }
 
@@ -181,7 +228,11 @@ static class UserTraversalBenchmarks
         s.Root.GetComponentsInChildren(Enemies);
         Enemies.Sort(static (a, b) => a.Health.CompareTo(b.Health));
         var sum = 0;
-        for (var i = 0; i < Math.Min(10, Enemies.Count); i++) sum += Enemies[i].Health;
+        for (var i = 0; i < Math.Min(10, Enemies.Count); i++)
+        {
+            sum += Enemies[i].Health;
+        }
+
         return sum;
     }
 }

@@ -17,9 +17,11 @@ public abstract record PackageSource
         ArgumentNullException.ThrowIfNull(spec);
 
         if (spec.StartsWith("builtin:", StringComparison.Ordinal))
+        {
             return spec.Length > "builtin:".Length
                 ? new BuiltinSource(spec["builtin:".Length..])
                 : throw new PackageException($"'{spec}' names no built-in package.");
+        }
 
         if (spec.StartsWith("file:", StringComparison.Ordinal))
         {
@@ -37,7 +39,9 @@ public abstract record PackageSource
 
             // A relative local repository is found from the declaring file, like a file: path.
             if (repository.StartsWith("./", StringComparison.Ordinal) || repository.StartsWith("../", StringComparison.Ordinal))
+            {
                 repository = Path.GetFullPath(repository, baseDirectory);
+            }
 
             return new GitSource(repository, reference);
         }

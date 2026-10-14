@@ -27,17 +27,25 @@ public sealed class PackageImportOverrides
     {
         var overrides = new PackageImportOverrides();
         var path = Path.Combine(projectRoot, RelativePath);
-        if (!File.Exists(path)) return overrides;
+        if (!File.Exists(path))
+        {
+            return overrides;
+        }
 
         try
         {
             if (JsonNode.Parse(File.ReadAllText(path)) is not JsonObject root)
+            {
                 throw new InvalidDataException($"{path} must hold a JSON object.");
+            }
 
             foreach (var (key, value) in root)
             {
                 if (!Guid.TryParse(key, out var id) || value is not JsonObject patch)
+                {
                     throw new InvalidDataException($"{path}: '{key}' must be an asset id with an object of settings.");
+                }
+
                 overrides.entries[id] = patch.DeepClone().AsObject();
             }
         }
@@ -61,15 +69,26 @@ public sealed class PackageImportOverrides
     /// <exception cref="ArgumentException">The property identifies the asset and cannot be overridden.</exception>
     public void Set(Guid id, string property, JsonNode? value)
     {
-        if (Protected.Contains(property)) throw new ArgumentException($"{property} cannot be overridden.", nameof(property));
+        if (Protected.Contains(property))
+        {
+            throw new ArgumentException($"{property} cannot be overridden.", nameof(property));
+        }
 
         if (value is null)
         {
-            if (entries.TryGetValue(id, out var existing) && existing.Remove(property) && existing.Count == 0) entries.Remove(id);
+            if (entries.TryGetValue(id, out var existing) && existing.Remove(property) && existing.Count == 0)
+            {
+                entries.Remove(id);
+            }
+
             return;
         }
 
-        if (!entries.TryGetValue(id, out var patch)) entries[id] = patch = [];
+        if (!entries.TryGetValue(id, out var patch))
+        {
+            entries[id] = patch = [];
+        }
+
         patch[property] = value.DeepClone();
     }
 
@@ -80,12 +99,20 @@ public sealed class PackageImportOverrides
         var path = Path.Combine(projectRoot, RelativePath);
         if (entries.Count == 0)
         {
-            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
             return;
         }
 
         var root = new JsonObject();
-        foreach (var (id, patch) in entries) root[id.ToString()] = patch.DeepClone();
+        foreach (var (id, patch) in entries)
+        {
+            root[id.ToString()] = patch.DeepClone();
+        }
+
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
@@ -96,12 +123,18 @@ public sealed class PackageImportOverrides
     /// <returns>The JSON to load the meta from.</returns>
     public string Apply(Guid id, string metaJson)
     {
-        if (!entries.TryGetValue(id, out var patch)) return metaJson;
+        if (!entries.TryGetValue(id, out var patch))
+        {
+            return metaJson;
+        }
 
         var meta = JsonNode.Parse(metaJson)!.AsObject();
         foreach (var (property, value) in patch)
         {
-            if (!Protected.Contains(property)) meta[property] = value?.DeepClone();
+            if (!Protected.Contains(property))
+            {
+                meta[property] = value?.DeepClone();
+            }
         }
 
         return meta.ToJsonString();

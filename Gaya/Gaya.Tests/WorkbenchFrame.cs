@@ -20,14 +20,22 @@ sealed class WorkbenchFrame : IDisposable
         var registrations = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
             .AddSingleton<IEditorSettings>(settings).AddSingleton<IThemeService>(themes)
             .AddSingleton(Blocker);
-        if (identity is not null) registrations.AddSingleton(identity);
+        if (identity is not null)
+        {
+            registrations.AddSingleton(identity);
+        }
+
         var services = registrations.BuildServiceProvider();
         application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
             new MenuRegistry(), Chrome, new ShortcutService(NullLogger.Instance),
             new FocusTracker(), [], settings: settings, themes: themes);
         Workbench = new Workbench(application, null,
             new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
-        if (zoom is { } scale) application.Themes.SetScale(ThemeTokens.Default.FontSize, scale);
+        if (zoom is { } scale)
+        {
+            application.Themes.SetScale(ThemeTokens.Default.FontSize, scale);
+        }
+
         Input.MousePosition.Returns(new Vector2(-1, -1));
         Input.PrevMousePosition.Returns(new Vector2(-1, -1));
         Gui.Input = Input;
@@ -107,6 +115,11 @@ sealed class WorkbenchFrame : IDisposable
     {
         yield return node;
         foreach (var child in node.Children)
-            foreach (var descendant in Descendants(child)) yield return descendant;
+        {
+            foreach (var descendant in Descendants(child))
+            {
+                yield return descendant;
+            }
+        }
     }
 }

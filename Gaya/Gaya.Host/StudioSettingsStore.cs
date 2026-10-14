@@ -29,7 +29,11 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     {
         ArgumentNullException.ThrowIfNull(page);
 
-        if (Load()?[previousId ?? page.Id] is JsonObject values) RestoreMembers(page, values);
+        if (Load()?[previousId ?? page.Id] is JsonObject values)
+        {
+            RestoreMembers(page, values);
+        }
+
         restored[page.Id] = SerializePage(page)?.DeepClone();
     }
 
@@ -37,8 +41,15 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     {
         foreach (var (name, value) in values)
         {
-            if (value is null) continue;
-            if (Writable(page.Target.GetType(), name) is not { } member) continue;
+            if (value is null)
+            {
+                continue;
+            }
+
+            if (Writable(page.Target.GetType(), name) is not { } member)
+            {
+                continue;
+            }
 
             try
             {
@@ -63,17 +74,27 @@ public sealed class StudioSettingsStore(ILogger log, string path)
             var snapshots = new Dictionary<string, JsonNode?>();
             foreach (var page in pages)
             {
-                if (SerializePage(page) is not { } values) continue;
+                if (SerializePage(page) is not { } values)
+                {
+                    continue;
+                }
+
                 MergePage(document, page.Id, values);
                 snapshots[page.Id] = values;
             }
 
             var directory = System.IO.Path.GetDirectoryName(Path);
-            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
             WriteDocument(document);
             stored = document;
-            foreach (var (id, values) in snapshots) restored[id] = values;
+            foreach (var (id, values) in snapshots)
+            {
+                restored[id] = values;
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -94,7 +115,11 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     void MergePage(JsonObject document, string id, JsonNode values)
     {
         restored.TryGetValue(id, out var baseline);
-        if (JsonNode.DeepEquals(values, baseline) && document.ContainsKey(id)) return;
+        if (JsonNode.DeepEquals(values, baseline) && document.ContainsKey(id))
+        {
+            return;
+        }
+
         if (values is not JsonObject members || document[id] is not JsonObject existing)
         {
             document[id] = values.DeepClone();
@@ -103,7 +128,11 @@ public sealed class StudioSettingsStore(ILogger log, string path)
         foreach (var (name, value) in members)
         {
             if (baseline is JsonObject original && JsonNode.DeepEquals(value, original[name])
-                && existing.ContainsKey(name)) continue;
+                && existing.ContainsKey(name))
+            {
+                continue;
+            }
+
             existing[name] = value?.DeepClone();
         }
     }
@@ -114,12 +143,19 @@ public sealed class StudioSettingsStore(ILogger log, string path)
         try
         {
             File.WriteAllText(temporary, document.ToJsonString(JsonOptions));
-            if (File.Exists(Path)) File.Copy(Path, $"{Path}.bak", overwrite: true);
+            if (File.Exists(Path))
+            {
+                File.Copy(Path, $"{Path}.bak", overwrite: true);
+            }
+
             File.Move(temporary, Path, overwrite: true);
         }
         finally
         {
-            if (File.Exists(temporary)) File.Delete(temporary);
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
         }
     }
 
@@ -130,7 +166,10 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     /// <summary>The file's contents, read once and kept, or null when there is nothing usable.</summary>
     JsonObject? Load()
     {
-        if (stored is not null) return stored;
+        if (stored is not null)
+        {
+            return stored;
+        }
 
         try
         {
@@ -149,7 +188,11 @@ public sealed class StudioSettingsStore(ILogger log, string path)
     {
         const BindingFlags scope = BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase;
 
-        if (type.GetProperty(name, scope) is { CanWrite: true } property) return property;
+        if (type.GetProperty(name, scope) is { CanWrite: true } property)
+        {
+            return property;
+        }
+
         return type.GetField(name, scope) is { IsInitOnly: false } field ? field : null;
     }
 
@@ -158,7 +201,13 @@ public sealed class StudioSettingsStore(ILogger log, string path)
 
     static void SetValue(MemberInfo member, object target, object? value)
     {
-        if (member is PropertyInfo property) property.SetValue(target, value);
-        else ((FieldInfo)member).SetValue(target, value);
+        if (member is PropertyInfo property)
+        {
+            property.SetValue(target, value);
+        }
+        else
+        {
+            ((FieldInfo)member).SetValue(target, value);
+        }
     }
 }

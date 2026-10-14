@@ -159,7 +159,7 @@ public static class PluginHost
 
         logger.LogInformation("Gaya loaded {Count} plugin(s): {Plugins}", loaded.Count, string.Join(", ", loaded));
         return new GayaApplication(provider, panels, commands, menus, chrome, shortcuts,
-            focus, loaded, [.. instances.Select(entry => entry.Plugin)], settings, themes, logger);
+            focus, loaded, [.. instances.Select(static entry => entry.Plugin)], settings, themes, logger);
     }
 
     /// <summary>
@@ -169,7 +169,7 @@ public static class PluginHost
     static void RegisterShellCommands(CommandRegistry commands, ShortcutService shortcuts)
     {
         commands.Register(new CommandDescriptor(ShellCommands.CommandPalette, "View: Command Palette",
-            services => services.GetRequiredService<IShellHost>().ToggleCommandPalette())
+            static services => services.GetRequiredService<IShellHost>().ToggleCommandPalette())
         { MenuLabel = "Command Palette" });
 
         shortcuts.Add(new KeyBinding(ShellCommands.CommandPalette, KeyboardKey.P,
@@ -256,21 +256,35 @@ public static class PluginHost
 
         void Visit(string id)
         {
-            if (state.GetValueOrDefault(id) == 2) return;
+            if (state.GetValueOrDefault(id) == 2)
+            {
+                return;
+            }
+
             if (state.GetValueOrDefault(id) == 1)
+            {
                 throw new InvalidOperationException($"Plugin dependency cycle involving '{id}'.");
+            }
+
             if (!byId.TryGetValue(id, out var plugin))
+            {
                 throw new InvalidOperationException($"Plugin depends on missing plugin '{id}'.");
+            }
 
             state[id] = 1;
             foreach (var dep in plugin.Type.GetCustomAttributes<PluginDependsOnAttribute>())
+            {
                 Visit(dep.PluginId);
+            }
+
             state[id] = 2;
             result.Add(plugin);
         }
 
         foreach (var plugin in plugins.OrderBy(p => p.Attr.Id, StringComparer.Ordinal))
+        {
             Visit(plugin.Attr.Id);
+        }
 
         return result;
     }

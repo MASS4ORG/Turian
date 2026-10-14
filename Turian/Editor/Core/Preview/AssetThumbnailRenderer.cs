@@ -9,18 +9,33 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
     /// <summary>Renders a static thumbnail, honoring custom texture and scene preview providers.</summary>
     public SKImage? Render(AssetEntry entry, int size)
     {
-        if (entry.AssetMetadata is not { } asset) return null;
+        if (entry.AssetMetadata is not { } asset)
+        {
+            return null;
+        }
+
         var provider = catalog.GetProvider(asset.GetType());
-        if (provider is null) return null;
+        if (provider is null)
+        {
+            return null;
+        }
+
         if (provider.GetType() == typeof(TextureAssetPreviewProvider) && Decode(entry.AbsolutePath, size) is { } decoded)
+        {
             return decoded;
+        }
+
         EnsureViewer(size);
         return RenderProvider(asset, provider);
     }
 
     void EnsureViewer(int size)
     {
-        if (viewer is not null && viewer.Width == size) return;
+        if (viewer is not null && viewer.Width == size)
+        {
+            return;
+        }
+
         viewer?.Dispose();
         viewer = new SceneViewerService(vulkan, assets, (uint)size, (uint)size) { ClearColor = Vector4.Zero };
     }
@@ -28,7 +43,11 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
     SKImage? RenderProvider(Asset asset, IAssetPreviewProvider provider)
     {
         var service = viewer!;
-        if (!SetOverlay(asset, provider)) return null;
+        if (!SetOverlay(asset, provider))
+        {
+            return null;
+        }
+
         AssetPreviewScene? scene = null;
         try
         {
@@ -50,7 +69,11 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
 
     AssetPreviewScene? BuildScene(Asset asset, IAssetPreviewProvider provider)
     {
-        if (provider is not IScenePreviewProvider sceneProvider) return null;
+        if (provider is not IScenePreviewProvider sceneProvider)
+        {
+            return null;
+        }
+
         var scene = sceneProvider.BuildPreview(asset, vulkan, assets);
         AssetPreviewServices.Initialize(scene, vulkan, assets);
         viewer!.FrameBounds(scene.Bounds);
@@ -60,12 +83,20 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
     static SKImage? Decode(string path, int size)
     {
         using var codec = SKCodec.Create(path);
-        if (codec is null) return null;
+        if (codec is null)
+        {
+            return null;
+        }
+
         var scale = Math.Min(1f, size / (float)Math.Max(codec.Info.Width, codec.Info.Height));
         var dimensions = codec.GetScaledDimensions(scale);
         var info = new SKImageInfo(dimensions.Width, dimensions.Height);
         using var bitmap = SKBitmap.Decode(codec, info);
-        if (bitmap is null) return null;
+        if (bitmap is null)
+        {
+            return null;
+        }
+
         var target = new SKImageInfo(Math.Max(1, (int)(codec.Info.Width * scale)),
             Math.Max(1, (int)(codec.Info.Height * scale)));
         using var resized = bitmap.Resize(target, new SKSamplingOptions(SKFilterMode.Linear));

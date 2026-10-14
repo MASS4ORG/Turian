@@ -15,7 +15,11 @@ public static class InspectorSelectionEdits
 
     static void Apply(FormField field, Func<object?, object?> edit, string label, UndoService? undo)
     {
-        if (field.IsReadOnly) return;
+        if (field.IsReadOnly)
+        {
+            return;
+        }
+
         undo?.BeginGesture();
         try
         {
@@ -27,9 +31,15 @@ public static class InspectorSelectionEdits
 
     static void RecordOwners(FormField field, string label, UndoService? undo)
     {
-        if (undo is null) return;
-        foreach (var owner in field.Sources.Select(source => source.Target).OfType<IdObject>().Distinct())
+        if (undo is null)
+        {
+            return;
+        }
+
+        foreach (var owner in field.Sources.Select(static source => source.Target).OfType<IdObject>().Distinct())
+        {
             undo.RecordObject(owner, label);
+        }
     }
 
     static void WriteOwners(FormField field, Func<object?, object?> edit)
@@ -38,7 +48,10 @@ public static class InspectorSelectionEdits
         {
             var value = source.GetValue();
             var edited = edit(value);
-            if (!ReferenceEquals(value, edited) && !Equals(value, edited)) source.SetValue(edited);
+            if (!ReferenceEquals(value, edited) && !Equals(value, edited))
+            {
+                source.SetValue(edited);
+            }
         }
     }
 
@@ -48,8 +61,14 @@ public static class InspectorSelectionEdits
         var edited = original.ToList();
         foreach (var (tag, selected) in changes)
         {
-            if (!selected) edited.RemoveAll(item => string.Equals(item, tag, StringComparison.Ordinal));
-            else if (!edited.Contains(tag, StringComparer.Ordinal)) edited.Add(tag);
+            if (!selected)
+            {
+                edited.RemoveAll(item => string.Equals(item, tag, StringComparison.Ordinal));
+            }
+            else if (!edited.Contains(tag, StringComparer.Ordinal))
+            {
+                edited.Add(tag);
+            }
         }
         return original.SequenceEqual(edited) ? value : new ObservableCollection<string>(edited);
     }

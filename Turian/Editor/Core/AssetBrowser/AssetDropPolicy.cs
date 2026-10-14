@@ -9,11 +9,23 @@ public static class AssetDropPolicy
     /// <summary>Returns a move or brick-copy request, or null for an invalid or mixed drop.</summary>
     public static AssetDrop? Resolve(AssetEntry target, object payload, IReadOnlyList<AssetEntry> entries)
     {
-        if (!target.IsDirectory || target.IsReadOnly) return null;
+        if (!target.IsDirectory || target.IsReadOnly)
+        {
+            return null;
+        }
+
         var carried = Carried(payload, entries);
-        if (!ValidSources(carried, target.AbsolutePath)) return null;
-        var copy = carried.All(entry => entry.IsReadOnly);
-        if (!copy && carried.Any(entry => entry.IsReadOnly)) return null;
+        if (!ValidSources(carried, target.AbsolutePath))
+        {
+            return null;
+        }
+
+        var copy = carried.All(static entry => entry.IsReadOnly);
+        if (!copy && carried.Any(static entry => entry.IsReadOnly))
+        {
+            return null;
+        }
+
         return new AssetDrop(target.AbsolutePath, carried, copy);
     }
 

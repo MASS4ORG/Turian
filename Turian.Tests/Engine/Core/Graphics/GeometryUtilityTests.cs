@@ -96,8 +96,8 @@ public sealed class GeometryUtilityTests
     [Fact]
     public void ValidatesStorageAndToleratesDegenerateMatrices()
     {
-        Assert.Throws<ArgumentNullException>(() => GeometryUtility.CalculateFrustumPlanes(null!));
-        Assert.Throws<ArgumentException>(() => GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, new Plane[5]));
+        Assert.Throws<ArgumentNullException>(static () => GeometryUtility.CalculateFrustumPlanes(null!));
+        Assert.Throws<ArgumentException>(static () => GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, new Plane[5]));
         var planes = new Plane[6];
         GeometryUtility.CalculateFrustumPlanes(default, planes);
         Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(100f), new Vector3(101f))));

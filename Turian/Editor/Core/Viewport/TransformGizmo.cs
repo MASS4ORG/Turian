@@ -104,9 +104,16 @@ public sealed partial class TransformGizmo
     public void ProcessPointerDown(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
         ArgumentNullException.ThrowIfNull(camera);
-        if (!CanInteract || isDragging) return;
+        if (!CanInteract || isDragging)
+        {
+            return;
+        }
+
         var hit = HitTest(screenPos, camera, viewportSize);
-        if (hit.Axis == TransformGizmoAxis.None) return;
+        if (hit.Axis == TransformGizmoAxis.None)
+        {
+            return;
+        }
 
         axis = hit.Axis;
         handleMode = hit.Mode;
@@ -119,7 +126,11 @@ public sealed partial class TransformGizmo
         axisStartPointerWorld = IntersectScreenPlane(screenPos, camera, viewportSize, axisStartAnchorWorld)
             ?? axisStartAnchorWorld;
         InitializeScaleDirection(camera, viewportSize);
-        if (handleMode == TransformGizmoMode.Rotate) BeginRotation(screenPos, camera, viewportSize);
+        if (handleMode == TransformGizmoMode.Rotate)
+        {
+            BeginRotation(screenPos, camera, viewportSize);
+        }
+
         DragStarted?.Invoke();
     }
 
@@ -159,7 +170,10 @@ public sealed partial class TransformGizmo
             case TransformGizmoMode.Scale: ApplyScale(screenPos); break;
             case TransformGizmoMode.Translate:
                 if (IntersectScreenPlane(screenPos, camera, viewportSize, axisStartAnchorWorld) is { } point)
+                {
                     ApplyTranslation(point);
+                }
+
                 break;
         }
     }
@@ -167,7 +181,11 @@ public sealed partial class TransformGizmo
     /// <summary>Ends the active drag and clears its highlight.</summary>
     public void ProcessPointerUp()
     {
-        if (!isDragging) return;
+        if (!isDragging)
+        {
+            return;
+        }
+
         isDragging = false;
         axis = TransformGizmoAxis.None;
         DragEnded?.Invoke();
@@ -176,7 +194,10 @@ public sealed partial class TransformGizmo
     /// <summary>Clears a hover highlight when the pointer leaves the viewport.</summary>
     public void ClearHover()
     {
-        if (!isDragging) axis = TransformGizmoAxis.None;
+        if (!isDragging)
+        {
+            axis = TransformGizmoAxis.None;
+        }
     }
 
     void ApplyTranslation(Vector3 hitWorld)
@@ -201,7 +222,11 @@ public sealed partial class TransformGizmo
         var delta = screenPos - dragStartScreen;
         var amount = axis == TransformGizmoAxis.Center ? (delta.X - delta.Y) * 0.005f : ScaleTravel(delta);
         var factor = 1f + amount;
-        if (SnapEnabled && SnapScale > 0f) factor = SnapValue(factor, SnapScale);
+        if (SnapEnabled && SnapScale > 0f)
+        {
+            factor = SnapValue(factor, SnapScale);
+        }
+
         factor = MathF.Max(factor, 0.01f);
         var mask = AxisMask(axis);
         transformSelection!.Scale(Vector3.One + mask * (factor - 1f));
@@ -253,9 +278,17 @@ public sealed partial class TransformGizmo
     static Vector3? IntersectScreenPlane(
         Vector2 screenPos, ICamera camera, Vector2 viewportSize, Vector3 planeOrigin)
     {
-        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray) return null;
+        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray)
+        {
+            return null;
+        }
+
         var denominator = Vector3.Dot(camera.Front, ray.Direction);
-        if (MathF.Abs(denominator) < 1e-6f) return null;
+        if (MathF.Abs(denominator) < 1e-6f)
+        {
+            return null;
+        }
+
         var distance = Vector3.Dot(planeOrigin - ray.Origin, camera.Front) / denominator;
         return distance > 0f ? ray.GetPoint(distance) : null;
     }

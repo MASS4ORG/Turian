@@ -29,7 +29,11 @@ public class AssetFileOperationsTests : IDisposable
     public void Dispose()
     {
         undo.Dispose();
-        if (Directory.Exists(project)) Directory.Delete(project, recursive: true);
+        if (Directory.Exists(project))
+        {
+            Directory.Delete(project, recursive: true);
+        }
+
         GC.SuppressFinalize(this);
     }
 

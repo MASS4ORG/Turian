@@ -18,16 +18,25 @@ public sealed partial class AssetImporter
 
     void EnsureAssetImported(string filePath, bool overwriteExisting)
     {
-        if (!CanImportSource(filePath)) return;
+        if (!CanImportSource(filePath))
+        {
+            return;
+        }
 
         var metaFilePath = GetMetaFilePath(filePath);
 
         // A store package is shared and read-only: it must ship its metas, and its files never change.
-        if (TryRegisterReadOnlyAsset(filePath, metaFilePath)) return;
+        if (TryRegisterReadOnlyAsset(filePath, metaFilePath))
+        {
+            return;
+        }
 
         if (!overwriteExisting && File.Exists(metaFilePath))
         {
-            if (TryRegisterMetadata(metaFilePath)) return;
+            if (TryRegisterMetadata(metaFilePath))
+            {
+                return;
+            }
         }
 
         Asset asset;
@@ -43,7 +52,10 @@ public sealed partial class AssetImporter
 
         SaveAssetMetadata(asset, metaFilePath);
 
-        if (!TryImportAssetToCache(asset, filePath, out _, out _)) return;
+        if (!TryImportAssetToCache(asset, filePath, out _, out _))
+        {
+            return;
+        }
 
         logger.LogInformation(
             "Asset metadata {Action}: {MetaFilePath}",
@@ -71,7 +83,11 @@ public sealed partial class AssetImporter
     static void SaveAssetMetadata(Asset asset, string path)
     {
         var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         File.WriteAllText(path, SerializeAssetMetadata(asset));
     }
 
@@ -80,9 +96,20 @@ public sealed partial class AssetImporter
 
     bool TryRegisterReadOnlyAsset(string path, string metaPath)
     {
-        if (PackageRootOf(path) is not { ReadOnly: true }) return false;
-        if (File.Exists(metaPath)) RegisterExistingMetaFile(metaPath);
-        else logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", path);
+        if (PackageRootOf(path) is not { ReadOnly: true })
+        {
+            return false;
+        }
+
+        if (File.Exists(metaPath))
+        {
+            RegisterExistingMetaFile(metaPath);
+        }
+        else
+        {
+            logger.LogWarning("Package asset {FilePath} has no meta file and cannot be given one; it is skipped", path);
+        }
+
         return true;
     }
 
@@ -145,15 +172,26 @@ public sealed partial class AssetImporter
             return false;
         }
 
-        if (!TryImportAssetToCache(asset, assetPath, out var imported, out var indexValid)) return true;
+        if (!TryImportAssetToCache(asset, assetPath, out var imported, out var indexValid))
+        {
+            return true;
+        }
+
         if (imported || !indexValid)
+        {
             FinishAssetImport(asset, assetPath, notify: false);
+        }
+
         return true;
     }
 
     Asset ApplyImportOverrides(Asset asset, string path)
     {
-        if (PackageRootOf(path) is null || importOverrides.Get(asset.Id) is null) return asset;
+        if (PackageRootOf(path) is null || importOverrides.Get(asset.Id) is null)
+        {
+            return asset;
+        }
+
         return Serializer.LoadData<Asset>(importOverrides.Apply(asset.Id, SerializeAssetMetadata(asset))) ?? asset;
     }
 
@@ -214,10 +252,16 @@ public sealed partial class AssetImporter
     /// </summary>
     Asset UpgradeUntypedMetadata(Asset existing, string filePath)
     {
-        if (existing.GetType() != typeof(Asset)) return existing;
+        if (existing.GetType() != typeof(Asset))
+        {
+            return existing;
+        }
 
         var typed = CreateAssetMetadata(filePath);
-        if (typed.GetType() == typeof(Asset)) return existing;
+        if (typed.GetType() == typeof(Asset))
+        {
+            return existing;
+        }
 
         typed.Id = existing.Id;
         return typed;

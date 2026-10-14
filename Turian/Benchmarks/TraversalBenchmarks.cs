@@ -16,7 +16,11 @@ static class TraversalBenchmarks
         Report("Enumerable (foreach)", () =>
         {
             var count = 0;
-            foreach (var _ in root.GetComponentsInChildren<Marker>()) count++;
+            foreach (var _ in root.GetComponentsInChildren<Marker>())
+            {
+                count++;
+            }
+
             return count;
         });
         Report("Into a reused List<T>", () =>
@@ -32,8 +36,16 @@ static class TraversalBenchmarks
         for (var i = 0; i < nodeCount; i++)
         {
             nodes[i] = new Node();
-            if (i % componentStride == 0) nodes[i].Components.Add(new Marker());
-            if (i == 0) continue;
+            if (i % componentStride == 0)
+            {
+                nodes[i].Components.Add(new Marker());
+            }
+
+            if (i == 0)
+            {
+                continue;
+            }
+
             var parent = nodes[(i - 1) / 4];
             nodes[i].Parent = parent;
             parent.Children.Add(nodes[i]);
@@ -44,7 +56,11 @@ static class TraversalBenchmarks
 
     static void Report(string label, Func<int> query)
     {
-        for (var i = 0; i < 3; i++) query();
+        for (var i = 0; i < 3; i++)
+        {
+            query();
+        }
+
         var times = new List<double>(runs);
         for (var i = 0; i < runs; i++)
         {

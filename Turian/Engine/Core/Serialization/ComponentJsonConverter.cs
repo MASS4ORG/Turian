@@ -2,7 +2,7 @@ namespace Turian.Engine.Core;
 
 /// <summary>
 /// JSON converter for polymorphic serialization/deserialization of Component types.
-/// Uses stable <see cref="System.Guid"/> ids declared with <see cref="TypeIdAttribute"/> and
+/// Uses stable <see cref="Guid"/> ids declared with <see cref="TypeIdAttribute"/> and
 /// resolved through <see cref="TypeRegistry"/> so renames and namespace changes do not
 /// break serialized scenes/prefabs.
 /// </summary>
@@ -17,14 +17,18 @@ public class ComponentJsonConverter : JsonConverter<Component>
         var root = doc.RootElement;
 
         if (!root.TryGetProperty(ObjectJsonSerializer<Component>.TypeIdProperty, out var typeIdProp))
+        {
             throw new JsonException($"Missing {ObjectJsonSerializer<Component>.TypeIdProperty} on Component");
+        }
 
         var typeIdString = typeIdProp.GetString()
             ?? throw new JsonException($"{ObjectJsonSerializer<Component>.TypeIdProperty} is null");
 
         if (!Guid.TryParse(typeIdString, out var typeId))
+        {
             throw new JsonException(
                 $"{ObjectJsonSerializer<Component>.TypeIdProperty} is not a valid Guid: '{typeIdString}'");
+        }
 
         var type = ResolveType(typeId);
 
@@ -48,7 +52,11 @@ public class ComponentJsonConverter : JsonConverter<Component>
 
         foreach (var prop in root.EnumerateObject())
         {
-            if (prop.Name == ObjectJsonSerializer<Component>.TypeIdProperty) continue;
+            if (prop.Name == ObjectJsonSerializer<Component>.TypeIdProperty)
+            {
+                continue;
+            }
+
             TrySetMember(instance, type, prop, options);
         }
 
@@ -80,11 +88,11 @@ public class ComponentJsonConverter : JsonConverter<Component>
 
         var members = value.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p is { CanRead: true, CanWrite: true } && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
+            .Where(static p => p is { CanRead: true, CanWrite: true } && p.GetCustomAttribute<JsonIgnoreAttribute>() is null)
             .Cast<MemberInfo>()
             .Concat(value.GetType()
                 .GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Where(f => f.GetCustomAttribute<JsonIgnoreAttribute>() is null));
+                .Where(static f => f.GetCustomAttribute<JsonIgnoreAttribute>() is null));
 
         foreach (var member in members)
         {
@@ -94,10 +102,17 @@ public class ComponentJsonConverter : JsonConverter<Component>
                 FieldInfo f => (f.Name, f.FieldType, f.GetValue(value)),
                 _ => default
             };
-            if (name is null) continue;
+            if (name is null)
+            {
+                continue;
+            }
+
             if (ObjectReferences.IsSavedAsReference(member, memberType, allowSceneObjects: true)
                 && ObjectReferences.TryWrite(writer, value, name, memberType, memberValue, allowSceneObjects: true))
+            {
                 continue;
+            }
+
             writer.WritePropertyName(name);
             JsonSerializer.Serialize(writer, memberValue, memberType, options);
         }
@@ -126,7 +141,11 @@ public class ComponentJsonConverter : JsonConverter<Component>
     {
         // Members Write skips are skipped here too, so values older files still carry for them are not applied.
         var property = type.GetProperty(prop.Name, BindingFlags.Public | BindingFlags.Instance);
-        if (property?.GetCustomAttribute<JsonIgnoreAttribute>() is not null) return;
+        if (property?.GetCustomAttribute<JsonIgnoreAttribute>() is not null)
+        {
+            return;
+        }
+
         if (property?.CanWrite == true)
         {
             if (ObjectReferences.IsSavedAsReference(property, property.PropertyType, allowSceneObjects: true)
@@ -141,7 +160,11 @@ public class ComponentJsonConverter : JsonConverter<Component>
             return;
         }
         var field = type.GetField(prop.Name, BindingFlags.Public | BindingFlags.Instance);
-        if (field is null || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null) return;
+        if (field is null || field.GetCustomAttribute<JsonIgnoreAttribute>() is not null)
+        {
+            return;
+        }
+
         field.SetValue(instance,
             ObjectReferences.IsSavedAsReference(field, field.FieldType, allowSceneObjects: true)
             && ObjectReferences.TryRead(instance, prop.Name, field.FieldType, prop.Value, true, out var fieldReference)

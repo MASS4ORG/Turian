@@ -30,8 +30,15 @@ static class UnityMaterialConverter
             EmissiveTexture = Texture(First(textures, "_EmissionMap"), context, notes),
             MetallicRoughnessTexture = Texture(First(textures, "_MetallicGlossMap"), context, notes),
         };
-        if (ReadColor(First(colors, "_EmissionColor")) is { } emission) result.EmissiveFactor = new Vector3(emission.X, emission.Y, emission.Z);
-        if (result.MetallicRoughnessTexture is not null) notes.Add("metallic map: Unity packs smoothness in alpha, glTF packs roughness in green");
+        if (ReadColor(First(colors, "_EmissionColor")) is { } emission)
+        {
+            result.EmissiveFactor = new Vector3(emission.X, emission.Y, emission.Z);
+        }
+
+        if (result.MetallicRoughnessTexture is not null)
+        {
+            notes.Add("metallic map: Unity packs smoothness in alpha, glTF packs roughness in green");
+        }
 
         var target = context.Place(Path.ChangeExtension(relative, ".material"));
         Serializer.Save(target, result);
@@ -45,7 +52,10 @@ static class UnityMaterialConverter
         var properties = new Dictionary<string, UnityYamlValue>(StringComparer.Ordinal);
         foreach (var item in sequence?.Items ?? [])
         {
-            if (item is UnityYamlMap { Entries.Count: > 0 } map) properties[map.Entries[0].Key] = map.Entries[0].Value;
+            if (item is UnityYamlMap { Entries.Count: > 0 } map)
+            {
+                properties[map.Entries[0].Key] = map.Entries[0].Value;
+            }
         }
 
         return properties;
@@ -61,9 +71,14 @@ static class UnityMaterialConverter
     {
         if (property?["m_Texture"] is not { } texture || !Guid.TryParseExact(texture["guid"]?.Text ?? string.Empty, "N", out var guid)
             || guid == Guid.Empty)
+        {
             return null;
+        }
 
-        if (context.Has(guid)) return new AssetReference<TextureAsset>(guid);
+        if (context.Has(guid))
+        {
+            return new AssetReference<TextureAsset>(guid);
+        }
 
         notes.Add($"texture {guid:N} is not in this package");
         return null;

@@ -57,7 +57,9 @@ sealed unsafe class HzbTarget : IDisposable
             if (!new DescriptorSetWriter(vulkan.Vk, vulkan.Device, reductionSet)
                 .WriteImage(0, source).WriteImage(1, destination)
                 .Build(pool, reductionSet.GetDescriptorSetLayout(), ref reductions[i]))
+            {
                 throw new VulkanException("HZB descriptor allocation failed.");
+            }
         }
     }
 

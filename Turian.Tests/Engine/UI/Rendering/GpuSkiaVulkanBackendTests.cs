@@ -26,8 +26,11 @@ public sealed class GpuSkiaVulkanBackendTests(VulkanFixture fixture) : IClassFix
             var expected = Composite(viewer, cpu.Texture!);
             var actual = Composite(viewer, texture);
             for (var i = 0; i < expected.Length; i++)
+            {
                 Assert.True(Math.Abs(actual[i] - expected[i]) <= 2,
                     $"Channel {i}: CPU {expected[i]}, GPU {actual[i]}");
+            }
+
             gpu.Render(DrawPattern);
             Assert.Same(texture, gpu.Texture);
         }
@@ -84,8 +87,10 @@ public sealed class GpuSkiaVulkanBackendTests(VulkanFixture fixture) : IClassFix
             viewer.WorldUiSource = _ => [new WorldUiQuad(gpu.Texture!, model)];
             var actual = Composite(viewer, null);
             for (var i = 0; i < expected.Length; i++)
+            {
                 Assert.True(Math.Abs(actual[i] - expected[i]) <= 2,
                     $"World channel {i}: CPU {expected[i]}, GPU {actual[i]}");
+            }
         }
         viewer.WorldUiSource = null;
     }

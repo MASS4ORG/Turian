@@ -13,7 +13,9 @@ public sealed class ThemeIconTests
         using var frame = Frame(theme);
 
         foreach (var id in Icons.All)
+        {
             Assert.True(frame.Gui.ResolveIcon(id) is { Kind: IconKind.Picture }, $"{theme} lacks {id}");
+        }
     }
 
     /// <summary>Mono icons take the text color; the colored theme keeps the true colors of asset icons.</summary>
@@ -65,7 +67,7 @@ public sealed class ThemeIconTests
             [EditorIcons.File, EditorIcons.Scene, EditorIcons.Material, EditorIcons.Data, EditorIcons.Image,
                 EditorIcons.Model, EditorIcons.Script, EditorIcons.Text, EditorIcons.UiDocument,
                 EditorIcons.StyleSheet]);
-        Assert.All(new AssetTypeCatalog().Types, type => Assert.Contains(type.DefaultIcon, Icons.All));
+        Assert.All(new AssetTypeCatalog().Types, static type => Assert.Contains(type.DefaultIcon, Icons.All));
     }
 
     static WorkbenchFrame Frame(string theme)

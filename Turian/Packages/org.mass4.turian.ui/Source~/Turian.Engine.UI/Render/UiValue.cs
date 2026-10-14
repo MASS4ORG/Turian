@@ -23,17 +23,24 @@ public static class UiValue
     {
         value = 0f;
         isPercent = false;
-        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
 
         var t = text.Trim();
         if (t.EndsWith('%'))
         {
             isPercent = true;
             return float.TryParse(t[..^1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
-                   && Finalise(ref value, v => v / 100f);
+                   && Finalise(ref value, static v => v / 100f);
         }
 
-        if (t.EndsWith("px", StringComparison.OrdinalIgnoreCase)) t = t[..^2].Trim();
+        if (t.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            t = t[..^2].Trim();
+        }
+
         return float.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 
@@ -60,11 +67,22 @@ public static class UiValue
     public static bool TryColor(string? text, out GuiColor color)
     {
         color = GuiColor.Black;
-        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
         var t = text.Trim();
 
-        if (t.StartsWith('#')) return TryHexColor(t[1..], out color);
-        if (t.StartsWith("rgb", StringComparison.OrdinalIgnoreCase)) return TryRgbColor(t, out color);
+        if (t.StartsWith('#'))
+        {
+            return TryHexColor(t[1..], out color);
+        }
+
+        if (t.StartsWith("rgb", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryRgbColor(t, out color);
+        }
 
         return TryNamedColor(t, out color);
     }
@@ -73,18 +91,31 @@ public static class UiValue
     {
         color = GuiColor.Black;
         if (hex.Length == 3)
+        {
             hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
-        if (hex.Length != 6 && hex.Length != 8) return false;
+        }
+
+        if (hex.Length != 6 && hex.Length != 8)
+        {
+            return false;
+        }
 
         Span<int> channels = stackalloc int[3];
         for (var i = 0; i < channels.Length; i++)
+        {
             if (!int.TryParse(hex.AsSpan(i * 2, 2), NumberStyles.HexNumber,
                     CultureInfo.InvariantCulture, out channels[i]))
+            {
                 return false;
+            }
+        }
 
         var alpha = 255;
         if (hex.Length == 8)
+        {
             _ = int.TryParse(hex.AsSpan(6, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out alpha);
+        }
+
         color = GuiColor.FromArgb(alpha, channels[0], channels[1], channels[2]);
         return true;
     }
@@ -94,13 +125,25 @@ public static class UiValue
         color = GuiColor.Black;
         var open = text.IndexOf('(', StringComparison.Ordinal);
         var close = text.IndexOf(')', StringComparison.Ordinal);
-        if (open < 0 || close < open) return false;
+        if (open < 0 || close < open)
+        {
+            return false;
+        }
 
         var parts = text[(open + 1)..close].Split(',', StringSplitOptions.TrimEntries);
-        if (parts.Length is < 3 or > 4) return false;
+        if (parts.Length is < 3 or > 4)
+        {
+            return false;
+        }
+
         Span<float> channels = stackalloc float[3];
         for (var i = 0; i < channels.Length; i++)
-            if (!TryFloat(parts[i], out channels[i])) return false;
+        {
+            if (!TryFloat(parts[i], out channels[i]))
+            {
+                return false;
+            }
+        }
 
         var alpha = RgbAlpha(parts);
         color = GuiColor.FromArgb((int)alpha, (int)channels[0], (int)channels[1], (int)channels[2]);
@@ -109,7 +152,11 @@ public static class UiValue
 
     static float RgbAlpha(string[] parts)
     {
-        if (parts.Length != 4 || !TryFloat(parts[3], out var alpha)) return 255f;
+        if (parts.Length != 4 || !TryFloat(parts[3], out var alpha))
+        {
+            return 255f;
+        }
+
         return alpha <= 1f ? alpha * 255f : alpha;
     }
 

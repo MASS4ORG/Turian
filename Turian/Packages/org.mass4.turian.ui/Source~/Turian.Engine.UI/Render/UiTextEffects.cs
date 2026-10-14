@@ -23,7 +23,9 @@ public static class UiTextEffects
         var gradient = ParseGradient(style("text-gradient"));
 
         if (outline is null && drop is null && inner is null && gradient is null)
+        {
             return null;
+        }
 
         return new TextEffects
         {
@@ -38,7 +40,10 @@ public static class UiTextEffects
     {
         var parts = Tokenize(value);
         if (parts.Length < 2 || !UiValue.TryColor(parts[0], out var color) || !UiValue.TryFloat(parts[1], out var width))
+        {
             return null;
+        }
+
         return new TextEffects.TextOutline(color, width);
     }
 
@@ -57,13 +62,18 @@ public static class UiTextEffects
 
     static TextEffects.TextGradient? ParseGradient(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
 
         var trimmed = value.Trim();
         var radial = trimmed.StartsWith("radial", StringComparison.OrdinalIgnoreCase);
         var args = GradientArguments(trimmed);
         if (args.Length < 2 || !UiValue.TryColor(args[0], out var from) || !UiValue.TryColor(args[1], out var to))
+        {
             return null;
+        }
 
         var angle = args.Length >= 3 && UiValue.TryFloat(args[2], out var a) ? a : 0f;
         return new TextEffects.TextGradient(from, to, angle, radial);
@@ -72,11 +82,17 @@ public static class UiTextEffects
     static string[] GradientArguments(string trimmed)
     {
         var open = trimmed.IndexOf('(', StringComparison.Ordinal);
-        if (open < 0) return [];
+        if (open < 0)
+        {
+            return [];
+        }
 
         var inside = trimmed[(open + 1)..];
         var close = inside.IndexOf(')', StringComparison.Ordinal);
-        if (close < 0) return [];
+        if (close < 0)
+        {
+            return [];
+        }
 
         return inside[..close].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     }

@@ -86,7 +86,7 @@ public static class ObjectReferences
     /// <summary>The member ids read from data whose targets are not resolved yet.</summary>
     /// <param name="owner">The object holding the member.</param>
     /// <param name="member">The member name.</param>
-    /// <param name="ids">The pending ids; <see cref="System.Guid.Empty"/> marks an element that needs none.</param>
+    /// <param name="ids">The pending ids; <see cref="Guid.Empty"/> marks an element that needs none.</param>
     /// <returns>True when the member has pending ids.</returns>
     public static bool TryGetUnresolved(IdObject owner, string member, out Guid[] ids)
     {
@@ -117,12 +117,18 @@ public static class ObjectReferences
     public static void Forget(IdObject owner, string member)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        if (owner.PendingReferences is not { } table) return;
+        if (owner.PendingReferences is not { } table)
+        {
+            return;
+        }
 
         lock (table)
         {
             var index = IndexOf(table, member);
-            if (index >= 0) table.RemoveAt(index);
+            if (index >= 0)
+            {
+                table.RemoveAt(index);
+            }
         }
     }
 
@@ -133,16 +139,25 @@ public static class ObjectReferences
     public static void Forget(IdObject owner, string member, int index)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        if (owner.PendingReferences is not { } table) return;
+        if (owner.PendingReferences is not { } table)
+        {
+            return;
+        }
 
         lock (table)
         {
             var entry = IndexOf(table, member);
-            if (entry < 0 || index < 0 || index >= table[entry].Value.Length) return;
+            if (entry < 0 || index < 0 || index >= table[entry].Value.Length)
+            {
+                return;
+            }
 
             var ids = table[entry].Value;
             ids[index] = Guid.Empty;
-            if (ids.All(static id => id == Guid.Empty)) table.RemoveAt(entry);
+            if (ids.All(static id => id == Guid.Empty))
+            {
+                table.RemoveAt(entry);
+            }
         }
     }
 
@@ -167,20 +182,31 @@ public static class ObjectReferences
 
         var objects = new Dictionary<Guid, IdObject>();
         var components = new List<Component>();
-        foreach (var root in roots) Index(root, objects, components);
+        foreach (var root in roots)
+        {
+            Index(root, objects, components);
+        }
 
         components.RemoveAll(static component => component.PendingReferences is null);
-        if (components.Count == 0) return 0;
+        if (components.Count == 0)
+        {
+            return 0;
+        }
 
         if (loader is not null)
         {
             var external = components.SelectMany(PendingIds).Where(id => !objects.ContainsKey(id)).Distinct().ToList();
-            if (external.Count > 0) loader.PreloadAsync(external).GetAwaiter().GetResult();
+            if (external.Count > 0)
+            {
+                loader.PreloadAsync(external).GetAwaiter().GetResult();
+            }
         }
 
         var pending = 0;
         foreach (var component in components)
+        {
             pending += ResolveOwner(component, id => objects.GetValueOrDefault(id) ?? CachedData(loader, id));
+        }
 
         return pending;
     }
@@ -198,7 +224,10 @@ public static class ObjectReferences
 
         // Taken out before loading, so a DataAsset cycle re-entering this one finds nothing left to do; the
         // other side of a cycle may briefly see this asset before its own references are assigned.
-        if (TakePending(data) is not { } pending) return;
+        if (TakePending(data) is not { } pending)
+        {
+            return;
+        }
 
         var ids = pending.SelectMany(static entry => entry.Value).Where(static id => id != Guid.Empty).Distinct();
         await loader.PreloadAsync([.. ids]).ConfigureAwait(false);
@@ -221,7 +250,10 @@ public static class ObjectReferences
     {
         ArgumentNullException.ThrowIfNull(writer);
         ArgumentNullException.ThrowIfNull(owner);
-        if (!IsReferenceMember(memberType, allowSceneObjects)) return false;
+        if (!IsReferenceMember(memberType, allowSceneObjects))
+        {
+            return false;
+        }
 
         TryGetUnresolved(owner, member, out var pending);
         writer.WritePropertyName(member);
@@ -265,22 +297,35 @@ public static class ObjectReferences
     {
         ArgumentNullException.ThrowIfNull(owner);
         value = null;
-        if (!IsReferenceMember(memberType, allowSceneObjects)) return false;
+        if (!IsReferenceMember(memberType, allowSceneObjects))
+        {
+            return false;
+        }
 
         if (ElementType(memberType) is not { } elementType)
         {
-            if (!IsRef(json, out var id)) return false;
+            if (!IsRef(json, out var id))
+            {
+                return false;
+            }
+
             Record(owner, member, [id]);
             return true;
         }
 
-        if (json.ValueKind != JsonValueKind.Array) return false;
+        if (json.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
 
         var ids = new Guid[json.GetArrayLength()];
         var index = 0;
         foreach (var element in json.EnumerateArray())
         {
-            if (!IsRef(element, out ids[index++])) return false;
+            if (!IsRef(element, out ids[index++]))
+            {
+                return false;
+            }
         }
 
         value = CreateList(memberType, elementType, ids.Length);
@@ -294,12 +339,17 @@ public static class ObjectReferences
     internal static void ExitNode(Node? node)
     {
         if (--_nodeReadDepth == 0 && node is not null)
+        {
             Resolve(node, DeserializationLoader.Value?.Loader);
+        }
     }
 
     static IEnumerable<Guid> PendingIds(IdObject owner)
     {
-        if (owner.PendingReferences is not { } table) return [];
+        if (owner.PendingReferences is not { } table)
+        {
+            return [];
+        }
 
         lock (table)
         {
@@ -332,19 +382,33 @@ public static class ObjectReferences
         GeneratedSerializer? generated)
     {
         if (ReferenceMemberType(owner, member, generated, out var info) is not { } memberType)
+        {
             return 0;
+        }
 
         var (value, missing) = ResolveMemberValue(owner, member, memberType, ids, find);
 
-        if (generated is not null) generated.SetMember(owner, member, value);
-        else SetValue(info!, owner, value);
+        if (generated is not null)
+        {
+            generated.SetMember(owner, member, value);
+        }
+        else
+        {
+            SetValue(info!, owner, value);
+        }
 
-        if (missing.All(static id => id == Guid.Empty)) return 0;
+        if (missing.All(static id => id == Guid.Empty))
+        {
+            return 0;
+        }
 
         var table = PendingTable(owner);
         lock (table)
         {
-            if (IndexOf(table, member) < 0) table.Add(new(member, missing));
+            if (IndexOf(table, member) < 0)
+            {
+                table.Add(new(member, missing));
+            }
         }
         return missing.Count(static id => id != Guid.Empty);
     }
@@ -361,9 +425,16 @@ public static class ObjectReferences
     {
         var missing = new Guid[ids.Length];
         if (ElementType(memberType) is { } elementType)
+        {
             return (ResolveList(owner, member, memberType, elementType, ids, missing, find), missing);
+        }
+
         var value = ids[0] == Guid.Empty ? null : Match(find(ids[0]), memberType);
-        if (value is null) missing[0] = ids[0];
+        if (value is null)
+        {
+            missing[0] = ids[0];
+        }
+
         return (value, missing);
     }
 
@@ -376,11 +447,18 @@ public static class ObjectReferences
         {
             if (ids[i] == Guid.Empty)
             {
-                if (existing is not null && i < existing.Count) list[i] = existing[i];
+                if (existing is not null && i < existing.Count)
+                {
+                    list[i] = existing[i];
+                }
+
                 continue;
             }
             list[i] = Match(find(ids[i]), elementType);
-            if (list[i] is null) missing[i] = ids[i];
+            if (list[i] is null)
+            {
+                missing[i] = ids[i];
+            }
         }
         return list;
     }
@@ -409,7 +487,9 @@ public static class ObjectReferences
         }
 
         foreach (var child in node.Children)
+        {
             Index(child, objects, components);
+        }
     }
 
     static void Record(IdObject owner, string member, Guid[] ids)
@@ -424,14 +504,23 @@ public static class ObjectReferences
         lock (table)
         {
             var index = IndexOf(table, member);
-            if (index >= 0) table[index] = new(member, ids);
-            else table.Add(new(member, ids));
+            if (index >= 0)
+            {
+                table[index] = new(member, ids);
+            }
+            else
+            {
+                table.Add(new(member, ids));
+            }
         }
     }
 
     static List<KeyValuePair<string, Guid[]>> PendingTable(IdObject owner)
     {
-        if (owner.PendingReferences is { } table) return table;
+        if (owner.PendingReferences is { } table)
+        {
+            return table;
+        }
 
         Interlocked.CompareExchange(ref owner.PendingReferences, new List<KeyValuePair<string, Guid[]>>(1), null);
         return owner.PendingReferences!;
@@ -441,7 +530,10 @@ public static class ObjectReferences
     {
         for (var i = 0; i < table.Count; i++)
         {
-            if (string.Equals(table[i].Key, member, StringComparison.Ordinal)) return i;
+            if (string.Equals(table[i].Key, member, StringComparison.Ordinal))
+            {
+                return i;
+            }
         }
 
         return -1;
@@ -463,7 +555,10 @@ public static class ObjectReferences
     static bool IsRef(JsonElement json, out Guid id)
     {
         id = Guid.Empty;
-        if (json.ValueKind == JsonValueKind.Null) return true;
+        if (json.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
 
         return json.ValueKind == JsonValueKind.Object
                && json.TryGetProperty(RefProperty, out var value)
@@ -477,7 +572,11 @@ public static class ObjectReferences
 
     static Type? ElementType(Type type)
     {
-        if (type.IsArray) return type.GetElementType();
+        if (type.IsArray)
+        {
+            return type.GetElementType();
+        }
+
         return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>)
             ? type.GetGenericArguments()[0]
             : null;
@@ -485,10 +584,17 @@ public static class ObjectReferences
 
     static System.Collections.IList CreateList(Type memberType, Type elementType, int count)
     {
-        if (memberType.IsArray) return Array.CreateInstance(elementType, count);
+        if (memberType.IsArray)
+        {
+            return Array.CreateInstance(elementType, count);
+        }
 
         var list = (System.Collections.IList)Activator.CreateInstance(memberType)!;
-        for (var i = 0; i < count; i++) list.Add(null);
+        for (var i = 0; i < count; i++)
+        {
+            list.Add(null);
+        }
+
         return list;
     }
 
@@ -502,7 +608,13 @@ public static class ObjectReferences
 
     static void SetValue(MemberInfo member, object owner, object? value)
     {
-        if (member is PropertyInfo { CanWrite: true } property) property.SetValue(owner, value);
-        else if (member is FieldInfo field) field.SetValue(owner, value);
+        if (member is PropertyInfo { CanWrite: true } property)
+        {
+            property.SetValue(owner, value);
+        }
+        else if (member is FieldInfo field)
+        {
+            field.SetValue(owner, value);
+        }
     }
 }

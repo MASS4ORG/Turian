@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 
 /// <summary>Measures geometry decoding without file I/O or GPU upload.</summary>
 static class MeshFormatBenchmarks
@@ -35,20 +34,32 @@ static class MeshFormatBenchmarks
             {
                 var loaded = item.Load();
                 if (!loaded.Vertices.SequenceEqual(vertices) || !loaded.Indices.SequenceEqual(indices))
+                {
                     throw new InvalidOperationException($"{item.Name} did not preserve benchmark geometry.");
+                }
+
                 if (loaded.SubMeshes.Count != 1 || loaded.SubMeshes[0].IndexCount != count)
+                {
                     throw new InvalidOperationException($"{item.Name} did not preserve the benchmark submesh.");
-                for (var i = 0; i < 20; i++) GC.KeepAlive(item.Load());
+                }
+
+                for (var i = 0; i < 20; i++)
+                {
+                    GC.KeepAlive(item.Load());
+                }
             }
 
             var iterations = count < 1000 ? 1000 : count < 100_000 ? 50 : 10;
             var timings = cases.Select(_ => new List<(double Time, long Alloc)>()).ToArray();
             for (var sample = 0; sample < samples; sample++)
+            {
                 for (var offset = 0; offset < cases.Length; offset++)
                 {
                     var index = (sample + offset) % cases.Length;
                     timings[index].Add(Measure(cases[index].Load, iterations));
                 }
+            }
+
             for (var i = 0; i < cases.Length; i++)
             {
                 var result = timings[i].OrderBy(value => value.Time).ElementAt(samples / 2);
@@ -63,7 +74,11 @@ static class MeshFormatBenchmarks
         GC.WaitForPendingFinalizers();
         var allocated = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
-        for (var i = 0; i < iterations; i++) GC.KeepAlive(load());
+        for (var i = 0; i < iterations; i++)
+        {
+            GC.KeepAlive(load());
+        }
+
         watch.Stop();
         return (watch.Elapsed.TotalMicroseconds / iterations,
             (GC.GetAllocatedBytesForCurrentThread() - allocated) / iterations);

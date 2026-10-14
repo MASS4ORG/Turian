@@ -44,9 +44,14 @@ public sealed class PrefabLinkClassifier(Func<Guid, string?> loadPrefab)
 
         var inInstance = false;
         for (var ancestor = node.Parent; ancestor is not null && !inInstance; ancestor = ancestor.Parent)
+        {
             inInstance = ancestor.PrefabInstance is not null;
+        }
 
-        if (node.PrefabInstance is not { } link) return inInstance ? PrefabLink.InstanceContent : PrefabLink.None;
+        if (node.PrefabInstance is not { } link)
+        {
+            return inInstance ? PrefabLink.InstanceContent : PrefabLink.None;
+        }
 
         return IsVariant(link.Source.AssetId) switch
         {
@@ -59,7 +64,10 @@ public sealed class PrefabLinkClassifier(Func<Guid, string?> loadPrefab)
 
     bool? IsVariant(Guid prefabId)
     {
-        if (variants.TryGetValue(prefabId, out var known)) return known;
+        if (variants.TryGetValue(prefabId, out var known))
+        {
+            return known;
+        }
 
         bool? variant;
         try

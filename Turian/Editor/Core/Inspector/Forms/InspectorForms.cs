@@ -35,9 +35,21 @@ public static class InspectorForms
     public static FormModel BuildForObjects(IReadOnlyList<object> targets, Action<object>? mutationNotifier = null)
     {
         ArgumentNullException.ThrowIfNull(targets);
-        if (targets.Count == 0) return FormModel.Empty;
-        if (targets.Any(target => target.GetType() != targets[0].GetType())) return FormModel.Empty;
-        if (targets.Count == 1) return Build(targets[0], mutationNotifier);
+        if (targets.Count == 0)
+        {
+            return FormModel.Empty;
+        }
+
+        if (targets.Any(target => target.GetType() != targets[0].GetType()))
+        {
+            return FormModel.Empty;
+        }
+
+        if (targets.Count == 1)
+        {
+            return Build(targets[0], mutationNotifier);
+        }
+
         var sections = targets.Select(target => Build(target, mutationNotifier).Sections[0]).ToArray();
         return new FormModel(targets[0], [CombineSections(sections, sections[0].Title)]);
     }
@@ -64,8 +76,15 @@ public static class InspectorForms
     public static FormModel BuildForNodes(IReadOnlyList<Node> nodes, Action<object>? mutationNotifier = null)
     {
         ArgumentNullException.ThrowIfNull(nodes);
-        if (nodes.Count == 0) return FormModel.Empty;
-        if (nodes.Count == 1) return BuildForNode(nodes[0], mutationNotifier);
+        if (nodes.Count == 0)
+        {
+            return FormModel.Empty;
+        }
+
+        if (nodes.Count == 1)
+        {
+            return BuildForNode(nodes[0], mutationNotifier);
+        }
 
         var models = nodes.Select(node => BuildForNode(node, mutationNotifier)).ToArray();
         var sections = new List<FormSection>
@@ -81,7 +100,9 @@ public static class InspectorForms
             var common = models.Select(model => model.Sections.Skip(1)
                 .Where(candidate => candidate.Target.GetType() == type).ElementAtOrDefault(occurrence)).ToArray();
             if (common.All(candidate => candidate is not null))
+            {
                 sections.Add(CombineSections(common.OfType<FormSection>().ToArray(), section.Title));
+            }
         }
         return new FormModel(nodes[0], sections);
     }
@@ -95,7 +116,9 @@ public static class InspectorForms
             var common = sections.Select(section => section.Fields.FirstOrDefault(candidate =>
                 candidate.Name == field.Name && candidate.ValueType == field.ValueType)).ToArray();
             if (common.All(candidate => candidate is not null))
+            {
                 fields.Add(FormField.Combine(common.OfType<FormField>()));
+            }
         }
         var enabled = fields.FirstOrDefault(field => field.Name == first.EnabledField?.Name);
         return first with { Title = title, Fields = fields, EnabledField = enabled, Buttons = [] };
@@ -108,10 +131,12 @@ public static class InspectorForms
     static FormSection WithActiveSwitch(FormSection section, FormOptions options)
     {
         var fields = section.Fields;
-        if (section.Target is Component && fields.All(field => field.Name != ActiveSwitch.Name))
+        if (section.Target is Component && fields.All(static field => field.Name != ActiveSwitch.Name))
+        {
             fields = [FormField.ForMember(ActiveSwitch, section.Target, options), .. fields];
+        }
 
-        var enabled = fields.FirstOrDefault(field => field.Name == ActiveSwitch.Name && field.ValueType == typeof(bool));
+        var enabled = fields.FirstOrDefault(static field => field.Name == ActiveSwitch.Name && field.ValueType == typeof(bool));
         return section with { Fields = fields, EnabledField = enabled };
     }
 

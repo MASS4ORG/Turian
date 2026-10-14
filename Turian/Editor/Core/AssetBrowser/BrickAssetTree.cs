@@ -33,7 +33,11 @@ public sealed class BrickAssetTree(AssetFileSystem files)
         foreach (var brick in bricks)
         {
             // An authored brick under Assets is already present in the project's tree.
-            if (brick.RootPath.StartsWith(assetsRoot, StringComparison.Ordinal)) continue;
+            if (brick.RootPath.StartsWith(assetsRoot, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var readOnly = brick.IsReadOnly;
             entries.Add(new AssetEntry(brick.RootPath, true, null, root, readOnly));
             entries.AddRange(files.ScanDirectory(brick.RootPath)

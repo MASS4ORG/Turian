@@ -27,7 +27,7 @@ public sealed class GameLoopObservationTests
     {
         using var scheduler = new GameLoopScheduler();
         using var registration = scheduler.SessionCancellationToken.Register(
-            () => throw new InvalidOperationException("cancellation callback"));
+            static () => throw new InvalidOperationException("cancellation callback"));
         var wait = scheduler.NextFrame(TestContext.Current.CancellationToken);
         scheduler.Dispose();
         Assert.True(Assert.Single(scheduler.InspectOutstanding()).IsCompleted);
@@ -41,7 +41,11 @@ public sealed class GameLoopObservationTests
     {
         using var scheduler = new GameLoopScheduler();
         SynchronizationContext context;
-        using (scheduler.EnterContext()) context = SynchronizationContext.Current!;
+        using (scheduler.EnterContext())
+        {
+            context = SynchronizationContext.Current!;
+        }
+
         Assert.Same(context, context.CreateCopy());
         var invoked = false;
         context.Send(_ => invoked = true, null);

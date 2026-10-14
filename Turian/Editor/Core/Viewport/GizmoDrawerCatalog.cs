@@ -12,7 +12,7 @@ public sealed class GizmoDrawerCatalog
 {
     readonly BuildManager buildManager;
 
-    readonly Dictionary<string, Assembly> knownAssemblies = new(StringComparer.Ordinal);
+    readonly Dictionary<string, ReflectionAssembly> knownAssemblies = new(StringComparer.Ordinal);
     readonly Dictionary<Type, List<Type>> registrations = new();
     readonly Dictionary<Type, IGizmoDrawer> drawerCache = new();
 
@@ -48,12 +48,20 @@ public sealed class GizmoDrawerCatalog
     /// </summary>
     public IEnumerable<IGizmoDrawer> GetDrawers(Type componentType)
     {
-        if (componentType is null) throw new ArgumentNullException(nameof(componentType));
+        if (componentType is null)
+        {
+            throw new ArgumentNullException(nameof(componentType));
+        }
+
         EnsureRefreshed();
 
         foreach (var (targetType, drawerTypes) in registrations)
         {
-            if (!targetType.IsAssignableFrom(componentType)) continue;
+            if (!targetType.IsAssignableFrom(componentType))
+            {
+                continue;
+            }
+
             foreach (var drawerType in drawerTypes)
             {
                 if (drawerCache.TryGetValue(drawerType, out var cached))
@@ -88,7 +96,7 @@ public sealed class GizmoDrawerCatalog
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types = [.. ex.Types.Where(t => t is not null).Cast<Type>()];
+                types = [.. ex.Types.Where(static t => t is not null).Cast<Type>()];
             }
             catch
             {
@@ -105,7 +113,11 @@ public sealed class GizmoDrawerCatalog
 
                 foreach (var attribute in type.GetCustomAttributes<CustomGizmoAttribute>())
                 {
-                    if (attribute.DrawerType != type) continue;
+                    if (attribute.DrawerType != type)
+                    {
+                        continue;
+                    }
+
                     if (!registrations.TryGetValue(attribute.ComponentType, out var list))
                     {
                         list = [];

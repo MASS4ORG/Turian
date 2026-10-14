@@ -57,7 +57,11 @@ public sealed class RenderStats
     /// <summary>Gets the median frame time, or zero when nothing was recorded.</summary>
     public double Median()
     {
-        if (times.Count == 0) return 0;
+        if (times.Count == 0)
+        {
+            return 0;
+        }
+
         var sorted = times.Order().ToList();
         return sorted[sorted.Count / 2];
     }
@@ -66,7 +70,11 @@ public sealed class RenderStats
     /// <param name="logger">The logger to report through.</param>
     public void Report(ILogger logger)
     {
-        if (Frames == 0 || !logger.IsEnabled(LogLevel.Information)) return;
+        if (Frames == 0 || !logger.IsEnabled(LogLevel.Information))
+        {
+            return;
+        }
+
         logger.LogInformation(
             "Frame CPU + wait: median {Median:F2} ms over {Frames} frames, last frame allocated {Allocated:F1} KiB",
             Median(),

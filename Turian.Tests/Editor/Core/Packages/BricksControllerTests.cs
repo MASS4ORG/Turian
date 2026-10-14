@@ -23,7 +23,10 @@ public sealed class BricksControllerTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -33,13 +36,13 @@ public sealed class BricksControllerTests : IDisposable
     {
         controller.Refresh();
 
-        Assert.Equal(ProjectPackages.DefaultBuiltins.Order(StringComparer.Ordinal), controller.Rows.Select(r => r.Id).Order(StringComparer.Ordinal));
-        Assert.All(controller.Rows, r =>
+        Assert.Equal(ProjectPackages.DefaultBuiltins.Order(StringComparer.Ordinal), controller.Rows.Select(static r => r.Id).Order(StringComparer.Ordinal));
+        Assert.All(controller.Rows, static r =>
         {
             Assert.Equal(PackageOrigin.Builtin, r.Origin);
             Assert.True(r.IsDirect);
         });
-        Assert.True(controller.Rows.Single(r => r.Id == "org.mass4.turian.ui").IsPrecast);
+        Assert.True(controller.Rows.Single(static r => r.Id == "org.mass4.turian.ui").IsPrecast);
         Assert.Null(controller.Error);
     }
 
@@ -104,7 +107,7 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.InstallAsync("user.mateo.shop", $"file:{shop}"));
 
         Assert.Equal(["user.mateo.shop"], controller.RequiredBy("user.mateo.rules"));
-        Assert.False(controller.Rows.Single(r => r.Id == "user.mateo.rules").IsDirect);
+        Assert.False(controller.Rows.Single(static r => r.Id == "user.mateo.rules").IsDirect);
         controller.Selected = "user.mateo.shop";
         Assert.Equal("user.mateo.shop", controller.SelectedBrick!.Id);
     }
@@ -116,7 +119,7 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
 
         Assert.True(Directory.Exists(Path.Combine(project, "Bricks", "org.mass4.turian.cameras")));
-        Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
+        Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == "org.mass4.turian.cameras").Origin);
     }
 
     /// <summary>Reverting a fork returns the brick to its global version and keeps the fork's files in the trash.</summary>
@@ -130,7 +133,7 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.RevertAsync("org.mass4.turian.cameras"));
 
         Assert.False(Directory.Exists(fork));
-        Assert.NotEqual(PackageOrigin.Embedded, controller.Rows.Single(r => r.Id == "org.mass4.turian.cameras").Origin);
+        Assert.NotEqual(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == "org.mass4.turian.cameras").Origin);
         Assert.Single(Directory.GetFiles(Path.Combine(project, ".Cache", "Trash"), "mine.txt", SearchOption.AllDirectories));
     }
 
@@ -151,17 +154,17 @@ public sealed class BricksControllerTests : IDisposable
     public async Task DisablingStopsUsingABrickAndItCanBeEnabledAgain()
     {
         controller.Refresh();
-        var catalog = controller.Catalog.ToDictionary(b => b.Id);
+        var catalog = controller.Catalog.ToDictionary(static b => b.Id);
         Assert.Equal(BrickState.Enabled, catalog["org.mass4.turian.ui"].State);
 
         Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
 
-        Assert.DoesNotContain(controller.Rows, r => r.Id == "org.mass4.turian.ui");
-        catalog = controller.Catalog.ToDictionary(b => b.Id);
+        Assert.DoesNotContain(controller.Rows, static r => r.Id == "org.mass4.turian.ui");
+        catalog = controller.Catalog.ToDictionary(static b => b.Id);
         Assert.Equal(BrickState.Available, catalog["org.mass4.turian.ui"].State);
 
         Assert.True(await controller.EnableAsync(catalog["org.mass4.turian.ui"]));
-        Assert.Contains(controller.Rows, r => r.Id == "org.mass4.turian.ui");
+        Assert.Contains(controller.Rows, static r => r.Id == "org.mass4.turian.ui");
     }
 
     /// <summary>A brick in use cannot be uninstalled, and a stored one leaves the store.</summary>
@@ -178,8 +181,8 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         controller.Selected = "user.mateo.stored";
         var form = controller.InspectSelection()!;
-        Assert.Equal("On this machine, not in use", form.Model.Sections[1].Fields.Single(f => f.Name == "Status").GetValue());
-        Assert.Equal(["Enable", "Uninstall"], form.Model.Sections[1].Buttons.Select(b => b.Label));
+        Assert.Equal("On this machine, not in use", form.Model.Sections[1].Fields.Single(static f => f.Name == "Status").GetValue());
+        Assert.Equal(["Enable", "Uninstall"], form.Model.Sections[1].Buttons.Select(static b => b.Label));
         Assert.True(await controller.UninstallAsync("user.mateo.stored"), controller.Error);
         Assert.False(Directory.Exists(stored));
     }
@@ -195,7 +198,7 @@ public sealed class BricksControllerTests : IDisposable
 
         controller.Refresh();
 
-        var remote = controller.Catalog.Single(b => b.Id == "user.mateo.remote");
+        var remote = controller.Catalog.Single(static b => b.Id == "user.mateo.remote");
         Assert.Equal(BrickState.Available, remote.State);
         Assert.Equal("registry:bricks.example", remote.Origin);
     }
@@ -210,9 +213,9 @@ public sealed class BricksControllerTests : IDisposable
         Directory.Move(BrickService.New(root, "user.mateo.old"), stored);
         controller.Refresh();
 
-        Assert.False(await controller.EnableAsync(controller.Catalog.Single(b => b.Id == "user.mateo.old")));
+        Assert.False(await controller.EnableAsync(controller.Catalog.Single(static b => b.Id == "user.mateo.old")));
         Assert.NotNull(controller.Error);
-        Assert.DoesNotContain(controller.Rows, r => r.Id == "user.mateo.old");
+        Assert.DoesNotContain(controller.Rows, static r => r.Id == "user.mateo.old");
     }
 
     /// <summary>The inspector composes manifest fields with actions for the brick's state.</summary>
@@ -222,25 +225,25 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         controller.Selected = "org.mass4.turian.ui";
         Assert.Equal(["Disable", "Update", "Make Local"],
-            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(b => b.Label));
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(static b => b.Label));
 
         Assert.Equal("In use", controller.InspectSelection()!.Model.Sections[1].Fields
-            .Single(f => f.Name == "Status").GetValue());
+            .Single(static f => f.Name == "Status").GetValue());
 
         Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
         controller.Selected = "org.mass4.turian.ui";
         var available = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.Equal("org.mass4.turian.ui", Assert.IsType<PackageManifest>(available.Target).Name);
-        Assert.Equal("Available", available.Model.Sections[1].Fields.Single(f => f.Name == "Status").GetValue());
+        Assert.Equal("Available", available.Model.Sections[1].Fields.Single(static f => f.Name == "Status").GetValue());
         Assert.Equal("Enable", Assert.Single(available.Model.Sections[1].Buttons).Label);
 
         var made = BrickService.New(Path.Combine(project, "Bricks"), "user.mateo.rules");
         controller.Refresh();
         controller.Selected = "user.mateo.rules";
         Assert.Equal(["Revert To Global", "Uninstall"],
-            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(b => b.Label));
+            Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(static b => b.Label));
         Assert.Equal("In use, local to the project", controller.InspectSelection()!.Model.Sections[1].Fields
-            .Single(f => f.Name == "Status").GetValue());
+            .Single(static f => f.Name == "Status").GetValue());
         Assert.True(Directory.Exists(made));
     }
 
@@ -257,9 +260,9 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Equal(2, model.Sections.Count);
         var section = model.Sections[0];
         Assert.Equal("Brick 'In-game UI'", section.Title);
-        Assert.All(section.BodyFields, f => Assert.True(f.IsReadOnly));
-        Assert.Contains(section.BodyFields, f => f.Label == "Name");
-        Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(b => b.Label));
+        Assert.All(section.BodyFields, static f => Assert.True(f.IsReadOnly));
+        Assert.Contains(section.BodyFields, static f => f.Label == "Name");
+        Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(static b => b.Label));
     }
 
     /// <summary>A registry is added, renamed and removed through the view the inspector shows.</summary>
@@ -270,7 +273,7 @@ public sealed class BricksControllerTests : IDisposable
         var fresh = new ScopedRegistry { Name = "studio", Url = "https://bricks.example/v1", Scopes = ["com.acme"], AllowUnsigned = true };
 
         Assert.True(await controller.SaveRegistryAsync(null, fresh));
-        Assert.Contains(controller.Registries, r => r.Name == "studio");
+        Assert.Contains(controller.Registries, static r => r.Name == "studio");
 
         controller.Tab = BricksTab.Registries;
         controller.SelectedRegistry = "studio";
@@ -283,8 +286,8 @@ public sealed class BricksControllerTests : IDisposable
             Scopes = view.Scopes,
             AllowUnsigned = true,
         }));
-        Assert.DoesNotContain(controller.Registries, r => r.Name == "studio");
-        Assert.Contains(controller.Registries, r => r.Name == "renamed");
+        Assert.DoesNotContain(controller.Registries, static r => r.Name == "studio");
+        Assert.Contains(controller.Registries, static r => r.Name == "renamed");
 
         Assert.True(await controller.SaveRegistryAsync(null, new ScopedRegistry
         {
@@ -300,15 +303,15 @@ public sealed class BricksControllerTests : IDisposable
             Scopes = ["com.x"],
             AllowUnsigned = true,
         }));
-        Assert.Equal("https://other.example/v1", controller.Registries.Single(r => r.Name == "other").Url);
+        Assert.Equal("https://other.example/v1", controller.Registries.Single(static r => r.Name == "other").Url);
         Assert.True(await controller.RemoveRegistryAsync("other"));
         Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = "bad" }));
         Assert.True(await controller.RemoveRegistryAsync("renamed"));
-        Assert.DoesNotContain(controller.Registries, r => r.Name == "renamed");
+        Assert.DoesNotContain(controller.Registries, static r => r.Name == "renamed");
         controller.SelectedRegistry = ProjectPackages.PublicRegistry.Name;
         var publicRegistry = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.IsType<ScopedRegistry>(publicRegistry.Target);
-        Assert.All(Assert.Single(publicRegistry.Model.Sections).Fields, f => Assert.True(f.IsReadOnly));
+        Assert.All(Assert.Single(publicRegistry.Model.Sections).Fields, static f => Assert.True(f.IsReadOnly));
         Assert.Empty(publicRegistry.Model.Sections[0].Buttons);
     }
 
@@ -352,9 +355,9 @@ public sealed class BricksControllerTests : IDisposable
             null, "1.2.0", "registry:studio", "^1.2.0", false);
         var form = BrickInspections.Brick(controller, brick, null);
         var fields = form.Model.Sections[0].Fields;
-        Assert.Contains(fields, f => f.Name == "Version");
-        Assert.DoesNotContain(fields, f => f.Name is "License" or "Dependencies" or "Nuget");
-        Assert.All(fields, f => Assert.False(f.SetValue("changed")));
+        Assert.Contains(fields, static f => f.Name == "Version");
+        Assert.DoesNotContain(fields, static f => f.Name is "License" or "Dependencies" or "Nuget");
+        Assert.All(fields, static f => Assert.False(f.SetValue("changed")));
     }
 
     /// <summary>Inspections from a previous project cannot act on the newly opened project.</summary>
@@ -366,7 +369,7 @@ public sealed class BricksControllerTests : IDisposable
         var brick = Assert.IsType<FormInspection>(controller.InspectSelection());
         var form = controller.InspectSettings(settings)!;
         settings.Set(new AppSettings { ProjectAbsoluteDir = Path.Combine(root, "other") });
-        foreach (var button in brick.Model.Sections.SelectMany(s => s.Buttons).Concat(form.Model.Sections[0].Buttons))
+        foreach (var button in brick.Model.Sections.SelectMany(static s => s.Buttons).Concat(form.Model.Sections[0].Buttons))
         {
             Assert.False(button.IsEnabled);
             button.Invoke();
@@ -386,7 +389,7 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.RemoveAsync("user.mateo.rules"));
 
         Assert.False(Directory.Exists(embedded));
-        Assert.DoesNotContain(controller.Rows, row => row.Id == "user.mateo.rules");
+        Assert.DoesNotContain(controller.Rows, static row => row.Id == "user.mateo.rules");
         var preserved = Directory.GetFiles(Path.Combine(project, ".Cache", "Trash"), "authored.txt",
             SearchOption.AllDirectories);
         Assert.Equal("rules", File.ReadAllText(Assert.Single(preserved)));
@@ -407,6 +410,6 @@ public sealed class BricksControllerTests : IDisposable
         Assert.False(await controller.RemoveAsync("user.mateo.rules"));
 
         Assert.True(Directory.Exists(rules));
-        Assert.Contains(controller.Rows, row => row.Id == "user.mateo.rules");
+        Assert.Contains(controller.Rows, static row => row.Id == "user.mateo.rules");
     }
 }

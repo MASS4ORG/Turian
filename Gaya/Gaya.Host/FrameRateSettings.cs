@@ -24,8 +24,11 @@ public sealed class FrameRateSettings
     public static FrameRateSettings Register(IEditorSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (settings.Pages.FirstOrDefault(page => page.Id == PageId)?.Target is FrameRateSettings existing)
+        if (settings.Pages.FirstOrDefault(static page => page.Id == PageId)?.Target is FrameRateSettings existing)
+        {
             return existing;
+        }
+
         var preferences = new FrameRateSettings();
         settings.Register(preferences);
         return preferences;

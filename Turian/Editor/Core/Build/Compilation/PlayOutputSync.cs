@@ -7,7 +7,11 @@ static class PlayOutputSync
     {
         var input = new FileInfo(source);
         var output = new FileInfo(destination);
-        if (output.Exists && input.Length == output.Length && input.LastWriteTimeUtc == output.LastWriteTimeUtc) return;
+        if (output.Exists && input.Length == output.Length && input.LastWriteTimeUtc == output.LastWriteTimeUtc)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         File.Copy(source, destination, overwrite: true);
     }

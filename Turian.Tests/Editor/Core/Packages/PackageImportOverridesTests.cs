@@ -14,7 +14,10 @@ public sealed class PackageImportOverridesTests : IDisposable
         new PackageManifest { Name = "user.mateo.icons", Version = SemanticVersion.Parse("1.0.0") }.Save(brick);
         using (var bitmap = new SKBitmap(4, 4))
         using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+        {
             File.WriteAllBytes(Path.Combine(brick, "Runtime", "Icon.png"), png.ToArray());
+        }
+
         File.WriteAllText(Path.Combine(brick, "Runtime", "Icon.png.meta"), $$"""
             { "__TypeId": "f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", "IsSrgb": true, "GenerateMips": true,
               "ImportSettings": { "MaxResolution": 0, "PerTarget": {} }, "RelativePath": "Runtime/Icon.png", "Id": "{{iconId}}" }
@@ -75,7 +78,11 @@ public sealed class PackageImportOverridesTests : IDisposable
 
     string SettingsHash(string project)
     {
-        if (Directory.Exists(Path.Combine(project, ".Cache"))) Directory.Delete(Path.Combine(project, ".Cache"), recursive: true);
+        if (Directory.Exists(Path.Combine(project, ".Cache")))
+        {
+            Directory.Delete(Path.Combine(project, ".Cache"), recursive: true);
+        }
+
         ProjectPackages.Invalidate(project);
         var settings = new SettingsService();
         settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });

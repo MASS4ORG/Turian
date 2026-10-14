@@ -157,8 +157,15 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
     public static bool TryParse(string? path, out InputControl control)
     {
         control = None;
-        if (string.IsNullOrWhiteSpace(path)) return false;
-        if (path.Split('/', StringSplitOptions.TrimEntries) is not [var device, var name]) return false;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        if (path.Split('/', StringSplitOptions.TrimEntries) is not [var device, var name])
+        {
+            return false;
+        }
 
         switch (device.ToUpperInvariant())
         {
@@ -193,7 +200,7 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
 
     /// <summary>Every control a rebinding operation can capture, in the order it scans them.</summary>
     public static IEnumerable<InputControl> All() =>
-        Enum.GetValues<Key>().Where(key => key != Key.Unknown).Select(Keyboard)
-            .Concat(Enum.GetValues<MouseButton>().Where(b => b != MouseButton.Unknown).Select(Mouse))
+        Enum.GetValues<Key>().Where(static key => key != Key.Unknown).Select(Keyboard)
+            .Concat(Enum.GetValues<MouseButton>().Where(static b => b != MouseButton.Unknown).Select(Mouse))
             .Concat(Enum.GetValues<GamepadButton>().Select(Gamepad));
 }

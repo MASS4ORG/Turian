@@ -14,8 +14,15 @@ public sealed class FrameStatisticsHudComponent : UiDocumentComponent, IRenderSt
         set
         {
             field = value;
-            if (!value) Statistics.Clear();
-            if (IsStarted) OnBuild = value ? Build : null;
+            if (!value)
+            {
+                Statistics.Clear();
+            }
+
+            if (IsStarted)
+            {
+                OnBuild = value ? Build : null;
+            }
         }
     } = true;
 
@@ -49,11 +56,19 @@ public sealed class FrameStatisticsHudComponent : UiDocumentComponent, IRenderSt
 
     void Build(Gui gui)
     {
-        if (!IsRecording || Statistics.Count == 0) return;
+        if (!IsRecording || Statistics.Count == 0)
+        {
+            return;
+        }
+
         using (gui.Node(HudSize.X, HudSize.Y, "frame-statistics").Absolute(HudPosition.X, HudPosition.Y).Enter())
         {
             gui.SetZIndex(SortOrder);
-            if (gui.Pass != Pass.Pass2Render) return;
+            if (gui.Pass != Pass.Pass2Render)
+            {
+                return;
+            }
+
             drawing ??= new FrameStatisticsDrawing(this);
             gui.CurrentNode.DrawList.Add(drawing);
         }

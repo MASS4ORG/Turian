@@ -26,10 +26,17 @@ public sealed class LayerFilter(IAppSettings? project = null, SettingsService? s
     LayerSlot Resolve(int index, bool physics)
     {
         var slot = physics ? Settings.FindPhysicsLayer(index) : Settings.FindRenderLayer(index);
-        if (slot is not null) return slot;
+        if (slot is not null)
+        {
+            return slot;
+        }
+
         if (warned.Add((physics, index)))
+        {
             Log.Logger.LogWarning("{Space} layer index {Index} is unnamed or missing; migrating to Default (0)",
                 physics ? "Physics" : "Render", index);
+        }
+
         return (physics ? Settings.FindPhysicsLayer(0) : Settings.FindRenderLayer(0))
                ?? TagsAndLayersSettings.DefaultLayer(physics);
     }

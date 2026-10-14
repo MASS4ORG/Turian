@@ -87,7 +87,7 @@ public class StudioContributionsTests
         var command = Assert.Single(contributions.Commands, item => item.Id == "gaya.turian.newScene");
         Assert.Contains(contributions.Menus, item => item.CommandId == command.Id && item.MenuId == MenuIds.File);
         var binding = Assert.Single(contributions.Shortcuts, item => item.CommandId == command.Id);
-        Assert.Equal(new KeyStroke(KeyboardKey.N, KeyModifiers.Ctrl), binding.Stroke);
+        Assert.Equal(new KeyStroke(GKey.N, KeyModifiers.Ctrl), binding.Stroke);
 
         var database = new AssetDatabase();
         using var workspace = new AssetWorkspace(new AssetManager(), new SettingsService());
@@ -119,9 +119,9 @@ public class StudioContributionsTests
         var first = Configure();
         var second = Configure();
 
-        Assert.Equal(first.Commands.Select(c => c.Id), second.Commands.Select(c => c.Id));
-        Assert.Equal(first.Panels.Select(p => p.Id), second.Panels.Select(p => p.Id));
-        Assert.Contains(first.Commands, command => command.Id == "gaya.turian.save");
+        Assert.Equal(first.Commands.Select(static c => c.Id), second.Commands.Select(static c => c.Id));
+        Assert.Equal(first.Panels.Select(static p => p.Id), second.Panels.Select(static p => p.Id));
+        Assert.Contains(first.Commands, static command => command.Id == "gaya.turian.save");
     }
 
     /// <summary>Modal dialogs render independently of the application bar's widgets and drag region.</summary>
@@ -130,9 +130,9 @@ public class StudioContributionsTests
     {
         var contributions = Configure();
         Assert.Equal(["gaya.turian.projectSwitcher", "gaya.turian.playToolbar"],
-            contributions.Chrome.Where(item => item.Slot == ChromeSlot.MenuBar).Select(item => item.Id));
+            contributions.Chrome.Where(static item => item.Slot == ChromeSlot.MenuBar).Select(static item => item.Id));
         Assert.Equal(["gaya.turian.fileDialog", "gaya.turian.unsavedChangesDialog",
                 "gaya.turian.confirmDialog", "gaya.turian.aboutDialog"],
-            contributions.Chrome.Where(item => item.Slot == ChromeSlot.Overlay).Select(item => item.Id));
+            contributions.Chrome.Where(static item => item.Slot == ChromeSlot.Overlay).Select(static item => item.Id));
     }
 }

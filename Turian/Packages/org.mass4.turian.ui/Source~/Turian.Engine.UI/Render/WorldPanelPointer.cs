@@ -29,11 +29,20 @@ public static class WorldPanelPointer
         out Vector2 hit)
     {
         hit = default;
-        if (viewportPixels.X <= 0f || viewportPixels.Y <= 0f) return false;
+        if (viewportPixels.X <= 0f || viewportPixels.Y <= 0f)
+        {
+            return false;
+        }
 
         if (!TryLocalRay(model, viewProjection, pointerPixels, viewportPixels, out var origin, out var direction))
+        {
             return false;
-        if (!TryIntersect(origin, direction, out var localHit)) return false;
+        }
+
+        if (!TryIntersect(origin, direction, out var localHit))
+        {
+            return false;
+        }
 
         hit = (localHit + new Vector2(0.5f)) * panelPixels;
         return true;
@@ -44,8 +53,15 @@ public static class WorldPanelPointer
     {
         origin = default;
         direction = default;
-        if (!Matrix4x4.Invert(viewProjection, out var invViewProj)) return false;
-        if (!Matrix4x4.Invert(model, out var invModel)) return false;
+        if (!Matrix4x4.Invert(viewProjection, out var invViewProj))
+        {
+            return false;
+        }
+
+        if (!Matrix4x4.Invert(model, out var invModel))
+        {
+            return false;
+        }
 
         // Pointer → NDC (Vulkan: x right in [-1,1], y down in [-1,1]).
         var ndcX = (2f * pointerPixels.X / viewportPixels.X) - 1f;
@@ -66,14 +82,23 @@ public static class WorldPanelPointer
     static bool TryIntersect(Vector3 origin, Vector3 direction, out Vector2 hit)
     {
         hit = default;
-        if (MathF.Abs(direction.Z) < 1e-6f) return false;
+        if (MathF.Abs(direction.Z) < 1e-6f)
+        {
+            return false;
+        }
 
         var t = -origin.Z / direction.Z;
-        if (t < 0f) return false;
+        if (t < 0f)
+        {
+            return false;
+        }
 
         var lx = origin.X + (t * direction.X);
         var ly = origin.Y + (t * direction.Y);
-        if (MathF.Abs(lx) > 0.5f || MathF.Abs(ly) > 0.5f) return false;
+        if (MathF.Abs(lx) > 0.5f || MathF.Abs(ly) > 0.5f)
+        {
+            return false;
+        }
 
         hit = new Vector2(lx, ly);
         return true;

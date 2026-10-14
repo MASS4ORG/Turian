@@ -45,7 +45,11 @@ sealed unsafe class HzbImage : IDisposable
         HzbPipelines.Check(vulkan.Vk.AllocateMemory(vulkan.Device.VkDevice, in allocation, null, out memory));
         HzbPipelines.Check(vulkan.Vk.BindImageMemory(vulkan.Device.VkDevice, image, memory, 0));
         Views = new ImageView[levels];
-        for (uint i = 0; i < levels; i++) Views[i] = View(format, aspect, i, 1);
+        for (uint i = 0; i < levels; i++)
+        {
+            Views[i] = View(format, aspect, i, 1);
+        }
+
         FullView = View(format, aspect, 0, levels);
     }
 
@@ -66,7 +70,11 @@ sealed unsafe class HzbImage : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        foreach (var view in Views) vulkan.Vk.DestroyImageView(vulkan.Device.VkDevice, view, null);
+        foreach (var view in Views)
+        {
+            vulkan.Vk.DestroyImageView(vulkan.Device.VkDevice, view, null);
+        }
+
         vulkan.Vk.DestroyImageView(vulkan.Device.VkDevice, FullView, null);
         vulkan.Vk.DestroyImage(vulkan.Device.VkDevice, Image, null);
         vulkan.Vk.FreeMemory(vulkan.Device.VkDevice, memory, null);

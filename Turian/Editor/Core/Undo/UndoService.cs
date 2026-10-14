@@ -91,10 +91,17 @@ public sealed class UndoService : IDisposable
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        if (altered || recordedLabel != label) Flush();
+        if (altered || recordedLabel != label)
+        {
+            Flush();
+        }
 
         // Recorded again within the same step, it keeps the state from before the step's first change.
-        if (recorded.Add(target)) watched[target] = ObjectState.Capture(target);
+        if (recorded.Add(target))
+        {
+            watched[target] = ObjectState.Capture(target);
+        }
+
         recordedLabel = label;
     }
 
@@ -103,7 +110,11 @@ public sealed class UndoService : IDisposable
     {
         foreach (var inspection in inspections)
         {
-            if (inspection is not { IsPayload: true, Target: IdObject target }) continue;
+            if (inspection is not { IsPayload: true, Target: IdObject target })
+            {
+                continue;
+            }
+
             RecordObject(target, label);
             inspectedAssets[inspection.Metadata.Id] = inspection;
             recordedDocument ??= inspection.Metadata.Id;
@@ -163,7 +174,10 @@ public sealed class UndoService : IDisposable
     /// <summary>Starts a gesture, such as a gizmo drag: everything it changes, however long, is one step.</summary>
     public void BeginGesture()
     {
-        if (gestures++ > 0) return;
+        if (gestures++ > 0)
+        {
+            return;
+        }
 
         Flush();
         gestureStep = Guid.Empty;
@@ -172,29 +186,46 @@ public sealed class UndoService : IDisposable
     /// <summary>Ends the gesture <see cref="BeginGesture"/> started.</summary>
     public void EndGesture()
     {
-        if (gestures == 0) return;
+        if (gestures == 0)
+        {
+            return;
+        }
 
         Flush();
-        if (--gestures == 0) gestureStep = Guid.Empty;
+        if (--gestures == 0)
+        {
+            gestureStep = Guid.Empty;
+        }
     }
 
     static Dictionary<IdObject, ObjectState> Capture(IEnumerable<IdObject> objects)
     {
         var states = new Dictionary<IdObject, ObjectState>(ReferenceEqualityComparer.Instance);
-        foreach (var target in objects) states[target] = ObjectState.Capture(target);
+        foreach (var target in objects)
+        {
+            states[target] = ObjectState.Capture(target);
+        }
+
         return states;
     }
 
     /// <summary>Notes an edit that did not go through the open scene, such as one to an inspected asset.</summary>
     public void MarkAltered()
     {
-        if (!restoring) altered = true;
+        if (!restoring)
+        {
+            altered = true;
+        }
     }
 
     /// <summary>Records what changed since the last call as one step. The studio calls it once a frame.</summary>
     public void Flush()
     {
-        if (!altered && recorded.Count == 0) return;
+        if (!altered && recorded.Count == 0)
+        {
+            return;
+        }
+
         altered = false;
 
         var label = recordedLabel;
@@ -212,7 +243,10 @@ public sealed class UndoService : IDisposable
 
         var (before, after) = CaptureChanges();
         WatchSelection();
-        if (before.Count == 0) return;
+        if (before.Count == 0)
+        {
+            return;
+        }
 
         RegisterInspectedAssets();
         StoreStep(new UndoStep(label ?? EditLabel(before.Keys), owner!.Value, before, after), explicitStep);
@@ -228,7 +262,10 @@ public sealed class UndoService : IDisposable
         foreach (var (target, previous) in watched)
         {
             var current = ObjectState.Capture(target);
-            if (previous.SameAs(current)) continue;
+            if (previous.SameAs(current))
+            {
+                continue;
+            }
 
             before[target] = previous;
             after[target] = current;
@@ -240,15 +277,24 @@ public sealed class UndoService : IDisposable
     void RegisterInspectedAssets()
     {
         foreach (var inspection in inspector.Selection.Objects.OfType<AssetInspection>()
-                     .Where(inspection => inspection is { IsPayload: true, Target: IdObject }))
+                     .Where(static inspection => inspection is { IsPayload: true, Target: IdObject }))
+        {
             inspectedAssets[inspection.Metadata.Id] = inspection;
+        }
     }
 
     void StoreStep(UndoStep step, bool explicitStep)
     {
-        if (TryMergeGesture(step)) return;
+        if (TryMergeGesture(step))
+        {
+            return;
+        }
+
         history.Push(step, mergeable: !explicitStep && gestures == 0);
-        if (gestures > 0) gestureStep = history.UndoSteps[^1].Id;
+        if (gestures > 0)
+        {
+            gestureStep = history.UndoSteps[^1].Id;
+        }
     }
 
     bool TryMergeGesture(UndoStep step)
@@ -266,7 +312,10 @@ public sealed class UndoService : IDisposable
     public void Undo()
     {
         Flush();
-        if (!CanUndo) return;
+        if (!CanUndo)
+        {
+            return;
+        }
 
         Show(history.UndoSteps[^1].Document);
         Finish(RunEffect(history.Undo, "undo"));
@@ -276,7 +325,10 @@ public sealed class UndoService : IDisposable
     public void Redo()
     {
         Flush();
-        if (!CanRedo) return;
+        if (!CanRedo)
+        {
+            return;
+        }
 
         Show(history.RedoSteps[^1].Document);
         Finish(RunEffect(history.Redo, "redo"));
@@ -320,12 +372,18 @@ public sealed class UndoService : IDisposable
     {
         if (inspectedAssets.TryGetValue(document, out var inspection))
         {
-            if (!ReferenceEquals(inspector.SelectedObject, inspection)) inspector.Select(inspection);
+            if (!ReferenceEquals(inspector.SelectedObject, inspection))
+            {
+                inspector.Select(inspection);
+            }
+
             return;
         }
 
         if (sceneTree.CurrentAsset?.Id != document && assets.GetTrackedAsset(document) is { } scene)
+        {
             assets.ActivateAsset(scene);
+        }
     }
 
     T Run<T>(Func<T> action)
@@ -349,13 +407,24 @@ public sealed class UndoService : IDisposable
 
     void Finish(UndoStep? step)
     {
-        if (step is null) return;
+        if (step is null)
+        {
+            return;
+        }
 
         var assetEdits = inspectedAssets.Values.Where(inspection => inspection.Target is IdObject target
             && step.Before.ContainsKey(target)).ToArray();
         if (assetEdits.Length > 0)
-            foreach (var inspection in assetEdits) AssetRestored?.Invoke(inspection);
-        else if (step.Document != ProjectDocument) RefreshScene(step);
+        {
+            foreach (var inspection in assetEdits)
+            {
+                AssetRestored?.Invoke(inspection);
+            }
+        }
+        else if (step.Document != ProjectDocument)
+        {
+            RefreshScene(step);
+        }
 
         altered = false;
         WatchSelection();
@@ -368,17 +437,26 @@ public sealed class UndoService : IDisposable
         try
         {
             sceneTree.MarkAssetModified();
-            foreach (var node in step.Before.Keys.OfType<Node>()) assets.RefreshNode(node);
+            foreach (var node in step.Before.Keys.OfType<Node>())
+            {
+                assets.RefreshNode(node);
+            }
+
             assets.UpdateSelectedNode();
 
             // A step can take the selected node out of the scene, such as undoing its creation.
             if (inspector.SelectedNodes.Count > 0)
+            {
                 inspector.SelectMany(inspector.SelectedNodes.Where(InScene), inspector.SelectedNode);
+            }
+
             inspector.RefreshSelection();
 
             // Back at the step the scene was saved at, its content is what is on disk again.
             if (savedAt.TryGetValue(step.Document, out var saved) && saved == history.LatestFor(step.Document))
+            {
                 assets.MarkClean(step.Document);
+            }
         }
         finally
         {
@@ -389,7 +467,11 @@ public sealed class UndoService : IDisposable
     bool InScene(Node node)
     {
         var root = node;
-        while (root.Parent is not null) root = root.Parent;
+        while (root.Parent is not null)
+        {
+            root = root.Parent;
+        }
+
         return ReferenceEquals(root, sceneTree.EditorSceneRoot);
     }
 
@@ -404,13 +486,26 @@ public sealed class UndoService : IDisposable
     void WatchSelection()
     {
         watched.Clear();
-        if (sceneTree.IsShowingRuntimeScene) return;
+        if (sceneTree.IsShowingRuntimeScene)
+        {
+            return;
+        }
+
         foreach (var inspection in inspector.Selection.Objects.OfType<AssetInspection>())
-            if (inspection is { IsPayload: true, Target: IdObject content }) watched[content] = ObjectState.Capture(content);
+        {
+            if (inspection is { IsPayload: true, Target: IdObject content })
+            {
+                watched[content] = ObjectState.Capture(content);
+            }
+        }
+
         foreach (var node in inspector.SelectedNodes)
         {
             watched[node] = ObjectState.Capture(node);
-            foreach (var component in node.Components) watched[component] = ObjectState.Capture(component);
+            foreach (var component in node.Components)
+            {
+                watched[component] = ObjectState.Capture(component);
+            }
         }
     }
 
@@ -423,7 +518,10 @@ public sealed class UndoService : IDisposable
 
     void OnAssetAltered(Asset asset)
     {
-        if (!restoring) altered = true;
+        if (!restoring)
+        {
+            altered = true;
+        }
     }
 
     void OnAssetClosed(Asset asset)
@@ -445,8 +543,15 @@ public sealed class UndoService : IDisposable
 
         IdObject Replace(IdObject old)
         {
-            if (old is not (Node or Component)) return old;
-            if (replacements.TryGetValue(old.Id, out var found)) return found;
+            if (old is not (Node or Component))
+            {
+                return old;
+            }
+
+            if (replacements.TryGetValue(old.Id, out var found))
+            {
+                return found;
+            }
 
             IdObject? rebuilt = old switch
             {
@@ -454,7 +559,10 @@ public sealed class UndoService : IDisposable
                 Component component => RebuildComponent(component),
                 _ => null,
             };
-            if (rebuilt is null) return old;
+            if (rebuilt is null)
+            {
+                return old;
+            }
 
             Register(rebuilt);
             return replacements.GetValueOrDefault(old.Id, rebuilt);
@@ -463,10 +571,20 @@ public sealed class UndoService : IDisposable
         void Register(IdObject obj)
         {
             replacements.TryAdd(obj.Id, obj);
-            if (obj is not Node node) return;
+            if (obj is not Node node)
+            {
+                return;
+            }
 
-            foreach (var component in node.Components) replacements.TryAdd(component.Id, component);
-            foreach (var child in node.Children) Register(child);
+            foreach (var component in node.Components)
+            {
+                replacements.TryAdd(component.Id, component);
+            }
+
+            foreach (var child in node.Children)
+            {
+                Register(child);
+            }
         }
     }
 
@@ -480,7 +598,9 @@ public sealed class UndoService : IDisposable
         };
 
         if (Serializer.LoadData<Node>(holder.ToJsonString(), assetLoader) is not { Components.Count: > 0 } node)
+        {
             return null;
+        }
 
         var rebuilt = node.Components[0];
         node.Components.Clear();

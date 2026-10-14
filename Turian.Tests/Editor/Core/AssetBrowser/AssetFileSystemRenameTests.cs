@@ -9,7 +9,11 @@ public class AssetFileSystemRenameTests : IDisposable
     /// <summary>Deletes the folder the test worked in.</summary>
     public void Dispose()
     {
-        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
         GC.SuppressFinalize(this);
     }
 

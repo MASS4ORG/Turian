@@ -65,7 +65,10 @@ public sealed class PrefabAuthoring(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prefabPath);
 
-        if (ImportedId(prefabPath) is not { } prefabId) return null;
+        if (ImportedId(prefabPath) is not { } prefabId)
+        {
+            return null;
+        }
 
         var name = $"{Path.GetFileNameWithoutExtension(prefabPath)} Variant";
         var path = UniquePath(Path.GetDirectoryName(prefabPath)!, name);
@@ -119,9 +122,14 @@ public sealed class PrefabAuthoring(
         {
             node.Id = isRoot ? instanceId : PrefabInstances.DeriveId(instanceId, node.Id);
             foreach (var component in node.Components)
+            {
                 component.Id = PrefabInstances.DeriveId(instanceId, component.Id);
+            }
+
             foreach (var child in node.Children)
+            {
                 Relink(child, isRoot: false);
+            }
         }
     }
 
@@ -136,14 +144,24 @@ public sealed class PrefabAuthoring(
         Collect(root);
         return () =>
         {
-            foreach (var (obj, id) in ids) obj.Id = id;
+            foreach (var (obj, id) in ids)
+            {
+                obj.Id = id;
+            }
         };
 
         void Collect(Node node)
         {
             ids.Add((node, node.Id));
-            foreach (var component in node.Components) ids.Add((component, component.Id));
-            foreach (var child in node.Children) Collect(child);
+            foreach (var component in node.Components)
+            {
+                ids.Add((component, component.Id));
+            }
+
+            foreach (var child in node.Children)
+            {
+                Collect(child);
+            }
         }
     }
 
@@ -169,11 +187,17 @@ public sealed class PrefabAuthoring(
     static string UniquePath(string directory, string name)
     {
         var stem = string.Concat(name.Split(Path.GetInvalidFileNameChars()));
-        if (stem.Length == 0) stem = "Prefab";
+        if (stem.Length == 0)
+        {
+            stem = "Prefab";
+        }
 
         var path = Path.Combine(directory, stem + prefabExtension);
         for (var n = 1; File.Exists(path); n++)
+        {
             path = Path.Combine(directory, $"{stem} {n}{prefabExtension}");
+        }
+
         return path;
     }
 }

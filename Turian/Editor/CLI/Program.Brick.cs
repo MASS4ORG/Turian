@@ -9,7 +9,7 @@ public static partial class Program
         var projectOption = new Option<DirectoryInfo>("--project")
         {
             Description = "Project folder",
-            DefaultValueFactory = _ => new DirectoryInfo("./"),
+            DefaultValueFactory = static _ => new DirectoryInfo("./"),
         };
 
         var studioOption = new Option<bool>("--studio")
@@ -132,7 +132,11 @@ public static partial class Program
             if (result.GetValue(studioOption))
             {
                 var studio = TurianStudioBricks.Workspace();
-                if (!studio.Remove(id)) throw new PackageException($"The studio's manifest does not declare {id}.");
+                if (!studio.Remove(id))
+                {
+                    throw new PackageException($"The studio's manifest does not declare {id}.");
+                }
+
                 studio.Restore();
                 Console.WriteLine($"Removed {id} from the studio");
                 return;
@@ -140,12 +144,16 @@ public static partial class Program
 
             var project = result.GetValue(projectOption)!.FullName;
             if (!BrickService.Remove(project, id))
+            {
                 throw new PackageException($"The project's manifest does not declare {id}.");
+            }
 
             _ = BrickService.Restore(project);
             Console.WriteLine($"Removed {id}");
             if (Directory.Exists(Path.Combine(project, ProjectManifest.DirectoryName, id)))
+            {
                 Console.WriteLine($"Its embedded copy in {ProjectManifest.DirectoryName}/{id} remains; delete that folder to uninstall it.");
+            }
         }));
         return command;
     }
@@ -255,7 +263,9 @@ public static partial class Program
                                             ?? throw new PackageException($"The project does not install {id}."))];
             foreach (var copy in BrickService.CopyAssets(project, id, assets, result.GetValue(toOption) ?? id.Split('.')[^1],
                          result.GetValue(remapOption)))
+            {
                 Console.WriteLine($"{copy.Source} -> {copy.Target} ({copy.NewId})");
+            }
         }));
         return command;
     }
@@ -316,8 +326,14 @@ public static partial class Program
         {
             var differences = BrickService.Diff(result.GetValue(projectOption)!.FullName, result.GetValue(idArg)!);
             foreach (var difference in differences)
+            {
                 Console.WriteLine($"{difference.Change switch { ForkChange.Added => "A", ForkChange.Modified => "M", _ => "D" }} {difference.Path}");
-            if (differences.Count == 0) Console.WriteLine("The fork matches its original");
+            }
+
+            if (differences.Count == 0)
+            {
+                Console.WriteLine("The fork matches its original");
+            }
         }));
         return command;
     }
@@ -336,12 +352,36 @@ public static partial class Program
             try
             {
                 var merged = BrickService.Rebase(result.GetValue(projectOption)!.FullName, result.GetValue(idArg)!, result.GetValue(toOption));
-                foreach (var path in merged.Updated) Console.WriteLine($"updated  {path}");
-                foreach (var path in merged.Added) Console.WriteLine($"added    {path}");
-                foreach (var path in merged.Removed) Console.WriteLine($"removed  {path}");
-                foreach (var path in merged.Merged) Console.WriteLine($"merged   {path}");
-                foreach (var path in merged.Conflicts) Console.Error.WriteLine($"conflict {path}");
-                if (merged.HasConflicts) Console.Error.WriteLine("Resolve the conflicts in the fork; the markers are <<<<<<< fork / ======= / >>>>>>> upstream.");
+                foreach (var path in merged.Updated)
+                {
+                    Console.WriteLine($"updated  {path}");
+                }
+
+                foreach (var path in merged.Added)
+                {
+                    Console.WriteLine($"added    {path}");
+                }
+
+                foreach (var path in merged.Removed)
+                {
+                    Console.WriteLine($"removed  {path}");
+                }
+
+                foreach (var path in merged.Merged)
+                {
+                    Console.WriteLine($"merged   {path}");
+                }
+
+                foreach (var path in merged.Conflicts)
+                {
+                    Console.Error.WriteLine($"conflict {path}");
+                }
+
+                if (merged.HasConflicts)
+                {
+                    Console.Error.WriteLine("Resolve the conflicts in the fork; the markers are <<<<<<< fork / ======= / >>>>>>> upstream.");
+                }
+
                 return merged.HasConflicts ? 1 : 0;
             }
             catch (PackageException ex)
@@ -408,7 +448,9 @@ public static partial class Program
         command.SetAction(async (result, _) => await RunBrickAsync(async () =>
         {
             foreach (var (registry, id, latest) in await BrickService.SearchAsync(result.GetValue(projectOption)!.FullName, result.GetValue(queryArg) ?? string.Empty).ConfigureAwait(false))
+            {
                 Console.WriteLine($"{id} {latest}  [{registry}]");
+            }
         }).ConfigureAwait(false));
         return command;
     }
@@ -441,14 +483,18 @@ public static partial class Program
         remove.SetAction(result => RunBrick(() =>
         {
             if (!BrickService.RemoveRegistry(result.GetValue(projectOption)!.FullName, result.GetValue(removeName)!))
+            {
                 throw new PackageException($"The project does not declare a registry named {result.GetValue(removeName)}.");
+            }
         }));
 
         var list = new Command("list", "List the registries bricks come from") { projectOption };
         list.SetAction(result => RunBrick(() =>
         {
             foreach (var registry in BrickService.Registries(result.GetValue(projectOption)!.FullName))
+            {
                 Console.WriteLine($"{registry.Name}  {registry.Url}  scopes: {string.Join(", ", registry.Scopes)}  keys: {registry.Keys.Count}{(registry.AllowUnsigned ? "  (unsigned allowed)" : string.Empty)}");
+            }
         }));
 
         return new Command("registry", "Registries the project takes bricks from") { add, remove, list };
@@ -472,8 +518,16 @@ public static partial class Program
         {
             var path = result.GetValue(pathArg)!.FullName;
             var issues = result.GetValue(againstOption) is { } against ? BrickVerifier.VerifyAgainst(path, against) : BrickVerifier.Verify(path);
-            foreach (var issue in issues) Console.Error.WriteLine(issue);
-            if (issues.Count == 0) Console.WriteLine("Brick is sound");
+            foreach (var issue in issues)
+            {
+                Console.Error.WriteLine(issue);
+            }
+
+            if (issues.Count == 0)
+            {
+                Console.WriteLine("Brick is sound");
+            }
+
             return issues.Count == 0 ? 0 : 1;
         });
         return command;

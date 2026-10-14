@@ -12,7 +12,7 @@ public sealed class SkiaFrameRasterizerTests
     {
         using var r = new SkiaFrameRasterizer(8, 4);
 
-        var pixels = r.Render(_ => { });
+        var pixels = r.Render(static _ => { });
 
         Assert.Equal(8, r.Width);
         Assert.Equal(4, r.Height);
@@ -25,10 +25,12 @@ public sealed class SkiaFrameRasterizerTests
     {
         using var r = new SkiaFrameRasterizer(4, 4);
 
-        var pixels = r.Render(_ => { });
+        var pixels = r.Render(static _ => { });
 
         foreach (var b in pixels)
+        {
             Assert.Equal(0, b);
+        }
     }
 
     /// <summary>A solid red fill reads back as R=255, G=0, B=0, A=255 in that byte order.</summary>
@@ -37,7 +39,7 @@ public sealed class SkiaFrameRasterizerTests
     {
         using var r = new SkiaFrameRasterizer(2, 2);
 
-        var pixels = r.Render(canvas =>
+        var pixels = r.Render(static canvas =>
         {
             using (var paint = new SKPaint())
             {
@@ -61,7 +63,7 @@ public sealed class SkiaFrameRasterizerTests
     {
         using var r = new SkiaFrameRasterizer(4, 2);
 
-        var pixels = r.Render(canvas =>
+        var pixels = r.Render(static canvas =>
         {
             using (var red = new SKPaint())
             using (var blue = new SKPaint())
@@ -86,14 +88,14 @@ public sealed class SkiaFrameRasterizerTests
     public void Resize_ChangesSizeAndOutputLength()
     {
         using var r = new SkiaFrameRasterizer(4, 4);
-        Assert.Equal(4 * 4 * 4, r.Render(_ => { }).Length);
+        Assert.Equal(4 * 4 * 4, r.Render(static _ => { }).Length);
 
         r.Resize(6, 3);
         Assert.Equal((6, 3), (r.Width, r.Height));
-        Assert.Equal(6 * 3 * 4, r.Render(_ => { }).Length);
+        Assert.Equal(6 * 3 * 4, r.Render(static _ => { }).Length);
 
         r.Resize(6, 3); // no-op
-        Assert.Equal(6 * 3 * 4, r.Render(_ => { }).Length);
+        Assert.Equal(6 * 3 * 4, r.Render(static _ => { }).Length);
     }
 
     /// <summary>Zero or negative dimensions are rejected.</summary>
@@ -125,7 +127,7 @@ public sealed class SkiaFrameRasterizerTests
     {
         using var r = new SkiaFrameRasterizer(16, 16);
 
-        void Draw(SKCanvas canvas)
+        static void Draw(SKCanvas canvas)
         {
             canvas.Scale(0.5f);                 // same as Guinevere's per-frame canvasScale
             using (var paint = new SKPaint())

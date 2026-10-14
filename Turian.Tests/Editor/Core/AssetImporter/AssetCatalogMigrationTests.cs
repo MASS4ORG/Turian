@@ -22,9 +22,12 @@ public sealed class AssetCatalogMigrationTests : IDisposable
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "cube.fbx"), source);
         var database = new AssetDatabase();
         using (var importer = new AssetImporter(NullLogger.Instance, database, new SettingsService()))
+        {
             importer.GenerateMetaFiles(assets);
-        var parent = database.GetAssetsSnapshot().Single(record => record.ParentAssetId == Guid.Empty);
-        var childIds = database.GetChildAssets(parent.AssetId).Select(record => record.AssetId).Order().ToArray();
+        }
+
+        var parent = database.GetAssetsSnapshot().Single(static record => record.ParentAssetId == Guid.Empty);
+        var childIds = database.GetChildAssets(parent.AssetId).Select(static record => record.AssetId).Order().ToArray();
         Assert.NotEmpty(childIds);
         var directory = Path.GetDirectoryName(parent.ResolveContentPath())!;
         var manifestPath = Path.Combine(directory, "import.json");
@@ -51,11 +54,14 @@ public sealed class AssetCatalogMigrationTests : IDisposable
         Assert.EndsWith("primary.glb", repaired.ImportedRelativePath);
         Assert.NotEmpty(GltfModelReader.Load(repaired.ResolveContentPath()).Vertices);
         Assert.Equal(childIds, project.Database.GetChildAssets(parent.AssetId)
-            .Select(record => record.AssetId).Order().ToArray());
-        Assert.All(project.Database.GetChildAssets(parent.AssetId), record => Assert.True(File.Exists(record.ResolveContentPath())));
+            .Select(static record => record.AssetId).Order().ToArray());
+        Assert.All(project.Database.GetChildAssets(parent.AssetId), static record => Assert.True(File.Exists(record.ResolveContentPath())));
         Assert.NotNull(Serializer.Load<ImportedAssetManifest>(manifestPath)!.IndexedAssetIds);
         if (!staleManifest)
+        {
             Assert.Equal(importTime, Serializer.Load<ImportedAssetManifest>(manifestPath)!.ImportedAtUtc);
+        }
+
         Assert.False(AssetImporter.RepairCachedCatalog(project.Database, settings, NullLogger.Instance));
         var persisted = new AssetDatabase();
         persisted.LoadCatalogFromProject(root);

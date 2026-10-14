@@ -114,7 +114,11 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         reveal.Requested += OnReveal;
         operations.Changed += Refresh;
         fileSystem.PathMoved += OnPathMoved;
-        if (importer is not null) importer.AssetsChanged += Refresh;
+        if (importer is not null)
+        {
+            importer.AssetsChanged += Refresh;
+        }
+
         editorSettings.Changed += OnEditorSettingsChanged;
     }
 
@@ -134,20 +138,31 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
             PrepareTree(root);
             frameMode = browserSettings.ViewMode;
         }
-        if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            pointer = gui.Input.MousePosition;
+        }
+
         systemClipboard ??= gui.Platform.Require<IClipboard>();
 
         using (gui.Node(-1, -1, "assets/browser").Expand().Direction(Axis.Vertical).Enter())
         {
             gui.On<FileDropEvent>(OnFileDrop);
             Toolbar(gui);
-            using (gui.Node(-1, -1, "assets/body").Expand().Direction(Axis.Horizontal).Enter()) Body(gui);
+            using (gui.Node(-1, -1, "assets/body").Expand().Direction(Axis.Horizontal).Enter())
+            {
+                Body(gui);
+            }
         }
 
         if (gui.Pass == Pass.Pass2Render)
         {
             InspectSelection();
-            if (thumbnails.PendingCount > 0) gui.RequestFrame();
+            if (thumbnails.PendingCount > 0)
+            {
+                gui.RequestFrame();
+            }
+
             thumbnails.Process();
         }
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
@@ -159,12 +174,25 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         var mode = AssetQuery.IsActive(frameFilter) ? AssetBrowserViewMode.Grid : frameMode;
         if (mode == AssetBrowserViewMode.Split)
         {
-            using (gui.Node().ExpandWidth(split).ExpandHeight().Enter()) Tree(gui);
+            using (gui.Node().ExpandWidth(split).ExpandHeight().Enter())
+            {
+                Tree(gui);
+            }
+
             gui.Splitter(ref split, Axis.Horizontal, thickness: 3f, min: 0.15f);
-            using (gui.Node().ExpandWidth(1f - split).ExpandHeight().Enter()) Grid(gui);
+            using (gui.Node().ExpandWidth(1f - split).ExpandHeight().Enter())
+            {
+                Grid(gui);
+            }
         }
-        else if (mode == AssetBrowserViewMode.Tree) Tree(gui);
-        else Grid(gui);
+        else if (mode == AssetBrowserViewMode.Tree)
+        {
+            Tree(gui);
+        }
+        else
+        {
+            Grid(gui);
+        }
     }
 
     void Tree(Gui gui) => gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
@@ -183,7 +211,10 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
 
         if (treeDirty) { Rebuild(); treeDirty = false; }
 
-        if (pendingReveal != Guid.Empty) RevealPending();
+        if (pendingReveal != Guid.Empty)
+        {
+            RevealPending();
+        }
     }
 
     /// <summary>
@@ -194,10 +225,15 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
     {
         var target = entries.FirstOrDefault(entry => entry.AssetMetadata?.Id == pendingReveal);
         pendingReveal = Guid.Empty;
-        if (target is null) return;
+        if (target is null)
+        {
+            return;
+        }
 
         for (var parent = target.ParentPath; parent is not null; parent = ParentOf(parent))
+        {
             state.SetExpanded(parent, true);
+        }
 
         // Revealed for a reference the inspector shows, so the inspector keeps what it is editing.
         state.SelectedId = target.AbsolutePath;
@@ -221,7 +257,11 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
             .. brickTree.Scan(projectRoot)];
         scannedRoot = root;
         byPath.Clear();
-        foreach (var entry in entries) byPath[entry.AbsolutePath] = entry;
+        foreach (var entry in entries)
+        {
+            byPath[entry.AbsolutePath] = entry;
+        }
+
         BindFavorites(projectRoot, root);
         IndexChildren();
         IndexThumbnails();
@@ -238,30 +278,40 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
             favorites = new AssetFavoritesStore(projectRoot);
             navigation.Reset(root);
         }
-        if (!entries.Any(entry => entry.IsDirectory && entry.AbsolutePath == navigation.Current)) navigation.Visit(root);
+        if (!entries.Any(entry => entry.IsDirectory && entry.AbsolutePath == navigation.Current))
+        {
+            navigation.Visit(root);
+        }
     }
 
     void IndexChildren()
     {
         children.Clear();
-        foreach (var group in entries.Where(entry => entry.ParentPath is not null).GroupBy(entry => entry.ParentPath!))
-            children[group.Key] = [.. group.OrderByDescending(entry => entry.IsDirectory)
-                .ThenBy(entry => Path.GetFileName(entry.AbsolutePath), StringComparer.OrdinalIgnoreCase)];
+        foreach (var group in entries.Where(static entry => entry.ParentPath is not null).GroupBy(static entry => entry.ParentPath!))
+        {
+            children[group.Key] = [.. group.OrderByDescending(static entry => entry.IsDirectory)
+                .ThenBy(static entry => Path.GetFileName(entry.AbsolutePath), StringComparer.OrdinalIgnoreCase)];
+        }
     }
 
     void IndexThumbnails()
     {
         thumbnails.Clear();
         thumbnailRevisions.Clear();
-        foreach (var entry in entries.Where(entry => !entry.IsDirectory))
+        foreach (var entry in entries.Where(static entry => !entry.IsDirectory))
+        {
             thumbnailRevisions[entry.AbsolutePath] = Revision(entry);
+        }
     }
 
     void Rebuild()
     {
         rows.Clear();
         AppendFavorites();
-        foreach (var entry in ChildrenOf(null)) Append(entry, depth: 0);
+        foreach (var entry in ChildrenOf(null))
+        {
+            Append(entry, depth: 0);
+        }
     }
 
     void AppendFavorites()
@@ -271,7 +321,9 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
             rows.Add(new TreeItem("assets/favorites", "Favorites", 0, true,
                 Icon: gui => gui.ThemedIcon(Icons.Favorite, ThemeTokens.Current.Text(12))));
             foreach (var entry in entries.Where(entry => favorites.Paths.Contains(entry.AbsolutePath)))
+            {
                 rows.Add(new TreeItem(entry.AbsolutePath, DisplayName(entry.AbsolutePath), 1, Icon: IconFor(entry), Tag: entry));
+            }
         }
     }
 
@@ -288,7 +340,11 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
 
     AssetRecord? RecordFor(AssetEntry entry)
     {
-        if (database is null || entry.AssetMetadata is null) return null;
+        if (database is null || entry.AssetMetadata is null)
+        {
+            return null;
+        }
+
         database.TryGetAsset(entry.AssetMetadata.Id, out var record);
         return record;
     }
@@ -313,7 +369,11 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         reveal.Requested -= OnReveal;
         fileSystem.PathMoved -= OnPathMoved;
         editorSettings.Changed -= OnEditorSettingsChanged;
-        if (importer is not null) importer.AssetsChanged -= Refresh;
+        if (importer is not null)
+        {
+            importer.AssetsChanged -= Refresh;
+        }
+
         thumbnails.Dispose();
         thumbnailRenderer?.Dispose();
     }

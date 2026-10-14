@@ -183,7 +183,10 @@ public sealed partial class DataAssetGeneratorTests
     static T LoadFromGenerator<T>(string typeName)
     {
         var root = AppContext.BaseDirectory;
-        while (Directory.GetFiles(root, "*.slnx").Length == 0) root = Directory.GetParent(root)!.FullName;
+        while (Directory.GetFiles(root, "*.slnx").Length == 0)
+        {
+            root = Directory.GetParent(root)!.FullName;
+        }
 
 #if DEBUG
         const string configuration = "Debug";

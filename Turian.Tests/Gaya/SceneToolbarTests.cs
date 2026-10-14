@@ -18,8 +18,8 @@ public sealed class SceneToolbarTests
         var play = new PlayModeService(Substitute.For<IPlaySceneHost>(), database, services, NullLogger.Instance);
         var settings = new EditorCameraSettings { Store = Substitute.For<IEditorSettings>() };
         var shortcuts = new ShortcutService(NullLogger.Instance);
-        shortcuts.Add(new KeyBinding("gaya.turian.viewport.frameSelected", KeyboardKey.F));
-        shortcuts.Add(new KeyBinding("gaya.turian.viewport.translate", KeyboardKey.W));
+        shortcuts.Add(new KeyBinding("gaya.turian.viewport.frameSelected", GKey.F));
+        shortcuts.Add(new KeyBinding("gaya.turian.viewport.translate", GKey.W));
         settings.Navigation = new SceneNavigationBindings(shortcuts, Substitute.For<IFocusTracker>());
         using var viewport = new SceneViewport(null!, database, tree, inspector, null!, play, settings,
             NullLogger.Instance, undo, new LocaleService());
@@ -54,9 +54,9 @@ public sealed class SceneToolbarTests
         Assert.NotNull(Find("scene/options/value/move"));
         Assert.NotNull(Find("scene/options/value/rotate"));
         Assert.NotNull(Find("scene/options/value/scale"));
-        input.IsKeyPressed(KeyboardKey.Escape).Returns(true);
+        input.IsKeyPressed(GKey.Escape).Returns(true);
         Frame();
-        input.IsKeyPressed(KeyboardKey.Escape).Returns(false);
+        input.IsKeyPressed(GKey.Escape).Returns(false);
         Frame();
         Assert.DoesNotContain(Nodes(), node => node.Id == "scene/options");
         Click("scene/toolbar/Transform");
@@ -147,8 +147,16 @@ public sealed class SceneToolbarTests
             var snap = settings.Tools.SnapEnabled;
             InspectorFormsRenderingTests.Frame(gui, surface, font, current =>
             {
-                using (current.Node(800, 500).Direction(Axis.Vertical).Enter()) toolbar.Render(current);
-                if (current.Pass != Pass.Pass1Build) return;
+                using (current.Node(800, 500).Direction(Axis.Vertical).Enter())
+                {
+                    toolbar.Render(current);
+                }
+
+                if (current.Pass != Pass.Pass1Build)
+                {
+                    return;
+                }
+
                 Assert.Equal(mode, viewport.Gizmo.Mode);
                 Assert.Equal(space, viewport.Gizmo.Space);
                 Assert.Equal(snap, settings.Tools.SnapEnabled);

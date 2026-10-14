@@ -43,7 +43,11 @@ public sealed class FrameRequestBridge : IDisposable
     /// <summary>Disconnects callbacks before the window and its services are disposed.</summary>
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         LogBuffer.Changed -= request;
         importer.AssetsChanged -= request;

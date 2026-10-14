@@ -106,7 +106,9 @@ public sealed partial class SceneCameraController
     public void OnMouseUp()
     {
         if (!IsLeftButton && !IsMiddleButton && !IsRightButton)
+        {
             mode = NavigationMode.None;
+        }
     }
 
     /// <summary>
@@ -155,7 +157,10 @@ public sealed partial class SceneCameraController
             var step = MoveSpeed * delta * ZoomFraction;
             var distance = Camera.Position.Length();
             if (distance > 0.01f)
+            {
                 step = MathF.Min(step, distance * 0.5f);
+            }
+
             Camera.Position += Camera.Front * step;
         }
     }
@@ -178,13 +183,19 @@ public sealed partial class SceneCameraController
         int moveUp, int moveDown)
     {
         ArgumentNullException.ThrowIfNull(keys);
-        if (keys.Count == 0) return;
+        if (keys.Count == 0)
+        {
+            return;
+        }
 
         var x = MovementAxis(keys, moveRight, moveLeft);
         var y = MovementAxis(keys, moveUp, moveDown);
         var z = MovementAxis(keys, moveForward, moveBackward);
 
-        if (x == 0f && y == 0f && z == 0f) return;
+        if (x == 0f && y == 0f && z == 0f)
+        {
+            return;
+        }
 
         var multiplier = IsFast ? fastMoveMultiplier : 1f;
         var step = MoveSpeed * multiplier * dt;
@@ -215,10 +226,17 @@ public sealed partial class SceneCameraController
     /// </summary>
     public void FrameBounds(Bounds bounds)
     {
-        if (bounds.IsEmpty) return;
+        if (bounds.IsEmpty)
+        {
+            return;
+        }
 
         var radius = bounds.Size.Length() * 0.5f;
-        if (radius < 0.001f) radius = 1f;
+        if (radius < 0.001f)
+        {
+            radius = 1f;
+        }
+
         var distance = radius / MathF.Tan(Camera.FieldOfView * 0.5f);
         Camera.Position = bounds.Center - Camera.Front * distance;
         orbitDistance = distance;

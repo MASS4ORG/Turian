@@ -8,7 +8,10 @@ public sealed class ProjectBootstrapperTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     /// <summary>The project folder is named after the title and holds the starter files.</summary>

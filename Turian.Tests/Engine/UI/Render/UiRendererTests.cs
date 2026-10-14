@@ -83,7 +83,7 @@ public sealed class UiRendererTests
     [Fact]
     public void MissingTemplate_DoesNotThrow()
     {
-        var ex = Record.Exception(() => Render(
+        var ex = Record.Exception(static () => Render(
             """
             <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement><Instance template="Nope" /></VisualElement>
@@ -100,7 +100,7 @@ public sealed class UiRendererTests
         var fired = 0;
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(30, 15));           // over a button at the origin
-        input.IsMouseButtonPressed(Arg.Any<MouseButton>()).Returns(true); // a click this frame
+        input.IsMouseButtonPressed(Arg.Any<GMouseButton>()).Returns(true); // a click this frame
 
         Render(
             """
@@ -154,7 +154,7 @@ public sealed class UiRendererTests
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(x, y));
         input.PrevMousePosition.Returns(new Vector2(x, y));
-        input.IsMouseButtonPressed(Arg.Any<MouseButton>()).Returns(pressed);
+        input.IsMouseButtonPressed(Arg.Any<GMouseButton>()).Returns(pressed);
         input.GetTypedCharacters().Returns(typed);
         return input;
     }
@@ -163,9 +163,13 @@ public sealed class UiRendererTests
     static bool Contains(byte[] px, byte r, byte g, byte b)
     {
         for (var i = 0; i + 3 < px.Length; i += 4)
+        {
             if (Math.Abs(px[i] - r) < 40 && Math.Abs(px[i + 1] - g) < 40 && Math.Abs(px[i + 2] - b) < 40
                 && px[i + 3] > 200)
+            {
                 return true;
+            }
+        }
 
         return false;
     }
@@ -249,7 +253,7 @@ public sealed class UiRendererTests
               </VisualElement>
             </UI>
             """,
-            r => r.DataResolver = path => path == "Rows" ? new[] { "#ff0000", "#00ff00", "#0000ff" } : null);
+            static r => r.DataResolver = static path => path == "Rows" ? new[] { "#ff0000", "#00ff00", "#0000ff" } : null);
 
         Assert.True(At(px, w / 2, 10).R > 200, "row 0 red");
         Assert.True(At(px, w / 2, 45).G > 200, "row 1 green");
@@ -268,15 +272,20 @@ public sealed class UiRendererTests
               </VisualElement>
             </UI>
             """,
-            r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }", UiStyleSheetAsset.ParseOptions)));
+            static r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }", UiStyleSheetAsset.ParseOptions)));
 
         var reddish = 0;
         for (var y = 0; y < h; y++)
+        {
             for (var x = 0; x < w; x++)
             {
                 var (rr, gg, bb, aa) = At(px, x, y);
-                if (aa > 40 && rr > 150 && gg < 100 && bb < 100) reddish++;
+                if (aa > 40 && rr > 150 && gg < 100 && bb < 100)
+                {
+                    reddish++;
+                }
             }
+        }
 
         Assert.True(reddish > 40, $"expected red glyph pixels from the .uss rule, found {reddish}");
     }
@@ -309,7 +318,7 @@ public sealed class UiRendererTests
         };
         var fired = 0;
         var input = Pointer(hovered ? 20 : -1, hovered ? 15 : -1, pressed);
-        input.IsMouseButtonDown(Arg.Any<MouseButton>()).Returns(pressed);
+        input.IsMouseButtonDown(Arg.Any<GMouseButton>()).Returns(pressed);
         var pixels = Render($$"""
             <UI><ImageButton width="80" height="40" image-normal="normal" image-hover="hover"
                 image-pressed="pressed" image-disabled="disabled" enabled="{{!disabled}}" click="Pick" /></UI>

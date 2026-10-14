@@ -37,7 +37,10 @@ public sealed class DataAssetSessionTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
+        if (Directory.Exists(projectRoot))
+        {
+            Directory.Delete(projectRoot, recursive: true);
+        }
     }
 
     /// <summary>

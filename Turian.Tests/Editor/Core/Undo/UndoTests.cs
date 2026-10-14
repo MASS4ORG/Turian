@@ -59,7 +59,11 @@ public class UndoTests
         Assert.Single(undo.History.UndoSteps);
         Assert.All(nodes, node => Assert.Equal(4f, node.GetComponent<LightComponent>()!.Intensity));
         undo.Undo();
-        for (var i = 0; i < nodes.Length; i++) Assert.Equal(i + 1, nodes[i].GetComponent<LightComponent>()!.Intensity);
+        for (var i = 0; i < nodes.Length; i++)
+        {
+            Assert.Equal(i + 1, nodes[i].GetComponent<LightComponent>()!.Intensity);
+        }
+
         Assert.Equal(nodes, inspector.SelectedNodes);
         Assert.Same(nodes[3], inspector.SelectedNode);
         undo.Redo();

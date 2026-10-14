@@ -26,7 +26,7 @@ public class ComponentQueryTests
     static Node BuildTree() =>
         NodeWith("root", NodeWith("a", NodeWith("a1"), NodeWith("a2")), NodeWith("b", NodeWith("b1")));
 
-    static string[] Labels(IEnumerable<Tag> tags) => [.. tags.Select(tag => tag.Label)];
+    static string[] Labels(IEnumerable<Tag> tags) => [.. tags.Select(static tag => tag.Label)];
 
     /// <summary>Both query forms visit depth-first in hierarchy order.</summary>
     [Fact]
@@ -71,7 +71,7 @@ public class ComponentQueryTests
         root.GetComponentsInChildren(results);
 
         Assert.Equal(6, results.Count);
-        Assert.DoesNotContain(results, tag => tag.Label == "stale");
+        Assert.DoesNotContain(results, static tag => tag.Label == "stale");
     }
 
     /// <summary>Descendant enumeration excludes the root, keeps hierarchy order and hides inactive subtrees.</summary>
@@ -81,7 +81,7 @@ public class ComponentQueryTests
         var root = BuildTree();
         root.Children[1].IsActive = false;
 
-        Assert.Equal(["a", "a1", "a2"], Node.GetChildren(root).Select(node => node.Name));
+        Assert.Equal(["a", "a1", "a2"], Node.GetChildren(root).Select(static node => node.Name));
         Assert.Empty(Node.GetChildren(null));
     }
 

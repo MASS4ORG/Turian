@@ -22,7 +22,7 @@ public sealed class AssetCreationCatalog
     readonly ILogger log;
 
     readonly List<AssetCreationKind> kinds = [];
-    Assembly? scanned;
+    ReflectionAssembly? scanned;
     bool scannedOnce;
 
     /// <summary>Creates the catalog over the services that write the files.</summary>
@@ -58,7 +58,10 @@ public sealed class AssetCreationCatalog
     public void EnsureRefreshed()
     {
         var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned)) return;
+        if (scannedOnce && ReferenceEquals(current, scanned))
+        {
+            return;
+        }
 
         scanned = current;
         scannedOnce = true;
@@ -84,7 +87,10 @@ public sealed class AssetCreationCatalog
 
         try
         {
-            if (kind.PayloadType is not null) return CreateDataAsset(kind, targetDirectory);
+            if (kind.PayloadType is not null)
+            {
+                return CreateDataAsset(kind, targetDirectory);
+            }
 
             return kind.MenuPath switch
             {
@@ -105,8 +111,15 @@ public sealed class AssetCreationCatalog
 
     bool CreateDataAsset(AssetCreationKind kind, string targetDirectory)
     {
-        if (settings.Settings is not { } appSettings) return false;
-        if (Activator.CreateInstance(kind.PayloadType!) is not DataAsset payload) return false;
+        if (settings.Settings is not { } appSettings)
+        {
+            return false;
+        }
+
+        if (Activator.CreateInstance(kind.PayloadType!) is not DataAsset payload)
+        {
+            return false;
+        }
 
         var assetPath = UniquePath(targetDirectory, kind.DefaultName);
         var meta = new DataAssetAsset
@@ -133,8 +146,8 @@ public sealed class AssetCreationCatalog
     /// <param name="loaded">Every assembly the editor has loaded.</param>
     /// <param name="activeUserAssemblies">The user assemblies in force, empty before the first compile.</param>
     /// <returns>The assemblies to scan.</returns>
-    public static IEnumerable<Assembly> CandidateAssemblies(IEnumerable<Assembly> loaded,
-        IReadOnlyCollection<Assembly> activeUserAssemblies)
+    public static IEnumerable<ReflectionAssembly> CandidateAssemblies(IEnumerable<ReflectionAssembly> loaded,
+        IReadOnlyCollection<ReflectionAssembly> activeUserAssemblies)
     {
         ArgumentNullException.ThrowIfNull(loaded);
         ArgumentNullException.ThrowIfNull(activeUserAssemblies);
@@ -159,7 +172,7 @@ public sealed class AssetCreationCatalog
     /// <param name="assemblies">The assemblies to scan.</param>
     /// <param name="log">Where a skipped type is reported.</param>
     /// <returns>The kinds, ordered by menu path.</returns>
-    public static IReadOnlyList<AssetCreationKind> Scan(IEnumerable<Assembly> assemblies, ILogger log)
+    public static IReadOnlyList<AssetCreationKind> Scan(IEnumerable<ReflectionAssembly> assemblies, ILogger log)
     {
         ArgumentNullException.ThrowIfNull(assemblies);
         ArgumentNullException.ThrowIfNull(log);
@@ -170,9 +183,20 @@ public sealed class AssetCreationCatalog
         {
             try
             {
-                if (type is not { IsClass: true, IsAbstract: false }) continue;
-                if (!typeof(DataAsset).IsAssignableFrom(type) || typeof(Asset).IsAssignableFrom(type)) continue;
-                if (type.GetCustomAttribute<CreateAssetMenuAttribute>(false) is not { } attribute) continue;
+                if (type is not { IsClass: true, IsAbstract: false })
+                {
+                    continue;
+                }
+
+                if (!typeof(DataAsset).IsAssignableFrom(type) || typeof(Asset).IsAssignableFrom(type))
+                {
+                    continue;
+                }
+
+                if (type.GetCustomAttribute<CreateAssetMenuAttribute>(false) is not { } attribute)
+                {
+                    continue;
+                }
 
                 found.Add(new AssetCreationKind(MenuPath(attribute.Path, type), FileName(attribute.FileName, type),
                     type));
@@ -187,7 +211,7 @@ public sealed class AssetCreationCatalog
         return [.. found.OrderBy(static kind => kind.MenuPath, StringComparer.OrdinalIgnoreCase)];
     }
 
-    static IEnumerable<Type> LoadableTypes(Assembly assembly)
+    static IEnumerable<Type> LoadableTypes(ReflectionAssembly assembly)
     {
         try
         {
@@ -218,7 +242,10 @@ public sealed class AssetCreationCatalog
     static string UniquePath(string directory, string requestedName)
     {
         var path = Path.Combine(directory, requestedName);
-        if (!File.Exists(path)) return path;
+        if (!File.Exists(path))
+        {
+            return path;
+        }
 
         var stem = Path.GetFileNameWithoutExtension(requestedName);
         var extension = Path.GetExtension(requestedName);
@@ -226,7 +253,10 @@ public sealed class AssetCreationCatalog
         for (var index = 1; ; index++)
         {
             var candidate = Path.Combine(directory, $"{stem} {index}{extension}");
-            if (!File.Exists(candidate)) return candidate;
+            if (!File.Exists(candidate))
+            {
+                return candidate;
+            }
         }
     }
 }

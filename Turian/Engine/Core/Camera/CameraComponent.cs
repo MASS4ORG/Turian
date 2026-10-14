@@ -45,7 +45,10 @@ public class CameraComponent : Component, ICamera
         set
         {
             field = value;
-            if (!field) UpdateOrtho();
+            if (!field)
+            {
+                UpdateOrtho();
+            }
         }
     } = true;
 
@@ -157,8 +160,13 @@ public class CameraComponent : Component, ICamera
         // wins a tie, as the stable sort did.
         CameraComponent? primary = null;
         foreach (var camera in Node.GetComponentsInChildren<CameraComponent>(root))
+        {
             if (primary is null || camera.Priority > primary.Priority)
+            {
                 primary = camera;
+            }
+        }
+
         return primary;
     }
 
@@ -337,7 +345,9 @@ public class CameraComponent : Component, ICamera
         v = Vector4.Transform(v, GetProjectionMatrix());
 
         if (Math.Abs(v.W) > float.Epsilon)
+        {
             v /= v.W;
+        }
 
         return new Vector2(v.X, v.Y);
     }
@@ -354,7 +364,9 @@ public class CameraComponent : Component, ICamera
         v = Vector4.Transform(v, viewInv);
 
         if (Math.Abs(v.W) > float.Epsilon)
+        {
             v /= v.W;
+        }
 
         return new Vector3(v.X, v.Y, v.Z);
     }

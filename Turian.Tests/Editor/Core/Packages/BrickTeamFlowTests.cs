@@ -12,7 +12,10 @@ public sealed class BrickTeamFlowTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -53,9 +56,9 @@ public sealed class BrickTeamFlowTests : IDisposable
 
         var issues = BrickVerifier.VerifyAgainst(stub, real);
 
-        Assert.Contains(issues, i => i.Contains("Level.bin) is missing", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("Icon.png", StringComparison.Ordinal) && i.Contains("expected f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", StringComparison.Ordinal));
-        Assert.Contains(issues, i => i.Contains("Mateo.Levels.Gate, expected Mateo.Levels.Door", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("Level.bin) is missing", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("Icon.png", StringComparison.Ordinal) && i.Contains("expected f12b8bbf-74b4-5af6-95a3-535c4fa6c16c", StringComparison.Ordinal));
+        Assert.Contains(issues, static i => i.Contains("Mateo.Levels.Gate, expected Mateo.Levels.Door", StringComparison.Ordinal));
     }
 
     /// <summary>The real brick can be a packed file: a stub is checked against what was published.</summary>
@@ -83,7 +86,7 @@ public sealed class BrickTeamFlowTests : IDisposable
         Assert.Empty(BrickService.Diff(project, "user.mateo.levels"));
 
         File.WriteAllText(Path.Combine(fork, "Runtime", "Notes.txt"), "fork header\nline one\nline two\nline three\n");
-        Assert.Equal([("Runtime/Notes.txt", ForkChange.Modified)], BrickService.Diff(project, "user.mateo.levels").Select(d => (d.Path, d.Change)));
+        Assert.Equal([("Runtime/Notes.txt", ForkChange.Modified)], BrickService.Diff(project, "user.mateo.levels").Select(static d => (d.Path, d.Change)));
         File.WriteAllText(Path.Combine(fork, "Runtime", "Mine.txt"), "mine\n");
         Meta(Path.Combine(fork, "Runtime", "Mine.txt"));
 
@@ -102,7 +105,7 @@ public sealed class BrickTeamFlowTests : IDisposable
         Assert.StartsWith("user.mateo.levels@1.3.0 (sha256-", PackageManifest.Load(fork, ["turian"]).Upstream, StringComparison.Ordinal);
         Assert.Equal($"file:{v2}", ProjectManifest.Load(project).Manifest.Dependencies["user.mateo.levels"]);
         Assert.Equal([("Runtime/Mine.txt", ForkChange.Added), ("Runtime/Mine.txt.meta", ForkChange.Added), ("Runtime/Notes.txt", ForkChange.Modified)],
-            BrickService.Diff(project, "user.mateo.levels").Select(d => (d.Path, d.Change)));
+            BrickService.Diff(project, "user.mateo.levels").Select(static d => (d.Path, d.Change)));
     }
 
     /// <summary>A fork of a git brick compares against the commit it was copied from, not the newest one.</summary>
@@ -142,7 +145,10 @@ public sealed class BrickTeamFlowTests : IDisposable
         Meta(Path.Combine(folder, "Runtime", "Notes.txt"));
         using (var bitmap = new SKBitmap(32, 32))
         using (var png = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+        {
             File.WriteAllBytes(Path.Combine(folder, "Runtime", "Icon.png"), png.ToArray());
+        }
+
         Meta(Path.Combine(folder, "Runtime", "Icon.png"), "f12b8bbf-74b4-5af6-95a3-535c4fa6c16c");
         var manifest = PackageManifest.Load(folder, ["turian"]);
         manifest.Version = SemanticVersion.Parse("1.2.0");
@@ -156,7 +162,11 @@ public sealed class BrickTeamFlowTests : IDisposable
     static void Git(string directory, params string[] arguments)
     {
         var start = new ProcessStartInfo("git") { WorkingDirectory = directory, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(start)!;
         process.WaitForExit();
         Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());

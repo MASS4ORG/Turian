@@ -47,7 +47,11 @@ public sealed partial class GameLoopScheduler
         lock (gate)
         {
             var canceled = Cancellation(cancellationToken, owner);
-            if (canceled.IsCancellationRequested) return ValueTask.FromCanceled(canceled);
+            if (canceled.IsCancellationRequested)
+            {
+                return ValueTask.FromCanceled(canceled);
+            }
+
             var operation = Rent(GameLoopWait.MainThread, 0, null, cancellationToken, owner);
             EnqueueContinuation(new OperationLease(operation, operation.Generation));
             return operation.Value;
@@ -76,7 +80,11 @@ public sealed partial class GameLoopScheduler
         lock (gate)
         {
             var canceled = Cancellation(token, owner);
-            if (canceled.IsCancellationRequested) return ValueTask.FromCanceled(canceled);
+            if (canceled.IsCancellationRequested)
+            {
+                return ValueTask.FromCanceled(canceled);
+            }
+
             var operation = Rent(kind, deadline, predicate, token, owner);
             queue.Enqueue(new OperationLease(operation, operation.Generation));
             return operation.Value;
@@ -94,10 +102,21 @@ public sealed partial class GameLoopScheduler
 
     internal CancellationToken Cancellation(CancellationToken token, Component? owner)
     {
-        if (token.IsCancellationRequested) return token;
-        if (stopped) return sessionToken;
+        if (token.IsCancellationRequested)
+        {
+            return token;
+        }
+
+        if (stopped)
+        {
+            return sessionToken;
+        }
+
         if (owner is not null && owner.DestroyCancellationToken.IsCancellationRequested)
+        {
             return owner.DestroyCancellationToken;
+        }
+
         return IsDestroyed(owner) ? new CancellationToken(true) : default;
     }
 
@@ -113,23 +132,33 @@ public sealed partial class GameLoopScheduler
             {
                 cancellationSnapshot.Clear();
                 foreach (var operation in outstanding)
+                {
                     cancellationSnapshot.Add(new OperationLease(operation, operation.Generation));
+                }
             }
             foreach (var lease in cancellationSnapshot)
+            {
                 lease.Operation!.TryCancel(lease.Generation);
+            }
         }
         finally
         {
             cancellationSnapshot.Clear();
             draining = false;
-            if (stopped) Dispose();
+            if (stopped)
+            {
+                Dispose();
+            }
         }
     }
 
     /// <summary>Returns a diagnostic snapshot, including completed operations that have not been consumed.</summary>
     public IReadOnlyList<GameLoopOperationInfo> InspectOutstanding()
     {
-        lock (gate) return outstanding.Select(operation => operation.Inspect()).ToArray();
+        lock (gate)
+        {
+            return outstanding.Select(static operation => operation.Inspect()).ToArray();
+        }
     }
 
     /// <summary>Stops the session and unwinds owned waits on the game thread before their services are released.</summary>
@@ -139,7 +168,11 @@ public sealed partial class GameLoopScheduler
         bool cancel;
         lock (gate)
         {
-            if (shuttingDown) return;
+            if (shuttingDown)
+            {
+                return;
+            }
+
             cancel = !stopped;
             stopped = true;
         }
@@ -148,7 +181,11 @@ public sealed partial class GameLoopScheduler
             try { lifetime.Cancel(); }
             catch (Exception ex) { Report(ex, null); }
         }
-        if (draining) return;
+        if (draining)
+        {
+            return;
+        }
+
         shuttingDown = true;
         PumpCancellation();
         DrainStoppedContinuations();
@@ -175,8 +212,12 @@ public sealed partial class GameLoopScheduler
         try
         {
             while (ready.TryDequeue(out var work))
+            {
                 if (work.Lease.Operation is { } operation)
+                {
                     operation.InvokeContinuation(work.Lease.Generation);
+                }
+            }
         }
         finally { draining = false; }
     }

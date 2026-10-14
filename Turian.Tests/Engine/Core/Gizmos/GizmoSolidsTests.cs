@@ -40,7 +40,7 @@ public sealed class GizmoSolidsTests
         gizmos.DrawCylinder(Vector3.Zero, Vector3.UnitY, 0.1f);
         Assert.Equal(12 + 32 + 64, gizmos.TriangleCount);
         Assert.Equal(color, gizmos.Color);
-        Assert.All(gizmos.WorldTriangles, triangle =>
+        Assert.All(gizmos.WorldTriangles, static triangle =>
             Assert.True(Vector3.Cross(triangle.B - triangle.A, triangle.C - triangle.A).LengthSquared() > 0f));
     }
 
@@ -60,7 +60,10 @@ public sealed class GizmoSolidsTests
     {
         var gizmos = new Gizmos();
         for (var i = 0; i <= Gizmos.MaxTriangles; i++)
+        {
             gizmos.DrawTriangle(Vector3.Zero, Vector3.UnitX, Vector3.UnitY);
+        }
+
         Assert.True(gizmos.IsOverflow);
         Assert.Equal(Gizmos.MaxTriangles, gizmos.TriangleCount);
         gizmos.Clear();
@@ -78,7 +81,7 @@ public sealed class GizmoSolidsTests
         var second = Area(vertices[3], vertices[4], vertices[5]);
         Assert.Equal(2f, first);
         Assert.Equal(first, second);
-        Assert.Equal(4, vertices.Select(vertex => (vertex.Side, vertex.End)).Distinct().Count());
+        Assert.Equal(4, vertices.Select(static vertex => (vertex.Side, vertex.End)).Distinct().Count());
     }
 
     static float Area(GizmoExpandedVertex a, GizmoExpandedVertex b, GizmoExpandedVertex c) =>

@@ -9,7 +9,7 @@ public sealed class TransformSelection
     public TransformSelection(IEnumerable<Node> nodes, Vector3 pivot, Quaternion axes)
     {
         snapshots = [.. SelectionService.TopLevelNodes(nodes)
-            .Select(node => (node, node.GlobalTransform, node.Scale))];
+            .Select(static node => (node, node.GlobalTransform, node.Scale))];
         Pivot = pivot;
         Axes = axes;
     }
@@ -24,18 +24,22 @@ public sealed class TransformSelection
     public void Translate(Vector3 delta)
     {
         foreach (var (node, world, _) in snapshots)
+        {
             node.GlobalTransform = world with { Position = world.Position + delta };
+        }
     }
 
     /// <summary>Rotates positions and orientations around the shared pivot.</summary>
     public void Rotate(Quaternion rotation)
     {
         foreach (var (node, world, _) in snapshots)
+        {
             node.GlobalTransform = world with
             {
                 Position = Pivot + Vector3.Transform(world.Position - Pivot, rotation),
                 Orientation = Quaternion.Normalize(rotation * world.Orientation),
             };
+        }
     }
 
     /// <summary>Scales offsets in the gesture's axes and each root's original local scale.</summary>
@@ -53,9 +57,17 @@ public sealed class TransformSelection
     /// <summary>Gets the centre of the selected root positions, or the active object's pivot.</summary>
     public static Vector3 GetPivot(IReadOnlyList<Node> nodes, Node? active, bool center)
     {
-        if (!center || nodes.Count == 0) return active?.GlobalTransform.Position ?? Vector3.Zero;
+        if (!center || nodes.Count == 0)
+        {
+            return active?.GlobalTransform.Position ?? Vector3.Zero;
+        }
+
         var bounds = Bounds.Empty;
-        foreach (var node in nodes) bounds = bounds.Encapsulate(node.GlobalTransform.Position);
+        foreach (var node in nodes)
+        {
+            bounds = bounds.Encapsulate(node.GlobalTransform.Position);
+        }
+
         return bounds.Center;
     }
 }

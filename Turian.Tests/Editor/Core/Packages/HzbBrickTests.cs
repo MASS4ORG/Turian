@@ -20,7 +20,7 @@ public sealed class HzbBrickTests : IDisposable
     {
         const string id = "org.mass4.turian.hzb";
         new ProjectManifest { Dependencies = { [id] = $"builtin:{id}" } }.Save(project);
-        var brick = ProjectPackages.Resolve(project).Packages.Single(p => p.Id == id);
+        var brick = ProjectPackages.Resolve(project).Packages.Single(static p => p.Id == id);
         Assert.Equal(["Turian.Engine.Hzb"],
             BrickAssemblies.RuntimeAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
         BrickAssemblies.Load([brick], NullLogger.Instance);

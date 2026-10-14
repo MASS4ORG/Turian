@@ -29,9 +29,20 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        if (id != Guid.Empty && !Accepts(field, id)) return false;
-        if (!field.IsDirect) return field.Set(id);
-        if (id == Guid.Empty) return field.SetTarget(null);
+        if (id != Guid.Empty && !Accepts(field, id))
+        {
+            return false;
+        }
+
+        if (!field.IsDirect)
+        {
+            return field.Set(id);
+        }
+
+        if (id == Guid.Empty)
+        {
+            return field.SetTarget(null);
+        }
 
         object? target = field.Kind switch
         {
@@ -73,14 +84,21 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        if (field.IsEmpty) return $"None ({field.TargetType.Name})";
+        if (field.IsEmpty)
+        {
+            return $"None ({field.TargetType.Name})";
+        }
 
         var name = field.Kind == ReferenceKind.Asset
             ? AssetName(field.CurrentId)
             : FindNode(field.CurrentId)?.Name;
 
         // The target type tells an asset, a node and a component slot apart at a glance, as "Player (Camera)".
-        if (name is null) return $"Missing ({field.TargetType.Name})";
+        if (name is null)
+        {
+            return $"Missing ({field.TargetType.Name})";
+        }
+
         return field.Kind == ReferenceKind.Asset && !Accepts(field, field.CurrentId)
             ? $"Invalid: {name} (incompatible with {field.DataAssetPayloadType?.Name ?? field.TargetType.Name})"
             : $"{name} ({field.DataAssetPayloadType?.Name ?? field.TargetType.Name})";
@@ -97,7 +115,10 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        if (id == Guid.Empty) return false;
+        if (id == Guid.Empty)
+        {
+            return false;
+        }
 
         return field.Kind switch
         {
@@ -120,14 +141,25 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     {
         yield return node;
         foreach (var child in node.Children)
+        {
             foreach (var descendant in Descend(child))
+            {
                 yield return descendant;
+            }
+        }
     }
 
     bool IsCompatible(AssetRecord record, ReferenceField field)
     {
-        if (!AssetReferenceQuery.IsValidForAssetType(record, AssetType(field))) return false;
-        if (field.DataAssetPayloadType is not { } payloadType) return true;
+        if (!AssetReferenceQuery.IsValidForAssetType(record, AssetType(field)))
+        {
+            return false;
+        }
+
+        if (field.DataAssetPayloadType is not { } payloadType)
+        {
+            return true;
+        }
 
         // Indexing happens at import, never while drawing the picker. The stable id resolves
         // against the current type registry after user-code reloads.
@@ -149,7 +181,10 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
 
     IReadOnlyList<ReferenceCandidate> SceneCandidates(Func<Node, bool> matches)
     {
-        if (sceneTree.CurrentSceneRoot is not { } root) return [];
+        if (sceneTree.CurrentSceneRoot is not { } root)
+        {
+            return [];
+        }
 
         return [.. Descend(root).Where(matches).Select(node => new ReferenceCandidate(node.Id, node.Name, NodePath(node)))];
     }
@@ -168,7 +203,11 @@ public sealed class ReferencePicker(AssetDatabase assets, SceneTreeController sc
     static string NodePath(Node node)
     {
         var parts = new List<string>();
-        for (var current = node.Parent; current is not null; current = current.Parent) parts.Insert(0, current.Name);
+        for (var current = node.Parent; current is not null; current = current.Parent)
+        {
+            parts.Insert(0, current.Name);
+        }
+
         return string.Join(" / ", parts);
     }
 }

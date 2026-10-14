@@ -30,13 +30,20 @@ sealed unsafe class HzbFrame : IDisposable
             .WriteBuffer(0, Input.DescriptorInfo()).WriteBuffer(1, Commands.DescriptorInfo())
             .WriteImage(2, pyramid).WriteBuffer(3, Counts.DescriptorInfo())
             .Build(pool, layout.GetDescriptorSetLayout(), ref set))
+        {
             throw new VulkanException("HZB frame descriptor allocation failed.");
+        }
+
         Set = set;
     }
 
     internal RenderCullingStats ReadCounts()
     {
-        if (!Submitted) return default;
+        if (!Submitted)
+        {
+            return default;
+        }
+
         var counts = Counts.ReadFromBuffer<ulong>();
         return new RenderCullingStats((int)(counts & uint.MaxValue), (int)(counts >> 32));
     }

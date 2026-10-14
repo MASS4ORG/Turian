@@ -47,7 +47,7 @@ public sealed class SettingsLoaderTests : IDisposable
     {
         var id = Guid.NewGuid();
         var loader = Substitute.For<IAssetLoader>();
-        loader.LoadContentAsync<InputActionsAsset>(id).Returns<Task<InputActionsAsset?>>(_ => throw new IOException("gone"));
+        loader.LoadContentAsync<InputActionsAsset>(id).Returns<Task<InputActionsAsset?>>(static _ => throw new IOException("gone"));
 
         Assert.Null(InputActionsLoader.Resolve(WithActions(id), loader));
     }
@@ -63,7 +63,7 @@ public sealed class SettingsLoaderTests : IDisposable
         var input = new InputSettings();
         var loader = Substitute.For<IAssetLoader>();
         loader.LoadContentAsync<ProjectSettingsAsset>(readable).Returns(input);
-        loader.LoadContentAsync<ProjectSettingsAsset>(broken).Returns<Task<ProjectSettingsAsset?>>(_ => throw new IOException("gone"));
+        loader.LoadContentAsync<ProjectSettingsAsset>(broken).Returns<Task<ProjectSettingsAsset?>>(static _ => throw new IOException("gone"));
         var settings = new AppSettings { ProjectAbsoluteDir = root };
 
         ProjectSettingsLoader.Load(settings, loader);

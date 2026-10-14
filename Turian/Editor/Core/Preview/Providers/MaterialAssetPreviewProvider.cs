@@ -12,7 +12,10 @@ public sealed class MaterialAssetPreviewProvider : IScenePreviewProvider
     public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan, AssetDatabase assets)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
-        if (asset is not MaterialAsset materialAsset) return default;
+        if (asset is not MaterialAsset materialAsset)
+        {
+            return default;
+        }
 
         var root = new Node { Name = "__AssetPreview" };
 

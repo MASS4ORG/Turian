@@ -29,51 +29,96 @@ public sealed class BufferedInputSource : IInputSource
     float scrollDelta;
 
     /// <inheritdoc/>
-    public Vector2 MousePosition { get { lock (gate) return mousePosition; } }
+    public Vector2 MousePosition { get { lock (gate) { return mousePosition; } } }
 
     /// <inheritdoc/>
-    public Vector2 MouseDelta { get { lock (gate) return mouseDelta; } }
+    public Vector2 MouseDelta { get { lock (gate) { return mouseDelta; } } }
 
     /// <inheritdoc/>
-    public float MouseScrollDelta { get { lock (gate) return scrollDelta; } }
+    public float MouseScrollDelta { get { lock (gate) { return scrollDelta; } } }
 
     /// <inheritdoc/>
-    public bool IsKeyDown(Key key) { lock (gate) return keysDown.Contains(key); }
+    public bool IsKeyDown(Key key)
+    {
+        lock (gate)
+        {
+            return keysDown.Contains(key);
+        }
+    }
 
     /// <inheritdoc/>
-    public bool WasKeyPressed(Key key) { lock (gate) return keysPressed.Contains(key); }
+    public bool WasKeyPressed(Key key)
+    {
+        lock (gate)
+        {
+            return keysPressed.Contains(key);
+        }
+    }
 
     /// <inheritdoc/>
-    public bool WasKeyReleased(Key key) { lock (gate) return keysReleased.Contains(key); }
+    public bool WasKeyReleased(Key key)
+    {
+        lock (gate)
+        {
+            return keysReleased.Contains(key);
+        }
+    }
 
     /// <inheritdoc/>
-    public bool IsMouseButtonDown(MouseButton button) { lock (gate) return buttonsDown.Contains(button); }
+    public bool IsMouseButtonDown(MouseButton button)
+    {
+        lock (gate)
+        {
+            return buttonsDown.Contains(button);
+        }
+    }
 
     /// <inheritdoc/>
-    public bool WasMouseButtonPressed(MouseButton button) { lock (gate) return buttonsPressed.Contains(button); }
+    public bool WasMouseButtonPressed(MouseButton button)
+    {
+        lock (gate)
+        {
+            return buttonsPressed.Contains(button);
+        }
+    }
 
     /// <inheritdoc/>
-    public bool WasMouseButtonReleased(MouseButton button) { lock (gate) return buttonsReleased.Contains(button); }
+    public bool WasMouseButtonReleased(MouseButton button)
+    {
+        lock (gate)
+        {
+            return buttonsReleased.Contains(button);
+        }
+    }
 
     /// <inheritdoc/>
-    public IReadOnlyList<int> ConnectedGamepads { get { lock (gate) return [.. gamepads.Keys.Order()]; } }
+    public IReadOnlyList<int> ConnectedGamepads { get { lock (gate) { return [.. gamepads.Keys.Order()]; } } }
 
     /// <inheritdoc/>
     public bool IsGamepadButtonDown(GamepadButton button, int playerIndex = -1)
     {
-        lock (gate) return Pads(playerIndex).Any(pad => pad.Down.Contains(button));
+        lock (gate)
+        {
+            return Pads(playerIndex).Any(pad => pad.Down.Contains(button));
+        }
     }
 
     /// <inheritdoc/>
     public bool WasGamepadButtonPressed(GamepadButton button, int playerIndex = -1)
     {
-        lock (gate) return Pads(playerIndex).Any(pad => pad.Pressed.Contains(button));
+        lock (gate)
+        {
+            return Pads(playerIndex).Any(pad => pad.Pressed.Contains(button));
+        }
     }
 
     /// <inheritdoc/>
     public bool WasGamepadButtonReleased(GamepadButton button, int playerIndex = -1)
     {
-        lock (gate) return Pads(playerIndex).Any(pad => pad.Released.Contains(button));
+        lock (gate)
+        {
+            return Pads(playerIndex).Any(pad => pad.Released.Contains(button));
+        }
     }
 
     /// <summary>
@@ -88,8 +133,12 @@ public sealed class BufferedInputSource : IInputSource
         {
             var value = 0f;
             foreach (var pad in Pads(playerIndex))
+            {
                 if (pad.Axes.GetValueOrDefault(axis) is var reading && Math.Abs(reading) > Math.Abs(value))
+                {
                     value = reading;
+                }
+            }
 
             return value;
         }
@@ -119,14 +168,20 @@ public sealed class BufferedInputSource : IInputSource
     /// <param name="playerIndex">The slot the gamepad occupies.</param>
     public void PushGamepadConnected(int playerIndex)
     {
-        lock (gate) gamepads.TryAdd(playerIndex, new GamepadState());
+        lock (gate)
+        {
+            gamepads.TryAdd(playerIndex, new GamepadState());
+        }
     }
 
     /// <summary>Records that a gamepad detached, dropping everything it was holding.</summary>
     /// <param name="playerIndex">The slot the gamepad occupied.</param>
     public void PushGamepadDisconnected(int playerIndex)
     {
-        lock (gate) gamepads.Remove(playerIndex);
+        lock (gate)
+        {
+            gamepads.Remove(playerIndex);
+        }
     }
 
     /// <summary>Records that a gamepad button went down.</summary>
@@ -137,7 +192,10 @@ public sealed class BufferedInputSource : IInputSource
         lock (gate)
         {
             var pad = Pad(playerIndex);
-            if (pad.Down.Add(button)) pad.Pressed.Add(button);
+            if (pad.Down.Add(button))
+            {
+                pad.Pressed.Add(button);
+            }
         }
     }
 
@@ -149,7 +207,10 @@ public sealed class BufferedInputSource : IInputSource
         lock (gate)
         {
             var pad = Pad(playerIndex);
-            if (pad.Down.Remove(button)) pad.Released.Add(button);
+            if (pad.Down.Remove(button))
+            {
+                pad.Released.Add(button);
+            }
         }
     }
 
@@ -159,12 +220,19 @@ public sealed class BufferedInputSource : IInputSource
     /// <param name="value">The reading: −1 to 1 for a stick, 0 to 1 for a trigger.</param>
     public void PushGamepadAxis(int playerIndex, GamepadAxis axis, float value)
     {
-        lock (gate) Pad(playerIndex).Axes[axis] = value;
+        lock (gate)
+        {
+            Pad(playerIndex).Axes[axis] = value;
+        }
     }
 
     GamepadState Pad(int playerIndex)
     {
-        if (!gamepads.TryGetValue(playerIndex, out var pad)) gamepads[playerIndex] = pad = new GamepadState();
+        if (!gamepads.TryGetValue(playerIndex, out var pad))
+        {
+            gamepads[playerIndex] = pad = new GamepadState();
+        }
+
         return pad;
     }
 
@@ -190,7 +258,11 @@ public sealed class BufferedInputSource : IInputSource
     {
         lock (gate)
         {
-            if (!keysDown.Add(key)) return; // key repeat: already held, not a new edge
+            if (!keysDown.Add(key))
+            {
+                return; // key repeat: already held, not a new edge
+            }
+
             keysPressed.Add(key);
         }
     }
@@ -200,7 +272,11 @@ public sealed class BufferedInputSource : IInputSource
     {
         lock (gate)
         {
-            if (!keysDown.Remove(key)) return;
+            if (!keysDown.Remove(key))
+            {
+                return;
+            }
+
             keysReleased.Add(key);
         }
     }
@@ -210,7 +286,11 @@ public sealed class BufferedInputSource : IInputSource
     {
         lock (gate)
         {
-            if (!buttonsDown.Add(button)) return;
+            if (!buttonsDown.Add(button))
+            {
+                return;
+            }
+
             buttonsPressed.Add(button);
         }
     }
@@ -220,7 +300,11 @@ public sealed class BufferedInputSource : IInputSource
     {
         lock (gate)
         {
-            if (!buttonsDown.Remove(button)) return;
+            if (!buttonsDown.Remove(button))
+            {
+                return;
+            }
+
             buttonsReleased.Add(button);
         }
     }
@@ -238,7 +322,10 @@ public sealed class BufferedInputSource : IInputSource
     /// <summary>Accumulates <paramref name="notches"/> of scroll-wheel movement into the frame delta.</summary>
     public void PushMouseScroll(float notches)
     {
-        lock (gate) scrollDelta += notches;
+        lock (gate)
+        {
+            scrollDelta += notches;
+        }
     }
 
     /// <summary>

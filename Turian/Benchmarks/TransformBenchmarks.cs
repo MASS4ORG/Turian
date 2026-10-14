@@ -22,7 +22,11 @@ static class TransformBenchmarks
 
     static double Measure(Action<int> frame, int stride)
     {
-        for (var i = 0; i < 3; i++) frame(stride);
+        for (var i = 0; i < 3; i++)
+        {
+            frame(stride);
+        }
+
         var times = new List<double>(runs);
         for (var i = 0; i < runs; i++)
         {
@@ -85,10 +89,16 @@ static class TransformBenchmarks
         {
             tick += 0.01f;
             for (var i = 0; i < nodeCount; i += stride)
+            {
                 nodes[i].Position = nodes[i].Position with { X = tick };
+            }
+
             var sum = 0f;
             for (var i = 0; i < nodeCount; i++)
+            {
                 sum += nodes[i].GlobalTransform.Position.X;
+            }
+
             GC.KeepAlive(sum);
         }
     }

@@ -64,7 +64,10 @@ public sealed class LocaleService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(locale);
 
-        if (string.Equals(ActiveLocale, locale, StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.Equals(ActiveLocale, locale, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
 
         ActiveLocale = locale;
         Generation++;
@@ -86,7 +89,9 @@ public sealed class LocaleService
         foreach (var locale in FallbackChain(ActiveLocale))
         {
             if (tables.TryGetValue(locale, out var table) && table.Get(key, count) is { } value)
+            {
                 return MessageFormatter.Format(value, count, locale);
+            }
         }
 
         return fallback ?? $"⟦{key}⟧";
@@ -110,13 +115,19 @@ public sealed class LocaleService
         yield return locale;
 
         var separator = locale.IndexOfAny(['-', '_']);
-        if (separator > 0) yield return locale[..separator];
+        if (separator > 0)
+        {
+            yield return locale[..separator];
+        }
 
         if (!string.Equals(locale, DefaultLocale, StringComparison.OrdinalIgnoreCase))
         {
             yield return DefaultLocale;
             var defaultSeparator = DefaultLocale.IndexOfAny(['-', '_']);
-            if (defaultSeparator > 0) yield return DefaultLocale[..defaultSeparator];
+            if (defaultSeparator > 0)
+            {
+                yield return DefaultLocale[..defaultSeparator];
+            }
         }
     }
 }

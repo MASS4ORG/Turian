@@ -13,7 +13,11 @@ public sealed class UiFontAssetImporter : IAssetImporter
     /// <inheritdoc/>
     public bool IsValid(string filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath)) return false;
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
         var ext = Path.GetExtension(filePath);
         return ext.Equals(".ttf", StringComparison.OrdinalIgnoreCase)
             || ext.Equals(".otf", StringComparison.OrdinalIgnoreCase);
@@ -38,7 +42,9 @@ public sealed class UiFontAssetImporter : IAssetImporter
 
         using var typeface = SKTypeface.FromFile(sourcePath);
         if (typeface is null)
+        {
             Log.Logger.LogError("UI font {Path} is not a readable typeface; it will fall back at runtime", sourcePath);
+        }
 
         return IAssetImporter.CopySourceToCache(sourcePath, importDirectory);
     }

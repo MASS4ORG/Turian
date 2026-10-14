@@ -35,7 +35,10 @@ public sealed class HeadlessPlayer : IGamePlayer
             previous = now;
 
             var wait = interval - (clock.Elapsed - now);
-            if (wait > TimeSpan.Zero) quit.WaitHandle.WaitOne(wait);
+            if (wait > TimeSpan.Zero)
+            {
+                quit.WaitHandle.WaitOne(wait);
+            }
         }
     }
 }

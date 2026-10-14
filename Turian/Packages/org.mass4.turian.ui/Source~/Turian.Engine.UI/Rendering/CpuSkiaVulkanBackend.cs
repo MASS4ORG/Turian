@@ -42,7 +42,10 @@ public sealed class CpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRenderer
     public void Resize(int width, int height)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if ((width, height) == Size && texture is not null) return;
+        if ((width, height) == Size && texture is not null)
+        {
+            return;
+        }
 
         rasterizer.Resize(width, height);
         texture?.Dispose();
@@ -76,7 +79,11 @@ public sealed class CpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRenderer
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         texture?.Dispose();
         texture = null;

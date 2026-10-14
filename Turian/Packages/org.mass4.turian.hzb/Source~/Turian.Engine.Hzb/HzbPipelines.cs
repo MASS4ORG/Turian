@@ -4,7 +4,10 @@ static unsafe class HzbPipelines
 {
     internal static void Check(Result result)
     {
-        if (result != Result.Success) throw new VulkanException("HZB Vulkan operation failed: {0}", result);
+        if (result != Result.Success)
+        {
+            throw new VulkanException("HZB Vulkan operation failed: {0}", result);
+        }
     }
 
     internal static ShaderModule Shader(Vulkan vulkan, string name)

@@ -147,8 +147,8 @@ public sealed class BuildReuseTests : IDisposable
         try { runtime = await new PlayUserCode(settings, logger).BuildAsync(); }
         catch
         {
-            var messages = logger.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "Log")
-                .Select(call => call.GetArguments()[2]?.ToString());
+            var messages = logger.ReceivedCalls().Where(static call => call.GetMethodInfo().Name == "Log")
+                .Select(static call => call.GetArguments()[2]?.ToString());
             throw new InvalidOperationException(string.Join(Environment.NewLine, messages));
         }
         Assert.True(File.Exists(runtime));

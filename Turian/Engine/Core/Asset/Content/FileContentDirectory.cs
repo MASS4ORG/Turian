@@ -33,7 +33,10 @@ public sealed class FileContentDirectory : IContentDirectory
     {
         ArgumentException.ThrowIfNullOrEmpty(extension);
         var directory = string.IsNullOrEmpty(folder) ? root : Resolve(folder);
-        if (!Directory.Exists(directory)) return [];
+        if (!Directory.Exists(directory))
+        {
+            return [];
+        }
 
         return
         [
@@ -48,11 +51,16 @@ public sealed class FileContentDirectory : IContentDirectory
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (Path.IsPathRooted(path))
+        {
             throw new ArgumentException($"Content path '{path}' must be relative to the content root.", nameof(path));
+        }
 
         var full = Path.GetFullPath(Path.Combine(root, path));
         if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
             throw new ArgumentException($"Content path '{path}' leaves the content root.", nameof(path));
+        }
+
         return full;
     }
 }

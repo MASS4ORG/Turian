@@ -86,7 +86,10 @@ public sealed class UiFontResolverTests : IDisposable
         var database = new AssetDatabase();
         var asset = new UiFontAsset { Id = Guid.NewGuid(), RelativePath = source };
         Assert.True(database.RegisterAsset(asset, imported));
-        if (removeSource) File.Delete(source);
+        if (removeSource)
+        {
+            File.Delete(source);
+        }
 
         var resolver = new UiFontResolver(database);
         Assert.NotNull(resolver.Resolve("Assets\\Fonts\\test.ttf"));

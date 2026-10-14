@@ -21,7 +21,10 @@ public sealed class GameLoopHostTests
         public override void OnAwake()
         {
             AwakeThread = Environment.CurrentManagedThreadId;
-            if (Scheduler is not null) Async.Run(Wait);
+            if (Scheduler is not null)
+            {
+                Async.Run(Wait);
+            }
         }
 
         async ValueTask Wait(CancellationToken token)
@@ -112,7 +115,7 @@ public sealed class GameLoopHostTests
             root.Components.Add(new AsyncComponent());
             Serializer.Save(path, root);
             var context = new GamePlayerContext(directory, NullLogger.Instance,
-                registrations => registrations.BuildServiceProvider());
+                static registrations => registrations.BuildServiceProvider());
             var runtime = GameRuntime.Start(context, new BufferedInputSource());
             using var scheduler = runtime.Ticker.Async;
             var prefab = new Prefab { RelativePath = path };

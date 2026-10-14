@@ -59,14 +59,18 @@ public static class UserCodeTypeManifestGenerator
         {
             var fqn = ExtractPrimaryClassFqn(csFilePath, logger);
             if (fqn is null)
+            {
                 continue;
+            }
 
             var metaPath = csFilePath + ".meta";
             var typeId = File.Exists(metaPath)
                 ? ReadAssetId(metaPath, logger)
                 : CreateScriptMeta(csFilePath, metaRoot, logger);
             if (typeId == Guid.Empty)
+            {
                 continue;
+            }
 
             var owner = graph?.AssemblyFor(csFilePath);
             manifest.Types.Add(new UserCodeTypeEntry
@@ -98,9 +102,15 @@ public static class UserCodeTypeManifestGenerator
                          .SkipLast(1).Any(static segment => segment.EndsWith('~'))))
         {
             var meta = $"{script}.meta";
-            if (!File.Exists(meta) || ExtractPrimaryClassFqn(script, logger) is not { } fqn) continue;
+            if (!File.Exists(meta) || ExtractPrimaryClassFqn(script, logger) is not { } fqn)
+            {
+                continue;
+            }
+
             if (ReadAssetId(meta, logger) is { } id && id != Guid.Empty)
+            {
                 entries.Add(new UserCodeTypeEntry { FullyQualifiedName = fqn, TypeId = id });
+            }
         }
 
         return entries;
@@ -160,7 +170,9 @@ public static class UserCodeTypeManifestGenerator
 
             var allClasses = root.DescendantNodes().OfType<ClassDeclarationSyntax>().ToList();
             if (allClasses.Count == 0)
+            {
                 return null;
+            }
 
             // Prefer the class whose name matches the file name (one-class-per-file convention).
             var expectedName = Path.GetFileNameWithoutExtension(csFilePath);
@@ -183,7 +195,9 @@ public static class UserCodeTypeManifestGenerator
             .OfType<FileScopedNamespaceDeclarationSyntax>()
             .FirstOrDefault();
         if (fileScopedNs is not null)
+        {
             return fileScopedNs.Name.ToString();
+        }
 
         return root.DescendantNodes()
             .OfType<NamespaceDeclarationSyntax>()

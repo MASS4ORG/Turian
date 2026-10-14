@@ -33,7 +33,11 @@ public class PrefabOverrideOperationsTests : IDisposable
     public void Dispose()
     {
         undo.Dispose();
-        if (Directory.Exists(projectRoot)) Directory.Delete(projectRoot, recursive: true);
+        if (Directory.Exists(projectRoot))
+        {
+            Directory.Delete(projectRoot, recursive: true);
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -185,7 +189,7 @@ public class PrefabOverrideOperationsTests : IDisposable
 
         operations.RevertAll(instance);
 
-        Assert.Equal(["Bulb", "Base"], instance.Children.Select(child => child.Name));
+        Assert.Equal(["Bulb", "Base"], instance.Children.Select(static child => child.Name));
         Assert.Equal(removed.Id, instance.Children[1].Id);
         Assert.Equal(1f, instance.Children[0].GetComponent<LightComponent>()!.Intensity);
         Assert.Empty(operations.DiffFor(instance)!.Overrides);

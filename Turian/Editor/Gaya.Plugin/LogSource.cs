@@ -24,14 +24,23 @@ public static class LogSource
     /// <returns>The file and line, or null when the message names no source location.</returns>
     public static (string Path, int Line)? TryParse(string message)
     {
-        if (string.IsNullOrEmpty(message)) return null;
+        if (string.IsNullOrEmpty(message))
+        {
+            return null;
+        }
 
         foreach (var match in new[] { ParenForm.Match(message), StackForm.Match(message), ColonForm.Match(message) })
         {
-            if (!match.Success || !int.TryParse(match.Groups["line"].Value, out var line)) continue;
+            if (!match.Success || !int.TryParse(match.Groups["line"].Value, out var line))
+            {
+                continue;
+            }
 
             var path = match.Groups["path"].Value.Trim();
-            if (path.Length == 0 || string.IsNullOrWhiteSpace(path)) continue;
+            if (path.Length == 0 || string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
 
             return (path, line);
         }
@@ -50,14 +59,23 @@ public static class LogSource
     public static string? ResolvePath(string message, string? projectDirectory)
     {
         var hit = TryParse(message);
-        if (hit is not { } source) return null;
+        if (hit is not { } source)
+        {
+            return null;
+        }
 
-        if (Path.IsPathRooted(source.Path)) return File.Exists(source.Path) ? source.Path : null;
+        if (Path.IsPathRooted(source.Path))
+        {
+            return File.Exists(source.Path) ? source.Path : null;
+        }
 
         if (!string.IsNullOrEmpty(projectDirectory))
         {
             var inProject = Path.GetFullPath(Path.Combine(projectDirectory, source.Path));
-            if (File.Exists(inProject)) return inProject;
+            if (File.Exists(inProject))
+            {
+                return inProject;
+            }
         }
 
         var inProcess = Path.GetFullPath(source.Path);
@@ -88,7 +106,9 @@ public static class LogSource
     static void ReportMissing(string message, ILogger log)
     {
         if (TryParse(message) is { } source)
+        {
             log.LogWarning("Output: {Path} is not a source file, cannot jump to line {Line}", source.Path, source.Line);
+        }
     }
 
     internal static void LaunchSource(string path, ILogger log, Func<ProcessStartInfo, Process?> start) =>

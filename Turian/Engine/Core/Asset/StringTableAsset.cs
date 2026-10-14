@@ -20,10 +20,15 @@ public sealed class StringTableAsset : Asset
     public StringTable? GetContent(AssetDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
-        if (Cache.TryGetValue(Id, out var cached)) return cached;
+        if (Cache.TryGetValue(Id, out var cached))
+        {
+            return cached;
+        }
 
         if (!database.TryGetAssetProvider(Id, out var provider) || provider is null)
+        {
             return null;
+        }
 
         try
         {

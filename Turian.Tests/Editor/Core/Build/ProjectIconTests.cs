@@ -19,7 +19,11 @@ public class ProjectIconTests : IDisposable
     /// <summary>Removes the project folder.</summary>
     public void Dispose()
     {
-        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -35,7 +39,9 @@ public class ProjectIconTests : IDisposable
         var imagePath = Path.Combine(root, "Assets", "logo.png");
         using (var image = Image(300, 150))
         using (var data = SKImage.FromBitmap(image).Encode(SKEncodedImageFormat.Png, 100))
+        {
             File.WriteAllBytes(imagePath, data.ToArray());
+        }
 
         var texture = new TextureAsset { Id = Guid.NewGuid(), RelativePath = "Assets/logo.png" };
         Serializer.Save<Asset>($"{imagePath}.meta", texture);

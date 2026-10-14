@@ -99,7 +99,7 @@ public sealed class ObjModelImporterTests : IDisposable
         var blob = GltfModelReader.Load(record.ResolveContentPath());
         Assert.Equal(3, blob.Vertices.Length);
         Assert.Equal(new uint[] { 0, 1, 2 }, blob.Indices);
-        Assert.All(blob.Vertices, vertex => Assert.Equal(Vector3.One, vertex.Color));
+        Assert.All(blob.Vertices, static vertex => Assert.Equal(Vector3.One, vertex.Color));
         Assert.Equal(new Vector2(0, 0), blob.Vertices[2].Uv);
 
         var output = new OapArchiveBuilder(NullLogger.Instance)
@@ -113,7 +113,7 @@ public sealed class ObjModelImporterTests : IDisposable
         Assert.True(brick.Manifest.EditorOnly);
         Assert.Empty(BrickAssemblies.RuntimeAssemblies(brick));
         Assert.DoesNotContain(BrickAssemblies.EditorAssemblies(brick),
-            p => Path.GetFileName(p) == "JeremyAnsel.Media.WavefrontObj.dll");
+            static p => Path.GetFileName(p) == "JeremyAnsel.Media.WavefrontObj.dll");
         var buildSettings = new BuildAppSettings { Title = "Game", ProjectAbsoluteDir = project };
         var executable = CsProjectGenerator.GenerateExecutable(buildSettings, NullLogger.Instance);
         Assert.DoesNotContain("WavefrontObj", executable.RawXml);

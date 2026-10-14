@@ -39,7 +39,11 @@ public sealed partial class TransformGizmo
     {
         if (rotationUsesPlane)
         {
-            if (RotationDirection(screenPos, camera, viewportSize) is not { } direction) return;
+            if (RotationDirection(screenPos, camera, viewportSize) is not { } direction)
+            {
+                return;
+            }
+
             if (rotationPreviousDirection.LengthSquared() > 0f)
             {
                 rotationAngle += MathF.Atan2(
@@ -51,7 +55,11 @@ public sealed partial class TransformGizmo
         else
         {
             var lengthSquared = rotationScreenTangent.LengthSquared();
-            if (lengthSquared < 1e-6f) return;
+            if (lengthSquared < 1e-6f)
+            {
+                return;
+            }
+
             rotationAngle += Vector2.Dot(screenPos - rotationPreviousScreen, rotationScreenTangent) / lengthSquared;
         }
 
@@ -62,11 +70,23 @@ public sealed partial class TransformGizmo
 
     Vector3? RotationDirection(Vector2 screenPos, ICamera camera, Vector2 viewportSize)
     {
-        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray) return null;
+        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray)
+        {
+            return null;
+        }
+
         var denominator = Vector3.Dot(rotationAxis, ray.Direction);
-        if (MathF.Abs(denominator) < 1e-6f) return null;
+        if (MathF.Abs(denominator) < 1e-6f)
+        {
+            return null;
+        }
+
         var distance = Vector3.Dot(axisStartAnchorWorld - ray.Origin, rotationAxis) / denominator;
-        if (distance <= 0f) return null;
+        if (distance <= 0f)
+        {
+            return null;
+        }
+
         var direction = ray.GetPoint(distance) - axisStartAnchorWorld;
         return direction.LengthSquared() < 1e-9f ? null : Vector3.Normalize(direction);
     }
@@ -84,7 +104,11 @@ public sealed partial class TransformGizmo
             var direction = u * MathF.Cos(angle) + v * MathF.Sin(angle);
             var pixel = WorldToPixel(anchor + direction * radius, camera, viewportSize);
             var distance = Vector2.DistanceSquared(screenPos, pixel);
-            if (distance >= bestDistance) continue;
+            if (distance >= bestDistance)
+            {
+                continue;
+            }
+
             closest = direction;
             bestDistance = distance;
         }

@@ -47,7 +47,10 @@ public unsafe partial class Device
 
     SwapChainSupportDetails QuerySwapChainSupportInternal(PhysicalDevice candidatePhysicalDevice)
     {
-        if (IsHeadless) return new SwapChainSupportDetails { Formats = [], PresentModes = [] };
+        if (IsHeadless)
+        {
+            return new SwapChainSupportDetails { Formats = [], PresentModes = [] };
+        }
 
         var details = new SwapChainSupportDetails();
 
@@ -135,7 +138,10 @@ public unsafe partial class Device
             if (!IsHeadless)
             {
                 _ = khrSurface.GetPhysicalDeviceSurfaceSupport(candidateDevice, i, surface, out var presentSupport);
-                if (presentSupport) indices.PresentFamily = i;
+                if (presentSupport)
+                {
+                    indices.PresentFamily = i;
+                }
             }
 
             if (indices.IsComplete())
@@ -203,7 +209,10 @@ public unsafe partial class Device
 
     bool SupportsMeshShading(PhysicalDevice candidateDevice)
     {
-        if (!AvailableDeviceExtensions(candidateDevice).Contains(meshShaderExtension)) return false;
+        if (!AvailableDeviceExtensions(candidateDevice).Contains(meshShaderExtension))
+        {
+            return false;
+        }
 
         var meshFeatures = new PhysicalDeviceMeshShaderFeaturesEXT
         {
@@ -230,7 +239,7 @@ public unsafe partial class Device
             );
         }
 
-        return [.. availableExtensions.Select(extension => Marshal.PtrToStringAnsi((IntPtr)extension.ExtensionName))];
+        return [.. availableExtensions.Select(static extension => Marshal.PtrToStringAnsi((IntPtr)extension.ExtensionName))];
     }
 
     string[] GetRequiredExtensions()
@@ -261,7 +270,7 @@ public unsafe partial class Device
         }
 
         var availableLayerNames = availableLayers
-                                  .Select(layer => Marshal.PtrToStringAnsi((IntPtr)layer.LayerName))
+                                  .Select(static layer => Marshal.PtrToStringAnsi((IntPtr)layer.LayerName))
                                   .ToHashSet();
 
         return validationLayers.All(availableLayerNames.Contains);
@@ -285,7 +294,10 @@ public unsafe partial class Device
     {
         foreach (var candidate in SampleCountCandidates)
         {
-            if ((uint)candidate <= (uint)requested && supported.HasFlag(candidate)) return candidate;
+            if ((uint)candidate <= (uint)requested && supported.HasFlag(candidate))
+            {
+                return candidate;
+            }
         }
 
         return SampleCountFlags.Count1Bit;
@@ -331,13 +343,21 @@ public unsafe partial class Device
     /// <summary>Destroys the command pool, logical device, surface, debug messenger and instance, in that order.</summary>
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
 
         vk.DestroyCommandPool(device, commandPool, null);
         vk.DestroyDevice(device, null);
         DestroySurface();
-        if (debugMessenger.Handle != 0) debugUtils.DestroyDebugUtilsMessenger(instance, debugMessenger, null);
+        if (debugMessenger.Handle != 0)
+        {
+            debugUtils.DestroyDebugUtilsMessenger(instance, debugMessenger, null);
+        }
+
         vk.DestroyInstance(instance, null);
         GC.SuppressFinalize(this);
     }

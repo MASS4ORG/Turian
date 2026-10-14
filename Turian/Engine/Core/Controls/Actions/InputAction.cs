@@ -139,9 +139,20 @@ public sealed class InputAction
         wasPressed = pressed && !wasDown;
         wasReleased = !pressed && wasDown;
 
-        if (wasPressed) Started?.Invoke(this);
-        if (value != previous && value != Vector2.Zero) Performed?.Invoke(this);
-        if (wasReleased) Canceled?.Invoke(this);
+        if (wasPressed)
+        {
+            Started?.Invoke(this);
+        }
+
+        if (value != previous && value != Vector2.Zero)
+        {
+            Performed?.Invoke(this);
+        }
+
+        if (wasReleased)
+        {
+            Canceled?.Invoke(this);
+        }
     }
 
     /// <summary>Drops the action to rest without raising anything, for a map that was just disabled.</summary>
@@ -160,10 +171,16 @@ public sealed class InputAction
         foreach (var binding in Bindings)
         {
             var control = binding.Control;
-            if (control.Kind == InputControlKind.None) continue;
+            if (control.Kind == InputControlKind.None)
+            {
+                continue;
+            }
 
             var reading = source.Read(control, binding.PlayerIndex);
-            if (reading == 0f) continue;
+            if (reading == 0f)
+            {
+                continue;
+            }
 
             // A button contributes its whole direction; an axis scales it, so one stick axis bound to
             // (0, 1) drives the same action a W key bound to (0, 1) does.

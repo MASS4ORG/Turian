@@ -33,8 +33,15 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
-        if (settings.Settings is not { } project) return;
-        if (gui.Pass == Pass.Pass1Build) Refresh(project);
+        if (settings.Settings is not { } project)
+        {
+            return;
+        }
+
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            Refresh(project);
+        }
 
         using (gui.Node().Expand().Direction(Axis.Horizontal).Gap(Theme.Gap).Padding(10f, 8f).Enter())
         {
@@ -49,7 +56,11 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         });
         references.DrawPendingPicker(gui);
 
-        if (gui.Pass != Pass.Pass2Render || pending is not { } action) return;
+        if (gui.Pass != Pass.Pass2Render || pending is not { } action)
+        {
+            return;
+        }
+
         pending = null;
         action();
     }
@@ -63,12 +74,17 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         var path = ProjectAsset.PathIn(project.AssetsAbsoluteDir);
         var written = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
         var stamp = (project.ProjectAbsoluteDir, written);
-        if (listedFrom == stamp) return;
+        if (listedFrom == stamp)
+        {
+            return;
+        }
 
         listedFrom = stamp;
         profiles = BuildProfiles.List(project);
         if (profiles.All(p => p.Id != selected))
+        {
             Select((profiles.FirstOrDefault(static p => p.IsActive) ?? profiles.FirstOrDefault())?.Id ?? Guid.Empty);
+        }
     }
 
     void Select(Guid id)
@@ -84,7 +100,11 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
 
     void Edited()
     {
-        if (inspection is null) return;
+        if (inspection is null)
+        {
+            return;
+        }
+
         autoSave.MarkChanged(inspection);
         undo.MarkAltered();
     }
@@ -97,8 +117,15 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
             {
                 gui.ScrollY();
-                if (profiles.Count == 0) Line(gui, "No build profiles", Theme.InkDim);
-                foreach (var profile in profiles) Row(gui, profile);
+                if (profiles.Count == 0)
+                {
+                    Line(gui, "No build profiles", Theme.InkDim);
+                }
+
+                foreach (var profile in profiles)
+                {
+                    Row(gui, profile);
+                }
             }
 
             if (StudioControls.SmallTextButton(gui, "Add Build Profile", "buildProfiles/add", Theme.Scale(listWidth)))
@@ -120,9 +147,19 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
             var interactable = gui.GetInteractable();
             if (gui.Pass == Pass.Pass2Render)
             {
-                if (profile.Id == selected) gui.DrawBackgroundRect(Theme.Hover, 3f);
-                else if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.Chrome, 3f);
-                if (interactable.OnClick()) pending = () => Select(profile.Id);
+                if (profile.Id == selected)
+                {
+                    gui.DrawBackgroundRect(Theme.Hover, 3f);
+                }
+                else if (interactable.OnHover())
+                {
+                    gui.DrawBackgroundRect(Theme.Chrome, 3f);
+                }
+
+                if (interactable.OnClick())
+                {
+                    pending = () => Select(profile.Id);
+                }
             }
 
             using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f)
@@ -133,7 +170,10 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
                 gui.DrawText(Summary(profile.Profile.Profile), Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            if (profile.IsActive) gui.DrawText("Active", Theme.Text(10f), Theme.Accent);
+            if (profile.IsActive)
+            {
+                gui.DrawText("Active", Theme.Text(10f), Theme.Accent);
+            }
         }
     }
 
@@ -161,7 +201,10 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
 
     void Details(Gui gui)
     {
-        if (profiles.FirstOrDefault(p => p.Id == selected) is not { } profile) return;
+        if (profiles.FirstOrDefault(p => p.Id == selected) is not { } profile)
+        {
+            return;
+        }
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(4f).Enter())
         {
@@ -178,7 +221,10 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
                    .Gap(8f).Padding(6f, 2f).ContentAlignY(0.5f).Enter())
         {
             gui.DrawText(NameOf(profile), Theme.Text(14f), Theme.Ink, centerInRect: false);
-            if (profile.IsActive) gui.DrawText("Active", Theme.Text(11f), Theme.Accent, centerInRect: false);
+            if (profile.IsActive)
+            {
+                gui.DrawText("Active", Theme.Text(11f), Theme.Accent, centerInRect: false);
+            }
         }
     }
 
@@ -187,14 +233,23 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Padding(8f, 2f).Enter())
         {
             gui.ScrollY();
-            if (inspection is null) return;
-            if (gui.Pass == Pass.Pass1Build) undo.RecordInspections([inspection], undoLabel);
+            if (inspection is null)
+            {
+                return;
+            }
+
+            if (gui.Pass == Pass.Pass1Build)
+            {
+                undo.RecordInspections([inspection], undoLabel);
+            }
 
             for (var s = 0; s < model.Sections.Count; s++)
             {
                 var fields = model.Sections[s].BodyFields;
                 for (var f = 0; f < fields.Count; f++)
+                {
                     gui.FormField(fields[f], $"buildProfiles/section{s}/field{f}", FormContext);
+                }
             }
         }
     }
@@ -209,11 +264,15 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
             if (!profile.IsActive
                 && StudioControls.SmallTextButton(gui, "Switch Profile", "buildProfiles/switch", Theme.Scale(100f),
                     "Build & Run, exports and play mode follow this profile"))
+            {
                 pending = () => Switch(profile.Id);
+            }
 
             if (StudioControls.SmallTextButton(gui, "Build", "buildProfiles/build", Theme.Scale(70f),
                     "Export the game with this profile"))
+            {
                 pending = () => Build(profile.Id);
+            }
         }
     }
 
@@ -221,7 +280,9 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
     {
         using (gui.Node(-1, Theme.Scale(rowHeight - 6f), $"buildProfiles/line/{text}").ExpandWidth()
                    .ContentAlignY(0.5f).Padding(6f, 0f).Enter())
+        {
             gui.DrawText(text, Theme.Text(11f), color, centerInRect: false);
+        }
     }
 
     void Add(AppSettings project, BuildTarget target)
@@ -229,12 +290,19 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
         var path = ProjectSettingsFiles.AddBuildProfile(project, target);
         listedFrom = null;
         Refresh(project);
-        if (profiles.FirstOrDefault(p => p.Profile.Path == path) is { } added) Select(added.Id);
+        if (profiles.FirstOrDefault(p => p.Profile.Path == path) is { } added)
+        {
+            Select(added.Id);
+        }
     }
 
     void Switch(Guid id)
     {
-        if (settings.Settings is not { } project) return;
+        if (settings.Settings is not { } project)
+        {
+            return;
+        }
+
         ProjectSettingsFiles.SetActiveBuildProfile(project, id);
         listedFrom = null;
     }
@@ -242,9 +310,16 @@ sealed class BuildProfilesPanel(SettingsService settings, AssetInspectionService
     /// <summary>Saves pending edits first, so the export reads the profile as it is shown.</summary>
     void Build(Guid id)
     {
-        if (settings.Settings is not { } project) return;
+        if (settings.Settings is not { } project)
+        {
+            return;
+        }
+
         autoSave.Flush(force: true);
-        if (BuildProfiles.List(project).FirstOrDefault(p => p.Id == id) is not { } profile) return;
+        if (BuildProfiles.List(project).FirstOrDefault(p => p.Id == id) is not { } profile)
+        {
+            return;
+        }
 
         StudioCommands.RunExport(tasks, () => build.ExportAsync(profile.Profile));
     }

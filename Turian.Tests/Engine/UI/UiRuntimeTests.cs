@@ -22,10 +22,12 @@ public sealed class UiRuntimeTests : IClassFixture<VulkanFixture>
         using var runtime = new UiRuntime(fixture.Vulkan, 128, 64);
 
         var tex = runtime.Render(
-            gui =>
+            static gui =>
             {
                 using (gui.Node(80, 40).Enter())
+                {
                     gui.DrawBackgroundRect(GuiColor.Red);
+                }
             },
             128, 64, deltaTime: 0.016f);
 
@@ -42,7 +44,7 @@ public sealed class UiRuntimeTests : IClassFixture<VulkanFixture>
 
         using var runtime = new UiRuntime(fixture.Vulkan, 200, 100);
 
-        var tex = runtime.Render(_ => { }, 200, 100, deltaTime: 0f, canvasScale: 1.5f);
+        var tex = runtime.Render(static _ => { }, 200, 100, deltaTime: 0f, canvasScale: 1.5f);
 
         Assert.Equal((200, 100), runtime.Size);
         Assert.Equal(200u, tex.Width);

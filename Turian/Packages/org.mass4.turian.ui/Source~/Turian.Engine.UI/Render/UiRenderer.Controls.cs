@@ -15,12 +15,18 @@ public sealed partial class UiRenderer
     /// <c>font-family</c> / <c>font</c> style declaration, resized to <paramref name="size"/>.</summary>
     Font? ResolveFont(Gui gui, UiElement el, float size)
     {
-        if (FontResolver is null) return null;
+        if (FontResolver is null)
+        {
+            return null;
+        }
 
         var reference = Attr(el, "font")
                         ?? NonEmpty(Style(gui, el, "font-family"))
                         ?? NonEmpty(Style(gui, el, "font"));
-        if (reference is null) return null;
+        if (reference is null)
+        {
+            return null;
+        }
 
         var font = FontResolver(reference);
         return font is not null && size > 0f ? font.WithSize(size) : font;
@@ -48,14 +54,20 @@ public sealed partial class UiRenderer
             var clicked = gui.Pass == Pass.Pass2Render && gui.GetInteractable().OnClick();
             DrawLabel(gui, el, text);
 
-            if (clicked) Fire(el, "click");
+            if (clicked)
+            {
+                Fire(el, "click");
+            }
         }
     }
 
     /// <summary>Draws an element's own text with the font size, color and effects its style resolves.</summary>
     void DrawLabel(Gui gui, UiElement el, string text)
     {
-        if (text.Length == 0) return;
+        if (text.Length == 0)
+        {
+            return;
+        }
 
         UiValue.TryFloat(Style(gui, el, "font-size"), out var size);
         var hasColor = UiValue.TryColor(Style(gui, el, "color"), out var color);
@@ -110,7 +122,10 @@ public sealed partial class UiRenderer
             var clicked = enabled && gui.GetInteractable().OnClick();
             DrawLabel(gui, el, ResolveText(el) ?? string.Empty);
 
-            if (clicked) Fire(el, "click");
+            if (clicked)
+            {
+                Fire(el, "click");
+            }
         }
     }
 
@@ -127,8 +142,14 @@ public sealed partial class UiRenderer
             : interactable.OnHover() ? hover
             : normal;
 
-        if (ParseInsets(Attr(el, "nine-slice")) is { } insets) gui.DrawImageNineSlice(image, rect, insets);
-        else gui.DrawImage(image, rect);
+        if (ParseInsets(Attr(el, "nine-slice")) is { } insets)
+        {
+            gui.DrawImageNineSlice(image, rect, insets);
+        }
+        else
+        {
+            gui.DrawImage(image, rect);
+        }
     }
 
     void RenderTextField(Gui gui, UiElement el)
@@ -153,8 +174,14 @@ public sealed partial class UiRenderer
             LogRect(gui, el, node);
             DrawBackground(gui, el);
 
-            if (enabled) TextEditor.Process(gui, edit, gui.GetInteractable(), FontSize(gui, el));
-            else edit.IsFocused = false;
+            if (enabled)
+            {
+                TextEditor.Process(gui, edit, gui.GetInteractable(), FontSize(gui, el));
+            }
+            else
+            {
+                edit.IsFocused = false;
+            }
 
             DrawFieldText(gui, el, edit, placeholder);
             next = edit.Text;
@@ -172,8 +199,16 @@ public sealed partial class UiRenderer
     string TextFieldValue(UiElement el, string key)
     {
         var (bound, value) = BoundValue(el, "value");
-        if (bound) return value?.ToString() ?? string.Empty;
-        if (state.TryGetValue(key, out var cached) && cached is string text) return text;
+        if (bound)
+        {
+            return value?.ToString() ?? string.Empty;
+        }
+
+        if (state.TryGetValue(key, out var cached) && cached is string text)
+        {
+            return text;
+        }
+
         return Attr(el, "value") ?? string.Empty;
     }
 
@@ -191,14 +226,20 @@ public sealed partial class UiRenderer
         var shownColor = empty && UiValue.TryColor(Style(gui, el, "placeholder-color"), out var pc) ? pc : ink;
 
         if (shown.Length > 0)
+        {
             gui.DrawText(shown, size, shownColor, font: ResolveFont(gui, el, size), centerInRect: false);
+        }
 
         DrawFieldCaret(gui, edit, size, ink);
     }
 
     void DrawFieldSelection(Gui gui, UiElement el, TextEditState edit, float size, GuiColor ink)
     {
-        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.HasSelection) return;
+        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.HasSelection)
+        {
+            return;
+        }
+
         var font = TextEditor.MeasuringFont(gui, size);
         var inner = gui.CurrentNode.InnerRect;
         var origin = TextEditor.TextOriginX(gui, font, edit.Text, inner);
@@ -213,7 +254,11 @@ public sealed partial class UiRenderer
 
     static void DrawFieldCaret(Gui gui, TextEditState edit, float size, GuiColor ink)
     {
-        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.ShowCursor) return;
+        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.ShowCursor)
+        {
+            return;
+        }
+
         var caretFont = TextEditor.MeasuringFont(gui, size);
         var rect = gui.CurrentNode.InnerRect;
         var caretX = TextEditor.TextOriginX(gui, caretFont, edit.Text, rect)
@@ -254,7 +299,10 @@ public sealed partial class UiRenderer
             DrawToggleMark(gui, el, on);
             DrawLabel(gui, el, ResolveTextAttribute(el, "label") ?? string.Empty);
 
-            if (clicked) next = !on;
+            if (clicked)
+            {
+                next = !on;
+            }
         }
 
         if (next != on)
@@ -269,8 +317,16 @@ public sealed partial class UiRenderer
     bool ToggleValue(UiElement el, string key)
     {
         var (bound, value) = BoundValue(el, "value");
-        if (bound) return value is true;
-        if (state.TryGetValue(key, out var cached) && cached is bool on) return on;
+        if (bound)
+        {
+            return value is true;
+        }
+
+        if (state.TryGetValue(key, out var cached) && cached is bool on)
+        {
+            return on;
+        }
+
         return UiValue.TryBool(Attr(el, "value"), out var attrOn) && attrOn;
     }
 
@@ -287,7 +343,10 @@ public sealed partial class UiRenderer
 
         using (gui.Node(size, size, "toggle/mark").Enter())
         {
-            if (gui.Pass != Pass.Pass2Render) return;
+            if (gui.Pass != Pass.Pass2Render)
+            {
+                return;
+            }
 
             var ink = UiValue.TryColor(Style(gui, el, "color"), out var c) ? c : GuiColor.White;
             var outline = UiValue.TryColor(Style(gui, el, "border-color"), out var b) ? b : ink;
@@ -295,7 +354,10 @@ public sealed partial class UiRenderer
 
             gui.DrawRectBorder(rect, outline, 1f, 2f);
 
-            if (!on) return;
+            if (!on)
+            {
+                return;
+            }
 
             var inset = size * 0.25f;
             gui.DrawRect(new Rect(rect.X + inset, rect.Y + inset, rect.W - (inset * 2f), rect.H - (inset * 2f)),
@@ -314,13 +376,15 @@ public sealed partial class UiRenderer
         }
 
         var cacheKey = instance.TemplateName + "|" +
-                       string.Join(";", instance.Parameters.OrderBy(p => p.Key).Select(p => $"{p.Key}={p.Value}"));
+                       string.Join(";", instance.Parameters.OrderBy(static p => p.Key).Select(static p => $"{p.Key}={p.Value}"));
 
         if (!expandedTemplates.TryGetValue(cacheKey, out var expanded))
         {
             var raw = template.RawXml;
             foreach (var (name, value) in instance.Parameters)
+            {
                 raw = raw.Replace("$" + name, value, StringComparison.Ordinal);
+            }
 
             expanded = UiXmlParser.ParseFragment(raw);
             expandedTemplates[cacheKey] = expanded;
@@ -332,7 +396,9 @@ public sealed partial class UiRenderer
     void RenderRepeat(Gui gui, UiElement el, UiRepeat repeat)
     {
         if (DataResolver?.Invoke(repeat.ItemsPath) is not IEnumerable items || items is string)
+        {
             return;
+        }
 
         foreach (var item in items)
         {
@@ -340,7 +406,9 @@ public sealed partial class UiRenderer
             try
             {
                 foreach (var child in el.Children)
+                {
                     RenderElement(gui, child);
+                }
             }
             finally
             {

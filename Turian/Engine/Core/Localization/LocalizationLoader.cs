@@ -35,16 +35,27 @@ public static class LocalizationLoader
 
         var localization = settings?.Get<LocalizationSettings>();
         if (!string.IsNullOrWhiteSpace(localization?.DefaultLocale))
+        {
             service.SetLocale(localization.DefaultLocale);
+        }
 
-        if (database is null) return service;
+        if (database is null)
+        {
+            return service;
+        }
 
         var expectedType = typeof(StringTableAsset).FullName;
         foreach (var record in database.GetAssetsSnapshot())
         {
-            if (!string.Equals(record.AssetTypeName, expectedType, StringComparison.Ordinal)) continue;
+            if (!string.Equals(record.AssetTypeName, expectedType, StringComparison.Ordinal))
+            {
+                continue;
+            }
 
-            if (!database.TryGetAssetProvider(record.AssetId, out var provider) || provider is null) continue;
+            if (!database.TryGetAssetProvider(record.AssetId, out var provider) || provider is null)
+            {
+                continue;
+            }
 
             try
             {

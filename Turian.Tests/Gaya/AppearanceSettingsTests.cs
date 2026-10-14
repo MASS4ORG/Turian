@@ -33,7 +33,7 @@ public sealed class AppearanceSettingsTests
         using var app = PluginHost.Load([typeof(AppearanceConsumer).Assembly], NullLogger.Instance);
         var plugin = Assert.IsType<AppearanceConsumer>(Assert.Single(app.Plugins));
         Assert.Same(app.Services.GetRequiredService<AppearanceSettings>(), plugin.Appearance);
-        Assert.Same(app.Settings.Pages.Single(page => page.Id == AppearanceSettings.PageId).Target, plugin.Appearance);
+        Assert.Same(app.Settings.Pages.Single(static page => page.Id == AppearanceSettings.PageId).Target, plugin.Appearance);
     }
 
     /// <summary>Studio selects XWayland when available and preserves an explicit backend choice.</summary>
@@ -62,10 +62,10 @@ public sealed class AppearanceSettingsTests
     public void HostProvidesOneAppearancePage()
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
-        var page = app.Settings.Pages.Single(page => page.Id == AppearanceSettings.PageId);
+        var page = app.Settings.Pages.Single(static page => page.Id == AppearanceSettings.PageId);
         Assert.Equal("Appearance", page.Path);
         Assert.Same(app.Services.GetRequiredService<AppearanceSettings>(), page.Target);
-        Assert.DoesNotContain(app.Settings.Pages, page => page.Id is "gaya.window" or "gaya.turian.appearance");
+        Assert.DoesNotContain(app.Settings.Pages, static page => page.Id is "gaya.window" or "gaya.turian.appearance");
     }
 
     /// <summary>Stored font, theme and window preferences move into the shared page and survive another restart.</summary>
@@ -99,7 +99,7 @@ public sealed class AppearanceSettingsTests
         Assert.True(next.NativeTitlebar);
         next.Appearance.TextSize = 2;
         Assert.Equal(12, next.Appearance.TextSize);
-        Assert.Throws<ArgumentNullException>(() => AppearanceSettings.Register(null!));
+        Assert.Throws<ArgumentNullException>(static () => AppearanceSettings.Register(null!));
     }
 
     /// <summary>The theme dropdown offers custom themes and changes the same committed choice as the menu.</summary>
@@ -146,14 +146,14 @@ public sealed class AppearanceSettingsTests
     {
         using var frame = new WorkbenchFrame();
         using var shell = PluginHost.Load([], NullLogger.Instance);
-        frame.Panels.Register(shell.Panels.All.Single(panel => panel.Id == ShellPanels.Settings));
+        frame.Panels.Register(shell.Panels.All.Single(static panel => panel.Id == ShellPanels.Settings));
         frame.Draw();
         frame.Workbench.ShowPanel(ShellPanels.Settings);
         frame.Draw();
         frame.Draw();
 
-        var browse = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/browse");
-        var editor = Nodes(frame).Single(node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
+        var browse = Nodes(frame).Single(static node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/browse");
+        var editor = Nodes(frame).Single(static node => node.Id == $"settings/{AppearanceSettings.PageId}/field0/editor");
         Assert.True(browse.Rect.X >= editor.Rect.X && browse.Rect.X + browse.Rect.W <= editor.Rect.X + editor.Rect.W + 0.5f);
         Click(frame, browse.Rect.Center);
         Assert.Equal(BrickCategoryFilter.All, shell.Services.GetRequiredService<BricksPanel>().Category);
@@ -211,7 +211,7 @@ public sealed class AppearanceSettingsTests
     static void OpenSettings(WorkbenchFrame frame)
     {
         using var shell = PluginHost.Load([], NullLogger.Instance);
-        frame.Panels.Register(shell.Panels.All.Single(panel => panel.Id == ShellPanels.Settings));
+        frame.Panels.Register(shell.Panels.All.Single(static panel => panel.Id == ShellPanels.Settings));
         frame.Draw();
         frame.Workbench.ShowPanel(ShellPanels.Settings);
         frame.Draw();

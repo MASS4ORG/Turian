@@ -36,12 +36,12 @@ public sealed class AssetWorkspace : IDisposable
     public AssetWrapper? Active { get; private set; }
 
     /// <summary>Whether any open document has unsaved edits.</summary>
-    public bool HasUnsavedChanges => documents.Any(document => document.IsDirty);
+    public bool HasUnsavedChanges => documents.Any(static document => document.IsDirty);
 
     /// <summary>
     /// Whether a scene is open, which is what play mode needs. A shell binds its Play button to this.
     /// </summary>
-    public bool HasOpenScene => documents.Any(document => document.Asset is Prefab);
+    public bool HasOpenScene => documents.Any(static document => document.Asset is Prefab);
 
     /// <summary>Raised when a document joins the workspace.</summary>
     public event Action<AssetWrapper>? Opened;
@@ -78,7 +78,10 @@ public sealed class AssetWorkspace : IDisposable
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        if (document.Asset is not null) assets.ActivateAsset(document.Asset);
+        if (document.Asset is not null)
+        {
+            assets.ActivateAsset(document.Asset);
+        }
     }
 
     /// <summary>
@@ -99,16 +102,27 @@ public sealed class AssetWorkspace : IDisposable
         ArgumentNullException.ThrowIfNull(document);
 
         if (resolution == UnsavedChanges.Save && document.Asset is not null)
+        {
             assets.SaveAsset(document.Asset);
+        }
 
-        if (document.Asset is not null) assets.CloseAsset(document.Asset);
-        else Remove(document);
+        if (document.Asset is not null)
+        {
+            assets.CloseAsset(document.Asset);
+        }
+        else
+        {
+            Remove(document);
+        }
     }
 
     /// <summary>Closes every document, discarding unsaved edits.</summary>
     public void CloseAll()
     {
-        foreach (var document in documents.ToList()) Close(document);
+        foreach (var document in documents.ToList())
+        {
+            Close(document);
+        }
 
         documents.Clear();
         SetActive(null);
@@ -120,7 +134,10 @@ public sealed class AssetWorkspace : IDisposable
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        if (document.Asset is not null) assets.SaveAsset(document.Asset);
+        if (document.Asset is not null)
+        {
+            assets.SaveAsset(document.Asset);
+        }
     }
 
     /// <summary>Writes every open document's edits to disk.</summary>
@@ -128,7 +145,7 @@ public sealed class AssetWorkspace : IDisposable
 
     /// <summary>The open documents' asset ids, for restoring the session next time.</summary>
     public WorkspaceSession Capture() =>
-        new(documents.Where(d => d.Asset is not null and not TemporaryScene).Select(d => d.Asset!.Id).ToList(),
+        new(documents.Where(static d => d.Asset is not null and not TemporaryScene).Select(static d => d.Asset!.Id).ToList(),
             Active?.Asset is TemporaryScene ? null : Active?.Asset?.Id);
 
     /// <inheritdoc />
@@ -156,7 +173,10 @@ public sealed class AssetWorkspace : IDisposable
 
     void OnAssetClosed(Asset asset)
     {
-        if (Find(asset) is { } document) Remove(document);
+        if (Find(asset) is { } document)
+        {
+            Remove(document);
+        }
     }
 
     AssetWrapper Track(Asset asset)
@@ -169,20 +189,32 @@ public sealed class AssetWorkspace : IDisposable
 
     void Remove(AssetWrapper document)
     {
-        if (!documents.Remove(document)) return;
+        if (!documents.Remove(document))
+        {
+            return;
+        }
 
         Closed?.Invoke(document);
         document.Dispose();
-        if (document.Asset is TemporaryScene temporary) temporary.Dispose();
+        if (document.Asset is TemporaryScene temporary)
+        {
+            temporary.Dispose();
+        }
 
-        if (ReferenceEquals(Active, document)) SetActive(documents.LastOrDefault());
+        if (ReferenceEquals(Active, document))
+        {
+            SetActive(documents.LastOrDefault());
+        }
 
         Changed?.Invoke();
     }
 
     void SetActive(AssetWrapper? document)
     {
-        if (ReferenceEquals(Active, document)) return;
+        if (ReferenceEquals(Active, document))
+        {
+            return;
+        }
 
         Active = document;
         Activated?.Invoke(document);

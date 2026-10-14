@@ -24,7 +24,10 @@ public sealed class SettingsPageDescriptor
         var attribute = type.GetCustomAttribute<EditorSettingAttribute>()
                         ?? throw new ArgumentException("Settings classes must declare [EditorSetting].", nameof(target));
         if (string.IsNullOrWhiteSpace(attribute.Path))
+        {
             throw new ArgumentException("Settings classes must declare a category path.", nameof(target));
+        }
+
         Target = target;
         Id = attribute.IdFor(type);
         Path = attribute.Path.Trim();
@@ -91,10 +94,14 @@ public static class SettingsDefaults
         var values = new Dictionary<string, object?>(StringComparer.Ordinal);
 
         foreach (var property in target.GetType().GetProperties(scope).Where(p => p is { CanRead: true, CanWrite: true }))
+        {
             values[property.Name] = Read(() => property.GetValue(target));
+        }
 
         foreach (var field in target.GetType().GetFields(scope).Where(f => !f.IsInitOnly))
+        {
             values[field.Name] = Read(() => field.GetValue(target));
+        }
 
         return values;
     }

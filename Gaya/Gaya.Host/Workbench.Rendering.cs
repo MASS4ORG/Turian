@@ -37,21 +37,31 @@ public sealed partial class Workbench
     void ChromeStrip(Gui gui, ChromeSlot slot)
     {
         var items = ChromeFor(slot);
-        if (items.Count == 0) return;
+        if (items.Count == 0)
+        {
+            return;
+        }
 
         var height = Theme.Scale(items.Max(item => item.Height > 0 ? item.Height : Theme.HeaderHeight));
 
         using (gui.Node(-1, height, $"chrome/{slot}").ExpandWidth().Direction(Axis.Horizontal).Enter())
         {
             foreach (var item in items)
+            {
                 using (gui.Node(-1, height, $"chrome/{slot}/{item.Id}").Expand().Enter())
+                {
                     ResolveChrome(item).Render(gui);
+                }
+            }
         }
     }
 
     IChromeItem ResolveChrome(ChromeDescriptor descriptor)
     {
-        if (chromeInstances.TryGetValue(descriptor.Id, out var item)) return item;
+        if (chromeInstances.TryGetValue(descriptor.Id, out var item))
+        {
+            return item;
+        }
 
         try
         {
@@ -71,7 +81,10 @@ public sealed partial class Workbench
     void RenderTabStripActions(DockTabStrip strip, Gui gui)
     {
         var panelId = strip.ActivePanelId;
-        if (panelId is null || !descriptors.TryGetValue(panelId, out var descriptor)) return;
+        if (panelId is null || !descriptors.TryGetValue(panelId, out var descriptor))
+        {
+            return;
+        }
 
         try
         {
@@ -99,7 +112,10 @@ public sealed partial class Workbench
 
     void RenderPanel(string panelId, Gui gui)
     {
-        if (!descriptors.TryGetValue(panelId, out var descriptor)) return;
+        if (!descriptors.TryGetValue(panelId, out var descriptor))
+        {
+            return;
+        }
 
         // No padding here: a panel that scrolls wants its scrollbar on its own border, so each panel
         // pads its own content instead.
@@ -116,9 +132,20 @@ public sealed partial class Workbench
     /// </summary>
     void TrackFocus(Gui gui, string panelId)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
-        if (!Pressed(gui.Input)) return;
-        if (!gui.CurrentNode.Rect.Contains(gui.Input.MousePosition)) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
+
+        if (!Pressed(gui.Input))
+        {
+            return;
+        }
+
+        if (!gui.CurrentNode.Rect.Contains(gui.Input.MousePosition))
+        {
+            return;
+        }
 
         app.Focus.Focus(panelId);
     }
@@ -142,7 +169,10 @@ public sealed partial class Workbench
     /// </summary>
     void HandleShortcuts(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
 
         var input = gui.Input;
         if (input.IsKeyPressed(KeyboardKey.Escape))
@@ -151,10 +181,15 @@ public sealed partial class Workbench
             paletteOpen = false;
         }
 
-        if (app.Shortcuts.IsCapturing || gui.Focus.IsTextInputFocused) return;
+        if (app.Shortcuts.IsCapturing || gui.Focus.IsTextInputFocused)
+        {
+            return;
+        }
 
         if (app.Shortcuts.Dispatch(input, app.Focus.ActivePanelId) is { } commandId)
+        {
             ExecuteCommand(commandId);
+        }
     }
 
     void MenuBar(Gui gui)
@@ -171,13 +206,19 @@ public sealed partial class Workbench
                    nativeTitlebar: frameNativeTitlebar, resizable: true, minimumWindowSize: new Vector2(640, 400)))
         {
             using (gui.Node(-1, height, "menubar").Direction(Axis.Horizontal).Enter())
+            {
                 gui.MenuBar(BuildMenus, height, fontSize: t.Text(13f));
+            }
 
             gui.Node().ExpandWidth();
             foreach (var item in ChromeFor(ChromeSlot.MenuBar))
+            {
                 using (gui.Node(-1, height, $"chrome/MenuBar/{item.Id}")
                            .Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
+                {
                     ResolveChrome(item).Render(gui);
+                }
+            }
         }
     }
 
@@ -189,8 +230,14 @@ public sealed partial class Workbench
             var id = menuId;
             bar.Menu(label, menu =>
             {
-                if (id == MenuIds.View) BuildViewMenu(menu);
-                else BuildItems(menu, [.. app.Menus.ItemsFor(id)], depth: 0);
+                if (id == MenuIds.View)
+                {
+                    BuildViewMenu(menu);
+                }
+                else
+                {
+                    BuildItems(menu, [.. app.Menus.ItemsFor(id)], depth: 0);
+                }
             });
         }
     }
@@ -205,11 +252,17 @@ public sealed partial class Workbench
     IEnumerable<(string MenuId, string Label)> TopLevelMenus()
     {
         foreach (var menuId in MenuOrder.Where(HasItems))
+        {
             yield return (menuId, T(MenuLabels[menuId]));
+        }
 
         foreach (var (menuId, label) in app.Menus.DeclaredMenus)
+        {
             if (!MenuLabels.ContainsKey(menuId) && HasItems(menuId))
+            {
                 yield return (menuId, T(label));
+            }
+        }
     }
 
 }

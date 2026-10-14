@@ -218,8 +218,15 @@ public sealed class TemporarySceneTests : IDisposable
     {
         var document = workspace.NewScene();
         var folder = Path.GetDirectoryName(document.Asset!.RelativePath)!;
-        if (switchProject) settings.Set(new AppSettings());
-        else workspace.Dispose();
+        if (switchProject)
+        {
+            settings.Set(new AppSettings());
+        }
+        else
+        {
+            workspace.Dispose();
+        }
+
         Assert.False(Directory.Exists(folder));
         Assert.Empty(workspace.Documents);
         Assert.Null(tree.CurrentSceneRoot);

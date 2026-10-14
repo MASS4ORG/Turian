@@ -40,7 +40,7 @@ public sealed class WorldUiRenderSystemTests : IClassFixture<VulkanFixture>
         var baseline = new byte[size * size * 4];
         svc.CopyPixels(baseline);
 
-        svc.WorldUiSource = _ => Array.Empty<WorldUiQuad>();
+        svc.WorldUiSource = static _ => Array.Empty<WorldUiQuad>();
         svc.Render(root, 0.016);
         var again = new byte[size * size * 4];
         svc.CopyPixels(again);

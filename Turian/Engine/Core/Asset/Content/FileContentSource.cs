@@ -46,7 +46,10 @@ public sealed class FileContentSource : IContentSource
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var fullPath = Path.GetFullPath(path);
-        if (!File.Exists(fullPath)) throw new FileNotFoundException("Content file was not found.", fullPath);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("Content file was not found.", fullPath);
+        }
 
         // FileShare.Delete lets a newer build replace the file by rename while a session still reads the old one.
         var handle = File.OpenHandle(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
@@ -76,14 +79,21 @@ public sealed class FileContentSource : IContentSource
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
-        if (offset >= Length) return 0;
+        if (offset >= Length)
+        {
+            return 0;
+        }
 
         var wanted = (int)Math.Min(buffer.Length, Length - offset);
         var total = 0;
         while (total < wanted)
         {
             var read = RandomAccess.Read(handle, buffer[total..wanted], baseOffset + offset + total);
-            if (read == 0) break;
+            if (read == 0)
+            {
+                break;
+            }
+
             total += read;
         }
 
@@ -100,8 +110,15 @@ public sealed class FileContentSource : IContentSource
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
-        if (ownsHandle) handle.Dispose();
+        if (ownsHandle)
+        {
+            handle.Dispose();
+        }
     }
 }

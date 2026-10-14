@@ -34,7 +34,9 @@ public static class UiXmlParser
 
         var root = xdoc.Root ?? throw new UiParseException("The document is empty", 1, 1);
         if (root.Name.LocalName != "UI")
+        {
             throw Fail(root, $"Root element must be <UI>, found <{root.Name.LocalName}>");
+        }
 
         var styleSheets = new List<string>();
         var templates = new Dictionary<string, UiTemplate>();
@@ -62,14 +64,23 @@ public static class UiXmlParser
                     break;
 
                 default:
-                    if (visualRoot is null) visualRoot = ParseElement(child, bindings);
-                    else strayRoots.Add(ParseElement(child, bindings));
+                    if (visualRoot is null)
+                    {
+                        visualRoot = ParseElement(child, bindings);
+                    }
+                    else
+                    {
+                        strayRoots.Add(ParseElement(child, bindings));
+                    }
+
                     break;
             }
         }
 
         if (visualRoot is null)
+        {
             throw Fail(root, "<UI> must contain a visual element");
+        }
 
         if (strayRoots.Count > 0)
         {
@@ -114,8 +125,10 @@ public static class UiXmlParser
 
     static void CollectBindings(XElement bindingsElement, List<UiBinding> into)
     {
-        foreach (var b in bindingsElement.Elements().Where(e => e.Name.LocalName == "Binding"))
+        foreach (var b in bindingsElement.Elements().Where(static e => e.Name.LocalName == "Binding"))
+        {
             into.Add(ParseBinding(b));
+        }
     }
 
     static UiTemplate ParseTemplate(XElement child, List<UiBinding> bindings)
@@ -149,7 +162,11 @@ public static class UiXmlParser
 
         foreach (var attr in el.Attributes())
         {
-            if (attr.IsNamespaceDeclaration) continue;
+            if (attr.IsNamespaceDeclaration)
+            {
+                continue;
+            }
+
             ParseAttribute(el, element, attr.Name.LocalName, attr.Value);
         }
 
@@ -171,20 +188,31 @@ public static class UiXmlParser
 
     static UiRepeat? ParseRepeat(XElement el)
     {
-        if (el.Name.LocalName != "Repeat") return null;
+        if (el.Name.LocalName != "Repeat")
+        {
+            return null;
+        }
+
         var items = RequireAttr(el, "items");
         if (!BindingExpression.IsBinding(items))
+        {
             throw Fail(el, "<Repeat items> must be a binding expression, e.g. items=\"{Path.To.List}\"");
+        }
+
         return new UiRepeat(BindingExpression.Parse(items).Path, el.Attribute("as")?.Value ?? "item");
     }
 
     static UiInstanceRef? ParseInstance(XElement el)
     {
-        if (el.Name.LocalName != "Instance") return null;
+        if (el.Name.LocalName != "Instance")
+        {
+            return null;
+        }
+
         var template = RequireAttr(el, "template");
         var parameters = el.Attributes()
-            .Where(a => a.Name.LocalName is not ("template" or "name") && !a.IsNamespaceDeclaration)
-            .ToDictionary(a => a.Name.LocalName, a => a.Value, StringComparer.Ordinal);
+            .Where(static a => a.Name.LocalName is not ("template" or "name") && !a.IsNamespaceDeclaration)
+            .ToDictionary(static a => a.Name.LocalName, static a => a.Value, StringComparer.Ordinal);
         return new UiInstanceRef(template, parameters);
     }
 
@@ -202,7 +230,11 @@ public static class UiXmlParser
                 return;
         }
 
-        if (IsStructuralAttribute(element.Tag, name)) return;
+        if (IsStructuralAttribute(element.Tag, name))
+        {
+            return;
+        }
+
         ParseContentAttribute(source, element, name, value);
     }
 
@@ -216,7 +248,9 @@ public static class UiXmlParser
         {
             var colon = declaration.IndexOf(':', StringComparison.Ordinal);
             if (colon > 0)
+            {
                 element.InlineStyle[declaration[..colon].Trim()] = declaration[(colon + 1)..].Trim();
+            }
         }
     }
 
@@ -249,7 +283,9 @@ public static class UiXmlParser
         var mode = BindingMode.OneWay;
         var modeAttr = b.Attribute("mode")?.Value;
         if (modeAttr is not null && Enum.TryParse<BindingMode>(modeAttr, ignoreCase: true, out var parsedMode))
+        {
             mode = parsedMode;
+        }
 
         return new UiBinding(
             RequireAttr(b, "element"),

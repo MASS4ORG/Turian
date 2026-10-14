@@ -64,7 +64,7 @@ public class AssetManager
     /// <summary>
     /// Gets whether any opened asset is currently dirty.
     /// </summary>
-    public bool HasDirtyAssets => assets.Any(asset => asset.IsModified);
+    public bool HasDirtyAssets => assets.Any(static asset => asset.IsModified);
 
     /// <summary>
     /// Opens an asset and makes it the active asset.
@@ -181,7 +181,10 @@ public class AssetManager
     /// <param name="assetId">The asset id.</param>
     public void MarkClean(Guid assetId)
     {
-        if (!assetsById.TryGetValue(assetId, out var asset) || !asset.IsModified) return;
+        if (!assetsById.TryGetValue(assetId, out var asset) || !asset.IsModified)
+        {
+            return;
+        }
 
         asset.MarkSaved();
         DirtyStateChanged?.Invoke(HasDirtyAssets);
@@ -341,7 +344,7 @@ public class AssetManager
     /// </summary>
     public void SaveAllAssets()
     {
-        foreach (var asset in assets.Where(asset => asset.IsModified).ToArray())
+        foreach (var asset in assets.Where(static asset => asset.IsModified).ToArray())
         {
             _ = SaveAsset(asset);
         }

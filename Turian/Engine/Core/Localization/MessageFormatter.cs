@@ -24,7 +24,10 @@ public static class MessageFormatter
         string locale = "en",
         IReadOnlyDictionary<string, object?>? values = null)
     {
-        if (string.IsNullOrEmpty(message)) return message;
+        if (string.IsNullOrEmpty(message))
+        {
+            return message;
+        }
 
         values ??= count is null
             ? EmptyValues
@@ -52,9 +55,14 @@ public static class MessageFormatter
             {
                 // '#' is the plural count inside a plural block and is only meaningful with a count.
                 if (text[i] == '#' && pluralValue is not null)
+                {
                     result.Append(pluralValue.Value.ToString(CultureInfo.InvariantCulture));
+                }
                 else
+                {
                     result.Append(text[i]);
+                }
+
                 i++;
                 continue;
             }
@@ -68,13 +76,21 @@ public static class MessageFormatter
 
             var parts = text[(i + 1)..close].Split(',', 3, StringSplitOptions.TrimEntries);
             if (parts.Length == 1)
+            {
                 result.Append(values.TryGetValue(parts[0], out var value) ? value : string.Empty);
+            }
             else if (parts.Length == 3 && parts[1].Equals("plural", StringComparison.OrdinalIgnoreCase))
+            {
                 result.Append(SelectVariant(parts[0], parts[2], values, pluralValue, locale));
+            }
             else if (parts.Length == 3 && parts[1].Equals("select", StringComparison.OrdinalIgnoreCase))
+            {
                 result.Append(SelectVariant(parts[0], parts[2], values, null, locale));
+            }
             else
+            {
                 result.Append(text[i..(close + 1)]);
+            }
 
             i = close + 1;
         }
@@ -122,7 +138,10 @@ public static class MessageFormatter
     {
         var marker = name + " {";
         var start = body.IndexOf(marker, StringComparison.Ordinal);
-        if (start < 0) return null;
+        if (start < 0)
+        {
+            return null;
+        }
 
         var open = start + marker.Length - 1;
         var close = FindClose(body, open, body.Length);
@@ -134,8 +153,14 @@ public static class MessageFormatter
         var depth = 0;
         for (var i = open; i < end; i++)
         {
-            if (text[i] == '{') depth++;
-            else if (text[i] == '}' && --depth == 0) return i;
+            if (text[i] == '{')
+            {
+                depth++;
+            }
+            else if (text[i] == '}' && --depth == 0)
+            {
+                return i;
+            }
         }
 
         return -1;

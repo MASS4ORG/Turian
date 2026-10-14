@@ -47,12 +47,18 @@ public sealed class AppearanceSettings
     public static AppearanceSettings Register(EditorSettings settings, string? previousPageId = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (settings.Pages.FirstOrDefault(page => page.Id == PageId)?.Target is AppearanceSettings existing)
+        if (settings.Pages.FirstOrDefault(static page => page.Id == PageId)?.Target is AppearanceSettings existing)
+        {
             return existing;
+        }
 
         var appearance = new AppearanceSettings();
         var page = new SettingsPageDescriptor(appearance);
-        if (previousPageId is not null) settings.RestoreUserPage(page, previousPageId);
+        if (previousPageId is not null)
+        {
+            settings.RestoreUserPage(page, previousPageId);
+        }
+
         settings.RestoreUserPage(page, "gaya.window");
         settings.RegisterPage(page);
         return appearance;

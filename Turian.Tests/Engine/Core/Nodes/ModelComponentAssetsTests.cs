@@ -33,8 +33,15 @@ public sealed class ModelComponentAssetsTests : IDisposable
         var node = new Node();
         var component = new ModelComponent { Mesh = new AssetReference<MeshAsset>(meshId) };
         node.AddComponent(component);
-        if (services is null) node.Awake(null);
-        else node.Awake(null, services);
+        if (services is null)
+        {
+            node.Awake(null);
+        }
+        else
+        {
+            node.Awake(null, services);
+        }
+
         return component;
     }
 

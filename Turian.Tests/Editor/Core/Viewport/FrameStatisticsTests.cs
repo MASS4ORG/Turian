@@ -21,9 +21,17 @@ public sealed class FrameStatisticsTests
         statistics.Clear();
         statistics.Add(sample);
         Assert.Equal(0, statistics.Count);
-        for (var i = 0; i < 100; i++) statistics.Add(sample);
+        for (var i = 0; i < 100; i++)
+        {
+            statistics.Add(sample);
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) statistics.Add(sample);
+        for (var i = 0; i < 1000; i++)
+        {
+            statistics.Add(sample);
+        }
+
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - allocated);
         Assert.Equal(60, statistics.Count);
     }
@@ -44,7 +52,11 @@ public sealed class FrameStatisticsTests
         Assert.Equal(30, stats.FrameMilliseconds, 6);
         Assert.Equal(1000.0 / 30, stats.FramesPerSecond, 6);
         Assert.Equal(3, stats.CpuMilliseconds);
-        for (var i = 0; i < 60; i++) stats.Add(0.05, new RenderFrameStats { CpuMilliseconds = 5 });
+        for (var i = 0; i < 60; i++)
+        {
+            stats.Add(0.05, new RenderFrameStats { CpuMilliseconds = 5 });
+        }
+
         Assert.Equal(60, stats.Count);
         Assert.Equal(20, stats.FramesPerSecond, 6);
         Assert.Equal(5, stats.CpuMilliseconds);
@@ -82,7 +94,11 @@ public sealed class FrameStatisticsTests
         Assert.Equal("Texture payload: 1.0 MiB", new string(buffer[..length]));
         Assert.Equal(0, stats.FormatLine(0, [], null, 0));
         Assert.Equal(0, stats.FormatLine(2, [], null, 0));
-        for (var i = 0; i < 100; i++) stats.FormatLine(i % 6, buffer, 123.4, 1048576);
+        for (var i = 0; i < 100; i++)
+        {
+            stats.FormatLine(i % 6, buffer, 123.4, 1048576);
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < 1000; i++)
         {

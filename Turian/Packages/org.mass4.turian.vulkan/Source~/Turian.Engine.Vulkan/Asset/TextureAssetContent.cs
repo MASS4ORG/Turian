@@ -29,7 +29,9 @@ public static class TextureAssetContent
 
             var cacheKey = (asset.Id, vulkan.Device.Id);
             if (TextureCache.TryGetValue(cacheKey, out var cached))
+            {
                 return cached;
+            }
 
             if (!database.TryGetAssetProvider(asset.Id, out var provider) || provider is null)
             {
@@ -99,7 +101,10 @@ public static class TextureAssetContent
         {
             foreach (var key in TextureCache.Keys.Where(k => k.Item1 == assetId).ToList())
             {
-                if (!TextureCache.TryRemove(key, out var texture)) continue;
+                if (!TextureCache.TryRemove(key, out var texture))
+                {
+                    continue;
+                }
 
                 Interlocked.Add(ref _uploadedBytes, -(long)texture.SizeBytes);
                 texture.Dispose();
@@ -112,7 +117,10 @@ public static class TextureAssetContent
         public static void ClearCache()
         {
             foreach (var (_, texture) in TextureCache)
+            {
                 texture.Dispose();
+            }
+
             TextureCache.Clear();
             Interlocked.Exchange(ref _uploadedBytes, 0);
             TextureMemoryReport.Reset();

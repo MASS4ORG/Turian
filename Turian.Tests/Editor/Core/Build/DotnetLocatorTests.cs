@@ -14,7 +14,11 @@ public sealed class DotnetLocatorTests : IDisposable
         var root = Path.Combine(directory, name);
         Directory.CreateDirectory(root);
         File.WriteAllText(Path.Combine(root, Executable), string.Empty);
-        foreach (var sdk in sdks) Directory.CreateDirectory(Path.Combine(root, "sdk", sdk));
+        foreach (var sdk in sdks)
+        {
+            Directory.CreateDirectory(Path.Combine(root, "sdk", sdk));
+        }
+
         return root;
     }
 
@@ -75,7 +79,10 @@ public sealed class DotnetLocatorTests : IDisposable
     [Fact]
     public void SymlinkedExecutablesUseTheirRealInstallation()
     {
-        if (OperatingSystem.IsWindows()) return;
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
 
         var real = Install("real", "11.0.100");
         var bin = Path.Combine(directory, "bin");

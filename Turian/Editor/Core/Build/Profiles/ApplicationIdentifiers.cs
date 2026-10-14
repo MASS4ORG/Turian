@@ -23,8 +23,16 @@ public static class ApplicationIdentifiers
         ArgumentNullException.ThrowIfNull(value);
         var chars = value.Select(static ch => char.IsAsciiLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '_').ToArray();
         var segment = new string(chars).Trim('_');
-        if (segment.Length == 0) return "game";
-        if (!char.IsAsciiLetter(segment[0])) segment = "g" + segment;
+        if (segment.Length == 0)
+        {
+            return "game";
+        }
+
+        if (!char.IsAsciiLetter(segment[0]))
+        {
+            segment = "g" + segment;
+        }
+
         return Keywords.Contains(segment) ? segment + "_" : segment;
     }
 
@@ -33,19 +41,29 @@ public static class ApplicationIdentifiers
     /// <returns>What is wrong with it, or <c>null</c> when it is valid.</returns>
     public static string? Validate(string? identifier)
     {
-        if (string.IsNullOrWhiteSpace(identifier)) return "The application identifier is empty.";
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return "The application identifier is empty.";
+        }
 
         var segments = identifier.Split('.');
         if (segments.Length < 2)
+        {
             return $"The application identifier '{identifier}' needs at least two dot-separated segments.";
+        }
 
         foreach (var segment in segments)
         {
             if (segment.Length == 0 || !char.IsAsciiLetter(segment[0]) || !segment.All(static c => char.IsAsciiLetterOrDigit(c) || c == '_'))
+            {
                 return $"The application identifier '{identifier}' has the invalid segment '{segment}': "
                        + "segments start with a letter and hold only letters, digits and underscores.";
+            }
+
             if (Keywords.Contains(segment))
+            {
                 return $"The application identifier '{identifier}' uses '{segment}', a reserved Java word.";
+            }
         }
 
         return null;

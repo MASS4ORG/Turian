@@ -3,7 +3,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// Compiles the user project as a class-library DLL.
 /// The output is written to the caller-supplied <paramref name="outputDirectory"/> so
-/// that <see cref="Turian.Editor.Core.AssemblySlotManager"/> can manage the A/B slot rotation.
+/// that <see cref="AssemblySlotManager"/> can manage the A/B slot rotation.
 /// </summary>
 public sealed class CompileUserCode(
     IAppSettings settings,
@@ -33,13 +33,19 @@ public sealed class CompileUserCode(
         if (CachedAssembly(cache, graph, csprojFilePath) is { } cached)
         {
             Logger.LogInformation("Compilation skipped. Cached assembly is still valid: {Path}", cached);
-            if (!UserCodeTypeManifest.Exists(cached)) GenerateAndSaveTypeManifest(cached, graph);
+            if (!UserCodeTypeManifest.Exists(cached))
+            {
+                GenerateAndSaveTypeManifest(cached, graph);
+            }
+
             return cached;
         }
 
         // The slot is loaded as a whole, so an assembly whose definition was removed must not linger in it.
         foreach (var stale in Directory.EnumerateFiles(outputDirectory, "*.dll"))
+        {
             File.Delete(stale);
+        }
 
         using var workspace = MSBuildWorkspace.Create();
         await OpenProjects(workspace, csprojFilePaths).ConfigureAwait(false);
@@ -89,7 +95,11 @@ public sealed class CompileUserCode(
     {
         foreach (var path in paths.Reverse())
         {
-            if (workspace.CurrentSolution.Projects.Any(project => PathsEqual(project.FilePath, path))) continue;
+            if (workspace.CurrentSolution.Projects.Any(project => PathsEqual(project.FilePath, path)))
+            {
+                continue;
+            }
+
             await workspace.OpenProjectAsync(path).ConfigureAwait(false);
         }
     }
@@ -97,7 +107,11 @@ public sealed class CompileUserCode(
     IReadOnlyList<string> GenerateCsProjFiles(AssemblyGraph graph)
     {
         var projects = CsProjectGenerator.GenerateUserCodeProjects(Settings, Logger, graph);
-        foreach (var project in projects) GeneratedProject.Save(project);
+        foreach (var project in projects)
+        {
+            GeneratedProject.Save(project);
+        }
+
         return [.. projects.Select(static project => project.FullPath)];
     }
 
@@ -114,12 +128,19 @@ public sealed class CompileUserCode(
 
     string? CachedAssembly(UserCodeCompileCache cache, AssemblyGraph graph, string projectPath)
     {
-        if (forceRecompile) return null;
+        if (forceRecompile)
+        {
+            return null;
+        }
+
         foreach (var directory in new[] { outputDirectory, reuseDirectory }.OfType<string>().Distinct())
         {
             var path = SlotAssemblyOutputPath(directory);
             if (graph.Definitions.All(assembly => File.Exists(Path.Combine(directory, $"{assembly.Name}.dll")))
-                && cache.IsAssemblyUpToDate(Settings, path, projectPath)) return path;
+                && cache.IsAssemblyUpToDate(Settings, path, projectPath))
+            {
+                return path;
+            }
         }
         return null;
     }

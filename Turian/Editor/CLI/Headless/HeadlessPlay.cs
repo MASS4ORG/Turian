@@ -67,7 +67,11 @@ static class HeadlessPlay
     static PlayRenderer? CreateRenderer(HeadlessProject project, PlayModeService play, ScreenshotOptions options,
         bool requested)
     {
-        if (!requested || project.Vulkan is null) return null;
+        if (!requested || project.Vulkan is null)
+        {
+            return null;
+        }
+
         return new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Locale,
             options.Width, options.Height);
     }
@@ -81,11 +85,16 @@ static class HeadlessPlay
             var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
             play.Tick();
             if (renderer is not null && play.PlayRoot is { } playRoot)
+            {
                 renderer.Render(playRoot, 1.0 / 60.0, play.ActiveCamera);
+            }
+
             var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
             stats.AddFrame(elapsed, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore, renderer?.FrameStats);
             if (frame == 0 || frame == frames - 1)
+            {
                 logger.LogInformation("Play frame {Frame}/{Frames}: {Elapsed:F1} ms", frame + 1, frames, elapsed);
+            }
         }
         return stats;
     }
@@ -99,7 +108,11 @@ static class HeadlessPlay
                 project.Database.LoadStatistics.Snapshot);
             logger.LogInformation("Wrote frame statistics: {StatisticsPath}", statisticsPath);
         }
-        if (renderer is null || outputPath is null) return;
+        if (renderer is null || outputPath is null)
+        {
+            return;
+        }
+
         var pixels = new byte[renderer.Width * renderer.Height * 4];
         renderer.CopyPixels(pixels);
         PngWriter.Save(outputPath, pixels, renderer.Width, renderer.Height);
@@ -122,10 +135,17 @@ static class HeadlessPlay
             Vulkan vulkan, AssetDatabase assets, IInputSource inputSource, LocaleService? locale, uint width, uint height)
         {
             uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
-            if (uiPresenter is not null) uiPresenter.IsPlaying = true;
+            if (uiPresenter is not null)
+            {
+                uiPresenter.IsPlaying = true;
+            }
+
             viewer = new SceneViewerService(vulkan, assets, width, height);
             viewer.CollectStatistics = true;
-            if (uiPresenter is null) return;
+            if (uiPresenter is null)
+            {
+                return;
+            }
 
             viewer.OverlaySource = (w, h, dt) =>
                 overlayRoot is null ? null : uiPresenter.TryRenderOverlay(overlayRoot, (int)w, (int)h, dt);

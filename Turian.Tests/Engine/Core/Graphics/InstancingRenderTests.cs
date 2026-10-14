@@ -94,7 +94,10 @@ public sealed class InstancingRenderTests(VulkanFixture fixture) : IClassFixture
         }
         finally
         {
-            foreach (var model in separate) model.Dispose();
+            foreach (var model in separate)
+            {
+                model.Dispose();
+            }
         }
 
         Node Scene(Func<int, Model> model)
@@ -192,7 +195,11 @@ public sealed class InstancingRenderTests(VulkanFixture fixture) : IClassFixture
         component.AddInstance(new MeshInstance(Transform.Identity));
         viewer.Render(root, 0.016);
         Assert.Equal(1, viewer.FrameStats.Instances);
-        for (var i = 0; i < 200; i++) component.AddInstance(new MeshInstance(new Transform { Position = new(i, 0, 0) }));
+        for (var i = 0; i < 200; i++)
+        {
+            component.AddInstance(new MeshInstance(new Transform { Position = new(i, 0, 0) }));
+        }
+
         viewer.Render(root, 0.016);
         Assert.Equal(201, viewer.FrameStats.Instances);
         component.RemoveAt(0);
@@ -232,7 +239,11 @@ public sealed class InstancingRenderTests(VulkanFixture fixture) : IClassFixture
         var first = Render(viewer, root);
 
         node.IsActive = false;
-        for (var i = 0; i < 4; i++) viewer.Render(root, 0.016);
+        for (var i = 0; i < 4; i++)
+        {
+            viewer.Render(root, 0.016);
+        }
+
         Assert.Equal(0, viewer.FrameStats.Instances);
         node.IsActive = true;
 

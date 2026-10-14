@@ -22,10 +22,16 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
     public static bool TryParse(string? text, [NotNullWhen(true)] out SemanticVersion? version)
     {
         version = null;
-        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
 
         var span = text.Trim();
-        if (span.StartsWith('v') || span.StartsWith('V')) span = span[1..];
+        if (span.StartsWith('v') || span.StartsWith('V'))
+        {
+            span = span[1..];
+        }
 
         var build = string.Empty;
         var plus = span.IndexOf('+');
@@ -33,7 +39,10 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
         {
             build = span[(plus + 1)..];
             span = span[..plus];
-            if (!IsIdentifierList(build)) return false;
+            if (!IsIdentifierList(build))
+            {
+                return false;
+            }
         }
 
         var prerelease = string.Empty;
@@ -42,7 +51,10 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
         {
             prerelease = span[(dash + 1)..];
             span = span[..dash];
-            if (!IsIdentifierList(prerelease)) return false;
+            if (!IsIdentifierList(prerelease))
+            {
+                return false;
+            }
         }
 
         var parts = span.Split('.');
@@ -50,7 +62,9 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
             || !TryParseNumber(parts[0], out var major)
             || !TryParseNumber(parts[1], out var minor)
             || !TryParseNumber(parts[2], out var patch))
+        {
             return false;
+        }
 
         version = new SemanticVersion(major, minor, patch, prerelease, build);
         return true;
@@ -59,11 +73,21 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
     /// <inheritdoc/>
     public int CompareTo(SemanticVersion? other)
     {
-        if (other is null) return 1;
+        if (other is null)
+        {
+            return 1;
+        }
 
         var core = (Major, Minor, Patch).CompareTo((other.Major, other.Minor, other.Patch));
-        if (core != 0) return core;
-        if (IsPrerelease != other.IsPrerelease) return IsPrerelease ? -1 : 1;
+        if (core != 0)
+        {
+            return core;
+        }
+
+        if (IsPrerelease != other.IsPrerelease)
+        {
+            return IsPrerelease ? -1 : 1;
+        }
 
         return ComparePrerelease(Prerelease, other.Prerelease);
     }
@@ -90,8 +114,16 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
     public override string ToString()
     {
         var text = $"{Major}.{Minor}.{Patch}";
-        if (IsPrerelease) text += $"-{Prerelease}";
-        if (Build.Length > 0) text += $"+{Build}";
+        if (IsPrerelease)
+        {
+            text += $"-{Prerelease}";
+        }
+
+        if (Build.Length > 0)
+        {
+            text += $"+{Build}";
+        }
+
         return text;
     }
 
@@ -112,7 +144,10 @@ public sealed record SemanticVersion(int Major, int Minor, int Patch, string Pre
                 (false, true) => 1,
                 _ => string.CompareOrdinal(a[i], b[i]),
             };
-            if (order != 0) return order;
+            if (order != 0)
+            {
+                return order;
+            }
         }
 
         return a.Length.CompareTo(b.Length);

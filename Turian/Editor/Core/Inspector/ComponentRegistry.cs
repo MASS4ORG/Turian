@@ -11,7 +11,7 @@ public static class ComponentRegistry
     /// across <paramref name="assemblies"/>.
     /// </summary>
     /// <param name="assemblies">The assemblies to scan, usually <see cref="BuildManager.LoadedAssemblies"/>.</param>
-    public static IEnumerable<Type> GetAvailableTypes(IEnumerable<Assembly> assemblies)
+    public static IEnumerable<Type> GetAvailableTypes(IEnumerable<ReflectionAssembly> assemblies)
     {
         ArgumentNullException.ThrowIfNull(assemblies);
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -25,7 +25,7 @@ public static class ComponentRegistry
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types = [.. ex.Types.Where(t => t is not null).Cast<Type>()];
+                types = [.. ex.Types.Where(static t => t is not null).Cast<Type>()];
             }
             catch
             {
@@ -34,9 +34,16 @@ public static class ComponentRegistry
 
             foreach (var type in types)
             {
-                if (!IsInspectable(type)) continue;
+                if (!IsInspectable(type))
+                {
+                    continue;
+                }
+
                 var key = type.AssemblyQualifiedName ?? type.FullName ?? type.Name;
-                if (seen.Add(key)) yield return type;
+                if (seen.Add(key))
+                {
+                    yield return type;
+                }
             }
         }
     }
@@ -52,12 +59,24 @@ public static class ComponentRegistry
     public static bool IsInspectable(Type type)
     {
         ArgumentNullException.ThrowIfNull(type);
-        if (!typeof(Component).IsAssignableFrom(type)) return false;
-        if (type.IsAbstract || type.IsInterface || type.ContainsGenericParameters) return false;
-        if (type.GetConstructor(Type.EmptyTypes) is null) return false;
+        if (!typeof(Component).IsAssignableFrom(type))
+        {
+            return false;
+        }
+
+        if (type.IsAbstract || type.IsInterface || type.ContainsGenericParameters)
+        {
+            return false;
+        }
+
+        if (type.GetConstructor(Type.EmptyTypes) is null)
+        {
+            return false;
+        }
+
         return !IsEngineType(type)
                || type.GetCustomAttributes(false)
-                   .Any(a => a.GetType().Name == nameof(ComponentContextMenuAttribute));
+                   .Any(static a => a.GetType().Name == nameof(ComponentContextMenuAttribute));
     }
 
     static bool IsEngineType(Type type) =>
@@ -71,7 +90,11 @@ public static class ComponentRegistry
     public static bool MatchesSearch(Type type, string filter)
     {
         ArgumentNullException.ThrowIfNull(type);
-        if (string.IsNullOrWhiteSpace(filter)) return true;
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            return true;
+        }
+
         var path = GetMenuPath(type);
         return type.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
                || type.FullName?.Contains(filter, StringComparison.OrdinalIgnoreCase) == true

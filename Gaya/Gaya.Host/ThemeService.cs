@@ -129,7 +129,10 @@ public sealed partial class ThemeService : IThemeService
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(defaultValue);
         if (!TokenName().IsMatch(name))
+        {
             throw new ArgumentException($"'{name}' is not a token name; use letters, digits, '-' and '_'.", nameof(name));
+        }
+
         var declaration = $"${name} = {defaultValue};";
         StyleSheet.Parse(declaration, new StyleSheetOptions { SourceName = name });
         contributions[name] = defaultValue;
@@ -145,9 +148,20 @@ public sealed partial class ThemeService : IThemeService
     public void SetUserToken(string name, string? value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (userTokens.GetValueOrDefault(name) == value) return;
-        if (value is null) userTokens.Remove(name);
-        else userTokens[name] = value;
+        if (userTokens.GetValueOrDefault(name) == value)
+        {
+            return;
+        }
+
+        if (value is null)
+        {
+            userTokens.Remove(name);
+        }
+        else
+        {
+            userTokens[name] = value;
+        }
+
         Invalidate();
     }
 
@@ -173,7 +187,10 @@ public sealed partial class ThemeService : IThemeService
     public string? DefaultColorThemeFor(string lookId)
     {
         ArgumentNullException.ThrowIfNull(lookId);
-        if (Catalog.Find(lookId) is not { Category: ThemeCategories.Look } info) return null;
+        if (Catalog.Find(lookId) is not { Category: ThemeCategories.Look } info)
+        {
+            return null;
+        }
 
         var dark = Catalog.Find(color.Committed)?.Kind is null or ThemeKind.Dark or ThemeKind.HighContrastDark;
         var suggested = dark ? info.DefaultDarkTheme : info.DefaultLightTheme;
@@ -186,7 +203,10 @@ public sealed partial class ThemeService : IThemeService
     {
         ArgumentNullException.ThrowIfNull(id);
         var resolved = Catalog.Find(id)?.Id ?? id;
-        if (string.Equals(selection.Committed, resolved, StringComparison.Ordinal) && selection.Preview is null) return;
+        if (string.Equals(selection.Committed, resolved, StringComparison.Ordinal) && selection.Preview is null)
+        {
+            return;
+        }
 
         selection.Committed = resolved;
         selection.Preview = null;
@@ -199,7 +219,9 @@ public sealed partial class ThemeService : IThemeService
         selection.Renewed = true;
 
         if (Catalog.Find(id) is not { } theme || string.Equals(selection.Preview, theme.Id, StringComparison.Ordinal))
+        {
             return;
+        }
 
         selection.Preview = theme.Id;
         Publish();
@@ -209,7 +231,10 @@ public sealed partial class ThemeService : IThemeService
     public void SetScale(float requestedTextSize, float requestedZoom)
     {
         if (Math.Abs(requestedTextSize - textSize) < 0.001f
-            && Math.Abs(requestedZoom - zoom) < 0.001f) return;
+            && Math.Abs(requestedZoom - zoom) < 0.001f)
+        {
+            return;
+        }
 
         textSize = requestedTextSize;
         zoom = requestedZoom;
@@ -222,7 +247,10 @@ public sealed partial class ThemeService : IThemeService
     /// </summary>
     public void EndFrame()
     {
-        if (Interlocked.Exchange(ref queuedBrickFolders, null) is { } folders) SetBrickFolders(folders);
+        if (Interlocked.Exchange(ref queuedBrickFolders, null) is { } folders)
+        {
+            SetBrickFolders(folders);
+        }
 
         if (pollClock.Elapsed >= PollInterval)
         {
@@ -235,12 +263,18 @@ public sealed partial class ThemeService : IThemeService
         {
             var renewed = selection.Renewed;
             selection.Renewed = false;
-            if (renewed || selection.Preview is null) continue;
+            if (renewed || selection.Preview is null)
+            {
+                continue;
+            }
 
             selection.Preview = null;
             dropped = true;
         }
-        if (dropped) Publish();
+        if (dropped)
+        {
+            Publish();
+        }
     }
 
     /// <summary>Rescans the themes and recompiles when a user or brick sheet, or the override sheet, changed.</summary>
@@ -249,7 +283,10 @@ public sealed partial class ThemeService : IThemeService
     {
         var files = Catalog.Fingerprint();
         var userSheet = Stamp(UserSheetPath);
-        if (files == fingerprint && userSheet == userSheetStamp) return false;
+        if (files == fingerprint && userSheet == userSheetStamp)
+        {
+            return false;
+        }
 
         fingerprint = files;
         userSheetStamp = userSheet;
@@ -292,7 +329,9 @@ public sealed partial class ThemeService : IThemeService
         var result = shown is null ? null : Compile(shown, shownLook, shownIcons);
         if (result is null && Sheets.Count == 0 && shown?.Id != ThemeCatalog.DefaultColorTheme
             && Catalog.Find(ThemeCatalog.DefaultColorTheme) is { } fallback)
+        {
             result = Compile(fallback, shownLook, shownIcons);
+        }
 
         if (result is not null && !ReferenceEquals(result.Sheets, Sheets))
         {
@@ -330,17 +369,38 @@ public sealed partial class ThemeService : IThemeService
                 : null;
 
             var sheets = new StyleSheetCollection();
-            if (contributions.Count > 0) sheets.Add(Catalog.Parse(Declarations(contributions), "plugin tokens"));
+            if (contributions.Count > 0)
+            {
+                sheets.Add(Catalog.Parse(Declarations(contributions), "plugin tokens"));
+            }
+
             sheets.Add(Catalog.Load(info.Id));
-            if (iconBase is not null) sheets.Add(iconBase);
-            if (iconSheet is not null) sheets.Add(iconSheet);
-            if (userTokens.Count > 0) sheets.Add(Catalog.Parse(Declarations(userTokens), "user settings"));
+            if (iconBase is not null)
+            {
+                sheets.Add(iconBase);
+            }
+
+            if (iconSheet is not null)
+            {
+                sheets.Add(iconSheet);
+            }
+
+            if (userTokens.Count > 0)
+            {
+                sheets.Add(Catalog.Parse(Declarations(userTokens), "user settings"));
+            }
+
             if (File.Exists(UserSheetPath))
+            {
                 sheets.Add(Catalog.Parse(File.ReadAllText(UserSheetPath), UserSheetPath, new Uri(UserSheetPath)));
+            }
 
             var problems = new List<string>();
             var tokens = ThemeCompiler.Compile(sheets, info, problems);
-            foreach (var problem in problems) log.LogDebug("Theme {Theme}: {Problem}", info.Id, problem);
+            foreach (var problem in problems)
+            {
+                log.LogDebug("Theme {Theme}: {Problem}", info.Id, problem);
+            }
 
             var result = new Compiled(tokens, [.. sheets], lookSheet, skipped);
             compiled[key] = result;
@@ -364,13 +424,22 @@ public sealed partial class ThemeService : IThemeService
     /// </summary>
     StyleSheet? LoadLook(ThemeInfo? info, ref ThemeDiagnostic? skipped)
     {
-        if (info is null || info.Id == ThemeCatalog.DefaultLook) return null;
+        if (info is null || info.Id == ThemeCatalog.DefaultLook)
+        {
+            return null;
+        }
 
         var sheet = LoadSheet(info, ref skipped);
-        if (sheet is null) return null;
+        if (sheet is null)
+        {
+            return null;
+        }
 
         var errors = ExcaliburStyles.ValidateBaseSheet(sheet);
-        if (errors.Count == 0) return sheet;
+        if (errors.Count == 0)
+        {
+            return sheet;
+        }
 
         skipped = new ThemeDiagnostic($"Look {info.Id} is not a complete base sheet: {string.Join("; ", errors)}",
             info.Path ?? info.Id, 0, 0);
@@ -380,7 +449,10 @@ public sealed partial class ThemeService : IThemeService
     /// <summary>Loads an optional sheet, recording a located error in <paramref name="skipped"/> when it fails.</summary>
     StyleSheet? LoadSheet(ThemeInfo? info, ref ThemeDiagnostic? skipped)
     {
-        if (info is null) return null;
+        if (info is null)
+        {
+            return null;
+        }
 
         try
         {
@@ -403,13 +475,17 @@ public sealed partial class ThemeService : IThemeService
             return;
         }
 
-        if (diagnostic.Message == reportedError) return;
+        if (diagnostic.Message == reportedError)
+        {
+            return;
+        }
+
         reportedError = diagnostic.Message;
         log.LogError("Theme error: {Message}", diagnostic.Message);
     }
 
     static string Declarations(IReadOnlyDictionary<string, string> tokens) =>
-        string.Join('\n', tokens.Select(token => string.Create(CultureInfo.InvariantCulture,
+        string.Join('\n', tokens.Select(static token => string.Create(CultureInfo.InvariantCulture,
             $"${token.Key} = {token.Value};")));
 
     static DateTime Stamp(string path) => File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;

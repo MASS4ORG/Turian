@@ -92,11 +92,16 @@ public static class BrickService
             var dependents = bricks.Where(p => p.Id != id && p.Manifest.Dependencies.ContainsKey(id))
                 .Select(p => p.Id).ToArray();
             if (dependents.Length > 0)
+            {
                 throw new PackageException($"Remove {string.Join(", ", dependents)} first; they require embedded brick {id}.");
+            }
         }
         var removed = ProjectBricks.Remove(projectRoot, id);
         ProjectPackages.Invalidate(projectRoot);
-        if (!ProjectPackages.DefaultDependencies.ContainsKey(id)) return removed;
+        if (!ProjectPackages.DefaultDependencies.ContainsKey(id))
+        {
+            return removed;
+        }
 
         ProjectPackages.OptOutOfDefault(projectRoot, id);
         return true;
@@ -121,8 +126,15 @@ public static class BrickService
         }
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        if (ProjectPackages.DefaultDependencies.ContainsKey(id)) manifest.Dependencies[id] = null;
-        else _ = manifest.Dependencies.Remove(id);
+        if (ProjectPackages.DefaultDependencies.ContainsKey(id))
+        {
+            manifest.Dependencies[id] = null;
+        }
+        else
+        {
+            _ = manifest.Dependencies.Remove(id);
+        }
+
         manifest.Save(projectRoot);
         ProjectPackages.Invalidate(projectRoot);
         try
@@ -215,7 +227,10 @@ public static class BrickService
         }
         finally
         {
-            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+            if (Directory.Exists(scratch))
+            {
+                Directory.Delete(scratch, recursive: true);
+            }
         }
     }
 
@@ -244,10 +259,16 @@ public static class BrickService
     public static PackageResolution SaveManifest(string projectRoot, ProjectManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        foreach (var registry in manifest.ScopedRegistries) BrickRegistries.Validate(registry);
-        if (manifest.ScopedRegistries.Select(r => r.Name).Distinct(StringComparer.Ordinal).Count()
+        foreach (var registry in manifest.ScopedRegistries)
+        {
+            BrickRegistries.Validate(registry);
+        }
+
+        if (manifest.ScopedRegistries.Select(static r => r.Name).Distinct(StringComparer.Ordinal).Count()
             != manifest.ScopedRegistries.Count)
+        {
             throw new PackageException("Registry names must be unique.");
+        }
 
         var path = Path.Combine(projectRoot, ProjectManifest.DirectoryName, ProjectManifest.FileName);
         var before = File.Exists(path) ? File.ReadAllText(path) : null;
@@ -259,8 +280,15 @@ public static class BrickService
         }
         catch
         {
-            if (before is null) File.Delete(path);
-            else File.WriteAllText(path, before);
+            if (before is null)
+            {
+                File.Delete(path);
+            }
+            else
+            {
+                File.WriteAllText(path, before);
+            }
+
             ProjectPackages.Invalidate(projectRoot);
             throw;
         }
@@ -273,7 +301,10 @@ public static class BrickService
     public static bool RemoveRegistry(string projectRoot, string name)
     {
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0) return false;
+        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0)
+        {
+            return false;
+        }
 
         manifest.Save(projectRoot);
         ProjectPackages.Invalidate(projectRoot);
@@ -327,7 +358,11 @@ public static class BrickService
             // The manifest itself conflicted; its upstream note is set by hand once the conflict is resolved.
         }
 
-        if (to is not null && !result.HasConflicts) ProjectBricks.Add(projectRoot, id, to);
+        if (to is not null && !result.HasConflicts)
+        {
+            ProjectBricks.Add(projectRoot, id, to);
+        }
+
         ProjectPackages.Invalidate(projectRoot);
         return result;
     }
@@ -353,7 +388,10 @@ public static class BrickService
             case ArchiveSource when pin is not null && pin.StartsWith("sha256-", StringComparison.Ordinal):
                 var hex = Convert.ToHexStringLower(Convert.FromBase64String(pin["sha256-".Length..]));
                 var stored = new PackageStore(PackageStore.DefaultRoot()).PackagePath(id, $"sha256-{hex[..16]}");
-                if (Directory.Exists(stored)) return new FetchedPackage(stored, null, pin);
+                if (Directory.Exists(stored))
+                {
+                    return new FetchedPackage(stored, null, pin);
+                }
 
                 var current = ProjectPackages.Fetch(id, source);
                 return current.Integrity == pin
@@ -385,10 +423,14 @@ public static class BrickService
     public static BrickPackResult Pack(string packageRoot, string outputDirectory, PackagePrecast? precast = null)
     {
         if (PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]) is { Upstream: not null, Store.Redistribute: false } fork)
+        {
             throw new PackageException($"{fork.Name} is licensed so that it cannot be republished, which includes forks of it.");
+        }
 
         if (BrickVerifier.Verify(packageRoot) is { Count: > 0 } issues)
+        {
             throw new PackageException($"{packageRoot} cannot be packed:{Environment.NewLine}  {string.Join($"{Environment.NewLine}  ", issues)}");
+        }
 
         return BrickArchive.Pack(packageRoot, outputDirectory, ["gaya", ProjectPackages.HostName], precast);
     }
@@ -407,7 +449,10 @@ public static class BrickService
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
         var payload = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder);
-        if (Directory.Exists(payload)) Directory.Delete(payload, recursive: true);
+        if (Directory.Exists(payload))
+        {
+            Directory.Delete(payload, recursive: true);
+        }
 
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-precast-{Guid.NewGuid():N}");
         try
@@ -444,19 +489,28 @@ public static class BrickService
                 (assembly.EditorOnly ? result.EditorAssemblies : result.Assemblies).Add(assembly.Name);
             }
 
-            if (own.Count == 0) throw new PackageException($"{manifest.Name} has no assembly definition to precast.");
+            if (own.Count == 0)
+            {
+                throw new PackageException($"{manifest.Name} has no assembly definition to precast.");
+            }
 
             var names = own.Select(static a => a.Name).ToHashSet(StringComparer.Ordinal);
             var types = new UserCodeTypeManifest();
             if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(compiled))) is { } built)
+            {
                 types.Types.AddRange(built.Types.Where(t => t.Assembly is not null && names.Contains(t.Assembly)));
+            }
+
             File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
                 JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
             return result;
         }
         finally
         {
-            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+            if (Directory.Exists(scratch))
+            {
+                Directory.Delete(scratch, recursive: true);
+            }
         }
     }
 
@@ -469,9 +523,16 @@ public static class BrickService
     /// <exception cref="PackageException">The id is invalid or the folder exists.</exception>
     public static string New(string parent, string id, string? displayName = null, string license = "MIT")
     {
-        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id (lowercase reverse-DNS, e.g. user.you.inventory).");
+        if (!PackageId.IsValid(id))
+        {
+            throw new PackageException($"'{id}' is not a valid package id (lowercase reverse-DNS, e.g. user.you.inventory).");
+        }
+
         var root = Path.Combine(parent, id);
-        if (Directory.Exists(root)) throw new PackageException($"{root} already exists.");
+        if (Directory.Exists(root))
+        {
+            throw new PackageException($"{root} already exists.");
+        }
 
         var segments = id.Split('.').Skip(1).Select(Pascal).ToArray();
         var assembly = string.Join('.', segments);

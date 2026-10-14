@@ -14,8 +14,12 @@ public sealed partial class AssetImporter
     void SaveIndexStamp(Guid assetId)
     {
         var path = Path.Combine(GetAssetImportDirectory(assetId), importManifestFileName);
-        if (LoadManifest(path) is not { } manifest) return;
-        manifest.IndexedAssetIds = [assetId, .. assetDatabase.GetChildAssets(assetId).Select(record => record.AssetId)];
+        if (LoadManifest(path) is not { } manifest)
+        {
+            return;
+        }
+
+        manifest.IndexedAssetIds = [assetId, .. assetDatabase.GetChildAssets(assetId).Select(static record => record.AssetId)];
         Serializer.Save(path, manifest);
     }
 
@@ -27,15 +31,27 @@ public sealed partial class AssetImporter
     static bool CanReuseImport(ImportedAssetManifest? manifest, string sourceHash, string settingsHash,
         int importerVersion, string directory)
     {
-        if (manifest is null || manifest.SourceHash != sourceHash || manifest.SettingsHash != settingsHash) return false;
-        if (manifest.PipelineVersion != pipelineVersion || manifest.ImporterVersion != importerVersion) return false;
+        if (manifest is null || manifest.SourceHash != sourceHash || manifest.SettingsHash != settingsHash)
+        {
+            return false;
+        }
+
+        if (manifest.PipelineVersion != pipelineVersion || manifest.ImporterVersion != importerVersion)
+        {
+            return false;
+        }
+
         return File.Exists(Path.Combine(directory, manifest.PrimaryArtifactFileName))
                && manifest.Artifacts.All(artifact => File.Exists(Path.Combine(directory, artifact)));
     }
 
     static void UpdateSourceStamp(ImportedAssetManifest manifest, FileInfo source, string path)
     {
-        if (manifest.SourceLength == source.Length && manifest.SourceLastWriteTimeUtc == source.LastWriteTimeUtc) return;
+        if (manifest.SourceLength == source.Length && manifest.SourceLastWriteTimeUtc == source.LastWriteTimeUtc)
+        {
+            return;
+        }
+
         manifest.SourceLength = source.Length;
         manifest.SourceLastWriteTimeUtc = source.LastWriteTimeUtc;
         Serializer.Save(path, manifest);

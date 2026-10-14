@@ -26,11 +26,20 @@ public sealed class UiManagerFactory : IUiPresenterFactory, IUiDocumentPreview
         foreach (var source in document.StyleSheets)
         {
             var stylesheet = Path.GetFullPath(Path.Combine(baseDir, source));
-            if (File.Exists(stylesheet)) renderer.StyleSheets.Add(StyleSheet.Parse(File.ReadAllText(stylesheet), UiStyleSheetAsset.ParseOptions));
-            else Log.Logger.LogWarning("Stylesheet not found: {Path}", stylesheet);
+            if (File.Exists(stylesheet))
+            {
+                renderer.StyleSheets.Add(StyleSheet.Parse(File.ReadAllText(stylesheet), UiStyleSheetAsset.ParseOptions));
+            }
+            else
+            {
+                Log.Logger.LogWarning("Stylesheet not found: {Path}", stylesheet);
+            }
         }
 
-        if (!string.IsNullOrEmpty(dataJson)) renderer.Bind(ToDictionary(dataJson));
+        if (!string.IsNullOrEmpty(dataJson))
+        {
+            renderer.Bind(ToDictionary(dataJson));
+        }
 
         return UiImageRenderer.RenderPng(renderer.Render, width, height, background: new SKColor(12, 14, 20));
     }
@@ -40,7 +49,9 @@ public sealed class UiManagerFactory : IUiPresenterFactory, IUiDocumentPreview
         for (var directory = new DirectoryInfo(baseDir); directory is not null; directory = directory.Parent)
         {
             if (string.Equals(directory.Name, "Assets", StringComparison.OrdinalIgnoreCase))
+            {
                 return directory.Parent?.FullName ?? baseDir;
+            }
         }
 
         return baseDir;

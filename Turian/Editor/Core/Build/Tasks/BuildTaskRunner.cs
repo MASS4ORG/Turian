@@ -39,7 +39,7 @@ public sealed class BuildTaskRunner : IDisposable
     /// Creates a new <see cref="BuildTaskRunner"/>.
     /// </summary>
     /// <param name="logger"></param>
-    /// <exception cref="System.ArgumentNullException"></exception>
+    /// <exception cref="ArgumentNullException"></exception>
     public BuildTaskRunner(ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -126,7 +126,11 @@ public sealed class BuildTaskRunner : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         gate.Dispose();
     }

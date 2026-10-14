@@ -12,7 +12,11 @@ public class MaterialAssetImporter : IAssetImporter
     /// <inheritdoc/>
     public bool IsValid(string filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath)) return false;
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
         return string.Equals(Path.GetExtension(filePath), materialExtension, StringComparison.OrdinalIgnoreCase);
     }
 

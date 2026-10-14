@@ -55,17 +55,26 @@ sealed class AppearanceBridge : IDisposable
     /// </summary>
     void Remember()
     {
-        if (applying) return;
+        if (applying)
+        {
+            return;
+        }
 
         var changed = Update(appearance.Theme, themes.CommittedColorTheme, value => appearance.Theme = value);
         changed |= Update(appearance.Look, themes.CommittedLook, value => appearance.Look = value);
         changed |= Update(appearance.IconTheme, themes.CommittedIconTheme, value => appearance.IconTheme = value);
-        if (changed) settings.NotifyChanged(AppearanceSettings.PageId);
+        if (changed)
+        {
+            settings.NotifyChanged(AppearanceSettings.PageId);
+        }
     }
 
     static bool Update(string stored, string committed, Action<string> store)
     {
-        if (string.Equals(stored, committed, StringComparison.Ordinal)) return false;
+        if (string.Equals(stored, committed, StringComparison.Ordinal))
+        {
+            return false;
+        }
 
         store(committed);
         return true;

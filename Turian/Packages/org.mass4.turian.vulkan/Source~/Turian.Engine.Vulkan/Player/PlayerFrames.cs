@@ -27,7 +27,10 @@ public sealed class PlayerFrames(
     public static IUiPresenter? CreatePresenter(IUiPresenterFactory? factory, Vulkan vulkan, IInputSource input,
         LocaleService locale)
     {
-        if (factory?.Create(vulkan, input, locale) is not { } created) return null;
+        if (factory?.Create(vulkan, input, locale) is not { } created)
+        {
+            return null;
+        }
 
         created.IsPlaying = true;
         return created;
@@ -45,7 +48,11 @@ public sealed class PlayerFrames(
         get => paused;
         set
         {
-            if (paused && !value) resumed = true;
+            if (paused && !value)
+            {
+                resumed = true;
+            }
+
             paused = value;
         }
     }
@@ -63,7 +70,11 @@ public sealed class PlayerFrames(
             return;
         }
 
-        if (Paused) return;
+        if (Paused)
+        {
+            return;
+        }
+
         if (resumed)
         {
             resumed = false;
@@ -77,7 +88,10 @@ public sealed class PlayerFrames(
         // just overdraws — which is what a scene with several enabled cameras looks like as flicker.
         foreach (var root in Roots())
         {
-            if (CameraComponent.FindPrimary(root) is { } camera) renderScene(deltaTime, camera, root);
+            if (CameraComponent.FindPrimary(root) is { } camera)
+            {
+                renderScene(deltaTime, camera, root);
+            }
         }
     }
 
@@ -86,17 +100,25 @@ public sealed class PlayerFrames(
     /// <param name="height">Height in pixels.</param>
     public void Resize(int width, int height)
     {
-        if (runtime.Scenes.ActiveScene?.RootNode is not { } root) return;
+        if (runtime.Scenes.ActiveScene?.RootNode is not { } root)
+        {
+            return;
+        }
 
         foreach (var camera in Node.GetComponentsInChildren<CameraComponent>(root))
+        {
             camera.Resize((uint)width, (uint)height);
+        }
     }
 
     /// <summary>Quits the game on Escape.</summary>
     /// <param name="key">The key pressed.</param>
     public static void KeyPressed(Key key)
     {
-        if (key == Key.Escape) Application.Quit();
+        if (key == Key.Escape)
+        {
+            Application.Quit();
+        }
     }
 
     /// <summary>Releases the interface presenter.</summary>
@@ -109,7 +131,10 @@ public sealed class PlayerFrames(
     void RenderOverlay(double deltaTime)
     {
         var size = framebufferSize();
-        if (presenter is null || size.X <= 0 || size.Y <= 0) return;
+        if (presenter is null || size.X <= 0 || size.Y <= 0)
+        {
+            return;
+        }
 
         var scenes = runtime.Scenes;
         var root = runtime.StartupRoot ?? scenes.ActiveScene?.RootNode ?? scenes.PersistentRoot;

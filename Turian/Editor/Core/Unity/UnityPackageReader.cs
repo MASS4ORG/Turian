@@ -36,10 +36,16 @@ public static class UnityPackageReader
         foreach (var directory in Directory.EnumerateDirectories(folder).Order(StringComparer.Ordinal))
         {
             var pathFile = Path.Combine(directory, "pathname");
-            if (!Guid.TryParseExact(Path.GetFileName(directory), "N", out var guid) || !File.Exists(pathFile)) continue;
+            if (!Guid.TryParseExact(Path.GetFileName(directory), "N", out var guid) || !File.Exists(pathFile))
+            {
+                continue;
+            }
 
             var pathname = File.ReadLines(pathFile).FirstOrDefault()?.Trim().Replace('\\', '/');
-            if (string.IsNullOrEmpty(pathname)) continue;
+            if (string.IsNullOrEmpty(pathname))
+            {
+                continue;
+            }
 
             var content = Path.Combine(directory, "asset");
             var meta = Path.Combine(directory, "asset.meta");

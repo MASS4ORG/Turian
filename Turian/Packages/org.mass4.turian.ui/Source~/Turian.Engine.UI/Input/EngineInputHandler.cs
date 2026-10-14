@@ -2,7 +2,7 @@ namespace Turian.Engine.UI;
 
 /// <summary>
 /// Feeds a <see cref="Gui"/> frame from the engine's screen-space input, bridging
-/// <see cref="Guinevere.IInputHandler"/> to an explicitly supplied <see cref="IInputSource"/>.
+/// <see cref="IInputHandler"/> to an explicitly supplied <see cref="IInputSource"/>.
 ///
 /// <para>
 /// Pointer coordinates are in viewport pixels with the origin at the top-left, which
@@ -11,7 +11,7 @@ namespace Turian.Engine.UI;
 /// </para>
 /// </summary>
 /// <remarks>
-/// <see cref="Guinevere.KeyboardKey"/> and <see cref="Guinevere.MouseButton"/> share
+/// <see cref="KeyboardKey"/> and <see cref="MouseButton"/> share
 /// GLFW-derived numeric values with <c>Silk.NET.Input</c> for the common range, so the
 /// mapping is a direct <see cref="int"/> cast — the same approach Guinevere's own
 /// Silk.NET integration uses.

@@ -29,9 +29,13 @@ public static class CompilationDiagnosticsReporter
             var message = d.GetMessage(CultureInfo.InvariantCulture);
 
             if (d.Severity == DiagnosticSeverity.Error)
+            {
                 logger.LogError("{File}({Line},{Column}): error {Code}: {Message}", file, line, col, d.Id, message);
+            }
             else
+            {
                 logger.LogWarning("{File}({Line},{Column}): warning {Code}: {Message}", file, line, col, d.Id, message);
+            }
         }
 
         return (
@@ -63,7 +67,9 @@ public static class CompilationDiagnosticsReporter
     {
         var span = d.Location.GetLineSpan();
         if (string.IsNullOrEmpty(span.Path))
+        {
             return ("N/A", 0, 0);
+        }
 
         return (
             span.Path,

@@ -42,20 +42,20 @@ public class BuildInfoGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var contributorsFile = context.AdditionalTextsProvider
-            .Where(file => Path.GetFileName(file.Path) == "CONTRIBUTORS.md");
+            .Where(static file => Path.GetFileName(file.Path) == "CONTRIBUTORS.md");
 
         var version = context.AnalyzerConfigOptionsProvider
-            .Select((options, _) => options.GlobalOptions.TryGetValue("build_property.Version", out var value)
+            .Select(static (options, _) => options.GlobalOptions.TryGetValue("build_property.Version", out var value)
                 && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : "dev");
 
         var buildInfo = contributorsFile
-            .Select((file, _) => ParseContributors(file.GetText()?.ToString()))
+            .Select(static (file, _) => ParseContributors(file.GetText()?.ToString()))
             .Combine(version)
-            .Combine(context.CompilationProvider.Select((_, _) => System.DateTime.UtcNow.ToString("yyyy-MM-dd")));
+            .Combine(context.CompilationProvider.Select(static (_, _) => System.DateTime.UtcNow.ToString("yyyy-MM-dd")));
 
-        context.RegisterSourceOutput(buildInfo, (spc, data) =>
+        context.RegisterSourceOutput(buildInfo, static (spc, data) =>
         {
             var ((contributorsList, versionString), compilationDate) = data;
             var source = $@"

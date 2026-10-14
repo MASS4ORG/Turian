@@ -33,8 +33,8 @@ public sealed class OutputLogBridgeTests
             bridge.Tick();
             play.Tick(0.016);
 
-            Assert.DoesNotContain(LogBuffer.Snapshot(), line => line.Text.Contains("old editor message"));
-            Assert.Contains(LogBuffer.Snapshot(), line => line.Text.Contains("first game update"));
+            Assert.DoesNotContain(LogBuffer.Snapshot(), static line => line.Text.Contains("old editor message"));
+            Assert.Contains(LogBuffer.Snapshot(), static line => line.Text.Contains("first game update"));
             play.Stop();
         }
         finally

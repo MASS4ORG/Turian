@@ -41,14 +41,19 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
         gui.Dialog(ref isOpen, title, () => Body(gui), Theme.Scale(dialogWidth), Theme.Scale(bodyHeight),
             () => Footer(gui), footerHeight: Theme.Scale(footerHeight));
 
-        if (!isOpen) confirmed = null;
+        if (!isOpen)
+        {
+            confirmed = null;
+        }
     }
 
     void Body(Gui gui)
     {
         using (gui.Node().Expand().ContentAlignY(0.5f).Enter())
+        {
             gui.DrawText(message, Theme.Text(13f), Theme.Ink, centerInRect: false,
                 wrapWidth: Theme.Scale(dialogWidth - 40f));
+        }
     }
 
     void Footer(Gui gui)
@@ -64,7 +69,9 @@ sealed class ConfirmDialogChrome(StudioLocalization localization) : IChromeItem
             }
 
             if (gui.Button(localization.T("Cancel"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            {
                 isOpen = false;
+            }
         }
     }
 }

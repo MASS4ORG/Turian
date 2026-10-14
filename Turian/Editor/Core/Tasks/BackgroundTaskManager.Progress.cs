@@ -70,18 +70,38 @@ public sealed partial class BackgroundTaskManager
 
         public void Finish(bool ok)
         {
-            if (finished) return;
+            if (finished)
+            {
+                return;
+            }
+
             finished = true;
-            if (ok) manager.Complete(id);
-            else manager.Fail(id, "");
+            if (ok)
+            {
+                manager.Complete(id);
+            }
+            else
+            {
+                manager.Fail(id, "");
+            }
         }
 
         public void Dispose()
         {
-            if (finished) return;
+            if (finished)
+            {
+                return;
+            }
+
             finished = true;
-            if (IsCancelled) manager.Cancel(id);
-            else manager.Complete(id);
+            if (IsCancelled)
+            {
+                manager.Cancel(id);
+            }
+            else
+            {
+                manager.Complete(id);
+            }
         }
     }
 }

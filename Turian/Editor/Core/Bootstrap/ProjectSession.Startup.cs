@@ -13,7 +13,11 @@ public sealed partial class ProjectSession
     public void QueueOpen(string projectPath, string? openScene = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectPath);
-        if (IsOpening) throw new InvalidOperationException("A project is already opening.");
+        if (IsOpening)
+        {
+            throw new InvalidOperationException("A project is already opening.");
+        }
+
         queuedOpen = (projectPath, openScene);
     }
 
@@ -23,7 +27,11 @@ public sealed partial class ProjectSession
         if (queuedOpen is { } request)
         {
             queuedOpen = null;
-            if (!PrepareOpen(request.Path)) return false;
+            if (!PrepareOpen(request.Path))
+            {
+                return false;
+            }
+
             startupScene = request.Scene;
             var runner = services.GetRequiredService<BackgroundTaskRunner>();
             startupTask = runner.RunAsync(new BackgroundTaskSpec
@@ -37,9 +45,17 @@ public sealed partial class ProjectSession
                 progress.Report(1, "Project ready");
             });
         }
-        if (startupTask is not { IsCompleted: true } completed) return IsOpening;
+        if (startupTask is not { IsCompleted: true } completed)
+        {
+            return IsOpening;
+        }
+
         startupTask = null;
-        if (completed.GetAwaiter().GetResult() == BackgroundTaskStatus.Completed) CompleteOpen(startupScene);
+        if (completed.GetAwaiter().GetResult() == BackgroundTaskStatus.Completed)
+        {
+            CompleteOpen(startupScene);
+        }
+
         return false;
     }
 

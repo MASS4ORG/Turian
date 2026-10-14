@@ -33,13 +33,18 @@ public static class BrickVerifier
         foreach (var file in Directory.EnumerateFiles(packageRoot, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
         {
             var relative = Path.GetRelativePath(packageRoot, file).Replace('\\', '/');
-            if (IsUnimported(relative)) continue;
+            if (IsUnimported(relative))
+            {
+                continue;
+            }
 
             if (relative.EndsWith(".meta", StringComparison.Ordinal))
             {
                 CheckMeta(file, relative, seen, issues);
                 if (!File.Exists(file[..^".meta".Length]))
+                {
                     issues.Add($"{relative} has no asset beside it.");
+                }
             }
             else if (!File.Exists($"{file}.meta"))
             {
@@ -76,7 +81,10 @@ public static class BrickVerifier
         }
         finally
         {
-            if (temporary is not null) Directory.Delete(temporary, recursive: true);
+            if (temporary is not null)
+            {
+                Directory.Delete(temporary, recursive: true);
+            }
         }
     }
 

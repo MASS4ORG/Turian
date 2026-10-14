@@ -34,6 +34,8 @@ public sealed class VulkanFixture : IDisposable
     public void Dispose()
     {
         if (Available)
+        {
             Vulkan.Device.Dispose();
+        }
     }
 }

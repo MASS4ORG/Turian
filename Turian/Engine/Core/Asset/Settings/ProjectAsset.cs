@@ -42,11 +42,14 @@ public class ProjectAsset : ProjectSettingsCollection
     public static ProjectAsset? Load(string assetsDirectory)
     {
         var path = PathIn(assetsDirectory);
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path))
+        {
+            return null;
+        }
 
         try
         {
-            return DataAsset.LoadContent(path, database: null) as ProjectAsset;
+            return LoadContent(path, database: null) as ProjectAsset;
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {

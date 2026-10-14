@@ -74,7 +74,9 @@ public sealed class RuntimeSave
     {
         ArgumentNullException.ThrowIfNull(migrate);
         if (fromVersion < 0 || fromVersion >= CurrentVersion || !migrations.TryAdd(fromVersion, migrate))
+        {
             throw new ArgumentOutOfRangeException(nameof(fromVersion), "Migration must start at an unregistered older version.");
+        }
     }
 
     /// <summary>Captures a JSON envelope containing only runtime state and content identifiers.</summary>
@@ -111,9 +113,15 @@ public sealed class RuntimeSave
     {
         var root = ParseRoot(json);
         if (root["Version"] is not JsonValue versionValue || !versionValue.TryGetValue<int>(out var version))
+        {
             throw new InvalidDataException("Runtime save is missing a valid numeric version.");
+        }
+
         if (version < 0 || version > CurrentVersion)
+        {
             throw new InvalidDataException($"Unsupported runtime save version {version}.");
+        }
+
         return MigrateRoot(root, version);
     }
 
@@ -135,7 +143,10 @@ public sealed class RuntimeSave
         while (version < CurrentVersion)
         {
             if (!migrations.TryGetValue(version, out var migrate))
+            {
                 throw new InvalidDataException($"No runtime save migration from version {version}.");
+            }
+
             root = Migrate(migrate, root, version);
             version++;
             root["Version"] = version;
@@ -164,7 +175,10 @@ public sealed class RuntimeSave
             var envelope = root.Deserialize<Envelope>(Options)
                 ?? throw new InvalidDataException("Runtime save envelope is empty.");
             if (envelope.Version != CurrentVersion || envelope.Content is null || envelope.Snapshot is null)
+            {
                 throw new InvalidDataException("Runtime save envelope is missing required data.");
+            }
+
             return envelope;
         }
         catch (JsonException error)
@@ -178,7 +192,10 @@ public sealed class RuntimeSave
         if (root["Content"] is not JsonObject content ||
             content["Fingerprint"] is null || content["Mods"] is not JsonObject ||
             root["Snapshot"] is not JsonObject snapshot)
+        {
             throw new InvalidDataException("Runtime save envelope is missing required data.");
+        }
+
         ValidateSnapshotShape(snapshot);
     }
 
@@ -187,15 +204,19 @@ public sealed class RuntimeSave
         if (snapshot["Tick"] is null || snapshot["RngState"] is null ||
             snapshot["State"] is not JsonObject || snapshot["ContentIds"] is not JsonArray ||
             snapshot["Extensions"] is not JsonObject extensions ||
-            extensions.Any(extension => extension.Value is not JsonObject entry || entry["Required"] is null))
+            extensions.Any(static extension => extension.Value is not JsonObject entry || entry["Required"] is null))
+        {
             throw new InvalidDataException("Runtime save envelope is missing required data.");
+        }
     }
 
     static void ValidateContentMatch(RuntimeSaveContent saved, RuntimeSaveContent expected)
     {
         if (saved.Fingerprint != expected.Fingerprint || saved.Mods.Count != expected.Mods.Count ||
             saved.Mods.Any(mod => !expected.Mods.TryGetValue(mod.Key, out var hash) || hash != mod.Value))
+        {
             throw new InvalidDataException("Runtime save content or mod fingerprints do not match this session.");
+        }
     }
 
     static List<string> CheckExtensions(Dictionary<string, RuntimeSaveExtension> extensions,
@@ -204,9 +225,16 @@ public sealed class RuntimeSave
         var unsupported = new List<string>();
         foreach (var extension in extensions)
         {
-            if (supported?.Contains(extension.Key) == true) continue;
+            if (supported?.Contains(extension.Key) == true)
+            {
+                continue;
+            }
+
             if (extension.Value.Required)
+            {
                 throw new InvalidDataException($"Unknown required runtime save extension '{extension.Key}'.");
+            }
+
             unsupported.Add(extension.Key);
         }
         return unsupported;
@@ -221,8 +249,11 @@ public sealed class RuntimeSave
         for (var index = 0; index < uniqueIds.Length; index++)
         {
             if (assets[index] is not { } asset)
+            {
                 throw new InvalidDataException(
                     $"Runtime save content '{uniqueIds[index]}' could not be resolved in this session.");
+            }
+
             resolved[uniqueIds[index]] = asset;
         }
         return resolved;
@@ -232,23 +263,33 @@ public sealed class RuntimeSave
     {
         Validate(content);
         if (snapshot.Tick < 0 || snapshot.State is null || snapshot.ContentIds is null || snapshot.Extensions is null)
+        {
             throw new InvalidDataException("Runtime save snapshot has invalid or missing data.");
+        }
+
         if (snapshot.ContentIds.Contains(Guid.Empty))
+        {
             throw new InvalidDataException("Runtime save snapshot has an empty content id.");
+        }
+
         ValidateExtensions(snapshot.Extensions);
     }
 
     static void ValidateExtensions(Dictionary<string, RuntimeSaveExtension> extensions)
     {
-        if (extensions.Any(entry => string.IsNullOrWhiteSpace(entry.Key) || entry.Value is null))
+        if (extensions.Any(static entry => string.IsNullOrWhiteSpace(entry.Key) || entry.Value is null))
+        {
             throw new InvalidDataException("Runtime save snapshot has invalid or missing extensions.");
+        }
     }
 
     static void Validate(RuntimeSaveContent content)
     {
         if (string.IsNullOrWhiteSpace(content.Fingerprint) || content.Mods is null ||
-            content.Mods.Any(mod => string.IsNullOrWhiteSpace(mod.Key) || string.IsNullOrWhiteSpace(mod.Value)))
+            content.Mods.Any(static mod => string.IsNullOrWhiteSpace(mod.Key) || string.IsNullOrWhiteSpace(mod.Value)))
+        {
             throw new InvalidDataException("Runtime save requires content and mod fingerprints.");
+        }
     }
 
     sealed record Envelope(int Version, RuntimeSaveContent Content, RuntimeSaveSnapshot Snapshot);

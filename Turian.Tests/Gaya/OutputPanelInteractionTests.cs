@@ -50,7 +50,11 @@ public sealed class OutputPanelInteractionTests
                 Frame();
             }
             var logger = LogBuffer.Provider.CreateLogger("Game");
-            for (var i = 0; i < 2; i++) logger.LogInformation("/missing/Game.cs(7): first\nsecond line");
+            for (var i = 0; i < 2; i++)
+            {
+                logger.LogInformation("/missing/Game.cs(7): first\nsecond line");
+            }
+
             logger.LogDebug("/missing/Game.cs(8): debug");
             Frame();
             var row = Nodes(gui.RootNode!).Single(node => node.Id == "gaya.turian.output/row/0");

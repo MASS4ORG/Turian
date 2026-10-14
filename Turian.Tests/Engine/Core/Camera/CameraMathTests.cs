@@ -75,7 +75,11 @@ public class CameraMathTests
             new Node { Position = new Vector3(0, 0, -5) }.AddComponent(component);
             component.Resize(960, 540);
         }
-        else ((EditorCamera)camera).Resize(960, 540);
+        else
+        {
+            ((EditorCamera)camera).Resize(960, 540);
+        }
+
         var center = camera.Project(Vector3.Zero);
         var above = camera.Project(Vector3.UnitY);
         Assert.True(above.Y < center.Y);

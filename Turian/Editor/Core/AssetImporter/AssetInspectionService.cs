@@ -40,7 +40,11 @@ public sealed class AssetInspectionService(
     {
         ArgumentNullException.ThrowIfNull(entry);
 
-        if (entry.IsDirectory) return null;
+        if (entry.IsDirectory)
+        {
+            return null;
+        }
+
         var inspection = Inspect(entry.AbsolutePath);
         return entry.IsReadOnly && inspection is not null
             ? inspection with { Target = null, Title = $"{inspection.Title} (read-only brick)" }
@@ -58,10 +62,16 @@ public sealed class AssetInspectionService(
         ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
 
         var metaPath = $"{absolutePath}.meta";
-        if (!File.Exists(metaPath)) return null;
+        if (!File.Exists(metaPath))
+        {
+            return null;
+        }
 
         var metadata = Load(() => Asset.Load(metaPath), metaPath);
-        if (metadata is null) return null;
+        if (metadata is null)
+        {
+            return null;
+        }
 
         var owner = importer.ImporterFor(absolutePath);
         var kind = types.Resolve(absolutePath)?.DisplayName ?? "Asset";
@@ -70,10 +80,14 @@ public sealed class AssetInspectionService(
         if (metadata is DataAssetAsset
             && Load(() => loader.LoadContentAsync<DataAsset>(metadata.Id).GetAwaiter().GetResult(), absolutePath)
                 is { } shared)
+        {
             return new AssetInspection(metadata, absolutePath, shared, shared.GetType().Name, IsPayload: true);
+        }
 
         if (Load(() => owner?.LoadAuthoredContent(metadata, absolutePath), absolutePath) is { } content)
+        {
             return new AssetInspection(metadata, absolutePath, content, content.GetType().Name, IsPayload: true);
+        }
 
         var importSettings = owner?.ImportSettingsFor(metadata);
 
@@ -121,7 +135,9 @@ public sealed class AssetInspectionService(
             if (inspection.Target is ProjectSettingsAsset applied
                 && settings.Settings is { } project
                 && ProjectSettingsFiles.Locate(project, applied.GetType()) == inspection.AbsolutePath)
+            {
                 project.Loaded.Use(applied);
+            }
 
             return true;
         }

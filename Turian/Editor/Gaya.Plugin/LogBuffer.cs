@@ -48,10 +48,17 @@ public static class LogBuffer
             Func<TState, Exception?, string> formatter)
         {
             ArgumentNullException.ThrowIfNull(formatter);
-            if (!IsEnabled(logLevel)) return;
+            if (!IsEnabled(logLevel))
+            {
+                return;
+            }
 
             var message = formatter(state, exception);
-            if (exception is not null) message = $"{message}{Environment.NewLine}{exception}";
+            if (exception is not null)
+            {
+                message = $"{message}{Environment.NewLine}{exception}";
+            }
+
             Add(LogOrigin.Capture(logLevel, message, category));
         }
     }

@@ -51,7 +51,11 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
         var root = new Node { Name = "Root" };
         var child = new Node { Name = "Panel" };
         child.AddComponent(panel);
-        foreach (var component in extra) child.AddComponent(component);
+        foreach (var component in extra)
+        {
+            child.AddComponent(component);
+        }
+
         child.Parent = root;
         root.Children.Add(child);
         root.Awake(null);
@@ -83,9 +87,9 @@ public sealed class UiManagerTests : IClassFixture<VulkanFixture>, IDisposable
 
         using var manager = new UiManager(fixture.Vulkan);
         var (root, panel) = Scene(
-            new UiDocumentComponent { Mode = UiRenderMode.WorldSpace, PanelSize = new Int2(64, 32), OnBuild = _ => { } },
+            new UiDocumentComponent { Mode = UiRenderMode.WorldSpace, PanelSize = new Int2(64, 32), OnBuild = static _ => { } },
             new UiRaycasterComponent { MaxDistance = 5f });
-        var screen = new UiDocumentComponent { OnBuild = _ => { } };
+        var screen = new UiDocumentComponent { OnBuild = static _ => { } };
         root.AddComponent(screen);
 
         var quads = manager.RenderWorldPanels(root, Frame());

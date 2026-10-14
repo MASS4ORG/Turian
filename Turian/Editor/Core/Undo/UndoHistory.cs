@@ -34,8 +34,16 @@ public sealed record UndoStep(
 
         var before = new Dictionary<IdObject, ObjectState>(Before, ReferenceEqualityComparer.Instance);
         var after = new Dictionary<IdObject, ObjectState>(After, ReferenceEqualityComparer.Instance);
-        foreach (var (target, state) in next.Before) before.TryAdd(target, state);
-        foreach (var (target, state) in next.After) after[target] = state;
+        foreach (var (target, state) in next.Before)
+        {
+            before.TryAdd(target, state);
+        }
+
+        foreach (var (target, state) in next.After)
+        {
+            after[target] = state;
+        }
+
         return this with { Before = before, After = after, LastChanged = next.LastChanged };
     }
 
@@ -109,7 +117,10 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         }
 
         undo.Add(step);
-        if (undo.Count > limit) undo.RemoveAt(0);
+        if (undo.Count > limit)
+        {
+            undo.RemoveAt(0);
+        }
     }
 
     /// <summary>Joins a change into the latest step whatever its label or timing, as within one gesture.</summary>
@@ -119,19 +130,29 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         ArgumentNullException.ThrowIfNull(step);
 
         redo.Clear();
-        if (undo.Count == 0) undo.Add(step);
-        else undo[^1] = undo[^1].Merge(step);
+        if (undo.Count == 0)
+        {
+            undo.Add(step);
+        }
+        else
+        {
+            undo[^1] = undo[^1].Merge(step);
+        }
     }
 
     /// <summary>Takes back the latest push, restoring the redo steps it dropped, when its change failed.</summary>
     public void CancelLatest()
     {
-        if (undo.Count > 0) undo.RemoveAt(undo.Count - 1);
+        if (undo.Count > 0)
+        {
+            undo.RemoveAt(undo.Count - 1);
+        }
+
         redo.Clear();
         redo.AddRange(droppedRedo);
     }
 
-    /// <summary>The id of a document's latest undoable step, or <see cref="System.Guid.Empty"/> when it has none.</summary>
+    /// <summary>The id of a document's latest undoable step, or <see cref="Guid.Empty"/> when it has none.</summary>
     /// <param name="document">The document's asset id.</param>
     /// <returns>The step id.</returns>
     public Guid LatestFor(Guid document) =>
@@ -142,14 +163,20 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
     public void Seal(Guid document)
     {
         var index = undo.FindLastIndex(step => step.Document == document);
-        if (index >= 0) undo[index] = undo[index] with { Sealed = true };
+        if (index >= 0)
+        {
+            undo[index] = undo[index] with { Sealed = true };
+        }
     }
 
     /// <summary>Undoes the latest step. When its effect throws, the step stays where it was.</summary>
     /// <returns>The step undone, or null when there was none.</returns>
     public UndoStep? Undo()
     {
-        if (undo.Count == 0) return null;
+        if (undo.Count == 0)
+        {
+            return null;
+        }
 
         redo.Add(undo[^1]);
         undo.RemoveAt(undo.Count - 1);
@@ -167,7 +194,11 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         }
 
         var step = redo[^1];
-        foreach (var (target, state) in step.Before) state.Restore(target);
+        foreach (var (target, state) in step.Before)
+        {
+            state.Restore(target);
+        }
+
         return step;
     }
 
@@ -175,7 +206,10 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
     /// <returns>The step redone, or null when there was none.</returns>
     public UndoStep? Redo()
     {
-        if (redo.Count == 0) return null;
+        if (redo.Count == 0)
+        {
+            return null;
+        }
 
         undo.Add(redo[^1]);
         redo.RemoveAt(redo.Count - 1);
@@ -192,7 +226,11 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         }
 
         var step = undo[^1];
-        foreach (var (target, state) in step.After) state.Restore(target);
+        foreach (var (target, state) in step.After)
+        {
+            state.Restore(target);
+        }
+
         return step;
     }
 
@@ -204,9 +242,20 @@ public sealed class UndoHistory(int limit = 200, TimeSpan? mergeWindow = null)
         ArgumentNullException.ThrowIfNull(map);
 
         for (var i = 0; i < undo.Count; i++)
-            if (undo[i].Document == document) undo[i] = undo[i].Remap(map);
+        {
+            if (undo[i].Document == document)
+            {
+                undo[i] = undo[i].Remap(map);
+            }
+        }
+
         for (var i = 0; i < redo.Count; i++)
-            if (redo[i].Document == document) redo[i] = redo[i].Remap(map);
+        {
+            if (redo[i].Document == document)
+            {
+                redo[i] = redo[i].Remap(map);
+            }
+        }
     }
 
     /// <summary>Forgets a document's steps, when its objects are gone for good.</summary>

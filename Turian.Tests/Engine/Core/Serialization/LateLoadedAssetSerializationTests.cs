@@ -57,7 +57,7 @@ public sealed class LateLoadedAssetSerializationTests
             """;
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Append(typeof(DataAsset).Assembly.Location).Append(typeof(TypeIdAttribute).Assembly.Location).Distinct()
-            .Select(path => MetadataReference.CreateFromFile(path));
+            .Select(static path => MetadataReference.CreateFromFile(path));
         var token = TestContext.Current.CancellationToken;
         var compilation = CSharpCompilation.Create($"LateAsset{typeId:N}",
             [CSharpSyntaxTree.ParseText(source, cancellationToken: token)], references,

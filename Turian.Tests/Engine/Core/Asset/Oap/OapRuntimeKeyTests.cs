@@ -11,7 +11,7 @@ public sealed class OapRuntimeKeyTests
         {
             OapRuntimeKey.SetPassphrase("runtime secret");
             Assert.Equal(OapCrypto.DeriveKey("runtime secret"), OapRuntimeKey.Current);
-            Assert.Throws<ArgumentException>(() => OapRuntimeKey.Set(new byte[OapCrypto.KeyLength - 1]));
+            Assert.Throws<ArgumentException>(static () => OapRuntimeKey.Set(new byte[OapCrypto.KeyLength - 1]));
             Assert.Equal(OapCrypto.DeriveKey("runtime secret"), OapRuntimeKey.Current);
         }
         finally

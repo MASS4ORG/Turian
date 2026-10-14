@@ -77,7 +77,7 @@ public sealed class CollectibleAssembliesTests : IDisposable
         Assert.Same(type, TypeRegistry.GetTypeOrThrow(typeId));
         var probe = (Component)Activator.CreateInstance(type)!;
         SceneServiceInjector.Inject(probe, new ServiceCollection().BuildServiceProvider(), allowMissingServices: true);
-        var loaded = Serializer.LoadData<Component>(Serializer.Serialize<Component>(probe));
+        var loaded = Serializer.LoadData<Component>(Serializer.Serialize(probe));
         Assert.IsType(type, loaded);
         return type;
     }
