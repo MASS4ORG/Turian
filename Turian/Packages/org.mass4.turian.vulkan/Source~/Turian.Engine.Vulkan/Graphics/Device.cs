@@ -85,6 +85,12 @@ public unsafe partial class Device : IDisposable
     public bool SupportsMeshShaders => supportsMeshShaders;
 
     /// <summary>
+    /// Whether indirect draws may start at a non-zero instance. Without it, GPU visibility passes are skipped and
+    /// draws fall back to CPU culling.
+    /// </summary>
+    public bool SupportsDrawIndirectFirstInstance => supportsDrawIndirectFirstInstance;
+
+    /// <summary>
     /// Gets the present queue associated with this device.
     /// </summary>
     public Queue PresentQueue => presentQueue;
@@ -130,6 +136,7 @@ public unsafe partial class Device : IDisposable
 
     string[] deviceExtensions = [];
     bool supportsMeshShaders;
+    bool supportsDrawIndirectFirstInstance;
 
     Instance instance;
     string[] instanceExtensions = [];

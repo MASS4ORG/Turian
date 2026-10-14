@@ -18,6 +18,9 @@ public readonly record struct RenderFrameStats
     /// <summary>Standard geometry draw commands recorded, including indirect commands.</summary>
     public int DrawCalls { get; init; }
 
+    /// <summary>Instances those draw commands submit; above <see cref="DrawCalls"/> when draws are instanced.</summary>
+    public int Instances { get; init; }
+
     /// <summary>Triangle-list primitives submitted before any GPU occlusion rejection.</summary>
     public long Triangles { get; init; }
 

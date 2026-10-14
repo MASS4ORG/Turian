@@ -75,12 +75,14 @@ public sealed class FrameStatistics
             case 2:
                 writer.Append("Draws: ");
                 writer.Append(stats.DrawCalls);
+                writer.Append("  |  Instances: ");
+                writer.Append(stats.Instances);
                 writer.Append("  |  Submitted tris: ");
                 writer.Append(stats.Triangles);
                 break;
             case 3:
                 writer.Append("Submeshes: ");
-                writer.Append(stats.DrawCalls);
+                writer.Append(stats.Submeshes.Submitted);
                 writer.Append(" submitted / ");
                 writer.Append(stats.Submeshes.Culled);
                 writer.Append(" CPU culled");
@@ -109,24 +111,27 @@ public sealed class FrameStatistics
 
     RenderFrameStats Average()
     {
-        long draws = 0, triangles = 0, binds = 0, allocated = 0, culled = 0;
+        long draws = 0, instances = 0, triangles = 0, binds = 0, allocated = 0, submitted = 0, culled = 0;
         for (var i = 0; i < count; i++)
         {
             var stats = samples[i].Stats;
             draws += stats.DrawCalls;
+            instances += stats.Instances;
             triangles += stats.Triangles;
             binds += stats.MaterialBinds;
             allocated += stats.AllocatedBytes;
+            submitted += stats.Submeshes.Submitted;
             culled += stats.Submeshes.Culled;
         }
         var divisor = Math.Max(1, count);
         return new RenderFrameStats
         {
             DrawCalls = (int)(draws / divisor),
+            Instances = (int)(instances / divisor),
             Triangles = triangles / divisor,
             MaterialBinds = (int)(binds / divisor),
             AllocatedBytes = allocated / divisor,
-            Submeshes = new RenderCullingStats((int)(draws / divisor), (int)(culled / divisor)),
+            Submeshes = new RenderCullingStats((int)(submitted / divisor), (int)(culled / divisor)),
         };
     }
 

@@ -4,7 +4,10 @@ namespace Turian.Tests;
 [Collection(SerialTests.Name)]
 public sealed class FrameStatisticsRenderingTests(VulkanFixture fixture) : IClassFixture<VulkanFixture>
 {
-    /// <summary>Visible draws and shared material binds reset each frame and survive a resize.</summary>
+    /// <summary>
+    /// Identical visible quads merge into one instanced draw; counters and shared material binds reset each frame and
+    /// survive a resize.
+    /// </summary>
     [Fact]
     public void CountersMatchSubmittedGeometryAndDisableCleanly()
     {
@@ -22,7 +25,8 @@ public sealed class FrameStatisticsRenderingTests(VulkanFixture fixture) : IClas
         Assert.Equal(default, viewer.FrameStats);
         viewer.CollectStatistics = true;
         viewer.Render(root, 0.05);
-        Assert.Equal(2, viewer.FrameStats.DrawCalls);
+        Assert.Equal(1, viewer.FrameStats.DrawCalls);
+        Assert.Equal(2, viewer.FrameStats.Instances);
         Assert.Equal(4, viewer.FrameStats.Triangles);
         Assert.Equal(1, viewer.FrameStats.MaterialBinds);
         Assert.Equal(new RenderCullingStats(2, 1), viewer.FrameStats.Submeshes);
@@ -35,10 +39,12 @@ public sealed class FrameStatisticsRenderingTests(VulkanFixture fixture) : IClas
         Assert.True(viewer.CollectStatistics);
         viewer.UseFrustumCulling = false;
         viewer.Render(root, 0.05);
-        Assert.Equal(3, viewer.FrameStats.DrawCalls);
+        Assert.Equal(1, viewer.FrameStats.DrawCalls);
+        Assert.Equal(3, viewer.FrameStats.Instances);
         Assert.Equal(6, viewer.FrameStats.Triangles);
         viewer.Render(new Node(), 0.05);
         Assert.Equal(0, viewer.FrameStats.DrawCalls);
+        Assert.Equal(0, viewer.FrameStats.Instances);
         Assert.Equal(0, viewer.FrameStats.Triangles);
         Assert.Equal(0, viewer.FrameStats.MaterialBinds);
         viewer.CollectStatistics = false;

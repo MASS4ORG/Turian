@@ -187,6 +187,12 @@ public unsafe class Buffer : IDisposable
         }
     }
 
+    /// <summary>The mapped memory as a span of <typeparamref name="T"/>; valid only while the buffer is mapped.</summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    public Span<T> AsSpan<T>()
+        where T : unmanaged =>
+        new(mapped, (int)(BufferSize / (ulong)sizeof(T)));
+
     /// <summary>
     /// Writes bytes to the mapped buffer.
     /// </summary>

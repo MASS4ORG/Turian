@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Turian.Tests;
@@ -43,6 +44,23 @@ public class RenderListTests
 
         Assert.Equal([first, second], list.Models);
         Assert.Equal([light], list.Lights);
+    }
+
+    /// <summary>Active instanced components are gathered apart from plain models.</summary>
+    [Fact]
+    public void GatherCollectsInstancedModelsSeparately()
+    {
+        var instanced = new InstancedModelComponent();
+        var disabled = new InstancedModelComponent { IsActive = false };
+        var model = new ModelComponent();
+        var list = new RenderList();
+
+        list.Gather([NodeWith("a", instanced, model), NodeWith("b", disabled)]);
+
+        Assert.Equal([instanced], list.InstancedModels);
+        Assert.Equal([model], list.Models);
+        list.Reset();
+        Assert.Empty(list.InstancedModels);
     }
 
     /// <summary>Gathering again replaces the previous frame's content.</summary>
@@ -106,6 +124,48 @@ public class RenderListTests
         list.Sort();
 
         Assert.Equal([3, 1, 0, 2], list.Draws.Select(draw => draw.SubMesh));
+    }
+
+    /// <summary>Within one material and model, draws of the same submesh become contiguous in scene order.</summary>
+    [Fact]
+    public void SortGroupsSubmeshesWithinMaterialAndModel()
+    {
+        var list = new RenderList();
+        int[] submeshes = [1, 0, 1, 0, 2];
+        for (var sequence = 0; sequence < submeshes.Length; sequence++)
+            list.Draws.Add(new DrawItem(null!, submeshes[sequence], null!, default, default, RenderList.SortKey(0, 0),
+                sequence));
+
+        list.Sort();
+
+        Assert.Equal([0, 0, 1, 1, 2], list.Draws.Select(draw => draw.SubMesh));
+        Assert.Equal([1, 3, 0, 2, 4], list.Draws.Select(draw => draw.Sequence));
+    }
+
+    /// <summary>A run merges only draws sharing model, submesh and material; any difference starts a new draw.</summary>
+    [Fact]
+    public void RunLengthSplitsOnModelSubmeshOrMaterial()
+    {
+        var vulkanModelA = (VulkanModel)RuntimeHelpers.GetUninitializedObject(typeof(VulkanModel));
+        var vulkanModelB = (VulkanModel)RuntimeHelpers.GetUninitializedObject(typeof(VulkanModel));
+        var materialA = (MaterialResource)RuntimeHelpers.GetUninitializedObject(typeof(MaterialResource));
+        var materialB = (MaterialResource)RuntimeHelpers.GetUninitializedObject(typeof(MaterialResource));
+        DrawItem[] draws =
+        [
+            Draw(vulkanModelA, 0, materialA), Draw(vulkanModelA, 0, materialA), Draw(vulkanModelA, 0, materialA),
+            Draw(vulkanModelA, 1, materialA),
+            Draw(vulkanModelB, 1, materialA),
+            Draw(vulkanModelB, 1, materialB), Draw(vulkanModelB, 1, materialB),
+        ];
+
+        var runs = new List<int>();
+        for (var start = 0; start < draws.Length; start += runs[^1])
+            runs.Add(RenderList.RunLength(draws, start));
+
+        Assert.Equal([3, 1, 1, 2], runs);
+
+        static DrawItem Draw(VulkanModel model, int subMesh, MaterialResource material) =>
+            new(model, subMesh, material, default, default, 0);
     }
 
     /// <summary>Removing invisible draws preserves scene order among draws sharing the same material and model.</summary>

@@ -9,7 +9,10 @@ public interface IOcclusionCuller : IDisposable
     /// <summary>Records the depth and visibility passes; returns false to use direct draws for this frame.</summary>
     bool Record(FrameInfo frame, ReadOnlySpan<OcclusionDraw> draws);
 
-    /// <summary>The indirect commands, with one 20-byte entry per candidate in the supplied order.</summary>
+    /// <summary>
+    /// The indirect commands, with one 20-byte entry per candidate in the supplied order; each entry's first instance
+    /// is the candidate's index, where the renderer wrote its instance data.
+    /// </summary>
     Silk.NET.Vulkan.Buffer IndirectBuffer { get; }
 
     /// <summary>Gets counts from the last completed use of the current frame slot.</summary>
