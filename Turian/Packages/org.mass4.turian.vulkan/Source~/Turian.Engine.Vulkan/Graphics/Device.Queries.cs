@@ -18,7 +18,7 @@ public unsafe partial class Device
         PopulateDebugMessengerCreateInfo(ref createInfo);
 
         if (
-            debugUtils!.CreateDebugUtilsMessenger(instance, in createInfo, null, out debugMessenger)
+            debugUtils.CreateDebugUtilsMessenger(instance, in createInfo, null, out debugMessenger)
             != Result.Success
         )
         {

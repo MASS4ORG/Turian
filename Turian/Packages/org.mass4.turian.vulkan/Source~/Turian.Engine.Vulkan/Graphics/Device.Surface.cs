@@ -1,6 +1,6 @@
 namespace Turian.Engine.Core;
 
-public unsafe partial class Device
+public partial class Device
 {
     /// <summary>Gets whether the device currently holds a Vulkan surface to present to.</summary>
     public bool HasSurface => surface.Handle != 0;

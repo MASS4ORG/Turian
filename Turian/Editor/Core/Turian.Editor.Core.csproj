@@ -34,10 +34,10 @@
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Codeuctivity.SanitizeFilename" Version="3.0.230"/>
-        <PackageReference Include="Microsoft.Build" Version="18.10.1" ExcludeAssets="runtime" PrivateAssets="all" NoWarn="NU1701">
+        <PackageReference Include="Microsoft.Build" Version="18.11.0" ExcludeAssets="runtime" PrivateAssets="all" NoWarn="NU1701">
           <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Build.Framework" Version="18.10.1" ExcludeAssets="runtime" PrivateAssets="all" NoWarn="NU1701">
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.11.0" ExcludeAssets="runtime" PrivateAssets="all" NoWarn="NU1701">
           <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2"/>
