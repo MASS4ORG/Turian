@@ -1,0 +1,13 @@
+{
+  "name": "org.mass4.turian.physics.bepu",
+  "version": "0.1.0",
+  "displayName": "3D Physics: BepuPhysics backend",
+  "description": "Simulates the 3D Physics brick's worlds with BepuPhysics v2.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "dependencies": {
+    "org.mass4.turian.physics": "builtin:org.mass4.turian.physics"
+  },
+  "categories": ["turian:simulation"],
+  "keywords": ["physics", "bepu"]
+}

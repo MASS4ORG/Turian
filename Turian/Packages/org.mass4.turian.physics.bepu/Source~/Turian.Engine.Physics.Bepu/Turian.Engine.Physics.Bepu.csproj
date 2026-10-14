@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.physics/Source~/Turian.Engine.Physics/Turian.Engine.Physics.csproj"/>
+        <InternalsVisibleTo Include="Turian.Tests"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="BepuPhysics" Version="2.5.0-beta.33"/>
+        <PackageReference Include="BepuUtilities" Version="2.5.0-beta.33"/>
+    </ItemGroup>
+    <!-- Bepu is pure managed code, so the brick ships it beside its own assembly for the editor to load. -->
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <ItemGroup>
+            <PrecastFile Include="$(TargetPath)"/>
+            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'BepuPhysics.dll'"/>
+            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'BepuUtilities.dll'"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(PrecastFile)"
+              DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.physics.bepu/Precast~/lib"/>
+    </Target>
+</Project>
