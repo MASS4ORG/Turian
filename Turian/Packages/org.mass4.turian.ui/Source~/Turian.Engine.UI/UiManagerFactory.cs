@@ -16,15 +16,7 @@ public sealed class UiManagerFactory : IUiPresenterFactory, IUiDocumentPreview
         var document = UiXmlParser.Parse(File.ReadAllText(path), path);
         var baseDir = Path.GetDirectoryName(path)!;
 
-        // Probe the .ui folder, then walk up for an Assets/ root so project-relative image paths resolve without a project.
-        var assetsRoot = baseDir;
-        for (var directory = new DirectoryInfo(baseDir); directory is not null; directory = directory.Parent)
-        {
-            if (!string.Equals(directory.Name, "Assets", StringComparison.OrdinalIgnoreCase)) continue;
-
-            assetsRoot = directory.Parent?.FullName ?? baseDir;
-            break;
-        }
+        var assetsRoot = FindAssetsRoot(baseDir);
 
         var renderer = new UiRenderer(document)
         {
@@ -41,6 +33,17 @@ public sealed class UiManagerFactory : IUiPresenterFactory, IUiDocumentPreview
         if (!string.IsNullOrEmpty(dataJson)) renderer.Bind(ToDictionary(dataJson));
 
         return UiImageRenderer.RenderPng(renderer.Render, width, height, background: new SKColor(12, 14, 20));
+    }
+
+    static string FindAssetsRoot(string baseDir)
+    {
+        for (var directory = new DirectoryInfo(baseDir); directory is not null; directory = directory.Parent)
+        {
+            if (string.Equals(directory.Name, "Assets", StringComparison.OrdinalIgnoreCase))
+                return directory.Parent?.FullName ?? baseDir;
+        }
+
+        return baseDir;
     }
 
     /// <summary>Parses a JSON object into nested dictionaries and lists for binding.</summary>

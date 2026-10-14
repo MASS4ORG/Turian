@@ -61,19 +61,24 @@ public static class UiTextEffects
 
         var trimmed = value.Trim();
         var radial = trimmed.StartsWith("radial", StringComparison.OrdinalIgnoreCase);
-        var open = trimmed.IndexOf('(', StringComparison.Ordinal);
-        if (open < 0) return null;
-
-        var inside = trimmed[(open + 1)..];
-        var close = inside.IndexOf(')', StringComparison.Ordinal);
-        if (close < 0) return null;
-
-        var args = inside[..close].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var args = GradientArguments(trimmed);
         if (args.Length < 2 || !UiValue.TryColor(args[0], out var from) || !UiValue.TryColor(args[1], out var to))
             return null;
 
         var angle = args.Length >= 3 && UiValue.TryFloat(args[2], out var a) ? a : 0f;
         return new TextEffects.TextGradient(from, to, angle, radial);
+    }
+
+    static string[] GradientArguments(string trimmed)
+    {
+        var open = trimmed.IndexOf('(', StringComparison.Ordinal);
+        if (open < 0) return [];
+
+        var inside = trimmed[(open + 1)..];
+        var close = inside.IndexOf(')', StringComparison.Ordinal);
+        if (close < 0) return [];
+
+        return inside[..close].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
     }
 
     static string[] Tokenize(string value) =>

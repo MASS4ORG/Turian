@@ -87,11 +87,10 @@ public sealed partial class UiRenderer
             return;
         }
 
-        var hover = ResolveImage(el, "image-hover") ?? normal;
-        var pressed = ResolveImage(el, "image-pressed") ?? normal;
-        var disabled = ResolveImage(el, "image-disabled") ?? normal;
-        var slice = ParseInsets(Attr(el, "nine-slice"));
-        var enabled = !UiValue.TryBool(Attr(el, "enabled"), out var en) || en;
+        var hover = ButtonImage(el, "image-hover", normal);
+        var pressed = ButtonImage(el, "image-pressed", normal);
+        var disabled = ButtonImage(el, "image-disabled", normal);
+        var enabled = IsEnabled(el);
 
         var node = gui.StyledNode(el.Tag, el.Classes, el.Name);
         ApplyAttributeSize(node, el);
@@ -107,34 +106,38 @@ public sealed partial class UiRenderer
                 return;
             }
 
-            var interactable = gui.GetInteractable();
-            var image = !enabled ? disabled
-                : interactable.OnHold() ? pressed
-                : interactable.OnHover() ? hover
-                : normal;
-
-            if (slice is { } insets) gui.DrawImageNineSlice(image, node.Rect, insets);
-            else gui.DrawImage(image, node.Rect);
-
-            var clicked = enabled && interactable.OnClick();
+            DrawButtonImage(gui, el, node.Rect, enabled, normal, hover, pressed, disabled);
+            var clicked = enabled && gui.GetInteractable().OnClick();
             DrawLabel(gui, el, ResolveText(el) ?? string.Empty);
 
             if (clicked) Fire(el, "click");
         }
     }
 
+    static bool IsEnabled(UiElement el) => !UiValue.TryBool(Attr(el, "enabled"), out var enabled) || enabled;
+
+    SKImage ButtonImage(UiElement el, string attribute, SKImage normal) => ResolveImage(el, attribute) ?? normal;
+
+    static void DrawButtonImage(Gui gui, UiElement el, Rect rect, bool enabled,
+        SKImage normal, SKImage hover, SKImage pressed, SKImage disabled)
+    {
+        var interactable = gui.GetInteractable();
+        var image = !enabled ? disabled
+            : interactable.OnHold() ? pressed
+            : interactable.OnHover() ? hover
+            : normal;
+
+        if (ParseInsets(Attr(el, "nine-slice")) is { } insets) gui.DrawImageNineSlice(image, rect, insets);
+        else gui.DrawImage(image, rect);
+    }
+
     void RenderTextField(Gui gui, UiElement el)
     {
         var key = StateKey(el, "value");
-        var (bound, boundValue) = BoundValue(el, "value");
-        var current = bound
-            ? boundValue?.ToString() ?? string.Empty
-            : state.TryGetValue(key, out var v) && v is string s
-                ? s
-                : Attr(el, "value") ?? string.Empty;
+        var current = TextFieldValue(el, key);
 
         var placeholder = ResolveTextAttribute(el, "placeholder") ?? string.Empty;
-        var enabled = !UiValue.TryBool(Attr(el, "enabled"), out var en) || en;
+        var enabled = IsEnabled(el);
 
         // The behavior — caret, selection, clipboard — is Guinevere's; only the paint is ours. The
         // state is fetched before the node so last frame's focus can select the styling for this one.
@@ -166,6 +169,14 @@ public sealed partial class UiRenderer
         state[key] = next;
     }
 
+    string TextFieldValue(UiElement el, string key)
+    {
+        var (bound, value) = BoundValue(el, "value");
+        if (bound) return value?.ToString() ?? string.Empty;
+        if (state.TryGetValue(key, out var cached) && cached is string text) return text;
+        return Attr(el, "value") ?? string.Empty;
+    }
+
     /// <summary>Paints a field's selection, its value (or placeholder) and its caret.</summary>
     void DrawFieldText(Gui gui, UiElement el, TextEditState edit, string placeholder)
     {
@@ -173,19 +184,7 @@ public sealed partial class UiRenderer
         var hasColor = UiValue.TryColor(Style(gui, el, "color"), out var color);
         var ink = hasColor ? color : GuiColor.White;
 
-        if (gui.Pass == Pass.Pass2Render && edit is { IsFocused: true, HasSelection: true })
-        {
-            var font = TextEditor.MeasuringFont(gui, size);
-            var inner = gui.CurrentNode.InnerRect;
-            var origin = TextEditor.TextOriginX(gui, font, edit.Text, inner);
-            var from = origin + TextEditor.MeasureWidth(font, edit.Text[..edit.SelectionStart]);
-            var to = origin + TextEditor.MeasureWidth(font, edit.Text[..edit.SelectionEnd]);
-
-            var selection = UiValue.TryColor(Style(gui, el, "selection-color"), out var sc)
-                ? sc
-                : GuiColor.FromArgb(110, ink);
-            gui.DrawRect(new Rect(from, inner.Y, Math.Max(1f, to - from), inner.H), selection);
-        }
+        DrawFieldSelection(gui, el, edit, size, ink);
 
         var empty = edit.Text.Length == 0;
         var shown = empty ? placeholder : edit.Text;
@@ -194,8 +193,27 @@ public sealed partial class UiRenderer
         if (shown.Length > 0)
             gui.DrawText(shown, size, shownColor, font: ResolveFont(gui, el, size), centerInRect: false);
 
-        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.ShowCursor) return;
+        DrawFieldCaret(gui, edit, size, ink);
+    }
 
+    void DrawFieldSelection(Gui gui, UiElement el, TextEditState edit, float size, GuiColor ink)
+    {
+        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.HasSelection) return;
+        var font = TextEditor.MeasuringFont(gui, size);
+        var inner = gui.CurrentNode.InnerRect;
+        var origin = TextEditor.TextOriginX(gui, font, edit.Text, inner);
+        var from = origin + TextEditor.MeasureWidth(font, edit.Text[..edit.SelectionStart]);
+        var to = origin + TextEditor.MeasureWidth(font, edit.Text[..edit.SelectionEnd]);
+
+        var selection = UiValue.TryColor(Style(gui, el, "selection-color"), out var color)
+            ? color
+            : GuiColor.FromArgb(110, ink);
+        gui.DrawRect(new Rect(from, inner.Y, Math.Max(1f, to - from), inner.H), selection);
+    }
+
+    static void DrawFieldCaret(Gui gui, TextEditState edit, float size, GuiColor ink)
+    {
+        if (gui.Pass != Pass.Pass2Render || !edit.IsFocused || !edit.ShowCursor) return;
         var caretFont = TextEditor.MeasuringFont(gui, size);
         var rect = gui.CurrentNode.InnerRect;
         var caretX = TextEditor.TextOriginX(gui, caretFont, edit.Text, rect)
@@ -219,12 +237,7 @@ public sealed partial class UiRenderer
     void RenderToggle(Gui gui, UiElement el)
     {
         var key = StateKey(el, "value");
-        var (bound, boundValue) = BoundValue(el, "value");
-        var on = bound
-            ? boundValue is true
-            : state.TryGetValue(key, out var v) && v is bool b
-                ? b
-                : UiValue.TryBool(Attr(el, "value"), out var attrOn) && attrOn;
+        var on = ToggleValue(el, key);
 
         var classes = WithClass(el.Classes, "checked", on);
         var node = gui.StyledNode(el.Tag, classes, el.Name).Direction(Axis.Horizontal).Gap(markGap);
@@ -251,6 +264,14 @@ public sealed partial class UiRenderer
         }
 
         state[key] = next;
+    }
+
+    bool ToggleValue(UiElement el, string key)
+    {
+        var (bound, value) = BoundValue(el, "value");
+        if (bound) return value is true;
+        if (state.TryGetValue(key, out var cached) && cached is bool on) return on;
+        return UiValue.TryBool(Attr(el, "value"), out var attrOn) && attrOn;
     }
 
     /// <summary>Gap between a toggle's box and its label.</summary>

@@ -41,21 +41,26 @@ public static class MemberPath
 
         var last = segments[^1];
 
+        return WriteMember(target, last, value);
+    }
+
+    static bool WriteMember(object target, string name, object? value)
+    {
         if (target is IDictionary<string, object?> dict)
         {
-            dict[last] = value;
+            dict[name] = value;
             return true;
         }
 
         var type = target.GetType();
 
-        if (type.GetProperty(last, flags) is { CanWrite: true } prop)
+        if (type.GetProperty(name, flags) is { CanWrite: true } prop)
         {
             prop.SetValue(target, Coerce(value, prop.PropertyType));
             return true;
         }
 
-        if (type.GetField(last, flags) is { } field)
+        if (type.GetField(name, flags) is { } field)
         {
             field.SetValue(target, Coerce(value, field.FieldType));
             return true;

@@ -52,11 +52,8 @@ public static class UiXmlParser
 
                 case "Template":
                     {
-                        var name = RequireAttr(child, "name");
-                        var body = child.Elements().SingleOrDefault()
-                                   ?? throw Fail(child, "<Template> must contain exactly one root element");
-                        templates[name] = new UiTemplate(
-                            name, ParseElement(body, bindings), body.ToString(SaveOptions.DisableFormatting), LineOf(child));
+                        var template = ParseTemplate(child, bindings);
+                        templates[template.Name] = template;
                         break;
                     }
 
@@ -121,29 +118,19 @@ public static class UiXmlParser
             into.Add(ParseBinding(b));
     }
 
+    static UiTemplate ParseTemplate(XElement child, List<UiBinding> bindings)
+    {
+        var name = RequireAttr(child, "name");
+        var body = child.Elements().SingleOrDefault()
+                   ?? throw Fail(child, "<Template> must contain exactly one root element");
+        return new UiTemplate(name, ParseElement(body, bindings), body.ToString(SaveOptions.DisableFormatting),
+            LineOf(child));
+    }
+
     static UiElement ParseElement(XElement el, List<UiBinding> bindings)
     {
         var tag = el.Name.LocalName;
         var ns = el.Name.NamespaceName;
-
-        UiRepeat? repeat = null;
-        UiInstanceRef? instance = null;
-
-        if (tag == "Repeat")
-        {
-            var items = RequireAttr(el, "items");
-            if (!BindingExpression.IsBinding(items))
-                throw Fail(el, "<Repeat items> must be a binding expression, e.g. items=\"{Path.To.List}\"");
-            repeat = new UiRepeat(BindingExpression.Parse(items).Path, el.Attribute("as")?.Value ?? "item");
-        }
-        else if (tag == "Instance")
-        {
-            var template = RequireAttr(el, "template");
-            var parameters = el.Attributes()
-                .Where(a => a.Name.LocalName is not ("template" or "name") && !a.IsNamespaceDeclaration)
-                .ToDictionary(a => a.Name.LocalName, a => a.Value, StringComparer.Ordinal);
-            instance = new UiInstanceRef(template, parameters);
-        }
 
         var childElements = el.Elements().ToList();
         var innerText = childElements.Count == 0 ? el.Value.Trim() : string.Empty;
@@ -151,11 +138,11 @@ public static class UiXmlParser
         var element = new UiElement
         {
             Tag = tag,
-            Namespace = string.IsNullOrEmpty(ns) || ns == Namespace ? null : ns,
+            Namespace = ElementNamespace(ns),
             Name = el.Attribute("name")?.Value,
             Text = innerText.Length > 0 ? innerText : null,
-            Repeat = repeat,
-            Instance = instance,
+            Repeat = ParseRepeat(el),
+            Instance = ParseInstance(el),
             Line = LineOf(el),
             Column = ColumnOf(el),
         };
@@ -163,52 +150,7 @@ public static class UiXmlParser
         foreach (var attr in el.Attributes())
         {
             if (attr.IsNamespaceDeclaration) continue;
-            var an = attr.Name.LocalName;
-            var av = attr.Value;
-
-            switch (an)
-            {
-                case "name":
-                    continue;
-                case "class":
-                    element.Classes.AddRange(av.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-                    continue;
-                case "style":
-                    foreach (var decl in av.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    {
-                        var colon = decl.IndexOf(':', StringComparison.Ordinal);
-                        if (colon > 0)
-                            element.InlineStyle[decl[..colon].Trim()] = decl[(colon + 1)..].Trim();
-                    }
-
-                    continue;
-            }
-
-            if (tag == "Instance" && an is "template") continue;
-            if (tag == "Repeat" && an is "items" or "as") continue;
-
-            if (an.StartsWith("binding-", StringComparison.Ordinal))
-            {
-                var target = an["binding-".Length..];
-                element.AttributeBindings.Add(new UiAttributeBinding(target, ParseBindingExpr(el, av)));
-                continue;
-            }
-
-            if (EventAttributes.Contains(an))
-            {
-                // A method name, or {controller.Method} — strip the braces either way.
-                element.Events[an] = BindingExpression.IsBinding(av) ? av[1..^1].Trim() : av;
-                continue;
-            }
-
-            if (BindingExpression.IsBinding(av))
-            {
-                // A plain attribute whose value is a { … } expression is an implicit one-way binding.
-                element.AttributeBindings.Add(new UiAttributeBinding(an, ParseBindingExpr(el, av)));
-                continue;
-            }
-
-            element.Attributes[an] = av;
+            ParseAttribute(el, element, attr.Name.LocalName, attr.Value);
         }
 
         foreach (var childEl in childElements)
@@ -223,6 +165,83 @@ public static class UiXmlParser
         }
 
         return element;
+    }
+
+    static string? ElementNamespace(string ns) => string.IsNullOrEmpty(ns) || ns == Namespace ? null : ns;
+
+    static UiRepeat? ParseRepeat(XElement el)
+    {
+        if (el.Name.LocalName != "Repeat") return null;
+        var items = RequireAttr(el, "items");
+        if (!BindingExpression.IsBinding(items))
+            throw Fail(el, "<Repeat items> must be a binding expression, e.g. items=\"{Path.To.List}\"");
+        return new UiRepeat(BindingExpression.Parse(items).Path, el.Attribute("as")?.Value ?? "item");
+    }
+
+    static UiInstanceRef? ParseInstance(XElement el)
+    {
+        if (el.Name.LocalName != "Instance") return null;
+        var template = RequireAttr(el, "template");
+        var parameters = el.Attributes()
+            .Where(a => a.Name.LocalName is not ("template" or "name") && !a.IsNamespaceDeclaration)
+            .ToDictionary(a => a.Name.LocalName, a => a.Value, StringComparer.Ordinal);
+        return new UiInstanceRef(template, parameters);
+    }
+
+    static void ParseAttribute(XElement source, UiElement element, string name, string value)
+    {
+        switch (name)
+        {
+            case "name": return;
+            case "class":
+                element.Classes.AddRange(value.Split(' ', StringSplitOptions.RemoveEmptyEntries
+                    | StringSplitOptions.TrimEntries));
+                return;
+            case "style":
+                ParseInlineStyle(element, value);
+                return;
+        }
+
+        if (IsStructuralAttribute(element.Tag, name)) return;
+        ParseContentAttribute(source, element, name, value);
+    }
+
+    static bool IsStructuralAttribute(string tag, string name) =>
+        tag == "Instance" && name == "template" || tag == "Repeat" && name is "items" or "as";
+
+    static void ParseInlineStyle(UiElement element, string value)
+    {
+        foreach (var declaration in value.Split(';', StringSplitOptions.RemoveEmptyEntries
+                     | StringSplitOptions.TrimEntries))
+        {
+            var colon = declaration.IndexOf(':', StringComparison.Ordinal);
+            if (colon > 0)
+                element.InlineStyle[declaration[..colon].Trim()] = declaration[(colon + 1)..].Trim();
+        }
+    }
+
+    static void ParseContentAttribute(XElement source, UiElement element, string name, string value)
+    {
+        if (name.StartsWith("binding-", StringComparison.Ordinal))
+        {
+            var target = name["binding-".Length..];
+            element.AttributeBindings.Add(new UiAttributeBinding(target, ParseBindingExpr(source, value)));
+            return;
+        }
+
+        if (EventAttributes.Contains(name))
+        {
+            element.Events[name] = BindingExpression.IsBinding(value) ? value[1..^1].Trim() : value;
+            return;
+        }
+
+        if (BindingExpression.IsBinding(value))
+        {
+            element.AttributeBindings.Add(new UiAttributeBinding(name, ParseBindingExpr(source, value)));
+            return;
+        }
+
+        element.Attributes[name] = value;
     }
 
     static UiBinding ParseBinding(XElement b)

@@ -93,4 +93,20 @@ public sealed class UiTextEffectsTests
 
         Assert.Null(fx);
     }
+
+    /// <summary>Incomplete syntax and invalid color stops disable a gradient.</summary>
+    [Theory]
+    [InlineData("linear")]
+    [InlineData("linear(#fff, #000")]
+    [InlineData("linear(invalid, #fff)")]
+    [InlineData("linear(#fff, invalid)")]
+    public void Gradient_Invalid(string value) => Assert.Null(UiTextEffects.Resolve(Style(("text-gradient", value))));
+
+    /// <summary>An invalid optional angle uses zero while retaining the gradient colors.</summary>
+    [Fact]
+    public void Gradient_InvalidAngleDefaultsToZero()
+    {
+        var effects = UiTextEffects.Resolve(Style(("text-gradient", "linear(#fff, #000, invalid)")));
+        Assert.Equal(0f, effects!.Value.Gradient!.Value.AngleDegrees);
+    }
 }

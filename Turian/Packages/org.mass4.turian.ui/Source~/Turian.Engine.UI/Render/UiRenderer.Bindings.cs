@@ -4,6 +4,17 @@ public sealed partial class UiRenderer
 {
     void DrawBackground(Gui gui, UiElement el)
     {
+        if (!UiValue.TryColor(BackgroundValue(el), out var color)) return;
+
+        var radius = 0f;
+        if (el.InlineStyle.TryGetValue("border-radius", out var r))
+            UiValue.TryFloat(r, out radius);
+
+        gui.DrawBackgroundRect(color, radius);
+    }
+
+    string? BackgroundValue(UiElement el)
+    {
         var (bgBound, bgValue) = BoundValue(el, "background-color");
         string bg;
         if (bgBound)
@@ -12,21 +23,14 @@ public sealed partial class UiRenderer
         }
         else if (!el.InlineStyle.TryGetValue("background-color", out bg!))
         {
-            return;
+            return null;
         }
         else if (BindingExpression.IsBinding(bg))
         {
             bg = ResolveBinding(BindingExpression.Parse(bg))?.ToString() ?? string.Empty;
         }
 
-        if (!UiValue.TryColor(bg, out var color))
-            return;
-
-        var radius = 0f;
-        if (el.InlineStyle.TryGetValue("border-radius", out var r))
-            UiValue.TryFloat(r, out radius);
-
-        gui.DrawBackgroundRect(color, radius);
+        return bg;
     }
 
     string? ResolveText(UiElement el)

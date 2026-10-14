@@ -42,42 +42,8 @@ public sealed class UiFontResolver
             return FromDatabaseStream(assetId);
         }
 
-        var looksLikePath = reference.Contains('/', StringComparison.Ordinal)
-                            || reference.Contains('\\', StringComparison.Ordinal)
-                            || reference.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase)
-                            || reference.EndsWith(".otf", StringComparison.OrdinalIgnoreCase);
+        if (LooksLikePath(reference)) return LoadPath(reference.Replace('\\', '/'));
 
-        if (looksLikePath)
-        {
-            var normalized = reference.Replace('\\', '/');
-
-            if (database is not null)
-            {
-                foreach (var record in database.GetAssetsSnapshot())
-                {
-                    if (!string.Equals(record.SourceRelativePath.Replace('\\', '/'), normalized,
-                            StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    // Packaged content has no source fonts; a project prefers its live source file.
-                    if (database.Content is not null) return FromDatabaseStream(record.AssetId);
-                    var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
-                    return File.Exists(absolute) ? FromFile(absolute) : FromDatabaseStream(record.AssetId);
-                }
-            }
-
-            foreach (var root in roots)
-            {
-                var absolute = Path.GetFullPath(Path.Combine(root, normalized));
-                if (File.Exists(absolute)) return FromFile(absolute);
-            }
-
-            return null;
-        }
-
-        // A bare family name.
         try
         {
             return Font.FromFamilyName(reference);
@@ -87,6 +53,33 @@ public sealed class UiFontResolver
             return null;
         }
     }
+
+    static bool LooksLikePath(string reference) =>
+        reference.Contains('/', StringComparison.Ordinal)
+        || reference.Contains('\\', StringComparison.Ordinal)
+        || reference.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase)
+        || reference.EndsWith(".otf", StringComparison.OrdinalIgnoreCase);
+
+    Font? LoadPath(string normalized)
+    {
+        if (FindAsset(normalized) is { } record)
+        {
+            if (database!.Content is not null) return FromDatabaseStream(record.AssetId);
+            var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
+            return File.Exists(absolute) ? FromFile(absolute) : FromDatabaseStream(record.AssetId);
+        }
+
+        foreach (var root in roots)
+        {
+            var absolute = Path.GetFullPath(Path.Combine(root, normalized));
+            if (File.Exists(absolute)) return FromFile(absolute);
+        }
+
+        return null;
+    }
+
+    AssetRecord? FindAsset(string normalized) => database?.GetAssetsSnapshot().FirstOrDefault(record =>
+        string.Equals(record.SourceRelativePath.Replace('\\', '/'), normalized, StringComparison.OrdinalIgnoreCase));
 
     static Font? FromFile(string path)
     {

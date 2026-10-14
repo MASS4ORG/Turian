@@ -73,4 +73,67 @@ public sealed class UiFontResolverTests : IDisposable
         // A family name always yields a font (Skia falls back to a default face).
         Assert.NotNull(resolver.Resolve("sans-serif"));
     }
+
+    /// <summary>Database paths prefer source fonts, with imported streams available by asset id.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_DatabaseFont(bool removeSource)
+    {
+        var source = Path.Combine(dir, "Assets", "Fonts", "test.ttf");
+        var imported = Path.Combine(dir, "test.ttf");
+        File.Copy(source, imported);
+        var database = new AssetDatabase();
+        var asset = new UiFontAsset { Id = Guid.NewGuid(), RelativePath = source };
+        Assert.True(database.RegisterAsset(asset, imported));
+        if (removeSource) File.Delete(source);
+
+        var resolver = new UiFontResolver(database);
+        Assert.NotNull(resolver.Resolve("Assets\\Fonts\\test.ttf"));
+        Assert.NotNull(resolver.Resolve($"ASSET://{asset.Id}"));
+        Assert.Null(resolver.Resolve($"asset://{Guid.NewGuid()}"));
+    }
+
+    /// <summary>Packaged fonts resolve through content even when a conflicting source exists.</summary>
+    [Fact]
+    public void Resolve_PackagedFont()
+    {
+        var source = Path.Combine(dir, "Assets", "Fonts", "test.ttf");
+        var content = new MemoryContentDirectory();
+        var id = Guid.NewGuid();
+        var package = new OapWriter();
+        package.Add(id, File.ReadAllBytes(source), "font.ttf");
+        content.Add("Content/fonts.oap", package.Serialize());
+        var catalog = new AssetCatalog { Version = AssetCatalog.CurrentVersion };
+        catalog.Records.Add(new AssetRecord
+        {
+            AssetId = id,
+            AssetTypeName = typeof(UiFontAsset).FullName!,
+            SourceRelativePath = "Assets/Fonts/test.ttf",
+            ImportedRelativePath = "Content/fonts.oap",
+            PrimaryContentKey = AssetRecord.CreatePrimaryContentKey(id),
+            StorageKind = AssetStorageKind.Oap,
+        });
+        content.Add(AssetDatabase.RuntimeCatalogPath, Serializer.Serialize(catalog));
+        var database = new AssetDatabase();
+        database.LoadRuntimeCatalog(content);
+
+        Assert.NotNull(new UiFontResolver(database).Resolve("Assets/Fonts/test.ttf"));
+    }
+
+    /// <summary>Missing font artifacts return null rather than breaking a frame.</summary>
+    [Fact]
+    public void Resolve_MissingArtifact()
+    {
+        var source = Path.Combine(dir, "Assets", "Fonts", "bad.ttf");
+        File.WriteAllText(source, "invalid font");
+        var database = new AssetDatabase();
+        var asset = new UiFontAsset { Id = Guid.NewGuid(), RelativePath = source };
+        Assert.True(database.RegisterAsset(asset, source));
+        var resolver = new UiFontResolver(database, "", Path.Combine(dir, "missing"));
+        File.Delete(source);
+        Assert.Null(resolver.Resolve("Assets/Fonts/bad.ttf"));
+        Assert.Null(resolver.Resolve($"asset://{asset.Id}"));
+        Assert.Null(new UiFontResolver(null).Resolve($"asset://{asset.Id}"));
+    }
 }

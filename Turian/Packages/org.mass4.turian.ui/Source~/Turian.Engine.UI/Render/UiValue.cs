@@ -3,6 +3,18 @@ namespace Turian.Engine.UI;
 /// <summary>Parsers for the scalar value forms used in <c>.ui</c> inline styles and attributes.</summary>
 public static class UiValue
 {
+    static readonly Dictionary<string, bool> booleans = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["true"] = true,
+        ["1"] = true,
+        ["yes"] = true,
+        ["on"] = true,
+        ["false"] = false,
+        ["0"] = false,
+        ["no"] = false,
+        ["off"] = false,
+    };
+
     /// <summary>Parses a length: bare number or <c>Npx</c> → pixels; <c>N%</c> → the fraction (0..1) via <paramref name="isPercent"/>.</summary>
     /// <param name="text">The length text.</param>
     /// <param name="value">The parsed magnitude (pixels, or the 0..1 fraction for a percentage).</param>
@@ -36,23 +48,7 @@ public static class UiValue
     /// <param name="value">The parsed bool.</param>
     public static bool TryBool(string? text, out bool value)
     {
-        var t = (text ?? string.Empty).Trim();
-        if (t.Equals("true", StringComparison.OrdinalIgnoreCase) || t is "1"
-            || t.Equals("yes", StringComparison.OrdinalIgnoreCase) || t.Equals("on", StringComparison.OrdinalIgnoreCase))
-        {
-            value = true;
-            return true;
-        }
-
-        if (t.Equals("false", StringComparison.OrdinalIgnoreCase) || t is "0"
-            || t.Equals("no", StringComparison.OrdinalIgnoreCase) || t.Equals("off", StringComparison.OrdinalIgnoreCase))
-        {
-            value = false;
-            return true;
-        }
-
-        value = false;
-        return false;
+        return booleans.TryGetValue((text ?? string.Empty).Trim(), out value);
     }
 
     /// <summary>
@@ -67,55 +63,60 @@ public static class UiValue
         if (string.IsNullOrWhiteSpace(text)) return false;
         var t = text.Trim();
 
-        if (t.StartsWith('#'))
-        {
-            var hex = t[1..];
-            if (hex.Length == 3)
-                hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+        if (t.StartsWith('#')) return TryHexColor(t[1..], out color);
+        if (t.StartsWith("rgb", StringComparison.OrdinalIgnoreCase)) return TryRgbColor(t, out color);
 
-            if ((hex.Length == 6 || hex.Length == 8)
-                && int.TryParse(hex[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r)
-                && int.TryParse(hex.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g)
-                && int.TryParse(hex.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b))
-            {
-                var a = 255;
-                if (hex.Length == 8)
-                    _ = int.TryParse(hex.Substring(6, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out a);
-                color = GuiColor.FromArgb(a, r, g, b);
-                return true;
-            }
+        return TryNamedColor(t, out color);
+    }
 
-            return false;
-        }
+    static bool TryHexColor(string hex, out GuiColor color)
+    {
+        color = GuiColor.Black;
+        if (hex.Length == 3)
+            hex = string.Concat(hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]);
+        if (hex.Length != 6 && hex.Length != 8) return false;
 
-        if (t.StartsWith("rgb", StringComparison.OrdinalIgnoreCase))
-        {
-            var open = t.IndexOf('(', StringComparison.Ordinal);
-            var close = t.IndexOf(')', StringComparison.Ordinal);
-            if (open < 0 || close < open) return false;
-
-            var parts = t[(open + 1)..close].Split(',', StringSplitOptions.TrimEntries);
-            if (parts.Length is < 3 or > 4) return false;
-            if (!TryFloat(parts[0], out var rr) || !TryFloat(parts[1], out var gg) || !TryFloat(parts[2], out var bb))
+        Span<int> channels = stackalloc int[3];
+        for (var i = 0; i < channels.Length; i++)
+            if (!int.TryParse(hex.AsSpan(i * 2, 2), NumberStyles.HexNumber,
+                    CultureInfo.InvariantCulture, out channels[i]))
                 return false;
 
-            var aa = 255f;
-            if (parts.Length == 4 && TryFloat(parts[3], out var av))
-                aa = av <= 1f ? av * 255f : av;
+        var alpha = 255;
+        if (hex.Length == 8)
+            _ = int.TryParse(hex.AsSpan(6, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out alpha);
+        color = GuiColor.FromArgb(alpha, channels[0], channels[1], channels[2]);
+        return true;
+    }
 
-            color = GuiColor.FromArgb((int)aa, (int)rr, (int)gg, (int)bb);
-            return true;
-        }
+    static bool TryRgbColor(string text, out GuiColor color)
+    {
+        color = GuiColor.Black;
+        var open = text.IndexOf('(', StringComparison.Ordinal);
+        var close = text.IndexOf(')', StringComparison.Ordinal);
+        if (open < 0 || close < open) return false;
 
-        try
-        {
-            color = System.Drawing.Color.FromName(t);
-            return color.A != 0 || t.Equals("transparent", StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
+        var parts = text[(open + 1)..close].Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length is < 3 or > 4) return false;
+        Span<float> channels = stackalloc float[3];
+        for (var i = 0; i < channels.Length; i++)
+            if (!TryFloat(parts[i], out channels[i])) return false;
+
+        var alpha = RgbAlpha(parts);
+        color = GuiColor.FromArgb((int)alpha, (int)channels[0], (int)channels[1], (int)channels[2]);
+        return true;
+    }
+
+    static float RgbAlpha(string[] parts)
+    {
+        if (parts.Length != 4 || !TryFloat(parts[3], out var alpha)) return 255f;
+        return alpha <= 1f ? alpha * 255f : alpha;
+    }
+
+    static bool TryNamedColor(string text, out GuiColor color)
+    {
+        color = System.Drawing.Color.FromName(text);
+        return color.A != 0 || text.Equals("transparent", StringComparison.OrdinalIgnoreCase);
     }
 
     static bool Finalise(ref float value, Func<float, float> f)

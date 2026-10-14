@@ -48,10 +48,18 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
             if (converter.Length == 0) converter = null;
         }
 
-        var mode = BindingMode.OneWay;
         var parts = body.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var path = parts.Length > 0 ? parts[0] : string.Empty;
 
+        if (path.Length == 0)
+            throw new FormatException($"Binding expression has no path: '{text}'");
+
+        return new BindingExpression(path, ParseMode(parts), converter);
+    }
+
+    static BindingMode ParseMode(string[] parts)
+    {
+        var mode = BindingMode.OneWay;
         for (var i = 1; i < parts.Length; i++)
         {
             var kv = parts[i].Split('=', 2, StringSplitOptions.TrimEntries);
@@ -62,9 +70,6 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
             }
         }
 
-        if (path.Length == 0)
-            throw new FormatException($"Binding expression has no path: '{text}'");
-
-        return new BindingExpression(path, mode, converter);
+        return mode;
     }
 }

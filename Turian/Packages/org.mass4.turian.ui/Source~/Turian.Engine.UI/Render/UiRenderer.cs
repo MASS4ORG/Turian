@@ -203,10 +203,7 @@ public sealed partial class UiRenderer
             LogRect(gui, el, node);
             DrawBackground(gui, el);
 
-            using (gui.StyledNode("TabStrip", el.Classes).Direction(Axis.Horizontal).Enter())
-                for (var t = 0; t < tabs.Count; t++)
-                    if (RenderTabHeader(gui, tabs[t], t, t == active))
-                        next = t;
+            next = RenderTabStrip(gui, el, tabs, active);
 
             foreach (var child in tabs[active].Children)
                 RenderElement(gui, child);
@@ -214,6 +211,16 @@ public sealed partial class UiRenderer
 
         if (next != active) Fire(el, "changed");
         state[key] = next;
+    }
+
+    int RenderTabStrip(Gui gui, UiElement el, List<UiElement> tabs, int active)
+    {
+        var next = active;
+        using (gui.StyledNode("TabStrip", el.Classes).Direction(Axis.Horizontal).Enter())
+            for (var t = 0; t < tabs.Count; t++)
+                if (RenderTabHeader(gui, tabs[t], t, t == active))
+                    next = t;
+        return next;
     }
 
     bool RenderTabHeader(Gui gui, UiElement tab, int index, bool selected)
@@ -238,8 +245,8 @@ public sealed partial class UiRenderer
     /// </summary>
     static void ApplyAttributeSize(LayoutNode node, UiElement el)
     {
-        if (UiValue.TryLength(Attr(el, "width") ?? string.Empty, out var w, out _) && w > 0f) node.Width(w);
-        if (UiValue.TryLength(Attr(el, "height") ?? string.Empty, out var h, out _) && h > 0f) node.Height(h);
+        if (UiValue.TryLength(Attr(el, "width"), out var w, out _) && w > 0f) node.Width(w);
+        if (UiValue.TryLength(Attr(el, "height"), out var h, out _) && h > 0f) node.Height(h);
     }
 
     /// <summary>The element's classes plus a state class, so a sheet can target the state.</summary>

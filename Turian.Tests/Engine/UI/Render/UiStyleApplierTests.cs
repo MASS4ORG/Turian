@@ -90,4 +90,101 @@ public sealed class UiStyleApplierTests
 
         Assert.Null(ex);
     }
+
+    /// <summary>Alignment aliases configure all three layout axes consistently.</summary>
+    [Theory]
+    [InlineData("flex-start", 0f)]
+    [InlineData("start", 0f)]
+    [InlineData("left", 0f)]
+    [InlineData("top", 0f)]
+    [InlineData("center", 0.5f)]
+    [InlineData("middle", 0.5f)]
+    [InlineData("flex-end", 1f)]
+    [InlineData("end", 1f)]
+    [InlineData("right", 1f)]
+    [InlineData("bottom", 1f)]
+    [InlineData("unknown", 0f)]
+    public void AlignmentAliases(string value, float expected)
+    {
+        var node = BuildNode(new Dictionary<string, string>
+        {
+            ["align-self"] = value,
+            ["align-items"] = value,
+            ["justify-content"] = value,
+        });
+        Assert.Equal(expected, node.Style.AlignSelf);
+        Assert.Equal(expected, node.Style.AlignContentHorizontal);
+        Assert.Equal(expected, node.Style.AlignContentVertical);
+    }
+
+    /// <summary>Four box values use CSS order: top, right, bottom and left.</summary>
+    [Theory]
+    [InlineData("padding")]
+    [InlineData("margin")]
+    public void FourSidedBoxes(string property)
+    {
+        var node = BuildNode(new Dictionary<string, string> { [property] = "1px 2px 3px 4px" });
+        if (property == "padding")
+        {
+            Assert.Equal(1f, node.Style.PaddingTop);
+            Assert.Equal(3f, node.Style.PaddingBottom);
+            Assert.Equal(4f, node.Style.PaddingLeft);
+            Assert.Equal(2f, node.Style.PaddingRight);
+            return;
+        }
+
+        Assert.Equal(1f, node.Style.MarginTop);
+        Assert.Equal(3f, node.Style.MarginBottom);
+        Assert.Equal(4f, node.Style.MarginLeft);
+        Assert.Equal(2f, node.Style.MarginRight);
+    }
+
+    /// <summary>Invalid numbers and unsupported shorthands leave existing layout values intact.</summary>
+    [Theory]
+    [InlineData("bad")]
+    [InlineData("1 2 3")]
+    [InlineData("1 2 3 4 5")]
+    [InlineData("")]
+    public void InvalidValuesPreserveLayout(string box)
+    {
+        var node = BuildNode(new Dictionary<string, string> { ["gap"] = "6", ["width"] = "20" });
+        node.Padding(9);
+        UiStyleApplier.Apply(node, new Dictionary<string, string>
+        {
+            ["gap"] = "bad",
+            ["width"] = "auto",
+            ["min-width"] = "bad",
+            ["flex-grow"] = "0",
+            ["padding"] = box,
+        });
+        Assert.Equal(6f, node.Style.Gap);
+        Assert.Equal(20f, node.Style.Width);
+        Assert.False(node.Style.IsExpanded);
+        Assert.Equal(9f, node.Style.PaddingTop);
+    }
+
+    /// <summary>All size constraints and reversed flex directions are recognised.</summary>
+    [Fact]
+    public void ConstraintsAndPercentWidth()
+    {
+        var node = BuildNode(new Dictionary<string, string>
+        {
+            ["flex-direction"] = "row-reverse",
+            ["width"] = "25%",
+            ["height"] = "40px",
+            ["min-width"] = "10px",
+            ["max-width"] = "100px",
+            ["min-height"] = "20px",
+            ["max-height"] = "80px",
+            ["margin"] = "5",
+        });
+        Assert.Equal(Axis.Horizontal, node.Style.Direction);
+        Assert.Equal(0.25f, node.Style.WidthPercent);
+        Assert.Equal(40f, node.Style.Height);
+        Assert.Equal(10f, node.Style.MinWidth);
+        Assert.Equal(100f, node.Style.MaxWidth);
+        Assert.Equal(20f, node.Style.MinHeight);
+        Assert.Equal(80f, node.Style.MaxHeight);
+        Assert.Equal(5f, node.Style.MarginLeft);
+    }
 }

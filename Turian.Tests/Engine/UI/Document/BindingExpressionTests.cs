@@ -64,4 +64,17 @@ public sealed class BindingExpressionTests
     {
         Assert.Throws<FormatException>(() => BindingExpression.Parse(text));
     }
+
+    /// <summary>Unknown options are ignored and the last valid mode takes precedence.</summary>
+    [Theory]
+    [InlineData("{Value, ignored, other=TwoWay, mode=invalid}", BindingMode.OneWay, null)]
+    [InlineData("{Value, mode=TwoWay, MODE=OneTime | upper}", BindingMode.OneTime, "upper")]
+    [InlineData("{Value | }", BindingMode.OneWay, null)]
+    public void Parse_Options(string text, BindingMode mode, string? converter)
+    {
+        var expression = BindingExpression.Parse(text);
+        Assert.Equal("Value", expression.Path);
+        Assert.Equal(mode, expression.Mode);
+        Assert.Equal(converter, expression.Converter);
+    }
 }

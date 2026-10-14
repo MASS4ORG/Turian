@@ -87,4 +87,93 @@ public sealed class UiImageResolverTests : IDisposable
         using var byPath = resolver.Resolve("Assets/Textures/button.png");
         Assert.NotNull(byPath);
     }
+
+    /// <summary>A live source image takes priority over its imported artifact.</summary>
+    [Fact]
+    public void Resolve_DatabasePathPrefersSource()
+    {
+        var source = Path.Combine(dir, "Assets", "Textures", "button.png");
+        var imported = Path.Combine(dir, "imported.png");
+        WritePng(imported, 2, 2);
+        var database = new AssetDatabase();
+        var asset = new TextureAsset { Id = Guid.NewGuid(), RelativePath = source };
+        Assert.True(database.RegisterAsset(asset, imported));
+        var resolver = new UiImageResolver(database);
+
+        using var image = resolver.Resolve("assets\\textures\\button.png");
+        Assert.NotNull(image);
+        Assert.Equal(8, image.Width);
+        using var byId = resolver.Resolve($"asset://{asset.Id}");
+        Assert.NotNull(byId);
+        Assert.Equal(2, byId.Width);
+        Assert.Null(resolver.Resolve($"asset://{Guid.NewGuid()}"));
+    }
+
+    /// <summary>Packaged image paths resolve through content with no project directory.</summary>
+    [Fact]
+    public void Resolve_PackagedImage()
+    {
+        var source = Path.Combine(dir, "Assets", "Textures", "button.png");
+        var content = new MemoryContentDirectory();
+        var id = Guid.NewGuid();
+        var package = new OapWriter();
+        package.Add(id, File.ReadAllBytes(source), "image.png");
+        content.Add("Content/images.oap", package.Serialize());
+        var catalog = new AssetCatalog { Version = AssetCatalog.CurrentVersion };
+        catalog.Records.Add(new AssetRecord
+        {
+            AssetId = id,
+            AssetTypeName = typeof(TextureAsset).FullName!,
+            SourceRelativePath = "Assets/Textures/button.png",
+            ImportedRelativePath = "Content/images.oap",
+            PrimaryContentKey = AssetRecord.CreatePrimaryContentKey(id),
+            StorageKind = AssetStorageKind.Oap,
+        });
+        content.Add(AssetDatabase.RuntimeCatalogPath, Serializer.Serialize(catalog));
+        var database = new AssetDatabase();
+        database.LoadRuntimeCatalog(content);
+
+        using var image = new UiImageResolver(database).Resolve("Assets/Textures/button.png");
+        Assert.NotNull(image);
+        Assert.Equal(8, image.Width);
+    }
+
+    /// <summary>Invalid and missing artifacts are cached as unavailable images.</summary>
+    [Fact]
+    public void Resolve_UnreadableArtifact()
+    {
+        var source = Path.Combine(dir, "Assets", "Textures", "bad.png");
+        File.WriteAllText(source, "invalid image");
+        var database = new AssetDatabase();
+        var asset = new TextureAsset { Id = Guid.NewGuid(), RelativePath = source };
+        Assert.True(database.RegisterAsset(asset, source));
+        var resolver = new UiImageResolver(database, "", Path.Combine(dir, "missing"));
+        Assert.Null(resolver.Resolve("Assets/Textures/bad.png"));
+        File.Delete(source);
+        Assert.Null(resolver.Resolve($"asset://{asset.Id}"));
+        Assert.Null(resolver.Resolve($"asset://{asset.Id}"));
+    }
+
+    /// <summary>CPU UI decoding accepts RGBA8 textures and rejects compressed GPU texture formats.</summary>
+    [Theory]
+    [InlineData(Ktx2VkFormat.R8G8B8A8Srgb, true)]
+    [InlineData(Ktx2VkFormat.R8G8B8A8Unorm, true)]
+    [InlineData(Ktx2VkFormat.Bc1RgbaUnormBlock, false)]
+    public void Resolve_TextureFormats(Ktx2VkFormat format, bool supported)
+    {
+        var path = Path.Combine(dir, "Assets", "Textures", "texture.ktx2");
+        Ktx2Writer.Save(path, new Ktx2Texture
+        {
+            Format = format,
+            Width = 4,
+            Height = 4,
+            Levels = [new byte[supported ? 64 : 8]],
+        });
+        var database = new AssetDatabase();
+        var asset = new TextureAsset { Id = Guid.NewGuid(), RelativePath = path };
+        Assert.True(database.RegisterAsset(asset, path));
+        using var image = new UiImageResolver(database).Resolve($"asset://{asset.Id}");
+        Assert.Equal(supported, image is not null);
+        if (image is not null) Assert.Equal(4, image.Width);
+    }
 }

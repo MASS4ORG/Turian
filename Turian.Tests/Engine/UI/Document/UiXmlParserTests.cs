@@ -150,4 +150,76 @@ public sealed class UiXmlParserTests
         Assert.Contains("requires a 'src'", ex.Message, StringComparison.Ordinal);
         Assert.Equal(2, ex.Line);
     }
+
+    /// <summary>Fragments keep literal content, event names and valid inline declarations.</summary>
+    [Fact]
+    public void ParseFragment_Attributes()
+    {
+        var element = UiXmlParser.ParseFragment("""
+            <Button xmlns="https://turian.mass4.org/ui" name="go" class="one  two"
+                    style="bad; :ignored; width: 20; color: rgb(1,2,3)"
+                    click="{ OnGo }" binding-value="{Value, mode=TwoWay}" tooltip="literal"> Go </Button>
+            """);
+        Assert.Null(element.Namespace);
+        Assert.Equal("Go", element.Text);
+        Assert.Equal(["one", "two"], element.Classes);
+        Assert.Equal("20", element.InlineStyle["width"]);
+        Assert.Equal("rgb(1,2,3)", element.InlineStyle["color"]);
+        Assert.Equal(2, element.InlineStyle.Count);
+        Assert.Equal("OnGo", element.Events["click"]);
+        Assert.Equal("literal", element.Attributes["tooltip"]);
+        Assert.Equal(BindingMode.TwoWay, Assert.Single(element.AttributeBindings).Expression.Mode);
+    }
+
+    /// <summary>Structural attributes populate repeat and instance metadata without becoming normal attributes.</summary>
+    [Fact]
+    public void ParseFragment_StructuralAttributes()
+    {
+        var repeat = UiXmlParser.ParseFragment("""<Repeat items="{Rows}"><Instance template="Row" name="r" color="red" /></Repeat>""");
+        Assert.Equal("item", repeat.Repeat!.ItemAlias);
+        Assert.Empty(repeat.Attributes);
+        var instance = Assert.Single(repeat.Children);
+        Assert.Equal("Row", instance.Instance!.TemplateName);
+        Assert.Equal("red", Assert.Single(instance.Instance.Parameters).Value);
+        Assert.False(instance.Attributes.ContainsKey("template"));
+        Assert.Equal("r", instance.Name);
+    }
+
+    /// <summary>Invalid structural and binding attributes report the element's location.</summary>
+    [Theory]
+    [InlineData("<Repeat items=\"literal\" />")]
+    [InlineData("<Repeat />")]
+    [InlineData("<Instance />")]
+    [InlineData("<Label binding-text=\"literal\" />")]
+    [InlineData("<Label text=\"{ | upper}\" />")]
+    public void ParseFragment_RejectsInvalidAttributes(string xml)
+    {
+        var error = Assert.Throws<UiParseException>(() => UiXmlParser.ParseFragment(xml));
+        Assert.Equal(1, error.Line);
+        Assert.True(error.Column > 0);
+    }
+
+    /// <summary>Sibling visual roots get a wrapper while top-level bindings retain their mode and converter.</summary>
+    [Fact]
+    public void Parse_MultipleRootsAndBindings()
+    {
+        var parsed = UiXmlParser.Parse("""
+            <UI>
+              <Bindings><Binding element="a" property="text" path="Value" mode="TwoWay" converter="upper" /></Bindings>
+              <Label name="a" /><Label name="b" />
+            </UI>
+            """);
+        Assert.Equal(["a", "b"], parsed.Root.Children.Select(child => child.Name));
+        var binding = Assert.Single(parsed.Bindings);
+        Assert.Equal(BindingMode.TwoWay, binding.Mode);
+        Assert.Equal("upper", binding.Converter);
+    }
+
+    /// <summary>Empty templates and malformed fragments retain structured parse errors.</summary>
+    [Fact]
+    public void Parse_RejectsEmptyTemplateAndMalformedFragment()
+    {
+        Assert.Throws<UiParseException>(() => UiXmlParser.Parse("<UI><Template name=\"empty\" /><Label /></UI>"));
+        Assert.Throws<UiParseException>(() => UiXmlParser.ParseFragment("<Label>"));
+    }
 }

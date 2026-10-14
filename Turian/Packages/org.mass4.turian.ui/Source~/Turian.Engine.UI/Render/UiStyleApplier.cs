@@ -7,6 +7,35 @@ namespace Turian.Engine.UI;
 /// </summary>
 public static class UiStyleApplier
 {
+    static readonly Dictionary<string, Action<LayoutNode, string>> declarations = new(StringComparer.Ordinal)
+    {
+        ["flex-direction"] = (node, value) =>
+            node.Direction(value is "row" or "row-reverse" ? Axis.Horizontal : Axis.Vertical),
+        ["gap"] = (node, value) => ApplyFloat(value, node.Gap),
+        ["flex-grow"] = ApplyGrow,
+        ["align-self"] = (node, value) => node.AlignSelf(AlignFraction(value)),
+        ["align-items"] = (node, value) => node.ContentAlignX(AlignFraction(value)),
+        ["justify-content"] = (node, value) => node.ContentAlignY(AlignFraction(value)),
+        ["width"] = (node, value) => ApplyLength(value, node.Width, node.WidthPercent),
+        ["height"] = (node, value) => ApplyLength(value, node.Height, node.HeightPercent),
+        ["min-width"] = (node, value) => ApplyConstraint(value, node.MinWidth),
+        ["max-width"] = (node, value) => ApplyConstraint(value, node.MaxWidth),
+        ["min-height"] = (node, value) => ApplyConstraint(value, node.MinHeight),
+        ["max-height"] = (node, value) => ApplyConstraint(value, node.MaxHeight),
+        ["padding"] = (node, value) => ApplyBox(value, node.Padding, node.Padding, node.Padding),
+        ["margin"] = (node, value) => ApplyBox(value, node.Margin, node.Margin, node.Margin),
+    };
+
+    static readonly Dictionary<string, float> alignments = new(StringComparer.Ordinal)
+    {
+        ["center"] = 0.5f,
+        ["middle"] = 0.5f,
+        ["flex-end"] = 1f,
+        ["end"] = 1f,
+        ["right"] = 1f,
+        ["bottom"] = 1f,
+    };
+
     /// <summary>Applies every recognised declaration in <paramref name="style"/> to <paramref name="node"/>.</summary>
     /// <param name="node">The layout node being configured (must be in the build pass).</param>
     /// <param name="style">Parsed <c>prop → value</c> declarations.</param>
@@ -16,61 +45,22 @@ public static class UiStyleApplier
         ArgumentNullException.ThrowIfNull(style);
 
         foreach (var (prop, raw) in style)
-        {
-            var value = raw.Trim();
-            switch (prop)
-            {
-                case "flex-direction":
-                    node.Direction(value is "row" or "row-reverse" ? Axis.Horizontal : Axis.Vertical);
-                    break;
+            if (declarations.TryGetValue(prop, out var apply)) apply(node, raw.Trim());
+    }
 
-                case "gap":
-                    if (UiValue.TryFloat(value, out var gap)) node.Gap(gap);
-                    break;
+    static void ApplyFloat(string value, Func<float, LayoutNode> apply)
+    {
+        if (UiValue.TryFloat(value, out var number)) apply(number);
+    }
 
-                case "flex-grow":
-                    if (UiValue.TryFloat(value, out var grow) && grow > 0f) node.Expand();
-                    break;
+    static void ApplyConstraint(string value, Func<float, LayoutNode> apply)
+    {
+        if (UiValue.TryLength(value, out var number, out _)) apply(number);
+    }
 
-                case "align-self":
-                    node.AlignSelf(AlignFraction(value));
-                    break;
-
-                case "align-items":
-                    node.ContentAlignX(AlignFraction(value));
-                    break;
-
-                case "justify-content":
-                    node.ContentAlignY(AlignFraction(value));
-                    break;
-
-                case "width":
-                    ApplyLength(value, node.Width, node.WidthPercent);
-                    break;
-                case "height":
-                    ApplyLength(value, node.Height, node.HeightPercent);
-                    break;
-                case "min-width":
-                    if (UiValue.TryLength(value, out var mnw, out _)) node.MinWidth(mnw);
-                    break;
-                case "max-width":
-                    if (UiValue.TryLength(value, out var mxw, out _)) node.MaxWidth(mxw);
-                    break;
-                case "min-height":
-                    if (UiValue.TryLength(value, out var mnh, out _)) node.MinHeight(mnh);
-                    break;
-                case "max-height":
-                    if (UiValue.TryLength(value, out var mxh, out _)) node.MaxHeight(mxh);
-                    break;
-
-                case "padding":
-                    ApplyBox(value, node.Padding, node.Padding, node.Padding);
-                    break;
-                case "margin":
-                    ApplyBox(value, node.Margin, node.Margin, node.Margin);
-                    break;
-            }
-        }
+    static void ApplyGrow(LayoutNode node, string value)
+    {
+        if (UiValue.TryFloat(value, out var grow) && grow > 0f) node.Expand();
     }
 
     static void ApplyLength(string value, Func<float, LayoutNode> px, Func<float, LayoutNode> percent)
@@ -100,11 +90,5 @@ public static class UiStyleApplier
         }
     }
 
-    static float AlignFraction(string value) => value switch
-    {
-        "flex-start" or "start" or "left" or "top" => 0f,
-        "center" or "middle" => 0.5f,
-        "flex-end" or "end" or "right" or "bottom" => 1f,
-        _ => 0f,
-    };
+    static float AlignFraction(string value) => alignments.GetValueOrDefault(value);
 }
