@@ -22,6 +22,18 @@ Existing `RuntimeSave` and `SimulationSession.CaptureSave/RestoreSave` remain th
 
 The storage envelope has its own version; the game supplies a stable schema ID and a positive schema version. Register `ISaveMigration` steps for each old version and serializer ID. Each step upgrades exactly one version and receives detached encoded bytes. Loading does not rewrite stored saves. Register old serializers as readers when switching the writer to another encoding. A MemoryPack, MessagePack or protobuf brick implements `ISaveSerializer`; no such package is required by the default JSON implementation. `JsonSaveSerializer` accepts options with generated type metadata for game DTOs.
 
+The payload serializer and the complete container format are separate plugins. Implement `ISaveSerializer` to encode game DTOs with any library, and `ISaveContainerCodec` to replace the JSON envelope with a binary, YAML, compressed or vendor-defined format. Its `Encode` and `Decode` methods work on a public `SaveContainer`, containing the schema, serializer ID, metadata and payload bytes. `CanRead` recognizes a stable signature; `Decode` must validate the format's version, integrity and supplied byte limit. Implementations must bound lengths and decompression before allocating. The service still validates schema compatibility and metadata after decoding.
+
+```csharp
+var saves = new SaveService(storage, "my-game:campaign",
+    writer: mySerializer,
+    containerCodec: myContainerCodec,
+    readers: [legacySerializer],
+    containerReaders: [legacyContainerCodec]);
+```
+
+The original version-one JSON envelope remains the default and is always registered as a legacy reader. Custom container signatures are checked before that broad JSON fallback. Once a codec recognizes a file, decoding or integrity failure stops the load; other codecs are not tried to bypass corruption. Container and payload changes are independent, so keep both kinds of legacy readers when upgrading either format. `FileSaveStorage` adds its own 32-byte revision framing around container bytes; an `ISaveStorage` plugin can replace that physical layout when exact plain-text interoperability is required.
+
 Registrations and serializer configuration are fixed at service construction. Serializers, migration objects and compatibility callbacks must be safe for concurrent worker use. A migration for encrypted encodings must decrypt, upgrade the inner schema and re-encrypt; alternatively load the legacy schema with its old service and explicitly write through a new service. Migrations do not change schema identity or encoding implicitly.
 
 The envelope stores metadata and payload together in a checksummed body. Byte arrays use JSON base64 so checksums cover the exact original bytes regardless of JSON formatting. SHA-256 detects corruption, not cheating. `AesGcmSaveSerializer` optionally authenticates and encrypts the payload; metadata remains visible and is not authenticated by AES. Provision keys outside save files, await outstanding operations before disposing the codec, and use different serializer IDs in custom adapters when implementing key rotation. Server-side authorization and validation remain necessary for multiplayer games.
@@ -49,3 +61,9 @@ For multiplayer, capture at an authoritative tick with RNG state and content/mod
 `Samples~` bundles an optional complete Studio project with an `Assets` folder, startup scene, registered settings and build profile. Its source is separate from the runtime library under `Source~`. `Assets/SaveShowcase.cs` demonstrates live capture/restore, local backups and simulated cloud conflicts, with a GUI brick overlay and A/D movement. Project script types use their `.cs.meta` identities. `SceneSmoke` loads that actual scene to verify controls, HUD readouts and simulation-thread restoration. `Smoke` is a separate console program for schema upgrades, serializer plugins, encryption, process interruption and deterministic replay. The complete project is also provided as `example-11-save` in the examples repository.
 
 This brick implements the runtime persistence API. Steam/console/cloud SDK adapters, a full offline synchronization coordinator, Studio slot inspection/editing and play-mode reset controls, and the shared typed preferences API are separate integrations still pending from #89. Preferences should use the existing settings profiles rather than treating a game save as a general settings database.
+
+## Shared persistence architecture
+
+For reuse by Gaya settings, workbench layouts, workspace sessions and Turian, the shared foundation belongs in a separate `Gaya.Persistence` library. It should depend only on the BCL and contain generic storage, serialization, container codecs, schema migration and integrity contracts. Both `Gaya.Host` and the optional Turian save brick can depend on that library without coupling standalone games to the workbench, UI or networking SDKs. This extraction and settings integration are not implemented yet.
+
+Gaya's Settings API retains user/workspace scopes, defaults, change notifications and preservation of unknown plugin pages. Turian's save layer retains game slots, play time, thumbnails, tick/RNG state, content/mod compatibility and entity capture/restore. Authored assets keep their existing reference-aware serializers. Shared persistence does not require every consumer to use the same container or merge policy; editable settings can stay plain JSON while game saves use checksummed or binary containers.

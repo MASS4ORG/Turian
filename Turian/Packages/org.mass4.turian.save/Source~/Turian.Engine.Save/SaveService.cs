@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Turian.Engine.Save;
@@ -6,7 +5,6 @@ namespace Turian.Engine.Save;
 /// <summary>Persists detached DTOs on worker threads and validates them before game restoration.</summary>
 public sealed class SaveService
 {
-    const int EnvelopeVersion = 1;
     readonly ISaveStorage storage;
     readonly string schemaId;
     readonly int schemaVersion;
@@ -14,11 +12,22 @@ public sealed class SaveService
     readonly Dictionary<string, ISaveSerializer> serializers;
     readonly Dictionary<(string, int), ISaveMigration> migrations;
     readonly int maximumBytes;
+    readonly ISaveContainerCodec containerCodec;
+    readonly ISaveContainerCodec[] containerReaders;
 
-    /// <summary>Freezes the serializer and migration registry for one game schema.</summary>
+    /// <summary>Freezes the serializer and migration registry using the default JSON container.</summary>
     public SaveService(ISaveStorage storage, string schemaId, int schemaVersion = 1,
         ISaveSerializer? writer = null, IEnumerable<ISaveSerializer>? readers = null,
         IEnumerable<ISaveMigration>? migrations = null, int maximumBytes = 64 * 1024 * 1024)
+        : this(storage, schemaId, null, schemaVersion, writer, readers, migrations, maximumBytes)
+    {
+    }
+
+    /// <summary>Freezes payload and container registries; a null container codec selects the JSON default.</summary>
+    public SaveService(ISaveStorage storage, string schemaId, ISaveContainerCodec? containerCodec,
+        int schemaVersion = 1, ISaveSerializer? writer = null, IEnumerable<ISaveSerializer>? readers = null,
+        IEnumerable<ISaveMigration>? migrations = null, int maximumBytes = 64 * 1024 * 1024,
+        IEnumerable<ISaveContainerCodec>? containerReaders = null)
     {
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaId);
@@ -32,6 +41,19 @@ public sealed class SaveService
         serializers = (readers ?? []).ToDictionary(static r => r.Id, StringComparer.Ordinal);
         serializers[this.writer.Id] = this.writer;
         this.migrations = (migrations ?? []).ToDictionary(static m => (m.SerializerId, m.FromVersion));
+        this.containerCodec = containerCodec ?? new JsonSaveContainerCodec();
+        this.containerReaders = ContainerReaders(this.containerCodec, containerReaders);
+    }
+
+    static ISaveContainerCodec[] ContainerReaders(ISaveContainerCodec writer,
+        IEnumerable<ISaveContainerCodec>? readers)
+    {
+        var jsonContainer = new JsonSaveContainerCodec();
+        var codecs = (readers ?? []).ToDictionary(static c => c.Id, StringComparer.Ordinal);
+        codecs.TryAdd(jsonContainer.Id, jsonContainer);
+        codecs.Remove(writer.Id);
+        return [.. codecs.Values.Prepend(writer)
+            .OrderBy(static codec => codec is JsonSaveContainerCodec)];
     }
 
     /// <summary>Queues an owned snapshot captured on the simulation thread.</summary>
@@ -65,16 +87,9 @@ public sealed class SaveService
 
     SaveSlotInfo Inspect(StoredSave saved)
     {
-        try
-        {
-            var body = ReadBody(saved.Data);
-            ValidateMetadata(body.Metadata);
-            return new SaveSlotInfo(body.Metadata, body.SchemaVersion, body.SerializerId, saved.Revision);
-        }
-        catch (JsonException error)
-        {
-            throw new InvalidDataException("Invalid save JSON.", error);
-        }
+        var body = ReadBody(saved.Data);
+        ValidateMetadata(body.Metadata);
+        return new SaveSlotInfo(body.Metadata, body.SchemaVersion, body.SerializerId, saved.Revision);
     }
 
     /// <summary>Loads a backup whose revision identifies that generation, rather than the primary slot.</summary>
@@ -104,10 +119,7 @@ public sealed class SaveService
         ValidateMetadata(metadata);
         var payload = writer.Serialize(snapshot);
         CheckSize(payload.Length);
-        var body = JsonSerializer.SerializeToUtf8Bytes(new Body(
-            schemaId, schemaVersion, writer.Id, metadata, payload));
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(new Envelope(
-            EnvelopeVersion, body, SHA256.HashData(body)));
+        var bytes = containerCodec.Encode(new SaveContainer(schemaId, schemaVersion, writer.Id, metadata, payload));
         CheckSize(bytes.Length);
         return bytes;
     }
@@ -129,28 +141,19 @@ public sealed class SaveService
         }
     }
 
-    Body ReadBody(byte[] bytes)
+    SaveContainer ReadBody(byte[] bytes)
     {
         CheckSize(bytes.Length);
-        var envelope = JsonSerializer.Deserialize<Envelope>(bytes)
-            ?? throw new InvalidDataException("Missing save envelope.");
-        ValidateEnvelope(envelope);
-        var body = JsonSerializer.Deserialize<Body>(envelope.Body)
-            ?? throw new InvalidDataException("Missing save body.");
+        var codec = containerReaders.FirstOrDefault(reader => reader.CanRead(bytes))
+            ?? throw new InvalidDataException("Unsupported save container format.");
+        var body = codec.Decode(bytes, maximumBytes)
+            ?? throw new InvalidDataException("Container codec returned null.");
         ValidateBody(body);
+        CheckSize(body.Payload.Length);
         return body;
     }
 
-    static void ValidateEnvelope(Envelope envelope)
-    {
-        if (envelope.Version != EnvelopeVersion || envelope.Body is null || envelope.Checksum is null ||
-            !CryptographicOperations.FixedTimeEquals(SHA256.HashData(envelope.Body), envelope.Checksum))
-        {
-            throw new InvalidDataException("Save envelope version or checksum is invalid.");
-        }
-    }
-
-    void ValidateBody(Body body)
+    void ValidateBody(SaveContainer body)
     {
         if (body.SchemaId != schemaId || body.SchemaVersion < 1 || body.SchemaVersion > schemaVersion)
         {
@@ -159,7 +162,7 @@ public sealed class SaveService
         ValidatePayload(body);
     }
 
-    void ValidatePayload(Body body)
+    void ValidatePayload(SaveContainer body)
     {
         if (body.Payload is null || body.Metadata is null || body.SerializerId is null ||
             !serializers.ContainsKey(body.SerializerId))
@@ -168,7 +171,7 @@ public sealed class SaveService
         }
     }
 
-    byte[] Upgrade(Body body)
+    byte[] Upgrade(SaveContainer body)
     {
         var payload = body.Payload;
         for (var version = body.SchemaVersion; version < schemaVersion; version++)
@@ -201,6 +204,4 @@ public sealed class SaveService
         }
     }
 
-    sealed record Envelope(int Version, byte[] Body, byte[] Checksum);
-    sealed record Body(string SchemaId, int SchemaVersion, string SerializerId, SaveMetadata Metadata, byte[] Payload);
 }
