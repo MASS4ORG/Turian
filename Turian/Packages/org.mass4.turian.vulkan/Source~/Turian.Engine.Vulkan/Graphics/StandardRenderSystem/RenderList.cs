@@ -10,6 +10,8 @@ namespace Turian.Engine.Core;
 /// <param name="Sequence">Scene order, used to preserve depth and blend ordering within equal sort keys.</param>
 /// <param name="WorldBounds">The world-space bounds supplied to optional visibility passes.</param>
 /// <param name="RenderLayer">The owning node's rendering layer index.</param>
+/// <param name="Color">The per-instance tint multiplied into the base color.</param>
+/// <param name="CustomData">Free per-instance values passed to the shader.</param>
 readonly record struct DrawItem(
     VulkanModel Model,
     int SubMesh,
@@ -19,7 +21,9 @@ readonly record struct DrawItem(
     long SortKey,
     int Sequence = 0,
     Bounds WorldBounds = default,
-    int RenderLayer = 0);
+    int RenderLayer = 0,
+    Color Color = default,
+    Vector4 CustomData = default);
 
 /// <summary>
 /// The scene content one frame draws: models and lights gathered in a single walk, and the submesh draws sorted so
@@ -37,6 +41,9 @@ sealed class RenderList
     /// <summary>The active light components found by the last <see cref="Gather"/>.</summary>
     public List<LightComponent> Lights { get; } = [];
 
+    /// <summary>The active instanced model components found by the last <see cref="Gather"/>.</summary>
+    public List<InstancedModelComponent> InstancedModels { get; } = [];
+
     /// <summary>The submesh draws, in recording order after <see cref="Sort"/>.</summary>
     public List<DrawItem> Draws { get; } = [];
 
@@ -47,6 +54,7 @@ sealed class RenderList
     {
         Models.Clear();
         Lights.Clear();
+        InstancedModels.Clear();
         Draws.Clear();
         for (var i = 0; i < roots.Count; i++)
             Collect(roots[i], cullingMask ?? LayerMask.Everything);
@@ -57,17 +65,33 @@ sealed class RenderList
         // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
         if (!node.IsActive || node.IsDestroyed) return;
 
-        var components = node.Components;
-        for (var i = 0; i < components.Count; i++)
+        if (cullingMask.Contains(node.RenderLayer))
         {
-            if (!cullingMask.Contains(node.RenderLayer)) continue;
-            if (components[i] is ModelComponent { IsActive: true } model) Models.Add(model);
-            else if (components[i] is LightComponent { IsActive: true } light) Lights.Add(light);
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
+                Add(components[i]);
         }
 
         var children = node.Children;
         for (var i = 0; i < children.Count; i++)
             Collect(children[i], cullingMask);
+    }
+
+    void Add(Component component)
+    {
+        if (!component.IsActive) return;
+        switch (component)
+        {
+            case ModelComponent model:
+                Models.Add(model);
+                break;
+            case LightComponent light:
+                Lights.Add(light);
+                break;
+            case InstancedModelComponent instanced:
+                InstancedModels.Add(instanced);
+                break;
+        }
     }
 
     /// <summary>
@@ -92,13 +116,33 @@ sealed class RenderList
     /// <returns>The combined key.</returns>
     public static long SortKey(int materialOrder, int modelOrder) => ((long)materialOrder << 32) | (uint)modelOrder;
 
-    /// <summary>Orders <see cref="Draws"/> by material, then model, so recording rebinds as little as possible.</summary>
+    /// <summary>
+    /// Orders <see cref="Draws"/> by material, model, then submesh, so recording rebinds as little as possible and
+    /// draws of the same submesh are contiguous and can merge into one instanced draw.
+    /// </summary>
     public void Sort() =>
         CollectionsMarshal.AsSpan(Draws).Sort(static (a, b) =>
         {
             var order = a.SortKey.CompareTo(b.SortKey);
+            if (order == 0) order = a.SubMesh.CompareTo(b.SubMesh);
             return order != 0 ? order : a.Sequence.CompareTo(b.Sequence);
         });
+
+    /// <summary>Counts the draws from <paramref name="start"/> that share its model, submesh and material.</summary>
+    /// <param name="draws">The sorted draws.</param>
+    /// <param name="start">The first draw of the run.</param>
+    /// <returns>The run length, at least one.</returns>
+    public static int RunLength(ReadOnlySpan<DrawItem> draws, int start)
+    {
+        ref readonly var first = ref draws[start];
+        var end = start + 1;
+        while (end < draws.Length
+               && ReferenceEquals(draws[end].Model, first.Model)
+               && draws[end].SubMesh == first.SubMesh
+               && ReferenceEquals(draws[end].Material, first.Material))
+            end++;
+        return end - start;
+    }
 
     /// <summary>Forgets the material and model numbering, for when the resources behind them are released.</summary>
     public void Reset()
@@ -107,6 +151,7 @@ sealed class RenderList
         nextOrder = 0;
         Models.Clear();
         Lights.Clear();
+        InstancedModels.Clear();
         Draws.Clear();
     }
 }

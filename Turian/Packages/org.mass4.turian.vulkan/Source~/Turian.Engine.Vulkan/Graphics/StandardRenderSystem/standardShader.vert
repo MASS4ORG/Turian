@@ -16,6 +16,9 @@ layout(location = 2) out vec3 fragNormalWorld;
 layout(location = 3) out vec2 fragUv;
 layout(location = 4) out vec3 fragTangentWorld;
 layout(location = 5) out vec3 fragBitangentWorld;
+layout(location = 6) flat out vec4 fragInstanceColor;
+layout(location = 7) flat out vec4 fragCustomData;
+layout(location = 8) flat out uint fragLayerMask;
 
 struct PointLight {
     vec4 position;
@@ -30,16 +33,27 @@ layout(set = 0, binding = 0) uniform GlobalUbo {
     PointLight pointLights[uboLights];
 } ubo;
 
-layout(push_constant) uniform Push {
-    mat4 modelMatrix;
-    mat4 normalMatrix;
-} push;
+// Per-instance data — must match InstanceData.cs. normal[3][3] carries the render layer's mask bits.
+struct InstanceData {
+    mat4 model;
+    mat4 normal;
+    vec4 color;
+    vec4 custom;
+};
+
+layout(std430, set = 2, binding = 0) readonly buffer Instances {
+    InstanceData instances[];
+};
 
 void main() {
-    vec4 positionWorld = push.modelMatrix * vec4(position, 1.0);
+    // gl_InstanceIndex already includes the draw's firstInstance.
+    mat4 model = instances[gl_InstanceIndex].model;
+    mat4 normalMatrix = instances[gl_InstanceIndex].normal;
+
+    vec4 positionWorld = model * vec4(position, 1.0);
     gl_Position = ubo.projection * ubo.view * positionWorld;
 
-    mat3 nm = mat3(push.normalMatrix);
+    mat3 nm = mat3(normalMatrix);
     fragNormalWorld = normalize(nm * normal);
 
     // Geometry without tangents carries a zero tangent; normalizing it would produce NaN
@@ -52,4 +66,7 @@ void main() {
     fragPosWorld = positionWorld.xyz;
     fragUv = uv;
     fragColor = color;
+    fragInstanceColor = instances[gl_InstanceIndex].color;
+    fragCustomData = instances[gl_InstanceIndex].custom;
+    fragLayerMask = floatBitsToUint(normalMatrix[3][3]);
 }

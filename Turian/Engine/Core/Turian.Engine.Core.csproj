@@ -30,7 +30,7 @@
 
     <!-- Engine-independent libraries, each in its own repository; the local checkout is used while unpublished. -->
     <ItemGroup Condition="'$(OapLocalPath)' != ''">
-        <ProjectReference Include="$(OapLocalPath)/csharp/src/OpenAssetPackage/OpenAssetPackage.csproj"/>
+        <ProjectReference Include="$(OapLocalPath)/csharp/OpenAssetPackage.csproj"/>
     </ItemGroup>
     <ItemGroup Condition="'$(OapLocalPath)' == ''">
         <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*"/>

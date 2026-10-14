@@ -79,6 +79,38 @@ public sealed class AssetCacheReuseTests : IDisposable
         Assert.NotNull(Asset.Load(source + ".meta"));
     }
 
+    /// <summary>
+    /// A cache cooked by the version-1 <c>.amtex</c> texture importer is cleared on reimport, so the stale artifact,
+    /// which sorts before <c>.ktx2</c>, can never be picked as the primary.
+    /// </summary>
+    [Fact]
+    public void ReimportClearsStaleAmtexArtifact()
+    {
+        var assets = Path.Combine(root, "Assets");
+        Directory.CreateDirectory(assets);
+        File.WriteAllBytes(Path.Combine(assets, "albedo.dds"), DdsFixture.Build("DXT1", 16, 16, 5, 8));
+        Scan();
+        var manifestPath = Directory.GetFiles(Path.Combine(root, ".Cache", "Assets"), "import.json",
+            SearchOption.AllDirectories).Single();
+        var directory = Path.GetDirectoryName(manifestPath)!;
+        foreach (var file in Directory.GetFiles(directory, "primary*")) File.Delete(file);
+        var stale = Path.Combine(directory, "primary.pc.amtex");
+        File.WriteAllText(stale, "stale");
+        var manifest = Serializer.Load<ImportedAssetManifest>(manifestPath)!;
+        manifest.ImporterVersion = 1;
+        manifest.PrimaryArtifactFileName = Path.GetFileName(stale);
+        manifest.Artifacts = [Path.GetFileName(stale)];
+        manifest.TargetArtifacts = new() { [TextureBuildTarget.Pc] = Path.GetFileName(stale) };
+        Serializer.Save(manifestPath, manifest);
+        File.Delete(Path.Combine(root, ".Cache", "assetCatalog.json"));
+
+        var record = Scan().GetAssetsSnapshot().Single(candidate => candidate.ParentAssetId == Guid.Empty);
+
+        Assert.False(File.Exists(stale));
+        Assert.Equal(TextureAssetImporter.ArtifactFileName(TextureBuildTarget.Pc),
+            Path.GetFileName(record.ResolveContentPath()));
+    }
+
     AssetDatabase Scan(IProgressSink? progress = null)
     {
         var database = new AssetDatabase();

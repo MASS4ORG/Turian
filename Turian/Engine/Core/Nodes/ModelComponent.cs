@@ -29,6 +29,15 @@ public class ModelComponent : Component, IDisposable
     /// </summary>
     public List<AssetReference<MaterialAsset>?> Materials { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets a linear tint multiplied into the material's base color. It travels as per-instance data, so
+    /// models that differ only in color still draw in one instanced batch.
+    /// </summary>
+    public Color Color { get; set; } = Color.White;
+
+    /// <summary>Gets or sets four free per-instance values passed to the shader unchanged.</summary>
+    public Vector4 CustomData { get; set; }
+
     Model? model;
     MeshAsset? meshAsset;
     Guid meshAssetId;

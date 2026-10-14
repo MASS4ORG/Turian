@@ -150,6 +150,35 @@ public class NodeTest
         Assert.Equal((double)t3.Scale.X, result3.Scale.X, 4);
     }
 
+    /// <summary>
+    /// Adding siblings one at a time stays linear, so a scene of many props builds quickly, and removals and
+    /// duplicate entries keep parent links consistent.
+    /// </summary>
+    [Fact(Timeout = 30_000)]
+    public async Task ManySiblingsAddAndRemoveKeepParentsInLinearTime()
+    {
+        var root = new Node();
+        var watch = Stopwatch.StartNew();
+        await Task.Run(() =>
+        {
+            for (var i = 0; i < 20_000; i++) root.Children.Add(new Node());
+        }, TestContext.Current.CancellationToken);
+        watch.Stop();
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"adding 20,000 children took {watch.Elapsed}");
+        Assert.All(root.Children, child => Assert.Same(root, child.Parent));
+        var duplicated = root.Children[0];
+        root.Children.Add(duplicated);
+        root.Children.RemoveAt(0);
+        Assert.Same(root, duplicated.Parent);
+        root.Children.Remove(duplicated);
+        Assert.Null(duplicated.Parent);
+        var detached = root.Children[^1];
+        detached.Parent = null;
+        Assert.DoesNotContain(detached, root.Children);
+        Assert.Equal(19_998, root.Children.Count);
+    }
+
     [TypeId("a3000004-0000-4000-8000-000000000005")]
     class TestComponent : Component { }
 

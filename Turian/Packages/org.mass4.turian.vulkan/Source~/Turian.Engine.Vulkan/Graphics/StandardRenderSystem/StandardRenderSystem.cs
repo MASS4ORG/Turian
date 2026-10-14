@@ -1,10 +1,11 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// PBR forward render system. Binds the global UBO at set 0 and, for every submesh drawn,
-/// the material descriptor set at set 1. Materials come from the model's material slots,
-/// falling back to a default material for submeshes that declare none. Draws are sorted by material, then model,
-/// so each is bound once per run of draws that share it.
+/// PBR forward render system. Binds the global UBO at set 0, the material descriptor set at set 1 and the
+/// per-instance data at set 2. Materials come from the model's material slots, falling back to a default material
+/// for submeshes that declare none. Draws are sorted by material, model, then submesh, so each is bound once per run
+/// and every run of the same submesh becomes one instanced draw; <see cref="InstancedModelComponent"/> batches draw
+/// from their own instance buffers.
 /// </summary>
 public class StandardRenderSystem : IRenderSystem
 {
@@ -25,6 +26,10 @@ public class StandardRenderSystem : IRenderSystem
     IOcclusionCuller? occlusion;
     OcclusionDraw[] candidates = [];
     bool indirect;
+    readonly DescriptorSetLayout instanceLayout;
+    readonly RetiredResources retired = new();
+    readonly InstanceBatches batches;
+    readonly InstanceBuffer?[] frameInstances = new InstanceBuffer?[SwapChain.MaxFramesInFlight];
 
     /// <summary>Optional visibility factory; the installed Brick is discovered when no factory is supplied.</summary>
     public IOcclusionCullingFactory? OcclusionCullingFactory { get; set; }
@@ -69,6 +74,10 @@ public class StandardRenderSystem : IRenderSystem
         materials = new MaterialDescriptorContext(vulkan, assets);
         OcclusionCullingFactory = OcclusionCullers.Find();
         UseOcclusionCulling = OcclusionCullingFactory?.IsEnabled(assets) ?? false;
+        instanceLayout = new DescriptorSetLayoutBuilder(vulkan.Vk, vulkan.Device)
+            .AddBinding(0, DescriptorType.StorageBuffer, ShaderStageFlags.VertexBit)
+            .Build();
+        batches = new InstanceBatches(vulkan, instanceLayout, retired);
         CreatePipelineLayout(globalSetLayout);
         CreatePipeline(renderPass);
     }
@@ -80,11 +89,15 @@ public class StandardRenderSystem : IRenderSystem
 
         renderList.Gather(frameInfo.Nodes, frameInfo.Camera.CullingMask);
         UpdateLights(renderList.Lights, ubo);
-        if (UseFrustumCulling && renderList.Models.Count != 0)
+        if (UseFrustumCulling && (renderList.Models.Count != 0 || renderList.InstancedModels.Count != 0))
             GeometryUtility.CalculateFrustumPlanes(
                 frameInfo.Camera.GetViewMatrix() * frameInfo.Camera.GetProjectionMatrix(), frustumPlanes);
         CullingStats = default;
+        retired.NextFrame();
         BuildDraws();
+        var stats = CullingStats;
+        batches.Prepare(renderList.InstancedModels, UseFrustumCulling ? frustumPlanes : [], ref stats);
+        CullingStats = stats;
         prepared = true;
         indirect = false;
     }
@@ -92,7 +105,11 @@ public class StandardRenderSystem : IRenderSystem
     /// <inheritdoc />
     public void RecordBeforeRenderPass(FrameInfo frameInfo)
     {
-        if (!UseOcclusionCulling || renderList.Draws.Count == 0) return;
+        batches.Upload(frameInfo.CommandBuffer, frameInfo.FrameIndex);
+
+        // Indirect commands start at their own instance; without that feature the CPU-culled draws stay direct.
+        if (!UseOcclusionCulling || !vulkan.Device.SupportsDrawIndirectFirstInstance
+                                 || renderList.Draws.Count == 0) return;
         occlusion ??= CreateOcclusionCuller();
         if (occlusion is null) return;
         FillOcclusionCandidates();
@@ -134,7 +151,7 @@ public class StandardRenderSystem : IRenderSystem
             null
         );
 
-        RecordDraws(frameInfo.CommandBuffer);
+        RecordDraws(frameInfo.CommandBuffer, frameInfo.FrameIndex);
 
         // Every material a visible scene needs has resolved by the end of the first frame, so this
         // reports the settled total once rather than counting textures as they stream in.
@@ -180,61 +197,111 @@ public class StandardRenderSystem : IRenderSystem
             var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
             var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
             renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
-                renderList.Draws.Count, cached.Bounds[i - start], component.Node!.RenderLayer));
+                renderList.Draws.Count, cached.Bounds[i - start], component.Node!.RenderLayer, component.Color,
+                component.CustomData));
         }
     }
 
-    void RecordDraws(CommandBuffer commandBuffer)
+    void RecordDraws(CommandBuffer commandBuffer, int frameIndex)
     {
-        VulkanModel? boundModel = null;
-        MaterialResource? boundMaterial = null;
-        var drawIndex = 0;
-        long triangles = 0;
-        var materialBinds = 0;
-        foreach (ref readonly var draw in CollectionsMarshal.AsSpan(renderList.Draws))
+        var draws = CollectionsMarshal.AsSpan(renderList.Draws);
+        var state = new RecordState();
+        if (!draws.IsEmpty)
         {
-            if (!ReferenceEquals(draw.Material, boundMaterial))
-            {
-                BindMaterial(commandBuffer, draw.Material);
-                boundMaterial = draw.Material;
-                if (CollectStatistics) materialBinds++;
-            }
-
-            if (!ReferenceEquals(draw.Model, boundModel))
-            {
-                draw.Model.Bind(commandBuffer);
-                boundModel = draw.Model;
-            }
-
-            StandardPushConstantData push = new() { ModelMatrix = draw.ModelMatrix, NormalMatrix = draw.NormalMatrix };
-            var normal = push.NormalMatrix;
-            // The normal matrix's unused final element carries layer bits within the 128-byte push constant limit.
-            normal.M44 = BitConverter.UInt32BitsToSingle(LayerMask.FromLayer(draw.RenderLayer).Value);
-            push.NormalMatrix = normal;
-            vulkan.Vk.CmdPushConstants(
-                commandBuffer,
-                pipelineLayout,
-                ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-                0,
-                StandardPushConstantData.SizeOf(),
-                ref push
-            );
-            if (indirect)
-                draw.Model.DrawSubMeshIndirect(commandBuffer, occlusion!.IndirectBuffer, (ulong)drawIndex * 20);
-            else
-                draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh);
-            drawIndex++;
-            if (CollectStatistics) triangles += draw.Model.SubMeshes[draw.SubMesh].IndexCount / 3;
+            // One instance per draw, at the draw's index: merged runs read consecutive instances, and an indirect
+            // command's first instance is its candidate index.
+            var instances = FrameInstances(frameIndex, draws.Length);
+            WriteInstances(instances.Instances, draws);
+            BindInstances(commandBuffer, instances.Set);
+            RecordDrawItems(commandBuffer, draws, ref state);
         }
+
+        RecordBatches(commandBuffer, ref state);
         FrameStats = CollectStatistics ? new RenderFrameStats
         {
-            DrawCalls = drawIndex,
-            Triangles = triangles,
-            MaterialBinds = materialBinds,
+            DrawCalls = state.Draws,
+            Instances = state.Instances,
+            Triangles = state.Triangles,
+            MaterialBinds = state.MaterialBinds,
             Submeshes = CullingStats,
             Indirect = indirect,
         } : default;
     }
+
+    void RecordDrawItems(CommandBuffer commandBuffer, ReadOnlySpan<DrawItem> draws, ref RecordState state)
+    {
+        for (var start = 0; start < draws.Length;)
+        {
+            ref readonly var draw = ref draws[start];
+            var count = indirect ? 1 : RenderList.RunLength(draws, start);
+            Bind(commandBuffer, ref state, draw.Model, draw.Material);
+            if (indirect)
+                draw.Model.DrawSubMeshIndirect(commandBuffer, occlusion!.IndirectBuffer, (ulong)start * 20);
+            else
+                draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh, (uint)count, (uint)start);
+            state.Count(draw.Model, draw.SubMesh, count);
+            start += count;
+        }
+    }
+
+    void RecordBatches(CommandBuffer commandBuffer, ref RecordState state)
+    {
+        foreach (var batch in batches.Visible)
+        {
+            // A batch whose upload was never recorded has nothing valid to draw yet.
+            if (batch.Buffer is not { } buffer || batch.Count == 0) continue;
+            BindInstances(commandBuffer, buffer.Set);
+            var model = batch.Model;
+            for (var i = 0; i < model.SubMeshes.Count; i++)
+            {
+                var material = ResolveMaterial(batch.Component.ModelAssetId, model.SubMeshes[i].MaterialIndex,
+                    batch.Component.Material);
+                Bind(commandBuffer, ref state, model, material);
+                model.DrawSubMesh(commandBuffer, i, (uint)batch.Count, 0);
+                state.Count(model, i, batch.Count);
+            }
+        }
+    }
+
+    void Bind(CommandBuffer commandBuffer, ref RecordState state, VulkanModel model, MaterialResource material)
+    {
+        if (!ReferenceEquals(material, state.Material))
+        {
+            BindMaterial(commandBuffer, material);
+            state.Material = material;
+            state.MaterialBinds++;
+        }
+
+        if (!ReferenceEquals(model, state.Model))
+        {
+            model.Bind(commandBuffer);
+            state.Model = model;
+        }
+    }
+
+    InstanceBuffer FrameInstances(int frameIndex, int count)
+    {
+        var slot = frameIndex % frameInstances.Length;
+        var current = frameInstances[slot];
+        if (current is not null && current.Capacity >= count) return current;
+        retired.Retire(current);
+        var capacity = InstanceBuffer.Grow(current?.Capacity ?? 0, count);
+        return frameInstances[slot] = new InstanceBuffer(vulkan, instanceLayout, capacity, hostVisible: true);
+    }
+
+    static void WriteInstances(Span<InstanceData> destination, ReadOnlySpan<DrawItem> draws)
+    {
+        for (var i = 0; i < draws.Length; i++)
+        {
+            ref readonly var draw = ref draws[i];
+            destination[i] = InstanceData.Create(draw.ModelMatrix, draw.NormalMatrix, draw.RenderLayer, draw.Color,
+                draw.CustomData);
+        }
+    }
+
+    unsafe void BindInstances(CommandBuffer commandBuffer, DescriptorSet set) =>
+        vulkan.Vk.CmdBindDescriptorSets(commandBuffer, PipelineBindPoint.Graphics, pipelineLayout, 2, 1, in set, 0,
+            null);
 
     unsafe void BindMaterial(CommandBuffer commandBuffer, MaterialResource material)
     {
@@ -323,6 +390,10 @@ public class StandardRenderSystem : IRenderSystem
     {
         renderList.Reset();
         occlusion?.Dispose();
+        batches.Dispose();
+        foreach (var instances in frameInstances) instances?.Dispose();
+        retired.Dispose();
+        instanceLayout.Dispose();
         worldBounds.Clear();
         derivedMaterials.Clear();
         overrideMaterials.Clear();
@@ -338,14 +409,8 @@ public class StandardRenderSystem : IRenderSystem
         [
             globalSetLayout,
             materials.SetLayout.GetDescriptorSetLayout(),
+            instanceLayout.GetDescriptorSetLayout(),
         ];
-
-        PushConstantRange pushConstantRange = new()
-        {
-            StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
-            Offset = 0,
-            Size = StandardPushConstantData.SizeOf(),
-        };
 
         fixed (Silk.NET.Vulkan.DescriptorSetLayout* descriptorSetLayoutPtr = descriptorSetLayouts)
         {
@@ -354,8 +419,6 @@ public class StandardRenderSystem : IRenderSystem
                 SType = StructureType.PipelineLayoutCreateInfo,
                 SetLayoutCount = (uint)descriptorSetLayouts.Length,
                 PSetLayouts = descriptorSetLayoutPtr,
-                PushConstantRangeCount = 1,
-                PPushConstantRanges = &pushConstantRange,
             };
 
             var resultVulkan = vulkan.Vk.CreatePipelineLayout(vulkan.Device.VkDevice, in pipelineLayoutInfo, null, out pipelineLayout);
@@ -384,5 +447,24 @@ public class StandardRenderSystem : IRenderSystem
             fragShaderPath,
             pipelineConfig
         );
+    }
+
+    /// <summary>The state bound while recording one frame, and the counts it reports.</summary>
+    struct RecordState
+    {
+        public VulkanModel? Model;
+        public MaterialResource? Material;
+        public int Draws;
+        public int Instances;
+        public long Triangles;
+        public int MaterialBinds;
+
+        /// <summary>Counts one draw command of <paramref name="instances"/> instances of a submesh.</summary>
+        public void Count(VulkanModel model, int subMesh, int instances)
+        {
+            Draws++;
+            Instances += instances;
+            Triangles += model.SubMeshes[subMesh].IndexCount / 3 * (long)instances;
+        }
     }
 }
