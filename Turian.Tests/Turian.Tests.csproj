@@ -19,6 +19,7 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.save/Source~/Turian.Engine.Save/Turian.Engine.Save.csproj" />
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CLI/Turian.Editor.CLI.csproj"/>

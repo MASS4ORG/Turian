@@ -1,0 +1,12 @@
+{
+  "__TypeId": "e59d7123-c554-5d48-a6bf-ff26210283e7",
+  "ProductName": "Example-11-Save",
+  "Author": "brmassa",
+  "ApplicationIdentifier": "org.mass4.turian.example11",
+  "Version": "0.1.0",
+  "Icon": null,
+  "StartupScene": {
+    "AssetId": "16f6185c-0132-564c-b733-3992480f6c69"
+  },
+  "Id": "e5ac2bc4-d405-5e58-8f6d-150da567a680"
+}

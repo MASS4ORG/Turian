@@ -1,0 +1,21 @@
+{
+  "__TypeId": "3a5514c7-c592-41f7-8d1f-33cf663aafc1",
+  "EngineVersion": "3.2.0",
+  "BuildProfiles": [
+    {
+      "AssetId": "2f5b568a-c62e-51bb-af0a-d4af805b32a6"
+    }
+  ],
+  "ActiveBuildProfile": {
+    "AssetId": "2f5b568a-c62e-51bb-af0a-d4af805b32a6"
+  },
+  "Settings": [
+    {
+      "AssetId": "e5ac2bc4-d405-5e58-8f6d-150da567a680"
+    },
+    {
+      "AssetId": "73f23c75-3d39-57e7-8f8d-3109c23e046d"
+    }
+  ],
+  "Id": "d7927e21-2dc1-5597-98aa-87110a98bd4c"
+}

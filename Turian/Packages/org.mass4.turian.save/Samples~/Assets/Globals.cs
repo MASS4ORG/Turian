@@ -1,0 +1,10 @@
+global using System;
+global using System.IO;
+global using System.Linq;
+global using System.Text.Json.Serialization;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Microsoft.Extensions.Logging;
+global using Turian.Engine.Core;
+global using Turian.Engine.Save;
+global using Key = Silk.NET.Input.Key;
