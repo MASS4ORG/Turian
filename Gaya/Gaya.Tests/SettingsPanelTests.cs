@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>
 /// The Settings panel is the host's own: a Gaya application with no plugin at all offers it, and it draws and edits
@@ -60,8 +60,8 @@ public sealed class SettingsPanelTests
         using var surface = SKSurface.Create(new SKImageInfo(900, 600));
         var font = Font.FromFamilyName("sans-serif", 14);
 
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
 
         var muted = Find(gui.RootNode!, "settings/sample/field1/editor");
         Assert.NotNull(Find(gui.RootNode!, "settings/sample/field0/editor"));
@@ -69,9 +69,9 @@ public sealed class SettingsPanelTests
 
         input.MousePosition.Returns(new Vector2(muted.Rect.X + 6, muted.Rect.Y + muted.Rect.H / 2));
         input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
         input.IsMouseButtonPressed(GMouseButton.Left).Returns(false);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
 
         Assert.True(page.Muted);
         Assert.True(changes > 0);
@@ -92,7 +92,7 @@ public sealed class SettingsPanelTests
         var gui = new Gui { Input = input };
         using var surface = SKSurface.Create(new SKImageInfo(1000, 1600));
         var font = Font.FromFamilyName("sans-serif", 14);
-        void Frame() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        void Frame() => WorkbenchFrame.Render(gui, surface, font, panel.Render);
         Frame();
         Frame();
         foreach (var id in new[] { "root", "gizmos", "nested", "grid" })
@@ -125,7 +125,7 @@ public sealed class SettingsPanelTests
         var gui = new Gui { Input = input };
         using var surface = SKSurface.Create(new SKImageInfo(900, 600));
         var font = Font.FromFamilyName("sans-serif", 14);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
         Assert.Null(Find(gui.RootNode!, "settings/heading/Scene Viewer"));
     }
 
@@ -149,8 +149,8 @@ public sealed class SettingsPanelTests
         using var surface = SKSurface.Create(new SKImageInfo(900, 600));
         var font = Font.FromFamilyName("sans-serif", 14);
 
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
-        InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(gui, surface, font, panel.Render);
 
         Assert.Equal(matches, Find(gui.RootNode!, "settings/sample/field0/editor") is not null);
         Assert.Null(Find(gui.RootNode!, "settings/sample/field1/editor"));

@@ -27,7 +27,8 @@ sealed partial class Build
     /// <summary>The runnable products. The solution also has test and build-host executables that must not ship.</summary>
     IEnumerable<Project> ReleaseProjects => [Solution.Editor.Turian_Editor_CLI, Solution.Editor.Turian_Editor_Studio];
 
-    Project TestProject => Solution.Turian_Tests;
+    /// <summary>Gaya's tests run on their own so the compiler proves they need nothing from Turian.</summary>
+    IEnumerable<Project> TestProjects => [Solution.Turian_Tests, Solution.Gaya.Gaya_Tests];
 
     AbsolutePath PublishOutput(Project project) => PublishDir / "lib";
 

@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Checks .pss color themes: built-in parity, catalog sources, reloads, errors and token contributions.</summary>
 [Collection(SerialTests.Name)]
@@ -262,7 +262,7 @@ public sealed class ThemeServiceTests : IDisposable
     [Fact]
     public void PreviewIsDroppedAndSheetsReachTheGui()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         frame.Draw();
         Assert.All(frame.Themes.Sheets, sheet => Assert.Contains(sheet, frame.Gui.StyleSheets));
         Assert.Equal(frame.Themes.Current.Panel, frame.Gui.StyleSheets.GetTokenColor("surface-panel"));

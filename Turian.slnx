@@ -24,6 +24,7 @@
     <Project Path="Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
     <Project Path="Gaya/Gaya.Attributes/Gaya.Attributes.csproj" />
     <Project Path="Gaya/Gaya.Host/Gaya.Host.csproj" />
+    <Project Path="Gaya/Gaya.Tests/Gaya.Tests.csproj" />
   </Folder>
   <Folder Name="/Engine/">
     <Project Path="Turian/Engine/Attributes/Turian.Engine.Attributes.csproj" />

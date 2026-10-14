@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Checks that Gaya offers header space to the same panel instance that renders its body.</summary>
 [Collection(SerialTests.Name)]
@@ -33,7 +33,7 @@ public sealed class PanelHeaderTests
     [Fact]
     public void HeaderIsAutomaticAndSharesThePanelInstance()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var panel = new Panel();
         var factories = 0;
         frame.Panels.Register(new PanelDescriptor("custom", "Custom", PanelPlacement.Center, _ =>
@@ -62,7 +62,7 @@ public sealed class PanelHeaderTests
     [Fact]
     public void HeaderFollowsActivationAndPanelLifetime()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var first = new Panel();
         var second = new Panel();
         frame.Panels.Register(new PanelDescriptor("first", "First", PanelPlacement.Center, _ => first));
@@ -86,7 +86,7 @@ public sealed class PanelHeaderTests
     [Fact]
     public void HeaderFailureDoesNotPreventBodyRendering()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var panel = new Panel { ThrowInHeader = true };
         frame.Panels.Register(new PanelDescriptor("broken", "Broken", PanelPlacement.Center, _ => panel));
         frame.Draw();
@@ -98,7 +98,7 @@ public sealed class PanelHeaderTests
     [Fact]
     public void ReplacingAPanelReplacesItsHeaderInstance()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var old = new Panel();
         var replacement = new Panel();
         frame.Panels.Register(new PanelDescriptor("live", "Live", PanelPlacement.Center, _ => old));

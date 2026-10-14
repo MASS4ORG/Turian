@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Tests for how the editor settings file is written.</summary>
 public class EditorSettingsFileTests : IDisposable
@@ -87,7 +87,7 @@ public class EditorSettingsFileTests : IDisposable
     public void TestsUseIsolatedPreferences()
     {
         var directory = Environment.GetEnvironmentVariable("GAYA_CONFIG_HOME")!;
-        Assert.Contains("turian-test-preferences-", directory);
+        Assert.Contains("gaya-test-preferences-", directory);
         Assert.Equal(Path.Combine(directory, "settings.json"),
             new EditorSettings(NullLogger.Instance).PathFor(SettingsScope.User));
         Assert.Equal(Path.Combine(directory, "layout.json"), new WorkbenchLayoutStore(NullLogger.Instance).Path);

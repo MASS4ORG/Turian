@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Plugins installed into the application through studio-scope packages.</summary>
 public sealed class PackagedPluginsTests : IDisposable

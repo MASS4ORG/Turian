@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Studio-scope bricks managed through the Bricks panel with no project open.</summary>
 [Collection(SerialTests.Name)]
@@ -184,7 +184,7 @@ public sealed class StudioBricksTests : IDisposable
             gui.EndFrame();
         }
 
-        public IEnumerable<LayoutNode> Nodes() => GayaChromeTests.Descendants(gui.RootNode!);
+        public IEnumerable<LayoutNode> Nodes() => WorkbenchFrame.Descendants(gui.RootNode!);
 
         public void Dispose() => surface.Dispose();
     }

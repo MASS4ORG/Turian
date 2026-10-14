@@ -11,7 +11,7 @@ public sealed class TaskBarChromeTests
     [InlineData(true, true)]
     public void ActiveTasksScheduleElapsedTimeRefresh(bool hasTask, bool completed)
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var tasks = new BackgroundTaskManager();
         var chrome = new TaskBarChrome(tasks);
         Assert.Throws<ArgumentNullException>(() => chrome.Render(null!));

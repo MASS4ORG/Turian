@@ -18,17 +18,17 @@ sealed partial class Build
             .Produces(CoverageResultFile)
             .Executes(() =>
             {
-                DotNetRun(settings => WithMsBuildProperties(settings
+                DotNetTest(settings => settings
                     .SetConfiguration(Config)
-                    .SetProjectFile(TestProject.Path)
-                    .SetApplicationArguments(
-                        "--coverage",
+                        .AddProcessAdditionalArguments([
+                            "--coverage",
                         "--coverage-settings", CoverageSettingsFile, // Excludes source generated files
                         "--coverage-output-format", "cobertura",
                         "--coverage-output", CoverageResultFile,
                         "--report-xunit-trx", // Consumed by tools/slow-tests.cs
-                        "--results-directory", CoverageDirectory)
-                ));
+                        "--results-directory", CoverageDirectory
+                        ])
+                    );
             });
 
     public Target TestReport => td =>

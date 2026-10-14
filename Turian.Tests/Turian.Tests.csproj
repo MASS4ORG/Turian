@@ -48,6 +48,7 @@
         <EmbeddedResource Include="$(SolutionDir)/Turian/Editor/CLI/Platform/obj/project.assets.json"
                           LogicalName="Turian.Tests.RuntimeLauncherAssets" />
         <Compile Include="$(SolutionDir)/Turian/Editor/Studio/WindowPlatform.cs" Link="Studio/WindowPlatform.cs" />
+        <Compile Include="$(SolutionDir)/Gaya/Gaya.Tests/WorkbenchFrame.cs" Link="Gaya/WorkbenchFrame.cs" />
         <None Update="Fixtures/**">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>

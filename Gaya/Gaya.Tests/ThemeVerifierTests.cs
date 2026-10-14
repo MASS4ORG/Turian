@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Checks theme sheets before installation: errors, unknown tokens and contrast.</summary>
 public sealed class ThemeVerifierTests : IDisposable

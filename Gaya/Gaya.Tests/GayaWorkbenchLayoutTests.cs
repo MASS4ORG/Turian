@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>
 /// Covers how the workbench turns contributed panels into a dock layout, and how it reconciles a

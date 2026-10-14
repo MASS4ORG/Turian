@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>
 /// Covers the shortcut layer: how a key sequence reads and prints, how a user override replaces a

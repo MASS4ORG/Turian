@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>The <c>.brick</c> transport file: reproducible packing, extraction and archive sources.</summary>
 public sealed class BrickArchiveTests : IDisposable
