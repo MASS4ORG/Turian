@@ -34,6 +34,70 @@ public static class EngineServiceModules
         return services;
     }
 
+    /// <summary>
+    /// The assemblies whose modules a game registers: every engine-referencing assembly <paramref name="root"/>
+    /// reaches, plus loaded brick assemblies, each after its own references, with <paramref name="root"/> last so the
+    /// game's registrations win. Core itself is left out.
+    /// </summary>
+    /// <param name="root">The game's assembly.</param>
+    /// <returns>The assemblies in registration order.</returns>
+    public static IReadOnlyList<Assembly> Graph(Assembly root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        var core = typeof(IEngineServiceModule).Assembly.GetName().Name!;
+        var ordered = new List<Assembly>();
+        var visited = new HashSet<string>(StringComparer.Ordinal) { core };
+
+        // The compiler drops references to bricks the game never names, so loaded bricks are visited explicitly.
+        foreach (var assembly in PrecastAssemblies.Loaded.Append(root))
+        {
+            Visit(assembly, core, visited, ordered);
+        }
+
+        ordered.Remove(root);
+        ordered.Add(root);
+        return ordered;
+    }
+
+    static void Visit(Assembly assembly, string core, HashSet<string> visited, List<Assembly> ordered)
+    {
+        if (!visited.Add(assembly.GetName().Name!))
+        {
+            return;
+        }
+
+        foreach (var reference in assembly.GetReferencedAssemblies())
+        {
+            if (!visited.Contains(reference.Name!) && TryLoad(reference) is { } loaded && ReferencesCore(loaded, core))
+            {
+                Visit(loaded, core, visited, ordered);
+            }
+        }
+
+        ordered.Add(assembly);
+    }
+
+    static bool ReferencesCore(Assembly assembly, string core) =>
+        assembly.GetReferencedAssemblies().Any(reference => reference.Name == core);
+
+    // Prefers an already loaded copy, so a collectible game assembly reaches the bricks the editor loaded.
+    static Assembly? TryLoad(AssemblyName reference)
+    {
+        if (AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == reference.Name) is { } loaded)
+        {
+            return loaded;
+        }
+
+        try
+        {
+            return Assembly.Load(reference);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
+        {
+            return null;
+        }
+    }
+
     static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
     {
         try

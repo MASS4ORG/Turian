@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: pluggable versioned saving system #89.
 - Changed: major change in code style.
 
 ## [3.2.0] - 2026-10-14

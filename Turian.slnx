@@ -33,6 +33,7 @@
     <Project Path="Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj" />
   </Folder>
   <Folder Name="/Packages/">
+    <Project Path="Turian/Packages/org.mass4.turian.save/Source~/Turian.Engine.Save/Turian.Engine.Save.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj" />
     <Project Path="Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj" />

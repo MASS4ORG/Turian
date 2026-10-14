@@ -8,6 +8,11 @@ public static class PrecastAssemblies
     /// <summary>The manifest property that lists the assembly names.</summary>
     public const string ManifestProperty = "PrecastAssemblies";
 
+    static readonly ConcurrentQueue<Assembly> LoadedAssemblies = new();
+
+    /// <summary>The brick assemblies loaded from manifests, in load order.</summary>
+    public static IReadOnlyCollection<Assembly> Loaded => LoadedAssemblies;
+
     /// <summary>
     /// Loads each listed assembly by name and registers its <see cref="TypeIdAttribute"/> types. A missing manifest
     /// or list loads nothing.
@@ -47,7 +52,12 @@ public static class PrecastAssemblies
         {
             try
             {
-                TypeRegistry.ScanAssembly(Assembly.Load(new AssemblyName(name)));
+                var assembly = Assembly.Load(new AssemblyName(name));
+                TypeRegistry.ScanAssembly(assembly);
+                if (!LoadedAssemblies.Contains(assembly))
+                {
+                    LoadedAssemblies.Enqueue(assembly);
+                }
             }
             catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
             {

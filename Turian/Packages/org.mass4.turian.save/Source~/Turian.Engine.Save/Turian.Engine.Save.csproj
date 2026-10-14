@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="../../Precast~/lib" />
+    </Target>
+</Project>
