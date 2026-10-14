@@ -33,7 +33,7 @@ public struct ModelBuilder
     }
 
     /// <summary>Resolves submeshes, computing bounds for procedural geometry that supplies no bounds.</summary>
-    internal IReadOnlyList<SubMesh> GetBoundedSubMeshes()
+    internal readonly IReadOnlyList<SubMesh> GetBoundedSubMeshes()
     {
         var source = SubMeshes is { Count: > 0 }
             ? SubMeshes
@@ -50,7 +50,7 @@ public struct ModelBuilder
         return Array.AsReadOnly(result);
     }
 
-    Bounds ComputeBounds(SubMesh sub)
+    readonly Bounds ComputeBounds(SubMesh sub)
     {
         var bounds = Bounds.Empty;
         var indexed = Indices.Length > 0;

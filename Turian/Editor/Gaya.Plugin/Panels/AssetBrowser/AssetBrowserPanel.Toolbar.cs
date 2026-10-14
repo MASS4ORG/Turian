@@ -23,11 +23,19 @@ sealed partial class AssetBrowserPanel
         using (gui.Node(-1, ThemeTokens.Current.Scale(26), "assets/toolbar").ExpandWidth()
                    .Direction(Axis.Horizontal).ContentAlignY(0.5f).Gap(4).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) toolbarWidth = gui.CurrentNode.Rect.W;
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                toolbarWidth = gui.CurrentNode.Rect.W;
+            }
+
             NavigationToolbar(gui);
             ToolsToolbar(gui);
         }
-        if (compactToolbar) FiltersToolbar(gui);
+        if (compactToolbar)
+        {
+            FiltersToolbar(gui);
+        }
+
         SnapshotFilters(gui);
     }
 
@@ -40,7 +48,7 @@ sealed partial class AssetBrowserPanel
             if (breadcrumbsDirty) { breadcrumbs = BuildBreadcrumbs(); breadcrumbsDirty = false; }
             if (toolbarDataDirty)
             {
-                typeOptions = [AssetQuery.FolderType, .. types.Types.Select(type => type.Id), AssetQuery.OtherType];
+                typeOptions = [AssetQuery.FolderType, .. types.Types.Select(static type => type.Id), AssetQuery.OtherType];
                 labelOptions = AssetLabelService.Collect(entries);
                 toolbarDataDirty = false;
             }
@@ -73,8 +81,15 @@ sealed partial class AssetBrowserPanel
                    .ContentAlignY(0.5f).Gap(4).Enter())
         {
             SearchControl(gui);
-            if (StudioControls.SmallTextButton(gui, "×", "assets/clearFilters", theme.Scale(22), "Clear filters")) ClearFilters();
-            if (!compactToolbar) FilterGroup(gui);
+            if (StudioControls.SmallTextButton(gui, "×", "assets/clearFilters", theme.Scale(22), "Clear filters"))
+            {
+                ClearFilters();
+            }
+
+            if (!compactToolbar)
+            {
+                FilterGroup(gui);
+            }
         }
     }
 
@@ -98,6 +113,7 @@ sealed partial class AssetBrowserPanel
     void SnapshotFilters(Gui gui)
     {
         if (gui.Pass == Pass.Pass1Build && queryDirty)
+        {
             frameFilter = new AssetFilter
             {
                 Name = search.Trim(),
@@ -105,6 +121,7 @@ sealed partial class AssetBrowserPanel
                 Labels = filterLabels.ToHashSet(),
                 FavoritesOnly = favoritesOnly,
             };
+        }
     }
 
     void SearchControl(Gui gui)
@@ -160,7 +177,10 @@ sealed partial class AssetBrowserPanel
         var zoom = (float)Math.Clamp(browserSettings.GridZoom, 32, 256);
         gui.Slider(ref zoom, 32, 256, step: 16, width: ThemeTokens.Current.Scale(compactToolbar ? 64 : 80),
             height: ThemeTokens.Current.Scale(24));
-        if (gui.Pass == Pass.Pass2Render && (int)zoom != browserSettings.GridZoom) SetZoom((int)zoom);
+        if (gui.Pass == Pass.Pass2Render && (int)zoom != browserSettings.GridZoom)
+        {
+            SetZoom((int)zoom);
+        }
     }
 
     void SetZoom(int zoom)
@@ -175,9 +195,16 @@ sealed partial class AssetBrowserPanel
         using (gui.Node(theme.Scale(22), theme.Scale(22), "assets/" + id).BlockInput().AlignContent(0.5f, 0.5f).Enter())
         {
             gui.DrawText(text, theme.Text(12), enabled ? theme.Ink : theme.InkFaint);
-            if (gui.Pass != Pass.Pass2Render || !enabled) return;
+            if (gui.Pass != Pass.Pass2Render || !enabled)
+            {
+                return;
+            }
+
             gui.RegisterFocusable();
-            if (gui.GetInteractable().OnClick()) action();
+            if (gui.GetInteractable().OnClick())
+            {
+                action();
+            }
         }
     }
 
@@ -199,8 +226,15 @@ sealed partial class AssetBrowserPanel
         breadcrumbsDirty = true;
         queryDirty = true;
         gridReset = true;
-        if (navigation.Current is not { } current) return;
-        for (var path = current; path is not null; path = ParentOf(path)) state.SetExpanded(path, true);
+        if (navigation.Current is not { } current)
+        {
+            return;
+        }
+
+        for (var path = current; path is not null; path = ParentOf(path))
+        {
+            state.SetExpanded(path, true);
+        }
     }
 
     void QueryChanged()

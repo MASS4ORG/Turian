@@ -151,7 +151,10 @@ public sealed class PackageManifest
         var merged = new Dictionary<string, string>(Nuget);
         foreach (var (_, extra) in PlatformNuget.Where(p => string.Equals(p.Key, platform, StringComparison.OrdinalIgnoreCase)))
         {
-            foreach (var (package, version) in extra) merged[package] = version;
+            foreach (var (package, version) in extra)
+            {
+                merged[package] = version;
+            }
         }
 
         return merged;
@@ -169,7 +172,10 @@ public sealed class PackageManifest
     public static PackageManifest Load(string packageRoot, IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
     {
         var path = Path.Combine(packageRoot, FileName);
-        if (!File.Exists(path)) throw new PackageException($"{packageRoot} has no {FileName}.");
+        if (!File.Exists(path))
+        {
+            throw new PackageException($"{packageRoot} has no {FileName}.");
+        }
 
         return Parse(File.ReadAllText(path), path, reservedCategoryPrefixes);
     }
@@ -192,7 +198,11 @@ public sealed class PackageManifest
             throw new PackageException($"{path} is not a valid package manifest: {ex.Message}", ex);
         }
 
-        if (manifest is null) throw new PackageException($"{path} is empty.");
+        if (manifest is null)
+        {
+            throw new PackageException($"{path} is empty.");
+        }
+
         manifest.Validate(path, reservedCategoryPrefixes ?? []);
         return manifest;
     }
@@ -207,7 +217,9 @@ public sealed class PackageManifest
     {
         var node = JsonSerializer.SerializeToNode(this, PackageJson.Options)!.AsObject();
         foreach (var name in node.Where(static p => IsDefault(p.Value)).Select(static p => p.Key).ToList())
+        {
             node.Remove(name);
+        }
 
         return node.ToJsonString(PackageJson.Options);
     }
@@ -218,26 +230,42 @@ public sealed class PackageManifest
 
     void Validate(string path, IReadOnlyCollection<string> reservedCategoryPrefixes)
     {
-        if (!PackageId.IsValid(Name)) throw new PackageException($"{path}: '{Name}' is not a valid package id.");
-        if (Version is null) throw new PackageException($"{path}: package '{Name}' has no version.");
+        if (!PackageId.IsValid(Name))
+        {
+            throw new PackageException($"{path}: '{Name}' is not a valid package id.");
+        }
+
+        if (Version is null)
+        {
+            throw new PackageException($"{path}: package '{Name}' has no version.");
+        }
 
         foreach (var id in Dependencies.Keys.Concat(DevDependencies.Keys).Where(static id => !PackageId.IsValid(id)))
+        {
             throw new PackageException($"{path}: dependency '{id}' is not a valid package id.");
+        }
 
         ValidateShipping(path);
 
         if (Platforms.Concat(PlatformNuget.Keys).Any(static p => string.IsNullOrWhiteSpace(p)))
+        {
             throw new PackageException($"{path}: platform ids cannot be empty.");
+        }
 
         foreach (var category in Categories)
         {
             var colon = category.IndexOf(':');
             var prefix = colon > 0 ? category[..colon] : string.Empty;
             if (colon <= 0 || colon == category.Length - 1)
+            {
                 throw new PackageException($"{path}: category '{category}' must read 'prefix:name'.");
+            }
+
             if (prefix != Name && !Dependencies.ContainsKey(prefix) && !reservedCategoryPrefixes.Contains(prefix))
+            {
                 throw new PackageException(
                     $"{path}: category '{category}' uses prefix '{prefix}', which is neither this package, one of its dependencies nor a reserved prefix.");
+            }
         }
     }
 
@@ -245,11 +273,15 @@ public sealed class PackageManifest
     void ValidateShipping(string path)
     {
         if (EditorOnly && CompileTimeOnly)
+        {
             throw new PackageException($"{path}: a package cannot be both editor-only and compile-time-only.");
+        }
 
         if (ClientOnly && (EditorOnly || CompileTimeOnly))
+        {
             throw new PackageException(
                 $"{path}: a client-only package ships in games, so it cannot be editor- or compile-time-only.");
+        }
     }
 }
 

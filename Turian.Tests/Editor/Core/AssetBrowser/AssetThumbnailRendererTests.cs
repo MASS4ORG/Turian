@@ -67,7 +67,11 @@ public sealed class AssetThumbnailRendererTests(VulkanFixture fixture) : IClassF
         }
         finally
         {
-            if (modelId != Guid.Empty) ModelAsset.InvalidateCacheEntry(modelId);
+            if (modelId != Guid.Empty)
+            {
+                ModelAsset.InvalidateCacheEntry(modelId);
+            }
+
             directory.Delete(recursive: true);
         }
     }

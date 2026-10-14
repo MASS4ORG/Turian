@@ -56,8 +56,14 @@ public static class BrickFork
 
         foreach (var (path, hash) in fork)
         {
-            if (!upstream.TryGetValue(path, out var original)) differences.Add(new ForkDifference(path, ForkChange.Added));
-            else if (original != hash) differences.Add(new ForkDifference(path, ForkChange.Modified));
+            if (!upstream.TryGetValue(path, out var original))
+            {
+                differences.Add(new ForkDifference(path, ForkChange.Added));
+            }
+            else if (original != hash)
+            {
+                differences.Add(new ForkDifference(path, ForkChange.Modified));
+            }
         }
 
         differences.AddRange(upstream.Keys.Where(path => !fork.ContainsKey(path)).Select(static path => new ForkDifference(path, ForkChange.Removed)));
@@ -85,7 +91,10 @@ public static class BrickFork
             var forkChanged = inFork != inBase || (inFork && forkHash != baseHash);
             var nextChanged = inNext != inBase || (inNext && nextHash != baseHash);
 
-            if (!nextChanged) continue;
+            if (!nextChanged)
+            {
+                continue;
+            }
 
             if (!forkChanged)
             {
@@ -103,7 +112,10 @@ public static class BrickFork
                 continue;
             }
 
-            if (inFork && inNext && forkHash == nextHash) continue;
+            if (inFork && inNext && forkHash == nextHash)
+            {
+                continue;
+            }
 
             if (!inFork || !inNext)
             {
@@ -130,7 +142,10 @@ public static class BrickFork
         var forkFile = Path.Combine(forkRoot, path);
         var upstreamFile = Path.Combine(upstreamRoot, path);
         var baseFile = baseRoot is null ? null : Path.Combine(baseRoot, path);
-        if (IsBinary(forkFile) || IsBinary(upstreamFile) || (baseFile is not null && IsBinary(baseFile))) return MergeOutcome.Conflict;
+        if (IsBinary(forkFile) || IsBinary(upstreamFile) || (baseFile is not null && IsBinary(baseFile)))
+        {
+            return MergeOutcome.Conflict;
+        }
 
         // A file both sides added has no common ancestor: merge against an empty one, which conflicts wherever they differ.
         var emptyBase = baseFile ?? Path.GetTempFileName();
@@ -138,13 +153,18 @@ public static class BrickFork
         {
             var start = new ProcessStartInfo("git") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
             foreach (var argument in new[] { "merge-file", "-p", "-L", "fork", "-L", "original", "-L", "upstream", forkFile, emptyBase, upstreamFile })
+            {
                 start.ArgumentList.Add(argument);
+            }
 
             using var process = Process.Start(start) ?? throw new PackageException("git could not be started.");
             var merged = process.StandardOutput.ReadToEnd();
             var error = process.StandardError.ReadToEnd();
             process.WaitForExit();
-            if (process.ExitCode is < 0 or > 127) throw new PackageException($"git merge-file failed for {path}: {error.Trim()}");
+            if (process.ExitCode is < 0 or > 127)
+            {
+                throw new PackageException($"git merge-file failed for {path}: {error.Trim()}");
+            }
 
             File.SetAttributes(forkFile, FileAttributes.Normal);
             File.WriteAllText(forkFile, merged);
@@ -156,7 +176,10 @@ public static class BrickFork
         }
         finally
         {
-            if (baseFile is null && File.Exists(emptyBase)) File.Delete(emptyBase);
+            if (baseFile is null && File.Exists(emptyBase))
+            {
+                File.Delete(emptyBase);
+            }
         }
     }
 
@@ -171,7 +194,11 @@ public static class BrickFork
     {
         var target = Path.Combine(toRoot, path);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-        if (File.Exists(target)) File.SetAttributes(target, FileAttributes.Normal);
+        if (File.Exists(target))
+        {
+            File.SetAttributes(target, FileAttributes.Normal);
+        }
+
         File.Copy(Path.Combine(fromRoot, path), target, overwrite: true);
         File.SetAttributes(target, FileAttributes.Normal);
     }
@@ -183,7 +210,10 @@ public static class BrickFork
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains)) continue;
+            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains))
+            {
+                continue;
+            }
 
             files[relative] = relative == PackageManifest.FileName ? ManifestHash(file) : Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)));
         }
@@ -193,7 +223,10 @@ public static class BrickFork
 
     static string ManifestHash(string file)
     {
-        if (JsonNode.Parse(File.ReadAllText(file)) is not JsonObject manifest) return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)));
+        if (JsonNode.Parse(File.ReadAllText(file)) is not JsonObject manifest)
+        {
+            return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)));
+        }
 
         manifest.Remove("upstream");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(manifest.ToJsonString())));

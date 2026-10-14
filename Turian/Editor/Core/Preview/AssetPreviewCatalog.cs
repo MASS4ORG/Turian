@@ -13,7 +13,7 @@ public sealed class AssetPreviewCatalog
 {
     readonly BuildManager buildManager;
 
-    readonly Dictionary<string, Assembly> knownAssemblies = new(StringComparer.Ordinal);
+    readonly Dictionary<string, ReflectionAssembly> knownAssemblies = new(StringComparer.Ordinal);
     readonly Dictionary<Type, Type> registrations = new();
     readonly Dictionary<Type, IAssetPreviewProvider> providerCache = new();
 
@@ -49,16 +49,29 @@ public sealed class AssetPreviewCatalog
     /// </summary>
     public IAssetPreviewProvider? GetProvider(Type assetType)
     {
-        if (assetType is null) throw new ArgumentNullException(nameof(assetType));
+        if (assetType is null)
+        {
+            throw new ArgumentNullException(nameof(assetType));
+        }
+
         EnsureRefreshed();
 
         for (var type = assetType; type is not null; type = type.BaseType)
         {
-            if (!registrations.TryGetValue(type, out var providerType)) continue;
+            if (!registrations.TryGetValue(type, out var providerType))
+            {
+                continue;
+            }
 
-            if (providerCache.TryGetValue(providerType, out var cached)) return cached;
+            if (providerCache.TryGetValue(providerType, out var cached))
+            {
+                return cached;
+            }
 
-            if (Activator.CreateInstance(providerType) is not IAssetPreviewProvider provider) continue;
+            if (Activator.CreateInstance(providerType) is not IAssetPreviewProvider provider)
+            {
+                continue;
+            }
 
             providerCache[providerType] = provider;
             return provider;
@@ -84,7 +97,7 @@ public sealed class AssetPreviewCatalog
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types = [.. ex.Types.Where(t => t is not null).Cast<Type>()];
+                types = [.. ex.Types.Where(static t => t is not null).Cast<Type>()];
             }
             catch
             {
@@ -100,7 +113,10 @@ public sealed class AssetPreviewCatalog
                 }
 
                 var attribute = type.GetCustomAttribute<AssetPreviewAttribute>();
-                if (attribute is null) continue;
+                if (attribute is null)
+                {
+                    continue;
+                }
 
                 registrations[attribute.AssetType] = type;
             }

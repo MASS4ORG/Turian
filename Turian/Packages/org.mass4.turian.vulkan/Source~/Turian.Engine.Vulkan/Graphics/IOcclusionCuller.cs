@@ -50,7 +50,9 @@ public static class OcclusionCullers
         {
             if (!assembly.IsDynamic &&
                 assembly.GetCustomAttribute<OcclusionCullingFactoryAttribute>() is { } attribute)
+            {
                 return (IOcclusionCullingFactory)Activator.CreateInstance(attribute.FactoryType)!;
+            }
         }
         return null;
     }

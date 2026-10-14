@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Turian.Tests;
@@ -12,7 +11,11 @@ public class RenderListTests
     static Node NodeWith(string name, params Component[] components)
     {
         var node = new Node { Name = name };
-        foreach (var component in components) node.AddComponent(component);
+        foreach (var component in components)
+        {
+            node.AddComponent(component);
+        }
+
         return node;
     }
 
@@ -119,11 +122,13 @@ public class RenderListTests
         int[] submeshes = [0, 1, 2, 3];
         (int Material, int Model)[] keys = [(1, 0), (0, 1), (1, 1), (0, 0)];
         foreach (var i in submeshes)
+        {
             list.Draws.Add(new DrawItem(null!, i, null!, default, default, RenderList.SortKey(keys[i].Material, keys[i].Model)));
+        }
 
         list.Sort();
 
-        Assert.Equal([3, 1, 0, 2], list.Draws.Select(draw => draw.SubMesh));
+        Assert.Equal([3, 1, 0, 2], list.Draws.Select(static draw => draw.SubMesh));
     }
 
     /// <summary>Within one material and model, draws of the same submesh become contiguous in scene order.</summary>
@@ -133,13 +138,15 @@ public class RenderListTests
         var list = new RenderList();
         int[] submeshes = [1, 0, 1, 0, 2];
         for (var sequence = 0; sequence < submeshes.Length; sequence++)
+        {
             list.Draws.Add(new DrawItem(null!, submeshes[sequence], null!, default, default, RenderList.SortKey(0, 0),
                 sequence));
+        }
 
         list.Sort();
 
-        Assert.Equal([0, 0, 1, 1, 2], list.Draws.Select(draw => draw.SubMesh));
-        Assert.Equal([1, 3, 0, 2, 4], list.Draws.Select(draw => draw.Sequence));
+        Assert.Equal([0, 0, 1, 1, 2], list.Draws.Select(static draw => draw.SubMesh));
+        Assert.Equal([1, 3, 0, 2, 4], list.Draws.Select(static draw => draw.Sequence));
     }
 
     /// <summary>A run merges only draws sharing model, submesh and material; any difference starts a new draw.</summary>
@@ -160,7 +167,9 @@ public class RenderListTests
 
         var runs = new List<int>();
         for (var start = 0; start < draws.Length; start += runs[^1])
+        {
             runs.Add(RenderList.RunLength(draws, start));
+        }
 
         Assert.Equal([3, 1, 1, 2], runs);
 
@@ -179,14 +188,17 @@ public class RenderListTests
             var draw = new DrawItem(null!, sequence, null!, default, default,
                 RenderList.SortKey(sequence % 3, 0), sequence);
             full.Draws.Add(draw);
-            if (sequence % 5 != 0) culled.Draws.Add(draw);
+            if (sequence % 5 != 0)
+            {
+                culled.Draws.Add(draw);
+            }
         }
 
         full.Sort();
         culled.Sort();
-        var expected = Enumerable.Range(0, 64).OrderBy(sequence => sequence % 3).ThenBy(sequence => sequence);
-        Assert.Equal(expected, full.Draws.Select(draw => draw.Sequence));
-        Assert.Equal(full.Draws.Where(draw => draw.Sequence % 5 != 0), culled.Draws);
+        var expected = Enumerable.Range(0, 64).OrderBy(static sequence => sequence % 3).ThenBy(static sequence => sequence);
+        Assert.Equal(expected, full.Draws.Select(static draw => draw.Sequence));
+        Assert.Equal(full.Draws.Where(static draw => draw.Sequence % 5 != 0), culled.Draws);
     }
 
     /// <summary>Lights fill their slots in scene order, past the slot count are dropped, and stale slots clear.</summary>
@@ -239,7 +251,11 @@ public class RenderListTests
         expected.AddRange(new Vector4(1f, 1f, 1f, 0.02f).AsBytes());
         var points = new PointLight[10];
         var directionals = new DirectionalLight[4];
-        for (var i = 0; i < points.Length; i++) points[i].SetColor(Vector4.Zero, 0f);
+        for (var i = 0; i < points.Length; i++)
+        {
+            points[i].SetColor(Vector4.Zero, 0f);
+        }
+
         points[2].SetPosition(new Vector3(4, 5, 6));
         directionals[1].SetDirection(Vector3.UnitY);
         directionals[1].SetColor(Vector4.One, 2f);

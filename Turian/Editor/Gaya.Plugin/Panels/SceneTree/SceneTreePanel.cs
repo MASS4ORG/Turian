@@ -84,27 +84,43 @@ sealed class SceneTreePanel : IPanel
             return;
         }
 
-        if (gui.Pass == Pass.Pass2Render) pointer = gui.Input.MousePosition;
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            pointer = gui.Input.MousePosition;
+        }
 
         // Flattening a scene the size of Bistro allocates thousands of rows, so it only happens when
         // the hierarchy changes rather than every frame.
-        if (gui.Pass == Pass.Pass1Build) PrepareTree(root);
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            PrepareTree(root);
+        }
 
         // The selection flows both ways: the controller wins when something else changed it, and the
         // tree wins when the keyboard moved it. Pushing the controller's value in unconditionally
         // undid every arrow-key move on the next frame.
-        if (gui.Pass == Pass.Pass1Build) PushSelection();
+        if (gui.Pass == Pass.Pass1Build)
+        {
+            PushSelection();
+        }
 
         gui.TreeView(state, rows, StudioControls.Tree(), OnClick, DragPayload, Rename, OnEmptyClick,
             dropAccept: CanDrop, onDrop: Drop);
 
-        if (gui.Pass == Pass.Pass2Render) PullSelection();
+        if (gui.Pass == Pass.Pass2Render)
+        {
+            PullSelection();
+        }
+
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
     }
 
     void PrepareTree(Node root)
     {
-        if (stale || !ReferenceEquals(builtFor, root)) Rebuild(root);
+        if (stale || !ReferenceEquals(builtFor, root))
+        {
+            Rebuild(root);
+        }
     }
 
     void PushSelection()
@@ -116,7 +132,10 @@ sealed class SceneTreePanel : IPanel
             syncedNodes = inspector.SelectedNodes;
             state.SetSelection(syncedNodes.Select(node => keysByNode.GetValueOrDefault(node)).OfType<string>(),
                 syncedSelection is null ? null : keysByNode.GetValueOrDefault(syncedSelection));
-            if (state.SelectedId is { } revealed) Reveal(revealed);
+            if (state.SelectedId is { } revealed)
+            {
+                Reveal(revealed);
+            }
         }
 
     }
@@ -135,17 +154,30 @@ sealed class SceneTreePanel : IPanel
         // A node row dropped on another row moves under it.
         if (item.Tag is Node target && payload is ReferenceDragPayload dragged
             && sceneTree.FindNodeById(dragged.Id) is { } dropped)
+        {
             ReparentSelection(dropped, target);
+        }
     }
 
     void DropComponent(Node node, Type type)
     {
-        if (!inspector.SelectedNodes.Contains(node)) inspector.Select(node);
+        if (!inspector.SelectedNodes.Contains(node))
+        {
+            inspector.Select(node);
+        }
+
         undo.BeginGesture();
         try
         {
-            foreach (var selected in inspector.SelectedNodes) undo.RecordObject(selected, "Add Component");
-            if (inspector.AddComponents(inspector.SelectedNodes, type)) Invalidate();
+            foreach (var selected in inspector.SelectedNodes)
+            {
+                undo.RecordObject(selected, "Add Component");
+            }
+
+            if (inspector.AddComponents(inspector.SelectedNodes, type))
+            {
+                Invalidate();
+            }
         }
         finally { undo.EndGesture(); }
     }
@@ -160,7 +192,9 @@ sealed class SceneTreePanel : IPanel
     void Reveal(string key)
     {
         for (var cut = key.LastIndexOf('/'); cut > 0; cut = key.LastIndexOf('/', cut - 1))
+        {
             state.SetExpanded(key[..cut], true);
+        }
 
         state.Reveal();
     }
@@ -197,30 +231,46 @@ sealed class SceneTreePanel : IPanel
             Tint: Tint(node, link)));
 
         var children = node.Children.ToList();
-        for (var i = 0; i < children.Count; i++) Append(children[i], depth + 1, $"{key}/{i}");
+        for (var i = 0; i < children.Count; i++)
+        {
+            Append(children[i], depth + 1, $"{key}/{i}");
+        }
     }
 
     void OnClick(TreeViewEvent e)
     {
-        if (e.Item.Tag is not Node node) return;
+        if (e.Item.Tag is not Node node)
+        {
+            return;
+        }
 
         if (e.Button == MouseButton.Right)
         {
-            if (!inspector.SelectedNodes.Contains(node)) Select(node);
+            if (!inspector.SelectedNodes.Contains(node))
+            {
+                Select(node);
+            }
+
             menuNode = node;
             menuAt = pointer;
             menuOpen = true;
             return;
         }
 
-        if (e.Button != MouseButton.Left) return;
+        if (e.Button != MouseButton.Left)
+        {
+            return;
+        }
 
         PullSelection();
     }
 
     void OnEmptyClick(MouseButton button)
     {
-        if (button != MouseButton.Right) return;
+        if (button != MouseButton.Right)
+        {
+            return;
+        }
 
         menuNode = inspector.SelectedNode ?? sceneTree.CurrentSceneRoot;
         menuAt = pointer;
@@ -259,12 +309,12 @@ sealed class SceneTreePanel : IPanel
     }
 
     /// <summary>Whether a node other than the scene root is selected, so an edit has a target.</summary>
-    public bool HasEditableSelection => inspector.SelectedNodes.Any(node => node.Parent is not null);
+    public bool HasEditableSelection => inspector.SelectedNodes.Any(static node => node.Parent is not null);
 
     /// <summary>Removes the selected node. What the panel's Delete shortcut runs.</summary>
     public void DeleteSelected() => RestructureSelection(() =>
     {
-        operations.Delete(inspector.SelectedNodes);
+        Operations.Delete(inspector.SelectedNodes);
         Invalidate();
     });
 
@@ -274,22 +324,32 @@ sealed class SceneTreePanel : IPanel
     /// <summary>Clones the selected node beside itself. What the panel's Duplicate shortcut runs.</summary>
     public void DuplicateSelected()
     {
-        var clones = operations.Duplicate(inspector.SelectedNodes);
-        if (clones.Count == 0) return;
+        var clones = Operations.Duplicate(inspector.SelectedNodes);
+        if (clones.Count == 0)
+        {
+            return;
+        }
+
         Invalidate();
         inspector.SelectMany(clones);
     }
 
     void BeginRename(Node? node)
     {
-        if (node is null || keysByNode.GetValueOrDefault(node) is not { } key) return;
+        if (node is null || keysByNode.GetValueOrDefault(node) is not { } key)
+        {
+            return;
+        }
 
         state.BeginRename(key, node.Name);
     }
 
     void Rename(TreeItem item, string name)
     {
-        if (item.Tag is not Node node || string.IsNullOrWhiteSpace(name)) return;
+        if (item.Tag is not Node node || string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
 
         undo.RecordObject(node, "Rename");
         sceneTree.RenameNode(node, name, SiblingNames(node.Parent, except: node));
@@ -300,18 +360,13 @@ sealed class SceneTreePanel : IPanel
 
     void Unpack(Node? node, bool completely)
     {
-        if (node is null) return;
+        if (node is null)
+        {
+            return;
+        }
 
         overrides.Unpack(node, completely);
         Invalidate();
-    }
-
-    /// <summary>Deletes a node, asking first to unpack the prefab instance that provides it.</summary>
-    void Delete(Node? node)
-    {
-        if (node is null || node.Parent is null) return;
-
-        Restructure(node, () => DeleteNow(node));
     }
 
     /// <summary>
@@ -338,7 +393,11 @@ sealed class SceneTreePanel : IPanel
                 undo.BeginGesture();
                 try
                 {
-                    while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
+                    while (PrefabOwned(node) is { } owner)
+                    {
+                        overrides.Unpack(owner, completely: false);
+                    }
+
                     change();
                 }
                 finally
@@ -348,27 +407,19 @@ sealed class SceneTreePanel : IPanel
             });
     }
 
-    void Reparent(Node node, Node target)
-    {
-        if (ReferenceEquals(node, target) || node.Parent is not { } parent) return;
-        for (var ancestor = target; ancestor is not null; ancestor = ancestor.Parent)
-            if (ReferenceEquals(ancestor, node)) return;
-
-        undo.RecordObject(parent, "Reparent");
-        undo.RecordObject(target, "Reparent");
-        sceneTree.DetachNode(node);
-        sceneTree.AttachNode(node, target, target.Children.Count);
-        sceneTree.MarkAssetModified();
-        Invalidate();
-    }
-
     void MoveBy(Node node, int offset)
     {
-        if (node.Parent is not { } parent) return;
+        if (node.Parent is not { } parent)
+        {
+            return;
+        }
 
         var index = parent.Children.IndexOf(node);
         var destination = index + offset;
-        if (index < 0 || destination < 0 || destination >= parent.Children.Count) return;
+        if (index < 0 || destination < 0 || destination >= parent.Children.Count)
+        {
+            return;
+        }
 
         undo.RecordObject(parent, offset < 0 ? "Move Up" : "Move Down");
         parent.Children.Move(index, destination);
@@ -383,22 +434,13 @@ sealed class SceneTreePanel : IPanel
             ? instance
             : null;
 
-    void DeleteNow(Node node)
-    {
-        if (node.Parent is not { } parent) return;
-        if (ReferenceEquals(inspector.SelectedNode, node)) inspector.ClearSelection();
-
-        undo.RecordObject(parent, "Delete");
-        sceneTree.DetachNode(node);
-        sceneTree.MarkAssetModified();
-        Invalidate();
-    }
-
     /// <summary>Saves the node as a prefab beside the open scene; the node becomes an instance of it.</summary>
     void CreatePrefab(Node? node)
     {
         if (node?.Parent is null || sceneTree.CurrentAsset is not { } scene || settings.Settings is not { } project)
+        {
             return;
+        }
 
         var directory = Path.GetDirectoryName(Path.Combine(project.ProjectAbsoluteDir, scene.RelativePath))!;
         if (prefabs.CreatePrefab(node, directory) is null)
@@ -414,7 +456,10 @@ sealed class SceneTreePanel : IPanel
 
     void Paste(Node? target)
     {
-        if (clipboard is null || target is null) return;
+        if (clipboard is null || target is null)
+        {
+            return;
+        }
 
         var parent = target.Parent ?? target;
         var clone = sceneTree.CloneNode(clipboard, NodeName(clipboard.Name, parent));
@@ -427,7 +472,10 @@ sealed class SceneTreePanel : IPanel
 
     void Create(Node? reference, bool asChild)
     {
-        if (reference is null) return;
+        if (reference is null)
+        {
+            return;
+        }
 
         var parent = asChild ? reference : reference.Parent ?? reference;
         var node = sceneTree.CreateNode(SiblingNames(parent));
@@ -437,7 +485,10 @@ sealed class SceneTreePanel : IPanel
         sceneTree.MarkAssetModified();
         Invalidate();
 
-        if (asChild && keysByNode.GetValueOrDefault(parent) is { } key) state.SetExpanded(key, true);
+        if (asChild && keysByNode.GetValueOrDefault(parent) is { } key)
+        {
+            state.SetExpanded(key, true);
+        }
 
         Select(node);
     }
@@ -455,28 +506,39 @@ sealed class SceneTreePanel : IPanel
         inspector.Select(node);
     }
 
-    NodeSelectionOperations operations => selectionOperations ??= new(sceneTree, inspector, undo);
+    NodeSelectionOperations Operations => selectionOperations ??= new(sceneTree, inspector, undo);
     NodeSelectionOperations? selectionOperations;
 
     void PullSelection()
     {
-        var nodes = state.SelectedIds.Select(key => nodesByKey.GetValueOrDefault(key)).OfType<Node>().ToArray();
+        var nodes = state.SelectedIds.Select(id => nodesByKey.GetValueOrDefault(id)).OfType<Node>().ToArray();
         var active = state.SelectedId is { } key ? nodesByKey.GetValueOrDefault(key) : null;
-        if (nodes.SequenceEqual(syncedNodes) && ReferenceEquals(active, syncedSelection)) return;
+        if (nodes.SequenceEqual(syncedNodes) && ReferenceEquals(active, syncedSelection))
+        {
+            return;
+        }
+
         inspector.SelectMany(nodes, active);
         syncedNodes = inspector.SelectedNodes;
         syncedSelection = inspector.SelectedNode;
         state.SetSelection(syncedNodes.Select(node => keysByNode.GetValueOrDefault(node)).OfType<string>(),
             syncedSelection is null ? null : keysByNode.GetValueOrDefault(syncedSelection));
-        if (syncedSelection is not null) sceneTree.SelectNode(syncedSelection);
+        if (syncedSelection is not null)
+        {
+            sceneTree.SelectNode(syncedSelection);
+        }
     }
 
     void ReparentSelection(Node dragged, Node target)
     {
-        if (!inspector.SelectedNodes.Contains(dragged)) Select(dragged);
+        if (!inspector.SelectedNodes.Contains(dragged))
+        {
+            Select(dragged);
+        }
+
         RestructureSelection(() =>
         {
-            operations.Reparent(inspector.SelectedNodes, target);
+            Operations.Reparent(inspector.SelectedNodes, target);
             Invalidate();
         });
     }
@@ -496,7 +558,13 @@ sealed class SceneTreePanel : IPanel
                 try
                 {
                     foreach (var node in nodes)
-                        while (PrefabOwned(node) is { } owner) overrides.Unpack(owner, completely: false);
+                    {
+                        while (PrefabOwned(node) is { } owner)
+                        {
+                            overrides.Unpack(owner, completely: false);
+                        }
+                    }
+
                     change();
                 }
                 finally { undo.EndGesture(); }
@@ -523,7 +591,11 @@ sealed class SceneTreePanel : IPanel
     static GuiColor? Tint(Node node, PrefabLink link)
     {
         var theme = ThemeTokens.Current;
-        if (!node.IsActiveInHierarchy) return theme.InkFaint;
+        if (!node.IsActiveInHierarchy)
+        {
+            return theme.InkFaint;
+        }
+
         return link switch
         {
             PrefabLink.None => null,

@@ -18,7 +18,10 @@ public sealed class GameLoopSchedulerTests
         var resumedThread = 0;
         var wait = default(ValueTask);
         OnWorker(() => wait = scheduler.MainThread());
-        if (completeBeforeRegistration) scheduler.DrainUpdate();
+        if (completeBeforeRegistration)
+        {
+            scheduler.DrainUpdate();
+        }
 
         OnWorker(() => wait.GetAwaiter().UnsafeOnCompleted(() =>
         {
@@ -62,7 +65,11 @@ public sealed class GameLoopSchedulerTests
         var completion = new TaskCompletionSource();
         var resumedThread = 0;
         Task routine;
-        using (scheduler.EnterContext()) routine = Routine();
+        using (scheduler.EnterContext())
+        {
+            routine = Routine();
+        }
+
         Assert.Same(previous, SynchronizationContext.Current);
         OnWorker(completion.SetResult);
         Assert.Equal(0, resumedThread);
@@ -110,8 +117,8 @@ public sealed class GameLoopSchedulerTests
     public void PredicateFailure_IsolatedFromOtherWaiters()
     {
         using var scheduler = new GameLoopScheduler();
-        var failure = scheduler.Until(() => throw new InvalidOperationException("predicate")).AsTask();
-        var following = scheduler.Until(() => true).AsTask();
+        var failure = scheduler.Until(static () => throw new InvalidOperationException("predicate")).AsTask();
+        var following = scheduler.Until(static () => true).AsTask();
         Pump(scheduler);
         Assert.True(following.IsCompletedSuccessfully);
         Assert.Equal("predicate", Assert.IsType<InvalidOperationException>(failure.Exception!.InnerException).Message);
@@ -176,7 +183,11 @@ public sealed class GameLoopSchedulerTests
     {
         using var original = new GameLoopScheduler();
         SynchronizationContext context;
-        using (original.EnterContext()) context = SynchronizationContext.Current!;
+        using (original.EnterContext())
+        {
+            context = SynchronizationContext.Current!;
+        }
+
         original.Dispose();
         using var successor = new GameLoopScheduler();
         var ran = false;
@@ -241,7 +252,10 @@ public sealed class GameLoopSchedulerTests
         { IsBackground = true };
         thread.Start();
         Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Worker did not return to the test.");
-        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+        if (failure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+        }
     }
 
     internal static TestOwner CreateOwner()

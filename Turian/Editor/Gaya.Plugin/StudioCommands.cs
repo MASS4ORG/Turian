@@ -14,15 +14,15 @@ static class StudioCommands
         // ── Edit: undo and redo ─────────────────────────────────────────────
         Add(context, MenuIds.Edit, "0", 0, new CommandDescriptor(
             "gaya.turian.undo", "Edit: Undo",
-            sp => sp.GetRequiredService<UndoService>().Undo(),
-            sp => sp.GetRequiredService<UndoService>().CanUndo)
-        { DynamicLabel = sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
+            static sp => sp.GetRequiredService<UndoService>().Undo(),
+            static sp => sp.GetRequiredService<UndoService>().CanUndo)
+        { DynamicLabel = static sp => StepLabel(sp, "Undo", sp.GetRequiredService<UndoService>().UndoLabel) });
 
         Add(context, MenuIds.Edit, "0", 1, new CommandDescriptor(
             "gaya.turian.redo", "Edit: Redo",
-            sp => sp.GetRequiredService<UndoService>().Redo(),
-            sp => sp.GetRequiredService<UndoService>().CanRedo)
-        { DynamicLabel = sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
+            static sp => sp.GetRequiredService<UndoService>().Redo(),
+            static sp => sp.GetRequiredService<UndoService>().CanRedo)
+        { DynamicLabel = static sp => StepLabel(sp, "Redo", sp.GetRequiredService<UndoService>().RedoLabel) });
 
         context.Shortcuts.Add(new KeyBinding("gaya.turian.undo", KeyboardKey.Z, KeyModifiers.Ctrl));
         context.Shortcuts.Add(new KeyBinding("gaya.turian.redo", KeyboardKey.Z, KeyModifiers.Ctrl | KeyModifiers.Shift));
@@ -33,12 +33,12 @@ static class StudioCommands
         // the menu and the Settings panel drive the same stored value.
         Add(context, MenuIds.Edit, "1", 0, new CommandDescriptor(
             "gaya.turian.locale.english", "Edit: Localization: English",
-            sp => sp.GetRequiredService<StudioLocalization>().SetLocale("en"))
+            static sp => sp.GetRequiredService<StudioLocalization>().SetLocale("en"))
         { DynamicLabel = Localized("English") }, "Localization");
 
         Add(context, MenuIds.Edit, "1", 1, new CommandDescriptor(
             "gaya.turian.locale.ptBR", "Edit: Localization: Português (Brasil)",
-            sp => sp.GetRequiredService<StudioLocalization>().SetLocale("pt-BR"))
+            static sp => sp.GetRequiredService<StudioLocalization>().SetLocale("pt-BR"))
         { DynamicLabel = Localized("Português (Brasil)") }, "Localization");
 
         // ── File: project and documents ─────────────────────────────────────
@@ -55,13 +55,13 @@ static class StudioCommands
         Add(context, MenuIds.File, "1", 2, new CommandDescriptor(
             "gaya.turian.save", "File: Save",
             Save,
-            sp => sp.GetRequiredService<AssetWorkspace>().Active is not null)
+            static sp => sp.GetRequiredService<AssetWorkspace>().Active is not null)
         { DynamicLabel = Localized("Save") });
 
         Add(context, MenuIds.File, "1", 3, new CommandDescriptor(
             "gaya.turian.saveAll", "File: Save All",
-            sp => sp.GetRequiredService<AssetWorkspace>().SaveAll(),
-            sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0)
+            static sp => sp.GetRequiredService<AssetWorkspace>().SaveAll(),
+            static sp => sp.GetRequiredService<AssetWorkspace>().Documents.Count > 0)
         { DynamicLabel = Localized("Save All") });
 
         context.Shortcuts.Add(new KeyBinding("gaya.turian.save", KeyboardKey.S, KeyModifiers.Ctrl));
@@ -71,7 +71,7 @@ static class StudioCommands
         // ── File: settings (the Settings entry itself is the host's) ────────
         Add(context, MenuIds.File, "2", 1, new CommandDescriptor(
             "gaya.turian.keyboardShortcuts", "File: Keyboard Shortcuts…",
-            sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))
+            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.ShortcutsPanelId))
         { DynamicLabel = Localized("Keyboard Shortcuts…") });
 
         // A chord, so the studio ships with one: Ctrl+K arms it and Ctrl+S completes it.
@@ -87,13 +87,13 @@ static class StudioCommands
         // ── Project ─────────────────────────────────────────────
         Add(context, MenuIds.Project, "2", 0, new CommandDescriptor(
             "gaya.turian.bricks", "Project: Bricks…",
-            sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BricksPanelId),
+            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BricksPanelId),
             HasProject)
         { DynamicLabel = Localized("Bricks…") });
 
         Add(context, MenuIds.Project, "3", 0, new CommandDescriptor(
             "gaya.turian.recompile", "Assets: Recompile Scripts",
-            sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),
+            static sp => sp.GetRequiredService<ProjectSession>().RecompileScripts(),
             HasProject)
         { DynamicLabel = Localized("Recompile") });
 
@@ -106,9 +106,9 @@ static class StudioCommands
         Add(context, MenuIds.Project, "3", 2, new CommandDescriptor(
             "gaya.turian.play", "Run: Play",
             TogglePlay,
-            sp => sp.GetRequiredService<PlayModeService>().IsActive
+            static sp => sp.GetRequiredService<PlayModeService>().IsActive
                   || sp.GetRequiredService<SceneTreeController>().CurrentSceneRoot is not null)
-        { DynamicLabel = sp => sp.GetRequiredService<PlayModeService>().IsActive ? "Stop" : "Play" });
+        { DynamicLabel = static sp => sp.GetRequiredService<PlayModeService>().IsActive ? "Stop" : "Play" });
 
         Add(context, MenuIds.Project, "3", 3, new CommandDescriptor(
             "gaya.turian.playStartupScene", "Run: Play Startup Scene",
@@ -123,16 +123,16 @@ static class StudioCommands
         Add(context, MenuIds.Project, "3", 4, new CommandDescriptor(
             "gaya.turian.playPause", "Run: Pause / Resume",
             TogglePause,
-            sp => sp.GetRequiredService<PlayModeService>().IsActive)
+            static sp => sp.GetRequiredService<PlayModeService>().IsActive)
         {
-            DynamicLabel = sp =>
+            DynamicLabel = static sp =>
             sp.GetRequiredService<PlayModeService>().State == PlayState.Paused ? "Resume" : "Pause"
         });
 
         Add(context, MenuIds.Project, "3", 5, new CommandDescriptor(
             "gaya.turian.playStep", "Run: Step Frame",
-            sp => sp.GetRequiredService<PlayModeService>().StepFrame(),
-            sp => sp.GetRequiredService<PlayModeService>().State == PlayState.Paused)
+            static sp => sp.GetRequiredService<PlayModeService>().StepFrame(),
+            static sp => sp.GetRequiredService<PlayModeService>().State == PlayState.Paused)
         { DynamicLabel = Localized("Step Frame") });
 
         Add(context, MenuIds.Project, "3", 6, new CommandDescriptor(
@@ -140,7 +140,7 @@ static class StudioCommands
             ToggleStandalone,
             HasProject)
         {
-            DynamicLabel = sp =>
+            DynamicLabel = static sp =>
             sp.GetRequiredService<BuildManager>().IsPlaying ? "Stop Standalone" : "Build & Run"
         });
 
@@ -152,7 +152,7 @@ static class StudioCommands
 
         Add(context, MenuIds.Project, "3", 8, new CommandDescriptor(
                 "gaya.turian.buildProfiles", "Run: Build Profiles…",
-                sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
+                static sp => sp.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.BuildProfilesPanelId),
                 HasProject)
         { DynamicLabel = Localized("Build Profiles…") });
 
@@ -166,7 +166,7 @@ static class StudioCommands
         // ── Help ────────────────────────────────────────────────────────────
         Add(context, MenuIds.Help, "1", 0, new CommandDescriptor(
             "gaya.turian.about", "Help: About",
-            sp => sp.GetRequiredService<AboutDialogChrome>().Open())
+            static sp => sp.GetRequiredService<AboutDialogChrome>().Open())
         { DynamicLabel = Localized("About") });
     }
 
@@ -193,7 +193,7 @@ static class StudioCommands
     {
         var command = new CommandDescriptor(
             $"gaya.turian.projectSettings.{id}", $"Settings: {label}",
-            sp => OpenProjectSettings(sp, typeof(T)),
+            static sp => OpenProjectSettings(sp, typeof(T)),
             HasProject)
         { DynamicLabel = Localized(label) };
 
@@ -208,15 +208,24 @@ static class StudioCommands
     /// </summary>
     static void OpenProjectSettings(IServiceProvider services, Type type)
     {
-        if (services.GetRequiredService<SettingsService>().Settings is not { } project) return;
+        if (services.GetRequiredService<SettingsService>().Settings is not { } project)
+        {
+            return;
+        }
 
         var existing = ProjectSettingsFiles.Locate(project, type);
         var path = existing ?? ProjectSettingsFiles.Ensure(project, type);
-        if (existing is null) services.GetRequiredService<AssetImporter>().ReimportNow(path);
+        if (existing is null)
+        {
+            services.GetRequiredService<AssetImporter>().ReimportNow(path);
+        }
 
         var inspection = services.GetRequiredService<AssetInspectionService>().Inspect(path);
         services.GetRequiredService<NodeInspectorController>().Select(inspection);
-        if (inspection is not null) services.GetRequiredService<AssetRevealService>().Reveal(inspection.Metadata.Id);
+        if (inspection is not null)
+        {
+            services.GetRequiredService<AssetRevealService>().Reveal(inspection.Metadata.Id);
+        }
 
         services.GetRequiredService<IShellHost>().ShowPanel(GayaPlugin.InspectorPanelId);
     }
@@ -254,8 +263,10 @@ static class StudioCommands
             OnComplete = path =>
             {
                 if (path is not null)
+                {
                     services.GetRequiredService<UnsavedChangesGuard>().Leave(leaveProjectQuestion,
                         () => session.Create(path));
+                }
             },
         });
     }
@@ -281,8 +292,10 @@ static class StudioCommands
             OnComplete = path =>
             {
                 if (path is not null)
+                {
                     services.GetRequiredService<UnsavedChangesGuard>().Leave(leaveProjectQuestion,
                         () => session.QueueOpen(path));
+                }
             },
         });
     }
@@ -302,8 +315,8 @@ static class StudioCommands
     {
         Add(context, MenuIds.File, "1", -1, new CommandDescriptor(
             "gaya.turian.newScene", "File: New Scene",
-            sp => sp.GetRequiredService<AssetWorkspace>().NewScene(),
-            sp => !sp.GetRequiredService<PlayModeService>().IsActive)
+            static sp => sp.GetRequiredService<AssetWorkspace>().NewScene(),
+            static sp => !sp.GetRequiredService<PlayModeService>().IsActive)
         { DynamicLabel = Localized("New Scene") });
         context.Shortcuts.Add(new KeyBinding("gaya.turian.newScene", KeyboardKey.N, KeyModifiers.Ctrl));
     }
@@ -311,7 +324,10 @@ static class StudioCommands
     static void Save(IServiceProvider services)
     {
         var workspace = services.GetRequiredService<AssetWorkspace>();
-        if (workspace.Active is { } document) workspace.Save(document);
+        if (workspace.Active is { } document)
+        {
+            workspace.Save(document);
+        }
     }
 
     /// <summary>
@@ -321,7 +337,10 @@ static class StudioCommands
     static void Reimport(IServiceProvider services)
     {
         var settings = services.GetRequiredService<SettingsService>().Settings;
-        if (settings is null) return;
+        if (settings is null)
+        {
+            return;
+        }
 
         var importer = services.GetRequiredService<AssetImporter>();
 
@@ -359,20 +378,30 @@ static class StudioCommands
         services.GetRequiredService<AssetManager>().SaveAllAssets();
 
         if (!playMode.Start())
+        {
             services.GetRequiredService<ILogger>().LogWarning("Cannot play: open a scene first");
+        }
     }
 
     static void PlayStartupScene(IServiceProvider services)
     {
         var playMode = services.GetRequiredService<PlayModeService>();
-        if (playMode.IsActive) return;
+        if (playMode.IsActive)
+        {
+            return;
+        }
 
-        if (!services.GetRequiredService<ProjectSession>().OpenStartupScene()) return;
+        if (!services.GetRequiredService<ProjectSession>().OpenStartupScene())
+        {
+            return;
+        }
 
         FocusGamePanel(services);
         services.GetRequiredService<AssetManager>().SaveAllAssets();
         if (!playMode.Start())
+        {
             services.GetRequiredService<ILogger>().LogWarning("Cannot play the startup scene");
+        }
     }
 
     static void FocusGamePanel(IServiceProvider services)
@@ -384,8 +413,14 @@ static class StudioCommands
     static void TogglePause(IServiceProvider services)
     {
         var playMode = services.GetRequiredService<PlayModeService>();
-        if (playMode.State == PlayState.Playing) playMode.Pause();
-        else playMode.Resume();
+        if (playMode.State == PlayState.Playing)
+        {
+            playMode.Pause();
+        }
+        else
+        {
+            playMode.Resume();
+        }
     }
 
     /// <summary>The out-of-process path: builds the standalone runtime and launches it in its own window.</summary>
@@ -445,7 +480,9 @@ static class StudioCommands
                 progress.Report(0, "Packaging the project");
                 var status = await export().ConfigureAwait(false);
                 if (status.State != BuildTaskState.Succeeded)
+                {
                     throw new InvalidOperationException(status.Message);
+                }
 
                 progress.Report(1, status.Message);
             });

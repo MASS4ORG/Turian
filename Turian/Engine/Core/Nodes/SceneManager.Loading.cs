@@ -100,8 +100,15 @@ public partial class SceneManager
                 $"Failed to deserialize a node hierarchy from '{sourceDescription}'.");
         }
 
-        if (services is null) root.Awake(null);
-        else root.Awake(null, services, allowMissingServices);
+        if (services is null)
+        {
+            root.Awake(null);
+        }
+        else
+        {
+            root.Awake(null, services, missingServicesAllowed);
+        }
+
         return root;
     }
 
@@ -143,9 +150,11 @@ public partial class SceneManager
         // A reference into another scene resolves once both are loaded, whichever loaded first.
         var pending = ObjectReferences.Resolve(roots, assetLoader);
         if (pending > 0)
+        {
             Log.Logger.LogWarning(
                 "{Count} reference(s) point at objects that are not loaded; they resolve when their targets load",
                 pending);
+        }
 
         return loadedScene;
     }
@@ -218,8 +227,15 @@ public partial class SceneManager
                     ?? throw new InvalidOperationException(
                         $"Failed to clone node hierarchy of type '{source.GetType().FullName}' via serialization.");
 
-        if (services is null) clone.Awake(null);
-        else clone.Awake(null, services, allowMissingServices);
+        if (services is null)
+        {
+            clone.Awake(null);
+        }
+        else
+        {
+            clone.Awake(null, services, missingServicesAllowed);
+        }
+
         return clone;
     }
 
@@ -246,6 +262,8 @@ public partial class SceneManager
         node.IsDestroyed = true;
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5351:DoNotUseBrokenCryptographicAlgorithms",
+        Justification = "MD5 preserves existing deterministic path identities; not used for security.")]
     static Guid HashPathToGuid(string absolutePath)
     {
         var normalized = Path.GetFullPath(absolutePath).Replace('\\', '/');

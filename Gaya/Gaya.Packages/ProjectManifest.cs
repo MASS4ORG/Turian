@@ -36,7 +36,10 @@ public class ProjectManifest
     {
         var legacy = Path.Combine(projectRoot, legacyDirectoryName);
         if (Directory.Exists(Path.Combine(projectRoot, DirectoryName))
-            || !File.Exists(Path.Combine(legacy, FileName))) return;
+            || !File.Exists(Path.Combine(legacy, FileName)))
+        {
+            return;
+        }
 
         Directory.Move(legacy, Path.Combine(projectRoot, DirectoryName));
     }
@@ -62,8 +65,15 @@ public class ProjectManifest
             // Per-key replace: an entry replaces that id's source; null removes the id.
             foreach (var (id, spec) in user.Dependencies)
             {
-                if (spec is null) manifest.Dependencies.Remove(id);
-                else manifest.Dependencies[id] = spec;
+                if (spec is null)
+                {
+                    manifest.Dependencies.Remove(id);
+                }
+                else
+                {
+                    manifest.Dependencies[id] = spec;
+                }
+
                 overridden.Add(id);
             }
 
@@ -85,13 +95,20 @@ public class ProjectManifest
         var directory = Path.Combine(projectRoot, DirectoryName);
         Directory.CreateDirectory(directory);
         var node = JsonSerializer.SerializeToNode(this, PackageJson.Options)!.AsObject();
-        if (ScopedRegistries.Count == 0) node.Remove("scopedRegistries");
+        if (ScopedRegistries.Count == 0)
+        {
+            node.Remove("scopedRegistries");
+        }
+
         File.WriteAllText(Path.Combine(directory, FileName), node.ToJsonString(PackageJson.Options));
     }
 
     static ProjectManifest? Read(string path)
     {
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path))
+        {
+            return null;
+        }
 
         ProjectManifest? manifest;
         try
@@ -104,7 +121,9 @@ public class ProjectManifest
         }
 
         foreach (var id in manifest?.Dependencies.Keys.Where(static id => !PackageId.IsValid(id)) ?? [])
+        {
             throw new PackageException($"{path}: '{id}' is not a valid package id.");
+        }
 
         return manifest;
     }

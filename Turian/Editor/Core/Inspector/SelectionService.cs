@@ -21,7 +21,11 @@ public sealed class SelectionService
         var next = targets.Distinct(ReferenceEqualityComparer.Instance).ToArray();
         var nextActive = next.Contains(active, ReferenceEqualityComparer.Instance) ? active : next.LastOrDefault();
         if (ReferenceEquals(ActiveObject, nextActive)
-            && objects.SequenceEqual(next, ReferenceEqualityComparer.Instance)) return;
+            && objects.SequenceEqual(next, ReferenceEqualityComparer.Instance))
+        {
+            return;
+        }
+
         objects = Array.AsReadOnly(next);
         ActiveObject = nextActive;
         Changed?.Invoke();
@@ -38,8 +42,13 @@ public sealed class SelectionService
     {
         ArgumentNullException.ThrowIfNull(target);
         if (objects.Contains(target, ReferenceEqualityComparer.Instance))
+        {
             SetObjects(objects.Where(item => !ReferenceEquals(item, target)), ActiveObject);
-        else Add(target);
+        }
+        else
+        {
+            Add(target);
+        }
     }
 
     /// <summary>Selects a contiguous range from the supplied visible order, optionally keeping the existing selection.</summary>
@@ -48,8 +57,16 @@ public sealed class SelectionService
         ArgumentNullException.ThrowIfNull(visible);
         var start = IndexOf(visible, anchor);
         var end = IndexOf(visible, target);
-        if (end < 0) return;
-        if (start < 0) start = end;
+        if (end < 0)
+        {
+            return;
+        }
+
+        if (start < 0)
+        {
+            start = end;
+        }
+
         var range = visible.Skip(Math.Min(start, end)).Take(Math.Abs(end - start) + 1);
         SetObjects(additive ? objects.Concat(range) : range, target);
     }
@@ -65,14 +82,26 @@ public sealed class SelectionService
     static bool HasSelectedAncestor(Node node, HashSet<Node> selected)
     {
         for (var parent = node.Parent; parent is not null; parent = parent.Parent)
-            if (selected.Contains(parent)) return true;
+        {
+            if (selected.Contains(parent))
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 
     static int IndexOf(IReadOnlyList<object> items, object target)
     {
         for (var i = 0; i < items.Count; i++)
-            if (ReferenceEquals(items[i], target)) return i;
+        {
+            if (ReferenceEquals(items[i], target))
+            {
+                return i;
+            }
+        }
+
         return -1;
     }
 }

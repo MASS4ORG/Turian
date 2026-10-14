@@ -85,10 +85,14 @@ public sealed unsafe class Texture : IDisposable
         ArgumentNullException.ThrowIfNull(vulkan);
         ArgumentNullException.ThrowIfNull(levels);
         if (levels.Count == 0)
+        {
             throw new ArgumentException("A texture needs at least one mip level", nameof(levels));
+        }
 
         if (!vulkan.Device.SupportsFormat(format, FormatFeatureFlags.SampledImageBit, ImageTiling.Optimal))
+        {
             throw new VulkanException($"Vulkan: device cannot sample texture format {format}");
+        }
 
         this.vulkan = vulkan;
         Width = width;
@@ -131,7 +135,9 @@ public sealed unsafe class Texture : IDisposable
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         if (rgba.Length != width * height * 4)
+        {
             throw new ArgumentException($"Expected {width * height * 4} RGBA bytes, got {rgba.Length}", nameof(rgba));
+        }
 
         this.vulkan = vulkan;
         Width = width;
@@ -153,7 +159,11 @@ public sealed unsafe class Texture : IDisposable
         SizeBytes = TotalLevelBytes(Format, width, height, (int)MipLevels);
 
         var usage = ImageUsageFlags.TransferDstBit | ImageUsageFlags.SampledBit;
-        if (wantMips) usage |= ImageUsageFlags.TransferSrcBit;
+        if (wantMips)
+        {
+            usage |= ImageUsageFlags.TransferSrcBit;
+        }
+
         CreateImage(usage);
 
         UploadLevels([rgba.ToArray()]);
@@ -180,16 +190,25 @@ public sealed unsafe class Texture : IDisposable
     /// graphics queue, so treat this as a synchronous upload and call it at most once per frame.
     /// </summary>
     /// <param name="rgba">Tightly-packed RGBA8 pixels for mip level 0; length must be Width*Height*4.</param>
-    /// <exception cref="System.InvalidOperationException">The texture has more than one mip level.</exception>
-    /// <exception cref="System.ArgumentException"><paramref name="rgba"/> is not exactly Width*Height*4 bytes.</exception>
+    /// <exception cref="InvalidOperationException">The texture has more than one mip level.</exception>
+    /// <exception cref="ArgumentException"><paramref name="rgba"/> is not exactly Width*Height*4 bytes.</exception>
     public void Update(ReadOnlySpan<byte> rgba)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (borrowedImage) throw new InvalidOperationException("Externally owned images cannot be uploaded");
+        if (borrowedImage)
+        {
+            throw new InvalidOperationException("Externally owned images cannot be uploaded");
+        }
+
         if (MipLevels != 1)
+        {
             throw new InvalidOperationException("Texture.Update requires a single-mip texture");
+        }
+
         if (rgba.Length != Width * Height * 4)
+        {
             throw new ArgumentException($"Expected {Width * Height * 4} RGBA bytes, got {rgba.Length}", nameof(rgba));
+        }
 
         // Undefined as the source layout discards the previous contents, which is exactly right when
         // the whole level is about to be overwritten, and is a transition the device path supports.
@@ -230,7 +249,7 @@ public sealed unsafe class Texture : IDisposable
     /// </summary>
     void UploadLevels(IReadOnlyList<ReadOnlyMemory<byte>> levels)
     {
-        var staged = new byte[levels.Sum(level => level.Length)];
+        var staged = new byte[levels.Sum(static level => level.Length)];
         var regions = new BufferImageCopy[levels.Count];
 
         var offset = 0;
@@ -276,7 +295,9 @@ public sealed unsafe class Texture : IDisposable
         };
 
         if (vulkan.Vk.CreateImageView(vulkan.Device.VkDevice, in info, null, out view) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to create image view for texture");
+        }
     }
 
     void CreateSampler(SamplerAddressMode addressMode)
@@ -304,20 +325,45 @@ public sealed unsafe class Texture : IDisposable
         };
 
         if (vulkan.Vk.CreateSampler(vulkan.Device.VkDevice, in info, null, out sampler) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to create sampler");
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
 
         var dev = vulkan.Device.VkDevice;
-        if (sampler.Handle != 0) vulkan.Vk.DestroySampler(dev, sampler, null);
-        if (borrowedImage) return;
-        if (view.Handle != 0) vulkan.Vk.DestroyImageView(dev, view, null);
-        if (image.Handle != 0) vulkan.Vk.DestroyImage(dev, image, null);
-        if (memory.Handle != 0) vulkan.Vk.FreeMemory(dev, memory, null);
+        if (sampler.Handle != 0)
+        {
+            vulkan.Vk.DestroySampler(dev, sampler, null);
+        }
+
+        if (borrowedImage)
+        {
+            return;
+        }
+
+        if (view.Handle != 0)
+        {
+            vulkan.Vk.DestroyImageView(dev, view, null);
+        }
+
+        if (image.Handle != 0)
+        {
+            vulkan.Vk.DestroyImage(dev, image, null);
+        }
+
+        if (memory.Handle != 0)
+        {
+            vulkan.Vk.FreeMemory(dev, memory, null);
+        }
     }
 }

@@ -57,17 +57,28 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
     {
         try
         {
-            if (!File.Exists(Path)) return null;
+            if (!File.Exists(Path))
+            {
+                return null;
+            }
 
             var text = File.ReadAllText(Path);
-            if (JsonNode.Parse(text) is not JsonObject root) return null;
+            if (JsonNode.Parse(text) is not JsonObject root)
+            {
+                return null;
+            }
 
             if (root["layout"] is not { } layoutNode)
+            {
                 return DockLayout.FromJson(text) is { } bare
                     ? new WorkbenchLayoutState(bare, [], [])
                     : null;
+            }
 
-            if (DockLayout.FromJson(layoutNode.ToJsonString()) is not { } layout) return null;
+            if (DockLayout.FromJson(layoutNode.ToJsonString()) is not { } layout)
+            {
+                return null;
+            }
 
             var known = root["known"]?.Deserialize<HashSet<string>>(JsonOptions) ?? [];
             known.UnionWith(layout.PanelIds);
@@ -94,7 +105,10 @@ public sealed class WorkbenchLayoutStore(ILogger log, string? path = null)
         try
         {
             var directory = System.IO.Path.GetDirectoryName(Path);
-            if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
             var root = new JsonObject
             {

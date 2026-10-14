@@ -5,7 +5,11 @@ public sealed partial class SceneCameraController
     /// <summary>Views the pivot from a signed world axis, keeping the camera's distance and entering orthographic mode.</summary>
     public void AlignToAxis(Vector3 direction, Vector3? pivot = null)
     {
-        if (direction.LengthSquared() < 1e-8f) return;
+        if (direction.LengthSquared() < 1e-8f)
+        {
+            return;
+        }
+
         direction = Vector3.Normalize(direction);
         orbitPivot = pivot ?? Camera.Position + Camera.Front * orbitDistance;
         orbitDistance = MathF.Max(Vector3.Distance(Camera.Position, orbitPivot), 0.01f);
@@ -26,8 +30,15 @@ public sealed partial class SceneCameraController
 
     void SetProjection(bool orthographic)
     {
-        if (Camera.IsOrthographic == orthographic) return;
-        if (orthographic) Camera.Frustum = orbitDistance * MathF.Tan(Camera.FieldOfView * 0.5f);
+        if (Camera.IsOrthographic == orthographic)
+        {
+            return;
+        }
+
+        if (orthographic)
+        {
+            Camera.Frustum = orbitDistance * MathF.Tan(Camera.FieldOfView * 0.5f);
+        }
         else
         {
             orbitDistance = Camera.Frustum / MathF.Tan(Camera.FieldOfView * 0.5f);

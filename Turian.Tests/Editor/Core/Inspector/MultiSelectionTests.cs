@@ -94,7 +94,7 @@ public sealed class MultiSelectionTests
         var form = InspectorForms.BuildForNodes([first, second]);
         Assert.Equal(2, form.Sections.Count);
         Assert.Equal("2 Objects", form.Sections[0].Title);
-        var intensity = form.Sections[1].Fields.Single(field => field.Name == nameof(LightComponent.Intensity));
+        var intensity = form.Sections[1].Fields.Single(static field => field.Name == nameof(LightComponent.Intensity));
         Assert.True(intensity.HasMixedValue);
         Assert.True(intensity.SetValue(7f));
         Assert.False(intensity.HasMixedValue);
@@ -113,16 +113,16 @@ public sealed class MultiSelectionTests
         var second = new Holder { Vector = new Vector3(1, 5, 6) };
         var changed = new List<object>();
         var fields = InspectorForms.BuildForObjects([first, second], changed.Add).Sections[0].Fields;
-        var vector = fields.Single(field => field.Name == nameof(Holder.Vector));
-        var x = vector.Project<Vector3, float>("X", value => value.X, (value, part) => value with { X = part });
-        var y = vector.Project<Vector3, float>("Y", value => value.Y, (value, part) => value with { Y = part });
+        var vector = fields.Single(static field => field.Name == nameof(Holder.Vector));
+        var x = vector.Project<Vector3, float>("X", static value => value.X, static (value, part) => value with { X = part });
+        var y = vector.Project<Vector3, float>("Y", static value => value.Y, static (value, part) => value with { Y = part });
         Assert.False(x.HasMixedValue);
         Assert.True(y.HasMixedValue);
         Assert.True(x.SetValue(9f));
         Assert.Equal(new Vector3(9, 2, 3), first.Vector);
         Assert.Equal(new Vector3(9, 5, 6), second.Vector);
         Assert.Equal([first, second], changed);
-        Assert.True(fields.Single(field => field.Name == nameof(Holder.ReadOnly)).IsReadOnly);
+        Assert.True(fields.Single(static field => field.Name == nameof(Holder.ReadOnly)).IsReadOnly);
         Assert.Empty(InspectorForms.BuildForObjects([first, new Node()]).Sections);
         Assert.Empty(InspectorForms.BuildForObjects([]).Sections);
         Assert.Single(InspectorForms.BuildForObjects([first]).Sections);
@@ -135,7 +135,7 @@ public sealed class MultiSelectionTests
         var first = new Holder { Entries = [1, 2, 3] };
         var second = new Holder { Entries = [4, 5] };
         var field = InspectorForms.BuildForObjects([first, second]).Sections[0].Fields
-            .Single(field => field.Name == nameof(Holder.Entries));
+            .Single(static field => field.Name == nameof(Holder.Entries));
         var list = CollectionField.TryCreate(field)!;
         Assert.Equal(2, list.Count);
         Assert.True(list.Entries()[0].HasMixedValue);
@@ -157,7 +157,7 @@ public sealed class MultiSelectionTests
         var first = new Holder { Reference = new Node() };
         var second = new Holder { Reference = new Node() };
         var fields = InspectorForms.BuildForObjects([first, second]).Sections[0].Fields;
-        var reference = fields.Single(field => field.Name == nameof(Holder.Reference));
+        var reference = fields.Single(static field => field.Name == nameof(Holder.Reference));
         Assert.True(reference.HasMixedValue);
         Assert.True(ReferenceField.TryCreate(reference)!.Clear());
         Assert.Null(first.Reference);
@@ -166,7 +166,7 @@ public sealed class MultiSelectionTests
         var enabled = InspectorForms.BuildForNodes(nodes).Sections[0].EnabledField!;
         Assert.True(enabled.HasMixedValue);
         Assert.True(enabled.SetValue(true));
-        Assert.All(nodes, node => Assert.True(node.IsActive));
+        Assert.All(nodes, static node => Assert.True(node.IsActive));
     }
 
     /// <summary>Component creation and removal use matching occurrences on each node.</summary>
@@ -179,18 +179,18 @@ public sealed class MultiSelectionTests
         Assert.False(inspector.AddComponents([], typeof(LightComponent)));
         Assert.False(inspector.AddComponents(nodes, typeof(string)));
         Assert.True(inspector.AddComponents(nodes, typeof(LightComponent)));
-        Assert.Contains(inspector.GetAvailableComponents(), type => type.ComponentType == typeof(ModelComponent));
+        Assert.Contains(inspector.GetAvailableComponents(), static type => type.ComponentType == typeof(ModelComponent));
         var representative = nodes[0].GetComponent<LightComponent>()!;
         Assert.Equal(2, NodeInspectorController.MatchingComponents(nodes, representative).Count);
         Assert.True(inspector.AddComponents(nodes, typeof(ModelComponent)));
         inspector.MoveComponents(nodes, representative, up: false);
-        Assert.All(nodes, node => Assert.Same(node.GetComponent<LightComponent>(), node.Components[1]));
+        Assert.All(nodes, static node => Assert.Same(node.GetComponent<LightComponent>(), node.Components[1]));
         inspector.MoveComponents(nodes, representative, up: false);
         inspector.MoveComponents(nodes, representative, up: true);
-        Assert.All(nodes, node => Assert.Same(node.GetComponent<LightComponent>(), node.Components[0]));
+        Assert.All(nodes, static node => Assert.Same(node.GetComponent<LightComponent>(), node.Components[0]));
         inspector.MoveComponents(nodes, representative, up: true);
         inspector.RemoveComponents(nodes, representative);
-        Assert.All(nodes, node => Assert.Single(node.Components));
+        Assert.All(nodes, static node => Assert.Single(node.Components));
         Assert.Empty(NodeInspectorController.MatchingComponents(nodes, new LightComponent()));
     }
 }

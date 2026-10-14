@@ -6,7 +6,10 @@ public sealed partial class AssetImporter
     /// <returns>Whether the catalog required an asset scan.</returns>
     public static bool RepairCachedCatalog(AssetDatabase database, IAppSettings settings, ILogger logger)
     {
-        if (!database.GetAssetsSnapshot().Any(NeedsCatalogRepair)) return false;
+        if (!database.GetAssetsSnapshot().Any(NeedsCatalogRepair))
+        {
+            return false;
+        }
 
         logger.LogInformation("Refreshing incomplete asset cache under {Project}",
             settings.ProjectAbsoluteDir);
@@ -17,8 +20,16 @@ public sealed partial class AssetImporter
 
     static bool NeedsCatalogRepair(AssetRecord record)
     {
-        if (string.IsNullOrWhiteSpace(record.ImportedRelativePath)) return false;
-        if (!File.Exists(Path.Combine(record.ProjectRootPath, record.SourceRelativePath))) return false;
+        if (string.IsNullOrWhiteSpace(record.ImportedRelativePath))
+        {
+            return false;
+        }
+
+        if (!File.Exists(Path.Combine(record.ProjectRootPath, record.SourceRelativePath)))
+        {
+            return false;
+        }
+
         return !File.Exists(record.ResolveContentPath());
     }
 }

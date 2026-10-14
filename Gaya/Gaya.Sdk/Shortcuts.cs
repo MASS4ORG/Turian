@@ -46,7 +46,10 @@ public readonly record struct KeyStroke(KeyboardKey Key, KeyModifiers Modifiers 
     public static bool TryParse(string? text, out KeyStroke stroke)
     {
         stroke = None;
-        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
 
         var modifiers = KeyModifiers.None;
         var parts = text.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -68,7 +71,11 @@ public readonly record struct KeyStroke(KeyboardKey Key, KeyModifiers Modifiers 
                 continue;
             }
 
-            if (!TryParseKey(part, out var key)) return false;
+            if (!TryParseKey(part, out var key))
+            {
+                return false;
+            }
+
             stroke = new KeyStroke(key, modifiers);
             return i == parts.Length - 1;
         }
@@ -86,20 +93,35 @@ public readonly record struct KeyStroke(KeyboardKey Key, KeyModifiers Modifiers 
         ArgumentNullException.ThrowIfNull(input);
 
         var modifiers = KeyModifiers.None;
-        if (Held(input, KeyboardKey.LeftControl, KeyboardKey.RightControl)) modifiers |= KeyModifiers.Ctrl;
-        if (Held(input, KeyboardKey.LeftShift, KeyboardKey.RightShift)) modifiers |= KeyModifiers.Shift;
-        if (Held(input, KeyboardKey.LeftAlt, KeyboardKey.RightAlt)) modifiers |= KeyModifiers.Alt;
+        if (Held(input, KeyboardKey.LeftControl, KeyboardKey.RightControl))
+        {
+            modifiers |= KeyModifiers.Ctrl;
+        }
+
+        if (Held(input, KeyboardKey.LeftShift, KeyboardKey.RightShift))
+        {
+            modifiers |= KeyModifiers.Shift;
+        }
+
+        if (Held(input, KeyboardKey.LeftAlt, KeyboardKey.RightAlt))
+        {
+            modifiers |= KeyModifiers.Alt;
+        }
 
         foreach (var key in Bindable)
+        {
             if (input.IsKeyPressed(key))
+            {
                 return new KeyStroke(key, modifiers);
+            }
+        }
 
         return null;
     }
 
     /// <summary>Every key a stroke may end on — everything except the modifiers themselves.</summary>
     public static IReadOnlyList<KeyboardKey> Bindable { get; } =
-        [.. Enum.GetValues<KeyboardKey>().Where(key => key != KeyboardKey.Unknown && !IsModifier(key)).Distinct()];
+        [.. Enum.GetValues<KeyboardKey>().Where(static key => key != KeyboardKey.Unknown && !IsModifier(key)).Distinct()];
 
     /// <summary>Whether a key only ever qualifies another, so it can never complete a stroke.</summary>
     /// <param name="key">The key to test.</param>
@@ -149,9 +171,19 @@ public readonly record struct KeyStroke(KeyboardKey Key, KeyModifiers Modifiers 
             _ => KeyboardKey.Unknown,
         };
 
-        if (key != KeyboardKey.Unknown) return true;
-        if (text.Length == 1 && char.IsAsciiDigit(text[0])) key = KeyboardKey.D0 + (text[0] - '0');
-        else if (!Enum.TryParse(text, ignoreCase: true, out key)) key = KeyboardKey.Unknown;
+        if (key != KeyboardKey.Unknown)
+        {
+            return true;
+        }
+
+        if (text.Length == 1 && char.IsAsciiDigit(text[0]))
+        {
+            key = KeyboardKey.D0 + (text[0] - '0');
+        }
+        else if (!Enum.TryParse(text, ignoreCase: true, out key))
+        {
+            key = KeyboardKey.Unknown;
+        }
 
         return key != KeyboardKey.Unknown;
     }
@@ -216,18 +248,33 @@ public sealed record KeyBinding(
     public static bool TryParseSequence(string? text, out (KeyStroke First, KeyStroke? Second) strokes)
     {
         strokes = (KeyStroke.None, null);
-        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
 
         var parts = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length is 0 or > 2) return false;
-        if (!KeyStroke.TryParse(parts[0], out var first)) return false;
+        if (parts.Length is 0 or > 2)
+        {
+            return false;
+        }
+
+        if (!KeyStroke.TryParse(parts[0], out var first))
+        {
+            return false;
+        }
+
         if (parts.Length == 1)
         {
             strokes = (first, null);
             return true;
         }
 
-        if (!KeyStroke.TryParse(parts[1], out var second)) return false;
+        if (!KeyStroke.TryParse(parts[1], out var second))
+        {
+            return false;
+        }
+
         strokes = (first, second);
         return true;
     }

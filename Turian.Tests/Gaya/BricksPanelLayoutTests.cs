@@ -43,8 +43,8 @@ public sealed class BricksPanelLayoutTests : IDisposable
         }
 
         var nodes = Descendants(gui.RootNode!).ToArray();
-        var name = Assert.Single(nodes, node => node.Id == "bricks/row/user.mateo.inventory/name");
-        var version = Assert.Single(nodes, node => node.Id == "bricks/row/user.mateo.inventory/version");
+        var name = Assert.Single(nodes, static node => node.Id == "bricks/row/user.mateo.inventory/name");
+        var version = Assert.Single(nodes, static node => node.Id == "bricks/row/user.mateo.inventory/version");
         Assert.True(name.Rect.X + name.Rect.W <= version.Rect.X);
 
         if (Environment.GetEnvironmentVariable("TURIAN_TEST_DUMP") is { Length: > 0 } output)
@@ -98,7 +98,11 @@ public sealed class BricksPanelLayoutTests : IDisposable
     {
         yield return node;
         foreach (var child in node.Children)
+        {
             foreach (var descendant in Descendants(child))
+            {
                 yield return descendant;
+            }
+        }
     }
 }

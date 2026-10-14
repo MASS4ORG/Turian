@@ -57,7 +57,11 @@ public class SceneTickerTests : IDisposable
 
         public override void OnUpdate(float deltaTime)
         {
-            if (Input?.WasKeyPressed(Key.Space) == true) Currency++;
+            if (Input?.WasKeyPressed(Key.Space) == true)
+            {
+                Currency++;
+            }
+
             accumulated += deltaTime;
             while (accumulated >= 1f)
             {

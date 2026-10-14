@@ -9,7 +9,7 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
     readonly GRVkGetProcedureAddressDelegate getProcedureAddress;
     GRVkExtensions? extensions;
     GRContext? context;
-    CpuSkiaVulkanBackend? fallback;
+    readonly CpuSkiaVulkanBackend? fallback;
     Image image;
     ImageView view;
     DeviceMemory memory;
@@ -34,7 +34,10 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
         Size = (width, height);
         getProcedureAddress = GetProcedureAddress;
         CreateContext(createContext);
-        if (context is null) fallback = new CpuSkiaVulkanBackend(vulkan, width, height);
+        if (context is null)
+        {
+            fallback = new CpuSkiaVulkanBackend(vulkan, width, height);
+        }
     }
 
     /// <inheritdoc />
@@ -72,7 +75,11 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
         {
             Log.Logger.LogWarning(exception, "Skia Vulkan context creation failed; using CPU UI rendering");
         }
-        if (context is not null) return;
+        if (context is not null)
+        {
+            return;
+        }
+
         extensions?.Dispose();
         extensions = null;
     }
@@ -87,7 +94,11 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        if (Size == (width, height)) return;
+        if (Size == (width, height))
+        {
+            return;
+        }
+
         ReleaseTarget();
         fallback?.Resize(width, height);
         Texture = null;
@@ -105,7 +116,11 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
             Texture = fallback.Texture;
             return;
         }
-        if (image.Handle == 0) CreateTarget();
+        if (image.Handle == 0)
+        {
+            CreateTarget();
+        }
+
         var vk = vulkan.Vk;
         var device = vulkan.Device.VkDevice;
         Check(vk.WaitForFences(device, 1, in fence, true, ulong.MaxValue));
@@ -129,7 +144,7 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
                                 ?? throw new VulkanException("Skia could not wrap the UI render target");
             surface.Canvas.Clear(SKColors.Transparent);
             try { draw(surface.Canvas); }
-            finally { context!.Flush(true, false); }
+            finally { context!.Flush(); }
         }
         finally
         {
@@ -219,23 +234,50 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
 
     static void Check(Result result)
     {
-        if (result != Result.Success) throw new VulkanException($"Vulkan UI rendering failed: {result}");
+        if (result != Result.Success)
+        {
+            throw new VulkanException($"Vulkan UI rendering failed: {result}");
+        }
     }
 
     void ReleaseTarget()
     {
-        if (image.Handle == 0) return;
+        if (image.Handle == 0)
+        {
+            return;
+        }
+
         var vk = vulkan.Vk;
         var device = vulkan.Device.VkDevice;
         Check(vk.DeviceWaitIdle(device));
         Texture?.Dispose();
         Texture = null;
-        if (fence.Handle != 0) vk.DestroyFence(device, fence, null);
-        if (beginCommands.Handle != 0) vk.FreeCommandBuffers(device, vulkan.Device.CommandPool, 1, in beginCommands);
-        if (endCommands.Handle != 0) vk.FreeCommandBuffers(device, vulkan.Device.CommandPool, 1, in endCommands);
-        if (view.Handle != 0) vk.DestroyImageView(device, view, null);
+        if (fence.Handle != 0)
+        {
+            vk.DestroyFence(device, fence, null);
+        }
+
+        if (beginCommands.Handle != 0)
+        {
+            vk.FreeCommandBuffers(device, vulkan.Device.CommandPool, 1, in beginCommands);
+        }
+
+        if (endCommands.Handle != 0)
+        {
+            vk.FreeCommandBuffers(device, vulkan.Device.CommandPool, 1, in endCommands);
+        }
+
+        if (view.Handle != 0)
+        {
+            vk.DestroyImageView(device, view, null);
+        }
+
         vk.DestroyImage(device, image, null);
-        if (memory.Handle != 0) vk.FreeMemory(device, memory, null);
+        if (memory.Handle != 0)
+        {
+            vk.FreeMemory(device, memory, null);
+        }
+
         image = default;
         memory = default;
         view = default;
@@ -247,7 +289,11 @@ public sealed unsafe class GpuSkiaVulkanBackend : IUiRenderBackend, ICanvasRende
     /// <summary>Releases GPU targets, the Skia context and any CPU fallback resources.</summary>
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         ReleaseTarget();
         fallback?.Dispose();

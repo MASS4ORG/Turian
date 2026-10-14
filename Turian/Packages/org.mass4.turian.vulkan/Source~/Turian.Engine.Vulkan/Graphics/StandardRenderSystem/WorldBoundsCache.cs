@@ -21,7 +21,9 @@ sealed class WorldBoundsCache
     public void Update(Model source, Transform global, int rangeStart, int rangeCount)
     {
         if (ReferenceEquals(model, source) && transform == global && start == rangeStart && count == rangeCount)
+        {
             return;
+        }
 
         model = source;
         transform = global;
@@ -29,8 +31,14 @@ sealed class WorldBoundsCache
         count = rangeCount;
         ModelMatrix = global.Matrix4X4();
         NormalMatrix = global.NormalMatrix();
-        if (Bounds.Length != count) Bounds = new Bounds[count];
+        if (Bounds.Length != count)
+        {
+            Bounds = new Bounds[count];
+        }
+
         for (var i = 0; i < count; i++)
+        {
             Bounds[i] = ModelBoundsUtility.ToWorldBounds(source.SubMeshes[start + i].Bounds, ModelMatrix);
+        }
     }
 }

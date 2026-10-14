@@ -61,7 +61,11 @@ public static class ModelBoundsUtility
     /// <param name="transform">The transform from that space into world space.</param>
     public static Bounds ToWorldBounds(Bounds local, Matrix4x4 transform)
     {
-        if (local.IsEmpty) return Bounds.Empty;
+        if (local.IsEmpty)
+        {
+            return Bounds.Empty;
+        }
+
         var world = Bounds.Empty;
 
         for (var corner = 0; corner < 8; corner++)

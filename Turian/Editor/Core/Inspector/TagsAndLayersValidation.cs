@@ -15,9 +15,15 @@ public static class TagsAndLayersValidation
     {
         var warnings = new List<string>();
         if (settings.FindPhysicsLayer(node.PhysicsLayer) is null)
+        {
             warnings.Add($"Physics layer {node.PhysicsLayer} is unnamed; it resolves to Default when loaded.");
+        }
+
         if (settings.FindRenderLayer(node.RenderLayer) is null)
+        {
             warnings.Add($"Render layer {node.RenderLayer} is unnamed; it resolves to Default when loaded.");
+        }
+
         return warnings;
     }
 }

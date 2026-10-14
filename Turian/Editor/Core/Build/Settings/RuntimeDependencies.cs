@@ -33,10 +33,15 @@ public sealed class RuntimeDependencies
         var assemblies = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var projects = new HashSet<string>(StringComparer.Ordinal);
         while (reader.ReadLine() is { } line)
+        {
             ReadEntry(line, result, packages, assemblies, projects);
+        }
 
         if (string.IsNullOrEmpty(result.TargetFramework) || packages.Count == 0 || assemblies.Count == 0)
+        {
             throw new InvalidDataException("The runtime dependency manifest is incomplete.");
+        }
+
         result.SetReferences(packages, assemblies, projects);
         return result;
     }
@@ -68,7 +73,11 @@ public sealed class RuntimeDependencies
             case "assembly":
                 RequireFieldCount(fields, 4);
                 assemblies.Add(fields[2], fields[1].Replace('\\', '/'));
-                if (fields[3].Length != 0) projects.Add(Path.ChangeExtension(fields[3].Replace('\\', '/'), null));
+                if (fields[3].Length != 0)
+                {
+                    projects.Add(Path.ChangeExtension(fields[3].Replace('\\', '/'), null));
+                }
+
                 break;
             default:
                 throw new InvalidDataException($"Invalid runtime dependency manifest entry: '{line}'.");
@@ -78,6 +87,8 @@ public sealed class RuntimeDependencies
     static void RequireFieldCount(string[] fields, int count)
     {
         if (fields.Length != count)
+        {
             throw new InvalidDataException($"Invalid runtime dependency manifest entry: '{string.Join('|', fields)}'.");
+        }
     }
 }

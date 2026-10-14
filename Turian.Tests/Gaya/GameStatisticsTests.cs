@@ -106,9 +106,17 @@ public sealed class GameStatisticsTests(VulkanFixture fixture) : IClassFixture<V
         var drawing = Assert.IsType<GameStatisticsDrawing>(typeof(GameViewport)
             .GetField("statisticsDrawing", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport));
         Assert.NotNull(drawing.Paint);
-        for (var i = 0; i < 100; i++) drawing.Render(gui, overlay, surface.Canvas);
+        for (var i = 0; i < 100; i++)
+        {
+            drawing.Render(gui, overlay, surface.Canvas);
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) drawing.Render(gui, overlay, surface.Canvas);
+        for (var i = 0; i < 1000; i++)
+        {
+            drawing.Render(gui, overlay, surface.Canvas);
+        }
+
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - allocated);
         Assert.Single(play.PlayRoot!.Components);
         Assert.Empty(play.PlayRoot.Children);
@@ -138,7 +146,10 @@ public sealed class GameStatisticsTests(VulkanFixture fixture) : IClassFixture<V
             using (current.Node().Expand().Direction(Axis.Vertical).Enter())
             {
                 using (current.Node(-1, 24, "game/header").ExpandWidth().Enter())
+                {
                     panel.RenderHeader(current, new PanelHeaderContext("game", "Game", default, false, services));
+                }
+
                 panel.Render(current);
             }
         });

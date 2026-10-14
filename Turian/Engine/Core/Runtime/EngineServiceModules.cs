@@ -16,13 +16,15 @@ public static class EngineServiceModules
         {
             ArgumentNullException.ThrowIfNull(assembly);
             foreach (var type in GetLoadableTypes(assembly)
-                         .Where(type => type is { IsClass: true, IsAbstract: false }
+                         .Where(static type => type is { IsClass: true, IsAbstract: false }
                                         && typeof(IEngineServiceModule).IsAssignableFrom(type))
-                         .OrderBy(type => type.FullName, StringComparer.Ordinal))
+                         .OrderBy(static type => type.FullName, StringComparer.Ordinal))
             {
                 if (type.GetConstructor(Type.EmptyTypes) is null)
+                {
                     throw new InvalidOperationException(
                         $"Engine service module '{type.FullName}' needs a public parameterless constructor.");
+                }
 
                 var module = (IEngineServiceModule)Activator.CreateInstance(type)!;
                 module.ConfigureServices(services);

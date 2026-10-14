@@ -23,6 +23,10 @@ public sealed class UiValueTests
     [InlineData("False", false)]
     [InlineData("1", true)]
     [InlineData("off", false)]
+    [InlineData(" YES ", true)]
+    [InlineData("ON", true)]
+    [InlineData("no", false)]
+    [InlineData("0", false)]
     public void TryBool(string text, bool expected)
     {
         Assert.True(UiValue.TryBool(text, out var v));
@@ -77,8 +81,49 @@ public sealed class UiValueTests
     [InlineData("not-a-color")]
     [InlineData("#xyz")]
     [InlineData("")]
-    public void TryColor_Rejects(string text)
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("#1234")]
+    [InlineData("#zz0011")]
+    [InlineData("#00zz11")]
+    [InlineData("#0011zz")]
+    [InlineData("rgb10,20,30")]
+    [InlineData("rgb)10,20,30(")]
+    [InlineData("rgb(10,20)")]
+    [InlineData("rgb(10,20,30,40,50)")]
+    [InlineData("rgb(x,20,30)")]
+    [InlineData("rgb(10,x,30)")]
+    [InlineData("rgb(10,20,x)")]
+    public void TryColor_Rejects(string? text)
     {
         Assert.False(UiValue.TryColor(text, out _));
+    }
+
+    /// <summary>Named colors, whitespace and alpha fallbacks retain their authored values.</summary>
+    [Theory]
+    [InlineData(" Red ", 255, 0, 0, 255)]
+    [InlineData("transparent", 255, 255, 255, 0)]
+    [InlineData(" #abc ", 170, 187, 204, 255)]
+    [InlineData("RGB(10,20,30)", 10, 20, 30, 255)]
+    [InlineData("rgba(10,20,30,invalid)", 10, 20, 30, 255)]
+    [InlineData("#102030zz", 16, 32, 48, 0)]
+    public void TryColor_Forms(string text, int r, int g, int b, int a)
+    {
+        Assert.True(UiValue.TryColor(text, out var color));
+        Assert.Equal(r, color.R);
+        Assert.Equal(g, color.G);
+        Assert.Equal(b, color.B);
+        Assert.Equal(a, color.A);
+    }
+
+    /// <summary>Unrecognised boolean values fail with a false output.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("enabled")]
+    public void TryBool_Rejects(string? text)
+    {
+        Assert.False(UiValue.TryBool(text, out var value));
+        Assert.False(value);
     }
 }

@@ -48,7 +48,9 @@ public sealed class UserCodeCompileCacheTests : IDisposable
     public void Dispose()
     {
         if (Directory.Exists(tempRoot))
+        {
             Directory.Delete(tempRoot, recursive: true);
+        }
     }
 
     // ── No assembly ───────────────────────────────────────────────────────────
@@ -250,7 +252,7 @@ public sealed class UserCodeCompileCacheTests : IDisposable
 
         var manifest = cache.CreateManifest(settings, assemblyPath, csprojPath);
 
-        Assert.All(manifest.SourceFiles, f =>
+        Assert.All(manifest.SourceFiles, static f =>
             Assert.DoesNotContain(".Cache", f.RelativePath, StringComparison.OrdinalIgnoreCase));
     }
 

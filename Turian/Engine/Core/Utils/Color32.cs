@@ -36,12 +36,22 @@ public readonly record struct Color32
     {
         ArgumentNullException.ThrowIfNull(value);
         var hex = value.AsSpan().Trim();
-        if (!hex.IsEmpty && hex[0] == '#') hex = hex[1..];
+        if (!hex.IsEmpty && hex[0] == '#')
+        {
+            hex = hex[1..];
+        }
+
         if (hex.Length is not (6 or 8))
+        {
             throw new FormatException("A color must contain six RGB or eight RGBA hexadecimal digits.");
+        }
 
         var packed = uint.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        if (hex.Length == 6) packed = packed << 8 | byte.MaxValue;
+        if (hex.Length == 6)
+        {
+            packed = packed << 8 | byte.MaxValue;
+        }
+
         return new Color32(packed);
     }
 

@@ -32,7 +32,6 @@ public sealed class TemporarySceneTests : IDisposable
         workspace.Dispose();
         binder.Dispose();
         services.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     /// <summary>New scenes have independent identities and tabs, and never enter the saved asset session.</summary>
@@ -218,8 +217,15 @@ public sealed class TemporarySceneTests : IDisposable
     {
         var document = workspace.NewScene();
         var folder = Path.GetDirectoryName(document.Asset!.RelativePath)!;
-        if (switchProject) settings.Set(new AppSettings());
-        else workspace.Dispose();
+        if (switchProject)
+        {
+            settings.Set(new AppSettings());
+        }
+        else
+        {
+            workspace.Dispose();
+        }
+
         Assert.False(Directory.Exists(folder));
         Assert.Empty(workspace.Documents);
         Assert.Null(tree.CurrentSceneRoot);

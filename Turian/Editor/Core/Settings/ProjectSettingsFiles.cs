@@ -54,7 +54,10 @@ public static class ProjectSettingsFiles
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(asset);
-        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return false;
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry)
+        {
+            return false;
+        }
 
         switch (asset)
         {
@@ -124,7 +127,9 @@ public static class ProjectSettingsFiles
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var name = target.ToString();
         for (var index = 1; taken.Contains(name); index++)
+        {
             name = $"{target} {index}";
+        }
 
         return CreateBuildProfile(project, new BuildProfile { Name = name, Target = target });
     }
@@ -139,8 +144,15 @@ public static class ProjectSettingsFiles
     public static bool SetActiveBuildProfile(IAppSettings project, Guid? profileId)
     {
         ArgumentNullException.ThrowIfNull(project);
-        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return false;
-        if (profileId is { } id && registry.BuildProfiles.All(r => r.AssetId != id)) return false;
+        if (ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry)
+        {
+            return false;
+        }
+
+        if (profileId is { } id && registry.BuildProfiles.All(r => r.AssetId != id))
+        {
+            return false;
+        }
 
         registry.ActiveBuildProfile = profileId is { } active
             ? new DataAssetReference<ProjectSettingsCollection>(active)
@@ -160,7 +172,10 @@ public static class ProjectSettingsFiles
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
         var project = SettingsService.Load(projectDirectory);
-        if (project is null || File.Exists(ProjectAsset.PathIn(project.AssetsAbsoluteDir))) return false;
+        if (project is null || File.Exists(ProjectAsset.PathIn(project.AssetsAbsoluteDir)))
+        {
+            return false;
+        }
 
         var found = ProjectSettingsLoader.Search(project.AssetsAbsoluteDir);
         LogDuplicates(projectDirectory, found);
@@ -176,9 +191,11 @@ public static class ProjectSettingsFiles
     static void LogDuplicates(string projectDirectory, IReadOnlyList<ProjectSettingsSource> found)
     {
         foreach (var kind in found.GroupBy(static s => s.Kind).Where(static g => g.Count() > 1))
+        {
             Log.Logger.LogWarning("{Kind}: registered {Used}; {Ignored} left unregistered", kind.Key.Name,
                 Path.GetRelativePath(projectDirectory, kind.First().SourcePath),
                 string.Join(", ", kind.Skip(1).Select(s => Path.GetRelativePath(projectDirectory, s.SourcePath))));
+        }
     }
 
     /// <summary>
@@ -191,11 +208,16 @@ public static class ProjectSettingsFiles
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
         var project = SettingsService.Load(projectDirectory);
-        if (project is null || ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry) return null;
+        if (project is null || ProjectAsset.Load(project.AssetsAbsoluteDir) is not { } registry)
+        {
+            return null;
+        }
 
         var current = ProjectPackages.EngineVersion;
         if (Gaya.Packages.SemanticVersion.TryParse(registry.EngineVersion, out var recorded) && recorded >= current)
+        {
             return null;
+        }
 
         var previous = registry.EngineVersion ?? string.Empty;
         registry.EngineVersion = EngineVersionStamp;
@@ -270,7 +292,10 @@ public static class ProjectSettingsFiles
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(type);
 
-        if (Locate(project, type) is { } existing) return existing;
+        if (Locate(project, type) is { } existing)
+        {
+            return existing;
+        }
 
         return Activator.CreateInstance(type) is ProjectSettingsAsset created
             ? Create(project, created)
@@ -302,7 +327,10 @@ public static class ProjectSettingsFiles
         ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
 
         var legacyPath = Path.Combine(projectDirectory, SettingsService.LegacyProjectFileName);
-        if (!File.Exists(legacyPath)) return false;
+        if (!File.Exists(legacyPath))
+        {
+            return false;
+        }
 
         var project = SettingsService.Load(projectDirectory)
             ?? throw new InvalidOperationException($"{projectDirectory} has no Assets folder.");
@@ -313,6 +341,7 @@ public static class ProjectSettingsFiles
             var root = document.RootElement;
 
             if (Locate(project, typeof(PlayerSettings)) is null)
+            {
                 Create(project, new PlayerSettings
                 {
                     ProductName = String(root, "ProductName") ?? String(root, "Title"),
@@ -321,11 +350,15 @@ public static class ProjectSettingsFiles
                     Version = String(root, "Version"),
                     StartupScene = Reference<Prefab>(root, "StartupScene"),
                 });
+            }
 
             if (Locate(project, typeof(InputSettings)) is null)
+            {
                 Create(project, new InputSettings { Actions = Reference<DataAssetAsset>(root, "InputActions") });
+            }
 
             if (Locate(project, typeof(GraphicsSettings)) is null)
+            {
                 Create(project, new GraphicsSettings
                 {
                     TextureMaxResolution = root.TryGetProperty("TextureMaxResolution", out var max)
@@ -333,6 +366,7 @@ public static class ProjectSettingsFiles
                         ? max.GetInt32()
                         : 0,
                 });
+            }
         }
 
         File.Move(legacyPath, $"{legacyPath}.bak", overwrite: true);
@@ -357,7 +391,9 @@ public static class ProjectSettingsFiles
     {
         var path = Path.Combine(directory, name + extension);
         for (var index = 1; File.Exists(path); index++)
+        {
             path = Path.Combine(directory, $"{name} {index}{extension}");
+        }
 
         return path;
     }

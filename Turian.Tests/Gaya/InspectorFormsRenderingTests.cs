@@ -32,7 +32,11 @@ public sealed class InspectorFormsRenderingTests
         using var undo = new UndoService(sceneTree, selection, assets, loader);
         var root = new Node();
         var nodes = Enumerable.Range(0, 10).Select(i => new Node { Parent = root, Name = $"Light {i}" }).ToArray();
-        foreach (var node in nodes) root.Children.Add(node);
+        foreach (var node in nodes)
+        {
+            root.Children.Add(node);
+        }
+
         typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(sceneTree, root);
         var panel = new SceneTreePanel(sceneTree, selection, assets, null!, null!, settings, undo,
@@ -59,20 +63,20 @@ public sealed class InspectorFormsRenderingTests
         }
         ClickRow(1);
         Assert.Equal([nodes[0]], selection.SelectedNodes);
-        input.IsKeyDown(KeyboardKey.LeftShift).Returns(true);
+        input.IsKeyDown(GKey.LeftShift).Returns(true);
         ClickRow(10);
         Assert.Equal(nodes, selection.SelectedNodes);
         Frame(gui, surface, font, panel.Render);
         Assert.Equal(nodes, selection.SelectedNodes);
-        input.IsKeyDown(KeyboardKey.LeftShift).Returns(false);
-        input.IsKeyDown(KeyboardKey.LeftControl).Returns(true);
+        input.IsKeyDown(GKey.LeftShift).Returns(false);
+        input.IsKeyDown(GKey.LeftControl).Returns(true);
         ClickRow(5);
         Assert.Equal(nodes.Where(node => !ReferenceEquals(node, nodes[4])), selection.SelectedNodes);
-        input.IsKeyPressed(KeyboardKey.A).Returns(true);
+        input.IsKeyPressed(GKey.A).Returns(true);
         Frame(gui, surface, font, panel.Render);
         Assert.Equal(nodes.Prepend(root), selection.SelectedNodes);
-        input.IsKeyPressed(KeyboardKey.A).Returns(false);
-        input.IsKeyDown(KeyboardKey.LeftControl).Returns(false);
+        input.IsKeyPressed(GKey.A).Returns(false);
+        input.IsKeyDown(GKey.LeftControl).Returns(false);
         input.IsMouseButtonPressed(GMouseButton.Right).Returns(true);
         Frame(gui, surface, font, panel.Render);
         input.IsMouseButtonPressed(GMouseButton.Right).Returns(false);
@@ -127,7 +131,11 @@ public sealed class InspectorFormsRenderingTests
         using var panel = new InspectorPanel(selection, assets, new ReferencePicker(null!, null!, null!),
             null!, null!, new InspectorSettings(), null!, null!, undo, null!, null!, null!, null!);
         panel.Locked = locked;
-        if (locked) selection.Select(root);
+        if (locked)
+        {
+            selection.Select(root);
+        }
+
         using var surface = SKSurface.Create(new SKImageInfo(640, 1200));
         var font = Font.FromFamilyName("sans-serif", 14);
         void RenderFrame()
@@ -149,13 +157,17 @@ public sealed class InspectorFormsRenderingTests
         input.GetTypedCharacters().Returns("1");
         RenderFrame();
         input.GetTypedCharacters().Returns("");
-        input.IsKeyPressed(KeyboardKey.Enter).Returns(true);
+        input.IsKeyPressed(GKey.Enter).Returns(true);
         RenderFrame();
-        input.IsKeyPressed(KeyboardKey.Enter).Returns(false);
+        input.IsKeyPressed(GKey.Enter).Returns(false);
         Assert.All(nodes, node => Assert.Equal(1f, node.GetComponent<LightComponent>()!.Intensity));
         Assert.Single(undo.History.UndoSteps);
         undo.Undo();
-        for (var i = 0; i < nodes.Length; i++) Assert.Equal(i + 1, nodes[i].GetComponent<LightComponent>()!.Intensity);
+        for (var i = 0; i < nodes.Length; i++)
+        {
+            Assert.Equal(i + 1, nodes[i].GetComponent<LightComponent>()!.Intensity);
+        }
+
         undo.Redo();
         Assert.All(nodes, node => Assert.Equal(1f, node.GetComponent<LightComponent>()!.Intensity));
         typeof(InspectorPanel).GetMethod("AddComponent", BindingFlags.Instance | BindingFlags.NonPublic)!
@@ -191,7 +203,11 @@ public sealed class InspectorFormsRenderingTests
         var font = Font.FromFamilyName("sans-serif", 14);
         Frame(gui, surface, font, current =>
         {
-            if (current.Pass == Pass.Pass2Render) selection.SelectMany([first, second]);
+            if (current.Pass == Pass.Pass2Render)
+            {
+                selection.SelectMany([first, second]);
+            }
+
             panel.Render(current);
         });
         Assert.Contains(Descendants(gui.RootNode!), node => node.Id == "inspector/section1");
@@ -223,7 +239,7 @@ public sealed class InspectorFormsRenderingTests
         using var surface = SKSurface.Create(new SKImageInfo(640, 800));
         var font = Font.FromFamilyName("sans-serif", 14);
         Frame(gui, surface, font, panel.Render);
-        Assert.Contains(Descendants(gui.RootNode!), node => node.Id == "inspector/layers/warning/0");
+        Assert.Contains(Descendants(gui.RootNode!), static node => node.Id == "inspector/layers/warning/0");
     }
 
     /// <summary>A settings selection made during rendering takes effect on the next complete frame.</summary>
@@ -248,7 +264,11 @@ public sealed class InspectorFormsRenderingTests
 
         Frame(gui, surface, font, current =>
         {
-            if (current.Pass == Pass.Pass2Render) selection.Select(inspection);
+            if (current.Pass == Pass.Pass2Render)
+            {
+                selection.Select(inspection);
+            }
+
             panel.Render(current);
         });
         Assert.DoesNotContain(Descendants(gui.RootNode!), n => n.Id == "inspector/asset/fields");
@@ -315,11 +335,11 @@ public sealed class InspectorFormsRenderingTests
         Frame(gui, surface, font, panel.Render);
         Frame(gui, surface, font, panel.Render);
 
-        var ids = Descendants(gui.RootNode!).Select(n => n.Id).OfType<string>().ToList();
-        Assert.Contains(ids, id => id.EndsWith("/pos", StringComparison.Ordinal));
-        Assert.Contains(ids, id => id.EndsWith("/scale", StringComparison.Ordinal));
+        var ids = Descendants(gui.RootNode!).Select(static n => n.Id).ToList();
+        Assert.Contains(ids, static id => id.EndsWith("/pos", StringComparison.Ordinal));
+        Assert.Contains(ids, static id => id.EndsWith("/scale", StringComparison.Ordinal));
         Assert.Contains("inspector/section1", ids);
-        Assert.Contains(ids, id => id.StartsWith("inspector/section1/", StringComparison.Ordinal)
+        Assert.Contains(ids, static id => id.StartsWith("inspector/section1/", StringComparison.Ordinal)
                                    && id.EndsWith("/ref", StringComparison.Ordinal));
     }
 

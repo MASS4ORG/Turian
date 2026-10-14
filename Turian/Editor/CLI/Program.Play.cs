@@ -198,9 +198,18 @@ public static partial class Program
         {
             total++;
             var local = ModelBoundsUtility.ComputeLocalBounds(component, loadModels: true, out var isResolved);
-            if (!isResolved) unresolved++;
-            else if (local.IsEmpty) resolvedEmpty++;
-            else resolvedNonEmpty++;
+            if (!isResolved)
+            {
+                unresolved++;
+            }
+            else if (local.IsEmpty)
+            {
+                resolvedEmpty++;
+            }
+            else
+            {
+                resolvedNonEmpty++;
+            }
         }
 
         logger.LogInformation(
@@ -210,11 +219,17 @@ public static partial class Program
 
     static Node? FindNodeByName(Node node, string name)
     {
-        if (string.Equals(node.Name, name, StringComparison.OrdinalIgnoreCase)) return node;
+        if (string.Equals(node.Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+            return node;
+        }
 
         foreach (var child in node.Children)
         {
-            if (FindNodeByName(child, name) is { } found) return found;
+            if (FindNodeByName(child, name) is { } found)
+            {
+                return found;
+            }
         }
 
         return null;
@@ -263,7 +278,9 @@ public static partial class Program
             var root = project.LoadScene(result.GetValue(sceneOption));
 
             if (result.GetValue(localeOption) is { } locale)
+            {
                 project.Locale.SetLocale(locale);
+            }
 
             var report = SceneReport.Collect(root, loadModels: true);
             report.Write(Log.Logger);

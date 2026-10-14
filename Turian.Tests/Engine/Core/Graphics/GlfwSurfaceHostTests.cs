@@ -41,7 +41,7 @@ public sealed class GlfwSurfaceHostTests
     public void WindowEventsAreForwarded()
     {
         var window = Substitute.For<IWindow>();
-        ((IView)window).FramebufferSize.Returns(new Silk.NET.Maths.Vector2D<int>(640, 480));
+        window.FramebufferSize.Returns(new Silk.NET.Maths.Vector2D<int>(640, 480));
         var host = Host(window);
         var sizes = new List<Int2>();
         var closings = 0;

@@ -127,7 +127,10 @@ public static class BuildPlatforms
     public static IBuildPlatform Find(string? id)
     {
         var platforms = All();
-        if (string.IsNullOrWhiteSpace(id)) return platforms[0];
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return platforms[0];
+        }
 
         return platforms.FirstOrDefault(p => string.Equals(p.Id, id.Trim(), StringComparison.OrdinalIgnoreCase))
                ?? throw new InvalidOperationException(
@@ -213,7 +216,10 @@ sealed class DesktopBuildPlatform : IBuildPlatform
         group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
 
         var icon = Path.Combine(context.Settings.CacheAbsoluteDir, ProjectIcon.IcoFileName);
-        if (File.Exists(icon)) group.AddProperty("ApplicationIcon", icon);
+        if (File.Exists(icon))
+        {
+            group.AddProperty("ApplicationIcon", icon);
+        }
 
         if (context.Mode == ExecutableGenerationMode.Export)
         {
@@ -223,7 +229,9 @@ sealed class DesktopBuildPlatform : IBuildPlatform
             group.AddProperty("SelfContained", "true");
             // In the project rather than on the command line, so restore resolves the same runtime packs.
             if (!string.IsNullOrWhiteSpace(context.Profile?.RuntimeIdentifier))
-                group.AddProperty("RuntimeIdentifier", context.Profile!.RuntimeIdentifier!.Trim());
+            {
+                group.AddProperty("RuntimeIdentifier", context.Profile.RuntimeIdentifier.Trim());
+            }
         }
         else
         {
@@ -243,7 +251,10 @@ sealed class DesktopBuildPlatform : IBuildPlatform
         // The profile's script symbols reach every script project the runtime project references, even none, so
         // they replace the active profile's that the script projects default to.
         if (context.Profile is { } profile)
+        {
             arguments.Add($"-p:TurianDefines={string.Join("%3B", profile.Symbols)}");
+        }
+
         return arguments;
     }
 

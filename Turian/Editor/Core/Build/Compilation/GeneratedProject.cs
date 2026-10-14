@@ -6,7 +6,11 @@ static class GeneratedProject
     internal static void Save(ProjectRootElement project)
     {
         var content = project.RawXml;
-        if (File.Exists(project.FullPath) && File.ReadAllText(project.FullPath) == content) return;
+        if (File.Exists(project.FullPath) && File.ReadAllText(project.FullPath) == content)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(Path.GetDirectoryName(project.FullPath)!);
         File.WriteAllText(project.FullPath, content);
     }

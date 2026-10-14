@@ -18,11 +18,20 @@ public sealed class PanelHeaderTests
         public void RenderHeader(Gui gui, PanelHeaderContext context)
         {
             Headers.Add((gui.Pass, context));
-            if (ThrowInHeader) throw new InvalidOperationException("Header failed");
+            if (ThrowInHeader)
+            {
+                throw new InvalidOperationException("Header failed");
+            }
+
             using (gui.Node(24, -1, $"{context.PanelId}/lock").ExpandHeight().Enter())
+            {
                 gui.DrawText("L");
+            }
+
             using (gui.Node().Expand().Direction(Axis.Horizontal).Enter())
+            {
                 gui.DrawText("Mini widget");
+            }
         }
 
         /// <inheritdoc />

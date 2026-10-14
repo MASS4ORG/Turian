@@ -45,9 +45,17 @@ public static class ValueConverters
     {
         public object? Convert(object? value)
         {
-            if (value is not IConvertible c) return value;
+            if (value is not IConvertible c)
+            {
+                return value;
+            }
+
             var d = c.ToDouble(CultureInfo.InvariantCulture);
-            if (d is >= -1.0 and <= 1.0) d *= 100.0;
+            if (d is >= -1.0 and <= 1.0)
+            {
+                d *= 100.0;
+            }
+
             return d.ToString("0", CultureInfo.InvariantCulture) + "%";
         }
     }
@@ -64,7 +72,10 @@ public static class ValueConverters
     {
         public object? Convert(object? value)
         {
-            if (value?.ToString() is not { } s) return value;
+            if (value?.ToString() is not { } s)
+            {
+                return value;
+            }
 #pragma warning disable CA1308 // a "lower" converter must lower-case
             return upper ? s.ToUpperInvariant() : s.ToLowerInvariant();
 #pragma warning restore CA1308

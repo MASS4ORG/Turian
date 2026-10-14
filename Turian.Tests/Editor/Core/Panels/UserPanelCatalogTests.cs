@@ -37,15 +37,15 @@ public sealed class UserPanelCatalogTests
     {
         var pages = Scan();
 
-        Assert.Contains(pages, page => page.Path == "Tools/Custom Panel");
-        Assert.DoesNotContain(pages, page => page.Path == "Tools/Unusable");
+        Assert.Contains(pages, static page => page.Path == "Tools/Custom Panel");
+        Assert.DoesNotContain(pages, static page => page.Path == "Tools/Unusable");
     }
 
     /// <summary>The page carries the attribute's name and path, and a freshly built instance.</summary>
     [Fact]
     public void APageCarriesItsNamePathAndInstance()
     {
-        var page = Scan().Single(page => page.Path == "Tools/Custom Panel");
+        var page = Scan().Single(static page => page.Path == "Tools/Custom Panel");
 
         Assert.Equal("Custom Panel", page.Name);
         Assert.IsType<Fixture>(page.Target);
@@ -56,8 +56,8 @@ public sealed class UserPanelCatalogTests
     [Fact]
     public void PageIdsAreStableAcrossScans()
     {
-        var first = Scan().Single(page => page.Path == "Tools/Custom Panel").Id;
-        var second = Scan().Single(page => page.Path == "Tools/Custom Panel").Id;
+        var first = Scan().Single(static page => page.Path == "Tools/Custom Panel").Id;
+        var second = Scan().Single(static page => page.Path == "Tools/Custom Panel").Id;
 
         Assert.Equal(first, second);
     }

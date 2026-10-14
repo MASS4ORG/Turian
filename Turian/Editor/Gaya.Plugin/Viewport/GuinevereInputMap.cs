@@ -10,7 +10,7 @@ static class GuinevereInputMap
 {
     /// <summary>Every key the Game panel watches, so a frame can diff held state into press edges.</summary>
     public static IReadOnlyList<KeyboardKey> Keys { get; } =
-        [.. Enum.GetValues<KeyboardKey>().Where(key => key != KeyboardKey.Unknown)];
+        [.. Enum.GetValues<KeyboardKey>().Where(static key => key != KeyboardKey.Unknown)];
 
     /// <summary>Every mouse button the Game panel watches.</summary>
     public static IReadOnlyList<MouseButton> Buttons { get; } = [.. Enum.GetValues<MouseButton>()];
@@ -18,7 +18,7 @@ static class GuinevereInputMap
     /// <summary>
     /// Maps a Guinevere key, or returns <c>null</c> when the engine has no equivalent. Both enums are
     /// GLFW usage codes — <c>Space</c> is 32 and <c>Escape</c> is 256 in each — so the cast is the
-    /// mapping; <see cref="System.Enum.IsDefined{TEnum}"/> drops the few Guinevere names Silk does not carry.
+    /// mapping; <see cref="Enum.IsDefined{TEnum}"/> drops the few Guinevere names Silk does not carry.
     /// </summary>
     /// <param name="key">The Guinevere key.</param>
     /// <returns>The engine's key, or null.</returns>

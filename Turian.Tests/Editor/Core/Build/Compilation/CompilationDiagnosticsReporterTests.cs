@@ -228,7 +228,7 @@ public class CompilationDiagnosticsReporterTests
     /// be read from its first argument rather than from the received method's name.
     /// </summary>
     List<LogLevel> LoggedLevels() =>
-        [.. logger.ReceivedCalls().Select(c => (LogLevel)c.GetArguments()[0]!)];
+        [.. logger.ReceivedCalls().Select(static c => (LogLevel)c.GetArguments()[0]!)];
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

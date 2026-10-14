@@ -90,7 +90,7 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
     /// <param name="deltaTime">The time elapsed since the last frame.</param>
     /// <param name="camera">The camera used for rendering the scene.</param>
     /// <param name="node">The root node of the scene to render.</param>
-    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="camera"/> or <paramref name="node"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="camera"/> or <paramref name="node"/> is null.</exception>
     public void Render(double deltaTime, ICamera camera, Node node)
     {
         ArgumentNullException.ThrowIfNull(camera);
@@ -99,7 +99,11 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
         standardSystem.CollectStatistics = target is not null;
         var measurement = new RenderFrameMeasurement(target is not null);
         var commandBuffer = Renderer.BeginFrame();
-        if (commandBuffer is null) return;
+        if (commandBuffer is null)
+        {
+            return;
+        }
+
         RenderFrame(commandBuffer.Value, deltaTime, camera, node);
         RenderStatisticsTargets.Record(target, measurement.Complete(standardSystem.FrameStats));
     }
@@ -147,13 +151,17 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
     void PrepareSystems(GlobalUbo ubo)
     {
         foreach (var system in renderSystems)
+        {
             system.Prepare(frameInfo, ubo);
+        }
     }
 
     void RecordBeforeRenderPass()
     {
         foreach (var system in renderSystems)
+        {
             system.RecordBeforeRenderPass(frameInfo);
+        }
     }
 
     /// <summary>

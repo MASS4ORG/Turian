@@ -77,7 +77,7 @@ public sealed class LayerLayoutTests
         Assert.True(StringComparer.Ordinal.Compare(smaller.ToString("D"), larger.ToString("D")) < 0);
         Assert.True(smaller.ToByteArray().AsSpan().SequenceCompareTo(larger.ToByteArray()) > 0);
         var ids = new[] { larger, smaller, Id("80000000"), Id("7fffffff") };
-        Assert.Equal(ids.Order().Select(id => id.ToString("D")), ids.Select(id => id.ToString("D")).Order());
+        Assert.Equal(ids.Order().Select(static id => id.ToString("D")), ids.Select(static id => id.ToString("D")).Order());
     }
 
     /// <summary>Consumer bindings participate in compatibility checks and do not follow later asset edits.</summary>

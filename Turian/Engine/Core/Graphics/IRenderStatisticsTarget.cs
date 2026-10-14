@@ -19,23 +19,38 @@ public static class RenderStatisticsTargets
     /// <summary>Records a completed render when its authored display remains enabled.</summary>
     public static void Record(IRenderStatisticsTarget? target, RenderFrameStats stats)
     {
-        if (target is { IsRecording: true }) target.Statistics.Add(stats);
+        if (target is { IsRecording: true })
+        {
+            target.Statistics.Add(stats);
+        }
     }
 
     /// <summary>Finds the first started display under active nodes, without allocating during traversal.</summary>
     public static IRenderStatisticsTarget? Find(Node root)
     {
-        if (!root.IsActive) return null;
+        if (!root.IsActive)
+        {
+            return null;
+        }
+
         var components = root.Components;
         for (var i = 0; i < components.Count; i++)
         {
             var component = components[i];
             if (component.IsActive && component is IRenderStatisticsTarget { IsRecording: true } target)
+            {
                 return target;
+            }
         }
         var children = root.Children;
         for (var i = 0; i < children.Count; i++)
-            if (Find(children[i]) is { } target) return target;
+        {
+            if (Find(children[i]) is { } target)
+            {
+                return target;
+            }
+        }
+
         return null;
     }
 }

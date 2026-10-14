@@ -29,8 +29,8 @@ public sealed class AssetImportProgressTests
             var progress = Substitute.For<IProgressSink>();
             var importing = Substitute.For<IProgressScope>();
             var indexing = Substitute.For<IProgressScope>();
-            progress.BeginChild(BackgroundTaskKind.Scan, "Checking assets", 1).Returns(importing);
-            progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets", 1).Returns(indexing);
+            progress.BeginChild(BackgroundTaskKind.Scan, "Checking assets").Returns(importing);
+            progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets").Returns(indexing);
             importer.StartMonitoring(progress);
             importer.StartMonitoring(progress);
             importing.Received().Units(0, 2);

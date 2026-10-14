@@ -65,7 +65,9 @@ public sealed class MaterialResource : IDisposable
             .WriteImage(MaterialDescriptorContext.EmissiveBinding, emissive.DescriptorInfo);
 
         if (!context.AllocateSet(writer, ref descriptorSet))
+        {
             throw new VulkanException("Vulkan: failed to allocate per-material descriptor set");
+        }
     }
 
     /// <summary>

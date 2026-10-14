@@ -19,7 +19,10 @@ sealed class RecentProjectsSettings
         var path = Path.GetFullPath(projectDirectory);
         Paths.RemoveAll(existing => string.Equals(existing, path, StringComparison.OrdinalIgnoreCase));
         Paths.Insert(0, path);
-        if (Paths.Count > 12) Paths.RemoveRange(12, Paths.Count - 12);
+        if (Paths.Count > 12)
+        {
+            Paths.RemoveRange(12, Paths.Count - 12);
+        }
     }
 
     public bool Remove(string projectDirectory) =>
@@ -51,12 +54,18 @@ sealed class ProjectSwitcherChrome(
     {
         RenderCurrent(gui);
         if (gui.Pass == Pass.Pass1Build && open)
+        {
             frameProjects = [.. recent.Paths.Where(Directory.Exists)
                 .Select(path => new ProjectRow(path, TitleFor(path), IconFor(path)))];
+        }
+
         var close = false;
         gui.Popup(ref open, () => close = RenderMenu(gui), width: MenuWidth,
             height: (frameProjects.Length + 1) * RowHeight + Theme.Scale(22), position: popupPosition);
-        if (close) open = false;
+        if (close)
+        {
+            open = false;
+        }
     }
 
     void RenderCurrent(Gui gui)
@@ -70,20 +79,39 @@ sealed class ProjectSwitcherChrome(
             DrawCurrentIcon(gui, project);
             gui.DrawText(label, Theme.Text(12), centerInRect: false);
             gui.ThemedIcon(Icons.CaretDown, Theme.Text(9), 0.7f);
-            if (gui.Pass != Pass.Pass2Render) return;
+            if (gui.Pass != Pass.Pass2Render)
+            {
+                return;
+            }
+
             var interaction = gui.GetInteractable();
-            if (interaction.OnHover()) gui.DrawBackgroundRect(Theme.Hover, 2);
-            if (!interaction.OnClick()) return;
+            if (interaction.OnHover())
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 2);
+            }
+
+            if (!interaction.OnClick())
+            {
+                return;
+            }
+
             popupPosition = new Vector2(Math.Clamp(anchor.X, 0, Math.Max(0, gui.ScreenRect.W - MenuWidth)),
                 anchor.Y + anchor.H);
             open = !open;
-            if (project is not null) titles.Remove(project.ProjectAbsoluteDir);
+            if (project is not null)
+            {
+                titles.Remove(project.ProjectAbsoluteDir);
+            }
         }
     }
 
     string CurrentLabel(AppSettings? project)
     {
-        if (project is null) return "No project";
+        if (project is null)
+        {
+            return "No project";
+        }
+
         var label = ProjectPresentation.Name(project);
         return unsaved.HasUnsavedChanges ? $"{label} \u25CF" : label;
     }
@@ -91,14 +119,24 @@ sealed class ProjectSwitcherChrome(
     void DrawCurrentIcon(Gui gui, AppSettings? project)
     {
         if (project is not null && IconFor(project.ProjectAbsoluteDir) is { } icon)
+        {
             gui.Image(icon, RowHeight, RowHeight);
+        }
     }
 
     string TitleFor(string path)
     {
         if (settings.Settings is { } current && string.Equals(current.ProjectAbsoluteDir, path,
-                StringComparison.OrdinalIgnoreCase)) return ProjectPresentation.Name(current);
-        if (!titles.TryGetValue(path, out var title)) titles[path] = title = ProjectPresentation.Name(path);
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectPresentation.Name(current);
+        }
+
+        if (!titles.TryGetValue(path, out var title))
+        {
+            titles[path] = title = ProjectPresentation.Name(path);
+        }
+
         return title;
     }
 
@@ -107,9 +145,16 @@ sealed class ProjectSwitcherChrome(
         var close = false;
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
-            foreach (var project in frameProjects) close |= RenderProjectRow(gui, project);
+            foreach (var project in frameProjects)
+            {
+                close |= RenderProjectRow(gui, project);
+            }
+
             using (gui.Node(-1, Theme.Scale(6)).ExpandWidth().Enter())
+            {
                 gui.DrawBackgroundRect(Theme.Border);
+            }
+
             using (gui.Node(-1, RowHeight, "project-switcher/open").ExpandWidth()
                        .Padding(8, 0).ContentAlignY(0.5f).Enter())
             {
@@ -134,7 +179,11 @@ sealed class ProjectSwitcherChrome(
             using (gui.Node(-1, RowHeight, $"project-switcher/{project.Path}/open").ExpandWidth()
                        .Direction(Axis.Horizontal).Gap(6).Padding(8, 0).ContentAlignY(0.5f).Enter())
             {
-                if (project.Icon is { } icon) gui.Image(icon, RowHeight, RowHeight);
+                if (project.Icon is { } icon)
+                {
+                    gui.Image(icon, RowHeight, RowHeight);
+                }
+
                 gui.DrawText(project.Title, Theme.Text(12), Theme.Ink, centerInRect: false);
                 if (ActivateMenuItem(gui))
                 {
@@ -149,7 +198,11 @@ sealed class ProjectSwitcherChrome(
             }
             if (MenuAction(gui, Icons.Close, $"{row.Id}/remove"))
             {
-                if (recent.Remove(project.Path)) editorSettings.NotifyChanged("gaya.turian.recentProjects");
+                if (recent.Remove(project.Path))
+                {
+                    editorSettings.NotifyChanged("gaya.turian.recentProjects");
+                }
+
                 close = true;
             }
             gui.Tooltip(row, project.Path, maxWidth: 1000);
@@ -159,16 +212,28 @@ sealed class ProjectSwitcherChrome(
 
     void SwitchProject(string path)
     {
-        if (string.Equals(path, settings.Settings?.ProjectAbsoluteDir, StringComparison.OrdinalIgnoreCase)) return;
+        if (string.Equals(path, settings.Settings?.ProjectAbsoluteDir, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         unsaved.Leave("Some documents have unsaved changes. Save them before leaving the project?",
             () => session.QueueOpen(path));
     }
 
     static bool ActivateMenuItem(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return false;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return false;
+        }
+
         var interaction = gui.GetInteractable();
-        if (interaction.OnHover()) gui.DrawBackgroundRect(Theme.Hover, 2);
+        if (interaction.OnHover())
+        {
+            gui.DrawBackgroundRect(Theme.Hover, 2);
+        }
+
         return interaction.OnClick();
     }
 
@@ -184,7 +249,10 @@ sealed class ProjectSwitcherChrome(
     /// <inheritdoc />
     public void Dispose()
     {
-        foreach (var image in icons.Values) image?.Dispose();
+        foreach (var image in icons.Values)
+        {
+            image?.Dispose();
+        }
     }
 
     /// <summary>
@@ -193,7 +261,10 @@ sealed class ProjectSwitcherChrome(
     /// </summary>
     SKImage? IconFor(string projectDirectory)
     {
-        if (icons.TryGetValue(projectDirectory, out var cached)) return cached;
+        if (icons.TryGetValue(projectDirectory, out var cached))
+        {
+            return cached;
+        }
 
         var image = ProjectIcon.FindSource(projectDirectory) is { } source ? SKImage.FromEncodedData(source) : null;
         icons[projectDirectory] = image;
@@ -204,7 +275,10 @@ sealed class ProjectSwitcherChrome(
     static void OpenInNewInstance(string projectDirectory)
     {
         var executable = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(executable)) return;
+        if (string.IsNullOrEmpty(executable))
+        {
+            return;
+        }
 
         var startInfo = new ProcessStartInfo(executable) { UseShellExecute = false };
         var arguments = Environment.GetCommandLineArgs();

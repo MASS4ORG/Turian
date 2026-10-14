@@ -36,7 +36,10 @@ public sealed class PackageStore(string root)
     public void RecordOrigin(string folder, string source)
     {
         var path = OriginPath(folder);
-        if (File.Exists(path)) return;
+        if (File.Exists(path))
+        {
+            return;
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, source);
@@ -55,7 +58,10 @@ public sealed class PackageStore(string root)
         IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
     {
         var found = new List<(string, PackageManifest)>();
-        if (!Directory.Exists(Root)) return found;
+        if (!Directory.Exists(Root))
+        {
+            return found;
+        }
 
         foreach (var folder in Directory.EnumerateDirectories(Root).Where(static d => !Path.GetFileName(d).StartsWith('.')))
         {
@@ -77,13 +83,19 @@ public sealed class PackageStore(string root)
     /// <returns>How many stored versions were deleted.</returns>
     public int Remove(string id)
     {
-        if (!PackageId.IsValid(id) || !Directory.Exists(Root)) return 0;
+        if (!PackageId.IsValid(id) || !Directory.Exists(Root))
+        {
+            return 0;
+        }
 
         var folders = Directory.EnumerateDirectories(Root, $"{id}@*").ToList();
         foreach (var folder in folders)
         {
             DeleteReadOnly(folder);
-            if (File.Exists(OriginPath(folder))) File.Delete(OriginPath(folder));
+            if (File.Exists(OriginPath(folder)))
+            {
+                File.Delete(OriginPath(folder));
+            }
         }
 
         return folders.Count;
@@ -126,15 +138,24 @@ public sealed class PackageStore(string root)
         ArgumentNullException.ThrowIfNull(source);
 
         var mirror = MirrorPath(source.Url);
-        if (!Directory.Exists(mirror)) await FetchMirrorAsync(source.Url, cancellationToken).ConfigureAwait(false);
+        if (!Directory.Exists(mirror))
+        {
+            await FetchMirrorAsync(source.Url, cancellationToken).ConfigureAwait(false);
+        }
 
         var manifestJson = await RunGitAsync(["--git-dir", mirror, "show", $"{commit}:{PackageManifest.FileName}"],
             cancellationToken, $"{source}@{commit} has no {PackageManifest.FileName} at its root").ConfigureAwait(false);
         var id = JsonSerializer.Deserialize<PackageManifest>(manifestJson, PackageJson.Options)?.Name;
-        if (!PackageId.IsValid(id)) throw new PackageException($"{source}@{commit}: '{id}' is not a valid package id.");
+        if (!PackageId.IsValid(id))
+        {
+            throw new PackageException($"{source}@{commit}: '{id}' is not a valid package id.");
+        }
 
         var target = PackagePath(id, commit);
-        if (Directory.Exists(target)) return target;
+        if (Directory.Exists(target))
+        {
+            return target;
+        }
 
         var staging = Path.Combine(Root, ".staging", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(staging);
@@ -159,7 +180,10 @@ public sealed class PackageStore(string root)
         }
         finally
         {
-            if (Directory.Exists(staging)) DeleteReadOnly(staging);
+            if (Directory.Exists(staging))
+            {
+                DeleteReadOnly(staging);
+            }
         }
 
         return target;
@@ -179,7 +203,10 @@ public sealed class PackageStore(string root)
         var integrity = BrickArchive.ComputeIntegrity(archivePath);
         var manifest = BrickArchive.ReadManifest(archivePath, reservedCategoryPrefixes);
         var target = PackagePath(manifest.Name, ArchiveFolderName(integrity));
-        if (Directory.Exists(target)) return (target, integrity);
+        if (Directory.Exists(target))
+        {
+            return (target, integrity);
+        }
 
         var staging = Path.Combine(Root, ".staging", Guid.NewGuid().ToString("N"));
         try
@@ -195,7 +222,10 @@ public sealed class PackageStore(string root)
         }
         finally
         {
-            if (Directory.Exists(staging)) DeleteReadOnly(staging);
+            if (Directory.Exists(staging))
+            {
+                DeleteReadOnly(staging);
+            }
         }
 
         return (target, integrity);
@@ -256,7 +286,10 @@ public sealed class PackageStore(string root)
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
         // Fail rather than wait on a credential prompt nobody can answer.
         startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
@@ -285,7 +318,9 @@ public sealed class PackageStore(string root)
 
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         if (process.ExitCode != 0)
+        {
             throw new PackageException($"{failure}: {(await error.ConfigureAwait(false)).Trim()}");
+        }
 
         return output;
     }
@@ -293,13 +328,18 @@ public sealed class PackageStore(string root)
     static void MakeReadOnly(string directory)
     {
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, File.GetAttributes(file) | FileAttributes.ReadOnly);
+        }
     }
 
     static void DeleteReadOnly(string directory)
     {
         foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(directory, recursive: true);
     }
 }

@@ -111,10 +111,20 @@ public sealed partial class ThemeCatalog
     {
         ArgumentNullException.ThrowIfNull(source);
         var (info, _) = Describe(source.Text, ThemeOrigin.Code, null);
-        if (info is null) throw new ArgumentException("A theme sheet needs @const theme-id.", nameof(source));
+        if (info is null)
+        {
+            throw new ArgumentException("A theme sheet needs @const theme-id.", nameof(source));
+        }
 
-        if (registered.TryAdd(info.Id, source)) registeredOrder.Add(info.Id);
-        else registered[info.Id] = source;
+        if (registered.TryAdd(info.Id, source))
+        {
+            registeredOrder.Add(info.Id);
+        }
+        else
+        {
+            registered[info.Id] = source;
+        }
+
         Refresh();
         return Find(info.Id)!;
     }
@@ -140,17 +150,28 @@ public sealed partial class ThemeCatalog
             embeddedBase = EmbeddedIcons.Extract(cacheFolder, log);
         }
         foreach (var name in EmbeddedResources())
+        {
             Add(scanned, index, ThemeOrigin.BuiltIn, name[ResourcePrefix.Length..^Extension.Length],
                 name[ResourcePrefix.Length..], null, () => ReadResource(name), embeddedBase);
+        }
+
         foreach (var path in SheetFiles(UserFolder))
+        {
             Add(scanned, index, ThemeOrigin.User, Path.GetFileNameWithoutExtension(path), path, path,
                 () => File.ReadAllText(path));
+        }
+
         foreach (var path in brickFolders.SelectMany(SheetFiles))
+        {
             Add(scanned, index, ThemeOrigin.Brick, Path.GetFileNameWithoutExtension(path), path, path,
                 () => File.ReadAllText(path));
+        }
+
         foreach (var id in registeredOrder)
+        {
             Add(scanned, index, ThemeOrigin.Code, id, registered[id].SourceName ?? id, null,
                 () => registered[id].Text);
+        }
 
         byImportId = index;
         All = [.. scanned.Where(entry => entry.Info is not null).Select(entry => entry.Info!)];
@@ -169,7 +190,11 @@ public sealed partial class ThemeCatalog
         {
             var file = new FileInfo(path);
             hash.Add(path);
-            if (!file.Exists) continue;
+            if (!file.Exists)
+            {
+                continue;
+            }
+
             hash.Add(file.LastWriteTimeUtc.Ticks);
             hash.Add(file.Length);
         }
@@ -185,7 +210,10 @@ public sealed partial class ThemeCatalog
     {
         var importId = Find(id)?.Id ?? id;
         if (!byImportId.TryGetValue(importId, out var entry))
+        {
             throw new KeyNotFoundException($"No theme sheet has the id '{id}'.");
+        }
+
         return Parse(entry.Text, entry.SourceName, entry.BaseUri);
     }
 
@@ -213,11 +241,17 @@ public sealed partial class ThemeCatalog
     {
         var constants = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (Match match in ConstPattern().Matches(text))
+        {
             constants[match.Groups[1].Value] = StyleValue.Unquote(match.Groups[2].Value);
+        }
 
         foreach (var (constant, category) in IdConstants)
         {
-            if (!constants.TryGetValue(constant, out var id) || id.Length == 0) continue;
+            if (!constants.TryGetValue(constant, out var id) || id.Length == 0)
+            {
+                continue;
+            }
+
             var prefix = constant[..^"id".Length];
             var name = constants.GetValueOrDefault(prefix + "name") ?? id;
             var info = new ThemeInfo(id, name, Kind(constants.GetValueOrDefault(prefix + "kind")), category, origin,
@@ -239,8 +273,12 @@ public sealed partial class ThemeCatalog
 
     StyleSheetText? Resolve(string id)
     {
-        if (byImportId.TryGetValue(id, out var entry)) return new StyleSheetText(entry.Text, entry.SourceName, entry.BaseUri);
-        return id == GuinevereDefaultId ? new StyleSheetText(ExcaliburStyles.DefaultSheetText, id + Extension, null) : null;
+        if (byImportId.TryGetValue(id, out var entry))
+        {
+            return new StyleSheetText(entry.Text, entry.SourceName, entry.BaseUri);
+        }
+
+        return id == GuinevereDefaultId ? new StyleSheetText(ExcaliburStyles.DefaultSheetText, id + Extension) : null;
     }
 
     void Add(List<Entry> scanned, Dictionary<string, Entry> index, ThemeOrigin origin, string stem, string sourceName,
@@ -277,15 +315,15 @@ public sealed partial class ThemeCatalog
     static IEnumerable<string> EmbeddedResources()
     {
         var names = typeof(ThemeCatalog).Assembly.GetManifestResourceNames()
-            .Where(name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal)
+            .Where(static name => name.StartsWith(ResourcePrefix, StringComparison.Ordinal)
                            && name.EndsWith(Extension, StringComparison.Ordinal))
             .ToList();
-        int Rank(string name)
+        static int Rank(string name)
         {
             var index = Array.IndexOf(BuiltInOrder, name[ResourcePrefix.Length..^Extension.Length]);
             return index < 0 ? BuiltInOrder.Length : index;
         }
-        return names.OrderBy(Rank).ThenBy(name => name, StringComparer.Ordinal);
+        return names.OrderBy(Rank).ThenBy(static name => name, StringComparer.Ordinal);
     }
 
     static string ReadResource(string name)

@@ -30,12 +30,14 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
     /// Parses a <c>{ … }</c> expression. The braces are required.
     /// </summary>
     /// <param name="text">The full expression including braces.</param>
-    /// <exception cref="System.FormatException">The text is not a well-formed binding expression.</exception>
+    /// <exception cref="FormatException">The text is not a well-formed binding expression.</exception>
     public static BindingExpression Parse(string text)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         if (!IsBinding(text))
+        {
             throw new FormatException($"Not a binding expression: '{text}'");
+        }
 
         var body = text[1..^1].Trim();
 
@@ -45,13 +47,26 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
         {
             converter = body[(pipe + 1)..].Trim();
             body = body[..pipe].Trim();
-            if (converter.Length == 0) converter = null;
+            if (converter.Length == 0)
+            {
+                converter = null;
+            }
         }
 
-        var mode = BindingMode.OneWay;
         var parts = body.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var path = parts.Length > 0 ? parts[0] : string.Empty;
 
+        if (path.Length == 0)
+        {
+            throw new FormatException($"Binding expression has no path: '{text}'");
+        }
+
+        return new BindingExpression(path, ParseMode(parts), converter);
+    }
+
+    static BindingMode ParseMode(string[] parts)
+    {
+        var mode = BindingMode.OneWay;
         for (var i = 1; i < parts.Length; i++)
         {
             var kv = parts[i].Split('=', 2, StringSplitOptions.TrimEntries);
@@ -62,9 +77,6 @@ public sealed record BindingExpression(string Path, BindingMode Mode = BindingMo
             }
         }
 
-        if (path.Length == 0)
-            throw new FormatException($"Binding expression has no path: '{text}'");
-
-        return new BindingExpression(path, mode, converter);
+        return mode;
     }
 }

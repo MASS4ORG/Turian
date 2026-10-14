@@ -23,7 +23,7 @@ public sealed class OapMountSetTests : IDisposable
         var mounts = OapMountSet.ForBasePackage(basePath)!;
 
         Assert.Equal(["dependent", "dependency", "base"],
-            mounts.Readers.Select(reader => OapManifest.TryParse(reader.Manifest)!.Name));
+            mounts.Readers.Select(static reader => OapManifest.TryParse(reader.Manifest)!.Name));
         Assert.True(mounts.TryResolveById(assetId, out var winner, out var entry));
         Assert.Equal("dependent", Encoding.UTF8.GetString(winner.ReadAsset(entry)));
     }
@@ -65,7 +65,7 @@ public sealed class OapMountSetTests : IDisposable
 
         var mounts = OapMountSet.ForBasePackage(basePath)!;
 
-        Assert.Equal(["z", "a", "base"], mounts.Readers.Select(reader => OapManifest.TryParse(reader.Manifest)!.Name));
+        Assert.Equal(["z", "a", "base"], mounts.Readers.Select(static reader => OapManifest.TryParse(reader.Manifest)!.Name));
         Assert.True(mounts.TryResolveById(assetId, out var reader, out var entry));
         Assert.Equal("z", Encoding.UTF8.GetString(reader.ReadAsset(entry)));
     }
@@ -94,7 +94,7 @@ public sealed class OapMountSetTests : IDisposable
         var mounts = OapMountSet.ForBasePackage(basePath)!;
 
         Assert.Equal(["x", "a", "z", "y", "base"],
-            mounts.Readers.Select(reader => OapManifest.TryParse(reader.Manifest)!.Name));
+            mounts.Readers.Select(static reader => OapManifest.TryParse(reader.Manifest)!.Name));
     }
 
     /// <summary>Malformed package requirements cannot silently disable dependency checks.</summary>
@@ -159,7 +159,7 @@ public sealed class OapMountSetTests : IDisposable
 
         using var mounts = OapMountSet.ForBasePackage(directory, "data/game.oap")!;
 
-        Assert.Equal(["mod", "base"], mounts.Readers.Select(reader => OapManifest.TryParse(reader.Manifest)!.Name));
+        Assert.Equal(["mod", "base"], mounts.Readers.Select(static reader => OapManifest.TryParse(reader.Manifest)!.Name));
         Assert.True(mounts.TryResolveById(assetId, out var reader, out var entry));
         using var stream = reader.OpenAssetStream(entry);
         Assert.Equal("mod", new StreamReader(stream).ReadToEnd());

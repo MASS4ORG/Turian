@@ -44,5 +44,5 @@ public class LocalizationExchangeXliffTests
     /// <summary>A document without a file element is rejected.</summary>
     [Fact]
     public void MissingFileElementThrows() =>
-        Assert.Throws<InvalidDataException>(() => LocalizationExchange.ReadXliff("<xliff/>"));
+        Assert.Throws<InvalidDataException>(static () => LocalizationExchange.ReadXliff("<xliff/>"));
 }

@@ -75,7 +75,10 @@ public class ModelComponent : Component, IDisposable
     {
         get
         {
-            if (ModelOverride is not null) return ModelOverride;
+            if (ModelOverride is not null)
+            {
+                return ModelOverride;
+            }
 
             var modelAssetId = ResolveModelAssetId();
 
@@ -86,10 +89,20 @@ public class ModelComponent : Component, IDisposable
                 loadedModelAssetId = modelAssetId;
             }
 
-            if (model is not null) return model;
-            if (loadFailed || modelAssetId == Guid.Empty) return null;
+            if (model is not null)
+            {
+                return model;
+            }
 
-            if (RenderDevice is not { } device || Assets is not { } assets) return null;
+            if (loadFailed || modelAssetId == Guid.Empty)
+            {
+                return null;
+            }
+
+            if (RenderDevice is not { } device || Assets is not { } assets)
+            {
+                return null;
+            }
 
             model = device.GetModel(modelAssetId, assets);
             loadFailed = model is null;
@@ -98,7 +111,7 @@ public class ModelComponent : Component, IDisposable
     }
 
     /// <summary>
-    /// Gets the id of the model asset this component draws from, or <see cref="System.Guid.Empty"/>
+    /// Gets the id of the model asset this component draws from, or <see cref="Guid.Empty"/>
     /// when neither reference resolves.
     /// </summary>
     [JsonIgnore, Hide]

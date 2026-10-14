@@ -53,6 +53,7 @@ public sealed class ContentContractTests : IDisposable
 
         var database = new AssetDatabase();
         foreach (var id in new[] { baseId, relatedId, variantId })
+        {
             database.Assets[id] = new AssetRecord
             {
                 AssetId = id,
@@ -64,6 +65,7 @@ public sealed class ContentContractTests : IDisposable
                 PrimaryContentKey = AssetRecord.CreatePrimaryContentKey(id),
                 StorageKind = AssetStorageKind.Oap
             };
+        }
 
         var firstLoader = new RuntimeAssetLoader(database);
         var first = Assert.IsType<Definition>(await firstLoader.LoadContentAsync<DataAsset>(variantId));

@@ -18,6 +18,9 @@ public sealed class TemporaryScene : Prefab, IDisposable
     /// <summary>Deletes the scene's temporary backing files.</summary>
     public void Dispose()
     {
-        if (Directory.Exists(directory.FullName)) directory.Delete(recursive: true);
+        if (Directory.Exists(directory.FullName))
+        {
+            directory.Delete(recursive: true);
+        }
     }
 }

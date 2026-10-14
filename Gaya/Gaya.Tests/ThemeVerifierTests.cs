@@ -23,7 +23,7 @@ public sealed class ThemeVerifierTests : IDisposable
         }
 
         var findings = ThemeVerifier.Verify(root);
-        Assert.DoesNotContain(findings, finding => finding.Severity == ThemeFindingSeverity.Error);
+        Assert.DoesNotContain(findings, static finding => finding.Severity == ThemeFindingSeverity.Error);
     }
 
     /// <summary>Unknown references are errors, unknown declarations notes, and low contrast a warning.</summary>
@@ -42,10 +42,10 @@ public sealed class ThemeVerifierTests : IDisposable
 
         var findings = ThemeVerifier.Verify(path);
 
-        Assert.Contains(findings, f => f is { Severity: ThemeFindingSeverity.Error } && f.Message.Contains("$link uses an unknown token"));
-        Assert.Contains(findings, f => f is { Severity: ThemeFindingSeverity.Error } && f.Message == "$gap is not a length");
-        Assert.Contains(findings, f => f is { Severity: ThemeFindingSeverity.Note } && f.Message.StartsWith("$surface-pannel"));
-        Assert.Contains(findings, f => f is { Severity: ThemeFindingSeverity.Warning } && f.Message.StartsWith("$ink on $surface-panel"));
+        Assert.Contains(findings, static f => f is { Severity: ThemeFindingSeverity.Error } && f.Message.Contains("$link uses an unknown token"));
+        Assert.Contains(findings, static f => f is { Severity: ThemeFindingSeverity.Error } && f.Message == "$gap is not a length");
+        Assert.Contains(findings, static f => f is { Severity: ThemeFindingSeverity.Note } && f.Message.StartsWith("$surface-pannel"));
+        Assert.Contains(findings, static f => f is { Severity: ThemeFindingSeverity.Warning } && f.Message.StartsWith("$ink on $surface-panel"));
         Assert.Equal(ThemeFindingSeverity.Error, findings[0].Severity);
         Assert.StartsWith($"{path}: error:", findings[0].ToString());
     }

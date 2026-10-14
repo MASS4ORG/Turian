@@ -15,12 +15,14 @@ public sealed class SimulationClockTests
         var clock = new SimulationClock();
         var ticks = new List<long>();
         for (var frame = 0; frame < renderRate * 2; frame++)
+        {
             clock.Advance(1d / renderRate, (tick, interval) =>
             {
                 Assert.Equal(tick - 1, clock.TickIndex);
                 Assert.Equal(SceneTicker.FixedTimestep, interval);
                 ticks.Add(tick);
             });
+        }
 
         Assert.Equal(Enumerable.Range(1, 120).Select(tick => (long)tick), ticks);
         Assert.Equal(120, clock.TickIndex);
@@ -43,7 +45,9 @@ public sealed class SimulationClockTests
         Assert.Equal(2, clock.MaxTicksPerFrame);
 
         for (var frame = 0; frame < 4; frame++)
+        {
             Assert.Equal(2, clock.Advance(0, IgnoreTick));
+        }
 
         Assert.Equal(10, clock.TickIndex);
         Assert.Equal(0, clock.Advance(0, IgnoreTick));
@@ -244,12 +248,16 @@ public sealed class SimulationClockTests
         var uninterrupted = new SimulationClock(settings);
         long expected = 0;
         for (var frame = 0; frame < 100; frame++)
+        {
             uninterrupted.Advance(0.01, (tick, _) => expected += tick);
+        }
 
         var first = new SimulationClock(settings);
         long actual = 0;
         for (var frame = 0; frame < 50; frame++)
+        {
             first.Advance(0.01, (tick, _) => actual += tick);
+        }
 
         var restored = new SimulationClock(settings);
         var json = JsonSerializer.Serialize(first.CaptureState());

@@ -69,18 +69,27 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
     /// </summary>
     public CommandBuffer? BeginFrame()
     {
-        if (Width == 0 || Height == 0) return null;
+        if (Width == 0 || Height == 0)
+        {
+            return null;
+        }
+
         Debug.Assert(!isFrameStarted);
 
         var waitResult = vk.WaitForFences(device.VkDevice, 1, in fence, true, 1_000_000_000UL);
         if (waitResult == Result.Timeout)
+        {
             throw new VulkanException("OffscreenFrameTarget.BeginFrame: WaitForFences timed out (likely GPU hang)");
+        }
+
         _ = vk.ResetFences(device.VkDevice, 1, in fence);
 
         CommandBufferBeginInfo beginInfo = new() { SType = StructureType.CommandBufferBeginInfo };
         var result = vk.BeginCommandBuffer(commandBuffer, in beginInfo);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to begin command buffer: {0}", result);
+        }
 
         isFrameStarted = true;
         return commandBuffer;
@@ -189,11 +198,15 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
         var result = vk.QueueSubmit(device.GraphicsQueue, 1, in submitInfo, fence);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: queue submit failed: {0}", result);
+        }
 
         var endWait = vk.WaitForFences(device.VkDevice, 1, in fence, true, 1_000_000_000UL);
         if (endWait == Result.Timeout)
+        {
             throw new VulkanException("OffscreenFrameTarget.EndFrame: GPU did not signal fence within 1s — likely GPU hang");
+        }
 
         isFrameStarted = false;
     }
@@ -217,7 +230,10 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
         DestroyResources();
         Width = newWidth;
         Height = newHeight;
-        if (Width > 0 && Height > 0) Initialize();
+        if (Width > 0 && Height > 0)
+        {
+            Initialize();
+        }
     }
 
     /// <inheritdoc/>
@@ -319,7 +335,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
             var result = vk.CreateRenderPass(device.VkDevice, in rpInfo, null, out renderPass);
             if (result != Result.Success)
+            {
                 throw new VulkanException("OffscreenFrameTarget: failed to create render pass: {0}", result);
+            }
         }
     }
 
@@ -369,7 +387,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
             var result = vk.CreateFramebuffer(device.VkDevice, in fbInfo, null, out framebuffer);
             if (result != Result.Success)
+            {
                 throw new VulkanException("OffscreenFrameTarget: failed to create framebuffer: {0}", result);
+            }
         }
     }
 
@@ -385,12 +405,16 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
         var result = vk.AllocateCommandBuffers(device.VkDevice, in allocInfo, out commandBuffer);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to allocate command buffer: {0}", result);
+        }
 
         FenceCreateInfo fenceInfo = new() { SType = StructureType.FenceCreateInfo, Flags = FenceCreateFlags.SignaledBit };
         result = vk.CreateFence(device.VkDevice, in fenceInfo, null, out fence);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to create fence: {0}", result);
+        }
     }
 
     void CreateStagingBuffer()
@@ -407,7 +431,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
         var result = vk.CreateBuffer(device.VkDevice, in bufInfo, null, out stagingBuffer);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to create staging buffer: {0}", result);
+        }
 
         vk.GetBufferMemoryRequirements(device.VkDevice, stagingBuffer, out var memReq);
 
@@ -421,7 +447,9 @@ public unsafe partial class OffscreenFrameTarget : IDisposable
 
         result = vk.AllocateMemory(device.VkDevice, in allocInfo, null, out stagingMemory);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to allocate staging memory: {0}", result);
+        }
 
         _ = vk.BindBufferMemory(device.VkDevice, stagingBuffer, stagingMemory, 0);
     }

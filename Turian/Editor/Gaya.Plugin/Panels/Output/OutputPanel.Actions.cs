@@ -15,14 +15,25 @@ sealed partial class OutputPanel
             menuAt = gui.Input.MousePosition;
             menuOpen = true;
         }
-        if (!interaction.OnClick(out var clicks)) return;
+        if (!interaction.OnClick(out var clicks))
+        {
+            return;
+        }
+
         selectedIndex = index;
-        if (clicks >= 2) OpenSource(row.Line);
+        if (clicks >= 2)
+        {
+            OpenSource(row.Line);
+        }
     }
 
     void BuildContextMenu(FlyoutBuilder menu, Gui gui)
     {
-        if (contextLine is not { } line) return;
+        if (contextLine is not { } line)
+        {
+            return;
+        }
+
         menu.Item(localization.T("Open"), () => OpenSource(line),
             enabled: LogSource.ResolvePath(LogSource.LocationMessage(line),
                 settingsService.Settings?.ProjectAbsoluteDir) is not null);

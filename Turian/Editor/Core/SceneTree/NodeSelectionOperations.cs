@@ -10,9 +10,15 @@ public sealed class NodeSelectionOperations(SceneTreeController sceneTree, NodeI
         var nodes = SelectionService.TopLevelNodes(selection).Where(node => node.Parent is not null).ToArray();
         Run("Delete", nodes.Select(node => node.Parent!), () =>
         {
-            foreach (var node in nodes) sceneTree.DetachNode(node);
+            foreach (var node in nodes)
+            {
+                sceneTree.DetachNode(node);
+            }
         });
-        if (nodes.Length > 0) inspector.ClearSelection();
+        if (nodes.Length > 0)
+        {
+            inspector.ClearSelection();
+        }
     }
 
     /// <summary>Duplicates selected subtrees beside their originals with available sibling names.</summary>
@@ -41,7 +47,11 @@ public sealed class NodeSelectionOperations(SceneTreeController sceneTree, NodeI
     {
         ArgumentNullException.ThrowIfNull(target);
         var nodes = SelectionService.TopLevelNodes(selection).Where(node => node.Parent is not null).ToArray();
-        if (nodes.Any(node => IsAncestor(node, target))) return;
+        if (nodes.Any(node => IsAncestor(node, target)))
+        {
+            return;
+        }
+
         Run("Reparent", nodes.Select(node => node.Parent!).Append(target).Concat(nodes), () =>
         {
             foreach (var node in nodes)
@@ -57,11 +67,19 @@ public sealed class NodeSelectionOperations(SceneTreeController sceneTree, NodeI
     void Run(string label, IEnumerable<Node> owners, Action change)
     {
         var targets = owners.Distinct().ToArray();
-        if (targets.Length == 0) return;
+        if (targets.Length == 0)
+        {
+            return;
+        }
+
         undo.BeginGesture();
         try
         {
-            foreach (var owner in targets) undo.RecordObject(owner, label);
+            foreach (var owner in targets)
+            {
+                undo.RecordObject(owner, label);
+            }
+
             change();
             sceneTree.MarkAssetModified();
         }
@@ -71,7 +89,13 @@ public sealed class NodeSelectionOperations(SceneTreeController sceneTree, NodeI
     static bool IsAncestor(Node ancestor, Node node)
     {
         for (var current = node; current is not null; current = current.Parent)
-            if (ReferenceEquals(current, ancestor)) return true;
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+        }
+
         return false;
     }
 }

@@ -48,7 +48,7 @@ sealed class AssetBrowserHarness : IDisposable
         Preferences.ViewMode = mode;
         Panel = new AssetBrowserPanel(files, settings, opener, inspections, Inspector, Reveal,
             new AssetCreationCatalog(files, settings, build, NullLogger.Instance), Preferences,
-            Substitute.For<IEditorSettings>(), types, new AssetPreviewCatalog(build), null!,
+            Substitute.For<IEditorSettings>(), types, null!,
             new AssetFileOperations(files, Undo), new BricksController(null, null, null, NullLogger.Instance),
             new ConfirmDialogChrome(new StudioLocalization()), build, importer: Importer, labelService: Labels,
             database: Database, fileDialogs: Dialog);

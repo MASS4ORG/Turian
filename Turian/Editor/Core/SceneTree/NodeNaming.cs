@@ -14,7 +14,10 @@ public static class NodeNaming
         ArgumentNullException.ThrowIfNull(baseName);
         ArgumentNullException.ThrowIfNull(existingNames);
         var names = existingNames.ToHashSet(StringComparer.Ordinal);
-        if (!names.Contains(baseName)) return baseName;
+        if (!names.Contains(baseName))
+        {
+            return baseName;
+        }
 
         var match = Regex.Match(baseName, @"^(.*?)(?:\s+(\d+))?$");
         var stem = match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value)

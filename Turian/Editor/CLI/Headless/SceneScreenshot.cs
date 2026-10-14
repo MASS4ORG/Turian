@@ -67,7 +67,10 @@ static class SceneScreenshot
             this.root = root;
             frames = options.Frames;
             viewer = new SceneViewerService(vulkan, assets, options.Width, options.Height);
-            if (drawGizmos) viewer.OnPopulateGizmos = DrawTestGizmos;
+            if (drawGizmos)
+            {
+                viewer.OnPopulateGizmos = DrawTestGizmos;
+            }
 
             uiPresenter = UiPresenters.Find()?.Create(vulkan, null, locale);
             if (uiPresenter is not null)
@@ -131,7 +134,11 @@ static class SceneScreenshot
 
         void ReportOcclusion(ILogger logger)
         {
-            if (!viewer.UseOcclusionCulling) return;
+            if (!viewer.UseOcclusionCulling)
+            {
+                return;
+            }
+
             var counts = viewer.OcclusionStats;
             logger.LogInformation("GPU occlusion: {Visible} visible, {Culled}/{Total} hidden; {Memory:F2} MiB (completed frame)",
                 counts.Submitted, counts.Culled, counts.Total, viewer.OcclusionAllocatedBytes / 1048576.0);

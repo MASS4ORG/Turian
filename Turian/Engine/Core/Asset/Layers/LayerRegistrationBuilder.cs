@@ -74,7 +74,11 @@ public sealed class LayerRegistrationBuilder
             Tags = Order(LayerRegistrationMerge.Values(tags, assetTags), tagOrder),
         };
         var errors = settings.Validate();
-        if (errors.Count != 0) throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        if (errors.Count != 0)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine, errors));
+        }
+
         return settings;
     }
 
@@ -95,7 +99,11 @@ public sealed class LayerGroupBuilder<TGroup> where TGroup : class, ILayerGroupK
     /// <summary>Declares the group's default with an identity derived from the group's TypeId.</summary>
     public LayerGroupBuilder<TGroup> Default(string name = "Default")
     {
-        if (group.DefaultValue is not null) throw new InvalidOperationException("A group can declare one default.");
+        if (group.DefaultValue is not null)
+        {
+            throw new InvalidOperationException("A group can declare one default.");
+        }
+
         var value = new LayerValueAsset { Id = AssetIdFactory.Derive(group.Id, "default"), Name = name };
         group.Values.Add(value);
         group.DefaultValue = value;
@@ -106,7 +114,11 @@ public sealed class LayerGroupBuilder<TGroup> where TGroup : class, ILayerGroupK
     public LayerGroupBuilder<TGroup> Default<TValue>(string? name = null, Color32? color = null,
         string description = "") where TValue : class, ILayerValueKey<TGroup>
     {
-        if (group.DefaultValue is not null) throw new InvalidOperationException("A group can declare one default.");
+        if (group.DefaultValue is not null)
+        {
+            throw new InvalidOperationException("A group can declare one default.");
+        }
+
         Value<TValue>(name, color, description);
         group.DefaultValue = group.Values[^1];
         return this;

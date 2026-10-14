@@ -29,12 +29,17 @@ public sealed record BrickContract(IReadOnlyList<ContractAsset> Assets, IReadOnl
         foreach (var meta in Directory.EnumerateFiles(packageRoot, "*.meta", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
         {
             var relative = Path.GetRelativePath(packageRoot, meta[..^".meta".Length]).Replace('\\', '/');
-            if (relative.Split('/').SkipLast(1).Any(static s => s.EndsWith('~'))) continue;
+            if (relative.Split('/').SkipLast(1).Any(static s => s.EndsWith('~')))
+            {
+                continue;
+            }
 
             try
             {
                 if (JsonNode.Parse(File.ReadAllText(meta)) is JsonObject json && Guid.TryParse((string?)json["Id"], out var id))
+                {
                     assets.Add(new ContractAsset(id, relative, (string?)json["__TypeId"]));
+                }
             }
             catch (JsonException)
             {
@@ -62,15 +67,27 @@ public sealed record BrickContract(IReadOnlyList<ContractAsset> Assets, IReadOnl
         var assets = Assets.ToDictionary(static a => a.Id);
         foreach (var asset in reference.Assets)
         {
-            if (!assets.TryGetValue(asset.Id, out var mine)) issues.Add($"asset {asset.Id} ({asset.Path}) is missing");
-            else if (mine.TypeId != asset.TypeId) issues.Add($"asset {asset.Id} ({asset.Path}) is type {mine.TypeId ?? "none"}, expected {asset.TypeId ?? "none"}");
+            if (!assets.TryGetValue(asset.Id, out var mine))
+            {
+                issues.Add($"asset {asset.Id} ({asset.Path}) is missing");
+            }
+            else if (mine.TypeId != asset.TypeId)
+            {
+                issues.Add($"asset {asset.Id} ({asset.Path}) is type {mine.TypeId ?? "none"}, expected {asset.TypeId ?? "none"}");
+            }
         }
 
         var types = Types.ToDictionary(static t => t.Id);
         foreach (var type in reference.Types)
         {
-            if (!types.TryGetValue(type.Id, out var mine)) issues.Add($"type {type.Id} ({type.FullName}) is missing");
-            else if (mine.FullName != type.FullName) issues.Add($"type {type.Id} is {mine.FullName}, expected {type.FullName}");
+            if (!types.TryGetValue(type.Id, out var mine))
+            {
+                issues.Add($"type {type.Id} ({type.FullName}) is missing");
+            }
+            else if (mine.FullName != type.FullName)
+            {
+                issues.Add($"type {type.Id} is {mine.FullName}, expected {type.FullName}");
+            }
         }
 
         return issues;

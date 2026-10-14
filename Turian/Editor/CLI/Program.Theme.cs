@@ -28,7 +28,11 @@ public static partial class Program
                 return 2;
             }
 
-            foreach (var finding in findings) Console.WriteLine(finding);
+            foreach (var finding in findings)
+            {
+                Console.WriteLine(finding);
+            }
+
             var errors = findings.Count(f => f.Severity == Gaya.Host.ThemeFindingSeverity.Error);
             Console.WriteLine(errors == 0 ? "Theme sheets are valid" : $"{errors} error(s)");
             return errors == 0 ? 0 : 1;

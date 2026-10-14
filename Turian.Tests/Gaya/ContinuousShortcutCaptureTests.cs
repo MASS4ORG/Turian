@@ -8,9 +8,9 @@ public sealed class ContinuousShortcutCaptureTests
     public void RebindingContinuousInputDoesNotArmAChord()
     {
         var shortcuts = new ShortcutService(NullLogger.Instance);
-        shortcuts.Add(new KeyBinding("move", KeyboardKey.Up) { IsContinuous = true });
-        shortcuts.Add(new KeyBinding("action", KeyboardKey.F2));
-        shortcuts.Add(new KeyBinding("chord", new KeyStroke(KeyboardKey.K, KeyModifiers.Ctrl), new KeyStroke(KeyboardKey.S)));
+        shortcuts.Add(new KeyBinding("move", GKey.Up) { IsContinuous = true });
+        shortcuts.Add(new KeyBinding("action", GKey.F2));
+        shortcuts.Add(new KeyBinding("chord", new KeyStroke(GKey.K, KeyModifiers.Ctrl), new KeyStroke(GKey.S)));
         var panel = new ShortcutsPanel(shortcuts, Substitute.For<ICommandCatalog>(), Substitute.For<IPanelAccessor>());
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1));

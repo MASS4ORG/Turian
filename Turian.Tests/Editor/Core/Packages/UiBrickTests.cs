@@ -26,7 +26,7 @@ public sealed class UiBrickTests : IDisposable
             BrickAssemblies.RuntimeAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
         Assert.Equal(["Turian.Editor.UI"],
             BrickAssemblies.EditorAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
-        Assert.Contains(typeof(UiDocumentComponent).Assembly.GetReferencedAssemblies(), r => r.Name == "Guinevere");
+        Assert.Contains(typeof(UiDocumentComponent).Assembly.GetReferencedAssemblies(), static r => r.Name == "Guinevere");
         Assert.Contains("SkiaSharp", brick.Manifest.Nuget.Keys);
     }
 
@@ -47,7 +47,10 @@ public sealed class UiBrickTests : IDisposable
             {
                 var reference = metadata.GetAssemblyReference(handle);
                 var name = metadata.GetString(reference.Name);
-                if (!brick.Manifest.Nuget.TryGetValue(name, out var pinned)) continue;
+                if (!brick.Manifest.Nuget.TryGetValue(name, out var pinned))
+                {
+                    continue;
+                }
 
                 var package = Version.Parse(pinned);
                 Assert.True(reference.Version.Major == package.Major && reference.Version.Minor == package.Minor,

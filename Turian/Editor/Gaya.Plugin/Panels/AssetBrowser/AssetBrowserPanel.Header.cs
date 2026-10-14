@@ -20,7 +20,10 @@ sealed partial class AssetBrowserPanel
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
 
             gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || headerMenuOpen ? theme.Ink : theme.InkDim);
 
@@ -39,7 +42,9 @@ sealed partial class AssetBrowserPanel
         {
             HeaderPreferences(gui, browserSettings, editorSettings);
             if (StudioControls.SmallTextButton(gui, "Settings…", "assets/settings", theme.Scale(150)))
+            {
                 context.Services.GetService<IShellHost>()?.ShowPanel(ShellPanels.Settings);
+            }
         },
             width: theme.Scale(headerMenuWidth),
             height: contentHeight,
@@ -71,7 +76,11 @@ sealed partial class AssetBrowserPanel
         var zoom = (float)Math.Clamp(settings.GridZoom, 32, 256);
         gui.Slider(ref zoom, 32, 256, width: theme.Scale(150), height: height, step: 16, showValue: true);
         if (value == settings.ShowFileExtensions && favorites == settings.ShowFavoritesInTree
-            && mode == settings.ViewMode && (int)zoom == settings.GridZoom) return;
+            && mode == settings.ViewMode && (int)zoom == settings.GridZoom)
+        {
+            return;
+        }
+
         settings.ShowFileExtensions = value;
         settings.ShowFavoritesInTree = favorites;
         settings.ViewMode = mode;

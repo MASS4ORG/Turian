@@ -33,9 +33,14 @@ sealed class DocumentTabsChrome(
         var outcome = gui.TabStrip(tabs, active, StudioControls.Tabs(Height), "documents");
 
         if (outcome.Activated?.Tag is AssetWrapper activated)
+        {
             workspace.Activate(activated);
+        }
 
-        if (outcome.Closed?.Tag is not AssetWrapper closed) return;
+        if (outcome.Closed?.Tag is not AssetWrapper closed)
+        {
+            return;
+        }
 
         if (!closed.IsDirty)
         {

@@ -198,7 +198,10 @@ public class InputActionTests
         }
         finally
         {
-            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
     }
 
@@ -239,7 +242,11 @@ public class InputActionTests
     static InputAction Button(string name, params InputControl[] controls)
     {
         var action = new InputAction { Name = name };
-        foreach (var control in controls) action.Bindings.Add(InputBinding.For(control));
+        foreach (var control in controls)
+        {
+            action.Bindings.Add(InputBinding.For(control));
+        }
+
         return action;
     }
 

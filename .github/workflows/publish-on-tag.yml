@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # makensis builds the Windows installer on Linux, so every release asset except macOS is built here.
       - name: Install NSIS
@@ -89,7 +89,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - uses: actions/download-artifact@v8
         with:
@@ -127,7 +127,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Install Podman
         run: sudo apt-get update -yqq && sudo apt-get install -yqq podman

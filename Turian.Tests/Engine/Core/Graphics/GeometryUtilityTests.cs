@@ -30,7 +30,7 @@ public sealed class GeometryUtilityTests
         var planes = new Plane[6];
         GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, planes);
         var center = new Vector3(x, y, z);
-        Assert.False(GeometryUtility.TestPlanesAABB(planes, new Bounds(center - new Vector3(0.1f),
+        Assert.False(GeometryUtility.TestPlanesAabb(planes, new Bounds(center - new Vector3(0.1f),
             center + new Vector3(0.1f))));
     }
 
@@ -40,13 +40,13 @@ public sealed class GeometryUtilityTests
     {
         var planes = new Plane[6];
         GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, planes);
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(-2f), new Vector3(2f))));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(1f, 0f, 0f),
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(-2f), new Vector3(2f))));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(1f, 0f, 0f),
             new Vector3(2f, 0f, 1f))));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, default));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, Bounds.Empty));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(float.NaN), new Vector3(float.NaN))));
-        Assert.True(GeometryUtility.TestPlanesAABB([], new Bounds(new Vector3(100f), new Vector3(101f))));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, default));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, Bounds.Empty));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(float.NaN), new Vector3(float.NaN))));
+        Assert.True(GeometryUtility.TestPlanesAabb([], new Bounds(new Vector3(100f), new Vector3(101f))));
     }
 
     /// <summary>Camera planes agree with direct clip-space tests through translation, yaw, pitch and roll.</summary>
@@ -75,7 +75,7 @@ public sealed class GeometryUtilityTests
             var clip = Vector4.Transform(new Vector4(point, 1f), matrix);
             var visible = clip.X >= -clip.W && clip.X <= clip.W && clip.Y >= -clip.W && clip.Y <= clip.W
                 && clip.Z >= 0f && clip.Z <= clip.W;
-            Assert.Equal(visible, GeometryUtility.TestPlanesAABB(planes, new Bounds(point, point)));
+            Assert.Equal(visible, GeometryUtility.TestPlanesAabb(planes, new Bounds(point, point)));
         }
     }
 
@@ -85,22 +85,22 @@ public sealed class GeometryUtilityTests
     {
         var camera = new EditorCamera { Position = Vector3.Zero, NearPlane = 1f, FarPlane = 10f };
         var planes = GeometryUtility.CalculateFrustumPlanes(camera);
-        Assert.False(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(-1f, -1f, -3f),
+        Assert.False(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(-1f, -1f, -3f),
             new Vector3(1f, 1f, -2f))));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(-0.1f, -0.1f, 0.5f),
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(-0.1f, -0.1f, 0.5f),
             new Vector3(0.1f, 0.1f, 1.5f))));
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(-2f), new Vector3(2f))));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(-2f), new Vector3(2f))));
     }
 
     /// <summary>Invalid extraction inputs are rejected, and degenerate plane normals disable rejection.</summary>
     [Fact]
     public void ValidatesStorageAndToleratesDegenerateMatrices()
     {
-        Assert.Throws<ArgumentNullException>(() => GeometryUtility.CalculateFrustumPlanes(null!));
-        Assert.Throws<ArgumentException>(() => GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, new Plane[5]));
+        Assert.Throws<ArgumentNullException>(static () => GeometryUtility.CalculateFrustumPlanes(null!));
+        Assert.Throws<ArgumentException>(static () => GeometryUtility.CalculateFrustumPlanes(Matrix4x4.Identity, new Plane[5]));
         var planes = new Plane[6];
         GeometryUtility.CalculateFrustumPlanes(default, planes);
-        Assert.True(GeometryUtility.TestPlanesAABB(planes, new Bounds(new Vector3(100f), new Vector3(101f))));
+        Assert.True(GeometryUtility.TestPlanesAabb(planes, new Bounds(new Vector3(100f), new Vector3(101f))));
     }
 
     /// <summary>World bounds enclose every corner after rotation, nonuniform negative scale and translation.</summary>

@@ -22,7 +22,10 @@ public sealed class PackageResolverTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -37,8 +40,8 @@ public sealed class PackageResolverTests : IDisposable
 
         var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["com.acme.rules", "com.acme.inventory", "com.acme.shop"], resolution.Packages.Select(p => p.Id));
-        Assert.Equal([3, 2, 1], resolution.Packages.Select(p => p.Depth));
+        Assert.Equal(["com.acme.rules", "com.acme.inventory", "com.acme.shop"], resolution.Packages.Select(static p => p.Id));
+        Assert.Equal([3, 2, 1], resolution.Packages.Select(static p => p.Depth));
     }
 
     /// <summary>A project still using the old Packages folder is renamed to Bricks when its manifest is read.</summary>
@@ -264,7 +267,11 @@ public sealed class PackageResolverTests : IDisposable
     static string Git(string directory, params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("git") { WorkingDirectory = directory, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(startInfo)!;
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit();

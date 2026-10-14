@@ -17,8 +17,8 @@ public sealed class LayerMigrationTests
         try
         {
             var project = new AppSettings();
-            project.Get<TagsAndLayersSettings>().PhysicsLayers.RemoveAll(slot => slot.Index >= 10);
-            project.Get<TagsAndLayersSettings>().RenderLayers.RemoveAll(slot => slot.Index >= 10);
+            project.Get<TagsAndLayersSettings>().PhysicsLayers.RemoveAll(static slot => slot.Index >= 10);
+            project.Get<TagsAndLayersSettings>().RenderLayers.RemoveAll(static slot => slot.Index >= 10);
             using var services = new ServiceCollection().AddSingleton<IAppSettings>(project)
                 .AddSingleton<LayerFilter>().BuildServiceProvider();
             var node = new Node
@@ -31,12 +31,12 @@ public sealed class LayerMigrationTests
             var filter = services.GetRequiredService<LayerFilter>();
             filter.ResolvePhysics(17);
             filter.ResolveRender(17);
-            var messages = logger.ReceivedCalls().Where(call => call.GetMethodInfo().Name == "Log")
-                .Select(call => call.GetArguments()[2]!.ToString()).ToArray();
+            var messages = logger.ReceivedCalls().Where(static call => call.GetMethodInfo().Name == "Log")
+                .Select(static call => call.GetArguments()[2]!.ToString()).ToArray();
             Assert.Equal(2, messages.Length);
-            Assert.Contains(messages, message => message!.Contains("Physics layer index 17", StringComparison.Ordinal));
-            Assert.Contains(messages, message => message!.Contains("Render layer index 17", StringComparison.Ordinal));
-            Assert.All(node.Children, child => Assert.Equal(0, child.PhysicsLayer));
+            Assert.Contains(messages, static message => message!.Contains("Physics layer index 17", StringComparison.Ordinal));
+            Assert.Contains(messages, static message => message!.Contains("Render layer index 17", StringComparison.Ordinal));
+            Assert.All(node.Children, static child => Assert.Equal(0, child.PhysicsLayer));
         }
         finally { Log.Configure(previous); }
     }

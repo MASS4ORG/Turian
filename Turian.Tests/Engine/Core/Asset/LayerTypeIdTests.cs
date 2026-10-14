@@ -8,7 +8,11 @@ public sealed class LayerTypeIdTests
     public void PayloadTypeIdsAreSourceLiterals()
     {
         var root = AppContext.BaseDirectory;
-        while (Directory.GetFiles(root, "*.slnx").Length == 0) root = Directory.GetParent(root)!.FullName;
+        while (Directory.GetFiles(root, "*.slnx").Length == 0)
+        {
+            root = Directory.GetParent(root)!.FullName;
+        }
+
         var files = new[] { "Asset/Layers/EnumValueAsset.cs", "Asset/Layers/LayerGroupAsset.cs",
             "Asset/Settings/NodeLayerSettings.cs" };
         var attributes = files.SelectMany(file => CSharpSyntaxTree.ParseText(
@@ -37,7 +41,11 @@ public sealed class LayerTypeIdTests
     {
         Assert.Equal(type, TypeRegistry.GetTypeOrThrow(Guid.Parse(previousId)));
         Assert.Equal(Guid.Parse(currentId), TypeRegistry.GetIdOrThrow(type));
-        if (type.IsAbstract) return;
+        if (type.IsAbstract)
+        {
+            return;
+        }
+
         var id = Guid.NewGuid();
         var payload = $$"""{"__TypeId":"{{previousId}}","Id":"{{id}}","Name":"Authored"}""";
         var asset = Serializer.LoadData<DataAsset>(payload)!;

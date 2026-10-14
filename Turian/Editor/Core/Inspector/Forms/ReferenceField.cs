@@ -49,7 +49,7 @@ public sealed class ReferenceField
     /// <summary>Whether the member refuses writes.</summary>
     public bool IsReadOnly => source.IsReadOnly;
 
-    /// <summary>The referenced asset or node id, or <see cref="System.Guid.Empty"/> when unset.</summary>
+    /// <summary>The referenced asset or node id, or <see cref="Guid.Empty"/> when unset.</summary>
     public Guid CurrentId => source.GetValue() switch
     {
         null when IsDirect => PendingId(),
@@ -77,7 +77,10 @@ public sealed class ReferenceField
         for (var current = type; current is not null; current = current.BaseType)
         {
             if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(DataAssetReference<>))
+            {
                 payloadType = current.GetGenericArguments()[0];
+            }
+
             if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(AssetReference<>))
             {
                 type = current;
@@ -85,13 +88,18 @@ public sealed class ReferenceField
             }
         }
 
-        if (!type.IsGenericType) return TryCreateDirect(field);
+        if (!type.IsGenericType)
+        {
+            return TryCreateDirect(field);
+        }
 
         var definition = type.GetGenericTypeDefinition();
         var argument = type.GetGenericArguments()[0];
 
         if (definition == typeof(AssetReference<>))
+        {
             return new ReferenceField(field, ReferenceKind.Asset, argument) { DataAssetPayloadType = payloadType };
+        }
 
         return null;
     }
@@ -106,7 +114,10 @@ public sealed class ReferenceField
     /// <returns>True when the write succeeded.</returns>
     public bool Set(Guid id)
     {
-        if (IsReadOnly) return false;
+        if (IsReadOnly)
+        {
+            return false;
+        }
 
         // Assigning a fresh instance rather than mutating in place keeps undo and change notification
         // working the same way they do for every other field.
@@ -114,7 +125,11 @@ public sealed class ReferenceField
         foreach (var field in source.Sources)
         {
             var value = Activator.CreateInstance(field.ValueType);
-            if (value is null) return false;
+            if (value is null)
+            {
+                return false;
+            }
+
             SetIdOn(value, id);
             success &= field.SetValue(value);
         }
@@ -129,12 +144,26 @@ public sealed class ReferenceField
     /// <returns>True when the write succeeded.</returns>
     public bool SetTarget(object? target)
     {
-        if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target))) return false;
+        if (IsReadOnly || (target is not null && !TargetType.IsInstanceOfType(target)))
+        {
+            return false;
+        }
+
         foreach (var field in source.Sources)
         {
-            if (field.Target is not IdObject owner) continue;
-            if (field.CollectionMember is { } list) ObjectReferences.Forget(owner, list, field.CollectionIndex);
-            else ObjectReferences.Forget(owner, field.Name);
+            if (field.Target is not IdObject owner)
+            {
+                continue;
+            }
+
+            if (field.CollectionMember is { } list)
+            {
+                ObjectReferences.Forget(owner, list, field.CollectionIndex);
+            }
+            else
+            {
+                ObjectReferences.Forget(owner, field.Name);
+            }
         }
 
         return source.SetValue(target);
@@ -143,7 +172,10 @@ public sealed class ReferenceField
     /// <summary>The id read from data for a direct reference whose target is not loaded, or empty.</summary>
     Guid PendingId()
     {
-        if (source.Target is not IdObject owner) return Guid.Empty;
+        if (source.Target is not IdObject owner)
+        {
+            return Guid.Empty;
+        }
 
         var member = source.CollectionMember ?? source.Name;
         var index = source.CollectionMember is null ? 0 : source.CollectionIndex;
@@ -160,7 +192,9 @@ public sealed class ReferenceField
     {
         var type = field.ValueType;
         if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true) || type.IsArray || type.IsGenericType)
+        {
             return null;
+        }
 
         var kind = typeof(DataAsset).IsAssignableFrom(type) ? ReferenceKind.Asset
             : typeof(Component).IsAssignableFrom(type) ? ReferenceKind.Component

@@ -57,7 +57,10 @@ public class BuildAppSettings : IdObject, IBuildAppSettings
     public IAppSettings Load(IAppSettings appSettings)
     {
         ArgumentNullException.ThrowIfNull(appSettings);
-        if (ReferenceEquals(appSettings, this)) return this;
+        if (ReferenceEquals(appSettings, this))
+        {
+            return this;
+        }
 
         ProjectAbsoluteDir = appSettings.ProjectAbsoluteDir;
         Title = appSettings.Title;

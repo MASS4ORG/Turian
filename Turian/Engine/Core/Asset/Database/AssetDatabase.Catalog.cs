@@ -66,7 +66,7 @@ public sealed partial class AssetDatabase
     {
         var stale = assets.Values
             .Where(static record => !string.IsNullOrWhiteSpace(record.MetaRelativePath))
-            .Where(record => !File.Exists(ResolveRecordPath(record.ProjectRootPath, record.MetaRelativePath)))
+            .Where(static record => !File.Exists(ResolveRecordPath(record.ProjectRootPath, record.MetaRelativePath)))
             .Select(static record => record.AssetId)
             .ToList();
 

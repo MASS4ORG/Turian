@@ -39,7 +39,9 @@ static class LayerAssetValidation
         List<string> errors)
     {
         if (group is not null && !groups.Any(registered => registered?.Id == group.Id))
+        {
             errors.Add($"{consumer} group must reference a group in the settings manifest.");
+        }
     }
 
     static void ValidateGroup(LayerGroupAsset group, Dictionary<Guid, string> identities, List<string> errors)
@@ -64,7 +66,9 @@ static class LayerAssetValidation
         }
 
         if (group.DefaultValue is null || !group.Values.Any(value => value?.Id == group.DefaultValue.Id))
+        {
             errors.Add($"Group '{group.Name}' default must reference a value in its manifest.");
+        }
     }
 
     static void ValidateTags(List<TagAsset> tags, Dictionary<Guid, string> identities, List<string> errors)
@@ -84,19 +88,30 @@ static class LayerAssetValidation
 
     static void ValidateCapacity(int count, int capacity, string source, List<string> errors)
     {
-        if (count > capacity) errors.Add($"{source} count {count} exceeds capacity {capacity}.");
+        if (count > capacity)
+        {
+            errors.Add($"{source} count {count} exceeds capacity {capacity}.");
+        }
     }
 
     static void ValidateName(string name, string source, List<string> errors)
     {
-        if (string.IsNullOrWhiteSpace(name)) errors.Add($"{source} name cannot be empty.");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            errors.Add($"{source} name cannot be empty.");
+        }
     }
 
     static void ValidateIdentity(IdObject asset, string source, Dictionary<Guid, string> identities,
         List<string> errors)
     {
-        if (asset.Id == Guid.Empty) errors.Add($"{source} identity cannot be empty.");
+        if (asset.Id == Guid.Empty)
+        {
+            errors.Add($"{source} identity cannot be empty.");
+        }
         else if (!identities.TryAdd(asset.Id, source))
+        {
             errors.Add($"{source} identity {asset.Id} is already used by {identities[asset.Id]}.");
+        }
     }
 }

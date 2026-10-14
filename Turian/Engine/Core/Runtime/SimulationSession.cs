@@ -20,7 +20,11 @@ public sealed class SimulationSession
         this.world = world ?? throw new ArgumentNullException(nameof(world));
         Clock = clock ?? throw new ArgumentNullException(nameof(clock));
         ArgumentException.ThrowIfNullOrWhiteSpace(compatibility);
-        if (clock.TickIndex != 0) throw new ArgumentException("The session requires a fresh clock.", nameof(clock));
+        if (clock.TickIndex != 0)
+        {
+            throw new ArgumentException("The session requires a fresh clock.", nameof(clock));
+        }
+
         Compatibility = compatibility;
         this.limits = limits;
         commands = new SimulationCommandQueue(limits);
@@ -49,7 +53,11 @@ public sealed class SimulationSession
     {
         EnsureAdmission();
         var boundary = executingTick == 0 ? Clock.TickIndex : executingTick;
-        if (boundary == long.MaxValue) return new(SimulationCommandStatus.LimitExceeded, null);
+        if (boundary == long.MaxValue)
+        {
+            return new(SimulationCommandStatus.LimitExceeded, null);
+        }
+
         var result = commands.Schedule(producer, producerSequence, kind, version, payload,
             targetTick ?? boundary + 1, boundary);
         started |= result.Status == SimulationCommandStatus.Accepted;
@@ -85,7 +93,10 @@ public sealed class SimulationSession
     {
         EnsureDrivingBoundary();
         if (tick != checked(completedTick + 1) || interval != Clock.FixedDeltaTime)
+        {
             throw new InvalidOperationException("The session must be driven by its own clock.");
+        }
+
         executingTick = tick;
         started = true;
         try
@@ -135,7 +146,10 @@ public sealed class SimulationSession
         {
             var state = world.CaptureState();
             if (state.ValueKind != JsonValueKind.Object)
+            {
                 throw new InvalidDataException("Simulation world state must be a JSON object.");
+            }
+
             return new SimulationCheckpoint
             {
                 Compatibility = Compatibility,
@@ -156,7 +170,11 @@ public sealed class SimulationSession
     {
         EnsureBoundary();
         ArgumentNullException.ThrowIfNull(state);
-        if (started) throw new InvalidOperationException("Restore requires an unused simulation session.");
+        if (started)
+        {
+            throw new InvalidOperationException("Restore requires an unused simulation session.");
+        }
+
         ValidateCheckpoint(state);
         var restoredRandom = new SimulationRandomStreams(Random.Seed);
         restoredRandom.RestoreState(state.Random);
@@ -193,7 +211,7 @@ public sealed class SimulationSession
         return new RuntimeSaveSnapshot
         {
             Tick = state.Clock.TickIndex,
-            RngState = state.Random.Streams.Single(entry => entry.Name == "default").State,
+            RngState = state.Random.Streams.Single(static entry => entry.Name == "default").State,
             State = JsonNode.Parse(state.World.GetRawText())!.AsObject(),
             Extensions = new Dictionary<string, RuntimeSaveExtension>(StringComparer.Ordinal)
             {
@@ -213,21 +231,29 @@ public sealed class SimulationSession
         var state = ReadCheckpoint(snapshot);
         ValidateCheckpoint(state);
         if (snapshot.Tick != state.Clock.TickIndex ||
-            snapshot.RngState != state.Random.Streams.Single(entry => entry.Name == "default").State ||
+            snapshot.RngState != state.Random.Streams.Single(static entry => entry.Name == "default").State ||
             SimulationStateHash.Compute(JsonSerializer.SerializeToElement(snapshot.State)) !=
             SimulationStateHash.Compute(state.World))
+        {
             throw new InvalidDataException("Runtime save mirrors do not match its simulation checkpoint.");
+        }
+
         RestoreState(state);
     }
 
     void ValidateCheckpoint(SimulationCheckpoint state)
     {
         if (!HasCompatibleMetadata(state))
+        {
             throw new InvalidDataException("Simulation checkpoint metadata is incompatible.");
+        }
+
         var clock = new SimulationClock(new TimeSettings { FixedDeltaTime = Clock.FixedDeltaTime });
         clock.RestoreState(state.Clock);
-        if (state.Random.Streams is null || state.Random.Streams.Count(entry => entry?.Name == "default") != 1)
+        if (state.Random.Streams is null || state.Random.Streams.Count(static entry => entry?.Name == "default") != 1)
+        {
             throw new InvalidDataException("Simulation checkpoint requires one default random stream.");
+        }
     }
 
     bool HasCompatibleMetadata(SimulationCheckpoint state) =>
@@ -240,7 +266,10 @@ public sealed class SimulationSession
         if (snapshot.Extensions is null ||
             !snapshot.Extensions.TryGetValue(SimulationCheckpoint.ExtensionName, out var extension) ||
             extension is null || !extension.Required || extension.Data is null)
+        {
             throw new InvalidDataException("The required simulation checkpoint is missing.");
+        }
+
         return extension.Data.Deserialize<SimulationCheckpoint>()
             ?? throw new InvalidDataException("The simulation checkpoint is empty.");
     }
@@ -248,19 +277,30 @@ public sealed class SimulationSession
     void EnsureAdmission()
     {
         if (faulted || Clock.IsFaulted || capturing)
+        {
             throw new InvalidOperationException("The simulation has faulted or is capturing/restoring state.");
-        if (executingTick == 0) EnsureBoundary();
+        }
+
+        if (executingTick == 0)
+        {
+            EnsureBoundary();
+        }
     }
 
     void EnsureBoundary()
     {
         if (faulted || Clock.IsFaulted || capturing || executingTick != 0 || Clock.TickIndex != completedTick)
+        {
             throw new InvalidOperationException("The simulation is outside a completed boundary or has faulted.");
+        }
     }
 
     void EnsureDrivingBoundary()
     {
         EnsureBoundary();
-        if (publishing) throw new InvalidOperationException("The completed tick cannot reenter the simulation driver.");
+        if (publishing)
+        {
+            throw new InvalidOperationException("The completed tick cannot reenter the simulation driver.");
+        }
     }
 }

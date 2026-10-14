@@ -30,7 +30,9 @@ public sealed class PanelHeaderInteractionTests
         internal void Draw() => InspectorFormsRenderingTests.Frame(Gui, surface, font, gui =>
         {
             using (gui.Node(-1, 24, "panel/header").ExpandWidth().Direction(Axis.Horizontal).Enter())
+            {
                 panel.RenderHeader(gui, new PanelHeaderContext(id, id, gui.CurrentNode.Rect, false, services));
+            }
         });
 
         internal LayoutNode Find(string nodeId) => Nodes(Gui.RootNode!).Single(node => node.Id == nodeId);
@@ -92,7 +94,7 @@ public sealed class PanelHeaderInteractionTests
             services, NullLogger.Instance);
         var preferences = new OutputPanelSettings();
         var panel = new OutputPanel(NullLogger.Instance, preferences,
-            new OutputLogBridge(preferences, play, build, NullLogger.Instance), new SettingsService(),
+            new OutputLogBridge(preferences, play, build), new SettingsService(),
             Substitute.For<IFocusTracker>(), new StudioLocalization());
         using var frame = new HeaderFrame(panel, GayaPlugin.OutputPanelId);
         frame.Click("gaya.turian.output/tabMenu");

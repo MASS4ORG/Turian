@@ -5,7 +5,7 @@ static class LayerTestData
     internal static LayerGroupAsset Group(string name = "Physics", int valueCount = 1)
     {
         var values = Enumerable.Range(0, valueCount)
-            .Select(index => new LayerValueAsset { Name = index == 0 ? "Default" : $"Value{index}" }).ToList();
+            .Select(static index => new LayerValueAsset { Name = index == 0 ? "Default" : $"Value{index}" }).ToList();
         return new LayerGroupAsset { Name = name, Values = values, DefaultValue = values.FirstOrDefault() };
     }
 
@@ -17,8 +17,8 @@ static class LayerTestData
     }
 
     internal static NodeLayerSettings TypedSettings() => new LayerRegistrationBuilder()
-        .Group<Physics>(group => group.Default().Value<Water>().Value<Actors>())
-        .Group<Rendering>(group => group.Default()).Tag<Player>().Build();
+        .Group<Physics>(static group => group.Default().Value<Water>().Value<Actors>())
+        .Group<Rendering>(static group => group.Default()).Tag<Player>().Build();
 
     /// <summary>A typed physics group fixture.</summary>
     [TypeId("d5f74ca8-a970-4770-a2c6-893d27000100")]

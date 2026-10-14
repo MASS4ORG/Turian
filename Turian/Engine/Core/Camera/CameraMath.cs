@@ -24,7 +24,11 @@ public static class CameraMath
         _ = Matrix4x4.Invert(camera.GetViewMatrix(), out var viewInv);
         v = Vector4.Transform(v, projInv);
         v = Vector4.Transform(v, viewInv);
-        if (MathF.Abs(v.W) > float.Epsilon) v /= v.W;
+        if (MathF.Abs(v.W) > float.Epsilon)
+        {
+            v /= v.W;
+        }
+
         return new Vector3(v.X, v.Y, v.Z);
     }
 
@@ -42,7 +46,10 @@ public static class CameraMath
     public static Ray? ScreenPointToRay(ICamera camera, Vector2 screenPos, Vector2 viewportSize)
     {
         ArgumentNullException.ThrowIfNull(camera);
-        if (viewportSize.X <= 0f || viewportSize.Y <= 0f) return null;
+        if (viewportSize.X <= 0f || viewportSize.Y <= 0f)
+        {
+            return null;
+        }
 
         var ndcX = (screenPos.X / viewportSize.X * 2f) - 1f;
         var ndcY = (screenPos.Y / viewportSize.Y * 2f) - 1f;

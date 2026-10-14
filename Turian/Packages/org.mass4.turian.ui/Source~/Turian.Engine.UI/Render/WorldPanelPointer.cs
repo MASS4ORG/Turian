@@ -29,10 +29,39 @@ public static class WorldPanelPointer
         out Vector2 hit)
     {
         hit = default;
-        if (viewportPixels.X <= 0f || viewportPixels.Y <= 0f) return false;
+        if (viewportPixels.X <= 0f || viewportPixels.Y <= 0f)
+        {
+            return false;
+        }
 
-        if (!Matrix4x4.Invert(viewProjection, out var invViewProj)) return false;
-        if (!Matrix4x4.Invert(model, out var invModel)) return false;
+        if (!TryLocalRay(model, viewProjection, pointerPixels, viewportPixels, out var origin, out var direction))
+        {
+            return false;
+        }
+
+        if (!TryIntersect(origin, direction, out var localHit))
+        {
+            return false;
+        }
+
+        hit = (localHit + new Vector2(0.5f)) * panelPixels;
+        return true;
+    }
+
+    static bool TryLocalRay(Matrix4x4 model, Matrix4x4 viewProjection, Vector2 pointerPixels,
+        Vector2 viewportPixels, out Vector3 origin, out Vector3 direction)
+    {
+        origin = default;
+        direction = default;
+        if (!Matrix4x4.Invert(viewProjection, out var invViewProj))
+        {
+            return false;
+        }
+
+        if (!Matrix4x4.Invert(model, out var invModel))
+        {
+            return false;
+        }
 
         // Pointer → NDC (Vulkan: x right in [-1,1], y down in [-1,1]).
         var ndcX = (2f * pointerPixels.X / viewportPixels.X) - 1f;
@@ -44,19 +73,34 @@ public static class WorldPanelPointer
         // Ray into panel-local space.
         var localNear = Vector4.Transform(new Vector4(near, 1f), invModel);
         var localFar = Vector4.Transform(new Vector4(far, 1f), invModel);
-        var lo = new Vector3(localNear.X, localNear.Y, localNear.Z) / SafeW(localNear.W);
+        origin = new Vector3(localNear.X, localNear.Y, localNear.Z) / SafeW(localNear.W);
         var lf = new Vector3(localFar.X, localFar.Y, localFar.Z) / SafeW(localFar.W);
-        var dir = lf - lo;
-        if (MathF.Abs(dir.Z) < 1e-6f) return false;
+        direction = lf - origin;
+        return true;
+    }
 
-        var t = -lo.Z / dir.Z;
-        if (t < 0f) return false;
+    static bool TryIntersect(Vector3 origin, Vector3 direction, out Vector2 hit)
+    {
+        hit = default;
+        if (MathF.Abs(direction.Z) < 1e-6f)
+        {
+            return false;
+        }
 
-        var lx = lo.X + (t * dir.X);
-        var ly = lo.Y + (t * dir.Y);
-        if (lx is < -0.5f or > 0.5f || ly is < -0.5f or > 0.5f) return false;
+        var t = -origin.Z / direction.Z;
+        if (t < 0f)
+        {
+            return false;
+        }
 
-        hit = new Vector2((lx + 0.5f) * panelPixels.X, (ly + 0.5f) * panelPixels.Y);
+        var lx = origin.X + (t * direction.X);
+        var ly = origin.Y + (t * direction.Y);
+        if (MathF.Abs(lx) > 0.5f || MathF.Abs(ly) > 0.5f)
+        {
+            return false;
+        }
+
+        hit = new Vector2(lx, ly);
         return true;
     }
 

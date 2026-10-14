@@ -23,14 +23,25 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         using (gui.Node(-1, Height, "scene/toolbar").ExpandWidth().Direction(Axis.Horizontal)
                    .Padding(4f, 3f).Gap(3f).ContentAlignY(0.5f).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) toolbarBounds = gui.CurrentNode.Rect;
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                toolbarBounds = gui.CurrentNode.Rect;
+            }
+
             gui.DrawBackgroundRect(Theme.Chrome);
             Tools(gui);
             Divider(gui, "tools");
-            if (IconButton(gui, Icons.SceneFrame, "frame", Hint("Frame selected", "frameSelected"))) frameSelected();
+            if (IconButton(gui, Icons.SceneFrame, "frame", Hint("Frame selected", "frameSelected")))
+            {
+                frameSelected();
+            }
+
             if (IconButton(gui, Icons.SceneProjection, "projection", "Toggle perspective / orthographic",
                     viewport.IsOrthographic))
+            {
                 viewport.ToggleProjection();
+            }
+
             Divider(gui, "view");
             Coordinates(gui);
             Snapping(gui);
@@ -55,7 +66,9 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     {
         if (IconButton(gui, icon, mode.ToString(), Hint(hint, mode.ToString().ToLowerInvariant()),
                 viewport.Gizmo.Mode == mode))
+        {
             viewport.Gizmo.Mode = mode;
+        }
     }
 
     string Hint(string text, string command)
@@ -74,7 +87,9 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         }
         var world = viewport.Gizmo.Space == TransformGizmoSpace.World;
         if (Button(gui, world ? "Global" : "Local", "space", "Switch global / local axes", width: 54f))
+        {
             viewport.Gizmo.Space = world ? TransformGizmoSpace.Local : TransformGizmoSpace.World;
+        }
     }
 
     void Snapping(Gui gui)
@@ -87,13 +102,17 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         }
         if (IconButton(gui, Icons.CaretDown, "snapOptions", "Translation, rotation and scale snap intervals",
                 width: 18f))
+        {
             OpenOptions(gui, camera: false);
+        }
     }
 
     static void Divider(Gui gui, string id)
     {
         using (gui.Node(1f, Theme.Scale(16f), "scene/toolbar/divider/" + id).Margin(5f, 0).Enter())
+        {
             gui.DrawBackgroundRect(Theme.Border);
+        }
     }
 
     static bool Button(Gui gui, string label, string id, string hint, bool selected = false, float width = 24f) =>
@@ -110,15 +129,31 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         {
             var inputPass = gui.Pass == Pass.Pass2Render;
             var hot = inputPass && gui.GetInteractable().OnHover();
-            if (selected) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
-            else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
+            if (selected)
+            {
+                gui.DrawBackgroundRect(Theme.AccentFill, 3f);
+            }
+            else if (hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
+
             var opacity = selected || hot ? 1f : 0.75f;
-            if (icon is not null) gui.ThemedIcon(icon, Theme.Text(13f), opacity);
+            if (icon is not null)
+            {
+                gui.ThemedIcon(icon, Theme.Text(13f), opacity);
+            }
             else
             {
                 using (gui.Node().Enter())
+                {
                     gui.DrawText(label, Theme.Text(width > 30f ? 11f : 13f), selected ? Theme.Ink : Theme.InkDim);
-                if (trailingIcon is not null) gui.ThemedIcon(trailingIcon, Theme.Text(9f), opacity);
+                }
+
+                if (trailingIcon is not null)
+                {
+                    gui.ThemedIcon(trailingIcon, Theme.Text(9f), opacity);
+                }
             }
             gui.Tooltip(gui.CurrentNode, hint);
             return hot && gui.GetInteractable().OnClick();
@@ -128,11 +163,20 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
     void MenuButton(Gui gui, string title, ref bool open, ref Vector2 position)
     {
         if (!Button(gui, title, null, title, title + " options", false, title.Length * 7f + 24f, Icons.CaretDown))
+        {
             return;
+        }
+
         open = !open;
         position = new Vector2(gui.CurrentNode.Rect.BottomRight.X - Theme.Scale(210f), gui.CurrentNode.Rect.BottomRight.Y);
-        if (title == "Transform") viewMenu = false;
-        else transformMenu = false;
+        if (title == "Transform")
+        {
+            viewMenu = false;
+        }
+        else
+        {
+            transformMenu = false;
+        }
     }
 
     void Menus(Gui gui)
@@ -165,13 +209,24 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         var view = viewport.Settings.View;
         foreach (var slot in viewport.RenderLayers.OrderBy(slot => slot.Index))
         {
-            if ((uint)slot.Index >= 32) continue;
+            if ((uint)slot.Index >= 32)
+            {
+                continue;
+            }
+
             var index = slot.Index;
             menu.CheckItem($"{index}: {slot.Name}",
                 () => (visibility ? view.VisibleLayers : view.LockedLayers).Contains(index), value =>
                 {
-                    if (visibility) view.SetVisible(index, value);
-                    else view.SetLocked(index, value);
+                    if (visibility)
+                    {
+                        view.SetVisible(index, value);
+                    }
+                    else
+                    {
+                        view.SetLocked(index, value);
+                    }
+
                     Changed("sceneViewer");
                 });
         }
@@ -233,7 +288,11 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             frameCameraOptions = cameraOptions;
             frameOptionsAt = optionsAt;
         }
-        if (!frameOptionsOpen) return;
+        if (!frameOptionsOpen)
+        {
+            return;
+        }
+
         var camera = frameCameraOptions;
         using (gui.Node(Theme.Scale(250f), Theme.Scale(camera ? 216f : 134f), "scene/options")
                    .AbsoluteScreen(frameOptionsAt.X, frameOptionsAt.Y).BlockInput().Direction(Axis.Vertical)
@@ -245,12 +304,24 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
             using (gui.Node().ExpandWidth().Direction(Axis.Horizontal).Enter())
             {
                 using (gui.Node().ExpandWidth().Enter())
+                {
                     gui.DrawText(camera ? "Camera" : "Snapping", Theme.Text(12), Theme.Ink);
+                }
+
                 if (IconButton(gui, Icons.Close, "closeOptions", "Close options", width: 18f))
+                {
                     snapOptions = cameraOptions = false;
+                }
             }
-            if (camera) CameraFields(gui);
-            else SnapFields(gui);
+            if (camera)
+            {
+                CameraFields(gui);
+            }
+            else
+            {
+                SnapFields(gui);
+            }
+
             DismissOptions(gui);
         }
     }
@@ -279,12 +350,19 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
         using (gui.Node(-1, Theme.Scale(24f), "scene/options/" + id).ExpandWidth()
                    .Direction(Axis.Horizontal).ContentAlignY(0.5f).Enter())
         {
-            using (gui.Node().ExpandWidth().Enter()) gui.DrawText(label, Theme.Text(11), Theme.InkDim);
+            using (gui.Node().ExpandWidth().Enter())
+            {
+                gui.DrawText(label, Theme.Text(11), Theme.InkDim);
+            }
+
             var text = value.ToString("0.####", CultureInfo.InvariantCulture);
             string edited;
             using (gui.Node(Theme.Scale(80f), Theme.Scale(22f), "scene/options/value/" + id).Enter())
+            {
                 edited = gui.TextInput(text, width: Theme.Scale(80f), height: Theme.Scale(22f), fontSize: Theme.Text(11),
                     padding: 4, id: "scene/options/input/" + id, alignX: 1f);
+            }
+
             if (gui.Pass == Pass.Pass2Render && edited != text
                 && float.TryParse(edited, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
                 && float.IsFinite(parsed))
@@ -297,9 +375,15 @@ sealed class SceneToolbar(SceneViewport viewport, Action frameSelected)
 
     void DismissOptions(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
+
         if (gui.Input.IsKeyPressed(KeyboardKey.Escape)
             || gui.Input.IsMouseButtonPressed(MouseButton.Left) && !gui.CurrentNode.Rect.Contains(gui.Input.MousePosition))
+        {
             snapOptions = cameraOptions = false;
+        }
     }
 }

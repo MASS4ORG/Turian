@@ -23,7 +23,11 @@ public class ProjectSettingsFilesTests : IDisposable
     /// <summary>Removes the project folder.</summary>
     public void Dispose()
     {
-        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        if (Directory.Exists(root))
+        {
+            Directory.Delete(root, recursive: true);
+        }
+
         GC.SuppressFinalize(this);
     }
 
@@ -180,9 +184,9 @@ public class ProjectSettingsFilesTests : IDisposable
         ProjectSettingsLoader.WriteIndex(project.AssetsAbsoluteDir, index);
 
         using var document = JsonDocument.Parse(File.ReadAllText(index));
-        var ids = document.RootElement.GetProperty("Settings").EnumerateArray().Select(id => id.GetGuid());
+        var ids = document.RootElement.GetProperty("Settings").EnumerateArray().Select(static id => id.GetGuid());
         Assert.Equal(
-            ProjectSettingsLoader.FindSources(project.AssetsAbsoluteDir).Select(source => source.AssetId).Order(),
+            ProjectSettingsLoader.FindSources(project.AssetsAbsoluteDir).Select(static source => source.AssetId).Order(),
             ids.Order());
     }
 }

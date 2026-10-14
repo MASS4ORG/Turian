@@ -47,9 +47,15 @@ public static class ContentBricks
     {
         ArgumentNullException.ThrowIfNull(gaya);
         if (!PackageId.IsValid(id))
+        {
             throw new PackageException($"'{id}' is not a valid package id (lowercase reverse-DNS, e.g. user.you.nord).");
+        }
+
         var root = Path.Combine(parent, id);
-        if (Directory.Exists(root)) throw new PackageException($"{root} already exists.");
+        if (Directory.Exists(root))
+        {
+            throw new PackageException($"{root} already exists.");
+        }
 
         var stem = id.Split('.')[^1];
         var name = displayName ?? char.ToUpperInvariant(stem[0]) + stem[1..].Replace('-', ' ');

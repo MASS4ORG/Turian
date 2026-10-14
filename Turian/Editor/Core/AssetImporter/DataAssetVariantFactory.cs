@@ -15,14 +15,22 @@ public static class DataAssetVariantFactory
     {
         var baseMeta = $"{baseFile}.meta";
         if (!File.Exists(baseFile) || !File.Exists(baseMeta))
+        {
             throw new FileNotFoundException($"{baseFile} and its .meta must both exist.");
+        }
+
         if (!GenericAssetImporter.IsDataAssetPath(baseFile))
+        {
             throw new InvalidOperationException($"{baseFile} is not a data asset.");
+        }
 
         var baseId = Guid.Parse((string)JsonNode.Parse(File.ReadAllText(baseMeta))!["Id"]!);
         var directory = Path.Combine(projectRoot, folder);
         var path = Path.Combine(directory, $"{name}.dataasset");
-        if (File.Exists(path)) throw new InvalidOperationException($"{path} already exists.");
+        if (File.Exists(path))
+        {
+            throw new InvalidOperationException($"{path} already exists.");
+        }
 
         var id = Guid.NewGuid();
         Directory.CreateDirectory(directory);

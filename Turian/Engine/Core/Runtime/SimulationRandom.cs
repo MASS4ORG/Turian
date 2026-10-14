@@ -29,7 +29,11 @@ public sealed class SimulationRandom(ulong seed)
         var bound = (ulong)exclusiveMaximum;
         var threshold = unchecked(0UL - bound) % bound;
         ulong value;
-        do value = NextUInt64(); while (value < threshold);
+        do
+        {
+            value = NextUInt64();
+        }
+        while (value < threshold);
         return (int)(value % bound);
     }
 

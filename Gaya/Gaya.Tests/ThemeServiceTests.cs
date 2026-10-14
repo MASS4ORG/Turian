@@ -22,7 +22,7 @@ public sealed class ThemeServiceTests : IDisposable
 
 #pragma warning disable CS0618
     /// <summary>The legacy palettes, which every built-in sheet reproduces exactly.</summary>
-    public static TheoryData<string> BuiltIns() => [.. StudioTheme.BuiltIn.Select(theme => theme.Name)];
+    public static TheoryData<string> BuiltIns() => [.. StudioTheme.BuiltIn.Select(static theme => theme.Name)];
 
     /// <summary>Each built-in .pss compiles to the colors and metrics of the C# theme it replaced.</summary>
     [Theory]
@@ -74,9 +74,9 @@ public sealed class ThemeServiceTests : IDisposable
     {
         var service = Service();
         Assert.Equal(14, service.ColorThemes.Count);
-        Assert.Equal(["Dark", "Light", "Dark Contrast"], service.ColorThemes.Take(3).Select(theme => theme.Name));
+        Assert.Equal(["Dark", "Light", "Dark Contrast"], service.ColorThemes.Take(3).Select(static theme => theme.Name));
         Assert.Equal(ThemeKind.HighContrastDark, service.Catalog.Find("gaya.dark-contrast")!.Kind);
-        Assert.DoesNotContain(service.ColorThemes, theme => theme.Id == ThemeCatalog.BaseId);
+        Assert.DoesNotContain(service.ColorThemes, static theme => theme.Id == ThemeCatalog.BaseId);
 
         foreach (var theme in service.ColorThemes)
         {
@@ -286,7 +286,10 @@ public sealed class ThemeServiceTests : IDisposable
         var service = Service();
         var tokens = service.Current;
         var sheets = new StyleSheetCollection { ExcaliburStyles.DefaultSheet };
-        foreach (var sheet in service.Sheets) sheets.Add(sheet);
+        foreach (var sheet in service.Sheets)
+        {
+            sheets.Add(sheet);
+        }
 
         Assert.Equal(tokens.Popup, sheets.GetTokenColor("popup"));
         Assert.Equal(tokens.Field, sheets.GetTokenColor("surface"));
@@ -322,7 +325,10 @@ public sealed class ThemeServiceTests : IDisposable
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            if (logLevel >= LogLevel.Error) Errors.Add(formatter(state, exception));
+            if (logLevel >= LogLevel.Error)
+            {
+                Errors.Add(formatter(state, exception));
+            }
         }
     }
 }

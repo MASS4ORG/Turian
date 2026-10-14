@@ -33,11 +33,21 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
     static void Analyze(SymbolAnalysisContext context)
     {
         var member = context.Symbol;
-        if (member.IsStatic || member.DeclaredAccessibility != Accessibility.Public) return;
-        if (!DerivesFrom(member.ContainingType, "Turian.Engine.Core.DataAsset")) return;
+        if (member.IsStatic || member.DeclaredAccessibility != Accessibility.Public)
+        {
+            return;
+        }
+
+        if (!DerivesFrom(member.ContainingType, "Turian.Engine.Core.DataAsset"))
+        {
+            return;
+        }
+
         if (member.GetAttributes().Any(static a => a.AttributeClass?.ToDisplayString() is
                 "System.Text.Json.Serialization.JsonIgnoreAttribute" or "Turian.SerializeInlineAttribute"))
+        {
             return;
+        }
 
         var type = member switch
         {
@@ -45,7 +55,10 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
             IPropertySymbol { IsIndexer: false, SetMethod: not null } property => property.Type,
             _ => null,
         };
-        if (type is null) return;
+        if (type is null)
+        {
+            return;
+        }
 
         var element = type switch
         {
@@ -57,7 +70,10 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
         var kind = DerivesFrom(element, "Turian.Engine.Core.Component") ? "component"
             : DerivesFrom(element, "Turian.Engine.Core.Node") ? "node"
             : null;
-        if (kind is null) return;
+        if (kind is null)
+        {
+            return;
+        }
 
         context.ReportDiagnostic(Diagnostic.Create(Rule, member.Locations.FirstOrDefault(), member.Name, kind));
     }
@@ -66,7 +82,10 @@ public sealed class DataAssetSceneReferenceAnalyzer : DiagnosticAnalyzer
     {
         for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == baseName) return true;
+            if (current.ToDisplayString() == baseName)
+            {
+                return true;
+            }
         }
 
         return false;

@@ -21,7 +21,11 @@ sealed class SimulationTestWorld : ISimulationWorld
     /// <inheritdoc/>
     public bool ApplyCommand(SimulationCommand command, SimulationRandomStreams random)
     {
-        if (command.Kind != "add" || command.Version != 1) return false;
+        if (command.Kind != "add" || command.Version != 1)
+        {
+            return false;
+        }
+
         Balance = checked(Balance + command.Payload.GetProperty("amount").GetInt64());
         Balance += random.Get("commands").NextInt(10);
         Applied.Add(command.AuthoritySequence);
@@ -45,9 +49,13 @@ sealed class SimulationTestWorld : ISimulationWorld
     /// <inheritdoc/>
     public void RestoreState(JsonElement state)
     {
-        if (FailRestore) throw new InvalidOperationException("Invalid game state");
+        if (FailRestore)
+        {
+            throw new InvalidOperationException("Invalid game state");
+        }
+
         var balance = state.GetProperty(nameof(Balance)).GetInt64();
-        var applied = state.GetProperty(nameof(Applied)).EnumerateArray().Select(value => value.GetInt64()).ToArray();
+        var applied = state.GetProperty(nameof(Applied)).EnumerateArray().Select(static value => value.GetInt64()).ToArray();
         Balance = balance;
         Applied.AddRange(applied);
     }

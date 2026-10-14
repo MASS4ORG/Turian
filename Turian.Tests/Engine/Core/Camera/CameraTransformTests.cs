@@ -18,7 +18,11 @@ public sealed class CameraTransformTests
         node.AddComponent(camera);
         var original = camera.GetViewMatrix();
         node.Rotation = new Vector3(x, y, z);
-        if (rotateParent) parent.Rotation = new Vector3(15, 30, 20);
+        if (rotateParent)
+        {
+            parent.Rotation = new Vector3(15, 30, 20);
+        }
+
         var transform = node.GlobalTransform;
         Assert.True(Vector3.Distance(transform.Forward, camera.Front) < 1e-5f);
         Assert.True(Vector3.Distance(-transform.Right, camera.Right) < 1e-5f);

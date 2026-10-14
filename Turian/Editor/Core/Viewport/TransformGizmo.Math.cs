@@ -8,7 +8,11 @@ public sealed partial class TransformGizmo
         normal = Vector3.Normalize(normal);
         var fallback = MathF.Abs(normal.Y) < 0.99f ? Mathf.Up : Mathf.Right;
         var u = Vector3.Normalize(Vector3.Cross(normal, fallback));
-        if (Vector3.Dot(u, u) < 1e-9f) u = new Vector3(0f, 0f, 1f);
+        if (Vector3.Dot(u, u) < 1e-9f)
+        {
+            u = new Vector3(0f, 0f, 1f);
+        }
+
         var v = Vector3.Cross(normal, u);
         return (u, v);
     }
@@ -18,7 +22,11 @@ public sealed partial class TransformGizmo
         var ab = b - a;
         var ap = p - a;
         var lenSq = Vector2.Dot(ab, ab);
-        if (lenSq < 1e-6f) return Vector2.Distance(p, a);
+        if (lenSq < 1e-6f)
+        {
+            return Vector2.Distance(p, a);
+        }
+
         var t = Math.Clamp(Vector2.Dot(ap, ab) / lenSq, 0f, 1f);
         var proj = a + (ab * t);
         return Vector2.Distance(p, proj);
@@ -35,7 +43,11 @@ public sealed partial class TransformGizmo
         var dot11 = Vector2.Dot(v1, v1);
         var dot12 = Vector2.Dot(v1, v2);
         var determinant = (dot00 * dot11) - (dot01 * dot01);
-        if (MathF.Abs(determinant) < 1e-6f) return false;
+        if (MathF.Abs(determinant) < 1e-6f)
+        {
+            return false;
+        }
+
         var inv = 1f / determinant;
         var u = ((dot11 * dot02) - (dot01 * dot12)) * inv;
         var v = ((dot00 * dot12) - (dot01 * dot02)) * inv;

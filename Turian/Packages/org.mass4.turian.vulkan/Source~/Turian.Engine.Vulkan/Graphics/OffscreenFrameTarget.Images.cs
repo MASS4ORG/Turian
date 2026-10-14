@@ -23,7 +23,9 @@ public unsafe partial class OffscreenFrameTarget
 
         var result = vk.CreateImage(device.VkDevice, in imageInfo, null, out image);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to create image: {0}", result);
+        }
 
         vk.GetImageMemoryRequirements(device.VkDevice, image, out var memReq);
         MemoryAllocateInfo allocInfo = new()
@@ -35,7 +37,9 @@ public unsafe partial class OffscreenFrameTarget
 
         result = vk.AllocateMemory(device.VkDevice, in allocInfo, null, out memory);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to allocate image memory: {0}", result);
+        }
 
         _ = vk.BindImageMemory(device.VkDevice, image, memory, 0);
     }
@@ -60,7 +64,9 @@ public unsafe partial class OffscreenFrameTarget
 
         var result = vk.CreateImageView(device.VkDevice, in viewInfo, null, out var view);
         if (result != Result.Success)
+        {
             throw new VulkanException("OffscreenFrameTarget: failed to create image view: {0}", result);
+        }
 
         return view;
     }

@@ -52,7 +52,10 @@ public sealed class SurfaceLossStressTests
     {
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            if (renderer.BeginFrame() is not { } commandBuffer) continue;
+            if (renderer.BeginFrame() is not { } commandBuffer)
+            {
+                continue;
+            }
 
             renderer.BeginSwapChainRenderPass(commandBuffer);
             renderer.EndSwapChainRenderPass(commandBuffer);

@@ -13,7 +13,10 @@ public sealed class CameraGizmoDrawer : IGizmoDrawer
     public void DrawGizmos(Gizmos gizmos, Component component)
     {
         ArgumentNullException.ThrowIfNull(gizmos);
-        if (component is not CameraComponent camera || camera.Node is null) return;
+        if (component is not CameraComponent camera || camera.Node is null)
+        {
+            return;
+        }
 
         var tfm = camera.Node.GlobalTransform;
         gizmos.Color = BodyColor;

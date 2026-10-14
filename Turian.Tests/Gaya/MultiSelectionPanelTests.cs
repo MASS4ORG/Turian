@@ -72,14 +72,22 @@ public sealed class MultiSelectionPanelTests
                 new DataAssetAsset { Id = Guid.NewGuid(), RelativePath = $"Assets/{index}.bin" },
                 Path.Combine(folder, $"{index}.bin"), new ObjectReferencesTests.Stats { Health = 10 + index },
                 "Import Settings", IsPayload: false)).ToArray();
-            foreach (var entry in entries) File.WriteAllText(entry.AbsolutePath, "content");
+            foreach (var entry in entries)
+            {
+                File.WriteAllText(entry.AbsolutePath, "content");
+            }
+
             selection.SelectMany(entries);
             using var panel = new InspectorPanel(selection, assets, new ReferencePicker(null!, null!, null!), null!,
                 inspections, new InspectorSettings(), null!, null!, undo,
                 new AssetAutoSave(inspections), null!, null!, database);
             panel.Locked = locked;
             var external = new Node();
-            if (locked) selection.Select(external);
+            if (locked)
+            {
+                selection.Select(external);
+            }
+
             var input = Substitute.For<IInputHandler>();
             input.MousePosition.Returns(new Vector2(-1));
             var gui = new Gui { Input = input };
@@ -107,9 +115,15 @@ public sealed class MultiSelectionPanelTests
                 .SetValue(panel, true);
             Frame();
             Frame();
-            if (locked) Assert.Same(external, selection.SelectedNode);
-            else Assert.Equal(entries.Select(entry => entry.AbsolutePath),
+            if (locked)
+            {
+                Assert.Same(external, selection.SelectedNode);
+            }
+            else
+            {
+                Assert.Equal(entries.Select(entry => entry.AbsolutePath),
                 selection.Selection.Objects.Cast<AssetInspection>().Select(entry => entry.AbsolutePath));
+            }
         }
         finally { Directory.Delete(project, recursive: true); }
     }
@@ -124,12 +138,20 @@ public sealed class MultiSelectionPanelTests
         try
         {
             var paths = new[] { "a.bin", "b.bin", "c.bin" }.Select(name => Path.Combine(folder, name)).ToArray();
-            foreach (var path in paths) File.WriteAllText(path, "content");
-            foreach (var path in paths) Serializer.Save($"{path}.meta", new DataAssetAsset
+            foreach (var path in paths)
             {
-                Id = Guid.NewGuid(),
-                RelativePath = Path.GetRelativePath(project, path),
-            });
+                File.WriteAllText(path, "content");
+            }
+
+            foreach (var path in paths)
+            {
+                Serializer.Save($"{path}.meta", new DataAssetAsset
+                {
+                    Id = Guid.NewGuid(),
+                    RelativePath = Path.GetRelativePath(project, path),
+                });
+            }
+
             var settings = new SettingsService();
             var app = new AppSettings { ProjectAbsoluteDir = project };
             settings.Set(app);
@@ -153,7 +175,7 @@ public sealed class MultiSelectionPanelTests
                 new AssetInspectionService(importer, types, settings, loader, logger), selection,
                 reveal, new AssetCreationCatalog(files, settings, build, logger),
                 new AssetBrowserSettings(), Substitute.For<IEditorSettings>(), types,
-                new AssetPreviewCatalog(build), null!, operations,
+                null!, operations,
                 new BricksController(null, null, null, logger), confirm, build);
             var state = (TreeViewState)typeof(AssetBrowserPanel)
                 .GetField("state", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(panel)!;
@@ -192,9 +214,9 @@ public sealed class MultiSelectionPanelTests
                 Frame();
             }
             ClickRow(1);
-            input.IsKeyDown(KeyboardKey.LeftShift).Returns(true);
+            input.IsKeyDown(GKey.LeftShift).Returns(true);
             ClickRow(2);
-            input.IsKeyDown(KeyboardKey.LeftShift).Returns(false);
+            input.IsKeyDown(GKey.LeftShift).Returns(false);
             Assert.Equal(paths.Take(2), state.SelectedIds);
             Frame();
             input.IsMouseButtonPressed(GMouseButton.Right).Returns(true);

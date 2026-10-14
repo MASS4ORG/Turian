@@ -20,10 +20,15 @@ public static partial class Program
         ProjectSettingsFiles.MigrateLegacyProject(directory);
         ProjectSettingsFiles.MigrateToProjectAsset(directory);
         if (!ProjectValidator.Report(ProjectValidator.Validate(directory), Log.Logger))
+        {
             throw new InvalidOperationException($"{directory} cannot be opened by this version of Turian.");
+        }
+
         if (ProjectSettingsFiles.RecordEngineVersion(directory) is { } previous)
+        {
             Log.Logger.LogInformation("Upgraded the project from Turian {Previous} to {Current}",
                 previous.Length == 0 ? "(unrecorded)" : previous, ProjectSettingsFiles.EngineVersionStamp);
+        }
 
         var s = ReadSettings(directory);
         ProjectSettingsLoader.LoadFromSources(s);
@@ -51,7 +56,10 @@ public static partial class Program
     static async Task PrepareProjectAsync(BuildAppSettings settings, bool reimport, bool loadUserCode)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        if (!reimport && !loadUserCode) return;
+        if (!reimport && !loadUserCode)
+        {
+            return;
+        }
 
         var appSettings = new AppSettings().Load(settings) as AppSettings
             ?? throw new InvalidOperationException("Failed to create AppSettings for CLI asset import.");
@@ -82,11 +90,15 @@ public static partial class Program
             var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
 
             if (status.State == BuildTaskState.Succeeded)
+            {
                 Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
+            }
             else
+            {
                 Log.Logger.LogWarning(
                     "User code did not load ({State}): {Message}. Custom components will report as MissingComponent",
                     status.State, status.Message);
+            }
         }
     }
 

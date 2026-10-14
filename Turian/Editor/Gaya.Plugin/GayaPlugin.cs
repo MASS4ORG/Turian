@@ -9,7 +9,6 @@ namespace Gaya.Plugin.Turian;
 public sealed class GayaPlugin : IPlugin
 {
     IReadOnlyList<string> args = [];
-    ILogger log = Log.Logger;
 
     /// <inheritdoc />
     public void Configure(IPluginContext context)
@@ -17,7 +16,6 @@ public sealed class GayaPlugin : IPlugin
         ArgumentNullException.ThrowIfNull(context);
 
         args = context.CommandLineArgs;
-        log = context.Logger;
         RegisterServices(context);
         RegisterSettings(context);
         ViewportThemeTokens.Register(context.Themes);
@@ -57,15 +55,14 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton(sp => new OutputLogBridge(
             sp.GetRequiredService<OutputPanelSettings>(),
             sp.GetRequiredService<PlayModeService>(),
-            sp.GetRequiredService<BuildManager>(),
-            sp.GetRequiredService<ILogger>()));
+            sp.GetRequiredService<BuildManager>()));
     }
 
     static void RegisterPanels(IPluginContext context)
     {
         context.Panels.Register(new PanelDescriptor(
             SceneTreePanelId, "Scene Tree", PanelPlacement.Left,
-            sp => new SceneTreePanel(
+            static sp => new SceneTreePanel(
                 sp.GetRequiredService<SceneTreeController>(),
                 sp.GetRequiredService<NodeInspectorController>(),
                 sp.GetRequiredService<AssetManager>(),
@@ -84,14 +81,14 @@ public sealed class GayaPlugin : IPlugin
 
         context.Commands.Register(new CommandDescriptor(
             "gaya.turian.inspector.new", "Window: New Inspector",
-            sp => sp.GetRequiredService<IShellHost>().ShowPanel(
+            static sp => sp.GetRequiredService<IShellHost>().ShowPanel(
                 sp.GetRequiredService<InspectorInstances>().CreateAdditional()))
         { MenuLabel = "New Inspector" });
         context.Menus.Add(new MenuItemDescriptor(MenuIds.View, "gaya.turian.inspector.new", "8"));
 
         context.Panels.Register(new PanelDescriptor(
             ViewportPanelId, "Scene", PanelPlacement.Center,
-            sp => new ScenePanel(
+            static sp => new ScenePanel(
                 new SceneViewport(
                     sp.GetRequiredService<Vulkan>(),
                     sp.GetRequiredService<AssetDatabase>(),
@@ -110,7 +107,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             "gaya.turian.game", "Game", PanelPlacement.Center,
-            sp => new GamePanel(
+            static sp => new GamePanel(
                 new GameViewport(
                     sp.GetRequiredService<Vulkan>(),
                     sp.GetRequiredService<AssetDatabase>(),
@@ -121,7 +118,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             AssetsPanelId, "Assets", PanelPlacement.Bottom,
-            sp => new AssetBrowserPanel(
+            static sp => new AssetBrowserPanel(
                 sp.GetRequiredService<AssetFileSystem>(),
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<AssetOpenService>(),
@@ -132,7 +129,6 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<AssetBrowserSettings>(),
                 sp.GetRequiredService<IEditorSettings>(),
                 sp.GetRequiredService<AssetTypeCatalog>(),
-                sp.GetRequiredService<AssetPreviewCatalog>(),
                 sp.GetRequiredService<PrefabAuthoring>(),
                 sp.GetRequiredService<AssetFileOperations>(),
                 sp.GetRequiredService<BricksController>(),
@@ -147,7 +143,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             OutputPanelId, "Output", PanelPlacement.Bottom,
-            sp => new OutputPanel(
+            static sp => new OutputPanel(
                 sp.GetRequiredService<ILogger>(),
                 sp.GetRequiredService<OutputPanelSettings>(),
                 sp.GetRequiredService<OutputLogBridge>(),
@@ -157,7 +153,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             ShortcutsPanelId, "Shortcuts", PanelPlacement.Center,
-            sp => new ShortcutsPanel(
+            static sp => new ShortcutsPanel(
                 sp.GetRequiredService<IShortcutService>(),
                 sp.GetRequiredService<ICommandCatalog>(),
                 sp.GetRequiredService<IPanelAccessor>()))
@@ -165,7 +161,7 @@ public sealed class GayaPlugin : IPlugin
 
         context.Panels.Register(new PanelDescriptor(
             BuildProfilesPanelId, "Build Profiles", PanelPlacement.Center,
-            sp => new BuildProfilesPanel(
+            static sp => new BuildProfilesPanel(
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<AssetInspectionService>(),
                 sp.GetRequiredService<AssetAutoSave>(),
@@ -183,7 +179,7 @@ public sealed class GayaPlugin : IPlugin
     {
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.projectSwitcher", ChromeSlot.MenuBar,
-            sp => new ProjectSwitcherChrome(
+            static sp => new ProjectSwitcherChrome(
                 sp.GetRequiredService<RecentProjectsSettings>(),
                 sp.GetRequiredService<SettingsService>(),
                 sp.GetRequiredService<ProjectSession>(),
@@ -192,13 +188,13 @@ public sealed class GayaPlugin : IPlugin
                 sp.GetRequiredService<UnsavedChangesGuard>())));
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.playToolbar", ChromeSlot.MenuBar,
-            sp => new PlayToolbarChrome(
+            static sp => new PlayToolbarChrome(
                 sp.GetRequiredService<ICommandDispatcher>(),
                 sp.GetRequiredService<PlayModeService>())));
 
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.documentTabs", ChromeSlot.TopBar,
-            sp => new DocumentTabsChrome(
+            static sp => new DocumentTabsChrome(
                 sp.GetRequiredService<AssetWorkspace>(),
                 sp.GetRequiredService<UnsavedChangesDialogChrome>(),
                 sp.GetRequiredService<StudioLocalization>()),
@@ -206,18 +202,18 @@ public sealed class GayaPlugin : IPlugin
 
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.taskBar", ChromeSlot.StatusBar,
-            sp => new TaskBarChrome(sp.GetRequiredService<BackgroundTaskManager>()),
+            static sp => new TaskBarChrome(sp.GetRequiredService<BackgroundTaskManager>()),
             TaskBarChrome.Height));
     }
 
     static void RegisterBrickServices(IPluginContext context)
     {
         // The Bricks panel belongs to the host; the project's bricks, tasks, inspector and dialogs plug into it.
-        context.Services.AddSingleton<IProjectBricks>(sp => sp.GetRequiredService<TurianProjectBricks>());
-        context.Services.AddSingleton<IBrickTaskRunner>(sp => sp.GetRequiredService<TurianProjectBricks>());
-        context.Services.AddSingleton<IBrickInspector>(sp => new TurianBrickInspector(
+        context.Services.AddSingleton<IProjectBricks>(static sp => sp.GetRequiredService<TurianProjectBricks>());
+        context.Services.AddSingleton<IBrickTaskRunner>(static sp => sp.GetRequiredService<TurianProjectBricks>());
+        context.Services.AddSingleton<IBrickInspector>(static sp => new TurianBrickInspector(
             sp.GetRequiredService<NodeInspectorController>(), sp.GetRequiredService<SettingsService>()));
-        context.Services.AddSingleton<IBrickFileDialogs>(sp => new BrickFileDialogs(
+        context.Services.AddSingleton<IBrickFileDialogs>(static sp => new BrickFileDialogs(
             sp.GetRequiredService<FileDialogChrome>()));
     }
 
@@ -226,23 +222,23 @@ public sealed class GayaPlugin : IPlugin
         context.Services.AddSingleton<FileDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.fileDialog", ChromeSlot.Overlay,
-            sp => sp.GetRequiredService<FileDialogChrome>()));
+            static sp => sp.GetRequiredService<FileDialogChrome>()));
 
         context.Services.AddSingleton<UnsavedChangesDialogChrome>();
         context.Services.AddSingleton<UnsavedChangesGuard>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.unsavedChangesDialog", ChromeSlot.Overlay,
-            sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
+            static sp => sp.GetRequiredService<UnsavedChangesDialogChrome>()));
 
         context.Services.AddSingleton<ConfirmDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.confirmDialog", ChromeSlot.Overlay,
-            sp => sp.GetRequiredService<ConfirmDialogChrome>()));
+            static sp => sp.GetRequiredService<ConfirmDialogChrome>()));
 
         context.Services.AddSingleton<AboutDialogChrome>();
         context.Chrome.Register(new ChromeDescriptor(
             "gaya.turian.aboutDialog", ChromeSlot.Overlay,
-            sp => sp.GetRequiredService<AboutDialogChrome>()));
+            static sp => sp.GetRequiredService<AboutDialogChrome>()));
     }
 
     /// <summary>The keybindings editor's id, which the File menu's entry brings to the front.</summary>
@@ -328,10 +324,17 @@ public sealed class GayaPlugin : IPlugin
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        if (services.GetRequiredService<ProjectSession>().TickStartup()) return;
+        if (services.GetRequiredService<ProjectSession>().TickStartup())
+        {
+            return;
+        }
+
         var playMode = services.GetRequiredService<PlayModeService>();
         services.GetRequiredService<OutputLogBridge>().Tick();
-        if (playMode.IsActive) playMode.Tick(deltaTime);
+        if (playMode.IsActive)
+        {
+            playMode.Tick(deltaTime);
+        }
 
         services.GetRequiredService<UndoService>().Flush();
         services.GetRequiredService<AssetAutoSave>().Flush();
@@ -374,7 +377,10 @@ public sealed class GayaPlugin : IPlugin
         // has to exist before anything that pulls in the scene tree.
         services.GetRequiredService<BuildManager>();
         if (services.GetService(typeof(ISceneManager)) is SceneManager sceneManager)
+        {
             sceneManager.BindServices(services, allowMissingServices: true);
+        }
+
         services.GetRequiredService<OutputLogBridge>();
         services.GetRequiredService<SceneDocumentBinder>().Attach();
 
@@ -407,7 +413,13 @@ public sealed class GayaPlugin : IPlugin
         }
 
         var session = services.GetRequiredService<ProjectSession>();
-        if (args.FirstOrDefault() is "--dump" or "--script") session.Open(projectPath, ArgumentValue("--scene"));
-        else session.QueueOpen(projectPath, ArgumentValue("--scene"));
+        if (args.FirstOrDefault() is "--dump" or "--script")
+        {
+            session.Open(projectPath, ArgumentValue("--scene"));
+        }
+        else
+        {
+            session.QueueOpen(projectPath, ArgumentValue("--scene"));
+        }
     }
 }

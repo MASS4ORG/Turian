@@ -26,7 +26,10 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
 
         tasks.Tick();
         var snapshot = tasks.Snapshot();
-        if (snapshot.Any(task => !task.IsFinished)) gui.RequestFrameIn(0.1);
+        if (snapshot.Any(task => !task.IsFinished))
+        {
+            gui.RequestFrameIn(0.1);
+        }
 
         using (gui.Node(-1, Height).Expand().Direction(Axis.Horizontal).Gap(8).ContentAlignY(0.5f).Enter())
         {
@@ -66,7 +69,7 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
 
         if (primary is null)
         {
-            var finished = BackgroundTaskTree.Roots(snapshot).Count(t => t.IsFinished);
+            var finished = BackgroundTaskTree.Roots(snapshot).Count(static t => t.IsFinished);
             Label(gui, finished == 1 ? "1 finished task" : $"{finished} finished tasks", Theme.InkDim);
         }
         else
@@ -79,10 +82,16 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
             var fraction = rollup.Progress > 0 ? rollup.Progress : (float?)null;
             gui.ProgressBar(fraction, barWidth, 5);
 
-            if (activeRoots > 1) Label(gui, $"+{activeRoots - 1}", Theme.InkDim);
+            if (activeRoots > 1)
+            {
+                Label(gui, $"+{activeRoots - 1}", Theme.InkDim);
+            }
         }
 
-        if (gui.GetInteractable().OnClick()) listOpen = !listOpen;
+        if (gui.GetInteractable().OnClick())
+        {
+            listOpen = !listOpen;
+        }
     }
 
     void TaskList(Gui gui)
@@ -97,7 +106,10 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
             using (gui.Node().Expand().Direction(Axis.Vertical).Gap(6).Enter())
             {
                 gui.ScrollY();
-                foreach (var root in roots) RootRow(gui, snapshot, root);
+                foreach (var root in roots)
+                {
+                    RootRow(gui, snapshot, root);
+                }
             }
         }
     }
@@ -111,7 +123,10 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
             Label(gui, $"{BackgroundTaskTree.ActiveRoots(snapshot)} running, {finished} finished", Theme.InkDim, 11);
 
             // Completed tasks retire on their own; failures stay until read, and this dismisses them.
-            if (finished > 0 && TextButton(gui, "Clear finished", "tasks/clear")) tasks.ClearFinished();
+            if (finished > 0 && TextButton(gui, "Clear finished", "tasks/clear"))
+            {
+                tasks.ClearFinished();
+            }
         }
     }
 
@@ -134,10 +149,20 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
                 }
             }
 
-            if (root.IsActive) gui.ProgressBar(rollup.Progress, -1, 5);
-            if (root.Note.Length > 0) Label(gui, root.Note, StatusInk(rollup.Status), 11);
+            if (root.IsActive)
+            {
+                gui.ProgressBar(rollup.Progress, -1, 5);
+            }
 
-            foreach (var child in BackgroundTaskTree.ChildrenOf(snapshot, root.Id)) ChildRow(gui, child);
+            if (root.Note.Length > 0)
+            {
+                Label(gui, root.Note, StatusInk(rollup.Status), 11);
+            }
+
+            foreach (var child in BackgroundTaskTree.ChildrenOf(snapshot, root.Id))
+            {
+                ChildRow(gui, child);
+            }
         }
     }
 
@@ -148,13 +173,19 @@ sealed class TaskBarChrome(BackgroundTaskManager tasks) : IChromeItem
         {
             var detail = child.UnitsTotal > 0 ? $"{child.Label} ({child.UnitsDone}/{child.UnitsTotal})" : child.Label;
             Label(gui, detail, Theme.InkDim, 11);
-            if (child.IsActive) gui.ProgressBar(child.Fraction, 70, 4);
+            if (child.IsActive)
+            {
+                gui.ProgressBar(child.Fraction, 70, 4);
+            }
         }
     }
 
     static void Label(Gui gui, string text, GuiColor color, float size = 12)
     {
-        if (text.Length > 0) gui.DrawText(text, Theme.Text(size), color);
+        if (text.Length > 0)
+        {
+            gui.DrawText(text, Theme.Text(size), color);
+        }
     }
 
     static bool TextButton(Gui gui, string text, string id)

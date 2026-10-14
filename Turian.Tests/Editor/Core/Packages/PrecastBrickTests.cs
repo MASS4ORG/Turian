@@ -36,9 +36,16 @@ public sealed class PrecastBrickFixture : IAsyncLifetime
     /// <param name="path">The folder to delete.</param>
     public static void DeleteTree(string path)
     {
-        if (!Directory.Exists(path)) return;
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
         foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(path, recursive: true);
     }
 
@@ -53,7 +60,11 @@ public sealed class PrecastBrickFixture : IAsyncLifetime
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(typeof(global::Turian.Editor.CLI.Program).Assembly.Location);
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
         start.Environment[PackageStore.StoreVariable] = Path.Combine(root, "store");
 
         using var process = Process.Start(start)!;

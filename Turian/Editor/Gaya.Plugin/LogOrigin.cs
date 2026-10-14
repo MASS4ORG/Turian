@@ -15,7 +15,10 @@ static class LogOrigin
         var caller = new StackTrace(true).GetFrames().FirstOrDefault(IsCaller);
         var internalMessage = IsInternal(category);
         if (category == "Turian" && caller is not null)
+        {
             internalMessage = StudioAssemblies.Contains(caller.GetMethod()!.DeclaringType!.Assembly.GetName().Name!);
+        }
+
         return new LogLine(level, DateTimeOffset.Now, message)
         {
             Category = category,

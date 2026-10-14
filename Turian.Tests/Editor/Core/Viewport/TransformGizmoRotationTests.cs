@@ -100,7 +100,9 @@ public class TransformGizmoRotationTests
         Assert.True(gizmo.IsDragging);
 
         for (var i = 1; i <= 40; i++)
+        {
             gizmo.ProcessPointerMove(Pixel(camera, RingPoint(u, v, 0.6f + i * 0.2f)), camera, Viewport);
+        }
 
         AssertRotation(Quaternion.CreateFromAxisAngle(Vector3.UnitZ, 8f), node.Orientation);
     }

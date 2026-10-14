@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 /// <summary>Creates identical uncompressed geometry in each measured container and buffer layout.</summary>
@@ -25,7 +24,11 @@ static class MeshFormatFixtures
         using var binary = new MemoryStream();
         for (var i = 0; i < names.Length; i++)
         {
-            if (omitColor && i == 1) continue;
+            if (omitColor && i == 1)
+            {
+                continue;
+            }
+
             var attribute = layout[i];
             var viewIndex = planar ? views.Count : 0;
             var accessorOffset = planar ? 0 : attribute.Offset;
@@ -101,7 +104,11 @@ static class MeshFormatFixtures
             writer.Write((uint)(json.Length + padding));
             writer.Write(0x4e4f534au);
             writer.Write(json);
-            for (var i = 0; i < padding; i++) writer.Write((byte)32);
+            for (var i = 0; i < padding; i++)
+            {
+                writer.Write((byte)32);
+            }
+
             writer.Write((uint)binary.Length);
             writer.Write(0x004e4942u);
             writer.Write(binary.GetBuffer().AsSpan(0, (int)binary.Length));
@@ -121,13 +128,20 @@ static class MeshFormatFixtures
     {
         var bytes = MemoryMarshal.AsBytes(vertices.AsSpan());
         var stride = (int)Vertex.SizeOf();
-        for (var i = 0; i < vertices.Length; i++) stream.Write(bytes.Slice(i * stride + offset, components * 4));
+        for (var i = 0; i < vertices.Length; i++)
+        {
+            stream.Write(bytes.Slice(i * stride + offset, components * 4));
+        }
     }
 
     static Bounds CalculateBounds(Vertex[] vertices)
     {
         var bounds = Bounds.Empty;
-        foreach (var vertex in vertices) bounds = bounds.Encapsulate(vertex.Position);
+        foreach (var vertex in vertices)
+        {
+            bounds = bounds.Encapsulate(vertex.Position);
+        }
+
         return bounds;
     }
 }

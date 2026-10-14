@@ -35,11 +35,17 @@ public sealed class PrefabStage : IDisposable
         if (instance.PrefabInstance?.Source.AssetId is not { } prefabId
             || !database.TryGetAsset(prefabId, out var record) || record is null
             || AssetReferenceQuery.CreateAsset(record) is not { } prefab)
+        {
             return false;
+        }
 
         var from = workspace.Active;
         Navigate(() => workspace.Open(prefab));
-        if (from is not null && !ReferenceEquals(from, workspace.Active)) trail.Add(from);
+        if (from is not null && !ReferenceEquals(from, workspace.Active))
+        {
+            trail.Add(from);
+        }
+
         return true;
     }
 
@@ -47,7 +53,10 @@ public sealed class PrefabStage : IDisposable
     /// <param name="index">The position in <see cref="Trail"/>.</param>
     public void Return(int index)
     {
-        if (index < 0 || index >= trail.Count) return;
+        if (index < 0 || index >= trail.Count)
+        {
+            return;
+        }
 
         var target = trail[index];
         trail.RemoveRange(index, trail.Count - index);
@@ -72,6 +81,9 @@ public sealed class PrefabStage : IDisposable
 
     void OnActivated(AssetWrapper? document)
     {
-        if (!navigating) trail.Clear();
+        if (!navigating)
+        {
+            trail.Clear();
+        }
     }
 }

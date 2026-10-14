@@ -70,13 +70,17 @@ sealed partial class OutputPanel(
             using (gui.Node(-1, -1, splitId).Expand().Direction(Axis.Vertical).Enter())
             {
                 using (gui.Node().ExpandWidth().ExpandHeight(split).Enter())
+                {
                     Entries(gui);
+                }
 
                 gui.Splitter(ref split, Axis.Vertical,
                     thickness: Theme.Scale(2f), min: 0.25f);
 
                 using (gui.Node().ExpandWidth().ExpandHeight(1f - split).Enter())
+                {
                     Detail(gui);
+                }
             }
         }
         gui.CascadeMenu(ref menuOpen, menuAt, menu => BuildContextMenu(menu, gui));
@@ -120,13 +124,21 @@ sealed partial class OutputPanel(
             {
                 rows = LogView.Project(LogBuffer.Snapshot(), filter, showErrors, showWarnings, showLog, collapse,
                     information: showInformation, studio: showStudio);
-                if (selectedIndex >= rows.Count) selectedIndex = -1;
+                if (selectedIndex >= rows.Count)
+                {
+                    selectedIndex = -1;
+                }
             }
 
             for (var index = 0; index < rows.Count; index++)
+            {
                 Row(gui, rows[index], index);
+            }
 
-            if (gui.Pass == Pass.Pass2Render) FollowTail(gui);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                FollowTail(gui);
+            }
         }
     }
 
@@ -140,17 +152,46 @@ sealed partial class OutputPanel(
     /// </summary>
     void Navigate(Gui gui)
     {
-        if (gui.Pass != Pass.Pass2Render || rows.Count == 0) return;
-        if (focusTracker.ActivePanelId != GayaPlugin.OutputPanelId) return;
-        if (gui.Focus.IsTextInputFocused) return;
+        if (gui.Pass != Pass.Pass2Render || rows.Count == 0)
+        {
+            return;
+        }
+
+        if (focusTracker.ActivePanelId != GayaPlugin.OutputPanelId)
+        {
+            return;
+        }
+
+        if (gui.Focus.IsTextInputFocused)
+        {
+            return;
+        }
 
         var page = Math.Max(1, PageSize(gui));
-        if (gui.Input.IsKeyPressed(KeyboardKey.Up)) MoveSelection(-1, gui);
-        else if (gui.Input.IsKeyPressed(KeyboardKey.Down)) MoveSelection(1, gui);
-        else if (gui.Input.IsKeyPressed(KeyboardKey.PageUp)) MoveSelection(-page, gui);
-        else if (gui.Input.IsKeyPressed(KeyboardKey.PageDown)) MoveSelection(page, gui);
-        else if (gui.Input.IsKeyPressed(KeyboardKey.Home)) MoveSelection(int.MinValue, gui);
-        else if (gui.Input.IsKeyPressed(KeyboardKey.End)) MoveSelection(int.MaxValue, gui);
+        if (gui.Input.IsKeyPressed(KeyboardKey.Up))
+        {
+            MoveSelection(-1, gui);
+        }
+        else if (gui.Input.IsKeyPressed(KeyboardKey.Down))
+        {
+            MoveSelection(1, gui);
+        }
+        else if (gui.Input.IsKeyPressed(KeyboardKey.PageUp))
+        {
+            MoveSelection(-page, gui);
+        }
+        else if (gui.Input.IsKeyPressed(KeyboardKey.PageDown))
+        {
+            MoveSelection(page, gui);
+        }
+        else if (gui.Input.IsKeyPressed(KeyboardKey.Home))
+        {
+            MoveSelection(int.MinValue, gui);
+        }
+        else if (gui.Input.IsKeyPressed(KeyboardKey.End))
+        {
+            MoveSelection(int.MaxValue, gui);
+        }
     }
 
     /// <summary>
@@ -163,7 +204,10 @@ sealed partial class OutputPanel(
         var target = delta == int.MinValue ? 0
             : delta == int.MaxValue ? rows.Count - 1
             : Math.Clamp(start + delta, 0, rows.Count - 1);
-        if (target == selectedIndex) return;
+        if (target == selectedIndex)
+        {
+            return;
+        }
 
         selectedIndex = target;
         followTail = selectedIndex == rows.Count - 1;
@@ -174,16 +218,32 @@ sealed partial class OutputPanel(
     void RevealRow(Gui gui, int index)
     {
         var scroll = gui.GetScrollState(scrollId);
-        if (scroll is null) return;
+        if (scroll is null)
+        {
+            return;
+        }
 
         var top = 0f;
-        for (var i = 0; i < index; i++) top += RowHeight(rows[i]);
+        for (var i = 0; i < index; i++)
+        {
+            top += RowHeight(rows[i]);
+        }
+
         var bottom = top + RowHeight(rows[index]);
         var offset = scroll.ScrollOffset.Y;
 
-        if (top < offset) offset = MathF.Max(0f, top - 4f);
-        else if (bottom > offset + scroll.ViewportSize.Y) offset = bottom - scroll.ViewportSize.Y + 4f;
-        else return;
+        if (top < offset)
+        {
+            offset = MathF.Max(0f, top - 4f);
+        }
+        else if (bottom > offset + scroll.ViewportSize.Y)
+        {
+            offset = bottom - scroll.ViewportSize.Y + 4f;
+        }
+        else
+        {
+            return;
+        }
 
         gui.ScrollBy(scrollId, new Vector2(0f, offset - scroll.ScrollOffset.Y));
     }
@@ -201,7 +261,11 @@ sealed partial class OutputPanel(
     int PageSize(Gui gui)
     {
         var scroll = gui.GetScrollState(scrollId);
-        if (scroll is null) return 1;
+        if (scroll is null)
+        {
+            return 1;
+        }
+
         var row = rows[Math.Clamp(selectedIndex < 0 ? 0 : selectedIndex, 0, rows.Count - 1)];
         return Math.Max(1, (int)(scroll.ViewportSize.Y / Math.Max(1f, RowHeight(row))));
     }
@@ -220,13 +284,22 @@ sealed partial class OutputPanel(
         {
             var interactable = gui.GetInteractable();
             var hovered = interactable.OnHover();
-            if (index == selectedIndex) gui.DrawBackgroundRect(Theme.AccentFill, 2f);
-            else if (hovered) gui.DrawBackgroundRect(Theme.Hover, 2f);
+            if (index == selectedIndex)
+            {
+                gui.DrawBackgroundRect(Theme.AccentFill, 2f);
+            }
+            else if (hovered)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 2f);
+            }
 
             if (settings.ShowTimestamp)
+            {
                 gui.DrawText(
                     row.Line.Timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture),
                     size, Theme.InkFaint, font);
+            }
+
             gui.DrawText(text, size, LevelColor(row.Line.Level), font);
 
             if (row.Count > 1)
@@ -235,7 +308,10 @@ sealed partial class OutputPanel(
                 CountBadge(gui, row.Count, height);
             }
 
-            if (gui.Pass == Pass.Pass2Render && hovered) HandleRowInput(gui, interactable, row, index);
+            if (gui.Pass == Pass.Pass2Render && hovered)
+            {
+                HandleRowInput(gui, interactable, row, index);
+            }
         }
     }
 
@@ -271,7 +347,11 @@ sealed partial class OutputPanel(
         using (gui.Node(Theme.Scale(22f), Math.Max(Theme.Scale(13f), height - Theme.Scale(3f)))
                    .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Chrome, 3f);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(Theme.Chrome, 3f);
+            }
+
             gui.DrawText(count.ToString(CultureInfo.InvariantCulture), Theme.Text(10f), Theme.InkDim);
         }
     }
@@ -284,7 +364,10 @@ sealed partial class OutputPanel(
     void FollowTail(Gui gui)
     {
         var state = gui.GetScrollState(scrollId);
-        if (state is null) return;
+        if (state is null)
+        {
+            return;
+        }
 
         var max = state.MaxScroll.Y;
         var atBottom = MathF.Abs(max) < float.Epsilon
@@ -299,7 +382,10 @@ sealed partial class OutputPanel(
             followTail = false;
         }
 
-        if (followTail) gui.ScrollToBottom(scrollId);
+        if (followTail)
+        {
+            gui.ScrollToBottom(scrollId);
+        }
 
         priorTailBottom = max;
     }

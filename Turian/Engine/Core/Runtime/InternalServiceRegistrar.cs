@@ -20,18 +20,27 @@ public static class InternalServiceRegistrar
         ArgumentNullException.ThrowIfNull(assemblies);
 
         foreach (var assembly in assemblies)
+        {
             foreach (var type in GetLoadableTypes(assembly))
             {
                 var attribute = SafeGetAttribute(type);
-                if (attribute is null) continue;
+                if (attribute is null)
+                {
+                    continue;
+                }
 
                 var serviceType = attribute.ServiceType ?? type;
 
                 if (attribute.Lifetime == InternalServiceLifetime.Singleton)
+                {
                     services.AddSingleton(serviceType, type);
+                }
                 else
+                {
                     services.AddTransient(serviceType, type);
+                }
             }
+        }
 
         return services;
     }
@@ -44,7 +53,7 @@ public static class InternalServiceRegistrar
         }
         catch (ReflectionTypeLoadException ex)
         {
-            return ex.Types.Where(type => type is not null).Cast<Type>();
+            return ex.Types.Where(static type => type is not null).Cast<Type>();
         }
     }
 

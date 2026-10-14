@@ -42,7 +42,10 @@ public sealed class ProjectStartupTests
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
         }
     }
 
@@ -68,18 +71,21 @@ public sealed class ProjectStartupTests
             Assert.Equal(first, session.Settings!.ProjectAbsoluteDir);
             session.TickStartup();
             var tasks = services.GetRequiredService<BackgroundTaskManager>();
-            Assert.Contains(tasks.Snapshot(), task => task.Label == "Opening project" && task.BlocksUi);
+            Assert.Contains(tasks.Snapshot(), static task => task.Label == "Opening project" && task.BlocksUi);
             session.FinishStartup();
             Assert.Equal(second, session.Settings.ProjectAbsoluteDir);
             Assert.False(session.IsOpening);
             var saved = services.GetRequiredService<WorkspaceSessionStore>().Load(first);
             Assert.Contains(prefab.Id, saved.OpenAssetIds);
-            Assert.Contains(tasks.Snapshot(), task => task.Label == "Checking assets" && task.UnitsTotal > 0);
-            Assert.Contains(tasks.Snapshot(), task => task.Label == "Indexing assets" && task.UnitsTotal > 0);
+            Assert.Contains(tasks.Snapshot(), static task => task.Label == "Checking assets" && task.UnitsTotal > 0);
+            Assert.Contains(tasks.Snapshot(), static task => task.Label == "Indexing assets" && task.UnitsTotal > 0);
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
         }
     }
 }

@@ -25,8 +25,11 @@ sealed class TagDrawer(LayerFilter layers, UndoService? undo = null) : IProperty
             width: 0, height: theme.Scale(theme.RowHeight), fontSize: theme.Text(12f),
             placeholder: "none", enabled: !field.IsReadOnly, filePath: $"{id}/tags");
         if (result.Changed)
+        {
             InspectorSelectionEdits.ApplyTags(field,
                 result.Changes.Select(change => (change.Item, change.Selected)).ToArray(), undo);
+        }
+
         return true;
     }
 

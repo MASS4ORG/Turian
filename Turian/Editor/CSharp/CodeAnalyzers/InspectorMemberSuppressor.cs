@@ -36,7 +36,10 @@ public class InspectorMemberSuppressor : DiagnosticSuppressor
         foreach (var diagnostic in context.ReportedDiagnostics)
         {
             // 1. Fix: Ensure Location and SourceTree are not null
-            if (diagnostic.Location.SourceTree is not { } tree) continue;
+            if (diagnostic.Location.SourceTree is not { } tree)
+            {
+                continue;
+            }
 
             var root = tree.GetRoot(context.CancellationToken);
             var node = root.FindNode(diagnostic.Location.SourceSpan);
@@ -45,7 +48,10 @@ public class InspectorMemberSuppressor : DiagnosticSuppressor
 
             // 3. Fix: GetDeclaredSymbol can return null; handle it safely
             var symbol = model.GetDeclaredSymbol(node, context.CancellationToken);
-            if (symbol == null) continue;
+            if (symbol == null)
+            {
+                continue;
+            }
 
             if (symbol is IFieldSymbol field && IsEngineMember(field.ContainingType, field.DeclaredAccessibility, field.GetAttributes()))
             {
@@ -82,12 +88,15 @@ public class InspectorMemberSuppressor : DiagnosticSuppressor
             current = current.BaseType;
         }
 
-        if (!derivesFromEngine) return false;
+        if (!derivesFromEngine)
+        {
+            return false;
+        }
 
         // Logic: If it's public, it's for the Inspector.
         // Or if it's private/internal but has an [Expose] attribute.
         var isPublic = access == Accessibility.Public;
-        var hasExposeAttribute = attributes.Any(a => a.AttributeClass?.Name == "ExposeAttribute" || a.AttributeClass?.Name == "SerializeField");
+        var hasExposeAttribute = attributes.Any(static a => a.AttributeClass?.Name == "ExposeAttribute" || a.AttributeClass?.Name == "SerializeField");
 
         return isPublic || hasExposeAttribute;
     }

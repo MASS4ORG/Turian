@@ -7,7 +7,6 @@ namespace Turian.Editor.CLI;
 /// </summary>
 sealed class HeadlessProject : IDisposable
 {
-    readonly ILogger logger;
     readonly ServiceProvider services;
 
     /// <summary>Gets the project's build settings.</summary>
@@ -27,7 +26,6 @@ sealed class HeadlessProject : IDisposable
 
     HeadlessProject(BuildAppSettings settings, ILogger logger, bool withGraphics)
     {
-        this.logger = logger;
         Settings = settings;
 
         // The bricks' [TypeId] types must be registered before any scene deserialises, or their components
@@ -72,7 +70,9 @@ sealed class HeadlessProject : IDisposable
         }
 
         if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        {
             registrations.AddEngineModules(gameType.Assembly);
+        }
 
         services = registrations.BuildServiceProvider();
         SceneManager.BindServices(services);

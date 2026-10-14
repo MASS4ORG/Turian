@@ -76,11 +76,18 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             return;
         }
 
-        if (Locked) RecordLockedSelection();
+        if (Locked)
+        {
+            RecordLockedSelection();
+        }
 
         if (target is AssetInspection inspection)
         {
-            if (inspection.Target is { } payload) DrawValidation(gui, payload);
+            if (inspection.Target is { } payload)
+            {
+                DrawValidation(gui, payload);
+            }
+
             RenderAsset(gui, inspection);
             return;
         }
@@ -105,7 +112,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         foreach (var node in frameNodes)
         {
             undo.RecordObject(node, "Edit Selection");
-            foreach (var component in node.Components) undo.RecordObject(component, "Edit Selection");
+            foreach (var component in node.Components)
+            {
+                undo.RecordObject(component, "Edit Selection");
+            }
         }
         undo.RecordInspections(frameAssets, "Edit Selection");
     }
@@ -154,7 +164,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         var components = (target as Node)?.Components.Count ?? 0;
         var allComponents = frameNodes.Sum(node => node.Components.Count);
         if (gui.Pass == Pass.Pass1Build && NeedsRebuild(target, components, allComponents))
+        {
             RebuildForm(target, components);
+        }
     }
 
     bool NeedsRebuild(object target, int components, int allComponents) => !ReferenceEquals(builtFor, target)
@@ -172,22 +184,41 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         // name. Components keep their fold.
         for (var i = 0; i < model.Sections.Count; i++)
         {
-            if (i == 0 && target is Node) RenderHeader(gui, model.Sections[i]);
-            else RenderSection(gui, model.Sections[i], i);
+            if (i == 0 && target is Node)
+            {
+                RenderHeader(gui, model.Sections[i]);
+            }
+            else
+            {
+                RenderSection(gui, model.Sections[i], i);
+            }
 
-            if (i == 0 && target is Node node && ReferenceEquals(node, overrides.InstanceRoot)) RenderPrefabBar(gui, node);
+            if (i == 0 && target is Node node && ReferenceEquals(node, overrides.InstanceRoot))
+            {
+                RenderPrefabBar(gui, node);
+            }
         }
 
-        if (target is Node) RenderAddComponent(gui);
+        if (target is Node)
+        {
+            RenderAddComponent(gui);
+        }
     }
 
     void DrawValidation(Gui gui, object target)
     {
         if (gui.Pass == Pass.Pass1Build)
+        {
             validationWarnings = TagsAndLayersValidation.Warnings(target, layerFilter.Settings);
+        }
+
         for (var i = 0; i < validationWarnings.Count; i++)
+        {
             using (gui.Node(-1, Theme.Scale(24f), $"inspector/layers/warning/{i}").ExpandWidth().Enter())
+            {
                 gui.DrawText(validationWarnings[i], Theme.Text(11f), Theme.InkDim);
+            }
+        }
     }
 
     void RebuildForm(object target, int components)
@@ -207,8 +238,12 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         // own section (index 0) is never one of them — its header is always open. A title the
         // user has already toggled keeps whatever they left it at.
         if (!settings.AutoExpandComponents)
+        {
             foreach (var section in model.Sections.Skip(1))
+            {
                 collapsed.Add(section.Title);
+            }
+        }
     }
 
     bool CanDropScript(ScriptDragPayload drop) =>
@@ -221,7 +256,11 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         undo.BeginGesture();
         try
         {
-            foreach (var node in frameNodes) undo.RecordObject(node, "Add Component");
+            foreach (var node in frameNodes)
+            {
+                undo.RecordObject(node, "Add Component");
+            }
+
             inspector.AddComponents(frameNodes, type);
         }
         finally { undo.EndGesture(); }
@@ -232,7 +271,11 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         undo.BeginGesture();
         try
         {
-            foreach (var node in frameNodes) undo.RecordObject(node, "Remove Component");
+            foreach (var node in frameNodes)
+            {
+                undo.RecordObject(node, "Remove Component");
+            }
+
             inspector.RemoveComponents(frameNodes, representative);
         }
         finally { undo.EndGesture(); }
@@ -247,7 +290,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             var interactable = gui.GetInteractable();
             var hot = enabled && interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Border : Theme.Panel, 3);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(hot ? Theme.Border : Theme.Panel, 3);
+            }
 
             gui.DrawText(label, Theme.Text(12), enabled ? Theme.Ink : Theme.InkDim);
 
@@ -269,14 +315,23 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             // The name box and the active toggle cannot turn bold, so their overrides mark the header's margin.
             RenderHeaderOverride(gui, section.Target);
 
-            if (active is not null) Toggle(gui, active, "inspector/header/active");
+            if (active is not null)
+            {
+                Toggle(gui, active, "inspector/header/active");
+            }
 
-            if (name is not null) RenderName(gui, name);
+            if (name is not null)
+            {
+                RenderName(gui, name);
+            }
             else
             {
                 gui.DrawText(section.Title, Theme.Text(13), Theme.Ink, centerInRect: false);
             }
-            if (frameNodes.Count > 1) gui.DrawText($"{frameNodes.Count} Objects", Theme.Text(11), Theme.InkDim);
+            if (frameNodes.Count > 1)
+            {
+                gui.DrawText($"{frameNodes.Count} Objects", Theme.Text(11), Theme.InkDim);
+            }
         }
 
         using (gui.Node(-1, -1, "inspector/header/fields").ExpandWidth().Direction(Axis.Vertical)
@@ -284,16 +339,26 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         {
             var rest = section.BodyFields.Where(f => f != name).ToList();
             for (var f = 0; f < rest.Count; f++)
+            {
                 DrawField(gui, rest[f], $"inspector/header/field{f}");
+            }
+
             DrawButtons(gui, section.Buttons, "inspector/header/button");
         }
     }
 
     void RenderHeaderOverride(Gui gui, object target)
     {
-        if (gui.Pass != Pass.Pass2Render) return;
-        if (!overrides.IsOverridden(target, nameof(Node.Name)) && !overrides.IsOverridden(target, nameof(Node.IsActive)))
+        if (gui.Pass != Pass.Pass2Render)
+        {
             return;
+        }
+
+        if (!overrides.IsOverridden(target, nameof(Node.Name)) && !overrides.IsOverridden(target, nameof(Node.IsActive)))
+        {
+            return;
+        }
+
         var rect = gui.CurrentNode.Rect;
         gui.DrawRect(new Rect(rect.X, rect.Y + 2f, 2f, rect.H - 4f), Theme.Accent);
     }
@@ -305,7 +370,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             padding: 4,
             id: "inspector/header/name", placeholder: name.HasMixedValue ? "—" : "");
         if (gui.Pass == Pass.Pass2Render && !string.Equals(edited, current, StringComparison.Ordinal))
+        {
             name.SetValue(edited);
+        }
     }
 
     void RenderSection(Gui gui, FormSection section, int index)
@@ -320,18 +387,29 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             {
                 gui.DrawBackgroundRect(Theme.Panel, 3);
                 var header = gui.GetInteractable();
-                if (header.OnClick()) Fold(section.Title);
+                if (header.OnClick())
+                {
+                    Fold(section.Title);
+                }
+
                 if (header.OnClick(MouseButton.Right) && section.Target is Component clicked)
+                {
                     OpenComponentMenu(gui, clicked);
+                }
             }
 
             using (gui.Node(10, Theme.Scale(22f), $"inspector/section{index}/arrow")
                        .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+            {
                 FormControls.FoldArrow(gui, isOpen);
+            }
 
             // The component's own on/off switch, beside its name. It blocks the
             // header behind it so ticking the box does not also fold the section.
-            if (section.EnabledField is { } enabled) Toggle(gui, enabled, $"inspector/section{index}/enabled");
+            if (section.EnabledField is { } enabled)
+            {
+                Toggle(gui, enabled, $"inspector/section{index}/enabled");
+            }
 
             // A component the instance added reads "+ Title"; one with overridden values has a bold title.
             var title = overrides.IsAdded(section.Target) ? $"+ {section.Title}" : section.Title;
@@ -343,10 +421,15 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
 
             if (section is { Removable: true, Target: Component component }
                 && FormControls.SmallButton(gui, "×", $"inspector/section{index}/remove"))
+            {
                 removeRequest = component;
+            }
         }
 
-        if (!isOpen) return;
+        if (!isOpen)
+        {
+            return;
+        }
 
         using (gui.Node(-1, -1, $"inspector/section{index}/fields").ExpandWidth()
                    .Direction(Axis.Vertical).Padding(8, 2).Gap(2f).Enter())
@@ -354,7 +437,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             if (section.BodyFields.Count > 0)
             {
                 for (var f = 0; f < section.BodyFields.Count; f++)
+                {
                     DrawField(gui, section.BodyFields[f], $"inspector/section{index}/field{f}");
+                }
             }
 
             DrawButtons(gui, section.Buttons, $"inspector/section{index}/button");
@@ -409,13 +494,20 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         using (gui.Node(-1, Theme.Scale(26f), "inspector/prefab").ExpandWidth().Direction(Axis.Horizontal)
                    .Padding(6, 3).Gap(6f).ContentAlignY(0.5f).Enter())
         {
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(Theme.Panel, 3);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(Theme.Panel, 3);
+            }
 
             gui.ThemedIcon(Icons.PrefabInstance, Theme.Text(12));
             gui.DrawText(name, Theme.Text(12), Theme.Ink, centerInRect: false);
             using (gui.Node().Expand().Enter()) { }
 
-            if (TextButton(gui, "Open", "inspector/prefab/open", record is not null)) prefabStage.OpenPrefab(instance);
+            if (TextButton(gui, "Open", "inspector/prefab/open", record is not null))
+            {
+                prefabStage.OpenPrefab(instance);
+            }
+
             if (TextButton(gui, "Revert All", "inspector/prefab/revert", differs))
             {
                 prefabOperations.RevertAll(instance);
@@ -423,7 +515,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             }
 
             if (TextButton(gui, "Apply All", "inspector/prefab/apply", differs))
+            {
                 Edited(prefabOperations.ApplyAll(instance));
+            }
         }
     }
 
@@ -444,7 +538,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             menu.Item("Move Up", () => MoveComponent(component, up: true), enabled: !prefabOwned && index > 0);
             menu.Item("Move Down", () => MoveComponent(component, up: false),
                 enabled: !prefabOwned && index >= 0 && index < count - 1);
-            if (!added && !overridden) return;
+            if (!added && !overridden)
+            {
+                return;
+            }
 
             menu.Separator();
             menu.Item(added ? "Remove Added Component" : "Revert Component", () =>
@@ -469,7 +566,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         try
         {
             foreach (var node in frameNodes)
+            {
                 undo.RecordObject(node, up ? "Move Component Up" : "Move Component Down");
+            }
+
             inspector.MoveComponents(frameNodes, component, up);
         }
         finally { undo.EndGesture(); }
@@ -485,7 +585,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     // An override action changes values outside the form, so the marks are compared again.
     void Edited(bool changed)
     {
-        if (changed) overrides.Invalidate();
+        if (changed)
+        {
+            overrides.Invalidate();
+        }
     }
 
     void OnAssetEdited(AssetInspection inspection)
@@ -506,7 +609,9 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
         {
             var buttonId = $"{id}{b}";
             if (FormControls.TextButton(gui, buttons[b].Label, buttonId, buttons[b].IsEnabled))
+            {
                 buttons[b].Invoke();
+            }
         }
     }
 
@@ -519,7 +624,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             var next = gui.Checkbox(current, size: Theme.Scale(14f), mixed: field.HasMixedValue,
                 enabled: !field.IsReadOnly);
 
-            if (gui.Pass == Pass.Pass2Render && next != current) field.SetValue(next);
+            if (gui.Pass == Pass.Pass2Render && next != current)
+            {
+                field.SetValue(next);
+            }
         }
     }
 
@@ -586,7 +694,10 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
 
     void Fold(string title)
     {
-        if (!collapsed.Add(title)) collapsed.Remove(title);
+        if (!collapsed.Add(title))
+        {
+            collapsed.Remove(title);
+        }
     }
 
     /// <inheritdoc/>

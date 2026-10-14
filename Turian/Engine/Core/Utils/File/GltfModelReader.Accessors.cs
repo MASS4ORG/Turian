@@ -5,15 +5,16 @@ public static partial class GltfModelReader
     readonly record struct Accessor(ReadOnlyMemory<byte> Data, int Offset, int Stride, int Count,
         int Components, int ComponentType, bool Normalized, JsonElement Description)
     {
-        internal int ComponentSize => ComponentType switch { 5120 or 5121 => 1, 5122 or 5123 => 2, _ => 4 };
+        internal int ComponentByteSize => ComponentType switch { 5120 or 5121 => 1, 5122 or 5123 => 2, _ => 4 };
 
         internal ReadOnlySpan<byte> Element(int index) => Data.Span.Slice(Offset + index * Stride,
-            Components * ComponentSize);
+            Components * ComponentByteSize);
 
         internal Vector4 Vector(int index)
         {
             var bytes = Element(index);
             if (ComponentType == 5126 && !Normalized && BitConverter.IsLittleEndian)
+            {
                 return Components switch
                 {
                     1 => new Vector4(MemoryMarshal.Read<float>(bytes), 0, 0, 0),
@@ -21,10 +22,15 @@ public static partial class GltfModelReader
                     3 => new Vector4(MemoryMarshal.Read<Vector3>(bytes), 0),
                     _ => MemoryMarshal.Read<Vector4>(bytes),
                 };
+            }
+
             Span<float> values = stackalloc float[4];
             values.Clear();
             for (var component = 0; component < Components; component++)
-                values[component] = Float(bytes[(component * ComponentSize)..]);
+            {
+                values[component] = Float(bytes[(component * ComponentByteSize)..]);
+            }
+
             return new(values[0], values[1], values[2], values[3]);
         }
 
@@ -78,9 +84,14 @@ public static partial class GltfModelReader
             stride = Integer(view, "byteStride", stride);
         }
         else if (sparse && count >= 0)
+        {
             data = new byte[checked(count * stride)];
+        }
         else
+        {
             throw new NotSupportedException("glTF geometry requires a buffer view or sparse values.");
+        }
+
         var accessor = new Accessor(data, Integer(description, "byteOffset"), stride, count,
             components, type, description.TryGetProperty("normalized", out var normalized) && normalized.GetBoolean(),
             description);
@@ -111,29 +122,43 @@ public static partial class GltfModelReader
         var offset = Integer(view, "byteOffset");
         var length = view.GetProperty("byteLength").GetInt32();
         if (offset < 0 || length < 0 || offset > buffer.Length - length)
+        {
             throw new InvalidDataException("glTF buffer view exceeds its buffer.");
+        }
+
         return buffer.Slice(offset, length);
     }
 
     static void ValidateAccessor(Accessor accessor)
     {
-        var size = accessor.Components * accessor.ComponentSize;
-        var end = (long)accessor.Offset + Math.Max(0L, accessor.Count - 1L) * accessor.Stride;
+        var size = accessor.Components * accessor.ComponentByteSize;
+        var end = accessor.Offset + Math.Max(0L, accessor.Count - 1L) * accessor.Stride;
         if (accessor.Count > 0)
+        {
             end += size;
+        }
+
         if (accessor.Count < 0 || accessor.Offset < 0 || accessor.Stride < size || end > accessor.Data.Length)
+        {
             throw new InvalidDataException("glTF accessor exceeds its buffer view.");
+        }
     }
 
     static Accessor? Attribute(JsonElement root, JsonElement attributes, string name,
         int components, int count, ReadOnlyMemory<byte>[] buffers)
     {
         if (!attributes.TryGetProperty(name, out var index))
+        {
             return null;
+        }
+
         var accessor = GetAccessor(root, index.GetInt32(), buffers);
         if (accessor.Count != count || accessor.Components != components &&
             !(name == "COLOR_0" && accessor.Components == 4))
+        {
             throw new InvalidDataException($"glTF {name} accessor has incompatible dimensions.");
+        }
+
         return accessor;
     }
 }

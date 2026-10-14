@@ -9,10 +9,17 @@ public sealed partial class Workbench
     void RenderBlocker(Gui gui)
     {
         if (gui.Pass == Pass.Pass1Build)
+        {
             frameProgress = app.Services.GetService(typeof(IUiBlocker)) is IUiBlocker { IsBlocked: true } blocker
                 ? blocker.Progress ?? new UiBlockerProgress(blocker.Message)
                 : null;
-        if (frameProgress is not { } progress) return;
+        }
+
+        if (frameProgress is not { } progress)
+        {
+            return;
+        }
+
         gui.RequestFrame();
 
         using (gui.Node(gui.ScreenRect.W, gui.ScreenRect.H, "__uiBlocker")
@@ -36,9 +43,15 @@ public sealed partial class Workbench
             gui.DrawRectBorder(gui.CurrentNode.Rect, t.Border, 1, t.Scale(8));
             gui.DrawText(progress.Title, t.Text(18), t.Ink, centerInRect: false);
             if (progress.Detail.Length > 0)
+            {
                 gui.DrawText(progress.Detail, t.Text(12), t.InkDim, centerInRect: false);
+            }
+
             using (gui.Node(-1, t.Scale(6), "__uiBlocker/progress").ExpandWidth().Enter())
+            {
                 gui.ProgressBar(progress.Fraction, -1, t.Scale(6));
+            }
+
             ProgressSummary(gui, progress);
         }
     }
@@ -52,8 +65,14 @@ public sealed partial class Workbench
             gui.Node().ExpandWidth();
             var counter = progress.Counter;
             if (progress.Fraction is { } fraction)
+            {
                 counter = $"{counter}  {fraction.ToString("P0", CultureInfo.InvariantCulture)}".Trim();
-            if (counter.Length > 0) gui.DrawText(counter, t.Text(11), t.InkDim, centerInRect: false);
+            }
+
+            if (counter.Length > 0)
+            {
+                gui.DrawText(counter, t.Text(11), t.InkDim, centerInRect: false);
+            }
         }
     }
 }

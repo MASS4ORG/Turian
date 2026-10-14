@@ -46,9 +46,16 @@ static class StudioControls
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            }
+
             gui.DrawText(label, Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
-            if (tooltip is not null) gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);
+            if (tooltip is not null)
+            {
+                gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);
+            }
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

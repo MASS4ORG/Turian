@@ -14,7 +14,10 @@ public sealed class AssetLoadStatistics
     {
         get
         {
-            lock (gate) return new(models, textures, modelMilliseconds, textureMilliseconds);
+            lock (gate)
+            {
+                return new(models, textures, modelMilliseconds, textureMilliseconds);
+            }
         }
     }
 

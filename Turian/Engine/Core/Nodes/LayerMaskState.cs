@@ -26,18 +26,32 @@ public sealed class LayerMaskState
         var mask = new CompiledLayerMask(slot, layout.GetLayerCount(slot));
         foreach (var value in Values)
         {
-            if (layout.TryGetLayerIndex(GroupId, value, out var index)) mask = mask.With(index);
-            else layout.WarnMissing(new LayerReference(GroupId, value));
+            if (layout.TryGetLayerIndex(GroupId, value, out var index))
+            {
+                mask = mask.With(index);
+            }
+            else
+            {
+                layout.WarnMissing(new LayerReference(GroupId, value));
+            }
         }
         if (Everything)
-            for (var index = 0; index < mask.ValueCount; index++) mask = mask.With((byte)index);
+        {
+            for (var index = 0; index < mask.ValueCount; index++)
+            {
+                mask = mask.With((byte)index);
+            }
+        }
+
         return mask;
     }
 
     void ValidateIdentities()
     {
-        if (GroupId == Guid.Empty || Values is null || Values.Any(value => value == Guid.Empty))
+        if (GroupId == Guid.Empty || Values is null || Values.Any(static value => value == Guid.Empty))
+        {
             throw new InvalidDataException("Layer masks require nonempty group and value identities.");
+        }
     }
 }
 
@@ -78,7 +92,11 @@ public readonly struct CompiledLayerMask
     public bool TryGetLegacyBits(out uint bits)
     {
         bits = 0;
-        if (GroupSlot < 0 || ValueCount == 0 || ValueCount > 32) return false;
+        if (GroupSlot < 0 || ValueCount == 0 || ValueCount > 32)
+        {
+            return false;
+        }
+
         bits = (uint)words[0];
         return true;
     }

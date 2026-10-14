@@ -22,7 +22,9 @@ sealed class ContentRangeStream : Stream
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         ArgumentOutOfRangeException.ThrowIfNegative(length);
         if (offset > source.Length - length)
+        {
             throw new ArgumentOutOfRangeException(nameof(length), "The range runs past the end of the content.");
+        }
 
         this.source = source;
         start = offset;
@@ -60,7 +62,10 @@ sealed class ContentRangeStream : Stream
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var remaining = Length - position;
-        if (remaining <= 0 || buffer.IsEmpty) return 0;
+        if (remaining <= 0 || buffer.IsEmpty)
+        {
+            return 0;
+        }
 
         var read = source.ReadAt(start + position, buffer[..(int)Math.Min(buffer.Length, remaining)]);
         position += read;
@@ -78,7 +83,10 @@ sealed class ContentRangeStream : Stream
             SeekOrigin.End => Length + offset,
             _ => throw new ArgumentOutOfRangeException(nameof(origin)),
         };
-        if (target < 0) throw new IOException("Attempted to seek before the start of the content range.");
+        if (target < 0)
+        {
+            throw new IOException("Attempted to seek before the start of the content range.");
+        }
 
         position = target;
         return position;

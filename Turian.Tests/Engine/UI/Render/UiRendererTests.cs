@@ -83,7 +83,7 @@ public sealed class UiRendererTests
     [Fact]
     public void MissingTemplate_DoesNotThrow()
     {
-        var ex = Record.Exception(() => Render(
+        var ex = Record.Exception(static () => Render(
             """
             <UI xmlns="https://turian.mass4.org/ui">
               <VisualElement><Instance template="Nope" /></VisualElement>
@@ -100,7 +100,7 @@ public sealed class UiRendererTests
         var fired = 0;
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(30, 15));           // over a button at the origin
-        input.IsMouseButtonPressed(Arg.Any<MouseButton>()).Returns(true); // a click this frame
+        input.IsMouseButtonPressed(Arg.Any<GMouseButton>()).Returns(true); // a click this frame
 
         Render(
             """
@@ -154,7 +154,7 @@ public sealed class UiRendererTests
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(x, y));
         input.PrevMousePosition.Returns(new Vector2(x, y));
-        input.IsMouseButtonPressed(Arg.Any<MouseButton>()).Returns(pressed);
+        input.IsMouseButtonPressed(Arg.Any<GMouseButton>()).Returns(pressed);
         input.GetTypedCharacters().Returns(typed);
         return input;
     }
@@ -163,9 +163,13 @@ public sealed class UiRendererTests
     static bool Contains(byte[] px, byte r, byte g, byte b)
     {
         for (var i = 0; i + 3 < px.Length; i += 4)
+        {
             if (Math.Abs(px[i] - r) < 40 && Math.Abs(px[i + 1] - g) < 40 && Math.Abs(px[i + 2] - b) < 40
                 && px[i + 3] > 200)
+            {
                 return true;
+            }
+        }
 
         return false;
     }
@@ -209,6 +213,7 @@ public sealed class UiRendererTests
 
     sealed class TextModel
     {
+        /// <summary>The editable text bound to the field.</summary>
         public string Value { get; set; } = "ab";
     }
 
@@ -248,7 +253,7 @@ public sealed class UiRendererTests
               </VisualElement>
             </UI>
             """,
-            r => r.DataResolver = path => path == "Rows" ? new[] { "#ff0000", "#00ff00", "#0000ff" } : null);
+            static r => r.DataResolver = static path => path == "Rows" ? new[] { "#ff0000", "#00ff00", "#0000ff" } : null);
 
         Assert.True(At(px, w / 2, 10).R > 200, "row 0 red");
         Assert.True(At(px, w / 2, 45).G > 200, "row 1 green");
@@ -267,16 +272,177 @@ public sealed class UiRendererTests
               </VisualElement>
             </UI>
             """,
-            r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }", UiStyleSheetAsset.ParseOptions)));
+            static r => r.StyleSheets.Add(StyleSheet.Parse(".big { color: #ff0000; font-size: 40; }", UiStyleSheetAsset.ParseOptions)));
 
         var reddish = 0;
         for (var y = 0; y < h; y++)
+        {
             for (var x = 0; x < w; x++)
             {
                 var (rr, gg, bb, aa) = At(px, x, y);
-                if (aa > 40 && rr > 150 && gg < 100 && bb < 100) reddish++;
+                if (aa > 40 && rr > 150 && gg < 100 && bb < 100)
+                {
+                    reddish++;
+                }
             }
+        }
 
         Assert.True(reddish > 40, $"expected red glyph pixels from the .uss rule, found {reddish}");
+    }
+
+    static SKImage Solid(SKColor color)
+    {
+        using var bitmap = new SKBitmap(8, 8);
+        bitmap.Erase(color);
+        return SKImage.FromBitmap(bitmap);
+    }
+
+    /// <summary>Image buttons paint the correct state and fire click handlers only when enabled.</summary>
+    [Theory]
+    [InlineData(false, false, false, 255, 0, 0)]
+    [InlineData(true, false, false, 0, 255, 0)]
+    [InlineData(true, true, false, 0, 0, 255)]
+    [InlineData(true, true, true, 255, 255, 0)]
+    public void ImageButton_States(bool hovered, bool pressed, bool disabled, int r, int g, int b)
+    {
+        using var normal = Solid(SKColors.Red);
+        using var hover = Solid(SKColors.Lime);
+        using var hold = Solid(SKColors.Blue);
+        using var inactive = Solid(SKColors.Yellow);
+        var images = new Dictionary<string, SKImage>
+        {
+            ["normal"] = normal,
+            ["hover"] = hover,
+            ["pressed"] = hold,
+            ["disabled"] = inactive,
+        };
+        var fired = 0;
+        var input = Pointer(hovered ? 20 : -1, hovered ? 15 : -1, pressed);
+        input.IsMouseButtonDown(Arg.Any<GMouseButton>()).Returns(pressed);
+        var pixels = Render($$"""
+            <UI><ImageButton width="80" height="40" image-normal="normal" image-hover="hover"
+                image-pressed="pressed" image-disabled="disabled" enabled="{{!disabled}}" click="Pick" /></UI>
+            """, renderer =>
+        {
+            renderer.ImageResolver = name => images.GetValueOrDefault(name);
+            renderer.Handlers["Pick"] = () => fired++;
+        }, input);
+        Assert.Equal((byte)r, At(pixels, 20, 15).R);
+        Assert.Equal((byte)g, At(pixels, 20, 15).G);
+        Assert.Equal((byte)b, At(pixels, 20, 15).B);
+        Assert.Equal(pressed && !disabled ? 1 : 0, fired);
+    }
+
+    /// <summary>Missing alternate button images fall back to normal, including nine-slice painting.</summary>
+    [Theory]
+    [InlineData("1")]
+    [InlineData("1,2")]
+    [InlineData("1,2,3,4")]
+    [InlineData("1,2,3")]
+    public void ImageButton_FallbackAndSlices(string slice)
+    {
+        using var normal = Solid(SKColors.Red);
+        var pixels = Render($$"""
+            <UI><ImageButton width="80" height="40" image-normal="normal" nine-slice="{{slice}}" /></UI>
+            """, renderer => renderer.ImageResolver = name => name == "normal" ? normal : null, Pointer(20, 15));
+        Assert.True(At(pixels, 20, 15).R > 200);
+    }
+
+    /// <summary>A missing normal image renders the button's children as a container.</summary>
+    [Fact]
+    public void ImageButton_MissingNormalRendersChildren()
+    {
+        var pixels = Render("""
+            <UI><ImageButton style="flex-grow: 1; background-color: #00ff00"><Label text="fallback" /></ImageButton></UI>
+            """);
+        Assert.True(At(pixels, 100, 80).G > 200);
+    }
+
+    /// <summary>Disabled fields keep their placeholder and ignore typing.</summary>
+    [Fact]
+    public void TextField_DisabledPlaceholder()
+    {
+        var renderer = new UiRenderer(UiXmlParser.Parse("""
+            <UI><TextField name="f" width="150" height="30" enabled="false" placeholder="Enter"
+                style="placeholder-color: #00ff00" /></UI>
+            """));
+        var pixels = RenderFrames(renderer, Pointer(80, 15, pressed: true), Pointer(80, 15, typed: "ignored"));
+        Assert.True(Contains(pixels, 0, 255, 0));
+    }
+
+    /// <summary>Select-all paints the selection and replacement typing persists in an unbound field.</summary>
+    [Fact]
+    public void TextField_SelectionAndPersistentValue()
+    {
+        var renderer = new UiRenderer(UiXmlParser.Parse("""
+            <UI><TextField name="f" width="150" height="30" value="Hello"
+                style="color: #ff0000; selection-color: #0000ff" /></UI>
+            """));
+        var select = Pointer(80, 15);
+        select.IsKeyDown(GKey.LeftControl).Returns(true);
+        select.IsKeyPressed(GKey.A).Returns(true);
+        var pixels = RenderFrames(renderer, Pointer(80, 15, pressed: true), select);
+        Assert.True(Contains(pixels, 0, 0, 255));
+        var replaced = RenderFrames(renderer, Pointer(80, 15, pressed: true),
+            select, Pointer(80, 15, typed: "Z"), Pointer(-1, -1));
+        Assert.True(Contains(replaced, 255, 0, 0));
+    }
+
+    /// <summary>Empty tabs render nothing and clicking an active header does not fire a change event.</summary>
+    [Fact]
+    public void Tabs_EmptyAndUnchangedSelection()
+    {
+        Assert.All(Render("<UI><Tabs /></UI>"), value => Assert.Equal((byte)0, value));
+        var changes = 0;
+        var renderer = new UiRenderer(UiXmlParser.Parse(tabsDocument.Replace("name=\"t\"", "name=\"t\" changed=\"Change\"",
+            StringComparison.Ordinal)));
+        renderer.Handlers["Change"] = () => changes++;
+        RenderFrames(renderer, Pointer(20, 10, pressed: true));
+        Assert.Equal(0, changes);
+        RenderFrames(renderer, Pointer(90, 10, pressed: true));
+        Assert.Equal(1, changes);
+    }
+
+    /// <summary>Unbound toggles keep their clicked value across frames.</summary>
+    [Fact]
+    public void Toggle_PersistsClickedValue()
+    {
+        var renderer = new UiRenderer(UiXmlParser.Parse("""
+            <UI><Toggle name="t" width="80" height="30" value="false" style="color: #00ff00" /></UI>
+            """));
+        var off = RenderFrames(renderer, Pointer(-1, -1));
+        var on = RenderFrames(renderer, Pointer(20, 10, pressed: true), Pointer(-1, -1));
+        Assert.NotEqual(off, on);
+        Assert.True(Contains(on, 0, 255, 0));
+    }
+
+    /// <summary>Images use authored sizes or their intrinsic dimensions and keep pixels outside them clear.</summary>
+    [Theory]
+    [InlineData("", 8, 8)]
+    [InlineData("width:40; height:30", 40, 30)]
+    public void Image_UsesResolvedDimensions(string style, int width, int height)
+    {
+        using var image = Solid(SKColors.Magenta);
+        var pixels = Render($$"""<UI><Image src="image" style="{{style}}" /></UI>""",
+            renderer => renderer.ImageResolver = _ => image);
+        Assert.Equal((byte)255, At(pixels, width / 2, height / 2).R);
+        Assert.Equal((byte)255, At(pixels, width / 2, height / 2).B);
+        Assert.Equal((byte)0, At(pixels, width + 2, height + 2).A);
+    }
+
+    /// <summary>Missing images reserve a placeholder so following content keeps its vertical position.</summary>
+    [Theory]
+    [InlineData("", 32)]
+    [InlineData("width:40; height:50", 50)]
+    public void Image_MissingPreservesLayout(string style, int height)
+    {
+        var pixels = Render($$"""
+            <UI><VisualElement style="flex-direction:column">
+              <Image src="missing" style="{{style}}" />
+              <VisualElement style="height:10; background-color:#00ff00" />
+            </VisualElement></UI>
+            """);
+        Assert.Equal((byte)0, At(pixels, 10, height - 2).A);
+        Assert.Equal((byte)255, At(pixels, 10, height + 2).G);
     }
 }

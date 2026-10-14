@@ -16,7 +16,11 @@ public sealed class LayerDrawerTests
         internal Harness(object target, string member, TagsAndLayersSettings? settings = null)
         {
             var project = new AppSettings();
-            if (settings is not null) project.Loaded.Use(settings);
+            if (settings is not null)
+            {
+                project.Loaded.Use(settings);
+            }
+
             drawer = new LayerDrawer(new LayerFilter(project));
             field = FormField.ForMember(target.GetType().GetProperty(member)!, target);
             Gui = new Gui { Input = Input };
@@ -33,18 +37,28 @@ public sealed class LayerDrawerTests
             InspectorFormsRenderingTests.Frame(Gui, surface, font, gui =>
             {
                 using (gui.Node(300, 250, "layer-panel").Direction(Axis.Vertical).Enter())
+                {
                     drawer.Draw(gui, field, "layer-field", context);
+                }
+
                 if (gui.Pass == Pass.Pass1Build)
                 {
-                    if (field.ValueType != typeof(LayerMask)) Assert.Equal(before, field.GetValue());
+                    if (field.ValueType != typeof(LayerMask))
+                    {
+                        Assert.Equal(before, field.GetValue());
+                    }
+
                     builtValue = field.GetValue();
                 }
-                else if (field.ValueType == typeof(LayerMask)) Assert.Equal(builtValue, field.GetValue());
+                else if (field.ValueType == typeof(LayerMask))
+                {
+                    Assert.Equal(builtValue, field.GetValue());
+                }
             });
         }
 
-        internal LayoutNode Button => Nodes().Single(node => node.Id.EndsWith("/button", StringComparison.Ordinal));
-        internal LayoutNode List => Nodes().Single(node => node.Id.EndsWith("/list", StringComparison.Ordinal));
+        internal LayoutNode Button => Nodes().Single(static node => node.Id.EndsWith("/button", StringComparison.Ordinal));
+        internal LayoutNode List => Nodes().Single(static node => node.Id.EndsWith("/list", StringComparison.Ordinal));
         internal LayoutNode Option(int index) => Nodes().Single(node =>
             node.Id.EndsWith(field.ValueType == typeof(LayerMask) ? $"/option/{index}" : $"/list/{index}",
                 StringComparison.Ordinal));

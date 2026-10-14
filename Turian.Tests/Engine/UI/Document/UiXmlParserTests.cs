@@ -77,7 +77,7 @@ public sealed class UiXmlParserTests
     {
         var parsedDocument = UiXmlParser.Parse(doc);
 
-        var repeat = parsedDocument.Elements().Single(e => e.Repeat is not null);
+        var repeat = parsedDocument.Elements().Single(static e => e.Repeat is not null);
         Assert.Equal("App.Levels", repeat.Repeat!.ItemsPath);
         Assert.Equal("level", repeat.Repeat.ItemAlias);
 
@@ -94,15 +94,15 @@ public sealed class UiXmlParserTests
 
         var play = parsedDocument.Find("play")!;
         Assert.Equal("OnPlay", play.Events["click"]);
-        Assert.Contains(play.AttributeBindings, b => b is { TargetAttribute: "enabled", Expression.Path: "App.CanPlay" });
+        Assert.Contains(play.AttributeBindings, static b => b is { TargetAttribute: "enabled", Expression.Path: "App.CanPlay" });
 
         var gauge = parsedDocument.Find("fps")!;
         Assert.Equal("Gauge", gauge.Tag);
         Assert.Equal("https://example.com/x", gauge.Namespace);
-        Assert.Contains(gauge.AttributeBindings, b => b.TargetAttribute == "value");
+        Assert.Contains(gauge.AttributeBindings, static b => b.TargetAttribute == "value");
 
         Assert.Equal(2, parsedDocument.Bindings.Count);
-        Assert.Contains(parsedDocument.Bindings, b => b is { Element: "play", Property: "enabled", Converter: "not" });
+        Assert.Contains(parsedDocument.Bindings, static b => b is { Element: "play", Property: "enabled", Converter: "not" });
     }
 
     /// <summary>The document round-trips through JSON unchanged.</summary>
@@ -123,7 +123,7 @@ public sealed class UiXmlParserTests
     [Fact]
     public void Parse_RejectsWrongRoot()
     {
-        var ex = Assert.Throws<UiParseException>(() =>
+        var ex = Assert.Throws<UiParseException>(static () =>
             UiXmlParser.Parse("<Window xmlns=\"https://turian.mass4.org/ui\"><Label/></Window>"));
 
         Assert.Contains("Root element must be <UI>", ex.Message, StringComparison.Ordinal);
@@ -134,7 +134,7 @@ public sealed class UiXmlParserTests
     [Fact]
     public void Parse_RejectsMalformedXml()
     {
-        var ex = Assert.Throws<UiParseException>(() =>
+        var ex = Assert.Throws<UiParseException>(static () =>
             UiXmlParser.Parse("<UI xmlns=\"https://turian.mass4.org/ui\">\n  <Label>\n</UI>"));
 
         Assert.True(ex.Line >= 2);
@@ -144,10 +144,82 @@ public sealed class UiXmlParserTests
     [Fact]
     public void Parse_RejectsStyleWithoutSrc()
     {
-        var ex = Assert.Throws<UiParseException>(() =>
+        var ex = Assert.Throws<UiParseException>(static () =>
             UiXmlParser.Parse("<UI xmlns=\"https://turian.mass4.org/ui\">\n  <Style/>\n  <Label/>\n</UI>"));
 
         Assert.Contains("requires a 'src'", ex.Message, StringComparison.Ordinal);
         Assert.Equal(2, ex.Line);
+    }
+
+    /// <summary>Fragments keep literal content, event names and valid inline declarations.</summary>
+    [Fact]
+    public void ParseFragment_Attributes()
+    {
+        var element = UiXmlParser.ParseFragment("""
+            <Button xmlns="https://turian.mass4.org/ui" name="go" class="one  two"
+                    style="bad; :ignored; width: 20; color: rgb(1,2,3)"
+                    click="{ OnGo }" binding-value="{Value, mode=TwoWay}" tooltip="literal"> Go </Button>
+            """);
+        Assert.Null(element.Namespace);
+        Assert.Equal("Go", element.Text);
+        Assert.Equal(["one", "two"], element.Classes);
+        Assert.Equal("20", element.InlineStyle["width"]);
+        Assert.Equal("rgb(1,2,3)", element.InlineStyle["color"]);
+        Assert.Equal(2, element.InlineStyle.Count);
+        Assert.Equal("OnGo", element.Events["click"]);
+        Assert.Equal("literal", element.Attributes["tooltip"]);
+        Assert.Equal(BindingMode.TwoWay, Assert.Single(element.AttributeBindings).Expression.Mode);
+    }
+
+    /// <summary>Structural attributes populate repeat and instance metadata without becoming normal attributes.</summary>
+    [Fact]
+    public void ParseFragment_StructuralAttributes()
+    {
+        var repeat = UiXmlParser.ParseFragment("""<Repeat items="{Rows}"><Instance template="Row" name="r" color="red" /></Repeat>""");
+        Assert.Equal("item", repeat.Repeat!.ItemAlias);
+        Assert.Empty(repeat.Attributes);
+        var instance = Assert.Single(repeat.Children);
+        Assert.Equal("Row", instance.Instance!.TemplateName);
+        Assert.Equal("red", Assert.Single(instance.Instance.Parameters).Value);
+        Assert.False(instance.Attributes.ContainsKey("template"));
+        Assert.Equal("r", instance.Name);
+    }
+
+    /// <summary>Invalid structural and binding attributes report the element's location.</summary>
+    [Theory]
+    [InlineData("<Repeat items=\"literal\" />")]
+    [InlineData("<Repeat />")]
+    [InlineData("<Instance />")]
+    [InlineData("<Label binding-text=\"literal\" />")]
+    [InlineData("<Label text=\"{ | upper}\" />")]
+    public void ParseFragment_RejectsInvalidAttributes(string xml)
+    {
+        var error = Assert.Throws<UiParseException>(() => UiXmlParser.ParseFragment(xml));
+        Assert.Equal(1, error.Line);
+        Assert.True(error.Column > 0);
+    }
+
+    /// <summary>Sibling visual roots get a wrapper while top-level bindings retain their mode and converter.</summary>
+    [Fact]
+    public void Parse_MultipleRootsAndBindings()
+    {
+        var parsed = UiXmlParser.Parse("""
+            <UI>
+              <Bindings><Binding element="a" property="text" path="Value" mode="TwoWay" converter="upper" /></Bindings>
+              <Label name="a" /><Label name="b" />
+            </UI>
+            """);
+        Assert.Equal(["a", "b"], parsed.Root.Children.Select(static child => child.Name));
+        var binding = Assert.Single(parsed.Bindings);
+        Assert.Equal(BindingMode.TwoWay, binding.Mode);
+        Assert.Equal("upper", binding.Converter);
+    }
+
+    /// <summary>Empty templates and malformed fragments retain structured parse errors.</summary>
+    [Fact]
+    public void Parse_RejectsEmptyTemplateAndMalformedFragment()
+    {
+        Assert.Throws<UiParseException>(static () => UiXmlParser.Parse("<UI><Template name=\"empty\" /><Label /></UI>"));
+        Assert.Throws<UiParseException>(static () => UiXmlParser.ParseFragment("<Label>"));
     }
 }

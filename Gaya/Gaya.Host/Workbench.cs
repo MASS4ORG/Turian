@@ -62,7 +62,7 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         dockTheme = Theme.ToDockTheme();
         app.Themes.Changed += OnThemeChanged;
         this.layoutStore = layoutStore ?? new WorkbenchLayoutStore(log);
-        descriptors = app.Panels.All.ToDictionary(descriptor => descriptor.Id);
+        descriptors = app.Panels.All.ToDictionary(static descriptor => descriptor.Id);
         panelsRevision = app.Panels.Revision;
 
         Layout = RestoreOrSeedLayout();
@@ -84,7 +84,11 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         get => Appearance.NativeTitlebar;
         set
         {
-            if (Appearance.NativeTitlebar == value) return;
+            if (Appearance.NativeTitlebar == value)
+            {
+                return;
+            }
+
             Appearance.NativeTitlebar = value;
             app.Settings.NotifyChanged(AppearanceSettings.PageId);
         }
@@ -111,13 +115,24 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// </summary>
     void SyncStyleSheets(Gui gui)
     {
-        if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui) return;
+        if (styleSheetsVersion == app.Themes.SheetsVersion && styledGui == gui)
+        {
+            return;
+        }
 
         styleSheetsVersion = app.Themes.SheetsVersion;
         styledGui = gui;
-        if (!gui.IconDecoders.Contains(SvgIconDecoder.Instance)) gui.IconDecoders.Add(SvgIconDecoder.Instance);
+        if (!gui.IconDecoders.Contains(SvgIconDecoder.Instance))
+        {
+            gui.IconDecoders.Add(SvgIconDecoder.Instance);
+        }
+
         gui.StyleSheets.Clear();
-        foreach (var sheet in app.Themes.Sheets) gui.StyleSheets.Add(sheet);
+        foreach (var sheet in app.Themes.Sheets)
+        {
+            gui.StyleSheets.Add(sheet);
+        }
+
         ExcaliburStyles.SetBaseSheet(gui, app.Themes.Look);
     }
 
@@ -129,10 +144,16 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     DockLayout RestoreOrSeedLayout()
     {
         var restored = layoutStore.Load();
-        if (restored is null) return SeedLayout();
+        if (restored is null)
+        {
+            return SeedLayout();
+        }
 
         knownPanels.UnionWith(restored.KnownPanels);
-        foreach (var (panelId, parked) in restored.ParkedPanels) parkedPanels[panelId] = parked;
+        foreach (var (panelId, parked) in restored.ParkedPanels)
+        {
+            parkedPanels[panelId] = parked;
+        }
 
         // A layout that knows no panels predates closed panels being remembered: it holds every panel
         // that was ever registered, wanted or not, so only those that open by default are kept.
@@ -142,13 +163,25 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         {
             if (descriptors.TryGetValue(panelId, out var descriptor))
             {
-                if (legacy && !descriptor.OpenByDefault) layout.Remove(panelId);
+                if (legacy && !descriptor.OpenByDefault)
+                {
+                    layout.Remove(panelId);
+                }
             }
-            else if (legacy) layout.Remove(panelId);
-            else Park(layout, panelId);
+            else if (legacy)
+            {
+                layout.Remove(panelId);
+            }
+            else
+            {
+                Park(layout, panelId);
+            }
         }
 
-        foreach (var descriptor in app.Panels.All) Reconcile(layout, descriptor);
+        foreach (var descriptor in app.Panels.All)
+        {
+            Reconcile(layout, descriptor);
+        }
 
         log.LogDebug("Restored workbench layout from {Path}", layoutStore.Path);
         return layout;
@@ -167,7 +200,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         }
 
         if (parkedPanels.ContainsKey(descriptor.Id) || (knownPanels.Add(descriptor.Id) && descriptor.OpenByDefault))
+        {
             Place(layout, descriptor);
+        }
     }
 
     /// <summary>
@@ -185,7 +220,11 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
             {
                 var active = leaf.PanelIds.ElementAtOrDefault(leaf.ActiveIndex);
                 layout.DockInto(panelId, leaf, DockZone.Center);
-                if (active is not null) layout.Activate(active);
+                if (active is not null)
+                {
+                    layout.Activate(active);
+                }
+
                 return;
             }
 
@@ -200,15 +239,22 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         }
 
         if (descriptor.DefaultPlacement == PanelPlacement.Floating)
+        {
             layout.Float(panelId, new Rect(180, 140, WorkbenchLayoutStore.DefaultLeftWidth, WorkbenchLayoutStore.DefaultBottomHeight));
+        }
         else
+        {
             layout.EnsurePanel(panelId, ZoneFor(descriptor.DefaultPlacement), FractionFor(descriptor.DefaultPlacement));
+        }
     }
 
     /// <summary>Records where a panel sits and takes it out of the layout until it registers again.</summary>
     void Park(DockLayout layout, string panelId)
     {
-        if (layout.FindLeaf(panelId) is not { } leaf) return;
+        if (layout.FindLeaf(panelId) is not { } leaf)
+        {
+            return;
+        }
 
         var window = layout.Floating.FirstOrDefault(candidate => candidate.Root.Leaves().Contains(leaf));
         parkedPanels[panelId] = new ParkedPanel(leaf.Zone,
@@ -224,24 +270,32 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// </summary>
     void SyncPanels()
     {
-        if (app.Panels.Revision == panelsRevision) return;
+        if (app.Panels.Revision == panelsRevision)
+        {
+            return;
+        }
 
         panelsRevision = app.Panels.Revision;
         var current = app.Panels.All;
         ReleaseReplacedPanels(current);
 
-        foreach (var goneId in descriptors.Keys.Except(current.Select(d => d.Id)).ToList())
+        foreach (var goneId in descriptors.Keys.Except(current.Select(static d => d.Id)).ToList())
         {
             if (panelInstances.Remove(goneId, out var panel) && panel is IDisposable disposable)
+            {
                 disposable.Dispose();
+            }
 
             // A recompile unregisters a user panel and registers it again moments later.
             Park(Layout, goneId);
         }
 
-        descriptors = current.ToDictionary(descriptor => descriptor.Id);
+        descriptors = current.ToDictionary(static descriptor => descriptor.Id);
 
-        foreach (var descriptor in current) Reconcile(Layout, descriptor);
+        foreach (var descriptor in current)
+        {
+            Reconcile(Layout, descriptor);
+        }
     }
 
     void ReleaseReplacedPanels(IReadOnlyList<PanelDescriptor> current)
@@ -249,9 +303,15 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         foreach (var descriptor in current)
         {
             if (!descriptors.TryGetValue(descriptor.Id, out var previous)
-                || ReferenceEquals(previous, descriptor)) continue;
+                || ReferenceEquals(previous, descriptor))
+            {
+                continue;
+            }
+
             if (panelInstances.Remove(descriptor.Id, out var panel) && panel is IDisposable disposable)
+            {
                 disposable.Dispose();
+            }
         }
     }
 
@@ -259,15 +319,17 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     DockLayout SeedLayout()
     {
         var layout = new DockLayout();
-        knownPanels.UnionWith(app.Panels.All.Select(descriptor => descriptor.Id));
-        var opening = app.Panels.All.Where(descriptor => descriptor.OpenByDefault).ToList();
+        knownPanels.UnionWith(app.Panels.All.Select(static descriptor => descriptor.Id));
+        var opening = app.Panels.All.Where(static descriptor => descriptor.OpenByDefault).ToList();
 
         // Center first: the edges wrap whatever is already there, so seeding an edge into an empty
         // layout would make that panel the center.
-        foreach (var descriptor in opening.Where(d => d.DefaultPlacement == PanelPlacement.Center))
+        foreach (var descriptor in opening.Where(static d => d.DefaultPlacement == PanelPlacement.Center))
+        {
             layout.DockAtEdge(descriptor.Id, DockZone.Center);
+        }
 
-        foreach (var descriptor in opening.Where(d => d.DefaultPlacement != PanelPlacement.Center))
+        foreach (var descriptor in opening.Where(static d => d.DefaultPlacement != PanelPlacement.Center))
         {
             if (descriptor.DefaultPlacement == PanelPlacement.Floating)
             {
@@ -301,7 +363,10 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
     /// <summary>Writes the layout out if the user has changed it since it was last saved.</summary>
     public void SaveLayoutIfChanged()
     {
-        if (Layout.Revision == savedRevision) return;
+        if (Layout.Revision == savedRevision)
+        {
+            return;
+        }
 
         savedRevision = Layout.Revision;
         layoutStore.Save(new WorkbenchLayoutState(Layout, knownPanels, parkedPanels));
@@ -315,10 +380,16 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         appearanceBridge.Dispose();
         app.Themes.Changed -= OnThemeChanged;
 
-        foreach (var panel in panelInstances.Values.OfType<IDisposable>()) panel.Dispose();
+        foreach (var panel in panelInstances.Values.OfType<IDisposable>())
+        {
+            panel.Dispose();
+        }
         // Plugins built outside this solution may contribute chrome items that own resources.
         // ReSharper disable SuspiciousTypeConversion.Global
-        foreach (var item in chromeInstances.Values.OfType<IDisposable>()) item.Dispose();
+        foreach (var item in chromeInstances.Values.OfType<IDisposable>())
+        {
+            item.Dispose();
+        }
         // ReSharper restore SuspiciousTypeConversion.Global
     }
 
@@ -332,7 +403,9 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
         }
 
         if (cmd.CanExecute is { } guard && !guard(app.Services))
+        {
             return;
+        }
 
         try
         {
@@ -380,8 +453,14 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
             using (gui.Node().Expand().ExpandWidth().Direction(Axis.Horizontal).Gap(t.Gap).Enter())
             {
-                if (paletteOpen) CommandPalette(gui);
-                else gui.DockSpace(Layout, PanelInfo, RenderPanel, dockTheme, RenderTabStripActions);
+                if (paletteOpen)
+                {
+                    CommandPalette(gui);
+                }
+                else
+                {
+                    gui.DockSpace(Layout, PanelInfo, RenderPanel, dockTheme, RenderTabStripActions);
+                }
             }
 
             StatusBar(gui);
@@ -391,7 +470,10 @@ public sealed partial class Workbench : IPanelAccessor, IDisposable
 
         RenderBlocker(gui);
 
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
 
         SaveLayoutIfChanged();
         app.Settings.Flush();

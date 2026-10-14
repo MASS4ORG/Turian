@@ -14,7 +14,10 @@ sealed class ContentOapSource(IContentSource content, bool ownsContent) : IOapSo
     /// <inheritdoc />
     public void Dispose()
     {
-        if (ownsContent) content.Dispose();
+        if (ownsContent)
+        {
+            content.Dispose();
+        }
     }
 }
 

@@ -15,21 +15,34 @@ public partial class Node : IdObject
         get => field;
         set
         {
-            if (field == value) return;
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
             RefreshActiveHierarchy();
             if (value)
             {
                 OnEnable();
                 foreach (var component in Components)
+                {
                     if (component.IsActive)
+                    {
                         component.OnEnable();
+                    }
+                }
             }
             else
             {
                 foreach (var component in Components)
+                {
                     if (component.IsActive)
+                    {
                         component.OnDisable();
+                    }
+                }
+
                 OnDisable();
             }
         }
@@ -51,7 +64,11 @@ public partial class Node : IdObject
         internal set
         {
             field = value;
-            if (value) tagRegistry?.Unregister(this);
+            if (value)
+            {
+                tagRegistry?.Unregister(this);
+            }
+
             RefreshActiveHierarchy();
         }
     }
@@ -65,7 +82,11 @@ public partial class Node : IdObject
         get;
         set
         {
-            if (ReferenceEquals(field, value)) return;
+            if (ReferenceEquals(field, value))
+            {
+                return;
+            }
+
             var previous = field;
             field = value;
             previous?.Children.Remove(this);
@@ -93,7 +114,11 @@ public partial class Node : IdObject
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            if (ReferenceEquals(field, value)) return;
+            if (ReferenceEquals(field, value))
+            {
+                return;
+            }
+
             field.CollectionChanged -= ChildrenChanged;
             field = value;
             field.CollectionChanged += ChildrenChanged;
@@ -123,7 +148,11 @@ public partial class Node : IdObject
         get;
         set
         {
-            if (field == value) return;
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
             InvalidateGlobalTransformCache();
         }
@@ -196,9 +225,14 @@ public partial class Node : IdObject
         EnsureTagRegistry();
         SceneServiceInjector.Inject(this, Services, AllowMissingServices);
         foreach (var component in Components)
+        {
             component.Setup(this);
+        }
+
         foreach (var child in Children)
+        {
             child.Awake(this);
+        }
     }
 
     /// <summary>Wakes a scene hierarchy with an explicit service provider.</summary>
@@ -215,11 +249,20 @@ public partial class Node : IdObject
     public virtual void Start()
     {
         foreach (var component in Components)
+        {
             if (component.IsActive)
+            {
                 component.EnsureStarted();
+            }
+        }
+
         foreach (var child in Children)
+        {
             if (child.IsActive)
+            {
                 child.Start();
+            }
+        }
     }
 
     /// <summary>Called when the node becomes active or is enabled.</summary>

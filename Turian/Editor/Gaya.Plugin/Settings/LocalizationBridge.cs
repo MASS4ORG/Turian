@@ -43,7 +43,10 @@ sealed class LocalizationBridge : IDisposable
     /// </summary>
     void Remember(string locale)
     {
-        if (string.Equals(locale, LocaleOf(language.Language), StringComparison.OrdinalIgnoreCase)) return;
+        if (string.Equals(locale, LocaleOf(language.Language), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         language.Language = LanguageOf(locale);
         settings.NotifyChanged(PageId);

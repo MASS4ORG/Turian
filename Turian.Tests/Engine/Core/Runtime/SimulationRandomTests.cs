@@ -36,7 +36,11 @@ public sealed class SimulationRandomTests
         var second = new SimulationRandomStreams(42);
         var otherCombat = second.Get("combat");
         Assert.Equal(economy.NextUInt64(), second.Get("economy").NextUInt64());
-        for (var index = 0; index < 20; index++) economy.NextUInt64();
+        for (var index = 0; index < 20; index++)
+        {
+            economy.NextUInt64();
+        }
+
         Assert.Equal(combat.NextUInt64(), otherCombat.NextUInt64());
         var state = first.CaptureState();
         Assert.Equal(new[] { "combat", "economy" }, state.Streams.Select(entry => entry.Name));

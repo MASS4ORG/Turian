@@ -32,6 +32,6 @@ public sealed class StudioLogOptionsTests
 
     /// <summary>A level option requires its following value.</summary>
     [Fact]
-    public void RejectsMissingLevel() => Assert.Throws<ArgumentException>(() =>
+    public void RejectsMissingLevel() => Assert.Throws<ArgumentException>(static () =>
         StudioLogOptions.MinimumLevel(["--log-level"]));
 }

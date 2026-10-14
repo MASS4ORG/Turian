@@ -71,7 +71,11 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         if (!loaded)
         {
             loaded = true;
-            if (!scopeChosen && !controller.HasProject && controller.HasStudio) controller.Scope = BrickScope.Studio;
+            if (!scopeChosen && !controller.HasProject && controller.HasStudio)
+            {
+                controller.Scope = BrickScope.Studio;
+            }
+
             controller.Refresh();
             _ = controller.RefreshRegistriesAsync();
         }
@@ -104,7 +108,11 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             }
 
             Toolbar(gui);
-            if (addLabel is not null) AddRow(gui);
+            if (addLabel is not null)
+            {
+                AddRow(gui);
+            }
+
             List(gui);
         }
 
@@ -121,7 +129,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     /// <summary>The Studio and Project scope chips, shown when the host has both.</summary>
     void Scopes(Gui gui)
     {
-        if (!controller.HasStudio) return;
+        if (!controller.HasStudio)
+        {
+            return;
+        }
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/scopes").ExpandWidth().Direction(Axis.Horizontal)
                    .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
@@ -129,7 +140,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             foreach (var (scope, label, width) in new[] { (BrickScope.Studio, "Studio", 56f), (BrickScope.Project, "Project", 60f) })
             {
                 if (!Chip(gui, label, $"bricks/scope/{scope}", width, controller.Scope == scope) || controller.Scope == scope)
+                {
                     continue;
+                }
+
                 scopeChosen = true;
                 controller.Scope = scope;
                 _ = controller.RefreshRegistriesAsync();
@@ -146,7 +160,9 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             foreach (var (tab, label, width) in new[] { (BricksTab.Bricks, "Bricks", 56f), (BricksTab.Registries, "Registries", 76f) })
             {
                 if (Chip(gui, label, $"bricks/tab/{tab}", width, controller.Tab == tab) && controller.Tab != tab)
+                {
                     Show(() => controller.Tab = tab);
+                }
             }
         }
     }
@@ -159,14 +175,18 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                    .Direction(Axis.Horizontal).Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
         {
             if (Button(gui, "+", "bricks/registries/add", 28f, "Add a registry to take bricks from."))
+            {
                 Show(() => controller.SelectedRegistry = "");
+            }
         }
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(2f).Enter())
         {
             gui.ScrollY();
             foreach (var registry in controller.Registries)
+            {
                 RegistryRow(gui, registry, height);
+            }
         }
     }
 
@@ -193,11 +213,24 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     void Selectable(Gui gui, bool selected, Action select)
     {
         var interactable = gui.GetInteractable();
-        if (gui.Pass != Pass.Pass2Render) return;
+        if (gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
 
-        if (selected) gui.DrawBackgroundRect(Theme.Hover, 3f);
-        else if (interactable.OnHover()) gui.DrawBackgroundRect(Theme.Chrome, 3f);
-        if (interactable.OnClick()) Show(select);
+        if (selected)
+        {
+            gui.DrawBackgroundRect(Theme.Hover, 3f);
+        }
+        else if (interactable.OnHover())
+        {
+            gui.DrawBackgroundRect(Theme.Chrome, 3f);
+        }
+
+        if (interactable.OnClick())
+        {
+            Show(select);
+        }
     }
 
     void Toolbar(Gui gui)
@@ -208,14 +241,20 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                    .ContentAlignY(0.5f).Enter())
         {
             if (Button(gui, "+", "bricks/add", 28f, "Add a brick by name, from a git repository, a folder or a .brick file."))
-                OpenMenu(ref addMenuOpen);
+            {
+                OpenMenu(out addMenuOpen);
+            }
 
             using (gui.Node(-1, height, "bricks/search").Expand().Enter())
+            {
                 search = gui.TextInput(search, width: 0, height: height, placeholder: "Search bricks",
                     fontSize: Theme.Text(12), padding: 5, id: "bricks/search/input");
+            }
 
             if (Button(gui, "…", "bricks/more", 28f, "Refresh the registries, restore the project's bricks, or update them all."))
-                OpenMenu(ref moreMenuOpen);
+            {
+                OpenMenu(out moreMenuOpen);
+            }
         }
 
         using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/filters").ExpandWidth().Direction(Axis.Horizontal)
@@ -223,7 +262,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         {
             foreach (var (value, label, width) in Filters)
             {
-                if (Chip(gui, label, $"bricks/filter/{value}", width, filter == value)) filter = value;
+                if (Chip(gui, label, $"bricks/filter/{value}", width, filter == value))
+                {
+                    filter = value;
+                }
             }
         }
 
@@ -232,12 +274,15 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         {
             foreach (var (value, label, width) in Categories)
             {
-                if (Chip(gui, label, $"bricks/category/{value}", width, Category == value)) Category = value;
+                if (Chip(gui, label, $"bricks/category/{value}", width, Category == value))
+                {
+                    Category = value;
+                }
             }
         }
     }
 
-    void OpenMenu(ref bool open)
+    void OpenMenu(out bool open)
     {
         menuAt = pointer;
         open = true;
@@ -280,7 +325,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     void Pick(bool folder, string title) =>
         dialogs?.Pick(folder, title, path =>
         {
-            if (path is not null) _ = controller.AddFromSourceAsync($"file:{path}");
+            if (path is not null)
+            {
+                _ = controller.AddFromSourceAsync($"file:{path}");
+            }
         });
 
     void AddRow(Gui gui)
@@ -290,8 +338,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         using (gui.Node(-1, height, "bricks/addRow").ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Gap).Enter())
         {
             using (gui.Node(-1, height, "bricks/addRow/input").Expand().Enter())
+            {
                 addInput = gui.TextInput(addInput, width: 0, height: height, placeholder: addLabel ?? "",
                     fontSize: Theme.Text(12), padding: 5, id: "bricks/addRow/text");
+            }
 
             if (Button(gui, "Add", "bricks/addRow/add", 50f) && addInput.Trim().Length > 0)
             {
@@ -299,14 +349,23 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                 addLabel = null;
             }
 
-            if (Button(gui, "Cancel", "bricks/addRow/cancel", 60f)) addLabel = null;
+            if (Button(gui, "Cancel", "bricks/addRow/cancel", 60f))
+            {
+                addLabel = null;
+            }
         }
     }
 
     void Notice(Gui gui)
     {
-        if (controller.IsBusy) Line(gui, "Working…", Theme.InkDim);
-        else if (controller.Error is { } error) Line(gui, error, Theme.Error);
+        if (controller.IsBusy)
+        {
+            Line(gui, "Working…", Theme.InkDim);
+        }
+        else if (controller.Error is { } error)
+        {
+            Line(gui, error, Theme.Error);
+        }
     }
 
     void List(Gui gui)
@@ -318,17 +377,26 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             Group(gui, "In use", shown.Where(static b => b.State == BrickState.Enabled));
             Group(gui, "On this machine", shown.Where(static b => b.State == BrickState.Installed));
             Group(gui, "Available", shown.Where(static b => b.State == BrickState.Available));
-            if (shown.Count == 0) Line(gui, "No bricks match.", Theme.InkDim);
+            if (shown.Count == 0)
+            {
+                Line(gui, "No bricks match.", Theme.InkDim);
+            }
         }
     }
 
     void Group(Gui gui, string title, IEnumerable<CatalogBrick> bricks)
     {
         var rows = bricks.ToList();
-        if (rows.Count == 0) return;
+        if (rows.Count == 0)
+        {
+            return;
+        }
 
         Line(gui, $"{title} ({rows.Count})", Theme.Ink);
-        foreach (var brick in rows) Row(gui, brick);
+        foreach (var brick in rows)
+        {
+            Row(gui, brick);
+        }
     }
 
     void Row(Gui gui, CatalogBrick brick)
@@ -346,7 +414,9 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             using (gui.Node(Theme.Scale(18f), height, $"{id}/enabled").ContentAlignY(0.5f).Enter())
             {
                 if (gui.Checkbox(enabled, size: Theme.Scale(14f)) != enabled && !controller.IsBusy)
+                {
                     _ = enabled ? controller.DisableAsync(brick.Id) : controller.EnableAsync(brick);
+                }
             }
 
             using (gui.Node(-1, height, $"{id}/name").Expand().Direction(Axis.Vertical).Gap(2f).ContentAlignY(0.5f).Enter())
@@ -391,7 +461,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             var hot = interactable.OnHover();
 
             if (gui.Pass == Pass.Pass2Render)
+            {
                 gui.DrawBackgroundRect(active ? Theme.Hover : hot ? Theme.Chrome : Theme.Panel, 9f);
+            }
+
             gui.DrawText(label, Theme.Text(11f), active || hot ? Theme.Ink : Theme.InkDim);
 
             return gui.Pass == Pass.Pass2Render && interactable.OnClick();
@@ -409,9 +482,16 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render) gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(hot ? Theme.Hover : Theme.Chrome, 3f);
+            }
+
             gui.DrawText(label, Theme.Text(11f), hot ? Theme.Ink : Theme.InkDim);
-            if (tooltip is not null) gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);
+            if (tooltip is not null)
+            {
+                gui.Tooltip(gui.CurrentNode, tooltip, maxWidth: 320);
+            }
 
             return gui.Pass == Pass.Pass2Render && hot && interactable.OnClick();
         }

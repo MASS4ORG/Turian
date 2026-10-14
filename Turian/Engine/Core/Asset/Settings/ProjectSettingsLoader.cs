@@ -36,7 +36,10 @@ public static class ProjectSettingsLoader
     /// <returns>The settings assets found.</returns>
     public static IReadOnlyList<ProjectSettingsSource> FindSources(string assetsDirectory)
     {
-        if (string.IsNullOrWhiteSpace(assetsDirectory) || !Directory.Exists(assetsDirectory)) return [];
+        if (string.IsNullOrWhiteSpace(assetsDirectory) || !Directory.Exists(assetsDirectory))
+        {
+            return [];
+        }
 
         return ProjectAsset.Load(assetsDirectory) is { } project
             ? Registered(project, new AssetSourceIndex(ProjectDirectory(assetsDirectory)))
@@ -54,7 +57,10 @@ public static class ProjectSettingsLoader
         ProjectSettingsCollection? overrides = null)
     {
         var sources = FindSources(assetsDirectory).DistinctBy(static source => source.Kind).ToList();
-        if (overrides is null || !Directory.Exists(assetsDirectory)) return sources;
+        if (overrides is null || !Directory.Exists(assetsDirectory))
+        {
+            return sources;
+        }
 
         foreach (var replacement in Registered(overrides, new AssetSourceIndex(ProjectDirectory(assetsDirectory)))
                      .DistinctBy(static source => source.Kind))
@@ -80,7 +86,10 @@ public static class ProjectSettingsLoader
             try
             {
                 // Through the index, so a variant reads its bases by id.
-                if (index.LoadFile(source.SourcePath) is ProjectSettingsAsset loaded) settings.Loaded.Use(loaded);
+                if (index.LoadFile(source.SourcePath) is ProjectSettingsAsset loaded)
+                {
+                    settings.Loaded.Use(loaded);
+                }
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException
                                            or InvalidOperationException)
@@ -127,7 +136,10 @@ public static class ProjectSettingsLoader
         }
 
         settings.Loaded.Clear();
-        if (loader is null) return;
+        if (loader is null)
+        {
+            return;
+        }
 
         foreach (var assetId in ReadIndex(content.ReadAllText(IndexFileName)))
         {
@@ -135,7 +147,9 @@ public static class ProjectSettingsLoader
             {
                 if (loader.LoadContentAsync<ProjectSettingsAsset>(assetId).GetAwaiter().GetResult()
                     is { } loaded)
+                {
                     settings.Loaded.Use(loaded);
+                }
             }
             catch (Exception ex) when (ex is IOException or JsonException)
             {
@@ -174,18 +188,27 @@ public static class ProjectSettingsLoader
     /// <returns>The settings assets found.</returns>
     public static IReadOnlyList<ProjectSettingsSource> Search(string assetsDirectory)
     {
-        if (string.IsNullOrWhiteSpace(assetsDirectory) || !Directory.Exists(assetsDirectory)) return [];
+        if (string.IsNullOrWhiteSpace(assetsDirectory) || !Directory.Exists(assetsDirectory))
+        {
+            return [];
+        }
 
         var preferred = Path.Combine(assetsDirectory, PreferredFolderName) + Path.DirectorySeparatorChar;
         var found = new List<ProjectSettingsSource>();
 
         foreach (var sourcePath in DataAssetSources(assetsDirectory))
         {
-            if (PeekKind(sourcePath) is not { } kind) continue;
+            if (PeekKind(sourcePath) is not { } kind)
+            {
+                continue;
+            }
 
             try
             {
-                if (Asset.Load($"{sourcePath}.meta") is { } meta) found.Add(new(kind, sourcePath, meta.Id));
+                if (Asset.Load($"{sourcePath}.meta") is { } meta)
+                {
+                    found.Add(new(kind, sourcePath, meta.Id));
+                }
             }
             catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
             {
@@ -207,7 +230,9 @@ public static class ProjectSettingsLoader
         foreach (var reference in collection.Settings.Where(static r => !r.IsEmpty))
         {
             if (index.PathOf(reference.AssetId) is { } path && PeekKind(path) is { } kind)
+            {
                 found.Add(new(kind, path, reference.AssetId));
+            }
         }
 
         return found;
@@ -225,7 +250,10 @@ public static class ProjectSettingsLoader
         try
         {
             var reader = new Utf8JsonReader(File.ReadAllBytes(sourcePath));
-            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return null;
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
 
             while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
             {

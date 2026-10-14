@@ -25,7 +25,10 @@ public sealed class PrefabOverrideTracker(Func<Guid, string?> loadPrefab, TimeSp
     public void Track(Node? node)
     {
         var root = node is null ? null : OutermostInstance(node);
-        if (ReferenceEquals(root, instanceRoot)) return;
+        if (ReferenceEquals(root, instanceRoot))
+        {
+            return;
+        }
 
         instanceRoot = root;
         diff = null;
@@ -40,7 +43,11 @@ public sealed class PrefabOverrideTracker(Func<Guid, string?> loadPrefab, TimeSp
     {
         get
         {
-            if (instanceRoot is null) return null;
+            if (instanceRoot is null)
+            {
+                return null;
+            }
+
             if (stale && (diff is null || sinceRefresh.Elapsed >= minimumInterval))
             {
                 diff = Compute(instanceRoot);
@@ -73,7 +80,13 @@ public sealed class PrefabOverrideTracker(Func<Guid, string?> loadPrefab, TimeSp
 
         Node? outermost = null;
         for (var current = node; current is not null; current = current.Parent)
-            if (current.PrefabInstance is not null) outermost = current;
+        {
+            if (current.PrefabInstance is not null)
+            {
+                outermost = current;
+            }
+        }
+
         return outermost;
     }
 

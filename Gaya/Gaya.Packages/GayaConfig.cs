@@ -15,9 +15,15 @@ public static class GayaConfig
         get
         {
             if (Environment.GetEnvironmentVariable(HomeVariable) is { Length: > 0 } directory)
+            {
                 return Path.GetFullPath(directory);
+            }
+
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (string.IsNullOrEmpty(home)) home = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (string.IsNullOrEmpty(home))
+            {
+                home = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            }
 
             return Path.Combine(string.IsNullOrEmpty(home) ? Path.GetTempPath() : home, ".gaya");
         }

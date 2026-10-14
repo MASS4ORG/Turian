@@ -19,19 +19,23 @@ sealed class UserAssemblyLoadContext : AssemblyLoadContext
         probingDirectory = Path.GetDirectoryName(Path.GetFullPath(assemblyPath));
     }
 
-    protected override Assembly? Load(AssemblyName assemblyName)
+    protected override ReflectionAssembly? Load(AssemblyName assemblyName)
     {
         if (resolver != null)
         {
             var path = resolver.ResolveAssemblyToPath(assemblyName);
             if (path != null)
+            {
                 return LoadFromAssemblyPath(path);
+            }
         }
 
         // Sibling user assemblies are emitted without a deps.json, so the resolver does not know them.
         if (probingDirectory != null && assemblyName.Name is { } name
             && Path.Combine(probingDirectory, $"{name}.dll") is var sibling && File.Exists(sibling))
+        {
             return LoadFromAssemblyPath(sibling);
+        }
 
         try { return Default.LoadFromAssemblyName(assemblyName); }
         catch { /* fallthrough */ }
@@ -45,7 +49,9 @@ sealed class UserAssemblyLoadContext : AssemblyLoadContext
         {
             var path = resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
             if (path != null)
+            {
                 return LoadUnmanagedDllFromPath(path);
+            }
         }
 
         return base.LoadUnmanagedDll(unmanagedDllName);

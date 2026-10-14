@@ -12,8 +12,6 @@ public sealed record UnityImportTarget(string Folder, string MetaRoot);
 /// </summary>
 public static class UnityPackageImporter
 {
-    static readonly string[] TextureExtensions = [".png", ".jpg", ".jpeg", ".tga", ".bmp", ".psd", ".gif", ".hdr"];
-
     static readonly (string[] Extensions, string Reason)[] Skipped =
     [
         ([".cs"], "C# written against UnityEngine; port the script to Turian's Component API"),
@@ -47,15 +45,23 @@ public static class UnityPackageImporter
             // Everything other assets can point at goes first, so a material finds the texture it names.
             foreach (var asset in assets.Where(static a => a.AssetFile is not null)
                          .OrderBy(static a => Kind(a.Pathname)).ThenBy(static a => a.Pathname, StringComparer.Ordinal))
+            {
                 ImportAsset(asset, context);
+            }
 
             if (report.Converted.Count > 0 || report.Skipped.Count > 0)
+            {
                 report.Notes.Add("Unity and Turian both use +Y up and +Z forward, so positions and rotations were copied as they are.");
+            }
+
             return report;
         }
         finally
         {
-            if (Directory.Exists(scratch)) Directory.Delete(scratch, recursive: true);
+            if (Directory.Exists(scratch))
+            {
+                Directory.Delete(scratch, recursive: true);
+            }
         }
     }
 
@@ -111,8 +117,15 @@ public static class UnityPackageImporter
         meta.RelativePath = context.MetaPath(target);
         var notes = new List<string>();
 
-        if (meta is TextureAsset texture && asset.MetaText is not null) ApplyTextureSettings(texture, asset.MetaText, notes);
-        if (asset.MetaText is not null) ApplyLabels(meta, asset.MetaText);
+        if (meta is TextureAsset texture && asset.MetaText is not null)
+        {
+            ApplyTextureSettings(texture, asset.MetaText, notes);
+        }
+
+        if (asset.MetaText is not null)
+        {
+            ApplyLabels(meta, asset.MetaText);
+        }
 
         context.WriteMeta(target, meta);
         context.Report.Converted.Add(new UnityImportEntry(asset.Pathname, context.Relative(target), notes.Count == 0 ? null : string.Join("; ", notes)));
@@ -122,14 +135,26 @@ public static class UnityPackageImporter
     static void ApplyTextureSettings(TextureAsset texture, string metaText, List<string> notes)
     {
         var importer = UnityYaml.Parse(metaText)["TextureImporter"];
-        if (importer is null) return;
+        if (importer is null)
+        {
+            return;
+        }
 
-        if (importer["sRGBTexture"] is { } srgb) texture.IsSrgb = srgb.Long(1) != 0;
-        if (importer["mipmaps"]?["enableMipMap"] is { } mips) texture.GenerateMips = mips.Long(1) != 0;
+        if (importer["sRGBTexture"] is { } srgb)
+        {
+            texture.IsSrgb = srgb.Long(1) != 0;
+        }
+
+        if (importer["mipmaps"]?["enableMipMap"] is { } mips)
+        {
+            texture.GenerateMips = mips.Long(1) != 0;
+        }
 
         // Unity's default limit is 2048, which is not a choice somebody made.
         if (importer["maxTextureSize"] is { } size && size.Long(2048) is var limit and not 2048)
+        {
             texture.ImportSettings.MaxResolution = (int)limit;
+        }
 
         // textureType 1 is a normal map, which is not color data.
         if (importer["textureType"]?.Long() == 1)
@@ -141,7 +166,10 @@ public static class UnityPackageImporter
 
     static void ApplyLabels(Asset meta, string metaText)
     {
-        if (UnityYaml.Parse(metaText)["labels"] is { } labels) meta.Labels.AddRange(labels.Items.Select(static l => l.Text).Where(static l => l.Length > 0));
+        if (UnityYaml.Parse(metaText)["labels"] is { } labels)
+        {
+            meta.Labels.AddRange(labels.Items.Select(static l => l.Text).Where(static l => l.Length > 0));
+        }
     }
 
     /// <summary>Unity's <c>Assets/…</c> path without its first segment, which is the project's own folder.</summary>
@@ -177,7 +205,9 @@ sealed class UnityImportContext(UnityImportTarget target, UnityImportReport repo
     {
         var path = Path.GetFullPath(Path.Combine(target.Folder, relative));
         if (!path.StartsWith(Path.GetFullPath(target.Folder) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+        {
             throw new InvalidDataException($"{relative} would be written outside the destination.");
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         return path;

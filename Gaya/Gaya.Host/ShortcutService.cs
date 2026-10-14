@@ -55,8 +55,14 @@ public sealed class ShortcutService : IShortcutService
         ArgumentNullException.ThrowIfNull(binding);
 
         var existing = defaults.FindIndex(b => b.CommandId == binding.CommandId && b.Context == binding.Context);
-        if (existing >= 0) defaults[existing] = binding;
-        else defaults.Add(binding);
+        if (existing >= 0)
+        {
+            defaults[existing] = binding;
+        }
+        else
+        {
+            defaults.Add(binding);
+        }
 
         Changed?.Invoke();
     }
@@ -64,7 +70,10 @@ public sealed class ShortcutService : IShortcutService
     /// <inheritdoc />
     public void Remove(string commandId)
     {
-        if (defaults.RemoveAll(binding => binding.CommandId == commandId) > 0) Changed?.Invoke();
+        if (defaults.RemoveAll(binding => binding.CommandId == commandId) > 0)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <inheritdoc />
@@ -84,9 +93,17 @@ public sealed class ShortcutService : IShortcutService
         KeyModifiers extraModifiers = KeyModifiers.None)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if (IsCapturing || !pending.IsNone) return false;
+        if (IsCapturing || !pending.IsNone)
+        {
+            return false;
+        }
+
         var binding = HeldBinding(commandId, activePanelId);
-        if (binding is null || !MatchesHeld(input, binding.Stroke, extraModifiers)) return false;
+        if (binding is null || !MatchesHeld(input, binding.Stroke, extraModifiers))
+        {
+            return false;
+        }
+
         var stroke = new KeyStroke(binding.Stroke.Key, HeldModifiers(input));
         var best = Best(entry => entry.Effective?.Stroke == stroke, activePanelId)
                    ?? Best(entry => entry.Effective?.Stroke == binding.Stroke, activePanelId);
@@ -99,13 +116,21 @@ public sealed class ShortcutService : IShortcutService
                                                && binding.Context == activePanelId)
                        ?? defaults.Find(binding => binding.CommandId == commandId && binding.IsContinuous
                                                    && ShortcutContexts.IsGlobal(binding.Context));
-        if (declared is null) return null;
+        if (declared is null)
+        {
+            return null;
+        }
+
         return Effective(declared) is { Second: null } effective && !effective.Stroke.IsNone ? effective : null;
     }
 
     static bool MatchesHeld(IInputHandler input, KeyStroke stroke, KeyModifiers extraModifiers)
     {
-        if (!input.IsKeyDown(stroke.Key)) return false;
+        if (!input.IsKeyDown(stroke.Key))
+        {
+            return false;
+        }
+
         var modifiers = HeldModifiers(input);
         var required = stroke.Modifiers;
         return (modifiers & required) == required && (modifiers & ~(required | extraModifiers)) == 0;
@@ -115,11 +140,20 @@ public sealed class ShortcutService : IShortcutService
     {
         var result = KeyModifiers.None;
         if (input.IsKeyDown(KeyboardKey.LeftControl) || input.IsKeyDown(KeyboardKey.RightControl))
+        {
             result |= KeyModifiers.Ctrl;
+        }
+
         if (input.IsKeyDown(KeyboardKey.LeftShift) || input.IsKeyDown(KeyboardKey.RightShift))
+        {
             result |= KeyModifiers.Shift;
+        }
+
         if (input.IsKeyDown(KeyboardKey.LeftAlt) || input.IsKeyDown(KeyboardKey.RightAlt))
+        {
             result |= KeyModifiers.Alt;
+        }
+
         return result;
     }
 
@@ -128,7 +162,9 @@ public sealed class ShortcutService : IShortcutService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(commandId);
         if (second is not null && defaults.Exists(binding => binding.CommandId == commandId && binding.IsContinuous))
+        {
             throw new ArgumentException("Continuous shortcuts require a single stroke.", nameof(second));
+        }
 
         overrides.Bindings[commandId] = stroke.IsNone
             ? string.Empty
@@ -140,14 +176,21 @@ public sealed class ShortcutService : IShortcutService
     /// <inheritdoc />
     public void Reset(string commandId)
     {
-        if (!overrides.Bindings.Remove(commandId)) return;
+        if (!overrides.Bindings.Remove(commandId))
+        {
+            return;
+        }
+
         Persist();
     }
 
     /// <inheritdoc />
     public void ResetAll()
     {
-        if (overrides.Bindings.Count == 0) return;
+        if (overrides.Bindings.Count == 0)
+        {
+            return;
+        }
 
         overrides.Bindings.Clear();
         Persist();
@@ -155,17 +198,20 @@ public sealed class ShortcutService : IShortcutService
 
     /// <inheritdoc />
     public IReadOnlyList<ShortcutConflict> Conflicts =>
-        [.. Entries.Where(entry => entry.Effective is not null)
-            .GroupBy(entry => (entry.Display, entry.Context))
-            .Select(group => new ShortcutConflict(group.Key.Display, group.Key.Context,
-                [.. group.Select(entry => entry.CommandId)]))
+        [.. Entries.Where(static entry => entry.Effective is not null)
+            .GroupBy(static entry => (entry.Display, entry.Context))
+            .Select(static group => new ShortcutConflict(group.Key.Display, group.Key.Context,
+                [.. group.Select(static entry => entry.CommandId)]))
             .Concat(GlobalShadowConflicts())
-            .Where(conflict => conflict.CommandIds.Count > 1)];
+            .Where(static conflict => conflict.CommandIds.Count > 1)];
 
     /// <inheritdoc />
     public IReadOnlyList<string> ConflictsFor(string commandId, KeyStroke stroke, KeyStroke? second = null)
     {
-        if (stroke.IsNone) return [];
+        if (stroke.IsNone)
+        {
+            return [];
+        }
 
         var display = new KeyBinding(commandId, stroke, second).Display;
         var context = defaults.Find(binding => binding.CommandId == commandId)?.Context
@@ -189,7 +235,10 @@ public sealed class ShortcutService : IShortcutService
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        if (KeyStroke.Read(input) is not { } stroke) return null;
+        if (KeyStroke.Read(input) is not { } stroke)
+        {
+            return null;
+        }
 
         if (!pending.IsNone)
         {
@@ -198,7 +247,9 @@ public sealed class ShortcutService : IShortcutService
 
             if (Best(entry => entry.Effective is { Second: { } second }
                               && entry.Effective.Stroke == armed && second == stroke, activePanelId) is { } chord)
+            {
                 return chord.CommandId;
+            }
         }
 
         if (Best(entry => !entry.Default.IsContinuous
@@ -238,8 +289,14 @@ public sealed class ShortcutService : IShortcutService
     KeyBinding? Effective(KeyBinding declared)
     {
         if (!overrides.Bindings.TryGetValue(declared.CommandId, out var stored))
+        {
             return declared.Stroke.IsNone ? null : declared;
-        if (stored.Length == 0) return null;
+        }
+
+        if (stored.Length == 0)
+        {
+            return null;
+        }
 
         if (!KeyBinding.TryParseSequence(stored, out var strokes))
         {

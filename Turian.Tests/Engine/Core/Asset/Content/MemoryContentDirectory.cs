@@ -29,7 +29,11 @@ sealed class MemoryContentDirectory : IContentDirectory
     /// <inheritdoc />
     public IContentSource Open(string path)
     {
-        if (!contents.TryGetValue(path, out var bytes)) throw new FileNotFoundException("No content.", path);
+        if (!contents.TryGetValue(path, out var bytes))
+        {
+            throw new FileNotFoundException("No content.", path);
+        }
+
         var source = new MemoryContentSource(bytes, Identity(path));
         Opened.Add(source);
         return source;
@@ -69,7 +73,11 @@ sealed class MemoryContentSource(byte[] bytes, ContentIdentity identity) : ICont
     public int ReadAt(long offset, Span<byte> buffer)
     {
         ObjectDisposedException.ThrowIf(Disposed, this);
-        if (offset >= bytes.Length) return 0;
+        if (offset >= bytes.Length)
+        {
+            return 0;
+        }
+
         var count = (int)Math.Min(buffer.Length, bytes.Length - offset);
         bytes.AsSpan((int)offset, count).CopyTo(buffer);
         return count;

@@ -115,7 +115,7 @@ public class FbxModelImporterTests
         {
             var blob = ImportBlob(directory.FullName);
 
-            Assert.Equal([0, 1], blob.SubMeshes.Select(subMesh => subMesh.MaterialIndex).ToArray());
+            Assert.Equal([0, 1], blob.SubMeshes.Select(static subMesh => subMesh.MaterialIndex).ToArray());
         }
         finally
         {
@@ -154,8 +154,8 @@ public class FbxModelImporterTests
         {
             var blob = ImportBlob(directory.FullName);
 
-            Assert.Contains(blob.Vertices, vertex => vertex.Position.Y > 0f);
-            Assert.Contains(blob.Vertices, vertex => vertex.Position.Y < 0f);
+            Assert.Contains(blob.Vertices, static vertex => vertex.Position.Y > 0f);
+            Assert.Contains(blob.Vertices, static vertex => vertex.Position.Y < 0f);
             Assert.Equal(-0.5f, blob.SubMeshes[0].Bounds.Min.Y, 3);
             Assert.Equal(0.5f, blob.SubMeshes[0].Bounds.Max.Y, 3);
         }
@@ -215,7 +215,7 @@ public class FbxModelImporterTests
             Path.Combine(Path.GetDirectoryName(FixturePath)!, "Textures", "red_BaseColor.dds"));
 
         Assert.Contains(expected, context.Requested);
-        Assert.All(context.Requested, path => Assert.True(Path.IsPathRooted(path)));
+        Assert.All(context.Requested, static path => Assert.True(Path.IsPathRooted(path)));
     }
 
     /// <summary>Verifies that textures are bound to their own asset rather than to a child of the model.</summary>

@@ -20,7 +20,11 @@ public static class GroundGrid
         ArgumentNullException.ThrowIfNull(gizmos);
         settings ??= Defaults;
         colors ??= DefaultColors;
-        if (!settings.Visible) return;
+        if (!settings.Visible)
+        {
+            return;
+        }
+
         var state = (gizmos.Color, gizmos.Thickness, gizmos.Matrix, gizmos.DepthTest);
         try
         {

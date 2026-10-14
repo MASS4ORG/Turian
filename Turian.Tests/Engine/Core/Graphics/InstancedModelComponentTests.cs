@@ -12,7 +12,7 @@ public sealed class InstancedModelComponentTests
 
     sealed class FixedDevice(Model model) : IRenderDevice
     {
-        public Model? GetModel(Guid modelAssetId, AssetDatabase assets) => model;
+        public Model GetModel(Guid modelAssetId, AssetDatabase assets) => model;
     }
 
     static MeshInstance At(float x, float z = 10f) => new(new Transform { Position = new Vector3(x, 0f, z) });

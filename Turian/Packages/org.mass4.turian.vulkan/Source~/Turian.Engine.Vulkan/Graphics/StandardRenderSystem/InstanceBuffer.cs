@@ -29,13 +29,19 @@ sealed class InstanceBuffer : IDisposable
             : new Buffer(vulkan, InstanceData.Size, (uint)capacity,
                 BufferUsageFlags.StorageBufferBit | BufferUsageFlags.TransferDstBit, MemoryPropertyFlags.DeviceLocalBit);
         if (hostVisible && Buffer.Map() != Result.Success)
+        {
             throw new VulkanException("Instance buffer mapping failed.");
+        }
+
         pool = new DescriptorPoolBuilder(vulkan.Vk, vulkan.Device).SetMaxSets(1)
             .AddPoolSize(DescriptorType.StorageBuffer, 1).Build();
         DescriptorSet set = default;
         if (!new DescriptorSetWriter(vulkan.Vk, vulkan.Device, layout).WriteBuffer(0, Buffer.DescriptorInfo())
                 .Build(pool, layout.GetDescriptorSetLayout(), ref set))
+        {
             throw new VulkanException("Instance descriptor allocation failed.");
+        }
+
         Set = set;
     }
 
@@ -48,7 +54,11 @@ sealed class InstanceBuffer : IDisposable
     public static int Grow(int current, int required)
     {
         var capacity = Math.Max(current, minimumCapacity);
-        while (capacity < required) capacity *= 2;
+        while (capacity < required)
+        {
+            capacity *= 2;
+        }
+
         return capacity;
     }
 

@@ -21,7 +21,7 @@ public class CameraComponentTests
         var loaded = Serializer.LoadData<Node>(json)!.GetComponent<CameraComponent>()!;
         Assert.Equal(new Color(1f, 0.5f, 0.25f, 0.75f), loaded.BackgroundColor);
 
-        var older = System.Text.RegularExpressions.Regex.Replace(json, "\"BackgroundColor\":\\s*\\{[^}]*\\},?", "");
+        var older = Regex.Replace(json, "\"BackgroundColor\":\\s*\\{[^}]*\\},?", "");
         Assert.DoesNotContain("BackgroundColor", older);
         Assert.Equal(new CameraComponent().BackgroundColor,
             Serializer.LoadData<Node>(older)!.GetComponent<CameraComponent>()!.BackgroundColor);

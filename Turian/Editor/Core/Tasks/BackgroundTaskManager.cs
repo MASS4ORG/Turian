@@ -41,7 +41,10 @@ public sealed partial class BackgroundTaskManager
     {
         get
         {
-            lock (gate) return tasks.Count(t => !IsTerminal(t.Status));
+            lock (gate)
+            {
+                return tasks.Count(static t => !IsTerminal(t.Status));
+            }
         }
     }
 
@@ -50,7 +53,10 @@ public sealed partial class BackgroundTaskManager
     {
         get
         {
-            lock (gate) return tasks.Count;
+            lock (gate)
+            {
+                return tasks.Count;
+            }
         }
     }
 
@@ -66,8 +72,13 @@ public sealed partial class BackgroundTaskManager
             {
                 var locks = EditorLocks.None;
                 foreach (var t in tasks)
+                {
                     if (!IsTerminal(t.Status))
+                    {
                         locks |= t.Locks;
+                    }
+                }
+
                 return locks;
             }
 
@@ -79,7 +90,10 @@ public sealed partial class BackgroundTaskManager
     {
         get
         {
-            lock (gate) return tasks.Any(t => !IsTerminal(t.Status) && t.BlocksUi);
+            lock (gate)
+            {
+                return tasks.Any(static t => !IsTerminal(t.Status) && t.BlocksUi);
+            }
         }
     }
 
@@ -88,7 +102,10 @@ public sealed partial class BackgroundTaskManager
     {
         get
         {
-            lock (gate) return tasks.FirstOrDefault(t => !IsTerminal(t.Status) && t.BlocksUi)?.ToSnapshot();
+            lock (gate)
+            {
+                return tasks.FirstOrDefault(static t => !IsTerminal(t.Status) && t.BlocksUi)?.ToSnapshot();
+            }
         }
     }
 
@@ -201,9 +218,12 @@ public sealed partial class BackgroundTaskManager
 
     /// <summary>Moves a queued task to running. No-op for unknown or already-running tasks.</summary>
     /// <param name="id">The task to start.</param>
-    public void Start(long id) => Mutate(id, t =>
+    public void Start(long id) => Mutate(id, static t =>
     {
-        if (t.Status == BackgroundTaskStatus.Queued) t.Status = BackgroundTaskStatus.Running;
+        if (t.Status == BackgroundTaskStatus.Queued)
+        {
+            t.Status = BackgroundTaskStatus.Running;
+        }
     });
 
     /// <summary>
@@ -215,9 +235,16 @@ public sealed partial class BackgroundTaskManager
     /// <param name="note">Short detail line, or empty to leave it unchanged.</param>
     public void SetProgress(long id, float fraction, string note = "") => Mutate(id, t =>
     {
-        if (t.Status == BackgroundTaskStatus.Queued) t.Status = BackgroundTaskStatus.Running;
+        if (t.Status == BackgroundTaskStatus.Queued)
+        {
+            t.Status = BackgroundTaskStatus.Running;
+        }
+
         t.Progress = Math.Clamp(fraction, 0, 1);
-        if (!string.IsNullOrEmpty(note)) t.Note = note;
+        if (!string.IsNullOrEmpty(note))
+        {
+            t.Note = note;
+        }
     });
 
     /// <summary>
@@ -229,7 +256,11 @@ public sealed partial class BackgroundTaskManager
     /// <param name="total">Items in the batch.</param>
     public void SetUnits(long id, long done, long total) => Mutate(id, t =>
     {
-        if (t.Status == BackgroundTaskStatus.Queued) t.Status = BackgroundTaskStatus.Running;
+        if (t.Status == BackgroundTaskStatus.Queued)
+        {
+            t.Status = BackgroundTaskStatus.Running;
+        }
+
         t.UnitsDone = Math.Max(0, done);
         t.UnitsTotal = Math.Max(0, total);
     });
@@ -254,8 +285,12 @@ public sealed partial class BackgroundTaskManager
         lock (gate)
         {
             foreach (var t in tasks)
+            {
                 if (t.Id == id || IsDescendantOf(t, id))
+                {
                     t.CancelRequested = true;
+                }
+            }
         }
 
         Changed?.Invoke();
@@ -266,7 +301,10 @@ public sealed partial class BackgroundTaskManager
     /// <returns>True when the operation should abort.</returns>
     public bool IsCancelRequested(long id)
     {
-        lock (gate) return Find(id)?.CancelRequested ?? false;
+        lock (gate)
+        {
+            return Find(id)?.CancelRequested ?? false;
+        }
     }
 
     /// <summary>
@@ -279,7 +317,11 @@ public sealed partial class BackgroundTaskManager
     {
         lock (gate)
         {
-            if (Find(id) is not { } t) return false;
+            if (Find(id) is not { } t)
+            {
+                return false;
+            }
+
             var pending = t.RerunRequested;
             t.RerunRequested = false;
             return pending;
@@ -304,7 +346,10 @@ public sealed partial class BackgroundTaskManager
     /// <returns>An immutable view, or null.</returns>
     public BackgroundTask? Get(long id)
     {
-        lock (gate) return Find(id)?.ToSnapshot();
+        lock (gate)
+        {
+            return Find(id)?.ToSnapshot();
+        }
     }
 
     /// <summary>
@@ -314,7 +359,10 @@ public sealed partial class BackgroundTaskManager
     /// <returns>All tasks, active and finished.</returns>
     public IReadOnlyList<BackgroundTask> Snapshot()
     {
-        lock (gate) return [.. tasks.Select(t => t.ToSnapshot())];
+        lock (gate)
+        {
+            return [.. tasks.Select(static t => t.ToSnapshot())];
+        }
     }
 
     /// <summary>The active task holding any of <paramref name="wanted"/>, for naming the blocker.</summary>
@@ -323,7 +371,9 @@ public sealed partial class BackgroundTaskManager
     public BackgroundTask? LockOwner(EditorLocks wanted)
     {
         lock (gate)
+        {
             return tasks.FirstOrDefault(t => !IsTerminal(t.Status) && (t.Locks & wanted) != 0)?.ToSnapshot();
+        }
     }
 
     /// <summary>
@@ -333,7 +383,10 @@ public sealed partial class BackgroundTaskManager
     /// <returns>The id, or null when nothing is ready.</returns>
     public long? NextReady()
     {
-        lock (gate) return tasks.FirstOrDefault(t => t.Status == BackgroundTaskStatus.Queued)?.Id;
+        lock (gate)
+        {
+            return tasks.FirstOrDefault(static t => t.Status == BackgroundTaskStatus.Queued)?.Id;
+        }
     }
 
     /// <summary>
@@ -348,12 +401,22 @@ public sealed partial class BackgroundTaskManager
         {
             foreach (var t in tasks)
             {
-                if (t is { Status: BackgroundTaskStatus.Running, StartedAt: null }) t.StartedAt = now;
-                if (IsTerminal(t.Status) && t.FinishedAt is null) t.FinishedAt = now;
+                if (t is { Status: BackgroundTaskStatus.Running, StartedAt: null })
+                {
+                    t.StartedAt = now;
+                }
+
+                if (IsTerminal(t.Status) && t.FinishedAt is null)
+                {
+                    t.FinishedAt = now;
+                }
             }
 
             ResolveDependenciesLocked();
-            if (Retention > TimeSpan.Zero) ReclaimLocked(now);
+            if (Retention > TimeSpan.Zero)
+            {
+                ReclaimLocked(now);
+            }
         }
     }
 
@@ -364,14 +427,22 @@ public sealed partial class BackgroundTaskManager
     /// </summary>
     public void ResolveDependencies()
     {
-        lock (gate) ResolveDependenciesLocked();
+        lock (gate)
+        {
+            ResolveDependenciesLocked();
+        }
+
         Changed?.Invoke();
     }
 
     /// <summary>Removes every task that has reached a terminal state.</summary>
     public void ClearFinished()
     {
-        lock (gate) tasks.RemoveAll(t => IsTerminal(t.Status));
+        lock (gate)
+        {
+            tasks.RemoveAll(static t => IsTerminal(t.Status));
+        }
+
         Changed?.Invoke();
     }
 
@@ -395,7 +466,11 @@ public sealed partial class BackgroundTaskManager
     {
         for (var parent = task.ParentId; parent != 0;)
         {
-            if (parent == ancestorId) return true;
+            if (parent == ancestorId)
+            {
+                return true;
+            }
+
             parent = Find(parent)?.ParentId ?? 0;
         }
 
@@ -406,7 +481,11 @@ public sealed partial class BackgroundTaskManager
     {
         lock (gate)
         {
-            if (Find(id) is not { } t) return;
+            if (Find(id) is not { } t)
+            {
+                return;
+            }
+
             change(t);
         }
 
@@ -423,20 +502,30 @@ public sealed partial class BackgroundTaskManager
             t.UnitsDone = t.UnitsTotal;
         }
 
-        if (!string.IsNullOrEmpty(note)) t.Note = note;
+        if (!string.IsNullOrEmpty(note))
+        {
+            t.Note = note;
+        }
     });
 
     void ResolveDependenciesLocked()
     {
         foreach (var t in tasks)
         {
-            if (t.Status != BackgroundTaskStatus.Blocked) continue;
+            if (t.Status != BackgroundTaskStatus.Blocked)
+            {
+                continue;
+            }
 
             var allDone = true;
             var anyBroken = false;
             foreach (var depId in t.DependsOn)
             {
-                if (Find(depId) is not { } dep) continue;
+                if (Find(depId) is not { } dep)
+                {
+                    continue;
+                }
+
                 switch (dep.Status)
                 {
                     case BackgroundTaskStatus.Completed: break;

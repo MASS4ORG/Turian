@@ -18,14 +18,23 @@ public static class StudioThemeBricks
 
         var initial = Scan(studio, logger);
         var loaded = initial is null ? [] : Libraries(initial);
-        if (initial is not null) themes.SetBrickFolders(PackagedPlugins.ThemeFolders(initial));
+        if (initial is not null)
+        {
+            themes.SetBrickFolders(PackagedPlugins.ThemeFolders(initial));
+        }
 
         studio.Applied += _ =>
         {
-            if (Scan(studio, logger) is not { } packages) return;
+            if (Scan(studio, logger) is not { } packages)
+            {
+                return;
+            }
+
             themes.QueueBrickFolders(PackagedPlugins.ThemeFolders(packages));
             foreach (var added in Libraries(packages).Except(loaded))
+            {
                 logger.LogInformation("Studio brick {Package} adds plugins; restart to load them", added);
+            }
         };
     }
 
@@ -44,7 +53,7 @@ public static class StudioThemeBricks
 
     static HashSet<string> Libraries(IEnumerable<ResolvedPackage> packages) =>
     [
-        .. packages.Where(package => Directory.Exists(Path.Combine(package.RootPath, PackagedPlugins.LibraryDirectoryName)))
-            .Select(package => package.Id),
+        .. packages.Where(static package => Directory.Exists(Path.Combine(package.RootPath, PackagedPlugins.LibraryDirectoryName)))
+            .Select(static package => package.Id),
     ];
 }

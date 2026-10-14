@@ -10,7 +10,11 @@ static class GltfGeometryFixture
         var vertexBytes = MemoryMarshal.AsBytes(vertices.AsSpan()).ToArray();
         var indexBytes = MemoryMarshal.AsBytes(indices.AsSpan()).ToArray();
         var bounds = Bounds.Empty;
-        foreach (var vertex in vertices) bounds = bounds.Encapsulate(vertex.Position);
+        foreach (var vertex in vertices)
+        {
+            bounds = bounds.Encapsulate(vertex.Position);
+        }
+
         var json = new
         {
             asset = new { version = "2.0" },
@@ -20,7 +24,7 @@ static class GltfGeometryFixture
                 new { buffer = 0, byteLength = vertexBytes.Length, byteStride = Vertex.SizeOf() },
                 new { buffer = 0, byteOffset = vertexBytes.Length, byteLength = indexBytes.Length },
             },
-            accessors = new object[]
+            accessors = new[]
             {
                 new { bufferView = 0, componentType = 5126, count = vertices.Length, type = "VEC3",
                     min = new[] { bounds.Min.X, bounds.Min.Y, bounds.Min.Z },
@@ -46,7 +50,11 @@ static class GltfGeometryFixture
         writer.Write((uint)padded);
         writer.Write(0x4e4f534au);
         writer.Write(text);
-        for (var i = text.Length; i < padded; i++) writer.Write((byte)' ');
+        for (var i = text.Length; i < padded; i++)
+        {
+            writer.Write((byte)' ');
+        }
+
         writer.Write((uint)(vertexBytes.Length + indexBytes.Length));
         writer.Write(0x004e4942u);
         writer.Write(vertexBytes);

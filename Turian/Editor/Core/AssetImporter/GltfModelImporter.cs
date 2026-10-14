@@ -20,7 +20,11 @@ public class GltfModelImporter : IAssetImporter
     /// <inheritdoc/>
     public bool IsValid(string filePath)
     {
-        if (string.IsNullOrWhiteSpace(filePath)) return false;
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return false;
+        }
+
         var extension = Path.GetExtension(filePath);
         return SupportedExtensions.Contains(extension, StringComparer.InvariantCultureIgnoreCase);
     }
@@ -76,7 +80,10 @@ public class GltfModelImporter : IAssetImporter
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        foreach (var buffer in ExternalBuffers(parentAssetId, filePath, root)) yield return buffer;
+        foreach (var buffer in ExternalBuffers(parentAssetId, filePath, root))
+        {
+            yield return buffer;
+        }
 
         // Map glTF texture index → image index (textures[].source)
         var textureToImage = BuildTextureToImageMap(root);
@@ -85,7 +92,10 @@ public class GltfModelImporter : IAssetImporter
 
         for (var i = 0; i < imageIds.Length; i++)
         {
-            if (!embedded[i]) continue;
+            if (!embedded[i])
+            {
+                continue;
+            }
 
             yield return new TextureAsset
             {
@@ -112,8 +122,14 @@ public class GltfModelImporter : IAssetImporter
     public byte[]? CreateChildAssetBinaryContent(Guid parentAssetId, Asset child, string filePath)
     {
         if (child.RelativePath.Contains("#buffer:", StringComparison.Ordinal))
+        {
             return LoadExternalBuffer(filePath, child.RelativePath);
-        if (child is not TextureAsset texture) return null;
+        }
+
+        if (child is not TextureAsset texture)
+        {
+            return null;
+        }
 
         var fragment = texture.RelativePath.LastIndexOf(imageFragment, StringComparison.Ordinal);
         return fragment >= 0 && int.TryParse(texture.RelativePath.AsSpan(fragment + imageFragment.Length), out var index)
@@ -123,12 +139,24 @@ public class GltfModelImporter : IAssetImporter
 
     static IEnumerable<Asset> ExternalBuffers(Guid parentId, string sourcePath, JsonElement root)
     {
-        if (!root.TryGetProperty("buffers", out var buffers)) yield break;
+        if (!root.TryGetProperty("buffers", out var buffers))
+        {
+            yield break;
+        }
+
         for (var i = 0; i < buffers.GetArrayLength(); i++)
         {
-            if (!buffers[i].TryGetProperty("uri", out var value)) continue;
+            if (!buffers[i].TryGetProperty("uri", out var value))
+            {
+                continue;
+            }
+
             var uri = value.GetString();
-            if (string.IsNullOrEmpty(uri) || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.IsNullOrEmpty(uri) || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             yield return new Asset
             {
                 Id = AssetIdFactory.Derive(parentId, $"buffer:{i}"),
@@ -152,7 +180,7 @@ public class GltfModelImporter : IAssetImporter
     /// an image embedded in a buffer or <c>data:</c> URI becomes a child of the model.
     /// </summary>
     /// <returns>
-    /// Asset ids indexed by image, <see cref="System.Guid.Empty"/> where an external file is missing, and
+    /// Asset ids indexed by image, <see cref="Guid.Empty"/> where an external file is missing, and
     /// which of them are embedded.
     /// </returns>
     static (Guid[] Ids, bool[] Embedded) ResolveImages(
@@ -162,7 +190,10 @@ public class GltfModelImporter : IAssetImporter
         HashSet<int> linearImages,
         IAssetImportContext context)
     {
-        if (!root.TryGetProperty("images", out var images)) return ([], []);
+        if (!root.TryGetProperty("images", out var images))
+        {
+            return ([], []);
+        }
 
         var directory = Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty;
         var ids = new Guid[images.GetArrayLength()];
@@ -201,32 +232,55 @@ public class GltfModelImporter : IAssetImporter
     static HashSet<int> CollectLinearImages(JsonElement root, int[] textureToImage)
     {
         var linear = new HashSet<int>();
-        if (!root.TryGetProperty("materials", out var materials)) return linear;
+        if (!root.TryGetProperty("materials", out var materials))
+        {
+            return linear;
+        }
 
         foreach (var mat in materials.EnumerateArray())
         {
             if (mat.TryGetProperty("pbrMetallicRoughness", out var pbr)
                 && pbr.TryGetProperty("metallicRoughnessTexture", out var mr))
+            {
                 Add(mr);
-            if (mat.TryGetProperty("normalTexture", out var nt)) Add(nt);
-            if (mat.TryGetProperty("occlusionTexture", out var ot)) Add(ot);
+            }
+
+            if (mat.TryGetProperty("normalTexture", out var nt))
+            {
+                Add(nt);
+            }
+
+            if (mat.TryGetProperty("occlusionTexture", out var ot))
+            {
+                Add(ot);
+            }
         }
 
         return linear;
 
         void Add(JsonElement texInfo)
         {
-            if (ImageIndex(texInfo, textureToImage) is { } imageIndex) linear.Add(imageIndex);
+            if (ImageIndex(texInfo, textureToImage) is { } imageIndex)
+            {
+                linear.Add(imageIndex);
+            }
         }
     }
 
     static int[] BuildTextureToImageMap(JsonElement root)
     {
-        if (!root.TryGetProperty("textures", out var textures)) return [];
+        if (!root.TryGetProperty("textures", out var textures))
+        {
+            return [];
+        }
+
         var map = new int[textures.GetArrayLength()];
         var i = 0;
         foreach (var tex in textures.EnumerateArray())
+        {
             map[i++] = tex.TryGetProperty("source", out var s) ? s.GetInt32() : -1;
+        }
+
         return map;
     }
 
@@ -247,30 +301,44 @@ public class GltfModelImporter : IAssetImporter
         if (mat.TryGetProperty("pbrMetallicRoughness", out var pbr))
         {
             if (pbr.TryGetProperty("baseColorFactor", out var bc) && bc.GetArrayLength() == 4)
+            {
                 asset.BaseColorFactor = new Vector4(
                     bc[0].GetSingle(), bc[1].GetSingle(), bc[2].GetSingle(), bc[3].GetSingle());
+            }
 
             if (pbr.TryGetProperty("metallicFactor", out var mf))
+            {
                 asset.MetallicFactor = mf.GetSingle();
+            }
 
             if (pbr.TryGetProperty("roughnessFactor", out var rf))
+            {
                 asset.RoughnessFactor = rf.GetSingle();
+            }
 
             asset.BaseColorTexture = TextureRef(pbr, "baseColorTexture", textureToImage, imageIds);
             asset.MetallicRoughnessTexture = TextureRef(pbr, "metallicRoughnessTexture", textureToImage, imageIds);
         }
 
         if (mat.TryGetProperty("emissiveFactor", out var ef) && ef.GetArrayLength() == 3)
+        {
             asset.EmissiveFactor = new Vector3(ef[0].GetSingle(), ef[1].GetSingle(), ef[2].GetSingle());
+        }
 
         if (mat.TryGetProperty("normalTexture", out var nt))
+        {
             asset.NormalTexture = TextureRefFromInfo(nt, textureToImage, imageIds);
+        }
 
         if (mat.TryGetProperty("occlusionTexture", out var ot))
+        {
             asset.OcclusionTexture = TextureRefFromInfo(ot, textureToImage, imageIds);
+        }
 
         if (mat.TryGetProperty("emissiveTexture", out var et))
+        {
             asset.EmissiveTexture = TextureRefFromInfo(et, textureToImage, imageIds);
+        }
 
         return asset;
     }
@@ -284,16 +352,28 @@ public class GltfModelImporter : IAssetImporter
 
     static AssetReference<TextureAsset>? TextureRefFromInfo(JsonElement texInfo, int[] textureToImage, Guid[] imageIds)
     {
-        if (ImageIndex(texInfo, textureToImage) is not { } imageIndex || imageIndex >= imageIds.Length) return null;
+        if (ImageIndex(texInfo, textureToImage) is not { } imageIndex || imageIndex >= imageIds.Length)
+        {
+            return null;
+        }
+
         var id = imageIds[imageIndex];
         return id == Guid.Empty ? null : new AssetReference<TextureAsset> { AssetId = id };
     }
 
     static int? ImageIndex(JsonElement texInfo, int[] textureToImage)
     {
-        if (!texInfo.TryGetProperty("index", out var idxElem)) return null;
+        if (!texInfo.TryGetProperty("index", out var idxElem))
+        {
+            return null;
+        }
+
         var textureIndex = idxElem.GetInt32();
-        if (textureIndex < 0 || textureIndex >= textureToImage.Length) return null;
+        if (textureIndex < 0 || textureIndex >= textureToImage.Length)
+        {
+            return null;
+        }
+
         var imageIndex = textureToImage[textureIndex];
         return imageIndex < 0 ? null : imageIndex;
     }
@@ -301,7 +381,10 @@ public class GltfModelImporter : IAssetImporter
     static IEnumerable<string> CopyDependencies(string gltfSourcePath, string importDirectory)
     {
         var sourceDir = Path.GetDirectoryName(gltfSourcePath);
-        if (string.IsNullOrEmpty(sourceDir)) yield break;
+        if (string.IsNullOrEmpty(sourceDir))
+        {
+            yield break;
+        }
 
         HashSet<string> uris;
         try
@@ -326,7 +409,11 @@ public class GltfModelImporter : IAssetImporter
 
             var dest = Path.Combine(importDirectory, Uri.UnescapeDataString(uri));
             var destDir = Path.GetDirectoryName(dest);
-            if (!string.IsNullOrEmpty(destDir)) Directory.CreateDirectory(destDir);
+            if (!string.IsNullOrEmpty(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+
             File.Copy(src, dest, overwrite: true);
             yield return uri;
         }
@@ -337,12 +424,24 @@ public class GltfModelImporter : IAssetImporter
         var uris = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var prop in new[] { "buffers", "images" })
         {
-            if (!root.TryGetProperty(prop, out var arr)) continue;
+            if (!root.TryGetProperty(prop, out var arr))
+            {
+                continue;
+            }
+
             foreach (var item in arr.EnumerateArray())
             {
-                if (!item.TryGetProperty("uri", out var uriElem)) continue;
+                if (!item.TryGetProperty("uri", out var uriElem))
+                {
+                    continue;
+                }
+
                 var uri = uriElem.GetString();
-                if (string.IsNullOrEmpty(uri) || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.IsNullOrEmpty(uri) || uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 uris.Add(uri);
             }
         }

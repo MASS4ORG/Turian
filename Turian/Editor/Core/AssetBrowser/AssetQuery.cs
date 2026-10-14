@@ -45,9 +45,21 @@ public static class AssetQuery
     public static bool Matches(AssetEntry entry, AssetFilter filter, AssetTypeCatalog catalog,
         IReadOnlySet<string> favorites, bool keepFolders = false)
     {
-        if (keepFolders && entry.IsDirectory) return true;
-        if (!Path.GetFileName(entry.AbsolutePath).Contains(filter.Name, StringComparison.OrdinalIgnoreCase)) return false;
-        if (filter.FavoritesOnly && !favorites.Contains(entry.AbsolutePath)) return false;
+        if (keepFolders && entry.IsDirectory)
+        {
+            return true;
+        }
+
+        if (!Path.GetFileName(entry.AbsolutePath).Contains(filter.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (filter.FavoritesOnly && !favorites.Contains(entry.AbsolutePath))
+        {
+            return false;
+        }
+
         return MatchesType(entry, filter, catalog) && MatchesLabels(entry, filter.Labels);
     }
 

@@ -67,7 +67,11 @@ public static class UnityYaml
 
         void Flush()
         {
-            if (!started) return;
+            if (!started)
+            {
+                return;
+            }
+
             if (Parse(string.Join('\n', body)) is UnityYamlMap { Entries.Count: > 0 } root)
             {
                 var (name, value) = root.Entries[0];
@@ -110,7 +114,10 @@ public static class UnityYaml
             .Where(static l => l.Trim().Length > 0 && !l.TrimStart().StartsWith('#'))
             .Select(static l => (Indent: l.Length - l.TrimStart(' ').Length, Text: l.Trim()))
             .ToList();
-        if (lines.Count == 0) return new UnityYamlMap([]);
+        if (lines.Count == 0)
+        {
+            return new UnityYamlMap([]);
+        }
 
         var index = 0;
         return Block(lines, ref index, lines[0].Indent);
@@ -122,8 +129,14 @@ public static class UnityYaml
         long fileId = 0;
         foreach (var part in line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1))
         {
-            if (part.StartsWith("!u!", StringComparison.Ordinal)) _ = int.TryParse(part[3..], NumberStyles.Integer, CultureInfo.InvariantCulture, out classId);
-            else if (part.StartsWith('&')) _ = long.TryParse(part[1..], NumberStyles.Integer, CultureInfo.InvariantCulture, out fileId);
+            if (part.StartsWith("!u!", StringComparison.Ordinal))
+            {
+                _ = int.TryParse(part[3..], NumberStyles.Integer, CultureInfo.InvariantCulture, out classId);
+            }
+            else if (part.StartsWith('&'))
+            {
+                _ = long.TryParse(part[1..], NumberStyles.Integer, CultureInfo.InvariantCulture, out fileId);
+            }
         }
 
         return (classId, fileId);
@@ -141,7 +154,10 @@ public static class UnityYaml
         {
             var text = lines[index].Text;
             var colon = KeyEnd(text);
-            if (colon < 0) throw new FormatException($"Expected 'key: value', found '{text}'.");
+            if (colon < 0)
+            {
+                throw new FormatException($"Expected 'key: value', found '{text}'.");
+            }
 
             var key = Unquote(text[..colon]);
             var rest = text[(colon + 1)..].Trim();
@@ -206,15 +222,27 @@ public static class UnityYaml
     /// <summary>The position of the colon ending a key, or -1; colons inside quotes and braces do not count.</summary>
     static int KeyEnd(string text)
     {
-        if (text.StartsWith('{') || text.StartsWith('[')) return -1;
+        if (text.StartsWith('{') || text.StartsWith('['))
+        {
+            return -1;
+        }
 
         var quote = '\0';
         for (var i = 0; i < text.Length; i++)
         {
             var c = text[i];
-            if (quote != '\0') quote = c == quote ? '\0' : quote;
-            else if (c is '\'' or '"') quote = c;
-            else if (c == ':' && (i == text.Length - 1 || text[i + 1] == ' ')) return i;
+            if (quote != '\0')
+            {
+                quote = c == quote ? '\0' : quote;
+            }
+            else if (c is '\'' or '"')
+            {
+                quote = c;
+            }
+            else if (c == ':' && (i == text.Length - 1 || text[i + 1] == ' '))
+            {
+                return i;
+            }
         }
 
         return -1;
@@ -230,7 +258,10 @@ public static class UnityYaml
     static UnityYamlValue Flow(string text, ref int position)
     {
         SkipSpaces(text, ref position);
-        if (position >= text.Length) return new UnityYamlScalar(string.Empty);
+        if (position >= text.Length)
+        {
+            return new UnityYamlScalar(string.Empty);
+        }
 
         switch (text[position])
         {
@@ -240,13 +271,21 @@ public static class UnityYaml
                 while (true)
                 {
                     SkipSpaces(text, ref position);
-                    if (position >= text.Length) throw new FormatException($"Unterminated '{{' in '{text}'.");
+                    if (position >= text.Length)
+                    {
+                        throw new FormatException($"Unterminated '{{' in '{text}'.");
+                    }
+
                     if (text[position] == '}') { position++; break; }
                     if (text[position] == ',') { position++; continue; }
 
                     var key = Scalar(text, ref position, ":");
                     SkipSpaces(text, ref position);
-                    if (position < text.Length && text[position] == ':') position++;
+                    if (position < text.Length && text[position] == ':')
+                    {
+                        position++;
+                    }
+
                     entries.Add(new KeyValuePair<string, UnityYamlValue>(Unquote(key), Flow(text, ref position)));
                 }
 
@@ -257,7 +296,11 @@ public static class UnityYaml
                 while (true)
                 {
                     SkipSpaces(text, ref position);
-                    if (position >= text.Length) throw new FormatException($"Unterminated '[' in '{text}'.");
+                    if (position >= text.Length)
+                    {
+                        throw new FormatException($"Unterminated '[' in '{text}'.");
+                    }
+
                     if (text[position] == ']') { position++; break; }
                     if (text[position] == ',') { position++; continue; }
 
@@ -277,9 +320,18 @@ public static class UnityYaml
         for (; position < text.Length; position++)
         {
             var c = text[position];
-            if (quote != '\0') quote = c == quote ? '\0' : quote;
-            else if (c is '\'' or '"') quote = c;
-            else if (stops.Contains(c) && (c != ':' || position + 1 >= text.Length || text[position + 1] == ' ')) break;
+            if (quote != '\0')
+            {
+                quote = c == quote ? '\0' : quote;
+            }
+            else if (c is '\'' or '"')
+            {
+                quote = c;
+            }
+            else if (stops.Contains(c) && (c != ':' || position + 1 >= text.Length || text[position + 1] == ' '))
+            {
+                break;
+            }
         }
 
         return text[start..position].Trim();
@@ -287,7 +339,10 @@ public static class UnityYaml
 
     static void SkipSpaces(string text, ref int position)
     {
-        while (position < text.Length && text[position] == ' ') position++;
+        while (position < text.Length && text[position] == ' ')
+        {
+            position++;
+        }
     }
 
     static string Unquote(string text) =>

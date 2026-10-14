@@ -23,7 +23,11 @@ public sealed class AssetAutoSave(AssetInspectionService inspections, TimeSpan? 
     {
         ArgumentNullException.ThrowIfNull(inspection);
 
-        if (!inspection.IsPayload) return;
+        if (!inspection.IsPayload)
+        {
+            return;
+        }
+
         pending[inspection.AbsolutePath] = inspection;
         sinceChange.Restart();
     }
@@ -35,10 +39,16 @@ public sealed class AssetAutoSave(AssetInspectionService inspections, TimeSpan? 
     /// <param name="force">Writes them now, such as when the studio closes.</param>
     public void Flush(bool force = false)
     {
-        if (pending.Count == 0 || (!force && sinceChange.Elapsed < settle)) return;
+        if (pending.Count == 0 || (!force && sinceChange.Elapsed < settle))
+        {
+            return;
+        }
 
         var saving = pending.Values.ToList();
         pending.Clear();
-        foreach (var inspection in saving) inspections.Apply(inspection);
+        foreach (var inspection in saving)
+        {
+            inspections.Apply(inspection);
+        }
     }
 }

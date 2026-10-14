@@ -29,29 +29,46 @@ public sealed class AssetBrowserNavigation
     /// <summary>Visits a different folder and replaces the forward history.</summary>
     public void Visit(string folder)
     {
-        if (Current == folder) return;
+        if (Current == folder)
+        {
+            return;
+        }
+
         history.RemoveRange(position + 1, history.Count - position - 1);
         history.Add(folder);
-        if (history.Count > 32) history.RemoveAt(0);
+        if (history.Count > 32)
+        {
+            history.RemoveAt(0);
+        }
+
         position = history.Count - 1;
     }
 
     /// <summary>Moves backward when a prior folder exists.</summary>
     public void Back()
     {
-        if (CanBack) position--;
+        if (CanBack)
+        {
+            position--;
+        }
     }
 
     /// <summary>Moves forward when a subsequent folder exists.</summary>
     public void Forward()
     {
-        if (CanForward) position++;
+        if (CanForward)
+        {
+            position++;
+        }
     }
 
     /// <summary>Remaps history after a move, including descendants of a moved folder.</summary>
     public void Remap(string source, string destination)
     {
-        for (var i = 0; i < history.Count; i++) history[i] = AssetPathSegments.Remap(history[i], source, destination);
+        for (var i = 0; i < history.Count; i++)
+        {
+            history[i] = AssetPathSegments.Remap(history[i], source, destination);
+        }
     }
 }
 
@@ -62,9 +79,12 @@ public static class AssetPathSegments
     public static IReadOnlyList<AssetPathSegment> Build(string folder, IReadOnlyList<AssetEntry> entries)
     {
         var trail = new List<AssetPathSegment>();
-        var byPath = entries.Where(entry => entry.IsDirectory).ToDictionary(entry => entry.AbsolutePath);
+        var byPath = entries.Where(static entry => entry.IsDirectory).ToDictionary(static entry => entry.AbsolutePath);
         for (var path = folder; path is not null && byPath.TryGetValue(path, out var entry); path = entry.ParentPath)
+        {
             trail.Add(new AssetPathSegment(path, Path.GetFileName(path)));
+        }
+
         trail.Reverse();
         return trail;
     }

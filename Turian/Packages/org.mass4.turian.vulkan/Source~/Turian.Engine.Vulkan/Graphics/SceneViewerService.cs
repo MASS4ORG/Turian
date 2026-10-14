@@ -46,7 +46,7 @@ public sealed class SceneViewerService : IDisposable
 
     readonly Vulkan vulkan;
     readonly AssetDatabase assets;
-    OffscreenFrameTarget frameTarget;
+    readonly OffscreenFrameTarget frameTarget;
     DescriptorPool globalPool = null!;
     DescriptorSetLayout globalSetLayout = null!;
     DescriptorSet globalDescriptorSet;
@@ -167,7 +167,9 @@ public sealed class SceneViewerService : IDisposable
         OnPopulateGizmos?.Invoke(Gizmos);
 
         if (OverlaySource is not null)
+        {
             OverlayTexture = OverlaySource(frameTarget.Width, frameTarget.Height, (float)deltaTime);
+        }
 
         worldUiSystem.Quads.Clear();
         if (WorldUiSource is not null)
@@ -177,7 +179,10 @@ public sealed class SceneViewerService : IDisposable
         }
 
         var cmd = frameTarget.BeginFrame();
-        if (cmd is null) return;
+        if (cmd is null)
+        {
+            return;
+        }
 
         var frameInfo = new FrameInfo
         {
@@ -238,10 +243,17 @@ public sealed class SceneViewerService : IDisposable
     /// </summary>
     public void FrameBounds(Bounds bounds)
     {
-        if (bounds.IsEmpty) return;
+        if (bounds.IsEmpty)
+        {
+            return;
+        }
 
         var radius = bounds.Size.Length() * 0.5f;
-        if (radius < 0.001f) radius = 1f;
+        if (radius < 0.001f)
+        {
+            radius = 1f;
+        }
+
         var distance = radius / MathF.Tan(Camera.FieldOfView * 0.5f);
         Camera.Position = bounds.Center - Camera.Front * distance;
         Camera.FarPlane = MathF.Max(Camera.FarPlane, (distance + radius * 2f) * 1.5f);
@@ -252,7 +264,11 @@ public sealed class SceneViewerService : IDisposable
     /// </summary>
     public void Resize(uint width, uint height)
     {
-        if (width == Width && height == Height) return;
+        if (width == Width && height == Height)
+        {
+            return;
+        }
+
         _ = vulkan.Vk.DeviceWaitIdle(vulkan.Device.VkDevice);
 
         frameTarget.Resize(width, height);

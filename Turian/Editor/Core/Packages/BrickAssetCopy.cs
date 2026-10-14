@@ -50,7 +50,9 @@ public static class BrickAssetCopy
             var source = Path.Combine(brick.RootPath, asset);
             var sourceMeta = $"{source}.meta";
             if (!File.Exists(source) || !File.Exists(sourceMeta))
+            {
                 throw new PackageException($"{brick.Id} has no asset {asset} (an asset and its .meta are both needed).");
+            }
 
             var target = Unused(Path.Combine(folder, Path.GetFileName(source)));
             var meta = JsonNode.Parse(File.ReadAllText(sourceMeta))!.AsObject();
@@ -68,7 +70,11 @@ public static class BrickAssetCopy
             copied.Add(new CopiedAsset(asset, Path.GetRelativePath(projectRoot, target).Replace('\\', '/'), oldId, newId));
         }
 
-        if (remapReferences) Remap(projectRoot, copied);
+        if (remapReferences)
+        {
+            Remap(projectRoot, copied);
+        }
+
         return copied;
     }
 
@@ -81,7 +87,10 @@ public static class BrickAssetCopy
         {
             var text = File.ReadAllText(file);
             var remapped = copied.Aggregate(text, static (current, c) => current.Replace(c.OldId.ToString(), c.NewId.ToString(), StringComparison.OrdinalIgnoreCase));
-            if (remapped != text) File.WriteAllText(file, remapped);
+            if (remapped != text)
+            {
+                File.WriteAllText(file, remapped);
+            }
         }
     }
 
@@ -97,24 +106,37 @@ public static class BrickAssetCopy
     internal static void ReplaceIds(string path, IReadOnlyList<(Guid Old, Guid New)> ids)
     {
         // Only text files hold ids; a binary asset cannot contain the hyphenated form by accident worth worrying about.
-        if (!IsText(path)) return;
+        if (!IsText(path))
+        {
+            return;
+        }
 
         var text = File.ReadAllText(path);
         var replaced = ids.Aggregate(text, static (current, id) =>
             current.Replace(id.Old.ToString(), id.New.ToString(), StringComparison.OrdinalIgnoreCase));
-        if (replaced != text) File.WriteAllText(path, replaced);
+        if (replaced != text)
+        {
+            File.WriteAllText(path, replaced);
+        }
     }
 
     static bool IsText(string path)
     {
-        if (path.EndsWith(".meta", StringComparison.Ordinal)) return true;
+        if (path.EndsWith(".meta", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         var extension = Path.GetExtension(path);
         return RemappedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase);
     }
 
     static string Unused(string path)
     {
-        if (!File.Exists(path) && !File.Exists($"{path}.meta")) return path;
+        if (!File.Exists(path) && !File.Exists($"{path}.meta"))
+        {
+            return path;
+        }
 
         var directory = Path.GetDirectoryName(path)!;
         var name = Path.GetFileNameWithoutExtension(path);
@@ -122,7 +144,10 @@ public static class BrickAssetCopy
         for (var index = 2; ; index++)
         {
             var candidate = Path.Combine(directory, $"{name} {index}{extension}");
-            if (!File.Exists(candidate) && !File.Exists($"{candidate}.meta")) return candidate;
+            if (!File.Exists(candidate) && !File.Exists($"{candidate}.meta"))
+            {
+                return candidate;
+            }
         }
     }
 }

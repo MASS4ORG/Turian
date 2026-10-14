@@ -15,6 +15,9 @@ public sealed class AssetRevealService
     /// <param name="assetId">The asset to show and select.</param>
     public void Reveal(Guid assetId)
     {
-        if (assetId != Guid.Empty) Requested?.Invoke(assetId);
+        if (assetId != Guid.Empty)
+        {
+            Requested?.Invoke(assetId);
+        }
     }
 }

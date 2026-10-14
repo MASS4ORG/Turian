@@ -19,16 +19,21 @@ public class InputActionsAsset : DataAsset
     /// <returns>The action, or null when nothing matches.</returns>
     public InputAction? Find(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
 
         if (path.Split('/', StringSplitOptions.TrimEntries) is [var map, var action])
+        {
             return Maps.Find(m => string.Equals(m.Name, map, StringComparison.OrdinalIgnoreCase))?.Find(action);
+        }
 
         return Maps.Select(m => m.Find(path)).FirstOrDefault(found => found is not null);
     }
 
     /// <summary>Every action in every map, in declaration order.</summary>
-    public IEnumerable<InputAction> Actions => Maps.SelectMany(map => map.Actions);
+    public IEnumerable<InputAction> Actions => Maps.SelectMany(static map => map.Actions);
 
     /// <summary>
     /// The default maps a project gets before anything is authored: WASD and a left stick driving

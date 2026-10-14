@@ -32,10 +32,16 @@ public static class PrecastAssemblies
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(logger);
-        if (!content.Exists(manifest)) return;
+        if (!content.Exists(manifest))
+        {
+            return;
+        }
 
         using var document = JsonDocument.Parse(content.ReadAllText(manifest));
-        if (!document.RootElement.TryGetProperty(ManifestProperty, out var names)) return;
+        if (!document.RootElement.TryGetProperty(ManifestProperty, out var names))
+        {
+            return;
+        }
 
         foreach (var name in names.EnumerateArray().Select(static e => e.GetString()).OfType<string>())
         {

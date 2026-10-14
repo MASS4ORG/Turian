@@ -26,7 +26,10 @@ public static class InspectorReflector
     /// </summary>
     static bool CanSafelyAccess(MemberMetadata metadata, object targetObject)
     {
-        if (metadata.Member is not PropertyInfo) return true;
+        if (metadata.Member is not PropertyInfo)
+        {
+            return true;
+        }
 
         try
         {

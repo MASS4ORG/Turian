@@ -53,7 +53,11 @@ public static class BackgroundTaskTree
 
         foreach (var c in tasks)
         {
-            if (c.ParentId != root.Id) continue;
+            if (c.ParentId != root.Id)
+            {
+                continue;
+            }
+
             childCount++;
             var w = c.Weight > 0 ? c.Weight : 1;
             weightTotal += w;
@@ -82,7 +86,9 @@ public static class BackgroundTaskTree
         }
 
         if (childCount == 0)
+        {
             return new TaskRollup { Progress = root.Fraction, Status = root.Status };
+        }
 
         // Divide by the planned total when the owner declared one, so the bar does not lurch
         // backwards each time another phase opens.
@@ -99,11 +105,13 @@ public static class BackgroundTaskTree
 
         // A finished root is authoritative: it knows outcomes its children cannot see.
         if (root.IsFinished)
+        {
             return rollup with
             {
                 Status = root.Status,
                 Progress = root.Status == BackgroundTaskStatus.Completed ? 1 : progress,
             };
+        }
 
         return rollup with
         {
@@ -120,7 +128,7 @@ public static class BackgroundTaskTree
     public static IReadOnlyList<BackgroundTask> Roots(IReadOnlyList<BackgroundTask> tasks)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return [.. tasks.Where(t => t.ParentId == 0)];
+        return [.. tasks.Where(static t => t.ParentId == 0)];
     }
 
     /// <summary>The direct children of <paramref name="parentId"/>, in submission order.</summary>
@@ -145,8 +153,15 @@ public static class BackgroundTaskTree
         BackgroundTask? best = null;
         foreach (var t in tasks)
         {
-            if (t.ParentId != 0 || !t.IsActive) continue;
-            if (best is null || t.Kind.Priority() > best.Kind.Priority()) best = t;
+            if (t.ParentId != 0 || !t.IsActive)
+            {
+                continue;
+            }
+
+            if (best is null || t.Kind.Priority() > best.Kind.Priority())
+            {
+                best = t;
+            }
         }
 
         return best;
@@ -158,7 +173,7 @@ public static class BackgroundTaskTree
     public static int ActiveRoots(IReadOnlyList<BackgroundTask> tasks)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return tasks.Count(t => t is { ParentId: 0, IsActive: true });
+        return tasks.Count(static t => t is { ParentId: 0, IsActive: true });
     }
 
     /// <summary>
@@ -173,11 +188,17 @@ public static class BackgroundTaskTree
         ArgumentNullException.ThrowIfNull(task);
 
         if (rollup.ActiveChild is { } child)
+        {
             return child.UnitsTotal > 0
                 ? $"{task.Label} — {child.Label} ({child.UnitsDone}/{child.UnitsTotal})"
                 : $"{task.Label} — {child.Label}";
+        }
 
-        if (task.UnitsTotal > 0) return $"{task.Label} ({task.UnitsDone}/{task.UnitsTotal})";
+        if (task.UnitsTotal > 0)
+        {
+            return $"{task.Label} ({task.UnitsDone}/{task.UnitsTotal})";
+        }
+
         return task.Note.Length > 0 ? $"{task.Label}: {task.Note}" : task.Label;
     }
 }

@@ -84,7 +84,11 @@ public sealed class AssetOpenService(
     {
         var folder = Directory.Exists(absolutePath) ? absolutePath : Path.GetDirectoryName(absolutePath)!;
         var start = new ProcessStartInfo(FileManagerExecutable());
-        if (OperatingSystem.IsMacOS() && File.Exists(absolutePath)) start.ArgumentList.Add("-R");
+        if (OperatingSystem.IsMacOS() && File.Exists(absolutePath))
+        {
+            start.ArgumentList.Add("-R");
+        }
+
         start.ArgumentList.Add(OperatingSystem.IsMacOS() ? absolutePath : folder);
         return start;
     }

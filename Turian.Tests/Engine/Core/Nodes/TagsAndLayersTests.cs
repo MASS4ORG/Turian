@@ -21,9 +21,9 @@ public sealed class TagsAndLayersTests
         Assert.Equal(32, settings.RenderLayers.Count);
         Assert.Equal("Default", settings.FindPhysicsLayer(0)!.Name);
         Assert.Equal("Default", settings.FindRenderLayer(0)!.Name);
-        Assert.Equal(64, settings.PhysicsLayers.Concat(settings.RenderLayers).Select(layer => layer.Id).Distinct().Count());
-        Assert.Equal(settings.PhysicsLayers.Select(layer => layer.Id),
-            new TagsAndLayersSettings().PhysicsLayers.Select(layer => layer.Id));
+        Assert.Equal(64, settings.PhysicsLayers.Concat(settings.RenderLayers).Select(static layer => layer.Id).Distinct().Count());
+        Assert.Equal(settings.PhysicsLayers.Select(static layer => layer.Id),
+            new TagsAndLayersSettings().PhysicsLayers.Select(static layer => layer.Id));
         Assert.Empty(settings.Validate());
     }
 
@@ -78,7 +78,7 @@ public sealed class TagsAndLayersTests
 
             Assert.Equal(LegacyNode, File.ReadAllText(path));
             var compact = PrefabInstances.CreateInstanceJson(Guid.NewGuid(), Guid.NewGuid());
-            var expanded = PrefabInstances.Expand(compact, _ => LegacyNode);
+            var expanded = PrefabInstances.Expand(compact, static _ => LegacyNode);
             var instance = Serializer.LoadData<Node>(expanded)!;
             Assert.Equal(["Untagged"], instance.Tags);
             Assert.Equal(0, instance.Children[0].RenderLayer);
@@ -178,7 +178,7 @@ public sealed class TagsAndLayersTests
         root.Awake(null);
         // Removing the backing collection without a change event makes a tree walk unable to find the node.
         var backing = typeof(Node).GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(field => field.FieldType == typeof(ObservableCollection<Node>));
+            .Single(static field => field.FieldType == typeof(ObservableCollection<Node>));
         backing.SetValue(root, new ObservableCollection<Node>());
         Assert.Same(parent, root.FindWithTag("Deep"));
         Assert.Equal([parent], root.FindAllWithTag("Deep"));
@@ -217,10 +217,10 @@ public sealed class TagsAndLayersTests
         settings.PhysicsLayers.Add(settings.PhysicsLayers[1]);
         settings.RenderLayers.Clear();
         var warnings = settings.Validate();
-        Assert.Contains(warnings, warning => warning.Contains("empty", StringComparison.Ordinal));
-        Assert.Contains(warnings, warning => warning.Contains("duplicated", StringComparison.Ordinal));
-        Assert.Contains(warnings, warning => warning.Contains("between 0 and 31", StringComparison.Ordinal));
-        Assert.Contains(warnings, warning => warning.Contains("layer 0", StringComparison.Ordinal));
+        Assert.Contains(warnings, static warning => warning.Contains("empty", StringComparison.Ordinal));
+        Assert.Contains(warnings, static warning => warning.Contains("duplicated", StringComparison.Ordinal));
+        Assert.Contains(warnings, static warning => warning.Contains("between 0 and 31", StringComparison.Ordinal));
+        Assert.Contains(warnings, static warning => warning.Contains("layer 0", StringComparison.Ordinal));
         Assert.Null(settings.FindPhysicsLayer(-1));
         Assert.Null(settings.FindRenderLayer(32));
     }

@@ -19,9 +19,12 @@ static class EmbeddedIcons
     {
         var assembly = typeof(EmbeddedIcons).Assembly;
         var names = assembly.GetManifestResourceNames()
-            .Where(name => name.StartsWith(ResourceRoot + IconsFolder, StringComparison.Ordinal))
+            .Where(static name => name.StartsWith(ResourceRoot + IconsFolder, StringComparison.Ordinal))
             .ToArray();
-        if (names.Length == 0) return null;
+        if (names.Length == 0)
+        {
+            return null;
+        }
 
         var build = assembly.ManifestModule.ModuleVersionId.ToString("N")[..12];
         var root = Path.Combine(cacheFolder, FolderPrefix + build);
@@ -53,7 +56,11 @@ static class EmbeddedIcons
     {
         foreach (var folder in Directory.EnumerateDirectories(cacheFolder, FolderPrefix + "*"))
         {
-            if (string.Equals(folder, current, StringComparison.Ordinal)) continue;
+            if (string.Equals(folder, current, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             try
             {
                 Directory.Delete(folder, recursive: true);

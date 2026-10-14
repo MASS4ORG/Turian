@@ -41,7 +41,10 @@ public sealed class ProjectBootstrapper
 
             var title = Path.GetFileName(
                 projectDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            if (string.IsNullOrWhiteSpace(title)) title = defaultProjectTitle;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                title = defaultProjectTitle;
+            }
 
             var startupSceneId = Guid.NewGuid();
             var sceneFilePath = Path.Combine(assetsDir, defaultSceneFileName);
@@ -76,12 +79,16 @@ public sealed class ProjectBootstrapper
             // Scripts get the engine, its attributes and the input key codes without per-file usings.
             var globalsPath = Path.Combine(assetsDir, "Globals.cs");
             if (!File.Exists(globalsPath))
+            {
                 await File.WriteAllTextAsync(globalsPath, defaultGlobalUsings);
+            }
 
             var bootstrapPath = Path.Combine(assetsDir, "Game.cs");
             if (!File.Exists(bootstrapPath))
+            {
                 await File.WriteAllTextAsync(bootstrapPath,
                     "namespace Usercode;\n\npublic static class Game\n{\n}\n");
+            }
 
             return settings.ProjectAbsoluteDir;
         }

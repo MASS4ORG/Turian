@@ -92,7 +92,9 @@ public sealed class UserCodeTypeManifest
         }
 
         if (manifest is null)
+        {
             return;
+        }
 
         var registered = 0;
         foreach (var entry in manifest.Types)

@@ -14,7 +14,11 @@ public class AssetAutoSaveTests : IDisposable
     /// <summary>Deletes the written file.</summary>
     public void Dispose()
     {
-        if (File.Exists(path)) File.Delete(path);
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+
         GC.SuppressFinalize(this);
     }
 

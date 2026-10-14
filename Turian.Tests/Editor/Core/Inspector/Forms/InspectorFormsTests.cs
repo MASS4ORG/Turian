@@ -31,11 +31,11 @@ public class InspectorFormsTests
         var holder = new Holder { Target = new Node() };
         var fields = InspectorForms.Build(holder).Sections[0].Fields;
 
-        Assert.True(fields.Single(f => f.Name == nameof(Holder.Target)).SetValue(null));
+        Assert.True(fields.Single(static f => f.Name == nameof(Holder.Target)).SetValue(null));
         Assert.Null(holder.Target);
-        Assert.False(fields.Single(f => f.Name == nameof(Holder.Name)).SetValue(null));
+        Assert.False(fields.Single(static f => f.Name == nameof(Holder.Name)).SetValue(null));
         Assert.Equal("kept", holder.Name);
-        Assert.False(fields.Single(f => f.Name == nameof(Holder.Optional)).SetValue(null));
+        Assert.False(fields.Single(static f => f.Name == nameof(Holder.Optional)).SetValue(null));
         Assert.Equal(3, holder.Optional);
     }
 

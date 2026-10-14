@@ -23,7 +23,11 @@ public partial class Node
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            if (ReferenceEquals(field, value)) return;
+            if (ReferenceEquals(field, value))
+            {
+                return;
+            }
+
             field.CollectionChanged -= TagsChanged;
             field = value;
             field.CollectionChanged += TagsChanged;
@@ -65,17 +69,31 @@ public partial class Node
 
     internal void BindTagRegistry(TagRegistry? registry)
     {
-        if (ReferenceEquals(tagRegistry, registry)) return;
+        if (ReferenceEquals(tagRegistry, registry))
+        {
+            return;
+        }
+
         tagRegistry?.Unregister(this);
         tagRegistry = registry;
-        if (!IsDestroyed) registry?.Register(this);
-        foreach (var child in Children) child.BindTagRegistry(registry);
+        if (!IsDestroyed)
+        {
+            registry?.Register(this);
+        }
+
+        foreach (var child in Children)
+        {
+            child.BindTagRegistry(registry);
+        }
     }
 
     internal void RefreshActiveHierarchy()
     {
         IsActiveInHierarchy = IsActive && !IsDestroyed && (Parent?.IsActiveInHierarchy ?? true);
-        foreach (var child in Children) child.RefreshActiveHierarchy();
+        foreach (var child in Children)
+        {
+            child.RefreshActiveHierarchy();
+        }
     }
 
     void BindLayers()
@@ -88,8 +106,16 @@ public partial class Node
 
     TagRegistry EnsureTagRegistry()
     {
-        if (tagRegistry is not null) return tagRegistry;
-        if (Parent is not null) return Parent.EnsureTagRegistry();
+        if (tagRegistry is not null)
+        {
+            return tagRegistry;
+        }
+
+        if (Parent is not null)
+        {
+            return Parent.EnsureTagRegistry();
+        }
+
         BindTagRegistry(new TagRegistry());
         return tagRegistry!;
     }
@@ -99,17 +125,33 @@ public partial class Node
     // Adds and removes visit only the changed items: a full resync per add makes building n siblings cubic.
     void ChildrenChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
-        if (args.Action == NotifyCollectionChangedAction.Move) return;
-        if (args.Action == NotifyCollectionChangedAction.Add && args.NewItems is { } added) Adopt(added);
-        else if (args.Action == NotifyCollectionChangedAction.Remove && args.OldItems is { } removed) Release(removed);
-        else Resync();
+        if (args.Action == NotifyCollectionChangedAction.Move)
+        {
+            return;
+        }
+
+        if (args.Action == NotifyCollectionChangedAction.Add && args.NewItems is { } added)
+        {
+            Adopt(added);
+        }
+        else if (args.Action == NotifyCollectionChangedAction.Remove && args.OldItems is { } removed)
+        {
+            Release(removed);
+        }
+        else
+        {
+            Resync();
+        }
     }
 
     void Adopt(IList added)
     {
         foreach (Node child in added)
         {
-            if (knownChildren.Add(child)) child.Parent = this;
+            if (knownChildren.Add(child))
+            {
+                child.Parent = this;
+            }
         }
     }
 
@@ -118,8 +160,15 @@ public partial class Node
         foreach (Node child in removed)
         {
             // A node listed twice stays a child until its last entry goes.
-            if (Children.Contains(child) || !knownChildren.Remove(child)) continue;
-            if (ReferenceEquals(child.Parent, this)) child.Parent = null;
+            if (Children.Contains(child) || !knownChildren.Remove(child))
+            {
+                continue;
+            }
+
+            if (ReferenceEquals(child.Parent, this))
+            {
+                child.Parent = null;
+            }
         }
     }
 
@@ -128,7 +177,10 @@ public partial class Node
         foreach (var child in knownChildren.Where(child => !Children.Contains(child)).ToArray())
         {
             knownChildren.Remove(child);
-            if (ReferenceEquals(child.Parent, this)) child.Parent = null;
+            if (ReferenceEquals(child.Parent, this))
+            {
+                child.Parent = null;
+            }
         }
 
         Adopt(Children);

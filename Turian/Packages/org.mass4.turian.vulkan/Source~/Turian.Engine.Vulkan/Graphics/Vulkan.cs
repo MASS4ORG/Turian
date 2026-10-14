@@ -21,7 +21,7 @@ public class Vulkan : IRenderDevice
     /// <param name="surfaceHost">The host whose surface the device presents to.</param>
     /// <param name="logger">The logger used for reporting startup progress.</param>
     /// <param name="settings">The project settings the device reads its MSAA sample count from, or <c>null</c>.</param>
-    /// <exception cref="System.ArgumentNullException">Thrown if <paramref name="surfaceHost"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="surfaceHost"/> is <c>null</c>.</exception>
     public Vulkan(ISurfaceHost surfaceHost, ILogger logger, IAppSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(surfaceHost);

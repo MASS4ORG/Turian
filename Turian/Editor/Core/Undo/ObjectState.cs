@@ -66,7 +66,10 @@ public sealed class ObjectState
         var remapped = new List<(MemberInfo, Type, string, object?)>();
         foreach (var member in MembersOf(targetType))
         {
-            if (!byName.TryGetValue(member.Name, out var old)) continue;
+            if (!byName.TryGetValue(member.Name, out var old))
+            {
+                continue;
+            }
 
             var type = TypeOf(member);
             if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true))
@@ -93,10 +96,18 @@ public sealed class ObjectState
             case IEnumerable items when type.IsArray:
                 var mapped = items.Cast<object?>().Select(item => item is IdObject obj ? map(obj) : item).ToArray();
                 var array = Array.CreateInstance(type.GetElementType()!, mapped.Length);
-                for (var i = 0; i < mapped.Length; i++) array.SetValue(mapped[i], i);
+                for (var i = 0; i < mapped.Length; i++)
+                {
+                    array.SetValue(mapped[i], i);
+                }
+
                 return array;
             case IEnumerable items when Activator.CreateInstance(type) is IList list:
-                foreach (var item in items) list.Add(item is IdObject obj ? map(obj) : item);
+                foreach (var item in items)
+                {
+                    list.Add(item is IdObject obj ? map(obj) : item);
+                }
+
                 return list;
             default:
                 return value;
@@ -110,9 +121,18 @@ public sealed class ObjectState
     {
         ArgumentNullException.ThrowIfNull(other);
 
-        if (values.Length != other.values.Length) return false;
+        if (values.Length != other.values.Length)
+        {
+            return false;
+        }
+
         for (var i = 0; i < values.Length; i++)
-            if (values[i].Json != other.values[i].Json) return false;
+        {
+            if (values[i].Json != other.values[i].Json)
+            {
+                return false;
+            }
+        }
 
         return Same(children, other.children) && Same(components, other.components);
     }
@@ -131,9 +151,20 @@ public sealed class ObjectState
             Set(member, target, value);
         }
 
-        if (target is not Node node) return;
-        if (children is not null) RestoreChildren(node, children);
-        if (components is not null) RestoreComponents(node, components);
+        if (target is not Node node)
+        {
+            return;
+        }
+
+        if (children is not null)
+        {
+            RestoreChildren(node, children);
+        }
+
+        if (components is not null)
+        {
+            RestoreComponents(node, components);
+        }
     }
 
     static void RestoreChildren(Node node, Node[] wanted)
@@ -141,17 +172,31 @@ public sealed class ObjectState
         foreach (var child in node.Children.Where(child => !wanted.Contains(child)).ToList())
         {
             node.Children.Remove(child);
-            if (ReferenceEquals(child.Parent, node)) child.Parent = null;
+            if (ReferenceEquals(child.Parent, node))
+            {
+                child.Parent = null;
+            }
         }
 
         for (var i = 0; i < wanted.Length; i++)
         {
             var child = wanted[i];
-            if (child.Parent is { } other && !ReferenceEquals(other, node)) other.Children.Remove(child);
+            if (child.Parent is { } other && !ReferenceEquals(other, node))
+            {
+                other.Children.Remove(child);
+            }
 
             var at = node.Children.IndexOf(child);
-            if (at == i) continue;
-            if (at >= 0) node.Children.RemoveAt(at);
+            if (at == i)
+            {
+                continue;
+            }
+
+            if (at >= 0)
+            {
+                node.Children.RemoveAt(at);
+            }
+
             node.Children.Insert(i, child);
             child.Parent = node;
         }
@@ -160,7 +205,9 @@ public sealed class ObjectState
     static void RestoreComponents(Node node, Component[] wanted)
     {
         foreach (var component in node.Components.Where(component => !wanted.Contains(component)).ToList())
+        {
             node.RemoveComponent(component);
+        }
 
         for (var i = 0; i < wanted.Length; i++)
         {
@@ -173,7 +220,11 @@ public sealed class ObjectState
             }
 
             var at = node.Components.IndexOf(component);
-            if (at == i) continue;
+            if (at == i)
+            {
+                continue;
+            }
+
             node.Components.RemoveAt(at);
             node.Components.Insert(i, component);
         }
@@ -193,7 +244,11 @@ public sealed class ObjectState
     static IList CopyList(IList list)
     {
         var copy = (IList)Activator.CreateInstance(list.GetType())!;
-        foreach (var item in list) copy.Add(item);
+        foreach (var item in list)
+        {
+            copy.Add(item);
+        }
+
         return copy;
     }
 
@@ -210,8 +265,14 @@ public sealed class ObjectState
 
     static void Set(MemberInfo member, object target, object? value)
     {
-        if (member is PropertyInfo property) property.SetValue(target, value);
-        else ((FieldInfo)member).SetValue(target, value);
+        if (member is PropertyInfo property)
+        {
+            property.SetValue(target, value);
+        }
+        else
+        {
+            ((FieldInfo)member).SetValue(target, value);
+        }
     }
 
     static Type TypeOf(MemberInfo member) =>
@@ -225,10 +286,10 @@ public sealed class ObjectState
     static MemberInfo[] MembersOf(Type type) => MembersByType.GetOrAdd(type, static type =>
     [
         .. type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(property => property.GetIndexParameters().Length == 0 && property is { CanRead: true, CanWrite: true }
+            .Where(static property => property.GetIndexParameters().Length == 0 && property is { CanRead: true, CanWrite: true }
                                                                          && Serialized(property, property.GetGetMethod(nonPublic: true)?.IsPublic == true)),
         .. type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Where(field => !field.IsInitOnly && Serialized(field, field.IsPublic)),
+            .Where(static field => !field.IsInitOnly && Serialized(field, field.IsPublic)),
     ]);
 
     static bool Serialized(MemberInfo member, bool isPublic) =>

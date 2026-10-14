@@ -22,10 +22,10 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
     public IReadOnlyCollection<string> ReservedCategoryPrefixes { get; } = ["gaya", ProjectPackages.HostName];
 
     /// <inheritdoc />
-    public string? BuiltinDirectory => ProjectPackages.BuiltinDirectory;
+    public string BuiltinDirectory => ProjectPackages.BuiltinDirectory;
 
     /// <inheritdoc />
-    public ScopedRegistry? PublicRegistry => ProjectPackages.PublicRegistry;
+    public ScopedRegistry PublicRegistry => ProjectPackages.PublicRegistry;
 
     /// <inheritdoc />
     public bool SupportsForks => true;
@@ -83,8 +83,15 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
     /// <inheritdoc />
     public void Changed(bool applied)
     {
-        if (applied) applier?.ApplyBrickChanges();
-        if (settings?.Settings is { } project && project.ProjectAbsoluteDir == Root) project.Bricks.Reload();
+        if (applied)
+        {
+            applier?.ApplyBrickChanges();
+        }
+
+        if (settings?.Settings is { } project && project.ProjectAbsoluteDir == Root)
+        {
+            project.Bricks.Reload();
+        }
     }
 }
 
@@ -103,8 +110,16 @@ public sealed class TurianProjectBricks(SettingsService settings, BackgroundTask
     {
         get
         {
-            if (settings is not { HasSettings: true, Settings.ProjectAbsoluteDir: { Length: > 0 } root }) return null;
-            if (workspace?.Root != root) workspace = new ProjectBrickWorkspace(root, settings, applier);
+            if (settings is not { HasSettings: true, Settings.ProjectAbsoluteDir: { Length: > 0 } root })
+            {
+                return null;
+            }
+
+            if (workspace?.Root != root)
+            {
+                workspace = new ProjectBrickWorkspace(root, settings, applier);
+            }
+
             return workspace;
         }
     }

@@ -20,7 +20,10 @@ sealed partial class OutputPanel
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
 
             gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || headerMenuOpen ? theme.Ink : theme.InkDim);
 
@@ -53,36 +56,44 @@ sealed partial class OutputPanel
     {
         var theme = ThemeTokens.Current;
         var box = theme.Scale(13f);
-        var rowHeight = theme.Scale(theme.RowHeight);
+        var entryHeight = theme.Scale(theme.RowHeight);
         var size = theme.Text(11f);
         var changed = false;
 
         using (gui.Node().Direction(Axis.Vertical).Gap(theme.Scale(2f)).Enter())
         {
-            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), box, size, rowHeight,
+            changed |= Toggle(gui, "showTimestamp", localization.T("Show Timestamp"), box, size, entryHeight,
                 () => settings.ShowTimestamp, value => settings.ShowTimestamp = value);
-            changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, rowHeight,
+            changed |= Toggle(gui, "monospace", localization.T("Monospace"), box, size, entryHeight,
                 () => settings.Monospace, value => settings.Monospace = value);
-            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnPlay", localization.T("Clear on Play"), box, size, entryHeight,
                 () => settings.ClearOnPlay, value => settings.ClearOnPlay = value);
-            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnBuild", localization.T("Clear on Build"), box, size, entryHeight,
                 () => settings.ClearOnBuild, value => settings.ClearOnBuild = value);
-            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), box, size, rowHeight,
+            changed |= Toggle(gui, "clearOnRecompile", localization.T("Clear on Recompile"), box, size, entryHeight,
                 () => settings.ClearOnRecompile, value => settings.ClearOnRecompile = value);
 
-            using (gui.Node(-1, rowHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
+            using (gui.Node(-1, entryHeight + theme.Scale(6f), "gaya.turian.output/tabMenu/entry")
                        .Direction(Axis.Horizontal).Gap(theme.Scale(6f)).ContentAlignY(0.5f).Enter())
             {
                 gui.DrawText(localization.T("Entry lines"), size, theme.InkDim);
                 if (StudioControls.SmallTextButton(gui, "−", "gaya.turian.output/tabMenu/minus", theme.Scale(20f)))
+                {
                     changed |= StepEntryLines(settings, settings.EntryLines - 1);
+                }
+
                 gui.DrawText(settings.EntryLines.ToString(CultureInfo.InvariantCulture), size, theme.Ink);
                 if (StudioControls.SmallTextButton(gui, "+", "gaya.turian.output/tabMenu/plus", theme.Scale(20f)))
+                {
                     changed |= StepEntryLines(settings, settings.EntryLines + 1);
+                }
             }
         }
 
-        if (changed) editorSettings.NotifyChanged(OutputPanelSettings.PageId);
+        if (changed)
+        {
+            editorSettings.NotifyChanged(OutputPanelSettings.PageId);
+        }
     }
 
     /// <summary>Draws one checkbox for a settings member and reports whether the click changed it.</summary>
@@ -94,7 +105,10 @@ sealed partial class OutputPanel
         {
             var value = get();
             gui.Checkbox(ref value, label, size: box, fontSize: size, spacing: 6f);
-            if (value == get()) return false;
+            if (value == get())
+            {
+                return false;
+            }
 
             set(value);
         }
@@ -104,7 +118,10 @@ sealed partial class OutputPanel
 
     static bool StepEntryLines(OutputPanelSettings settings, int value)
     {
-        if (value == settings.EntryLines) return false;
+        if (value == settings.EntryLines)
+        {
+            return false;
+        }
 
         settings.EntryLines = value;
         return true;

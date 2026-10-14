@@ -19,7 +19,7 @@ public sealed class UserPanelCatalog
     readonly ILogger log;
 
     readonly List<UserPanelPage> pages = [];
-    Assembly? scanned;
+    ReflectionAssembly? scanned;
     bool scannedOnce;
 
     /// <summary>Creates the catalog over the build manager that owns the user assembly.</summary>
@@ -54,27 +54,36 @@ public sealed class UserPanelCatalog
     public void EnsureRefreshed()
     {
         var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned)) return;
+        if (scannedOnce && ReferenceEquals(current, scanned))
+        {
+            return;
+        }
 
         scanned = current;
         scannedOnce = true;
         Rescan(current);
     }
 
-    void Rescan(Assembly? assembly)
+    void Rescan(ReflectionAssembly? assembly)
     {
         var previous = pages.Count;
         pages.Clear();
 
         if (assembly is not null)
         {
-            foreach (var userAssembly in buildManager.ActiveUserAssemblies) pages.AddRange(Scan(userAssembly, log));
+            foreach (var userAssembly in buildManager.ActiveUserAssemblies)
+            {
+                pages.AddRange(Scan(userAssembly, log));
+            }
         }
 
         log.LogDebug("User panels: {Count} page(s) from {Assembly}", pages.Count,
             assembly?.GetName().Name ?? "no user assembly");
 
-        if (previous != 0 || pages.Count != 0) Changed?.Invoke();
+        if (previous != 0 || pages.Count != 0)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
@@ -84,7 +93,7 @@ public sealed class UserPanelCatalog
     /// <param name="assembly">The assembly to scan.</param>
     /// <param name="log">Where a skipped type is reported.</param>
     /// <returns>One page per usable annotated class, in reflection order.</returns>
-    public static IReadOnlyList<UserPanelPage> Scan(Assembly assembly, ILogger log)
+    public static IReadOnlyList<UserPanelPage> Scan(ReflectionAssembly assembly, ILogger log)
     {
         ArgumentNullException.ThrowIfNull(assembly);
         ArgumentNullException.ThrowIfNull(log);
@@ -93,8 +102,15 @@ public sealed class UserPanelCatalog
 
         foreach (var (type, attribute) in AnnotatedTypes(assembly, log))
         {
-            if (string.IsNullOrWhiteSpace(attribute.Path)) continue;
-            if (Create(type, log) is not { } target) continue;
+            if (string.IsNullOrWhiteSpace(attribute.Path))
+            {
+                continue;
+            }
+
+            if (Create(type, log) is not { } target)
+            {
+                continue;
+            }
 
             found.Add(new UserPanelPage($"usercode.panel.{type.FullName}", attribute.Name,
                 attribute.Path.Trim(), target));
@@ -109,7 +125,7 @@ public sealed class UserPanelCatalog
     /// <c>TypeRegistry</c> treats the same failure.
     /// </summary>
     static IEnumerable<(Type Type, PanelAttribute Attribute)> AnnotatedTypes(
-        Assembly assembly, ILogger log)
+        ReflectionAssembly assembly, ILogger log)
     {
         Type[] types;
         try
@@ -118,7 +134,7 @@ public sealed class UserPanelCatalog
         }
         catch (ReflectionTypeLoadException ex)
         {
-            types = [.. ex.Types.Where(type => type is not null)!];
+            types = [.. ex.Types.Where(static type => type is not null)!];
         }
         catch (Exception ex)
         {
@@ -126,7 +142,7 @@ public sealed class UserPanelCatalog
             yield break;
         }
 
-        foreach (var type in types.Where(type => type is { IsClass: true, IsAbstract: false }))
+        foreach (var type in types.Where(static type => type is { IsClass: true, IsAbstract: false }))
         {
             PanelAttribute? attribute = null;
             try
@@ -138,7 +154,10 @@ public sealed class UserPanelCatalog
                 log.LogWarning(ex, "User panels: could not read the attributes on {Type}", type.FullName);
             }
 
-            if (attribute is not null) yield return (type, attribute);
+            if (attribute is not null)
+            {
+                yield return (type, attribute);
+            }
         }
     }
 

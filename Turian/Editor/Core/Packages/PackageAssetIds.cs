@@ -15,7 +15,10 @@ public static class PackageAssetIds
     public static void EnsureUnique(string assetsDirectory, IReadOnlyList<ResolvedPackage> packages)
     {
         ArgumentNullException.ThrowIfNull(packages);
-        if (packages.Count == 0) return;
+        if (packages.Count == 0)
+        {
+            return;
+        }
 
         var owners = new Dictionary<Guid, string>();
         var roots = packages.Select(static p => (p.RootPath, Owner: $"package {p.Id}"))
@@ -26,11 +29,16 @@ public static class PackageAssetIds
             foreach (var meta in Directory.EnumerateFiles(root, "*.meta", SearchOption.AllDirectories)
                          .Where(meta => !AssetDatabase.IsInTildeFolder(meta, root)))
             {
-                if (ReadId(meta) is not { } id) continue;
+                if (ReadId(meta) is not { } id)
+                {
+                    continue;
+                }
 
                 var claim = $"{owner} ({meta})";
                 if (!owners.TryAdd(id, claim))
+                {
                     throw new PackageException($"Asset id {id} is claimed by {owners[id]} and by {claim}.");
+                }
             }
         }
     }
@@ -40,7 +48,10 @@ public static class PackageAssetIds
         try
         {
             var reader = new Utf8JsonReader(File.ReadAllBytes(metaPath));
-            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return null;
+            if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+            {
+                return null;
+            }
 
             while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
             {

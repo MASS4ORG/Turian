@@ -30,15 +30,21 @@ sealed class UserPanel(UserPanelPage page) : IPanel
             var fields = model.Sections.SelectMany(section => section.BodyFields).ToList();
 
             for (var i = 0; i < fields.Count; i++)
+            {
                 gui.FormField(fields[i], $"userpanel/{page.Id}/field{i}", context);
+            }
 
             foreach (var section in model.Sections)
+            {
                 for (var b = 0; b < section.Buttons.Count; b++)
                 {
                     var button = section.Buttons[b];
                     if (FormControls.TextButton(gui, button.Label, $"userpanel/{page.Id}/button{b}"))
+                    {
                         button.Invoke();
+                    }
                 }
+            }
         }
     }
 }

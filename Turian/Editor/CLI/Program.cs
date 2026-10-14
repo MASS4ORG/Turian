@@ -8,7 +8,7 @@ public static partial class Program
     /// <summary>Entry point.</summary>
     public static async Task<int> Main(string[] args)
     {
-        using var loggerFactory = LoggerFactory.Create(builder => builder
+        using var loggerFactory = LoggerFactory.Create(static builder => builder
 #if DEBUG
             .SetMinimumLevel(LogLevel.Debug)
 #else
@@ -50,10 +50,10 @@ public static partial class Program
         var arg = new Argument<FileSystemInfo>("ProjectPath")
         {
             Description = "Project folder (a file inside it, such as an older project.data, also works)",
-            DefaultValueFactory = _ => new DirectoryInfo("./")
+            DefaultValueFactory = static _ => new DirectoryInfo("./")
         };
 
-        arg.Validators.Add(result =>
+        arg.Validators.Add(static result =>
         {
             var info = result.GetValue<FileSystemInfo>("ProjectPath");
             if (info is null)
@@ -64,7 +64,9 @@ public static partial class Program
 
             foreach (var issue in ProjectValidator.Validate(info.FullName)
                          .Where(static issue => issue.Severity == ProjectIssueSeverity.Error))
+            {
                 result.AddError(issue.Message);
+            }
         });
 
         return arg;
@@ -94,7 +96,10 @@ public static partial class Program
             }
 
             var created = await new ProjectBootstrapper().CreateAsync(directory.FullName).ConfigureAwait(false);
-            if (created is null) return 1;
+            if (created is null)
+            {
+                return 1;
+            }
 
             Log.Logger.LogInformation("Created project {Path}", created);
             return 0;

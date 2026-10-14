@@ -8,7 +8,11 @@ public sealed class EngineVersionTests
     public void EngineVersionIsTheProjectVersion()
     {
         var root = AppContext.BaseDirectory;
-        while (Directory.GetFiles(root, "*.slnx").Length == 0) root = Directory.GetParent(root)!.FullName;
+        while (Directory.GetFiles(root, "*.slnx").Length == 0)
+        {
+            root = Directory.GetParent(root)!.FullName;
+        }
+
         var project = XDocument.Load(Path.Combine(root, "Turian/Engine/Core/Turian.Engine.Core.csproj"));
         var declared = project.Descendants("Version").Single().Value;
 

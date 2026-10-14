@@ -8,24 +8,24 @@ namespace Gaya.Tests;
 public sealed class SettingsPanelTests
 {
     [UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
-    [Gaya.EditorSetting("Audio", Id = "sample", Order = -1)]
+    [EditorSetting("Audio", Id = "sample", Order = -1)]
     class SamplePage
     {
-        [Gaya.EditorSetting("Output Level", Description = "Playback loudness.")]
+        [EditorSetting("Output Level", Description = "Playback loudness.")]
         public int Volume { get; set; } = 3;
         public bool Muted { get; set; }
     }
 
-    [Gaya.EditorSetting("Scene Viewer", Id = "root", Order = -10)]
+    [EditorSetting("Scene Viewer", Id = "root", Order = -10)]
     sealed class RootPage : SamplePage;
 
-    [Gaya.EditorSetting("Scene Viewer/Gizmos", Id = "gizmos")]
+    [EditorSetting("Scene Viewer/Gizmos", Id = "gizmos")]
     sealed class GizmosPage : SamplePage;
 
-    [Gaya.EditorSetting("Scene Viewer/Gizmos/Colors", Id = "nested")]
+    [EditorSetting("Scene Viewer/Gizmos/Colors", Id = "nested")]
     sealed class ColorsPage : SamplePage;
 
-    [Gaya.EditorSetting("Scene Viewer/Grid", Id = "grid")]
+    [EditorSetting("Scene Viewer/Grid", Id = "grid")]
     sealed class GridPage : SamplePage;
 
     /// <summary>With no plugin loaded, the host contributes the panel, its File entry and its shortcut.</summary>
@@ -35,9 +35,9 @@ public sealed class SettingsPanelTests
         using var app = PluginHost.Load([], NullLogger.Instance);
 
         Assert.Empty(app.LoadedPluginIds);
-        Assert.Contains(app.Panels.All, panel => panel.Id == ShellPanels.Settings);
+        Assert.Contains(app.Panels.All, static panel => panel.Id == ShellPanels.Settings);
         Assert.NotNull(app.Commands.Find(ShellCommands.Settings));
-        Assert.Contains(app.Menus.ItemsFor(MenuIds.File), item => item.CommandId == ShellCommands.Settings);
+        Assert.Contains(app.Menus.ItemsFor(MenuIds.File), static item => item.CommandId == ShellCommands.Settings);
         Assert.NotEmpty(app.Shortcuts.DisplayFor(ShellCommands.Settings));
     }
 
@@ -96,9 +96,15 @@ public sealed class SettingsPanelTests
         Frame();
         Frame();
         foreach (var id in new[] { "root", "gizmos", "nested", "grid" })
+        {
             Assert.NotNull(Find(gui.RootNode!, $"settings/{id}/field0/editor"));
+        }
+
         foreach (var path in new[] { "Scene Viewer", "Scene Viewer/Gizmos", "Scene Viewer/Gizmos/Colors", "Scene Viewer/Grid" })
+        {
             Assert.NotNull(Find(gui.RootNode!, "settings/heading/" + path));
+        }
+
         var rows = (IReadOnlyList<TreeItem>)panel.GetType().GetMethod("Rows", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(panel, [app.Settings.Pages])!;
         Assert.Single(rows, row => row.Id == "Scene Viewer");
@@ -118,8 +124,12 @@ public sealed class SettingsPanelTests
     public void EmptyRegistryHasNoCategoryHeading()
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
-        foreach (var page in app.Settings.Pages.ToArray()) app.Settings.Remove(page.Id);
-        var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);
+        foreach (var page in app.Settings.Pages.ToArray())
+        {
+            app.Settings.Remove(page.Id);
+        }
+
+        var panel = app.Panels.All.Single(static p => p.Id == ShellPanels.Settings).Factory(app.Services);
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1));
         var gui = new Gui { Input = input };
@@ -139,9 +149,13 @@ public sealed class SettingsPanelTests
     public void SearchMatchesGayaOptionMetadata(string query, bool matches)
     {
         using var app = PluginHost.Load([], NullLogger.Instance);
-        foreach (var page in app.Settings.Pages.ToArray()) app.Settings.Remove(page.Id);
+        foreach (var page in app.Settings.Pages.ToArray())
+        {
+            app.Settings.Remove(page.Id);
+        }
+
         app.Settings.Register(new SamplePage());
-        var panel = app.Panels.All.Single(p => p.Id == ShellPanels.Settings).Factory(app.Services);
+        var panel = app.Panels.All.Single(static p => p.Id == ShellPanels.Settings).Factory(app.Services);
         panel.GetType().GetField("filter", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(panel, query);
         var input = Substitute.For<IInputHandler>();
         input.MousePosition.Returns(new Vector2(-1));
@@ -158,9 +172,19 @@ public sealed class SettingsPanelTests
 
     static LayoutNode? Find(LayoutNode node, string id)
     {
-        if (node.Id == id) return node;
+        if (node.Id == id)
+        {
+            return node;
+        }
+
         foreach (var child in node.Children)
-            if (Find(child, id) is { } found) return found;
+        {
+            if (Find(child, id) is { } found)
+            {
+                return found;
+            }
+        }
+
         return null;
     }
 }

@@ -20,7 +20,11 @@ public sealed class BuildProfilesTests : IDisposable
     IReadOnlyList<ResolvedPackage> Install(params string[] ids)
     {
         var manifest = new ProjectManifest();
-        foreach (var id in ids) manifest.Dependencies[id] = $"builtin:{id}";
+        foreach (var id in ids)
+        {
+            manifest.Dependencies[id] = $"builtin:{id}";
+        }
+
         manifest.Save(project);
         ProjectPackages.Invalidate(project);
         return ProjectPackages.Resolve(project).Packages;
@@ -58,7 +62,7 @@ public sealed class BuildProfilesTests : IDisposable
     {
         BuildProfiles.EnsureSupported([Brick("a.any"), Brick("a.desktop", "Desktop")], BuildPlatforms.Desktop);
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
+        var error = Assert.Throws<InvalidOperationException>(static () =>
             BuildProfiles.EnsureSupported([Brick("a.any"), Brick("a.desktop", "desktop"), Brick("a.xr", "xr")], "android"));
         Assert.Contains("a.desktop, a.xr", error.Message);
         Assert.DoesNotContain("a.any", error.Message);
@@ -90,7 +94,7 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Equal("1.0.0", manifest.NugetFor("desktop")["X"]);
         Assert.Equal(["desktop"], PackageManifest.Parse(manifest.ToJson(), "package.json").Platforms);
 
-        Assert.Throws<PackageException>(() =>
+        Assert.Throws<PackageException>(static () =>
             PackageManifest.Parse("""{"name":"a.b","version":"1.0.0","platforms":[" "]}""", "package.json"));
     }
 
@@ -130,7 +134,7 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Same(desktop.GetType(), BuildPlatforms.Find("DESKTOP").GetType());
         Assert.Equal("Desktop", desktop.DisplayName);
         Assert.True(Directory.Exists(desktop.LauncherDirectory));
-        Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(() => BuildPlatforms.Find("android")).Message);
+        Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(static () => BuildPlatforms.Find("android")).Message);
         Assert.Equal(["publish", "game.csproj", "-o", "out", "-c", "Release", "--no-restore"],
             desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
                 "game.csproj", "out", "Release", null)));
@@ -266,8 +270,14 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Contains(ProjectPackages.ResolveOrEmpty(project), static p => p.Id == ProjectPackages.RenderBrick);
         Install("org.mass4.turian.cameras");
 
-        if (disable) BrickService.Disable(project, ProjectPackages.RenderBrick);
-        else Assert.True(BrickService.Remove(project, ProjectPackages.RenderBrick));
+        if (disable)
+        {
+            BrickService.Disable(project, ProjectPackages.RenderBrick);
+        }
+        else
+        {
+            Assert.True(BrickService.Remove(project, ProjectPackages.RenderBrick));
+        }
 
         Assert.Null(ProjectManifest.Load(project).Manifest.Dependencies[ProjectPackages.RenderBrick]);
         Assert.Equal(["org.mass4.turian.cameras"], ProjectPackages.Resolve(project).Packages.Select(static p => p.Id));

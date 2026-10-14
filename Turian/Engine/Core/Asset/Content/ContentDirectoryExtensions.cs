@@ -24,7 +24,10 @@ public static class ContentDirectoryExtensions
         using var source = directory.Open(path);
         var bytes = new byte[checked((int)source.Length)];
         if (source.ReadAt(0, bytes) != bytes.Length)
+        {
             throw new EndOfStreamException($"Content '{path}' ended before its declared length.");
+        }
+
         return bytes;
     }
 

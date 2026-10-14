@@ -19,7 +19,7 @@ public struct QueueFamilyIndices
     /// Checks if both graphics and present queue families are available.
     /// </summary>
     /// <returns>True if both families are available, otherwise false.</returns>
-    public bool IsComplete()
+    public readonly bool IsComplete()
     {
         return GraphicsFamily.HasValue && PresentFamily.HasValue;
     }

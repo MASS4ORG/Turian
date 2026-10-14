@@ -77,7 +77,10 @@ public sealed class UiRuntime : IDisposable
 
         backend.Render(canvas =>
         {
-            if (canvasScale is not 1f) canvas.Scale(canvasScale);
+            if (canvasScale is not 1f)
+            {
+                canvas.Scale(canvasScale);
+            }
 
             Gui.SetStage(Pass.Pass1Build);
             Gui.BeginFrame(canvas, font, iconFont);
@@ -97,7 +100,11 @@ public sealed class UiRuntime : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         backend.Dispose();
     }

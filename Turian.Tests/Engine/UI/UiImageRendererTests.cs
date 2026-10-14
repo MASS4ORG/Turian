@@ -11,7 +11,7 @@ public sealed class UiImageRendererTests
     public void RenderPng_ProducesDecodablePngOfRequestedSize()
     {
         var png = UiImageRenderer.RenderPng(
-            gui =>
+            static gui =>
             {
                 using (gui.Node(240, 80).Enter())
                 {
@@ -38,10 +38,12 @@ public sealed class UiImageRendererTests
     public void RenderPng_ContainsDrawnColor()
     {
         var png = UiImageRenderer.RenderPng(
-            gui =>
+            static gui =>
             {
                 using (gui.Node(300, 140).Enter())
+                {
                     gui.DrawBackgroundRect(GuiColor.Red);
+                }
             },
             width: 320,
             height: 160);
@@ -49,11 +51,16 @@ public sealed class UiImageRendererTests
         using var bitmap = SKBitmap.Decode(png);
         var hitRed = false;
         for (var y = 0; y < bitmap.Height && !hitRed; y += 8)
+        {
             for (var x = 0; x < bitmap.Width && !hitRed; x += 8)
             {
                 var c = bitmap.GetPixel(x, y);
-                if (c is { Red: > 180, Green: < 80, Blue: < 80 }) hitRed = true;
+                if (c is { Red: > 180, Green: < 80, Blue: < 80 })
+                {
+                    hitRed = true;
+                }
             }
+        }
 
         Assert.True(hitRed, "expected the red panel to appear in the rendered image");
     }
@@ -93,7 +100,7 @@ public sealed class UiImageRendererTests
     [Fact]
     public void RenderPng_RejectsNonPositiveDimensions()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => UiImageRenderer.RenderPng(_ => { }, 0, 100));
-        Assert.Throws<ArgumentOutOfRangeException>(() => UiImageRenderer.RenderPng(_ => { }, 100, -5));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => UiImageRenderer.RenderPng(static _ => { }, 0, 100));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => UiImageRenderer.RenderPng(static _ => { }, 100, -5));
     }
 }

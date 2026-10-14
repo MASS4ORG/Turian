@@ -161,7 +161,10 @@ public class NodeTest
         var watch = Stopwatch.StartNew();
         await Task.Run(() =>
         {
-            for (var i = 0; i < 20_000; i++) root.Children.Add(new Node());
+            for (var i = 0; i < 20_000; i++)
+            {
+                root.Children.Add(new Node());
+            }
         }, TestContext.Current.CancellationToken);
         watch.Stop();
 

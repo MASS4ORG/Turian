@@ -40,9 +40,12 @@ public class AssimpModelConverterTests
             AssimpModelConverter.ConvertToGlb(source, destination);
             using var document = JsonDocument.Parse(ModelUtils.LoadJsonFromGlb(destination));
             if (document.RootElement.TryGetProperty("meshes", out var meshes))
+            {
                 Assert.Empty(meshes.EnumerateArray());
+            }
+
             Assert.Contains(document.RootElement.GetProperty("nodes").EnumerateArray(),
-                node => node.TryGetProperty("name", out var name) && name.GetString() == "Root");
+                static node => node.TryGetProperty("name", out var name) && name.GetString() == "Root");
             Assert.Empty(GltfModelReader.Load(destination).Vertices);
         }
         finally
@@ -84,6 +87,7 @@ public class AssimpModelConverterTests
             using var document = JsonDocument.Parse(ModelUtils.LoadJsonFromGlb(destination));
             var root = document.RootElement;
             foreach (var mesh in root.GetProperty("meshes").EnumerateArray())
+            {
                 foreach (var primitive in mesh.GetProperty("primitives").EnumerateArray())
                 {
                     var index = primitive.GetProperty("attributes").GetProperty("TANGENT").GetInt32();
@@ -91,12 +95,14 @@ public class AssimpModelConverterTests
                     Assert.Equal("VEC4", tangent.GetProperty("type").GetString());
                     Assert.Equal(5126, tangent.GetProperty("componentType").GetInt32());
                 }
+            }
+
             var builder = GltfModelReader.Load(destination);
             AssertTangentBasis(builder);
             var vertices = builder.Vertices;
-            Assert.Contains(vertices, v => v.Tangent.W == 1);
-            Assert.Contains(vertices, v => v.Tangent.W == -1);
-            Assert.All(vertices, v => Assert.Equal(1f,
+            Assert.Contains(vertices, static v => v.Tangent.W == 1);
+            Assert.Contains(vertices, static v => v.Tangent.W == -1);
+            Assert.All(vertices, static v => Assert.Equal(1f,
                 new Vector3(v.Tangent.X, v.Tangent.Y, v.Tangent.Z).Length(), precision: 5));
         }
         finally

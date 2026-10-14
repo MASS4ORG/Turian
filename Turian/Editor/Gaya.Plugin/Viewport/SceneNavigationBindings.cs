@@ -23,9 +23,18 @@ sealed class SceneNavigationBindings(IShortcutService shortcuts, IFocusTracker f
     public void Read(IInputHandler input, HashSet<int> held, bool editingText)
     {
         held.Clear();
-        if (editingText || focus.ActivePanelId != GayaPlugin.ViewportPanelId) return;
+        if (editingText || focus.ActivePanelId != GayaPlugin.ViewportPanelId)
+        {
+            return;
+        }
+
         for (var i = 0; i < Directions.Length; i++)
-            if (shortcuts.IsHeld(CommandId(i), input, focus.ActivePanelId, KeyModifiers.Shift)) held.Add(i);
+        {
+            if (shortcuts.IsHeld(CommandId(i), input, focus.ActivePanelId, KeyModifiers.Shift))
+            {
+                held.Add(i);
+            }
+        }
     }
 
     /// <summary>Registers editable movement bindings and commands that nudge the camera from the palette.</summary>

@@ -16,7 +16,7 @@ sealed partial class Build
     string ResolveVersion()
     {
         var range = HasAnyTags ? $"{CurrentTag}..HEAD" : "HEAD";
-        var messageLines = Git($"log --format=%B {range}", logOutput: false).Select(output => output.Text);
+        var messageLines = Git($"log --format=%B {range}", logOutput: false).Select(static output => output.Text);
         return BumpVersion(CurrentVersion, messageLines);
     }
 
@@ -65,8 +65,8 @@ sealed partial class Build
                 try
                 {
                     CachedTag = Git("tag --merged HEAD --sort=-version:refname", logOutput: false)
-                        .Select(output => output.Text)
-                        .FirstOrDefault(tag => ReleaseTagRegex().IsMatch(tag)) ?? "0.0.0";
+                        .Select(static output => output.Text)
+                        .FirstOrDefault(static tag => ReleaseTagRegex().IsMatch(tag)) ?? "0.0.0";
                 }
                 catch
                 {
@@ -157,7 +157,10 @@ sealed partial class Build
                     var path = project.Path;
                     var text = File.ReadAllText(path);
                     var stamped = ProjectVersionRegex().Replace(text, $"<Version>{Version}</Version>", 1);
-                    if (stamped == text) continue;
+                    if (stamped == text)
+                    {
+                        continue;
+                    }
 
                     var bom = File.ReadAllBytes(path) is [0xEF, 0xBB, 0xBF, ..];
                     File.WriteAllText(path, stamped, new UTF8Encoding(bom));

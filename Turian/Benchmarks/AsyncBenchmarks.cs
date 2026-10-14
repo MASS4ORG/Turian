@@ -20,15 +20,26 @@ static class AsyncBenchmarks
         using var scheduler = new GameLoopScheduler();
         var routines = new Task[Waiters];
         for (var i = 0; i < Waiters; i++)
+        {
             routines[i] = Loop(scheduler, resume);
-        for (var frame = 0; frame < WarmupFrames; frame++) Pump(scheduler);
+        }
+
+        for (var frame = 0; frame < WarmupFrames; frame++)
+        {
+            Pump(scheduler);
+        }
+
         var samples = new double[Samples];
         var allocated = 0L;
         for (var sample = 0; sample < Samples; sample++)
         {
             var start = Stopwatch.GetTimestamp();
             var before = GC.GetAllocatedBytesForCurrentThread();
-            for (var frame = 0; frame < MeasuredFrames; frame++) Pump(scheduler);
+            for (var frame = 0; frame < MeasuredFrames; frame++)
+            {
+                Pump(scheduler);
+            }
+
             allocated += GC.GetAllocatedBytesForCurrentThread() - before;
             samples[sample] = Stopwatch.GetElapsedTime(start).TotalNanoseconds / (MeasuredFrames * Waiters);
         }
@@ -38,7 +49,9 @@ static class AsyncBenchmarks
         scheduler.Dispose();
         Task.WhenAll(routines).GetAwaiter().GetResult();
         if (allocated != 0)
+        {
             throw new InvalidOperationException($"{label} allocated {allocated} bytes after warm-up.");
+        }
     }
 
     static async Task Loop(GameLoopScheduler scheduler, bool resume)
@@ -47,8 +60,14 @@ static class AsyncBenchmarks
         {
             while (true)
             {
-                if (resume) await scheduler.NextFrame();
-                else await scheduler.Seconds(double.MaxValue);
+                if (resume)
+                {
+                    await scheduler.NextFrame();
+                }
+                else
+                {
+                    await scheduler.Seconds(double.MaxValue);
+                }
             }
         }
         catch (OperationCanceledException) when (scheduler.IsStopped) { }

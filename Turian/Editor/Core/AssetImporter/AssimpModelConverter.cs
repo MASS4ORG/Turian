@@ -67,7 +67,7 @@ public static partial class AssimpModelConverter
         | PostProcessSteps.GenerateBoundingBoxes);
 
     static readonly Lazy<AssimpApi> Assimp =
-        new(() => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
+        new(static () => new AssimpApi(AssimpApi.CreateDefaultContext(NativeLibraryNames)), isThreadSafe: true);
 
     internal static AssimpApi Api => Assimp.Value;
     internal static uint PostProcessFlags => postProcessFlags;
@@ -80,7 +80,10 @@ public static partial class AssimpModelConverter
         var api = Api;
         var scene = api.ImportFile(sourcePath, postProcessFlags);
         if (scene is null)
+        {
             throw new InvalidDataException($"Assimp failed to read '{sourcePath}': {api.GetErrorStringS()}");
+        }
+
         try
         {
             ExportScene(api, scene, sourcePath, destinationPath);
@@ -94,12 +97,17 @@ public static partial class AssimpModelConverter
         AssimpScene* copy = null;
         api.CopyScene(scene, &copy);
         if (copy is null)
+        {
             throw new InvalidDataException($"Assimp failed to copy '{sourcePath}' for export.");
+        }
+
         try
         {
             // The native exporter reapplies required indexing to copied scenes without imported processing flags.
             if (api.ExportScene(copy, "glb2", destinationPath, 0) != Silk.NET.Assimp.Return.Success)
+            {
                 throw new InvalidDataException($"Assimp failed to export '{sourcePath}': {api.GetErrorStringS()}");
+            }
         }
         finally { api.FreeScene(copy); }
     }

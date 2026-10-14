@@ -52,7 +52,10 @@ public sealed class AssetTypeCatalog
     /// <summary>Creates the catalog with the built-in kinds registered.</summary>
     public AssetTypeCatalog()
     {
-        foreach (var type in BuiltIn) Register(type);
+        foreach (var type in BuiltIn)
+        {
+            Register(type);
+        }
     }
 
     /// <summary>The registered kinds, in registration order.</summary>
@@ -70,7 +73,10 @@ public sealed class AssetTypeCatalog
         types.RemoveAll(existing => existing.Id == type.Id);
         types.Add(type);
 
-        foreach (var extension in type.Extensions) byExtension[extension] = type;
+        foreach (var extension in type.Extensions)
+        {
+            byExtension[extension] = type;
+        }
     }
 
     /// <summary>The kind claiming a file's extension, or null when nothing does.</summary>

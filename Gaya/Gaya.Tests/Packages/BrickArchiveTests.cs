@@ -12,7 +12,10 @@ public sealed class BrickArchiveTests : IDisposable
     public void Dispose()
     {
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -47,7 +50,7 @@ public sealed class BrickArchiveTests : IDisposable
         var packed = BrickArchive.Pack(brick, Path.Combine(root, "out"));
 
         using var zip = ZipFile.OpenRead(packed.Path);
-        Assert.Equal([".git-ignored.txt", "Runtime/Rule.txt", "package.json"], zip.Entries.Select(e => e.FullName).Order(StringComparer.Ordinal));
+        Assert.Equal([".git-ignored.txt", "Runtime/Rule.txt", "package.json"], zip.Entries.Select(static e => e.FullName).Order(StringComparer.Ordinal));
     }
 
     /// <summary>A brick file is read back as the same manifest and extracts to the same files.</summary>
@@ -72,7 +75,10 @@ public sealed class BrickArchiveTests : IDisposable
 
         var empty = Path.Combine(root, "empty.brick");
         using (var zip = ZipFile.Open(empty, ZipArchiveMode.Create))
+        {
             zip.CreateEntry("readme.txt");
+        }
+
         Assert.Throws<PackageException>(() => BrickArchive.ReadManifest(empty));
     }
 

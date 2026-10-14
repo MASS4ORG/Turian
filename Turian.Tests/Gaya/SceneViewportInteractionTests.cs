@@ -141,11 +141,11 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         Assert.Empty(inspector.SelectedNodes);
         Assert.Equal(initialPosition, viewer.Camera.Position);
         inspector.Select(node);
-        input.IsKeyDown(KeyboardKey.LeftShift).Returns(true);
+        input.IsKeyDown(GKey.LeftShift).Returns(true);
         DragRectangle();
         Assert.Equal([node], inspector.SelectedNodes);
-        input.IsKeyDown(KeyboardKey.LeftShift).Returns(false);
-        input.IsKeyDown(KeyboardKey.LeftControl).Returns(true);
+        input.IsKeyDown(GKey.LeftShift).Returns(false);
+        input.IsKeyDown(GKey.LeftControl).Returns(true);
         DragRectangle();
         Assert.Equal([node], inspector.SelectedNodes);
         input.MousePosition.Returns(new Vector2(500, 300));
@@ -156,7 +156,7 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         input.IsMouseButtonDown(GMouseButton.Left).Returns(false);
         Frame();
         Assert.Equal([node], inspector.SelectedNodes);
-        input.IsKeyDown(KeyboardKey.LeftControl).Returns(false);
+        input.IsKeyDown(GKey.LeftControl).Returns(false);
 
         void PanelFrame() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
 
@@ -167,7 +167,10 @@ public sealed class SceneViewportInteractionTests(VulkanFixture fixture) : IClas
         {
             InspectorFormsRenderingTests.Frame(gui, surface, font, current =>
             {
-                using (current.Node(960, 540, "viewport").Enter()) viewport.Render(current);
+                using (current.Node(960, 540, "viewport").Enter())
+                {
+                    viewport.Render(current);
+                }
             });
             undo.Flush();
         }

@@ -91,22 +91,36 @@ public sealed class UiDocumentAssetImporter : IAssetImporter
 
         foreach (var reference in CollectReferences(document))
         {
-            if (!LooksLikePath(reference)) continue;
+            if (!LooksLikePath(reference))
+            {
+                continue;
+            }
+
             var absolute = Path.GetFullPath(Path.Combine(baseDir, reference));
             if (File.Exists(absolute))
+            {
                 context.EnsureAsset(absolute);
+            }
         }
     }
 
     static IEnumerable<string> CollectReferences(UiDocument document)
     {
         foreach (var src in document.StyleSheets)
+        {
             yield return src;
+        }
 
         foreach (var element in document.Elements())
+        {
             foreach (var attribute in PathAttributes)
+            {
                 if (element.Attributes.TryGetValue(attribute, out var value) && !string.IsNullOrWhiteSpace(value))
+                {
                     yield return value.Trim();
+                }
+            }
+        }
     }
 
     static bool LooksLikePath(string value) =>

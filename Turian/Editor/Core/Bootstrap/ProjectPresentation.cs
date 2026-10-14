@@ -10,8 +10,16 @@ public static class ProjectPresentation
     {
         ArgumentNullException.ThrowIfNull(project);
         var name = project.Get<PlayerSettings>().ProductName;
-        if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
-        if (!string.IsNullOrWhiteSpace(project.Title)) return project.Title.Trim();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(project.Title))
+        {
+            return project.Title.Trim();
+        }
+
         return Path.GetFileName(Path.TrimEndingDirectorySeparator(project.ProjectAbsoluteDir));
     }
 
@@ -21,7 +29,10 @@ public static class ProjectPresentation
     public static string Name(string directory)
     {
         if (SettingsService.Load(directory) is not { } project)
+        {
             return Path.GetFileName(Path.TrimEndingDirectorySeparator(directory));
+        }
+
         ProjectSettingsLoader.LoadFromSources(project);
         return Name(project);
     }

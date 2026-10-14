@@ -94,5 +94,5 @@ public struct PointLight : IEquatable<PointLight>
     public static bool operator !=(PointLight left, PointLight right) => !left.Equals(right);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(position, color);
+    public override readonly int GetHashCode() => HashCode.Combine(position, color);
 }

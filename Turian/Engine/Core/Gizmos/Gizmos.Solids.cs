@@ -64,7 +64,11 @@ public sealed partial class Gizmos
     void DrawRoundSolid(Vector3 from, Vector3 to, float radius, bool cone)
     {
         var direction = to - from;
-        if (direction.LengthSquared() < 1e-9f || radius <= 0f) return;
+        if (direction.LengthSquared() < 1e-9f || radius <= 0f)
+        {
+            return;
+        }
+
         var normal = Vector3.Normalize(direction);
         var (u, v) = OrthonormalBasis(normal);
         for (var i = 0; i < solidSegments; i++)
@@ -77,8 +81,14 @@ public sealed partial class Gizmos
             Shade(-normal);
             DrawTriangle(from, from + offsetB, from + offsetA);
             Color = color;
-            if (cone) ConeSide(from, to, offsetA, offsetB);
-            else CylinderSide(from, to, offsetA, offsetB, normal);
+            if (cone)
+            {
+                ConeSide(from, to, offsetA, offsetB);
+            }
+            else
+            {
+                CylinderSide(from, to, offsetA, offsetB, normal);
+            }
         }
     }
 

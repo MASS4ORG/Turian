@@ -57,7 +57,10 @@ public sealed partial class AssetFileOperations(AssetFileSystem files, UndoServi
     /// <returns>The pasted entry's path, or null when nothing was pasted.</returns>
     public string? Paste(string directory)
     {
-        if (files.ClipboardSource is not { } source) return null;
+        if (files.ClipboardSource is not { } source)
+        {
+            return null;
+        }
 
         var isDirectory = Directory.Exists(source);
         string? pasted = null;
@@ -101,13 +104,21 @@ public sealed partial class AssetFileOperations(AssetFileSystem files, UndoServi
         undo.Perform(label, [],
             () =>
             {
-                if (!first && !perform()) throw new IOException($"Could not redo {label}.");
+                if (!first && !perform())
+                {
+                    throw new IOException($"Could not redo {label}.");
+                }
+
                 first = false;
                 Changed?.Invoke();
             },
             () =>
             {
-                if (!revert()) throw new IOException($"Could not undo {label}.");
+                if (!revert())
+                {
+                    throw new IOException($"Could not undo {label}.");
+                }
+
                 Changed?.Invoke();
             },
             document: UndoService.ProjectDocument);

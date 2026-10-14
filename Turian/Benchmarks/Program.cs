@@ -108,7 +108,10 @@ Guid[] CreateAssets(string prefix, Func<int, Stats> create, Guid[]? ids = null)
 
 void WarmFileCache()
 {
-    foreach (var file in Directory.EnumerateFiles(assets)) _ = File.ReadAllBytes(file);
+    foreach (var file in Directory.EnumerateFiles(assets))
+    {
+        _ = File.ReadAllBytes(file);
+    }
 }
 
 void Preload(Guid[] ids) => new RuntimeAssetLoader(database).PreloadAsync(ids).GetAwaiter().GetResult();
@@ -116,7 +119,10 @@ void Preload(Guid[] ids) => new RuntimeAssetLoader(database).PreloadAsync(ids).G
 void LoadSequentially(Guid[] ids)
 {
     var loader = new RuntimeAssetLoader(database);
-    foreach (var id in ids) _ = loader.LoadContentAsync<Stats>(id).GetAwaiter().GetResult();
+    foreach (var id in ids)
+    {
+        _ = loader.LoadContentAsync<Stats>(id).GetAwaiter().GetResult();
+    }
 }
 
 static void WithoutGenerated(Type type, Action run)
@@ -137,7 +143,11 @@ static double ReadNanoseconds(Stats stats)
     const int reads = 200_000_000;
     var sum = 0L;
     var watch = Stopwatch.StartNew();
-    for (var i = 0; i < reads; i++) sum += stats.Health;
+    for (var i = 0; i < reads; i++)
+    {
+        sum += stats.Health;
+    }
+
     watch.Stop();
     GC.KeepAlive(sum);
     return watch.Elapsed.TotalNanoseconds / reads;

@@ -10,7 +10,10 @@ static class LayerRegistrationMerge
         foreach (var value in code)
         {
             if (!registered.Add(value.Id))
+            {
                 throw new InvalidOperationException($"Code identity {value.Id} is registered more than once.");
+            }
+
             merged.Add(overrides.Remove(value.Id, out var asset) ? asset : value);
         }
         merged.AddRange(authored.Where(asset => overrides.ContainsKey(asset.Id)));
@@ -40,7 +43,10 @@ static class LayerRegistrationMerge
             });
         }
         if (overrides.Count != 0)
+        {
             throw new InvalidOperationException("An included value has no registered group membership.");
+        }
+
         return result;
     }
 
@@ -50,7 +56,9 @@ static class LayerRegistrationMerge
         foreach (var value in values)
         {
             if (!indexed.TryAdd(value.Id, value))
+            {
                 throw new InvalidOperationException($"Authored identity {value.Id} is registered more than once.");
+            }
         }
         return indexed;
     }

@@ -33,7 +33,9 @@ public sealed class StringTable
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (string.IsNullOrWhiteSpace(entry.Key))
+        {
             throw new ArgumentException("A localization entry key is required.", nameof(entry));
+        }
 
         entries[entry.Key] = entry;
     }
@@ -93,7 +95,9 @@ public sealed class StringTableEntry
     public string Resolve(string locale, decimal? count)
     {
         if (count is not null && Plurals.TryGetValue(PluralRules.GetCategory(locale, count.Value), out var plural))
+        {
             return plural;
+        }
 
         return string.IsNullOrEmpty(Translation) ? Source : Translation;
     }

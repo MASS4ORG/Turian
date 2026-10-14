@@ -42,7 +42,7 @@ public sealed class EditorSettings : IEditorSettings
 
     /// <inheritdoc />
     public IReadOnlyList<SettingsPageDescriptor> Pages =>
-        [.. pages.OrderBy(page => page.Order).ThenBy(page => page.Path, StringComparer.OrdinalIgnoreCase)];
+        [.. pages.OrderBy(static page => page.Order).ThenBy(static page => page.Path, StringComparer.OrdinalIgnoreCase)];
 
     /// <inheritdoc />
     public bool HasWorkspace => workspace is not null;
@@ -64,8 +64,14 @@ public sealed class EditorSettings : IEditorSettings
         Store(page.Scope)?.Restore(page);
 
         var existing = pages.FindIndex(registered => registered.Id == page.Id);
-        if (existing >= 0) pages[existing] = page;
-        else pages.Add(page);
+        if (existing >= 0)
+        {
+            pages[existing] = page;
+        }
+        else
+        {
+            pages.Add(page);
+        }
 
         Changed?.Invoke();
     }
@@ -73,7 +79,10 @@ public sealed class EditorSettings : IEditorSettings
     /// <inheritdoc />
     public void Remove(string pageId)
     {
-        if (pages.RemoveAll(page => page.Id == pageId) > 0) Changed?.Invoke();
+        if (pages.RemoveAll(page => page.Id == pageId) > 0)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <inheritdoc />
@@ -81,15 +90,20 @@ public sealed class EditorSettings : IEditorSettings
     {
         // Whatever the previous project's pages hold is written before it is let go, or an edit made
         // just before switching projects would be lost.
-        if (workspace is not null && dirty.Contains(SettingsScope.Workspace)) Write(SettingsScope.Workspace);
+        if (workspace is not null && dirty.Contains(SettingsScope.Workspace))
+        {
+            Write(SettingsScope.Workspace);
+        }
 
         workspace = string.IsNullOrWhiteSpace(projectDirectory)
             ? null
             : new StudioSettingsStore(log,
                 Path.Combine(projectDirectory, WorkspaceDirectory, FileName));
 
-        foreach (var page in pages.Where(page => page.Scope == SettingsScope.Workspace))
+        foreach (var page in pages.Where(static page => page.Scope == SettingsScope.Workspace))
+        {
             workspace?.Restore(page);
+        }
 
         log.LogDebug("Settings: workspace scope is {Path}", workspace?.Path ?? "unbound");
         Changed?.Invoke();
@@ -107,7 +121,10 @@ public sealed class EditorSettings : IEditorSettings
     public void Save()
     {
         Write(SettingsScope.User);
-        if (workspace is not null) Write(SettingsScope.Workspace);
+        if (workspace is not null)
+        {
+            Write(SettingsScope.Workspace);
+        }
     }
 
     /// <summary>
@@ -116,7 +133,10 @@ public sealed class EditorSettings : IEditorSettings
     /// </summary>
     public void Flush()
     {
-        if (dirty.Count == 0 || sinceWrite.Elapsed < WriteInterval) return;
+        if (dirty.Count == 0 || sinceWrite.Elapsed < WriteInterval)
+        {
+            return;
+        }
 
         Save();
     }

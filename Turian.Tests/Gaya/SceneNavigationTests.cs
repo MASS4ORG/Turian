@@ -15,14 +15,14 @@ public sealed class SceneNavigationTests
         focus.ActivePanelId.Returns(GayaPlugin.ViewportPanelId);
         var navigation = new SceneNavigationBindings(shortcuts, focus);
         var input = Substitute.For<IInputHandler>();
-        var keys = new HashSet<KeyboardKey>();
-        input.IsKeyDown(Arg.Any<KeyboardKey>()).Returns(call => keys.Contains(call.Arg<KeyboardKey>()));
+        var keys = new HashSet<GKey>();
+        input.IsKeyDown(Arg.Any<GKey>()).Returns(call => keys.Contains(call.Arg<GKey>()));
         var held = new HashSet<int>();
-        keys.UnionWith([KeyboardKey.W, KeyboardKey.A, KeyboardKey.S, KeyboardKey.D, KeyboardKey.Q, KeyboardKey.E]);
+        keys.UnionWith([GKey.W, GKey.A, GKey.S, GKey.D, GKey.Q, GKey.E]);
         navigation.Read(input, held, false);
         Assert.Empty(held);
         keys.Clear();
-        keys.UnionWith([KeyboardKey.Up, KeyboardKey.Down, KeyboardKey.Left, KeyboardKey.Right]);
+        keys.UnionWith([GKey.Up, GKey.Down, GKey.Left, GKey.Right]);
         navigation.Read(input, held, false);
         Assert.Equal([0, 1, 2, 3], held.Order());
         Assert.Null(shortcuts.Entries.Single(entry => entry.CommandId == SceneNavigationBindings.CommandId(4)).Effective);
@@ -30,7 +30,7 @@ public sealed class SceneNavigationTests
         Assert.Equal("Up", navigation.DisplayFor(SceneNavigationBindings.CommandId(0)));
         Assert.Empty(shortcuts.Conflicts);
         keys.Clear();
-        keys.UnionWith([KeyboardKey.Up, KeyboardKey.LeftShift]);
+        keys.UnionWith([GKey.Up, GKey.LeftShift]);
         navigation.Read(input, held, false);
         Assert.Equal([0], held);
         navigation.Read(input, held, true);
@@ -43,18 +43,18 @@ public sealed class SceneNavigationTests
         navigation.Read(input, held, false);
         Assert.Empty(held);
         shortcuts.IsCapturing = false;
-        shortcuts.Rebind(SceneNavigationBindings.CommandId(0), new KeyStroke(KeyboardKey.I));
+        shortcuts.Rebind(SceneNavigationBindings.CommandId(0), new KeyStroke(GKey.I));
         navigation.Read(input, held, false);
         Assert.Empty(held);
-        keys.Add(KeyboardKey.I);
+        keys.Add(GKey.I);
         navigation.Read(input, held, false);
         Assert.Equal([0], held);
         shortcuts.Rebind(SceneNavigationBindings.CommandId(0), KeyStroke.None);
         navigation.Read(input, held, false);
         Assert.Empty(held);
-        shortcuts.Rebind(SceneNavigationBindings.CommandId(4), new KeyStroke(KeyboardKey.PageUp));
+        shortcuts.Rebind(SceneNavigationBindings.CommandId(4), new KeyStroke(GKey.PageUp));
         keys.Clear();
-        keys.Add(KeyboardKey.PageUp);
+        keys.Add(GKey.PageUp);
         navigation.Read(input, held, false);
         Assert.Equal([4], held);
         shortcuts.ResetAll();
@@ -67,57 +67,57 @@ public sealed class SceneNavigationTests
     public void ContinuousShortcutsHonorShortcutRules()
     {
         var shortcuts = new ShortcutService(NullLogger.Instance);
-        var binding = new KeyBinding("move", KeyboardKey.Up, context: GayaPlugin.ViewportPanelId) { IsContinuous = true };
+        var binding = new KeyBinding("move", GKey.Up, context: GayaPlugin.ViewportPanelId) { IsContinuous = true };
         shortcuts.Add(binding);
         var input = Substitute.For<IInputHandler>();
-        var keys = new HashSet<KeyboardKey>();
-        input.IsKeyDown(Arg.Any<KeyboardKey>()).Returns(call => keys.Contains(call.Arg<KeyboardKey>()));
-        input.IsKeyPressed(Arg.Any<KeyboardKey>()).Returns(call => keys.Contains(call.Arg<KeyboardKey>()));
+        var keys = new HashSet<GKey>();
+        input.IsKeyDown(Arg.Any<GKey>()).Returns(call => keys.Contains(call.Arg<GKey>()));
+        input.IsKeyPressed(Arg.Any<GKey>()).Returns(call => keys.Contains(call.Arg<GKey>()));
         Assert.False(Held());
-        keys.Add(KeyboardKey.Up);
+        keys.Add(GKey.Up);
         Assert.True(Held());
         Assert.Null(shortcuts.Dispatch(input, GayaPlugin.ViewportPanelId));
         Assert.False(shortcuts.IsHeld("missing", input, GayaPlugin.ViewportPanelId));
         Assert.False(shortcuts.IsHeld("move", input, GayaPlugin.AssetsPanelId));
-        foreach (var key in new[] { KeyboardKey.LeftControl, KeyboardKey.LeftAlt, KeyboardKey.LeftShift })
+        foreach (var key in new[] { GKey.LeftControl, GKey.LeftAlt, GKey.LeftShift })
         {
             keys.Add(key);
             Assert.False(Held());
             keys.Remove(key);
         }
-        keys.Add(KeyboardKey.RightShift);
+        keys.Add(GKey.RightShift);
         Assert.True(shortcuts.IsHeld("move", input, GayaPlugin.ViewportPanelId, KeyModifiers.Shift));
         keys.Clear();
-        keys.UnionWith([KeyboardKey.RightControl, KeyboardKey.RightAlt, KeyboardKey.RightShift, KeyboardKey.Up]);
-        shortcuts.Rebind("move", new KeyStroke(KeyboardKey.Up, KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift));
+        keys.UnionWith([GKey.RightControl, GKey.RightAlt, GKey.RightShift, GKey.Up]);
+        shortcuts.Rebind("move", new KeyStroke(GKey.Up, KeyModifiers.Ctrl | KeyModifiers.Alt | KeyModifiers.Shift));
         Assert.True(Held());
-        keys.Remove(KeyboardKey.RightControl);
+        keys.Remove(GKey.RightControl);
         Assert.False(Held());
-        Assert.Throws<ArgumentException>(() => shortcuts.Rebind("move", new KeyStroke(KeyboardKey.K),
-            new KeyStroke(KeyboardKey.S)));
+        Assert.Throws<ArgumentException>(() => shortcuts.Rebind("move", new KeyStroke(GKey.K),
+            new KeyStroke(GKey.S)));
         shortcuts.ResetAll();
         keys.Clear();
-        keys.Add(KeyboardKey.Up);
-        shortcuts.Add(new KeyBinding("global", KeyboardKey.Up));
+        keys.Add(GKey.Up);
+        shortcuts.Add(new KeyBinding("global", GKey.Up));
         Assert.Equal("move", shortcuts.Entries.First(entry => entry.CommandId == "move").CommandId);
         Assert.True(Held());
         shortcuts.Remove("move");
         Assert.False(Held());
         shortcuts.Add(binding with { Context = ShortcutContexts.Global });
-        shortcuts.Add(new KeyBinding("scoped", KeyboardKey.Up, context: GayaPlugin.ViewportPanelId));
+        shortcuts.Add(new KeyBinding("scoped", GKey.Up, context: GayaPlugin.ViewportPanelId));
         Assert.False(Held());
         shortcuts.Remove("scoped");
         shortcuts.Remove("global");
-        shortcuts.Add(new KeyBinding("chord", new KeyStroke(KeyboardKey.K), new KeyStroke(KeyboardKey.S)));
+        shortcuts.Add(new KeyBinding("chord", new KeyStroke(GKey.K), new KeyStroke(GKey.S)));
         keys.Clear();
-        keys.Add(KeyboardKey.K);
+        keys.Add(GKey.K);
         shortcuts.Dispatch(input, GayaPlugin.ViewportPanelId);
-        keys.Add(KeyboardKey.Up);
+        keys.Add(GKey.Up);
         Assert.False(Held());
         shortcuts.CancelPending();
         Assert.True(Held());
         shortcuts.Remove("move");
-        shortcuts.Add(binding with { Second = new KeyStroke(KeyboardKey.S) });
+        shortcuts.Add(binding with { Second = new KeyStroke(GKey.S) });
         Assert.False(Held());
         shortcuts.Add(binding with { Stroke = KeyStroke.None });
         Assert.False(Held());

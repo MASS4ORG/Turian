@@ -26,7 +26,10 @@ public class GlfwSurfaceHost : ISurfaceHost
         set
         {
             title = value;
-            if (Window is IWindow window) window.Title = value;
+            if (Window is IWindow window)
+            {
+                window.Title = value;
+            }
         }
     }
 
@@ -91,7 +94,10 @@ public class GlfwSurfaceHost : ISurfaceHost
         Window.Update += Update;
         Window.FramebufferResize += OnFramebufferResize;
         Window.Closing += OnClosing;
-        if (Window is IWindow window) window.StateChanged += OnStateChanged;
+        if (Window is IWindow window)
+        {
+            window.StateChanged += OnStateChanged;
+        }
     }
 
     /// <summary>Gets whether the window is minimized, which the host reports as a lost surface.</summary>
@@ -105,12 +111,21 @@ public class GlfwSurfaceHost : ISurfaceHost
     internal void OnStateChanged(WindowState state)
     {
         var minimized = state == WindowState.Minimized;
-        if (minimized == IsSurfaceLost) return;
+        if (minimized == IsSurfaceLost)
+        {
+            return;
+        }
 
         IsSurfaceLost = minimized;
         Window.IsEventDriven = minimized;
-        if (minimized) SurfaceLost?.Invoke();
-        else SurfaceRestored?.Invoke();
+        if (minimized)
+        {
+            SurfaceLost?.Invoke();
+        }
+        else
+        {
+            SurfaceRestored?.Invoke();
+        }
     }
 
     /// <inheritdoc />
@@ -121,7 +136,10 @@ public class GlfwSurfaceHost : ISurfaceHost
     public unsafe void DestroySurface(Vk vk, Instance instance, SurfaceKHR surface)
     {
         ArgumentNullException.ThrowIfNull(vk);
-        if (!vk.TryGetInstanceExtension(instance, out KhrSurface khrSurface)) return;
+        if (!vk.TryGetInstanceExtension(instance, out KhrSurface khrSurface))
+        {
+            return;
+        }
 
         khrSurface.DestroySurface(instance, surface, null);
     }
@@ -152,7 +170,10 @@ public class GlfwSurfaceHost : ISurfaceHost
 
     void Update(double frametime)
     {
-        if (!ShowStats) return;
+        if (!ShowStats)
+        {
+            return;
+        }
 
         frameCount++;
         if (DateTime.Now.Ticks - fpsLastUpdate < fpsUpdateInterval)
@@ -175,7 +196,10 @@ public class GlfwSurfaceHost : ISurfaceHost
     /// <param name="path">The icon a game's build wrote, relative to <paramref name="content"/>.</param>
     public void SetIcon(IContentDirectory content, string path)
     {
-        if (TryLoadIcon(Window, content, path, out var window, out var icon)) window.SetWindowIcon(ref icon);
+        if (TryLoadIcon(Window, content, path, out var window, out var icon))
+        {
+            window.SetWindowIcon(ref icon);
+        }
     }
 
     /// <summary>Reads the icon at <paramref name="path"/> when <paramref name="view"/> is a window and it exists.</summary>
@@ -194,7 +218,10 @@ public class GlfwSurfaceHost : ISurfaceHost
     /// <returns>The icon, or <c>null</c> when there is none.</returns>
     internal static RawImage? LoadIcon(IContentDirectory content, string path)
     {
-        if (!content.Exists(path)) return null;
+        if (!content.Exists(path))
+        {
+            return null;
+        }
 
         var image = ImageResult.FromMemory(content.ReadAllBytes(path), ColorComponents.RedGreenBlueAlpha);
         return new RawImage(image.Width, image.Height, image.Data);
@@ -208,7 +235,11 @@ public class GlfwSurfaceHost : ISurfaceHost
         Window.Update -= Update;
         Window.FramebufferResize -= OnFramebufferResize;
         Window.Closing -= OnClosing;
-        if (Window is IWindow window) window.StateChanged -= OnStateChanged;
+        if (Window is IWindow window)
+        {
+            window.StateChanged -= OnStateChanged;
+        }
+
         Window.Dispose();
 
         GC.SuppressFinalize(this);

@@ -62,8 +62,8 @@ public class BuildAppSetttingsTest
     public void EngineListsLeaveTheUiToItsBrick()
     {
         Assert.DoesNotContain(settings.TurianPackages,
-            package => package.Item2 is "Guinevere" or "Turian.Engine.UI");
-        Assert.DoesNotContain(settings.PackageReferences, package => package.Item1.StartsWith("SkiaSharp", StringComparison.Ordinal));
+            static package => package.Item2 is "Guinevere" or "Turian.Engine.UI");
+        Assert.DoesNotContain(settings.PackageReferences, static package => package.Item1.StartsWith("SkiaSharp", StringComparison.Ordinal));
     }
 
     /// <summary>

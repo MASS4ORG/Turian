@@ -71,8 +71,8 @@ public sealed class SignatureTests
     {
         Assert.Equal(32, SshSignature.ParsePublicKey(fixtureKey).Length);
         Assert.Equal("SHA256:jM0P76DVYigT/G0MFh1c0t38h967d7tNnGXkF+pKOkc", SshSignature.Fingerprint(fixtureKey));
-        Assert.Throws<PackageException>(() => SshSignature.ParsePublicKey("ssh-rsa AAAAB3NzaC1yc2E user"));
-        Assert.Throws<PackageException>(() => SshSignature.ParsePublicKey("nonsense"));
+        Assert.Throws<PackageException>(static () => SshSignature.ParsePublicKey("ssh-rsa AAAAB3NzaC1yc2E user"));
+        Assert.Throws<PackageException>(static () => SshSignature.ParsePublicKey("nonsense"));
     }
 
     /// <summary>A signature made now with the installed <c>ssh-keygen</c> verifies too; skipped where it is not installed.</summary>
@@ -83,7 +83,10 @@ public sealed class SignatureTests
         Directory.CreateDirectory(folder);
         try
         {
-            if (!await Run(folder, "-q", "-t", "ed25519", "-N", "", "-f", "key")) return;
+            if (!await Run(folder, "-q", "-t", "ed25519", "-N", "", "-f", "key"))
+            {
+                return;
+            }
 
             await File.WriteAllTextAsync(Path.Combine(folder, "message"), "a brick", TestContext.Current.CancellationToken);
             Assert.True(await Run(folder, "-Y", "sign", "-f", "key", "-n", "bricks@mass4.org", "message"));
@@ -117,7 +120,11 @@ public sealed class SignatureTests
     static async Task<string> Output(string folder, params string[] arguments)
     {
         var start = new ProcessStartInfo("ssh-keygen") { WorkingDirectory = folder, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(start)!;
         var output = await process.StandardOutput.ReadToEndAsync();
         await process.WaitForExitAsync();

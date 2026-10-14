@@ -3,7 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>Process-level control of a running game, as Unity's <c>Application</c>.</summary>
 public static class Application
 {
-    static CancellationTokenSource quit = new();
+    static CancellationTokenSource _quit = new();
 
     /// <summary>
     /// Whether the game runs without a window, renderer or input device: a dedicated server, or a client build
@@ -12,7 +12,7 @@ public static class Application
     public static bool IsHeadless { get; private set; }
 
     /// <summary>Signalled once the game is asked to quit; players end their loop on it.</summary>
-    public static CancellationToken QuitToken => quit.Token;
+    public static CancellationToken QuitToken => _quit.Token;
 
     /// <summary>The process exit code the last <see cref="Quit"/> asked for.</summary>
     public static int ExitCode { get; private set; }
@@ -38,7 +38,10 @@ public static class Application
     /// <returns>Whether to cancel the default termination.</returns>
     internal static bool Interrupt()
     {
-        if (quit.IsCancellationRequested) return false;
+        if (_quit.IsCancellationRequested)
+        {
+            return false;
+        }
 
         Quit();
         return true;
@@ -63,17 +66,17 @@ public static class Application
     public static void Quit(int exitCode = 0)
     {
         ExitCode = exitCode;
-        quit.Cancel();
+        _quit.Cancel();
     }
 
     /// <summary>Starts a player session: clears an earlier quit request and records how the game runs.</summary>
     /// <param name="headless">Whether the player has no window, renderer or input device.</param>
     public static void BeginSession(bool headless)
     {
-        if (quit.IsCancellationRequested)
+        if (_quit.IsCancellationRequested)
         {
-            quit.Dispose();
-            quit = new CancellationTokenSource();
+            _quit.Dispose();
+            _quit = new CancellationTokenSource();
         }
 
         ExitCode = 0;

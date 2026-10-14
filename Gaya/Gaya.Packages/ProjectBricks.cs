@@ -10,7 +10,11 @@ public static class ProjectBricks
     /// <exception cref="PackageException">The id or the value is invalid.</exception>
     public static void Add(string projectRoot, string id, string spec)
     {
-        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id.");
+        if (!PackageId.IsValid(id))
+        {
+            throw new PackageException($"'{id}' is not a valid package id.");
+        }
+
         _ = PackageSource.Parse(spec, Path.Combine(projectRoot, ProjectManifest.DirectoryName));
 
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
@@ -24,12 +28,19 @@ public static class ProjectBricks
     /// <returns>Whether the project declared or embedded it.</returns>
     public static bool Remove(string projectRoot, string id)
     {
-        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id.");
+        if (!PackageId.IsValid(id))
+        {
+            throw new PackageException($"'{id}' is not a valid package id.");
+        }
+
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         var embedded = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
         var hasEmbedded = File.Exists(Path.Combine(embedded, PackageManifest.FileName));
         var declared = manifest.Dependencies.Remove(id);
-        if (!declared && !hasEmbedded) return false;
+        if (!declared && !hasEmbedded)
+        {
+            return false;
+        }
 
         string? trash = null;
         if (hasEmbedded)
@@ -41,11 +52,18 @@ public static class ProjectBricks
 
         try
         {
-            if (declared) manifest.Save(projectRoot);
+            if (declared)
+            {
+                manifest.Save(projectRoot);
+            }
         }
         catch
         {
-            if (trash is not null) Directory.Move(trash, embedded);
+            if (trash is not null)
+            {
+                Directory.Move(trash, embedded);
+            }
+
             throw;
         }
         return true;
@@ -65,11 +83,15 @@ public static class ProjectBricks
     {
         ArgumentNullException.ThrowIfNull(package);
         if (package.Manifest.Store is { Embeddable: false })
+        {
             throw new PackageException($"{package.Id} is licensed so that it cannot be embedded; use it from its registry, or ask its publisher.");
+        }
 
         var target = Path.Combine(projectRoot, ProjectManifest.DirectoryName, package.Id);
         if (package.Origin == PackageOrigin.Embedded || Directory.Exists(target))
+        {
             throw new PackageException($"{package.Id} is already embedded at {target}.");
+        }
 
         try
         {
@@ -82,7 +104,11 @@ public static class ProjectBricks
         }
         catch
         {
-            if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+            if (Directory.Exists(target))
+            {
+                Directory.Delete(target, recursive: true);
+            }
+
             throw;
         }
     }
@@ -98,12 +124,21 @@ public static class ProjectBricks
     public static string Revert(string projectRoot, string id,
         IReadOnlyCollection<string>? reservedCategoryPrefixes = null)
     {
-        if (!PackageId.IsValid(id)) throw new PackageException($"'{id}' is not a valid package id.");
+        if (!PackageId.IsValid(id))
+        {
+            throw new PackageException($"'{id}' is not a valid package id.");
+        }
+
         var fork = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
         if (!File.Exists(Path.Combine(fork, PackageManifest.FileName)))
+        {
             throw new PackageException($"{id} is not local to the project.");
+        }
+
         if (PackageManifest.Load(fork, reservedCategoryPrefixes).Upstream is null)
+        {
             throw new PackageException($"{id} was made in this project and has no global version to go back to.");
+        }
 
         var trash = Path.Combine(projectRoot, ".Cache", "Trash", Guid.NewGuid().ToString("N"), id);
         Directory.CreateDirectory(Path.GetDirectoryName(trash)!);
@@ -116,7 +151,9 @@ public static class ProjectBricks
         Directory.CreateDirectory(target);
         foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories)
                      .Where(static d => !IsVersionControl(d)))
+        {
             Directory.CreateDirectory(Path.Combine(target, Path.GetRelativePath(source, directory)));
+        }
 
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories)
                      .Where(static f => !IsVersionControl(f)))

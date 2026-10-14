@@ -67,18 +67,28 @@ sealed class SurfaceLifecycle : IDisposable
     /// <summary>Releases the device's work, the swap chain and then the surface; does nothing when already lost.</summary>
     public void OnSurfaceLost()
     {
-        if (IsSurfaceLost) return;
+        if (IsSurfaceLost)
+        {
+            return;
+        }
 
         IsSurfaceLost = true;
         target.WaitIdle();
-        if (target.HasSwapChain) target.DestroySwapChain();
+        if (target.HasSwapChain)
+        {
+            target.DestroySwapChain();
+        }
+
         target.DestroySurface();
     }
 
     /// <summary>Recreates the surface; the swap chain follows on the next <see cref="TryPrepare"/>.</summary>
     public void OnSurfaceRestored()
     {
-        if (!IsSurfaceLost) return;
+        if (!IsSurfaceLost)
+        {
+            return;
+        }
 
         target.CreateSurface();
         IsSurfaceLost = false;
@@ -99,9 +109,20 @@ sealed class SurfaceLifecycle : IDisposable
     /// <returns>Whether a swap chain is ready to render to.</returns>
     public bool TryPrepare()
     {
-        if (IsSurfaceLost) return false;
-        if (!outOfDate && target.HasSwapChain) return true;
-        if (DrawableExtent() is not { } extent) return false;
+        if (IsSurfaceLost)
+        {
+            return false;
+        }
+
+        if (!outOfDate && target.HasSwapChain)
+        {
+            return true;
+        }
+
+        if (DrawableExtent() is not { } extent)
+        {
+            return false;
+        }
 
         Rebuild(extent);
         return true;
@@ -144,7 +165,10 @@ sealed class SurfaceLifecycle : IDisposable
     Extent2D? DrawableExtent()
     {
         var size = host.FramebufferSize;
-        if (size.X <= 0 || size.Y <= 0 || !target.SurfaceHasArea) return null;
+        if (size.X <= 0 || size.Y <= 0 || !target.SurfaceHasArea)
+        {
+            return null;
+        }
 
         return new Extent2D((uint)size.X, (uint)size.Y);
     }
@@ -156,7 +180,10 @@ sealed class SurfaceLifecycle : IDisposable
         outOfDate = false;
         var changed = formats is { } previous && previous != created;
         formats = created;
-        if (changed) FormatChanged?.Invoke();
+        if (changed)
+        {
+            FormatChanged?.Invoke();
+        }
     }
 
     void OnResized(Int2 size) => outOfDate = true;

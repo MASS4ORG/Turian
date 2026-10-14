@@ -39,7 +39,10 @@ public sealed class SkiaFrameRasterizer : IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        if (width == Width && height == Height && surface is not null) return;
+        if (width == Width && height == Height && surface is not null)
+        {
+            return;
+        }
 
         surface?.Dispose();
         surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
@@ -89,7 +92,9 @@ public sealed class SkiaFrameRasterizer : IDisposable
             // Raster surfaces are usually tightly packed, but the color type's alignment can pad
             // the stride; copy row by row when it does.
             for (var y = 0; y < Height; y++)
+            {
                 src.Slice(y * rowBytes, tightRow).CopyTo(pixels.AsSpan(y * tightRow));
+            }
         }
 
         return pixels;
@@ -102,9 +107,16 @@ public sealed class SkiaFrameRasterizer : IDisposable
     // being drawn independent of how it is later composited into the viewport.
     void DumpIfRequested(SKSurface dumpSurface)
     {
-        if (dumpCount >= 3) return;
+        if (dumpCount >= 3)
+        {
+            return;
+        }
+
         var dir = Environment.GetEnvironmentVariable("TURIAN_UI_DUMP");
-        if (string.IsNullOrEmpty(dir)) return;
+        if (string.IsNullOrEmpty(dir))
+        {
+            return;
+        }
 
         try
         {
@@ -125,7 +137,11 @@ public sealed class SkiaFrameRasterizer : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         surface?.Dispose();
         surface = null;

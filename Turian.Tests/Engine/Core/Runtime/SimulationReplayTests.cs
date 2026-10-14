@@ -24,14 +24,25 @@ public sealed class SimulationReplayTests
         var expectedHashes = new List<string>();
         reference.TickCompleted += session => expectedHashes.Add(session.ComputeStateHash());
         var log = Record(reference);
-        for (var frame = 0; frame < 120; frame++) reference.Advance(1d / 60);
+        for (var frame = 0; frame < 120; frame++)
+        {
+            reference.Advance(1d / 60);
+        }
+
         var replay = Create();
         var actualHashes = new List<string>();
         replay.TickCompleted += session => actualHashes.Add(session.ComputeStateHash());
         var json = JsonSerializer.Serialize(log);
         foreach (var command in JsonSerializer.Deserialize<SimulationCommand[]>(json)!)
+        {
             Assert.Equal(SimulationCommandStatus.Accepted, replay.ScheduleRecorded(command).Status);
-        for (var frame = 0; frame < rate * 2; frame++) replay.Advance(1d / rate);
+        }
+
+        for (var frame = 0; frame < rate * 2; frame++)
+        {
+            replay.Advance(1d / rate);
+        }
+
         Assert.Equal(120, replay.Clock.TickIndex);
         Assert.Equal(reference.ComputeStateHash(), replay.ComputeStateHash());
         Assert.Equal(120, expectedHashes.Count);
@@ -45,7 +56,11 @@ public sealed class SimulationReplayTests
     {
         var first = Create();
         Record(first);
-        for (var frame = 0; frame < 60; frame++) first.Advance(1d / 60);
+        for (var frame = 0; frame < 60; frame++)
+        {
+            first.Advance(1d / 60);
+        }
+
         var save = first.CaptureSave();
         var content = new RuntimeSaveContent { Fingerprint = "integer-fixture-content-v1" };
         var codec = new RuntimeSave();
@@ -65,7 +80,11 @@ public sealed class SimulationReplayTests
             resumed.Advance(0.003);
             resumed.Advance(0.047);
         }
-        for (var frame = 0; frame < 60; frame++) first.Advance(1d / 60);
+        for (var frame = 0; frame < 60; frame++)
+        {
+            first.Advance(1d / 60);
+        }
+
         Assert.Equal(120, resumed.Clock.TickIndex);
         Assert.Equal(first.ComputeStateHash(), resumed.ComputeStateHash());
         Assert.Throws<InvalidOperationException>(() => resumed.RestoreSave(loaded.Snapshot));

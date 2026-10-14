@@ -1,5 +1,3 @@
-using System.Buffers.Binary;
-
 namespace Turian.Engine.Core;
 
 static class LayerLayoutFingerprint

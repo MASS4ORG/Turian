@@ -95,7 +95,7 @@ public class DdsReaderTests
         var image = DdsReader.Read(file, isSrgb: false);
 
         Assert.Equal(3, image.Levels.Count);
-        Assert.All(image.Levels, level => Assert.Equal(16, level.Length));
+        Assert.All(image.Levels, static level => Assert.Equal(16, level.Length));
     }
 
     /// <summary>A non-power-of-two extent rounds up to whole blocks in both axes.</summary>
@@ -115,7 +115,7 @@ public class DdsReaderTests
     public void Read_NonDdsPayload_Throws()
     {
         Assert.False(DdsReader.IsDds("not a dds"u8));
-        Assert.Throws<InvalidDataException>(() => DdsReader.Read("not a dds"u8.ToArray(), isSrgb: false));
+        Assert.Throws<InvalidDataException>(static () => DdsReader.Read("not a dds"u8.ToArray(), isSrgb: false));
     }
 
     /// <summary>An unrecognised fourCC names itself in the error, so a bad import is diagnosable.</summary>

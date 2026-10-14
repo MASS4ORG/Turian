@@ -76,14 +76,21 @@ public class DataAssetAsset : Asset
     DataAsset? ReadContent(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
         var payload = ReadPayload(projectPath, readBase, provider);
-        if (payload is not null) payload.Id = Id;
+        if (payload is not null)
+        {
+            payload.Id = Id;
+        }
+
         return payload;
     }
 
     DataAsset? ReadPayload(string projectPath, Func<Guid, string?> readBase, IAssetFileProvider? provider)
     {
         // Without a project folder, such as in a built game's packaged content, only the imported copy exists.
-        if (string.IsNullOrEmpty(projectPath)) return provider is null ? null : ReadImported(readBase, provider);
+        if (string.IsNullOrEmpty(projectPath))
+        {
+            return provider is null ? null : ReadImported(readBase, provider);
+        }
 
         var sourcePath = Path.Combine(projectPath, RelativePath);
         if (File.Exists(sourcePath))
@@ -91,7 +98,10 @@ public class DataAssetAsset : Asset
             return DataAsset.LoadContent(sourcePath, Id, readBase);
         }
 
-        if (provider is null) return DataAsset.LoadContent(sourcePath, Id, readBase);
+        if (provider is null)
+        {
+            return DataAsset.LoadContent(sourcePath, Id, readBase);
+        }
 
         // A built or play-mode game has no sources, only the imported copy the catalog points at.
         return ReadImported(readBase, provider);
@@ -116,7 +126,11 @@ public class DataAssetAsset : Asset
                          | BindingFlags.DeclaredOnly))
             {
                 // Event subscribers belong to the live instance, not to the data.
-                if (typeof(Delegate).IsAssignableFrom(field.FieldType)) continue;
+                if (typeof(Delegate).IsAssignableFrom(field.FieldType))
+                {
+                    continue;
+                }
+
                 field.SetValue(target, field.GetValue(source));
             }
         }

@@ -89,7 +89,10 @@ public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bo
         set
         {
             useFifo = value;
-            if (swapChain is not null) swapChain.UseFifo = value;
+            if (swapChain is not null)
+            {
+                swapChain.UseFifo = value;
+            }
         }
     }
 
@@ -119,7 +122,10 @@ public partial class Renderer(Vk vk, Device device, ISurfaceHost surfaceHost, bo
     {
         Debug.Assert(!isFrameStarted, "Can't call beginFrame while already in progress!");
 
-        if (!TryAcquire()) return null;
+        if (!TryAcquire())
+        {
+            return null;
+        }
 
         isFrameStarted = true;
 

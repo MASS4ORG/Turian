@@ -25,7 +25,7 @@ public sealed class OutputLogBridgeTests
             var host = Substitute.For<IPlaySceneHost>();
             host.CurrentSceneRoot.Returns(root);
             var play = new PlayModeService(host, new AssetDatabase(), editorServices, NullLogger.Instance);
-            var bridge = new OutputLogBridge(new OutputPanelSettings(), play, build, NullLogger.Instance);
+            var bridge = new OutputLogBridge(new OutputPanelSettings(), play, build);
             var logger = LogBuffer.Provider.CreateLogger("Editor");
             logger.LogInformation("old editor message");
 
@@ -33,8 +33,8 @@ public sealed class OutputLogBridgeTests
             bridge.Tick();
             play.Tick(0.016);
 
-            Assert.DoesNotContain(LogBuffer.Snapshot(), line => line.Text.Contains("old editor message"));
-            Assert.Contains(LogBuffer.Snapshot(), line => line.Text.Contains("first game update"));
+            Assert.DoesNotContain(LogBuffer.Snapshot(), static line => line.Text.Contains("old editor message"));
+            Assert.Contains(LogBuffer.Snapshot(), static line => line.Text.Contains("first game update"));
             play.Stop();
         }
         finally

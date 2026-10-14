@@ -198,7 +198,11 @@ public class ShortcutServiceTests
         var settings = Substitute.For<IEditorSettings>();
         var service = new ShortcutService(NullLogger.Instance, settings);
 
-        foreach (var binding in bindings) service.Add(binding);
+        foreach (var binding in bindings)
+        {
+            service.Add(binding);
+        }
+
         return service;
     }
 

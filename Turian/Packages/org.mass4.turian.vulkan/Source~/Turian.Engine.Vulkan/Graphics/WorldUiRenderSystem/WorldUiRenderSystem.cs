@@ -55,7 +55,10 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
     /// <inheritdoc/>
     public void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
-        if (Quads.Count == 0) return;
+        if (Quads.Count == 0)
+        {
+            return;
+        }
 
         pipeline.Bind(frameInfo.CommandBuffer);
 
@@ -65,10 +68,16 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
 
         foreach (var quad in Quads)
         {
-            if (quad.Texture is null) continue;
+            if (quad.Texture is null)
+            {
+                continue;
+            }
 
             var set = DescriptorFor(quad.Texture);
-            if (set.Handle == default) continue;
+            if (set.Handle == default)
+            {
+                continue;
+            }
 
             vulkan.Vk.CmdBindDescriptorSets(
                 frameInfo.CommandBuffer, PipelineBindPoint.Graphics, pipelineLayout, 1, 1, in set, 0, null);
@@ -88,7 +97,10 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
 
     DescriptorSet DescriptorFor(Texture texture)
     {
-        if (descriptorByTexture.TryGetValue(texture, out var existing)) return existing;
+        if (descriptorByTexture.TryGetValue(texture, out var existing))
+        {
+            return existing;
+        }
 
         if (descriptorByTexture.Count >= maxPanels)
         {
@@ -98,7 +110,9 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
 
         var set = default(DescriptorSet);
         if (!pool.AllocateDescriptorSet(panelSetLayout.GetDescriptorSetLayout(), ref set))
+        {
             return default;
+        }
 
         var info = texture.DescriptorInfo;
         WriteDescriptorSet write = new()
@@ -144,7 +158,9 @@ public sealed unsafe class WorldUiRenderSystem : IRenderSystem
         };
 
         if (vulkan.Vk.CreatePipelineLayout(vulkan.Device.VkDevice, in info, null, out pipelineLayout) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to create world-UI pipeline layout");
+        }
     }
 
     void CreatePipeline(RenderPass renderPass)

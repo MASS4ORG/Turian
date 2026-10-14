@@ -18,7 +18,11 @@ public sealed class AssetThumbnailCache(Func<AssetEntry, int, SKImage?> render, 
     /// <summary>Releases evicted images after the preceding frame has finished drawing them.</summary>
     public void BeginFrame()
     {
-        foreach (var image in retired) image.Dispose();
+        foreach (var image in retired)
+        {
+            image.Dispose();
+        }
+
         retired.Clear();
     }
 
@@ -39,14 +43,21 @@ public sealed class AssetThumbnailCache(Func<AssetEntry, int, SKImage?> render, 
             recent.AddLast(cached.Node);
             return cached.Image;
         }
-        if (queued.Add(key)) pending.Enqueue(new Request(key, entry));
+        if (queued.Add(key))
+        {
+            pending.Enqueue(new Request(key, entry));
+        }
+
         return null;
     }
 
     /// <summary>Produces at most the supplied budget of thumbnails; failed previews retain their fallback icons.</summary>
     public void Process(int budget = 2)
     {
-        for (var i = 0; i < budget && pending.TryDequeue(out var request); i++) Produce(request);
+        for (var i = 0; i < budget && pending.TryDequeue(out var request); i++)
+        {
+            Produce(request);
+        }
     }
 
     void Produce(Request request)
@@ -64,7 +75,11 @@ public sealed class AssetThumbnailCache(Func<AssetEntry, int, SKImage?> render, 
         while (images.Count > Math.Max(1, capacity))
         {
             var key = recent.First!.Value;
-            if (images[key].Image is { } image) retired.Add(image);
+            if (images[key].Image is { } image)
+            {
+                retired.Add(image);
+            }
+
             images.Remove(key);
             recent.RemoveFirst();
         }
@@ -74,7 +89,11 @@ public sealed class AssetThumbnailCache(Func<AssetEntry, int, SKImage?> render, 
     public void Clear()
     {
         BeginFrame();
-        foreach (var cached in images.Values) cached.Image?.Dispose();
+        foreach (var cached in images.Values)
+        {
+            cached.Image?.Dispose();
+        }
+
         images.Clear();
         recent.Clear();
         pending.Clear();

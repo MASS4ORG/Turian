@@ -89,12 +89,18 @@ public sealed class UiManager : IUiPresenter
             .ToArray();
 
         Diagnose($"panels: {found.Count} found, {panels.Length} eligible");
-        if (panels.Length == 0) return null;
+        if (panels.Length == 0)
+        {
+            return null;
+        }
 
         var builders = panels.Select(panel => ResolveBuild(panel, deltaTime)).OfType<Action<Gui>>().ToList();
 
         Diagnose($"builders: {builders.Count}");
-        if (builders.Count == 0) return null;
+        if (builders.Count == 0)
+        {
+            return null;
+        }
 
         var first = panels[0];
         var scale = UiScale.Resolve(
@@ -110,7 +116,10 @@ public sealed class UiManager : IUiPresenter
         var texture = overlayRuntime.Render(
             gui =>
             {
-                foreach (var build in builders) build(gui);
+                foreach (var build in builders)
+                {
+                    build(gui);
+                }
             },
             scale.PixelWidth, scale.PixelHeight, deltaTime, scale.CanvasScale);
 
@@ -157,7 +166,10 @@ public sealed class UiManager : IUiPresenter
                 ? hitPixels
                 : null);
 
-            if (ResolveBuild(panel, frame.DeltaTime) is not { } build) continue;
+            if (ResolveBuild(panel, frame.DeltaTime) is not { } build)
+            {
+                continue;
+            }
 
             var texture = wp.Runtime.Render(build, pw, ph, frame.DeltaTime);
             quads.Add(new WorldUiQuad(texture, model));
@@ -179,8 +191,15 @@ public sealed class UiManager : IUiPresenter
     /// <summary>The panel's code-built UI, or its document's renderer after ticking the document's controller.</summary>
     Action<Gui>? ResolveBuild(UiDocumentComponent panel, float deltaTime)
     {
-        if (panel.OnBuild is { } onBuild) return onBuild;
-        if (ResolveDocumentBuilder(panel) is not { } resolved) return null;
+        if (panel.OnBuild is { } onBuild)
+        {
+            return onBuild;
+        }
+
+        if (ResolveDocumentBuilder(panel) is not { } resolved)
+        {
+            return null;
+        }
 
         resolved.Controller?.OnUpdate(deltaTime);
         return resolved.Renderer.Render;
@@ -188,7 +207,10 @@ public sealed class UiManager : IUiPresenter
 
     WorldPanel GetOrCreateWorldPanel(Guid panelId, int width, int height)
     {
-        if (worldPanels.TryGetValue(panelId, out var existing)) return existing;
+        if (worldPanels.TryGetValue(panelId, out var existing))
+        {
+            return existing;
+        }
 
         // Ownership passes to worldPanels, which Dispose releases.
         var handler = new WorldPanelInputHandler(inputSource);
@@ -208,7 +230,11 @@ public sealed class UiManager : IUiPresenter
 
     static bool WithinRange(UiRaycasterComponent raycaster, ICamera camera, Node panelNode)
     {
-        if (raycaster.MaxDistance <= 0f) return true;
+        if (raycaster.MaxDistance <= 0f)
+        {
+            return true;
+        }
+
         var d = (panelNode.GlobalTransform.Position - camera.Position).Length();
         return d <= raycaster.MaxDistance;
     }
@@ -219,8 +245,16 @@ public sealed class UiManager : IUiPresenter
 
     void Diagnose(string message)
     {
-        if (!seenDiag.Add(message)) return;
-        if (Environment.GetEnvironmentVariable("TURIAN_UI_DIAG") == "0") return;
+        if (!seenDiag.Add(message))
+        {
+            return;
+        }
+
+        if (Environment.GetEnvironmentVariable("TURIAN_UI_DIAG") == "0")
+        {
+            return;
+        }
+
         Log.Logger.LogInformation("UiManager: {Message}", message);
     }
 
@@ -230,9 +264,17 @@ public sealed class UiManager : IUiPresenter
 
     void DiagnoseChange(string key, string message)
     {
-        if (lastByKey.TryGetValue(key, out var prev) && prev == message) return;
+        if (lastByKey.TryGetValue(key, out var prev) && prev == message)
+        {
+            return;
+        }
+
         lastByKey[key] = message;
-        if (Environment.GetEnvironmentVariable("TURIAN_UI_DIAG") == "0") return;
+        if (Environment.GetEnvironmentVariable("TURIAN_UI_DIAG") == "0")
+        {
+            return;
+        }
+
         Log.Logger.LogInformation("UiManager[{Key}]: {Message}", key, message);
     }
 
@@ -280,7 +322,9 @@ public sealed class UiManager : IUiPresenter
 
         var controller = CreateController(document.ControllerType);
         if (controller is not null)
+        {
             renderer.Bind(controller: controller);
+        }
 
         var entry = new CachedRenderer(panel.Document.AssetId, key, renderer, controller);
         renderers[panel.Id] = entry;
@@ -290,15 +334,21 @@ public sealed class UiManager : IUiPresenter
     string ResolveText(string? key, string? source)
     {
         if (key is { Length: > 0 })
+        {
             return Locale?.Translate(key, source ?? key) ?? source ?? key;
+        }
 
-        if (string.IsNullOrEmpty(source)) return string.Empty;
+        if (string.IsNullOrEmpty(source))
+        {
+            return string.Empty;
+        }
+
         return Locale?.TranslateSource(source) ?? source;
     }
 
     // Changes whenever the panel's or the document's stylesheets, or its controller, change.
     static string SheetKeyFor(UiDocumentComponent panel, UiDocument document) =>
-        string.Join(',', panel.StyleSheets.Where(r => !r.IsEmpty).Select(r => r.AssetId)) + '|'
+        string.Join(',', panel.StyleSheets.Where(static r => !r.IsEmpty).Select(static r => r.AssetId)) + '|'
         + string.Join(',', document.StyleSheets) + '|' + (document.ControllerType ?? string.Empty);
 
     static void AddStyleSheets(
@@ -308,18 +358,25 @@ public sealed class UiManager : IUiPresenter
         var baseDir = Path.GetDirectoryName(documentPath)?.Replace('\\', '/') ?? string.Empty;
         foreach (var sheet in document.StyleSheets.Select(src => ResolveSheetByPath(db, baseDir, src))
                      .OfType<StyleSheet>())
+        {
             renderer.StyleSheets.Add(sheet);
+        }
 
         // Explicit component stylesheets take priority (added last).
         foreach (var sheet in panel.StyleSheets.Select(reference => reference.Resolve(db)?.GetContent(db))
                      .OfType<StyleSheet>())
+        {
             renderer.StyleSheets.Add(sheet);
+        }
     }
 
     /// <summary>Instantiates the named <see cref="UiController"/> from any loaded assembly, or <c>null</c>.</summary>
     internal static UiController? CreateController(string? typeName)
     {
-        if (string.IsNullOrWhiteSpace(typeName)) return null;
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            return null;
+        }
 
         // The user and brick assemblies are loaded by name at startup from the type manifest.
         var type = ResolveType(typeName);
@@ -348,7 +405,10 @@ public sealed class UiManager : IUiPresenter
 
     static StyleSheet? ResolveSheetByPath(AssetDatabase db, string baseDir, string src)
     {
-        if (string.IsNullOrWhiteSpace(src) || src.StartsWith('{')) return null;
+        if (string.IsNullOrWhiteSpace(src) || src.StartsWith('{'))
+        {
+            return null;
+        }
 
         // <Style src> is accepted both relative to the .ui file and relative to the project root.
         var candidates = new[]
@@ -362,7 +422,10 @@ public sealed class UiManager : IUiPresenter
         {
             var record = snapshot.FirstOrDefault(r =>
                 string.Equals(r.SourceRelativePath.Replace('\\', '/'), relative, StringComparison.OrdinalIgnoreCase));
-            if (record is null) continue;
+            if (record is null)
+            {
+                continue;
+            }
 
             var asset = new UiStyleSheetAsset { Id = record.AssetId, RelativePath = record.SourceRelativePath };
             return asset.GetContent(db);
@@ -373,22 +436,40 @@ public sealed class UiManager : IUiPresenter
 
     static void Collect(Node node, List<UiDocumentComponent> into)
     {
-        if (!node.IsActive) return;
+        if (!node.IsActive)
+        {
+            return;
+        }
+
         foreach (var component in node.Components)
+        {
             if (component is UiDocumentComponent ui)
+            {
                 into.Add(ui);
+            }
+        }
 
         foreach (var child in node.Children)
+        {
             Collect(child, into);
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         overlayRuntime?.Dispose();
-        foreach (var wp in worldPanels.Values) wp.Runtime.Dispose();
+        foreach (var wp in worldPanels.Values)
+        {
+            wp.Runtime.Dispose();
+        }
+
         worldPanels.Clear();
         renderers.Clear();
         found.Clear();

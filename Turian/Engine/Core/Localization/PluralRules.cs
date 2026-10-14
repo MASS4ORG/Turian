@@ -63,15 +63,31 @@ public static class PluralRules
 
     static PluralCategory EastSlavic(Operands o)
     {
-        if (!o.IsInteger) return PluralCategory.Other;
-        if (o.Mod10 == 1 && o.Mod100 != 11) return PluralCategory.One;
+        if (!o.IsInteger)
+        {
+            return PluralCategory.Other;
+        }
+
+        if (o.Mod10 == 1 && o.Mod100 != 11)
+        {
+            return PluralCategory.One;
+        }
+
         return o.Mod10 is >= 2 and <= 4 && !o.IsTeen ? PluralCategory.Few : PluralCategory.Many;
     }
 
     static PluralCategory Polish(Operands o)
     {
-        if (!o.IsInteger) return PluralCategory.Other;
-        if (o.Integer == 1) return PluralCategory.One;
+        if (!o.IsInteger)
+        {
+            return PluralCategory.Other;
+        }
+
+        if (o.Integer == 1)
+        {
+            return PluralCategory.One;
+        }
+
         return o.Mod10 is >= 2 and <= 4 && !o.IsTeen ? PluralCategory.Few : PluralCategory.Many;
     }
 

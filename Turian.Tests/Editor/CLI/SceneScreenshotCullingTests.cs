@@ -51,7 +51,7 @@ public sealed class SceneScreenshotCullingTests(VulkanFixture fixture) : IClassF
                 output, logger, drawGizmos: true);
             Assert.True(File.Exists(output));
             var messages = logger.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(ILogger.Log))
-                .Select(call => call.GetArguments()[2]!.ToString()!);
+                .Select(call => call.GetArguments()[2]!.ToString()!).ToList();
             Assert.Contains(messages, message => message.Contains("Culling: 1 submitted, 1/2 submeshes culled",
                 StringComparison.Ordinal));
             Assert.Equal(useOcclusion, messages.Any(message => message.Contains("GPU occlusion: 1 visible, 0/1 hidden",

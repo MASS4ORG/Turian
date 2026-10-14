@@ -1,4 +1,4 @@
-using EngineColor = global::Turian.Engine.Core.Color;
+using EngineColor = Turian.Engine.Core.Color;
 
 namespace Turian.Tests;
 
@@ -9,18 +9,18 @@ public sealed class GuiColorBridgeTests
     [Fact]
     public void DirectCommandsPreserveEngineColorsAndAlpha()
     {
-        var fill = EngineColor.FromSrgb(new Color32(128, 64, 32, 255));
-        var border = EngineColor.FromSrgb(new Color32(0, 0, 255, 255));
+        var fill = EngineColor.FromSrgb(new Color32(128, 64, 32));
+        var border = EngineColor.FromSrgb(new Color32(0, 0, 255));
         var background = EngineColor.FromSrgb(new Color32(10, 20, 30, 128));
-        Action<Gui, Guinevere.Rect, EngineColor, float, Guinevere.Corner> drawRect = GuiColorBridge.DrawRect;
-        Action<Gui, Guinevere.Rect, EngineColor, float, float, Guinevere.Corner> drawBorder =
+        Action<Gui, Rect, EngineColor, float, Corner> drawRect = GuiColorBridge.DrawRect;
+        Action<Gui, Rect, EngineColor, float, float, Corner> drawBorder =
             GuiColorBridge.DrawRectBorder;
-        Action<Gui, EngineColor?, float, Guinevere.Corner> drawBackground = GuiColorBridge.DrawBackgroundRect;
+        Action<Gui, EngineColor?, float, Corner> drawBackground = GuiColorBridge.DrawBackgroundRect;
         var png = UiImageRenderer.RenderPng(gui =>
         {
-            drawRect(gui, new Guinevere.Rect(10, 10, 20, 20), fill, 0f, Guinevere.Corner.All);
-            drawBorder(gui, new Guinevere.Rect(40, 10, 20, 20), border, 2f, 0f, Guinevere.Corner.All);
-            drawBackground(gui, background, 0f, Guinevere.Corner.All);
+            drawRect(gui, new Rect(10, 10, 20, 20), fill, 0f, Corner.All);
+            drawBorder(gui, new Rect(40, 10, 20, 20), border, 2f, 0f, Corner.All);
+            drawBackground(gui, background, 0f, Corner.All);
         }, 80, 80, background: SKColors.Transparent);
         using var pixels = SKBitmap.Decode(png);
         Assert.Equal(new SKColor(128, 64, 32), pixels.GetPixel(20, 20));
@@ -36,8 +36,8 @@ public sealed class GuiColorBridgeTests
     [Fact]
     public void NullBackgroundUsesWhite()
     {
-        Action<Gui, EngineColor?, float, Guinevere.Corner> drawBackground = GuiColorBridge.DrawBackgroundRect;
-        var png = UiImageRenderer.RenderPng(gui => drawBackground(gui, null, 0f, Guinevere.Corner.All),
+        Action<Gui, EngineColor?, float, Corner> drawBackground = GuiColorBridge.DrawBackgroundRect;
+        var png = UiImageRenderer.RenderPng(gui => drawBackground(gui, null, 0f, Corner.All),
             40, 40, background: SKColors.Transparent);
         using var pixels = SKBitmap.Decode(png);
         Assert.Equal(SKColors.White, pixels.GetPixel(20, 20));

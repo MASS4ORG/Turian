@@ -25,8 +25,15 @@ public sealed class AssetFavoritesStore
     /// <summary>Adds or removes a favorite and persists it.</summary>
     public void Set(string absolutePath, bool favorite)
     {
-        if (favorite) paths.Add(absolutePath);
-        else paths.Remove(absolutePath);
+        if (favorite)
+        {
+            paths.Add(absolutePath);
+        }
+        else
+        {
+            paths.Remove(absolutePath);
+        }
+
         Save();
     }
 
@@ -42,7 +49,11 @@ public sealed class AssetFavoritesStore
     {
         try
         {
-            if (!File.Exists(file)) return;
+            if (!File.Exists(file))
+            {
+                return;
+            }
+
             var relative = JsonSerializer.Deserialize<string[]>(File.ReadAllText(file)) ?? [];
             paths = relative.Select(path => Path.GetFullPath(Path.Combine(project, path)))
                 .Where(path => File.Exists(path) || Directory.Exists(path)).ToHashSet(StringComparer.Ordinal);

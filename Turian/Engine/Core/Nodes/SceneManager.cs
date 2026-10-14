@@ -20,7 +20,7 @@ public partial class SceneManager : ISceneManager
     readonly object scenesLock = new();
     IServiceProvider? services;
     IAssetLoader? assetLoader;
-    bool allowMissingServices;
+    bool missingServicesAllowed;
 
     /// <summary>
     /// Gets a snapshot of all currently loaded scenes.
@@ -96,7 +96,7 @@ public partial class SceneManager : ISceneManager
     {
         services = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         assetLoader = services.GetService<IAssetLoader>();
-        this.allowMissingServices = allowMissingServices;
+        missingServicesAllowed = allowMissingServices;
         PersistentRoot.Awake(null, services, allowMissingServices);
     }
 

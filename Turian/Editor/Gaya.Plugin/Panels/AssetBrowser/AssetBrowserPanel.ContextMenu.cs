@@ -11,7 +11,7 @@ sealed partial class AssetBrowserPanel
         var rules = AssetContextMenu.Rules(selection, destination, CanPaste,
             path => importer?.ImporterFor(path) is not null);
         BuildOpenMenu(menu, entry, selection, rules, destination is not null);
-        BuildTransferMenu(menu, entry, selection, rules);
+        BuildTransferMenu(menu, entry, rules);
         BuildMetadataMenu(menu, selection, rules);
         BuildCreationMenu(menu, entry);
         menu.Item("Import…", () => ImportFile(DirectoryFor(entry)!), enabled: rules.CanCreate && fileDialogs is not null);
@@ -25,11 +25,17 @@ sealed partial class AssetBrowserPanel
     {
         menu.Item(selection.Count > 1 ? "Open all selected" : "Open", () =>
         {
-            foreach (var selected in selection) Activate(selected);
+            foreach (var selected in selection)
+            {
+                Activate(selected);
+            }
         }, enabled: rules.HasSelection);
         menu.Item("Open externally", () =>
         {
-            foreach (var selected in selection) opener.OpenExternally(selected.AbsolutePath);
+            foreach (var selected in selection)
+            {
+                opener.OpenExternally(selected.AbsolutePath);
+            }
         }, enabled: rules.CanOpen);
         var showPath = entry?.AbsolutePath ?? navigation.Current!;
         menu.Item("Show in file manager", () => opener.ShowInFileManager(showPath),
@@ -38,7 +44,7 @@ sealed partial class AssetBrowserPanel
         menu.Separator();
     }
 
-    void BuildTransferMenu(FlyoutBuilder menu, AssetEntry? entry, IReadOnlyList<AssetEntry> selection, AssetMenuRules rules)
+    void BuildTransferMenu(FlyoutBuilder menu, AssetEntry? entry, AssetMenuRules rules)
     {
         menu.Item("Rename", () => BeginRename(entry), "F2", rules.CanRename);
         menu.Item("Delete", DeleteSelected, "Del", rules.Writable);
@@ -76,13 +82,18 @@ sealed partial class AssetBrowserPanel
 
         if (entry is { IsDirectory: false, IsReadOnly: false } prefab
             && string.Equals(Path.GetExtension(prefab.AbsolutePath), ".prefab", StringComparison.OrdinalIgnoreCase))
+        {
             menu.Item("Create Prefab Variant", () => CreateVariant(prefab));
+        }
     }
 
     void CreateVariant(AssetEntry prefab)
     {
         if (prefabs.CreateVariant(prefab.AbsolutePath) is null)
+        {
             Log.Logger.LogWarning("Could not create a variant of {Prefab}", prefab.AbsolutePath);
+        }
+
         Refresh();
     }
 
@@ -111,7 +122,11 @@ sealed partial class AssetBrowserPanel
 
     void RevealEntry(AssetEntry? entry)
     {
-        if (entry is null) return;
+        if (entry is null)
+        {
+            return;
+        }
+
         NavigateTo(entry.IsDirectory ? entry.AbsolutePath : entry.ParentPath!);
         ClearFilters();
         state.SelectedId = entry.AbsolutePath;
@@ -121,7 +136,11 @@ sealed partial class AssetBrowserPanel
 
     void Reimport(IEnumerable<AssetEntry> selection)
     {
-        foreach (var entry in selection) importer?.ReimportNow(entry.AbsolutePath);
+        foreach (var entry in selection)
+        {
+            importer?.ReimportNow(entry.AbsolutePath);
+        }
+
         Refresh();
     }
 
@@ -134,9 +153,17 @@ sealed partial class AssetBrowserPanel
         Validate = path => importer?.ImporterFor(path) is null ? "No importer supports this file." : null,
         OnComplete = path =>
         {
-            if (path is null) return;
+            if (path is null)
+            {
+                return;
+            }
+
             var copied = operations.Duplicate(path, directory, isDirectory: false);
-            if (copied is not null) importer?.ReimportNow(copied);
+            if (copied is not null)
+            {
+                importer?.ReimportNow(copied);
+            }
+
             Refresh();
         },
     });
@@ -145,7 +172,11 @@ sealed partial class AssetBrowserPanel
 
     void SetFavorites(IEnumerable<AssetEntry> selection, bool value)
     {
-        foreach (var entry in selection) favorites!.Set(entry.AbsolutePath, value);
+        foreach (var entry in selection)
+        {
+            favorites!.Set(entry.AbsolutePath, value);
+        }
+
         QueryChanged();
         treeDirty = true;
     }
@@ -153,8 +184,11 @@ sealed partial class AssetBrowserPanel
     void BuildLabelMenu(FlyoutBuilder menu, IReadOnlyList<AssetEntry> selection)
     {
         foreach (var label in AssetLabelService.Collect(entries))
+        {
             menu.CheckItem(label, () => selection.All(entry => entry.AssetMetadata?.Labels.Contains(label) == true),
                 present => SetLabel(selection, label, present));
+        }
+
         menu.Item("New label…", () => { labelSelection = selection; newLabel = ""; labelPromptOpen = true; });
     }
 

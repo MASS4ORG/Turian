@@ -1,4 +1,8 @@
 <Project>
+    <PropertyGroup Condition="'$(IsTestProject)' == 'true' And '$(CI)' == 'true'">
+        <WarningsAsErrors>$(WarningsAsErrors.Replace(';CA1707', ''))</WarningsAsErrors>
+    </PropertyGroup>
+
     <!-- A package built against a local checkout would depend on versions nobody can restore -->
     <Target Name="RejectLocalPackagesInPack" BeforeTargets="GenerateNuspec" Condition="'$(UsesLocalPackages)' == 'true'">
         <Error Text="$(MSBuildProjectName) is being packed against a local checkout (Directory.Build.local.props). Pack with -p:NoLocalPackages=true (NUKE: --no-local-packages)." />

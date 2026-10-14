@@ -49,7 +49,7 @@ public sealed class UiScaleTests
     [Fact]
     public void Resolve_RejectsNonPositiveFramebuffer()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => UiScale.Resolve(0, 100, UiScaleMode.ConstantPixelSize));
-        Assert.Throws<ArgumentOutOfRangeException>(() => UiScale.Resolve(100, -1, UiScaleMode.ConstantPixelSize));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => UiScale.Resolve(0, 100, UiScaleMode.ConstantPixelSize));
+        Assert.Throws<ArgumentOutOfRangeException>(static () => UiScale.Resolve(100, -1, UiScaleMode.ConstantPixelSize));
     }
 }

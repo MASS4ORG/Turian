@@ -52,7 +52,7 @@ public sealed class UserMenuCatalogTests
     [Fact]
     public void OnlyAnnotatedPublicStaticMethodsBecomeEntries()
     {
-        var paths = Scan().Select(command => command.Path).ToList();
+        var paths = Scan().Select(static command => command.Path).ToList();
 
         Assert.Contains("Tools/Rebuild", paths);
         Assert.Contains("Tools/Level/Bake Lighting", paths);
@@ -64,7 +64,7 @@ public sealed class UserMenuCatalogTests
     [Fact]
     public void AMethodWithTooManyParametersIsSkipped()
     {
-        Assert.DoesNotContain("Tools/Unusable", Scan().Select(command => command.Path));
+        Assert.DoesNotContain("Tools/Unusable", Scan().Select(static command => command.Path));
     }
 
     /// <summary>The first path segment is the menu, the last is the label, the middle is the submenu.</summary>

@@ -18,7 +18,11 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// <returns>True if the project was valid and opened.</returns>
     public bool Open(string projectPath, string? openScene = null)
     {
-        if (!PrepareOpen(projectPath)) return false;
+        if (!PrepareOpen(projectPath))
+        {
+            return false;
+        }
+
         ImportAndCompile();
         CompleteOpen(openScene);
         return true;
@@ -26,15 +30,23 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
     bool PrepareOpen(string projectPath)
     {
-        if (!ProjectValidator.Report(ProjectValidator.Validate(projectPath), log)) return false;
+        if (!ProjectValidator.Report(ProjectValidator.Validate(projectPath), log))
+        {
+            return false;
+        }
 
         var directory = SettingsService.ResolveProjectDirectory(projectPath)!;
         var migrated = ProjectSettingsFiles.MigrateLegacyProject(directory);
         if (ProjectSettingsFiles.MigrateToProjectAsset(directory) || migrated)
+        {
             ProjectValidator.Report(ProjectValidator.Validate(directory), log);
+        }
+
         if (ProjectSettingsFiles.RecordEngineVersion(directory) is { } previous)
+        {
             log.LogInformation("Upgraded the project from Turian {Previous} to {Current}",
                 previous.Length == 0 ? "(unrecorded)" : previous, ProjectSettingsFiles.EngineVersionStamp);
+        }
 
         var loaded = SettingsService.Load(directory)!;
         ProjectSettingsLoader.LoadFromSources(loaded);
@@ -53,12 +65,22 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     {
         progress ??= NullProgressSink.Instance;
         progress.PlanChildren(5);
-        using (progress.BeginChild(BackgroundTaskKind.Scan, "Loading project packages")) LoadProjectPackages();
+        using (progress.BeginChild(BackgroundTaskKind.Scan, "Loading project packages"))
+        {
+            LoadProjectPackages();
+        }
+
         RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings!, progress);
         services.GetRequiredService<AssetImporter>().StartMonitoring(progress);
-        using (progress.BeginChild(BackgroundTaskKind.Compile, "Compiling scripts")) CompileUserScripts();
+        using (progress.BeginChild(BackgroundTaskKind.Compile, "Compiling scripts"))
+        {
+            CompileUserScripts();
+        }
+
         using (progress.BeginChild(BackgroundTaskKind.Scan, "Starting file monitoring"))
+        {
             services.GetRequiredService<BuildManager>().EnableHotReload();
+        }
     }
 
     void LoadProjectPackages()
@@ -79,12 +101,17 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         // String tables live in the asset catalog, so the project localization can only be loaded once
         // the catalog is indexed. Hosts that do not register a LocaleService simply skip this.
         if (services.GetService(typeof(LocaleService)) is LocaleService locale)
+        {
             LocalizationLoader.Load(locale, Settings!, services.GetRequiredService<AssetDatabase>());
+        }
 
         log.LogInformation("Opened project {Project}", Settings!.ProjectAbsoluteDir);
 
         RestoreSession(Settings);
-        if (openScene is not null) OpenAsset(Settings, openScene);
+        if (openScene is not null)
+        {
+            OpenAsset(Settings, openScene);
+        }
     }
 
     /// <summary>
@@ -102,7 +129,9 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     void RestoreAssetCatalog(AssetDatabase database, AppSettings settings, IProgressSink? progress = null)
     {
         if (database.LoadCatalogFromProject(settings.ProjectAbsoluteDir) is not AssetCatalogLoadStatus.Unreadable)
+        {
             return;
+        }
 
         log.LogWarning(
             "The asset catalog of {Project} is damaged; reimporting {Assets} to rebuild it",
@@ -130,7 +159,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// <exception cref="Gaya.Packages.PackageException">The bricks cannot be resolved.</exception>
     public void ApplyBrickChanges()
     {
-        if (Settings is null) return;
+        if (Settings is null)
+        {
+            return;
+        }
 
         ProjectPackages.Invalidate(Settings.ProjectAbsoluteDir);
         BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log);
@@ -152,7 +184,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         var created = services.GetRequiredService<ProjectBootstrapper>()
             .CreateAsync(projectDirectory).GetAwaiter().GetResult();
 
-        if (created is not null) return Open(created);
+        if (created is not null)
+        {
+            return Open(created);
+        }
 
         log.LogError("Could not create a project at {Directory}", projectDirectory);
         return false;
@@ -182,7 +217,9 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
                 progress.Report(0, "Building user assembly");
                 var status = await build.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
                 if (status.State != BuildTaskState.Succeeded)
+                {
                     throw new InvalidOperationException(status.Message);
+                }
 
                 progress.Report(1, status.Message);
             });
@@ -191,7 +228,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// <summary>Writes the open documents to the project's session file.</summary>
     public void SaveSession()
     {
-        if (Settings is null) return;
+        if (Settings is null)
+        {
+            return;
+        }
 
         var workspace = services.GetRequiredService<AssetWorkspace>();
         services.GetRequiredService<WorkspaceSessionStore>()
@@ -202,7 +242,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// <returns><c>true</c> when a scene was resolved and opened.</returns>
     public bool OpenStartupScene()
     {
-        if (Settings is null) return false;
+        if (Settings is null)
+        {
+            return false;
+        }
 
         var reference = Settings.Get<PlayerSettings>().StartupScene?.AssetId;
         if (reference is not null && reference.Value != Guid.Empty)
@@ -216,7 +259,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
             .OfType<Prefab>()
             .OrderBy(asset => asset.RelativePath, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
-        if (firstScene is null) return false;
+        if (firstScene is null)
+        {
+            return false;
+        }
 
         services.GetRequiredService<AssetWorkspace>().Open(firstScene);
         LogOpenedScene(firstScene);
@@ -230,11 +276,16 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
         // Opening blocks on this rather than racing it: every scene read after this point needs the
         // component types it defines.
-        while (tasks.Get(id) is { IsActive: true }) Thread.Sleep(25);
+        while (tasks.Get(id) is { IsActive: true })
+        {
+            Thread.Sleep(25);
+        }
 
         if (tasks.Get(id) is { Status: BackgroundTaskStatus.Failed } failed)
+        {
             log.LogWarning("User scripts did not compile: {Message}. Components from them will be missing",
                 failed.Note);
+        }
     }
 
     void RestoreSession(AppSettings settings)
@@ -261,7 +312,9 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         }
 
         if (session.ActiveAssetId is { } activeId && Resolve(database, activeId) is { } active)
+        {
             workspace.Open(active);
+        }
 
         log.LogInformation("Restored {Count} open document(s)", workspace.Documents.Count);
     }
@@ -287,8 +340,14 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     void LogOpenedScene(Asset asset)
     {
         var root = services.GetRequiredService<SceneTreeController>().CurrentSceneRoot;
-        if (root is null) log.LogInformation("Opened {Asset}", asset.DisplayName);
-        else log.LogInformation("Loaded scene {Scene} with {Children} child node(s)", root.Name, root.Children.Count);
+        if (root is null)
+        {
+            log.LogInformation("Opened {Asset}", asset.DisplayName);
+        }
+        else
+        {
+            log.LogInformation("Loaded scene {Scene} with {Children} child node(s)", root.Name, root.Children.Count);
+        }
     }
 
     static Asset? Resolve(AssetDatabase database, Guid assetId) =>

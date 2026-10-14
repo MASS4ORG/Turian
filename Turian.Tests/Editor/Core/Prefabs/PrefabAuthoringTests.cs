@@ -18,7 +18,7 @@ public class PrefabAuthoringTests
     };
 
     static IEnumerable<Guid> Ids(Node node) =>
-        [node.Id, .. node.Components.Select(component => component.Id), .. node.Children.SelectMany(Ids)];
+        [node.Id, .. node.Components.Select(static component => component.Id), .. node.Children.SelectMany(Ids)];
 
     /// <summary>The converted node carries the ids loading an instance of the new prefab would give it.</summary>
     [Fact]

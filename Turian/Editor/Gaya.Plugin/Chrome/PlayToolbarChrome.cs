@@ -16,7 +16,10 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
     public void Render(Gui gui)
     {
         ArgumentNullException.ThrowIfNull(gui);
-        if (playMode.State == PlayState.Playing) gui.RequestFrame();
+        if (playMode.State == PlayState.Playing)
+        {
+            gui.RequestFrame();
+        }
 
         var playing = playMode.IsActive;
         var paused = playMode.State == PlayState.Paused;
@@ -39,12 +42,21 @@ sealed class PlayToolbarChrome(ICommandDispatcher commands, PlayModeService play
             var interactable = gui.GetInteractable();
             var hot = gui.Pass == Pass.Pass2Render && enabled && interactable.OnHover();
 
-            if (active) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
-            else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
+            if (active)
+            {
+                gui.DrawBackgroundRect(Theme.AccentFill, 3f);
+            }
+            else if (hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
 
             gui.ThemedIcon(icon, IconSize, enabled ? 1f : 0.4f);
 
-            if (hot && interactable.OnClick()) commands.Execute(commandId);
+            if (hot && interactable.OnClick())
+            {
+                commands.Execute(commandId);
+            }
         }
     }
 }

@@ -130,12 +130,12 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.True(database.RegisterAsset(settings));
 
         var holder = new TypedHolder { Rule = new DataAssetReference<DataAssetTest>(settings.Id) };
-        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(static f => f.Name == nameof(TypedHolder.Rule));
         var reference = ReferenceField.TryCreate(field)!;
         var picker = new ReferencePicker(database, null!, new RuntimeAssetLoader(database));
 
         Assert.Equal(typeof(DataAssetTest), reference.DataAssetPayloadType);
-        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(static c => c.Id));
         Assert.False(picker.Accepts(reference, settings.Id));
         Assert.False(picker.Assign(reference, settings.Id));
         Assert.Equal(settings.Id, holder.Rule.AssetId);
@@ -148,7 +148,7 @@ public sealed class DataAssetSharingTests : IDisposable
         database.SaveCatalog(projectRoot);
         database.LoadCatalogFromProject(projectRoot);
         var reopened = new ReferencePicker(database, null!, new RuntimeAssetLoader(database));
-        Assert.Equal([metadata.Id], reopened.Candidates(reference).Select(c => c.Id));
+        Assert.Equal([metadata.Id], reopened.Candidates(reference).Select(static c => c.Id));
         Assert.False(reopened.Accepts(reference, settings.Id));
     }
 
@@ -191,12 +191,15 @@ public sealed class DataAssetSharingTests : IDisposable
         var catalogPath = Path.Combine(projectRoot, ".Cache", "assetCatalog.json");
         var catalog = JsonNode.Parse(File.ReadAllText(catalogPath))!;
         foreach (var record in catalog["Records"]!.AsArray())
+        {
             record!.AsObject().Remove("DataAssetPayloadTypeId");
+        }
+
         File.WriteAllText(catalogPath, catalog.ToJsonString());
         database.LoadCatalogFromProject(projectRoot);
 
         var holder = new TypedHolder();
-        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(f => f.Name == nameof(TypedHolder.Rule));
+        var field = InspectorForms.Build(holder).Sections[0].Fields.Single(static f => f.Name == nameof(TypedHolder.Rule));
         var loader = new RuntimeAssetLoader(database);
         var picker = new ReferencePicker(database, null!, loader);
         var reference = ReferenceField.TryCreate(field)!;
@@ -204,7 +207,7 @@ public sealed class DataAssetSharingTests : IDisposable
         Assert.False(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
 
         Assert.True(database.RegisterAsset(metadata));
-        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(c => c.Id));
+        Assert.Equal([metadata.Id], picker.Candidates(reference).Select(static c => c.Id));
         Assert.False(loader.TryGetLoaded<DataAssetAsset>(metadata.Id, out _));
     }
 

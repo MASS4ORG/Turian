@@ -111,7 +111,9 @@ public class VulkanModel : Model
     public void Draw(CommandBuffer commandBuffer)
     {
         for (var i = 0; i < SubMeshes.Count; i++)
+        {
             DrawSubMesh(commandBuffer, i);
+        }
     }
 
     /// <summary>
@@ -141,16 +143,27 @@ public class VulkanModel : Model
     public void DrawSubMeshIndirect(CommandBuffer commandBuffer, Silk.NET.Vulkan.Buffer commands, ulong offset)
     {
         if (hasIndexBuffer)
+        {
             vulkan.Vk.CmdDrawIndexedIndirect(commandBuffer, commands, offset, 1, 20);
+        }
         else
+        {
             vulkan.Vk.CmdDrawIndirect(commandBuffer, commands, offset, 1, 20);
+        }
     }
 
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
-        if (!disposing) return;
+        if (!disposing)
+        {
+            return;
+        }
+
         vertexBuffer.Dispose();
-        if (hasIndexBuffer) indexBuffer.Dispose();
+        if (hasIndexBuffer)
+        {
+            indexBuffer.Dispose();
+        }
     }
 }

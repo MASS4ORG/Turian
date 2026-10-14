@@ -15,8 +15,15 @@ public static class InputActionsLoader
     /// <returns>The maps, or null.</returns>
     public static InputActionsAsset? Resolve(IAppSettings? settings, IAssetLoader? loader)
     {
-        if (settings?.Get<InputSettings>().Actions is not { IsEmpty: false } reference) return null;
-        if (loader is null) return null;
+        if (settings?.Get<InputSettings>().Actions is not { IsEmpty: false } reference)
+        {
+            return null;
+        }
+
+        if (loader is null)
+        {
+            return null;
+        }
 
         try
         {

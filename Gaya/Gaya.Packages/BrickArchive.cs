@@ -47,7 +47,11 @@ public static class BrickArchive
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, reservedCategoryPrefixes);
-        if (precast is not null) manifest.Precast = precast;
+        if (precast is not null)
+        {
+            manifest.Precast = precast;
+        }
+
         Directory.CreateDirectory(outputDirectory);
         var path = Path.Combine(Path.GetFullPath(outputDirectory), FileNameFor(manifest));
 

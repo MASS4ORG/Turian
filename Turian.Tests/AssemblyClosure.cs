@@ -18,11 +18,17 @@ static class AssemblyClosure
             foreach (var reference in current.Assembly.GetReferencedAssemblies())
             {
                 var name = reference.Name!;
-                if (paths.ContainsKey(name)) continue;
+                if (paths.ContainsKey(name))
+                {
+                    continue;
+                }
 
                 var path = $"{current.Path} → {name}";
                 paths[name] = path;
-                if (TryLoad(reference) is { } assembly) pending.Enqueue((assembly, path));
+                if (TryLoad(reference) is { } assembly)
+                {
+                    pending.Enqueue((assembly, path));
+                }
             }
         }
 

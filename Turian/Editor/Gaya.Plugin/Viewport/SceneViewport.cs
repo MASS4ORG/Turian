@@ -6,7 +6,7 @@ namespace Gaya.Plugin.Turian;
 /// StudioA's <c>SceneViewerControl</c>: every navigation and gizmo decision still belongs to
 /// <see cref="SceneCameraController"/> and <see cref="TransformGizmo"/> in <c>Editor.Core</c>.
 /// </summary>
-sealed partial class SceneViewport : IDisposable
+sealed class SceneViewport : IDisposable
 {
     /// <summary>Pointer travel, in pixels, under which a press-release still counts as a click.</summary>
     const float clickDragThreshold = 4f;
@@ -122,7 +122,11 @@ sealed partial class SceneViewport : IDisposable
     /// <summary>Moves the camera once along a command palette direction.</summary>
     public void MoveCamera(int direction)
     {
-        if (direction < 0 || direction >= SceneNavigationBindings.Directions.Length) return;
+        if (direction < 0 || direction >= SceneNavigationBindings.Directions.Length)
+        {
+            return;
+        }
+
         controller?.ApplyKeyboardMovement([direction], 0.1f, 0, 1, 2, 3, 4, 5);
     }
 
@@ -154,7 +158,10 @@ sealed partial class SceneViewport : IDisposable
         var rect = gui.CurrentNode.Rect;
         var width = (uint)Math.Max(1f, rect.W);
         var height = (uint)Math.Max(1f, rect.H);
-        if (!EnsureService(width, height)) return;
+        if (!EnsureService(width, height))
+        {
+            return;
+        }
 
         orientationWidget.Render(gui, controller, inspector.SelectedNode, cameraSettings.Gizmos);
         ApplyGizmoTheme(ThemeTokens.Current);
@@ -176,12 +183,18 @@ sealed partial class SceneViewport : IDisposable
         var text = Gizmo.IsDragging && Gizmo.HandleMode == TransformGizmoMode.Rotate
             ? $"{Gizmo.RotationDegrees:0.#}°" : string.Empty;
         using (gui.Node(120f, 24f, "scene/rotationFeedback").Absolute(12f, 12f).Enter())
+        {
             gui.DrawText(text, ThemeTokens.Current.Text(13), ThemeTokens.Current.Ink, centerInRect: false);
+        }
+
         var pointer = gui.Input.MousePosition;
         using (gui.Node(24f, 24f, "scene/gizmoCursor").AbsoluteScreen(pointer.X - 12f, pointer.Y - 12f)
                    .ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
         {
-            if (showGizmoCursor) gui.ThemedIcon(Icons.SceneMove, ThemeTokens.Current.Text(18));
+            if (showGizmoCursor)
+            {
+                gui.ThemedIcon(Icons.SceneMove, ThemeTokens.Current.Text(18));
+            }
         }
     }
 
@@ -216,7 +229,11 @@ sealed partial class SceneViewport : IDisposable
             return false;
         }
 
-        if (pixels.Length != width * height * 4) pixels = new byte[width * height * 4];
+        if (pixels.Length != width * height * 4)
+        {
+            pixels = new byte[width * height * 4];
+        }
+
         return true;
     }
 
@@ -224,7 +241,10 @@ sealed partial class SceneViewport : IDisposable
 
     void HandleInput(Gui gui, Rect rect)
     {
-        if (controller is null || service is null) return;
+        if (controller is null || service is null)
+        {
+            return;
+        }
 
         var input = gui.Input;
         var interactable = gui.GetInteractable();
@@ -247,9 +267,19 @@ sealed partial class SceneViewport : IDisposable
         DispatchPointer(phase, local, hovered);
         UpdateGizmoCursor(gui, hovered);
 
-        if (hovered && input.MouseWheelDelta != 0f) controller.OnWheel(input.MouseWheelDelta);
-        if (hovered || gesture.Active is not null) HandleKeyboard(gui);
-        else heldKeys.Clear();
+        if (hovered && input.MouseWheelDelta != 0f)
+        {
+            controller.OnWheel(input.MouseWheelDelta);
+        }
+
+        if (hovered || gesture.Active is not null)
+        {
+            HandleKeyboard(gui);
+        }
+        else
+        {
+            heldKeys.Clear();
+        }
     }
 
     void ReadSelectionModifiers(IInputHandler input)
@@ -262,8 +292,15 @@ sealed partial class SceneViewport : IDisposable
     void UpdateGizmoCursor(Gui gui, bool hovered)
     {
         showGizmoCursor = hovered && !playMode.IsActive && Gizmo.Axis != TransformGizmoAxis.None;
-        if (showGizmoCursor) gui.RequestPointerMode(PointerMode.Hidden);
-        if (!hovered && !gizmoOwnsDrag) Gizmo.ClearHover();
+        if (showGizmoCursor)
+        {
+            gui.RequestPointerMode(PointerMode.Hidden);
+        }
+
+        if (!hovered && !gizmoOwnsDrag)
+        {
+            Gizmo.ClearHover();
+        }
     }
 
     // Pushed every frame rather than wired to a change event: the assignments cost nothing, and an edit made
@@ -289,10 +326,22 @@ sealed partial class SceneViewport : IDisposable
 
     void DispatchPointer(ViewportGesturePhase phase, Vector2 local, bool hovered)
     {
-        if (phase == ViewportGesturePhase.Pressed) OnPressed(local);
-        else if (phase == ViewportGesturePhase.Released) OnReleased(local, gesture.Released!.Value);
-        else if (phase == ViewportGesturePhase.Dragged) OnDragged(local);
-        else if (hovered && !playMode.IsActive) Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
+        if (phase == ViewportGesturePhase.Pressed)
+        {
+            OnPressed(local);
+        }
+        else if (phase == ViewportGesturePhase.Released)
+        {
+            OnReleased(local, gesture.Released!.Value);
+        }
+        else if (phase == ViewportGesturePhase.Dragged)
+        {
+            OnDragged(local);
+        }
+        else if (hovered && !playMode.IsActive)
+        {
+            Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
+        }
     }
 
     /// <summary>
@@ -314,14 +363,26 @@ sealed partial class SceneViewport : IDisposable
             marqueeOwnsDrag = !gizmoOwnsDrag;
         }
 
-        if (!gizmoOwnsDrag) controller.OnMouseDown(local.X, local.Y);
+        if (!gizmoOwnsDrag)
+        {
+            controller.OnMouseDown(local.X, local.Y);
+        }
     }
 
     void OnDragged(Vector2 local)
     {
-        if (gizmoOwnsDrag) Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
-        else if (marqueeOwnsDrag) marqueePosition = local;
-        else controller!.OnMouseMove(local.X, local.Y);
+        if (gizmoOwnsDrag)
+        {
+            Gizmo.ProcessPointerMove(local, service!.Camera, ViewportSize);
+        }
+        else if (marqueeOwnsDrag)
+        {
+            marqueePosition = local;
+        }
+        else
+        {
+            controller!.OnMouseMove(local.X, local.Y);
+        }
     }
 
     /// <summary>
@@ -339,7 +400,10 @@ sealed partial class SceneViewport : IDisposable
         }
 
         if (!playMode.IsActive && sceneTree.CurrentSceneRoot is { } root)
+        {
             SelectReleased(root, local, button);
+        }
+
         marqueeOwnsDrag = false;
         controller!.OnMouseUp();
     }
@@ -352,8 +416,10 @@ sealed partial class SceneViewport : IDisposable
     void SelectReleased(Node root, Vector2 local, ViewportButton button)
     {
         if (IsSelectionClick(local, button))
+        {
             inspector.SelectNode(ScenePicker.Pick(root, service!.Camera, local, ViewportSize, cameraSettings.View),
                 additiveSelection, toggleSelection);
+        }
         else if (marqueeOwnsDrag && button == ViewportButton.Left)
         {
             var selected = SceneMarquee.Pick(root, service!.Camera, pressPosition, local,
@@ -386,7 +452,11 @@ sealed partial class SceneViewport : IDisposable
 
         frame?.Dispose();
         frame = Snapshot(pixels, service.Width, service.Height);
-        if (frame is not null) gui.DrawImage(frame, rect);
+        if (frame is not null)
+        {
+            gui.DrawImage(frame, rect);
+        }
+
         DrawMarquee(gui, rect);
 
         RenderPreview(gui, rect, dt);
@@ -398,14 +468,20 @@ sealed partial class SceneViewport : IDisposable
     /// </summary>
     void RenderPreview(Gui gui, Rect rect, float dt)
     {
-        if (previewService is null || previewCamera is null || sceneTree.CurrentSceneRoot is not { } root) return;
+        if (previewService is null || previewCamera is null || sceneTree.CurrentSceneRoot is not { } root)
+        {
+            return;
+        }
 
         previewService.Render(root, dt, previewCamera);
         previewService.CopyPixels(previewPixels);
 
         previewFrame?.Dispose();
         previewFrame = Snapshot(previewPixels, previewService.Width, previewService.Height);
-        if (previewFrame is null) return;
+        if (previewFrame is null)
+        {
+            return;
+        }
 
         var target = new Rect(
             rect.X + rect.W - previewMargin - previewService.Width,
@@ -423,7 +499,10 @@ sealed partial class SceneViewport : IDisposable
     /// </summary>
     static SKImage? Snapshot(byte[] buffer, uint width, uint height)
     {
-        if (width == 0 || height == 0) return null;
+        if (width == 0 || height == 0)
+        {
+            return null;
+        }
 
         var info = new SKImageInfo((int)width, (int)height, SKColorType.Bgra8888, SKAlphaType.Opaque);
         var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
@@ -442,16 +521,28 @@ sealed partial class SceneViewport : IDisposable
 
     void PopulateGizmos(Gizmos g)
     {
-        if (playMode.IsActive || service is null) return;
+        if (playMode.IsActive || service is null)
+        {
+            return;
+        }
 
         GroundGrid.Draw(g, service.Camera.Position, gridSettings, cameraSettings.Gizmos);
 
-        if (!cameraSettings.Gizmos.Visible) return;
+        if (!cameraSettings.Gizmos.Visible)
+        {
+            return;
+        }
 
         foreach (var selected in inspector.SelectedNodes)
+        {
             foreach (var component in selected.Components)
+            {
                 foreach (var drawer in gizmos.GetDrawers(component.GetType()))
+                {
                     drawer.DrawGizmos(g, component);
+                }
+            }
+        }
 
         Gizmo.Draw(g, service.Camera, ViewportSize);
     }
@@ -471,7 +562,10 @@ sealed partial class SceneViewport : IDisposable
 
     void NotifyGizmoMutation()
     {
-        foreach (var node in inspector.SelectedNodes) mutateNode?.Invoke(node);
+        foreach (var node in inspector.SelectedNodes)
+        {
+            mutateNode?.Invoke(node);
+        }
     }
 
     // ── Selection ───────────────────────────────────────────────────────────
@@ -501,7 +595,9 @@ sealed partial class SceneViewport : IDisposable
         {
             previewService ??= new SceneViewerService(vulkan, assets, width, height);
             if (previewService.Width != width || previewService.Height != height)
+            {
                 previewService.Resize(width, height);
+            }
         }
         catch (Exception ex)
         {
@@ -510,12 +606,19 @@ sealed partial class SceneViewport : IDisposable
             return;
         }
 
-        if (previewPixels.Length != width * height * 4) previewPixels = new byte[width * height * 4];
+        if (previewPixels.Length != width * height * 4)
+        {
+            previewPixels = new byte[width * height * 4];
+        }
     }
 
     void DrawMarquee(Gui gui, Rect viewport)
     {
-        if (!marqueeOwnsDrag || Vector2.DistanceSquared(pressPosition, marqueePosition) <= 16f) return;
+        if (!marqueeOwnsDrag || Vector2.DistanceSquared(pressPosition, marqueePosition) <= 16f)
+        {
+            return;
+        }
+
         var start = Vector2.Clamp(Vector2.Min(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
         var end = Vector2.Clamp(Vector2.Max(pressPosition, marqueePosition), Vector2.Zero, ViewportSize);
         var rect = new Rect(viewport.X + start.X, viewport.Y + start.Y, end.X - start.X, end.Y - start.Y);
@@ -535,7 +638,10 @@ sealed partial class SceneViewport : IDisposable
 
     void OnFrameNodeRequested(Node node, FrameNodeOptions options)
     {
-        if (controller is null) return;
+        if (controller is null)
+        {
+            return;
+        }
 
         if (options.MatchRotation && node.GetComponent<CameraComponent>() is { } camera)
         {
@@ -558,7 +664,11 @@ sealed partial class SceneViewport : IDisposable
         DisposePreview();
         frame?.Dispose();
         frame = null;
-        if (service is not null) service.OnPopulateGizmos = null;
+        if (service is not null)
+        {
+            service.OnPopulateGizmos = null;
+        }
+
         service?.Dispose();
         service = null;
         uiPresenter?.Dispose();

@@ -39,7 +39,7 @@ public static class CsProjectGenerator
     /// <param name="settings"></param>
     /// <param name="logger"></param>
     /// <returns></returns>
-    /// <exception cref="System.InvalidOperationException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     public static ProjectRootElement GenerateUserCode(IBuildAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -121,7 +121,11 @@ public static class CsProjectGenerator
         var projectRoot = ProjectRootElement.Create(AssemblyCsProjFullPath(settings, assembly.Name));
         projectRoot.Sdk = settings.TargetSdk;
         projectRoot.AddLibraryInfo(settings, symbols).AddTurianDir();
-        if (!assembly.NoEngineReferences) projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
+        if (!assembly.NoEngineReferences)
+        {
+            projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
+        }
+
         projectRoot
             .AddNugetPackageReferences(settings.PackageReferences)
             .AddAssemblyReferences(settings, assembly.References);
@@ -130,13 +134,18 @@ public static class CsProjectGenerator
         group.AddProperty("AssemblyName", assembly.Name);
         group.AddProperty("RootNamespace", assembly.RootNamespace);
         group.AddProperty("EnableDefaultCompileItems", "false");
-        if (assembly.AllowUnsafeCode) group.AddProperty("AllowUnsafeBlocks", "true");
+        if (assembly.AllowUnsafeCode)
+        {
+            group.AddProperty("AllowUnsafeBlocks", "true");
+        }
 
         var projectDirectory = Path.GetDirectoryName(projectRoot.FullPath)!;
         var exclude = string.Join(';', ExcludePatterns(projectDirectory, graph.ExcludedDirectories(assembly)));
         var itemGroup = projectRoot.AddItemGroup();
         foreach (var directory in assembly.Directories)
+        {
             itemGroup.AddItem("Compile", $"{Path.GetRelativePath(projectDirectory, directory)}/**/*.cs").Exclude = exclude;
+        }
 
         return projectRoot;
     }
@@ -165,7 +174,7 @@ public static class CsProjectGenerator
     /// <param name="mode">Controls whether the executable is generated for play mode or export.</param>
     /// <param name="profile">The build profile an export follows; none builds a client for this machine.</param>
     /// <returns></returns>
-    /// <exception cref="System.InvalidOperationException"></exception>
+    /// <exception cref="InvalidOperationException"></exception>
     public static ProjectRootElement GenerateExecutable(
         IBuildAppSettings settings,
         ILogger logger,
@@ -198,7 +207,9 @@ public static class CsProjectGenerator
             .AddAssetsDir(settings)
             .CopyLauncherFiles(platform);
         if (profile?.Target == BuildTarget.Server)
+        {
             projectRoot.AddServerVerification(settings, platform.Dependencies.Packages);
+        }
 
         return projectRoot;
     }
@@ -277,7 +288,9 @@ public static class CsProjectGenerator
 
             var iconPath = Path.Combine(settings.CacheAbsoluteDir, ProjectIcon.PngFileName);
             if (File.Exists(iconPath))
+            {
                 projectSettingsFiles.AddItem("ProjectSettingsFile", Path.GetRelativePath(outputDirectory, iconPath));
+            }
 
             var target = projectRoot.AddTarget("CopyAssetContent");
             target.AfterTargets = "PostBuildEvent";
@@ -318,8 +331,11 @@ public static class CsProjectGenerator
             var projectDirectory = Path.GetDirectoryName(projectRoot.FullPath)!;
             var itemGroup = projectRoot.AddItemGroup();
             foreach (var name in assemblyNames)
+            {
                 itemGroup.AddItem("ProjectReference",
                     Path.GetRelativePath(projectDirectory, AssemblyCsProjFullPath(settings, name)));
+            }
+
             return projectRoot;
         }
 
@@ -334,7 +350,10 @@ public static class CsProjectGenerator
             group.AddProperty("GenerateDocumentationFile", "true");
             // The editor's compile and the IDE use the active profile's symbols; a build passing
             // -p:TurianDefines, global and so stronger, uses its own profile's instead.
-            if (symbols is { Count: > 0 }) group.AddProperty("TurianDefines", string.Join(';', symbols));
+            if (symbols is { Count: > 0 })
+            {
+                group.AddProperty("TurianDefines", string.Join(';', symbols));
+            }
             // A build profile passes its script symbols, such as TURIAN_SERVER, as the TurianDefines property.
             group.AddProperty("DefineConstants", "$(DefineConstants);$(TurianDefines)");
             // The XML docs feed inspector tooltips; they are optional, so undocumented members are not warned about.
@@ -400,14 +419,19 @@ public static class CsProjectGenerator
             IReadOnlyList<(string, string)>? packages = null, string platform = BuildPlatforms.Desktop)
         {
             var bricks = ReferencedBricks(settings, shipping, target);
-            if (shipping) BuildProfiles.EnsureSupported(bricks, platform);
+            if (shipping)
+            {
+                BuildProfiles.EnsureSupported(bricks, platform);
+            }
 
             var references = projectRoot.AddItemGroup();
             // An editor-only assembly may also use what the bricks' editor assemblies offer.
             var paths = bricks.SelectMany(BrickAssemblies.RuntimeAssemblies)
                 .Concat(editor ? bricks.SelectMany(BrickAssemblies.EditorAssemblies) : []);
             foreach (var path in paths)
+            {
                 references.AddItem("Reference", Path.GetFileNameWithoutExtension(path)).AddMetadata("HintPath", path, true);
+            }
 
             AddBrickPackages(references, packages ?? settings.PackageReferences, bricks, shipping, platform);
             return projectRoot;
@@ -417,7 +441,7 @@ public static class CsProjectGenerator
         /// Fails a server build that would still copy a client-only brick's assembly or package, as when a script
         /// uses the renderer outside <c>#if !TURIAN_SERVER</c>.
         /// </summary>
-        private ProjectRootElement AddServerVerification(IBuildAppSettings settings,
+        private void AddServerVerification(IBuildAppSettings settings,
             IReadOnlyList<(string, string)> declaredPackages)
         {
             var resolved = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir);
@@ -431,7 +455,10 @@ public static class CsProjectGenerator
             var conditions = assemblies.Select(static name => $"'%(ReferenceCopyLocalPaths.Filename)' == '{name}'")
                 .Concat(packages.Select(static id => $"'%(ReferenceCopyLocalPaths.NuGetPackageId)' == '{id}'"))
                 .ToList();
-            if (conditions.Count == 0) return projectRoot;
+            if (conditions.Count == 0)
+            {
+                return;
+            }
 
             var target = projectRoot.AddTarget("VerifyServerDependencies");
             target.AfterTargets = "ResolveAssemblyReferences";
@@ -442,7 +469,6 @@ public static class CsProjectGenerator
             error.SetParameter("Text",
                 "This server build would ship client-only files: @(_TurianClientOnly->'%(Filename)%(Extension)'). "
                 + "Guard script code that uses the renderer, window or in-game UI with #if !TURIAN_SERVER.");
-            return projectRoot;
         }
 
         private ProjectRootElement AddNugetPackageReferences(IReadOnlyList<(string, string)> packages)
@@ -473,10 +499,17 @@ public static class CsProjectGenerator
         var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, version) in bricks.SelectMany(b => b.Manifest.NugetFor(platform)).DistinctBy(static p => p.Key))
         {
-            if (!declared.Add(id)) continue;
+            if (!declared.Add(id))
+            {
+                continue;
+            }
+
             var package = references.AddItem("PackageReference", id);
             package.AddMetadata("Version", version, true);
-            if (!shipping) package.AddMetadata("PrivateAssets", "all", true);
+            if (!shipping)
+            {
+                package.AddMetadata("PrivateAssets", "all", true);
+            }
         }
     }
 

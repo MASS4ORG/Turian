@@ -22,9 +22,17 @@ public sealed class FrameStatisticsHudComponentTests(VulkanFixture fixture) : IC
         RenderStatisticsTargets.Record(component, new RenderFrameStats { DrawCalls = 4 });
         RenderStatisticsTargets.Record(component, new RenderFrameStats { DrawCalls = 4 });
         Assert.True(component.Statistics.Count > 0);
-        for (var i = 0; i < 100; i++) RenderStatisticsTargets.Find(root);
+        for (var i = 0; i < 100; i++)
+        {
+            RenderStatisticsTargets.Find(root);
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) RenderStatisticsTargets.Find(root);
+        for (var i = 0; i < 1000; i++)
+        {
+            RenderStatisticsTargets.Find(root);
+        }
+
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - allocated);
         component.Statistics.Add(0.05, new RenderFrameStats { DrawCalls = 4 });
         component.ShowHud = false;
@@ -80,9 +88,17 @@ public sealed class FrameStatisticsHudComponentTests(VulkanFixture fixture) : IC
         var drawing = (IDrawable)typeof(FrameStatisticsHudComponent)
             .GetField("drawing", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(component)!;
         Assert.NotNull(drawing.Paint);
-        for (var i = 0; i < 100; i++) drawing.Render(gui, hud, surface.Canvas);
+        for (var i = 0; i < 100; i++)
+        {
+            drawing.Render(gui, hud, surface.Canvas);
+        }
+
         var allocated = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 1000; i++) drawing.Render(gui, hud, surface.Canvas);
+        for (var i = 0; i < 1000; i++)
+        {
+            drawing.Render(gui, hud, surface.Canvas);
+        }
+
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - allocated);
         component.FontSize = 14;
         component.SceneLoadMilliseconds = null;

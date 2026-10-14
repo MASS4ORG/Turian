@@ -14,7 +14,10 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
     static float ToolbarHeight => Theme.Scale(26f);
     readonly SceneToolbar toolbar = new(viewport, () =>
     {
-        if (inspector.SelectedNode is { } selected) sceneTree.RequestFrameNode(selected);
+        if (inspector.SelectedNode is { } selected)
+        {
+            sceneTree.RequestFrameNode(selected);
+        }
     });
 
     /// <inheritdoc />
@@ -30,11 +33,17 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Enter())
         {
-            if (prefabStage.Trail.Count > 0) Breadcrumb(gui);
+            if (prefabStage.Trail.Count > 0)
+            {
+                Breadcrumb(gui);
+            }
+
             toolbar.Render(gui);
 
             using (gui.Node().Expand().Enter())
+            {
                 viewport.Render(gui);
+            }
         }
     }
 
@@ -47,8 +56,15 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
     /// <summary>Frames the selected node in the viewport. What the panel's F shortcut runs.</summary>
     public void FrameSelected()
     {
-        if (sceneTree.CurrentSceneRoot is null) return;
-        if (inspector.SelectedNode is not { } node) return;
+        if (sceneTree.CurrentSceneRoot is null)
+        {
+            return;
+        }
+
+        if (inspector.SelectedNode is not { } node)
+        {
+            return;
+        }
 
         sceneTree.RequestFrameNode(node);
     }
@@ -80,7 +96,11 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
 
             for (var i = 0; i < trail.Count; i++)
             {
-                if (Button(gui, trail[i].Title, $"scene/breadcrumb/{i}", selected: false)) returnTo = i;
+                if (Button(gui, trail[i].Title, $"scene/breadcrumb/{i}", selected: false))
+                {
+                    returnTo = i;
+                }
+
                 gui.ThemedIcon(Icons.CaretRight, Theme.Text(10), 0.5f);
             }
 
@@ -88,7 +108,10 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             gui.DrawText(workspace.Active?.Title ?? string.Empty, Theme.Text(11), Theme.Ink, centerInRect: false);
         }
 
-        if (returnTo >= 0) prefabStage.Return(returnTo);
+        if (returnTo >= 0)
+        {
+            prefabStage.Return(returnTo);
+        }
     }
 
     static bool Button(Gui gui, string label, string id, bool selected)
@@ -99,8 +122,14 @@ sealed class ScenePanel(SceneViewport viewport, SceneTreeController sceneTree,
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (selected) gui.DrawBackgroundRect(Theme.AccentFill, 3f);
-            else if (hot) gui.DrawBackgroundRect(Theme.Hover, 3f);
+            if (selected)
+            {
+                gui.DrawBackgroundRect(Theme.AccentFill, 3f);
+            }
+            else if (hot)
+            {
+                gui.DrawBackgroundRect(Theme.Hover, 3f);
+            }
 
             gui.DrawText(label, Theme.Text(11), selected ? Theme.Ink : Theme.InkDim);
             return hot && interactable.OnClick();

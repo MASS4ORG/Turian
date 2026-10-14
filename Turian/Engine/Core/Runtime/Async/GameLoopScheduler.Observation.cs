@@ -9,7 +9,11 @@ public sealed partial class GameLoopScheduler
     internal void RunOwned(Func<CancellationToken, ValueTask> routine, Component owner)
     {
         RequireMainThread();
-        if (Cancellation(default, owner).IsCancellationRequested) return;
+        if (Cancellation(default, owner).IsCancellationRequested)
+        {
+            return;
+        }
+
         using var contextScope = EnterContext();
         var lifetimeScope = CancellationTokenSource.CreateLinkedTokenSource(owner.DestroyCancellationToken,
             SessionCancellationToken);
@@ -33,13 +37,23 @@ public sealed partial class GameLoopScheduler
 
     void ObserveFailure(Exception exception, Component? owner, CancellationToken token, string? nodeName)
     {
-        if (exception is OperationCanceledException && IsExpectedCancellation(token, owner)) return;
-        if (IsMainThread || IsStopped) Report(exception, owner, nodeName);
-        else Post(static state =>
+        if (exception is OperationCanceledException && IsExpectedCancellation(token, owner))
+        {
+            return;
+        }
+
+        if (IsMainThread || IsStopped)
+        {
+            Report(exception, owner, nodeName);
+        }
+        else
+        {
+            Post(static state =>
         {
             var failure = ((Exception Exception, Component? Owner, string? Node))state!;
             Report(failure.Exception, failure.Owner, failure.Node);
         }, (exception, owner, nodeName));
+        }
     }
 
     bool IsExpectedCancellation(CancellationToken cancellationToken, Component? owner)

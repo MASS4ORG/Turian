@@ -22,6 +22,7 @@ public sealed class AssetLoadStatisticsTests(VulkanFixture fixture) : IClassFixt
             var path = Path.Combine(assets.FullName, baked ? "texture.ktx2" : "texture.png");
             asset.RelativePath = path;
             if (baked)
+            {
                 Ktx2Writer.Save(path, new Ktx2Texture
                 {
                     Format = Ktx2VkFormat.R8G8B8A8Unorm,
@@ -29,6 +30,7 @@ public sealed class AssetLoadStatisticsTests(VulkanFixture fixture) : IClassFixt
                     Height = 2,
                     Levels = [new byte[16]],
                 });
+            }
             else
             {
                 using var bitmap = new SKBitmap(2, 2);

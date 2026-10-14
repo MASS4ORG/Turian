@@ -51,7 +51,9 @@ public static class GamePlayers
         foreach (var assembly in assemblies)
         {
             if (!assembly.IsDynamic && assembly.GetCustomAttribute<GamePlayerAttribute>() is { } attribute)
+            {
                 return (IGamePlayer)Activator.CreateInstance(attribute.PlayerType)!;
+            }
         }
 
         return null;

@@ -1,10 +1,10 @@
 namespace Turian.Editor.Core;
 
 /// <summary>
-/// Abstract base class for monitoring a project directory with a <see cref="System.IO.FileSystemWatcher"/>.
+/// Abstract base class for monitoring a project directory with a <see cref="FileSystemWatcher"/>.
 ///
 /// <para>
-/// Manages the watcher lifecycle (<see cref="Start"/>, <see cref="Stop"/>, <see cref="System.IDisposable.Dispose"/>)
+/// Manages the watcher lifecycle (<see cref="Start"/>, <see cref="Stop"/>, <see cref="IDisposable.Dispose"/>)
 /// and exposes protected virtual hooks (<see cref="OnFileCreated"/>, <see cref="OnFileChanged"/>,
 /// <see cref="OnFileDeleted"/>, <see cref="OnFileRenamed"/>) for subclasses to handle file-system events.
 /// </para>
@@ -68,7 +68,7 @@ public abstract class ProjectDirectoryWatcher : IDisposable
     /// <see cref="WatcherNotifyFilters"/>. Any previously active watch is stopped first.
     /// </summary>
     /// <param name="directory">Absolute path to the directory to watch.</param>
-    /// <exception cref="System.ArgumentException">When <paramref name="directory"/> is null or whitespace.</exception>
+    /// <exception cref="ArgumentException">When <paramref name="directory"/> is null or whitespace.</exception>
     /// <exception cref="DirectoryNotFoundException">When <paramref name="directory"/> does not exist.</exception>
     public void Start(string directory)
     {
@@ -78,7 +78,9 @@ public abstract class ProjectDirectoryWatcher : IDisposable
 
         var fullPath = Path.GetFullPath(directory);
         if (!Directory.Exists(fullPath))
+        {
             throw new DirectoryNotFoundException($"Directory not found: {fullPath}");
+        }
 
         watcher = new FileSystemWatcher(fullPath, Filter)
         {
@@ -99,7 +101,10 @@ public abstract class ProjectDirectoryWatcher : IDisposable
     /// <summary>Stops the active watcher, detaches all event handlers, and releases the underlying resource.</summary>
     public void Stop()
     {
-        if (watcher is null) return;
+        if (watcher is null)
+        {
+            return;
+        }
 
         watcher.EnableRaisingEvents = false;
         watcher.Created -= OnCreatedCore;
@@ -152,7 +157,11 @@ public abstract class ProjectDirectoryWatcher : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
 
         Stop();

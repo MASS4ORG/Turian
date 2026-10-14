@@ -25,7 +25,7 @@ public sealed class AssetCacheReuseTests : IDisposable
         var artifactTime = File.GetLastWriteTimeUtc(artifact);
         var progress = Substitute.For<IProgressSink>();
         var indexing = Substitute.For<IProgressScope>();
-        progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets", 1).Returns(indexing);
+        progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets").Returns(indexing);
         Scan(progress);
         indexing.Received().Units(0, 0);
         Assert.Equal(original.ImportedAtUtc, Serializer.Load<ImportedAssetManifest>(manifestPath)!.ImportedAtUtc);
@@ -52,10 +52,10 @@ public sealed class AssetCacheReuseTests : IDisposable
         Directory.CreateDirectory(assets);
         File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "cube.fbx"), Path.Combine(assets, "cube.fbx"));
         var first = Scan();
-        var parent = first.GetAssetsSnapshot().Single(record => record.ParentAssetId == Guid.Empty);
+        var parent = first.GetAssetsSnapshot().Single(static record => record.ParentAssetId == Guid.Empty);
         var children = first.GetChildAssets(parent.AssetId).ToArray();
         Assert.NotEmpty(children);
-        var content = children.First(record => record.AssetTypeName == typeof(Prefab).FullName).ResolveContentPath();
+        var content = children.First(static record => record.AssetTypeName == typeof(Prefab).FullName).ResolveContentPath();
         var contentTime = File.GetLastWriteTimeUtc(content);
         var reopened = Scan();
         Assert.Equal(children.Length, reopened.GetChildAssets(parent.AssetId).Count());
@@ -93,7 +93,11 @@ public sealed class AssetCacheReuseTests : IDisposable
         var manifestPath = Directory.GetFiles(Path.Combine(root, ".Cache", "Assets"), "import.json",
             SearchOption.AllDirectories).Single();
         var directory = Path.GetDirectoryName(manifestPath)!;
-        foreach (var file in Directory.GetFiles(directory, "primary*")) File.Delete(file);
+        foreach (var file in Directory.GetFiles(directory, "primary*"))
+        {
+            File.Delete(file);
+        }
+
         var stale = Path.Combine(directory, "primary.pc.amtex");
         File.WriteAllText(stale, "stale");
         var manifest = Serializer.Load<ImportedAssetManifest>(manifestPath)!;
@@ -104,7 +108,7 @@ public sealed class AssetCacheReuseTests : IDisposable
         Serializer.Save(manifestPath, manifest);
         File.Delete(Path.Combine(root, ".Cache", "assetCatalog.json"));
 
-        var record = Scan().GetAssetsSnapshot().Single(candidate => candidate.ParentAssetId == Guid.Empty);
+        var record = Scan().GetAssetsSnapshot().Single(static candidate => candidate.ParentAssetId == Guid.Empty);
 
         Assert.False(File.Exists(stale));
         Assert.Equal(TextureAssetImporter.ArtifactFileName(TextureBuildTarget.Pc),

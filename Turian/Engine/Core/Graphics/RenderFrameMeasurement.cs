@@ -13,7 +13,11 @@ struct RenderFrameMeasurement
     public RenderFrameMeasurement(bool enabled)
     {
         this.enabled = enabled;
-        if (!enabled) return;
+        if (!enabled)
+        {
+            return;
+        }
+
         started = Stopwatch.GetTimestamp();
         allocated = GC.GetAllocatedBytesForCurrentThread();
     }
@@ -21,19 +25,29 @@ struct RenderFrameMeasurement
     /// <summary>Marks the beginning of scene preparation and uploads.</summary>
     public void BeginPreparation()
     {
-        if (enabled) preparation = Stopwatch.GetTimestamp();
+        if (enabled)
+        {
+            preparation = Stopwatch.GetTimestamp();
+        }
     }
 
     /// <summary>Marks command recording, submission and the GPU completion wait.</summary>
     public void BeginSubmission()
     {
-        if (enabled) submission = Stopwatch.GetTimestamp();
+        if (enabled)
+        {
+            submission = Stopwatch.GetTimestamp();
+        }
     }
 
     /// <summary>Completes the CPU measurements, retaining the recorded geometry counts.</summary>
     public readonly RenderFrameStats Complete(RenderFrameStats geometry)
     {
-        if (!enabled) return default;
+        if (!enabled)
+        {
+            return default;
+        }
+
         var ended = Stopwatch.GetTimestamp();
         return geometry with
         {

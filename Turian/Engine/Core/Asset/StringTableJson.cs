@@ -28,17 +28,19 @@ public static class StringTableJson
     /// <summary>Parses a table from its JSON text.</summary>
     /// <param name="json">The JSON text.</param>
     /// <returns>The parsed table.</returns>
-    /// <exception cref="System.Text.Json.JsonException">Raised for malformed JSON.</exception>
-    /// <exception cref="System.ArgumentException">Raised when the JSON lacks a locale.</exception>
+    /// <exception cref="JsonException">Raised for malformed JSON.</exception>
+    /// <exception cref="ArgumentException">Raised when the JSON lacks a locale.</exception>
     public static StringTable Load(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
 
         var dto = JsonSerializer.Deserialize<TableDto>(json, Options);
         if (string.IsNullOrWhiteSpace(dto?.Locale))
+        {
             throw new ArgumentException("A string table JSON document requires a locale.", nameof(json));
+        }
 
-        var table = new StringTable(dto.Locale!);
+        var table = new StringTable(dto.Locale);
         foreach (var entry in dto.Entries)
         {
             ArgumentNullException.ThrowIfNull(entry);
@@ -52,7 +54,7 @@ public static class StringTableJson
                 Plurals = entry.Plurals is null
                     ? []
                     : new Dictionary<PluralCategory, string>(
-                        entry.Plurals.Where(kv => kv.Value is not null).Select(kv => new KeyValuePair<PluralCategory, string>(kv.Key, kv.Value!))),
+                        entry.Plurals.Where(static kv => kv.Value is not null).Select(static kv => new KeyValuePair<PluralCategory, string>(kv.Key, kv.Value))),
             });
         }
 
@@ -70,7 +72,7 @@ public static class StringTableJson
         {
             Locale = table.Locale,
             Entries = [.. table.Entries
-                .Select(e => new EntryDto
+                .Select(static e => new EntryDto
                 {
                     Key = e.Key,
                     Source = e.Source,

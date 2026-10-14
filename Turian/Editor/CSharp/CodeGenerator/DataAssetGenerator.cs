@@ -43,12 +43,16 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         {
             var serializable = models.Where(static m => m!.Members is not null).Distinct().ToList();
             if (serializable.Count > 0)
+            {
                 output.AddSource("TurianGeneratedSerializers.g.cs",
                     SourceText.From(EmitSerializers(serializable), Encoding.UTF8));
+            }
 
             foreach (var model in models.Where(static m => m!.Observables.Length > 0).Distinct())
+            {
                 output.AddSource($"{model!.HintName}.Observable.g.cs",
                     SourceText.From(EmitObservables(model), Encoding.UTF8));
+            }
         });
     }
 
@@ -56,7 +60,10 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == dataAssetName) return true;
+            if (current.ToDisplayString() == dataAssetName)
+            {
+                return true;
+            }
         }
 
         return false;
@@ -82,7 +89,9 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
 
         var containers = new List<string>();
         for (var outer = type.ContainingType; outer is not null; outer = outer.ContainingType)
+        {
             containers.Insert(0, outer.Name);
+        }
 
         return new TypeModel(
             type.ToDisplayString(TypeFormat),
@@ -96,54 +105,102 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     /// <summary>The serialized members in reflection order, or null when the type keeps the reflection path.</summary>
     static EquatableArray<MemberModel>? DescribeMembers(INamedTypeSymbol type)
     {
-        if (type.IsAbstract || type.IsGenericType || !IsReachable(type)) return null;
+        if (type.IsAbstract || type.IsGenericType || !IsReachable(type))
+        {
+            return null;
+        }
+
         if (!type.InstanceConstructors.Any(static c =>
                 c.Parameters.Length == 0 && c.DeclaredAccessibility == Accessibility.Public))
+        {
             return null;
+        }
 
         var chain = new List<INamedTypeSymbol>();
         for (var current = type; current is not null && current.SpecialType != SpecialType.System_Object;
              current = current.BaseType)
+        {
             chain.Add(current);
+        }
 
         var members = new List<MemberModel>();
         var names = new HashSet<string>();
 
         foreach (var property in chain.SelectMany(static t => t.GetMembers().OfType<IPropertySymbol>()))
         {
-            if (property.IsStatic || property.IsIndexer) continue;
+            if (property.IsStatic || property.IsIndexer)
+            {
+                continue;
+            }
+
             if (property.DeclaredAccessibility != Accessibility.Public)
             {
-                if (HasAttribute(property, jsonIncludeName)) return null;
+                if (HasAttribute(property, jsonIncludeName))
+                {
+                    return null;
+                }
+
                 continue;
             }
 
             if (property.GetMethod?.DeclaredAccessibility != Accessibility.Public)
             {
-                if (HasAttribute(property, jsonIncludeName)) return null;
+                if (HasAttribute(property, jsonIncludeName))
+                {
+                    return null;
+                }
+
                 continue;
             }
 
-            if (HasAttribute(property, jsonIgnoreName) || property.SetMethod is null) continue;
+            if (HasAttribute(property, jsonIgnoreName) || property.SetMethod is null)
+            {
+                continue;
+            }
+
             if (property.SetMethod.IsInitOnly
                 || property.SetMethod.DeclaredAccessibility != Accessibility.Public)
+            {
                 return null;
+            }
 
-            if (!TryAdd(property.Name, property.Type, property)) return null;
+            if (!TryAdd(property.Name, property.Type, property))
+            {
+                return null;
+            }
         }
 
         foreach (var field in chain.SelectMany(static t => t.GetMembers().OfType<IFieldSymbol>()))
         {
-            if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared) continue;
-            if (field.DeclaredAccessibility != Accessibility.Public)
+            if (field.IsStatic || field.IsConst || field.IsImplicitlyDeclared)
             {
-                if (HasAttribute(field, jsonIncludeName)) return null;
                 continue;
             }
 
-            if (HasAttribute(field, jsonIgnoreName)) continue;
-            if (field.IsReadOnly) return null;
-            if (!TryAdd(field.Name, field.Type, field)) return null;
+            if (field.DeclaredAccessibility != Accessibility.Public)
+            {
+                if (HasAttribute(field, jsonIncludeName))
+                {
+                    return null;
+                }
+
+                continue;
+            }
+
+            if (HasAttribute(field, jsonIgnoreName))
+            {
+                continue;
+            }
+
+            if (field.IsReadOnly)
+            {
+                return null;
+            }
+
+            if (!TryAdd(field.Name, field.Type, field))
+            {
+                return null;
+            }
         }
 
         return new EquatableArray<MemberModel>([.. members]);
@@ -152,7 +209,9 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         {
             if (!names.Add(name) || DerivesFrom(memberType, assetName) || memberType.IsRefLikeType
                 || memberType.TypeKind == TypeKind.Pointer)
+            {
                 return false;
+            }
 
             members.Add(new MemberModel(
                 name,
@@ -169,7 +228,9 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         {
             if (current.DeclaredAccessibility is not (Accessibility.Public
                 or Accessibility.Internal))
+            {
                 return false;
+            }
         }
 
         return true;
@@ -192,7 +253,10 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     {
         for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == baseName) return true;
+            if (current.ToDisplayString() == baseName)
+            {
+                return true;
+            }
         }
 
         return false;
@@ -253,7 +317,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             code.AppendLine("                static (writer, value, options) =>");
             code.AppendLine("                {");
             code.AppendLine($"                    var o = ({t})value;");
-            foreach (var member in members) code.Append(EmitWrite(member));
+            foreach (var member in members)
+            {
+                code.Append(EmitWrite(member));
+            }
+
             code.AppendLine("                },");
 
             code.AppendLine("                static (value, property, options) =>");
@@ -261,7 +329,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             code.AppendLine($"                    var o = ({t})value;");
             code.AppendLine("                    switch (property.Name)");
             code.AppendLine("                    {");
-            foreach (var member in members) code.Append(EmitRead(member));
+            foreach (var member in members)
+            {
+                code.Append(EmitRead(member));
+            }
+
             code.AppendLine("                        default: return false;");
             code.AppendLine("                    }");
             code.AppendLine("                },");
@@ -272,8 +344,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             code.AppendLine("                    switch (member)");
             code.AppendLine("                    {");
             foreach (var member in references)
+            {
                 code.AppendLine($"                        case \"{member.Name}\": "
                                 + $"o.{Identifier(member.Name)} = ({member.Type})memberValue; return true;");
+            }
+
             code.AppendLine("                        default: return false;");
             code.AppendLine("                    }");
             code.AppendLine("                },");
@@ -281,7 +356,10 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             code.AppendLine("                static member => member switch");
             code.AppendLine("                {");
             foreach (var member in references)
+            {
                 code.AppendLine($"                    \"{member.Name}\" => typeof({member.Type}),");
+            }
+
             code.AppendLine("                    _ => null,");
             code.AppendLine("                }));");
         }
@@ -303,8 +381,10 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                       + $"{json}.JsonSerializer.Serialize(writer, o.{id}, options); }}";
 
         if (member.IsReference)
+        {
             return $"{indent}if (!{core}.ObjectReferences.TryWrite("
                    + $"writer, o, \"{name}\", typeof({member.Type}), o.{id}, false)) {general}\n";
+        }
 
         return member.FastPath switch
         {
@@ -325,9 +405,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var general = $"{json}.JsonSerializer.Deserialize<{member.Type}>(property.Value, options)";
 
         if (member.IsReference)
+        {
             return $"{indent}case \"{name}\": o.{id} = {core}.ObjectReferences.TryRead("
                    + $"o, \"{name}\", typeof({member.Type}), property.Value, false, out var {name}Reference) "
                    + $"? ({member.Type}){name}Reference : {general}; return true;\n";
+        }
 
         var fast = member.FastPath switch
         {
@@ -349,9 +431,16 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var code = new StringBuilder();
         code.AppendLine("// <auto-generated/>");
         code.AppendLine("#nullable enable");
-        if (model.Namespace is not null) code.AppendLine($"namespace {model.Namespace};");
+        if (model.Namespace is not null)
+        {
+            code.AppendLine($"namespace {model.Namespace};");
+        }
 
-        foreach (var container in model.Containers) code.AppendLine($"partial class {container} {{");
+        foreach (var container in model.Containers)
+        {
+            code.AppendLine($"partial class {container} {{");
+        }
+
         code.AppendLine($"partial class {model.Name}");
         code.AppendLine("{");
 
@@ -376,7 +465,11 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         }
 
         code.AppendLine("}");
-        foreach (var _ in model.Containers) code.AppendLine("}");
+        foreach (var _ in model.Containers)
+        {
+            code.AppendLine("}");
+        }
+
         return code.ToString();
     }
 

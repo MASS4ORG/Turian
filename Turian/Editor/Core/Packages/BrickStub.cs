@@ -25,7 +25,9 @@ public static class BrickStub
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
         if (Directory.Exists(outputDirectory) && Directory.EnumerateFileSystemEntries(outputDirectory).Any())
+        {
             throw new PackageException($"{outputDirectory} is not empty.");
+        }
 
         var scripts = UserCodeTypeManifestGenerator.ScriptTypes(packageRoot, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance)
             .ToDictionary(static t => t.FullyQualifiedName, static t => t);
@@ -34,13 +36,25 @@ public static class BrickStub
             var relative = Path.GetRelativePath(packageRoot, file).Replace('\\', '/');
             var segments = relative.Split('/');
             if (segments.Any(static s => s is ".git" or "bin" or "obj" or "Precast~" or "Source~") || relative.EndsWith(".brick", StringComparison.Ordinal)
-                || relative == PackageManifest.FileName) continue;
+                || relative == PackageManifest.FileName)
+            {
+                continue;
+            }
 
             var target = Path.Combine(outputDirectory, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            if (relative.EndsWith(".cs", StringComparison.Ordinal)) WriteScriptStub(file, target, scripts);
-            else if (KeptExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)) File.Copy(file, target);
-            else WritePlaceholder(file, target);
+            if (relative.EndsWith(".cs", StringComparison.Ordinal))
+            {
+                WriteScriptStub(file, target, scripts);
+            }
+            else if (KeptExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+            {
+                File.Copy(file, target);
+            }
+            else
+            {
+                WritePlaceholder(file, target);
+            }
         }
 
         manifest.Version = SemanticVersion.Parse($"{manifest.Version!.Major}.{manifest.Version.Minor}.{manifest.Version.Patch}-stub");

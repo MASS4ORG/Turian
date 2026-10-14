@@ -95,7 +95,11 @@ public static partial class Program
             for (var i = 0; i < reader.Count; i++)
             {
                 var entry = reader.EntryAt(i);
-                if (entry.IsTombstone) continue;
+                if (entry.IsTombstone)
+                {
+                    continue;
+                }
+
                 var relative = SafeRelativePath(reader.VirtualPath(entry), entry.AssetId);
                 var destination = Path.GetFullPath(Path.Combine(outDir, relative));
                 if (!destination.StartsWith(outDir, StringComparison.Ordinal))
@@ -214,7 +218,11 @@ public static partial class Program
             for (var i = 0; i < reader.Count; i++)
             {
                 var entry = reader.EntryAt(i);
-                if (entry.IsTombstone) continue;
+                if (entry.IsTombstone)
+                {
+                    continue;
+                }
+
                 try
                 {
                     _ = reader.ReadAsset(entry, verify: true);

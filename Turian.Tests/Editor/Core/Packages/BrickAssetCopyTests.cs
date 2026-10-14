@@ -46,7 +46,7 @@ public sealed class BrickAssetCopyTests : IDisposable
     {
         var copies = BrickService.CopyAssets(project, "user.mateo.stats", ["Runtime/Hero.dataasset", "Runtime/Icon.png"], "Stats");
 
-        var hero = copies.Single(c => c.Source == "Runtime/Hero.dataasset");
+        var hero = copies.Single(static c => c.Source == "Runtime/Hero.dataasset");
         Assert.Equal("Assets/Stats/Hero.dataasset", hero.Target);
         Assert.NotEqual(stats, hero.NewId);
         var payload = File.ReadAllText(Path.Combine(project, hero.Target));

@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       # glslc: shader compilation (CompileShaders). fontconfig/dejavu: SkiaSharp text rendering
       # at test-run time (Guinevere UI); the ubuntu-latest image ships neither.
@@ -82,7 +82,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: "10.0.x"
+          global-json-file: global.json
 
       - name: Install packaging tools
         run: |

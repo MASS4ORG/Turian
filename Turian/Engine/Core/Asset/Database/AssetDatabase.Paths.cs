@@ -22,7 +22,10 @@ public sealed partial class AssetDatabase
 
     static AssetCatalog ReadCatalog(IContentDirectory content, string path)
     {
-        if (!content.Exists(path)) return new AssetCatalog();
+        if (!content.Exists(path))
+        {
+            return new AssetCatalog();
+        }
 
         try
         {
@@ -200,7 +203,11 @@ public sealed partial class AssetDatabase
     static string? ReadManifestPrimary(string directory)
     {
         var manifestPath = Path.Combine(directory, "import.json");
-        if (!File.Exists(manifestPath)) return null;
+        if (!File.Exists(manifestPath))
+        {
+            return null;
+        }
+
         try
         {
             using var stream = File.OpenRead(manifestPath);
@@ -215,19 +222,39 @@ public sealed partial class AssetDatabase
 
     static string? ResolveManifestPrimary(string directory, JsonElement manifest)
     {
-        if (ManifestPrimaryFileName(manifest) is not { } fileName) return null;
+        if (ManifestPrimaryFileName(manifest) is not { } fileName)
+        {
+            return null;
+        }
+
         var path = Path.Combine(directory, fileName);
-        if (ArtifactTarget(path) is { } target && target != TextureBuildTarget.Current) return null;
+        if (ArtifactTarget(path) is { } target && target != TextureBuildTarget.Current)
+        {
+            return null;
+        }
+
         return File.Exists(path) ? path : null;
     }
 
     static string? ManifestPrimaryFileName(JsonElement manifest)
     {
-        if (manifest.ValueKind != JsonValueKind.Object) return null;
+        if (manifest.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
         if (!manifest.TryGetProperty("PrimaryArtifactFileName", out var property)
-            || property.ValueKind != JsonValueKind.String) return null;
+            || property.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
         var fileName = property.GetString();
-        if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName) return null;
+        if (string.IsNullOrWhiteSpace(fileName) || Path.GetFileName(fileName) != fileName)
+        {
+            return null;
+        }
+
         return fileName;
     }
 

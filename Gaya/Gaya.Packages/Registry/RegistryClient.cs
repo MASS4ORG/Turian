@@ -37,10 +37,16 @@ public sealed class RegistryClient
     public static string? TokenFor(ScopedRegistry registry)
     {
         var variable = "GAYA_REGISTRY_TOKEN_" + new string([.. registry.Name.ToUpperInvariant().Select(static c => char.IsAsciiLetterOrDigit(c) ? c : '_')]);
-        if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } fromEnvironment) return fromEnvironment;
+        if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } fromEnvironment)
+        {
+            return fromEnvironment;
+        }
 
         var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gaya", "credentials.json");
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path))
+        {
+            return null;
+        }
 
         try
         {
@@ -79,13 +85,17 @@ public sealed class RegistryClient
         CancellationToken cancellationToken = default)
     {
         if (entry.Store?.Entitlement is { Length: > 0 } && token is null)
+        {
             throw new PackageException(
                 $"{id} {version} needs an access token from {registry.Name}: set GAYA_REGISTRY_TOKEN_{registry.Name.ToUpperInvariant()} or add it to ~/.gaya/credentials.json.");
+        }
 
         var bytes = await ReadAsync(entry.Url, cancellationToken).ConfigureAwait(false);
         var integrity = $"sha256-{Convert.ToBase64String(SHA256.HashData(bytes))}";
         if (integrity != entry.Integrity)
+        {
             throw new PackageException($"{id} {version} from {registry.Name} does not match the hash its index lists.");
+        }
 
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, $"{id}-{version}{BrickArchive.Extension}");
@@ -96,7 +106,10 @@ public sealed class RegistryClient
     async Task<byte[]> ReadAsync(string relative, CancellationToken cancellationToken)
     {
         var location = registry.Url;
-        if (location.StartsWith("file:", StringComparison.Ordinal)) location = new Uri(location).LocalPath;
+        if (location.StartsWith("file:", StringComparison.Ordinal))
+        {
+            location = new Uri(location).LocalPath;
+        }
 
         if (!location.StartsWith("http://", StringComparison.Ordinal) && !location.StartsWith("https://", StringComparison.Ordinal))
         {
@@ -109,13 +122,19 @@ public sealed class RegistryClient
         var baseUri = new Uri(location.EndsWith('/') ? location : location + "/");
         var uri = Uri.TryCreate(relative, UriKind.Absolute, out var absolute) ? absolute : new Uri(baseUri, relative);
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        if (token is not null && uri.Host == baseUri.Host) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (token is not null && uri.Host == baseUri.Host)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
 
         try
         {
             using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
                 throw new PackageException($"{registry.Name} refused {uri}: an access token is needed or the one given is not valid.");
+            }
+
             _ = response.EnsureSuccessStatusCode();
             return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -143,16 +162,23 @@ public static class RegistryTrust
         if (entry.PublisherSignature is { Length: > 0 } publisherSignature
             && (entry.PublisherKey is not { Length: > 0 } publisherKey
                 || !SshSignature.Verify(publisherKey, RegistrySignatures.PublisherNamespace, message, publisherSignature)))
+        {
             throw new PackageException($"{id} {version}: the publisher's signature in {registry.Name} is not valid.");
+        }
 
         if (string.IsNullOrEmpty(entry.Signature))
+        {
             return registry.AllowUnsigned
                 ? null
                 : throw new PackageException($"{id} {version} is not signed, and {registry.Name} is not trusted to serve unsigned bricks.");
+        }
 
         foreach (var key in registry.Keys)
         {
-            if (SshSignature.Verify(key, RegistrySignatures.RegistryNamespace, message, entry.Signature)) return SshSignature.Fingerprint(key);
+            if (SshSignature.Verify(key, RegistrySignatures.RegistryNamespace, message, entry.Signature))
+            {
+                return SshSignature.Fingerprint(key);
+            }
         }
 
         throw new PackageException(

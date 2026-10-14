@@ -20,11 +20,23 @@ sealed class TurianBrickInspector(NodeInspectorController inspector, SettingsSer
     public void Refresh(BricksController controller)
     {
         // A registry being edited keeps its unsaved values until it is saved, removed or another is selected.
-        if (inspector.SelectedObject is not FormInspection inspection) return;
-        if (IsCurrentRegistry(controller, inspection)) return;
+        if (inspector.SelectedObject is not FormInspection inspection)
+        {
+            return;
+        }
+
+        if (IsCurrentRegistry(controller, inspection))
+        {
+            return;
+        }
+
         if (inspection.Key == "bricks-settings")
         {
-            if (!Equals(inspection.Context, controller.WorkspaceRoot)) inspector.Select(InspectSettings(controller));
+            if (!Equals(inspection.Context, controller.WorkspaceRoot))
+            {
+                inspector.Select(InspectSettings(controller));
+            }
+
             return;
         }
 
@@ -52,7 +64,11 @@ static class BrickInspections
     /// <summary>Builds an inspection for the controller's selected brick or registry.</summary>
     public static FormInspection? Selection(BricksController controller)
     {
-        if (controller.Tab == BricksTab.Registries) return Registry(controller);
+        if (controller.Tab == BricksTab.Registries)
+        {
+            return Registry(controller);
+        }
+
         var brick = controller.Catalog.FirstOrDefault(b => b.Id == controller.Selected);
         return brick is null ? null : Brick(controller, brick, controller.Installed.FirstOrDefault(p => p.Id == brick.Id));
     }
@@ -64,7 +80,10 @@ static class BrickInspections
         var model = InspectorForms.Build(manifest, readOnly: true);
         var fields = model.Sections[0].Fields;
         if (resolved is null && brick.Manifest is null)
+        {
             fields = [.. fields.Where(f => f.Name is "Name" or "DisplayName" or "Description" or "Author" or "Version")];
+        }
+
         var metadata = new FormSection($"Brick '{brick.DisplayName ?? brick.Id}'", manifest, fields);
         var installation = new FormSection("Installation", manifest,
         [
@@ -125,9 +144,17 @@ static class BrickInspections
 
     static FormInspection? Registry(BricksController controller)
     {
-        if (controller.SelectedRegistry is not { } name) return null;
+        if (controller.SelectedRegistry is not { } name)
+        {
+            return null;
+        }
+
         var registry = name.Length == 0 ? new ScopedRegistry() : controller.Registries.FirstOrDefault(r => r.Name == name);
-        if (registry is null) return null;
+        if (registry is null)
+        {
+            return null;
+        }
+
         var readOnly = name == controller.Workspace?.PublicRegistry?.Name;
         var draft = JsonSerializer.Deserialize<ScopedRegistry>(JsonSerializer.Serialize(registry, PackageJson.Options),
             PackageJson.Options)!;
@@ -156,7 +183,7 @@ static class BrickInspections
             Buttons =
             [
                 Action(controller, "Save", () => controller.SaveSettingsAsync(settings)),
-                new Button("Reload", () => { if (CanReload()) settings.Reload(); }, CanReload),
+                new Button("Reload", () => { if (CanReload()) { settings.Reload(); } }, CanReload),
             ],
         };
         return new FormInspection(settings, model with { Sections = [section] }, "bricks-settings", controller.WorkspaceRoot);
@@ -166,6 +193,6 @@ static class BrickInspections
     {
         var project = controller.WorkspaceRoot;
         bool Enabled() => project is not null && controller.WorkspaceRoot == project && !controller.IsBusy;
-        return new Button(label, () => { if (Enabled()) _ = action(); }, Enabled);
+        return new Button(label, () => { if (Enabled()) { _ = action(); } }, Enabled);
     }
 }

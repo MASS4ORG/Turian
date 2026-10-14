@@ -18,7 +18,10 @@ public sealed class RegistryTests : IDisposable
     public RegistryTests()
     {
         Directory.CreateDirectory(root);
-        if (!KeygenAvailable()) Assert.Skip("ssh-keygen is not installed");
+        if (!KeygenAvailable())
+        {
+            Assert.Skip("ssh-keygen is not installed");
+        }
 
         registry = Path.Combine(root, "registry");
         project = Path.Combine(root, "game");
@@ -32,9 +35,16 @@ public sealed class RegistryTests : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (!Directory.Exists(root)) return;
+        if (!Directory.Exists(root))
+        {
+            return;
+        }
+
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
             File.SetAttributes(file, FileAttributes.Normal);
+        }
+
         Directory.Delete(root, recursive: true);
     }
 
@@ -50,12 +60,12 @@ public sealed class RegistryTests : IDisposable
 
         var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["user.mateo.rules", "user.mateo.shop"], resolution.Packages.Select(p => p.Id));
+        Assert.Equal(["user.mateo.rules", "user.mateo.shop"], resolution.Packages.Select(static p => p.Id));
         var rules = resolution.Packages[0];
         Assert.Equal("1.1.0", rules.Version.ToString());
         Assert.Equal(PackageOrigin.Registry, rules.Origin);
         Assert.True(rules.IsReadOnly);
-        Assert.Equal([2, 1], resolution.Packages.Select(p => p.Depth));
+        Assert.Equal([2, 1], resolution.Packages.Select(static p => p.Depth));
         var entry = resolution.Lock.Dependencies["user.mateo.rules"];
         Assert.Equal(SshSignature.Fingerprint(registrySigner.PublicKey), entry.SignedBy);
         Assert.NotNull(entry.Integrity);
@@ -63,7 +73,7 @@ public sealed class RegistryTests : IDisposable
         resolution.Lock.Save(project);
         Directory.Delete(registry, recursive: true);
         var offline = await Resolver(locked: true).ResolveAsync(project, TestContext.Current.CancellationToken);
-        Assert.Equal(["user.mateo.rules", "user.mateo.shop"], offline.Packages.Select(p => p.Id));
+        Assert.Equal(["user.mateo.rules", "user.mateo.shop"], offline.Packages.Select(static p => p.Id));
     }
 
     /// <summary>A locked project stays on its version until asked to update, which takes the newest one that fits.</summary>
@@ -219,9 +229,21 @@ public sealed class RegistryTests : IDisposable
         var folder = Path.Combine(root, "sources", $"{id}-{version}");
         Directory.CreateDirectory(Path.Combine(folder, "Runtime"));
         var manifest = new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) };
-        if (dependency is { } needed) manifest.Dependencies[needed.Id] = needed.Range;
-        if (engine is not null) manifest.Engines["engine"] = VersionRange.Parse(engine);
-        if (entitlement is not null) manifest.Store = new PackageStoreInfo { Entitlement = entitlement };
+        if (dependency is { } needed)
+        {
+            manifest.Dependencies[needed.Id] = needed.Range;
+        }
+
+        if (engine is not null)
+        {
+            manifest.Engines["engine"] = VersionRange.Parse(engine);
+        }
+
+        if (entitlement is not null)
+        {
+            manifest.Store = new PackageStoreInfo { Entitlement = entitlement };
+        }
+
         manifest.Save(folder);
         File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
         var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed"), ["engine"]);
@@ -246,7 +268,11 @@ public sealed class RegistryTests : IDisposable
     {
         var path = Path.Combine(root, $"{name}_key");
         var start = new ProcessStartInfo("ssh-keygen") { RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var argument in new[] { "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", path }) start.ArgumentList.Add(argument);
+        foreach (var argument in new[] { "-q", "-t", "ed25519", "-N", "", "-C", name, "-f", path })
+        {
+            start.ArgumentList.Add(argument);
+        }
+
         using var process = Process.Start(start)!;
         process.WaitForExit();
         Assert.Equal(0, process.ExitCode);

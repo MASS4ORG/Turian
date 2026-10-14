@@ -75,7 +75,7 @@ public class ReferenceFieldTests
         var holder = new Holder();
         var notified = new List<object>();
         var field = InspectorForms.Build(holder, notified.Add).Sections[0].Fields
-            .First(f => f.Name == nameof(Holder.DirectNode));
+            .First(static f => f.Name == nameof(Holder.DirectNode));
 
         ReferenceField.TryCreate(field)!.Set(SomeId);
 

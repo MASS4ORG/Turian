@@ -44,14 +44,21 @@ public readonly partial record struct Color(float R, float G, float B, float A =
     static float[] BuildSrgbToLinearTable()
     {
         var table = new float[256];
-        for (var i = 0; i < table.Length; i++) table[i] = SrgbToLinear(i / 255f);
+        for (var i = 0; i < table.Length; i++)
+        {
+            table[i] = SrgbToLinear(i / 255f);
+        }
+
         return table;
     }
 
     /// <summary>Converts packed sRGB colors into an equally sized destination span.</summary>
     public static void FromSrgb(ReadOnlySpan<Color32> source, Span<Color> destination)
     {
-        if (destination.Length < source.Length) throw new ArgumentException("Destination is too short.", nameof(destination));
+        if (destination.Length < source.Length)
+        {
+            throw new ArgumentException("Destination is too short.", nameof(destination));
+        }
 
         for (var i = 0; i < source.Length; i++)
         {

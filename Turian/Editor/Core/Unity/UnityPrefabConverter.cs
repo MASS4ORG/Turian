@@ -19,7 +19,9 @@ static class UnityPrefabConverter
             .ToDictionary(static o => Reference(o.Body["m_GameObject"]), static o => o);
         var nodes = new Dictionary<long, Node>();
         foreach (var gameObject in objects.Where(static o => o.ClassId == 1))
+        {
             nodes[gameObject.FileId] = BuildNode(asset.Guid, gameObject, byFile, transformOf, skipped, context);
+        }
 
         var roots = new List<Node>();
         foreach (var (gameObjectId, node) in nodes.OrderBy(static n => n.Key))
@@ -28,17 +30,30 @@ static class UnityPrefabConverter
 
             var father = Reference(transform.Body["m_Father"]);
             if (father != 0 && byFile.TryGetValue(father, out var parentTransform) && nodes.TryGetValue(Reference(parentTransform.Body["m_GameObject"]), out var parent))
+            {
                 parent.Children.Add(node);
+            }
             else
+            {
                 roots.Add(node);
+            }
         }
 
         var nested = objects.Count(static o => o.ClassId == 1001);
-        if (nested > 0) skipped["nested prefab instance"] = nested;
+        if (nested > 0)
+        {
+            skipped["nested prefab instance"] = nested;
+        }
 
         var isScene = Path.GetExtension(asset.Pathname).Equals(".unity", StringComparison.OrdinalIgnoreCase);
         var root = roots.Count == 1 && !isScene ? roots[0] : new Node { Name = Path.GetFileNameWithoutExtension(asset.Pathname), Id = AssetIdFactory.Derive(asset.Guid, "root") };
-        if (root != roots.FirstOrDefault() || roots.Count != 1) foreach (var node in roots) root.Children.Add(node);
+        if (root != roots.FirstOrDefault() || roots.Count != 1)
+        {
+            foreach (var node in roots)
+            {
+                root.Children.Add(node);
+            }
+        }
 
         var target = context.Place(Path.ChangeExtension(relative, ".prefab"));
         Serializer.Save(target, root);
@@ -66,7 +81,10 @@ static class UnityPrefabConverter
                 Orientation = Rotation(transform.Body["m_LocalRotation"]),
                 Scale = Vector(transform.Body["m_LocalScale"], Vector3.One),
             };
-            if (transform.ClassId == 224) Count(skipped, "RectTransform (UI)");
+            if (transform.ClassId == 224)
+            {
+                Count(skipped, "RectTransform (UI)");
+            }
         }
 
         var components = (gameObject.Body["m_Component"]?.Items ?? [])
@@ -92,15 +110,25 @@ static class UnityPrefabConverter
             }
         }
 
-        if (filter is not null && renderer is not null) AddModel(node, filter, renderer, skipped, context);
-        else if (renderer is not null) Count(skipped, "MeshRenderer without a mesh");
+        if (filter is not null && renderer is not null)
+        {
+            AddModel(node, filter, renderer, skipped, context);
+        }
+        else if (renderer is not null)
+        {
+            Count(skipped, "MeshRenderer without a mesh");
+        }
+
         return node;
     }
 
     static void AddLight(Node node, UnityObject light, SortedDictionary<string, int> skipped)
     {
         var type = light.Body["m_Type"]?.Long(2);
-        if (type is not (1 or 2)) Count(skipped, type == 0 ? "spot light (made a point light)" : "area light (made a point light)");
+        if (type is not (1 or 2))
+        {
+            Count(skipped, type == 0 ? "spot light (made a point light)" : "area light (made a point light)");
+        }
 
         var color = light.Body["m_Color"];
         node.AddComponent(new LightComponent
@@ -129,8 +157,15 @@ static class UnityPrefabConverter
         if (meshGuid == UnityBuiltinResources)
         {
             // Unity's cube is the only built-in mesh with a Turian counterpart.
-            if (mesh?["fileID"]?.Long() == 10202) node.AddComponent<MeshComponent>();
-            else Count(skipped, "built-in mesh other than the cube");
+            if (mesh?["fileID"]?.Long() == 10202)
+            {
+                node.AddComponent<MeshComponent>();
+            }
+            else
+            {
+                Count(skipped, "built-in mesh other than the cube");
+            }
+
             return;
         }
 
@@ -149,7 +184,10 @@ static class UnityPrefabConverter
         }
 
         // A model file holds several meshes; the component draws the whole model.
-        if (mesh?["fileID"]?.Long() is > 0 and not 4300000) Count(skipped, "sub-mesh of a model (the whole model is used)");
+        if (mesh?["fileID"]?.Long() is > 0 and not 4300000)
+        {
+            Count(skipped, "sub-mesh of a model (the whole model is used)");
+        }
     }
 
     static long Reference(UnityYamlValue? value) => value?["fileID"]?.Long() ?? 0;

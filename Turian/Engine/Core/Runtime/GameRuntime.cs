@@ -85,7 +85,10 @@ public sealed class GameRuntime
     /// <summary>Loads the startup scene the player settings name, if any.</summary>
     public void LoadStartupScene()
     {
-        if (Settings.Get<PlayerSettings>().StartupScene is not { IsEmpty: false } startupScene) return;
+        if (Settings.Get<PlayerSettings>().StartupScene is not { IsEmpty: false } startupScene)
+        {
+            return;
+        }
 
         var load = Scenes.LoadSceneAsync(startupScene.AssetId);
         while (!load.IsCompleted)
@@ -116,7 +119,9 @@ public sealed class GameRuntime
             .AddSingleton(Locale);
         addServices?.Invoke(registrations);
         if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        {
             registrations.AddEngineModules(gameType.Assembly);
+        }
 
         Services = context.BuildServices(registrations);
         Ticker = new SceneTicker(Scenes, clock)
@@ -141,17 +146,25 @@ public sealed class GameRuntime
         Actions.Load(InputActionsLoader.Resolve(Settings, loader));
 
         if (Actions.Asset is not null && Settings.Get<PlayerSettings>().ProductName is { Length: > 0 } product)
+        {
             InputBindingStore.Load(Actions, InputBindingStore.DefaultPath(product));
+        }
     }
 
     // A built game ships its runtime catalog in Content/; a game run from its project reads the editor's cache.
     static void LoadCatalog(AssetDatabase assets, IContentDirectory content, string projectDirectory)
     {
         if (content.Exists(AssetDatabase.RuntimeCatalogPath))
+        {
             assets.LoadRuntimeCatalog(content);
+        }
         else if (content.Exists(".Cache/assetCatalog.json"))
+        {
             assets.LoadCatalogFromProject(projectDirectory);
+        }
         else
+        {
             assets.BuildDatabase(Path.Combine(projectDirectory, "Assets"));
+        }
     }
 }

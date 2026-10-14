@@ -29,7 +29,7 @@ public sealed class AssetImportFailureTests : IDisposable
 
         Assert.Equal(metadata, File.ReadAllBytes(failingSource + ".meta"));
         Assert.Equal(model.Id, Asset.Load(failingSource + ".meta")!.Id);
-        var healthy = database.GetAssetsSnapshot().Single(record => record.SourceRelativePath.EndsWith("healthy.txt"));
+        var healthy = database.GetAssetsSnapshot().Single(static record => record.SourceRelativePath.EndsWith("healthy.txt"));
         Assert.Equal("healthy", File.ReadAllText(healthy.ResolveContentPath()));
         Assert.True(File.Exists(Path.Combine(root, ".Cache", "assetCatalog.json")));
     }
@@ -80,7 +80,11 @@ public sealed class AssetImportFailureTests : IDisposable
         /// <inheritdoc/>
         public IReadOnlyList<string> ImportToCache(Asset asset, string sourcePath, string importDirectory)
         {
-            if (File.ReadAllText(sourcePath) == "cancel") throw new OperationCanceledException();
+            if (File.ReadAllText(sourcePath) == "cancel")
+            {
+                throw new OperationCanceledException();
+            }
+
             throw new NullReferenceException("Converter could not read the model scene.");
         }
     }

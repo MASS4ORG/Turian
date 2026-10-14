@@ -11,7 +11,10 @@ public sealed class ModelAssetPreviewProvider : IScenePreviewProvider
     public AssetPreviewScene BuildPreview(Asset asset, Vulkan vulkan, AssetDatabase assets)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
-        if (asset is not ModelAsset modelAsset) return default;
+        if (asset is not ModelAsset modelAsset)
+        {
+            return default;
+        }
 
         var root = new Node { Name = "__AssetPreview" };
 
@@ -27,10 +30,17 @@ public sealed class ModelAssetPreviewProvider : IScenePreviewProvider
         var model = modelAsset.GetContent(vulkan, assets);
         var bounds = Bounds.Empty;
         if (model is not null)
+        {
             foreach (var subMesh in model.SubMeshes)
+            {
                 bounds = bounds.Encapsulate(subMesh.Bounds);
+            }
+        }
 
-        if (bounds.IsEmpty) bounds = new Bounds(new(-0.5f), new(0.5f));
+        if (bounds.IsEmpty)
+        {
+            bounds = new Bounds(new(-0.5f), new(0.5f));
+        }
 
         return new AssetPreviewScene(root, bounds);
     }

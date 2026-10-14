@@ -45,10 +45,10 @@ public sealed class UnityImportTests : IDisposable
               m_Empty: []
             """);
 
-        Assert.Equal([(1, 1000L, "GameObject"), (21, 2100000L, "Material")], objects.Select(o => (o.ClassId, o.FileId, o.TypeName)));
+        Assert.Equal([(1, 1000L, "GameObject"), (21, 2100000L, "Material")], objects.Select(static o => (o.ClassId, o.FileId, o.TypeName)));
         var crate = objects[0].Body;
         Assert.Equal("Crate: big", crate["m_Name"]!.Text);
-        Assert.Equal([2000, 3000], crate["m_Component"]!.Items.Select(i => (int)i["component"]!["fileID"]!.Long()));
+        Assert.Equal([2000, 3000], crate["m_Component"]!.Items.Select(static i => (int)i["component"]!["fileID"]!.Long()));
         var material = objects[1].Body["m_SavedProperties"]!;
         Assert.Equal("abc", material["m_TexEnvs"]!.Items[0]["_MainTex"]!["m_Texture"]!["guid"]!.Text);
         Assert.Equal(0.25f, material["m_Floats"]!.Items[0]["_Metallic"]!.Float());
@@ -68,8 +68,8 @@ public sealed class UnityImportTests : IDisposable
         var report = UnityPackageImporter.Import(package, new UnityImportTarget(Path.Combine(brick, "Runtime"), brick));
 
         Assert.Equal(["Assets/Art/Crate.png", "Assets/Mats/Wood.mat", "Assets/Models/crate.obj", "Assets/Prefabs/Crate.prefab"],
-            report.Converted.Select(c => c.Source).Order(StringComparer.Ordinal));
-        Assert.Equal(["Assets/Scripts/Spin.cs"], report.Skipped.Select(s => s.Source));
+            report.Converted.Select(static c => c.Source).Order(StringComparer.Ordinal));
+        Assert.Equal(["Assets/Scripts/Spin.cs"], report.Skipped.Select(static s => s.Source));
         Assert.Contains("UnityEngine", report.Skipped[0].Note, StringComparison.Ordinal);
         Assert.Empty(BrickVerifier.Verify(brick));
 
@@ -100,7 +100,7 @@ public sealed class UnityImportTests : IDisposable
 
         var report = UnityPackageImporter.Import(BuildPackage(), new UnityImportTarget(Path.Combine(project, "Assets", "Crates"), project));
 
-        var entry = report.Converted.Single(c => c.Source.EndsWith("Crate.prefab", StringComparison.Ordinal));
+        var entry = report.Converted.Single(static c => c.Source.EndsWith("Crate.prefab", StringComparison.Ordinal));
         Assert.Equal("Prefabs/Crate.prefab", entry.Target);
         Assert.Contains("1 × MonoBehaviour not converted", entry.Note, StringComparison.Ordinal);
 
@@ -112,7 +112,7 @@ public sealed class UnityImportTests : IDisposable
         Assert.Equal(Guid.Parse(modelGuid), model.Model!.AssetId);
         Assert.Equal(Guid.Parse(materialGuid), model.Materials.Single()!.AssetId);
 
-        Assert.Equal(["Lamp", "Eye"], crate.Children.Select(c => c.Name));
+        Assert.Equal(["Lamp", "Eye"], crate.Children.Select(static c => c.Name));
         var lamp = crate.Children[0].Components.OfType<LightComponent>().Single();
         Assert.Equal(LightType.Directional, lamp.Type);
         Assert.Equal(2f, lamp.Intensity);
@@ -148,7 +148,9 @@ public sealed class UnityImportTests : IDisposable
         byte[] png;
         using (var bitmap = new SKBitmap(4, 4))
         using (var encoded = bitmap.Encode(SKEncodedImageFormat.Png, 100))
+        {
             png = encoded.ToArray();
+        }
 
         var entries = new List<(string Guid, string Path, byte[]? Content, string Meta)>
         {
@@ -260,7 +262,10 @@ public sealed class UnityImportTests : IDisposable
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, "pathname"), $"{path}\n00");
             File.WriteAllText(Path.Combine(directory, "asset.meta"), meta);
-            if (content is not null) File.WriteAllBytes(Path.Combine(directory, "asset"), content);
+            if (content is not null)
+            {
+                File.WriteAllBytes(Path.Combine(directory, "asset"), content);
+            }
         }
 
         var package = Path.Combine(root, $"{Guid.NewGuid():N}.unitypackage");

@@ -8,14 +8,14 @@ namespace Turian.Engine.Core;
 /// <remarks>
 /// This JSON converter handles special cases, such as serializing and deserializing objects derived from Asset,
 /// and allows dynamic serialization and deserialization of object properties and fields. Polymorphism is
-/// handled via stable <see cref="System.Guid"/> ids declared with <see cref="TypeIdAttribute"/> and resolved
+/// handled via stable <see cref="Guid"/> ids declared with <see cref="TypeIdAttribute"/> and resolved
 /// through <see cref="TypeRegistry"/>, so serialized data survives renames and namespace changes.
 /// </remarks>
 public class ObjectJsonSerializer<T> : JsonConverter<T>
     where T : IdObject
 {
     /// <summary>
-    /// Property name carrying the stable type id (a <see cref="System.Guid"/>) for polymorphic dispatch.
+    /// Property name carrying the stable type id (a <see cref="Guid"/>) for polymorphic dispatch.
     /// </summary>
     public const string TypeIdProperty = "__TypeId";
 
@@ -35,7 +35,10 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
             var created = (T)generated.Create();
             foreach (var property in root.EnumerateObject())
             {
-                if (property.Name != TypeIdProperty) generated.ReadMember(created, property, options);
+                if (property.Name != TypeIdProperty)
+                {
+                    generated.ReadMember(created, property, options);
+                }
             }
 
             return created;
@@ -107,7 +110,11 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (property is { CanRead: true, CanWrite: true } && IsMemberValid(property))
                 {
                     var propValue = property.GetValue(value);
-                    if (propValue is null && SkipsNull(property)) continue;
+                    if (propValue is null && SkipsNull(property))
+                    {
+                        continue;
+                    }
+
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(property, property.PropertyType, false)
                         && ObjectReferences.TryWrite(writer, value, property.Name, property.PropertyType, propValue,
@@ -130,7 +137,11 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
                 if (IsMemberValid(field))
                 {
                     var fieldValue = field.GetValue(value);
-                    if (fieldValue is null && SkipsNull(field)) continue;
+                    if (fieldValue is null && SkipsNull(field))
+                    {
+                        continue;
+                    }
+
                     if (value is DataAsset
                         && ObjectReferences.IsSavedAsReference(field, field.FieldType, false)
                         && ObjectReferences.TryWrite(writer, value, field.Name, field.FieldType, fieldValue,

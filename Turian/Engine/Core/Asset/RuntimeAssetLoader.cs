@@ -64,16 +64,25 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         // Packaged content has no sources to prefer over the imported copy.
         var projectPath = assetDatabase.Content is null ? record.ProjectRootPath : string.Empty;
         var content = metadata.GetContent(projectPath, ReadBaseFromSession, GetProvider(assetId));
-        if (content is not null) await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
+        if (content is not null)
+        {
+            await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
+        }
+
         return content as TData;
     }
 
     IAssetFileProvider? GetProvider(Guid assetId)
     {
         if (!assetDatabase.TryGetAsset(assetId, out var record) || record is null)
+        {
             return null;
+        }
+
         if (record.StorageKind != AssetStorageKind.Oap)
+        {
             return assetDatabase.TryGetAssetProvider(assetId, out var provider) ? provider : null;
+        }
 
         var content = assetDatabase.Content;
         var path = PackagePath(record, content);
@@ -94,7 +103,10 @@ public sealed class RuntimeAssetLoader : IAssetLoader
             sessionMounts ??= CaptureMounts(content);
 
             if (!sessionMounts.TryGetValue(path, out var mount) || mount is null)
+            {
                 throw new FileNotFoundException("OAP content is absent from this session.", path);
+            }
+
             return mount;
         }
     }
@@ -113,7 +125,11 @@ public sealed class RuntimeAssetLoader : IAssetLoader
 
     string? ReadBaseFromSession(Guid assetId)
     {
-        if (GetProvider(assetId) is not { } provider) return null;
+        if (GetProvider(assetId) is not { } provider)
+        {
+            return null;
+        }
+
         using var reader = new StreamReader(provider.GetAssetStream());
         return reader.ReadToEnd();
     }
@@ -142,7 +158,9 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     async Task PreloadOneAsync(Guid assetId)
     {
         if (await LoadAsync<Asset>(assetId).ConfigureAwait(false) is DataAssetAsset)
+        {
             await LoadContentAsync<DataAsset>(assetId).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -233,7 +251,9 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     {
         if (string.IsNullOrWhiteSpace(record.MetaRelativePath) || Path.IsPathRooted(record.MetaRelativePath)
             || record.MetaRelativePath.StartsWith("..", StringComparison.Ordinal))
+        {
             return null;
+        }
 
         var metaPath = AssetDatabase.ContentPath(record.MetaRelativePath);
         return content.Exists(metaPath) ? Serializer.LoadData<Asset>(content.ReadAllText(metaPath)) : null;

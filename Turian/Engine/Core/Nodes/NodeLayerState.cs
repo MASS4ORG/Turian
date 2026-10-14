@@ -16,11 +16,20 @@ public sealed class NodeLayerState
     public void SetLayer(Guid groupId, Guid valueId)
     {
         if (groupId == Guid.Empty || valueId == Guid.Empty)
+        {
             throw new ArgumentException("Explicit layer assignments require nonempty group and value identities.");
+        }
+
         var reference = new LayerReference(groupId, valueId);
         var index = Layers.FindIndex(layer => layer.GroupId == groupId);
-        if (index < 0) Layers.Add(reference);
-        else Layers[index] = reference;
+        if (index < 0)
+        {
+            Layers.Add(reference);
+        }
+        else
+        {
+            Layers[index] = reference;
+        }
     }
 
     /// <summary>Clears an assignment so the group follows its default at the next layout binding.</summary>
@@ -30,16 +39,28 @@ public sealed class NodeLayerState
     public NodeLayers ResolveLayers(LayerInterningService layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        if (Layers is null) throw new InvalidDataException("Layer references cannot be null.");
+        if (Layers is null)
+        {
+            throw new InvalidDataException("Layer references cannot be null.");
+        }
+
         var memberships = new NodeLayers();
         var groups = new HashSet<Guid>();
         foreach (var reference in Layers)
         {
             if (reference.GroupId == Guid.Empty || reference.ValueId == Guid.Empty || !groups.Add(reference.GroupId))
+            {
                 throw new InvalidDataException("Layer state requires nonempty identities and one assignment per group.");
+            }
+
             if (layout.TryGetGroupSlot(reference.GroupId, out var slot))
+            {
                 memberships[slot] = layout.ResolveLayer(reference);
-            else layout.WarnMissing(reference);
+            }
+            else
+            {
+                layout.WarnMissing(reference);
+            }
         }
         return memberships;
     }
@@ -48,13 +69,27 @@ public sealed class NodeLayerState
     public ushort[] ResolveTags(LayerInterningService layout)
     {
         ArgumentNullException.ThrowIfNull(layout);
-        if (Tags is null) throw new InvalidDataException("Tag references cannot be null.");
+        if (Tags is null)
+        {
+            throw new InvalidDataException("Tag references cannot be null.");
+        }
+
         var ids = new SortedSet<ushort>();
         foreach (var tag in Tags)
         {
-            if (tag == Guid.Empty) throw new InvalidDataException("Tag state requires nonempty identities.");
-            if (layout.TryGetTagId(tag, out var id)) ids.Add(id);
-            else layout.WarnMissingTag(tag);
+            if (tag == Guid.Empty)
+            {
+                throw new InvalidDataException("Tag state requires nonempty identities.");
+            }
+
+            if (layout.TryGetTagId(tag, out var id))
+            {
+                ids.Add(id);
+            }
+            else
+            {
+                layout.WarnMissingTag(tag);
+            }
         }
         return [.. ids];
     }

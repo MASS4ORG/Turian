@@ -139,7 +139,10 @@ public class EditorCamera : ICamera
     /// <param name="up">Reference up direction.</param>
     public void LookIn(Vector3 front, Vector3 up)
     {
-        if (front.LengthSquared() < 1e-8f) return;
+        if (front.LengthSquared() < 1e-8f)
+        {
+            return;
+        }
 
         var f = Vector3.Normalize(front);
         var reference = Vector3.Cross(f, up).LengthSquared() < 1e-6f ? Up : up;
@@ -169,7 +172,11 @@ public class EditorCamera : ICamera
     /// <summary>Updates the aspect ratio when the viewport is resized.</summary>
     public void Resize(uint width, uint height)
     {
-        if (height == 0) return;
+        if (height == 0)
+        {
+            return;
+        }
+
         aspect = (float)width / height;
     }
 
@@ -205,7 +212,11 @@ public class EditorCamera : ICamera
         var v = new Vector4(p.X, p.Y, p.Z, 1f);
         v = Vector4.Transform(v, GetViewMatrix());
         v = Vector4.Transform(v, GetProjectionMatrix());
-        if (MathF.Abs(v.W) > float.Epsilon) v /= v.W;
+        if (MathF.Abs(v.W) > float.Epsilon)
+        {
+            v /= v.W;
+        }
+
         return new Vector2(v.X, v.Y);
     }
 
@@ -217,7 +228,11 @@ public class EditorCamera : ICamera
         _ = Matrix4x4.Invert(GetViewMatrix(), out var viewInv);
         v = Vector4.Transform(v, projInv);
         v = Vector4.Transform(v, viewInv);
-        if (MathF.Abs(v.W) > float.Epsilon) v /= v.W;
+        if (MathF.Abs(v.W) > float.Epsilon)
+        {
+            v /= v.W;
+        }
+
         return new Vector3(v.X, v.Y, v.Z);
     }
 

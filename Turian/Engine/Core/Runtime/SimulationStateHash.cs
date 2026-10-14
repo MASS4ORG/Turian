@@ -7,7 +7,11 @@ public static class SimulationStateHash
     public static string Compute(JsonElement state)
     {
         using var buffer = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(buffer)) Write(writer, state);
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            Write(writer, state);
+        }
+
         return Convert.ToHexString(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
     }
 
@@ -20,7 +24,11 @@ public static class SimulationStateHash
                 break;
             case JsonValueKind.Array:
                 writer.WriteStartArray();
-                foreach (var item in value.EnumerateArray()) Write(writer, item);
+                foreach (var item in value.EnumerateArray())
+                {
+                    Write(writer, item);
+                }
+
                 writer.WriteEndArray();
                 break;
             default:
@@ -33,9 +41,13 @@ public static class SimulationStateHash
     {
         writer.WriteStartObject();
         string? previous = null;
-        foreach (var property in value.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
+        foreach (var property in value.EnumerateObject().OrderBy(static property => property.Name, StringComparer.Ordinal))
         {
-            if (property.Name == previous) throw new InvalidDataException("State hash input contains duplicate keys.");
+            if (property.Name == previous)
+            {
+                throw new InvalidDataException("State hash input contains duplicate keys.");
+            }
+
             previous = property.Name;
             writer.WritePropertyName(property.Name);
             Write(writer, property.Value);

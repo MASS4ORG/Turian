@@ -11,7 +11,7 @@ public interface ITagKey;
 
 static class LayerKeyIdentity<T> where T : class
 {
-    static readonly Lazy<Guid> Identity = new(() => TypeRegistry.GetIdOrThrow(typeof(T)));
+    static readonly Lazy<Guid> Identity = new(static () => TypeRegistry.GetIdOrThrow(typeof(T)));
 
     internal static Guid Id => Identity.Value;
 }

@@ -97,7 +97,9 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         }
 
         if (userCodeDllPath is not null)
+        {
             SavePlayBuildStamp(projectDirectory, userCodeDllPath);
+        }
 
         CopyTypeManifestToOutput(outputDir);
         return dllPath;
@@ -139,7 +141,10 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     void SyncAssetsToOutput(string outputDir)
     {
         var srcAssets = Path.Combine(Settings.CacheAbsoluteDir, "Assets");
-        if (!Directory.Exists(srcAssets)) return;
+        if (!Directory.Exists(srcAssets))
+        {
+            return;
+        }
 
         var dstAssets = Path.Combine(outputDir, ".Cache", "Assets");
         try
@@ -205,7 +210,10 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     IEnumerable<string> EngineAssemblyPaths()
     {
         var root = CsProjectGenerator.TurianDir();
-        if (string.IsNullOrEmpty(root)) yield break;
+        if (string.IsNullOrEmpty(root))
+        {
+            yield break;
+        }
 
         foreach (var (relativeDir, name) in Settings.TurianPackages)
         {
@@ -252,7 +260,10 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
         try { stamp = Serializer.Load<PlayBuildStamp>(stampPath); }
         catch { return false; }
 
-        if (stamp is null) return false;
+        if (stamp is null)
+        {
+            return false;
+        }
 
         var ucManifest = LoadUserCodeManifest(ucDllPath);
         if (ucManifest is null)
@@ -291,7 +302,10 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     void SavePlayBuildStamp(string projectDirectory, string ucDllPath)
     {
         var ucManifest = LoadUserCodeManifest(ucDllPath);
-        if (ucManifest is null) return;
+        if (ucManifest is null)
+        {
+            return;
+        }
 
         var stamp = new PlayBuildStamp
         {
@@ -314,7 +328,11 @@ public sealed class PlayUserCode(IAppSettings settings, ILogger logger, string? 
     UserCodeCompileCacheManifest? LoadUserCodeManifest(string ucDllPath)
     {
         var manifestPath = UserCodeCompileCache.GetManifestPath(Settings.ProjectAbsoluteDir, ucDllPath);
-        if (!File.Exists(manifestPath)) return null;
+        if (!File.Exists(manifestPath))
+        {
+            return null;
+        }
+
         try { return Serializer.Load<UserCodeCompileCacheManifest>(manifestPath); }
         catch { return null; }
     }

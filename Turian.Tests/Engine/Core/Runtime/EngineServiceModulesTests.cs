@@ -87,6 +87,6 @@ public class EngineServiceModulesTests
         var assembly = typeof(BagModule).Assembly;
         var services = new ServiceCollection().AddEngineModules(assembly, assembly);
 
-        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IBagManager));
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IBagManager));
     }
 }

@@ -152,7 +152,11 @@ public sealed class GizmoRenderingTests(VulkanFixture fixture) : IClassFixture<V
 
     static unsafe void SaveCapture(string name, byte[] pixels, int width, int height)
     {
-        if (Environment.GetEnvironmentVariable("TURIAN_GIZMO_CAPTURES") is not { Length: > 0 } directory) return;
+        if (Environment.GetEnvironmentVariable("TURIAN_GIZMO_CAPTURES") is not { Length: > 0 } directory)
+        {
+            return;
+        }
+
         Directory.CreateDirectory(directory);
         fixed (byte* pointer = pixels)
         {

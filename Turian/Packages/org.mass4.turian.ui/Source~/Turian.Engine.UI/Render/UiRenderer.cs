@@ -67,7 +67,9 @@ public sealed partial class UiRenderer
         {
             controller.Attach(document);
             foreach (var (name, action) in controller.DiscoverHandlers())
+            {
                 Handlers[name] = action;
+            }
         }
 
         bindingContext = new BindingContext(dataContext ?? controller);
@@ -78,14 +80,26 @@ public sealed partial class UiRenderer
 
     void FoldExplicitBindings()
     {
-        if (bindingsFolded) return;
+        if (bindingsFolded)
+        {
+            return;
+        }
+
         bindingsFolded = true;
 
         foreach (var b in document.Bindings)
         {
             var target = document.Find(b.Element);
-            if (target is null) continue;
-            if (target.AttributeBindings.Any(x => x.TargetAttribute == b.Property)) continue;
+            if (target is null)
+            {
+                continue;
+            }
+
+            if (target.AttributeBindings.Any(x => x.TargetAttribute == b.Property))
+            {
+                continue;
+            }
+
             target.AttributeBindings.Add(
                 new UiAttributeBinding(b.Property, new BindingExpression(b.Path, b.Mode, b.Converter)));
         }
@@ -100,7 +114,9 @@ public sealed partial class UiRenderer
 
         gui.StyleSheets.Clear();
         foreach (var sheet in StyleSheets)
+        {
             gui.StyleSheets.Add(sheet);
+        }
 
         RenderElement(gui, document.Root);
     }
@@ -144,7 +160,9 @@ public sealed partial class UiRenderer
             LogRect(gui, el, node);
             DrawBackground(gui, el);
             foreach (var child in el.Children)
+            {
                 RenderElement(gui, child);
+            }
         }
     }
 
@@ -154,7 +172,11 @@ public sealed partial class UiRenderer
 
     static void LogRect(Gui gui, UiElement el, LayoutNode node)
     {
-        if (!LayoutDiag || gui.Pass != Pass.Pass2Render) return;
+        if (!LayoutDiag || gui.Pass != Pass.Pass2Render)
+        {
+            return;
+        }
+
         var r = node.Rect;
         var id = el.Name is { Length: > 0 } n ? $"#{n}" : el.Tag;
         var cls = el.Classes.Count > 0 ? "." + string.Join('.', el.Classes) : string.Empty;
@@ -174,7 +196,9 @@ public sealed partial class UiRenderer
             gui.ClipContent();
             DrawBackground(gui, el);
             foreach (var child in el.Children)
+            {
                 RenderElement(gui, child);
+            }
         }
     }
 
@@ -188,11 +212,14 @@ public sealed partial class UiRenderer
         var key = StateKey(el, "tab");
         var active = state.TryGetValue(key, out var v) && v is int i ? i : 0;
 
-        var tabs = el.Children.Where(child => child.Tag == "Tab").ToList();
-        if (tabs.Count == 0) return;
+        var tabs = el.Children.Where(static child => child.Tag == "Tab").ToList();
+        if (tabs.Count == 0)
+        {
+            return;
+        }
 
         active = Math.Clamp(active, 0, tabs.Count - 1);
-        var next = active;
+        int next;
 
         var node = gui.StyledNode(el.Tag, el.Classes, el.Name);
         ApplyAttributeSize(node, el);
@@ -203,17 +230,37 @@ public sealed partial class UiRenderer
             LogRect(gui, el, node);
             DrawBackground(gui, el);
 
-            using (gui.StyledNode("TabStrip", el.Classes).Direction(Axis.Horizontal).Enter())
-                for (var t = 0; t < tabs.Count; t++)
-                    if (RenderTabHeader(gui, tabs[t], t, t == active))
-                        next = t;
+            next = RenderTabStrip(gui, el, tabs, active);
 
             foreach (var child in tabs[active].Children)
+            {
                 RenderElement(gui, child);
+            }
         }
 
-        if (next != active) Fire(el, "changed");
+        if (next != active)
+        {
+            Fire(el, "changed");
+        }
+
         state[key] = next;
+    }
+
+    int RenderTabStrip(Gui gui, UiElement el, List<UiElement> tabs, int active)
+    {
+        var next = active;
+        using (gui.StyledNode("TabStrip", el.Classes).Direction(Axis.Horizontal).Enter())
+        {
+            for (var t = 0; t < tabs.Count; t++)
+            {
+                if (RenderTabHeader(gui, tabs[t], t, t == active))
+                {
+                    next = t;
+                }
+            }
+        }
+
+        return next;
     }
 
     bool RenderTabHeader(Gui gui, UiElement tab, int index, bool selected)
@@ -238,14 +285,24 @@ public sealed partial class UiRenderer
     /// </summary>
     static void ApplyAttributeSize(LayoutNode node, UiElement el)
     {
-        if (UiValue.TryLength(Attr(el, "width") ?? string.Empty, out var w, out _) && w > 0f) node.Width(w);
-        if (UiValue.TryLength(Attr(el, "height") ?? string.Empty, out var h, out _) && h > 0f) node.Height(h);
+        if (UiValue.TryLength(Attr(el, "width"), out var w, out _) && w > 0f)
+        {
+            node.Width(w);
+        }
+
+        if (UiValue.TryLength(Attr(el, "height"), out var h, out _) && h > 0f)
+        {
+            node.Height(h);
+        }
     }
 
     /// <summary>The element's classes plus a state class, so a sheet can target the state.</summary>
     static IReadOnlyList<string> WithClass(IReadOnlyList<string> classes, string name, bool present)
     {
-        if (!present) return classes;
+        if (!present)
+        {
+            return classes;
+        }
 
         var combined = new List<string>(classes.Count + 1);
         combined.AddRange(classes);

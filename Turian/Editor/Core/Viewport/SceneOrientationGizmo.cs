@@ -32,7 +32,7 @@ public static class SceneOrientationGizmo
     {
         var depth = Vector3.Dot(direction, camera.Front);
         var perspective = camera.IsOrthographic ? 1f : 1f / (1f + depth * 0.3f);
-        return new Marker(direction, Project(camera, direction) * 25f * perspective, depth, Label(direction))
+        return new Marker(direction, Project(camera, direction) * 25f * perspective, depth, AxisLabel(direction))
         {
             Radius = 8f * perspective
         };
@@ -51,7 +51,11 @@ public static class SceneOrientationGizmo
         void Add(Vector3 normal, Vector3 u, Vector3 v, float shade)
         {
             var facing = Vector3.Dot(normal, camera.Front);
-            if (MathF.Abs(facing) < 1e-5f) return;
+            if (MathF.Abs(facing) < 1e-5f)
+            {
+                return;
+            }
+
             normal *= -MathF.Sign(facing);
             faces.Add(new Face(Project(camera, normal - u - v) * size,
                 Project(camera, normal + u - v) * size, Project(camera, normal + u + v) * size,
@@ -63,9 +67,14 @@ public static class SceneOrientationGizmo
     public static Vector3? HitTest(EditorCamera camera, Vector2 offset)
     {
         foreach (var marker in Markers(camera).Reverse())
+        {
             if (marker.IsVisible
                 && Vector2.DistanceSquared(marker.Offset, offset) <= (marker.Radius + 2f) * (marker.Radius + 2f))
+            {
                 return marker.Direction;
+            }
+        }
+
         return offset.LengthSquared() <= 10f * 10f ? Vector3.Zero : null;
     }
 
@@ -73,7 +82,7 @@ public static class SceneOrientationGizmo
         new(Vector3.Dot(direction, camera.Right),
             Vector3.Dot(direction, camera.Up) * MathF.Sign(camera.GetProjectionMatrix().M22));
 
-    static string Label(Vector3 direction)
+    static string AxisLabel(Vector3 direction)
     {
         var letter = MathF.Abs(direction.X) > 0.5f ? "X" : MathF.Abs(direction.Y) > 0.5f ? "Y" : "Z";
         return Vector3.Dot(direction, Vector3.One) > 0f ? letter : "−" + letter;

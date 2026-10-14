@@ -11,7 +11,7 @@ public sealed class FrameRateTests
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
         try
         {
-            Assert.Throws<ArgumentNullException>(() => FrameRateSettings.Register(null!));
+            Assert.Throws<ArgumentNullException>(static () => FrameRateSettings.Register(null!));
             var settings = new EditorSettings(NullLogger.Instance, path);
             var performance = FrameRateSettings.Register(settings);
             Assert.Equal("General/Performance", Assert.Single(settings.Pages).Path);
@@ -28,14 +28,14 @@ public sealed class FrameRateTests
             using var app = PluginHost.Load([], NullLogger.Instance);
             using var workbench = new Workbench(app);
             Assert.NotNull(workbench.FrameRate);
-            Assert.Contains(app.Settings.Pages, page => page.Id == FrameRateSettings.PageId);
+            Assert.Contains(app.Settings.Pages, static page => page.Id == FrameRateSettings.PageId);
             var limiter = new FrameRateLimiter(performance);
             Assert.False(limiter.RenderOnDemand);
             performance.RenderOnDemand = true;
             Assert.True(limiter.RenderOnDemand);
             ((Action<TimeSpan>)typeof(FrameRateLimiter).GetField("delay", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .GetValue(limiter)!)(TimeSpan.Zero);
-            Assert.Throws<ArgumentNullException>(() => new FrameRateLimiter(null!));
+            Assert.Throws<ArgumentNullException>(static () => new FrameRateLimiter(null!));
         }
         finally
         {
@@ -57,7 +57,7 @@ public sealed class FrameRateTests
         };
         var limiter = (FrameRateLimiter)Activator.CreateInstance(typeof(FrameRateLimiter),
             BindingFlags.NonPublic | BindingFlags.Instance, null,
-            [preferences, (Func<long>)(() => now), 60000L, delay], null)!;
+            [preferences, (() => now), 60000L, delay], null)!;
         limiter.Wait();
         Assert.Empty(waits);
         now += 300;

@@ -167,7 +167,9 @@ public sealed class PlayerFramesTests : IDisposable
         using (var bitmap = new SKBitmap(4, 2))
         using (var image = SKImage.FromBitmap(bitmap))
         using (var png = image.Encode(SKEncodedImageFormat.Png, 100))
+        {
             File.WriteAllBytes(Path.Combine(project, path), png.ToArray());
+        }
 
         var icon = GlfwSurfaceHost.LoadIcon(content, path);
         Assert.Equal(4, icon!.Value.Width);

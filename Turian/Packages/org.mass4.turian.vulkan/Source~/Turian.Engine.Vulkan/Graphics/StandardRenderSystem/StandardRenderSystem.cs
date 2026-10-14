@@ -90,8 +90,11 @@ public class StandardRenderSystem : IRenderSystem
         renderList.Gather(frameInfo.Nodes, frameInfo.Camera.CullingMask);
         UpdateLights(renderList.Lights, ubo);
         if (UseFrustumCulling && (renderList.Models.Count != 0 || renderList.InstancedModels.Count != 0))
+        {
             GeometryUtility.CalculateFrustumPlanes(
                 frameInfo.Camera.GetViewMatrix() * frameInfo.Camera.GetProjectionMatrix(), frustumPlanes);
+        }
+
         CullingStats = default;
         retired.NextFrame();
         BuildDraws();
@@ -109,9 +112,17 @@ public class StandardRenderSystem : IRenderSystem
 
         // Indirect commands start at their own instance; without that feature the CPU-culled draws stay direct.
         if (!UseOcclusionCulling || !vulkan.Device.SupportsDrawIndirectFirstInstance
-                                 || renderList.Draws.Count == 0) return;
+                                 || renderList.Draws.Count == 0)
+        {
+            return;
+        }
+
         occlusion ??= CreateOcclusionCuller();
-        if (occlusion is null) return;
+        if (occlusion is null)
+        {
+            return;
+        }
+
         FillOcclusionCandidates();
         indirect = occlusion.Record(frameInfo, candidates.AsSpan(0, renderList.Draws.Count));
     }
@@ -122,7 +133,11 @@ public class StandardRenderSystem : IRenderSystem
     void FillOcclusionCandidates()
     {
         var count = renderList.Draws.Count;
-        if (candidates.Length < count) candidates = new OcclusionDraw[count];
+        if (candidates.Length < count)
+        {
+            candidates = new OcclusionDraw[count];
+        }
+
         for (var i = 0; i < count; i++)
         {
             var draw = renderList.Draws[i];
@@ -134,7 +149,11 @@ public class StandardRenderSystem : IRenderSystem
     public unsafe void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
         // A host that skips Prepare still draws; its lights then reach the GPU a frame late.
-        if (!prepared) Prepare(frameInfo, ubo);
+        if (!prepared)
+        {
+            Prepare(frameInfo, ubo);
+        }
+
         prepared = false;
 
         pipeline.Bind(frameInfo.CommandBuffer);
@@ -163,7 +182,9 @@ public class StandardRenderSystem : IRenderSystem
         foreach (var component in renderList.Models)
         {
             if (component.ModelInstance is VulkanModel model && component.Node is { } node)
+            {
                 AddDraws(component, model, node.GlobalTransform);
+            }
         }
 
         renderList.Sort();
@@ -186,7 +207,7 @@ public class StandardRenderSystem : IRenderSystem
         var modelOrder = renderList.OrderOf(model);
         for (var i = start; i < last; i++)
         {
-            if (UseFrustumCulling && !GeometryUtility.TestPlanesAABB(frustumPlanes, cached.Bounds[i - start]))
+            if (UseFrustumCulling && !GeometryUtility.TestPlanesAabb(frustumPlanes, cached.Bounds[i - start]))
             {
                 CullingStats = CullingStats with { Culled = CullingStats.Culled + 1 };
                 continue;
@@ -236,9 +257,14 @@ public class StandardRenderSystem : IRenderSystem
             var count = indirect ? 1 : RenderList.RunLength(draws, start);
             Bind(commandBuffer, ref state, draw.Model, draw.Material);
             if (indirect)
+            {
                 draw.Model.DrawSubMeshIndirect(commandBuffer, occlusion!.IndirectBuffer, (ulong)start * 20);
+            }
             else
+            {
                 draw.Model.DrawSubMesh(commandBuffer, draw.SubMesh, (uint)count, (uint)start);
+            }
+
             state.Count(draw.Model, draw.SubMesh, count);
             start += count;
         }
@@ -249,7 +275,11 @@ public class StandardRenderSystem : IRenderSystem
         foreach (var batch in batches.Visible)
         {
             // A batch whose upload was never recorded has nothing valid to draw yet.
-            if (batch.Buffer is not { } buffer || batch.Count == 0) continue;
+            if (batch.Buffer is not { } buffer || batch.Count == 0)
+            {
+                continue;
+            }
+
             BindInstances(commandBuffer, buffer.Set);
             var model = batch.Model;
             for (var i = 0; i < model.SubMeshes.Count; i++)
@@ -283,7 +313,11 @@ public class StandardRenderSystem : IRenderSystem
     {
         var slot = frameIndex % frameInstances.Length;
         var current = frameInstances[slot];
-        if (current is not null && current.Capacity >= count) return current;
+        if (current is not null && current.Capacity >= count)
+        {
+            return current;
+        }
+
         retired.Retire(current);
         var capacity = InstanceBuffer.Grow(current?.Capacity ?? 0, count);
         return frameInstances[slot] = new InstanceBuffer(vulkan, instanceLayout, capacity, hostVisible: true);
@@ -331,15 +365,26 @@ public class StandardRenderSystem : IRenderSystem
 
     MaterialResource? OverrideMaterial(AssetReference<MaterialAsset>? reference)
     {
-        if (reference is not { IsEmpty: false }) return null;
+        if (reference is not { IsEmpty: false })
+        {
+            return null;
+        }
+
         if (!overrideMaterials.TryGetValue(reference.AssetId, out var handle))
+        {
             overrideMaterials[reference.AssetId] = handle = new MaterialAsset { Id = reference.AssetId };
+        }
+
         return handle.GetContent(materials);
     }
 
     MaterialResource? DerivedMaterial(Guid modelAssetId, int? materialIndex)
     {
-        if (modelAssetId == Guid.Empty || materialIndex is not { } index) return null;
+        if (modelAssetId == Guid.Empty || materialIndex is not { } index)
+        {
+            return null;
+        }
+
         if (!derivedMaterials.TryGetValue((modelAssetId, index), out var handle))
         {
             var id = AssetIdFactory.Derive(modelAssetId, $"material:{index}");
@@ -362,11 +407,17 @@ public class StandardRenderSystem : IRenderSystem
         var directionalIndex = 0;
         foreach (var component in lights)
         {
-            if (component.Node is not { } lightNode) continue;
+            if (component.Node is not { } lightNode)
+            {
+                continue;
+            }
 
             if (component.Type == LightType.Directional)
             {
-                if (directionalIndex == ubo.DirectionalCount) continue;
+                if (directionalIndex == ubo.DirectionalCount)
+                {
+                    continue;
+                }
 
                 ubo.SetDirectionalLight(
                     directionalIndex,
@@ -377,7 +428,10 @@ public class StandardRenderSystem : IRenderSystem
                 continue;
             }
 
-            if (pointIndex == ubo.Count) continue;
+            if (pointIndex == ubo.Count)
+            {
+                continue;
+            }
 
             ubo.SetPointLightPosition(pointIndex, lightNode.GlobalTransform.Position);
             ubo.SetPointLightColor(pointIndex, component.Color, component.Intensity);
@@ -391,7 +445,11 @@ public class StandardRenderSystem : IRenderSystem
         renderList.Reset();
         occlusion?.Dispose();
         batches.Dispose();
-        foreach (var instances in frameInstances) instances?.Dispose();
+        foreach (var instances in frameInstances)
+        {
+            instances?.Dispose();
+        }
+
         retired.Dispose();
         instanceLayout.Dispose();
         worldBounds.Clear();
@@ -464,7 +522,7 @@ public class StandardRenderSystem : IRenderSystem
         {
             Draws++;
             Instances += instances;
-            Triangles += model.SubMeshes[subMesh].IndexCount / 3 * (long)instances;
+            Triangles += model.SubMeshes[subMesh].IndexCount / 3 * instances;
         }
     }
 }

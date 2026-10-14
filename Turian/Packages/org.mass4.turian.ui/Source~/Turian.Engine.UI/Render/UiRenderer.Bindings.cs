@@ -4,6 +4,22 @@ public sealed partial class UiRenderer
 {
     void DrawBackground(Gui gui, UiElement el)
     {
+        if (!UiValue.TryColor(BackgroundValue(el), out var color))
+        {
+            return;
+        }
+
+        var radius = 0f;
+        if (el.InlineStyle.TryGetValue("border-radius", out var r))
+        {
+            UiValue.TryFloat(r, out radius);
+        }
+
+        gui.DrawBackgroundRect(color, radius);
+    }
+
+    string? BackgroundValue(UiElement el)
+    {
         var (bgBound, bgValue) = BoundValue(el, "background-color");
         string bg;
         if (bgBound)
@@ -12,32 +28,28 @@ public sealed partial class UiRenderer
         }
         else if (!el.InlineStyle.TryGetValue("background-color", out bg!))
         {
-            return;
+            return null;
         }
         else if (BindingExpression.IsBinding(bg))
         {
             bg = ResolveBinding(BindingExpression.Parse(bg))?.ToString() ?? string.Empty;
         }
 
-        if (!UiValue.TryColor(bg, out var color))
-            return;
-
-        var radius = 0f;
-        if (el.InlineStyle.TryGetValue("border-radius", out var r))
-            UiValue.TryFloat(r, out radius);
-
-        gui.DrawBackgroundRect(color, radius);
+        return bg;
     }
 
     string? ResolveText(UiElement el)
     {
-        var bound = el.AttributeBindings.FirstOrDefault(b => b.TargetAttribute is "text");
+        var bound = el.AttributeBindings.FirstOrDefault(static b => b.TargetAttribute is "text");
         var source = bound is not null
             ? ResolveBinding(bound.Expression)?.ToString() ?? string.Empty
             : Attr(el, "text") ?? el.Text;
 
         var textResolver = TextResolver;
-        if (textResolver is null) return source;
+        if (textResolver is null)
+        {
+            return source;
+        }
 
         var key = Attr(el, "text-key");
         return textResolver(string.IsNullOrEmpty(key) ? null : key, source);
@@ -51,9 +63,16 @@ public sealed partial class UiRenderer
     string? ResolveTextAttribute(UiElement el, string attribute)
     {
         var source = Attr(el, attribute);
-        if (source is null) return null;
+        if (source is null)
+        {
+            return null;
+        }
+
         var textResolver = TextResolver;
-        if (textResolver is null) return source;
+        if (textResolver is null)
+        {
+            return source;
+        }
 
         var key = Attr(el, $"{attribute}-key");
         return textResolver(string.IsNullOrEmpty(key) ? null : key, source);
@@ -76,7 +95,10 @@ public sealed partial class UiRenderer
     void WriteBinding(UiElement el, string attribute, object? value)
     {
         var b = el.AttributeBindings.FirstOrDefault(x => x.TargetAttribute == attribute);
-        if (b is null || b.Expression.Mode != BindingMode.TwoWay || bindingContext is null) return;
+        if (b is null || b.Expression.Mode != BindingMode.TwoWay || bindingContext is null)
+        {
+            return;
+        }
 
         var converter = ValueConverters.Get(b.Expression.Converter);
         bindingContext.TrySet(b.Expression.Path, converter is null ? value : converter.ConvertBack(value));
@@ -86,9 +108,15 @@ public sealed partial class UiRenderer
     {
         foreach (var (alias, item) in repeatScope)
         {
-            if (path == alias) return item;
+            if (path == alias)
+            {
+                return item;
+            }
+
             if (path.StartsWith(alias + ".", StringComparison.Ordinal) && item is not null)
+            {
                 return MemberPath.Read(item, path[(alias.Length + 1)..]);
+            }
         }
 
         return DataResolver?.Invoke(path);
@@ -104,7 +132,9 @@ public sealed partial class UiRenderer
     void Fire(UiElement el, string eventName)
     {
         if (el.Events.TryGetValue(eventName, out var method) && Handlers.TryGetValue(method, out var action))
+        {
             action();
+        }
     }
 
     static string? Attr(UiElement el, string name) =>
@@ -119,10 +149,14 @@ public sealed partial class UiRenderer
     string Style(Gui gui, UiElement el, string name)
     {
         if (el.InlineStyle.TryGetValue(name, out var inline))
+        {
             return inline;
+        }
 
         if (gui.StyleSheets.Count == 0)
+        {
             return string.Empty;
+        }
 
         return gui.ResolveStyle(el.Tag, el.Classes, el.Name).Get(name) ?? string.Empty;
     }
@@ -132,9 +166,13 @@ public sealed partial class UiRenderer
 
     static Insets? ParseInsets(string? text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
         var n = text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(p => UiValue.TryFloat(p, out var f) ? f : 0f)
+            .Select(static p => UiValue.TryFloat(p, out var f) ? f : 0f)
             .ToArray();
 
         return n.Length switch

@@ -21,7 +21,7 @@ public class GltfParserTests
             File.WriteAllBytes(Path.Combine(directory.FullName, "triangle data.bin"), FloatsToBytes(positions));
             var builder = ModelUtils.ParseGltf(json.ToJsonString(), null, directory.FullName);
             Assert.Equal(new[] { Vector3.Zero, Vector3.UnitX, Vector3.UnitY },
-                builder.Vertices.Select(vertex => vertex.Position));
+                builder.Vertices.Select(static vertex => vertex.Position));
         }
         finally
         {
@@ -83,7 +83,10 @@ public class GltfParserTests
     {
         var bytes = new byte[values.Length * 4];
         for (var i = 0; i < values.Length; i++)
+        {
             BitConverter.GetBytes(values[i]).CopyTo(bytes, i * 4);
+        }
+
         return bytes;
     }
 
@@ -91,7 +94,10 @@ public class GltfParserTests
     {
         var bytes = new byte[values.Length * 4];
         for (var i = 0; i < values.Length; i++)
+        {
             BitConverter.GetBytes(values[i]).CopyTo(bytes, i * 4);
+        }
+
         return bytes;
     }
 

@@ -19,8 +19,8 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
 
     readonly Vulkan vulkan;
 
-    DescriptorSetLayout setLayout;
-    DescriptorPool pool;
+    readonly DescriptorSetLayout setLayout;
+    readonly DescriptorPool pool;
     DescriptorSet descriptorSet;
     PipelineLayout pipelineLayout;
     StandardPipeline? pipeline;
@@ -49,7 +49,9 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
             .Build();
 
         if (!pool.AllocateDescriptorSet(setLayout.GetDescriptorSetLayout(), ref descriptorSet))
+        {
             throw new VulkanException("Vulkan: failed to allocate overlay descriptor set");
+        }
 
         CreatePipelineLayout();
         CreatePipeline(renderPass);
@@ -64,7 +66,11 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
         get => source;
         set
         {
-            if (ReferenceEquals(source, value)) return;
+            if (ReferenceEquals(source, value))
+            {
+                return;
+            }
+
             source = value;
             descriptorDirty = value is not null;
         }
@@ -74,7 +80,10 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
     public void Render(FrameInfo frameInfo, ref GlobalUbo ubo)
     {
         var tex = source;
-        if (tex is null) return;
+        if (tex is null)
+        {
+            return;
+        }
 
         if (descriptorDirty)
         {
@@ -127,7 +136,9 @@ public sealed unsafe class OverlayRenderSystem : IRenderSystem
         };
 
         if (vulkan.Vk.CreatePipelineLayout(vulkan.Device.VkDevice, in info, null, out pipelineLayout) != Result.Success)
+        {
             throw new VulkanException("Vulkan: failed to create overlay pipeline layout");
+        }
     }
 
     void CreatePipeline(RenderPass renderPass)

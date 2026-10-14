@@ -19,7 +19,7 @@ public sealed class LayerEnrichmentTests
         };
         var tag = new TagAsset { Id = declared.Tags[0].Id, Name = "Hero" };
         var settings = new LayerRegistrationBuilder().Include(water).Include(tag)
-            .Group<Physics>(group => group.Default().Value<Water>()).Tag<Player>().Build();
+            .Group<Physics>(static group => group.Default().Value<Water>()).Tag<Player>().Build();
         Assert.Same(water, settings.Groups[0].Values[1]);
         Assert.Same(tag, settings.Tags[0]);
         Assert.True(Registry(settings).TryGetLayerIndex<Physics, Water>(out var index));
@@ -36,7 +36,7 @@ public sealed class LayerEnrichmentTests
         group.Values.Reverse();
         group.DefaultValue = group.Values[0];
         var settings = new LayerRegistrationBuilder()
-            .Group<Physics>(builder => builder.Default().Value<Water>()).Include(group).Build();
+            .Group<Physics>(static builder => builder.Default().Value<Water>()).Include(group).Build();
         Assert.Same(group, settings.Groups[0]);
         Assert.Equal(group.DefaultValue.Id, Registry(settings).GetLayerId(0, 0));
         var defaultAsset = new LayerValueAsset { Id = group.DefaultValue.Id, Name = "Designer default" };

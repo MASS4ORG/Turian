@@ -78,7 +78,11 @@ public sealed class AssetThumbnailCacheTests
         using var cache = new AssetThumbnailCache((_, _) =>
         {
             calls++;
-            if (throws) throw new IOException("unavailable");
+            if (throws)
+            {
+                throw new IOException("unavailable");
+            }
+
             return null;
         });
         var entry = Entry("script.cs");

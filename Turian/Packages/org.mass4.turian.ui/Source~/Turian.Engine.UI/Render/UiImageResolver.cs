@@ -21,15 +21,22 @@ public sealed class UiImageResolver
     public UiImageResolver(AssetDatabase? database, params string[] roots)
     {
         this.database = database;
-        this.roots = [.. roots.Where(r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r))];
+        this.roots = [.. roots.Where(static r => !string.IsNullOrWhiteSpace(r) && Directory.Exists(r))];
     }
 
     /// <summary>Resolves <paramref name="src"/> to an image, or <c>null</c>.</summary>
     /// <param name="src">A project-relative path or <c>asset://&lt;guid&gt;</c>.</param>
     public SKImage? Resolve(string src)
     {
-        if (string.IsNullOrWhiteSpace(src)) return null;
-        if (cache.TryGetValue(src, out var cached)) return cached;
+        if (string.IsNullOrWhiteSpace(src))
+        {
+            return null;
+        }
+
+        if (cache.TryGetValue(src, out var cached))
+        {
+            return cached;
+        }
 
         var image = Load(src.Trim());
         cache[src] = image;
@@ -46,27 +53,37 @@ public sealed class UiImageResolver
 
         var normalized = src.Replace('\\', '/');
 
-        if (database is not null)
+        if (FindAsset(normalized) is { } record)
         {
-            foreach (var record in database.GetAssetsSnapshot())
-            {
-                if (!string.Equals(record.SourceRelativePath.Replace('\\', '/'), normalized,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                // Packaged content has no source images; a project prefers its live source file.
-                if (database.Content is not null) return DecodeFromDatabase(record.AssetId);
-                var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
-                return File.Exists(absolute) ? Decode(absolute) : DecodeFromDatabase(record.AssetId);
-            }
+            return DecodeAsset(record);
         }
 
+        return DecodePath(normalized);
+    }
+
+    AssetRecord? FindAsset(string normalized) => database?.GetAssetsSnapshot().FirstOrDefault(record =>
+        string.Equals(record.SourceRelativePath.Replace('\\', '/'), normalized, StringComparison.OrdinalIgnoreCase));
+
+    SKImage? DecodeAsset(AssetRecord record)
+    {
+        if (database!.Content is not null)
+        {
+            return DecodeFromDatabase(record.AssetId);
+        }
+
+        var absolute = Path.Combine(record.ProjectRootPath, record.SourceRelativePath);
+        return File.Exists(absolute) ? Decode(absolute) : DecodeFromDatabase(record.AssetId);
+    }
+
+    SKImage? DecodePath(string normalized)
+    {
         foreach (var root in roots)
         {
             var absolute = Path.GetFullPath(Path.Combine(root, normalized));
-            if (File.Exists(absolute)) return Decode(absolute);
+            if (File.Exists(absolute))
+            {
+                return Decode(absolute);
+            }
         }
 
         return null;
@@ -88,7 +105,9 @@ public sealed class UiImageResolver
     SKImage? DecodeFromDatabase(Guid assetId)
     {
         if (database is null || !database.TryGetAssetProvider(assetId, out var provider) || provider is null)
+        {
             return null;
+        }
 
         try
         {
@@ -96,28 +115,38 @@ public sealed class UiImageResolver
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
             var bytes = buffer.ToArray();
-            if (!Ktx2Reader.IsKtx2(bytes)) return SKImage.FromEncodedData(bytes);
-
-            var blob = Ktx2Reader.Read(bytes);
-            if (blob.Format is not (Ktx2VkFormat.R8G8B8A8Srgb or Ktx2VkFormat.R8G8B8A8Unorm)
-                || blob.Levels.Count == 0)
+            if (!Ktx2Reader.IsKtx2(bytes))
             {
-                Log.Logger.LogWarning("UI image {AssetId} uses unsupported texture format {Format}", assetId, blob.Format);
-                return null;
+                return SKImage.FromEncodedData(bytes);
             }
 
-            var info = new SKImageInfo(checked((int)blob.Width), checked((int)blob.Height),
-                SKColorType.Rgba8888, SKAlphaType.Unpremul);
-            var pixels = blob.Levels[0].ToArray();
-            if (pixels.Length != checked(info.Width * info.Height * 4))
-                throw new InvalidDataException("UI texture pixels do not match its dimensions.");
-
-            using var data = SKData.CreateCopy(pixels);
-            return SKImage.FromPixels(info, data, info.Width * 4);
+            return DecodeTexture(bytes, assetId);
         }
         catch (IOException)
         {
             return null;
         }
+    }
+
+    static SKImage? DecodeTexture(byte[] bytes, Guid assetId)
+    {
+        var blob = Ktx2Reader.Read(bytes);
+        if (blob.Format is not (Ktx2VkFormat.R8G8B8A8Srgb or Ktx2VkFormat.R8G8B8A8Unorm)
+            || blob.Levels.Count == 0)
+        {
+            Log.Logger.LogWarning("UI image {AssetId} uses unsupported texture format {Format}", assetId, blob.Format);
+            return null;
+        }
+
+        var info = new SKImageInfo(checked((int)blob.Width), checked((int)blob.Height),
+            SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        var pixels = blob.Levels[0].ToArray();
+        if (pixels.Length != checked(info.Width * info.Height * 4))
+        {
+            throw new InvalidDataException("UI texture pixels do not match its dimensions.");
+        }
+
+        using var data = SKData.CreateCopy(pixels);
+        return SKImage.FromPixels(info, data, info.Width * 4);
     }
 }

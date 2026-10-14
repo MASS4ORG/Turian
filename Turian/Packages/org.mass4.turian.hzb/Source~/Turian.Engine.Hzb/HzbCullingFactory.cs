@@ -8,7 +8,11 @@ public sealed class HzbCullingFactory : IOcclusionCullingFactory
     {
         foreach (var record in assets.GetAssetsSnapshot())
         {
-            if (record.DataAssetPayloadTypeId != HzbSettings.PayloadTypeId) continue;
+            if (record.DataAssetPayloadTypeId != HzbSettings.PayloadTypeId)
+            {
+                continue;
+            }
+
             var metadata = new DataAssetAsset { Id = record.AssetId, RelativePath = record.SourceRelativePath };
             return metadata.GetContent(record.ProjectRootPath, assets) is HzbSettings { Enabled: true };
         }

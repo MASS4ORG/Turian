@@ -37,13 +37,18 @@ sealed partial class InspectorPanel
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
 
             gui.ThemedIcon(Locked ? Icons.Lock : Icons.Unlock, theme.Text(13), Locked || hot ? 1f : 0.7f,
                 Locked ? theme.Accent : null);
 
             if (gui.Pass == Pass.Pass2Render && hot && interactable.OnClick())
+            {
                 Locked = !Locked;
+            }
         }
     }
 
@@ -55,7 +60,10 @@ sealed partial class InspectorPanel
             var interactable = gui.GetInteractable();
             var hot = interactable.OnHover();
 
-            if (gui.Pass == Pass.Pass2Render && hot) gui.DrawBackgroundRect(theme.Hover);
+            if (gui.Pass == Pass.Pass2Render && hot)
+            {
+                gui.DrawBackgroundRect(theme.Hover);
+            }
 
             gui.DrawText("…", ThemeTokens.Current.Scale(11f), hot || headerMenuOpen ? theme.Ink : theme.InkDim);
 

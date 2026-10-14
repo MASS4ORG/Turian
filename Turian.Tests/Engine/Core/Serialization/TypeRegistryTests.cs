@@ -61,7 +61,7 @@ public class TypeRegistryTests
     [Fact]
     public void UnannotatedTypeThrowsOnGetId()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => TypeRegistry.GetIdOrThrow(typeof(UntaggedSample)));
+        var ex = Assert.Throws<InvalidOperationException>(static () => TypeRegistry.GetIdOrThrow(typeof(UntaggedSample)));
         Assert.Contains("[TypeId", ex.Message, StringComparison.Ordinal);
     }
 
@@ -69,7 +69,7 @@ public class TypeRegistryTests
     [Fact]
     public void RegisterEmptyGuidThrows()
     {
-        Assert.Throws<ArgumentException>(() => TypeRegistry.Register(Guid.Empty, typeof(TaggedSampleA)));
+        Assert.Throws<ArgumentException>(static () => TypeRegistry.Register(Guid.Empty, typeof(TaggedSampleA)));
     }
 
     /// <summary>Re-registering the same id with a new type wins (hot-reload semantics).</summary>

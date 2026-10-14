@@ -36,7 +36,7 @@ public sealed class WindowIdentityTests
         frame.Draw();
         Assert.Equal("Gaya", window.Title);
         Assert.Equal(64 * 64 * 4, window.Pixels.Length);
-        Assert.Contains(window.Pixels, channel => channel != 0);
+        Assert.Contains(window.Pixels, static channel => channel != 0);
         var gaya = window.Pixels;
         var project = new AppSettings { ProjectAbsoluteDir = "/projects/my-game", Title = "my-game" };
         project.Get<PlayerSettings>().ProductName = "My Game";

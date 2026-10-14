@@ -88,4 +88,58 @@ public sealed class WorldPanelPointerTests
 
         Assert.False(ok);
     }
+
+    /// <summary>Viewport dimensions must be positive before a ray can be projected.</summary>
+    [Theory]
+    [InlineData(0, 600)]
+    [InlineData(800, 0)]
+    [InlineData(-1, 600)]
+    [InlineData(800, -1)]
+    public void InvalidViewport_ReturnsFalse(float width, float height)
+    {
+        Assert.False(WorldPanelPointer.TryHit(PanelModel(), ViewProjection(), new Vector2(400, 300),
+            new Vector2(width, height), new Vector2(panelW, panelH), out var hit));
+        Assert.Equal(Vector2.Zero, hit);
+    }
+
+    /// <summary>Singular panel or camera matrices cannot produce a hit.</summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SingularMatrix_ReturnsFalse(bool singularModel)
+    {
+        var model = singularModel ? default : PanelModel();
+        var camera = singularModel ? ViewProjection() : default;
+        Assert.False(WorldPanelPointer.TryHit(model, camera, new Vector2(400, 300),
+            new Vector2(vpW, vpH), new Vector2(panelW, panelH), out var hit));
+        Assert.Equal(Vector2.Zero, hit);
+    }
+
+    /// <summary>Each quad edge maps to the corresponding panel edge, and points beyond it miss.</summary>
+    [Theory]
+    [InlineData(0.25f, 0.5f, true, 0f, 0.5f)]
+    [InlineData(0.75f, 0.5f, true, 1f, 0.5f)]
+    [InlineData(0.5f, 0.25f, true, 0.5f, 0f)]
+    [InlineData(0.5f, 0.75f, true, 0.5f, 1f)]
+    [InlineData(0.24f, 0.5f, false, 0f, 0f)]
+    [InlineData(0.76f, 0.5f, false, 0f, 0f)]
+    [InlineData(0.5f, 0.24f, false, 0f, 0f)]
+    [InlineData(0.5f, 0.76f, false, 0f, 0f)]
+    public void QuadEdges(float x, float y, bool expected, float hitX, float hitY)
+    {
+        var panel = new Vector2(panelW, panelH);
+        Assert.Equal(expected, WorldPanelPointer.TryHit(Matrix4x4.Identity, Matrix4x4.Identity,
+            new Vector2(x * vpW, y * vpH), new Vector2(vpW, vpH), panel, out var hit));
+        Assert.Equal(hitX * panelW, hit.X, 0.01f);
+        Assert.Equal(hitY * panelH, hit.Y, 0.01f);
+    }
+
+    /// <summary>A ray parallel to the panel plane has no intersection.</summary>
+    [Fact]
+    public void ParallelRay_ReturnsFalse()
+    {
+        Assert.False(WorldPanelPointer.TryHit(Matrix4x4.CreateRotationY(MathF.PI / 2f), Matrix4x4.Identity,
+            new Vector2(400, 300), new Vector2(vpW, vpH), new Vector2(panelW, panelH), out var hit));
+        Assert.Equal(Vector2.Zero, hit);
+    }
 }

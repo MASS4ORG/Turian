@@ -76,8 +76,15 @@ public static class AssetReferenceQuery
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        if (TryResolveType(record.AssetTypeName) is not { } type) return null;
-        if (Activator.CreateInstance(type) is not Asset asset) return null;
+        if (TryResolveType(record.AssetTypeName) is not { } type)
+        {
+            return null;
+        }
+
+        if (Activator.CreateInstance(type) is not Asset asset)
+        {
+            return null;
+        }
 
         asset.Id = record.AssetId;
         asset.RelativePath = record.SourceRelativePath;
@@ -86,9 +93,20 @@ public static class AssetReferenceQuery
 
     static bool IsAssetTypeMatch(string recordTypeName, Type assetType)
     {
-        if (string.IsNullOrWhiteSpace(recordTypeName)) return false;
-        if (string.Equals(recordTypeName, assetType.FullName, StringComparison.Ordinal)) return true;
-        if (string.Equals(recordTypeName, assetType.Name, StringComparison.Ordinal)) return true;
+        if (string.IsNullOrWhiteSpace(recordTypeName))
+        {
+            return false;
+        }
+
+        if (string.Equals(recordTypeName, assetType.FullName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (string.Equals(recordTypeName, assetType.Name, StringComparison.Ordinal))
+        {
+            return true;
+        }
 
         var resolved = TryResolveType(recordTypeName);
         return resolved is not null && assetType.IsAssignableFrom(resolved);
@@ -96,17 +114,26 @@ public static class AssetReferenceQuery
 
     static bool IsPrefabRecord(string assetTypeName)
     {
-        if (string.IsNullOrWhiteSpace(assetTypeName)) return false;
+        if (string.IsNullOrWhiteSpace(assetTypeName))
+        {
+            return false;
+        }
 
         var resolved = TryResolveType(assetTypeName);
-        if (resolved is not null) return typeof(Prefab).IsAssignableFrom(resolved);
+        if (resolved is not null)
+        {
+            return typeof(Prefab).IsAssignableFrom(resolved);
+        }
 
         return assetTypeName.EndsWith(nameof(Prefab), StringComparison.Ordinal);
     }
 
     static bool HasCompatibleComponent(List<string> componentTypes, Type componentType)
     {
-        if (componentTypes is not { Count: > 0 }) return false;
+        if (componentTypes is not { Count: > 0 })
+        {
+            return false;
+        }
 
         return componentTypes.Any(name =>
         {
@@ -117,7 +144,11 @@ public static class AssetReferenceQuery
 
     static bool MatchesSearch(AssetRecord record, string? search)
     {
-        if (string.IsNullOrWhiteSpace(search)) return true;
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return true;
+        }
+
         return GetDisplayName(record.SourceRelativePath).Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 

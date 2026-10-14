@@ -46,22 +46,39 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
 
     internal bool IsPending(long generation)
     {
-        lock (gate) return Generation == generation && !consumed && !completed;
+        lock (gate)
+        {
+            return Generation == generation && !consumed && !completed;
+        }
     }
 
     internal bool TryCancel(long generation)
     {
         lock (gate)
-            if (Generation != generation || consumed) return false;
+        {
+            if (Generation != generation || consumed)
+            {
+                return false;
+            }
+        }
+
         var cancellation = scheduler.Cancellation(token, owner);
-        if (!cancellation.IsCancellationRequested) return false;
+        if (!cancellation.IsCancellationRequested)
+        {
+            return false;
+        }
+
         Complete(generation, new OperationCanceledException(cancellation));
         return true;
     }
 
     internal bool TryComplete(long generation)
     {
-        if (TryCancel(generation)) return true;
+        if (TryCancel(generation))
+        {
+            return true;
+        }
+
         bool eligible;
         try { eligible = IsEligible(); }
         catch (Exception ex)
@@ -69,7 +86,11 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
             Complete(generation, ex);
             return true;
         }
-        if (!eligible) return false;
+        if (!eligible)
+        {
+            return false;
+        }
+
         Complete(generation, null);
         return true;
     }
@@ -89,7 +110,11 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
 
     bool PollPredicate(bool desired)
     {
-        if (lastPredicateFrame == scheduler.FrameIndex) return false;
+        if (lastPredicateFrame == scheduler.FrameIndex)
+        {
+            return false;
+        }
+
         lastPredicateFrame = scheduler.FrameIndex;
         return predicate!() == desired;
     }
@@ -99,12 +124,22 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
         scheduler.RequireMainThread();
         lock (gate)
         {
-            if (Generation != generation || consumed) return;
+            if (Generation != generation || consumed)
+            {
+                return;
+            }
+
             if (!completed)
             {
                 completed = true;
-                if (exception is null) core.SetResult(true);
-                else core.SetException(exception);
+                if (exception is null)
+                {
+                    core.SetResult(true);
+                }
+                else
+                {
+                    core.SetException(exception);
+                }
             }
         }
         InvokeContinuation(generation);
@@ -120,7 +155,11 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
         string? nodeName;
         lock (gate)
         {
-            if (Generation != generation || !completed || consumed || continuation is null) return;
+            if (Generation != generation || !completed || consumed || continuation is null)
+            {
+                return;
+            }
+
             callback = continuation;
             callbackState = state;
             captured = executionContext;
@@ -132,12 +171,18 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
         }
         try
         {
-            if (captured is null) callback(callbackState);
-            else ExecutionContext.Run(captured, static payload =>
+            if (captured is null)
+            {
+                callback(callbackState);
+            }
+            else
+            {
+                ExecutionContext.Run(captured, static payload =>
             {
                 var invocation = ((Action<object?> Callback, object? State))payload!;
                 invocation.Callback(invocation.State);
             }, (callback, callbackState));
+            }
         }
         catch (Exception ex) { GameLoopScheduler.Report(ex, component, nodeName); }
     }
@@ -158,7 +203,11 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
         lock (gate)
         {
             Validate(version);
-            if (!completed) throw new InvalidOperationException("A gameplay wait cannot be consumed before completion.");
+            if (!completed)
+            {
+                throw new InvalidOperationException("A gameplay wait cannot be consumed before completion.");
+            }
+
             consumed = true;
         }
         try
@@ -177,27 +226,41 @@ sealed class GameLoopOperation(GameLoopScheduler scheduler) : System.Threading.T
         lock (gate)
         {
             Validate(version);
-            if (registered) throw new InvalidOperationException("A gameplay wait can only be awaited once.");
+            if (registered)
+            {
+                throw new InvalidOperationException("A gameplay wait can only be awaited once.");
+            }
+
             registered = true;
             continuation = callback;
             state = callbackState;
             if ((flags & System.Threading.Tasks.Sources.ValueTaskSourceOnCompletedFlags.FlowExecutionContext) != 0)
+            {
                 executionContext = ExecutionContext.Capture();
+            }
+
             if (completed)
+            {
                 scheduler.EnqueueContinuation(new GameLoopScheduler.OperationLease(this, Generation));
+            }
         }
     }
 
     void Validate(short version)
     {
         if (consumed || version != core.Version)
+        {
             throw new InvalidOperationException("A gameplay wait must be consumed exactly once; preserve shared results.");
+        }
     }
 
     internal GameLoopOperationInfo Inspect()
     {
-        lock (gate) return new GameLoopOperationInfo(kind.ToString(), ownerComponent, ownerNode,
+        lock (gate)
+        {
+            return new GameLoopOperationInfo(kind.ToString(), ownerComponent, ownerNode,
             completed, creationStack);
+        }
     }
 
     internal void Clear()

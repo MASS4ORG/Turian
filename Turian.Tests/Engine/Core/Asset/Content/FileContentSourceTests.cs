@@ -107,7 +107,10 @@ public sealed class FileContentSourceTests : IDisposable
         var path = Write("data.bin", 100);
         var directory = new FileContentDirectory(root);
         ContentIdentity opened;
-        using (var source = directory.Open("data.bin")) opened = source.Identity;
+        using (var source = directory.Open("data.bin"))
+        {
+            opened = source.Identity;
+        }
 
         Assert.Equal(Path.GetFullPath(path), opened.Id);
         Assert.Equal(opened, directory.Probe("data.bin"));
@@ -146,7 +149,11 @@ public sealed class FileContentSourceTests : IDisposable
     static byte[] Pattern(int size)
     {
         var bytes = new byte[size];
-        for (var i = 0; i < size; i++) bytes[i] = (byte)i;
+        for (var i = 0; i < size; i++)
+        {
+            bytes[i] = (byte)i;
+        }
+
         return bytes;
     }
 }

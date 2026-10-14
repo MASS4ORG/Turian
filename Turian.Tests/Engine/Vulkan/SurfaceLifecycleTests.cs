@@ -29,7 +29,11 @@ public sealed class SurfaceLifecycleTests
 
         public event Action? SurfaceRestored;
 
-        public event Action? Closing;
+        public event Action? Closing
+        {
+            add { }
+            remove { }
+        }
 
         public int Subscribers => (Resized?.GetInvocationList().Length ?? 0)
             + (SurfaceLost?.GetInvocationList().Length ?? 0) + (SurfaceRestored?.GetInvocationList().Length ?? 0);
@@ -43,8 +47,6 @@ public sealed class SurfaceLifecycleTests
         public void Lose() => SurfaceLost?.Invoke();
 
         public void Restore() => SurfaceRestored?.Invoke();
-
-        public void RequestClose() => Closing?.Invoke();
 
         public SurfaceKHR CreateSurface(Vk vk, Instance instance) => default;
 
@@ -287,10 +289,10 @@ public sealed class SurfaceLifecycleTests
         }
 
         Assert.True(lifecycle.TryPrepare());
-        Assert.Equal(100, target.Calls.Count(c => c == "destroy surface"));
-        Assert.Equal(100, target.Calls.Count(c => c == "create surface"));
-        Assert.Equal(101, target.Calls.Count(c => c.StartsWith("swapchain ", StringComparison.Ordinal)));
-        Assert.Equal(100, target.Calls.Count(c => c == "destroy swapchain"));
+        Assert.Equal(100, target.Calls.Count(static c => c == "destroy surface"));
+        Assert.Equal(100, target.Calls.Count(static c => c == "create surface"));
+        Assert.Equal(101, target.Calls.Count(static c => c.StartsWith("swapchain ", StringComparison.Ordinal)));
+        Assert.Equal(100, target.Calls.Count(static c => c == "destroy swapchain"));
     }
 
     /// <summary>Disposing stops following the host, and the constructor rejects missing arguments.</summary>

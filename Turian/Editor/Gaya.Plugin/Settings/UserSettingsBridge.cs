@@ -37,7 +37,10 @@ sealed class UserSettingsBridge : IDisposable
 
     void Publish()
     {
-        foreach (var pageId in published) settings.Remove(pageId);
+        foreach (var pageId in published)
+        {
+            settings.Remove(pageId);
+        }
 
         published.Clear();
 

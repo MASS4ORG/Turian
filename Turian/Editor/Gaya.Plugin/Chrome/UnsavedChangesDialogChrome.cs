@@ -39,13 +39,18 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
             Theme.Scale(dialogWidth), Theme.Scale(bodyHeight), () => Footer(gui),
             footerHeight: Theme.Scale(footerHeight));
 
-        if (!isOpen) decided = null;
+        if (!isOpen)
+        {
+            decided = null;
+        }
     }
 
     void Body(Gui gui)
     {
         using (gui.Node().Expand().ContentAlignY(0.5f).Enter())
+        {
             gui.DrawText(message, Theme.Text(13f), Theme.Ink, centerInRect: false);
+        }
     }
 
     void Footer(Gui gui)
@@ -53,13 +58,19 @@ sealed class UnsavedChangesDialogChrome(StudioLocalization localization) : IChro
         using (gui.Node().ExpandWidth().Direction(Axis.Horizontal).Gap(Theme.Scale(8f)).Enter())
         {
             if (gui.Button(localization.T("Save"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            {
                 Decide(UnsavedChanges.Save);
+            }
 
             if (gui.Button(localization.T("Don't Save"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            {
                 Decide(UnsavedChanges.Discard);
+            }
 
             if (gui.Button(localization.T("Cancel"), width: Theme.Scale(buttonWidth), height: Theme.Scale(28f)))
+            {
                 isOpen = false;
+            }
         }
     }
 

@@ -57,7 +57,11 @@ public sealed class ThemeBrickCliTests : IDisposable
     {
         var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add(typeof(global::Turian.Editor.CLI.Program).Assembly.Location);
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var argument in arguments)
+        {
+            start.ArgumentList.Add(argument);
+        }
+
         start.Environment[PackageStore.StoreVariable] = Path.Combine(root, "store");
         start.Environment[GayaConfig.HomeVariable] = Path.Combine(root, "config");
 

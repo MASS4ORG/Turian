@@ -11,7 +11,7 @@ public sealed partial class DataAssetGeneratorTests
     public async Task GameplayAnalyzer_RejectsAsyncVoid(string member)
     {
         var diagnostics = await AnalyzeGameplay(member, true);
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "TUR0002" &&
+        Assert.Contains(diagnostics, static diagnostic => diagnostic.Id == "TUR0002" &&
             diagnostic.Severity == DiagnosticSeverity.Error);
     }
 

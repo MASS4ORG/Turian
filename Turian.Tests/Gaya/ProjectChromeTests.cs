@@ -165,6 +165,6 @@ public sealed class ProjectChromeTests
         project.Get<PlayerSettings>().ProductName = product;
         Assert.Equal(expected, ProjectPresentation.Name(project));
         Assert.Equal("missing", ProjectPresentation.Name("/does-not-exist/missing/"));
-        Assert.Throws<ArgumentNullException>(() => ProjectPresentation.Name((IAppSettings)null!));
+        Assert.Throws<ArgumentNullException>(static () => ProjectPresentation.Name((IAppSettings)null!));
     }
 }

@@ -77,7 +77,11 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
         get;
         set
         {
-            if (field == value) return;
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
             Selected = null;
             SelectedRegistry = null;
@@ -144,11 +148,20 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
         return RunAsync($"Save registry {registry.Name}", workspace =>
         {
             if (registry.Name != previousName && workspace.Registries().Any(r => r.Name == registry.Name))
+            {
                 throw new PackageException($"A registry named {registry.Name} already exists.");
+            }
 
             workspace.AddRegistry(registry);
-            if (previousName is not null && previousName != registry.Name) _ = workspace.RemoveRegistry(previousName);
-            if (SelectedRegistry == before) SelectedRegistry = registry.Name;
+            if (previousName is not null && previousName != registry.Name)
+            {
+                _ = workspace.RemoveRegistry(previousName);
+            }
+
+            if (SelectedRegistry == before)
+            {
+                SelectedRegistry = registry.Name;
+            }
         }, applyToProject: false);
     }
 
@@ -158,8 +171,15 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
     public Task<bool> RemoveRegistryAsync(string name) =>
         RunAsync($"Remove registry {name}", workspace =>
         {
-            if (!workspace.RemoveRegistry(name)) throw new PackageException($"The workspace does not declare registry {name}.");
-            if (SelectedRegistry == name) SelectedRegistry = null;
+            if (!workspace.RemoveRegistry(name))
+            {
+                throw new PackageException($"The workspace does not declare registry {name}.");
+            }
+
+            if (SelectedRegistry == name)
+            {
+                SelectedRegistry = null;
+            }
         }, applyToProject: false);
 
     /// <summary>The installed brick selected in the panel, or null.</summary>
@@ -238,30 +258,50 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
         {
             if (installed.FirstOrDefault(p => p.Id == id) is { Origin: PackageOrigin.Embedded })
             {
-                if (!workspace.Remove(id)) throw new PackageException($"{id} is not installed.");
+                if (!workspace.Remove(id))
+                {
+                    throw new PackageException($"{id} is not installed.");
+                }
+
                 return;
             }
 
             if (installed.Any(p => p.Id == id))
+            {
                 throw new PackageException($"{id} is in use; disable it before uninstalling it.");
-            if (Store.Remove(id) == 0) throw new PackageException($"{id} is not in the shared store.");
+            }
+
+            if (Store.Remove(id) == 0)
+            {
+                throw new PackageException($"{id} is not in the shared store.");
+            }
         }, applyToProject: installed.Any(p => p.Id == id && p.Origin == PackageOrigin.Embedded));
 
     /// <summary>Reads the registries' bricks into <see cref="Catalog"/>; an unreachable registry is reported in <see cref="Error"/>.</summary>
     /// <returns>A task that completes when the catalog is updated.</returns>
     public async Task RefreshRegistriesAsync()
     {
-        if (Workspace is not { } workspace) return;
+        if (Workspace is not { } workspace)
+        {
+            return;
+        }
 
         var root = workspace.Root;
         var found = await workspace.SearchAsync(string.Empty).ConfigureAwait(false);
-        if (WorkspaceRoot != root) return;
+        if (WorkspaceRoot != root)
+        {
+            return;
+        }
 
         registryBricks = [.. found.Where(static f => f.Latest.Length > 0)];
         registryRoot = root;
         SaveRegistryCache(root);
         var unavailable = found.FirstOrDefault(static f => f.Latest.Length == 0);
-        if (unavailable.Id is not null) log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
+        if (unavailable.Id is not null)
+        {
+            log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
+        }
+
         Publish(installed, unavailable.Id);
     }
 
@@ -271,7 +311,10 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
     public Task<bool> RemoveAsync(string id) =>
         RunAsync($"Remove brick {id}", workspace =>
         {
-            if (!workspace.Remove(id)) throw new PackageException($"The workspace does not declare or embed {id}.");
+            if (!workspace.Remove(id))
+            {
+                throw new PackageException($"The workspace does not declare or embed {id}.");
+            }
         });
 
     /// <summary>Moves git bricks to their newest commit.</summary>
@@ -282,7 +325,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
 
     /// <summary>Fetches every brick the project needs.</summary>
     /// <returns>Whether every brick resolved.</returns>
-    public Task<bool> RestoreAsync() => RunAsync("Restore bricks", workspace => workspace.Restore());
+    public Task<bool> RestoreAsync() => RunAsync("Restore bricks", static workspace => workspace.Restore());
 
     /// <summary>Copies an installed brick into the project as a writable fork.</summary>
     /// <param name="id">The brick id.</param>
@@ -326,16 +369,24 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
                 catch (PackageException ex)
                 {
                     failure = ex.Message;
-                    log.LogError("{Label} failed: {Message}", label, ex.Message);
+                    log.LogError(ex, "{Label} failed: {Message}", label, ex.Message);
                     throw;
                 }
 
                 workspace.Changed(applyToProject);
             }).ConfigureAwait(false);
 
-            if (!succeeded) log.LogWarning("{Label} did not complete", label);
+            if (!succeeded)
+            {
+                log.LogWarning("{Label} did not complete", label);
+            }
+
             Refresh();
-            if (!succeeded) Publish(installed, failure ?? $"{label} failed");
+            if (!succeeded)
+            {
+                Publish(installed, failure ?? $"{label} failed");
+            }
+
             return succeeded;
         }
         finally
@@ -360,7 +411,11 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
         ];
         Registries = workspace is null ? [] : ReadRegistries(workspace);
         Error = error;
-        if (Selected is not null && Catalog.All(b => b.Id != Selected)) Selected = null;
+        if (Selected is not null && Catalog.All(b => b.Id != Selected))
+        {
+            Selected = null;
+        }
+
         Revision++;
         Changed?.Invoke();
     }
@@ -384,17 +439,25 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
     // What the registries offered last time, so the catalog lists available bricks before (or without) the network.
     void LoadRegistryCache(string? root)
     {
-        if (registryRoot == root) return;
+        if (registryRoot == root)
+        {
+            return;
+        }
 
         registryRoot = root;
         registryBricks = [];
-        if (root is null) return;
+        if (root is null)
+        {
+            return;
+        }
 
         try
         {
             if (File.Exists(RegistryCachePath(root)))
+            {
                 registryBricks = JsonSerializer.Deserialize<List<RegistryCacheEntry>>(File.ReadAllText(RegistryCachePath(root)))?
                     .Select(static e => (e.Registry, e.Id, e.Latest)).ToList() ?? [];
+            }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
         {

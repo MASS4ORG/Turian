@@ -28,7 +28,10 @@ public static class ScenePicker
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(camera);
 
-        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray) return null;
+        if (CameraMath.ScreenPointToRay(camera, screenPos, viewportSize) is not { } ray)
+        {
+            return null;
+        }
 
         return PickClosest(EnumerateWorldBounds(root), ray, settings);
     }
@@ -52,8 +55,15 @@ public static class ScenePicker
 
         foreach (var (node, bounds) in candidates)
         {
-            if (!node.IsActiveInHierarchy || settings?.CanSelect(node) == false) continue;
-            if (!bounds.TryIntersect(ray, out var distance)) continue;
+            if (!node.IsActiveInHierarchy || settings?.CanSelect(node) == false)
+            {
+                continue;
+            }
+
+            if (!bounds.TryIntersect(ray, out var distance))
+            {
+                continue;
+            }
 
             if (distance < closestDistance)
             {
@@ -70,20 +80,34 @@ public static class ScenePicker
         foreach (var component in Node.GetComponentsInChildren<ModelComponent>(root))
         {
             var local = ModelBoundsUtility.ComputeLocalBounds(component, loadModels: true, out var isResolved);
-            if (!isResolved || local.IsEmpty) continue;
+            if (!isResolved || local.IsEmpty)
+            {
+                continue;
+            }
 
-            if (component.Node is not { } node) continue;
+            if (component.Node is not { } node)
+            {
+                continue;
+            }
+
             yield return (node, ModelBoundsUtility.ToWorldBounds(local, node.GlobalTransform.Matrix4X4()));
         }
 
         // One box per instance, never the aggregate, so a click in the gaps between instances selects nothing.
         foreach (var component in Node.GetComponentsInChildren<InstancedModelComponent>(root))
         {
-            if (component.Node is not { } node) continue;
+            if (component.Node is not { } node)
+            {
+                continue;
+            }
+
             for (var i = 0; i < component.Count; i++)
             {
                 var bounds = component.GetInstanceWorldBounds(i);
-                if (!bounds.IsEmpty) yield return (node, bounds);
+                if (!bounds.IsEmpty)
+                {
+                    yield return (node, bounds);
+                }
             }
         }
     }

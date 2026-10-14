@@ -25,17 +25,19 @@ static class ServiceBenchmarks
         BuildScene(static () => new PlainComponent()).Awake(null, provider);
         var cases = new (string Name, Func<Node> Create, IServiceProvider? Provider)[]
         {
-            ("No provider, no injected properties", () => BuildScene(static () => new PlainComponent()), null),
-            ("Provider, no injected properties", () => BuildScene(static () => new PlainComponent()), provider),
-            ("Provider, one injected property", () => BuildScene(static () => new InjectedComponent()), provider),
+            ("No provider, no injected properties", static () => BuildScene(static () => new PlainComponent()), null),
+            ("Provider, no injected properties", static () => BuildScene(static () => new PlainComponent()), provider),
+            ("Provider, one injected property", static () => BuildScene(static () => new InjectedComponent()), provider),
         };
-        var samples = Enumerable.Range(0, cases.Length).Select(_ => new List<double>(runs)).ToArray();
+        var samples = Enumerable.Range(0, cases.Length).Select(static _ => new List<double>(runs)).ToArray();
         for (var run = 0; run < runs; run++)
+        {
             for (var offset = 0; offset < cases.Length; offset++)
             {
                 var index = (run + offset) % cases.Length;
                 samples[index].Add(Measure(cases[index].Create, cases[index].Provider));
             }
+        }
 
         Console.WriteLine($"Scene Awake, {componentCount:N0} components, median of {runs} runs");
         for (var i = 0; i < cases.Length; i++)
@@ -63,8 +65,15 @@ static class ServiceBenchmarks
         var scene = create();
         GC.Collect();
         var watch = Stopwatch.StartNew();
-        if (provider is null) scene.Awake(null);
-        else scene.Awake(null, provider);
+        if (provider is null)
+        {
+            scene.Awake(null);
+        }
+        else
+        {
+            scene.Awake(null, provider);
+        }
+
         watch.Stop();
         GC.KeepAlive(scene);
         return watch.Elapsed.TotalMilliseconds;

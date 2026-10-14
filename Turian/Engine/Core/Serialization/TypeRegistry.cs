@@ -1,8 +1,8 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// Maps stable <see cref="System.Guid"/> identifiers (declared via <see cref="TypeIdAttribute"/>)
-/// to runtime <see cref="System.Type"/> instances and vice versa. Used by the polymorphic JSON
+/// Maps stable <see cref="Guid"/> identifiers (declared via <see cref="TypeIdAttribute"/>)
+/// to runtime <see cref="Type"/> instances and vice versa. Used by the polymorphic JSON
 /// serializers so that serialized data survives renames, namespace changes and assembly
 /// moves of the annotated classes.
 /// </summary>
@@ -57,7 +57,7 @@ public static class TypeRegistry
             }
             catch (ReflectionTypeLoadException ex)
             {
-                types = [.. ex.Types.Where(t => t is not null).Cast<Type>()];
+                types = [.. ex.Types.Where(static t => t is not null).Cast<Type>()];
             }
             catch
             {
@@ -91,9 +91,9 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Registers a <see cref="System.Type"/> with its stable id. Subsequent registrations for the
+    /// Registers a <see cref="Type"/> with its stable id. Subsequent registrations for the
     /// same id overwrite previous entries (this matters for hot-reload of user code, where
-    /// a recompiled assembly produces a new <see cref="System.Type"/> instance for the same id).
+    /// a recompiled assembly produces a new <see cref="Type"/> instance for the same id).
     /// </summary>
     public static void Register(Guid id, Type type)
     {
@@ -110,7 +110,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Tries to look up a registered <see cref="System.Type"/> by its stable id.
+    /// Tries to look up a registered <see cref="Type"/> by its stable id.
     /// </summary>
     public static bool TryGetType(Guid id, out Type? type)
     {
@@ -130,7 +130,7 @@ public static class TypeRegistry
     public static Guid CanonicalId(Guid id) => BuiltInTypeIds.Aliases.GetValueOrDefault(id, id);
 
     /// <summary>
-    /// Tries to look up a registered <see cref="System.Type"/> by its full name, the form asset catalogs
+    /// Tries to look up a registered <see cref="Type"/> by its full name, the form asset catalogs
     /// record. Only current registrations are searched, so hot-reloaded user code wins.
     /// </summary>
     public static bool TryGetType(string fullName, out Type? type)
@@ -147,7 +147,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Tries to look up the stable id assigned to a <see cref="System.Type"/>.
+    /// Tries to look up the stable id assigned to a <see cref="Type"/>.
     /// </summary>
     public static bool TryGetId(Type type, out Guid id)
     {
@@ -156,7 +156,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Resolves a registered <see cref="System.Type"/> by id, or throws if no type is registered
+    /// Resolves a registered <see cref="Type"/> by id, or throws if no type is registered
     /// for the given id.
     /// </summary>
     public static Type GetTypeOrThrow(Guid id)
@@ -172,7 +172,7 @@ public static class TypeRegistry
     }
 
     /// <summary>
-    /// Returns the stable id assigned to a <see cref="System.Type"/>, or throws if the type is
+    /// Returns the stable id assigned to a <see cref="Type"/>, or throws if the type is
     /// not annotated with <see cref="TypeIdAttribute"/>.
     /// </summary>
     public static Guid GetIdOrThrow(Type type)
@@ -219,8 +219,12 @@ public static class TypeRegistry
             ScannedAssemblies.RemoveWhere(CollectibleAssemblies.IsReleased);
             CollectibleAssemblies.RemoveReleased(TypeToId, static type => type);
             foreach (var (id, type) in IdToType)
+            {
                 if (CollectibleAssemblies.IsReleased(type))
+                {
                     IdToType.TryRemove(new KeyValuePair<Guid, Type>(id, type));
+                }
+            }
         }
     }
 
@@ -251,13 +255,18 @@ public static class TypeRegistry
         ArgumentNullException.ThrowIfNull(logger);
 
         using var doc = ReadManifest(content, manifest, logger);
-        if (doc is null || !doc.RootElement.TryGetProperty("Types", out var typesArray)) return;
+        if (doc is null || !doc.RootElement.TryGetProperty("Types", out var typesArray))
+        {
+            return;
+        }
 
         // A single-file game bundles the user assembly, so there is no DLL above to load; it is
         // loaded by name instead.
         var assemblyName = ReadString(doc.RootElement, "AssemblyName");
         if (assemblyName is { Length: > 0 })
+        {
             LoadAssemblyByName(assemblyName, logger);
+        }
 
         var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
         var registered = typesArray.EnumerateArray().Count(entry =>
@@ -300,11 +309,16 @@ public static class TypeRegistry
     static bool RegisterManifestEntry(JsonElement entry, Assembly[] assemblies, ILogger logger, string? defaultAssembly)
     {
         var fqn = ReadString(entry, "FullyQualifiedName");
-        if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId)) return false;
+        if (string.IsNullOrEmpty(fqn) || !Guid.TryParse(ReadString(entry, "TypeId"), out var typeId))
+        {
+            return false;
+        }
 
         // A game ships without its editor-only assemblies.
         if (entry.TryGetProperty("EditorOnly", out var editorOnly) && editorOnly.ValueKind == JsonValueKind.True)
+        {
             return false;
+        }
 
         var declaredAssembly = ReadString(entry, "Assembly") ?? defaultAssembly;
         var type = ResolveManifestType(fqn, declaredAssembly, assemblies, logger);

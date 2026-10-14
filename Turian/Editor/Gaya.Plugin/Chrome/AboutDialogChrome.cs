@@ -51,8 +51,14 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
         using (gui.Node().ExpandWidth().Direction(Axis.Vertical).ContentAlignX(0.5f)
                    .Gap(Theme.Scale(4f)).Enter())
         {
-            if (Logo.Value is { } image) gui.Image(image, Theme.Scale(logoSize), Theme.Scale(logoSize));
-            else gui.DrawText("◉", Theme.Text(52f), Theme.Accent);
+            if (Logo.Value is { } image)
+            {
+                gui.Image(image, Theme.Scale(logoSize), Theme.Scale(logoSize));
+            }
+            else
+            {
+                gui.DrawText("◉", Theme.Text(52f), Theme.Accent);
+            }
 
             gui.DrawText("Turian Studio", Theme.Text(18f), Theme.Ink);
             gui.DrawText($"{localization.T("Version")} {BuildInfo.Version}", Theme.Text(12f), Theme.InkDim);
@@ -85,7 +91,11 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
 
             foreach (var line in BuildInfo.Contributors.Split('\n'))
             {
-                if (line.Length == 0) continue;
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
                 gui.DrawText(line, Theme.Text(12f), Theme.InkDim, centerInRect: false);
             }
         }
@@ -94,18 +104,25 @@ sealed class AboutDialogChrome(StudioLocalization localization) : IChromeItem
     static void Divider(Gui gui)
     {
         using (gui.Node(Theme.Scale(contentWidth), Theme.Scale(1f)).Enter())
+        {
             gui.DrawBackgroundRect(Theme.Border);
+        }
     }
 
     void Link(Gui gui, string label, string url)
     {
         if (gui.Button(localization.T(label), width: Theme.Scale(contentWidth), height: Theme.Scale(28f)))
+        {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
+        }
     }
 
     void Footer(Gui gui)
     {
-        if (gui.Button(localization.T("Close"), width: Theme.Scale(80f), height: Theme.Scale(28f))) isOpen = false;
+        if (gui.Button(localization.T("Close"), width: Theme.Scale(80f), height: Theme.Scale(28f)))
+        {
+            isOpen = false;
+        }
     }
 
     /// <summary>Loads the embedded logo once; falls back to a glyph when the resource is missing.</summary>

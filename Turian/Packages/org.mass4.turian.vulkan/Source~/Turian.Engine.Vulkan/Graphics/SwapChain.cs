@@ -107,7 +107,7 @@ public partial class SwapChain : IDisposable
     Fence[] imagesInFlight = null!;
     int currentFrame;
     Format swapChainImageFormat;
-    SwapChain? oldSwapChain;
+    readonly SwapChain? oldSwapChain;
 
     /// <summary>
     /// Gets the image count of the swap chain.

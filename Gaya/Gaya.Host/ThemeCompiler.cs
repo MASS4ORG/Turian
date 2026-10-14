@@ -21,11 +21,21 @@ public static class ThemeCompiler
         var lengths = new Dictionary<string, float>(StringComparer.Ordinal);
         foreach (var key in TokenKeys(sheets))
         {
-            if (sheets.GetToken(key) is not { } value) continue;
+            if (sheets.GetToken(key) is not { } value)
+            {
+                continue;
+            }
+
             var name = key[2..];
             values[name] = value;
-            if (StyleValue.TryColor(value, out var color)) colors[name] = color;
-            else if (StyleValue.TryLength(value, out var length, out var percent) && !percent) lengths[name] = length;
+            if (StyleValue.TryColor(value, out var color))
+            {
+                colors[name] = color;
+            }
+            else if (StyleValue.TryLength(value, out var length, out var percent) && !percent)
+            {
+                lengths[name] = length;
+            }
         }
 
         var reader = new Reader(colors, lengths, problems);
@@ -94,7 +104,7 @@ public static class ThemeCompiler
 
     /// <summary>Every token key (<c>--name</c>) the sheets or the host overrides define.</summary>
     static IEnumerable<string> TokenKeys(StyleSheetCollection sheets) =>
-        sheets.SelectMany(sheet => sheet.Variables.Keys).Concat(sheets.Tokens.Keys).Distinct(StringComparer.Ordinal);
+        sheets.SelectMany(static sheet => sheet.Variables.Keys).Concat(sheets.Tokens.Keys).Distinct(StringComparer.Ordinal);
 
     /// <summary>Reads typed tokens, reporting the ones that are missing or of the wrong type.</summary>
     sealed class Reader(Dictionary<string, Color> colors, Dictionary<string, float> lengths,
@@ -102,14 +112,22 @@ public static class ThemeCompiler
     {
         public Color Color(string name, Color fallback)
         {
-            if (colors.TryGetValue(name, out var color)) return color;
+            if (colors.TryGetValue(name, out var color))
+            {
+                return color;
+            }
+
             problems?.Add($"${name} is not a color");
             return fallback;
         }
 
         public float Length(string name, float fallback)
         {
-            if (lengths.TryGetValue(name, out var length)) return length;
+            if (lengths.TryGetValue(name, out var length))
+            {
+                return length;
+            }
+
             problems?.Add($"${name} is not a length");
             return fallback;
         }

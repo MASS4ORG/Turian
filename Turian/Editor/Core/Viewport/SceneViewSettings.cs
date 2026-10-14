@@ -13,7 +13,11 @@ public sealed class SceneViewSettings
         get;
         set
         {
-            if (field == value) return;
+            if (field == value)
+            {
+                return;
+            }
+
             field = value;
             LocksChanged?.Invoke();
         }

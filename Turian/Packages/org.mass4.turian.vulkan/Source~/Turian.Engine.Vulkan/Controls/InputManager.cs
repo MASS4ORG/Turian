@@ -5,7 +5,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 public class InputManager : IDisposable
 {
-    List<Key> keysDown = [];
+    readonly List<Key> keysDown = [];
 
     /// <summary>
     /// Event that is raised when a key is pressed.

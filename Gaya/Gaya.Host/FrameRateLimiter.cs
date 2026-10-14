@@ -16,7 +16,7 @@ public sealed class FrameRateLimiter
     /// <summary>Creates a limiter that reads live preferences and sleeps between frames.</summary>
     public FrameRateLimiter(FrameRateSettings settings)
         : this(settings, Stopwatch.GetTimestamp, Stopwatch.Frequency,
-            duration => Thread.Sleep((int)Math.Ceiling(duration.TotalMilliseconds)))
+            static duration => Thread.Sleep((int)Math.Ceiling(duration.TotalMilliseconds)))
     { }
 
     internal FrameRateLimiter(FrameRateSettings settings, Func<long> timestamp, long frequency, Action<TimeSpan> delay)
@@ -40,7 +40,11 @@ public sealed class FrameRateLimiter
         var now = timestamp();
         var interval = Math.Max(1, frequency / fps);
         var remaining = interval - (now - lastFrame);
-        if (started && remaining > 0) delay(TimeSpan.FromSeconds((double)remaining / frequency));
+        if (started && remaining > 0)
+        {
+            delay(TimeSpan.FromSeconds((double)remaining / frequency));
+        }
+
         lastFrame = timestamp();
         started = true;
     }

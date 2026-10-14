@@ -39,14 +39,20 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(generateCsProjFiles);
 
-        if (SettingsOverrides is { } overrides) ProjectSettingsLoader.LoadFromSources(Settings, overrides);
+        if (SettingsOverrides is { } overrides)
+        {
+            ProjectSettingsLoader.LoadFromSources(Settings, overrides);
+        }
+
         ValidateStartupSceneSettings();
         ProjectSettingsLoader.WriteIndex(Settings.AssetsAbsoluteDir,
             Path.Combine(Settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName), SettingsOverrides);
         ProjectIcon.Write(Settings, Settings.CacheAbsoluteDir);
 
         if (!MSBuildLocator.IsRegistered)
+        {
             MSBuildLocator.RegisterDefaults();
+        }
 
         var csprojFilePaths = generateCsProjFiles();
         if (csprojFilePaths.Count == 0 || csprojFilePaths.Any(string.IsNullOrEmpty))
@@ -99,7 +105,9 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
+        {
             Directory.CreateDirectory(dir);
+        }
     }
 
     /// <summary>Restores NuGet packages for the given project.</summary>
@@ -150,7 +158,10 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(startInfo);
         foreach (var variable in LocatorVariables)
+        {
             startInfo.Environment.Remove(variable);
+        }
+
         return startInfo;
     }
 

@@ -25,8 +25,6 @@ public sealed class NodeInspectorController
     /// </summary>
     public object? SelectedObject => Selection.ActiveObject;
 
-    Node? selectedNode => SelectedNode;
-
     /// <summary>Raised after selection or component list changes.</summary>
     public event Action? SelectionChanged;
 
@@ -43,7 +41,10 @@ public sealed class NodeInspectorController
         this.build = build;
         this.viewSettings = viewSettings;
         Selection.Changed += () => SelectionChanged?.Invoke();
-        if (viewSettings is not null) viewSettings.LocksChanged += OnLocksChanged;
+        if (viewSettings is not null)
+        {
+            viewSettings.LocksChanged += OnLocksChanged;
+        }
     }
 
     readonly BuildManager? build;
@@ -63,7 +64,11 @@ public sealed class NodeInspectorController
     public void Select(object? target)
     {
         var node = NodeOf(target);
-        if (node is not null && viewSettings?.CanSelect(node) == false) return;
+        if (node is not null && viewSettings?.CanSelect(node) == false)
+        {
+            return;
+        }
+
         Selection.Select(target);
     }
 
@@ -76,13 +81,30 @@ public sealed class NodeInspectorController
     {
         if (node is null)
         {
-            if (!additive && !toggle) ClearSelection();
+            if (!additive && !toggle)
+            {
+                ClearSelection();
+            }
+
             return;
         }
-        if (!CanSelect(node)) return;
-        if (toggle) Selection.Toggle(node);
-        else if (additive) Selection.Add(node);
-        else Select(node);
+        if (!CanSelect(node))
+        {
+            return;
+        }
+
+        if (toggle)
+        {
+            Selection.Toggle(node);
+        }
+        else if (additive)
+        {
+            Selection.Add(node);
+        }
+        else
+        {
+            Select(node);
+        }
     }
 
     /// <summary>Notifies listeners that the selected objects' structure changed without replacing the selection.</summary>
@@ -106,21 +128,36 @@ public sealed class NodeInspectorController
     public void ClearSelection() => Select(null);
 
     /// <summary>
-    /// Instantiates and attaches <paramref name="componentType"/> to <see cref="selectedNode"/>.
+    /// Instantiates and attaches <paramref name="componentType"/> to <see cref="SelectedNode"/>.
     /// </summary>
     /// <param name="componentType">The type of component to add to the selected node.</param>
     /// <returns>True if the component was successfully added; otherwise, false.</returns>
     public bool AddComponent(Type componentType)
     {
         ArgumentNullException.ThrowIfNull(componentType);
-        if (selectedNode is null) return false;
-        if (!typeof(Component).IsAssignableFrom(componentType)) return false;
-        if (!ComponentRegistry.CanAddTo(selectedNode, componentType)) return false;
+        if (SelectedNode is null)
+        {
+            return false;
+        }
+
+        if (!typeof(Component).IsAssignableFrom(componentType))
+        {
+            return false;
+        }
+
+        if (!ComponentRegistry.CanAddTo(SelectedNode, componentType))
+        {
+            return false;
+        }
 
         try
         {
-            if (Activator.CreateInstance(componentType) is not Component instance) return false;
-            selectedNode.AddComponent(instance);
+            if (Activator.CreateInstance(componentType) is not Component instance)
+            {
+                return false;
+            }
+
+            SelectedNode.AddComponent(instance);
             NotifyNodeChanged();
             return true;
         }
@@ -136,7 +173,11 @@ public sealed class NodeInspectorController
     {
         ArgumentNullException.ThrowIfNull(componentType);
         if (nodes.Count == 0 || !typeof(Component).IsAssignableFrom(componentType)
-            || nodes.Any(node => !ComponentRegistry.CanAddTo(node, componentType))) return false;
+            || nodes.Any(node => !ComponentRegistry.CanAddTo(node, componentType)))
+        {
+            return false;
+        }
+
         try
         {
             var instances = nodes.Select(_ => (Component)Activator.CreateInstance(componentType)!).ToArray();
@@ -159,10 +200,18 @@ public sealed class NodeInspectorController
     public static IReadOnlyList<Component> MatchingComponents(IReadOnlyList<Node> nodes, Component representative)
     {
         var type = representative.GetType();
-        if (representative.Node is not { } owner) return [];
+        if (representative.Node is not { } owner)
+        {
+            return [];
+        }
+
         var occurrence = owner.Components.Where(component => component.GetType() == type)
             .ToList().IndexOf(representative);
-        if (occurrence < 0) return [];
+        if (occurrence < 0)
+        {
+            return [];
+        }
+
         return [.. nodes.Select(node => node.Components.Where(component => component.GetType() == type)
             .ElementAtOrDefault(occurrence)).OfType<Component>()];
     }
@@ -172,8 +221,15 @@ public sealed class NodeInspectorController
     {
         foreach (var component in MatchingComponents(nodes, representative))
         {
-            if (component.Node is not { } node) continue;
-            if (node.RemoveComponent(component)) NotifyMutation(node);
+            if (component.Node is not { } node)
+            {
+                continue;
+            }
+
+            if (node.RemoveComponent(component))
+            {
+                NotifyMutation(node);
+            }
         }
         RefreshSelection();
     }
@@ -186,7 +242,11 @@ public sealed class NodeInspectorController
             var node = component.Node!;
             var index = node.Components.IndexOf(component);
             var destination = index + (up ? -1 : 1);
-            if (destination < 0 || destination >= node.Components.Count) continue;
+            if (destination < 0 || destination >= node.Components.Count)
+            {
+                continue;
+            }
+
             node.Components.RemoveAt(index);
             node.Components.Insert(destination, component);
             NotifyMutation(node);
@@ -199,15 +259,22 @@ public sealed class NodeInspectorController
     /// </summary>
     /// <param name="component">The component to remove from the selected node.</param>
     /// <returns>True if the component was successfully removed; otherwise, false.</returns>
-    /// <exception cref="System.ArgumentNullException">Thrown when the component is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when the component is null.</exception>
     public bool RemoveComponent(Component component)
     {
         ArgumentNullException.ThrowIfNull(component);
-        if (selectedNode is null) return false;
+        if (SelectedNode is null)
+        {
+            return false;
+        }
 
         try
         {
-            if (!selectedNode.RemoveComponent(component)) return false;
+            if (!SelectedNode.RemoveComponent(component))
+            {
+                return false;
+            }
+
             NotifyNodeChanged();
             return true;
         }
@@ -224,11 +291,19 @@ public sealed class NodeInspectorController
     /// <param name="component">The component to move up.</param>
     public void MoveComponentUp(Component component)
     {
-        if (selectedNode is null) return;
-        var idx = selectedNode.Components.IndexOf(component);
-        if (idx <= 0) return;
-        selectedNode.Components.RemoveAt(idx);
-        selectedNode.Components.Insert(idx - 1, component);
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var idx = SelectedNode.Components.IndexOf(component);
+        if (idx <= 0)
+        {
+            return;
+        }
+
+        SelectedNode.Components.RemoveAt(idx);
+        SelectedNode.Components.Insert(idx - 1, component);
         NotifyNodeChanged();
     }
 
@@ -238,11 +313,19 @@ public sealed class NodeInspectorController
     /// <param name="component">The component to move down.</param>
     public void MoveComponentDown(Component component)
     {
-        if (selectedNode is null) return;
-        var idx = selectedNode.Components.IndexOf(component);
-        if (idx < 0 || idx >= selectedNode.Components.Count - 1) return;
-        selectedNode.Components.RemoveAt(idx);
-        selectedNode.Components.Insert(idx + 1, component);
+        if (SelectedNode is null)
+        {
+            return;
+        }
+
+        var idx = SelectedNode.Components.IndexOf(component);
+        if (idx < 0 || idx >= SelectedNode.Components.Count - 1)
+        {
+            return;
+        }
+
+        SelectedNode.Components.RemoveAt(idx);
+        SelectedNode.Components.Insert(idx + 1, component);
         NotifyNodeChanged();
     }
 
@@ -257,7 +340,11 @@ public sealed class NodeInspectorController
         IReadOnlyList<Node>? targets = null)
     {
         var nodes = targets ?? SelectedNodes;
-        if (nodes.Count == 0) return [];
+        if (nodes.Count == 0)
+        {
+            return [];
+        }
+
         var filter = SearchFilter(searchText);
 
         return ComponentRegistry.GetAvailableTypes(LoadedAssemblies())
@@ -270,7 +357,7 @@ public sealed class NodeInspectorController
 
     static string SearchFilter(string? searchText) => searchText?.Trim() ?? string.Empty;
 
-    IEnumerable<Assembly> LoadedAssemblies() => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+    IEnumerable<ReflectionAssembly> LoadedAssemblies() => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
 
     /// <summary>
     /// Notifies the asset manager of mutations to the specified target.
@@ -298,9 +385,9 @@ public sealed class NodeInspectorController
     /// </summary>
     void NotifyNodeChanged()
     {
-        if (selectedNode is not null)
+        if (SelectedNode is not null)
         {
-            assetManager.RefreshNode(selectedNode);
+            assetManager.RefreshNode(SelectedNode);
             assetManager.UpdateSelectedNode();
         }
 
