@@ -1,6 +1,7 @@
 #version 450
 layout(local_size_x = 64) in;
-struct Candidate { vec4 minimum; vec4 maximum; uvec4 command; uvec4 padding; };
+// command: count, instances, start, vertex offset (indexed) or first instance (non-indexed); extra.x: first instance.
+struct Candidate { vec4 minimum; vec4 maximum; uvec4 command; uvec4 extra; };
 layout(std430, set = 0, binding = 0) readonly buffer Candidates { Candidate candidates[]; };
 layout(std430, set = 0, binding = 1) writeonly buffer Commands { uint commands[]; };
 layout(set = 0, binding = 2) uniform sampler2D pyramid;
@@ -44,6 +45,6 @@ void main() {
     commands[offset + 1] = occluded ? 0 : 1;
     commands[offset + 2] = candidate.command.z;
     commands[offset + 3] = candidate.command.w;
-    commands[offset + 4] = 0;
+    commands[offset + 4] = candidate.extra.x;
     if (occluded) atomicAdd(culled, 1); else atomicAdd(visible, 1);
 }

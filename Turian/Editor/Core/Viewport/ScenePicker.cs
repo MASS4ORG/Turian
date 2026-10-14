@@ -75,5 +75,16 @@ public static class ScenePicker
             if (component.Node is not { } node) continue;
             yield return (node, ModelBoundsUtility.ToWorldBounds(local, node.GlobalTransform.Matrix4X4()));
         }
+
+        // One box per instance, never the aggregate, so a click in the gaps between instances selects nothing.
+        foreach (var component in Node.GetComponentsInChildren<InstancedModelComponent>(root))
+        {
+            if (component.Node is not { } node) continue;
+            for (var i = 0; i < component.Count; i++)
+            {
+                var bounds = component.GetInstanceWorldBounds(i);
+                if (!bounds.IsEmpty) yield return (node, bounds);
+            }
+        }
     }
 }

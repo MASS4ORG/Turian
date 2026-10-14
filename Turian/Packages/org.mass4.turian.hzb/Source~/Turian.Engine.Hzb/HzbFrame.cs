@@ -48,6 +48,9 @@ sealed unsafe class HzbFrame : IDisposable
             ref readonly var draw = ref draws[i];
             var bounds = draw.WorldBounds;
             var submesh = draw.Model.SubMeshes[draw.SubMesh];
+            // Each candidate reads the instance the renderer wrote at its own draw index; a non-indexed command
+            // keeps firstInstance in the slot an indexed one uses for the vertex offset.
+            var firstInstance = (uint)i;
             candidates[i] = new GpuCandidate
             {
                 Minimum = new Vector4(bounds.Min, bounds.IsEmpty ? 0 : 1),
@@ -55,7 +58,8 @@ sealed unsafe class HzbFrame : IDisposable
                 Count = submesh.IndexCount,
                 Instances = 1,
                 Start = submesh.IndexStart,
-                Offset = 0
+                Offset = draw.Model.IsIndexed ? 0 : firstInstance,
+                FirstInstance = firstInstance,
             };
         }
         Input.WriteToBuffer(candidates);
@@ -76,6 +80,6 @@ sealed unsafe class HzbFrame : IDisposable
     {
         public Vector4 Minimum, Maximum;
         public uint Count, Instances, Start, Offset;
-        public Vector4 Padding;
+        public uint FirstInstance, Padding0, Padding1, Padding2;
     }
 }

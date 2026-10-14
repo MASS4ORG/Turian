@@ -8,7 +8,7 @@ public sealed class FrameStatisticsTests
     public void WallTimeSamplingResetsAndDoesNotAllocate()
     {
         var statistics = new FrameStatistics();
-        var sample = new RenderFrameStats { CpuMilliseconds = 2, DrawCalls = 4, Triangles = 12 };
+        var sample = new RenderFrameStats { CpuMilliseconds = 2, DrawCalls = 4, Instances = 4, Triangles = 12 };
         statistics.Add(sample);
         Assert.Equal(0, statistics.Count);
         statistics.Add(sample);
@@ -17,7 +17,7 @@ public sealed class FrameStatisticsTests
         Assert.Equal(2, statistics.CpuMilliseconds);
         Span<char> buffer = stackalloc char[192];
         var length = statistics.FormatLine(2, buffer, null, 0);
-        Assert.Equal("Draws: 4  |  Submitted tris: 12", new string(buffer[..length]));
+        Assert.Equal("Draws: 4  |  Instances: 4  |  Submitted tris: 12", new string(buffer[..length]));
         statistics.Clear();
         statistics.Add(sample);
         Assert.Equal(0, statistics.Count);
@@ -63,18 +63,19 @@ public sealed class FrameStatisticsTests
         {
             CpuMilliseconds = 2,
             DrawCalls = 4,
+            Instances = 10,
             Triangles = 12,
             MaterialBinds = 2,
             AllocatedBytes = 2048,
-            Submeshes = new RenderCullingStats(4, 8),
+            Submeshes = new RenderCullingStats(10, 8),
         };
         stats.Add(0.05, sample);
-        stats.Add(0.05, sample with { DrawCalls = 8, Triangles = 24 });
+        stats.Add(0.05, sample with { DrawCalls = 8, Instances = 20, Triangles = 24 });
         Span<char> buffer = stackalloc char[192];
         Assert.Equal("20.0 fps  |  50.00 ms/frame", Format(0));
         Assert.Equal("Render CPU + wait: 2.00 ms", Format(1));
-        Assert.Equal("Draws: 6  |  Submitted tris: 18", Format(2));
-        Assert.Equal("Submeshes: 6 submitted / 8 CPU culled", Format(3));
+        Assert.Equal("Draws: 6  |  Instances: 15  |  Submitted tris: 18", Format(2));
+        Assert.Equal("Submeshes: 10 submitted / 8 CPU culled", Format(3));
         Assert.Equal("Material binds: 2  |  Alloc: 2.0 KiB", Format(4));
         Assert.Equal("Scene load: 123.4 ms  |  Texture payload: 1.0 MiB", Format(5));
         var length = stats.FormatLine(5, buffer, null, 1048576);

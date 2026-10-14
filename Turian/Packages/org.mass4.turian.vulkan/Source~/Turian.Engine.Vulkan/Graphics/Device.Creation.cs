@@ -185,7 +185,14 @@ public unsafe partial class Device
             SType = StructureType.PhysicalDeviceFeatures2,
             PNext = &sync2Features
         };
-        features2.Features = new PhysicalDeviceFeatures { SamplerAnisotropy = Vk.True };
+        // Indirect draws carry a per-candidate firstInstance so GPU-culled draws read their own instance data.
+        vk.GetPhysicalDeviceFeatures(candidatePhysicalDevice, out var supported);
+        var firstInstance = supported.DrawIndirectFirstInstance;
+        features2.Features = new PhysicalDeviceFeatures
+        {
+            SamplerAnisotropy = Vk.True,
+            DrawIndirectFirstInstance = firstInstance,
+        };
 
         var createInfo = new DeviceCreateInfo
         {
@@ -225,6 +232,7 @@ public unsafe partial class Device
 
         deviceExtensions = extensions;
         supportsMeshShaders = meshShading;
+        supportsDrawIndirectFirstInstance = firstInstance;
         return logicalDevice;
     }
 

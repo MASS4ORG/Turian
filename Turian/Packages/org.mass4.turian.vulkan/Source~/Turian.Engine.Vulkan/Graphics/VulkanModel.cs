@@ -30,6 +30,9 @@ public class VulkanModel : Model
         }
     }
 
+    /// <summary>Whether draws use the index buffer, which decides the indirect command layout.</summary>
+    public bool IsIndexed => hasIndexBuffer;
+
     void CreateVertexBuffers(Vertex[] vertices)
     {
         var instanceSize = (ulong)Vertex.SizeOf();
@@ -102,7 +105,7 @@ public class VulkanModel : Model
 
     /// <summary>
     /// Draws all submeshes of the model. Equivalent to calling
-    /// <see cref="DrawSubMesh"/> for each entry in <see cref="Model.SubMeshes"/>.
+    /// <see cref="DrawSubMesh(CommandBuffer, int)"/> for each entry in <see cref="Model.SubMeshes"/>.
     /// </summary>
     /// <param name="commandBuffer">The Vulkan command buffer.</param>
     public void Draw(CommandBuffer commandBuffer)
@@ -115,16 +118,22 @@ public class VulkanModel : Model
     /// Draws the submesh at <paramref name="index"/>. Bind the model and the submesh's
     /// material descriptor sets first.
     /// </summary>
-    public void DrawSubMesh(CommandBuffer commandBuffer, int index)
+    public void DrawSubMesh(CommandBuffer commandBuffer, int index) => DrawSubMesh(commandBuffer, index, 1, 0);
+
+    /// <summary>
+    /// Draws <paramref name="instanceCount"/> instances of the submesh at <paramref name="index"/>; the shader sees
+    /// <c>gl_InstanceIndex</c> starting at <paramref name="firstInstance"/>.
+    /// </summary>
+    public void DrawSubMesh(CommandBuffer commandBuffer, int index, uint instanceCount, uint firstInstance)
     {
         var sub = SubMeshes[index];
         if (hasIndexBuffer)
         {
-            vulkan.Vk.CmdDrawIndexed(commandBuffer, sub.IndexCount, 1, sub.IndexStart, 0, 0);
+            vulkan.Vk.CmdDrawIndexed(commandBuffer, sub.IndexCount, instanceCount, sub.IndexStart, 0, firstInstance);
         }
         else
         {
-            vulkan.Vk.CmdDraw(commandBuffer, sub.IndexCount, 1, sub.IndexStart, 0);
+            vulkan.Vk.CmdDraw(commandBuffer, sub.IndexCount, instanceCount, sub.IndexStart, firstInstance);
         }
     }
 

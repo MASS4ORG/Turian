@@ -10,6 +10,9 @@ layout(location = 2) in vec3 fragNormalWorld;
 layout(location = 3) in vec2 fragUv;
 layout(location = 4) in vec3 fragTangentWorld;
 layout(location = 5) in vec3 fragBitangentWorld;
+layout(location = 6) flat in vec4 fragInstanceColor;
+layout(location = 7) flat in vec4 fragCustomData;
+layout(location = 8) flat in uint fragLayerMask;
 
 layout(location = 0) out vec4 outColor;
 
@@ -48,11 +51,6 @@ layout(set = 1, binding = 2) uniform sampler2D metallicRoughnessTex;  // glTF: G
 layout(set = 1, binding = 3) uniform sampler2D normalTex;
 layout(set = 1, binding = 4) uniform sampler2D occlusionTex;          // R channel
 layout(set = 1, binding = 5) uniform sampler2D emissiveTex;
-
-layout(push_constant) uniform Push {
-    mat4 modelMatrix;
-    mat4 normalMatrix;
-} push;
 
 // ─── PBR helpers ───────────────────────────────────────────────────────────────
 
@@ -121,7 +119,7 @@ vec3 sampleNormal(vec3 N, vec3 T, vec3 B, vec2 uv) {
 
 void main() {
     // ─── Sample textures ───────────────────────────────────────────────────────
-    vec4 baseColorSample = texture(baseColorTex, fragUv) * mat.baseColorFactor;
+    vec4 baseColorSample = texture(baseColorTex, fragUv) * mat.baseColorFactor * fragInstanceColor;
     vec3 albedo = baseColorSample.rgb * fragColor;
 
     vec3 mrSample = texture(metallicRoughnessTex, fragUv).rgb;
@@ -143,7 +141,7 @@ void main() {
 
     for (int i = 0; i < uboLights; i++) {
         PointLight light = ubo.pointLights[i];
-        if ((floatBitsToUint(light.position.w) & floatBitsToUint(push.normalMatrix[3][3])) == 0u) continue;
+        if ((floatBitsToUint(light.position.w) & fragLayerMask) == 0u) continue;
         vec3 toLight = light.position.xyz - fragPosWorld;
         float distSq = dot(toLight, toLight);
         float attenuation = 1.0 / max(distSq, 1e-4);
@@ -157,7 +155,7 @@ void main() {
     // Directional light does not attenuate: the sun reaches every surface at the same strength.
     for (int i = 0; i < uboDirectionalLights; i++) {
         DirectionalLight light = ubo.directionalLights[i];
-        if ((floatBitsToUint(light.direction.w) & floatBitsToUint(push.normalMatrix[3][3])) == 0u) continue;
+        if ((floatBitsToUint(light.direction.w) & fragLayerMask) == 0u) continue;
         if (light.color.w < 1e-4) continue;
 
         vec3 L = normalize(-light.direction.xyz);
