@@ -81,8 +81,14 @@ public partial class SceneManager
     {
         using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
         var json = await reader.ReadToEndAsync().ConfigureAwait(false);
+        await ReturnToSceneThread();
         return DeserializeNode(json, sourceDescription);
     }
+
+    ValueTask ReturnToSceneThread()
+        => services?.GetService<GameLoopScheduler>() is { IsMainThread: false } scheduler
+            ? scheduler.MainThread()
+            : ValueTask.CompletedTask;
 
     Node DeserializeNode(string json, string sourceDescription)
     {

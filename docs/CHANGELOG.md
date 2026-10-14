@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: async scheduler foundation #88.
 - Added: GPU instancing: identical mesh and material draws batch automatically #104
 - Fixed: `ktx validate` test in CICD #31
 

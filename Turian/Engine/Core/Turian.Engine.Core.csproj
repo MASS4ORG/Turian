@@ -29,17 +29,9 @@
     </ItemGroup>
 
     <!-- Engine-independent libraries, each in its own repository; the local checkout is used while unpublished. -->
-    <ItemGroup Condition="'$(OapLocalPath)' != ''">
-        <ProjectReference Include="$(OapLocalPath)/csharp/OpenAssetPackage.csproj"/>
-    </ItemGroup>
-    <ItemGroup Condition="'$(OapLocalPath)' == ''">
-        <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*"/>
-    </ItemGroup>
-    <ItemGroup Condition="'$(Ktx2LocalPath)' != ''">
-        <ProjectReference Include="$(Ktx2LocalPath)/src/Ktx2/Ktx2.csproj"/>
-    </ItemGroup>
-    <ItemGroup Condition="'$(Ktx2LocalPath)' == ''">
-        <PackageReference Include="MASS4.Ktx2" Version="1.*"/>
+    <ItemGroup>
+        <ProjectReference Include="$(OapLocalPath)/csharp/OpenAssetPackage.csproj" Condition="'$(OapLocalPath)' != ''"/>
+        <ProjectReference Include="$(Ktx2LocalPath)/Ktx2/Ktx2.csproj" Condition="'$(Ktx2LocalPath)' != ''"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -49,5 +41,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
         <PackageReference Include="System.IO.Hashing" Version="10.0.12" />
+        <PackageReference Include="MASS4.Ktx2" Version="1.*" Condition="'$(Ktx2LocalPath)' == ''"/>
+        <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*" Condition="'$(OapLocalPath)' == ''"/>
     </ItemGroup>
 </Project>

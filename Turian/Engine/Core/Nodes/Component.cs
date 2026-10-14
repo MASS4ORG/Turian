@@ -5,6 +5,33 @@ namespace Turian.Engine.Core;
 /// </summary>
 public abstract class Component : IdObject
 {
+    CancellationTokenSource? destruction;
+    volatile bool destructionStarted;
+
+    /// <summary>Cancels before destruction callbacks, allowing gameplay waits to unwind on the game loop.</summary>
+    [JsonIgnore, Hide]
+    public CancellationToken DestroyCancellationToken
+    {
+        get
+        {
+            var source = destruction;
+            if (source is null)
+            {
+                var created = new CancellationTokenSource();
+                source = Interlocked.CompareExchange(ref destruction, created, null) ?? created;
+                if (!ReferenceEquals(source, created)) created.Dispose();
+            }
+            if (destructionStarted && !source.IsCancellationRequested) source.Cancel();
+            return source.Token;
+        }
+    }
+
+    /// <summary>Provides gameplay waits bound to this component and its running game session.</summary>
+    [JsonIgnore, Hide]
+    public ComponentAsync Async => new(this,
+        Services?.GetService<GameLoopScheduler>() ??
+        throw new InvalidOperationException("Gameplay async requires a running game session."));
+
     /// <summary>Gets or sets a value indicating whether this component is active.</summary>
     [Hide]
     public bool IsActive
@@ -80,6 +107,9 @@ public abstract class Component : IdObject
     {
         if (Node is null) return;
 
+        destructionStarted = true;
+        try { destruction?.Cancel(); }
+        catch (Exception ex) { GameLoopScheduler.Report(ex, this); }
         OnDisable();
         OnDetached();
         OnDestroy();

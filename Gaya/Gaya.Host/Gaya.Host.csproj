@@ -21,28 +21,22 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Svg/Guinevere.Svg.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*"/>
-        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*"/>
-        <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*"/>
-        <PackageReference Include="MASS4.Guinevere.Svg" Version="6.*"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj" />
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj" />
+        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers.Excalibur/Autoformers.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Styling/Guinevere.Styling.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Svg/Guinevere.Svg.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
     </ItemGroup>
 
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12"/>
+        <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Svg" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
 
 </Project>

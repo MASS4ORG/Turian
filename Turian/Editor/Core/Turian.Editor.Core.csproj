@@ -23,12 +23,12 @@
                           ReferenceOutputAssembly="false" PrivateAssets="all"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' != ''">
-        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers/Autoformers.csproj"/>
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Autoformers/Autoformers.csproj" Condition="'$(GuinevereLocalPath)' != ''"/>
     </ItemGroup>
 
-    <ItemGroup Condition="'$(GuinevereLocalPath)' == ''">
-        <PackageReference Include="MASS4.Autoformers" Version="6.*"/>
+    <ItemGroup>
+        <PackageReference Include="MASS4.Autoformers" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''"/>
     </ItemGroup>
 
     <!-- External libraries -->

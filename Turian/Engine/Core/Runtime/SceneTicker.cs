@@ -31,6 +31,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
     public SimulationClock Clock { get; } = clock ?? new SimulationClock();
 
+    /// <summary>The gameplay scheduler owned by this running session.</summary>
+    public GameLoopScheduler Async { get; init; } = new();
+
     /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
     public SimulationSession? Simulation { get; init; }
 
@@ -73,6 +76,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         if (!double.IsFinite(scaledDeltaTime))
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Scaled delta time must be finite.");
 
+        using var asyncContext = Async.EnterContext();
+        Async.BeginFrame(scaledDeltaTime, unscaledDeltaTime);
         UnscaledElapsedSeconds += deltaTime;
         deltaTime = scaledDeltaTime;
         ElapsedSeconds += deltaTime;
@@ -85,7 +90,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             (tick, interval) => RunFixedTick(roots, tick, interval), PublishCompletedTick);
 
         RunUpdate(roots, (float)deltaTime);
+        Async.DrainUpdate();
         RunLateUpdate(roots, (float)deltaTime);
+        Async.DrainLateUpdate();
 
         InputSource?.NewFrame();
     }
@@ -103,6 +110,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         if (!double.IsFinite(deltaTime) || deltaTime < 0)
             throw new ArgumentOutOfRangeException(nameof(deltaTime), "Delta time must be finite and non-negative.");
 
+        using var asyncContext = Async.EnterContext();
+        Async.BeginFrame(deltaTime, deltaTime);
         ElapsedSeconds += deltaTime;
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
@@ -112,7 +121,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Clock.Step((tick, interval) => RunFixedTick(roots, tick, interval));
         PublishCompletedTick();
         RunUpdate(roots, (float)deltaTime);
+        Async.DrainUpdate();
         RunLateUpdate(roots, (float)deltaTime);
+        Async.DrainLateUpdate();
 
         InputSource?.NewFrame();
     }
@@ -134,7 +145,11 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         simulation?.RunTick(tick, interval);
     }
 
-    void PublishCompletedTick() => Simulation?.PublishCompletedTick();
+    void PublishCompletedTick()
+    {
+        Simulation?.PublishCompletedTick();
+        Async.CompleteFixedStep(Clock.FixedDeltaTime);
+    }
 
     static void RunFixedUpdate(List<Node> roots, float fixedDeltaTime)
     {

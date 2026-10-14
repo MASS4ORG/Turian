@@ -182,15 +182,26 @@ public sealed class PlayerFramesTests : IDisposable
         Assert.False(GlfwSurfaceHost.TryLoadIcon(window, content, "missing.png", out _, out _));
     }
 
-    /// <summary>Disposing the frame loop releases the interface presenter it was given.</summary>
+    /// <summary>Disposing the frame loop unwinds gameplay before releasing the interface presenter.</summary>
     [Fact]
     public void DisposingReleasesThePresenter()
     {
         var presenter = Substitute.For<IUiPresenter>();
+        var runtime = Runtime();
+        var cleaned = false;
+        runtime.Ticker.Async.Forget(Wait());
+        presenter.When(value => value.Dispose()).Do(_ => Assert.True(cleaned));
 
-        Frames(Runtime(), presenter).Dispose();
+        Frames(runtime, presenter).Dispose();
         Frames(Runtime(), null).Dispose();
 
         presenter.Received(1).Dispose();
+        Assert.True(runtime.Ticker.Async.IsStopped);
+
+        async ValueTask Wait()
+        {
+            try { await runtime.Ticker.Async.NextFrame(TestContext.Current.CancellationToken); }
+            finally { cleaned = true; }
+        }
     }
 }

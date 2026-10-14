@@ -88,6 +88,7 @@ public sealed class PlayModeService(
         Input.Clear();
 
         var sceneManager = PreparePlayServices(localeOverride);
+        using var asyncContext = playServices.GetRequiredService<GameLoopScheduler>().EnterContext();
 
         Node? clone;
         try
@@ -115,6 +116,7 @@ public sealed class PlayModeService(
         PlayRoot = clone;
         ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
         {
+            Async = playServices.GetRequiredService<GameLoopScheduler>(),
             Simulation = playServices.GetService<SimulationSession>(),
             InputSource = Input,
             Actions = playServices.GetService<InputActionService>(),
@@ -167,6 +169,7 @@ public sealed class PlayModeService(
     {
         if (State == PlayState.Stopped) return;
 
+        ticker?.Async.Dispose();
         PlayRoot = null;
         ticker = null;
         playSceneManager = null;
@@ -194,6 +197,7 @@ public sealed class PlayModeService(
     /// </remarks>
     public void Tick()
     {
+        if (State == PlayState.Paused) ticker?.Async.PumpCancellation();
         if (State != PlayState.Playing) return;
 
         var now = clock.Elapsed.TotalSeconds;
@@ -210,6 +214,7 @@ public sealed class PlayModeService(
     /// <param name="deltaTime">The time elapsed since the previous frame, in seconds.</param>
     public void Tick(double deltaTime)
     {
+        if (State == PlayState.Paused) ticker?.Async.PumpCancellation();
         if (State != PlayState.Playing) return;
         RunGuarded(() => ticker!.Tick(deltaTime));
         FollowActiveScene();
@@ -286,6 +291,7 @@ public sealed class PlayModeService(
             .AddSingleton(logger)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
+            .AddSingleton<GameLoopScheduler>()
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(assetDatabase))
             .AddSingleton<IInputSource>(Input)
             .AddSingleton(_ => new InputActionService(Input))
