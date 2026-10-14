@@ -46,6 +46,6 @@ For multiplayer, capture at an authoritative tick with RNG state and content/mod
 
 ## Samples and scope
 
-`Samples~/Smoke` contains executable headless examples for slots/backups, game schema upgrades, compression as a serializer plugin, encrypted payloads, cloud conflicts, stable entity references and a 10,000-entity deterministic replay. A copy is provided in `example-11-save` in the examples repository.
+`Samples~` bundles an optional complete Studio project with an `Assets` folder, startup scene, registered settings and build profile. Its source is separate from the runtime library under `Source~`. `Assets/SaveShowcase.cs` demonstrates live capture/restore, local backups and simulated cloud conflicts, with a GUI brick overlay and A/D movement. Project script types use their `.cs.meta` identities. `SceneSmoke` loads that actual scene to verify controls, HUD readouts and simulation-thread restoration. `Smoke` is a separate console program for schema upgrades, serializer plugins, encryption, process interruption and deterministic replay. The complete project is also provided as `example-11-save` in the examples repository.
 
 This brick implements the runtime persistence API. Steam/console/cloud SDK adapters, a full offline synchronization coordinator, Studio slot inspection/editing and play-mode reset controls, and the shared typed preferences API are separate integrations still pending from #89. Preferences should use the existing settings profiles rather than treating a game save as a general settings database.

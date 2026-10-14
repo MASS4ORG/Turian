@@ -1,0 +1,17 @@
+{
+  "__TypeId": "308dc8ac-3bc0-55f2-a12e-2c00bb440973",
+  "ImportSettings": {
+    "Format": "GLTF",
+    "ImportMeshes": true,
+    "ImportMaterials": true,
+    "ImportAnimations": true,
+    "RecalculateNormals": false,
+    "GenerateTangents": true,
+    "ScaleFactor": 1,
+    "OptimizeHierarchy": true,
+    "ImportExtras": false,
+    "ImportExtensions": false
+  },
+  "RelativePath": "Assets/Models/Marker-2.gltf",
+  "Id": "29b7789d-d1e1-526e-8301-9af685feebe3"
+}
