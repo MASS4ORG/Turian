@@ -40,7 +40,7 @@ public static class StringTableJson
             throw new ArgumentException("A string table JSON document requires a locale.", nameof(json));
         }
 
-        var table = new StringTable(dto.Locale!);
+        var table = new StringTable(dto.Locale);
         foreach (var entry in dto.Entries)
         {
             ArgumentNullException.ThrowIfNull(entry);
@@ -54,7 +54,7 @@ public static class StringTableJson
                 Plurals = entry.Plurals is null
                     ? []
                     : new Dictionary<PluralCategory, string>(
-                        entry.Plurals.Where(static kv => kv.Value is not null).Select(static kv => new KeyValuePair<PluralCategory, string>(kv.Key, kv.Value!))),
+                        entry.Plurals.Where(static kv => kv.Value is not null).Select(static kv => new KeyValuePair<PluralCategory, string>(kv.Key, kv.Value))),
             });
         }
 

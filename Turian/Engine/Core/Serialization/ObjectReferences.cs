@@ -523,7 +523,7 @@ public static class ObjectReferences
         }
 
         Interlocked.CompareExchange(ref owner.PendingReferences, new List<KeyValuePair<string, Guid[]>>(1), null);
-        return owner.PendingReferences!;
+        return owner.PendingReferences;
     }
 
     static int IndexOf(List<KeyValuePair<string, Guid[]>> table, string member)
