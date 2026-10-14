@@ -27,8 +27,6 @@ sealed partial class Build
     /// <summary>The runnable products. The solution also has test and build-host executables that must not ship.</summary>
     IEnumerable<Project> ReleaseProjects => [Solution.Editor.Turian_Editor_CLI, Solution.Editor.Turian_Editor_Studio];
 
-    Project TestProject => Solution.Turian_Tests;
-
     AbsolutePath PublishOutput(Project project) => PublishDir / "lib";
 
     [Parameter("Build against the published packages, ignoring local checkouts from Directory.Build.local.props")]

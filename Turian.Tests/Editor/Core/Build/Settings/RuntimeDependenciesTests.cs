@@ -96,4 +96,23 @@ public class RuntimeDependenciesTests
         Assert.All(settings.TurianPackages, static assembly => Assert.False(Path.IsPathRooted(assembly.Item1)));
         Assert.Equal(settings.PackageReferences.Select(static package => package.Item1), settings.Packages);
     }
+
+    /// <summary>The restored launcher graph contains no editor, workbench or Vulkan library, as project or package.</summary>
+    [Fact]
+    public void LauncherGraphHasNoEditorOrHostProject()
+    {
+        using var assets = typeof(RuntimeDependenciesTests).Assembly
+            .GetManifestResourceStream("Turian.Tests.RuntimeLauncherAssets")!;
+        using var document = JsonDocument.Parse(assets);
+        // Projects with a PackageId appear under it, so the shared MASS4 prefix is dropped before matching.
+        var libraries = document.RootElement.GetProperty("libraries").EnumerateObject()
+            .Select(static item => item.Name[..item.Name.LastIndexOf('/')])
+            .Select(static name => name.StartsWith("MASS4.", StringComparison.Ordinal) ? name["MASS4.".Length..] : name)
+            .ToArray();
+
+        Assert.Contains("Turian.Engine.Core", libraries);
+        Assert.DoesNotContain(libraries, static name =>
+            name is "Gaya.Host" or "Gaya.Sdk" or "Gaya.Packages.Editor" or "Gaya.Plugin.Turian" or "Turian.Engine.Vulkan"
+            || name.StartsWith("Turian.Editor.", StringComparison.Ordinal));
+    }
 }

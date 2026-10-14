@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Checks application bar composition and the lifetime of plugin chrome across both GUI passes.</summary>
 [Collection(SerialTests.Name)]
@@ -23,92 +23,6 @@ public sealed class GayaChromeTests
         {
             Disposals++;
             dispose?.Invoke();
-        }
-    }
-
-    internal sealed class Frame : IDisposable
-    {
-        readonly string directory = Path.Combine(Path.GetTempPath(), $"gaya-chrome-{Guid.NewGuid():N}");
-        readonly SKSurface surface = SKSurface.Create(new SKImageInfo(800, 600));
-        readonly Font font = Font.FromFamilyName("sans-serif", 14);
-        readonly GayaApplication application;
-
-        /// <summary>Creates an isolated workbench with temporary settings and layout files.</summary>
-        public Frame(float? zoom = null, IWindowIdentity? identity = null)
-        {
-            Directory.CreateDirectory(directory);
-            var settings = new EditorSettings(NullLogger.Instance, Path.Combine(directory, "settings.json"));
-            var themes = new ThemeService();
-            var registrations = new ServiceCollection().AddSingleton<ILogger>(NullLogger.Instance)
-                .AddSingleton<IEditorSettings>(settings).AddSingleton<IThemeService>(themes)
-                .AddSingleton(Blocker);
-            if (identity is not null) registrations.AddSingleton(identity);
-            var services = registrations.BuildServiceProvider();
-            application = new GayaApplication(services, new PanelRegistry(), new CommandRegistry(),
-                new MenuRegistry(), Chrome, new ShortcutService(NullLogger.Instance),
-                new FocusTracker(), [], settings: settings, themes: themes);
-            Workbench = new Workbench(application, null,
-                new WorkbenchLayoutStore(NullLogger.Instance, Path.Combine(directory, "layout.json")));
-            if (zoom is { } scale) application.Themes.SetScale(ThemeTokens.Default.FontSize, scale);
-            Input.MousePosition.Returns(new Vector2(-1, -1));
-            Input.PrevMousePosition.Returns(new Vector2(-1, -1));
-            Gui.Input = Input;
-        }
-
-        /// <summary>The contributions rendered by the workbench.</summary>
-        public ChromeRegistry Chrome { get; } = new();
-        /// <summary>The input state supplied to both passes.</summary>
-        public IInputHandler Input { get; } = Substitute.For<IInputHandler>();
-        /// <summary>The persistent GUI context for the headless frames.</summary>
-        public Gui Gui { get; } = new();
-        /// <summary>The shell under test.</summary>
-        public Workbench Workbench { get; }
-        /// <summary>The service controlling the modal input blocker.</summary>
-        public IUiBlocker Blocker { get; } = Substitute.For<IUiBlocker>();
-        /// <summary>The commands available to menus and the command palette.</summary>
-        public CommandRegistry Commands => application.Commands;
-        /// <summary>The registered menu entries.</summary>
-        public MenuRegistry Menus => application.Menus;
-        /// <summary>The page registry and persistence used by the workbench.</summary>
-        public EditorSettings Settings => application.Settings;
-        /// <summary>The services used by contributed panels.</summary>
-        public IServiceProvider Services => application.Services;
-        /// <summary>The themes available to menus and the Appearance settings page.</summary>
-        public ThemeService Themes => application.Themes;
-        /// <summary>The panels rendered by the workbench.</summary>
-        public PanelRegistry Panels => application.Panels;
-
-        /// <summary>Draws both passes, optionally mutating contributions after layout is calculated.</summary>
-        public void Draw(Action? betweenPasses = null)
-        {
-            Gui.Time.Update(0.016);
-            Gui.SetStage(Pass.Pass1Build);
-            Gui.BeginFrame(surface.Canvas, font, font);
-            Workbench.Render(Gui);
-            Gui.CalculateLayout();
-            betweenPasses?.Invoke();
-            Gui.SetStage(Pass.Pass2Render);
-            Workbench.Render(Gui);
-            Gui.Render();
-            Gui.EndFrame();
-        }
-
-        /// <summary>Writes the workbench's offscreen surface for visual inspection.</summary>
-        public void Capture(string path)
-        {
-            using var image = surface.Snapshot();
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-            using var file = File.Create(path);
-            data.SaveTo(file);
-        }
-
-        /// <summary>Releases the host and drawing surface and deletes its temporary files.</summary>
-        public void Dispose()
-        {
-            Workbench.Dispose();
-            application.Dispose();
-            surface.Dispose();
-            Directory.Delete(directory, true);
         }
     }
 
@@ -152,7 +66,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void ChromeFactoriesAreCachedAcrossPassesAndFrames()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var items = new List<Item>();
         var creations = 0;
         foreach (var slot in Enum.GetValues<ChromeSlot>())
@@ -177,7 +91,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void ReplacingAndRemovingChromeReleaseCachedInstances()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var old = new Item();
         var next = new Item();
         frame.Chrome.Register(new ChromeDescriptor("item", ChromeSlot.MenuBar, _ => old));
@@ -201,7 +115,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void ReusingADescriptorStillRecreatesItsChromeInstance()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var items = new List<Item>();
         var descriptor = new ChromeDescriptor("item", ChromeSlot.MenuBar, _ =>
         {
@@ -230,7 +144,7 @@ public sealed class GayaChromeTests
     [InlineData(true)]
     public void MutationsBetweenPassesDoNotChangeTheRenderedTree(bool replace)
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var old = new Item();
         var next = new Item();
         frame.Chrome.Register(new ChromeDescriptor("item", ChromeSlot.MenuBar, _ => old));
@@ -252,7 +166,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void RenderingMutationsAreDeferredUntilTheNextBuild()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var old = new Item();
         var next = new Item();
         frame.Chrome.Register(new ChromeDescriptor("target", ChromeSlot.StatusBar, _ => old));
@@ -273,7 +187,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void DisposalMutationsDoNotLoseRegistrations()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var added = new Item();
         var old = new Item(dispose: () => frame.Chrome.Register(
             new ChromeDescriptor("added", ChromeSlot.MenuBar, _ => added)));
@@ -291,7 +205,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void FailedFactoryCanBeReplacedWithoutRetryingEveryPass()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var attempts = 0;
         frame.Chrome.Register(new ChromeDescriptor("broken", ChromeSlot.MenuBar, _ =>
         {
@@ -309,7 +223,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void CompactMenuAndOverlaysDoNotReserveExtraBarWidth()
     {
-        using var frame = new Frame(zoom: 0.6f);
+        using var frame = new WorkbenchFrame(zoom: 0.6f);
         frame.Chrome.Register(Descriptor("overlay", ChromeSlot.Overlay));
         frame.Draw();
         var nodes = Descendants(frame.Gui.RootNode!).ToList();
@@ -325,7 +239,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void ModalBlockerCoversTheWorkbenchAndCommandPalette()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         frame.Commands.Register(new CommandDescriptor("test", "Test", _ => { }));
         frame.Workbench.ToggleCommandPalette();
         frame.Blocker.IsBlocked.Returns(true);
@@ -344,7 +258,7 @@ public sealed class GayaChromeTests
     [InlineData(false, false, true)]
     public void AppBarOwnsNativeDecorations(bool canMove, bool native, bool expected)
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var window = Substitute.For<IWindowChromeCapability>();
         window.CanMove.Returns(canMove);
         frame.Gui.Platform.Register(window);
@@ -365,7 +279,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void WindowPreferencesArePersistedAndKeepBothPassesConsistent()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var page = frame.Settings.Pages.Single(page => page.Id == AppearanceSettings.PageId);
         Assert.Equal("Appearance", page.Path);
         Assert.Equal(SettingsScope.User, page.Scope);
@@ -398,17 +312,17 @@ public sealed class GayaChromeTests
     [Fact]
     public void WindowPreferencesCanBeEditedInTheSettingsPanel()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         using var shell = PluginHost.Load([], NullLogger.Instance);
         var panel = shell.Panels.All.Single(item => item.Id == ShellPanels.Settings).Factory(frame.Services);
         using var surface = SKSurface.Create(new SKImageInfo(900, 600));
         var font = Font.FromFamilyName("sans-serif", 14);
-        InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(frame.Gui, surface, font, panel.Render);
         var checkbox = Descendants(frame.Gui.RootNode!).Single(node =>
             node.Id == $"settings/{AppearanceSettings.PageId}/field5/editor");
         frame.Input.MousePosition.Returns(checkbox.Rect.Position + new Vector2(6, checkbox.Rect.H / 2));
         frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
-        InspectorFormsRenderingTests.Frame(frame.Gui, surface, font, panel.Render);
+        WorkbenchFrame.Render(frame.Gui, surface, font, panel.Render);
         Assert.True(frame.Workbench.NativeTitlebar);
     }
 
@@ -416,7 +330,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void CompactMenuDispatchesEnabledCommandsAndCollapsesAfterActivation()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var executions = 0;
         var enabled = false;
         frame.Commands.Register(new CommandDescriptor("test", "Original", _ => executions++, _ => enabled)
@@ -450,7 +364,7 @@ public sealed class GayaChromeTests
     [Fact]
     public void WindowCloseButtonUsesTheGuardedCloseRequest()
     {
-        using var frame = new Frame();
+        using var frame = new WorkbenchFrame();
         var window = Substitute.For<IWindowChromeCapability>();
         window.CanMove.Returns(true);
         frame.Gui.Platform.Register(window);
@@ -462,29 +376,5 @@ public sealed class GayaChromeTests
         window.Received(1).RequestClose();
     }
 
-    /// <summary>A play-button press dispatches once during rendering and never while building the frame.</summary>
-    [Fact]
-    public void PlayButtonsDoNotDispatchDuringTheBuildPass()
-    {
-        using var frame = new Frame();
-        var commands = Substitute.For<ICommandDispatcher>();
-        commands.CanExecute(Arg.Any<string>()).Returns(true);
-        var playMode = new PlayModeService(Substitute.For<IPlaySceneHost>(), null!,
-            Substitute.For<IServiceProvider>(), NullLogger.Instance);
-        frame.Chrome.Register(new ChromeDescriptor("play", ChromeSlot.MenuBar,
-            _ => new PlayToolbarChrome(commands, playMode)));
-        frame.Draw();
-        var play = Descendants(frame.Gui.RootNode!).Single(node => node.Id == "play/play");
-        frame.Input.MousePosition.Returns(play.Rect.Position + new Vector2(12, 12));
-        frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
-        frame.Draw(() => commands.DidNotReceive().Execute(Arg.Any<string>()));
-        commands.Received(1).Execute("gaya.turian.play");
-    }
-
-    internal static IEnumerable<LayoutNode> Descendants(LayoutNode node)
-    {
-        yield return node;
-        foreach (var child in node.Children)
-            foreach (var descendant in Descendants(child)) yield return descendant;
-    }
+    static IEnumerable<LayoutNode> Descendants(LayoutNode node) => WorkbenchFrame.Descendants(node);
 }

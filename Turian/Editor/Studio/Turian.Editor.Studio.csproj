@@ -29,21 +29,21 @@
     <ItemGroup>
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere/Guinevere.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
         <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Excalibur/Guinevere.Excalibur.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
-        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Scripting/Guinevere.Scripting.csproj"/>
-        <ProjectReference Include="$(GuinevereLocalPath)/Integrations/Guinevere.Vulkan.SilkNET/Guinevere.Vulkan.SilkNET.csproj"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Guinevere.Scripting/Guinevere.Scripting.csproj" Condition="'$(GuinevereLocalPath)' != ''"/>
+        <ProjectReference Include="$(GuinevereLocalPath)/Integrations/Guinevere.Vulkan.SilkNET/Guinevere.Vulkan.SilkNET.csproj" Condition="'$(GuinevereLocalPath)' != ''"/>
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="MASS4.Guinevere" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
-        <PackageReference Include="MASS4.Guinevere.Scripting" Version="6.*"/>
-        <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="6.*"/>
+        <PackageReference Include="MASS4.Guinevere.Scripting" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+        <PackageReference Include="MASS4.Guinevere.Vulkan.SilkNET" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
     </ItemGroup>
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.12"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
         <PackageReference Include="SkiaSharp" Version="4.153.1" />
     </ItemGroup>
 

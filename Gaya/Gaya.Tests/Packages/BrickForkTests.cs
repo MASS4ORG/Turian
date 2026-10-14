@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Comparing an embedded fork with its original and merging a new release into it.</summary>
 public sealed class BrickForkTests : IDisposable

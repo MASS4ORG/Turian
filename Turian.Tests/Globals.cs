@@ -21,6 +21,7 @@ global using Gaya.Packages;
 global using Gaya.Packages.Editor;
 global using Gaya.Plugin.Turian;
 global using Gaya.Sdk;
+global using Gaya.Tests;
 global using Guinevere;
 global using Ktx2;
 global using MASS4.Attributes;

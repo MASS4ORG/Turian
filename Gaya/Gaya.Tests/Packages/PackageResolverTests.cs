@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>
 /// Resolving a project's packages from local folders, embedded folders and real git repositories created on the
@@ -94,7 +94,7 @@ public sealed class PackageResolverTests : IDisposable
         Package("rules", "com.acme.rules", "1.0.0");
         var embedded = Package(Path.Combine("project", "Bricks", "rules"), "com.acme.rules", "1.0.1-fork");
         var manifest = PackageManifest.Load(embedded);
-        manifest.Categories = ["turian:gameplay"];
+        manifest.Categories = ["engine:gameplay"];
         manifest.Save(embedded);
         Manifest(("com.acme.rules", "file:../../rules"));
 
@@ -159,7 +159,7 @@ public sealed class PackageResolverTests : IDisposable
     {
         var path = Package("rules", "com.acme.rules", "1.0.0");
         var manifest = PackageManifest.Load(path);
-        manifest.Engines["turian"] = VersionRange.Parse("^2.0.0");
+        manifest.Engines["engine"] = VersionRange.Parse("^2.0.0");
         manifest.Save(path);
         Manifest(("com.acme.rules", "file:../../rules"));
 
@@ -231,8 +231,8 @@ public sealed class PackageResolverTests : IDisposable
     PackageResolver Resolver(bool locked = false, string? builtinDirectory = null) => new(store, new PackageResolverOptions
     {
         BuiltinDirectory = builtinDirectory,
-        ReservedCategoryPrefixes = ["turian"],
-        Hosts = new Dictionary<string, SemanticVersion> { ["turian"] = SemanticVersion.Parse("1.2.0") },
+        ReservedCategoryPrefixes = ["engine"],
+        Hosts = new Dictionary<string, SemanticVersion> { ["engine"] = SemanticVersion.Parse("1.2.0") },
         Locked = locked,
     });
 

@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Checks looks and icon themes: catalog sources, base-sheet validation, pairing, previews and persistence.</summary>
 [Collection(SerialTests.Name)]
@@ -196,7 +196,7 @@ public sealed class ThemeLookTests : IDisposable
     [Fact]
     public void WorkbenchRemembersLookAndIconTheme()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         frame.Themes.Register(new ThemeSource(Square));
         frame.Themes.Register(new ThemeSource(Icons("test.icons")));
 

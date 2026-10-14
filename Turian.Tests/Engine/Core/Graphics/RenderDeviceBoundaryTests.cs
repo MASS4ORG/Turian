@@ -49,6 +49,21 @@ public sealed class RenderDeviceBoundaryTests
                                                          || name == "Turian.Engine.Vulkan");
     }
 
+    /// <summary>Games that load Core never pull in the editor, the Gaya workbench or a Vulkan or window backend.</summary>
+    [Fact]
+    public void CoreReferencesNoEditorOrHost()
+    {
+        // Silk.NET.Input.Common brings the backend-free windowing abstractions; only concrete backends are banned.
+        var offenders = AssemblyClosure.Offenders(typeof(Node).Assembly, static name =>
+            name is "Gaya.Host" or "Gaya.Sdk" or "Gaya.Packages.Editor" or "Gaya.Plugin.Turian" or "Turian.Engine.Vulkan"
+            || name.StartsWith("Turian.Editor.", StringComparison.Ordinal)
+            || name.StartsWith("Silk.NET.Vulkan", StringComparison.Ordinal)
+            || (name.StartsWith("Silk.NET.Windowing", StringComparison.Ordinal) && name != "Silk.NET.Windowing.Common")
+            || name.StartsWith("Silk.NET.GLFW", StringComparison.Ordinal));
+
+        Assert.True(offenders.Length == 0, $"Engine.Core reaches editor or backend assemblies: {string.Join("; ", offenders)}.");
+    }
+
     /// <summary>The model a component draws comes from the scene's render device, once per referenced asset.</summary>
     [Fact]
     public void ModelInstanceComesFromTheInjectedRenderDevice()

@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>
 /// Covers the Output detail pane's text layout: greedy word wrap with correct offsets into the

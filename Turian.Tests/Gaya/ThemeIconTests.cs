@@ -34,7 +34,7 @@ public sealed class ThemeIconTests
     [Fact]
     public void PartialThemeFallsBackToMono()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         frame.Themes.Register(new ThemeSource("""
             @const icon-theme-id = "test.partial";
             @const icon-theme-name = "Partial";
@@ -68,9 +68,9 @@ public sealed class ThemeIconTests
         Assert.All(new AssetTypeCatalog().Types, type => Assert.Contains(type.DefaultIcon, Icons.All));
     }
 
-    static GayaChromeTests.Frame Frame(string theme)
+    static WorkbenchFrame Frame(string theme)
     {
-        var frame = new GayaChromeTests.Frame();
+        var frame = new WorkbenchFrame();
         frame.Themes.ApplyIconTheme(theme);
         frame.Draw();
         return frame;

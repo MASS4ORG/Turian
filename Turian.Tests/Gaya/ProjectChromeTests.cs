@@ -48,7 +48,7 @@ public sealed class ProjectChromeTests
         /// <summary>Clicks a menu node, then advances a frame with no pressed buttons.</summary>
         public void Click(IChromeItem item, string id)
         {
-            var node = GayaChromeTests.Descendants(Gui.RootNode!).Single(node => node.Id == id);
+            var node = WorkbenchFrame.Descendants(Gui.RootNode!).Single(node => node.Id == id);
             Input.MousePosition.Returns(node.Rect.Position + new Vector2(8, node.Rect.H / 2));
             Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
             Draw(item);
@@ -82,14 +82,14 @@ public sealed class ProjectChromeTests
                 harness.Services.GetRequiredService<ProjectSession>(), harness.Commands, harness.EditorSettings,
                 harness.Services.GetRequiredService<UnsavedChangesGuard>());
             harness.Draw(chrome);
-            var control = GayaChromeTests.Descendants(harness.Gui.RootNode!).Single(node => node.Id == "project-switcher");
+            var control = WorkbenchFrame.Descendants(harness.Gui.RootNode!).Single(node => node.Id == "project-switcher");
             var initialWidth = control.Rect.W;
             project.Get<PlayerSettings>().ProductName = "A much longer configured project title";
             harness.Draw(chrome);
-            control = GayaChromeTests.Descendants(harness.Gui.RootNode!).Single(node => node.Id == "project-switcher");
+            control = WorkbenchFrame.Descendants(harness.Gui.RootNode!).Single(node => node.Id == "project-switcher");
             Assert.True(control.Rect.W > initialWidth);
             harness.Click(chrome, "project-switcher");
-            var row = GayaChromeTests.Descendants(harness.Gui.RootNode!).Single(node => node.Id == $"project-switcher/{root}/open");
+            var row = WorkbenchFrame.Descendants(harness.Gui.RootNode!).Single(node => node.Id == $"project-switcher/{root}/open");
             Assert.True(row.Rect.W > 100);
             harness.Click(chrome, $"project-switcher/{root}/open");
             Assert.False(harness.Services.GetRequiredService<ProjectSession>().IsOpening);

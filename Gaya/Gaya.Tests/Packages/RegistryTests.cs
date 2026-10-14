@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>A static registry: publishing signed bricks into it, and resolving, locking and updating from it.</summary>
 [Collection(SerialTests.Name)]
@@ -190,8 +190,8 @@ public sealed class RegistryTests : IDisposable
 
     PackageResolver Resolver(bool locked = false, bool updateAll = false) => new(store, new PackageResolverOptions
     {
-        Hosts = new Dictionary<string, SemanticVersion> { ["turian"] = SemanticVersion.Parse("1.2.0") },
-        ReservedCategoryPrefixes = ["turian"],
+        Hosts = new Dictionary<string, SemanticVersion> { ["engine"] = SemanticVersion.Parse("1.2.0") },
+        ReservedCategoryPrefixes = ["engine"],
         Locked = locked,
         Update = updateAll ? null : new HashSet<string>(),
     });
@@ -220,13 +220,13 @@ public sealed class RegistryTests : IDisposable
         Directory.CreateDirectory(Path.Combine(folder, "Runtime"));
         var manifest = new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) };
         if (dependency is { } needed) manifest.Dependencies[needed.Id] = needed.Range;
-        if (engine is not null) manifest.Engines["turian"] = VersionRange.Parse(engine);
+        if (engine is not null) manifest.Engines["engine"] = VersionRange.Parse(engine);
         if (entitlement is not null) manifest.Store = new PackageStoreInfo { Entitlement = entitlement };
         manifest.Save(folder);
         File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
-        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed"), ["turian"]);
+        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed"), ["engine"]);
 
-        RegistryPublisher.Publish(registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["turian"]);
+        RegistryPublisher.Publish(registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["engine"]);
     }
 
     void Unsign()

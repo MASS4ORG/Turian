@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Ed25519 verification and OpenSSH signatures, against independently produced vectors.</summary>
 public sealed class SignatureTests

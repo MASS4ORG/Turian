@@ -30,7 +30,7 @@ public sealed class WindowIdentityTests
         var settings = new SettingsService();
         var identity = new ProjectWindowIdentity(settings);
         Assert.Null(identity.Current);
-        using var frame = new GayaChromeTests.Frame(identity: identity);
+        using var frame = new WorkbenchFrame(identity: identity);
         var window = new Window();
         frame.Gui.Platform.Register<IWindowIdentityCapability>(window);
         frame.Draw();

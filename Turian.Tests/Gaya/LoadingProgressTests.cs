@@ -46,13 +46,13 @@ public sealed class LoadingProgressTests
     [Fact]
     public void ProgressCardIsCenteredAndKeepsItsFrameSnapshot()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         frame.Blocker.IsBlocked.Returns(true);
         frame.Blocker.Progress.Returns(new UiBlockerProgress("Opening project", "Importing assets: bistro.fbx",
             0.42f, "42 / 100", TimeSpan.FromSeconds(12)));
         frame.Draw(() => frame.Blocker.IsBlocked.Returns(false));
         Assert.Equal(0, frame.Gui.FrameWaitSeconds);
-        var card = GayaChromeTests.Descendants(frame.Gui.RootNode!).Single(node => node.Id == "__uiBlocker/card");
+        var card = WorkbenchFrame.Descendants(frame.Gui.RootNode!).Single(node => node.Id == "__uiBlocker/card");
         Assert.InRange(card.Rect.X + card.Rect.W / 2, 399, 401);
         Assert.InRange(card.Rect.Y + card.Rect.H / 2, 299, 301);
         Assert.True(card.Rect.H >= 120, $"Card height: {card.Rect.H}");
@@ -63,10 +63,10 @@ public sealed class LoadingProgressTests
             frame.Capture(Path.Combine(directory, "opening-project.png"));
         }
         frame.Draw();
-        Assert.DoesNotContain(GayaChromeTests.Descendants(frame.Gui.RootNode!), node => node.Id == "__uiBlocker");
+        Assert.DoesNotContain(WorkbenchFrame.Descendants(frame.Gui.RootNode!), node => node.Id == "__uiBlocker");
         frame.Blocker.IsBlocked.Returns(true);
         frame.Blocker.Progress.Returns(new UiBlockerProgress("Compiling scripts"));
         frame.Draw();
-        Assert.Contains(GayaChromeTests.Descendants(frame.Gui.RootNode!), node => node.Id == "__uiBlocker/card");
+        Assert.Contains(WorkbenchFrame.Descendants(frame.Gui.RootNode!), node => node.Id == "__uiBlocker/card");
     }
 }

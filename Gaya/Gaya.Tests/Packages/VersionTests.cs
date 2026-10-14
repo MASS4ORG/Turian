@@ -1,4 +1,4 @@
-namespace Turian.Tests;
+namespace Gaya.Tests;
 
 /// <summary>Semantic versions and npm-style ranges, as package dependencies state them.</summary>
 public class VersionTests

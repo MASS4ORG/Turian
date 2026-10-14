@@ -72,7 +72,7 @@ public sealed class AppearanceSettingsTests
     [Fact]
     public void MigratesAppearanceAndWindowPreferences()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var path = frame.Settings.PathFor(SettingsScope.User);
         File.WriteAllText(path, """
             {"gaya.turian.appearance":{"Theme":"Light","TextSize":16,"Zoom":1.25},
@@ -106,7 +106,7 @@ public sealed class AppearanceSettingsTests
     [Fact]
     public void ThemeDropdownAndMenuShareThePersistedChoice()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         frame.Themes.Register(new ThemeSource("""
             @const theme-id = "test.custom";
             @const theme-name = "Custom";
@@ -144,7 +144,7 @@ public sealed class AppearanceSettingsTests
     [Fact]
     public void BrowseButtonListsThemeBricks()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         using var shell = PluginHost.Load([], NullLogger.Instance);
         frame.Panels.Register(shell.Panels.All.Single(panel => panel.Id == ShellPanels.Settings));
         frame.Draw();
@@ -163,7 +163,7 @@ public sealed class AppearanceSettingsTests
     [Fact]
     public void AppearanceToggleSwitchesDecorationsButtonsAndDragging()
     {
-        using var frame = new GayaChromeTests.Frame();
+        using var frame = new WorkbenchFrame();
         var window = Substitute.For<IWindowChromeCapability>();
         window.CanMove.Returns(true);
         var position = new Vector2(100, 200);
@@ -205,10 +205,10 @@ public sealed class AppearanceSettingsTests
 
     static WorkbenchLayoutStore LayoutStore(string path) => new(NullLogger.Instance, path + ".layout");
 
-    static IEnumerable<LayoutNode> Nodes(GayaChromeTests.Frame frame) =>
-        GayaChromeTests.Descendants(frame.Gui.RootNode!);
+    static IEnumerable<LayoutNode> Nodes(WorkbenchFrame frame) =>
+        WorkbenchFrame.Descendants(frame.Gui.RootNode!);
 
-    static void OpenSettings(GayaChromeTests.Frame frame)
+    static void OpenSettings(WorkbenchFrame frame)
     {
         using var shell = PluginHost.Load([], NullLogger.Instance);
         frame.Panels.Register(shell.Panels.All.Single(panel => panel.Id == ShellPanels.Settings));
@@ -218,7 +218,7 @@ public sealed class AppearanceSettingsTests
         frame.Draw();
     }
 
-    static void Click(GayaChromeTests.Frame frame, Vector2 pointer)
+    static void Click(WorkbenchFrame frame, Vector2 pointer)
     {
         frame.Input.MousePosition.Returns(pointer);
         frame.Input.IsMouseButtonPressed(GMouseButton.Left).Returns(true);
