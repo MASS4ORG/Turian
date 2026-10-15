@@ -28,6 +28,19 @@ public sealed class BrickAssemblyLoadTests : IDisposable
         Assert.Equal(Path.Combine(lib, "X.dll"), BrickAssemblies.ResolveDependency(new AssemblyName("X")));
     }
 
+    /// <summary>A package that only targets an older framework, as Bepu ships net8.0, still resolves from its cache.</summary>
+    [Fact]
+    public void PackageFoldersResolveOlderFrameworks()
+    {
+        var name = $"Net8Only{Guid.NewGuid():N}";
+        var package = Path.Combine(root, "packages", name, "2.5.0");
+        var lib = Directory.CreateDirectory(Path.Combine(package, "lib", "net8.0")).FullName;
+        File.Copy(typeof(BrickNuGet).Assembly.Location, Path.Combine(lib, $"{name}.dll"));
+        BrickAssemblies.RegisterProbing([Brick("a.prober")], [package]);
+
+        Assert.Equal(Path.Combine(lib, $"{name}.dll"), BrickAssemblies.ResolveDependency(new AssemblyName(name)));
+    }
+
     /// <summary>A brick's sidecar deps.json resolves its restored files through a dependency resolver.</summary>
     [Fact]
     public void BrickDepsJsonResolvesRestoredFiles()

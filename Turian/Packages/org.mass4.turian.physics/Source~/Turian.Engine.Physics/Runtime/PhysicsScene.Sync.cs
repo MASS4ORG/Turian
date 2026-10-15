@@ -74,6 +74,8 @@ public sealed partial class PhysicsScene
 
             ApplyCommands(record, deltaTime);
         }
+
+        SynchronizeJoints();
     }
 
     // Groups colliders under their nearest rigidbody; the others become one static body each.
@@ -104,7 +106,7 @@ public sealed partial class PhysicsScene
     {
         var groups = registeredBodies.ToDictionary(static body => body, static _ => new List<ColliderComponent>());
         var statics = new List<ColliderComponent>();
-        foreach (var collider in registeredColliders)
+        foreach (var collider in registeredColliders.Where(static c => c.HasShape))
         {
             if (FindRigidbody(collider.Node) is { } body && groups.TryGetValue(body, out var group))
             {
@@ -373,7 +375,8 @@ public sealed partial class PhysicsScene
         }
     }
 
-    CollisionFilter FilterOf(ColliderComponent collider)
+    /// <summary>The collider's layer, and the layers it collides with after its include and exclude masks.</summary>
+    internal CollisionFilter FilterOf(ColliderComponent collider)
     {
         var layer = LayerOf(collider.Node);
         var accepts = (layerMatrix[layer] | collider.IncludeLayers.Value) & ~collider.ExcludeLayers.Value;

@@ -13,19 +13,31 @@ static class ColliderGeometry
         _ => PointsHalfExtents(shape.Points),
     };
 
-    /// <summary>The world-space bounds of a collider.</summary>
+    /// <summary>The tight world-space bounds of a collider.</summary>
     public static Bounds WorldBounds(ColliderComponent collider)
     {
         var pose = collider.WorldPose(out var shape);
         var center = pose.Position;
-        var half = HalfExtents(shape);
-        if (shape.Type is ShapeType.ConvexHull or ShapeType.TriangleMesh)
+        var axis = Vector3.Transform(Vector3.UnitY, pose.Orientation);
+        switch (shape.Type)
         {
-            var local = PointsBounds(shape.Points);
-            center = pose.TransformPoint(local.Center);
-            half = local.Size * 0.5f;
+            case ShapeType.Sphere:
+                return new Bounds(center - new Vector3(shape.Radius), center + new Vector3(shape.Radius));
+            case ShapeType.Capsule:
+                var tip = Vector3.Abs(axis * shape.Length * 0.5f) + new Vector3(shape.Radius);
+                return new Bounds(center - tip, center + tip);
+            case ShapeType.Cylinder:
+                // A disc spans its radius times the sine of each axis' angle to the cylinder's axis.
+                var disc = shape.Radius * Vector3.SquareRoot(Vector3.Max(Vector3.Zero, Vector3.One - axis * axis));
+                var reach = Vector3.Abs(axis * shape.Length * 0.5f) + disc;
+                return new Bounds(center - reach, center + reach);
+            case ShapeType.ConvexHull or ShapeType.TriangleMesh:
+                return shape.Points is { Length: > 0 } points
+                    ? points.Aggregate(Bounds.Empty, (box, point) => box.Encapsulate(pose.TransformPoint(point)))
+                    : new Bounds(center, center);
         }
 
+        var half = HalfExtents(shape);
         var rotation = Matrix4x4.CreateFromQuaternion(pose.Orientation);
         var extent = new Vector3(
             MathF.Abs(rotation.M11) * half.X + MathF.Abs(rotation.M21) * half.Y + MathF.Abs(rotation.M31) * half.Z,

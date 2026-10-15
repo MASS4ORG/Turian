@@ -4,7 +4,6 @@ namespace Turian.Engine.Physics;
 struct BepuNarrowPhaseCallbacks(BepuPhysicsWorld world) : INarrowPhaseCallbacks
 {
     // Bounciness drives the contact spring towards an undamped one that keeps more of the impact speed.
-    const float ContactFrequency = 30f;
     const float SolidRecoveryVelocity = 2f;
     const float BouncyRecoveryVelocity = 100f;
 
@@ -66,7 +65,7 @@ struct BepuNarrowPhaseCallbacks(BepuPhysicsWorld world) : INarrowPhaseCallbacks
             return false;
         }
 
-        pairMaterial = Combine(bodyA.Material, bodyB.Material);
+        pairMaterial = Combine(bodyA.Material, bodyB.Material, world.ContactFrequency);
         var solidPossible = !bodyA.AllTriggers && !bodyB.AllTriggers &&
                             (pair.A.Mobility == CollidableMobility.Dynamic ||
                              pair.B.Mobility == CollidableMobility.Dynamic);
@@ -127,13 +126,13 @@ struct BepuNarrowPhaseCallbacks(BepuPhysicsWorld world) : INarrowPhaseCallbacks
         return CollisionFilter.IsCollisionEnabled(a.Filter, b.Filter) && !world.IsPairIgnored(a.UserData, b.UserData);
     }
 
-    static PairMaterialProperties Combine(in MaterialDesc a, in MaterialDesc b)
+    static PairMaterialProperties Combine(in MaterialDesc a, in MaterialDesc b, float frequency)
     {
         var friction = MaterialDesc.Combine(a.DynamicFriction, b.DynamicFriction, a.FrictionCombine, b.FrictionCombine);
         var bounce = Bounce(a, b);
         return new PairMaterialProperties(MathF.Max(friction, 0f),
             SolidRecoveryVelocity + bounce * (BouncyRecoveryVelocity - SolidRecoveryVelocity),
-            new SpringSettings(ContactFrequency, 1f - bounce));
+            new SpringSettings(frequency, 1f - bounce));
     }
 
     static float Bounce(in MaterialDesc a, in MaterialDesc b) =>

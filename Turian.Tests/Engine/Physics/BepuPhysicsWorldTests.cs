@@ -32,6 +32,24 @@ public sealed class BepuPhysicsWorldTests : IDisposable
         }
     }
 
+    /// <summary>A fast sphere stops at the face of a wall instead of sinking deep into it before being pushed out.</summary>
+    [Fact]
+    public void FastBody_StopsAtTheWallFace()
+    {
+        world.CreateStatic(new StaticDesc(new PhysicsPose(new Vector3(0, 5, 0), Quaternion.Identity),
+            [Collider(ShapeDesc.Box(new Vector3(4, 4, 1)), 100)]));
+        var bullet = world.CreateBody(BodyDesc.Dynamic(new PhysicsPose(new Vector3(0, 5, -3), Quaternion.Identity),
+            Collider(ShapeDesc.Sphere(0.5f), 1)) with
+        {
+            GravityScale = 0f,
+            Velocity = new PhysicsVelocity(new Vector3(0, 0, 400), Vector3.Zero),
+        });
+
+        world.Step(Dt);
+
+        Assert.True(world.GetPose(bullet).Position.Z < -0.85f, $"sank to {world.GetPose(bullet).Position.Z}");
+    }
+
     /// <summary>A falling box comes to rest on the ground and falls asleep.</summary>
     [Fact]
     public void Body_FallsAndRestsOnStatic()

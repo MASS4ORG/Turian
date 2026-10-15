@@ -60,6 +60,10 @@ public abstract class ColliderComponent : Component
     [JsonIgnore, Hide]
     public ulong PhysicsId { get; } = (ulong)Interlocked.Increment(ref nextId);
 
+    /// <summary>Whether the collider has a shape to simulate; one without, such as an empty mesh collider, is skipped.</summary>
+    [JsonIgnore, Hide]
+    public virtual bool HasShape => true;
+
     /// <summary>The point on the shape closest to <paramref name="position"/>; a point inside returns itself.</summary>
     public Vector3 ClosestPoint(Vector3 position) => ColliderGeometry.ClosestPoint(this, position);
 

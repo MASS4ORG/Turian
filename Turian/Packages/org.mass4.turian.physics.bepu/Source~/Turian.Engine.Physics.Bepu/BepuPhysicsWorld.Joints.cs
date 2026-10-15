@@ -165,7 +165,8 @@ public sealed partial class BepuPhysicsWorld
         }
     }
 
-    // The motor drives the first body around its axis relative to the second, as Unity's hinge motor does.
+    // Joint values are of the first body relative to the second. Bepu's twist constraints measure the second body
+    // against the first, so their angles are negated; its axis motor already drives the first body's velocity.
     IEnumerable<ConstraintHandle> HingeExtras(JointFrame f)
     {
         var d = f.Description;
@@ -182,7 +183,7 @@ public sealed partial class BepuPhysicsWorld
         {
             yield return Simulation.Solver.Add(f.A.Body, f.B.Body, new AngularAxisMotor
             {
-                LocalAxisA = f.AxisA, TargetVelocity = -d.Motor.TargetVelocity,
+                LocalAxisA = f.AxisA, TargetVelocity = d.Motor.TargetVelocity,
                 Settings = new MotorSettings(MathF.Max(d.Motor.MaxForce, 0f), 1e-3f),
             });
         }

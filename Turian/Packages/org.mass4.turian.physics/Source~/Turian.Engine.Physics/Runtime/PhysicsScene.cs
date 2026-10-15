@@ -23,12 +23,18 @@ public sealed partial class PhysicsScene : IFixedTickSystem, IDisposable
     /// <param name="layers">Resolves nodes' physics layers; null uses their raw index.</param>
     /// <param name="clock">The session clock, used in <see cref="SimulationMode.Update"/> mode.</param>
     /// <param name="factory">The backend; null finds one among the loaded bricks.</param>
+    /// <param name="loader">Resolves the settings' material references, which settings read from sources leave pending.</param>
     public PhysicsScene(IAppSettings? settings = null, LayerFilter? layers = null, SimulationClock? clock = null,
-        IPhysicsWorldFactory? factory = null)
+        IPhysicsWorldFactory? factory = null, IAssetLoader? loader = null)
     {
         this.layers = layers;
         this.clock = clock;
         Settings = settings?.Get<PhysicsSettings>() ?? new PhysicsSettings();
+        if (loader is not null)
+        {
+            ObjectReferences.ResolveAsync(Settings, loader).GetAwaiter().GetResult();
+        }
+
         for (var layer = 0; layer < layerMatrix.Length; layer++)
         {
             layerMatrix[layer] = Settings.CollisionMask(layer);
@@ -76,6 +82,9 @@ public sealed partial class PhysicsScene : IFixedTickSystem, IDisposable
 
         return null;
     }
+
+    /// <summary>The registered collider with a backend id, as hits and events report it.</summary>
+    internal ColliderComponent? ColliderOf(ulong physicsId) => collidersById.GetValueOrDefault(physicsId);
 
     /// <summary>Adds an enabled collider to the simulation at the next step.</summary>
     public void Register(ColliderComponent collider)
@@ -125,9 +134,17 @@ public sealed partial class PhysicsScene : IFixedTickSystem, IDisposable
     /// <summary>Rebuilds a collider's body at the next step after one of its properties changed.</summary>
     public void MarkDirty(ColliderComponent collider)
     {
+        ArgumentNullException.ThrowIfNull(collider);
         if (owners.TryGetValue(collider, out var record))
         {
             record.Dirty = true;
+        }
+
+        // A collider gaining or losing its shape, such as a mesh collider's mesh, joins or leaves the bodies.
+        var built = record is not null;
+        if (built != collider.HasShape && collidersById.ContainsKey(collider.PhysicsId))
+        {
+            assignmentDirty = true;
         }
     }
 
@@ -219,6 +236,7 @@ public sealed partial class PhysicsScene : IFixedTickSystem, IDisposable
         bodies.Clear();
         owners.Clear();
         byHandle.Clear();
+        joints.Clear();
     }
 
     double FrameTime() => clock is null ? 0d : clock.ElapsedSeconds + clock.AccumulatorSeconds;

@@ -9,6 +9,7 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
     readonly Dictionary<int, BepuShape> shapes = [];
     readonly Dictionary<int, BepuBody> records = [];
     readonly HashSet<(ulong, ulong)> ignoredPairs = [];
+    readonly int substeps;
     BepuBody?[] byBody = new BepuBody?[64];
     BepuBody?[] byStatic = new BepuBody?[64];
     int nextShape = 1;
@@ -26,8 +27,9 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
         }
 
         Events = new BepuEventSink(this, dispatcher?.ThreadCount ?? 1);
+        substeps = Math.Max(1, settings.Substeps);
         Simulation = Simulation.Create(pool, new BepuNarrowPhaseCallbacks(this), new BepuPoseIntegratorCallbacks(this),
-            new SolveDescription(Math.Max(1, settings.SolverIterations), Math.Max(1, settings.Substeps)));
+            new SolveDescription(Math.Max(1, settings.SolverIterations), substeps));
         Simulation.Deterministic = settings.Deterministic;
         Interlocked.Increment(ref liveCount);
     }
@@ -39,6 +41,12 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
     internal Simulation Simulation { get; }
 
     internal BepuEventSink Events { get; }
+
+    /// <summary>
+    /// The contact spring frequency of the current step: half the substep rate, the stiffest Bepu keeps stable. A
+    /// softer spring lets speculative contacts leak, so fast bodies sink into or pass through what they hit.
+    /// </summary>
+    internal float ContactFrequency { get; private set; } = 120f;
 
     /// <inheritdoc />
     public Vector3 Gravity { get; set; }
@@ -327,6 +335,7 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
             return;
         }
 
+        ContactFrequency = substeps / (2f * deltaTime);
         Events.BeginStep();
         Simulation.Timestep(deltaTime, dispatcher);
         AfterStep();

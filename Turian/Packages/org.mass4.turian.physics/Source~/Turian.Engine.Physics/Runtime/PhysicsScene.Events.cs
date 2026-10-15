@@ -2,16 +2,26 @@ namespace Turian.Engine.Physics;
 
 public sealed partial class PhysicsScene
 {
+    // Enough for debug drawing a busy scene; more would only slow the editor.
+    const int MaxRecordedContacts = 4096;
+
+    readonly List<ContactPoint> lastContacts = [];
+
+    /// <summary>The touching contact points of the last step, seen from the first collider of each pair.</summary>
+    public IReadOnlyList<ContactPoint> LastContacts => lastContacts;
+
     // Callbacks run after the step on the game loop thread; they may change the scene, so events are copied first.
     void DispatchEvents()
     {
         var world = World!;
         var contacts = world.Contacts.ToArray();
         var triggers = world.Triggers.ToArray();
+        lastContacts.Clear();
         foreach (var contact in contacts)
         {
             if (Resolve(contact.ColliderA, contact.ColliderB) is var (a, b))
             {
+                Record(a, b, contact);
                 SendCollision(a, b, contact, 1f);
                 SendCollision(b, a, contact, -1f);
             }
@@ -32,6 +42,15 @@ public sealed partial class PhysicsScene
         collidersById.TryGetValue(a, out var first) && collidersById.TryGetValue(b, out var second)
             ? (first, second)
             : null;
+
+    void Record(ColliderComponent a, ColliderComponent b, in ContactEvent contact)
+    {
+        for (var i = 0; i < contact.PointCount && lastContacts.Count < MaxRecordedContacts; i++)
+        {
+            var point = contact.Points[i];
+            lastContacts.Add(new ContactPoint(point.Point, point.Normal, point.Separation, a, b));
+        }
+    }
 
     void SendCollision(ColliderComponent self, ColliderComponent other, in ContactEvent contact, float sign)
     {

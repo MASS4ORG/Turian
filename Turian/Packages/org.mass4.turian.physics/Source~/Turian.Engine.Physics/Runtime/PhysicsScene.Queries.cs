@@ -120,7 +120,7 @@ public sealed partial class PhysicsScene : IPhysicsQueryBackend
         distance = 0f;
         var (shapeA, poseA) = PlaceCollider(a, positionA, rotationA);
         var (shapeB, poseB) = PlaceCollider(b, positionB, rotationB);
-        if (World is null || !shapeA.IsConvex)
+        if (World is null || !shapeA.IsConvex || !a.HasShape || !b.HasShape)
         {
             return false;
         }
