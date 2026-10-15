@@ -12,7 +12,7 @@ public partial class SceneManager
     {
         var milliseconds = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         loadTimings.Add(root, new SceneLoadTiming(milliseconds));
-        Log.Logger.LogInformation("Loaded scene '{SceneName}' in {Elapsed:F1} ms", root.Name, milliseconds);
+        Log.Logger.LogDebug("Loaded scene '{SceneName}' in {Elapsed:F1} ms", root.Name, milliseconds);
         return root;
     }
 

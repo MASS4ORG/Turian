@@ -252,6 +252,14 @@ public sealed class PackageManifest
             throw new PackageException($"{path}: platform ids cannot be empty.");
         }
 
+        foreach (var (package, version) in Nuget.Concat(PlatformNuget.Values.SelectMany(static extra => extra)))
+        {
+            if (version.Contains('*'))
+            {
+                throw new PackageException($"{path}: NuGet package '{package}' version '{version}' is a floating version; pin an exact version.");
+            }
+        }
+
         foreach (var category in Categories)
         {
             var colon = category.IndexOf(':');

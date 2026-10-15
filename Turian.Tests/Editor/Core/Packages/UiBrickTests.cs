@@ -16,18 +16,19 @@ public sealed class UiBrickTests : IDisposable
     /// <inheritdoc/>
     public void Dispose() => Directory.Delete(project, recursive: true);
 
-    /// <summary>The brick ships the UI and the Guinevere it was built against prebuilt, and the editor's importers apart.</summary>
+    /// <summary>The brick ships its own assembly prebuilt and the editor's importers apart; its packages come from the map.</summary>
     [Fact]
     public void BrickShipsPrebuiltAssemblies()
     {
         var brick = Install(brickId);
 
-        Assert.Equal(["Guinevere.Styling", "Guinevere", "Turian.Engine.UI"],
+        Assert.Equal(["Turian.Engine.UI"],
             BrickAssemblies.RuntimeAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
         Assert.Equal(["Turian.Editor.UI"],
             BrickAssemblies.EditorAssemblies(brick).Select(Path.GetFileNameWithoutExtension));
         Assert.Contains(typeof(UiDocumentComponent).Assembly.GetReferencedAssemblies(), static r => r.Name == "Guinevere");
         Assert.Contains("SkiaSharp", brick.Manifest.Nuget.Keys);
+        Assert.Contains("MASS4.Guinevere", brick.Manifest.Nuget.Keys);
     }
 
     /// <summary>
@@ -70,8 +71,9 @@ public sealed class UiBrickTests : IDisposable
         Install(brickId);
         var references = References(settings);
         Assert.Contains("Turian.Engine.UI", references);
-        Assert.Contains("Guinevere", references);
-        Assert.Contains("SkiaSharp.NativeAssets.Win32", References(settings, "PackageReference"));
+        var packages = References(settings, "PackageReference");
+        Assert.Contains("MASS4.Guinevere", packages);
+        Assert.Contains("SkiaSharp.NativeAssets.Win32", packages);
     }
 
     /// <summary>A game lists the prebuilt assemblies in its type manifest so it registers their types at start.</summary>
@@ -82,8 +84,7 @@ public sealed class UiBrickTests : IDisposable
 
         var manifest = UserCodeTypeManifestGenerator.Generate(Path.Combine(project, "Assets"), NullLogger.Instance);
 
-        Assert.Equal(["Guinevere", "Guinevere.Styling", "Turian.Engine.UI", "Turian.Engine.Vulkan"],
-            manifest.PrecastAssemblies.Order());
+        Assert.Equal(["Turian.Engine.UI", "Turian.Engine.Vulkan"], manifest.PrecastAssemblies.Order());
     }
 
     /// <summary>Loading a brick registers its types once, and the presenter factory is then found without naming the UI.</summary>
