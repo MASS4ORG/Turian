@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Turian.Engine.Physics;
 
 /// <summary>
@@ -190,10 +192,16 @@ public sealed partial class PhysicsScene : IFixedTickSystem, IDisposable
             return;
         }
 
+        var start = Stopwatch.GetTimestamp();
         Synchronize(deltaTime);
+        var step = Stopwatch.GetTimestamp();
         World.Step(deltaTime);
+        stepTicks = Stopwatch.GetTimestamp() - step;
+        contactPairs = TouchingPairs(World.Contacts);
         PullPoses();
         DispatchEvents();
+        simulateTicks = Stopwatch.GetTimestamp() - start;
+        steps++;
     }
 
     /// <inheritdoc />

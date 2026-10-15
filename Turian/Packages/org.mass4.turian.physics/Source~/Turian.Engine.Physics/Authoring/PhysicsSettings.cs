@@ -52,6 +52,32 @@ public sealed class PhysicsSettings : ProjectSettingsAsset
     public uint CollisionMask(int layer) =>
         (uint)layer < (uint)LayerCollisionMatrix.Count ? LayerCollisionMatrix[layer] : uint.MaxValue;
 
+    /// <summary>Whether two physics layers collide at the start of a session.</summary>
+    public bool GetLayerCollision(int layerA, int layerB)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)layerA, 31u, nameof(layerA));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)layerB, 31u, nameof(layerB));
+        return (CollisionMask(layerA) & (1u << layerB)) != 0;
+    }
+
+    /// <summary>Makes two physics layers collide or not at the start of a session, in both directions.</summary>
+    public void SetLayerCollision(int layerA, int layerB, bool collide)
+    {
+        ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)layerA, 31u, nameof(layerA));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)layerB, 31u, nameof(layerB));
+        while (LayerCollisionMatrix.Count < 32)
+        {
+            LayerCollisionMatrix.Add(uint.MaxValue);
+        }
+
+        SetBit(layerA, layerB, collide);
+        SetBit(layerB, layerA, collide);
+    }
+
+    void SetBit(int layer, int other, bool collide) => LayerCollisionMatrix[layer] = collide
+        ? LayerCollisionMatrix[layer] | (1u << other)
+        : LayerCollisionMatrix[layer] & ~(1u << other);
+
     /// <summary>The backend settings these describe.</summary>
     public PhysicsWorldSettings ToWorldSettings() => new()
     {

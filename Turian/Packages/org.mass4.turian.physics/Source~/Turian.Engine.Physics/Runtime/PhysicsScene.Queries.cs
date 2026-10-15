@@ -140,6 +140,30 @@ public sealed partial class PhysicsScene : IPhysicsQueryBackend
         return true;
     }
 
+    /// <summary>The nearest solid collider along a ray that does not belong to <paramref name="ignored"/>.</summary>
+    internal bool RaycastIgnoring(Vector3 origin, Vector3 direction, float maxDistance, RigidbodyComponent ignored,
+        CollisionFilter filter, out RaycastHit hit)
+    {
+        hit = default;
+        if (World is null || !TryDirection(direction, maxDistance, out var unit, out var length))
+        {
+            return false;
+        }
+
+        var collector = new AllHitsCollector();
+        World.CastRay(new RaycastInput(origin, origin + unit * length, filter, false), ref collector);
+        foreach (var candidate in ToHits(collector, length))
+        {
+            if (candidate.Collider.AttachedRigidbody != ignored)
+            {
+                hit = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     IEnumerable<PhysicsHit> IPhysicsQueryBackend.RaycastAll(Ray ray, float maxDistance) =>
         RaycastAll(ray.Origin, ray.Direction, maxDistance).Where(static hit => hit.Node is not null)
             .Select(static hit => new PhysicsHit(hit.Node!, hit.Point, hit.Normal, hit.Distance));
