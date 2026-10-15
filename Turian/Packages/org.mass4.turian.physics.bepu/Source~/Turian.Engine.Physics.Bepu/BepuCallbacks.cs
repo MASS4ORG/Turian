@@ -167,19 +167,23 @@ struct BepuPoseIntegratorCallbacks(BepuPhysicsWorld world) : IPoseIntegratorCall
         Span<float> keepX = stackalloc float[Vector<float>.Count];
         Span<float> keepY = stackalloc float[Vector<float>.Count];
         Span<float> keepZ = stackalloc float[Vector<float>.Count];
+        Span<float> spinX = stackalloc float[Vector<float>.Count];
+        Span<float> spinY = stackalloc float[Vector<float>.Count];
+        Span<float> spinZ = stackalloc float[Vector<float>.Count];
         var handles = world.Simulation.Bodies.ActiveSet.IndexToHandle;
         for (var lane = 0; lane < Vector<float>.Count; lane++)
         {
             var index = bodyIndices[lane];
-            var body = index >= 0 ? world.FindBody(handles[index]) : null;
-            var step = dt[lane];
-            scale[lane] = body?.GravityScale ?? 0f;
-            linear[lane] = MathF.Max(0f, 1f - (body?.LinearDamping ?? 0f) * step);
-            angular[lane] = MathF.Max(0f, 1f - (body?.AngularDamping ?? 0f) * step);
-            var locks = body?.Locks ?? AxisLocks.None;
-            keepX[lane] = (locks & AxisLocks.LinearX) != 0 ? 0f : 1f;
-            keepY[lane] = (locks & AxisLocks.LinearY) != 0 ? 0f : 1f;
-            keepZ[lane] = (locks & AxisLocks.LinearZ) != 0 ? 0f : 1f;
+            var factors = LaneFactors.Of(index >= 0 ? world.FindBody(handles[index]) : null, dt[lane]);
+            scale[lane] = factors.GravityScale;
+            linear[lane] = factors.LinearDamping;
+            angular[lane] = factors.AngularDamping;
+            keepX[lane] = factors.Linear.X;
+            keepY[lane] = factors.Linear.Y;
+            keepZ[lane] = factors.Linear.Z;
+            spinX[lane] = factors.Angular.X;
+            spinY[lane] = factors.Angular.Y;
+            spinZ[lane] = factors.Angular.Z;
         }
 
         var gravityStep = new Vector<float>(scale) * dt;
@@ -188,6 +192,28 @@ struct BepuPoseIntegratorCallbacks(BepuPhysicsWorld world) : IPoseIntegratorCall
         velocity.Linear.X = (velocity.Linear.X + gravity.X * gravityStep) * linearDamping * new Vector<float>(keepX);
         velocity.Linear.Y = (velocity.Linear.Y + gravity.Y * gravityStep) * linearDamping * new Vector<float>(keepY);
         velocity.Linear.Z = (velocity.Linear.Z + gravity.Z * gravityStep) * linearDamping * new Vector<float>(keepZ);
-        velocity.Angular *= angularDamping;
+        // Locked inertia stops forces from turning the body; the velocity a script set is dropped in local space.
+        var local = QuaternionWide.TransformByConjugate(velocity.Angular * angularDamping, orientation);
+        local.X *= new Vector<float>(spinX);
+        local.Y *= new Vector<float>(spinY);
+        local.Z *= new Vector<float>(spinZ);
+        velocity.Angular = QuaternionWide.Transform(local, orientation);
+    }
+
+    /// <summary>One body's integration multipliers: 1 keeps an axis's velocity, 0 drops it.</summary>
+    readonly record struct LaneFactors(float GravityScale, float LinearDamping, float AngularDamping, Vector3 Linear,
+        Vector3 Angular)
+    {
+        public static LaneFactors Of(BepuBody? body, float step) => body is null
+            ? new LaneFactors(0f, 1f, 1f, Vector3.One, Vector3.One)
+            : new LaneFactors(body.GravityScale, MathF.Max(0f, 1f - body.LinearDamping * step),
+                MathF.Max(0f, 1f - body.AngularDamping * step),
+                Keep(body.Locks, AxisLocks.LinearX, AxisLocks.LinearY, AxisLocks.LinearZ),
+                Keep(body.Locks, AxisLocks.AngularX, AxisLocks.AngularY, AxisLocks.AngularZ));
+
+        static Vector3 Keep(AxisLocks locks, AxisLocks x, AxisLocks y, AxisLocks z) =>
+            new(Free(locks, x), Free(locks, y), Free(locks, z));
+
+        static float Free(AxisLocks locks, AxisLocks axis) => (locks & axis) == 0 ? 1f : 0f;
     }
 }

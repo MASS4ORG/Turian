@@ -3,6 +3,7 @@ namespace Turian.Engine.Physics;
 /// <summary>An <see cref="IPhysicsWorld"/> simulated by BepuPhysics v2.</summary>
 public sealed partial class BepuPhysicsWorld : IPhysicsWorld
 {
+    static int liveCount;
     readonly BufferPool pool = new();
     readonly ThreadDispatcher? dispatcher;
     readonly Dictionary<int, BepuShape> shapes = [];
@@ -28,7 +29,11 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
         Simulation = Simulation.Create(pool, new BepuNarrowPhaseCallbacks(this), new BepuPoseIntegratorCallbacks(this),
             new SolveDescription(Math.Max(1, settings.SolverIterations), Math.Max(1, settings.Substeps)));
         Simulation.Deterministic = settings.Deterministic;
+        Interlocked.Increment(ref liveCount);
     }
+
+    /// <summary>The number of worlds created and not yet disposed in this process, for leak checks.</summary>
+    internal static int LiveCount => Volatile.Read(ref liveCount);
 
     /// <summary>The underlying simulation, for advanced use within the Bepu brick.</summary>
     internal Simulation Simulation { get; }
@@ -340,6 +345,7 @@ public sealed partial class BepuPhysicsWorld : IPhysicsWorld
         Simulation.Dispose();
         dispatcher?.Dispose();
         pool.Clear();
+        Interlocked.Decrement(ref liveCount);
     }
 
     internal BepuBody? Find(CollidableReference collidable) => collidable.Mobility == CollidableMobility.Static

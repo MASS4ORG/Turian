@@ -288,7 +288,7 @@ public static class BrickAssemblies
     static void RegisterModules(ResolvedPackage brick)
     {
         var names = RuntimeAssemblies(brick).Select(static path => Path.GetFileNameWithoutExtension(path)).ToHashSet();
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => names.Contains(a.GetName().Name)))
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => a.GetName().Name is { } name && names.Contains(name)))
         {
             PrecastAssemblies.Register(assembly);
         }

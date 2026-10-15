@@ -16,14 +16,10 @@
         <PackageReference Include="BepuPhysics" Version="2.5.0-beta.33"/>
         <PackageReference Include="BepuUtilities" Version="2.5.0-beta.33"/>
     </ItemGroup>
-    <!-- Bepu is pure managed code, so the brick ships it beside its own assembly for the editor to load. -->
+    <!-- The brick ships its assembly prebuilt in Precast~/lib; games and the editor load it from there. Third-party
+         assemblies come from the brick's nuget map through `brick sync-precast`, never from a hand-kept list. -->
     <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
-        <ItemGroup>
-            <PrecastFile Include="$(TargetPath)"/>
-            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'BepuPhysics.dll'"/>
-            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'BepuUtilities.dll'"/>
-        </ItemGroup>
-        <Copy SourceFiles="@(PrecastFile)"
+        <Copy SourceFiles="$(TargetPath)"
               DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.physics.bepu/Precast~/lib"/>
     </Target>
 </Project>
