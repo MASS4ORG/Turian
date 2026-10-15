@@ -118,7 +118,8 @@ public sealed class CharacterControllerTests : IDisposable
     [InlineData(0.5f, false)]
     public void Steps_ClimbOnlyUpToTheOffset(float height, bool climbs)
     {
-        Block("step", new Vector3(0, height / 2f, 3), new Vector3(4, height, 2));
+        // Deeper than the walk, so a character that climbs it is still on top at the end.
+        Block("step", new Vector3(0, height / 2f, 5), new Vector3(4, height, 6));
         var (node, controller) = Character(Vector3.Zero);
         Start();
         Walk(controller, Vector3.Zero, 5);
@@ -208,7 +209,12 @@ public sealed class CharacterControllerTests : IDisposable
         var node = new Node();
         var controller = new CharacterControllerComponent
         {
-            Radius = 0.3f, Height = 1.8f, SlopeLimit = 50f, StepOffset = 0.4f, SkinWidth = 0.03f, MinMoveDistance = 0.01f,
+            Radius = 0.3f,
+            Height = 1.8f,
+            SlopeLimit = 50f,
+            StepOffset = 0.4f,
+            SkinWidth = 0.03f,
+            MinMoveDistance = 0.01f,
             Center = new Vector3(0, 0.9f, 0),
         };
         node.AddComponent(controller);

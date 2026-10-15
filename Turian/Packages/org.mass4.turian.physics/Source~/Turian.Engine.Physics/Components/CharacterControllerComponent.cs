@@ -18,6 +18,7 @@ public class CharacterControllerComponent : ColliderComponent
     ColliderComponent? ground;
     Matrix4x4 groundPose;
     float fallSpeed;
+    float startFeet;
 
     /// <summary>The capsule's radius.</summary>
     public float Radius
@@ -81,6 +82,7 @@ public class CharacterControllerComponent : ColliderComponent
         var wasGrounded = IsGrounded;
         var center = RideGround(node.GlobalTransform.Position + Center);
         center = Depenetrate(world, center);
+        startFeet = center.Y - Height * 0.5f;
         var flags = CollisionFlags.None;
         if (motion.LengthSquared() >= MinMoveDistance * MinMoveDistance)
         {
@@ -256,12 +258,13 @@ public class CharacterControllerComponent : ColliderComponent
     }
 
     // The rounded bottom touching a step's edge reports a tilted normal; a ray just past the edge, towards the step,
-    // finds its walkable top, while on a steep slope it finds the slope again.
+    // finds its walkable top, while on a steep slope it finds the slope again. The step is measured from the feet
+    // before the move, since resting on an edge already raises them and a taller step would otherwise be climbed bit
+    // by bit.
     bool OnStepEdge(IPhysicsWorld world, Vector3 center, in PhysicsQueryHit hit, CollisionFilter filter)
     {
         var outward = (hit.Point - center) with { Y = 0f };
-        var feet = center.Y - Height * 0.5f;
-        if (outward.LengthSquared() < 1e-8f || hit.Point.Y > feet + StepOffset + SkinWidth)
+        if (outward.LengthSquared() < 1e-8f || hit.Point.Y > startFeet + StepOffset + SkinWidth)
         {
             return false;
         }
