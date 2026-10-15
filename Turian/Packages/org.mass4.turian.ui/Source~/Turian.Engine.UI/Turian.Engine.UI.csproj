@@ -30,18 +30,11 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
     </ItemGroup>
 
-    <!-- The brick ships these assemblies prebuilt in Precast~/lib; games and the editor load them from there. -->
+    <!-- The brick ships its assembly prebuilt in Precast~/lib; games and the editor load it from there. Third-party
+         assemblies come from the brick's nuget map through `brick sync-precast`, never from a hand-kept list. -->
     <Target Name="PrecastRuntimeAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
-        <PropertyGroup>
-            <PrecastDirectory>$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Precast~/lib</PrecastDirectory>
-        </PropertyGroup>
-        <!-- Guinevere comes from a checkout or a package, so it is taken from the references, wherever they resolved to. -->
-        <ItemGroup>
-            <PrecastFile Include="$(TargetPath)"/>
-            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'Guinevere.dll'"/>
-            <PrecastFile Include="@(ReferencePath)" Condition="'%(Filename)%(Extension)' == 'Guinevere.Styling.dll'"/>
-        </ItemGroup>
-        <Copy SourceFiles="@(PrecastFile)" DestinationFolder="$(PrecastDirectory)"/>
+        <Copy SourceFiles="$(TargetPath)"
+              DestinationFolder="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Precast~/lib"/>
     </Target>
 
 </Project>

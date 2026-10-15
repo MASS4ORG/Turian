@@ -264,7 +264,7 @@ public sealed partial class AssetImporter : IDisposable
             packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
 
             // A brick's importers live in its prebuilt editor assembly, which may have loaded since the list was built.
-            BrickAssemblies.Load(packages, logger);
+            BrickAssemblies.Load(packages, logger, projectRootPath);
             RefreshImporters();
         }
         catch (Gaya.Packages.PackageException ex)

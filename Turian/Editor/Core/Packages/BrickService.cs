@@ -503,6 +503,7 @@ public static class BrickService
 
             File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
                 JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+            _ = SyncPrecastDependencies(packageRoot, logger);
             return result;
         }
         finally
@@ -512,6 +513,180 @@ public static class BrickService
                 Directory.Delete(scratch, recursive: true);
             }
         }
+    }
+
+    /// <summary>
+    /// Restores a brick's <c>nuget</c> map and copies its managed assemblies flat into <c>Precast~/lib</c>, writing a
+    /// <c>.deps.json</c> beside every other assembly there, so the copies are a generated artifact of the map instead
+    /// of a hand-maintained list. Only managed <c>lib/</c> assemblies are copied; native assets stay out of scope.
+    /// </summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <param name="logger">Receives what was copied.</param>
+    /// <param name="platform">The build platform.</param>
+    /// <param name="sources">Package sources to restore from, as for a private feed; the machine's own when none.</param>
+    /// <returns>What was copied, package by package.</returns>
+    /// <exception cref="PackageException">The brick is invalid, its map conflicts, or the restore fails.</exception>
+    public static IReadOnlyList<BrickRuntimeFile> SyncPrecastDependencies(string packageRoot, ILogger logger,
+        string platform = "desktop", IReadOnlyList<string>? sources = null)
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+        packageRoot = Path.GetFullPath(packageRoot);
+        var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+        var brick = new ResolvedPackage(manifest.Name, manifest, packageRoot, PackageOrigin.File, $"file:{packageRoot}",
+            null, null, 1, false);
+        IReadOnlyDictionary<string, string> unified;
+        try
+        {
+            unified = BrickNuGet.UnifyVersions([brick], platform);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new PackageException(ex.Message, ex);
+        }
+
+        var lib = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, "lib");
+        Directory.CreateDirectory(lib);
+        var previous = ReadSyncedFiles(packageRoot);
+        if (unified.Count == 0)
+        {
+            foreach (var stale in previous)
+            {
+                File.Delete(Path.Combine(lib, stale));
+            }
+
+            WriteSyncedRecord(packageRoot, unified, []);
+            return [];
+        }
+
+        var stub = Path.Combine(Path.GetTempPath(), $"turian-nuget-sync-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(stub);
+            BrickNuGetRestore.WriteStub(stub, unified, sources);
+            BrickNuGetRestore.RunRestore(stub, BrickNuGetRestore.DefaultPackagesFolder(), logger);
+            var copied = CopyPackageAssemblies(BrickNuGetRestore.PackageDirectories(BrickNuGetRestore.DefaultPackagesFolder(), unified), lib, logger);
+
+            foreach (var stale in previous.Where(f => !copied.Any(c => c.FileName == f)))
+            {
+                File.Delete(Path.Combine(lib, stale));
+            }
+
+            WriteSyncedRecord(packageRoot, unified, copied);
+            foreach (var assembly in Directory.EnumerateFiles(lib, "*.dll")
+                         .Where(path => !copied.Any(c => c.FileName == Path.GetFileName(path))))
+            {
+                BrickDepsJson.Write(assembly, copied);
+            }
+
+            return copied;
+        }
+        finally
+        {
+            if (Directory.Exists(stub))
+            {
+                Directory.Delete(stub, recursive: true);
+            }
+        }
+    }
+
+    // Managed assemblies win over older targets; native runtimes/ folders are never copied.
+    static readonly string[] PreferredLibFrameworks =
+        ["net10.0", "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
+
+    static IReadOnlyList<BrickRuntimeFile> CopyPackageAssemblies(IReadOnlyList<string> packageDirectories, string lib,
+        ILogger logger)
+    {
+        var copied = new List<BrickRuntimeFile>();
+        foreach (var package in packageDirectories)
+        {
+            var framework = PreferredLibFrameworks.Select(f => Path.Combine(package, "lib", f)).FirstOrDefault(Directory.Exists);
+            if (framework is null)
+            {
+                throw new PackageException($"Restored package {package} has no managed lib/ assemblies to copy.");
+            }
+
+            var info = ReadNuspecIdentity(package);
+            var assemblies = Directory.EnumerateFiles(framework, "*.dll").Order(StringComparer.Ordinal).ToList();
+            foreach (var assembly in assemblies)
+            {
+                var file = Path.GetFileName(assembly);
+                File.Copy(assembly, Path.Combine(lib, file), overwrite: true);
+                copied.Add(new BrickRuntimeFile(info.Id, info.Version, file));
+            }
+
+            logger.LogInformation("Copied {Count} managed assemblies of {Package} into Precast~/lib", assemblies.Count, info.Id);
+        }
+
+        return copied;
+    }
+
+    static (string Id, string Version) ReadNuspecIdentity(string package)
+    {
+        var nuspec = Directory.EnumerateFiles(package, "*.nuspec").FirstOrDefault();
+        if (nuspec is null)
+        {
+            return (Path.GetFileName(Path.GetDirectoryName(package)) ?? package, string.Empty);
+        }
+
+        try
+        {
+            using var reader = System.Xml.XmlReader.Create(nuspec);
+            string? id = null;
+            string? version = null;
+            while (reader.Read())
+            {
+                if (reader.NodeType != System.Xml.XmlNodeType.Element)
+                {
+                    continue;
+                }
+
+                if (reader.Name == "id")
+                {
+                    id = reader.ReadElementContentAsString();
+                }
+                else if (reader.Name == "version")
+                {
+                    version = reader.ReadElementContentAsString();
+                }
+
+                if (id is not null && version is not null)
+                {
+                    break;
+                }
+            }
+
+            return (id ?? package, version ?? string.Empty);
+        }
+        catch (System.Xml.XmlException)
+        {
+            return (package, string.Empty);
+        }
+    }
+
+    // The files a previous sync copied, so stale ones are deleted when the map changes.
+    static IReadOnlyList<string> ReadSyncedFiles(string packageRoot) =>
+        [.. BrickNuGetRestore.SyncedPackages(packageRoot).Values.SelectMany(static p => p.Files)
+            .Distinct(StringComparer.Ordinal)];
+
+    // Every mapped package is recorded, including one that carries no managed assembly, so a later load can tell
+    // which maps the committed copies already cover.
+    static void WriteSyncedRecord(string packageRoot, IReadOnlyDictionary<string, string> unified,
+        IReadOnlyList<BrickRuntimeFile> copied)
+    {
+        var packages = new JsonObject();
+        foreach (var package in unified.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            packages[package.Key] = new JsonObject
+            {
+                ["version"] = package.Value,
+                ["files"] = new JsonArray([.. copied.Where(c => string.Equals(c.PackageId, package.Key,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(static c => (JsonNode)c.FileName)]),
+            };
+        }
+
+        File.WriteAllText(Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, BrickNuGetRestore.SyncRecordFileName),
+            new JsonObject { ["packages"] = packages }.ToJsonString(PackageJson.Options));
     }
 
     /// <summary>Creates a brick folder <c>&lt;parent&gt;/&lt;id&gt;</c> with a manifest, an assembly definition and a script.</summary>

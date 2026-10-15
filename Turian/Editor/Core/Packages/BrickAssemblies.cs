@@ -15,6 +15,10 @@ public static class BrickAssemblies
     public const string TypesFile = "types.json";
 
     static readonly Lock LoadLock = new();
+    static readonly Lock ProbeLock = new();
+    static readonly HashSet<string> ProbeDirectories = new(StringComparer.Ordinal);
+    static readonly Dictionary<string, AssemblyDependencyResolver> Resolvers = new(StringComparer.Ordinal);
+    static bool ResolvingRegistered;
 
     /// <summary>
     /// Whether the brick has a usable prebuilt payload: assemblies in <c>Precast~</c> that were not compiled against
@@ -42,8 +46,9 @@ public static class BrickAssemblies
     /// </summary>
     /// <param name="bricks">The installed bricks.</param>
     /// <param name="logger">Receives assemblies that cannot be loaded.</param>
+    /// <param name="projectRoot">The project folder; its bricks' NuGet packages are restored and probed when given.</param>
     /// <returns>Whether any assembly was newly loaded.</returns>
-    public static bool Load(IEnumerable<ResolvedPackage> bricks, ILogger logger)
+    public static bool Load(IEnumerable<ResolvedPackage> bricks, ILogger logger, string? projectRoot = null)
     {
         ArgumentNullException.ThrowIfNull(bricks);
         ArgumentNullException.ThrowIfNull(logger);
@@ -53,6 +58,10 @@ public static class BrickAssemblies
         {
             var loaded = AppDomain.CurrentDomain.GetAssemblies().Select(static a => a.GetName().Name).ToHashSet();
             var installed = bricks.Where(static b => !b.Manifest.CompileTimeOnly).ToList();
+            if (projectRoot is not null)
+            {
+                RegisterProbing(installed, BrickNuGetRestore.EnsureRestored(installed, projectRoot, logger));
+            }
             foreach (var path in installed.SelectMany(static b => RuntimeAssemblies(b).Concat(EditorAssemblies(b))))
             {
                 try
@@ -121,6 +130,99 @@ public static class BrickAssemblies
             {
                 TypeRegistry.Register(entry.TypeId, type);
             }
+        }
+    }
+
+    /// <summary>
+    /// Resolves a dependency of a loaded brick assembly: first through each brick's
+    /// <see cref="AssemblyDependencyResolver"/>, which sees its sidecar <c>.deps.json</c>, then by file name in the
+    /// probed brick and restored package folders.
+    /// </summary>
+    /// <param name="name">The requested assembly name.</param>
+    /// <returns>The assembly path, or null when nothing probed holds it.</returns>
+    internal static string? ResolveDependency(AssemblyName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        lock (ProbeLock)
+        {
+            foreach (var resolver in Resolvers.Values)
+            {
+                if (resolver.ResolveAssemblyToPath(name) is { } resolved && File.Exists(resolved))
+                {
+                    return resolved;
+                }
+            }
+
+            foreach (var directory in ProbeDirectories)
+            {
+                if (name.Name is { } simple && Path.Combine(directory, $"{simple}.dll") is { } candidate && File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Remembers where brick dependencies resolve from: each brick's prebuilt folders and resolver, and the
+    /// restored package folders. Later brick loads reuse them; assemblies stay loaded until the editor restarts.
+    /// </summary>
+    /// <param name="bricks">The loaded bricks.</param>
+    /// <param name="packageDirectories">The restored package folders.</param>
+    internal static void RegisterProbing(IReadOnlyList<ResolvedPackage> bricks, IReadOnlyList<string> packageDirectories)
+    {
+        lock (ProbeLock)
+        {
+            if (!ResolvingRegistered)
+            {
+                AssemblyLoadContext.Default.Resolving += (_, args) =>
+                    args.Name is { } name && ResolveDependency(new AssemblyName(name)) is { } path ? LoadFromProbedPath(path) : null;
+                ResolvingRegistered = true;
+            }
+
+            foreach (var brick in bricks)
+            {
+                foreach (var folder in new[] { "lib", "editor" })
+                {
+                    var directory = Path.Combine(brick.RootPath, PrecastFolder, folder);
+                    if (BuiltForThisEngine(brick) && Directory.Exists(directory))
+                    {
+                        _ = ProbeDirectories.Add(directory);
+                    }
+                }
+
+                foreach (var path in RuntimeAssemblies(brick).Concat(EditorAssemblies(brick)))
+                {
+                    Resolvers.TryAdd(path, new AssemblyDependencyResolver(path));
+                }
+            }
+
+            foreach (var package in packageDirectories)
+            {
+                foreach (var folder in new[] { "lib/net10.0", "lib/netstandard2.0", "lib/netstandard2.1" })
+                {
+                    var directory = Path.Combine(package, folder);
+                    if (Directory.Exists(directory))
+                    {
+                        _ = ProbeDirectories.Add(directory);
+                    }
+                }
+            }
+        }
+    }
+
+    static ReflectionAssembly? LoadFromProbedPath(string path)
+    {
+        try
+        {
+            return AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+        }
+        catch (Exception ex) when (ex is IOException or BadImageFormatException or FileLoadException)
+        {
+            return null;
         }
     }
 

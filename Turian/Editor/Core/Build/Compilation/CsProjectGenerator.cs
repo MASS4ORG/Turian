@@ -450,7 +450,8 @@ public static class CsProjectGenerator
             var assemblies = leftOut.SelectMany(BrickAssemblies.RuntimeAssemblies).Select(Path.GetFileNameWithoutExtension);
             // A package the engine itself needs, such as the input enums' windowing abstractions, ships anyway.
             var engine = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var packages = leftOut.SelectMany(static b => b.Manifest.Nuget.Keys)
+            var packages = leftOut.SelectMany(static b => b.Manifest.Nuget.Keys.Concat(
+                    b.Manifest.PlatformNuget.Values.SelectMany(static perPlatform => perPlatform.Keys)))
                 .Where(id => !engine.Contains(id)).Distinct(StringComparer.OrdinalIgnoreCase);
             var conditions = assemblies.Select(static name => $"'%(ReferenceCopyLocalPaths.Filename)' == '{name}'")
                 .Concat(packages.Select(static id => $"'%(ReferenceCopyLocalPaths.NuGetPackageId)' == '{id}'"))
@@ -497,7 +498,7 @@ public static class CsProjectGenerator
         IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping, string platform)
     {
         var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, version) in bricks.SelectMany(b => b.Manifest.NugetFor(platform)).DistinctBy(static p => p.Key))
+        foreach (var (id, version) in BrickNuGet.UnifyVersions(bricks, platform))
         {
             if (!declared.Add(id))
             {

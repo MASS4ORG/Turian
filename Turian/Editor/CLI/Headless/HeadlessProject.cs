@@ -30,7 +30,7 @@ sealed class HeadlessProject : IDisposable
 
         // The bricks' [TypeId] types must be registered before any scene deserialises, or their components
         // fall back to MissingComponent.
-        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), logger);
+        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), logger, settings.ProjectAbsoluteDir);
 
         // --reimport writes the catalog this reads, so the two options combine without sharing an instance.
         Database = new AssetDatabase();

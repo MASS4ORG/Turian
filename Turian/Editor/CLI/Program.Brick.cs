@@ -17,7 +17,7 @@ public static partial class Program
             Description = "Manage the studio's own bricks (~/.gaya/studio/Bricks) instead of a project's",
         };
 
-        return new Command("brick", "Manage a project's or the studio's bricks (packages): add, remove, list, restore, update, embed; author, verify and pack your own")
+        return new Command("brick", "Manage a project's or the studio's bricks (packages): add, remove, list, restore, update, embed; author, verify, sync-precast and pack your own")
         {
             BrickNewCommand(),
             BrickAddCommand(projectOption, studioOption),
@@ -36,6 +36,7 @@ public static partial class Program
             BrickRegistryCommand(projectOption),
             BrickVerifyCommand(),
             BrickPackCommand(),
+            BrickSyncPrecastCommand(),
         };
     }
 
@@ -559,6 +560,25 @@ public static partial class Program
             var packed = BrickService.Pack(path, result.GetValue(outOption)!.FullName, precast);
             Console.WriteLine($"{packed.Path}\n{packed.Integrity}");
         }).ConfigureAwait(false));
+        return command;
+    }
+
+    static Command BrickSyncPrecastCommand()
+    {
+        var pathArg = new Argument<DirectoryInfo>("path")
+        {
+            Description = "Brick folder",
+            DefaultValueFactory = _ => new DirectoryInfo("./"),
+        };
+
+        var command = new Command("sync-precast", "Restore the brick's NuGet map and copy its managed assemblies into Precast~") { pathArg };
+        command.SetAction(result => RunBrick(() =>
+        {
+            foreach (var copied in BrickService.SyncPrecastDependencies(result.GetValue(pathArg)!.FullName, Log.Logger))
+            {
+                Console.WriteLine($"{copied.PackageId} {copied.Version} -> Precast~/lib/{copied.FileName}");
+            }
+        }));
         return command;
     }
 

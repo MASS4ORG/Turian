@@ -9,6 +9,8 @@
     "org.mass4.turian.vulkan": "builtin:org.mass4.turian.vulkan"
   },
   "nuget": {
+    "MASS4.Guinevere": "6.2.0",
+    "MASS4.Guinevere.Styling": "6.2.0",
     "SkiaSharp": "4.153.1",
     "SkiaSharp.NativeAssets.Linux": "4.153.1",
     "SkiaSharp.NativeAssets.macOS": "4.153.1",

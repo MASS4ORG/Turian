@@ -88,7 +88,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         // The catalog names asset types by full name, and some of those live in bricks' prebuilt assemblies.
         try
         {
-            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log);
+            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
         }
         catch (Gaya.Packages.PackageException ex)
         {
@@ -165,7 +165,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         }
 
         ProjectPackages.Invalidate(Settings.ProjectAbsoluteDir);
-        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log);
+        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
         services.GetRequiredService<AssetImporter>().StartMonitoring();
         _ = RecompileScripts();
     }
