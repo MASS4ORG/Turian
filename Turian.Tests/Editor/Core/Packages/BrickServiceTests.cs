@@ -21,6 +21,20 @@ public sealed class BrickServiceTests : IDisposable
 
     static bool IsDeclared(ResolvedPackage package) => !ProjectPackages.DefaultDependencies.ContainsKey(package.Id);
 
+    /// <summary>The registry's camera and OBJ bricks ship stable asset identities and can be packed.</summary>
+    [Theory]
+    [InlineData("org.mass4.turian.cameras")]
+    [InlineData("org.mass4.turian.obj")]
+    public void RegistryBricksCanBePacked(string id)
+    {
+        var folder = Path.Combine(ProjectPackages.BuiltinDirectory, id);
+
+        Assert.Empty(BrickVerifier.Verify(folder));
+        var packed = BrickService.Pack(folder, Path.Combine(root, "out"));
+
+        Assert.True(File.Exists(packed.Path));
+    }
+
     /// <summary>A new brick passes verification and names its assembly after the id.</summary>
     [Fact]
     public void NewBrickIsSound()
