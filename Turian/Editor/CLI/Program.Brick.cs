@@ -32,6 +32,7 @@ public static partial class Program
             BrickStubCommand(),
             BrickLoginCommand(),
             BrickPublishCommand(),
+            BrickUploadCommand(),
             BrickReleasesCommand(),
             BrickYankCommand(),
             BrickDeprecateCommand(),

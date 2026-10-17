@@ -117,7 +117,55 @@ public sealed class StoreClient
             ["sourceRevision"] = sourceRevision,
             ["isPrivate"] = isPrivate,
         };
+        return await UploadAsync(brickFile, release, id, version, cancellationToken).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Uploads a <c>.brick</c> file with release metadata signed elsewhere, such as on the publisher's workstation, so
+    /// the private keys never reach this machine. The metadata is sent as it is, once its id, version and hash are
+    /// checked against the archive.
+    /// </summary>
+    /// <param name="brickFile">The packed brick that was signed.</param>
+    /// <param name="releaseFile">The signed release JSON: <c>packageId</c>, <c>version</c>, <c>integrity</c>, signatures and provenance.</param>
+    /// <param name="reservedCategoryPrefixes">Category prefixes the manifest may use without depending on them.</param>
+    /// <param name="cancellationToken">Cancels the upload.</param>
+    /// <returns>The release; check <see cref="StoreRelease.Approved"/> before telling consumers it is available.</returns>
+    /// <exception cref="PackageException">The metadata does not describe the archive, or the store refused the release.</exception>
+    public async Task<StoreRelease> PublishSignedAsync(string brickFile, string releaseFile,
+        IReadOnlyCollection<string>? reservedCategoryPrefixes = null, CancellationToken cancellationToken = default)
+    {
+        var manifest = BrickArchive.ReadManifest(brickFile, reservedCategoryPrefixes);
+        var (id, version) = (manifest.Name, manifest.Version!.ToString());
+        JsonObject release;
+        try
+        {
+            release = JsonNode.Parse(await File.ReadAllTextAsync(releaseFile, cancellationToken).ConfigureAwait(false)) as JsonObject
+                ?? throw new PackageException($"{releaseFile} is not a release object.");
+        }
+        catch (JsonException ex)
+        {
+            throw new PackageException($"{releaseFile} is not valid JSON: {ex.Message}", ex);
+        }
+
+        var expected = (id, version, BrickArchive.ComputeIntegrity(brickFile));
+        var signedFor = ((string?)release["packageId"], (string?)release["version"], (string?)release["integrity"]);
+        if (signedFor != expected)
+        {
+            throw new PackageException(
+                $"{releaseFile} is signed for {signedFor.Item1} {signedFor.Item2} ({signedFor.Item3}), not this archive, {id} {version} ({expected.Item3}).");
+        }
+
+        if (release["signature"] is null || release["signedBy"] is null)
+        {
+            throw new PackageException($"{releaseFile} carries no registry signature; sign the release before uploading it.");
+        }
+
+        return await UploadAsync(brickFile, release, id, version, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<StoreRelease> UploadAsync(string brickFile, JsonObject release, string id, string version,
+        CancellationToken cancellationToken)
+    {
         await using var archive = File.OpenRead(brickFile);
         using var form = new MultipartFormDataContent
         {
@@ -253,7 +301,8 @@ public sealed class StoreClient
         return status switch
         {
             HttpStatusCode.Unauthorized => "the access token is missing, expired or revoked.",
-            HttpStatusCode.Forbidden => "the access token does not allow this.",
+            HttpStatusCode.Forbidden =>
+                "the access token does not allow this; publishing and changing releases need the registry.publish scope for the brick's prefix.",
             HttpStatusCode.NotFound => "it is not there, or the access token may not see it.",
             _ => $"{(int)status} {status}.",
         };

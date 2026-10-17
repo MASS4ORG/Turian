@@ -141,6 +141,40 @@ public static partial class Program
         return command;
     }
 
+    static Command BrickUploadCommand()
+    {
+        var storeArg = StoreArgument();
+        var fileArg = new Argument<FileInfo>("file") { Description = "The packed .brick that was signed" };
+        var releaseOption = new Option<FileInfo>("--release")
+        {
+            Description = "The signed release JSON made with it on the signing workstation",
+            Required = true,
+        };
+
+        var command = new Command("upload", "Upload a brick signed elsewhere, with its signed release JSON, to an asset store; no key is needed here")
+        {
+            storeArg, fileArg, releaseOption,
+        };
+        command.SetAction(async (result, cancellationToken) => await RunBrickAsync(async () =>
+        {
+            var store = new StoreClient(result.GetValue(storeArg)!);
+            var release = await store.PublishSignedAsync(result.GetValue(fileArg)!.FullName, result.GetValue(releaseOption)!.FullName,
+                ["gaya", ProjectPackages.HostName], cancellationToken).ConfigureAwait(false);
+            ReportPublished(store, release);
+        }).ConfigureAwait(false));
+        return command;
+    }
+
+    /// <summary>Tells whether a release the store received is offered to consumers yet.</summary>
+    static void ReportPublished(StoreClient store, StoreRelease release)
+    {
+        Console.WriteLine($"Published {release.PackageId} {release.Version} to {store.Origin.Host}{ReleaseState(release)}");
+        if (!release.Approved)
+        {
+            Console.WriteLine("It waits for the store's approval and is not offered to consumers until then.");
+        }
+    }
+
     /// <summary>Uploads a brick to a store and reports whether consumers can see it yet.</summary>
     static async Task PublishToStoreAsync(string path, string address, string key, string? publisherKey, bool isPrivate,
         PackagePrecast? precast, CancellationToken cancellationToken)
@@ -148,11 +182,7 @@ public static partial class Program
         var store = new StoreClient(address);
         var release = await BrickStorePublishing.PublishAsync(path, store, key, publisherKey, isPrivate,
             precast: precast, cancellationToken: cancellationToken).ConfigureAwait(false);
-        Console.WriteLine($"Published {release.PackageId} {release.Version} to {store.Origin.Host}{ReleaseState(release)}");
-        if (!release.Approved)
-        {
-            Console.WriteLine("It waits for the store's approval and is not offered to consumers until then.");
-        }
+        ReportPublished(store, release);
     }
 
     /// <summary>Yanks a version on a store, or puts it back.</summary>

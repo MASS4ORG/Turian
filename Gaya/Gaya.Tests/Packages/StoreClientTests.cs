@@ -122,6 +122,54 @@ public sealed class StoreClientTests : IDisposable
         Assert.Contains("name=archive", body, StringComparison.Ordinal);
     }
 
+    /// <summary>Metadata signed elsewhere is uploaded as it is, once it is checked to describe the archive.</summary>
+    [Fact]
+    public async Task PresignedReleasesAreUploadedAsTheyAre()
+    {
+        var brick = Brick("org.mass4.demo", "1.2.0");
+        var integrity = BrickArchive.ComputeIntegrity(brick);
+        var releaseFile = Path.Combine(root, "release.json");
+        File.WriteAllText(releaseFile, $$"""
+            { "packageId": "org.mass4.demo", "version": "1.2.0", "integrity": "{{integrity}}",
+              "signature": "sig", "signedBy": "SHA256:abc", "sourceRevision": "workstation-1" }
+            """);
+        var handler = new StoreHandler();
+        handler.Routes["/api/v1/publish"] = """{ "id": "6f9619ff-8b86-d011-b42d-00cf4fc964ff", "packageId": "org.mass4.demo", "version": "1.2.0", "approved": true }""";
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+
+        var release = await store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(release.Approved);
+        var body = Assert.Single(handler.Requests).Body.Replace(" ", "", StringComparison.Ordinal);
+        Assert.Contains("\"signature\":\"sig\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"sourceRevision\":\"workstation-1\"", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>Metadata for another archive, unsigned metadata or a file that is not JSON is refused before any upload.</summary>
+    [Fact]
+    public async Task MismatchedPresignedReleasesAreRefused()
+    {
+        var brick = Brick("org.mass4.demo", "1.2.0");
+        var integrity = BrickArchive.ComputeIntegrity(brick);
+        var handler = new StoreHandler();
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+        var releaseFile = Path.Combine(root, "release.json");
+
+        File.WriteAllText(releaseFile, """{ "packageId": "org.mass4.demo", "version": "1.2.0", "integrity": "sha256-other", "signature": "s", "signedBy": "k" }""");
+        var other = await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("not this archive", other.Message, StringComparison.Ordinal);
+
+        File.WriteAllText(releaseFile, $$"""{ "packageId": "org.mass4.demo", "version": "1.2.0", "integrity": "{{integrity}}" }""");
+        var unsigned = await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("no registry signature", unsigned.Message, StringComparison.Ordinal);
+
+        File.WriteAllText(releaseFile, "{ not json");
+        await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        File.WriteAllText(releaseFile, "[]");
+        await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(handler.Requests);
+    }
+
     /// <summary>A release's state is changed by its id and version in one request; an unknown version is explained.</summary>
     [Fact]
     public async Task ReleasesAreYankedByIdAndVersion()
