@@ -140,6 +140,56 @@ public sealed class PackageResolverTests : IDisposable
             Resolver(builtinDirectory: Path.Combine(root, "host")).ResolveAsync(project, TestContext.Current.CancellationToken));
     }
 
+    /// <summary>A host's default package is installed without being declared, unless the project declares it or opts out with null.</summary>
+    [Fact]
+    public async Task HostDefaultsApplyUnlessTheProjectDecides()
+    {
+        Package(Path.Combine("host", "com.acme.renderer"), "com.acme.renderer", "1.0.0");
+        var resolver = new PackageResolver(store, new PackageResolverOptions
+        {
+            BuiltinDirectory = Path.Combine(root, "host"),
+            DefaultDependencies = new Dictionary<string, string> { ["com.acme.renderer"] = "builtin:com.acme.renderer" },
+        });
+        Manifest();
+
+        var defaulted = Assert.Single((await resolver.ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
+        Assert.Equal(("com.acme.renderer", PackageOrigin.Builtin), (defaulted.Id, defaulted.Origin));
+
+        new ProjectManifest { Dependencies = { ["com.acme.renderer"] = null } }.Save(project);
+        Assert.Empty((await resolver.ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
+    }
+
+    /// <summary>One package is fetched from a folder, a packed file or the built-ins, and must be the package asked for.</summary>
+    [Fact]
+    public async Task SinglePackagesAreFetchedFromEachSource()
+    {
+        var folder = Package("rules", "com.acme.rules", "1.0.0");
+        var builtin = Package(Path.Combine("host", "com.acme.rules"), "com.acme.rules", "1.0.0");
+        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed"), []);
+        var resolver = Resolver(builtinDirectory: Path.Combine(root, "host"));
+        var token = TestContext.Current.CancellationToken;
+
+        Assert.Equal(folder, (await resolver.FetchAsync("com.acme.rules", new FileSource(folder), token)).Folder);
+        Assert.Equal(packed.Integrity, (await resolver.FetchAsync("com.acme.rules", new ArchiveSource(packed.Path), token)).Integrity);
+        Assert.Equal(builtin, (await resolver.FetchAsync("com.acme.rules", new BuiltinSource("com.acme.rules"), token)).Folder);
+        await Assert.ThrowsAsync<PackageException>(() => resolver.FetchAsync("com.acme.other", new FileSource(folder), token));
+        await Assert.ThrowsAsync<PackageException>(() => resolver.FetchAsync("com.acme.rules", new FileSource(Path.Combine(root, "gone")), token));
+    }
+
+    /// <summary>A leftover built-in folder without a manifest, such as build output from another branch, is not a brick.</summary>
+    [Fact]
+    public async Task BuiltinFoldersWithoutAManifestAreNotBuiltins()
+    {
+        Directory.CreateDirectory(Path.Combine(root, "host", "com.acme.physics", "Precast~", "lib"));
+        Manifest(("com.acme.physics", "builtin:com.acme.physics"));
+
+        var missing = await Assert.ThrowsAsync<PackageException>(() =>
+            Resolver(builtinDirectory: Path.Combine(root, "host")).ResolveAsync(project, TestContext.Current.CancellationToken));
+
+        Assert.Contains("not a built-in package", missing.Message, StringComparison.Ordinal);
+        Assert.Contains(PackageManifest.FileName, missing.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>The user override remaps a package for one machine and marks the resolution as local.</summary>
     [Fact]
     public async Task UserOverridesRemapPackages()

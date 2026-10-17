@@ -265,6 +265,68 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(static b => b.Label));
     }
 
+    /// <summary>A registry saved with only its address takes its name, scopes and keys from the registry itself.</summary>
+    [Fact]
+    public async Task RegistriesSavedWithOnlyAnAddressAreCompleted()
+    {
+        const string key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETjciFivC4Q7z6o7KhiydqNS1Z5D6+ZZFbGUxQgL7ur test";
+        var location = Path.Combine(root, "studio-store");
+        Directory.CreateDirectory(location);
+        File.WriteAllText(Path.Combine(location, "index.json"), """{ "format": 1, "bricks": {}, "claims": { "com.studio": { "key": "k" } } }""");
+        File.WriteAllText(Path.Combine(location, "keys"), $$"""{ "keys": [ { "id": "k", "publicKey": "{{key}}" } ] }""");
+        controller.Refresh();
+
+        Assert.True(await controller.SaveRegistryAsync(null, new ScopedRegistry { Url = location }));
+
+        var saved = controller.Registries.Single(static r => r.Name == "studio-store");
+        Assert.Equal(location, saved.Url);
+        Assert.Equal(["com.studio"], saved.Scopes);
+        Assert.Equal([key], saved.Keys);
+        Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Url = Path.Combine(root, "nowhere") }));
+    }
+
+    /// <summary>A new registry's form asks for the address first, since it is the only field needed.</summary>
+    [Fact]
+    public void NewRegistryFormsStartWithTheAddress()
+    {
+        controller.Refresh();
+        controller.Tab = BricksTab.Registries;
+        controller.SelectedRegistry = string.Empty;
+
+        var fields = Assert.Single(Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections).Fields;
+
+        Assert.Equal(["Url", "Name"], fields.Take(2).Select(static f => f.Name));
+    }
+
+    /// <summary>
+    /// An address typed as the name beside a name typed as the address is swapped, and the catalog then lists the
+    /// registry's bricks without a manual refresh; two addresses, or no address, are refused.
+    /// </summary>
+    [Fact]
+    public async Task AddressesTypedAsTheNameAreUnderstood()
+    {
+        var location = Path.Combine(root, "named-store");
+        Directory.CreateDirectory(location);
+        File.WriteAllText(Path.Combine(location, "index.json"), """
+            { "format": 1, "claims": { "com.named": { "key": "k" } },
+              "bricks": { "com.named.rules": { "versions": { "1.2.0": { "url": "x.brick", "integrity": "sha256-x" } } },
+                          "com.other.rules": { "versions": { "1.0.0": { "url": "y.brick", "integrity": "sha256-y" } } } } }
+            """);
+        controller.Refresh();
+
+        Assert.True(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = location, Url = "local", AllowUnsigned = true }));
+
+        var saved = controller.Registries.Single(static r => r.Name == "local");
+        Assert.Equal((location, "com.named"), (saved.Url, Assert.Single(saved.Scopes)));
+        Assert.Contains(controller.Catalog, static b => b.Id == "com.named.rules" && b.LatestVersion == "1.2.0");
+        Assert.DoesNotContain(controller.Catalog, static b => b.Id == "com.other.rules");
+
+        Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = "http://store.example:5080", Url = location }));
+        Assert.Contains("put it under Url", controller.Error, StringComparison.Ordinal);
+        Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = "just a name" }));
+        Assert.Contains("Enter the registry's address", controller.Error, StringComparison.Ordinal);
+    }
+
     /// <summary>A registry is added, renamed and removed through the view the inspector shows.</summary>
     [Fact]
     public async Task RegistriesAreSavedAndRemoved()

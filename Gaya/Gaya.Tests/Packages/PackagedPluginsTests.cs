@@ -43,6 +43,23 @@ public sealed class PackagedPluginsTests : IDisposable
         Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
     }
 
+    /// <summary>A built-in studio brick loads from the host's built-in folder the workspace is given.</summary>
+    [Fact]
+    public void BuiltinStudioBricksLoadFromTheWorkspaceBuiltins()
+    {
+        var builtins = Path.Combine(root, "builtins");
+        var assemblyName = $"Acme.Look{Guid.NewGuid():N}";
+        Package(Path.Combine("builtins", "com.acme.look"), "com.acme.look", [PackageScope.Studio], assemblyName);
+        Manifest(("com.acme.look", "builtin:com.acme.look"));
+        var workspace = new StudioBricks(studio, Hosts, new PackageStore(Path.Combine(root, "store")),
+            builtinDirectory: builtins);
+
+        var loaded = PackagedPlugins.Load(workspace, NullLogger.Instance);
+
+        Assert.Equal("com.acme.look", Assert.Single(loaded.Packages).Id);
+        Assert.Equal(assemblyName, Assert.Single(loaded.Assemblies).GetName().Name);
+    }
+
     /// <summary>Without a studio manifest nothing is loaded.</summary>
     [Fact]
     public void NoManifestLoadsNothing() => Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);

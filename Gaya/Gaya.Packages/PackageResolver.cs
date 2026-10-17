@@ -117,7 +117,7 @@ public sealed record PackageResolverOptions
 /// </summary>
 /// <param name="store">Where git packages are fetched into.</param>
 /// <param name="options">Resolution choices.</param>
-public sealed class PackageResolver(PackageStore store, PackageResolverOptions? options = null)
+public sealed partial class PackageResolver(PackageStore store, PackageResolverOptions? options = null)
 {
     readonly PackageResolverOptions options = options ?? new PackageResolverOptions();
 
@@ -129,7 +129,6 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
     public async Task<PackageResolution> ResolveAsync(string projectRoot, CancellationToken cancellationToken = default)
     {
         projectRoot = Path.GetFullPath(projectRoot);
-        var packagesDirectory = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
         var (manifest, overridden) = ProjectManifest.Load(projectRoot, includeUserOverride: !options.Locked);
         var existingLock = LockFile.Load(projectRoot);
         if (options.Locked && existingLock is null)
@@ -137,106 +136,19 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
             throw new PackageException($"{projectRoot} has no {LockFile.FileName} to install from.");
         }
 
-        var resolved = new Dictionary<string, ResolvedPackage>(StringComparer.Ordinal);
-        var constraints = new List<(string Id, VersionRange Range, string RequiredBy, int Depth)>();
-        var registries = new List<ScopedRegistry>([.. manifest.ScopedRegistries, .. options.Registries]);
-        var queue = new Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)>();
+        var session = new Session(this, overridden, existingLock, [.. manifest.ScopedRegistries, .. options.Registries],
+            cancellationToken);
+        Seed(session, Path.Combine(projectRoot, ProjectManifest.DirectoryName), manifest, overridden);
+        await session.DrainAsync().ConfigureAwait(false);
 
-        foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
+        // What nothing declared a source for comes from a registry scoped to its name, until no new brick appears.
+        while (await session.ResolveFromRegistriesAsync().ConfigureAwait(false))
         {
-            queue.Enqueue((embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1));
+            await session.DrainAsync().ConfigureAwait(false);
         }
 
-        foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
-                     .OrderBy(static d => d.Key, StringComparer.Ordinal))
-        {
-            queue.Enqueue((id, PackageSource.Parse(spec!, packagesDirectory), spec!, "the project", 1));
-        }
-
-        foreach (var (id, spec) in options.DefaultDependencies
-                     .Where(d => !manifest.Dependencies.ContainsKey(d.Key) && !overridden.Contains(d.Key))
-                     .OrderBy(static d => d.Key, StringComparer.Ordinal))
-        {
-            queue.Enqueue((id, PackageSource.Parse(spec, packagesDirectory), spec, "the host's defaults", 1));
-        }
-
-        async Task DrainAsync()
-        {
-            while (queue.TryDequeue(out var next))
-            {
-                if (next.Source is RangeSource range)
-                {
-                    constraints.Add((next.Id, range.Range, next.RequiredBy, next.Depth));
-                    continue;
-                }
-
-                if (resolved.ContainsKey(next.Id))
-                {
-                    continue;
-                }
-
-                var package = await MaterializeAsync(next.Id, next.Source, next.Spec, next.Depth,
-                    overridden.Contains(next.Id), existingLock, cancellationToken).ConfigureAwait(false);
-                AddPackage(package);
-            }
-        }
-
-        void AddPackage(ResolvedPackage package)
-        {
-            resolved[package.Id] = package;
-            foreach (var (id, spec) in package.Manifest.Dependencies.OrderBy(static d => d.Key, StringComparer.Ordinal))
-            {
-                queue.Enqueue((id, PackageSource.Parse(spec, package.RootPath), spec, package.Id, package.Depth + 1));
-            }
-        }
-
-        await DrainAsync().ConfigureAwait(false);
-
-        // What nothing declared a source for comes from the registry scoped to its name, until no new brick appears.
-        var clients = new Dictionary<string, RegistryClient>(StringComparer.Ordinal);
-        while (true)
-        {
-            var progressed = false;
-            foreach (var group in constraints.Where(c => !resolved.ContainsKey(c.Id)).GroupBy(static c => c.Id).ToList())
-            {
-                if (registries.FirstOrDefault(r => r.Serves(group.Key)) is not { } registry)
-                {
-                    continue;
-                }
-
-                if (!clients.TryGetValue(registry.Name, out var client))
-                {
-                    clients[registry.Name] = client = new RegistryClient(registry, options.Http);
-                }
-
-                AddPackage(await MaterializeFromRegistryAsync(client, group.Key, [.. group], existingLock, cancellationToken).ConfigureAwait(false));
-                progressed = true;
-            }
-
-            if (!progressed)
-            {
-                break;
-            }
-
-            await DrainAsync().ConfigureAwait(false);
-        }
-
-        foreach (var (id, range, requiredBy, _) in constraints)
-        {
-            if (!resolved.TryGetValue(id, out var package))
-            {
-                throw new PackageException(
-                    $"{requiredBy} requires {id} {range}, which nothing provides; add it to {ProjectManifest.DirectoryName}/{ProjectManifest.FileName}.");
-            }
-
-            if (!range.IsSatisfiedBy(package.Version))
-            {
-                throw new PackageException(
-                    $"{requiredBy} requires {id} {range}, but {package.Version} is installed (from {package.Source}).");
-            }
-        }
-
-        var ordered = DependencyOrder(resolved);
+        session.CheckConstraints();
+        var ordered = DependencyOrder(session.Resolved);
         var lockFile = ToLock(ordered);
         if (options.Locked && existingLock!.Serialize() != lockFile.Serialize())
         {
@@ -247,100 +159,26 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         return new PackageResolution(ordered, lockFile);
     }
 
-    async Task<ResolvedPackage> MaterializeFromRegistryAsync(RegistryClient client, string id,
-        IReadOnlyList<(string Id, VersionRange Range, string RequiredBy, int Depth)> asked, LockFile? existingLock,
-        CancellationToken cancellationToken)
+    /// <summary>Queues what the project asks for itself: its embedded packages, its declarations, then the host's defaults.</summary>
+    void Seed(Session session, string packagesDirectory, ProjectManifest manifest, IReadOnlySet<string> overridden)
     {
-        var registry = client.Registry;
-        var ranges = asked.Select(static a => a.Range).ToList();
-        var depth = asked.Min(static a => a.Depth);
-        var locked = existingLock?.Dependencies.GetValueOrDefault(id);
-        var keepLocked = locked is { Version: not null, Integrity: not null } && locked.Source == $"registry:{registry.Name}"
-                         && ranges.All(range => range.IsSatisfiedBy(locked.Version!))
-                         && (options.Locked || options.Update is { } update && !update.Contains(id));
-
-        if (keepLocked)
+        foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
         {
-            var stored = store.PackagePath(id, store.ArchiveFolderName(locked!.Integrity!));
-            if (Directory.Exists(stored))
-            {
-                return Finish(id, stored, locked.Integrity!, locked.SignedBy, registry, depth);
-            }
+            session.Enqueue(embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1);
         }
 
-        var index = await client.GetIndexAsync(cancellationToken).ConfigureAwait(false);
-        if (!index.Bricks.TryGetValue(id, out var brick))
+        foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
+                     .OrderBy(static d => d.Key, StringComparer.Ordinal))
         {
-            throw new PackageException($"{asked[0].RequiredBy} requires {id}, which {registry.Name} does not serve.");
+            session.Enqueue(id, PackageSource.Parse(spec!, packagesDirectory), spec!, "the project", 1);
         }
 
-        var (version, entry) = keepLocked
-            ? PickLocked(brick, id, locked!.Version!)
-            : PickNewest(brick, id, ranges, asked[0].RequiredBy);
-
-        var signer = RegistryTrust.Verify(registry, id, version, entry);
-        if (keepLocked && locked!.SignedBy is { } pinned && signer != pinned)
+        foreach (var (id, spec) in options.DefaultDependencies
+                     .Where(d => !manifest.Dependencies.ContainsKey(d.Key) && !overridden.Contains(d.Key))
+                     .OrderBy(static d => d.Key, StringComparer.Ordinal))
         {
-            throw new PackageException($"{id} {version} is now signed by a different key than {LockFile.FileName} records.");
+            session.Enqueue(id, PackageSource.Parse(spec, packagesDirectory), spec, "the host's defaults", 1);
         }
-
-        var downloads = Path.Combine(store.Root, ".downloads");
-        var file = await client.DownloadAsync(id, version, entry, downloads, cancellationToken).ConfigureAwait(false);
-        try
-        {
-            var (folder, integrity) = store.ExtractArchive(file, options.ReservedCategoryPrefixes);
-            store.RecordOrigin(folder, $"registry:{registry.Name}");
-            return Finish(id, folder, integrity, signer, registry, depth);
-        }
-        finally
-        {
-            File.Delete(file);
-        }
-    }
-
-    ResolvedPackage Finish(string id, string folder, string integrity, string? signer, ScopedRegistry registry, int depth)
-    {
-        var manifest = PackageManifest.Load(folder, options.ReservedCategoryPrefixes);
-        if (manifest.Name != id)
-        {
-            throw new PackageException($"{registry.Name} served '{manifest.Name}' as {id}.");
-        }
-
-        if (!manifest.EffectiveScopes.Contains(options.Scope))
-        {
-            throw new PackageException($"{id} cannot be installed with scope {options.Scope}; its scopes are {string.Join(", ", manifest.EffectiveScopes)}.");
-        }
-
-        CheckEngines(manifest);
-
-        return new ResolvedPackage(id, manifest, folder, PackageOrigin.Registry, $"registry:{registry.Name}", null, integrity, depth, false, signer);
-    }
-
-    static (string Version, RegistryVersion Entry) PickLocked(RegistryBrick brick, string id, SemanticVersion version) =>
-        brick.Versions.FirstOrDefault(v => SemanticVersion.TryParse(v.Key, out var parsed) && parsed == version) is { Key: not null } found
-            ? (found.Key, found.Value)
-            : throw new PackageException($"{id} {version} is no longer in the registry.");
-
-    (string Version, RegistryVersion Entry) PickNewest(RegistryBrick brick, string id, List<VersionRange> ranges, string requiredBy)
-    {
-        var candidates = brick.Versions
-            .Where(v => !v.Value.Yanked && SemanticVersion.TryParse(v.Key, out _))
-            .Select(v => (Text: v.Key, Version: SemanticVersion.Parse(v.Key), Entry: v.Value))
-            .Where(c => ranges.All(range => range.IsSatisfiedBy(c.Version)) && RunsOnThisHost(c.Entry))
-            .ToList();
-
-        // A release beats a prerelease, which is taken only when nothing else fits.
-        var best = candidates.Where(static c => !c.Version.IsPrerelease).OrderByDescending(static c => c.Version).Cast<(string, SemanticVersion, RegistryVersion)?>().FirstOrDefault()
-                   ?? candidates.OrderByDescending(static c => c.Version).Cast<(string, SemanticVersion, RegistryVersion)?>().FirstOrDefault();
-        return best is { } chosen
-            ? (chosen.Item1, chosen.Item3)
-            : throw new PackageException($"{requiredBy} requires {id} {string.Join(" and ", ranges)}, but the registry has no matching version that runs here (it has {string.Join(", ", brick.Versions.Keys)}).");
-    }
-
-    bool RunsOnThisHost(RegistryVersion entry)
-    {
-        var known = entry.Engines.Where(e => options.Hosts.ContainsKey(e.Key)).ToList();
-        return entry.Engines.Count == 0 || (known.Count > 0 && known.All(e => e.Value.IsSatisfiedBy(options.Hosts[e.Key])));
     }
 
     /// <summary>
@@ -355,123 +193,52 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
     public async Task<FetchedPackage> FetchAsync(string id, PackageSource source, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
-
-        FetchedPackage fetched;
-        switch (source)
-        {
-            case FileSource file when Directory.Exists(file.Path):
-                fetched = new FetchedPackage(file.Path, null, null);
-                break;
-            case ArchiveSource archive when File.Exists(archive.Path):
-                var (folder, hash) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
-                fetched = new FetchedPackage(folder, null, hash);
-                break;
-            case BuiltinSource when options.BuiltinDirectory is { } builtins && Directory.Exists(Path.Combine(builtins, id)):
-                fetched = new FetchedPackage(Path.Combine(builtins, id), null, null);
-                break;
-            case GitSource git:
-                var commit = await store.ResolveCommitAsync(git, cancellationToken).ConfigureAwait(false);
-                var root = store.PackagePath(id, commit);
-                if (!Directory.Exists(root))
-                {
-                    root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
-                }
-
-                fetched = new FetchedPackage(root, commit, PackageStore.ComputeIntegrity(root));
-                break;
-            default:
-                throw new PackageException($"{id}: {source} cannot be found.");
-        }
+        var fetched = source is GitSource git
+            ? await FetchGitAsync(id, git, cancellationToken).ConfigureAwait(false)
+            : FetchLocal(id, source);
 
         var manifest = PackageManifest.Load(fetched.Folder, options.ReservedCategoryPrefixes);
         return manifest.Name == id ? fetched : throw new PackageException($"{source} holds package '{manifest.Name}', not '{id}'.");
     }
 
-    async Task<ResolvedPackage> MaterializeAsync(string id, PackageSource source, string spec, int depth,
-        bool isOverridden, LockFile? existingLock, CancellationToken cancellationToken)
+    FetchedPackage FetchLocal(string id, PackageSource source)
     {
-        string root;
-        PackageOrigin origin;
-        string? commit = null, integrity = null;
-
         switch (source)
         {
-            case FileSource file:
-                if (!Directory.Exists(file.Path))
-                {
-                    throw new PackageException($"{id}: folder {file.Path} does not exist.");
-                }
-
-                root = file.Path;
-                origin = spec == "embedded" ? PackageOrigin.Embedded : PackageOrigin.File;
-                break;
-
-            case ArchiveSource archive:
-                if (!File.Exists(archive.Path))
-                {
-                    throw new PackageException($"{id}: file {archive.Path} does not exist.");
-                }
-
-                (root, integrity) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
-                store.RecordOrigin(root, archive.ToString());
-                if (options.Locked && existingLock?.Dependencies.GetValueOrDefault(id) is { Integrity: { } pinned } && pinned != integrity)
-                {
-                    throw new PackageException($"{id}: {archive.Path} does not match the integrity in {LockFile.FileName}.");
-                }
-
-                origin = PackageOrigin.Archive;
-                break;
-
-            case BuiltinSource builtin:
-                if (builtin.Id != id)
-                {
-                    throw new PackageException($"{id}: {spec} names another package.");
-                }
-
-                root = options.BuiltinDirectory is { } builtins ? Path.Combine(builtins, id) : "";
-                if (!Directory.Exists(root))
-                {
-                    throw new PackageException($"{id} is not a built-in package of this host.");
-                }
-
-                origin = PackageOrigin.Builtin;
-                break;
-
-            case GitSource git:
-                var locked = existingLock?.Dependencies.GetValueOrDefault(id);
-                var keepLocked = locked is { Commit: not null } && locked.Source == spec
-                                 && (options.Locked || options.Update is { } update && !update.Contains(id));
-                commit = keepLocked ? locked!.Commit! : await store.ResolveCommitAsync(git, cancellationToken).ConfigureAwait(false);
-
-                root = store.PackagePath(id, commit);
-                var checkedOut = !Directory.Exists(root);
-                if (checkedOut)
-                {
-                    root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
-                }
-
-                store.RecordOrigin(root, git.ToString());
-
-                // Hashing a large package is slow, so an unchanged store folder is trusted unless installing locked.
-                integrity = keepLocked && !checkedOut && !options.Locked && locked!.Integrity is { } known
-                    ? known
-                    : PackageStore.ComputeIntegrity(root);
-                if (keepLocked && locked!.Integrity is { } expected && expected != integrity)
-                {
-                    throw new PackageException($"{id}: store folder {root} does not match the integrity in {LockFile.FileName}.");
-                }
-
-                origin = PackageOrigin.Git;
-                break;
-
+            case FileSource file when Directory.Exists(file.Path):
+                return new FetchedPackage(file.Path, null, null);
+            case ArchiveSource archive when File.Exists(archive.Path):
+                var (folder, hash) = store.ExtractArchive(archive.Path, options.ReservedCategoryPrefixes);
+                return new FetchedPackage(folder, null, hash);
+            case BuiltinSource when options.BuiltinDirectory is { } builtins && IsBuiltin(Path.Combine(builtins, id)):
+                return new FetchedPackage(Path.Combine(builtins, id), null, null);
             default:
-                throw new PackageException($"{id}: {source} is not a source that can be installed from.");
+                throw new PackageException($"{id}: {source} cannot be found.");
+        }
+    }
+
+    async Task<FetchedPackage> FetchGitAsync(string id, GitSource git, CancellationToken cancellationToken)
+    {
+        var commit = await store.ResolveCommitAsync(git, cancellationToken).ConfigureAwait(false);
+        var root = store.PackagePath(id, commit);
+        if (!Directory.Exists(root))
+        {
+            root = await store.CheckoutAsync(git, commit, cancellationToken).ConfigureAwait(false);
         }
 
+        return new FetchedPackage(root, commit, PackageStore.ComputeIntegrity(root));
+    }
+
+    /// <summary>Loads a package's manifest and checks it is the package asked for and fits this host and scope.</summary>
+    /// <param name="id">The id the package was asked for as.</param>
+    /// <param name="root">The package folder.</param>
+    /// <param name="otherName">The message when the folder holds another package, given its name.</param>
+    PackageManifest LoadChecked(string id, string root, Func<string, string> otherName)
+    {
         var manifest = PackageManifest.Load(root, options.ReservedCategoryPrefixes);
         if (manifest.Name != id)
         {
-            throw new PackageException($"{spec} holds package '{manifest.Name}', not '{id}'.");
+            throw new PackageException(otherName(manifest.Name));
         }
 
         if (!manifest.EffectiveScopes.Contains(options.Scope))
@@ -481,8 +248,7 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         }
 
         CheckEngines(manifest);
-
-        return new ResolvedPackage(id, manifest, root, origin, spec, commit, integrity, depth, isOverridden);
+        return manifest;
     }
 
     void CheckEngines(PackageManifest manifest)
@@ -576,5 +342,153 @@ public sealed class PackageResolver(PackageStore store, PackageResolverOptions? 
         }
 
         return lockFile;
+    }
+
+    /// <summary>
+    /// The state of one resolution: what is queued, resolved and required, and the registries read so far.
+    /// </summary>
+    sealed class Session(PackageResolver resolver, IReadOnlySet<string> overridden, LockFile? existingLock,
+        List<ScopedRegistry> registries, CancellationToken cancellationToken)
+    {
+        readonly Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)> queue = new();
+        readonly Dictionary<string, RegistryClient> clients = new(StringComparer.Ordinal);
+        readonly Dictionary<string, RegistryIndex?> indexes = new(StringComparer.Ordinal);
+
+        /// <summary>Id → its package, for every package resolved so far.</summary>
+        public Dictionary<string, ResolvedPackage> Resolved { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>The version ranges stated so far, with who stated them.</summary>
+        public List<(string Id, VersionRange Range, string RequiredBy, int Depth)> Constraints { get; } = [];
+
+        /// <summary>Queues a declaration to resolve.</summary>
+        public void Enqueue(string id, PackageSource source, string spec, string requiredBy, int depth) =>
+            queue.Enqueue((id, source, spec, requiredBy, depth));
+
+        /// <summary>Resolves every queued declaration with a source, and records the ranges of the others.</summary>
+        public async Task DrainAsync()
+        {
+            while (queue.TryDequeue(out var next))
+            {
+                if (next.Source is RangeSource range)
+                {
+                    Constraints.Add((next.Id, range.Range, next.RequiredBy, next.Depth));
+                }
+                else if (!Resolved.ContainsKey(next.Id))
+                {
+                    Add(await resolver.MaterializeAsync(next.Id, next.Source, next.Spec, next.Depth,
+                        overridden.Contains(next.Id), existingLock, cancellationToken).ConfigureAwait(false));
+                }
+            }
+        }
+
+        /// <summary>Takes each brick only ranges ask for from a registry scoped to it.</summary>
+        /// <returns>Whether any brick was added.</returns>
+        public async Task<bool> ResolveFromRegistriesAsync()
+        {
+            var progressed = false;
+            foreach (var group in Constraints.Where(c => !Resolved.ContainsKey(c.Id)).GroupBy(static c => c.Id).ToList())
+            {
+                var serving = registries.Where(r => r.Serves(group.Key)).ToList();
+                if (serving.Count == 0)
+                {
+                    continue;
+                }
+
+                var registry = await PickRegistryAsync(serving, group.Key).ConfigureAwait(false);
+                Add(await resolver.MaterializeFromRegistryAsync(Client(registry), group.Key, [.. group], existingLock,
+                    indexes.GetValueOrDefault(registry.Name), cancellationToken).ConfigureAwait(false));
+                progressed = true;
+            }
+
+            return progressed;
+        }
+
+        /// <summary>Checks that every stated range is provided and holds.</summary>
+        /// <exception cref="PackageException">A range nothing provides, or one the chosen version breaks.</exception>
+        public void CheckConstraints()
+        {
+            foreach (var (id, range, requiredBy, _) in Constraints)
+            {
+                if (!Resolved.TryGetValue(id, out var package))
+                {
+                    throw new PackageException(
+                        $"{requiredBy} requires {id} {range}, which nothing provides; add it to {ProjectManifest.DirectoryName}/{ProjectManifest.FileName}.");
+                }
+
+                if (!range.IsSatisfiedBy(package.Version))
+                {
+                    throw new PackageException(
+                        $"{requiredBy} requires {id} {range}, but {package.Version} is installed (from {package.Source}).");
+                }
+            }
+        }
+
+        void Add(ResolvedPackage package)
+        {
+            Resolved[package.Id] = package;
+            foreach (var (id, spec) in package.Manifest.Dependencies.OrderBy(static d => d.Key, StringComparer.Ordinal))
+            {
+                Enqueue(id, PackageSource.Parse(spec, package.RootPath), spec, package.Id, package.Depth + 1);
+            }
+        }
+
+        /// <summary>
+        /// The registry a brick comes from among those scoped to its name: the one the lock file records, else the
+        /// first, in declaration order, whose index holds the brick, else the first one, which then reports it does
+        /// not serve it.
+        /// </summary>
+        async Task<ScopedRegistry> PickRegistryAsync(List<ScopedRegistry> serving, string id)
+        {
+            var lockedSource = existingLock?.Dependencies.GetValueOrDefault(id)?.Source;
+            if (serving.Count == 1)
+            {
+                return serving[0];
+            }
+
+            if (serving.FirstOrDefault(r => lockedSource == $"registry:{r.Name}") is { } locked)
+            {
+                return locked;
+            }
+
+            foreach (var registry in serving)
+            {
+                if ((await IndexAsync(registry).ConfigureAwait(false))?.Bricks.ContainsKey(id) == true)
+                {
+                    return registry;
+                }
+            }
+
+            return serving[0];
+        }
+
+        /// <summary>A registry's index, read once per resolution; null when it cannot be read.</summary>
+        async Task<RegistryIndex?> IndexAsync(ScopedRegistry registry)
+        {
+            if (!indexes.TryGetValue(registry.Name, out var index))
+            {
+                try
+                {
+                    index = await Client(registry).GetIndexAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (PackageException)
+                {
+                    index = null;
+                }
+
+                indexes[registry.Name] = index;
+            }
+
+            return index;
+        }
+
+        RegistryClient Client(ScopedRegistry registry)
+        {
+            if (!clients.TryGetValue(registry.Name, out var client))
+            {
+                clients[registry.Name] = client = new RegistryClient(registry, resolver.options.Http);
+            }
+
+            return client;
+        }
     }
 }

@@ -109,7 +109,9 @@ public sealed class StudioBricksTests : IDisposable
 
         Assert.Equal(["com.acme.sunset"], controller.Rows.Select(static row => row.Id));
         Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/row/com.acme.sunset");
-        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/category/Themes");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/category");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/scope/Studio");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/tab/Registries");
 
         panel.Category = BrickCategoryFilter.Fonts;
         frame.Draw();

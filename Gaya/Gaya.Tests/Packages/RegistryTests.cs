@@ -198,6 +198,57 @@ public sealed class RegistryTests : IDisposable
         }
     }
 
+    /// <summary>A registry whose address cannot be reached is read from its mirror; when every address fails, the address's error is reported.</summary>
+    [Fact]
+    public async Task MirrorsServeWhenTheAddressCannotBeReached()
+    {
+        Publish("user.mateo.rules", "1.0.0");
+        var gone = Path.Combine(root, "gone");
+        Registries(("user.mateo.rules", "^1.0.0"), new ScopedRegistry
+        {
+            Name = "test",
+            Url = gone,
+            Mirrors = [RegistryPublisher.LocationOf(registry)],
+            Scopes = ["user.mateo"],
+            Keys = [registrySigner.PublicKey],
+        });
+
+        var package = Assert.Single((await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
+        Assert.Equal("registry:test", package.Source);
+
+        Directory.Delete(registry, recursive: true);
+        var failed = await Assert.ThrowsAsync<PackageException>(() => Resolver(updateAll: true).ResolveAsync(project, TestContext.Current.CancellationToken));
+        Assert.Contains(gone, failed.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Of two registries scoped to the same names, a brick comes from the first that holds it, and stays there once locked.</summary>
+    [Fact]
+    public async Task OverlappingRegistriesFallThroughToTheOneHoldingTheBrick()
+    {
+        var local = Path.Combine(root, "local");
+        Publish("user.mateo.shop", "1.0.0", into: local);
+        Publish("user.mateo.rules", "1.0.0");
+        ScopedRegistry Named(string name, string folder) => new()
+        {
+            Name = name,
+            Url = RegistryPublisher.LocationOf(folder),
+            Scopes = ["user.mateo"],
+            Keys = [registrySigner.PublicKey],
+        };
+        Registries(("user.mateo.rules", "^1.0.0"), Named("local", local), Named("public", registry));
+
+        var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal("registry:public", Assert.Single(resolution.Packages).Source);
+        resolution.Lock.Save(project);
+
+        Publish("user.mateo.rules", "1.0.0", into: local);
+        var locked = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal("registry:public", Assert.Single(locked.Packages).Source);
+    }
+
+    void Registries((string Id, string Range) dependency, params ScopedRegistry[] registries) =>
+        new ProjectManifest { Dependencies = { [dependency.Id] = dependency.Range }, ScopedRegistries = [.. registries] }.Save(project);
+
     PackageResolver Resolver(bool locked = false, bool updateAll = false) => new(store, new PackageResolverOptions
     {
         Hosts = new Dictionary<string, SemanticVersion> { ["engine"] = SemanticVersion.Parse("1.2.0") },
@@ -224,9 +275,9 @@ public sealed class RegistryTests : IDisposable
         }.Save(project);
 
     void Publish(string id, string version, (string Id, string Range)? dependency = null, string? engine = null,
-        string? entitlement = null, SshKeygenSigner? publisher = null, string? claim = null)
+        string? entitlement = null, SshKeygenSigner? publisher = null, string? claim = null, string? into = null)
     {
-        var folder = Path.Combine(root, "sources", $"{id}-{version}");
+        var folder = Path.Combine(root, "sources", $"{id}-{version}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(folder, "Runtime"));
         var manifest = new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) };
         if (dependency is { } needed)
@@ -246,9 +297,9 @@ public sealed class RegistryTests : IDisposable
 
         manifest.Save(folder);
         File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
-        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed"), ["engine"]);
+        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"]);
 
-        RegistryPublisher.Publish(registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["engine"]);
+        RegistryPublisher.Publish(into ?? registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["engine"]);
     }
 
     void Unsign()

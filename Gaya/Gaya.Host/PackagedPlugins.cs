@@ -47,12 +47,25 @@ public static class PackagedPlugins
         string? studioRoot = null)
     {
         ArgumentNullException.ThrowIfNull(hosts);
+        return Load(Workspace(hosts, studioRoot), logger);
+    }
+
+    /// <summary>
+    /// Resolves the bricks of <paramref name="workspace"/> and loads their plugin assemblies, so the bricks load from the
+    /// same built-in folder and registries the Bricks panel installs them from.
+    /// </summary>
+    /// <param name="workspace">The studio's bricks as the host configures them.</param>
+    /// <param name="logger">Where failures are reported.</param>
+    /// <returns>The resolved bricks and loaded assemblies, dependencies first.</returns>
+    public static StudioPackages Load(StudioBricks workspace, ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(logger);
 
         PackageResolution resolution;
         try
         {
-            resolution = Workspace(hosts, studioRoot).ResolveAll();
+            resolution = workspace.ResolveAll();
         }
         catch (PackageException ex)
         {

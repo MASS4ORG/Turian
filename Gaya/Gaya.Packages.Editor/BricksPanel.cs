@@ -1,10 +1,11 @@
 namespace Gaya.Packages.Editor;
 
 /// <summary>
-/// The Bricks panel: one searchable list of every brick the studio or the open workspace could use, grouped by how
-/// far it is from being used (in use, on this machine, available), and a second tab for the registries bricks come
-/// from. A checkbox turns a brick on or off; selecting a row shows the brick or registry in the inspector, which is
-/// where its details and actions are. It draws <see cref="BricksController"/> and holds no logic of its own.
+/// The Bricks panel: one searchable list of every brick the studio or the open project could use, grouped by how far it
+/// is from being used (in use, on this machine, available), and a second tab for the registries bricks come from; a
+/// Studio and Project filter on the same row chooses whose. A checkbox turns a brick on or off; selecting a row shows
+/// the brick or registry in the inspector, which is where its details and actions are. It draws
+/// <see cref="BricksController"/> and holds no logic of its own.
 /// </summary>
 /// <param name="controller">The bricks' state and actions.</param>
 /// <param name="dialogs">Asks for a folder or file to add a brick from; without it those menu items are inert.</param>
@@ -44,6 +45,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     bool scopeChosen;
     bool addMenuOpen;
     bool moreMenuOpen;
+    bool categoryMenuOpen;
     Vector2 pointer;
     Vector2 menuAt;
     int seenRevision = -1;
@@ -89,7 +91,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
 
         using (gui.Node().Expand().Direction(Axis.Vertical).Gap(Theme.Gap).Padding(10f, 8f).Enter())
         {
-            Scopes(gui);
+            Header(gui);
             if (!controller.HasWorkspace)
             {
                 Line(gui, controller.Scope == BrickScope.Project
@@ -98,7 +100,6 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                 return;
             }
 
-            Tabs(gui);
             Notice(gui);
 
             if (controller.Tab == BricksTab.Registries)
@@ -118,6 +119,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
 
         gui.CascadeMenu(ref addMenuOpen, menuAt, BuildAddMenu);
         gui.CascadeMenu(ref moreMenuOpen, menuAt, BuildMoreMenu);
+        gui.CascadeMenu(ref categoryMenuOpen, menuAt, BuildCategoryMenu);
     }
 
     void Show(Action select)
@@ -126,44 +128,50 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         inspector?.ShowSelection(controller);
     }
 
-    /// <summary>The Studio and Project scope chips, shown when the host has both.</summary>
-    void Scopes(Gui gui)
+    /// <summary>
+    /// One row: the Bricks and Registries tabs, and, at the right, the Studio and Project filter that chooses whose
+    /// bricks both show, when the host has both.
+    /// </summary>
+    void Header(Gui gui)
     {
-        if (!controller.HasStudio)
-        {
-            return;
-        }
-
-        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/scopes").ExpandWidth().Direction(Axis.Horizontal)
+        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/header").ExpandWidth().Direction(Axis.Horizontal)
                    .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
         {
-            foreach (var (scope, label, width) in new[] { (BrickScope.Studio, "Studio", 56f), (BrickScope.Project, "Project", 60f) })
+            if (controller.HasWorkspace)
             {
-                if (!Chip(gui, label, $"bricks/scope/{scope}", width, controller.Scope == scope) || controller.Scope == scope)
+                foreach (var (tab, label, width) in new[] { (BricksTab.Bricks, "Bricks", 56f), (BricksTab.Registries, "Registries", 76f) })
                 {
-                    continue;
+                    if (Chip(gui, label, $"bricks/tab/{tab}", width, controller.Tab == tab) && controller.Tab != tab)
+                    {
+                        Show(() => controller.Tab = tab);
+                    }
                 }
+            }
 
-                scopeChosen = true;
-                controller.Scope = scope;
-                _ = controller.RefreshRegistriesAsync();
-                inspector?.ShowSelection(controller);
+            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/header/gap").ExpandWidth().Enter())
+            {
+            }
+
+            if (controller.HasStudio)
+            {
+                Scopes(gui);
             }
         }
     }
 
-    void Tabs(Gui gui)
+    void Scopes(Gui gui)
     {
-        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/tabs").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
+        foreach (var (scope, label, width) in new[] { (BrickScope.Studio, "Studio", 56f), (BrickScope.Project, "Project", 60f) })
         {
-            foreach (var (tab, label, width) in new[] { (BricksTab.Bricks, "Bricks", 56f), (BricksTab.Registries, "Registries", 76f) })
+            if (!Chip(gui, label, $"bricks/scope/{scope}", width, controller.Scope == scope) || controller.Scope == scope)
             {
-                if (Chip(gui, label, $"bricks/tab/{tab}", width, controller.Tab == tab) && controller.Tab != tab)
-                {
-                    Show(() => controller.Tab = tab);
-                }
+                continue;
             }
+
+            scopeChosen = true;
+            controller.Scope = scope;
+            _ = controller.RefreshRegistriesAsync();
+            inspector?.ShowSelection(controller);
         }
     }
 
@@ -267,18 +275,47 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                     filter = value;
                 }
             }
-        }
 
-        using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/categories").ExpandWidth().Direction(Axis.Horizontal)
-                   .Gap(Theme.Gap).ContentAlignY(0.5f).Enter())
-        {
-            foreach (var (value, label, width) in Categories)
+            using (gui.Node(-1, Theme.Scale(Theme.RowHeight), "bricks/filters/gap").ExpandWidth().Enter())
             {
-                if (Chip(gui, label, $"bricks/category/{value}", width, Category == value))
-                {
-                    Category = value;
-                }
             }
+
+            var (_, category, categoryWidth) = Categories.First(c => c.Category == Category);
+            if (DropdownChip(gui, category, "bricks/category", categoryWidth + 16f, Category != BrickCategoryFilter.All))
+            {
+                OpenMenu(out categoryMenuOpen);
+            }
+        }
+    }
+
+    /// <summary>A chip that opens a menu: its label and a caret.</summary>
+    static bool DropdownChip(Gui gui, string label, string id, float width, bool active)
+    {
+        using (gui.Node(Theme.Scale(width), Theme.Scale(Theme.RowHeight), id).BlockInput().Direction(Axis.Horizontal)
+                   .Gap(4f).ContentAlignX(0.5f).ContentAlignY(0.5f).Enter())
+        {
+            var interactable = gui.GetInteractable();
+            var hot = interactable.OnHover();
+            if (gui.Pass == Pass.Pass2Render)
+            {
+                gui.DrawBackgroundRect(active ? Theme.Hover : hot ? Theme.Chrome : Theme.Panel, 9f);
+            }
+
+            using (gui.Node().Enter())
+            {
+                gui.DrawText(label, Theme.Text(11f), active || hot ? Theme.Ink : Theme.InkDim);
+            }
+
+            _ = gui.Icon(gui.ResolveIcon(Icons.CaretDown), Theme.Text(9), null, 0.7f);
+            return gui.Pass == Pass.Pass2Render && interactable.OnClick();
+        }
+    }
+
+    void BuildCategoryMenu(FlyoutBuilder menu)
+    {
+        foreach (var (value, label, _) in Categories)
+        {
+            menu.Item(label, () => Category = value);
         }
     }
 

@@ -4,10 +4,14 @@
 #     brick:
 #       uses: MASS4ORG/Turian/.github/workflows/brick.yml@main
 #       with:
-#         brick-path: .          # a folder holding package.json, to verify and pack
-#         project-path: ''       # a game project, to restore its bricks from the lock file
+#         brick-path: .                 # a folder holding package.json, to verify, compile and pack
+#         project-path: ''              # a game project, to restore its bricks from the lock file
+#         store: store.mass4.org        # publish to this asset store on a v<version> tag; empty never publishes
+#       secrets:
+#         brick-signing-key: ${{ secrets.BRICK_SIGNING_KEY }}   # OpenSSH private key the store trusts
+#         store-token: ${{ secrets.BRICK_STORE_TOKEN }}         # store access token with the publish permission
 #
-# On a version tag the packed .brick and its .sha256 are attached to the GitHub release.
+# On a version tag the packed .brick and its .sha256 are attached to the GitHub release and, with a store, published.
 name: Brick
 
 on:
@@ -21,10 +25,25 @@ on:
         description: Folder of a game project whose bricks are restored with --locked; empty skips it
         type: string
         default: ""
+      precast:
+        description: Compile the brick's assemblies into Precast~ before packing, which also proves they build
+        type: boolean
+        default: true
+      store:
+        description: Asset store to publish to on a v<version> tag, such as store.mass4.org; empty never publishes
+        type: string
+        default: ""
       turian-version:
         description: Tag of the ghcr.io/mass4org/turian-cli image to run
         type: string
         default: latest
+    secrets:
+      brick-signing-key:
+        description: The OpenSSH private key the store trusts to sign releases
+        required: false
+      store-token:
+        description: The store access token, with the publish permission for the brick's names
+        required: false
 
 permissions:
   contents: write
@@ -56,7 +75,7 @@ jobs:
 
       - name: Pack the brick
         if: inputs.brick-path != ''
-        run: turian-cli brick pack "${{ inputs.brick-path }}" --out "${{ github.workspace }}/.bricks"
+        run: turian-cli brick pack "${{ inputs.brick-path }}" --out "${{ github.workspace }}/.bricks" ${{ inputs.precast && '--precast' || '' }}
 
       - name: Keep the packed brick
         if: inputs.brick-path != ''
@@ -70,3 +89,29 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: .bricks/*
+
+      - name: Publish to the asset store
+        if: inputs.brick-path != '' && inputs.store != '' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          BRICK_PATH: ${{ inputs.brick-path }}
+          STORE: ${{ inputs.store }}
+          SIGNING_KEY: ${{ secrets.brick-signing-key }}
+          STORE_TOKEN: ${{ secrets.store-token }}
+          PRECAST: ${{ inputs.precast && '--precast' || '' }}
+        run: |
+          version=$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$BRICK_PATH/package.json")
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "The tag ${GITHUB_REF_NAME} does not match package.json version ${version}." >&2
+            exit 1
+          fi
+          if [ -z "$SIGNING_KEY" ] || [ -z "$STORE_TOKEN" ]; then
+            echo "Publishing needs the brick-signing-key and store-token secrets." >&2
+            exit 1
+          fi
+          key="$RUNNER_TEMP/brick-signing-key"
+          printf '%s\n' "$SIGNING_KEY" > "$key"
+          chmod 600 "$key"
+          turian-cli brick login "$STORE" --token "$STORE_TOKEN"
+          turian-cli brick publish "$BRICK_PATH" --store "$STORE" --key "$key" $PRECAST
+          rm -f "$key"

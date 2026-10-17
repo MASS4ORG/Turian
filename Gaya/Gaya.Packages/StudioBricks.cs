@@ -263,7 +263,10 @@ public static class BrickRegistries
         }
     }
 
-    /// <summary>Finds bricks in <paramref name="registries"/> whose id contains <paramref name="query"/>.</summary>
+    /// <summary>
+    /// Finds bricks in <paramref name="registries"/> whose id contains <paramref name="query"/>, among the names each
+    /// registry is scoped to, since only those are installed from it.
+    /// </summary>
     /// <param name="registries">The registries to read.</param>
     /// <param name="query">Text the id must contain; every brick when empty.</param>
     /// <returns>Registry, id and newest version; an unreadable registry is reported in place of its bricks.</returns>
@@ -277,7 +280,7 @@ public static class BrickRegistries
             try
             {
                 var index = await new RegistryClient(registry).GetIndexAsync().ConfigureAwait(false);
-                found.AddRange(index.Bricks.Where(b => b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                found.AddRange(index.Bricks.Where(b => registry.Serves(b.Key) && b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
                     .Select(b => (registry.Name, b.Key, Newest(b.Value))));
             }
             catch (PackageException ex)

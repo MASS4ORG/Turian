@@ -156,11 +156,15 @@ public static class ProjectPackages
         Invalidate(projectRoot);
     }
 
-    /// <summary>The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with MASS4's signing key.</summary>
+    /// <summary>
+    /// The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with
+    /// MASS4's signing key. Its name is what lock files record, so it stays fixed while the asset store's address moves.
+    /// </summary>
     public static ScopedRegistry PublicRegistry { get; } = new()
     {
         Name = "bricks.mass4.org",
-        Url = "https://bricks.mass4.org/v1",
+        Url = "https://store.mass4.org/v1",
+        Mirrors = ["https://bricks.mass4.org/v1"],
         Scopes = ["org.mass4", "user"],
         Keys = [ReadEmbeddedKey()],
     };

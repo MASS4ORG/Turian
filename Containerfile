@@ -32,11 +32,13 @@ LABEL org.opencontainers.image.title="Turian CLI" \
 
 # glslc: shader compilation. fontconfig/dejavu: SkiaSharp text rendering (Guinevere UI).
 # libvulkan1/mesa-vulkan-drivers: software Vulkan (lavapipe) for headless screenshot/playmode.
+# openssh-client: ssh-keygen signs bricks published to a registry or asset store.
 RUN apt-get update -yqq \
     && apt-get install -yqq --no-install-recommends \
        glslc \
        libfontconfig1 fontconfig fonts-dejavu-core \
        libvulkan1 mesa-vulkan-drivers \
+       openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

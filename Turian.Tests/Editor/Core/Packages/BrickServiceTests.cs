@@ -34,6 +34,31 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Throws<PackageException>(() => BrickService.New(root, "Inventory"));
     }
 
+    /// <summary>A new studio-only content brick packs without asset metas, since the studio never imports its files.</summary>
+    [Theory]
+    [InlineData(ContentBrickKind.Look)]
+    [InlineData(ContentBrickKind.Theme)]
+    [InlineData(ContentBrickKind.IconTheme)]
+    [InlineData(ContentBrickKind.FontPack)]
+    public void NewContentBricksPack(ContentBrickKind kind)
+    {
+        var folder = ContentBricks.New(root, $"user.mateo.{kind.ToString().ToLowerInvariant()}", kind, ProjectPackages.GayaVersion);
+
+        Assert.Empty(BrickVerifier.Verify(folder));
+        Assert.True(File.Exists(BrickService.Pack(folder, Path.Combine(root, "out")).Path));
+    }
+
+    /// <summary>Every built-in brick passes the checks publishing runs, so each can be packed and moved to its own repository.</summary>
+    [Fact]
+    public void BuiltinBricksAreSound()
+    {
+        var bricks = Directory.EnumerateDirectories(ProjectPackages.BuiltinDirectory)
+            .Where(static folder => File.Exists(Path.Combine(folder, PackageManifest.FileName))).ToList();
+
+        Assert.NotEmpty(bricks);
+        Assert.All(bricks, static folder => Assert.Empty(BrickVerifier.Verify(folder)));
+    }
+
     /// <summary>A folder that declares no bricks is not given a Bricks folder with an empty lock file.</summary>
     [Fact]
     public void ResolvingAFolderWithoutBricksWritesNothing()
@@ -75,6 +100,9 @@ public sealed class BrickServiceTests : IDisposable
         File.WriteAllText(Path.Combine(folder, "Runtime", "Copy.cs.meta"), scriptMeta);
         Directory.CreateDirectory(Path.Combine(folder, "Samples~"));
         File.WriteAllText(Path.Combine(folder, "Samples~", "Free.txt"), "no meta needed");
+        Directory.CreateDirectory(Path.Combine(folder, ".github", "workflows"));
+        File.WriteAllText(Path.Combine(folder, ".github", "workflows", "brick.yml"), "on: push");
+        File.WriteAllText(Path.Combine(folder, ".gitlab-ci.yml"), "brick: {}");
 
         var issues = BrickVerifier.Verify(folder);
 
@@ -83,6 +111,7 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Contains(issues, static i => i.Contains("Orphan.png.meta has no valid Id", StringComparison.Ordinal));
         Assert.Contains(issues, static i => i.Contains("reuses the id", StringComparison.Ordinal));
         Assert.DoesNotContain(issues, static i => i.Contains("Free.txt", StringComparison.Ordinal));
+        Assert.DoesNotContain(issues, static i => i.Contains("brick.yml", StringComparison.Ordinal) || i.Contains(".gitlab-ci", StringComparison.Ordinal));
     }
 
     /// <summary>A brick that fails verification is not packed; a sound one is installed into a project from its file.</summary>

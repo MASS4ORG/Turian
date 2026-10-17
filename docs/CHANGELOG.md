@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: asset store integration.
 - Added: pluggable versioned saving system #89.
-- Changed: major change in code style.
 - Added: nuget support inside bricks #313.
+- Changed: major change in code style.
+- Fixed: built-in studio bricks failing to load at startup
+- Fixed: studio-only bricks failing to pack
+- Fixed: and hidden folders such as `.github` being imported as assets.
 
 ## [3.2.0] - 2026-10-14
 

@@ -222,7 +222,10 @@ public sealed class AssemblyGraph
         return graph;
     }
 
-    /// <summary>The scripts under a folder, leaving out folders whose name ends in <c>~</c>, which are never compiled.</summary>
+    /// <summary>
+    /// The scripts under a folder, leaving out folders that are never compiled: those whose name ends in <c>~</c>, and
+    /// hidden ones.
+    /// </summary>
     /// <param name="directory">The folder.</param>
     /// <returns>Absolute script paths.</returns>
     public IEnumerable<string> Scripts(string directory) =>
@@ -233,7 +236,7 @@ public sealed class AssemblyGraph
 
     static bool IsInTildeFolder(string relativePath) =>
         relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1)
-            .Any(static segment => segment.EndsWith('~'));
+            .Any(AssetDatabase.IsUnimportedFolder);
 
     /// <summary>
     /// Whether a data-asset file holds an <see cref="AssemblyDefinition"/> or an
