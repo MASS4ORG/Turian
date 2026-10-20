@@ -498,11 +498,14 @@ public static partial class Program
         return command;
     }
 
+    static string RegistryScopeText(ScopedRegistry registry) =>
+        registry.Scopes.Count == 0 ? "*" : string.Join(", ", registry.Scopes);
+
     static Command BrickRegistryCommand(Option<DirectoryInfo> projectOption, Option<bool> studioOption)
     {
         var addressArg = new Argument<string>("address") { Description = "The registry's address, such as store.mass4.org, or the v1 folder of a copy" };
         var nameOption = new Option<string?>("--name") { Description = "A name for the registry; its host when omitted" };
-        var scopeOption = new Option<string[]>("--scope") { Description = "Brick name prefix served from this registry, repeat for several; read from the registry when omitted", AllowMultipleArgumentsPerToken = true };
+        var scopeOption = new Option<string[]>("--scope") { Description = "Filter by brick name prefix, repeat for several; omitted or * accepts all names", AllowMultipleArgumentsPerToken = true };
         var keyOption = new Option<string[]>("--key") { Description = "A trusted key: an OpenSSH public key line, or a .pub file, repeat for several; the registry's own keys when omitted", AllowMultipleArgumentsPerToken = true };
         var unsignedOption = new Option<bool>("--allow-unsigned") { Description = "Accept bricks without a signature (only for a registry you run)" };
 
@@ -530,7 +533,7 @@ public static partial class Program
                 BrickService.AddRegistry(result.GetValue(projectOption)!.FullName, registry);
             }
 
-            Console.WriteLine($"Added registry {registry.Name} ({registry.Url}) for {string.Join(", ", registry.Scopes)}");
+            Console.WriteLine($"Added registry {registry.Name} ({registry.Url}) for {RegistryScopeText(registry)}");
             foreach (var key in registry.Keys.Where(k => !typed.Keys.Contains(k)))
             {
                 Console.WriteLine($"Trusting its key {SshSignature.Fingerprint(key)}; remove the registry if you do not recognize it.");
@@ -559,7 +562,7 @@ public static partial class Program
                 : BrickService.Registries(result.GetValue(projectOption)!.FullName);
             foreach (var registry in registries)
             {
-                Console.WriteLine($"{registry.Name}  {registry.Url}  scopes: {string.Join(", ", registry.Scopes)}  keys: {registry.Keys.Count}{(registry.AllowUnsigned ? "  (unsigned allowed)" : string.Empty)}");
+                Console.WriteLine($"{registry.Name}  {registry.Url}  scopes: {RegistryScopeText(registry)}  keys: {registry.Keys.Count}{(registry.AllowUnsigned ? "  (unsigned allowed)" : string.Empty)}");
             }
         }));
 

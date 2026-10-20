@@ -59,40 +59,54 @@ public sealed class StoreClientTests : IDisposable
         Assert.Empty(RegistryDiscovery.ScopesOf(new RegistryIndex(), new RegistryKeys()));
     }
 
-    /// <summary>Only an address is needed: the location, name, scopes and keys are read from the store.</summary>
+    /// <summary>Only an address is needed; publisher claims and key scopes do not restrict the registry.</summary>
     [Fact]
     public async Task RegistriesAreCompletedFromTheirAddress()
     {
         var handler = new StoreHandler();
         handler.Routes["/api/v1/registry/v1/index.json"] = """{ "format": 1, "bricks": {}, "claims": { "org.mass4": { "key": "x" } } }""";
-        handler.Routes["/api/v1/registry/v1/keys"] = $$"""{ "keys": [ { "id": "k", "publicKey": "{{Key}}" } ] }""";
+        handler.Routes["/api/v1/registry/v1/keys"] = $$"""{ "keys": [ { "id": "k", "publicKey": "{{Key}}", "scopes": ["com.acme"] } ] }""";
 
         var registry = await RegistryDiscovery.CompleteAsync(new ScopedRegistry { Url = "store.example:5080" },
             new HttpClient(handler), TestContext.Current.CancellationToken);
 
         Assert.Equal("store.example", registry.Name);
         Assert.Equal("https://store.example:5080/api/v1/registry/v1", registry.Url);
-        Assert.Equal(["org.mass4"], registry.Scopes);
+        Assert.Empty(registry.Scopes);
+        Assert.True(registry.Serves("com.newpublisher.rules"));
         Assert.Equal([Key], registry.Keys);
         BrickRegistries.Validate(registry);
     }
 
     /// <summary>What the user typed is kept, and a complete registry needs no request.</summary>
-    [Fact]
-    public async Task TypedRegistryValuesAreKept()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("*")]
+    [InlineData("com.me")]
+    public async Task TypedRegistryValuesAreKept(string? scope)
     {
-        var complete = new ScopedRegistry { Name = "mine", Url = "https://nowhere.invalid", Scopes = ["com.me"], Keys = [Key] };
-        Assert.Same(complete, await RegistryDiscovery.CompleteAsync(complete, new HttpClient(new StoreHandler()), TestContext.Current.CancellationToken));
+        var complete = new ScopedRegistry
+        {
+            Name = "mine",
+            Url = "https://nowhere.invalid",
+            Scopes = scope is null ? [] : [scope],
+            Keys = [Key],
+        };
+        var noRequests = new StoreHandler();
+        Assert.Same(complete, await RegistryDiscovery.CompleteAsync(complete, new HttpClient(noRequests), TestContext.Current.CancellationToken));
+        Assert.Empty(noRequests.Requests);
 
         var handler = new StoreHandler();
         handler.Routes["/v1/index.json"] = """{ "format": 1, "bricks": {}, "claims": {} }""";
-        var empty = await Assert.ThrowsAsync<PackageException>(() =>
-            RegistryDiscovery.CompleteAsync(new ScopedRegistry { Url = "https://store.example" }, new HttpClient(handler), TestContext.Current.CancellationToken));
-        Assert.Contains("does not say which bricks it serves", empty.Message, StringComparison.Ordinal);
+        var empty = await RegistryDiscovery.CompleteAsync(new ScopedRegistry { Url = "https://store.example", AllowUnsigned = true },
+            new HttpClient(handler), TestContext.Current.CancellationToken);
+        Assert.Empty(empty.Scopes);
+        BrickRegistries.Validate(empty);
 
         var scoped = await RegistryDiscovery.CompleteAsync(new ScopedRegistry { Url = "https://store.example", Scopes = ["com.me"], AllowUnsigned = true },
             new HttpClient(handler), TestContext.Current.CancellationToken);
         Assert.Equal(("store.example", "https://store.example/v1", true), (scoped.Name, scoped.Url, scoped.AllowUnsigned));
+        Assert.Equal(["com.me"], scoped.Scopes);
         Assert.Empty(scoped.Keys);
 
         await Assert.ThrowsAsync<PackageException>(() =>

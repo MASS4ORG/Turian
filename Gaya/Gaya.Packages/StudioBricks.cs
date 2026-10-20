@@ -239,16 +239,20 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
 /// <summary>Registry checks and searches shared by every brick workspace.</summary>
 public static class BrickRegistries
 {
-    /// <summary>Checks that a registry has a name, an address, scopes, and keys or explicit trust in unsigned bricks.</summary>
+    /// <summary>Checks a registry's name, address, optional scope filters and explicit signing trust.</summary>
     /// <param name="registry">The registry.</param>
     /// <exception cref="PackageException">The registry is incomplete or a key is not an OpenSSH ed25519 public key.</exception>
     public static void Validate(ScopedRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace) || registry.Scopes.Count == 0
-            || registry.Scopes.Any(string.IsNullOrWhiteSpace))
+        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace))
         {
-            throw new PackageException("A registry needs a name, an address and at least one scope.");
+            throw new PackageException("A registry needs a name and an address.");
+        }
+
+        if (registry.Scopes.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new PackageException("Registry scope filters cannot be blank; omit scopes or use * to accept all names.");
         }
 
         foreach (var key in registry.Keys)
@@ -264,8 +268,7 @@ public static class BrickRegistries
     }
 
     /// <summary>
-    /// Finds bricks in <paramref name="registries"/> whose id contains <paramref name="query"/>, among the names each
-    /// registry is scoped to, since only those are installed from it.
+    /// Finds bricks whose id contains <paramref name="query"/> and matches each registry's optional scope filters.
     /// </summary>
     /// <param name="registries">The registries to read.</param>
     /// <param name="query">Text the id must contain; every brick when empty.</param>

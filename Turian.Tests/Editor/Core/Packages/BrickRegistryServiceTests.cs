@@ -20,14 +20,17 @@ public sealed class BrickRegistryServiceTests : IDisposable
     }
 
     /// <summary>Registries are declared in the manifest with their trusted keys, listed after the public one is added, and removed.</summary>
-    [Fact]
-    public void RegistriesAreDeclaredAndListed()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("*")]
+    [InlineData("com.studio")]
+    public void RegistriesAreDeclaredAndListed(string? scope)
     {
         var project = Path.Combine(root, "game");
         Directory.CreateDirectory(project);
         const string key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETjciFivC4Q7z6o7KhiydqNS1Z5D6+ZZFbGUxQgL7ur test";
 
-        BrickService.AddRegistry(project, new ScopedRegistry { Name = "studio", Url = "https://bricks.studio.example/v1", Scopes = ["com.studio"], Keys = [key] });
+        BrickService.AddRegistry(project, new ScopedRegistry { Name = "studio", Url = "https://bricks.studio.example/v1", Scopes = scope is null ? [] : [scope], Keys = [key] });
 
         Assert.Equal(["studio", "bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
         var saved = File.ReadAllText(Path.Combine(project, "Bricks", "manifest.json"));
@@ -50,12 +53,12 @@ public sealed class BrickRegistryServiceTests : IDisposable
         Assert.Equal("bricks.mass4.org", registry.Name);
         Assert.Equal("https://store.mass4.org/v1", registry.Url);
         Assert.Equal(["https://bricks.mass4.org/v1"], registry.Mirrors);
-        Assert.Contains("user", registry.Scopes);
+        Assert.Empty(registry.Scopes);
         Assert.StartsWith("SHA256:", SshSignature.Fingerprint(Assert.Single(registry.Keys)), StringComparison.Ordinal);
         Assert.True(registry.Serves("org.mass4.turian.ui"));
         Assert.True(registry.Serves("user.mateo.rules"));
-        Assert.False(registry.Serves("com.acme.rules"));
-        Assert.False(registry.Serves("org.mass4x.other"));
+        Assert.True(registry.Serves("com.acme.rules"));
+        Assert.True(registry.Serves("org.mass4x.other"));
     }
 
     /// <summary>A brick licensed against forks cannot be embedded, and a fork of a brick licensed against republishing cannot be packed.</summary>

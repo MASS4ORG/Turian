@@ -1,9 +1,8 @@
 namespace Gaya.Packages;
 
 /// <summary>
-/// Completes a registry from the address a user types, such as <c>store.mass4.org</c>: finds where its index is, names it
-/// after its host, scopes it to the name prefixes it serves and proposes the keys it publishes. The caller shows the keys'
-/// fingerprints so the user decides whether to trust them.
+/// Completes a registry from an address such as <c>store.mass4.org</c>: finds its index, names it after its host and
+/// proposes its published keys without restricting brick names. The caller shows key fingerprints for trust decisions.
 /// </summary>
 public static class RegistryDiscovery
 {
@@ -14,7 +13,7 @@ public static class RegistryDiscovery
     /// <param name="address">A host, a URL or a local folder; without a scheme https is tried before http.</param>
     /// <param name="http">The HTTP client to use; a shared one when null.</param>
     /// <param name="cancellationToken">Cancels the requests.</param>
-    /// <returns>The registry, with no scope when it does not say which names it serves.</returns>
+    /// <returns>The registry, without a brick name filter.</returns>
     /// <exception cref="PackageException">No registry answers at any address derived from <paramref name="address"/>.</exception>
     public static async Task<ScopedRegistry> DiscoverAsync(string address, HttpClient? http = null,
         CancellationToken cancellationToken = default)
@@ -25,10 +24,9 @@ public static class RegistryDiscovery
         {
             var registry = new ScopedRegistry { Name = NameOf(location), Url = location };
             var client = new RegistryClient(registry, http);
-            RegistryIndex index;
             try
             {
-                index = await client.GetIndexAsync(cancellationToken).ConfigureAwait(false);
+                _ = await client.GetIndexAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (PackageException)
             {
@@ -37,7 +35,6 @@ public static class RegistryDiscovery
 
             var keys = await KeysAsync(client, cancellationToken).ConfigureAwait(false);
             registry.Keys = [.. keys.Keys.Select(static k => k.PublicKey).Where(static k => k.Length > 0).Distinct(StringComparer.Ordinal)];
-            registry.Scopes = ScopesOf(index, keys);
             return registry;
         }
 
@@ -46,14 +43,14 @@ public static class RegistryDiscovery
     }
 
     /// <summary>
-    /// Fills what a user left out of a registry from the registry itself: its location, name, scopes and keys. What the
-    /// user entered is kept; a registry already complete is returned as it is, without a request.
+    /// Fills a registry's location, name and keys from the registry itself, preserving the user's optional scope filters.
+    /// A registry already complete is returned as it is, without a request.
     /// </summary>
     /// <param name="typed">The registry as entered; only its address is required.</param>
     /// <param name="http">The HTTP client to use; a shared one when null.</param>
     /// <param name="cancellationToken">Cancels the requests.</param>
     /// <returns>The completed registry.</returns>
-    /// <exception cref="PackageException">There is no address, no registry answers at it, or it does not say which names it serves.</exception>
+    /// <exception cref="PackageException">There is no address or no registry answers at it.</exception>
     public static async Task<ScopedRegistry> CompleteAsync(ScopedRegistry typed, HttpClient? http = null,
         CancellationToken cancellationToken = default)
     {
@@ -64,7 +61,7 @@ public static class RegistryDiscovery
         }
 
         var trusted = typed.Keys.Count > 0 || typed.AllowUnsigned;
-        if (typed.Scopes.Count > 0 && trusted && typed.Name.Length > 0)
+        if (trusted && typed.Name.Length > 0)
         {
             return typed;
         }
@@ -75,19 +72,12 @@ public static class RegistryDiscovery
     /// <summary>The registry as typed, with what was left out taken from the one found at its address.</summary>
     static ScopedRegistry Merge(ScopedRegistry typed, ScopedRegistry found)
     {
-        var scopes = typed.Scopes.Count > 0 ? typed.Scopes : found.Scopes;
-        if (scopes.Count == 0)
-        {
-            throw new PackageException(
-                $"{found.Url} does not say which bricks it serves yet; enter the brick name prefixes to take from it under Scopes, such as com.acme.");
-        }
-
         return new ScopedRegistry
         {
             Name = typed.Name.Length > 0 ? typed.Name : found.Name,
             Url = found.Url,
             Mirrors = typed.Mirrors,
-            Scopes = scopes,
+            Scopes = typed.Scopes,
             Keys = typed.Keys.Count > 0 || typed.AllowUnsigned ? typed.Keys : found.Keys,
             AllowUnsigned = typed.AllowUnsigned,
         };

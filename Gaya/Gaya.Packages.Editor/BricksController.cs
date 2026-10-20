@@ -135,7 +135,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
 
     /// <summary>
     /// Writes a registry into the project, replacing the one of the same name, or the one it was renamed from. Only the
-    /// address is required: what is left out is read from the registry, and the keys trusted that way are logged.
+    /// address is required: its name and keys are discovered, and empty scope filters accept all brick names.
     /// </summary>
     /// <param name="previousName">The name the registry had when it was opened, or null for a new one.</param>
     /// <param name="registry">The registry as edited.</param>

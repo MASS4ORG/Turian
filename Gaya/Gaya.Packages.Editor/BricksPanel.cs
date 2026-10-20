@@ -213,7 +213,7 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                 gui.DrawText(registry.Url, Theme.Text(10f), Theme.InkDim, centerInRect: false);
             }
 
-            Cell(gui, $"{id}/scopes", string.Join(", ", registry.Scopes), 150f, height);
+            Cell(gui, $"{id}/scopes", registry.Scopes.Count == 0 ? "*" : string.Join(", ", registry.Scopes), 150f, height);
         }
     }
 

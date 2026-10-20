@@ -265,7 +265,7 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(static b => b.Label));
     }
 
-    /// <summary>A registry saved with only its address takes its name, scopes and keys from the registry itself.</summary>
+    /// <summary>A registry saved with only its address takes its name and keys from the registry without a scope filter.</summary>
     [Fact]
     public async Task RegistriesSavedWithOnlyAnAddressAreCompleted()
     {
@@ -280,7 +280,7 @@ public sealed class BricksControllerTests : IDisposable
 
         var saved = controller.Registries.Single(static r => r.Name == "studio-store");
         Assert.Equal(location, saved.Url);
-        Assert.Equal(["com.studio"], saved.Scopes);
+        Assert.Empty(saved.Scopes);
         Assert.Equal([key], saved.Keys);
         Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Url = Path.Combine(root, "nowhere") }));
     }
@@ -317,9 +317,18 @@ public sealed class BricksControllerTests : IDisposable
         Assert.True(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = location, Url = "local", AllowUnsigned = true }));
 
         var saved = controller.Registries.Single(static r => r.Name == "local");
-        Assert.Equal((location, "com.named"), (saved.Url, Assert.Single(saved.Scopes)));
+        Assert.Equal(location, saved.Url);
+        Assert.Empty(saved.Scopes);
         Assert.Contains(controller.Catalog, static b => b.Id == "com.named.rules" && b.LatestVersion == "1.2.0");
+        Assert.Contains(controller.Catalog, static b => b.Id == "com.other.rules");
+
+        saved.Scopes = ["com.named"];
+        Assert.True(await controller.SaveRegistryAsync("local", saved));
         Assert.DoesNotContain(controller.Catalog, static b => b.Id == "com.other.rules");
+
+        saved.Scopes = [];
+        Assert.True(await controller.SaveRegistryAsync("local", saved));
+        Assert.Contains(controller.Catalog, static b => b.Id == "com.other.rules");
 
         Assert.False(await controller.SaveRegistryAsync(null, new ScopedRegistry { Name = "http://store.example:5080", Url = location }));
         Assert.Contains("put it under Url", controller.Error, StringComparison.Ordinal);

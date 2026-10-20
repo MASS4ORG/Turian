@@ -157,7 +157,7 @@ public static class ProjectPackages
     }
 
     /// <summary>
-    /// The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with
+    /// The public registry every project can take bricks from, accepting all brick names and trusted with
     /// MASS4's signing key. Its name is what lock files record, so it stays fixed while the asset store's address moves.
     /// </summary>
     public static ScopedRegistry PublicRegistry { get; } = new()
@@ -165,7 +165,6 @@ public static class ProjectPackages
         Name = "bricks.mass4.org",
         Url = "https://store.mass4.org/v1",
         Mirrors = ["https://bricks.mass4.org/v1"],
-        Scopes = ["org.mass4", "user"],
         Keys = [ReadEmbeddedKey()],
     };
 

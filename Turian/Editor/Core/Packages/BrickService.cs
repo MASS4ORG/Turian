@@ -243,7 +243,7 @@ public static class BrickService
     /// <summary>Declares a registry in the project's manifest, replacing one of the same name.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="registry">The registry.</param>
-    /// <exception cref="PackageException">The registry has no name, address or scope, or a key that is not an ed25519 public key.</exception>
+    /// <exception cref="PackageException">The registry lacks a name, address or signing trust, or has invalid filters or keys.</exception>
     public static void AddRegistry(string projectRoot, ScopedRegistry registry)
     {
         BrickRegistries.Validate(registry);

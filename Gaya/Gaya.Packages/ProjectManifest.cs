@@ -26,7 +26,7 @@ public class ProjectManifest
     [Tooltip("Brick id to version range, builtin:, file: or git+ source.")]
     public Dictionary<string, string?> Dependencies { get; set; } = [];
 
-    /// <summary>The registries the project takes bricks from by version range, for the names each is scoped to.</summary>
+    /// <summary>The registries the project takes bricks from by version range, with optional brick name filters.</summary>
     [Tooltip("Registries and signing keys explicitly trusted by this project.")]
     public List<ScopedRegistry> ScopedRegistries { get; set; } = [];
 

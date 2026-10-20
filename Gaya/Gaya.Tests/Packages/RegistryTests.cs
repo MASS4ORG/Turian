@@ -76,6 +76,38 @@ public sealed class RegistryTests : IDisposable
         Assert.Equal(["user.mateo.rules", "user.mateo.shop"], offline.Packages.Select(static p => p.Id));
     }
 
+    /// <summary>Unfiltered registries discover new publishers and resolve dependencies across prefixes.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnfilteredRegistriesDiscoverAndResolveNewPublishers(bool wildcard)
+    {
+        Publish("user.mateo.rules", "1.0.0");
+        var source = new ScopedRegistry
+        {
+            Name = "store",
+            Url = RegistryPublisher.LocationOf(registry),
+            Scopes = wildcard ? ["*"] : [],
+            Keys = [registrySigner.PublicKey],
+        };
+        Registries(("com.acme.shop", "^1.0.0"), source);
+
+        var initial = await BrickRegistries.SearchAsync([source], string.Empty);
+        Assert.Equal("user.mateo.rules", Assert.Single(initial).Id);
+
+        Publish("com.acme.shop", "1.0.0", ("user.mateo.rules", "^1.0.0"), publisher: other, claim: "com.acme");
+
+        var refreshed = await BrickRegistries.SearchAsync([source], string.Empty);
+        Assert.Equal(["com.acme.shop", "user.mateo.rules"], refreshed.Select(static b => b.Id));
+        var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal(["user.mateo.rules", "com.acme.shop"], resolution.Packages.Select(static p => p.Id));
+        Assert.All(resolution.Packages, static p => Assert.Equal("registry:store", p.Source));
+
+        source.Scopes = ["user.mateo"];
+        var filtered = await BrickRegistries.SearchAsync([source], string.Empty);
+        Assert.Equal("user.mateo.rules", Assert.Single(filtered).Id);
+    }
+
     /// <summary>A locked project stays on its version until asked to update, which takes the newest one that fits.</summary>
     [Fact]
     public async Task UpdatesMoveTheLock()

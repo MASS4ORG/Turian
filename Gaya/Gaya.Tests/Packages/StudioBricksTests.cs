@@ -68,14 +68,17 @@ public sealed class StudioBricksTests : IDisposable
     }
 
     /// <summary>Registries are declared in the studio manifest, validated, and listed before the public one.</summary>
-    [Fact]
-    public void StudioRegistriesAreValidated()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("*")]
+    [InlineData("com.acme")]
+    public void StudioRegistriesAreValidated(string? scope)
     {
         var shared = new ScopedRegistry { Name = "public", Url = "https://example.invalid", Scopes = ["org"], AllowUnsigned = true };
         var withPublic = new StudioBricks(studio.Root, Hosts, publicRegistry: shared);
         Assert.Equal([shared], withPublic.Registries());
 
-        withPublic.AddRegistry(new ScopedRegistry { Name = "acme", Url = "https://acme.invalid", Scopes = ["com.acme"], AllowUnsigned = true });
+        withPublic.AddRegistry(new ScopedRegistry { Name = "acme", Url = "https://acme.invalid", Scopes = scope is null ? [] : [scope], AllowUnsigned = true });
         Assert.Equal(["acme", "public"], withPublic.Registries().Select(r => r.Name));
         Assert.Throws<PackageException>(() => withPublic.AddRegistry(new ScopedRegistry { Name = "bad" }));
         Assert.Throws<PackageException>(() => withPublic.AddRegistry(new ScopedRegistry
