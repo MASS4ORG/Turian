@@ -115,7 +115,8 @@ public static partial class Program
             var settings = CreateSettings(result.GetValue(projectArg)!);
             Log.Logger.LogInformation("Compiling {Title}…", settings.Title);
 
-            await PrepareProjectAsync(settings, reimport: true, loadUserCode: false).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+                .ConfigureAwait(false);
 
             // Compile into a temp directory (no slot management needed for one-shot CLI)
             var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");
@@ -150,7 +151,8 @@ public static partial class Program
                 .Select(name => BuildProfiles.Find(settings, name)).ToList();
             Log.Logger.LogInformation("Exporting {Title} [{Config}]…", settings.Title, config);
 
-            await PrepareProjectAsync(settings, reimport: true, loadUserCode: false).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+                .ConfigureAwait(false);
 
             // Compile library first
             var slotDir = Path.Combine(settings.CacheAbsoluteDir, "bin", "CLI");

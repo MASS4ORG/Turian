@@ -46,7 +46,8 @@ public static partial class Program
         cmd.SetAction(async (result, _) =>
         {
             var settings = CreateSettings(result.GetValue(projectArg)!);
-            await PrepareProjectAsync(settings, result.GetValue(reimportOption), result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, result.GetValue(reimportOption),
+                result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
 
             var output = result.GetValue(outputOption);
             var statistics = result.GetValue(statisticsOption);
@@ -91,7 +92,8 @@ public static partial class Program
             var settings = CreateSettings(result.GetValue(projectArg)!);
             Log.Logger.LogInformation("Playing {Title}…", settings.Title);
 
-            await PrepareProjectAsync(settings, reimport: true, loadUserCode: false).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+                .ConfigureAwait(false);
 
             var player = new PlayUserCode(settings, Log.Logger);
             await player.ExecuteAsync();
@@ -113,7 +115,8 @@ public static partial class Program
         cmd.SetAction(async (result, _) =>
         {
             var settings = CreateSettings(result.GetValue(projectArg)!);
-            await PrepareProjectAsync(settings, result.GetValue(reimportOption), result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, result.GetValue(reimportOption),
+                result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
 
             using var project = HeadlessProject.Open(settings, Log.Logger, withGraphics: false);
             var root = project.LoadScene(result.GetValue(sceneOption));
@@ -153,7 +156,8 @@ public static partial class Program
         cmd.SetAction(async (result, _) =>
         {
             var settings = CreateSettings(result.GetValue(projectArg)!);
-            await PrepareProjectAsync(settings, result.GetValue(reimportOption), result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, result.GetValue(reimportOption),
+                result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
 
             using var project = HeadlessProject.Open(settings, Log.Logger, withGraphics: true);
             var root = project.LoadScene(result.GetValue(sceneOption));
@@ -272,7 +276,8 @@ public static partial class Program
         cmd.SetAction(async (result, _) =>
         {
             var settings = CreateSettings(result.GetValue(projectArg)!);
-            await PrepareProjectAsync(settings, result.GetValue(reimportOption), result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, result.GetValue(reimportOption),
+                result.GetValue(loadUserCodeOption)).ConfigureAwait(false);
 
             using var project = HeadlessProject.Open(settings, Log.Logger, withGraphics: true);
             var root = project.LoadScene(result.GetValue(sceneOption));

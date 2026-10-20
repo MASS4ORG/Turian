@@ -1,0 +1,205 @@
+name: Protected brick release
+
+on:
+  workflow_call:
+    inputs:
+      brick-path:
+        description: Brick folder in the calling repository
+        type: string
+        default: .
+      precast:
+        description: Compile assemblies before packing
+        type: boolean
+        default: true
+      cli-image:
+        description: Reviewed ghcr.io/mass4org/turian-cli image pinned by sha256 digest
+        type: string
+        required: true
+      tools-ref:
+        description: Reviewed full MASS4ORG/Turian commit containing the C# release tool
+        type: string
+        required: true
+      test-command:
+        description: Additional brick tests; BRICK_ARCHIVE identifies the exact archive to test
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brick-release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      qualification: ${{ steps.identity.outputs.qualification }}
+      archive: ${{ steps.identity.outputs.archive }}
+    env:
+      TURIAN_CLI_IMAGE: ${{ inputs.cli-image }}
+      TOOLS_REF: ${{ inputs.tools-ref }}
+      BRICK_PATH: ${{ inputs.brick-path }}
+      BRICK_RELEASE_ROOT: ${{ github.workspace }}/release-tools
+      BRICK_RELEASE_TOOL: ${{ github.workspace }}/release-tools/tools/BrickRelease/bin/Release/net10.0/Mass4.BrickRelease.dll
+    steps:
+      - name: Require immutable release tools
+        shell: bash
+        run: |
+          [[ "$TURIAN_CLI_IMAGE" =~ ^ghcr\.io/mass4org/turian-cli@sha256:[0-9a-f]{64}$ ]]
+          [[ "$TOOLS_REF" =~ ^[0-9a-f]{40}$ ]]
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: MASS4ORG/Turian
+          ref: ${{ inputs.tools-ref }}
+          path: release-tools
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/BrickRelease
+            signing
+            Turian/Editor/Core/Packages/registry-mass4.pub
+            global.json
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: release-tools/global.json
+
+      - name: Build the reviewed release tool
+        run: dotnet build release-tools/tools/BrickRelease/BrickRelease.csproj --configuration Release --nologo
+
+      - name: Verify and pack once
+        shell: bash
+        run: |
+          docker pull "$TURIAN_CLI_IMAGE"
+          mkdir -p packed
+          turian() {
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -e HOME=/tmp -e GAYA_BRICKS=/tmp/bricks -e GAYA_CONFIG_HOME=/tmp/gaya \
+              -v "$GITHUB_WORKSPACE:/work" -w /work/source "$TURIAN_CLI_IMAGE" "$@"
+          }
+          turian brick verify "$BRICK_PATH"
+          flags=()
+          if [[ "$PRECAST" == true ]]; then flags+=(--precast); fi
+          turian brick pack "$BRICK_PATH" --out /work/packed "${flags[@]}"
+        env:
+          PRECAST: ${{ inputs.precast }}
+
+      - name: Bind qualification to archive bytes
+        id: identity
+        shell: bash
+        run: |
+          archives=(packed/*.brick)
+          [[ ${#archives[@]} == 1 && -f "${archives[0]}" ]]
+          dotnet "$BRICK_RELEASE_TOOL" qualify \
+            "${archives[0]}" "$GITHUB_REF_NAME" "$GITHUB_SHA" packed/qualification.json --github-output
+
+      - name: Test the packed archive
+        shell: bash
+        working-directory: source
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+          ARCHIVE_NAME: ${{ steps.identity.outputs.archive }}
+        run: |
+          export BRICK_ARCHIVE="$GITHUB_WORKSPACE/packed/$ARCHIVE_NAME"
+          dotnet "$BRICK_RELEASE_TOOL" consumer "$BRICK_ARCHIVE" "$TURIAN_CLI_IMAGE"
+          if [[ -n "$TEST_COMMAND" ]]; then bash -euo pipefail -c "$TEST_COMMAND"; fi
+
+      - name: Check tested bytes are unchanged
+        shell: bash
+        env:
+          ARCHIVE_NAME: ${{ steps.identity.outputs.archive }}
+          QUALIFICATION: ${{ steps.identity.outputs.qualification }}
+        run: |
+          printf '%s\n' "$QUALIFICATION" > packed/qualification.json
+          dotnet "$BRICK_RELEASE_TOOL" validate "packed/$ARCHIVE_NAME" packed/qualification.json
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: qualified-brick
+          path: |
+            packed/*.brick
+            packed/qualification.json
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    needs: qualify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: brick-production
+    env:
+      TURIAN_CLI_IMAGE: ${{ inputs.cli-image }}
+      ARCHIVE_NAME: ${{ needs.qualify.outputs.archive }}
+      QUALIFICATION: ${{ needs.qualify.outputs.qualification }}
+      BRICK_RELEASE_ROOT: ${{ github.workspace }}/release-tools
+      BRICK_RELEASE_TOOL: ${{ github.workspace }}/release-tools/tools/BrickRelease/bin/Release/net10.0/Mass4.BrickRelease.dll
+    steps:
+      # Only reviewed tools are checked out here; no brick code or consumer tests execute with secrets.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: MASS4ORG/Turian
+          ref: ${{ inputs.tools-ref }}
+          path: release-tools
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tools/BrickRelease
+            signing
+            Turian/Editor/Core/Packages/registry-mass4.pub
+            global.json
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: release-tools/global.json
+
+      - name: Build the reviewed release tool
+        run: dotnet build release-tools/tools/BrickRelease/BrickRelease.csproj --configuration Release --nologo
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: qualified-brick
+          path: qualified
+
+      - name: Verify downloaded archive
+        shell: bash
+        run: |
+          printf '%s\n' "$QUALIFICATION" > qualified/qualification.json
+          dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$ARCHIVE_NAME" qualified/qualification.json
+          docker pull "$TURIAN_CLI_IMAGE"
+
+      - name: Sign the qualified release
+        shell: bash
+        env:
+          MASS4_BRICKS_CI_SIGNING_KEY: ${{ secrets.MASS4_BRICKS_CI_SIGNING_KEY }}
+          MASS4_BRICKS_CI_PUBLIC_KEY: ${{ vars.MASS4_BRICKS_CI_PUBLIC_KEY }}
+        run: dotnet "$BRICK_RELEASE_TOOL" sign "qualified/$ARCHIVE_NAME" qualified/qualification.json qualified/release.json
+
+      - name: Upload exact archive for store approval
+        shell: bash
+        env:
+          GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG: ${{ secrets.MASS4_BRICKS_STORE_TOKEN }}
+        run: |
+          : "${GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG:?Missing protected publish token}"
+          dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$ARCHIVE_NAME" qualified/qualification.json
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -e GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG \
+            -v "$GITHUB_WORKSPACE/qualified:/release:ro" "$TURIAN_CLI_IMAGE" \
+            brick upload https://store.mass4.org "/release/$ARCHIVE_NAME" --release /release/release.json
+          printf '%s\n' 'Upload completed. Store admin approval is a separate gate before index visibility.' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: signed-brick-release
+          path: qualified/release.json
+          if-no-files-found: error

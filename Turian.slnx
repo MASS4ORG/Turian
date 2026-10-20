@@ -41,4 +41,7 @@
   <Project Path=".nuke/Build.csproj" />
   <Project Path="Turian/Benchmarks/Turian.Benchmarks.csproj" />
   <Project Path="Turian.Tests/Turian.Tests.csproj" />
+  <Folder Name="/Tools/">
+    <Project Path="tools/BrickRelease/BrickRelease.csproj" />
+  </Folder>
 </Solution>
