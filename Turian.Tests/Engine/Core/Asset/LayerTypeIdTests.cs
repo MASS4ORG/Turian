@@ -22,7 +22,7 @@ public sealed class LayerTypeIdTests
             .Where(attribute => attribute.Name.ToString() == "TypeId")).ToArray();
         Assert.Equal(5, attributes.Length);
         Assert.All(attributes, attribute => Assert.True(attribute.ArgumentList!.Arguments[0].Expression
-            .IsKind(SyntaxKind.StringLiteralExpression)));
+            .IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.StringLiteralExpression)));
     }
 
     /// <summary>Earlier TypeIds resolve to the same payload type while new writes use its phrase-derived identity.</summary>

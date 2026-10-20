@@ -31,6 +31,7 @@ public static partial class Program
             BrickRebaseCommand(projectOption),
             BrickStubCommand(),
             BrickLoginCommand(),
+            BrickWhoamiCommand(),
             BrickPublishCommand(),
             BrickUploadCommand(),
             BrickReleasesCommand(),

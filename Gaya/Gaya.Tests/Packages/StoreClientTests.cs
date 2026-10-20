@@ -208,6 +208,23 @@ public sealed class StoreClientTests : IDisposable
         Assert.Equal(["org.mass4"], body["prefixes"]!.AsArray().Select(static s => (string?)s));
     }
 
+    /// <summary>The token's account and prefixes are read with the token; an empty answer is not taken for an account.</summary>
+    [Fact]
+    public async Task AccountsAreDescribedForTheirToken()
+    {
+        var handler = new StoreHandler();
+        handler.Routes["/api/v1/account"] = """{ "email": "me@example.com", "prefixes": [ "com.me", "org.mass4" ] }""";
+        var account = await new StoreClient("store.example", "secret", new HttpClient(handler)).AccountAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("me@example.com", account.Email);
+        Assert.Equal(["com.me", "org.mass4"], account.Prefixes);
+        Assert.Equal(("GET", "secret"), (handler.Requests[0].Method, handler.Requests[0].Token));
+
+        handler.Routes["/api/v1/account"] = "";
+        await Assert.ThrowsAsync<PackageException>(() =>
+            new StoreClient("store.example", "secret", new HttpClient(handler)).AccountAsync(TestContext.Current.CancellationToken));
+    }
+
     /// <summary>A refused sign-in reports the store's reason, and an empty answer is not taken for a token.</summary>
     [Fact]
     public async Task RefusedSignInsAreExplained()

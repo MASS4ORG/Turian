@@ -151,7 +151,7 @@ sealed partial class Build
             .Executes(() =>
             {
                 var projects = VersionedProjects
-                    .Where(project => project.Path.ReadAllText().Contains("<Version>", StringComparison.Ordinal));
+                    .Where(static project => project.Path.ReadAllText().Contains("<Version>", StringComparison.Ordinal));
                 foreach (var project in projects)
                 {
                     var path = project.Path;

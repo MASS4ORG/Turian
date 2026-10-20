@@ -127,7 +127,7 @@ public static partial class Program
             Required = true,
         };
 
-        var command = new Command("deprecate", "Mark a released version deprecated on an asset store; consumers are warned, nothing is removed")
+        var command = new Command("deprecate", "Mark a released version deprecated on an asset store, saying what to use instead; nothing is removed")
         {
             storeArg, idArg, versionArg, reasonOption,
         };
@@ -137,6 +137,20 @@ public static partial class Program
             await new StoreClient(result.GetValue(storeArg)!).SetStateAsync(result.GetValue(idArg)!, result.GetValue(versionArg)!,
                 new StoreReleaseState(DeprecationReason: reason), cancellationToken).ConfigureAwait(false);
             Console.WriteLine(reason.Length == 0 ? "Deprecation cleared" : "Deprecated");
+        }).ConfigureAwait(false));
+        return command;
+    }
+
+    static Command BrickWhoamiCommand()
+    {
+        var storeArg = StoreArgument();
+        var command = new Command("whoami", "Show which account the saved access token acts for on an asset store, and the prefixes it may publish") { storeArg };
+        command.SetAction(async (result, cancellationToken) => await RunBrickAsync(async () =>
+        {
+            var store = new StoreClient(result.GetValue(storeArg)!);
+            var account = await store.AccountAsync(cancellationToken).ConfigureAwait(false);
+            Console.WriteLine($"{account.Email} on {store.Origin.Host}");
+            Console.WriteLine(account.Prefixes.Count == 0 ? "prefixes: none" : $"prefixes: {string.Join(", ", account.Prefixes)}");
         }).ConfigureAwait(false));
         return command;
     }

@@ -18,6 +18,11 @@ public sealed record StoreRelease(Guid Id, string PackageId, string Version, boo
 /// <param name="DeprecationReason">Mark the release deprecated with this reason; empty clears it.</param>
 public sealed record StoreReleaseState(bool? Yanked = null, string? DeprecationReason = null);
 
+/// <summary>Who an access token acts for on a store.</summary>
+/// <param name="Email">The account's email.</param>
+/// <param name="Prefixes">The brick name prefixes the token may act on.</param>
+public sealed record StoreAccount(string Email, IReadOnlyList<string> Prefixes);
+
 /// <summary>An access token a store issued at sign-in.</summary>
 /// <param name="Id">The store's id for the token, which its owner revokes it by.</param>
 /// <param name="Secret">The bearer secret; the store keeps only its hash, so it is shown once.</param>
@@ -185,6 +190,17 @@ public sealed class StoreClient
     {
         using var request = Request(HttpMethod.Get, "api/v1/manage/releases", null);
         return await SendAsync<List<StoreRelease>>(request, "list releases", cancellationToken).ConfigureAwait(false) ?? [];
+    }
+
+    /// <summary>The account the access token acts for, and the prefixes it may act on.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The account.</returns>
+    /// <exception cref="PackageException">There is no token, the store refused it, or it cannot be reached.</exception>
+    public async Task<StoreAccount> AccountAsync(CancellationToken cancellationToken = default)
+    {
+        using var request = Request(HttpMethod.Get, "api/v1/account", null);
+        return await SendAsync<StoreAccount>(request, "describe the account", cancellationToken).ConfigureAwait(false)
+            ?? throw new PackageException($"{Origin.Host} did not describe the account.");
     }
 
     /// <summary>

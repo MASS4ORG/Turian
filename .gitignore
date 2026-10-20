@@ -44,8 +44,8 @@ x86/
 .vscode/
 .windsurf/
 .zed
-AGENTS.md
 
+!.nuke/Directory.Build.props
 docs/internal/
 .script-*.cs
 .script-*.sh

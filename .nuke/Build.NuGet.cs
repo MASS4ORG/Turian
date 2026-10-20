@@ -22,7 +22,7 @@ sealed partial class Build
 
     public Target PackNuGet => td =>
         td
-            .DependsOn(Restore, Compile) // Compile builds with --no-restore and no longer pulls in Restore itself
+            .DependsOn(Compile)
             .After(Publish)
             .Executes(() =>
             {
@@ -75,7 +75,7 @@ sealed partial class Build
             .Executes(() =>
             {
                 var packages = PackagesDirectory.GlobFiles("*.nupkg")
-                    .Where(package => !package.Name.Contains("symbols", StringComparison.OrdinalIgnoreCase))
+                    .Where(static package => !package.Name.Contains("symbols", StringComparison.OrdinalIgnoreCase))
                     .ToList();
                 if (packages.Count == 0)
                 {
