@@ -39,21 +39,4 @@ public sealed class MissingTypeMetaTests : IDisposable
             .Invoke(importer, [asset, true]);
         Assert.Equal(original, File.ReadAllText(meta));
     }
-
-    /// <summary>An importer built before the project opened still finds the importers of the project's bricks.</summary>
-    [Fact]
-    public void ImporterBuiltEarlyGainsBrickImporters()
-    {
-        using var build = new BuildManager(new AppSettings(), NullLogger.Instance);
-        var settings = new SettingsService();
-        using var importer = new AssetImporter(NullLogger.Instance, new AssetDatabase(), settings);
-
-        new ProjectManifest { Dependencies = { ["org.mass4.turian.ui"] = "builtin:org.mass4.turian.ui" } }
-            .Save(project);
-        settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
-        File.WriteAllText(Path.Combine(project, "Assets", "hud.ui"), "<ui/>");
-        importer.GenerateMetaFiles(Path.Combine(project, "Assets"));
-
-        Assert.IsType<UiDocumentAssetImporter>(importer.ImporterFor(Path.Combine(project, "Assets", "hud.ui")));
-    }
 }

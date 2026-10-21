@@ -74,7 +74,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public void Add(string id, string? source)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        Rollback(() => ProjectBricks.Add(Root, id, source ?? $"builtin:{id}"), Resolve);
+        Rollback(() => ProjectBricks.Add(Root, id, source ?? PackageSource.DefaultSpec(id, BuiltinDirectory)), Resolve);
     }
 
     /// <inheritdoc />

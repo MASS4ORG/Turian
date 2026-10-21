@@ -18,8 +18,7 @@ public static class ProjectPackages
     public static string BuiltinDirectory { get; } = FindBuiltinDirectory();
 
     /// <summary>The built-in packages a new project installs.</summary>
-    public static IReadOnlyList<string> DefaultBuiltins { get; } =
-        [RenderBrick, "org.mass4.turian.cameras", "org.mass4.turian.ui"];
+    public static IReadOnlyList<string> DefaultBuiltins { get; } = [RenderBrick];
 
     /// <summary>The built-in render brick: the Vulkan renderer and window client builds play in.</summary>
     public const string RenderBrick = "org.mass4.turian.vulkan";

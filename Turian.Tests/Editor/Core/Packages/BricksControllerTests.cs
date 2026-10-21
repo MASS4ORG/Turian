@@ -9,6 +9,8 @@ public sealed class BricksControllerTests : IDisposable
     readonly SettingsService settings = new();
     readonly BricksController controller;
 
+    const string Rules = "user.mateo.rules";
+
     /// <summary>Opens a scaffolded project, which installs the default built-in bricks.</summary>
     public BricksControllerTests()
     {
@@ -17,6 +19,13 @@ public sealed class BricksControllerTests : IDisposable
         controller = TestBricks.Controller(settings, new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
             applier);
         controller.Store = new PackageStore(Path.Combine(root, "store"));
+    }
+
+    /// <summary>Makes a source brick beside the project, installed from its folder.</summary>
+    string RulesSource()
+    {
+        var folder = Path.Combine(root, "fixtures", Rules);
+        return $"file:{(Directory.Exists(folder) ? folder : BrickService.New(Path.Combine(root, "fixtures"), Rules))}";
     }
 
     /// <inheritdoc/>
@@ -42,7 +51,7 @@ public sealed class BricksControllerTests : IDisposable
             Assert.Equal(PackageOrigin.Builtin, r.Origin);
             Assert.True(r.IsDirect);
         });
-        Assert.True(controller.Rows.Single(static r => r.Id == "org.mass4.turian.ui").IsPrecast);
+        Assert.True(controller.Rows.Single(static r => r.Id == ProjectPackages.RenderBrick).IsPrecast);
         Assert.Null(controller.Error);
     }
 
@@ -56,7 +65,7 @@ public sealed class BricksControllerTests : IDisposable
         closed.Refresh();
         Assert.False(closed.HasProject);
         Assert.Empty(closed.Rows);
-        Assert.False(await closed.InstallAsync("org.mass4.turian.ui", null));
+        Assert.False(await closed.InstallAsync(Rules, null));
         Assert.NotNull(closed.Error);
         applier.DidNotReceive().ApplyBrickChanges();
     }
@@ -68,15 +77,16 @@ public sealed class BricksControllerTests : IDisposable
         controller.Refresh();
         var changes = 0;
         controller.Changed += () => changes++;
+        Assert.True(await controller.InstallAsync(Rules, RulesSource()));
 
-        Assert.True(await controller.RemoveAsync("org.mass4.turian.cameras"));
-        Assert.DoesNotContain(controller.Rows, r => r.Id == "org.mass4.turian.cameras");
-        Assert.DoesNotContain("org.mass4.turian.cameras", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+        Assert.True(await controller.RemoveAsync(Rules));
+        Assert.DoesNotContain(controller.Rows, r => r.Id == Rules);
+        Assert.DoesNotContain(Rules, ProjectManifest.Load(project).Manifest.Dependencies.Keys);
 
-        Assert.True(await controller.InstallAsync("org.mass4.turian.cameras", null));
-        Assert.Contains(controller.Rows, r => r.Id == "org.mass4.turian.cameras");
+        Assert.True(await controller.InstallAsync(Rules, RulesSource()));
+        Assert.Contains(controller.Rows, r => r.Id == Rules);
 
-        applier.Received(2).ApplyBrickChanges();
+        applier.Received(3).ApplyBrickChanges();
         Assert.True(changes > 0);
         Assert.False(controller.IsBusy);
     }
@@ -116,24 +126,26 @@ public sealed class BricksControllerTests : IDisposable
     [Fact]
     public async Task EmbedForksTheBrick()
     {
-        Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
+        Assert.True(await controller.InstallAsync(Rules, RulesSource()));
+        Assert.True(await controller.EmbedAsync(Rules));
 
-        Assert.True(Directory.Exists(Path.Combine(project, "Bricks", "org.mass4.turian.cameras")));
-        Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == "org.mass4.turian.cameras").Origin);
+        Assert.True(Directory.Exists(Path.Combine(project, "Bricks", Rules)));
+        Assert.Equal(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == Rules).Origin);
     }
 
     /// <summary>Reverting a fork returns the brick to its global version and keeps the fork's files in the trash.</summary>
     [Fact]
     public async Task RevertGoesBackToTheGlobalBrick()
     {
-        Assert.True(await controller.EmbedAsync("org.mass4.turian.cameras"));
-        var fork = Path.Combine(project, "Bricks", "org.mass4.turian.cameras");
+        Assert.True(await controller.InstallAsync(Rules, RulesSource()));
+        Assert.True(await controller.EmbedAsync(Rules));
+        var fork = Path.Combine(project, "Bricks", Rules);
         File.WriteAllText(Path.Combine(fork, "mine.txt"), "changed");
 
-        Assert.True(await controller.RevertAsync("org.mass4.turian.cameras"));
+        Assert.True(await controller.RevertAsync(Rules));
 
         Assert.False(Directory.Exists(fork));
-        Assert.NotEqual(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == "org.mass4.turian.cameras").Origin);
+        Assert.NotEqual(PackageOrigin.Embedded, controller.Rows.Single(static r => r.Id == Rules).Origin);
         Assert.Single(Directory.GetFiles(Path.Combine(project, ".Cache", "Trash"), "mine.txt", SearchOption.AllDirectories));
     }
 
@@ -155,16 +167,16 @@ public sealed class BricksControllerTests : IDisposable
     {
         controller.Refresh();
         var catalog = controller.Catalog.ToDictionary(static b => b.Id);
-        Assert.Equal(BrickState.Enabled, catalog["org.mass4.turian.ui"].State);
+        Assert.Equal(BrickState.Enabled, catalog[ProjectPackages.RenderBrick].State);
 
-        Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
+        Assert.True(await controller.DisableAsync(ProjectPackages.RenderBrick));
 
-        Assert.DoesNotContain(controller.Rows, static r => r.Id == "org.mass4.turian.ui");
+        Assert.DoesNotContain(controller.Rows, static r => r.Id == ProjectPackages.RenderBrick);
         catalog = controller.Catalog.ToDictionary(static b => b.Id);
-        Assert.Equal(BrickState.Available, catalog["org.mass4.turian.ui"].State);
+        Assert.Equal(BrickState.Available, catalog[ProjectPackages.RenderBrick].State);
 
-        Assert.True(await controller.EnableAsync(catalog["org.mass4.turian.ui"]));
-        Assert.Contains(controller.Rows, static r => r.Id == "org.mass4.turian.ui");
+        Assert.True(await controller.EnableAsync(catalog[ProjectPackages.RenderBrick]));
+        Assert.Contains(controller.Rows, static r => r.Id == ProjectPackages.RenderBrick);
     }
 
     /// <summary>A brick in use cannot be uninstalled, and a stored one leaves the store.</summary>
@@ -172,7 +184,7 @@ public sealed class BricksControllerTests : IDisposable
     public async Task UninstallDeletesOnlyBricksThatAreNotInUse()
     {
         controller.Refresh();
-        Assert.False(await controller.UninstallAsync("org.mass4.turian.ui"));
+        Assert.False(await controller.UninstallAsync(ProjectPackages.RenderBrick));
 
         var stored = Path.Combine(controller.Store.Root, "user.mateo.stored@abc");
         Directory.CreateDirectory(controller.Store.Root);
@@ -223,17 +235,17 @@ public sealed class BricksControllerTests : IDisposable
     public async Task InspectionFollowsTheBricksState()
     {
         controller.Refresh();
-        controller.Selected = "org.mass4.turian.ui";
+        controller.Selected = ProjectPackages.RenderBrick;
         Assert.Equal(["Disable", "Update", "Make Local"],
             Assert.IsType<FormInspection>(controller.InspectSelection()).Model.Sections[1].Buttons.Select(static b => b.Label));
 
         Assert.Equal("In use", controller.InspectSelection()!.Model.Sections[1].Fields
             .Single(static f => f.Name == "Status").GetValue());
 
-        Assert.True(await controller.DisableAsync("org.mass4.turian.ui"));
-        controller.Selected = "org.mass4.turian.ui";
+        Assert.True(await controller.DisableAsync(ProjectPackages.RenderBrick));
+        controller.Selected = ProjectPackages.RenderBrick;
         var available = Assert.IsType<FormInspection>(controller.InspectSelection());
-        Assert.Equal("org.mass4.turian.ui", Assert.IsType<PackageManifest>(available.Target).Name);
+        Assert.Equal(ProjectPackages.RenderBrick, Assert.IsType<PackageManifest>(available.Target).Name);
         Assert.Equal("Available", available.Model.Sections[1].Fields.Single(static f => f.Name == "Status").GetValue());
         Assert.Equal("Enable", Assert.Single(available.Model.Sections[1].Buttons).Label);
 
@@ -252,14 +264,14 @@ public sealed class BricksControllerTests : IDisposable
     public void ManifestsBuildAnInspectorForm()
     {
         controller.Refresh();
-        controller.Selected = "org.mass4.turian.ui";
+        controller.Selected = ProjectPackages.RenderBrick;
 
         var inspection = Assert.IsType<FormInspection>(controller.InspectSelection());
         Assert.Same(controller.SelectedBrick!.Manifest, inspection.Target);
         var model = inspection.Model;
         Assert.Equal(2, model.Sections.Count);
         var section = model.Sections[0];
-        Assert.Equal("Brick 'In-game UI'", section.Title);
+        Assert.Equal("Brick 'Vulkan Renderer'", section.Title);
         Assert.All(section.BodyFields, static f => Assert.True(f.IsReadOnly));
         Assert.Contains(section.BodyFields, static f => f.Label == "Name");
         Assert.Equal(["Disable", "Update", "Make Local"], model.Sections[1].Buttons.Select(static b => b.Label));
@@ -394,9 +406,9 @@ public sealed class BricksControllerTests : IDisposable
         var form = controller.InspectSettings(settings)!;
         var bricks = Assert.IsType<BricksSettings>(form.Target);
         Assert.Same(settings.Settings!.Bricks, bricks);
-        bricks.Dependencies.Remove("org.mass4.turian.cameras");
+        bricks.Dependencies.Remove(ProjectPackages.RenderBrick);
         Assert.True(await controller.SaveSettingsAsync(bricks), controller.Error);
-        Assert.DoesNotContain("org.mass4.turian.cameras", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+        Assert.DoesNotContain(ProjectPackages.RenderBrick, ProjectManifest.Load(project).Manifest.Dependencies.Keys);
         var path = Path.Combine(project, "Bricks", "manifest.json");
         var before = File.ReadAllText(path);
         bricks.Dependencies["user.mateo.missing"] = "file:../nowhere";
@@ -412,10 +424,10 @@ public sealed class BricksControllerTests : IDisposable
     public void RefreshKeepsSettingsDraft()
     {
         var bricks = settings.Settings!.Bricks;
-        bricks.Dependencies.Remove("org.mass4.turian.cameras");
+        bricks.Dependencies.Remove(ProjectPackages.RenderBrick);
         controller.Refresh();
-        Assert.DoesNotContain("org.mass4.turian.cameras", bricks.Dependencies.Keys);
-        Assert.Contains("org.mass4.turian.cameras", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+        Assert.DoesNotContain(ProjectPackages.RenderBrick, bricks.Dependencies.Keys);
+        Assert.Contains(ProjectPackages.RenderBrick, ProjectManifest.Load(project).Manifest.Dependencies.Keys);
     }
 
     /// <summary>Registry-only catalog entries expose only metadata supplied by the index.</summary>
@@ -436,7 +448,7 @@ public sealed class BricksControllerTests : IDisposable
     public void StaleFormsCannotRunActions()
     {
         controller.Refresh();
-        controller.Selected = "org.mass4.turian.ui";
+        controller.Selected = ProjectPackages.RenderBrick;
         var brick = Assert.IsType<FormInspection>(controller.InspectSelection());
         var form = controller.InspectSettings(settings)!;
         settings.Set(new AppSettings { ProjectAbsoluteDir = Path.Combine(root, "other") });

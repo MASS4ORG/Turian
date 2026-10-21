@@ -36,7 +36,6 @@ public static partial class Program
             BrickCommand(),
             VariantCommand(),
             ImportCommand(),
-            UiCommand(),
             ThemeCommand()
         };
 

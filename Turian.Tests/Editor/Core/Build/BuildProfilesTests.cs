@@ -6,6 +6,7 @@ namespace Turian.Tests;
 public sealed class BuildProfilesTests : IDisposable
 {
     readonly string project = Directory.CreateTempSubdirectory("turian-build-profiles-").FullName;
+    readonly string fixtures = Directory.CreateTempSubdirectory("turian-build-profiles-bricks-").FullName;
 
     /// <summary>Creates the project's Assets folder.</summary>
     public BuildProfilesTests() => Directory.CreateDirectory(Assets);
@@ -15,19 +16,46 @@ public sealed class BuildProfilesTests : IDisposable
     BuildAppSettings Settings => new() { Title = "Game", ProjectAbsoluteDir = project };
 
     /// <inheritdoc/>
-    public void Dispose() => Directory.Delete(project, recursive: true);
+    public void Dispose()
+    {
+        Directory.Delete(project, recursive: true);
+        Directory.Delete(fixtures, recursive: true);
+    }
 
+    /// <summary>Installs source bricks made for the test; <see cref="ViewBrick"/> uses the renderer, so it is client-only.</summary>
     IReadOnlyList<ResolvedPackage> Install(params string[] ids)
     {
         var manifest = new ProjectManifest();
         foreach (var id in ids)
         {
-            manifest.Dependencies[id] = $"builtin:{id}";
+            manifest.Dependencies[id] = $"file:{Fixture(id)}";
         }
 
         manifest.Save(project);
         ProjectPackages.Invalidate(project);
         return ProjectPackages.Resolve(project).Packages;
+    }
+
+    const string RulesBrick = "user.mateo.rules";
+    const string ViewBrick = "user.mateo.view";
+
+    string Fixture(string id)
+    {
+        var folder = Path.Combine(fixtures, id);
+        if (Directory.Exists(folder))
+        {
+            return folder;
+        }
+
+        BrickService.New(fixtures, id);
+        if (id == ViewBrick)
+        {
+            var manifest = PackageManifest.Load(folder, ["gaya", ProjectPackages.HostName]);
+            manifest.Dependencies[ProjectPackages.RenderBrick] = $"builtin:{ProjectPackages.RenderBrick}";
+            manifest.Save(folder);
+        }
+
+        return folder;
     }
 
     void SaveProfile(string file, BuildProfile profile)
@@ -41,14 +69,13 @@ public sealed class BuildProfilesTests : IDisposable
     [Fact]
     public void ServerBuildsLeaveOutClientOnlyBricksAndTheirDependents()
     {
-        var bricks = Install("org.mass4.turian.cameras", "org.mass4.turian.ui", "org.mass4.turian.hzb");
+        var bricks = Install(RulesBrick, ViewBrick);
 
         var client = BuildProfiles.ShippingBricks(bricks, BuildTarget.Client).Select(static b => b.Id).Order();
         var server = BuildProfiles.ShippingBricks(bricks, BuildTarget.Server).Select(static b => b.Id);
 
-        Assert.Equal(["org.mass4.turian.cameras", "org.mass4.turian.hzb", "org.mass4.turian.ui", ProjectPackages.RenderBrick],
-            client);
-        Assert.Equal(["org.mass4.turian.cameras"], server);
+        Assert.Equal([ProjectPackages.RenderBrick, RulesBrick, ViewBrick], client);
+        Assert.Equal([RulesBrick], server);
         Assert.True(BuildProfiles.HasPlayer(BuildProfiles.ShippingBricks(bricks, BuildTarget.Client)));
         Assert.False(BuildProfiles.HasPlayer(BuildProfiles.ShippingBricks(bricks, BuildTarget.Server)));
     }
@@ -200,15 +227,14 @@ public sealed class BuildProfilesTests : IDisposable
     [Fact]
     public void ServerRuntimeProjectsShipNoClientOnlyFiles()
     {
-        Install("org.mass4.turian.ui");
+        Install();
         var server = new BuildProfile { Target = BuildTarget.Server, RuntimeIdentifier = " linux-arm64 " };
 
         var serverProject = CsProjectGenerator.GenerateExecutable(Settings, NullLogger.Instance,
             ExecutableGenerationMode.Export, server);
         var clientProject = CsProjectGenerator.GenerateExecutable(Settings, NullLogger.Instance);
 
-        Assert.DoesNotContain(Items(serverProject), static i => i.Include is "Turian.Engine.Vulkan" or "Turian.Engine.UI"
-            or "Silk.NET.Vulkan" or "SkiaSharp");
+        Assert.DoesNotContain(Items(serverProject), static i => i.Include is "Turian.Engine.Vulkan" or "Silk.NET.Vulkan");
         Assert.Contains(serverProject.Targets, static t => t.Name == "VerifyServerDependencies");
         Assert.Contains(serverProject.Properties, static p => p is { Name: "RuntimeIdentifier", Value: "linux-arm64" });
         Assert.Contains(serverProject.Properties, static p => p is { Name: "OutputType", Value: "Exe" });
@@ -248,14 +274,14 @@ public sealed class BuildProfilesTests : IDisposable
     [Fact]
     public void ServerTypeManifestsListNoClientOnlyAssemblies()
     {
-        Install("org.mass4.turian.ui");
+        Install();
 
         var client = UserCodeTypeManifestGenerator.Generate(Assets, NullLogger.Instance);
         var server = UserCodeTypeManifestGenerator.Generate(Assets, NullLogger.Instance, target: BuildTarget.Server);
 
         Assert.Contains("Turian.Engine.Vulkan", client.PrecastAssemblies);
         Assert.Empty(server.PrecastAssemblies);
-        Assert.DoesNotContain(server.Types, static t => t.Assembly == "Turian.Engine.UI");
+        Assert.DoesNotContain(server.Types, static t => t.Assembly == "Turian.Engine.Vulkan");
     }
 
     /// <summary>
@@ -268,7 +294,7 @@ public sealed class BuildProfilesTests : IDisposable
     public void RemovingTheRenderBrickOptsOutOfTheDefault(bool disable)
     {
         Assert.Contains(ProjectPackages.ResolveOrEmpty(project), static p => p.Id == ProjectPackages.RenderBrick);
-        Install("org.mass4.turian.cameras");
+        Install(RulesBrick);
 
         if (disable)
         {
@@ -280,7 +306,7 @@ public sealed class BuildProfilesTests : IDisposable
         }
 
         Assert.Null(ProjectManifest.Load(project).Manifest.Dependencies[ProjectPackages.RenderBrick]);
-        Assert.Equal(["org.mass4.turian.cameras"], ProjectPackages.Resolve(project).Packages.Select(static p => p.Id));
+        Assert.Equal([RulesBrick], ProjectPackages.Resolve(project).Packages.Select(static p => p.Id));
     }
 
     /// <summary>Only a client build left without a render brick is warned that it runs headless.</summary>
@@ -303,7 +329,7 @@ public sealed class BuildProfilesTests : IDisposable
         Install();
 
         Assert.Contains("does not declare", Assert.Throws<PackageException>(
-            () => BrickService.Disable(project, "org.mass4.turian.cameras")).Message);
+            () => BrickService.Disable(project, RulesBrick)).Message);
     }
 
     /// <summary>A package cannot ship only in clients while also being editor- or compile-time-only.</summary>

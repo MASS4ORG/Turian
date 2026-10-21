@@ -54,6 +54,31 @@ public sealed class StudioBricksTests : IDisposable
         Assert.Null(studio.BuiltinDirectory);
     }
 
+    /// <summary>A brick added without a source is built-in when the host ships it, else any registry version.</summary>
+    [Fact]
+    public void BricksAddedWithoutASourcePreferTheBuiltinCopy()
+    {
+        var builtin = Path.Combine(root, "builtin");
+        var shipped = Path.Combine(builtin, "com.acme.shipped");
+        Directory.CreateDirectory(shipped);
+        new PackageManifest
+        {
+            Name = "com.acme.shipped",
+            Version = SemanticVersion.Parse("1.0.0"),
+            Scopes = [PackageScope.Studio],
+        }.Save(shipped);
+
+        Assert.Equal("builtin:com.acme.shipped", PackageSource.DefaultSpec("com.acme.shipped", builtin));
+        Assert.Equal("*", PackageSource.DefaultSpec("com.acme.remote", builtin));
+        Assert.Equal("*", PackageSource.DefaultSpec("com.acme.shipped", null));
+
+        var shipping = new StudioBricks(studio.Root, Hosts, new PackageStore(Path.Combine(root, "store")), builtinDirectory: builtin);
+        shipping.Add("com.acme.shipped", null);
+        Assert.Equal("builtin:com.acme.shipped", ProjectManifest.Load(studio.Root).Manifest.Dependencies["com.acme.shipped"]);
+        Assert.Throws<PackageException>(() => shipping.Add("com.acme.remote", null));
+        Assert.DoesNotContain("com.acme.remote", ProjectManifest.Load(studio.Root).Manifest.Dependencies.Keys);
+    }
+
     /// <summary>A project-only brick is refused by the studio and the manifest is put back.</summary>
     [Fact]
     public void ProjectOnlyBricksAreRefused()

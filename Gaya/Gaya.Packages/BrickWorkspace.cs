@@ -30,7 +30,7 @@ public interface IBrickWorkspace
 
     /// <summary>Declares a brick and resolves.</summary>
     /// <param name="id">The brick id.</param>
-    /// <param name="source">The source; <c>builtin:&lt;id&gt;</c> when null.</param>
+    /// <param name="source">The source; the built-in copy, else any registry version, when null.</param>
     void Add(string id, string? source);
 
     /// <summary>Declares a brick from a folder, a <c>.brick</c> file or a git repository, reading its id from it.</summary>

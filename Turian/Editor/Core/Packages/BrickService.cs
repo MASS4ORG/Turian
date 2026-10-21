@@ -29,12 +29,15 @@ public static class BrickService
     /// <summary>Declares a brick in the project and resolves, so a bad source fails now.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
-    /// <param name="spec">The source; <c>builtin:&lt;id&gt;</c> when the brick ships with the engine and none is given.</param>
+    /// <param name="spec">
+    /// The source; when none is given, <c>builtin:&lt;id&gt;</c> for a brick that ships with the engine and any
+    /// registry version otherwise.
+    /// </param>
     /// <returns>The resolution.</returns>
     public static PackageResolution Add(string projectRoot, string id, string? spec = null)
     {
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        ProjectBricks.Add(projectRoot, id, spec ?? $"builtin:{id}");
+        ProjectBricks.Add(projectRoot, id, spec ?? PackageSource.DefaultSpec(id, ProjectPackages.BuiltinDirectory));
         ProjectPackages.Invalidate(projectRoot);
         try
         {

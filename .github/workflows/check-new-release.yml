@@ -30,7 +30,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      # Building the test project compiles the HZB shaders through Turian.Engine.Hzb.csproj.
+      # glslc: shader compilation (CompileShaders).
       - name: Install glslc
         run: sudo apt-get update -yqq && sudo apt-get install -yqq glslc
 

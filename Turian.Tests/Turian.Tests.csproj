@@ -20,8 +20,6 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/tools/BrickRelease/BrickRelease.csproj" />
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.save/Source~/Turian.Engine.Save/Turian.Engine.Save.csproj" />
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.obj/Source~/Turian.Editor.Obj/Turian.Editor.Obj.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CLI/Turian.Editor.CLI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Host/Gaya.Host.csproj"/>
@@ -29,9 +27,6 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.hzb/Source~/Turian.Engine.Hzb/Turian.Engine.Hzb.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Engine.UI/Turian.Engine.UI.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.ui/Source~/Turian.Editor.UI/Turian.Editor.UI.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj"
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>

@@ -50,6 +50,18 @@ public abstract record PackageSource
             ? new RangeSource(range)
             : throw new PackageException($"'{spec}' is neither a builtin: id, a file: path, a git+ url nor a version range.");
     }
+
+    /// <summary>
+    /// The dependency value of a brick added without a source: its built-in copy when the host ships one, else any
+    /// version the registries serve.
+    /// </summary>
+    /// <param name="id">The brick id.</param>
+    /// <param name="builtinDirectory">The host's built-in packages folder, if it has one.</param>
+    /// <returns>The dependency value.</returns>
+    public static string DefaultSpec(string id, string? builtinDirectory) =>
+        builtinDirectory is not null && File.Exists(Path.Combine(builtinDirectory, id, PackageManifest.FileName))
+            ? $"builtin:{id}"
+            : "*";
 }
 
 /// <summary>A package shipped with the host, read in place from its built-in folder.</summary>

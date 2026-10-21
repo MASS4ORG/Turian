@@ -97,7 +97,7 @@ public static partial class Program
         var idArg = new Argument<string>("id") { Description = "Brick id" };
         var sourceArg = new Argument<string?>("source")
         {
-            Description = "builtin:<id>, file:<folder or .brick>, git+<url>[#ref] or a version range; builtin:<id> when omitted",
+            Description = "builtin:<id>, file:<folder or .brick>, git+<url>[#ref] or a version range; when omitted, builtin:<id> for a brick the engine ships, else any registry version",
             Arity = ArgumentArity.ZeroOrOne,
         };
 

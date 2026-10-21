@@ -253,7 +253,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
 
     /// <summary>Installs a brick: declares it in the manifest, resolves, and brings the open project in line.</summary>
     /// <param name="id">The brick id.</param>
-    /// <param name="source">The source; <c>builtin:&lt;id&gt;</c> when empty.</param>
+    /// <param name="source">The source; the built-in copy, else any registry version, when empty.</param>
     /// <returns>Whether the brick was installed.</returns>
     public Task<bool> InstallAsync(string id, string? source) =>
         RunAsync($"Install brick {id}", workspace =>

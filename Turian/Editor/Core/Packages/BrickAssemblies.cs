@@ -178,7 +178,7 @@ public static class BrickAssemblies
         {
             if (!ResolvingRegistered)
             {
-                AssemblyLoadContext.Default.Resolving += (_, args) =>
+                AssemblyLoadContext.Default.Resolving += static (_, args) =>
                     args.Name is { } name && ResolveDependency(new AssemblyName(name)) is { } path ? LoadFromProbedPath(path) : null;
                 ResolvingRegistered = true;
             }

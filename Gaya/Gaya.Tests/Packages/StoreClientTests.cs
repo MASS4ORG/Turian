@@ -27,7 +27,7 @@ public sealed class StoreClientTests : IDisposable
     /// <summary>An address that is not http or https is refused.</summary>
     [Fact]
     public void NonHttpStoreAddressesAreRefused() =>
-        Assert.Throws<PackageException>(() => StoreClient.OriginOf("ftp://store.example"));
+        Assert.Throws<PackageException>(static () => StoreClient.OriginOf("ftp://store.example"));
 
     /// <summary>A bare host is tried with https, then http, at the root, the store's <c>/v1</c>, then its older registry path.</summary>
     [Fact]
@@ -109,7 +109,7 @@ public sealed class StoreClientTests : IDisposable
         Assert.Equal(["com.me"], scoped.Scopes);
         Assert.Empty(scoped.Keys);
 
-        await Assert.ThrowsAsync<PackageException>(() =>
+        await Assert.ThrowsAsync<PackageException>(static () =>
             RegistryDiscovery.DiscoverAsync("https://nothing.example", new HttpClient(new StoreHandler()), TestContext.Current.CancellationToken));
     }
 

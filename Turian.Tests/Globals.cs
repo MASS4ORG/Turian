@@ -37,14 +37,11 @@ global using OpenAssetPackage;
 global using Silk.NET.Vulkan;
 global using SkiaSharp;
 global using Turian.Editor.Core;
-global using Turian.Editor.UI;
 global using Turian.Engine.Core;
-global using Turian.Engine.UI;
 global using Xunit;
 global using Color = Turian.Engine.Core.Color;
 global using GKey = Guinevere.KeyboardKey;
 global using GMouseButton = Guinevere.MouseButton;
-global using GuiColor = Guinevere.Color;
 global using Key = Silk.NET.Input.Key;
 global using SilkMouseButton = Silk.NET.Input.MouseButton;
 
