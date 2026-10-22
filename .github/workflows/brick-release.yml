@@ -23,6 +23,22 @@ on:
         description: Additional brick tests; BRICK_ARCHIVE identifies the exact archive to test
         type: string
         default: ""
+      twin:
+        description: Bake the brick and release its bake twin <id>.bake beside it
+        type: boolean
+        default: true
+      source-tests:
+        description: Test project under the brick that builds its Source~ projects into Precast~ against Turian; empty when the brick has none
+        type: string
+        default: ""
+      turian-ref:
+        description: Full MASS4ORG/Turian commit the Source~ projects build against; the engine inside cli-image
+        type: string
+        default: ""
+      precast-path:
+        description: Precast role path relative to the brick; use Precast~ for a v1 brick
+        type: string
+        default: Brick~/Precast
 
 permissions:
   contents: read
@@ -32,13 +48,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Source~ projects build against a Turian checkout beside the brick, as on a workstation; no secrets here.
+  build-source:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && inputs.source-tests != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TURIAN_REF: ${{ inputs.turian-ref }}
+    steps:
+      - name: Require an immutable Turian
+        shell: bash
+        run: '[[ "$TURIAN_REF" =~ ^[0-9a-f]{40}$ ]]'
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          path: Bricks/brick
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: MASS4ORG/Turian
+          ref: ${{ inputs.turian-ref }}
+          path: Turian
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: Turian/global.json
+
+      - name: Build and test the sources
+        run: dotnet test --project "Bricks/brick/${{ inputs.brick-path }}/${{ inputs.source-tests }}" -p:SkipShaders=true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: precast
+          path: Bricks/brick/${{ inputs.brick-path }}/${{ inputs.precast-path }}/
+          if-no-files-found: error
+
   qualify:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build-source
+    if: >-
+      always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      && (needs.build-source.result == 'success' || needs.build-source.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
       qualification: ${{ steps.identity.outputs.qualification }}
       archive: ${{ steps.identity.outputs.archive }}
+      twin-qualification: ${{ steps.identity.outputs.twin-qualification }}
+      twin-archive: ${{ steps.identity.outputs.twin-archive }}
     env:
       TURIAN_CLI_IMAGE: ${{ inputs.cli-image }}
       TOOLS_REF: ${{ inputs.tools-ref }}
@@ -78,7 +137,13 @@ jobs:
       - name: Build the reviewed release tool
         run: dotnet build release-tools/tools/BrickRelease/BrickRelease.csproj --configuration Release --nologo
 
-      - name: Verify and pack once
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: inputs.source-tests != ''
+        with:
+          name: precast
+          path: source/${{ inputs.brick-path }}/${{ inputs.precast-path }}
+
+      - name: Verify, bake and pack once
         shell: bash
         run: |
           docker pull "$TURIAN_CLI_IMAGE"
@@ -88,31 +153,48 @@ jobs:
               -e HOME=/tmp -e GAYA_BRICKS=/tmp/bricks -e GAYA_CONFIG_HOME=/tmp/gaya \
               -v "$GITHUB_WORKSPACE:/work" -w /work/source "$TURIAN_CLI_IMAGE" "$@"
           }
+          if [[ -n "$SOURCE_TESTS" ]]; then turian brick sync-precast "$BRICK_PATH"; fi
           turian brick verify "$BRICK_PATH"
           flags=()
           if [[ "$PRECAST" == true ]]; then flags+=(--precast); fi
+          if [[ "$TWIN" == true ]]; then flags+=(--twin); fi
           turian brick pack "$BRICK_PATH" --out /work/packed "${flags[@]}"
         env:
           PRECAST: ${{ inputs.precast }}
+          TWIN: ${{ inputs.twin }}
+          SOURCE_TESTS: ${{ inputs.source-tests }}
 
       - name: Bind qualification to archive bytes
         id: identity
         shell: bash
+        env:
+          TWIN: ${{ inputs.twin }}
         run: |
-          archives=(packed/*.brick)
-          [[ ${#archives[@]} == 1 && -f "${archives[0]}" ]]
+          twins=(packed/*.bake-*.brick)
+          sources=()
+          for archive in packed/*.brick; do [[ "$archive" == *.bake-*.brick ]] || sources+=("$archive"); done
+          [[ ${#sources[@]} == 1 && -f "${sources[0]}" ]]
           dotnet "$BRICK_RELEASE_TOOL" qualify \
-            "${archives[0]}" "$GITHUB_REF_NAME" "$GITHUB_SHA" packed/qualification.json --github-output
+            "${sources[0]}" "$GITHUB_REF_NAME" "$GITHUB_SHA" packed/qualification.json --github-output
+          if [[ "$TWIN" == true ]]; then
+            [[ ${#twins[@]} == 1 && -f "${twins[0]}" ]]
+            dotnet "$BRICK_RELEASE_TOOL" qualify \
+              "${twins[0]}" "$GITHUB_REF_NAME" "$GITHUB_SHA" packed/twin-qualification.json --github-output twin-
+          fi
 
-      - name: Test the packed archive
+      - name: Test the packed archives
         shell: bash
         working-directory: source
         env:
           TEST_COMMAND: ${{ inputs.test-command }}
           ARCHIVE_NAME: ${{ steps.identity.outputs.archive }}
+          TWIN_ARCHIVE_NAME: ${{ steps.identity.outputs.twin-archive }}
         run: |
           export BRICK_ARCHIVE="$GITHUB_WORKSPACE/packed/$ARCHIVE_NAME"
           dotnet "$BRICK_RELEASE_TOOL" consumer "$BRICK_ARCHIVE" "$TURIAN_CLI_IMAGE"
+          if [[ -n "$TWIN_ARCHIVE_NAME" ]]; then
+            dotnet "$BRICK_RELEASE_TOOL" consumer "$GITHUB_WORKSPACE/packed/$TWIN_ARCHIVE_NAME" "$TURIAN_CLI_IMAGE"
+          fi
           if [[ -n "$TEST_COMMAND" ]]; then bash -euo pipefail -c "$TEST_COMMAND"; fi
 
       - name: Check tested bytes are unchanged
@@ -120,16 +202,22 @@ jobs:
         env:
           ARCHIVE_NAME: ${{ steps.identity.outputs.archive }}
           QUALIFICATION: ${{ steps.identity.outputs.qualification }}
+          TWIN_ARCHIVE_NAME: ${{ steps.identity.outputs.twin-archive }}
+          TWIN_QUALIFICATION: ${{ steps.identity.outputs.twin-qualification }}
         run: |
           printf '%s\n' "$QUALIFICATION" > packed/qualification.json
           dotnet "$BRICK_RELEASE_TOOL" validate "packed/$ARCHIVE_NAME" packed/qualification.json
+          if [[ -n "$TWIN_ARCHIVE_NAME" ]]; then
+            printf '%s\n' "$TWIN_QUALIFICATION" > packed/twin-qualification.json
+            dotnet "$BRICK_RELEASE_TOOL" validate "packed/$TWIN_ARCHIVE_NAME" packed/twin-qualification.json
+          fi
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qualified-brick
           path: |
             packed/*.brick
-            packed/qualification.json
+            packed/*qualification.json
           if-no-files-found: error
           compression-level: 0
 
@@ -142,6 +230,8 @@ jobs:
       TURIAN_CLI_IMAGE: ${{ inputs.cli-image }}
       ARCHIVE_NAME: ${{ needs.qualify.outputs.archive }}
       QUALIFICATION: ${{ needs.qualify.outputs.qualification }}
+      TWIN_ARCHIVE_NAME: ${{ needs.qualify.outputs.twin-archive }}
+      TWIN_QUALIFICATION: ${{ needs.qualify.outputs.twin-qualification }}
       BRICK_RELEASE_ROOT: ${{ github.workspace }}/release-tools
       BRICK_RELEASE_TOOL: ${{ github.workspace }}/release-tools/tools/BrickRelease/bin/Release/net10.0/Mass4.BrickRelease.dll
     steps:
@@ -171,35 +261,48 @@ jobs:
           name: qualified-brick
           path: qualified
 
-      - name: Verify downloaded archive
+      - name: Verify downloaded archives
         shell: bash
         run: |
           printf '%s\n' "$QUALIFICATION" > qualified/qualification.json
           dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$ARCHIVE_NAME" qualified/qualification.json
+          if [[ -n "$TWIN_ARCHIVE_NAME" ]]; then
+            printf '%s\n' "$TWIN_QUALIFICATION" > qualified/twin-qualification.json
+            dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$TWIN_ARCHIVE_NAME" qualified/twin-qualification.json
+          fi
           docker pull "$TURIAN_CLI_IMAGE"
 
-      - name: Sign the qualified release
+      - name: Sign the qualified releases
         shell: bash
         env:
           MASS4_BRICKS_CI_SIGNING_KEY: ${{ secrets.MASS4_BRICKS_CI_SIGNING_KEY }}
           MASS4_BRICKS_CI_PUBLIC_KEY: ${{ vars.MASS4_BRICKS_CI_PUBLIC_KEY }}
-        run: dotnet "$BRICK_RELEASE_TOOL" sign "qualified/$ARCHIVE_NAME" qualified/qualification.json qualified/release.json
+        run: |
+          dotnet "$BRICK_RELEASE_TOOL" sign "qualified/$ARCHIVE_NAME" qualified/qualification.json qualified/release.json
+          if [[ -n "$TWIN_ARCHIVE_NAME" ]]; then
+            dotnet "$BRICK_RELEASE_TOOL" sign "qualified/$TWIN_ARCHIVE_NAME" qualified/twin-qualification.json qualified/twin-release.json
+          fi
 
-      - name: Upload exact archive for store approval
+      - name: Upload exact archives for store approval
         shell: bash
         env:
           GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG: ${{ secrets.MASS4_BRICKS_STORE_TOKEN }}
         run: |
           : "${GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG:?Missing protected publish token}"
-          dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$ARCHIVE_NAME" qualified/qualification.json
-          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-            -e GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG \
-            -v "$GITHUB_WORKSPACE/qualified:/release:ro" "$TURIAN_CLI_IMAGE" \
-            brick upload https://store.mass4.org "/release/$ARCHIVE_NAME" --release /release/release.json
+          upload() {
+            dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$1" "qualified/$2"
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+              -e GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG \
+              -v "$GITHUB_WORKSPACE/qualified:/release:ro" "$TURIAN_CLI_IMAGE" \
+              brick upload https://store.mass4.org "/release/$1" --release "/release/$3"
+          }
+          # The source first: a twin's bakeOf names the source release it stands in for.
+          upload "$ARCHIVE_NAME" qualification.json release.json
+          if [[ -n "$TWIN_ARCHIVE_NAME" ]]; then upload "$TWIN_ARCHIVE_NAME" twin-qualification.json twin-release.json; fi
           printf '%s\n' 'Upload completed. Store admin approval is a separate gate before index visibility.' >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: signed-brick-release
-          path: qualified/release.json
+          path: qualified/*release.json
           if-no-files-found: error

@@ -7,16 +7,19 @@ namespace Turian.Tests;
 /// importing, unless they no longer match the source, its settings or the importer.
 /// </summary>
 [Trait("Category", "E2E")]
+[Collection(SerialTests.Name)]
 public sealed class BrickBakeTests : IDisposable
 {
     static readonly Guid NotesId = Guid.Parse("4f1c2a7e-9b3d-4e5f-8a6b-1c2d3e4f5a6b");
 
     readonly string root = Path.Combine(Path.GetTempPath(), $"turian-bake-{Guid.NewGuid():N}");
+    readonly string? previousStore = Environment.GetEnvironmentVariable(PackageStore.StoreVariable);
     readonly string brick;
 
     /// <summary>Creates an asset-only brick whose single asset carries a committed meta.</summary>
     public BrickBakeTests()
     {
+        Environment.SetEnvironmentVariable(PackageStore.StoreVariable, Path.Combine(root, "store"));
         brick = Path.Combine(root, "notes");
         Directory.CreateDirectory(Path.Combine(brick, "Runtime"));
         new PackageManifest { Name = "user.mateo.notes", Version = SemanticVersion.Parse("1.0.0") }.Save(brick);
@@ -25,7 +28,11 @@ public sealed class BrickBakeTests : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() => PrecastBrickFixture.DeleteTree(root);
+    public void Dispose()
+    {
+        Environment.SetEnvironmentVariable(PackageStore.StoreVariable, previousStore);
+        PrecastBrickFixture.DeleteTree(root);
+    }
 
     /// <summary>
     /// Packing with a twin bakes first: the twin carries the bake, the source does not, and baking again writes the same

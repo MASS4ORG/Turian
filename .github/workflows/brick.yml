@@ -25,6 +25,10 @@ on:
         description: Compile the brick's assemblies into Precast~ before packing, which also proves they build
         type: boolean
         default: true
+      twin:
+        description: Bake the brick and pack its bake twin <id>.bake beside it
+        type: boolean
+        default: false
       turian-version:
         description: Tag of the ghcr.io/mass4org/turian-cli image to run
         type: string
@@ -60,7 +64,7 @@ jobs:
 
       - name: Pack the brick
         if: inputs.brick-path != ''
-        run: turian-cli brick pack "${{ inputs.brick-path }}" --out "${{ github.workspace }}/.bricks" ${{ inputs.precast && '--precast' || '' }}
+        run: turian-cli brick pack "${{ inputs.brick-path }}" --out "${{ github.workspace }}/.bricks" ${{ inputs.precast && '--precast' || '' }} ${{ inputs.twin && '--twin' || '' }}
 
       - name: Keep the packed brick
         if: inputs.brick-path != ''

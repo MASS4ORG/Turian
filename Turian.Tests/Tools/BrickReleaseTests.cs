@@ -203,6 +203,29 @@ public sealed class BrickReleaseTests : IAsyncLifetime
             QualificationFile, outputs));
     }
 
+    /// <summary>
+    /// A bake twin is qualified beside its source under prefixed outputs, and a manifest naming the brick by its v2
+    /// <c>id</c> is read like one using <c>name</c>.
+    /// </summary>
+    [Fact]
+    public void TwinsQualifyUnderPrefixedOutputs()
+    {
+        var twin = Path.Combine(root, "user.mateo.rules.bake-1.0.0.brick");
+        using (var packed = ZipFile.Open(twin, ZipArchiveMode.Create))
+        {
+            using var writer = new StreamWriter(packed.CreateEntry("package.json").Open());
+            writer.Write("""{ "id": "user.mateo.rules.bake", "version": "1.0.0" }""");
+        }
+
+        var outputs = Path.Combine(root, "github-output");
+        var qualification = ReleaseArchive.Qualify(twin, "v1.0.0", new string('a', 40), QualificationFile, outputs, "twin-");
+
+        Assert.Equal("user.mateo.rules.bake", qualification.PackageId);
+        Assert.Equal("twin-archive=" + Path.GetFileName(twin), File.ReadAllLines(outputs)[1]);
+        Assert.Throws<InvalidDataException>(() => ReleaseArchive.Qualify(twin, "v1.0.0", new string('a', 40),
+            QualificationFile, outputs, "twin\narchive=evil-"));
+    }
+
     /// <summary>The command dispatcher qualifies and validates without shell argument interpretation.</summary>
     [Fact]
     public async Task CommandDispatchQualifiesAndValidates()

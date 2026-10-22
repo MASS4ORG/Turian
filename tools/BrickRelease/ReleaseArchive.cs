@@ -24,7 +24,7 @@ static partial class ReleaseArchive
 
         using var stream = entries[0].Open();
         using var manifest = JsonDocument.Parse(stream);
-        var id = manifest.RootElement.GetProperty("name").GetString() ?? "";
+        var id = (manifest.RootElement.TryGetProperty("id", out var v2) ? v2 : manifest.RootElement.GetProperty("name")).GetString() ?? "";
         var version = manifest.RootElement.GetProperty("version").GetString() ?? "";
         if (!IdPattern().IsMatch(id) || !VersionPattern().IsMatch(version))
         {
@@ -36,7 +36,7 @@ static partial class ReleaseArchive
     }
 
     internal static Qualification Qualify(string archive, string tag, string revision, string output,
-        string? githubOutput = null)
+        string? githubOutput = null, string outputPrefix = "")
     {
         var identity = Read(archive);
         if (tag != "v" + identity.Version || !RevisionPattern().IsMatch(revision))
@@ -48,7 +48,7 @@ static partial class ReleaseArchive
         File.WriteAllText(output, JsonSerializer.Serialize(qualification, Json) + "\n");
         if (githubOutput is not null)
         {
-            WriteGithubOutput(archive, qualification, githubOutput);
+            WriteGithubOutput(archive, qualification, githubOutput, outputPrefix);
         }
 
         return qualification;
@@ -68,7 +68,7 @@ static partial class ReleaseArchive
         return expected;
     }
 
-    static void WriteGithubOutput(string archive, Qualification qualification, string output)
+    static void WriteGithubOutput(string archive, Qualification qualification, string output, string prefix)
     {
         var name = Path.GetFileName(archive);
         if (name != $"{qualification.PackageId}-{qualification.Version}.brick")
@@ -76,9 +76,17 @@ static partial class ReleaseArchive
             throw new InvalidDataException("Archive filename must match its ID and version.");
         }
 
+        if (!OutputPrefixPattern().IsMatch(prefix))
+        {
+            throw new InvalidDataException("Output prefix must be lowercase letters and dashes.");
+        }
+
         var compact = JsonSerializer.Serialize(qualification, new JsonSerializerOptions(Json) { WriteIndented = false });
-        File.AppendAllText(output, $"qualification={compact}\narchive={name}\n");
+        File.AppendAllText(output, $"{prefix}qualification={compact}\n{prefix}archive={name}\n");
     }
+
+    [GeneratedRegex(@"\A(?:[a-z]+-)*\z")]
+    private static partial Regex OutputPrefixPattern();
 
     [GeneratedRegex(@"\A[a-z0-9]+(?:[.-][a-z0-9]+)+\z")]
     private static partial Regex IdPattern();

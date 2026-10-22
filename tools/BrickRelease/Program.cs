@@ -53,14 +53,14 @@ static class Program
 
     static Task QualifyCommand(string[] args)
     {
-        RequireArguments(args, 5, 6);
-        if (args.Length == 6 && args[5] != "--github-output")
+        RequireArguments(args, 5, 7);
+        if (args.Length >= 6 && args[5] != "--github-output")
         {
             throw Usage();
         }
 
         ReleaseArchive.Qualify(args[1], args[2], args[3], args[4],
-            args.Length == 6 ? Required("GITHUB_OUTPUT") : null);
+            args.Length >= 6 ? Required("GITHUB_OUTPUT") : null, args.Length == 7 ? args[6] : "");
         return Task.CompletedTask;
     }
 
@@ -91,7 +91,7 @@ static class Program
         }
     }
 
-    static ArgumentException Usage() => new("Expected qualify ARCHIVE TAG REVISION OUTPUT [--github-output], " +
+    static ArgumentException Usage() => new("Expected qualify ARCHIVE TAG REVISION OUTPUT [--github-output [PREFIX]], " +
                                             "validate ARCHIVE QUALIFICATION, sign ARCHIVE QUALIFICATION OUTPUT, " +
                                             "or consumer ARCHIVE IMAGE.");
 
