@@ -420,10 +420,11 @@ public static partial class Program
         var claimOption = new Option<string?>("--claim") { Description = "Static registry: a name prefix to claim with the publisher key, such as com.acme (user.<name> is claimed on first publish)" };
         var privateOption = new Option<bool>("--private") { Description = "Store: only readers with access to your bricks can download it" };
         var precastOption = new Option<bool>("--precast") { Description = "Compile the brick's assemblies into Precast~ first" };
+        var twinOption = new Option<bool>("--twin") { Description = "Publish the source brick without Precast~, and its bake twin <id>.bake with it" };
 
         var command = new Command("publish", "Pack a brick and upload it, signed, to an asset store (--store) or a static registry folder (--registry)")
         {
-            pathArg, storeOption, registryOption, keyOption, publisherOption, claimOption, privateOption, precastOption,
+            pathArg, storeOption, registryOption, keyOption, publisherOption, claimOption, privateOption, precastOption, twinOption,
         };
         command.SetAction(async (result, cancellationToken) => await RunBrickAsync(async () =>
         {
@@ -438,13 +439,15 @@ public static partial class Program
             if (store is not null)
             {
                 await PublishToStoreAsync(path, store, result.GetValue(keyOption)!.FullName, result.GetValue(publisherOption)?.FullName,
-                    result.GetValue(privateOption), precast, cancellationToken).ConfigureAwait(false);
+                    result.GetValue(privateOption), precast, result.GetValue(twinOption), cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            var published = BrickService.Publish(path, registry!.FullName, result.GetValue(keyOption)!.FullName,
-                result.GetValue(publisherOption)?.FullName, result.GetValue(claimOption), precast);
-            Console.WriteLine($"Published {published.Id} {published.Version} as {published.Url}");
+            foreach (var published in BrickService.Publish(path, registry!.FullName, result.GetValue(keyOption)!.FullName,
+                         result.GetValue(publisherOption)?.FullName, result.GetValue(claimOption), precast, result.GetValue(twinOption)))
+            {
+                Console.WriteLine($"Published {published.Id} {published.Version} as {published.Url}");
+            }
         }).ConfigureAwait(false));
         return command;
     }
@@ -620,13 +623,20 @@ public static partial class Program
             Description = "Compile the brick's assemblies into Precast~ first, so consumers load them instead of compiling the code",
         };
 
-        var command = new Command("pack", "Verify a brick and pack it into a .brick file") { pathArg, outOption, precastOption };
+        var twinOption = new Option<bool>("--twin")
+        {
+            Description = "Pack the source brick without Precast~, and its bake twin <id>.bake: Precast~ and the assets, without Source~ or C# scripts",
+        };
+
+        var command = new Command("pack", "Verify a brick and pack it into a .brick file") { pathArg, outOption, precastOption, twinOption };
         command.SetAction(async (result, _) => await RunBrickAsync(async () =>
         {
             var path = result.GetValue(pathArg)!.FullName;
             var precast = result.GetValue(precastOption) ? await BrickService.PrecastAsync(path, Log.Logger).ConfigureAwait(false) : null;
-            var packed = BrickService.Pack(path, result.GetValue(outOption)!.FullName, precast);
-            Console.WriteLine($"{packed.Path}\n{packed.Integrity}");
+            foreach (var packed in BrickService.PackFiles(path, result.GetValue(outOption)!.FullName, precast, result.GetValue(twinOption)))
+            {
+                Console.WriteLine($"{packed.Path}\n{packed.Integrity}");
+            }
         }).ConfigureAwait(false));
         return command;
     }

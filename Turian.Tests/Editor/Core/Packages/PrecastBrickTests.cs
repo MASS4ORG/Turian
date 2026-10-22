@@ -118,6 +118,44 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
         Assert.True(exitCode == 0, output);
     }
 
+    /// <summary>
+    /// A brick packs as its source without the payload and a twin with the payload but no scripts; a project installing
+    /// only the twin compiles a script against the brick's assembly.
+    /// </summary>
+    [Fact]
+    public async Task TwinsShipThePayloadWithoutTheSources()
+    {
+        var built = BrickArchive.ReadManifest(fixture.Packed, ["turian"]).Precast!;
+        var (source, twin) = BrickService.PackWithTwin(fixture.Folder, Path.Combine(root, "pair"), built);
+
+        using (var sourceZip = ZipFile.OpenRead(source.Path))
+        using (var twinZip = ZipFile.OpenRead(twin.Path))
+        {
+            Assert.DoesNotContain(sourceZip.Entries, static e => e.FullName.StartsWith(BrickAssemblies.PrecastFolder, StringComparison.Ordinal));
+            Assert.Contains(sourceZip.Entries, static e => e.FullName.EndsWith(".cs", StringComparison.Ordinal));
+            Assert.Contains(twinZip.Entries, static e => e.FullName == "Precast~/lib/Mateo.Inventory.dll");
+            Assert.DoesNotContain(twinZip.Entries, static e => e.FullName.EndsWith(".cs", StringComparison.Ordinal) || e.FullName.EndsWith(".cs.meta", StringComparison.Ordinal));
+        }
+
+        Assert.Equal(("user.mateo.inventory.bake", source.Integrity), (twin.Manifest.Name, twin.Manifest.BakeOf!.Integrity));
+        Assert.Equal(["Mateo.Inventory"], twin.Manifest.Precast!.Assemblies);
+
+        var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "project")))!;
+        var brick = BrickService.Add(project, "user.mateo.inventory.bake", $"file:{twin.Path}").Packages
+            .Single(static p => p.Id == "user.mateo.inventory.bake");
+        Assert.True(BrickAssemblies.IsPrecast(brick));
+        File.WriteAllText(Path.Combine(project, "Assets", "Bag.cs"),
+            "namespace Usercode; public class Bag : Mateo.Inventory.InventoryComponent { }");
+
+        var (exitCode, output) = await PrecastBrickFixture.RunCli(root, "compile", project);
+        Assert.True(exitCode == 0, output);
+
+        // Without a reimport, which loads them on its own, the brick's assemblies must still load before the game's code.
+        (exitCode, output) = await PrecastBrickFixture.RunCli(root, "scene", project, "--load-usercode");
+        Assert.True(exitCode == 0, output);
+        Assert.DoesNotContain("'Usercode.Bag' not found", output, StringComparison.Ordinal);
+    }
+
     /// <summary>A payload built for another engine version is ignored, so the brick compiles from its sources again.</summary>
     [Fact]
     public void PayloadsBuiltForAnotherEngineAreIgnored()

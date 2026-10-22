@@ -52,6 +52,21 @@
         "required": ["displayName", "path"],
         "properties": { "displayName": { "type": "string" }, "path": { "type": "string" }, "description": { "type": "string" } }
       }
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Globs the .brick file leaves out, relative to the brick folder and '/'-separated: * and ? within a name, ** across folders. A glob without '/' matches a name at any depth; a matching folder drops everything in it. E.g. [\"Tests~\", \".github\", \"**/*.pdb\"]."
+    },
+    "bakeOf": {
+      "type": "object",
+      "description": "Set in a bake twin (id <source>.bake), written by 'brick pack --twin': the source .brick it is the consumable form of. The twin stands in for its source, so dependents of the source accept it.",
+      "required": ["brick", "version", "integrity"],
+      "properties": {
+        "brick": { "type": "string", "description": "The source brick's id." },
+        "version": { "type": "string", "description": "The source brick's version." },
+        "integrity": { "type": "string", "description": "The source .brick file's sha256- integrity." }
+      }
     }
   }
 }

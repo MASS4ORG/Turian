@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Added: asset store integration with optional registry scope filters, protected CI brick releases and source brick components in headless commands.
+- Added: asset store integration.
 - Added: pluggable versioned saving system #89.
 - Added: nuget support inside bricks #313.
 - Changed: cameras, in-game UI, OBJ import, saves, GPU occlusion culling and the Windows looks moved to their own brick repositorie.

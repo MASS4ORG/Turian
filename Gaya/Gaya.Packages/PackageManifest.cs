@@ -37,6 +37,22 @@ public sealed class PackagePrecast
 }
 
 /// <summary>
+/// Set in a bake twin: the source brick it is the consumable form of, pinned to the exact <c>.brick</c> file. A twin
+/// installs in place of its source, so whatever depends on the source accepts the twin.
+/// </summary>
+public sealed class PackageBakeOf
+{
+    /// <summary>The source brick's id.</summary>
+    public string Brick { get; set; } = string.Empty;
+
+    /// <summary>The source brick's version.</summary>
+    public SemanticVersion? Version { get; set; }
+
+    /// <summary>The source <c>.brick</c> file's integrity, <c>sha256-</c> + base64.</summary>
+    public string Integrity { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// A package's <c>package.json</c>: its identity, what it depends on, and how hosts treat it. Field names follow
 /// Unity's package manifest where the meaning is the same.
 /// </summary>
@@ -136,6 +152,15 @@ public sealed class PackageManifest
 
     /// <summary>Samples the user can copy into the project.</summary>
     public List<PackageSample> Samples { get; set; } = [];
+
+    /// <summary>
+    /// Globs of files the <c>.brick</c> file leaves out, relative to the brick folder, such as <c>Tests~</c> or
+    /// <c>**/*.pdb</c>. A glob without <c>/</c> matches a name at any depth; a matching folder drops everything in it.
+    /// </summary>
+    public List<string> Exclude { get; set; } = [];
+
+    /// <summary>Set in a bake twin: the source brick it was baked from.</summary>
+    public PackageBakeOf? BakeOf { get; set; }
 
     /// <summary>Whether the package supports building for <paramref name="platform"/>.</summary>
     /// <param name="platform">A platform id, ignoring case.</param>
@@ -246,6 +271,8 @@ public sealed class PackageManifest
         }
 
         ValidateShipping(path);
+        ValidateExclude(path);
+        ValidateBakeOf(path);
 
         if (Platforms.Concat(PlatformNuget.Keys).Any(static p => string.IsNullOrWhiteSpace(p)))
         {
@@ -269,11 +296,50 @@ public sealed class PackageManifest
                 throw new PackageException($"{path}: category '{category}' must read 'prefix:name'.");
             }
 
-            if (prefix != Name && !Dependencies.ContainsKey(prefix) && !reservedCategoryPrefixes.Contains(prefix))
+            if (prefix != Name && prefix != BakeOf?.Brick && !Dependencies.ContainsKey(prefix) && !reservedCategoryPrefixes.Contains(prefix))
             {
                 throw new PackageException(
                     $"{path}: category '{category}' uses prefix '{prefix}', which is neither this package, one of its dependencies nor a reserved prefix.");
             }
+        }
+    }
+
+    void ValidateExclude(string path)
+    {
+        foreach (var glob in Exclude)
+        {
+            if (!BrickGlob.IsValid(glob))
+            {
+                throw new PackageException($"{path}: exclude '{glob}' must be a relative path glob using '/', without '..'.");
+            }
+
+            if (BrickGlob.Matches(glob, FileName))
+            {
+                throw new PackageException($"{path}: exclude '{glob}' would leave out {FileName}.");
+            }
+        }
+    }
+
+    void ValidateBakeOf(string path)
+    {
+        if (BakeOf is not { } bakeOf)
+        {
+            return;
+        }
+
+        if (!PackageId.IsValid(bakeOf.Brick) || bakeOf.Brick == Name)
+        {
+            throw new PackageException($"{path}: bakeOf.brick '{bakeOf.Brick}' must be the id of another brick.");
+        }
+
+        if (bakeOf.Version is null)
+        {
+            throw new PackageException($"{path}: bakeOf has no version.");
+        }
+
+        if (!bakeOf.Integrity.StartsWith("sha256-", StringComparison.Ordinal))
+        {
+            throw new PackageException($"{path}: bakeOf.integrity must be the source file's sha256- hash.");
         }
     }
 

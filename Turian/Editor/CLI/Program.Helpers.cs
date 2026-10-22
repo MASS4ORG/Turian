@@ -83,6 +83,8 @@ public static partial class Program
             if (loadUserCode)
             {
                 Log.Logger.LogInformation("Compiling and loading user code…");
+                // User types deriving from or holding a precast brick's types resolve against its loaded assemblies.
+                BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger, settings.ProjectAbsoluteDir);
                 var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
 
                 if (status.State == BuildTaskState.Succeeded)

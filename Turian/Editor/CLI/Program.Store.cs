@@ -191,12 +191,14 @@ public static partial class Program
 
     /// <summary>Uploads a brick to a store and reports whether consumers can see it yet.</summary>
     static async Task PublishToStoreAsync(string path, string address, string key, string? publisherKey, bool isPrivate,
-        PackagePrecast? precast, CancellationToken cancellationToken)
+        PackagePrecast? precast, bool twin, CancellationToken cancellationToken)
     {
         var store = new StoreClient(address);
-        var release = await BrickStorePublishing.PublishAsync(path, store, key, publisherKey, isPrivate,
-            precast: precast, cancellationToken: cancellationToken).ConfigureAwait(false);
-        ReportPublished(store, release);
+        foreach (var release in await BrickStorePublishing.PublishAsync(path, store, key, publisherKey, isPrivate,
+                     precast: precast, twin: twin, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            ReportPublished(store, release);
+        }
     }
 
     /// <summary>Yanks a version on a store, or puts it back.</summary>

@@ -16,21 +16,27 @@ public static class BrickStorePublishing
     /// <param name="isPrivate">Whether only readers with access to the publisher's bricks can download it.</param>
     /// <param name="sourceRevision">The source revision to record; the CI commit when null and one is known.</param>
     /// <param name="precast">What the brick's <c>Precast~</c> payload was built with.</param>
+    /// <param name="twin">Also upload its bake twin, as <see cref="BrickService.PackWithTwin"/> packs them.</param>
     /// <param name="cancellationToken">Cancels the upload.</param>
-    /// <returns>The release the store holds.</returns>
+    /// <returns>The releases the store holds: the brick, then its twin.</returns>
     /// <exception cref="PackageException">The brick is invalid, or the store refused it.</exception>
-    public static async Task<StoreRelease> PublishAsync(string packageRoot, StoreClient store, string registryKeyFile,
+    public static async Task<IReadOnlyList<StoreRelease>> PublishAsync(string packageRoot, StoreClient store, string registryKeyFile,
         string? publisherKeyFile = null, bool isPrivate = false, string? sourceRevision = null,
-        PackagePrecast? precast = null, CancellationToken cancellationToken = default)
+        PackagePrecast? precast = null, bool twin = false, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(store);
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-publish-{Guid.NewGuid():N}");
         try
         {
-            var packed = BrickService.Pack(packageRoot, scratch, precast);
-            return await store.PublishAsync(packed.Path, new SshKeygenSigner(registryKeyFile),
-                new SshKeygenSigner(publisherKeyFile ?? registryKeyFile), isPrivate, sourceRevision ?? CiRevision(),
-                ["gaya", ProjectPackages.HostName], cancellationToken).ConfigureAwait(false);
+            var releases = new List<StoreRelease>();
+            foreach (var packed in BrickService.PackFiles(packageRoot, scratch, precast, twin))
+            {
+                releases.Add(await store.PublishAsync(packed.Path, new SshKeygenSigner(registryKeyFile),
+                    new SshKeygenSigner(publisherKeyFile ?? registryKeyFile), isPrivate, sourceRevision ?? CiRevision(),
+                    ["gaya", ProjectPackages.HostName], cancellationToken).ConfigureAwait(false));
+            }
+
+            return releases;
         }
         finally
         {

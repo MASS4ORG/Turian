@@ -76,6 +76,30 @@ public sealed class RegistryTests : IDisposable
         Assert.Equal(["user.mateo.rules", "user.mateo.shop"], offline.Packages.Select(static p => p.Id));
     }
 
+    /// <summary>
+    /// A bake twin asked for alongside a brick that needs its source stands in for the source, which is never fetched,
+    /// even when both are taken from the registry in the same pass.
+    /// </summary>
+    [Fact]
+    public async Task TwinsStandInForTheirSource()
+    {
+        Publish("user.mateo.rules", "1.1.0");
+        Publish("user.mateo.rules", "1.1.0", twinOf: "user.mateo.rules");
+        Publish("user.mateo.shop", "1.0.0", ("user.mateo.rules", "^1.0.0"));
+        Scope(("user.mateo.shop", "^1.0.0"));
+        Declare("user.mateo.rules.bake", "^1.0.0");
+
+        var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["user.mateo.rules.bake", "user.mateo.shop"], resolution.Packages.Select(static p => p.Id));
+        Assert.Equal("user.mateo.rules", resolution.Packages[0].Manifest.BakeOf!.Brick);
+
+        Declare("user.mateo.shop", "^2.0.0");
+        Publish("user.mateo.shop", "2.0.0", ("user.mateo.rules", "^2.0.0"));
+        var stale = await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+        Assert.Contains("bake of 1.1.0", stale.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>Unfiltered registries discover new publishers and resolve dependencies across prefixes.</summary>
     [Theory]
     [InlineData(false)]
@@ -306,8 +330,16 @@ public sealed class RegistryTests : IDisposable
             ],
         }.Save(project);
 
+    void Declare(string id, string spec)
+    {
+        var manifest = ProjectManifest.Load(project).Manifest;
+        manifest.Dependencies[id] = spec;
+        manifest.Save(project);
+    }
+
     void Publish(string id, string version, (string Id, string Range)? dependency = null, string? engine = null,
-        string? entitlement = null, SshKeygenSigner? publisher = null, string? claim = null, string? into = null)
+        string? entitlement = null, SshKeygenSigner? publisher = null, string? claim = null, string? into = null,
+        string? twinOf = null)
     {
         var folder = Path.Combine(root, "sources", $"{id}-{version}-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Path.Combine(folder, "Runtime"));
@@ -330,6 +362,13 @@ public sealed class RegistryTests : IDisposable
         manifest.Save(folder);
         File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
         var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"]);
+        if (twinOf is not null)
+        {
+            var source = RegistryIndex.Parse(File.ReadAllText(Path.Combine(registry, "v1", "index.json"))).Bricks[twinOf].Versions[version];
+            File.Delete(packed.Path);
+            packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"],
+                bakeOf: new PackageBakeOf { Brick = twinOf, Version = SemanticVersion.Parse(version), Integrity = source.Integrity });
+        }
 
         RegistryPublisher.Publish(into ?? registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["engine"]);
     }

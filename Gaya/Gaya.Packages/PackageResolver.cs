@@ -113,7 +113,8 @@ public sealed record PackageResolverOptions
 /// <summary>
 /// Resolves a project's packages: the embedded ones, those its manifest declares, and, to any depth, the packages
 /// those depend on. Each id resolves to exactly one package; the first declaration found wins (embedded, then the
-/// project manifest, then dependencies breadth-first) and every version range anyone states must then hold.
+/// project manifest, then dependencies breadth-first) and every version range anyone states must then hold. A bake
+/// twin stands in for its source brick: what depends on the source gets the twin.
 /// </summary>
 /// <param name="store">Where git packages are fetched into.</param>
 /// <param name="options">Resolution choices.</param>
@@ -148,7 +149,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         }
 
         session.CheckConstraints();
-        var ordered = DependencyOrder(session.Resolved);
+        var ordered = DependencyOrder(session.Resolved, session.Twins);
         var lockFile = ToLock(ordered);
         if (options.Locked && existingLock!.Serialize() != lockFile.Serialize())
         {
@@ -293,7 +294,8 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         }
     }
 
-    static List<ResolvedPackage> DependencyOrder(Dictionary<string, ResolvedPackage> resolved)
+    static List<ResolvedPackage> DependencyOrder(Dictionary<string, ResolvedPackage> resolved,
+        Dictionary<string, ResolvedPackage> twins)
     {
         var ordered = new List<ResolvedPackage>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -307,7 +309,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
 
             foreach (var id in package.Manifest.Dependencies.Keys.Order(StringComparer.Ordinal))
             {
-                if (resolved.TryGetValue(id, out var dependency))
+                if (resolved.TryGetValue(id, out var dependency) || twins.TryGetValue(id, out dependency))
                 {
                     Visit(dependency);
                 }
@@ -357,6 +359,9 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         /// <summary>Id → its package, for every package resolved so far.</summary>
         public Dictionary<string, ResolvedPackage> Resolved { get; } = new(StringComparer.Ordinal);
 
+        /// <summary>Source id → the bake twin standing in for it.</summary>
+        public Dictionary<string, ResolvedPackage> Twins { get; } = new(StringComparer.Ordinal);
+
         /// <summary>The version ranges stated so far, with who stated them.</summary>
         public List<(string Id, VersionRange Range, string RequiredBy, int Depth)> Constraints { get; } = [];
 
@@ -373,6 +378,10 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 {
                     Constraints.Add((next.Id, range.Range, next.RequiredBy, next.Depth));
                 }
+                else if (Twins.TryGetValue(next.Id, out var twin))
+                {
+                    throw BothInstalled(next.Id, twin.Id);
+                }
                 else if (!Resolved.ContainsKey(next.Id))
                 {
                     Add(await resolver.MaterializeAsync(next.Id, next.Source, next.Spec, next.Depth,
@@ -386,8 +395,17 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         public async Task<bool> ResolveFromRegistriesAsync()
         {
             var progressed = false;
-            foreach (var group in Constraints.Where(c => !Resolved.ContainsKey(c.Id)).GroupBy(static c => c.Id).ToList())
+            // Twins first: one asked for in this pass stands in for its source, which is then not fetched.
+            foreach (var group in Constraints.Where(c => !Resolved.ContainsKey(c.Id))
+                         .GroupBy(static c => c.Id)
+                         .OrderBy(static g => g.Key.EndsWith(BrickArchive.TwinSuffix, StringComparison.Ordinal) ? 0 : 1)
+                         .ToList())
             {
+                if (Twins.ContainsKey(group.Key))
+                {
+                    continue;
+                }
+
                 var serving = registries.Where(r => r.Serves(group.Key)).ToList();
                 if (serving.Count == 0)
                 {
@@ -409,6 +427,17 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         {
             foreach (var (id, range, requiredBy, _) in Constraints)
             {
+                if (Twins.TryGetValue(id, out var twin))
+                {
+                    if (!range.IsSatisfiedBy(twin.Manifest.BakeOf!.Version!))
+                    {
+                        throw new PackageException(
+                            $"{requiredBy} requires {id} {range}, but {twin.Id} is the bake of {twin.Manifest.BakeOf.Version} (from {twin.Source}).");
+                    }
+
+                    continue;
+                }
+
                 if (!Resolved.TryGetValue(id, out var package))
                 {
                     throw new PackageException(
@@ -425,12 +454,25 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
 
         void Add(ResolvedPackage package)
         {
+            if (package.Manifest.BakeOf is { } bakeOf)
+            {
+                if (Resolved.ContainsKey(bakeOf.Brick) || (Twins.TryGetValue(bakeOf.Brick, out var other) && other.Id != package.Id))
+                {
+                    throw BothInstalled(bakeOf.Brick, package.Id);
+                }
+
+                Twins[bakeOf.Brick] = package;
+            }
+
             Resolved[package.Id] = package;
             foreach (var (id, spec) in package.Manifest.Dependencies.OrderBy(static d => d.Key, StringComparer.Ordinal))
             {
                 Enqueue(id, PackageSource.Parse(spec, package.RootPath), spec, package.Id, package.Depth + 1);
             }
         }
+
+        static PackageException BothInstalled(string source, string twin) =>
+            new($"{source} and {twin}, its bake twin, are both installed; keep one of them.");
 
         /// <summary>
         /// The registry a brick comes from among those scoped to its name: the one the lock file records, else the

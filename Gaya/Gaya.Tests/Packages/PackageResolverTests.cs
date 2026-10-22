@@ -176,6 +176,29 @@ public sealed class PackageResolverTests : IDisposable
         await Assert.ThrowsAsync<PackageException>(() => resolver.FetchAsync("com.acme.rules", new FileSource(Path.Combine(root, "gone")), token));
     }
 
+    /// <summary>
+    /// A bake twin stands in for its source: a dependency on the source gets the twin, and declaring both is refused.
+    /// </summary>
+    [Fact]
+    public async Task TwinsStandInForTheirSourceFromFolders()
+    {
+        var rules = Package("rules", "com.acme.rules", "1.0.0");
+        var twin = Package("rules-bake", "com.acme.rules.bake", "1.0.0");
+        var manifest = PackageManifest.Load(twin);
+        manifest.BakeOf = new PackageBakeOf { Brick = "com.acme.rules", Version = SemanticVersion.Parse("1.0.0"), Integrity = "sha256-AAAA" };
+        manifest.Save(twin);
+        Package("shop", "com.acme.shop", "2.0.0", ("com.acme.rules", "^1.0.0"));
+        Manifest(("com.acme.rules.bake", "file:../../rules-bake"), ("com.acme.shop", "file:../../shop"));
+
+        var resolution = await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["com.acme.rules.bake", "com.acme.shop"], resolution.Packages.Select(static p => p.Id));
+
+        Manifest(("com.acme.rules.bake", "file:../../rules-bake"), ("com.acme.rules", $"file:{rules}"));
+        var both = await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+        Assert.Contains("are both installed", both.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>A leftover built-in folder without a manifest, such as build output from another branch, is not a brick.</summary>
     [Fact]
     public async Task BuiltinFoldersWithoutAManifestAreNotBuiltins()

@@ -53,6 +53,73 @@ public sealed class BrickArchiveTests : IDisposable
         Assert.Equal([".git-ignored.txt", "Runtime/Rule.txt", "package.json"], zip.Entries.Select(static e => e.FullName).Order(StringComparer.Ordinal));
     }
 
+    /// <summary>The manifest's exclude globs, and the caller's, leave files and whole folders out of the file.</summary>
+    [Fact]
+    public void PackingLeavesOutExcludedGlobs()
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.0.0");
+        var manifest = PackageManifest.Load(brick);
+        manifest.Exclude = ["Tests~", "*.pdb", "Docs/**/draft-*"];
+        manifest.Save(brick);
+        foreach (var file in new[] { "Tests~/Rules.Tests/RuleTests.cs", "Runtime/Rule.pdb", "Docs/guide.md", "Docs/a/b/draft-1.md", "Extra/notes.txt" })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(brick, file))!);
+            File.WriteAllText(Path.Combine(brick, file), "x");
+        }
+
+        var packed = BrickArchive.Pack(brick, Path.Combine(root, "out"), exclude: ["Extra"]);
+
+        using var zip = ZipFile.OpenRead(packed.Path);
+        Assert.Equal(["Docs/guide.md", "Runtime/Rule.txt", "package.json"], zip.Entries.Select(static e => e.FullName).Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>An exclude glob that escapes the folder or would drop the manifest is refused.</summary>
+    [Theory]
+    [InlineData("../secret")]
+    [InlineData("Runtime\\\\Rule.txt")]
+    [InlineData("package.json")]
+    [InlineData("*.json")]
+    public void InvalidExcludeGlobsAreRefused(string glob)
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.0.0");
+        File.WriteAllText(Path.Combine(brick, PackageManifest.FileName),
+            $$"""{ "name": "com.acme.rules", "version": "1.0.0", "exclude": [{{System.Text.Json.JsonSerializer.Serialize(glob)}}] }""");
+
+        Assert.Throws<PackageException>(() => PackageManifest.Load(brick));
+    }
+
+    /// <summary>Glob syntax: one name per star, any depth for a double star, and a bare name anywhere.</summary>
+    [Theory]
+    [InlineData("Tests~", "Tests~/a/b.cs", true)]
+    [InlineData("Tests~", "Runtime/Tests~/b.cs", true)]
+    [InlineData("/Tests~", "Runtime/Tests~/b.cs", false)]
+    [InlineData("Runtime/*.cs", "Runtime/a.cs", true)]
+    [InlineData("Runtime/*.cs", "Runtime/x/a.cs", false)]
+    [InlineData("Runtime/**/*.cs", "Runtime/a.cs", true)]
+    [InlineData("Runtime/**/*.cs", "Runtime/x/y/a.cs", true)]
+    [InlineData("?.txt", "a.txt", true)]
+    [InlineData("?.txt", "ab.txt", false)]
+    [InlineData("a.txt", "a_txt", false)]
+    public void GlobsMatchLikeGitIgnore(string glob, string path, bool expected) =>
+        Assert.Equal(expected, BrickGlob.Matches(glob, path));
+
+    /// <summary>A twin is packed under the source id plus .bake and records the source file it was baked from.</summary>
+    [Fact]
+    public void TwinsRecordTheirSource()
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.2.0");
+        var source = BrickArchive.Pack(brick, Path.Combine(root, "out"));
+
+        var twin = BrickArchive.Pack(brick, Path.Combine(root, "out"),
+            bakeOf: new PackageBakeOf { Brick = "com.acme.rules", Version = source.Manifest.Version, Integrity = source.Integrity });
+
+        var manifest = BrickArchive.ReadManifest(twin.Path);
+        Assert.Equal("com.acme.rules.bake-1.2.0.brick", Path.GetFileName(twin.Path));
+        Assert.Equal("com.acme.rules.bake", manifest.Name);
+        Assert.Equal(source.Integrity, manifest.BakeOf!.Integrity);
+        Assert.Equal("1.2.0", manifest.BakeOf.Version!.ToString());
+    }
+
     /// <summary>A brick file is read back as the same manifest and extracts to the same files.</summary>
     [Fact]
     public void ArchivesRoundTrip()
