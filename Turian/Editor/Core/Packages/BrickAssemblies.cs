@@ -8,8 +8,28 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class BrickAssemblies
 {
-    /// <summary>The folder, at a brick's root, that holds its prebuilt payload.</summary>
+    /// <summary>The folder, at a v1 brick's root, that holds its prebuilt payload; v2 bricks name it by role.</summary>
     public const string PrecastFolder = "Precast~";
+
+    /// <summary>A brick's prebuilt payload folder: <see cref="PrecastFolder"/>, or the v2 <c>precast</c> role.</summary>
+    /// <param name="brick">The resolved brick.</param>
+    /// <returns>The folder; it may not exist.</returns>
+    public static string PrecastDirectory(ResolvedPackage brick)
+    {
+        ArgumentNullException.ThrowIfNull(brick);
+        return BrickLayout.PathOf(brick.RootPath, brick.Manifest, BrickLayout.Precast);
+    }
+
+    /// <summary>
+    /// The prebuilt payload folder of the brick folder at <paramref name="brickRoot"/>; <see cref="PrecastFolder"/>
+    /// for a folder without a manifest.
+    /// </summary>
+    /// <param name="brickRoot">The brick folder.</param>
+    /// <returns>The folder; it may not exist.</returns>
+    public static string PrecastDirectory(string brickRoot) =>
+        File.Exists(Path.Combine(brickRoot, PackageManifest.FileName))
+            ? BrickLayout.PathOf(brickRoot, PackageManifest.Load(brickRoot, ["gaya", ProjectPackages.HostName]), BrickLayout.Precast)
+            : Path.Combine(brickRoot, PrecastFolder);
 
     /// <summary>The file, inside <c>Precast~</c>, listing the types of the prebuilt assemblies with their type ids.</summary>
     public const string TypesFile = "types.json";
@@ -94,7 +114,7 @@ public static class BrickAssemblies
     /// <returns>The entries; none when the brick has no <see cref="TypesFile"/>.</returns>
     public static IReadOnlyList<UserCodeTypeEntry> PrecastTypes(ResolvedPackage brick)
     {
-        var path = Path.Combine(brick.RootPath, PrecastFolder, TypesFile);
+        var path = Path.Combine(PrecastDirectory(brick), TypesFile);
         if (!File.Exists(path) || !IsPrecast(brick))
         {
             return [];
@@ -187,7 +207,7 @@ public static class BrickAssemblies
             {
                 foreach (var folder in new[] { "lib", "editor" })
                 {
-                    var directory = Path.Combine(brick.RootPath, PrecastFolder, folder);
+                    var directory = Path.Combine(PrecastDirectory(brick), folder);
                     if (BuiltForThisEngine(brick) && Directory.Exists(directory))
                     {
                         _ = ProbeDirectories.Add(directory);
@@ -228,7 +248,7 @@ public static class BrickAssemblies
 
     static string[] Find(ResolvedPackage brick, string folder)
     {
-        var directory = Path.Combine(brick.RootPath, PrecastFolder, folder);
+        var directory = Path.Combine(PrecastDirectory(brick), folder);
         return Directory.Exists(directory) && BuiltForThisEngine(brick)
             ? [.. Directory.EnumerateFiles(directory, "*.dll").Order(StringComparer.Ordinal)]
             : [];

@@ -375,6 +375,20 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
     /// <returns>Whether the brick is global again.</returns>
     public Task<bool> RevertAsync(string id) => RunAsync($"Revert brick {id} to global", workspace => workspace.Revert(id));
 
+    /// <summary>Switches between a published twin and an editable source fork.</summary>
+    /// <param name="id">The source or twin brick id.</param>
+    /// <param name="toSource">Whether to use editable source.</param>
+    /// <returns>Whether the workspace changed form successfully.</returns>
+    public Task<bool> SwapAsync(string id, bool toSource) => RunAsync($"Swap brick {id}", workspace =>
+    {
+        if (workspace is not IBrickTwinWorkspace twins)
+        {
+            throw new PackageException("This workspace does not support bake twins.");
+        }
+
+        twins.Swap(id, toSource);
+    });
+
     /// <summary>
     /// Copies assets of an installed brick into the project's <c>Assets/&lt;last id segment&gt;</c> folder under new ids,
     /// detached from the brick.

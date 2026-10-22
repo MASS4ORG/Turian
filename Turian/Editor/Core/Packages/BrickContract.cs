@@ -49,8 +49,8 @@ public sealed record BrickContract(IReadOnlyList<ContractAsset> Assets, IReadOnl
 
         var types = UserCodeTypeManifestGenerator.ScriptTypes(packageRoot, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance)
             .Select(static t => new ContractType(t.TypeId, t.FullyQualifiedName)).ToList();
-        if (File.Exists(Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, BrickAssemblies.TypesFile))
-            && JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, BrickAssemblies.TypesFile))) is { } precast)
+        if (File.Exists(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickAssemblies.TypesFile))
+            && JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickAssemblies.TypesFile))) is { } precast)
         {
             types.AddRange(precast.Types.Where(t => types.All(known => known.Id != t.TypeId)).Select(static t => new ContractType(t.TypeId, t.FullyQualifiedName)));
         }

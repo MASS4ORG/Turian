@@ -95,6 +95,20 @@ public static class RegistryPublisher
     /// <returns>The <c>v1</c> folder.</returns>
     public static string LocationOf(string registryRoot) => Path.Combine(Path.GetFullPath(registryRoot), ApiFolder);
 
+    /// <summary>Links a bake twin from the source version it was baked from, when the index holds that version.</summary>
+    static void LinkBake(RegistryIndex index, PackageBakeOf? bakeOf, string twinId, string twinVersion)
+    {
+        if (bakeOf is null
+            || index.Bricks.GetValueOrDefault(bakeOf.Brick)?.Versions.GetValueOrDefault(bakeOf.Version!.ToString()) is not { } source
+            || source.Integrity != bakeOf.Integrity)
+        {
+            return;
+        }
+
+        source.Bakes ??= [];
+        source.Bakes.Add(new RegistryBakeLink { Brick = twinId, Version = twinVersion });
+    }
+
     /// <summary>Publishes a <c>.brick</c> file into a registry folder.</summary>
     /// <param name="registryRoot">The registry's root folder; created when it does not exist.</param>
     /// <param name="brickFile">The <c>.brick</c> file.</param>
@@ -160,6 +174,7 @@ public static class RegistryPublisher
         }
 
         existing.Versions[version] = entry;
+        LinkBake(index, manifest.BakeOf, id, version);
         index.GeneratedAt = DateTimeOffset.UtcNow;
 
         Directory.CreateDirectory(location);

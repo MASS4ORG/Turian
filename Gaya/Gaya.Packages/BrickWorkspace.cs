@@ -102,6 +102,15 @@ public interface IBrickWorkspace
     void Changed(bool applied);
 }
 
+/// <summary>A workspace that can exchange a published bake twin and an editable source fork.</summary>
+public interface IBrickTwinWorkspace : IBrickWorkspace
+{
+    /// <summary>Switches a registry brick's form, keeping edited source in the project trash when returning to a twin.</summary>
+    /// <param name="id">The source or twin brick id.</param>
+    /// <param name="toSource">Whether to download and embed editable source.</param>
+    void Swap(string id, bool toSource);
+}
+
 /// <summary>Supplies the open workspace's bricks, such as a game project's, to the Bricks panel.</summary>
 public interface IProjectBricks
 {

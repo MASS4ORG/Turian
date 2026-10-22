@@ -131,9 +131,9 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
         using (var sourceZip = ZipFile.OpenRead(source.Path))
         using (var twinZip = ZipFile.OpenRead(twin.Path))
         {
-            Assert.DoesNotContain(sourceZip.Entries, static e => e.FullName.StartsWith(BrickAssemblies.PrecastFolder, StringComparison.Ordinal));
+            Assert.DoesNotContain(sourceZip.Entries, static e => e.FullName.StartsWith("Brick~/Precast", StringComparison.Ordinal));
             Assert.Contains(sourceZip.Entries, static e => e.FullName.EndsWith(".cs", StringComparison.Ordinal));
-            Assert.Contains(twinZip.Entries, static e => e.FullName == "Precast~/lib/Mateo.Inventory.dll");
+            Assert.Contains(twinZip.Entries, static e => e.FullName == "Brick~/Precast/lib/Mateo.Inventory.dll");
             Assert.DoesNotContain(twinZip.Entries, static e => e.FullName.EndsWith(".cs", StringComparison.Ordinal) || e.FullName.EndsWith(".cs.meta", StringComparison.Ordinal));
         }
 

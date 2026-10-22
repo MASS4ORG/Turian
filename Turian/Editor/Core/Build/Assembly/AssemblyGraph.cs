@@ -14,6 +14,7 @@ namespace Turian.Editor.Core;
 /// <param name="EditorOnly">Compiled and loaded by the editor only.</param>
 /// <param name="AllowUnsafeCode">Allows <c>unsafe</c> code.</param>
 /// <param name="NoEngineReferences">Compiles against .NET alone, without the engine.</param>
+/// <param name="EmbeddedResources">Files relative to the definition folder embedded in the assembly.</param>
 public sealed record ProjectAssembly(
     string Name,
     string RootNamespace,
@@ -22,7 +23,8 @@ public sealed record ProjectAssembly(
     IReadOnlyList<string> References,
     bool EditorOnly,
     bool AllowUnsafeCode,
-    bool NoEngineReferences)
+    bool NoEngineReferences,
+    IReadOnlyList<string>? EmbeddedResources = null)
 {
     /// <summary>Whether this is the default assembly, which holds every script outside a definition.</summary>
     public bool IsDefault => DefinitionPath is null;
@@ -357,7 +359,8 @@ public sealed class AssemblyGraph
             references,
             definition.EditorOnly,
             definition.AllowUnsafeCode,
-            definition.NoEngineReferences);
+            definition.NoEngineReferences,
+            definition.EmbeddedResources);
     }
 
     static List<ProjectAssembly> TopologicalOrder(Dictionary<string, ProjectAssembly> assemblies)

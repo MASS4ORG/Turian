@@ -263,7 +263,10 @@ public sealed class UserCodeCompileCache(ILogger logger)
         EnumerateSourceFiles(settings.AssetsAbsoluteDir)
             .Concat(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir)
                 .SelectMany(static package => EnumerateSourceFiles(package.RootPath)
-                    .Where(path => !AssetDatabase.IsInTildeFolder(path, package.RootPath))));
+                    .Where(path => !AssetDatabase.IsInTildeFolder(path, package.RootPath))))
+            .Concat(CsProjectGenerator.DiscoverAssemblies(settings).Definitions.SelectMany(static assembly =>
+                (assembly.EmbeddedResources ?? []).Select(relative => Path.Combine(assembly.Directories[0], relative))))
+            .Distinct(StringComparer.Ordinal);
 
     static IEnumerable<string> EnumerateSourceFiles(string assetsAbsoluteDir)
     {

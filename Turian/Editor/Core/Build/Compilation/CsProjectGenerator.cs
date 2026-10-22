@@ -124,6 +124,11 @@ public static class CsProjectGenerator
         if (!assembly.NoEngineReferences)
         {
             projectRoot.AddInternalDllReferences(settings).AddBrickReferences(settings, editor: assembly.EditorOnly);
+            if (assembly.EditorOnly)
+            {
+                projectRoot.AddItemGroup().AddItem("Reference", "Turian.Editor.Core")
+                    .AddMetadata("HintPath", typeof(IAssetImporter).Assembly.Location, true);
+            }
         }
 
         projectRoot
@@ -145,6 +150,19 @@ public static class CsProjectGenerator
         foreach (var directory in assembly.Directories)
         {
             itemGroup.AddItem("Compile", $"{Path.GetRelativePath(projectDirectory, directory)}/**/*.cs").Exclude = exclude;
+        }
+
+        foreach (var relative in assembly.EmbeddedResources ?? [])
+        {
+            var file = Path.GetFullPath(Path.Combine(assembly.Directories[0], relative));
+            var prefix = Path.GetFullPath(assembly.Directories[0]) + Path.DirectorySeparatorChar;
+            if (!file.StartsWith(prefix, StringComparison.Ordinal) || !File.Exists(file))
+            {
+                throw new InvalidOperationException($"Embedded resource '{relative}' of {assembly.Name} must exist inside its assembly folder.");
+            }
+
+            itemGroup.AddItem("EmbeddedResource", Path.GetRelativePath(projectDirectory, file))
+                .AddMetadata("LogicalName", $"{assembly.RootNamespace}.{relative.Replace('/', '.').Replace('\\', '.')}", true);
         }
 
         return projectRoot;

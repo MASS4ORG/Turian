@@ -60,7 +60,7 @@ public sealed class CompileUserCode(
 
             await using var fs = new FileStream(Path.Combine(outputDirectory, $"{project.AssemblyName}.dll"),
                 FileMode.Create, FileAccess.Write, FileShare.None);
-            var result = compilation.Emit(fs);
+            var result = compilation.Emit(fs, manifestResources: EmbeddedResources(graph, project.AssemblyName));
             var (errors, warnings) = CompilationDiagnosticsReporter.Report(result.Diagnostics, Logger);
             warningCount += warnings;
 
@@ -88,6 +88,14 @@ public sealed class CompileUserCode(
             assemblyOutputPath,
             warningCount);
         return assemblyOutputPath;
+    }
+
+    static IEnumerable<ResourceDescription> EmbeddedResources(AssemblyGraph graph, string? name)
+    {
+        var assembly = graph.Definitions.FirstOrDefault(a => a.Name == name);
+        return (assembly?.EmbeddedResources ?? []).Select(relative => new ResourceDescription(
+            $"{assembly!.RootNamespace}.{relative.Replace('/', '.').Replace('\\', '.')}",
+            () => File.OpenRead(Path.Combine(assembly.Directories[0], relative)), isPublic: true));
     }
 
     static async Task OpenProjects(MSBuildWorkspace workspace, IReadOnlyList<string> paths)

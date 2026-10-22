@@ -33,7 +33,16 @@
                 "dependencies": { "type": "object", "additionalProperties": { "type": "string" } },
                 "engines": { "type": "object", "additionalProperties": { "type": "string" } },
                 "store": { "$ref": "package.schema.json#/properties/store" },
-                "yanked": { "type": "boolean" }
+                "yanked": { "type": "boolean" },
+                "bakes": {
+                  "type": "array",
+                  "description": "Advisory links to the bake twins of this version; clients verify each twin's own bakeOf.",
+                  "items": {
+                    "type": "object",
+                    "required": ["brick", "version"],
+                    "properties": { "brick": { "type": "string" }, "version": { "type": "string" } }
+                  }
+                }
               }
             }
           }

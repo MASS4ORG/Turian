@@ -200,6 +200,17 @@ public sealed partial class AssetImporter
         AssetsChanged?.Invoke();
     }
 
+    /// <summary>
+    /// What an asset's import settings hash covers: its metadata without where the file is, so a moved project or a
+    /// brick installed elsewhere, including a bake twin, keeps its imports.
+    /// </summary>
+    internal static string ImportSettingsOf(Asset asset)
+    {
+        var node = JsonNode.Parse(SerializeAssetMetadata(asset));
+        _ = (node as JsonObject)?.Remove(nameof(Asset.RelativePath));
+        return node?.ToJsonString() ?? string.Empty;
+    }
+
     internal static string SerializeAssetMetadata(Asset asset)
     {
         return asset switch
@@ -317,7 +328,7 @@ public sealed partial class AssetImporter
         var importDirectory = GetAssetImportDirectory(asset.Id);
         Directory.CreateDirectory(importDirectory);
 
-        var settingsHash = ComputeStringHash(SerializeAssetMetadata(asset));
+        var settingsHash = ComputeStringHash(ImportSettingsOf(asset));
         var manifestPath = Path.Combine(importDirectory, importManifestFileName);
 
         var importer = assetImporters.FirstOrDefault(candidate => candidate.IsValid(sourceFilePath));
@@ -326,6 +337,12 @@ public sealed partial class AssetImporter
         var existingManifest = LoadManifest(manifestPath);
         var source = new FileInfo(sourceFilePath);
         var sourceHash = SourceHash(existingManifest, source);
+        if (!CanReuseImport(existingManifest, sourceHash, settingsHash, importerVersion, importDirectory)
+            && MountBake(asset.Id, sourceFilePath, importDirectory, sourceHash, settingsHash, importerVersion) is { } mounted)
+        {
+            existingManifest = mounted;
+        }
+
         if (CanReuseImport(existingManifest, sourceHash, settingsHash, importerVersion, importDirectory))
         {
             UpdateSourceStamp(existingManifest!, source, manifestPath);

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: Bricks v2 roles, verified baked assets and editable source swaps.
 - Added: asset store integration.
 - Added: pluggable versioned saving system #89.
 - Added: nuget support inside bricks #313.

@@ -5,30 +5,8 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// What a Turian project can do with its bricks, in one place for the command line and the Studio panel.
 /// </summary>
-public static class BrickService
+public static partial class BrickService
 {
-    /// <summary>The folder, at a brick's root, holding sources built outside the project, such as C# projects.</summary>
-    public const string SourceFolder = "Source~";
-
-    /// <summary>Packs a brick folder, and its bake twin when <paramref name="twin"/> is set.</summary>
-    /// <param name="packageRoot">The brick folder.</param>
-    /// <param name="outputDirectory">Where the files and their hashes are written.</param>
-    /// <param name="precast">What the folder's <c>Precast~</c> payload was built with.</param>
-    /// <param name="twin">Whether to pack the twin too, as <see cref="PackWithTwin"/> does.</param>
-    /// <returns>The brick, then its twin.</returns>
-    /// <exception cref="PackageException">The brick cannot be packed.</exception>
-    public static IReadOnlyList<BrickPackResult> PackFiles(string packageRoot, string outputDirectory, PackagePrecast? precast,
-        bool twin)
-    {
-        if (!twin)
-        {
-            return [Pack(packageRoot, outputDirectory, precast)];
-        }
-
-        var (source, baked) = PackWithTwin(packageRoot, outputDirectory, precast);
-        return [source, baked];
-    }
-
     /// <summary>The bricks a project resolves to, dependencies first.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <returns>The resolved bricks.</returns>
@@ -452,33 +430,6 @@ public static class BrickService
         return BrickArchive.Pack(packageRoot, outputDirectory, ["gaya", ProjectPackages.HostName], precast);
     }
 
-    /// <summary>
-    /// Packs a brick folder as a source brick and its bake twin. The source file leaves out <c>Precast~</c>; the twin,
-    /// <c>id.bake</c>, carries <c>Precast~</c> and the assets without <c>Source~</c> or C# scripts, and records the
-    /// source file it was baked from.
-    /// </summary>
-    /// <param name="packageRoot">The brick folder, with its <c>Precast~</c> payload built.</param>
-    /// <param name="outputDirectory">Where both files and their hashes are written.</param>
-    /// <param name="precast">What the payload was built with, from <see cref="PrecastAsync"/>.</param>
-    /// <returns>The source file and the twin.</returns>
-    /// <exception cref="PackageException">The brick fails verification or has no payload to bake.</exception>
-    public static (BrickPackResult Source, BrickPackResult Twin) PackWithTwin(string packageRoot, string outputDirectory,
-        PackagePrecast? precast = null)
-    {
-        CheckPackable(packageRoot);
-        var payload = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder);
-        if (!Directory.Exists(payload) || !Directory.EnumerateFiles(payload, "*.dll", SearchOption.AllDirectories).Any())
-        {
-            throw new PackageException($"{packageRoot} has no {BrickAssemblies.PrecastFolder} assemblies to bake; build them, or pack with --precast.");
-        }
-
-        string[] prefixes = ["gaya", ProjectPackages.HostName];
-        var source = BrickArchive.Pack(packageRoot, outputDirectory, prefixes, exclude: [BrickAssemblies.PrecastFolder]);
-        var twin = BrickArchive.Pack(packageRoot, outputDirectory, prefixes, precast, [SourceFolder, "*.cs", "*.cs.meta"],
-            new PackageBakeOf { Brick = source.Manifest.Name, Version = source.Manifest.Version, Integrity = source.Integrity });
-        return (source, twin);
-    }
-
     static void CheckPackable(string packageRoot)
     {
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
@@ -511,7 +462,7 @@ public static class BrickService
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
-        var payload = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder);
+        var payload = BrickAssemblies.PrecastDirectory(packageRoot);
         if (Directory.Exists(payload))
         {
             Directory.Delete(payload, recursive: true);
@@ -607,7 +558,7 @@ public static class BrickService
             throw new PackageException(ex.Message, ex);
         }
 
-        var lib = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, "lib");
+        var lib = Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), "lib");
         Directory.CreateDirectory(lib);
         var previous = ReadSyncedFiles(packageRoot);
         if (unified.Count == 0)
@@ -748,7 +699,7 @@ public static class BrickService
             };
         }
 
-        File.WriteAllText(Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, BrickNuGetRestore.SyncRecordFileName),
+        File.WriteAllText(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickNuGetRestore.SyncRecordFileName),
             new JsonObject { ["packages"] = packages }.ToJsonString(PackageJson.Options));
     }
 
@@ -780,11 +731,17 @@ public static class BrickService
         new PackageManifest
         {
             Name = id,
+            UsesId = true,
             Version = SemanticVersion.Parse("0.1.0"),
             DisplayName = displayName ?? string.Join(' ', segments[^1]),
             License = license,
             Engines = { [ProjectPackages.HostName] = VersionRange.Parse($">={ProjectPackages.EngineVersion.Major}.{ProjectPackages.EngineVersion.Minor}") },
             Categories = [$"{ProjectPackages.HostName}:gameplay"],
+            Roles = new Dictionary<string, JsonElement>
+            {
+                [BrickLayout.Precast] = JsonSerializer.SerializeToElement("Brick~/Precast"),
+                [BrickLayout.Bake] = JsonSerializer.SerializeToElement("Brick~/Bake"),
+            },
         }.Save(root);
 
         var definition = Path.Combine(runtime, $"{assembly}.dataasset");
@@ -804,7 +761,7 @@ public static class BrickService
             }
             """.ReplaceLineEndings("\n") + "\n");
         Serializer.Save($"{script}.meta", new Asset { Id = Guid.NewGuid(), RelativePath = $"Runtime/{Path.GetFileName(script)}" });
-        File.WriteAllText(Path.Combine(root, ".gitignore"), "# Built by `turian-cli brick pack --precast`.\nPrecast~/\n.bricks/\n");
+        File.WriteAllText(Path.Combine(root, ".gitignore"), "# Generated by the brick compiler and baker.\nBrick~/Precast/\nBrick~/Bake/\n.bricks/\n");
         File.WriteAllText(Path.Combine(root, "README.md"), $$"""
             # {{displayName ?? segments[^1]}}
 

@@ -83,6 +83,10 @@ public static class ProjectPackages
 
         var resolution = NewResolver(locked, update).ResolveAsync(projectRoot).GetAwaiter().GetResult();
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
+        foreach (var warning in resolution.Warnings)
+        {
+            Log.Logger.LogWarning("{Warning}", warning);
+        }
 
         if (resolution.UsesUserOverride)
         {

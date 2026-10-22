@@ -35,7 +35,7 @@ public static class BrickStub
         {
             var relative = Path.GetRelativePath(packageRoot, file).Replace('\\', '/');
             var segments = relative.Split('/');
-            if (segments.Any(static s => s is ".git" or "bin" or "obj" or "Precast~" or "Source~") || relative.EndsWith(".brick", StringComparison.Ordinal)
+            if (segments.Any(static s => s is ".git" or "bin" or "obj" or "Precast~" or "Source~" or "Bake~" or BrickLayout.ReservedRoot) || relative.EndsWith(".brick", StringComparison.Ordinal)
                 || relative == PackageManifest.FileName)
             {
                 continue;

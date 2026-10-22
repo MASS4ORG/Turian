@@ -104,7 +104,7 @@ public static class BrickNuGetRestore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(brickRoot);
 
-        var path = Path.Combine(brickRoot, BrickAssemblies.PrecastFolder, SyncRecordFileName);
+        var path = Path.Combine(BrickAssemblies.PrecastDirectory(brickRoot), SyncRecordFileName);
         if (!File.Exists(path))
         {
             return NoSyncedPackages;
@@ -150,7 +150,7 @@ public static class BrickNuGetRestore
         var records = bricks.Select(static brick => (Brick: brick, Synced: SyncedPackages(brick.RootPath))).ToList();
         return unified.All(package => records.Any(record => record.Synced.TryGetValue(package.Key, out var synced)
             && SameVersion(synced.Version, package.Value)
-            && synced.Files.All(file => File.Exists(Path.Combine(record.Brick.RootPath, BrickAssemblies.PrecastFolder,
+            && synced.Files.All(file => File.Exists(Path.Combine(BrickAssemblies.PrecastDirectory(record.Brick),
                 "lib", file)))));
     }
 

@@ -145,7 +145,8 @@ public sealed class PackageStore(string root)
 
         var manifestJson = await RunGitAsync(["--git-dir", mirror, "show", $"{commit}:{PackageManifest.FileName}"],
             cancellationToken, $"{source}@{commit} has no {PackageManifest.FileName} at its root").ConfigureAwait(false);
-        var id = JsonSerializer.Deserialize<PackageManifest>(manifestJson, PackageJson.Options)?.Name;
+        var identity = JsonNode.Parse(manifestJson) as JsonObject;
+        var id = (identity?["id"] ?? identity?["name"])?.GetValue<string>();
         if (!PackageId.IsValid(id))
         {
             throw new PackageException($"{source}@{commit}: '{id}' is not a valid package id.");

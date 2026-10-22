@@ -42,7 +42,10 @@ public sealed record RebaseResult(
 /// </summary>
 public static class BrickFork
 {
-    static readonly HashSet<string> SkippedDirectories = new(StringComparer.Ordinal) { ".git", "bin", "obj", "Precast~" };
+    static readonly HashSet<string> SkippedDirectories = new(StringComparer.Ordinal) { ".git", "bin", "obj", "Precast~", "Bake~" };
+
+    // Generated payloads of a v2 brick, which a fork rebuilds rather than edits.
+    static readonly string[] SkippedPrefixes = [$"{BrickLayout.ReservedRoot}/Precast/", $"{BrickLayout.ReservedRoot}/Bake/"];
 
     /// <summary>The files of <paramref name="forkRoot"/> that differ from <paramref name="upstreamRoot"/>.</summary>
     /// <param name="upstreamRoot">The original brick folder.</param>
@@ -210,7 +213,8 @@ public static class BrickFork
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains))
+            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains)
+                || SkippedPrefixes.Any(prefix => relative.StartsWith(prefix, StringComparison.Ordinal)))
             {
                 continue;
             }

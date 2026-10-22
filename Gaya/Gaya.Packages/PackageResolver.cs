@@ -57,6 +57,9 @@ public sealed record ResolvedPackage(
 /// <param name="Lock">The lock file describing them.</param>
 public sealed record PackageResolution(IReadOnlyList<ResolvedPackage> Packages, LockFile Lock)
 {
+    /// <summary>What the user should know about the resolution that did not stop it, such as a refused bake twin.</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
     /// <summary>
     /// Whether the per-user manifest override chose any package. Such a resolution is local to one machine, so its
     /// lock must not replace the committed one.
@@ -138,7 +141,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         }
 
         var session = new Session(this, overridden, existingLock, [.. manifest.ScopedRegistries, .. options.Registries],
-            cancellationToken);
+            manifest, cancellationToken);
         Seed(session, Path.Combine(projectRoot, ProjectManifest.DirectoryName), manifest, overridden);
         await session.DrainAsync().ConfigureAwait(false);
 
@@ -157,7 +160,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 $"{ProjectManifest.DirectoryName}/{ProjectManifest.FileName} no longer matches {LockFile.FileName}; resolve without --locked and commit the lock file.");
         }
 
-        return new PackageResolution(ordered, lockFile);
+        return new PackageResolution(ordered, lockFile) { Warnings = session.Warnings };
     }
 
     /// <summary>Queues what the project asks for itself: its embedded packages, its declarations, then the host's defaults.</summary>
@@ -338,6 +341,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 Commit = package.Commit,
                 Integrity = package.Integrity,
                 SignedBy = package.SignedBy,
+                BakeOf = package.Manifest.BakeOf,
                 Depth = package.Depth,
                 Dependencies = new SortedDictionary<string, string>(package.Manifest.Dependencies, StringComparer.Ordinal),
             };
@@ -350,7 +354,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
     /// The state of one resolution: what is queued, resolved and required, and the registries read so far.
     /// </summary>
     sealed class Session(PackageResolver resolver, IReadOnlySet<string> overridden, LockFile? existingLock,
-        List<ScopedRegistry> registries, CancellationToken cancellationToken)
+        List<ScopedRegistry> registries, ProjectManifest manifest, CancellationToken cancellationToken)
     {
         readonly Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)> queue = new();
         readonly Dictionary<string, RegistryClient> clients = new(StringComparer.Ordinal);
@@ -364,6 +368,9 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
 
         /// <summary>The version ranges stated so far, with who stated them.</summary>
         public List<(string Id, VersionRange Range, string RequiredBy, int Depth)> Constraints { get; } = [];
+
+        /// <summary>What did not stop the resolution but the user should know.</summary>
+        public List<string> Warnings { get; } = [];
 
         /// <summary>Queues a declaration to resolve.</summary>
         public void Enqueue(string id, PackageSource source, string spec, string requiredBy, int depth) =>
@@ -413,13 +420,40 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 }
 
                 var registry = await PickRegistryAsync(serving, group.Key).ConfigureAwait(false);
-                Add(await resolver.MaterializeFromRegistryAsync(Client(registry), group.Key, [.. group], existingLock,
-                    indexes.GetValueOrDefault(registry.Name), cancellationToken).ConfigureAwait(false));
+                var package = await MaterializeAsync(Client(registry), group.Key, [.. group]).ConfigureAwait(false);
+                Add(overridden.Contains(group.Key) ? package with { IsOverridden = true } : package);
                 progressed = true;
             }
 
             return progressed;
         }
+
+        /// <summary>A brick only ranges ask for: its trusted twin when the project takes twins, else the brick itself.</summary>
+        async Task<ResolvedPackage> MaterializeAsync(RegistryClient client, string id,
+            List<(string Id, VersionRange Range, string RequiredBy, int Depth)> asked)
+        {
+            var known = indexes.GetValueOrDefault(client.Registry.Name);
+            if (WantsTwin(id) && await resolver.MaterializeTwinAsync(client, id, asked, existingLock, known, Warnings,
+                    cancellationToken).ConfigureAwait(false) is { } twin)
+            {
+                return twin;
+            }
+
+            var package = await resolver.MaterializeFromRegistryAsync(client, id, asked, existingLock, known,
+                cancellationToken).ConfigureAwait(false);
+
+            // A twin asked for by its own id is checked against its source, unless the lock already pinned it.
+            if (package.Manifest.BakeOf is not null && existingLock?.Dependencies.GetValueOrDefault(id)?.Integrity != package.Integrity)
+            {
+                var index = known ?? await client.GetIndexAsync(cancellationToken).ConfigureAwait(false);
+                await resolver.CheckRequestedTwinAsync(client, package, index, Warnings, cancellationToken).ConfigureAwait(false);
+            }
+
+            return package;
+        }
+
+        bool WantsTwin(string id) =>
+            manifest.Twins && !manifest.Sources.Contains(id) && !id.EndsWith(BrickArchive.TwinSuffix, StringComparison.Ordinal);
 
         /// <summary>Checks that every stated range is provided and holds.</summary>
         /// <exception cref="PackageException">A range nothing provides, or one the chosen version breaks.</exception>

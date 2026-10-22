@@ -61,6 +61,13 @@ public sealed class PackageManifest
     /// <summary>The file name at a package's root.</summary>
     public const string FileName = "package.json";
 
+    /// <summary>The key brick format v2 names the id with; earlier manifests use <c>name</c>.</summary>
+    const string IdKey = "id";
+
+    /// <summary>Whether the file names the id <c>id</c>, as brick format v2 does, rather than <c>name</c>.</summary>
+    [JsonIgnore]
+    public bool UsesId { get; set; }
+
     /// <summary>The package id, reverse-DNS (<c>com.example.inventory</c>).</summary>
     [SetOrder(-30), Tooltip("Permanent reverse-DNS brick identifier.")]
     public string Name { get; set; } = string.Empty;
@@ -162,6 +169,42 @@ public sealed class PackageManifest
     /// <summary>Set in a bake twin: the source brick it was baked from.</summary>
     public PackageBakeOf? BakeOf { get; set; }
 
+    /// <summary>
+    /// Whether bake twins of the package may exist: <c>auto</c>, the default, lets consumers take one when it is
+    /// published; <c>none</c> means the package itself is the consumable form and twins of it are refused.
+    /// </summary>
+    public string? Bake { get; set; }
+
+    /// <summary>
+    /// Fingerprints (<c>SHA256:…</c>) of keys, besides the package's own publisher, whose bake twins of it consumers
+    /// accept.
+    /// </summary>
+    public List<string> TrustedBakers { get; set; } = [];
+
+    /// <summary>
+    /// Brick format v2: role → the path, or array of paths, under <c>Brick~/</c> holding it, such as <c>source</c>,
+    /// <c>tests</c>, <c>precast</c>, <c>bake</c>, <c>samples</c> or <c>docs</c>. Hosts ignore roles they do not know.
+    /// </summary>
+    public Dictionary<string, JsonElement> Roles { get; set; } = [];
+
+    /// <summary>The paths a role names, in order; none when the manifest does not declare it.</summary>
+    /// <param name="role">The role.</param>
+    /// <returns>Paths relative to the brick folder, with <c>/</c> separators.</returns>
+    public IReadOnlyList<string> RolePaths(string role) =>
+        Roles.TryGetValue(role, out var value) ? value.ValueKind switch
+        {
+            JsonValueKind.String => [value.GetString()!],
+            JsonValueKind.Array => [.. value.EnumerateArray().Where(static e => e.ValueKind == JsonValueKind.String).Select(static e => e.GetString()!)],
+            _ => [],
+        } : [];
+
+    /// <summary>Whether consumers may take a bake twin of the package in its place.</summary>
+    [JsonIgnore]
+    public bool AllowsTwins => Bake != BakeNone;
+
+    /// <summary>The <see cref="Bake"/> value that refuses twins.</summary>
+    public const string BakeNone = "none";
+
     /// <summary>Whether the package supports building for <paramref name="platform"/>.</summary>
     /// <param name="platform">A platform id, ignoring case.</param>
     /// <returns>True when the package lists no platforms or lists this one.</returns>
@@ -216,7 +259,23 @@ public sealed class PackageManifest
         PackageManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<PackageManifest>(json, PackageJson.Options);
+            // Brick format v2 names the id "id"; it is read as "name" and written back as it was found.
+            var node = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            if (node is JsonObject identity && identity.ContainsKey(IdKey) && identity.ContainsKey("name"))
+            {
+                throw new PackageException($"{path}: use either id or name, not both.");
+            }
+            var usesId = node is JsonObject root && root.ContainsKey(IdKey) && !root.ContainsKey("name");
+            if (usesId)
+            {
+                var obj = node!.AsObject();
+                var id = obj[IdKey];
+                obj.Remove(IdKey);
+                obj["name"] = id;
+            }
+
+            manifest = node.Deserialize<PackageManifest>(PackageJson.Options);
+            manifest?.UsesId = usesId;
         }
         catch (JsonException ex)
         {
@@ -246,7 +305,19 @@ public sealed class PackageManifest
             node.Remove(name);
         }
 
-        return node.ToJsonString(PackageJson.Options);
+        if (!UsesId)
+        {
+            return node.ToJsonString(PackageJson.Options);
+        }
+
+        // Keep the id first, under the name the file used.
+        var ordered = new JsonObject { [IdKey] = node["name"]?.DeepClone() };
+        foreach (var (key, value) in node.Where(static p => p.Key != "name").ToList())
+        {
+            ordered[key] = value?.DeepClone();
+        }
+
+        return ordered.ToJsonString(PackageJson.Options);
     }
 
     static bool IsDefault(JsonNode? value) =>
@@ -273,6 +344,8 @@ public sealed class PackageManifest
         ValidateShipping(path);
         ValidateExclude(path);
         ValidateBakeOf(path);
+        ValidateBake(path);
+        ValidateRoles(path);
 
         if (Platforms.Concat(PlatformNuget.Keys).Any(static p => string.IsNullOrWhiteSpace(p)))
         {
@@ -340,6 +413,36 @@ public sealed class PackageManifest
         if (!bakeOf.Integrity.StartsWith("sha256-", StringComparison.Ordinal))
         {
             throw new PackageException($"{path}: bakeOf.integrity must be the source file's sha256- hash.");
+        }
+    }
+
+    void ValidateRoles(string path)
+    {
+        foreach (var (role, value) in Roles)
+        {
+            if (value.ValueKind is not JsonValueKind.String and not JsonValueKind.Array
+                || value.ValueKind == JsonValueKind.Array && value.EnumerateArray().Any(static e => e.ValueKind != JsonValueKind.String))
+            {
+                throw new PackageException($"{path}: role '{role}' must be a path or an array of paths.");
+            }
+
+            if (RolePaths(role).FirstOrDefault(static p => !BrickLayout.IsInsideReservedRoot(p)) is { } outside)
+            {
+                throw new PackageException($"{path}: role '{role}' path '{outside}' must lie inside {BrickLayout.ReservedRoot}/, using '/', without '..'.");
+            }
+        }
+    }
+
+    void ValidateBake(string path)
+    {
+        if (Bake is not null and not "auto" and not BakeNone)
+        {
+            throw new PackageException($"{path}: bake must be 'auto' or '{BakeNone}', not '{Bake}'.");
+        }
+
+        if (TrustedBakers.FirstOrDefault(static key => !key.StartsWith("SHA256:", StringComparison.Ordinal)) is { } bad)
+        {
+            throw new PackageException($"{path}: trustedBakers entry '{bad}' must be a key fingerprint, SHA256:….");
         }
     }
 

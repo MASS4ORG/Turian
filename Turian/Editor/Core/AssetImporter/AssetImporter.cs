@@ -34,12 +34,14 @@ public sealed partial class AssetImporter : IDisposable
     AssetFolderWatcher? folderWatcher;
     List<AssetFolderWatcher> packageWatchers = [];
     IReadOnlyList<(string Root, bool ReadOnly)> packageRoots = [];
+    IReadOnlyDictionary<string, string> bakeFolders = new Dictionary<string, string>();
     PackageImportOverrides importOverrides = new();
     List<(Asset Asset, string SourcePath)>? pendingBatch;
     string? projectRootPath;
     string? assetsRootPath;
     string? cacheRootPath;
     string? cacheAssetsRootPath;
+    int mountedBakes;
     bool disposed;
 
     /// <summary>
@@ -262,6 +264,8 @@ public sealed partial class AssetImporter : IDisposable
             importOverrides = PackageImportOverrides.Load(projectRootPath);
             var packages = ProjectPackages.ResolveOrEmpty(projectRootPath);
             packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
+            bakeFolders = packages.ToDictionary(static p => Path.GetFullPath(p.RootPath),
+                static p => Gaya.Packages.BrickLayout.PathOf(Path.GetFullPath(p.RootPath), p.Manifest, Gaya.Packages.BrickLayout.Bake));
 
             // A brick's importers live in its prebuilt editor assembly, which may have loaded since the list was built.
             BrickAssemblies.Load(packages, logger, projectRootPath);
@@ -271,6 +275,7 @@ public sealed partial class AssetImporter : IDisposable
         {
             logger.LogError(ex, "The project's packages could not be resolved; their assets are left out");
             packageRoots = [];
+            bakeFolders = new Dictionary<string, string>();
         }
 
         assetDatabase.SetPackageRoots(projectRootPath, packageRoots.Select(static p => p.Root));
@@ -320,6 +325,11 @@ public sealed partial class AssetImporter : IDisposable
 
         logger.LogInformation("Asset scan finished: {ChangedCount} changed or unindexed assets from {FolderPath}",
             batch.Count, folderPath);
+        if (mountedBakes > 0)
+        {
+            logger.LogInformation("Mounted {Count} baked import(s) from bake twins instead of importing them", mountedBakes);
+            mountedBakes = 0;
+        }
         ReportTextureCacheSize();
     }
 

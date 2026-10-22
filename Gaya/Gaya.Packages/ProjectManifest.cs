@@ -30,6 +30,17 @@ public class ProjectManifest
     [Tooltip("Registries and signing keys explicitly trusted by this project.")]
     public List<ScopedRegistry> ScopedRegistries { get; set; } = [];
 
+    /// <summary>
+    /// Take each registry brick's bake twin, its prebuilt and imported form, when one is published and trusted, so
+    /// nothing of it compiles or imports here. Bricks listed in <see cref="Sources"/> stay source.
+    /// </summary>
+    [Tooltip("Use bake twins of registry bricks when published and trusted.")]
+    public bool Twins { get; set; }
+
+    /// <summary>Bricks taken as source even when <see cref="Twins"/> is on, such as one being fixed.</summary>
+    [Tooltip("Bricks kept as source even when twins are on.")]
+    public List<string> Sources { get; set; } = [];
+
     /// <summary>Renames a project's legacy <c>Packages</c> folder to <see cref="DirectoryName"/> when it holds a manifest.</summary>
     /// <param name="projectRoot">The project folder.</param>
     public static void MigrateLegacyLayout(string projectRoot)
@@ -83,6 +94,13 @@ public class ProjectManifest
                 manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
                 manifest.ScopedRegistries.Add(registry);
             }
+
+            // Bricks one developer takes as source, such as one being fixed, are theirs alone.
+            foreach (var id in user.Sources.Where(id => !manifest.Sources.Contains(id)))
+            {
+                manifest.Sources.Add(id);
+                overridden.Add(id);
+            }
         }
 
         return (manifest, overridden);
@@ -98,6 +116,16 @@ public class ProjectManifest
         if (ScopedRegistries.Count == 0)
         {
             node.Remove("scopedRegistries");
+        }
+
+        if (!Twins)
+        {
+            node.Remove("twins");
+        }
+
+        if (Sources.Count == 0)
+        {
+            node.Remove("sources");
         }
 
         File.WriteAllText(Path.Combine(directory, FileName), node.ToJsonString(PackageJson.Options));
@@ -120,7 +148,7 @@ public class ProjectManifest
             throw new PackageException($"{path} is not a valid project manifest: {ex.Message}", ex);
         }
 
-        foreach (var id in manifest?.Dependencies.Keys.Where(static id => !PackageId.IsValid(id)) ?? [])
+        foreach (var id in manifest?.Dependencies.Keys.Concat(manifest.Sources).Where(static id => !PackageId.IsValid(id)) ?? [])
         {
             throw new PackageException($"{path}: '{id}' is not a valid package id.");
         }
