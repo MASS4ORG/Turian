@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-23
+
 - Fixed: publish Gaya and Turian NuGet packages on release tags.
 
 ## [3.3.0] - 2026-10-23
@@ -131,7 +133,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/MASS4ORG/Turian/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/MASS4ORG/Turian/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/MASS4ORG/Turian/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/MASS4ORG/Turian/compare/v3.0.0...v3.1.0
