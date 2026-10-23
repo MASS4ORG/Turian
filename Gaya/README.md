@@ -78,6 +78,7 @@ public sealed class NotesPanel : IPanel
 
 ## API migration
 
+- Register color themes as `.pss` sheets with `IThemeService.Register(ThemeSource)`, and read their compiled colors and metrics from `IThemeService.Current`. The C# theme record and its registration overload have been removed.
 - Replace `MASS4.Attributes.EditorSettingAttribute` with `Gaya.EditorSettingAttribute` from `MASS4.Gaya.Attributes`. Use `[Gaya.EditorSetting(...)]` when importing both namespaces; regenerated Turian user projects provide an alias for `[EditorSetting]`.
 - Move settings page ids, paths, descriptions, order, scope and visibility into the class attribute. Replace `settings.Register(new SettingsPageDescriptor(...))` with `settings.Register(instance)`; descriptors expose read-only metadata derived from that instance. Preserve each existing id to retain preferences.
 - Move `TabStripChromeDescriptor` contributions into the panel's `RenderHeader` method. The tab-strip registry and `IPluginContext.TabStripChrome` have been removed. Keep application-wide chrome contributions on `IPluginContext.Chrome`.
