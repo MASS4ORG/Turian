@@ -39,6 +39,12 @@ dotnet run --project Turian/Editor/Studio/Turian.Editor.Studio.csproj -- --proje
 dotnet run --project Turian/Editor/CLI -- screenshot path/to/example-01/ --out shot.png
 ```
 
+## NuGet releases
+
+`./build.sh PackNuGet --configuration Release --no-local-packages --skip-shaders` builds every solution project declaring a `PackageId` and writes the packages to `artifacts/packages/`. This includes `MASS4.Gaya.Attributes`, `MASS4.Gaya.Sdk` and `MASS4.Gaya.Packages`. The SDK declares the attributes package as a dependency; Gaya.Packages uses the separate `MASS4.Attributes` package from Guinevere.
+
+`publish-on-tag.yml` calls `PushNuGet` for release tags when `RELEASE_REPOSITORY` is set. Configure a nuget.org Trusted Publishing policy for repository owner `MASS4ORG`, repository `Turian` and workflow `publish-on-tag.yml`, and set the repository secret `NUGET_USER` to the owning nuget.org account name. The workflow exchanges its OIDC token for a short-lived API key and uploads the generated packages as the `nuget-packages` artifact. Existing package versions are skipped on retries.
+
 ## Troubleshooting
 
 - **Shader Compilation Failed**: Ensure `glslc` is in your PATH.
