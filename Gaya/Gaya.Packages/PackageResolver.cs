@@ -159,6 +159,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
             await session.DrainAsync().ConfigureAwait(false);
         }
 
+        await session.ThrowIfUnresolvedAsync().ConfigureAwait(false);
         session.CheckConstraints();
         var ordered = DependencyOrder(session.Resolved, session.Twins);
         var lockFile = ToLock(ordered);
@@ -398,7 +399,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
     /// <summary>
     /// The state of one resolution: what is queued, resolved and required, and the registries read so far.
     /// </summary>
-    sealed class Session(PackageResolver resolver, IReadOnlySet<string> overridden, LockFile? existingLock,
+    sealed partial class Session(PackageResolver resolver, IReadOnlySet<string> overridden, LockFile? existingLock,
         List<ScopedRegistry> registries, ProjectManifest manifest, CancellationToken cancellationToken)
     {
         readonly Queue<(string Id, PackageSource Source, string Spec, string RequiredBy, int Depth)> queue = new();
@@ -434,12 +435,27 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 {
                     throw BothInstalled(next.Id, twin.Id);
                 }
-                else if (!Resolved.ContainsKey(next.Id))
+                else if (!Resolved.ContainsKey(next.Id)
+                         && !TryRegistryBuiltin(next.Id, next.Source, next.RequiredBy, next.Depth))
                 {
                     Add(await resolver.MaterializeAsync(next.Id, next.Source, next.Spec, next.Depth,
                         overridden.Contains(next.Id), existingLock, cancellationToken).ConfigureAwait(false));
                 }
             }
+        }
+
+        bool TryRegistryBuiltin(string id, PackageSource source, string requiredBy, int depth)
+        {
+            if (source is not BuiltinSource builtin || builtin.Id != id
+                || PackageSource.DefaultSpec(id, resolver.options.BuiltinDirectory) != "*"
+                || !registries.Any(registry => registry.Serves(id)))
+            {
+                return false;
+            }
+
+            Constraints.Add((id, VersionRange.Parse("*"), requiredBy, depth));
+            Warnings.Add($"{id} no longer ships with this host; resolving it from the configured registries.");
+            return true;
         }
 
         /// <summary>Takes each brick only ranges ask for from a registry scoped to it.</summary>
@@ -453,7 +469,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                          .OrderBy(static g => g.Key.EndsWith(BrickArchive.TwinSuffix, StringComparison.Ordinal) ? 0 : 1)
                          .ToList())
             {
-                if (Twins.ContainsKey(group.Key))
+                if (Twins.ContainsKey(group.Key) || unresolved.ContainsKey(group.Key))
                 {
                     continue;
                 }
@@ -464,10 +480,18 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                     continue;
                 }
 
-                var registry = await PickRegistryAsync(serving, group.Key).ConfigureAwait(false);
-                var package = await MaterializeAsync(Client(registry), group.Key, [.. group]).ConfigureAwait(false);
-                Add(overridden.Contains(group.Key) ? package with { IsOverridden = true } : package);
-                progressed = true;
+                // A brick no registry can give is reported with the others at the end, not one at a time.
+                try
+                {
+                    var registry = await PickRegistryAsync(serving, group.Key).ConfigureAwait(false);
+                    var package = await MaterializeAsync(Client(registry), group.Key, [.. group]).ConfigureAwait(false);
+                    Add(overridden.Contains(group.Key) ? package with { IsOverridden = true } : package);
+                    progressed = true;
+                }
+                catch (PackageException ex)
+                {
+                    unresolved[group.Key] = ex.Message;
+                }
             }
 
             return progressed;
@@ -591,9 +615,10 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 {
                     index = await Client(registry).GetIndexAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (PackageException)
+                catch (PackageException ex)
                 {
                     index = null;
+                    unreadable[registry.Name] = ex.Message;
                 }
 
                 indexes[registry.Name] = index;

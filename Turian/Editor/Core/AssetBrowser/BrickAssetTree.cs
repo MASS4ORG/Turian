@@ -14,9 +14,10 @@ public sealed class BrickAssetTree(AssetFileSystem files)
         {
             return Scan(projectRoot, ProjectPackages.ResolveOrEmpty(projectRoot));
         }
-        catch (PackageException ex)
+        catch (PackageException)
         {
-            Log.Logger.LogWarning(ex, "Could not browse the project's bricks");
+            // ProjectPackages has logged what is missing and what to do.
+            Log.Logger.LogWarning("The bricks cannot be browsed until the project's bricks resolve");
             return Scan(projectRoot, []);
         }
     }

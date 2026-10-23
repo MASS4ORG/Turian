@@ -178,7 +178,7 @@ public sealed class RegistryTests : IDisposable
         Publish("user.mateo.rules", "1.0.0");
         Scope(("user.mateo.rules", "^1.0.0"), trusted: other.PublicKey);
         var wrongKey = await Assert.ThrowsAsync<PackageException>(() => Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
-        Assert.Contains("was not made by any of the 1 key(s)", wrongKey.Message, StringComparison.Ordinal);
+        Assert.Contains("which is not one of the 1 key(s) trusted for it", wrongKey.Message, StringComparison.Ordinal);
 
         Scope(("user.mateo.rules", "^1.0.0"));
         var file = Directory.GetFiles(Path.Combine(registry, "v1", "bricks"), "*.brick", SearchOption.AllDirectories).Single();

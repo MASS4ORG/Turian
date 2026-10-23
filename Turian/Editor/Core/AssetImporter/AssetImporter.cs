@@ -276,9 +276,10 @@ public sealed partial class AssetImporter : IDisposable
             BrickAssemblies.Load(packages, logger, projectRoot);
             RefreshImporters();
         }
-        catch (Gaya.Packages.PackageException ex)
+        catch (Gaya.Packages.PackageException)
         {
-            logger.LogError(ex, "The project's packages could not be resolved; their assets are left out");
+            // ProjectPackages has logged what is missing and what to do.
+            logger.LogWarning("The bricks' assets are left out until the project's bricks resolve");
             packageRoots = [];
             bakeFolders = new Dictionary<string, IReadOnlyList<string>>();
         }

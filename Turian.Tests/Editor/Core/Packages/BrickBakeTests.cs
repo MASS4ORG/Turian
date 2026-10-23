@@ -182,9 +182,13 @@ public sealed class BrickBakeTests : IDisposable
         var logger = Substitute.For<ILogger>();
         using var importer = new AssetImporter(logger, new AssetDatabase(), settingsService);
         importer.GenerateMetaFiles(settings.AssetsAbsoluteDir);
+
+        // The importer says what it leaves out; the resolution failure itself names the missing link.
         Assert.Contains(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log)
-            && call.GetArguments()[0] is LogLevel.Error && call.GetArguments()[3] is PackageException error
-            && error.Message.Contains("linked folder", StringComparison.Ordinal));
+            && call.GetArguments()[0] is LogLevel.Warning
+            && call.GetArguments()[2]?.ToString()?.Contains("left out", StringComparison.Ordinal) == true);
+        var error = Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project));
+        Assert.Contains("linked folder", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>A failed source compilation is reported and cannot leave a publishable archive behind.</summary>

@@ -58,6 +58,29 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project));
     }
 
+    /// <summary>
+    /// A failed resolution is kept, so the editor's many callers neither resolve again nor log it again, until an
+    /// explicit restore retries it.
+    /// </summary>
+    [Fact]
+    public void FailedResolutionsAreKeptUntilARestore()
+    {
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(Path.Combine(project, "Assets"));
+        var rules = Path.Combine(root, "user.mateo.rules");
+        new ProjectManifest
+        {
+            Dependencies = { [ProjectPackages.RenderBrick] = null, ["user.mateo.rules"] = $"file:{rules}" },
+        }.Save(project);
+
+        var first = Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project));
+        Assert.Same(first, Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project)));
+
+        _ = BrickService.New(root, "user.mateo.rules");
+        Assert.Same(first, Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project)));
+        Assert.Equal("user.mateo.rules", Assert.Single(BrickService.Restore(project).Packages).Id);
+    }
+
     /// <summary>Both project and studio brick verification reject dependencies on a producer's local paths.</summary>
     [Theory]
     [InlineData(PackageScope.Project)]

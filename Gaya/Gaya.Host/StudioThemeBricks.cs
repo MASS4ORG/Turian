@@ -46,7 +46,7 @@ public static class StudioThemeBricks
         }
         catch (PackageException ex)
         {
-            logger.LogError(ex, "Studio bricks could not be resolved");
+            logger.LogError("Studio bricks could not be resolved: {Problem}", ex.Message);
             return null;
         }
     }

@@ -69,7 +69,7 @@ public static class PackagedPlugins
         }
         catch (PackageException ex)
         {
-            logger.LogError(ex, "Studio packages could not be resolved; none are loaded");
+            logger.LogError("Studio packages could not be resolved; none are loaded: {Problem}", ex.Message);
             return StudioPackages.Empty;
         }
 

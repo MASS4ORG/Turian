@@ -16,8 +16,12 @@ public static partial class BrickService
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="locked">Install exactly what the lock records and fail on drift, as CI does.</param>
     /// <returns>The resolution.</returns>
-    public static PackageResolution Restore(string projectRoot, bool locked = false) =>
-        ProjectPackages.Resolve(projectRoot, locked);
+    public static PackageResolution Restore(string projectRoot, bool locked = false)
+    {
+        // An explicit restore retries: a registry may be back, or a key added, since the last failure was kept.
+        ProjectPackages.Invalidate(projectRoot);
+        return ProjectPackages.Resolve(projectRoot, locked);
+    }
 
     /// <summary>Fetches newer commits of git bricks and rewrites the lock.</summary>
     /// <param name="projectRoot">The project folder.</param>

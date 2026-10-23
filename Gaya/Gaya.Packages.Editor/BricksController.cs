@@ -315,7 +315,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             }
         }, applyToProject: installed.Any(p => p.Id == id && p.Origin == PackageOrigin.Embedded));
 
-    /// <summary>Reads the registries' bricks into <see cref="Catalog"/>; an unreachable registry is reported in <see cref="Error"/>.</summary>
+    /// <summary>Refreshes registry offers and restores the workspace; unresolved bricks remain reported in <see cref="Error"/>.</summary>
     /// <returns>A task that completes when the catalog is updated.</returns>
     public async Task RefreshRegistriesAsync()
     {
@@ -340,7 +340,11 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
         }
 
-        Publish(installed, unavailable.Id);
+        await RunAsync("Restore refreshed bricks", static current => current.Restore()).ConfigureAwait(false);
+        if (WorkspaceRoot == root)
+        {
+            Publish(installed, Error ?? unavailable.Id);
+        }
     }
 
     /// <summary>Removes a brick, preserving embedded sources in the project's trash.</summary>
@@ -421,7 +425,8 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
                 catch (PackageException ex)
                 {
                     failure = ex.Message;
-                    log.LogError(ex, "{Label} failed: {Message}", label, ex.Message);
+                    // The message says what is wrong and what to do; a stack trace would only bury it.
+                    log.LogError("{Label} failed: {Message}", label, ex.Message);
                     throw;
                 }
 

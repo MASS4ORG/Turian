@@ -142,9 +142,10 @@ public sealed class BuildManager : IDisposable
                 packageSourceWatchers.Add(watcher);
             }
         }
-        catch (Gaya.Packages.PackageException ex)
+        catch (Gaya.Packages.PackageException)
         {
-            logger.LogError(ex, "The project's packages could not be resolved; their scripts are not watched");
+            // ProjectPackages has logged what is missing and what to do.
+            logger.LogWarning("The bricks' scripts are not watched until the project's bricks resolve");
         }
     }
 

@@ -237,7 +237,31 @@ public static class RegistryTrust
             }
         }
 
-        throw new PackageException(
-            $"{id} {version}: the signature in {registry.Name} was not made by any of the {registry.Keys.Count} key(s) this project trusts for it.");
+        throw new PackageException(Untrusted(registry, id, version, entry));
+    }
+
+    /// <summary>Says why a signed entry is refused and what the user can do, depending on whether any key is trusted.</summary>
+    static string Untrusted(ScopedRegistry registry, string id, string version, RegistryVersion entry)
+    {
+        var signer = entry.SignedBy is { Length: > 0 } signedBy ? $"is signed by {signedBy}" : "is signed";
+        var keys = $"{registry.Url.TrimEnd('/')}/keys";
+        return registry.Keys.Count == 0
+            ? $"{id} {version} from {registry.Name} {signer}, but no signing key is trusted for {registry.Name}, so none of its bricks can be installed. "
+              + $"If you trust this registry, add its public key to the registry's \"keys\": {keys} lists the keys it signs with; confirm the fingerprint with its owner first."
+            : $"{id} {version} from {registry.Name} {signer}, which is not one of the {registry.Keys.Count} key(s) trusted for it "
+              + $"({string.Join(", ", registry.Keys.Select(FingerprintOf))}). The registry may have changed its key, or this copy was altered; "
+              + $"ask its owner before adding the key {keys} lists.";
+    }
+
+    static string FingerprintOf(string key)
+    {
+        try
+        {
+            return SshSignature.Fingerprint(key);
+        }
+        catch (PackageException)
+        {
+            return "an unreadable key";
+        }
     }
 }

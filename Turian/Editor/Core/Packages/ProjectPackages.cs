@@ -33,6 +33,12 @@ public static class ProjectPackages
     static readonly Lock CacheLock = new();
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];
 
+    // A failed resolution, kept like a good one: every caller gets it again without another network round, and it is logged once.
+    static readonly Dictionary<string, (string Stamp, PackageException Failure)> Failures = [];
+
+    // The kept failures already logged by ResolveOrEmpty.
+    static readonly ConditionalWeakTable<PackageException, object> Reported = new();
+
     /// <summary>This engine's version, which packages' <c>engines.turian</c> ranges are checked against.</summary>
     public static SemanticVersion EngineVersion { get; } = ReadVersion(typeof(Component).Assembly);
 
@@ -59,9 +65,26 @@ public static class ProjectPackages
             {
                 return cached.Resolution;
             }
+
+            if (Failures.TryGetValue(projectRoot, out var failed) && failed.Stamp == stamp)
+            {
+                throw failed.Failure;
+            }
         }
 
-        return ResolveUncached(projectRoot, locked, new HashSet<string>());
+        try
+        {
+            return ResolveUncached(projectRoot, locked, new HashSet<string>());
+        }
+        catch (PackageException ex)
+        {
+            lock (CacheLock)
+            {
+                Failures[projectRoot] = (stamp, ex);
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -100,6 +123,7 @@ public static class ProjectPackages
         lock (CacheLock)
         {
             Cache[projectRoot] = (Stamp(projectRoot, locked), resolution);
+            _ = Failures.Remove(projectRoot);
         }
 
         return resolution;
@@ -120,6 +144,7 @@ public static class ProjectPackages
         lock (CacheLock)
         {
             _ = Cache.Remove(Path.GetFullPath(projectRoot));
+            _ = Failures.Remove(Path.GetFullPath(projectRoot));
         }
     }
 
@@ -137,7 +162,20 @@ public static class ProjectPackages
         }
 
         ProjectManifest.MigrateLegacyLayout(projectRoot);
-        return Resolve(projectRoot).Packages;
+        try
+        {
+            return Resolve(projectRoot).Packages;
+        }
+        catch (PackageException ex)
+        {
+            // The editor's callers each note what they leave out; what is missing and why is told here, once per failure.
+            if (Reported.TryAdd(ex, Reported))
+            {
+                Log.Logger.LogError("The project's bricks could not be resolved: {Problem}", ex.Message);
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
