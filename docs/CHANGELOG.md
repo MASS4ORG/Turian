@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: publish Gaya and Turian NuGet packages on release tags.
+
 ## [3.3.0] - 2026-10-23
 
 - Added: asset store integration.
