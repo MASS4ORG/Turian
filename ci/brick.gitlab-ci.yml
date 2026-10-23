@@ -16,7 +16,7 @@
     entrypoint: [""]
   variables:
     # The official image, pinned by digest; a project or group variable overrides it.
-    TURIAN_CLI_IMAGE: ghcr.io/mass4org/turian-cli@sha256:f6a1e0379084b1b8c8b93d938b989b4d649a90766be8b5e6427b2ee40100050c
+    TURIAN_CLI_IMAGE: ghcr.io/mass4org/turian-cli@sha256:88dd379139cf1718368ff478ae6f5ed37c0333d26ddb2b2ce2bcabda4ae8406d
     BRICK_PATH: "."
     BRICK_PRECAST: "--precast"
     BRICK_TWIN: "--twin"
