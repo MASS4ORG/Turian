@@ -5,9 +5,9 @@ namespace Mass4.BrickRelease;
 static class ToolProcess
 {
     internal static async Task<string> RunAsync(string executable, IEnumerable<string> arguments,
-        CancellationToken cancellationToken, string? input = null)
+        CancellationToken cancellationToken, string? input = null, IReadOnlyDictionary<string, string>? environment = null)
     {
-        using var process = Start(executable, arguments);
+        using var process = Start(executable, arguments, environment);
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
         try
@@ -21,7 +21,7 @@ static class ToolProcess
         }
     }
 
-    static Process Start(string executable, IEnumerable<string> arguments)
+    static Process Start(string executable, IEnumerable<string> arguments, IReadOnlyDictionary<string, string>? environment)
     {
         var start = new ProcessStartInfo(executable)
         {
@@ -34,6 +34,11 @@ static class ToolProcess
         foreach (var argument in arguments)
         {
             start.ArgumentList.Add(argument);
+        }
+
+        foreach (var (name, value) in environment ?? new Dictionary<string, string>())
+        {
+            start.Environment[name] = value;
         }
 
         start.Environment.Remove("SSH_AUTH_SOCK");

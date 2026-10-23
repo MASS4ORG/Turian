@@ -79,8 +79,10 @@ static class Program
 
     static Task ConsumerCommand(string[] args, CancellationToken cancellationToken)
     {
-        RequireArguments(args, 3, 3);
-        return ConsumerSmoke.RunAsync(args[1], args[2], cancellationToken);
+        RequireArguments(args, 2, 3);
+        return args.Length == 3
+            ? ConsumerSmoke.RunAsync(args[1], args[2], cancellationToken)
+            : ConsumerSmoke.RunLocalAsync(args[1], cancellationToken);
     }
 
     static void RequireArguments(string[] args, int minimum, int maximum)
@@ -93,7 +95,7 @@ static class Program
 
     static ArgumentException Usage() => new("Expected qualify ARCHIVE TAG REVISION OUTPUT [--github-output [PREFIX]], " +
                                             "validate ARCHIVE QUALIFICATION, sign ARCHIVE QUALIFICATION OUTPUT, " +
-                                            "or consumer ARCHIVE IMAGE.");
+                                            "or consumer ARCHIVE [IMAGE] (without IMAGE, with the turian-cli on PATH).");
 
     static async Task SignAsync(string root, string archive, string qualification, string output,
         CancellationToken cancellationToken)

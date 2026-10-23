@@ -282,6 +282,62 @@ public sealed class BrickReleaseTests : IAsyncLifetime
             "ghcr.io/mass4org/turian-cli:latest", TestContext.Current.CancellationToken));
     }
 
+    /// <summary>
+    /// The GitLab brick template defaults to one official image pinned by digest, never a moving tag.
+    /// </summary>
+    [Fact]
+    public void GitLabTemplatePinsTheOfficialImage()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Turian.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.SkipWhen(directory is null, "Test binaries are outside the repository.");
+        var template = File.ReadAllText(Path.Combine(directory.FullName, "ci/brick.gitlab-ci.yml"));
+
+        Assert.Single(Regex.Matches(template, @"ghcr\.io/mass4org/turian-cli[@:]"));
+        Assert.Matches(@"TURIAN_CLI_IMAGE: ghcr\.io/mass4org/turian-cli@sha256:[0-9a-f]{64}\n", template);
+    }
+
+    /// <summary>
+    /// Inside the CLI image the consumer runs the local turian-cli, isolated by its own home, store and configuration,
+    /// with the archive and project at their real paths.
+    /// </summary>
+    [Fact]
+    public async Task LocalConsumerIsolatesTheCli()
+    {
+        WriteArchive();
+        var calls = new List<string[]>();
+        var restored = false;
+        await ConsumerSmoke.RunLocalAsync(Archive, TestContext.Current.CancellationToken, (arguments, environment, _) =>
+        {
+            var work = Path.GetDirectoryName(environment["HOME"])!;
+            Assert.True(Directory.Exists(environment["HOME"]));
+            Assert.Equal(Path.Combine(work, "store"), environment["GAYA_BRICKS"]);
+            Assert.Equal(Path.Combine(work, "config"), environment["GAYA_CONFIG_HOME"]);
+            calls.Add(arguments);
+            if (arguments is ["brick", "add", ..])
+            {
+                Assert.Equal($"file:{Path.GetFullPath(Archive)}", arguments[3]);
+                Directory.CreateDirectory(environment["GAYA_BRICKS"]);
+            }
+
+            if (arguments is ["brick", "restore", "--locked", ..])
+            {
+                Assert.False(Directory.Exists(environment["GAYA_BRICKS"]));
+                restored = true;
+            }
+
+            return Task.FromResult("");
+        });
+
+        Assert.True(restored);
+        Assert.Equal(["new", "brick", "compile", "brick", "brick"], calls.Select(static call => call[0]));
+        Assert.StartsWith(Path.GetTempPath(), calls[0][1], StringComparison.Ordinal);
+    }
+
     /// <summary>The executable consumes environment credentials without leaving them in child-process environments.</summary>
     [Fact]
     public async Task CommandSigningConsumesEnvironmentKeyAndReportsErrors()

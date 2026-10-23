@@ -215,7 +215,7 @@ public sealed class BuiltinRegistryTests : IDisposable
         Assert.NotNull(controller.Error);
         Assert.Contains(Extracted, controller.Error);
         Assert.Empty(controller.Rows);
-        Assert.Contains(controller.Catalog, brick => brick.Id == Shipped && brick.IsBuiltin);
+        Assert.Contains(controller.Catalog, static brick => brick.Id == Shipped && brick.IsBuiltin);
     }
 
     PackageResolver Resolver(bool locked = false) => new(store, new PackageResolverOptions
