@@ -3,20 +3,13 @@ namespace Gaya.Plugin.Turian;
 /// <summary>Retains the origin of events, including calls through the shared ambient logger.</summary>
 static class LogOrigin
 {
-    static readonly HashSet<string> StudioAssemblies =
-    [
-        "Turian.Engine.Core", "Turian.Engine.Attributes", "Turian.Editor.Core", "Turian.Editor.Studio",
-        "Turian.Editor.CLI", "Gaya.Plugin.Turian", "Gaya.Host", "Gaya.Sdk", "Gaya.Packages",
-        "Guinevere", "Guinevere.Excalibur", "Turian.Engine.UI", "Turian.Editor.UI", "Turian.Engine.Hzb",
-    ];
-
     internal static LogLine Capture(LogLevel level, string message, string category)
     {
         var caller = new StackTrace(true).GetFrames().FirstOrDefault(IsCaller);
         var internalMessage = IsInternal(category);
         if (category == "Turian" && caller is not null)
         {
-            internalMessage = StudioAssemblies.Contains(caller.GetMethod()!.DeclaringType!.Assembly.GetName().Name!);
+            internalMessage = IsStudioAssembly(caller.GetMethod()!.DeclaringType!.Assembly);
         }
 
         return new LogLine(level, DateTimeOffset.Now, message)
@@ -27,6 +20,10 @@ static class LogOrigin
             SourceLine = caller?.GetFileLineNumber() ?? 0,
         };
     }
+
+    /// <summary>Whether this repository built the assembly: <c>Directory.Build.targets</c> stamps every non-test project.</summary>
+    static bool IsStudioAssembly(Assembly assembly) =>
+        assembly.GetCustomAttributes<AssemblyMetadataAttribute>().Any(static a => a is { Key: "Mass4.Origin", Value: "Turian" });
 
     static bool IsCaller(StackFrame frame)
     {

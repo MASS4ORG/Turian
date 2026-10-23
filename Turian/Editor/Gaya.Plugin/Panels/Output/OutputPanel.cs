@@ -44,7 +44,6 @@ sealed partial class OutputPanel(
     long lastGeneration;
 
     Font? monoFont;
-    SKFont? monoMeasure;
     float monoSize;
 
     IReadOnlyList<LogRow> rows = [];
@@ -336,8 +335,7 @@ sealed partial class OutputPanel(
             }
 
             var row = rows[selectedIndex];
-            gui.WrappedLabel(row.Line.Text, size, MeasureFont(gui, size),
-                drawFont: settings.Monospace ? Mono(size) : null);
+            gui.WrappedLabel(row.Line.Text, size, settings.Monospace ? Mono(size) : null);
         }
     }
 
@@ -402,26 +400,6 @@ sealed partial class OutputPanel(
 
         return monoFont;
     }
-
-    /// <summary>
-    /// The monospaced font for measuring, a sibling of <see cref="Mono"/> the draw font has no public
-    /// access to its SKFont. Kept in lockstep with the drawing size, so the wrap and the selection
-    /// arithmetic measure the glyphs the same way the pane paints them.
-    /// </summary>
-    SKFont MonoMeasure(float size)
-    {
-        if (monoMeasure is null || MathF.Abs(size - monoSize) > float.Epsilon)
-        {
-            monoMeasure?.Dispose();
-            monoMeasure = new SKFont(SKTypeface.FromFamilyName("monospace"), size);
-        }
-
-        return monoMeasure;
-    }
-
-    /// <summary>The font the wrapped lines are measured with: monospace, or whatever scope font draws.</summary>
-    SKFont MeasureFont(Gui gui, float size) =>
-        settings.Monospace ? MonoMeasure(size) : TextEditor.MeasuringFont(gui, size);
 
     static GuiColor LevelColor(LogLevel level) => level switch
     {

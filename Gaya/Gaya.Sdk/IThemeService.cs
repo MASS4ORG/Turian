@@ -86,11 +86,6 @@ public interface IThemeService : IThemeTokenRegistry
     /// <returns>The theme's metadata.</returns>
     ThemeInfo Register(ThemeSource source);
 
-    /// <summary>Adds a theme built from a legacy <see cref="StudioTheme"/>, converted to <c>$token</c> declarations.</summary>
-    /// <param name="theme">The theme to offer; its name becomes its id.</param>
-    [Obsolete("Register a .pss ThemeSource instead; StudioTheme is removed in the next release.")]
-    void Register(StudioTheme theme);
-
     /// <summary>Raised when the theme on screen changed, preview included.</summary>
     event Action? Changed;
 }

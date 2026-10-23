@@ -116,6 +116,26 @@ static class BrickInspections
     };
 
     static IReadOnlyList<Button> Actions(BricksController controller, CatalogBrick brick,
+        ResolvedPackage? resolved) => [.. FormActions(controller, brick, resolved), .. StandardActions(controller, brick, resolved)];
+
+    static IReadOnlyList<Button> FormActions(BricksController controller, CatalogBrick brick, ResolvedPackage? resolved)
+    {
+        if (controller.Workspace is not IBrickTwinWorkspace || brick.State != BrickState.Enabled)
+        {
+            return [];
+        }
+
+        return resolved switch
+        {
+            { Origin: PackageOrigin.Registry, Manifest.BakeOf: not null } =>
+                [Action(controller, "Edit Source", () => controller.SwapAsync(brick.Id, toSource: true))],
+            { Origin: PackageOrigin.Embedded, Manifest: { Upstream: not null, AllowsTwins: true } } =>
+                [Action(controller, "Use Baked Twin", () => controller.SwapAsync(brick.Id, toSource: false))],
+            _ => [],
+        };
+    }
+
+    static IReadOnlyList<Button> StandardActions(BricksController controller, CatalogBrick brick,
         ResolvedPackage? resolved) => brick.State switch
         {
             BrickState.Available => [Action(controller, "Enable", () => controller.EnableAsync(brick))],

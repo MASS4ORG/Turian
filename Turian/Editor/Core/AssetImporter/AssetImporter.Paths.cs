@@ -46,6 +46,16 @@ public sealed partial class AssetImporter
             assetId.ToString("N"));
     }
 
+    /// <summary>Where a project's import of an asset lives, beside its <c>import.json</c>.</summary>
+    internal static string ImportDirectoryOf(string projectRoot, Guid assetId) =>
+        Path.Combine(projectRoot, cacheDirectoryName, cacheAssetsDirectoryName, cacheByGuidDirectoryName, assetId.ToString("N"));
+
+    /// <summary>The name of the manifest each import directory holds.</summary>
+    internal const string ImportManifestFileName = importManifestFileName;
+
+    /// <summary>The version of the import pipeline this host runs.</summary>
+    internal const int PipelineVersion = pipelineVersion;
+
     void CleanupImportedArtifactsForAssetPath(string assetPath)
     {
         var metaPath = GetMetaFilePath(assetPath);

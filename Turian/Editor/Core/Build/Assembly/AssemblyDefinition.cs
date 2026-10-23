@@ -35,4 +35,7 @@ public class AssemblyDefinition : DataAsset
     /// tool); it may only reference other assemblies without engine references.
     /// </summary>
     public bool NoEngineReferences { get; set; }
+
+    /// <summary>Files relative to this definition to embed, using the root namespace and relative path as their resource names.</summary>
+    public List<string> EmbeddedResources { get; set; } = [];
 }

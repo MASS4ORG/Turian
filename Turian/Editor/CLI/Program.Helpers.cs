@@ -37,68 +37,74 @@ public static partial class Program
     }
 
     /// <summary>
-    /// Reimports assets and/or compiles and loads the user-code assembly before a headless command
-    /// reads the project. Both steps go through one <see cref="BuildManager"/>: it is a process-wide
-    /// singleton whose constructor throws if one already exists and whose <see cref="BuildManager.Dispose"/>
-    /// never clears that singleton, so a command that needs both steps would throw constructing a
-    /// second instance for the other.
+    /// Prepares a headless project's assets and user code. The caller keeps the returned manager alive until
+    /// scene processing finishes, then disposes it to unload user code.
     /// </summary>
     /// <param name="settings">The project's build settings.</param>
     /// <param name="reimport">Whether to reimport assets (the existing <c>--reimport</c> behavior).</param>
     /// <param name="loadUserCode">
-    /// Whether to compile and load the user-code assembly (<c>--load-usercode</c>). Without this,
-    /// user-defined components deserialize as <c>MissingComponent</c> and never run — the same
-    /// limitation the Studio's own hot-reload exists to avoid, just never wired into this CLI
-    /// until now. A compile failure is logged and does not abort the command: the caller still
-    /// gets whatever it asked for, just with <c>MissingComponent</c> placeholders, same as before
-    /// this flag existed.
+    /// Whether to compile and load user code so its components can deserialize. Compilation failures are logged
+    /// and leave unavailable component types as placeholders.
     /// </param>
-    static async Task PrepareProjectAsync(BuildAppSettings settings, bool reimport, bool loadUserCode)
+    /// <returns>The preparation lifetime, or null when no preparation was requested.</returns>
+    internal static async Task<BuildManager?> PrepareProjectAsync(BuildAppSettings settings, bool reimport, bool loadUserCode)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!reimport && !loadUserCode)
         {
-            return;
+            return null;
         }
 
         var appSettings = new AppSettings().Load(settings) as AppSettings
             ?? throw new InvalidOperationException("Failed to create AppSettings for CLI asset import.");
 
-        using var buildManager = new BuildManager(appSettings, Log.Logger);
-        buildManager.UpdateSettings(settings);
-
-        if (reimport)
+        var buildManager = new BuildManager(appSettings, Log.Logger);
+        try
         {
-            var assetsDir = settings.AssetsAbsoluteDir;
-            Directory.CreateDirectory(settings.CacheAbsoluteDir);
+            buildManager.UpdateSettings(settings);
 
-            Log.Logger.LogInformation("Importing assets from {AssetsDir}…", assetsDir);
+            if (reimport)
+            {
+                var assetsDir = settings.AssetsAbsoluteDir;
+                Directory.CreateDirectory(settings.CacheAbsoluteDir);
 
-            var assetDatabase = new AssetDatabase();
-            var settingsService = new SettingsService();
-            settingsService.Set(appSettings);
+                Log.Logger.LogInformation("Importing assets from {AssetsDir}…", assetsDir);
 
-            using var importer = new AssetImporter(Log.Logger, assetDatabase, settingsService, buildManager);
-            importer.GenerateMetaFiles(assetsDir);
+                var assetDatabase = new AssetDatabase();
+                var settingsService = new SettingsService();
+                settingsService.Set(appSettings);
 
-            Log.Logger.LogInformation("Asset import completed");
+                using var importer = new AssetImporter(Log.Logger, assetDatabase, settingsService, buildManager);
+                importer.GenerateMetaFiles(assetsDir);
+
+                Log.Logger.LogInformation("Asset import completed");
+            }
+
+            if (loadUserCode)
+            {
+                Log.Logger.LogInformation("Compiling and loading user code…");
+                // User types deriving from or holding a precast brick's types resolve against its loaded assemblies.
+                BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir), Log.Logger, settings.ProjectAbsoluteDir);
+                var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
+
+                if (status.State == BuildTaskState.Succeeded)
+                {
+                    Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
+                }
+                else
+                {
+                    Log.Logger.LogWarning(
+                        "User code did not load ({State}): {Message}. Custom components will report as MissingComponent",
+                        status.State, status.Message);
+                }
+            }
+
+            return buildManager;
         }
-
-        if (loadUserCode)
+        catch
         {
-            Log.Logger.LogInformation("Compiling and loading user code…");
-            var status = await buildManager.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
-
-            if (status.State == BuildTaskState.Succeeded)
-            {
-                Log.Logger.LogInformation("User code loaded: {Message}", status.Message);
-            }
-            else
-            {
-                Log.Logger.LogWarning(
-                    "User code did not load ({State}): {Message}. Custom components will report as MissingComponent",
-                    status.State, status.Message);
-            }
+            buildManager.Dispose();
+            throw;
         }
     }
 

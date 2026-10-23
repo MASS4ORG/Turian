@@ -49,7 +49,7 @@ public class ModelAssetImporter : IAssetImporter
         if (Path.GetExtension(sourcePath).Equals(".obj", StringComparison.OrdinalIgnoreCase))
         {
             throw new NotSupportedException(
-                "OBJ import requires the org.mass4.turian.obj editor brick. Install builtin:org.mass4.turian.obj "
+                "OBJ import requires the org.mass4.turian.obj editor brick. Install org.mass4.turian.obj "
                 + "or convert the model to glTF/GLB or FBX, preserving its .meta asset ID and scene references.");
         }
 

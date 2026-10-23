@@ -46,7 +46,8 @@ public static partial class Program
             var settings = CreateSettings(result.GetValue(projectArg)!);
             var output = Path.GetFullPath(result.GetValue(outputArg)!);
 
-            await PrepareProjectAsync(settings, reimport: true, loadUserCode: false).ConfigureAwait(false);
+            using var preparation = await PrepareProjectAsync(settings, reimport: true, loadUserCode: false)
+                .ConfigureAwait(false);
 
             var options = new OapPackOptions
             {

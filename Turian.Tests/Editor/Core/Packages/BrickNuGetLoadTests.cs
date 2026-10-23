@@ -192,7 +192,7 @@ public sealed class BrickNuGetLoadTests(BrickNuGetFeedFixture fixture) : IClassF
         var feed = fixture.NewFeed();
         var copied = BrickService.SyncPrecastDependencies(brick.RootPath, NullLogger.Instance, "desktop", [feed]);
         Assert.NotEmpty(copied);
-        var assembly = CompileAgainst(Path.Combine(brick.RootPath, BrickAssemblies.PrecastFolder, "lib",
+        var assembly = CompileAgainst(Path.Combine(BrickAssemblies.PrecastDirectory(brick), "lib",
             $"{BrickNuGetFeedFixture.PackageId}.dll"), brick);
         var precast = new PackagePrecast { Assemblies = { Path.GetFileNameWithoutExtension(assembly) } };
         precast.BuiltWith[ProjectPackages.HostName] = ProjectPackages.EngineVersion;
@@ -260,7 +260,7 @@ public sealed class BrickNuGetLoadTests(BrickNuGetFeedFixture fixture) : IClassF
             [CSharpSyntaxTree.ParseText(
                 $"namespace user.probe; public static class Scratch {{ public static int Compute(int value) => {BrickNuGetFeedFixture.PackageId}.Probe.Twice(value); }}")],
             references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        var lib = Directory.CreateDirectory(Path.Combine(brick.RootPath, BrickAssemblies.PrecastFolder, "lib")).FullName;
+        var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(brick), "lib")).FullName;
         var assembly = Path.Combine(lib, $"{name}.dll");
         var result = compilation.Emit(assembly);
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));

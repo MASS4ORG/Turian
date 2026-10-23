@@ -129,24 +129,50 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
         return RunAsync("Save brick settings", workspace => workspace.SaveManifest(snapshot));
     }
 
-    /// <summary>Writes a registry into the project, replacing the one of the same name, or the one it was renamed from.</summary>
+    /// <summary>Whether text is a registry address rather than a name: a URL, a host with a dot or port, or a folder.</summary>
+    static bool LooksLikeAddress(string text) =>
+        text.Contains("://", StringComparison.Ordinal) || text.Contains('.') || text.Contains(':') || Directory.Exists(text);
+
+    /// <summary>
+    /// Writes a registry into the project, replacing the one of the same name, or the one it was renamed from. Only the
+    /// address is required: its name and keys are discovered, and empty scope filters accept all brick names.
+    /// </summary>
     /// <param name="previousName">The name the registry had when it was opened, or null for a new one.</param>
     /// <param name="registry">The registry as edited.</param>
     /// <returns>Whether the registry was saved.</returns>
     public Task<bool> SaveRegistryAsync(string? previousName, ScopedRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        registry = new ScopedRegistry
+        var typed = new ScopedRegistry
         {
             Name = registry.Name.Trim(),
             Url = registry.Url.Trim(),
+            Mirrors = registry.Mirrors?.Select(s => s.Trim()).Where(s => s.Length > 0).ToList() is { Count: > 0 } mirrors ? mirrors : null,
             Scopes = [.. registry.Scopes.Select(s => s.Trim()).Where(s => s.Length > 0)],
             Keys = [.. registry.Keys.Select(s => s.Trim()).Where(s => s.Length > 0)],
             AllowUnsigned = registry.AllowUnsigned,
         };
-        var before = SelectedRegistry;
-        return RunAsync($"Save registry {registry.Name}", workspace =>
+        // An address typed into the name field, beside a name typed into the address field, is a swap.
+        if (LooksLikeAddress(typed.Name) && !LooksLikeAddress(typed.Url))
         {
+            (typed.Url, typed.Name) = (typed.Name, typed.Url);
+        }
+
+        var before = SelectedRegistry;
+        return RefreshCatalogAfter(RunAsync($"Save registry {(typed.Name.Length > 0 ? typed.Name : typed.Url)}", workspace =>
+        {
+            if (typed.Name.Contains("://", StringComparison.Ordinal))
+            {
+                throw new PackageException($"'{typed.Name}' is an address: put it under Url and leave Name empty.");
+            }
+
+            registry = RegistryDiscovery.CompleteAsync(typed).GetAwaiter().GetResult();
+            foreach (var key in registry.Keys.Where(k => !typed.Keys.Contains(k)))
+            {
+                log.LogInformation("Registry {Registry}: trusting key {Fingerprint} it publishes", registry.Name,
+                    SshSignature.Fingerprint(key));
+            }
+
             if (registry.Name != previousName && workspace.Registries().Any(r => r.Name == registry.Name))
             {
                 throw new PackageException($"A registry named {registry.Name} already exists.");
@@ -162,14 +188,14 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             {
                 SelectedRegistry = registry.Name;
             }
-        }, applyToProject: false);
+        }, applyToProject: false));
     }
 
-    /// <summary>Stops the project taking bricks from a registry.</summary>
+    /// <summary>Stops the project taking bricks from a registry, and lists the catalog without its bricks.</summary>
     /// <param name="name">The registry's name.</param>
     /// <returns>Whether the project declared it.</returns>
     public Task<bool> RemoveRegistryAsync(string name) =>
-        RunAsync($"Remove registry {name}", workspace =>
+        RefreshCatalogAfter(RunAsync($"Remove registry {name}", workspace =>
         {
             if (!workspace.RemoveRegistry(name))
             {
@@ -180,7 +206,19 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             {
                 SelectedRegistry = null;
             }
-        }, applyToProject: false);
+        }, applyToProject: false));
+
+    /// <summary>After a registry changed, reads the registries again so the catalog lists what they now offer.</summary>
+    async Task<bool> RefreshCatalogAfter(Task<bool> change)
+    {
+        var changed = await change.ConfigureAwait(false);
+        if (changed)
+        {
+            await RefreshRegistriesAsync().ConfigureAwait(false);
+        }
+
+        return changed;
+    }
 
     /// <summary>The installed brick selected in the panel, or null.</summary>
     public ResolvedPackage? SelectedBrick => installed.FirstOrDefault(p => p.Id == Selected);
@@ -215,7 +253,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
 
     /// <summary>Installs a brick: declares it in the manifest, resolves, and brings the open project in line.</summary>
     /// <param name="id">The brick id.</param>
-    /// <param name="source">The source; <c>builtin:&lt;id&gt;</c> when empty.</param>
+    /// <param name="source">The source; the built-in copy, else any registry version, when empty.</param>
     /// <returns>Whether the brick was installed.</returns>
     public Task<bool> InstallAsync(string id, string? source) =>
         RunAsync($"Install brick {id}", workspace =>
@@ -277,7 +315,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             }
         }, applyToProject: installed.Any(p => p.Id == id && p.Origin == PackageOrigin.Embedded));
 
-    /// <summary>Reads the registries' bricks into <see cref="Catalog"/>; an unreachable registry is reported in <see cref="Error"/>.</summary>
+    /// <summary>Refreshes registry offers and restores the workspace; unresolved bricks remain reported in <see cref="Error"/>.</summary>
     /// <returns>A task that completes when the catalog is updated.</returns>
     public async Task RefreshRegistriesAsync()
     {
@@ -302,7 +340,11 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             log.LogWarning("Registry {Registry}: {Message}", unavailable.Registry, unavailable.Id);
         }
 
-        Publish(installed, unavailable.Id);
+        await RunAsync("Restore refreshed bricks", static current => current.Restore()).ConfigureAwait(false);
+        if (WorkspaceRoot == root)
+        {
+            Publish(installed, Error ?? unavailable.Id);
+        }
     }
 
     /// <summary>Removes a brick, preserving embedded sources in the project's trash.</summary>
@@ -337,6 +379,20 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
     /// <returns>Whether the brick is global again.</returns>
     public Task<bool> RevertAsync(string id) => RunAsync($"Revert brick {id} to global", workspace => workspace.Revert(id));
 
+    /// <summary>Switches between a published twin and an editable source fork.</summary>
+    /// <param name="id">The source or twin brick id.</param>
+    /// <param name="toSource">Whether to use editable source.</param>
+    /// <returns>Whether the workspace changed form successfully.</returns>
+    public Task<bool> SwapAsync(string id, bool toSource) => RunAsync($"Swap brick {id}", workspace =>
+    {
+        if (workspace is not IBrickTwinWorkspace twins)
+        {
+            throw new PackageException("This workspace does not support bake twins.");
+        }
+
+        twins.Swap(id, toSource);
+    });
+
     /// <summary>
     /// Copies assets of an installed brick into the project's <c>Assets/&lt;last id segment&gt;</c> folder under new ids,
     /// detached from the brick.
@@ -369,7 +425,8 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
                 catch (PackageException ex)
                 {
                     failure = ex.Message;
-                    log.LogError(ex, "{Label} failed: {Message}", label, ex.Message);
+                    // The message says what is wrong and what to do; a stack trace would only bury it.
+                    log.LogError("{Label} failed: {Message}", label, ex.Message);
                     throw;
                 }
 

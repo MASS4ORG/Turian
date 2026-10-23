@@ -88,6 +88,31 @@ public sealed class UserCodeCompileCacheTests : IDisposable
         Assert.True(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
     }
 
+    /// <summary>Changing an embedded native payload invalidates compiled code even though its folder is opaque.</summary>
+    [Fact]
+    public void EmbeddedResourcesInvalidateTheCompileCache()
+    {
+        var definition = new AssemblyDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Game.Native",
+            EmbeddedResources = ["Resources~/payload.bin"],
+        };
+        var path = Path.Combine(assetsDir, "Native.dataasset");
+        Serializer.Save(path, definition);
+        Serializer.Save(path + ".meta", new DataAssetAsset { Id = definition.Id });
+        Directory.CreateDirectory(Path.Combine(assetsDir, "Resources~"));
+        var payload = Path.Combine(assetsDir, "Resources~", "payload.bin");
+        File.WriteAllText(payload, "first");
+        File.WriteAllText(assemblyPath, "fake-dll");
+        cache.SaveManifest(tempRoot, assemblyPath, cache.CreateManifest(settings, assemblyPath, csprojPath));
+        Assert.True(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+
+        File.WriteAllText(payload, "other");
+
+        Assert.False(cache.IsAssemblyUpToDate(settings, assemblyPath, csprojPath));
+    }
+
     /// <summary>An assembly compiled against another engine module must be rebuilt.</summary>
     [Fact]
     public void IsAssemblyUpToDate_EngineChanged_ReturnsFalse()

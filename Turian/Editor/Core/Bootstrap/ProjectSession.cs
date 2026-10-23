@@ -90,9 +90,10 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         {
             BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
         }
-        catch (Gaya.Packages.PackageException ex)
+        catch (Gaya.Packages.PackageException)
         {
-            log.LogError(ex, "The project's packages could not be resolved; their types are unavailable");
+            // ProjectPackages has logged what is missing and what to do.
+            log.LogWarning("The bricks' types are unavailable until the project's bricks resolve");
         }
     }
 

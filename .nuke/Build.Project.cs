@@ -1,8 +1,7 @@
 namespace Build;
 
 /// <summary>
-/// The only build file that differs between the MASS4 repositories besides the feature partials: it names this
-/// project and wires its features into the shared build. Names of projects, repositories and products live here.
+/// Defines project-specific settings and feature hooks for the shared MASS4 build.
 /// </summary>
 sealed partial class Build
 {
@@ -17,6 +16,9 @@ sealed partial class Build
     const bool DefaultPublishSelfContained = false;
     const bool DefaultPublishSingleFile = false;
     const bool DefaultPublishTrimmed = false;
+
+    string DefaultConfiguration => IsLocalBuild ? ConfigurationOptions.Debug : ConfigurationOptions.Release;
+    const string TestReportArgument = "--report-xunit-trx";
 
     const string PackageAuthors = "Bruno Massa";
     const string PackageCopyrightOwner = "Bruno Massa";
@@ -42,6 +44,7 @@ sealed partial class Build
         ["SkipShaders"] = SkipShaders,
     };
 
+    Target[] RestoreDependencies => [];
     Target[] PackDependencies => [Publish, WindowsInstaller];
 
     Target[] ReleaseCommitDependencies => [UpdateProjectVersions];

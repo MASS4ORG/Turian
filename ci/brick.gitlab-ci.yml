@@ -1,0 +1,34 @@
+# GitLab CI template for repositories that author bricks (Turian packages); the GitHub counterparts are the
+# MASS4ORG/action-brick-build action and the MASS4ORG/action-brick-release workflows.
+#
+#   include:
+#     - remote: https://raw.githubusercontent.com/MASS4ORG/Turian/main/ci/brick.gitlab-ci.yml
+#   brick:
+#     extends: .turian-brick
+#     variables:
+#       BRICK_TWIN: ""                 # skip the bake twin for a brick declaring bake: none
+#
+# This job verifies and packs without publication credentials. Protected release jobs sign and upload these exact
+# qualified archives; the GitHub implementation is MASS4ORG/action-brick-release with tools/BrickRelease.
+.turian-brick:
+  image:
+    name: ${TURIAN_CLI_IMAGE}
+    entrypoint: [""]
+  variables:
+    # The official image, pinned by digest; a project or group variable overrides it.
+    TURIAN_CLI_IMAGE: ghcr.io/mass4org/turian-cli@sha256:f6a1e0379084b1b8c8b93d938b989b4d649a90766be8b5e6427b2ee40100050c
+    BRICK_PATH: "."
+    BRICK_PRECAST: "--precast"
+    BRICK_TWIN: "--twin"
+    # The brick store is the CI cache: the same lock file always fills it with the same content.
+    GAYA_BRICKS: ${CI_PROJECT_DIR}/.gaya-bricks
+  cache:
+    key: bricks-${CI_PROJECT_ID}
+    paths:
+      - .gaya-bricks/
+  script:
+    - turian-cli brick verify "$BRICK_PATH"
+    - turian-cli brick pack "$BRICK_PATH" --out .bricks $BRICK_PRECAST $BRICK_TWIN
+  artifacts:
+    paths:
+      - .bricks/

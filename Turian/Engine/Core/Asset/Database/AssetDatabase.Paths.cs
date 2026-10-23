@@ -318,15 +318,24 @@ public sealed partial class AssetDatabase
         path.StartsWith(Path.TrimEndingDirectorySeparator(directory) + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
     /// <summary>
-    /// Whether a path inside <paramref name="root"/> sits in a folder whose name ends in <c>~</c>, which packages use
-    /// for content that is never imported (samples, documentation).
+    /// Whether a path inside <paramref name="root"/> is never imported, as in Unity: it sits in a folder whose name
+    /// ends in <c>~</c>, which packages use for samples and documentation, or in a hidden folder such as
+    /// <c>.github</c>, or it is a hidden file such as <c>.gitlab-ci.yml</c>.
     /// </summary>
     /// <param name="path">An absolute path.</param>
     /// <param name="root">The package folder.</param>
-    /// <returns>True when the path is in such a folder.</returns>
-    public static bool IsInTildeFolder(string path, string root) =>
-        Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1)
-            .Any(static segment => segment.EndsWith('~'));
+    /// <returns>True when the path is never imported.</returns>
+    public static bool IsInTildeFolder(string path, string root)
+    {
+        var segments = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return segments.SkipLast(1).Any(IsUnimportedFolder) || segments[^1].StartsWith('.');
+    }
+
+    /// <summary>Whether a folder name marks content that is never imported: ending in <c>~</c>, or hidden.</summary>
+    /// <param name="name">One folder name of a relative path.</param>
+    /// <returns>True for such a folder; false for <c>.</c> and <c>..</c>.</returns>
+    public static bool IsUnimportedFolder(string name) =>
+        name.EndsWith('~') || (name.StartsWith('.') && name is not ("." or ".."));
 
     static string? TryResolveProjectRoot(string? path)
     {

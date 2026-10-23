@@ -78,6 +78,22 @@ public sealed class RegistryVersion
 
     /// <summary>Withdrawn: still downloadable for projects that locked it, never chosen for a new resolution.</summary>
     public bool Yanked { get; set; }
+
+    /// <summary>
+    /// The bake twins published of this version, so clients find them without scanning. Advisory: a client checks
+    /// the twin's own signed <c>bakeOf</c> before using it.
+    /// </summary>
+    public List<RegistryBakeLink>? Bakes { get; set; }
+}
+
+/// <summary>A bake twin of a registry version, as the index links it.</summary>
+public sealed class RegistryBakeLink
+{
+    /// <summary>The twin's id.</summary>
+    public string Brick { get; set; } = string.Empty;
+
+    /// <summary>The twin's version.</summary>
+    public string Version { get; set; } = string.Empty;
 }
 
 /// <summary>A name prefix a publisher owns.</summary>

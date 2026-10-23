@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Gaya.Tests;
 
 /// <summary>Plugins installed into the application through studio-scope packages.</summary>
@@ -33,6 +35,30 @@ public sealed class PackagedPluginsTests : IDisposable
         Assert.True(File.Exists(Path.Combine(studio, "Bricks", LockFile.FileName)));
     }
 
+    /// <summary>Independent plugin assemblies in both declared precast folders load in role order.</summary>
+    [Fact]
+    public void V2StudioPluginsAggregateRoleFolders()
+    {
+        var firstName = $"Acme.First{Guid.NewGuid():N}";
+        var secondName = $"Acme.Second{Guid.NewGuid():N}";
+        Package("theme", "com.acme.theme", [PackageScope.Studio], firstName);
+        Package("other", "com.acme.other", [PackageScope.Studio], secondName);
+        var folder = Path.Combine(root, "theme");
+        Directory.CreateDirectory(Path.Combine(folder, "Brick~"));
+        Directory.Move(Path.Combine(folder, "Precast~"), Path.Combine(folder, "Brick~", "First"));
+        Directory.Move(Path.Combine(root, "other", "Precast~"), Path.Combine(folder, "Brick~", "Second"));
+        var manifest = PackageManifest.Load(folder);
+        manifest.UsesId = true;
+        manifest.Roles[BrickLayout.Precast] = JsonSerializer.SerializeToElement(new[] { "Brick~/First", "Brick~/Second" });
+        manifest.Save(folder);
+        Manifest(("com.acme.theme", "file:../../theme"));
+
+        var result = PackagedPlugins.Load(Hosts, NullLogger.Instance, studio);
+        Assert.Equal([firstName, secondName], result.Assemblies.Select(static assembly => assembly.GetName().Name));
+        Assert.All(result.Assemblies, static assembly =>
+            Assert.Contains(assembly.GetTypes(), static type => type.GetCustomAttribute<PluginAttribute>() is not null));
+    }
+
     /// <summary>A package made for projects only is not loaded into the application.</summary>
     [Fact]
     public void ProjectOnlyPackagesAreRefused()
@@ -41,6 +67,23 @@ public sealed class PackagedPluginsTests : IDisposable
         Manifest(("com.acme.tool", "file:../../tool"));
 
         Assert.Empty(PackagedPlugins.Load(Hosts, NullLogger.Instance, studio).Assemblies);
+    }
+
+    /// <summary>A built-in studio brick loads from the host's built-in folder the workspace is given.</summary>
+    [Fact]
+    public void BuiltinStudioBricksLoadFromTheWorkspaceBuiltins()
+    {
+        var builtins = Path.Combine(root, "builtins");
+        var assemblyName = $"Acme.Look{Guid.NewGuid():N}";
+        Package(Path.Combine("builtins", "com.acme.look"), "com.acme.look", [PackageScope.Studio], assemblyName);
+        Manifest(("com.acme.look", "builtin:com.acme.look"));
+        var workspace = new StudioBricks(studio, Hosts, new PackageStore(Path.Combine(root, "store")),
+            builtinDirectory: builtins);
+
+        var loaded = PackagedPlugins.Load(workspace, NullLogger.Instance);
+
+        Assert.Equal("com.acme.look", Assert.Single(loaded.Packages).Id);
+        Assert.Equal(assemblyName, Assert.Single(loaded.Assemblies).GetName().Name);
     }
 
     /// <summary>Without a studio manifest nothing is loaded.</summary>

@@ -10,7 +10,7 @@ namespace Turian.Editor.Core;
 /// <param name="settings">Reloads the open project's brick settings after a change.</param>
 /// <param name="applier">Brings the open project in line after its bricks changed.</param>
 public sealed class ProjectBrickWorkspace(string root, SettingsService? settings = null, IBrickApplier? applier = null)
-    : IBrickWorkspace
+    : IBrickTwinWorkspace
 {
     /// <inheritdoc />
     public string Root { get; } = root;
@@ -56,6 +56,9 @@ public sealed class ProjectBrickWorkspace(string root, SettingsService? settings
 
     /// <inheritdoc />
     public void Revert(string id) => BrickService.Revert(Root, id);
+
+    /// <inheritdoc />
+    public void Swap(string id, bool toSource) => _ = BrickService.Swap(Root, id, toSource);
 
     /// <inheritdoc />
     public void CopyAssets(string id, IReadOnlyCollection<string> assets, string destination) =>

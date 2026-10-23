@@ -104,7 +104,21 @@ public static class BrickNuGetRestore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(brickRoot);
 
-        var path = Path.Combine(brickRoot, BrickAssemblies.PrecastFolder, SyncRecordFileName);
+        var synced = new Dictionary<string, SyncedPackage>(StringComparer.OrdinalIgnoreCase);
+        foreach (var payload in BrickAssemblies.PrecastDirectories(brickRoot))
+        {
+            foreach (var (package, entry) in ReadSyncedPackages(payload))
+            {
+                synced.TryAdd(package, entry);
+            }
+        }
+
+        return synced;
+    }
+
+    internal static IReadOnlyDictionary<string, SyncedPackage> ReadSyncedPackages(string payload)
+    {
+        var path = Path.Combine(payload, SyncRecordFileName);
         if (!File.Exists(path))
         {
             return NoSyncedPackages;
@@ -112,31 +126,38 @@ public static class BrickNuGetRestore
 
         try
         {
-            var packages = JsonNode.Parse(File.ReadAllText(path))?["packages"]?.AsObject();
-            if (packages is null)
-            {
-                return NoSyncedPackages;
-            }
-
-            var synced = new Dictionary<string, SyncedPackage>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (package, entry) in packages)
-            {
-                if (entry?.AsObject()["version"]?.GetValue<string>() is not { } version)
-                {
-                    continue;
-                }
-
-                var files = entry["files"]?.AsArray().Select(static f => f?.GetValue<string>()).OfType<string>() ?? [];
-                synced[package] = new SyncedPackage(version, [.. files]);
-            }
-
-            return synced;
+            return ParseSyncedPackages(JsonNode.Parse(File.ReadAllText(path))?["packages"]?.AsObject());
         }
         catch (JsonException)
         {
             return NoSyncedPackages;
         }
     }
+
+    static IReadOnlyDictionary<string, SyncedPackage> ParseSyncedPackages(JsonObject? packages)
+    {
+        var synced = new Dictionary<string, SyncedPackage>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (package, entry) in packages ?? new JsonObject())
+        {
+            if (ReadSyncedEntry(entry) is { } record)
+            {
+                synced[package] = record;
+            }
+        }
+        return synced;
+    }
+
+    static SyncedPackage? ReadSyncedEntry(JsonNode? entry)
+    {
+        if (entry?.AsObject()["version"]?.GetValue<string>() is not { } version)
+        {
+            return null;
+        }
+        return new SyncedPackage(version, ReadSyncedFileNames(entry["files"]));
+    }
+
+    static IReadOnlyList<string> ReadSyncedFileNames(JsonNode? files) =>
+        [.. files?.AsArray().Select(static file => file?.GetValue<string>()).OfType<string>() ?? []];
 
     /// <summary>
     /// Whether every unified package is already committed beside a brick's prebuilt assembly, which is what lets a
@@ -147,10 +168,11 @@ public static class BrickNuGetRestore
     /// <returns>True when one brick's copies cover every package at the unified version.</returns>
     static bool CoveredByPrecast(IEnumerable<ResolvedPackage> bricks, IReadOnlyDictionary<string, string> unified)
     {
-        var records = bricks.Select(static brick => (Brick: brick, Synced: SyncedPackages(brick.RootPath))).ToList();
+        var records = bricks.SelectMany(static brick => BrickAssemblies.PrecastDirectories(brick)
+            .Select(static payload => (Payload: payload, Synced: ReadSyncedPackages(payload)))).ToList();
         return unified.All(package => records.Any(record => record.Synced.TryGetValue(package.Key, out var synced)
             && SameVersion(synced.Version, package.Value)
-            && synced.Files.All(file => File.Exists(Path.Combine(record.Brick.RootPath, BrickAssemblies.PrecastFolder,
+            && synced.Files.All(file => File.Exists(Path.Combine(record.Payload,
                 "lib", file)))));
     }
 

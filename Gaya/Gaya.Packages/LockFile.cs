@@ -18,6 +18,12 @@ public sealed class LockEntry
     /// <summary>The fingerprint of the key that signed a package from a registry; later installs must be signed by it too.</summary>
     public string? SignedBy { get; set; }
 
+    /// <summary>A local folder relative to the project manifest, used without registry integrity or signatures.</summary>
+    public string? Link { get; set; }
+
+    /// <summary>For a bake twin: the source brick it stands in for, with that source file's integrity.</summary>
+    public PackageBakeOf? BakeOf { get; set; }
+
     /// <summary>1 for a package the project installs itself, deeper for what those depend on.</summary>
     public int Depth { get; set; }
 

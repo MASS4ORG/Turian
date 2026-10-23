@@ -25,6 +25,7 @@
       "type": "string",
       "enum": [
         "CheckNewCommits",
+        "CheckSharedBuild",
         "Clean",
         "Compile",
         "CompileShaders",
@@ -125,7 +126,7 @@
       "properties": {
         "Configuration": {
           "type": "string",
-          "description": "Config to build - Default is 'Debug' (local) or 'Release' (server)"
+          "description": "Config to build (default set by the project)"
         },
         "ContainerRegistries": {
           "type": "string",
@@ -193,6 +194,13 @@
         "RuntimeIdentifier": {
           "type": "string",
           "description": "Runtime identifier for the build (e.g., win-x64, linux-x64, osx-x64) (default: linux-x64)"
+        },
+        "SharedBuildDirectories": {
+          "type": "array",
+          "description": "Project directories whose shared NUKE files must match this checkout",
+          "items": {
+            "type": "string"
+          }
         },
         "SkipShaders": {
           "type": "boolean",

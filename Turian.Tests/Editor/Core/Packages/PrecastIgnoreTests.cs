@@ -17,12 +17,12 @@ public sealed class PrecastIgnoreTests
         Assert.Empty(tracked.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries));
     }
 
-    /// <summary>The UI brick's synced third-party copy stays ignored, which is the invariant this guards.</summary>
+    /// <summary>The render brick's synced third-party copy stays ignored, which is the invariant this guards.</summary>
     [Fact]
     public void SyncedCopiesStayIgnored()
     {
-        var probe = Path.Combine(ProjectPackages.BuiltinDirectory, "org.mass4.turian.ui", "Precast~", "lib",
-            "SkiaSharp.dll");
+        var probe = Path.Combine(ProjectPackages.BuiltinDirectory, ProjectPackages.RenderBrick, "Precast~", "lib",
+            "Silk.NET.Vulkan.dll");
 
         var check = Git("check-ignore", "-q", probe);
 

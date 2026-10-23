@@ -36,7 +36,7 @@ public static class ProjectBricks
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
         var embedded = Path.Combine(projectRoot, ProjectManifest.DirectoryName, id);
         var hasEmbedded = File.Exists(Path.Combine(embedded, PackageManifest.FileName));
-        var declared = manifest.Dependencies.Remove(id);
+        var declared = manifest.Dependencies.Remove(id) | manifest.Links.Remove(id);
         if (!declared && !hasEmbedded)
         {
             return false;

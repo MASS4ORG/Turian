@@ -5,7 +5,7 @@
 @import "gaya.base";
 
 $base = #232323;
-$accent = #8c8c8c;
+$accent = #6c6c6c;
 
 $surface-window = #1a1a1a;
 $surface-panel = #232323;
@@ -15,9 +15,9 @@ $surface-hover = #383838;
 $surface-editor-area = #101010;
 $border = #3a3a3a;
 $ink = #d6d6d6;
-$ink-dim = #909090;
-$ink-faint = #6b6b6b;
-$accent-fill = #3e3e3e;
+$ink-dim = #999999;
+$ink-faint = #7b7b7b;
+$accent-fill = #4e4e4e;
 $error = #d67676;
 $warning = #ebbe6e;
 $folder = #e2c076;

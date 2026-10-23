@@ -111,6 +111,8 @@ A project chooses registries with `scopedRegistries` in `Bricks/manifest.json`:
 }
 ```
 
-A version range with no other source is looked up in the registry whose scope covers the name: the newest release that
-satisfies every range asked for and runs on the host's engine. The lock file records the version, the file's hash and
-the fingerprint of the signing key; later installs must match all three.
+Registry scopes are optional client filters. Omit `scopes`, use `"scopes": []`, or include `"*"` to accept every brick name from a registry. Explicit prefixes such as `com.studio` accept that exact name and its dot-separated descendants. Discovery reads the address, name and signing keys without copying publisher claims into the filters; new publishers become discoverable on refresh. The built-in main asset store accepts all names. Existing saved prefix lists remain filters; clear the list or replace it with `["*"]` to accept all names.
+
+A version range with no other source is looked up among registries whose filters accept the name. An existing lock keeps its registry; otherwise the first matching registry in declaration order whose index contains the brick supplies it. Resolution chooses the newest release that satisfies every requested range and runs on the host's engine. The lock file records the version, the file's hash and the fingerprint of the signing key; later installs must match all three.
+
+Refreshing currently downloads each registry's full index and applies scope and search filters locally. Scope filters do not reduce metadata downloads; they control which bricks the client lists and resolves.

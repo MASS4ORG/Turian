@@ -3,6 +3,11 @@
         <WarningsAsErrors>$(WarningsAsErrors.Replace(';CA1707', ''))</WarningsAsErrors>
     </PropertyGroup>
 
+    <!-- Marks the assemblies this repository ships; Studio's Output panel files their messages as internal -->
+    <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+        <AssemblyMetadata Include="Mass4.Origin" Value="Turian" />
+    </ItemGroup>
+
     <!-- A package built against a local checkout would depend on versions nobody can restore -->
     <Target Name="RejectLocalPackagesInPack" BeforeTargets="GenerateNuspec" Condition="'$(UsesLocalPackages)' == 'true'">
         <Error Text="$(MSBuildProjectName) is being packed against a local checkout (Directory.Build.local.props). Pack with -p:NoLocalPackages=true (NUKE: --no-local-packages)." />

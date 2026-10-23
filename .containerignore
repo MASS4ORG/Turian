@@ -18,3 +18,7 @@ docs/
 **/*.user
 artifacts/
 .publish/
+.local/
+.script-*
+.gaya-bricks/
+.bricks/

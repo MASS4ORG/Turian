@@ -54,6 +54,31 @@ public sealed class StudioBricksTests : IDisposable
         Assert.Null(studio.BuiltinDirectory);
     }
 
+    /// <summary>A brick added without a source is built-in when the host ships it, else any registry version.</summary>
+    [Fact]
+    public void BricksAddedWithoutASourcePreferTheBuiltinCopy()
+    {
+        var builtin = Path.Combine(root, "builtin");
+        var shipped = Path.Combine(builtin, "com.acme.shipped");
+        Directory.CreateDirectory(shipped);
+        new PackageManifest
+        {
+            Name = "com.acme.shipped",
+            Version = SemanticVersion.Parse("1.0.0"),
+            Scopes = [PackageScope.Studio],
+        }.Save(shipped);
+
+        Assert.Equal("builtin:com.acme.shipped", PackageSource.DefaultSpec("com.acme.shipped", builtin));
+        Assert.Equal("*", PackageSource.DefaultSpec("com.acme.remote", builtin));
+        Assert.Equal("*", PackageSource.DefaultSpec("com.acme.shipped", null));
+
+        var shipping = new StudioBricks(studio.Root, Hosts, new PackageStore(Path.Combine(root, "store")), builtinDirectory: builtin);
+        shipping.Add("com.acme.shipped", null);
+        Assert.Equal("builtin:com.acme.shipped", ProjectManifest.Load(studio.Root).Manifest.Dependencies["com.acme.shipped"]);
+        Assert.Throws<PackageException>(() => shipping.Add("com.acme.remote", null));
+        Assert.DoesNotContain("com.acme.remote", ProjectManifest.Load(studio.Root).Manifest.Dependencies.Keys);
+    }
+
     /// <summary>A project-only brick is refused by the studio and the manifest is put back.</summary>
     [Fact]
     public void ProjectOnlyBricksAreRefused()
@@ -68,14 +93,17 @@ public sealed class StudioBricksTests : IDisposable
     }
 
     /// <summary>Registries are declared in the studio manifest, validated, and listed before the public one.</summary>
-    [Fact]
-    public void StudioRegistriesAreValidated()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("*")]
+    [InlineData("com.acme")]
+    public void StudioRegistriesAreValidated(string? scope)
     {
         var shared = new ScopedRegistry { Name = "public", Url = "https://example.invalid", Scopes = ["org"], AllowUnsigned = true };
         var withPublic = new StudioBricks(studio.Root, Hosts, publicRegistry: shared);
         Assert.Equal([shared], withPublic.Registries());
 
-        withPublic.AddRegistry(new ScopedRegistry { Name = "acme", Url = "https://acme.invalid", Scopes = ["com.acme"], AllowUnsigned = true });
+        withPublic.AddRegistry(new ScopedRegistry { Name = "acme", Url = "https://acme.invalid", Scopes = scope is null ? [] : [scope], AllowUnsigned = true });
         Assert.Equal(["acme", "public"], withPublic.Registries().Select(r => r.Name));
         Assert.Throws<PackageException>(() => withPublic.AddRegistry(new ScopedRegistry { Name = "bad" }));
         Assert.Throws<PackageException>(() => withPublic.AddRegistry(new ScopedRegistry
@@ -109,7 +137,9 @@ public sealed class StudioBricksTests : IDisposable
 
         Assert.Equal(["com.acme.sunset"], controller.Rows.Select(static row => row.Id));
         Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/row/com.acme.sunset");
-        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/category/Themes");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/category");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/scope/Studio");
+        Assert.Contains(frame.Nodes(), static node => node.Id == "bricks/tab/Registries");
 
         panel.Category = BrickCategoryFilter.Fonts;
         frame.Draw();

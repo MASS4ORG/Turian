@@ -30,7 +30,7 @@ public interface IBrickWorkspace
 
     /// <summary>Declares a brick and resolves.</summary>
     /// <param name="id">The brick id.</param>
-    /// <param name="source">The source; <c>builtin:&lt;id&gt;</c> when null.</param>
+    /// <param name="source">The source; the built-in copy, else any registry version, when null.</param>
     void Add(string id, string? source);
 
     /// <summary>Declares a brick from a folder, a <c>.brick</c> file or a git repository, reading its id from it.</summary>
@@ -100,6 +100,15 @@ public interface IBrickWorkspace
     /// </summary>
     /// <param name="applied">Whether the operation changed which bricks are used, rather than only registries.</param>
     void Changed(bool applied);
+}
+
+/// <summary>A workspace that can exchange a published bake twin and an editable source fork.</summary>
+public interface IBrickTwinWorkspace : IBrickWorkspace
+{
+    /// <summary>Switches a registry brick's form, keeping edited source in the project trash when returning to a twin.</summary>
+    /// <param name="id">The source or twin brick id.</param>
+    /// <param name="toSource">Whether to download and embed editable source.</param>
+    void Swap(string id, bool toSource);
 }
 
 /// <summary>Supplies the open workspace's bricks, such as a game project's, to the Bricks panel.</summary>

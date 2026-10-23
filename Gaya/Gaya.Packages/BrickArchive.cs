@@ -17,6 +17,9 @@ public static class BrickArchive
     /// <summary>The file extension.</summary>
     public const string Extension = ".brick";
 
+    /// <summary>What a bake twin's id adds to its source brick's id.</summary>
+    public const string TwinSuffix = ".bake";
+
     static readonly DateTimeOffset FixedTime = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
     static readonly HashSet<string> SkippedDirectories = new(StringComparer.Ordinal)
     {
@@ -40,17 +43,33 @@ public static class BrickArchive
     /// What the folder's <c>Precast~</c> payload was built with; recorded in the file's <c>package.json</c>, never in
     /// the folder's.
     /// </param>
+    /// <param name="exclude">Globs left out besides the manifest's <see cref="PackageManifest.Exclude"/>.</param>
+    /// <param name="bakeOf">
+    /// Packs the folder as the bake twin of this source file instead: the id gains <see cref="TwinSuffix"/> and the
+    /// file's <c>package.json</c> records the source.
+    /// </param>
     /// <returns>The packed file, its hash and the manifest.</returns>
     /// <exception cref="PackageException">The folder is not a valid package.</exception>
     public static BrickPackResult Pack(string packageRoot, string outputDirectory,
-        IReadOnlyCollection<string>? reservedCategoryPrefixes = null, PackagePrecast? precast = null)
+        IReadOnlyCollection<string>? reservedCategoryPrefixes = null, PackagePrecast? precast = null,
+        IReadOnlyCollection<string>? exclude = null, PackageBakeOf? bakeOf = null)
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, reservedCategoryPrefixes);
+        ValidatePortable(packageRoot, manifest);
+        var rewritten = precast is not null || bakeOf is not null;
         if (precast is not null)
         {
             manifest.Precast = precast;
         }
+
+        if (bakeOf is not null)
+        {
+            manifest.Name = TwinIdOf(bakeOf.Brick);
+            manifest.BakeOf = bakeOf;
+        }
+
+        string[] globs = [.. manifest.Exclude, .. exclude ?? []];
 
         Directory.CreateDirectory(outputDirectory);
         var path = Path.Combine(Path.GetFullPath(outputDirectory), FileNameFor(manifest));
@@ -58,13 +77,13 @@ public static class BrickArchive
         using (var stream = File.Create(path))
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create))
         {
-            foreach (var (relative, file) in Files(packageRoot))
+            foreach (var (relative, file) in Files(packageRoot).Where(f => !BrickGlob.MatchesAny(globs, f.Relative)))
             {
                 var entry = zip.CreateEntry(relative, CompressionLevel.Optimal);
                 entry.LastWriteTime = FixedTime;
                 entry.ExternalAttributes = 0b110_100_100 << 16;
                 using var target = entry.Open();
-                if (relative == PackageManifest.FileName && precast is not null)
+                if (relative == PackageManifest.FileName && rewritten)
                 {
                     target.Write(Encoding.UTF8.GetBytes(manifest.ToJson()));
                     continue;
@@ -79,6 +98,31 @@ public static class BrickArchive
         File.WriteAllText($"{path}.sha256", $"{Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]))}  {Path.GetFileName(path)}\n");
         return new BrickPackResult(path, integrity, manifest);
     }
+
+    /// <summary>Checks that a brick can be distributed without referring to its producer's filesystem.</summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <param name="manifest">Its loaded manifest.</param>
+    /// <exception cref="PackageException">A dependency uses a local path or the brick declares project links.</exception>
+    public static void ValidatePortable(string packageRoot, PackageManifest manifest)
+    {
+        foreach (var (id, spec) in manifest.Dependencies.Concat(manifest.DevDependencies)
+                     .Where(static pair => PackageSource.IsPathDependency(pair.Value)))
+        {
+            throw new PackageException($"{manifest.Name}: dependency {id} uses local path '{spec}'; packed bricks require portable dependencies. Put local links in the project manifest.");
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(packageRoot, PackageManifest.FileName)),
+            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        if (document.RootElement.TryGetProperty("links", out _))
+        {
+            throw new PackageException($"{manifest.Name}: links belong only in a project's manifest, never in a packed brick.");
+        }
+    }
+
+    /// <summary>The id of <paramref name="sourceId"/>'s bake twin.</summary>
+    /// <param name="sourceId">The source brick's id.</param>
+    /// <returns>The twin's id.</returns>
+    public static string TwinIdOf(string sourceId) => sourceId + TwinSuffix;
 
     /// <summary>The <c>package.json</c> inside a <c>.brick</c> file.</summary>
     /// <param name="archivePath">The <c>.brick</c> file.</param>

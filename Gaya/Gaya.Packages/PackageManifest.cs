@@ -37,6 +37,22 @@ public sealed class PackagePrecast
 }
 
 /// <summary>
+/// Set in a bake twin: the source brick it is the consumable form of, pinned to the exact <c>.brick</c> file. A twin
+/// installs in place of its source, so whatever depends on the source accepts the twin.
+/// </summary>
+public sealed class PackageBakeOf
+{
+    /// <summary>The source brick's id.</summary>
+    public string Brick { get; set; } = string.Empty;
+
+    /// <summary>The source brick's version.</summary>
+    public SemanticVersion? Version { get; set; }
+
+    /// <summary>The source <c>.brick</c> file's integrity, <c>sha256-</c> + base64.</summary>
+    public string Integrity { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// A package's <c>package.json</c>: its identity, what it depends on, and how hosts treat it. Field names follow
 /// Unity's package manifest where the meaning is the same.
 /// </summary>
@@ -44,6 +60,13 @@ public sealed class PackageManifest
 {
     /// <summary>The file name at a package's root.</summary>
     public const string FileName = "package.json";
+
+    /// <summary>The key brick format v2 names the id with; earlier manifests use <c>name</c>.</summary>
+    const string IdKey = "id";
+
+    /// <summary>Whether the file names the id <c>id</c>, as brick format v2 does, rather than <c>name</c>.</summary>
+    [JsonIgnore]
+    public bool UsesId { get; set; }
 
     /// <summary>The package id, reverse-DNS (<c>com.example.inventory</c>).</summary>
     [SetOrder(-30), Tooltip("Permanent reverse-DNS brick identifier.")]
@@ -137,6 +160,51 @@ public sealed class PackageManifest
     /// <summary>Samples the user can copy into the project.</summary>
     public List<PackageSample> Samples { get; set; } = [];
 
+    /// <summary>
+    /// Globs of files the <c>.brick</c> file leaves out, relative to the brick folder, such as <c>Tests~</c> or
+    /// <c>**/*.pdb</c>. A glob without <c>/</c> matches a name at any depth; a matching folder drops everything in it.
+    /// </summary>
+    public List<string> Exclude { get; set; } = [];
+
+    /// <summary>Set in a bake twin: the source brick it was baked from.</summary>
+    public PackageBakeOf? BakeOf { get; set; }
+
+    /// <summary>
+    /// Whether bake twins of the package may exist: <c>auto</c>, the default, lets consumers take one when it is
+    /// published; <c>none</c> means the package itself is the consumable form and twins of it are refused.
+    /// </summary>
+    public string? Bake { get; set; }
+
+    /// <summary>
+    /// Fingerprints (<c>SHA256:…</c>) of keys, besides the package's own publisher, whose bake twins of it consumers
+    /// accept.
+    /// </summary>
+    public List<string> TrustedBakers { get; set; } = [];
+
+    /// <summary>
+    /// Brick format v2: role → the path, or array of paths, under <c>Brick~/</c> holding it, such as <c>source</c>,
+    /// <c>tests</c>, <c>precast</c>, <c>bake</c>, <c>samples</c> or <c>docs</c>. Hosts ignore roles they do not know.
+    /// </summary>
+    public Dictionary<string, JsonElement> Roles { get; set; } = [];
+
+    /// <summary>The paths a role names, in order; none when the manifest does not declare it.</summary>
+    /// <param name="role">The role.</param>
+    /// <returns>Paths relative to the brick folder, with <c>/</c> separators.</returns>
+    public IReadOnlyList<string> RolePaths(string role) =>
+        Roles.TryGetValue(role, out var value) ? value.ValueKind switch
+        {
+            JsonValueKind.String => [value.GetString()!],
+            JsonValueKind.Array => [.. value.EnumerateArray().Where(static e => e.ValueKind == JsonValueKind.String).Select(static e => e.GetString()!)],
+            _ => [],
+        } : [];
+
+    /// <summary>Whether consumers may take a bake twin of the package in its place.</summary>
+    [JsonIgnore]
+    public bool AllowsTwins => Bake != BakeNone;
+
+    /// <summary>The <see cref="Bake"/> value that refuses twins.</summary>
+    public const string BakeNone = "none";
+
     /// <summary>Whether the package supports building for <paramref name="platform"/>.</summary>
     /// <param name="platform">A platform id, ignoring case.</param>
     /// <returns>True when the package lists no platforms or lists this one.</returns>
@@ -191,7 +259,23 @@ public sealed class PackageManifest
         PackageManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<PackageManifest>(json, PackageJson.Options);
+            // Brick format v2 names the id "id"; it is read as "name" and written back as it was found.
+            var node = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            if (node is JsonObject identity && identity.ContainsKey(IdKey) && identity.ContainsKey("name"))
+            {
+                throw new PackageException($"{path}: use either id or name, not both.");
+            }
+            var usesId = node is JsonObject root && root.ContainsKey(IdKey) && !root.ContainsKey("name");
+            if (usesId)
+            {
+                var obj = node!.AsObject();
+                var id = obj[IdKey];
+                obj.Remove(IdKey);
+                obj["name"] = id;
+            }
+
+            manifest = node.Deserialize<PackageManifest>(PackageJson.Options);
+            manifest?.UsesId = usesId;
         }
         catch (JsonException ex)
         {
@@ -221,7 +305,19 @@ public sealed class PackageManifest
             node.Remove(name);
         }
 
-        return node.ToJsonString(PackageJson.Options);
+        if (!UsesId)
+        {
+            return node.ToJsonString(PackageJson.Options);
+        }
+
+        // Keep the id first, under the name the file used.
+        var ordered = new JsonObject { [IdKey] = node["name"]?.DeepClone() };
+        foreach (var (key, value) in node.Where(static p => p.Key != "name").ToList())
+        {
+            ordered[key] = value?.DeepClone();
+        }
+
+        return ordered.ToJsonString(PackageJson.Options);
     }
 
     static bool IsDefault(JsonNode? value) =>
@@ -246,6 +342,10 @@ public sealed class PackageManifest
         }
 
         ValidateShipping(path);
+        ValidateExclude(path);
+        ValidateBakeOf(path);
+        ValidateBake(path);
+        ValidateRoles(path);
 
         if (Platforms.Concat(PlatformNuget.Keys).Any(static p => string.IsNullOrWhiteSpace(p)))
         {
@@ -269,11 +369,80 @@ public sealed class PackageManifest
                 throw new PackageException($"{path}: category '{category}' must read 'prefix:name'.");
             }
 
-            if (prefix != Name && !Dependencies.ContainsKey(prefix) && !reservedCategoryPrefixes.Contains(prefix))
+            if (prefix != Name && prefix != BakeOf?.Brick && !Dependencies.ContainsKey(prefix) && !reservedCategoryPrefixes.Contains(prefix))
             {
                 throw new PackageException(
                     $"{path}: category '{category}' uses prefix '{prefix}', which is neither this package, one of its dependencies nor a reserved prefix.");
             }
+        }
+    }
+
+    void ValidateExclude(string path)
+    {
+        foreach (var glob in Exclude)
+        {
+            if (!BrickGlob.IsValid(glob))
+            {
+                throw new PackageException($"{path}: exclude '{glob}' must be a relative path glob using '/', without '..'.");
+            }
+
+            if (BrickGlob.Matches(glob, FileName))
+            {
+                throw new PackageException($"{path}: exclude '{glob}' would leave out {FileName}.");
+            }
+        }
+    }
+
+    void ValidateBakeOf(string path)
+    {
+        if (BakeOf is not { } bakeOf)
+        {
+            return;
+        }
+
+        if (!PackageId.IsValid(bakeOf.Brick) || bakeOf.Brick == Name)
+        {
+            throw new PackageException($"{path}: bakeOf.brick '{bakeOf.Brick}' must be the id of another brick.");
+        }
+
+        if (bakeOf.Version is null)
+        {
+            throw new PackageException($"{path}: bakeOf has no version.");
+        }
+
+        if (!bakeOf.Integrity.StartsWith("sha256-", StringComparison.Ordinal))
+        {
+            throw new PackageException($"{path}: bakeOf.integrity must be the source file's sha256- hash.");
+        }
+    }
+
+    void ValidateRoles(string path)
+    {
+        foreach (var (role, value) in Roles)
+        {
+            if (value.ValueKind is not JsonValueKind.String and not JsonValueKind.Array
+                || value.ValueKind == JsonValueKind.Array && value.EnumerateArray().Any(static e => e.ValueKind != JsonValueKind.String))
+            {
+                throw new PackageException($"{path}: role '{role}' must be a path or an array of paths.");
+            }
+
+            if (RolePaths(role).FirstOrDefault(static p => !BrickLayout.IsInsideReservedRoot(p)) is { } outside)
+            {
+                throw new PackageException($"{path}: role '{role}' path '{outside}' must lie inside {BrickLayout.ReservedRoot}/, using '/', without '..'.");
+            }
+        }
+    }
+
+    void ValidateBake(string path)
+    {
+        if (Bake is not null and not "auto" and not BakeNone)
+        {
+            throw new PackageException($"{path}: bake must be 'auto' or '{BakeNone}', not '{Bake}'.");
+        }
+
+        if (TrustedBakers.FirstOrDefault(static key => !key.StartsWith("SHA256:", StringComparison.Ordinal)) is { } bad)
+        {
+            throw new PackageException($"{path}: trustedBakers entry '{bad}' must be a key fingerprint, SHA256:….");
         }
     }
 

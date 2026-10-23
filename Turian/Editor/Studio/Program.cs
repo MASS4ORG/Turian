@@ -16,8 +16,9 @@ Log.Configure(loggerFactory);
 BuildManager.MsBuildLocatorRegisterDefaults();
 
 // Built-in plugins are compiled in; the rest come from the studio packages the user installed.
+var studioBricks = TurianStudioBricks.Workspace();
 var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }
-    .Concat(PackagedPlugins.Load(TurianStudioBricks.Hosts, Log.Logger).Assemblies);
+    .Concat(PackagedPlugins.Load(studioBricks, Log.Logger).Assemblies);
 var shell = new ShellHost();
 var dispatcher = new CommandDispatcher();
 var panelAccessor = new PanelAccessor();
@@ -27,7 +28,7 @@ using var app = PluginHost.Load(pluginAssemblies, Log.Logger,
         services.AddSingleton<IShellHost>(shell);
         services.AddSingleton<ICommandDispatcher>(dispatcher);
         services.AddSingleton<IPanelAccessor>(panelAccessor);
-        services.AddSingleton(TurianStudioBricks.Workspace());
+        services.AddSingleton(studioBricks);
     },
     args, previousAppearancePageId: "gaya.turian.appearance");
 using var workbench = new Workbench(app);

@@ -5,7 +5,7 @@ namespace Turian.Editor.Core;
 /// <summary>
 /// What a Turian project can do with its bricks, in one place for the command line and the Studio panel.
 /// </summary>
-public static class BrickService
+public static partial class BrickService
 {
     /// <summary>The bricks a project resolves to, dependencies first.</summary>
     /// <param name="projectRoot">The project folder.</param>
@@ -16,8 +16,12 @@ public static class BrickService
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="locked">Install exactly what the lock records and fail on drift, as CI does.</param>
     /// <returns>The resolution.</returns>
-    public static PackageResolution Restore(string projectRoot, bool locked = false) =>
-        ProjectPackages.Resolve(projectRoot, locked);
+    public static PackageResolution Restore(string projectRoot, bool locked = false)
+    {
+        // An explicit restore retries: a registry may be back, or a key added, since the last failure was kept.
+        ProjectPackages.Invalidate(projectRoot);
+        return ProjectPackages.Resolve(projectRoot, locked);
+    }
 
     /// <summary>Fetches newer commits of git bricks and rewrites the lock.</summary>
     /// <param name="projectRoot">The project folder.</param>
@@ -29,12 +33,15 @@ public static class BrickService
     /// <summary>Declares a brick in the project and resolves, so a bad source fails now.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="id">The brick id.</param>
-    /// <param name="spec">The source; <c>builtin:&lt;id&gt;</c> when the brick ships with the engine and none is given.</param>
+    /// <param name="spec">
+    /// The source; when none is given, <c>builtin:&lt;id&gt;</c> for a brick that ships with the engine and any
+    /// registry version otherwise.
+    /// </param>
     /// <returns>The resolution.</returns>
     public static PackageResolution Add(string projectRoot, string id, string? spec = null)
     {
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        ProjectBricks.Add(projectRoot, id, spec ?? $"builtin:{id}");
+        ProjectBricks.Add(projectRoot, id, spec ?? PackageSource.DefaultSpec(id, ProjectPackages.BuiltinDirectory));
         ProjectPackages.Invalidate(projectRoot);
         try
         {
@@ -213,17 +220,18 @@ public static class BrickService
     /// <param name="publisherKeyFile">The publisher's private key file, or null.</param>
     /// <param name="claim">A name prefix to claim for the publisher.</param>
     /// <param name="precast">What the brick's <c>Precast~</c> payload was built with, from <see cref="PrecastAsync"/>.</param>
-    /// <returns>What was published.</returns>
+    /// <param name="twin">Also publish its bake twin, as <see cref="PackWithTwin"/> packs them.</param>
+    /// <returns>What was published: the brick, then its twin.</returns>
     /// <exception cref="PackageException">The brick is invalid, the version exists, or the name belongs to another key.</exception>
-    public static RegistryPublishResult Publish(string packageRoot, string registryRoot, string registryKeyFile,
-        string? publisherKeyFile, string? claim = null, PackagePrecast? precast = null)
+    public static IReadOnlyList<RegistryPublishResult> Publish(string packageRoot, string registryRoot, string registryKeyFile,
+        string? publisherKeyFile, string? claim = null, PackagePrecast? precast = null, bool twin = false)
     {
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-publish-{Guid.NewGuid():N}");
         try
         {
-            var packed = Pack(packageRoot, scratch, precast);
-            return RegistryPublisher.Publish(registryRoot, packed.Path, new SshKeygenSigner(registryKeyFile),
-                publisherKeyFile is null ? null : new SshKeygenSigner(publisherKeyFile), claim, ["gaya", ProjectPackages.HostName]);
+            return [.. PackFiles(packageRoot, scratch, precast, twin).Select(packed => RegistryPublisher.Publish(registryRoot,
+                packed.Path, new SshKeygenSigner(registryKeyFile), publisherKeyFile is null ? null : new SshKeygenSigner(publisherKeyFile),
+                claim, ["gaya", ProjectPackages.HostName]))];
         }
         finally
         {
@@ -243,7 +251,7 @@ public static class BrickService
     /// <summary>Declares a registry in the project's manifest, replacing one of the same name.</summary>
     /// <param name="projectRoot">The project folder.</param>
     /// <param name="registry">The registry.</param>
-    /// <exception cref="PackageException">The registry has no name, address or scope, or a key that is not an ed25519 public key.</exception>
+    /// <exception cref="PackageException">The registry lacks a name, address or signing trust, or has invalid filters or keys.</exception>
     public static void AddRegistry(string projectRoot, ScopedRegistry registry)
     {
         BrickRegistries.Validate(registry);
@@ -422,17 +430,27 @@ public static class BrickService
     /// <exception cref="PackageException">The brick fails verification.</exception>
     public static BrickPackResult Pack(string packageRoot, string outputDirectory, PackagePrecast? precast = null)
     {
-        if (PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]) is { Upstream: not null, Store.Redistribute: false } fork)
+        CheckPackable(packageRoot);
+        return BrickArchive.Pack(packageRoot, outputDirectory, ["gaya", ProjectPackages.HostName], precast);
+    }
+
+    static void CheckPackable(string packageRoot)
+    {
+        var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+        if (manifest is { Upstream: not null, Store.Redistribute: false })
         {
-            throw new PackageException($"{fork.Name} is licensed so that it cannot be republished, which includes forks of it.");
+            throw new PackageException($"{manifest.Name} is licensed so that it cannot be republished, which includes forks of it.");
+        }
+
+        if (manifest.BakeOf is not null)
+        {
+            throw new PackageException($"{manifest.Name} is a bake twin; pack its source brick instead.");
         }
 
         if (BrickVerifier.Verify(packageRoot) is { Count: > 0 } issues)
         {
             throw new PackageException($"{packageRoot} cannot be packed:{Environment.NewLine}  {string.Join($"{Environment.NewLine}  ", issues)}");
         }
-
-        return BrickArchive.Pack(packageRoot, outputDirectory, ["gaya", ProjectPackages.HostName], precast);
     }
 
     /// <summary>
@@ -448,10 +466,11 @@ public static class BrickService
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
-        var payload = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder);
-        if (Directory.Exists(payload))
+        DeclarePrecastRole(packageRoot, manifest);
+        var payload = BrickAssemblies.PrecastDirectory(packageRoot);
+        foreach (var directory in BrickAssemblies.PrecastDirectories(packageRoot).Where(Directory.Exists))
         {
-            Directory.Delete(payload, recursive: true);
+            Directory.Delete(directory, recursive: true);
         }
 
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-precast-{Guid.NewGuid():N}");
@@ -478,31 +497,12 @@ public static class BrickService
             }
 
             var own = CsProjectGenerator.DiscoverAssemblies(buildSettings).Definitions
-                .Where(a => a.DefinitionPath is { } path && Path.GetFullPath(path).StartsWith(packageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                .Where(assembly => OwnsAssembly(assembly.DefinitionPath, packageRoot))
                 .ToList();
-            var result = new PackagePrecast { BuiltWith = { [ProjectPackages.HostName] = ProjectPackages.EngineVersion } };
-            foreach (var assembly in own)
-            {
-                var folder = Path.Combine(payload, assembly.EditorOnly ? "editor" : "lib");
-                Directory.CreateDirectory(folder);
-                File.Copy(Path.Combine(output, $"{assembly.Name}.dll"), Path.Combine(folder, $"{assembly.Name}.dll"));
-                (assembly.EditorOnly ? result.EditorAssemblies : result.Assemblies).Add(assembly.Name);
-            }
-
-            if (own.Count == 0)
-            {
-                throw new PackageException($"{manifest.Name} has no assembly definition to precast.");
-            }
-
+            var result = CopyPrecastAssemblies([.. own.Select(static assembly => (assembly.Name, assembly.EditorOnly))],
+                output, payload, manifest.Name);
             var names = own.Select(static a => a.Name).ToHashSet(StringComparer.Ordinal);
-            var types = new UserCodeTypeManifest();
-            if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(compiled))) is { } built)
-            {
-                types.Types.AddRange(built.Types.Where(t => t.Assembly is not null && names.Contains(t.Assembly)));
-            }
-
-            File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
-                JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+            WritePrecastTypes(compiled, payload, names);
             _ = SyncPrecastDependencies(packageRoot, logger);
             return result;
         }
@@ -513,6 +513,39 @@ public static class BrickService
                 Directory.Delete(scratch, recursive: true);
             }
         }
+    }
+
+    static void WritePrecastTypes(string compiled, string payload, IReadOnlySet<string> names)
+    {
+        var types = new UserCodeTypeManifest();
+        if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(compiled))) is { } built)
+        {
+            types.Types.AddRange(built.Types.Where(t => t.Assembly is not null && names.Contains(t.Assembly)));
+        }
+
+        File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
+            JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+    }
+
+    static bool OwnsAssembly(string? definitionPath, string packageRoot) => definitionPath is not null
+        && Path.GetFullPath(definitionPath).StartsWith(packageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+    static PackagePrecast CopyPrecastAssemblies(IReadOnlyList<(string Name, bool EditorOnly)> assemblies,
+        string output, string payload, string brick)
+    {
+        var result = new PackagePrecast { BuiltWith = { [ProjectPackages.HostName] = ProjectPackages.EngineVersion } };
+        foreach (var assembly in assemblies)
+        {
+            var folder = Path.Combine(payload, assembly.EditorOnly ? "editor" : "lib");
+            Directory.CreateDirectory(folder);
+            File.Copy(Path.Combine(output, $"{assembly.Name}.dll"), Path.Combine(folder, $"{assembly.Name}.dll"));
+            (assembly.EditorOnly ? result.EditorAssemblies : result.Assemblies).Add(assembly.Name);
+        }
+        if (assemblies.Count == 0)
+        {
+            throw new PackageException($"{brick} has no assembly definition to precast.");
+        }
+        return result;
     }
 
     /// <summary>
@@ -544,7 +577,7 @@ public static class BrickService
             throw new PackageException(ex.Message, ex);
         }
 
-        var lib = Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, "lib");
+        var lib = Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), "lib");
         Directory.CreateDirectory(lib);
         var previous = ReadSyncedFiles(packageRoot);
         if (unified.Count == 0)
@@ -665,14 +698,24 @@ public static class BrickService
 
     // The files a previous sync copied, so stale ones are deleted when the map changes.
     static IReadOnlyList<string> ReadSyncedFiles(string packageRoot) =>
-        [.. BrickNuGetRestore.SyncedPackages(packageRoot).Values.SelectMany(static p => p.Files)
+        [.. BrickNuGetRestore.ReadSyncedPackages(BrickAssemblies.PrecastDirectory(packageRoot)).Values.SelectMany(static p => p.Files)
             .Distinct(StringComparer.Ordinal)];
+
+    static void DeclarePrecastRole(string packageRoot, PackageManifest manifest)
+    {
+        if (BrickLayout.IsV2(manifest) && manifest.RolePaths(BrickLayout.Precast).Count == 0)
+        {
+            manifest.Roles[BrickLayout.Precast] = JsonSerializer.SerializeToElement(BrickLayout.RelativePathOf(manifest, BrickLayout.Precast));
+            manifest.Save(packageRoot);
+        }
+    }
 
     // Every mapped package is recorded, including one that carries no managed assembly, so a later load can tell
     // which maps the committed copies already cover.
     static void WriteSyncedRecord(string packageRoot, IReadOnlyDictionary<string, string> unified,
         IReadOnlyList<BrickRuntimeFile> copied)
     {
+        DeclarePrecastRole(packageRoot, PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]));
         var packages = new JsonObject();
         foreach (var package in unified.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase))
         {
@@ -685,7 +728,7 @@ public static class BrickService
             };
         }
 
-        File.WriteAllText(Path.Combine(packageRoot, BrickAssemblies.PrecastFolder, BrickNuGetRestore.SyncRecordFileName),
+        File.WriteAllText(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickNuGetRestore.SyncRecordFileName),
             new JsonObject { ["packages"] = packages }.ToJsonString(PackageJson.Options));
     }
 
@@ -717,11 +760,17 @@ public static class BrickService
         new PackageManifest
         {
             Name = id,
+            UsesId = true,
             Version = SemanticVersion.Parse("0.1.0"),
             DisplayName = displayName ?? string.Join(' ', segments[^1]),
             License = license,
             Engines = { [ProjectPackages.HostName] = VersionRange.Parse($">={ProjectPackages.EngineVersion.Major}.{ProjectPackages.EngineVersion.Minor}") },
             Categories = [$"{ProjectPackages.HostName}:gameplay"],
+            Roles = new Dictionary<string, JsonElement>
+            {
+                [BrickLayout.Precast] = JsonSerializer.SerializeToElement("Brick~/Precast"),
+                [BrickLayout.Bake] = JsonSerializer.SerializeToElement("Brick~/Bake"),
+            },
         }.Save(root);
 
         var definition = Path.Combine(runtime, $"{assembly}.dataasset");
@@ -741,7 +790,7 @@ public static class BrickService
             }
             """.ReplaceLineEndings("\n") + "\n");
         Serializer.Save($"{script}.meta", new Asset { Id = Guid.NewGuid(), RelativePath = $"Runtime/{Path.GetFileName(script)}" });
-        File.WriteAllText(Path.Combine(root, ".gitignore"), "# Built by `turian-cli brick pack --precast`.\nPrecast~/\n.bricks/\n");
+        File.WriteAllText(Path.Combine(root, ".gitignore"), "# Generated by the brick compiler and baker.\nBrick~/Precast/\nBrick~/Bake/\n.bricks/\n");
         File.WriteAllText(Path.Combine(root, "README.md"), $$"""
             # {{displayName ?? segments[^1]}}
 

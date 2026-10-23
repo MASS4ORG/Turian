@@ -42,7 +42,7 @@ public sealed record RebaseResult(
 /// </summary>
 public static class BrickFork
 {
-    static readonly HashSet<string> SkippedDirectories = new(StringComparer.Ordinal) { ".git", "bin", "obj", "Precast~" };
+    static readonly HashSet<string> SkippedDirectories = new(StringComparer.Ordinal) { ".git", "bin", "obj", "Precast~", "Bake~" };
 
     /// <summary>The files of <paramref name="forkRoot"/> that differ from <paramref name="upstreamRoot"/>.</summary>
     /// <param name="upstreamRoot">The original brick folder.</param>
@@ -207,10 +207,18 @@ public static class BrickFork
     static Dictionary<string, string> Snapshot(string root)
     {
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        var manifestPath = Path.Combine(root, PackageManifest.FileName);
+        var manifest = File.Exists(manifestPath)
+            ? JsonSerializer.Deserialize<PackageManifest>(File.ReadAllText(manifestPath), PackageJson.Options) ?? new PackageManifest()
+            : new PackageManifest();
+        var generated = BrickLayout.PathsOf(root, manifest, BrickLayout.Precast)
+            .Concat(BrickLayout.PathsOf(root, manifest, BrickLayout.Bake))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/') + "/").ToList();
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
-            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains))
+            if (relative.Split('/').SkipLast(1).Any(SkippedDirectories.Contains)
+                || generated.Any(prefix => relative.StartsWith(prefix, StringComparison.Ordinal)))
             {
                 continue;
             }

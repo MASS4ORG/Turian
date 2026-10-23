@@ -14,6 +14,7 @@ namespace Turian.Editor.Core;
 /// <param name="EditorOnly">Compiled and loaded by the editor only.</param>
 /// <param name="AllowUnsafeCode">Allows <c>unsafe</c> code.</param>
 /// <param name="NoEngineReferences">Compiles against .NET alone, without the engine.</param>
+/// <param name="EmbeddedResources">Files relative to the definition folder embedded in the assembly.</param>
 public sealed record ProjectAssembly(
     string Name,
     string RootNamespace,
@@ -22,7 +23,8 @@ public sealed record ProjectAssembly(
     IReadOnlyList<string> References,
     bool EditorOnly,
     bool AllowUnsafeCode,
-    bool NoEngineReferences)
+    bool NoEngineReferences,
+    IReadOnlyList<string>? EmbeddedResources = null)
 {
     /// <summary>Whether this is the default assembly, which holds every script outside a definition.</summary>
     public bool IsDefault => DefinitionPath is null;
@@ -222,7 +224,10 @@ public sealed class AssemblyGraph
         return graph;
     }
 
-    /// <summary>The scripts under a folder, leaving out folders whose name ends in <c>~</c>, which are never compiled.</summary>
+    /// <summary>
+    /// The scripts under a folder, leaving out folders that are never compiled: those whose name ends in <c>~</c>, and
+    /// hidden ones.
+    /// </summary>
     /// <param name="directory">The folder.</param>
     /// <returns>Absolute script paths.</returns>
     public IEnumerable<string> Scripts(string directory) =>
@@ -233,7 +238,7 @@ public sealed class AssemblyGraph
 
     static bool IsInTildeFolder(string relativePath) =>
         relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).SkipLast(1)
-            .Any(static segment => segment.EndsWith('~'));
+            .Any(AssetDatabase.IsUnimportedFolder);
 
     /// <summary>
     /// Whether a data-asset file holds an <see cref="AssemblyDefinition"/> or an
@@ -354,7 +359,8 @@ public sealed class AssemblyGraph
             references,
             definition.EditorOnly,
             definition.AllowUnsafeCode,
-            definition.NoEngineReferences);
+            definition.NoEngineReferences,
+            definition.EmbeddedResources);
     }
 
     static List<ProjectAssembly> TopologicalOrder(Dictionary<string, ProjectAssembly> assemblies)

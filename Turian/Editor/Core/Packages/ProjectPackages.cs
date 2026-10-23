@@ -18,8 +18,7 @@ public static class ProjectPackages
     public static string BuiltinDirectory { get; } = FindBuiltinDirectory();
 
     /// <summary>The built-in packages a new project installs.</summary>
-    public static IReadOnlyList<string> DefaultBuiltins { get; } =
-        [RenderBrick, "org.mass4.turian.cameras", "org.mass4.turian.ui"];
+    public static IReadOnlyList<string> DefaultBuiltins { get; } = [RenderBrick];
 
     /// <summary>The built-in render brick: the Vulkan renderer and window client builds play in.</summary>
     public const string RenderBrick = "org.mass4.turian.vulkan";
@@ -33,6 +32,12 @@ public static class ProjectPackages
 
     static readonly Lock CacheLock = new();
     static readonly Dictionary<string, (string Stamp, PackageResolution Resolution)> Cache = [];
+
+    // A failed resolution, kept like a good one: every caller gets it again without another network round, and it is logged once.
+    static readonly Dictionary<string, (string Stamp, PackageException Failure)> Failures = [];
+
+    // The kept failures already logged by ResolveOrEmpty.
+    static readonly ConditionalWeakTable<PackageException, object> Reported = new();
 
     /// <summary>This engine's version, which packages' <c>engines.turian</c> ranges are checked against.</summary>
     public static SemanticVersion EngineVersion { get; } = ReadVersion(typeof(Component).Assembly);
@@ -60,9 +65,26 @@ public static class ProjectPackages
             {
                 return cached.Resolution;
             }
+
+            if (Failures.TryGetValue(projectRoot, out var failed) && failed.Stamp == stamp)
+            {
+                throw failed.Failure;
+            }
         }
 
-        return ResolveUncached(projectRoot, locked, new HashSet<string>());
+        try
+        {
+            return ResolveUncached(projectRoot, locked, new HashSet<string>());
+        }
+        catch (PackageException ex)
+        {
+            lock (CacheLock)
+            {
+                Failures[projectRoot] = (stamp, ex);
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -84,11 +106,14 @@ public static class ProjectPackages
 
         var resolution = NewResolver(locked, update).ResolveAsync(projectRoot).GetAwaiter().GetResult();
         PackageAssetIds.EnsureUnique(Path.Combine(projectRoot, "Assets"), resolution.Packages);
+        foreach (var warning in resolution.Warnings)
+        {
+            Log.Logger.LogWarning("{Warning}", warning);
+        }
 
         if (resolution.UsesUserOverride)
         {
-            Log.Logger.LogInformation("Packages resolved with {File}; the lock file is left unchanged",
-                ProjectManifest.UserFileName);
+            Log.Logger.LogInformation("Packages resolved with personal overrides; the lock file is left unchanged");
         }
         else if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
         {
@@ -98,6 +123,7 @@ public static class ProjectPackages
         lock (CacheLock)
         {
             Cache[projectRoot] = (Stamp(projectRoot, locked), resolution);
+            _ = Failures.Remove(projectRoot);
         }
 
         return resolution;
@@ -118,6 +144,7 @@ public static class ProjectPackages
         lock (CacheLock)
         {
             _ = Cache.Remove(Path.GetFullPath(projectRoot));
+            _ = Failures.Remove(Path.GetFullPath(projectRoot));
         }
     }
 
@@ -135,7 +162,20 @@ public static class ProjectPackages
         }
 
         ProjectManifest.MigrateLegacyLayout(projectRoot);
-        return Resolve(projectRoot).Packages;
+        try
+        {
+            return Resolve(projectRoot).Packages;
+        }
+        catch (PackageException ex)
+        {
+            // The editor's callers each note what they leave out; what is missing and why is told here, once per failure.
+            if (Reported.TryAdd(ex, Reported))
+            {
+                Log.Logger.LogError("The project's bricks could not be resolved: {Problem}", ex.Message);
+            }
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -156,12 +196,15 @@ public static class ProjectPackages
         Invalidate(projectRoot);
     }
 
-    /// <summary>The public registry every project can take bricks from: <c>org.mass4.*</c> and <c>user.*</c> names, trusted with MASS4's signing key.</summary>
+    /// <summary>
+    /// The public registry every project can take bricks from, accepting all brick names and trusted with
+    /// MASS4's signing key. Its name is what lock files record, so it stays fixed while the asset store's address moves.
+    /// </summary>
     public static ScopedRegistry PublicRegistry { get; } = new()
     {
         Name = "bricks.mass4.org",
         Url = "https://bricks.mass4.org/v1",
-        Scopes = ["org.mass4", "user"],
+        Mirrors = ["https://store.mass4.org/v1"],
         Keys = [ReadEmbeddedKey()],
     };
 
@@ -200,14 +243,20 @@ public static class ProjectPackages
     static string Stamp(string projectRoot, bool locked)
     {
         var directory = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
-        var files = new[] { ProjectManifest.FileName, ProjectManifest.UserFileName, LockFile.FileName }
+        var files = new[] { ProjectManifest.FileName, ProjectManifest.UserFileName, ProjectManifest.LinksFileName, LockFile.FileName }
             .Select(name => Path.Combine(directory, name))
             .Select(static path => File.Exists(path) ? File.GetLastWriteTimeUtc(path).Ticks : 0);
         IEnumerable<string> embedded = Directory.Exists(directory)
             ? Directory.EnumerateDirectories(directory).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal)
             : [];
 
-        return $"{locked}|{string.Join('|', files)}|{string.Join('|', embedded)}";
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: !locked);
+        var links = manifest.Links.OrderBy(static pair => pair.Key, StringComparer.Ordinal).Select(pair =>
+        {
+            var path = Path.Combine(Path.GetFullPath(pair.Value, directory), PackageManifest.FileName);
+            return $"{pair.Key}:{(File.Exists(path) ? File.GetLastWriteTimeUtc(path).Ticks : 0)}";
+        });
+        return $"{locked}|{string.Join('|', files)}|{string.Join('|', embedded)}|{string.Join('|', links)}";
     }
 
     static SemanticVersion ReadVersion(Assembly assembly)

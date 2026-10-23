@@ -1,5 +1,6 @@
 # Turian CLI: headless editor automation (compile, playmode, screenshot, pick, oap, brick)
-# for gamedevs to build their Turian projects in their own CI/CD. Built with Podman.
+# for gamedevs to build their Turian projects in their own CI/CD, plus brick-release for brick release workflows.
+# Built with Podman.
 ARG DOTNET_VERSION=10.0
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
@@ -20,6 +21,18 @@ RUN dotnet publish Turian/Editor/CLI/Turian.Editor.CLI.csproj \
     && mv /app/bootstrap/Turian.Editor.Bootstrap /app/publish/turian-cli \
     && cp Turian/Editor/CSharp/CodeGenerator/bin/Release/netstandard2.0/Turian.CSharp.CodeGenerator.dll /app/publish/lib/
 
+# The brick release tool, with the revocation list and owner key it checks signing identities against, so brick
+# release workflows need nothing from a Turian checkout: everything comes from this digest-pinned image.
+RUN dotnet publish tools/BrickRelease/BrickRelease.csproj \
+    -c Release \
+    -o /app/publish/tools/brick-release \
+    -p:Version=${VERSION} -p:AssemblyVersion=${VERSION} -p:InformationalVersion=${VERSION} \
+    && install -D -m 0644 signing/revoked-keys.json /app/publish/tools/brick-release/signing/revoked-keys.json \
+    && install -D -m 0644 Turian/Editor/Core/Packages/registry-mass4.pub \
+       /app/publish/tools/brick-release/Turian/Editor/Core/Packages/registry-mass4.pub \
+    && printf '#!/bin/sh\nexec dotnet /app/tools/brick-release/Mass4.BrickRelease.dll "$@"\n' > /app/publish/brick-release \
+    && chmod 0755 /app/publish/brick-release
+
 # The dotnet SDK (not just the runtime) is required at runtime: the CLI uses
 # Microsoft.Build.Locator to compile a gamedev's own project via MSBuild.
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}
@@ -32,16 +45,19 @@ LABEL org.opencontainers.image.title="Turian CLI" \
 
 # glslc: shader compilation. fontconfig/dejavu: SkiaSharp text rendering (Guinevere UI).
 # libvulkan1/mesa-vulkan-drivers: software Vulkan (lavapipe) for headless screenshot/playmode.
+# openssh-client: ssh-keygen signs bricks published to a registry or asset store.
 RUN apt-get update -yqq \
     && apt-get install -yqq --no-install-recommends \
        glslc \
        libfontconfig1 fontconfig fonts-dejavu-core \
        libvulkan1 mesa-vulkan-drivers \
+       openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=build /app/publish .
-ENV PATH="/app:${PATH}"
+ENV PATH="/app:${PATH}" \
+    BRICK_RELEASE_ROOT=/app/tools/brick-release
 
 ENTRYPOINT ["/app/turian-cli"]
 CMD ["--help"]

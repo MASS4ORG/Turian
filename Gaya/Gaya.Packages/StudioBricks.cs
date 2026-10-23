@@ -17,6 +17,13 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     /// <summary>The folder, inside a brick, holding its compiled plugin assemblies.</summary>
     public const string LibraryDirectoryName = "Precast~/lib";
 
+    /// <summary>All library folders of a studio brick, in precast-role order.</summary>
+    /// <param name="brick">The resolved studio brick.</param>
+    /// <returns>The folders that can contain plugins.</returns>
+    public static IReadOnlyList<string> LibraryDirectories(ResolvedPackage brick) =>
+        [.. BrickLayout.PathsOf(brick.RootPath, brick.Manifest, BrickLayout.Precast)
+            .Select(static payload => Path.Combine(payload, "lib"))];
+
     readonly PackageStore packages = store ?? new PackageStore(PackageStore.DefaultRoot());
 
     /// <inheritdoc />
@@ -74,7 +81,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public void Add(string id, string? source)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        Rollback(() => ProjectBricks.Add(Root, id, source ?? $"builtin:{id}"), Resolve);
+        Rollback(() => ProjectBricks.Add(Root, id, source ?? PackageSource.DefaultSpec(id, BuiltinDirectory)), Resolve);
     }
 
     /// <inheritdoc />
@@ -193,7 +200,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public bool IsPrecast(ResolvedPackage brick)
     {
         ArgumentNullException.ThrowIfNull(brick);
-        return Directory.Exists(Path.Combine(brick.RootPath, LibraryDirectoryName));
+        return LibraryDirectories(brick).Any(Directory.Exists);
     }
 
     /// <inheritdoc />
@@ -239,16 +246,20 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
 /// <summary>Registry checks and searches shared by every brick workspace.</summary>
 public static class BrickRegistries
 {
-    /// <summary>Checks that a registry has a name, an address, scopes, and keys or explicit trust in unsigned bricks.</summary>
+    /// <summary>Checks a registry's name, address, optional scope filters and explicit signing trust.</summary>
     /// <param name="registry">The registry.</param>
     /// <exception cref="PackageException">The registry is incomplete or a key is not an OpenSSH ed25519 public key.</exception>
     public static void Validate(ScopedRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
-        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace) || registry.Scopes.Count == 0
-            || registry.Scopes.Any(string.IsNullOrWhiteSpace))
+        if (new[] { registry.Name, registry.Url }.Any(string.IsNullOrWhiteSpace))
         {
-            throw new PackageException("A registry needs a name, an address and at least one scope.");
+            throw new PackageException("A registry needs a name and an address.");
+        }
+
+        if (registry.Scopes.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new PackageException("Registry scope filters cannot be blank; omit scopes or use * to accept all names.");
         }
 
         foreach (var key in registry.Keys)
@@ -263,7 +274,9 @@ public static class BrickRegistries
         }
     }
 
-    /// <summary>Finds bricks in <paramref name="registries"/> whose id contains <paramref name="query"/>.</summary>
+    /// <summary>
+    /// Finds bricks whose id contains <paramref name="query"/> and matches each registry's optional scope filters.
+    /// </summary>
     /// <param name="registries">The registries to read.</param>
     /// <param name="query">Text the id must contain; every brick when empty.</param>
     /// <returns>Registry, id and newest version; an unreadable registry is reported in place of its bricks.</returns>
@@ -277,7 +290,7 @@ public static class BrickRegistries
             try
             {
                 var index = await new RegistryClient(registry).GetIndexAsync().ConfigureAwait(false);
-                found.AddRange(index.Bricks.Where(b => b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
+                found.AddRange(index.Bricks.Where(b => registry.Serves(b.Key) && b.Key.Contains(query, StringComparison.OrdinalIgnoreCase))
                     .Select(b => (registry.Name, b.Key, Newest(b.Value))));
             }
             catch (PackageException ex)

@@ -20,53 +20,73 @@ public sealed class ThemeServiceTests : IDisposable
         Directory.Delete(directory, recursive: true);
     }
 
-#pragma warning disable CS0618
-    /// <summary>The legacy palettes, which every built-in sheet reproduces exactly.</summary>
-    public static TheoryData<string> BuiltIns() => [.. StudioTheme.BuiltIn.Select(static theme => theme.Name)];
+    /// <summary>The color themes shipped as built-in sheets.</summary>
+    public static TheoryData<string> BuiltIns() =>
+    [
+        "Dark", "Light", "Dark Contrast", "Dracula", "Monokai", "One Dark", "Nord", "Gruvbox", "Tokyo Night",
+        "Catppuccin", "Solarized Dark", "Solarized Light", "Ayu Dark", "Ayu Light",
+    ];
 
-    /// <summary>Each built-in .pss compiles to the colors and metrics of the C# theme it replaced.</summary>
+    /// <summary>Each built-in sheet supplies the selected theme's colors and metrics.</summary>
     [Theory]
     [MemberData(nameof(BuiltIns))]
-    public void BuiltInSheetsReproduceTheLegacyThemes(string name)
+    public void BuiltInSheetsSupplyTheSelectedThemeTokens(string name)
     {
-        var legacy = StudioTheme.BuiltIn.Single(theme => theme.Name == name);
         var service = Service();
         service.ApplyColorTheme(name);
         var tokens = service.Current;
+        var info = service.Catalog.Find(name)!;
+        var sheets = new StyleSheetCollection { service.Catalog.Load(info.Id) };
 
         Assert.Equal("gaya." + name.ToLowerInvariant().Replace(' ', '-'), tokens.Id);
-        Assert.Equal(legacy.IsDark, tokens.IsDark);
-        Assert.Equal(
-            [legacy.Background, legacy.Panel, legacy.Chrome, legacy.Field, legacy.Hover, legacy.Border, legacy.Ink,
-                legacy.InkDim, legacy.InkFaint, legacy.Accent, legacy.AccentFill, legacy.EditorArea, legacy.Error,
-                legacy.Warning, legacy.Folder],
-            [
-                tokens.Background, tokens.Panel, tokens.Chrome, tokens.Field, tokens.Hover, tokens.Border, tokens.Ink,
-                tokens.InkDim, tokens.InkFaint, tokens.Accent, tokens.AccentFill, tokens.EditorArea, tokens.Error,
-                tokens.Warning, tokens.Folder,
-            ]);
-        Assert.Equal([legacy.FontSize, legacy.MenuHeight, legacy.StatusHeight, legacy.HeaderHeight, legacy.RowHeight,
-            legacy.Gap], [ tokens.FontSize, tokens.MenuHeight, tokens.StatusHeight, tokens.HeaderHeight,
-            tokens.RowHeight, tokens.Gap ]);
-        Assert.Equal(GuiColor.FromArgb(128, legacy.Accent), tokens.FocusRing);
-        Assert.Equal(GuiColor.FromArgb(110, legacy.Accent), tokens.Selection);
-        Assert.Equal(legacy.Panel, tokens.Popup);
+        Assert.Equal(name, tokens.Name);
+        Assert.Equal(info.Kind, tokens.Kind);
+        (string Token, GuiColor Color)[] colors =
+        [
+            ("surface-window", tokens.Background), ("surface-panel", tokens.Panel), ("surface-chrome", tokens.Chrome),
+            ("surface-field", tokens.Field), ("surface-hover", tokens.Hover), ("border", tokens.Border),
+            ("ink", tokens.Ink), ("ink-dim", tokens.InkDim), ("ink-faint", tokens.InkFaint), ("accent", tokens.Accent),
+            ("accent-fill", tokens.AccentFill), ("surface-editor-area", tokens.EditorArea), ("error", tokens.Error),
+            ("warning", tokens.Warning), ("folder", tokens.Folder), ("focus-ring", tokens.FocusRing),
+            ("selection", tokens.Selection), ("surface-popup", tokens.Popup),
+        ];
+        foreach (var (token, color) in colors)
+        {
+            Assert.Equal(sheets.GetTokenColor(token), color);
+        }
+
+        (string Token, float Length)[] metrics =
+        [
+            ("font-size", tokens.FontSize), ("menu-height", tokens.MenuHeight), ("status-height", tokens.StatusHeight),
+            ("header-height", tokens.HeaderHeight), ("row-height", tokens.RowHeight), ("gap", tokens.Gap),
+        ];
+        foreach (var (token, length) in metrics)
+        {
+            Assert.Equal(sheets.GetTokenLength(token), length);
+        }
+
         Assert.Null(service.Diagnostic);
     }
 
-    /// <summary>The legacy registration converts a C# theme into a sheet with the same colors.</summary>
+    /// <summary>A registered sheet inherits a built-in theme and overrides its metrics.</summary>
     [Fact]
-    public void LegacyRegistrationConvertsToASheet()
+    public void RegisteredSheetSuppliesItsColorsAndMetrics()
     {
         var service = Service();
-        service.Register(StudioTheme.Nord with { Name = "Legacy", FontSize = 14 });
-        service.ApplyColorTheme("Legacy");
-        Assert.Equal("Legacy", service.Current.Id);
-        Assert.Equal(StudioTheme.Nord.Accent, service.Current.Accent);
+        var info = service.Register(new ThemeSource("""
+            @const theme-id = "test.custom";
+            @const theme-name = "Custom";
+            @import "gaya.nord";
+            $font-size = 14;
+            """));
+        service.ApplyColorTheme(info.Id);
+        Assert.Equal("test.custom", service.Current.Id);
+        Assert.Equal("Custom", service.Current.Name);
+        var nord = new StyleSheetCollection { service.Catalog.Load("gaya.nord") };
+        Assert.Equal(nord.GetTokenColor("accent"), service.Current.Accent);
         Assert.Equal(14f, service.Current.FontSize);
-        Assert.Throws<ArgumentNullException>(() => service.Register((StudioTheme)null!));
+        Assert.Throws<ArgumentNullException>(() => service.Register(null!));
     }
-#pragma warning restore CS0618
 
     /// <summary>Built-ins are listed in menu order, and every built-in defines every catalog token.</summary>
     [Fact]
@@ -237,12 +257,14 @@ public sealed class ThemeServiceTests : IDisposable
     }
 
     /// <summary>Plugin tokens get their default, follow other tokens, and are overridable by a theme.</summary>
-    [Fact]
-    public void PluginTokenContributionsHaveDefaultsThemesOverride()
+    [Theory]
+    [MemberData(nameof(BuiltIns))]
+    public void PluginTokenContributionsHaveDefaultsThemesOverride(string name)
     {
         var service = Service();
+        service.ApplyColorTheme(name);
         service.Token("test-glow", "alpha($accent, 0.5)");
-        Assert.Equal(GuiColor.FromArgb(128, 140, 140, 140), service.Current.GetColor("test-glow"));
+        Assert.Equal(GuiColor.FromArgb(128, service.Current.Accent), service.Current.GetColor("test-glow"));
 
         service.Register(new ThemeSource("""
             @const theme-id = "test.glow";

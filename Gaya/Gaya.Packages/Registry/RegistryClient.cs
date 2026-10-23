@@ -33,16 +33,17 @@ public sealed class RegistryClient
     /// token. Tokens are never stored in a manifest or lock file.
     /// </summary>
     /// <param name="registry">The registry.</param>
+    /// <param name="credentialsPath">The credentials file; <see cref="CredentialsPath"/> when null.</param>
     /// <returns>The token, or null when there is none.</returns>
-    public static string? TokenFor(ScopedRegistry registry)
+    public static string? TokenFor(ScopedRegistry registry, string? credentialsPath = null)
     {
-        var variable = "GAYA_REGISTRY_TOKEN_" + new string([.. registry.Name.ToUpperInvariant().Select(static c => char.IsAsciiLetterOrDigit(c) ? c : '_')]);
-        if (Environment.GetEnvironmentVariable(variable) is { Length: > 0 } fromEnvironment)
+        ArgumentNullException.ThrowIfNull(registry);
+        if (Environment.GetEnvironmentVariable("GAYA_REGISTRY_TOKEN_" + StoreClient.Variable(registry.Name)) is { Length: > 0 } fromEnvironment)
         {
             return fromEnvironment;
         }
 
-        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gaya", "credentials.json");
+        var path = credentialsPath ?? CredentialsPath;
         if (!File.Exists(path))
         {
             return null;
@@ -50,12 +51,45 @@ public sealed class RegistryClient
 
         try
         {
-            var credentials = JsonNode.Parse(File.ReadAllText(path))?.AsObject();
-            return (string?)credentials?[registry.Name] ?? (string?)credentials?[registry.Url];
+            return JsonNode.Parse(File.ReadAllText(path)) is JsonObject credentials
+                ? (string?)credentials[registry.Name] ?? (string?)credentials[registry.Url]
+                : null;
         }
         catch (JsonException)
         {
             return null;
+        }
+    }
+
+    /// <summary>The per-user file mapping a registry name or url to its access token.</summary>
+    public static string CredentialsPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gaya", "credentials.json");
+
+    /// <summary>Saves a registry's access token in the per-user credentials file, readable only by the user.</summary>
+    /// <param name="name">The registry name or url the token is for.</param>
+    /// <param name="token">The token.</param>
+    /// <param name="path">The credentials file; <see cref="CredentialsPath"/> when null.</param>
+    public static void SaveToken(string name, string token, string? path = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        path ??= CredentialsPath;
+        JsonObject credentials;
+        try
+        {
+            credentials = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? [] : [];
+        }
+        catch (JsonException)
+        {
+            credentials = [];
+        }
+
+        credentials[name] = token.Trim();
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        File.WriteAllText(path, credentials.ToJsonString(PackageJson.Options));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         }
     }
 
@@ -103,22 +137,44 @@ public sealed class RegistryClient
         return path;
     }
 
+    /// <summary>
+    /// Reads from the registry's address, then from each mirror in turn; when all fail, the address's own error is
+    /// reported.
+    /// </summary>
     async Task<byte[]> ReadAsync(string relative, CancellationToken cancellationToken)
     {
-        var location = registry.Url;
-        if (location.StartsWith("file:", StringComparison.Ordinal))
+        PackageException? first = null;
+        foreach (var location in (IEnumerable<string>)[registry.Url, .. registry.Mirrors ?? []])
         {
-            location = new Uri(location).LocalPath;
+            try
+            {
+                return await ReadAsync(location, relative, cancellationToken).ConfigureAwait(false);
+            }
+            catch (PackageException ex)
+            {
+                first ??= ex;
+            }
         }
 
-        if (!location.StartsWith("http://", StringComparison.Ordinal) && !location.StartsWith("https://", StringComparison.Ordinal))
-        {
-            var path = Path.GetFullPath(relative, location);
-            return File.Exists(path)
-                ? await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false)
-                : throw new PackageException($"{registry.Name}: {path} does not exist.");
-        }
+        throw first!;
+    }
 
+    Task<byte[]> ReadAsync(string location, string relative, CancellationToken cancellationToken) =>
+        location.StartsWith("http://", StringComparison.Ordinal) || location.StartsWith("https://", StringComparison.Ordinal)
+            ? ReadHttpAsync(location, relative, cancellationToken)
+            : ReadFolderAsync(location.StartsWith("file:", StringComparison.Ordinal) ? new Uri(location).LocalPath : location,
+                relative, cancellationToken);
+
+    async Task<byte[]> ReadFolderAsync(string folder, string relative, CancellationToken cancellationToken)
+    {
+        var path = Path.GetFullPath(relative, folder);
+        return File.Exists(path)
+            ? await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false)
+            : throw new PackageException($"{registry.Name}: {path} does not exist.");
+    }
+
+    async Task<byte[]> ReadHttpAsync(string location, string relative, CancellationToken cancellationToken)
+    {
         var baseUri = new Uri(location.EndsWith('/') ? location : location + "/");
         var uri = Uri.TryCreate(relative, UriKind.Absolute, out var absolute) ? absolute : new Uri(baseUri, relative);
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -181,7 +237,31 @@ public static class RegistryTrust
             }
         }
 
-        throw new PackageException(
-            $"{id} {version}: the signature in {registry.Name} was not made by any of the {registry.Keys.Count} key(s) this project trusts for it.");
+        throw new PackageException(Untrusted(registry, id, version, entry));
+    }
+
+    /// <summary>Says why a signed entry is refused and what the user can do, depending on whether any key is trusted.</summary>
+    static string Untrusted(ScopedRegistry registry, string id, string version, RegistryVersion entry)
+    {
+        var signer = entry.SignedBy is { Length: > 0 } signedBy ? $"is signed by {signedBy}" : "is signed";
+        var keys = $"{registry.Url.TrimEnd('/')}/keys";
+        return registry.Keys.Count == 0
+            ? $"{id} {version} from {registry.Name} {signer}, but no signing key is trusted for {registry.Name}, so none of its bricks can be installed. "
+              + $"If you trust this registry, add its public key to the registry's \"keys\": {keys} lists the keys it signs with; confirm the fingerprint with its owner first."
+            : $"{id} {version} from {registry.Name} {signer}, which is not one of the {registry.Keys.Count} key(s) trusted for it "
+              + $"({string.Join(", ", registry.Keys.Select(FingerprintOf))}). The registry may have changed its key, or this copy was altered; "
+              + $"ask its owner before adding the key {keys} lists.";
+    }
+
+    static string FingerprintOf(string key)
+    {
+        try
+        {
+            return SshSignature.Fingerprint(key);
+        }
+        catch (PackageException)
+        {
+            return "an unreadable key";
+        }
     }
 }

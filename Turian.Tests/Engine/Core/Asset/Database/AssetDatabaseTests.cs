@@ -5,6 +5,21 @@ namespace Turian.Tests;
 /// </summary>
 public class AssetDatabaseTests
 {
+    /// <summary>Folders ending in <c>~</c>, hidden folders and hidden files are never imported, as in Unity.</summary>
+    [Theory]
+    [InlineData("Samples~/Scene.prefab", true)]
+    [InlineData(".github/workflows/brick.yml", true)]
+    [InlineData(".gitlab-ci.yml", true)]
+    [InlineData("Runtime/.hidden/Asset.png", true)]
+    [InlineData("Runtime/Camera.cs", false)]
+    [InlineData("Runtime/Tilde~Name.png", false)]
+    public void UnimportedPathsAreRecognized(string relative, bool unimported)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "brick");
+
+        Assert.Equal(unimported, AssetDatabase.IsInTildeFolder(Path.Combine(root, relative), root));
+    }
+
     /// <summary>
     /// Databases are plain instances: two can coexist, and a record registered in one is unknown to the other.
     /// </summary>

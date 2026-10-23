@@ -8,7 +8,7 @@ namespace Turian.Editor.Core;
 /// </summary>
 public static class BrickVerifier
 {
-    static readonly string[] UnimportedNames = ["package.json", ".gitignore", ".gitattributes"];
+    static readonly string[] UnimportedNames = ["package.json"];
     static readonly string[] UnimportedPrefixes = ["README", "LICENSE", "CHANGELOG", "NOTICE"];
 
     /// <summary>Finds what is wrong with the brick at <paramref name="packageRoot"/>.</summary>
@@ -21,7 +21,14 @@ public static class BrickVerifier
 
         try
         {
-            _ = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+            // A brick only the studio installs is never imported into a project, so its files carry no asset ids.
+            var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+            CheckPortable(packageRoot, manifest, issues);
+
+            if (!manifest.EffectiveScopes.Contains(PackageScope.Project))
+            {
+                return issues;
+            }
         }
         catch (PackageException ex)
         {
@@ -53,6 +60,18 @@ public static class BrickVerifier
         }
 
         return issues;
+    }
+
+    static void CheckPortable(string packageRoot, PackageManifest manifest, List<string> issues)
+    {
+        try
+        {
+            BrickArchive.ValidatePortable(packageRoot, manifest);
+        }
+        catch (PackageException ex)
+        {
+            issues.Add(ex.Message);
+        }
     }
 
     /// <summary>
@@ -113,7 +132,8 @@ public static class BrickVerifier
     {
         var segments = relative.Split('/');
         var name = segments[^1];
-        return segments[..^1].Any(static s => s.EndsWith('~') || s == ".git")
+        return segments[..^1].Any(AssetDatabase.IsUnimportedFolder)
+               || name.StartsWith('.')
                || UnimportedNames.Contains(name)
                || UnimportedPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
     }

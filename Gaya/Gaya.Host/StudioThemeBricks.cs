@@ -46,14 +46,14 @@ public static class StudioThemeBricks
         }
         catch (PackageException ex)
         {
-            logger.LogError(ex, "Studio bricks could not be resolved");
+            logger.LogError("Studio bricks could not be resolved: {Problem}", ex.Message);
             return null;
         }
     }
 
     static HashSet<string> Libraries(IEnumerable<ResolvedPackage> packages) =>
     [
-        .. packages.Where(static package => Directory.Exists(Path.Combine(package.RootPath, PackagedPlugins.LibraryDirectoryName)))
+        .. packages.Where(static package => StudioBricks.LibraryDirectories(package).Any(Directory.Exists))
             .Select(static package => package.Id),
     ];
 }

@@ -1,9 +1,0 @@
-{
-  "name": "org.mass4.turian.save",
-  "version": "0.1.0",
-  "displayName": "Game Saves",
-  "description": "Versioned game snapshots, atomic slots and revision-aware storage adapters.",
-  "author": "MASS4",
-  "license": "MPL-2.0",
-  "categories": ["turian:simulation"]
-}

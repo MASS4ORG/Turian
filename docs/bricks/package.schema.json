@@ -3,8 +3,20 @@
   "$comment": "Dedicated to the public domain under CC0 1.0.",
   "title": "Brick manifest (package.json)",
   "type": "object",
-  "required": ["name", "version"],
+  "required": ["version"],
+  "oneOf": [{ "required": ["name"] }, { "required": ["id"] }],
   "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$", "description": "Bricks v2 permanent reverse-DNS identity." },
+    "roles": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string", "pattern": "^Brick~/[^\\\\]+$" },
+          { "type": "array", "items": { "type": "string", "pattern": "^Brick~/[^\\\\]+$" } }
+        ]
+      },
+      "description": "Opaque tooling folders under Brick~/: source, tests, precast, bake, samples and docs."
+    },
     "name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$", "description": "Lowercase reverse-DNS id." },
     "version": { "type": "string", "description": "Semantic version." },
     "displayName": { "type": "string" },
@@ -14,8 +26,9 @@
     "keywords": { "type": "array", "items": { "type": "string" } },
     "dependencies": {
       "type": "object",
-      "additionalProperties": { "type": "string", "description": "A version range, or a source: builtin:<id>, file:<folder or .brick>, git+<url>[#ref]." }
+      "additionalProperties": { "type": "string", "description": "A version range, builtin:<id> or portable git+<url>[#ref]. Local paths are allowed only during development and are rejected when packing." }
     },
+    "links": false,
     "devDependencies": { "type": "object", "additionalProperties": { "type": "string" } },
     "nuget": { "type": "object", "additionalProperties": { "type": "string" }, "description": "NuGet package id -> exact version, for the prebuilt assemblies." },
     "platformNuget": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }, "description": "Platform id -> NuGet package id -> exact version, added to nuget for builds of that platform." },
@@ -52,6 +65,30 @@
         "required": ["displayName", "path"],
         "properties": { "displayName": { "type": "string" }, "path": { "type": "string" }, "description": { "type": "string" } }
       }
+    },
+    "exclude": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Globs the .brick file leaves out, relative to the brick folder and '/'-separated: * and ? within a name, ** across folders. A glob without '/' matches a name at any depth; a matching folder drops everything in it. E.g. [\"Tests~\", \".github\", \"**/*.pdb\"]."
+    },
+    "bakeOf": {
+      "type": "object",
+      "description": "Set in a bake twin (id <source>.bake), written by 'brick pack --twin': the source .brick it is the consumable form of. The twin stands in for its source, so dependents of the source accept it.",
+      "required": ["brick", "version", "integrity"],
+      "properties": {
+        "brick": { "type": "string", "description": "The source brick's id." },
+        "version": { "type": "string", "description": "The source brick's version." },
+        "integrity": { "type": "string", "description": "The source .brick file's sha256- integrity." }
+      }
+    },
+    "bake": {
+      "enum": ["auto", "none"],
+      "description": "auto (default): consumers may take a published bake twin of this brick. none: the brick is its own consumable form and twins of it are refused."
+    },
+    "trustedBakers": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^SHA256:" },
+      "description": "Fingerprints of keys, besides this brick's publisher, whose bake twins of it consumers accept."
     }
   }
 }

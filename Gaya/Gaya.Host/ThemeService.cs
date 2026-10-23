@@ -116,14 +116,6 @@ public sealed partial class ThemeService : IThemeService
     }
 
     /// <inheritdoc />
-    [Obsolete("Register a .pss ThemeSource instead; StudioTheme is removed in the next release.")]
-    public void Register(StudioTheme theme)
-    {
-        ArgumentNullException.ThrowIfNull(theme);
-        Register(new ThemeSource(LegacyThemeSheet.From(theme), theme.Name));
-    }
-
-    /// <inheritdoc />
     public void Token(string name, string defaultValue)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
