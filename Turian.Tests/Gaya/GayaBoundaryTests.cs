@@ -9,7 +9,7 @@ namespace Turian.Tests;
 public class GayaBoundaryTests
 {
     static readonly string[] GayaAssemblies =
-        ["Gaya.Attributes", "Gaya.Sdk", "Gaya.Packages", "Gaya.Packages.Editor", "Gaya.Host"];
+        ["Gaya.Attributes", "Gaya.Sdk", "MASS4.Bricks", "Gaya.Packages.Editor", "Gaya.Host"];
 
     /// <summary>Generic libraries shared by Gaya and Turian: MASS4.Attributes and the Guinevere generic forms.</summary>
     static readonly string[] SharedLibraries = ["Attributes", "Autoformers"];
@@ -29,15 +29,15 @@ public class GayaBoundaryTests
 
     /// <summary>The package format stays usable on its own: it needs only the shared attributes, never the workbench.</summary>
     [Fact]
-    public void GayaPackages_DependsOnlyOnAttributes()
+    public void Bricks_DependsOnlyOnAttributes()
     {
-        var offenders = AssemblyClosure.Offenders(Assembly.Load("Gaya.Packages"), static reference =>
+        var offenders = AssemblyClosure.Offenders(Assembly.Load("MASS4.Bricks"), static reference =>
             reference is "Gaya.Sdk" or "Gaya.Host" or "SkiaSharp"
             || reference.StartsWith("Guinevere", StringComparison.Ordinal)
             || IsTurian(reference));
 
         Assert.True(offenders.Length == 0,
-            $"Gaya.Packages must stay free of the workbench and UI: {string.Join("; ", offenders)}.");
+            $"MASS4.Bricks must stay free of the workbench and UI: {string.Join("; ", offenders)}.");
     }
 
     /// <summary>The generic libraries Gaya and Turian build on reference neither of them.</summary>

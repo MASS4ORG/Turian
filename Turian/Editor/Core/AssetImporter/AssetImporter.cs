@@ -270,13 +270,13 @@ public sealed partial class AssetImporter : IDisposable
             var packages = ProjectPackages.ResolveOrEmpty(projectRoot);
             packageRoots = [.. packages.Select(static p => (Path.GetFullPath(p.RootPath), p.IsReadOnly))];
             bakeFolders = packages.ToDictionary(static p => Path.GetFullPath(p.RootPath),
-                static p => Gaya.Packages.BrickLayout.PathsOf(Path.GetFullPath(p.RootPath), p.Manifest, Gaya.Packages.BrickLayout.Bake));
+                static p => MASS4.Bricks.BrickLayout.PathsOf(Path.GetFullPath(p.RootPath), p.Manifest, MASS4.Bricks.BrickLayout.Bake));
 
             // A brick's importers live in its prebuilt editor assembly, which may have loaded since the list was built.
             BrickAssemblies.Load(packages, logger, projectRoot);
             RefreshImporters();
         }
-        catch (Gaya.Packages.PackageException)
+        catch (MASS4.Bricks.PackageException)
         {
             // ProjectPackages has logged what is missing and what to do.
             logger.LogWarning("The bricks' assets are left out until the project's bricks resolve");

@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>3.3.1</Version>
+        <Version>3.3.0</Version>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian</RootNamespace>
-        <PackageId>MASS4.Turian.Engine.Attributes</PackageId>
+        <PackageId>MASS4.Turian.Attributes</PackageId>
+        <Description>Gameplay and editor metadata for Turian components and assets, with no engine dependency.</Description>
         <!-- Release packaging includes the shared MASS4.Attributes assembly from this output. -->
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>

@@ -11,7 +11,7 @@ public static class ProjectSettingsFiles
 
     /// <summary>The engine version a project records: without build metadata such as the commit.</summary>
     public static string EngineVersionStamp =>
-        new Gaya.Packages.SemanticVersion(ProjectPackages.EngineVersion.Major, ProjectPackages.EngineVersion.Minor,
+        new MASS4.Bricks.SemanticVersion(ProjectPackages.EngineVersion.Major, ProjectPackages.EngineVersion.Minor,
             ProjectPackages.EngineVersion.Patch, ProjectPackages.EngineVersion.Prerelease).ToString();
 
     /// <summary>
@@ -214,7 +214,7 @@ public static class ProjectSettingsFiles
         }
 
         var current = ProjectPackages.EngineVersion;
-        if (Gaya.Packages.SemanticVersion.TryParse(registry.EngineVersion, out var recorded) && recorded >= current)
+        if (MASS4.Bricks.SemanticVersion.TryParse(registry.EngineVersion, out var recorded) && recorded >= current)
         {
             return null;
         }

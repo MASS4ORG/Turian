@@ -4,6 +4,6 @@ namespace Turian.Editor.Core;
 public interface IBrickApplier
 {
     /// <summary>Loads new bricks' prebuilt assemblies, rescans assets and recompiles scripts.</summary>
-    /// <exception cref="Gaya.Packages.PackageException">The bricks cannot be resolved.</exception>
+    /// <exception cref="MASS4.Bricks.PackageException">The bricks cannot be resolved.</exception>
     void ApplyBrickChanges();
 }

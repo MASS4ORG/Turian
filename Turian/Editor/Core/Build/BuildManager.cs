@@ -142,7 +142,7 @@ public sealed class BuildManager : IDisposable
                 packageSourceWatchers.Add(watcher);
             }
         }
-        catch (Gaya.Packages.PackageException)
+        catch (MASS4.Bricks.PackageException)
         {
             // ProjectPackages has logged what is missing and what to do.
             logger.LogWarning("The bricks' scripts are not watched until the project's bricks resolve");
