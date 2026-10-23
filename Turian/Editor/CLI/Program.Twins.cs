@@ -63,11 +63,15 @@ public static partial class Program
     /// <summary>Prints which bricks resolved as twins and which as sources.</summary>
     static void PrintForms(PackageResolution resolution)
     {
-        foreach (var brick in resolution.Packages.Where(static p => p.Origin == PackageOrigin.Registry))
+        foreach (var brick in resolution.Packages.Where(static p => p.Origin is PackageOrigin.Registry or PackageOrigin.Embedded or PackageOrigin.Link))
         {
             Console.WriteLine(brick.Manifest.BakeOf is { } bakeOf
                 ? $"  {bakeOf.Brick} {bakeOf.Version}: twin {brick.Id}"
-                : $"  {brick.Id} {brick.Version}: source");
+                : brick.Origin == PackageOrigin.Link
+                    ? $"  {brick.Id} {brick.Version}: source, linked to {brick.RootPath}"
+                : brick.Origin == PackageOrigin.Embedded
+                    ? $"  {brick.Id} {brick.Version}: source, editable in {ProjectManifest.DirectoryName}/{brick.Id}"
+                    : $"  {brick.Id} {brick.Version}: source");
         }
     }
 }

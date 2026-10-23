@@ -98,12 +98,19 @@ public static class BrickBake
 
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
         var bake = BrickLayout.PathOf(packageRoot, manifest, BrickLayout.Bake);
+        if (BrickLayout.IsV2(manifest) && manifest.RolePaths(BrickLayout.Bake).Count == 0)
+        {
+            manifest.Roles[BrickLayout.Bake] = JsonSerializer.SerializeToElement(BrickLayout.RelativePathOf(manifest, BrickLayout.Bake));
+            manifest.Save(packageRoot);
+        }
+
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-bake-{Guid.NewGuid():N}");
         try
         {
             // Baking a copy keeps the import from touching the brick's own files.
             var copy = Path.Combine(scratch, "brick");
-            CopyDirectory(packageRoot, copy, skip: directory => directory == bake || Path.GetFileName(directory) is ".git" or "bin" or "obj");
+            var bakes = BrickLayout.PathsOf(packageRoot, manifest, BrickLayout.Bake);
+            CopyDirectory(packageRoot, copy, skip: directory => bakes.Contains(directory) || Path.GetFileName(directory) is ".git" or "bin" or "obj");
             var project = Path.Combine(scratch, "project");
             _ = await new ProjectBootstrapper().CreateAsync(project).ConfigureAwait(false)
                 ?? throw new PackageException("The scratch project for the bake could not be created.");

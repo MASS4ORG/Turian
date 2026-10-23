@@ -101,13 +101,8 @@ public static class PackagedPlugins
 
     static IEnumerable<Assembly> LoadAssemblies(ResolvedPackage package, ILogger logger)
     {
-        var library = Path.Combine(package.RootPath, LibraryDirectoryName);
-        if (!Directory.Exists(library))
-        {
-            yield break;
-        }
-
-        foreach (var path in Directory.EnumerateFiles(library, "*.dll").Order(StringComparer.Ordinal))
+        foreach (var path in StudioBricks.LibraryDirectories(package).Where(Directory.Exists)
+                     .SelectMany(static library => Directory.EnumerateFiles(library, "*.dll").Order(StringComparer.Ordinal)))
         {
             Assembly? assembly = null;
             try

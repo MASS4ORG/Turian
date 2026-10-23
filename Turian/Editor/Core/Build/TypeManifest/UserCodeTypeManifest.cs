@@ -64,8 +64,10 @@ public sealed class UserCodeTypeManifest
     }
 
     /// <summary>
-    /// Loads the manifest from disk and registers each entry into <see cref="TypeRegistry"/>.
-    /// Types not found in <paramref name="userAssemblies"/> are skipped with a warning.
+    /// Loads the manifest from disk and registers each entry into <see cref="TypeRegistry"/>. An entry is looked up in
+    /// <paramref name="userAssemblies"/>, then, when it names its assembly, in the loaded ones such as a precast brick's:
+    /// swapping user code resets the registry, which forgets the brick types registered when the bricks loaded.
+    /// Types found in neither are skipped with a warning.
     /// </summary>
     public static void RegisterFromManifest(string assemblyPath, IReadOnlyCollection<ReflectionAssembly> userAssemblies,
         ILogger logger)
@@ -97,10 +99,10 @@ public sealed class UserCodeTypeManifest
         }
 
         var registered = 0;
+        var loaded = AppDomain.CurrentDomain.GetAssemblies();
         foreach (var entry in manifest.Types)
         {
-            var type = userAssemblies.Select(assembly => assembly.GetType(entry.FullyQualifiedName))
-                .FirstOrDefault(static candidate => candidate is not null);
+            var type = FindEntryType(entry, userAssemblies, loaded);
             if (type is null)
             {
                 logger.LogWarning("User type '{Fqn}' not found in assembly; skipping registration", entry.FullyQualifiedName);
@@ -113,4 +115,14 @@ public sealed class UserCodeTypeManifest
 
         logger.LogInformation("Registered {Count}/{Total} user type(s) from manifest", registered, manifest.Types.Count);
     }
+
+    static Type? FindEntryType(UserCodeTypeEntry entry, IReadOnlyCollection<ReflectionAssembly> userAssemblies,
+        ReflectionAssembly[] loaded) =>
+        userAssemblies.Select(assembly => assembly.GetType(entry.FullyQualifiedName))
+            .FirstOrDefault(static candidate => candidate is not null)
+        ?? (entry.Assembly is null
+            ? null
+            : loaded.Where(assembly => !assembly.IsCollectible && assembly.GetName().Name == entry.Assembly)
+                .Select(assembly => assembly.GetType(entry.FullyQualifiedName))
+                .FirstOrDefault(static candidate => candidate is not null));
 }

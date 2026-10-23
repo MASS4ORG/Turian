@@ -462,10 +462,11 @@ public static partial class BrickService
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+        DeclarePrecastRole(packageRoot, manifest);
         var payload = BrickAssemblies.PrecastDirectory(packageRoot);
-        if (Directory.Exists(payload))
+        foreach (var directory in BrickAssemblies.PrecastDirectories(packageRoot).Where(Directory.Exists))
         {
-            Directory.Delete(payload, recursive: true);
+            Directory.Delete(directory, recursive: true);
         }
 
         var scratch = Path.Combine(Path.GetTempPath(), $"turian-precast-{Guid.NewGuid():N}");
@@ -492,31 +493,12 @@ public static partial class BrickService
             }
 
             var own = CsProjectGenerator.DiscoverAssemblies(buildSettings).Definitions
-                .Where(a => a.DefinitionPath is { } path && Path.GetFullPath(path).StartsWith(packageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                .Where(assembly => OwnsAssembly(assembly.DefinitionPath, packageRoot))
                 .ToList();
-            var result = new PackagePrecast { BuiltWith = { [ProjectPackages.HostName] = ProjectPackages.EngineVersion } };
-            foreach (var assembly in own)
-            {
-                var folder = Path.Combine(payload, assembly.EditorOnly ? "editor" : "lib");
-                Directory.CreateDirectory(folder);
-                File.Copy(Path.Combine(output, $"{assembly.Name}.dll"), Path.Combine(folder, $"{assembly.Name}.dll"));
-                (assembly.EditorOnly ? result.EditorAssemblies : result.Assemblies).Add(assembly.Name);
-            }
-
-            if (own.Count == 0)
-            {
-                throw new PackageException($"{manifest.Name} has no assembly definition to precast.");
-            }
-
+            var result = CopyPrecastAssemblies([.. own.Select(static assembly => (assembly.Name, assembly.EditorOnly))],
+                output, payload, manifest.Name);
             var names = own.Select(static a => a.Name).ToHashSet(StringComparer.Ordinal);
-            var types = new UserCodeTypeManifest();
-            if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(compiled))) is { } built)
-            {
-                types.Types.AddRange(built.Types.Where(t => t.Assembly is not null && names.Contains(t.Assembly)));
-            }
-
-            File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
-                JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+            WritePrecastTypes(compiled, payload, names);
             _ = SyncPrecastDependencies(packageRoot, logger);
             return result;
         }
@@ -527,6 +509,39 @@ public static partial class BrickService
                 Directory.Delete(scratch, recursive: true);
             }
         }
+    }
+
+    static void WritePrecastTypes(string compiled, string payload, IReadOnlySet<string> names)
+    {
+        var types = new UserCodeTypeManifest();
+        if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(compiled))) is { } built)
+        {
+            types.Types.AddRange(built.Types.Where(t => t.Assembly is not null && names.Contains(t.Assembly)));
+        }
+
+        File.WriteAllText(Path.Combine(payload, BrickAssemblies.TypesFile),
+            JsonSerializer.Serialize(types, new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }));
+    }
+
+    static bool OwnsAssembly(string? definitionPath, string packageRoot) => definitionPath is not null
+        && Path.GetFullPath(definitionPath).StartsWith(packageRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
+    static PackagePrecast CopyPrecastAssemblies(IReadOnlyList<(string Name, bool EditorOnly)> assemblies,
+        string output, string payload, string brick)
+    {
+        var result = new PackagePrecast { BuiltWith = { [ProjectPackages.HostName] = ProjectPackages.EngineVersion } };
+        foreach (var assembly in assemblies)
+        {
+            var folder = Path.Combine(payload, assembly.EditorOnly ? "editor" : "lib");
+            Directory.CreateDirectory(folder);
+            File.Copy(Path.Combine(output, $"{assembly.Name}.dll"), Path.Combine(folder, $"{assembly.Name}.dll"));
+            (assembly.EditorOnly ? result.EditorAssemblies : result.Assemblies).Add(assembly.Name);
+        }
+        if (assemblies.Count == 0)
+        {
+            throw new PackageException($"{brick} has no assembly definition to precast.");
+        }
+        return result;
     }
 
     /// <summary>
@@ -679,14 +694,24 @@ public static partial class BrickService
 
     // The files a previous sync copied, so stale ones are deleted when the map changes.
     static IReadOnlyList<string> ReadSyncedFiles(string packageRoot) =>
-        [.. BrickNuGetRestore.SyncedPackages(packageRoot).Values.SelectMany(static p => p.Files)
+        [.. BrickNuGetRestore.ReadSyncedPackages(BrickAssemblies.PrecastDirectory(packageRoot)).Values.SelectMany(static p => p.Files)
             .Distinct(StringComparer.Ordinal)];
+
+    static void DeclarePrecastRole(string packageRoot, PackageManifest manifest)
+    {
+        if (BrickLayout.IsV2(manifest) && manifest.RolePaths(BrickLayout.Precast).Count == 0)
+        {
+            manifest.Roles[BrickLayout.Precast] = JsonSerializer.SerializeToElement(BrickLayout.RelativePathOf(manifest, BrickLayout.Precast));
+            manifest.Save(packageRoot);
+        }
+    }
 
     // Every mapped package is recorded, including one that carries no managed assembly, so a later load can tell
     // which maps the committed copies already cover.
     static void WriteSyncedRecord(string packageRoot, IReadOnlyDictionary<string, string> unified,
         IReadOnlyList<BrickRuntimeFile> copied)
     {
+        DeclarePrecastRole(packageRoot, PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]));
         var packages = new JsonObject();
         foreach (var package in unified.OrderBy(static p => p.Key, StringComparer.OrdinalIgnoreCase))
         {

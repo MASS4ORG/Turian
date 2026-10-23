@@ -22,7 +22,10 @@ public static class BrickVerifier
         try
         {
             // A brick only the studio installs is never imported into a project, so its files carry no asset ids.
-            if (!PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]).EffectiveScopes.Contains(PackageScope.Project))
+            var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+            CheckPortable(packageRoot, manifest, issues);
+
+            if (!manifest.EffectiveScopes.Contains(PackageScope.Project))
             {
                 return issues;
             }
@@ -57,6 +60,18 @@ public static class BrickVerifier
         }
 
         return issues;
+    }
+
+    static void CheckPortable(string packageRoot, PackageManifest manifest, List<string> issues)
+    {
+        try
+        {
+            BrickArchive.ValidatePortable(packageRoot, manifest);
+        }
+        catch (PackageException ex)
+        {
+            issues.Add(ex.Message);
+        }
     }
 
     /// <summary>

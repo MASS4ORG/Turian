@@ -259,6 +259,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
             work = arguments.Single(static argument => argument.EndsWith(":/test", StringComparison.Ordinal))[..^6];
             var command = arguments[(Array.IndexOf(arguments, image) + 1)..];
             calls.Add(command);
+            Assert.True(Directory.Exists(Path.Combine(work, "home")));
             if (command is ["brick", "add", ..])
             {
                 Directory.CreateDirectory(Path.Combine(work, "store"));

@@ -19,6 +19,8 @@ static partial class ConsumerSmoke
         var directory = Directory.CreateTempSubdirectory("brick-consumer-");
         try
         {
+            // The image's dotnet refuses a HOME that does not exist, and compiling restores NuGet packages under it.
+            Directory.CreateDirectory(Path.Combine(directory.FullName, "home"));
             var user = (await ToolProcess.RunAsync("id", ["-u"], cancellationToken)).Trim();
             var group = (await ToolProcess.RunAsync("id", ["-g"], cancellationToken)).Trim();
             var cli = new[] { "run", "--rm", "--user", $"{user}:{group}", "-e", "HOME=/test/home",

@@ -75,6 +75,8 @@ public sealed class ProjectBootstrapper
             {
                 Dependencies = ProjectPackages.DefaultBuiltins.ToDictionary(static id => id, static string? (id) => $"builtin:{id}"),
             }.Save(projectDirectory);
+            await File.WriteAllTextAsync(Path.Combine(projectDirectory, Gaya.Packages.ProjectManifest.DirectoryName, ".gitignore"),
+                $"{Gaya.Packages.ProjectManifest.LinksFileName}\n{Gaya.Packages.ProjectManifest.UserFileName}\n");
 
             // Scripts get the engine, its attributes and the input key codes without per-file usings.
             var globalsPath = Path.Combine(assetsDir, "Globals.cs");

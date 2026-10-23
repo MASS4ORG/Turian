@@ -51,8 +51,8 @@ public sealed class BrickRegistryServiceTests : IDisposable
         var registry = ProjectPackages.PublicRegistry;
 
         Assert.Equal("bricks.mass4.org", registry.Name);
-        Assert.Equal("https://store.mass4.org/v1", registry.Url);
-        Assert.Equal(["https://bricks.mass4.org/v1"], registry.Mirrors);
+        Assert.Equal("https://bricks.mass4.org/v1", registry.Url);
+        Assert.Equal(["https://store.mass4.org/v1"], registry.Mirrors);
         Assert.Empty(registry.Scopes);
         Assert.StartsWith("SHA256:", SshSignature.Fingerprint(Assert.Single(registry.Keys)), StringComparison.Ordinal);
         Assert.True(registry.Serves("org.mass4.turian.ui"));

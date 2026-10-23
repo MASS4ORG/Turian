@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Gaya.Tests;
 
 /// <summary>Comparing an embedded fork with its original and merging a new release into it.</summary>
@@ -42,6 +44,27 @@ public sealed class BrickForkTests : IDisposable
         Assert.Equal(
             [("Runtime/New.txt", ForkChange.Added), ("Runtime/Stats.txt", ForkChange.Modified), ("Runtime/Unused.txt", ForkChange.Removed)],
             differences.Select(static d => (d.Path, d.Change)));
+    }
+
+    /// <summary>Every generated role folder is excluded from fork diffs while opaque source data remains editable.</summary>
+    [Fact]
+    public void ForkDiffIgnoresAllGeneratedRoleFragments()
+    {
+        foreach (var folder in new[] { original, fork })
+        {
+            var manifest = PackageManifest.Load(folder);
+            manifest.UsesId = true;
+            manifest.Roles[BrickLayout.Precast] = JsonSerializer.SerializeToElement(new[] { "Brick~/BinA", "Brick~/BinB" });
+            manifest.Roles[BrickLayout.Bake] = JsonSerializer.SerializeToElement(new[] { "Brick~/CacheA", "Brick~/CacheB" });
+            manifest.Save(folder);
+            foreach (var part in new[] { "BinA", "BinB", "CacheA", "CacheB", "Source" })
+            {
+                Write(folder, $"Brick~/{part}/data", folder);
+            }
+        }
+
+        var difference = Assert.Single(BrickFork.Diff(original, fork));
+        Assert.Equal("Brick~/Source/data", difference.Path);
     }
 
     /// <summary>Files the fork left alone follow the new release: updated, added and removed.</summary>

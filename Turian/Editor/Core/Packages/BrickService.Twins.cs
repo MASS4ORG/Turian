@@ -45,30 +45,38 @@ public static partial class BrickService
             throw new PackageException($"{packageRoot} sets bake to '{PackageManifest.BakeNone}': it is its own consumable form and has no twin.");
         }
 
-        var payload = BrickLayout.RelativePathOf(manifest, BrickLayout.Precast);
-        var bake = BrickLayout.RelativePathOf(manifest, BrickLayout.Bake);
-        var compiled = Directory.Exists(Path.Combine(packageRoot, payload))
-                       && Directory.EnumerateFiles(Path.Combine(packageRoot, payload), "*.dll", SearchOption.AllDirectories).Any();
-        if (!compiled && HasCode(packageRoot, manifest))
-        {
-            throw new PackageException($"{packageRoot} has code but no {payload} assemblies to bake; build them, or pack with --precast.");
-        }
+        var payloads = BrickLayout.PathsOf(packageRoot, manifest, BrickLayout.Precast);
+        var bakes = BrickLayout.PathsOf(packageRoot, manifest, BrickLayout.Bake);
+        CheckTwinPayload(packageRoot, manifest, payloads, bakes);
 
-        if (!compiled && !Directory.Exists(Path.Combine(packageRoot, bake)))
-        {
-            throw new PackageException($"{packageRoot} has neither code nor baked assets for a twin; run brick bake first.");
-        }
-
-        var source = BrickArchive.Pack(packageRoot, outputDirectory, prefixes, exclude: [payload, bake]);
+        var source = BrickArchive.Pack(packageRoot, outputDirectory, prefixes,
+            exclude: [.. payloads.Concat(bakes).Select(path => Path.GetRelativePath(packageRoot, path).Replace('\\', '/'))]);
         string[] sources = [.. SourcePaths(manifest), "*.cs", "*.cs.meta"];
         var twin = BrickArchive.Pack(packageRoot, outputDirectory, prefixes, precast, sources,
             new PackageBakeOf { Brick = source.Manifest.Name, Version = source.Manifest.Version, Integrity = source.Integrity });
         return (source, twin);
     }
 
+    static void CheckTwinPayload(string packageRoot, PackageManifest manifest, IReadOnlyList<string> payloads,
+        IReadOnlyList<string> bakes)
+    {
+        var compiled = payloads.Where(Directory.Exists)
+            .Any(static path => Directory.EnumerateFiles(path, "*.dll", SearchOption.AllDirectories).Any());
+        if (!compiled && HasCode(packageRoot, manifest))
+        {
+            throw new PackageException($"{packageRoot} has code but no precast assemblies to bake; build them, or pack with --precast.");
+        }
+
+        if (!compiled && !bakes.Any(Directory.Exists))
+        {
+            throw new PackageException($"{packageRoot} has neither code nor baked assets for a twin; run brick bake first.");
+        }
+
+    }
+
     /// <summary>The folders holding C# projects the engine solution builds: the <c>source</c> role, or v1 <c>Source~</c>.</summary>
     static IReadOnlyList<string> SourcePaths(PackageManifest manifest) =>
-        manifest.RolePaths(BrickLayout.Source) is { Count: > 0 } paths ? paths : [BrickLayout.RelativePathOf(manifest, BrickLayout.Source)];
+        BrickLayout.IsV2(manifest) ? manifest.RolePaths(BrickLayout.Source) : [BrickLayout.RelativePathOf(manifest, BrickLayout.Source)];
 
     /// <summary>Whether a brick folder holds C#: projects in its source folders, or scripts the project would compile.</summary>
     static bool HasCode(string packageRoot, PackageManifest manifest) =>

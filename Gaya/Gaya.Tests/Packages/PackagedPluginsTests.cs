@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Gaya.Tests;
 
 /// <summary>Plugins installed into the application through studio-scope packages.</summary>
@@ -31,6 +33,30 @@ public sealed class PackagedPluginsTests : IDisposable
         Assert.Equal(assemblyName, loaded.GetName().Name);
         Assert.Contains(loaded.GetTypes(), static type => type.GetCustomAttribute<PluginAttribute>() is not null);
         Assert.True(File.Exists(Path.Combine(studio, "Bricks", LockFile.FileName)));
+    }
+
+    /// <summary>Independent plugin assemblies in both declared precast folders load in role order.</summary>
+    [Fact]
+    public void V2StudioPluginsAggregateRoleFolders()
+    {
+        var firstName = $"Acme.First{Guid.NewGuid():N}";
+        var secondName = $"Acme.Second{Guid.NewGuid():N}";
+        Package("theme", "com.acme.theme", [PackageScope.Studio], firstName);
+        Package("other", "com.acme.other", [PackageScope.Studio], secondName);
+        var folder = Path.Combine(root, "theme");
+        Directory.CreateDirectory(Path.Combine(folder, "Brick~"));
+        Directory.Move(Path.Combine(folder, "Precast~"), Path.Combine(folder, "Brick~", "First"));
+        Directory.Move(Path.Combine(root, "other", "Precast~"), Path.Combine(folder, "Brick~", "Second"));
+        var manifest = PackageManifest.Load(folder);
+        manifest.UsesId = true;
+        manifest.Roles[BrickLayout.Precast] = JsonSerializer.SerializeToElement(new[] { "Brick~/First", "Brick~/Second" });
+        manifest.Save(folder);
+        Manifest(("com.acme.theme", "file:../../theme"));
+
+        var result = PackagedPlugins.Load(Hosts, NullLogger.Instance, studio);
+        Assert.Equal([firstName, secondName], result.Assemblies.Select(static assembly => assembly.GetName().Name));
+        Assert.All(result.Assemblies, static assembly =>
+            Assert.Contains(assembly.GetTypes(), static type => type.GetCustomAttribute<PluginAttribute>() is not null));
     }
 
     /// <summary>A package made for projects only is not loaded into the application.</summary>

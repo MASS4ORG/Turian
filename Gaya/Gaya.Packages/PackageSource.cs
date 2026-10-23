@@ -62,6 +62,20 @@ public abstract record PackageSource
         builtinDirectory is not null && File.Exists(Path.Combine(builtinDirectory, id, PackageManifest.FileName))
             ? $"builtin:{id}"
             : "*";
+
+    /// <summary>Whether a dependency needs a local path and therefore cannot ship inside a packed brick.</summary>
+    /// <param name="spec">The declared dependency source.</param>
+    /// <returns>True for file sources, links and local Git repositories.</returns>
+    public static bool IsPathDependency(string spec) =>
+        spec.StartsWith("file:", StringComparison.Ordinal) || spec.StartsWith("link:", StringComparison.Ordinal)
+        || IsLocalPath(spec)
+        || spec.StartsWith("git+", StringComparison.Ordinal)
+        && Parse(spec, Environment.CurrentDirectory) is GitSource git
+        && IsLocalPath(git.Url);
+
+    static bool IsLocalPath(string path) => Path.IsPathRooted(path)
+        || path.StartsWith("./", StringComparison.Ordinal) || path.StartsWith("../", StringComparison.Ordinal)
+        || Uri.TryCreate(path, UriKind.Absolute, out var uri) && uri.IsFile;
 }
 
 /// <summary>A package shipped with the host, read in place from its built-in folder.</summary>
@@ -79,6 +93,10 @@ public sealed record FileSource(string Path) : PackageSource
     /// <inheritdoc/>
     public override string ToString() => $"file:{Path}";
 }
+
+/// <summary>A project-selected local folder replacing a brick's declared resolution.</summary>
+/// <param name="Path">The absolute local folder.</param>
+sealed record LinkSource(string Path) : PackageSource;
 
 /// <summary>A packed <c>.brick</c> file, extracted into the store and pinned by its content hash.</summary>
 /// <param name="Path">The absolute path of the <c>.brick</c> file.</param>

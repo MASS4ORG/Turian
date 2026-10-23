@@ -53,7 +53,7 @@ public static class StudioThemeBricks
 
     static HashSet<string> Libraries(IEnumerable<ResolvedPackage> packages) =>
     [
-        .. packages.Where(static package => Directory.Exists(Path.Combine(package.RootPath, PackagedPlugins.LibraryDirectoryName)))
+        .. packages.Where(static package => StudioBricks.LibraryDirectories(package).Any(Directory.Exists))
             .Select(static package => package.Id),
     ];
 }

@@ -20,6 +20,9 @@ public enum PackageOrigin
 
     /// <summary>Downloaded from a registry, checked against its signature, and extracted into the store.</summary>
     Registry,
+
+    /// <summary>A project link to a trusted local folder, used in place.</summary>
+    Link,
 }
 
 /// <summary>One package of a resolved project.</summary>
@@ -140,6 +143,11 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
             throw new PackageException($"{projectRoot} has no {LockFile.FileName} to install from.");
         }
 
+        if (options.Locked)
+        {
+            CheckLockedLinks(projectRoot, existingLock!);
+        }
+
         var session = new Session(this, overridden, existingLock, [.. manifest.ScopedRegistries, .. options.Registries],
             manifest, cancellationToken);
         Seed(session, Path.Combine(projectRoot, ProjectManifest.DirectoryName), manifest, overridden);
@@ -166,17 +174,53 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
     /// <summary>Queues what the project asks for itself: its embedded packages, its declarations, then the host's defaults.</summary>
     void Seed(Session session, string packagesDirectory, ProjectManifest manifest, IReadOnlySet<string> overridden)
     {
-        foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
-        {
-            session.Enqueue(embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1);
-        }
-
-        foreach (var (id, spec) in manifest.Dependencies.Where(static d => d.Value is not null)
+        SeedLinks(session, packagesDirectory, manifest);
+        SeedEmbedded(session, packagesDirectory, manifest);
+        foreach (var (id, spec) in manifest.Dependencies.Where(d => d.Value is not null && !manifest.Links.ContainsKey(d.Key))
                      .OrderBy(static d => d.Key, StringComparer.Ordinal))
         {
             session.Enqueue(id, PackageSource.Parse(spec!, packagesDirectory), spec!, "the project", 1);
         }
 
+        SeedDefaults(session, packagesDirectory, manifest, overridden);
+    }
+
+    static void CheckLockedLinks(string projectRoot, LockFile existingLock)
+    {
+        foreach (var (id, entry) in existingLock.Dependencies.Where(static pair => pair.Value.Link is not null))
+        {
+            var path = Path.GetFullPath(entry.Link!, Path.Combine(projectRoot, ProjectManifest.DirectoryName));
+            if (!Directory.Exists(path))
+            {
+                throw new PackageException($"{id}: locked linked folder {path} does not exist; restore the folder or update the project link and lock.");
+            }
+        }
+    }
+
+    static void SeedLinks(Session session, string packagesDirectory, ProjectManifest manifest)
+    {
+        foreach (var (id, path) in manifest.Links.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            session.Enqueue(id, new LinkSource(Path.GetFullPath(path, packagesDirectory)), $"link:{path}", "the project", 1);
+        }
+    }
+
+    void SeedEmbedded(Session session, string packagesDirectory, ProjectManifest manifest)
+    {
+        foreach (var embedded in EmbeddedPackages(packagesDirectory, options.ReservedCategoryPrefixes))
+        {
+            if (manifest.Links.ContainsKey(embedded.Id))
+            {
+                continue;
+            }
+
+            session.Enqueue(embedded.Id, new FileSource(embedded.Path), "embedded", "the project", 1);
+        }
+
+    }
+
+    void SeedDefaults(Session session, string packagesDirectory, ProjectManifest manifest, IReadOnlySet<string> overridden)
+    {
         foreach (var (id, spec) in options.DefaultDependencies
                      .Where(d => !manifest.Dependencies.ContainsKey(d.Key) && !overridden.Contains(d.Key))
                      .OrderBy(static d => d.Key, StringComparer.Ordinal))
@@ -336,7 +380,8 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         {
             lockFile.Dependencies[package.Id] = new LockEntry
             {
-                Version = package.Version,
+                Version = package.Origin == PackageOrigin.Link ? null : package.Version,
+                Link = package.Origin == PackageOrigin.Link ? package.Source["link:".Length..] : null,
                 Source = package.Source,
                 Commit = package.Commit,
                 Integrity = package.Integrity,

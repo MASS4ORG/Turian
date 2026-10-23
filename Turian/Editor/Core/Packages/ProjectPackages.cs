@@ -90,8 +90,7 @@ public static class ProjectPackages
 
         if (resolution.UsesUserOverride)
         {
-            Log.Logger.LogInformation("Packages resolved with {File}; the lock file is left unchanged",
-                ProjectManifest.UserFileName);
+            Log.Logger.LogInformation("Packages resolved with personal overrides; the lock file is left unchanged");
         }
         else if (!locked && Directory.Exists(Path.Combine(projectRoot, ProjectManifest.DirectoryName)))
         {
@@ -166,8 +165,8 @@ public static class ProjectPackages
     public static ScopedRegistry PublicRegistry { get; } = new()
     {
         Name = "bricks.mass4.org",
-        Url = "https://store.mass4.org/v1",
-        Mirrors = ["https://bricks.mass4.org/v1"],
+        Url = "https://bricks.mass4.org/v1",
+        Mirrors = ["https://store.mass4.org/v1"],
         Keys = [ReadEmbeddedKey()],
     };
 
@@ -206,14 +205,20 @@ public static class ProjectPackages
     static string Stamp(string projectRoot, bool locked)
     {
         var directory = Path.Combine(projectRoot, ProjectManifest.DirectoryName);
-        var files = new[] { ProjectManifest.FileName, ProjectManifest.UserFileName, LockFile.FileName }
+        var files = new[] { ProjectManifest.FileName, ProjectManifest.UserFileName, ProjectManifest.LinksFileName, LockFile.FileName }
             .Select(name => Path.Combine(directory, name))
             .Select(static path => File.Exists(path) ? File.GetLastWriteTimeUtc(path).Ticks : 0);
         IEnumerable<string> embedded = Directory.Exists(directory)
             ? Directory.EnumerateDirectories(directory).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal)
             : [];
 
-        return $"{locked}|{string.Join('|', files)}|{string.Join('|', embedded)}";
+        var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: !locked);
+        var links = manifest.Links.OrderBy(static pair => pair.Key, StringComparer.Ordinal).Select(pair =>
+        {
+            var path = Path.Combine(Path.GetFullPath(pair.Value, directory), PackageManifest.FileName);
+            return $"{pair.Key}:{(File.Exists(path) ? File.GetLastWriteTimeUtc(path).Ticks : 0)}";
+        });
+        return $"{locked}|{string.Join('|', files)}|{string.Join('|', embedded)}|{string.Join('|', links)}";
     }
 
     static SemanticVersion ReadVersion(Assembly assembly)

@@ -16,6 +16,9 @@ public sealed partial class PackageResolver
         var located = source switch
         {
             FileSource file => FromFolder(id, file, spec),
+            LinkSource link => Directory.Exists(link.Path)
+                ? new Located(link.Path, PackageOrigin.Link)
+                : throw new PackageException($"{id}: linked folder {link.Path} does not exist; restore the folder or remove the project link."),
             ArchiveSource archive => FromArchive(id, archive, existingLock),
             BuiltinSource builtin => FromBuiltin(id, builtin, spec),
             GitSource git => await FromGitAsync(id, git, spec, existingLock, cancellationToken).ConfigureAwait(false),

@@ -25,6 +25,11 @@ public sealed record BrickContract(IReadOnlyList<ContractAsset> Assets, IReadOnl
     public static BrickContract Read(string packageRoot)
     {
         packageRoot = Path.GetFullPath(packageRoot);
+        return new BrickContract(ReadAssets(packageRoot), ReadTypes(packageRoot));
+    }
+
+    static List<ContractAsset> ReadAssets(string packageRoot)
+    {
         var assets = new List<ContractAsset>();
         foreach (var meta in Directory.EnumerateFiles(packageRoot, "*.meta", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
         {
@@ -47,15 +52,23 @@ public sealed record BrickContract(IReadOnlyList<ContractAsset> Assets, IReadOnl
             }
         }
 
+        return assets;
+    }
+
+    static List<ContractType> ReadTypes(string packageRoot)
+    {
         var types = UserCodeTypeManifestGenerator.ScriptTypes(packageRoot, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance)
             .Select(static t => new ContractType(t.TypeId, t.FullyQualifiedName)).ToList();
-        if (File.Exists(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickAssemblies.TypesFile))
-            && JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(Path.Combine(BrickAssemblies.PrecastDirectory(packageRoot), BrickAssemblies.TypesFile))) is { } precast)
+        foreach (var path in BrickAssemblies.PrecastDirectories(packageRoot)
+                     .Select(static payload => Path.Combine(payload, BrickAssemblies.TypesFile)).Where(File.Exists))
         {
-            types.AddRange(precast.Types.Where(t => types.All(known => known.Id != t.TypeId)).Select(static t => new ContractType(t.TypeId, t.FullyQualifiedName)));
+            if (JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(path)) is { } precast)
+            {
+                types.AddRange(precast.Types.Where(t => types.All(known => known.Id != t.TypeId)).Select(static t => new ContractType(t.TypeId, t.FullyQualifiedName)));
+            }
         }
 
-        return new BrickContract(assets, types);
+        return types;
     }
 
     /// <summary>What <paramref name="reference"/> exposes that this contract does not.</summary>

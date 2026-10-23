@@ -127,11 +127,94 @@ public sealed class BrickBakeTests : IDisposable
         Assert.Equal(AssetImporter.ImportSettingsOf(here), AssetImporter.ImportSettingsOf(there));
     }
 
+    /// <summary>Disjoint baked assets in separate role folders both mount without reimporting.</summary>
+    [Fact]
+    public async Task EveryBakeRoleFolderContributesItsAssets()
+    {
+        var otherId = Guid.NewGuid();
+        File.WriteAllText(Path.Combine(brick, "Runtime", "other.txt"), "A separate baked payload.");
+        File.WriteAllText(Path.Combine(brick, "Runtime", "other.txt.meta"), Serializer.Serialize(new Asset { Id = otherId }));
+        var (exitCode, output) = await PrecastBrickFixture.RunCli(root, "brick", "bake", brick);
+        Assert.True(exitCode == 0, output);
+
+        var first = Path.Combine(brick, "Brick~", "First");
+        var second = Path.Combine(brick, "Brick~", "Second");
+        Directory.CreateDirectory(Path.GetDirectoryName(first)!);
+        Directory.Move(Path.Combine(brick, BrickBake.Folder), first);
+        Directory.CreateDirectory(Path.Combine(second, BrickBake.ImportedFolder));
+        Directory.Move(Path.Combine(first, BrickBake.ImportedFolder, otherId.ToString("N")),
+            Path.Combine(second, BrickBake.ImportedFolder, otherId.ToString("N")));
+        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var syncPath = Path.Combine(first, BrickBake.SyncFileName);
+        var sync = JsonSerializer.Deserialize<BakeSync>(File.ReadAllText(syncPath), options)!;
+        var other = sync.Entries.Single(entry => entry.Guid == otherId);
+        sync.Entries.Remove(other);
+        File.WriteAllText(syncPath, JsonSerializer.Serialize(sync, options));
+        sync.Entries = [other];
+        File.WriteAllText(Path.Combine(second, BrickBake.SyncFileName), JsonSerializer.Serialize(sync, options));
+        var manifest = PackageManifest.Load(brick);
+        manifest.UsesId = true;
+        manifest.Roles[BrickLayout.Bake] = JsonSerializer.SerializeToElement(new[] { "Brick~/First", "Brick~/Second" });
+        manifest.Save(brick);
+
+        var (_, twin) = BrickService.PackWithTwin(brick, Path.Combine(root, "out"));
+        var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "game")))!;
+        _ = BrickService.Add(project, twin.Manifest.Name, $"file:{twin.Path}");
+        (exitCode, output) = await PrecastBrickFixture.RunCli(root, "scene", project, "--reimport");
+        Assert.True(exitCode == 0, output);
+        Assert.Contains("Mounted 2 baked import(s)", output, StringComparison.Ordinal);
+        Assert.DoesNotContain($"Imported asset {NotesId}", output, StringComparison.Ordinal);
+        Assert.DoesNotContain($"Imported asset {otherId}", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>A missing development link remains an explicit import error rather than resolving from a registry.</summary>
+    [Fact]
+    public async Task ImportReportsMissingProjectLinks()
+    {
+        var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "missing-link")))!;
+        var (manifest, _) = ProjectManifest.Load(project);
+        manifest.Links["user.mateo.missing"] = "../../missing-checkout";
+        manifest.Save(project);
+        ProjectPackages.Invalidate(project);
+        var settings = SettingsService.Load(project)!;
+        var settingsService = new SettingsService();
+        settingsService.Set(settings);
+        var logger = Substitute.For<ILogger>();
+        using var importer = new AssetImporter(logger, new AssetDatabase(), settingsService);
+        importer.GenerateMetaFiles(settings.AssetsAbsoluteDir);
+        Assert.Contains(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && call.GetArguments()[0] is LogLevel.Error && call.GetArguments()[3] is PackageException error
+            && error.Message.Contains("linked folder", StringComparison.Ordinal));
+    }
+
+    /// <summary>A failed source compilation is reported and cannot leave a publishable archive behind.</summary>
+    [Fact]
+    public async Task BrokenSourcesCannotProduceAnArchive()
+    {
+        var folder = BrickService.New(root, "user.mateo.broken");
+        var (initialCode, initialOutput) = await PrecastBrickFixture.RunCli(root, "brick", "pack", folder,
+            "--precast", "--out", Path.Combine(root, "initial-output"));
+        Assert.True(initialCode == 0, initialOutput);
+        Assert.True(Directory.Exists(Path.Combine(folder, "Brick~", "Precast")));
+        File.WriteAllText(Path.Combine(folder, "Runtime", "BrokenComponent.cs"),
+            "namespace Mateo.Broken; public class BrokenComponent : MissingBaseType { }");
+        var outputDirectory = Path.Combine(root, "failed-output");
+        var (exitCode, output) = await PrecastBrickFixture.RunCli(root, "brick", "pack", folder,
+            "--precast", "--out", outputDirectory);
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("does not compile", output, StringComparison.Ordinal);
+        Assert.True(!Directory.Exists(outputDirectory) || !Directory.EnumerateFiles(outputDirectory, "*.brick").Any());
+        Assert.False(Directory.Exists(Path.Combine(folder, "Brick~", "Precast")));
+    }
+
     /// <summary>Consumer-built editor assemblies can use the editor import contract without an engine checkout.</summary>
     [Fact]
     public async Task EditorSourcesCompileAgainstTheEditorContract()
     {
         var folder = BrickService.New(root, "user.mateo.importer");
+        var manifest = PackageManifest.Load(folder, ["turian"]);
+        manifest.Roles.Remove(BrickLayout.Precast);
+        manifest.Save(folder);
         var definitionPath = Path.Combine(folder, "Runtime", "Mateo.Importer.dataasset");
         var definition = Serializer.Load<AssemblyDefinition>(definitionPath)!;
         definition.EditorOnly = true;

@@ -34,6 +34,53 @@ public sealed class BrickServiceTests : IDisposable
         Assert.Throws<PackageException>(() => BrickService.New(root, "Inventory"));
     }
 
+    /// <summary>Changing a personal link or removing a linked manifest invalidates the editor's cached resolution.</summary>
+    [Fact]
+    public void ProjectLinkChangesInvalidateTheCache()
+    {
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(Path.Combine(project, "Assets"));
+        var first = BrickService.New(Path.Combine(root, "first"), "user.mateo.rules");
+        var second = BrickService.New(Path.Combine(root, "second"), "user.mateo.rules");
+        new ProjectManifest
+        {
+            Dependencies = { [ProjectPackages.RenderBrick] = null },
+            Links = { ["user.mateo.rules"] = first },
+        }.Save(project);
+        Assert.Equal(first, Assert.Single(ProjectPackages.Resolve(project).Packages).RootPath);
+        var lockPath = Path.Combine(project, "Bricks", LockFile.FileName);
+        var lockBefore = File.ReadAllText(lockPath);
+        File.WriteAllText(Path.Combine(project, "Bricks", ProjectManifest.LinksFileName),
+            JsonSerializer.Serialize(new { links = new Dictionary<string, string> { ["user.mateo.rules"] = second } }));
+        Assert.Equal(second, Assert.Single(ProjectPackages.Resolve(project).Packages).RootPath);
+        Assert.Equal(lockBefore, File.ReadAllText(lockPath));
+        File.Delete(Path.Combine(second, PackageManifest.FileName));
+        Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project));
+    }
+
+    /// <summary>Both project and studio brick verification reject dependencies on a producer's local paths.</summary>
+    [Theory]
+    [InlineData(PackageScope.Project)]
+    [InlineData(PackageScope.Studio)]
+    public void VerificationRejectsLocalDependencies(PackageScope scope)
+    {
+        var folder = BrickService.New(root, "user.mateo.inventory");
+        var manifest = PackageManifest.Load(folder, ["turian"]);
+        manifest.Scopes = [scope];
+        manifest.Dependencies["user.mateo.rules"] = "file:../rules";
+        manifest.Save(folder);
+        Assert.Contains(BrickVerifier.Verify(folder), static issue => issue.Contains("local path", StringComparison.Ordinal));
+        Assert.Throws<PackageException>(() => BrickService.Pack(folder, Path.Combine(root, "out")));
+    }
+
+    /// <summary>An invalid manifest is reported by verification without scanning its assets.</summary>
+    [Fact]
+    public void VerificationReportsMalformedManifests()
+    {
+        File.WriteAllText(Path.Combine(root, PackageManifest.FileName), "{");
+        Assert.Single(BrickVerifier.Verify(root));
+    }
+
     /// <summary>A new studio-only content brick packs without asset metas, since the studio never imports its files.</summary>
     [Theory]
     [InlineData(ContentBrickKind.Look)]

@@ -39,6 +39,10 @@ on:
         description: Precast role path relative to the brick; use Precast~ for a v1 brick
         type: string
         default: Brick~/Precast
+      store-url:
+        description: Asset store the signed pair is uploaded to, empty for https://bricks.mass4.org; MASS4_BRICKS_STORE_TOKEN must belong to it
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -77,13 +81,23 @@ jobs:
         with:
           global-json-file: Turian/global.json
 
+      # From Turian, whose global.json selects the Microsoft.Testing.Platform runner that --project needs.
       - name: Build and test the sources
-        run: dotnet test --project "Bricks/brick/${{ inputs.brick-path }}/${{ inputs.source-tests }}" -p:SkipShaders=true
+        working-directory: Turian
+        run: dotnet test --project "../Bricks/brick/${{ inputs.brick-path }}/${{ inputs.source-tests }}" -p:SkipShaders=true
+
+      # upload-artifact rejects '.' segments, which the default brick-path leaves in a joined path.
+      - name: Locate the precast output
+        id: paths
+        shell: bash
+        env:
+          PRECAST: Bricks/brick/${{ inputs.brick-path }}/${{ inputs.precast-path }}
+        run: echo "precast=$(realpath -m --relative-to=. "$PRECAST")" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: precast
-          path: Bricks/brick/${{ inputs.brick-path }}/${{ inputs.precast-path }}/
+          path: ${{ steps.paths.outputs.precast }}/
           if-no-files-found: error
 
   qualify:
@@ -223,6 +237,8 @@ jobs:
 
   publish:
     needs: qualify
+    # A skipped build-source would otherwise skip this job too, as it skips every job after it.
+    if: ${{ !cancelled() && needs.qualify.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: brick-production
@@ -286,15 +302,20 @@ jobs:
       - name: Upload exact archives for store approval
         shell: bash
         env:
-          GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG: ${{ secrets.MASS4_BRICKS_STORE_TOKEN }}
+          STORE_TOKEN: ${{ secrets.MASS4_BRICKS_STORE_TOKEN }}
+          STORE_URL: ${{ inputs.store-url || 'https://bricks.mass4.org' }}
         run: |
-          : "${GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG:?Missing protected publish token}"
+          : "${STORE_TOKEN:?Missing protected publish token}"
+          # The CLI reads the token from GAYA_REGISTRY_TOKEN_<HOST>, the host upper-cased with other characters as _.
+          host="${STORE_URL#*://}"
+          host="${host%%[:/]*}"
+          variable="GAYA_REGISTRY_TOKEN_$(tr '[:lower:]' '[:upper:]' <<< "$host" | tr -c 'A-Z0-9\n' '_')"
+          export "$variable=$STORE_TOKEN"
           upload() {
             dotnet "$BRICK_RELEASE_TOOL" validate "qualified/$1" "qualified/$2"
-            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-              -e GAYA_REGISTRY_TOKEN_STORE_MASS4_ORG \
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e "$variable" \
               -v "$GITHUB_WORKSPACE/qualified:/release:ro" "$TURIAN_CLI_IMAGE" \
-              brick upload https://store.mass4.org "/release/$1" --release "/release/$3"
+              brick upload "$STORE_URL" "/release/$1" --release "/release/$3"
           }
           # The source first: a twin's bakeOf names the source release it stands in for.
           upload "$ARCHIVE_NAME" qualification.json release.json

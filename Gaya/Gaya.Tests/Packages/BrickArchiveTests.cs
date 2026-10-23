@@ -35,6 +35,47 @@ public sealed class BrickArchiveTests : IDisposable
         Assert.Contains(Path.GetFileName(first.Path), File.ReadAllText($"{first.Path}.sha256"), StringComparison.Ordinal);
     }
 
+    /// <summary>Published archives cannot refer to a producer's local filesystem.</summary>
+    [Theory]
+    [InlineData("file:../rules")]
+    [InlineData("file:/tmp/rules.brick")]
+    [InlineData("link:../rules")]
+    [InlineData("git+../rules#main")]
+    [InlineData("git+file:///tmp/rules")]
+    [InlineData("C:/work/rules")]
+    public void PackingRejectsPathDependencies(string spec)
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.0.0");
+        var manifest = PackageManifest.Load(brick);
+        manifest.Dependencies["com.acme.local"] = spec;
+        manifest.Save(brick);
+        var error = Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "packed")));
+        Assert.Contains("local path", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>A project-only links map is rejected even though it is not a brick manifest field.</summary>
+    [Fact]
+    public void PackingRejectsProjectLinks()
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.0.0");
+        var path = Path.Combine(brick, PackageManifest.FileName);
+        var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        json["links"] = new JsonObject { ["com.acme.local"] = "../local" };
+        File.WriteAllText(path, json.ToJsonString());
+        Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "packed")));
+    }
+
+    /// <summary>Development-only dependencies must also be portable in a distributed archive.</summary>
+    [Fact]
+    public void PackingRejectsLocalDevelopmentDependencies()
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.0.0");
+        var manifest = PackageManifest.Load(brick);
+        manifest.DevDependencies["com.acme.local"] = "file:../tests";
+        manifest.Save(brick);
+        Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "packed")));
+    }
+
     /// <summary>Build output, version control and earlier packs stay out of the file.</summary>
     [Fact]
     public void PackingSkipsBuildOutputAndVersionControl()

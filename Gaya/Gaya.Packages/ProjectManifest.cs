@@ -19,6 +19,13 @@ public class ProjectManifest
     /// <summary>The per-user override's file name.</summary>
     public const string UserFileName = "manifest.user.json";
 
+    /// <summary>The file holding personal local links, excluded from locked restores.</summary>
+    public const string LinksFileName = "links.json";
+
+    /// <summary>Local folders replacing brick resolutions, relative to this manifest's folder.</summary>
+    [Tooltip("Local brick folders, relative to Bricks/manifest.json; bypass registry verification.")]
+    public Dictionary<string, string> Links { get; set; } = [];
+
     /// <summary>
     /// The installed packages: id → <c>file:</c> path (relative to the <c>Packages</c> folder), <c>git+</c> url or
     /// version range.
@@ -73,37 +80,61 @@ public class ProjectManifest
 
         if (includeUserOverride && Read(Path.Combine(directory, UserFileName)) is { } user)
         {
-            // Per-key replace: an entry replaces that id's source; null removes the id.
-            foreach (var (id, spec) in user.Dependencies)
-            {
-                if (spec is null)
-                {
-                    manifest.Dependencies.Remove(id);
-                }
-                else
-                {
-                    manifest.Dependencies[id] = spec;
-                }
+            manifest.ApplyLinks(user.Links, overridden);
+            manifest.ApplyDependencies(user.Dependencies, overridden);
+            manifest.ApplyRegistries(user.ScopedRegistries);
+            manifest.ApplySources(user.Sources, overridden);
+        }
 
-                overridden.Add(id);
-            }
-
-            // A registry of the same name replaces the project's; others are added.
-            foreach (var registry in user.ScopedRegistries)
-            {
-                manifest.ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
-                manifest.ScopedRegistries.Add(registry);
-            }
-
-            // Bricks one developer takes as source, such as one being fixed, are theirs alone.
-            foreach (var id in user.Sources.Where(id => !manifest.Sources.Contains(id)))
-            {
-                manifest.Sources.Add(id);
-                overridden.Add(id);
-            }
+        if (includeUserOverride && Read(Path.Combine(directory, LinksFileName)) is { } personal)
+        {
+            manifest.ApplyLinks(personal.Links, overridden);
         }
 
         return (manifest, overridden);
+    }
+
+    void ApplyLinks(Dictionary<string, string> links, HashSet<string> overridden)
+    {
+        foreach (var (id, path) in links)
+        {
+            Links[id] = path;
+            overridden.Add(id);
+        }
+    }
+
+    void ApplyDependencies(Dictionary<string, string?> dependencies, HashSet<string> overridden)
+    {
+        foreach (var (id, spec) in dependencies)
+        {
+            if (spec is null)
+            {
+                Dependencies.Remove(id);
+            }
+            else
+            {
+                Dependencies[id] = spec;
+            }
+            overridden.Add(id);
+        }
+    }
+
+    void ApplyRegistries(List<ScopedRegistry> registries)
+    {
+        foreach (var registry in registries)
+        {
+            ScopedRegistries.RemoveAll(existing => existing.Name == registry.Name);
+            ScopedRegistries.Add(registry);
+        }
+    }
+
+    void ApplySources(List<string> sources, HashSet<string> overridden)
+    {
+        foreach (var id in sources.Where(id => !Sources.Contains(id)))
+        {
+            Sources.Add(id);
+            overridden.Add(id);
+        }
     }
 
     /// <summary>Writes the manifest into the project's <c>Packages</c> folder.</summary>
@@ -113,6 +144,10 @@ public class ProjectManifest
         var directory = Path.Combine(projectRoot, DirectoryName);
         Directory.CreateDirectory(directory);
         var node = JsonSerializer.SerializeToNode(this, PackageJson.Options)!.AsObject();
+        if (Links.Count == 0)
+        {
+            node.Remove("links");
+        }
         if (ScopedRegistries.Count == 0)
         {
             node.Remove("scopedRegistries");
@@ -148,11 +183,37 @@ public class ProjectManifest
             throw new PackageException($"{path} is not a valid project manifest: {ex.Message}", ex);
         }
 
-        foreach (var id in manifest?.Dependencies.Keys.Concat(manifest.Sources).Where(static id => !PackageId.IsValid(id)) ?? [])
+        if (manifest is not null)
         {
-            throw new PackageException($"{path}: '{id}' is not a valid package id.");
+            manifest.ValidateLinks(path);
+            manifest.ValidateIds(path);
         }
 
         return manifest;
+    }
+
+    void ValidateIds(string path)
+    {
+        foreach (var id in Dependencies.Keys.Concat(Sources).Concat(Links.Keys).Where(static id => !PackageId.IsValid(id)))
+        {
+            throw new PackageException($"{path}: '{id}' is not a valid package id.");
+        }
+    }
+
+    void ValidateLinks(string path)
+    {
+        if (Links is null)
+        {
+            throw new PackageException($"{path}: links must be an object mapping brick ids to local folders.");
+        }
+
+        foreach (var (id, link) in Links)
+        {
+            if (string.IsNullOrWhiteSpace(link))
+            {
+                throw new PackageException($"{path}: link '{id}' must name a local folder.");
+            }
+        }
+
     }
 }

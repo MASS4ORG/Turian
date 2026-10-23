@@ -74,6 +74,20 @@ public static class BrickLayout
     public static string PathOf(string packageRoot, PackageManifest manifest, string role) =>
         Path.Combine(packageRoot, RelativePathOf(manifest, role).Replace('/', Path.DirectorySeparatorChar));
 
+    /// <summary>All declared folders for a role, in declaration order; absent v2 roles have no payload.</summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <param name="manifest">The brick manifest.</param>
+    /// <param name="role">The role to read.</param>
+    /// <returns>Absolute role paths, or the legacy folder for a v1 manifest.</returns>
+    public static IReadOnlyList<string> PathsOf(string packageRoot, PackageManifest manifest, string role)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        var paths = manifest.RolePaths(role);
+        return IsV2(manifest)
+            ? [.. paths.Select(path => Path.Combine(packageRoot, path.Replace('/', Path.DirectorySeparatorChar)))]
+            : [PathOf(packageRoot, manifest, role)];
+    }
+
     /// <summary>Whether a role path lies inside <see cref="ReservedRoot"/>, as v2 requires.</summary>
     /// <param name="path">The path from the manifest.</param>
     /// <returns>True for a relative <c>Brick~/…</c> path without <c>..</c> or backslashes.</returns>

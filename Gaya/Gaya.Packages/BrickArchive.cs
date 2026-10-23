@@ -56,6 +56,7 @@ public static class BrickArchive
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, reservedCategoryPrefixes);
+        ValidatePortable(packageRoot, manifest);
         var rewritten = precast is not null || bakeOf is not null;
         if (precast is not null)
         {
@@ -96,6 +97,26 @@ public static class BrickArchive
         var integrity = ComputeIntegrity(path);
         File.WriteAllText($"{path}.sha256", $"{Convert.ToHexStringLower(Convert.FromBase64String(integrity["sha256-".Length..]))}  {Path.GetFileName(path)}\n");
         return new BrickPackResult(path, integrity, manifest);
+    }
+
+    /// <summary>Checks that a brick can be distributed without referring to its producer's filesystem.</summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <param name="manifest">Its loaded manifest.</param>
+    /// <exception cref="PackageException">A dependency uses a local path or the brick declares project links.</exception>
+    public static void ValidatePortable(string packageRoot, PackageManifest manifest)
+    {
+        foreach (var (id, spec) in manifest.Dependencies.Concat(manifest.DevDependencies)
+                     .Where(static pair => PackageSource.IsPathDependency(pair.Value)))
+        {
+            throw new PackageException($"{manifest.Name}: dependency {id} uses local path '{spec}'; packed bricks require portable dependencies. Put local links in the project manifest.");
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(packageRoot, PackageManifest.FileName)),
+            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        if (document.RootElement.TryGetProperty("links", out _))
+        {
+            throw new PackageException($"{manifest.Name}: links belong only in a project's manifest, never in a packed brick.");
+        }
     }
 
     /// <summary>The id of <paramref name="sourceId"/>'s bake twin.</summary>

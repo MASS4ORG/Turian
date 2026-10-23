@@ -17,6 +17,13 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     /// <summary>The folder, inside a brick, holding its compiled plugin assemblies.</summary>
     public const string LibraryDirectoryName = "Precast~/lib";
 
+    /// <summary>All library folders of a studio brick, in precast-role order.</summary>
+    /// <param name="brick">The resolved studio brick.</param>
+    /// <returns>The folders that can contain plugins.</returns>
+    public static IReadOnlyList<string> LibraryDirectories(ResolvedPackage brick) =>
+        [.. BrickLayout.PathsOf(brick.RootPath, brick.Manifest, BrickLayout.Precast)
+            .Select(static payload => Path.Combine(payload, "lib"))];
+
     readonly PackageStore packages = store ?? new PackageStore(PackageStore.DefaultRoot());
 
     /// <inheritdoc />
@@ -193,7 +200,7 @@ public sealed class StudioBricks(string root, IReadOnlyDictionary<string, Semant
     public bool IsPrecast(ResolvedPackage brick)
     {
         ArgumentNullException.ThrowIfNull(brick);
-        return Directory.Exists(Path.Combine(brick.RootPath, LibraryDirectoryName));
+        return LibraryDirectories(brick).Any(Directory.Exists);
     }
 
     /// <inheritdoc />

@@ -52,12 +52,12 @@ public sealed partial class AssetImporter
     ImportedAssetManifest? MountBake(Guid assetId, string sourceFilePath, string importDirectory, string sourceHash,
         string settingsHash, int importerVersion)
     {
-        if (PackageRootOf(sourceFilePath) is not { } package || !bakeFolders.TryGetValue(package.Root, out var bake)
-            || BrickBake.BakedImportOf(bake, assetId) is not { } baked)
+        if (FindBake(sourceFilePath, assetId) is not { } payload)
         {
             return null;
         }
 
+        var (bake, baked) = payload;
         var manifest = LoadManifest(Path.Combine(baked, importManifestFileName));
         if (!CanReuseImport(manifest, sourceHash, settingsHash, importerVersion, baked)
             || manifest!.AssetId != assetId || manifest.ImporterId != ResolveImporterId(sourceFilePath)
@@ -79,6 +79,17 @@ public sealed partial class AssetImporter
         Serializer.Save(Path.Combine(importDirectory, importManifestFileName), manifest);
         mountedBakes++;
         return manifest;
+    }
+
+    (string Bake, string Imported)? FindBake(string sourceFilePath, Guid assetId)
+    {
+        if (PackageRootOf(sourceFilePath) is not { } package || !bakeFolders.TryGetValue(package.Root, out var folders)
+            || folders.FirstOrDefault(path => BrickBake.BakedImportOf(path, assetId) is not null) is not { } bake
+            || BrickBake.BakedImportOf(bake, assetId) is not { } imported)
+        {
+            return null;
+        }
+        return (bake, imported);
     }
 
     static bool VerifyBake(string bake, Guid assetId, string sourceFilePath)

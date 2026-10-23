@@ -31,6 +31,20 @@ public static class BrickAssemblies
             ? BrickLayout.PathOf(brickRoot, PackageManifest.Load(brickRoot, ["gaya", ProjectPackages.HostName]), BrickLayout.Precast)
             : Path.Combine(brickRoot, PrecastFolder);
 
+    /// <summary>All prebuilt payload folders in the manifest's declared order.</summary>
+    /// <param name="brick">The resolved brick.</param>
+    /// <returns>The payload folders.</returns>
+    public static IReadOnlyList<string> PrecastDirectories(ResolvedPackage brick) =>
+        BrickLayout.PathsOf(brick.RootPath, brick.Manifest, BrickLayout.Precast);
+
+    /// <summary>All prebuilt payload folders of a brick, or the legacy folder when no manifest exists.</summary>
+    /// <param name="brickRoot">The brick folder.</param>
+    /// <returns>The payload folders.</returns>
+    public static IReadOnlyList<string> PrecastDirectories(string brickRoot) =>
+        File.Exists(Path.Combine(brickRoot, PackageManifest.FileName))
+            ? BrickLayout.PathsOf(brickRoot, PackageManifest.Load(brickRoot, ["gaya", ProjectPackages.HostName]), BrickLayout.Precast)
+            : [Path.Combine(brickRoot, PrecastFolder)];
+
     /// <summary>The file, inside <c>Precast~</c>, listing the types of the prebuilt assemblies with their type ids.</summary>
     public const string TypesFile = "types.json";
 
@@ -114,12 +128,26 @@ public static class BrickAssemblies
     /// <returns>The entries; none when the brick has no <see cref="TypesFile"/>.</returns>
     public static IReadOnlyList<UserCodeTypeEntry> PrecastTypes(ResolvedPackage brick)
     {
-        var path = Path.Combine(PrecastDirectory(brick), TypesFile);
-        if (!File.Exists(path) || !IsPrecast(brick))
+        if (!IsPrecast(brick))
         {
             return [];
         }
 
+        var entries = new List<UserCodeTypeEntry>();
+        foreach (var path in PrecastDirectories(brick).Select(static directory => Path.Combine(directory, TypesFile)))
+        {
+            entries.AddRange(ReadTypes(path));
+        }
+
+        return entries.DistinctBy(static entry => entry.TypeId).ToList();
+    }
+
+    static IReadOnlyList<UserCodeTypeEntry> ReadTypes(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return [];
+        }
         try
         {
             return JsonSerializer.Deserialize<UserCodeTypeManifest>(File.ReadAllText(path))?.Types ?? [];
@@ -205,31 +233,40 @@ public static class BrickAssemblies
 
             foreach (var brick in bricks)
             {
-                foreach (var folder in new[] { "lib", "editor" })
-                {
-                    var directory = Path.Combine(PrecastDirectory(brick), folder);
-                    if (BuiltForThisEngine(brick) && Directory.Exists(directory))
-                    {
-                        _ = ProbeDirectories.Add(directory);
-                    }
-                }
-
-                foreach (var path in RuntimeAssemblies(brick).Concat(EditorAssemblies(brick)))
-                {
-                    Resolvers.TryAdd(path, new AssemblyDependencyResolver(path));
-                }
+                RegisterBrickProbing(brick);
             }
 
             foreach (var package in packageDirectories)
             {
-                foreach (var folder in new[] { "lib/net10.0", "lib/netstandard2.0", "lib/netstandard2.1" })
-                {
-                    var directory = Path.Combine(package, folder);
-                    if (Directory.Exists(directory))
-                    {
-                        _ = ProbeDirectories.Add(directory);
-                    }
-                }
+                RegisterPackageProbing(package);
+            }
+        }
+    }
+
+    static void RegisterBrickProbing(ResolvedPackage brick)
+    {
+        foreach (var directory in PrecastDirectories(brick)
+                     .SelectMany(static payload => new[] { Path.Combine(payload, "lib"), Path.Combine(payload, "editor") }))
+        {
+            if (BuiltForThisEngine(brick) && Directory.Exists(directory))
+            {
+                _ = ProbeDirectories.Add(directory);
+            }
+        }
+        foreach (var path in RuntimeAssemblies(brick).Concat(EditorAssemblies(brick)))
+        {
+            Resolvers.TryAdd(path, new AssemblyDependencyResolver(path));
+        }
+    }
+
+    static void RegisterPackageProbing(string package)
+    {
+        foreach (var folder in new[] { "lib/net10.0", "lib/netstandard2.0", "lib/netstandard2.1" })
+        {
+            var directory = Path.Combine(package, folder);
+            if (Directory.Exists(directory))
+            {
+                _ = ProbeDirectories.Add(directory);
             }
         }
     }
@@ -248,9 +285,10 @@ public static class BrickAssemblies
 
     static string[] Find(ResolvedPackage brick, string folder)
     {
-        var directory = Path.Combine(PrecastDirectory(brick), folder);
-        return Directory.Exists(directory) && BuiltForThisEngine(brick)
-            ? [.. Directory.EnumerateFiles(directory, "*.dll").Order(StringComparer.Ordinal)]
+        return BuiltForThisEngine(brick)
+            ? [.. PrecastDirectories(brick).Select(payload => Path.Combine(payload, folder))
+                .Where(Directory.Exists).SelectMany(static directory => Directory.EnumerateFiles(directory, "*.dll").Order(StringComparer.Ordinal))
+                .Distinct(StringComparer.Ordinal)]
             : [];
     }
 

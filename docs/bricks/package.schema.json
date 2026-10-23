@@ -26,8 +26,9 @@
     "keywords": { "type": "array", "items": { "type": "string" } },
     "dependencies": {
       "type": "object",
-      "additionalProperties": { "type": "string", "description": "A version range, or a source: builtin:<id>, file:<folder or .brick>, git+<url>[#ref]." }
+      "additionalProperties": { "type": "string", "description": "A version range, builtin:<id> or portable git+<url>[#ref]. Local paths are allowed only during development and are rejected when packing." }
     },
+    "links": false,
     "devDependencies": { "type": "object", "additionalProperties": { "type": "string" } },
     "nuget": { "type": "object", "additionalProperties": { "type": "string" }, "description": "NuGet package id -> exact version, for the prebuilt assemblies." },
     "platformNuget": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }, "description": "Platform id -> NuGet package id -> exact version, added to nuget for builds of that platform." },
