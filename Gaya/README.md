@@ -5,12 +5,14 @@ The shell knows nothing about what it is editing: panels, commands, menus, key b
 arrive from plugins, so the same host can be a game studio, a code editor or a 3D modeller depending on
 which plugins are loaded.
 
-| Package | Referenced by |
-| --- | --- |
-| `MASS4.Gaya.Attributes` | settings metadata without a UI dependency; included transitively by the SDK |
-| `MASS4.Gaya.Sdk` | plugins — the contract, and the only Gaya assembly a plugin needs |
-| `MASS4.Gaya.Host` | the application shell — plugin activation, workbench, docking, layout persistence |
-| `Gaya.Packages` | hosts — brick manifests, sources, resolution, the shared store and registries |
+| Assembly | NuGet package | Referenced by |
+| --- | --- | --- |
+| `Gaya.Attributes` | `MASS4.Gaya.Attributes` | settings metadata without a UI dependency; included transitively by the SDK |
+| `Gaya.Sdk` | `MASS4.Gaya.Sdk` | plugins — the contract, and the only Gaya assembly a plugin needs |
+| `MASS4.Bricks` | `MASS4.Bricks` | hosts, engines and stores — brick manifests, sources, resolution, the shared store and registries |
+| `Gaya.Host` | — | the application shell — plugin activation, workbench, docking, layout persistence |
+
+The workbench and Bricks panel assemblies are distributed as DLLs with the application.
 
 A plugin is a class carrying `[Plugin(id, displayName)]` and implementing `IPlugin`:
 
@@ -82,4 +84,5 @@ public sealed class NotesPanel : IPanel
 - Replace `MASS4.Attributes.EditorSettingAttribute` with `Gaya.EditorSettingAttribute` from `MASS4.Gaya.Attributes`. Use `[Gaya.EditorSetting(...)]` when importing both namespaces; regenerated Turian user projects provide an alias for `[EditorSetting]`.
 - Move settings page ids, paths, descriptions, order, scope and visibility into the class attribute. Replace `settings.Register(new SettingsPageDescriptor(...))` with `settings.Register(instance)`; descriptors expose read-only metadata derived from that instance. Preserve each existing id to retain preferences.
 - Move `TabStripChromeDescriptor` contributions into the panel's `RenderHeader` method. The tab-strip registry and `IPluginContext.TabStripChrome` have been removed. Keep application-wide chrome contributions on `IPluginContext.Chrome`.
+- Replace `Gaya.Packages` with `MASS4.Bricks`: the namespace, the assembly (`MASS4.Bricks.dll`) and the NuGet package. Rebuild precast bricks compiled against `Gaya.Packages.dll`.
 - Recompile plugins and user scripts against the updated Gaya assemblies. These changes require a major release under the release policy.

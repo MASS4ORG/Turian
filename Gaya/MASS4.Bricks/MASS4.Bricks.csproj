@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Version>3.3.1</Version>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>MASS4.Bricks</RootNamespace>
+        <AssemblyName>MASS4.Bricks</AssemblyName>
+        <PackageId>MASS4.Bricks</PackageId>
+        <Title>MASS4 Bricks</Title>
+        <Description>Brick manifests, sources, resolution, lock files, registries and the machine-wide brick store shared by Gaya hosts, Turian and the asset store. No UI; shared presentation metadata comes from MASS4.Attributes.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="$(GuinevereLocalPath)/Attributes/Attributes.csproj" Condition="'$(GuinevereLocalPath)' != ''" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MASS4.Attributes" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="MASS4.Attributes" />
+    </ItemGroup>
+</Project>

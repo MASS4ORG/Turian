@@ -255,7 +255,7 @@ public sealed partial class AssetImporter
                  directory is not null && AssetDatabase.IsUnderDirectory(directory, assetsRootPath);
                  directory = Path.GetDirectoryName(directory))
             {
-                if (File.Exists(Path.Combine(directory, Gaya.Packages.PackageManifest.FileName)))
+                if (File.Exists(Path.Combine(directory, MASS4.Bricks.PackageManifest.FileName)))
                 {
                     return (directory, ReadOnly: false);
                 }

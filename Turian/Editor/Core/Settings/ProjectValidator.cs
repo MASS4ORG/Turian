@@ -96,7 +96,7 @@ public static class ProjectValidator
     /// </summary>
     static ProjectIssue? EngineVersionIssue(ProjectAsset project)
     {
-        if (!Gaya.Packages.SemanticVersion.TryParse(project.EngineVersion, out var saved))
+        if (!MASS4.Bricks.SemanticVersion.TryParse(project.EngineVersion, out var saved))
         {
             return null;
         }

@@ -90,7 +90,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         {
             BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
         }
-        catch (Gaya.Packages.PackageException)
+        catch (MASS4.Bricks.PackageException)
         {
             // ProjectPackages has logged what is missing and what to do.
             log.LogWarning("The bricks' types are unavailable until the project's bricks resolve");
@@ -157,7 +157,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     /// new brick, rescans the assets with the current brick folders, and recompiles the scripts. Assemblies of a
     /// removed brick stay loaded until the editor restarts.
     /// </summary>
-    /// <exception cref="Gaya.Packages.PackageException">The bricks cannot be resolved.</exception>
+    /// <exception cref="MASS4.Bricks.PackageException">The bricks cannot be resolved.</exception>
     public void ApplyBrickChanges()
     {
         if (Settings is null)

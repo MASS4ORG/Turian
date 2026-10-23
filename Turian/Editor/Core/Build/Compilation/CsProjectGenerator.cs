@@ -502,7 +502,7 @@ public static class CsProjectGenerator
         }
     }
 
-    static IReadOnlyList<Gaya.Packages.ResolvedPackage> ReferencedBricks(IBuildAppSettings settings, bool shipping,
+    static IReadOnlyList<MASS4.Bricks.ResolvedPackage> ReferencedBricks(IBuildAppSettings settings, bool shipping,
         BuildTarget target)
     {
         var resolved = ProjectPackages.ResolveOrEmpty(settings.ProjectAbsoluteDir);
@@ -513,7 +513,7 @@ public static class CsProjectGenerator
 
     // The engine's own packages are already referenced; a script project keeps brick packages to itself.
     static void AddBrickPackages(ProjectItemGroupElement references, IReadOnlyList<(string, string)> declaredPackages,
-        IReadOnlyList<Gaya.Packages.ResolvedPackage> bricks, bool shipping, string platform)
+        IReadOnlyList<MASS4.Bricks.ResolvedPackage> bricks, bool shipping, string platform)
     {
         var declared = declaredPackages.Select(static p => p.Item1).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, version) in BrickNuGet.UnifyVersions(bricks, platform))

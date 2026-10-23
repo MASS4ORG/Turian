@@ -11,7 +11,7 @@ namespace Turian.Editor.Core;
 public static class UserCodeTypeManifestGenerator
 {
     // The bricks whose types a game registers: those it ships, and the editor-only ones a Play build may meet.
-    static List<Gaya.Packages.ResolvedPackage> ManifestBricks(string? projectRoot, BuildTarget target)
+    static List<MASS4.Bricks.ResolvedPackage> ManifestBricks(string? projectRoot, BuildTarget target)
     {
         var resolved = ProjectPackages.ResolveOrEmpty(projectRoot);
         var shipped = BuildProfiles.ShippingBricks(resolved, target).Select(static b => b.Id).ToHashSet(StringComparer.Ordinal);

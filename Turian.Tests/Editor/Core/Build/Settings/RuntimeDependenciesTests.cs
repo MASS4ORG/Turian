@@ -110,7 +110,7 @@ public class RuntimeDependenciesTests
             .Select(static name => name.StartsWith("MASS4.", StringComparison.Ordinal) ? name["MASS4.".Length..] : name)
             .ToArray();
 
-        Assert.Contains("Turian.Engine.Core", libraries);
+        Assert.Contains("Turian.Engine", libraries);
         Assert.DoesNotContain(libraries, static name =>
             name is "Gaya.Host" or "Gaya.Sdk" or "Gaya.Packages.Editor" or "Gaya.Plugin.Turian" or "Turian.Engine.Vulkan"
             || name.StartsWith("Turian.Editor.", StringComparison.Ordinal));

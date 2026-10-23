@@ -16,7 +16,7 @@
     <!-- Internal libraries -->
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Sdk/Gaya.Sdk.csproj"/>
-        <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Packages/Gaya.Packages.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Gaya/MASS4.Bricks/MASS4.Bricks.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -25,6 +25,10 @@
 
     <ItemGroup>
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="MASS4.Bricks" />
     </ItemGroup>
 
 </Project>

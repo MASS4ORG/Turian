@@ -71,12 +71,12 @@ public sealed class ProjectBootstrapper
             ProjectSettingsFiles.Create(settings, new TagsAndLayersSettings());
             ProjectSettingsFiles.CreateBuildProfile(settings, new BuildProfile { Name = "Client" }, active: true);
 
-            new Gaya.Packages.ProjectManifest
+            new MASS4.Bricks.ProjectManifest
             {
                 Dependencies = ProjectPackages.DefaultBuiltins.ToDictionary(static id => id, static string? (id) => $"builtin:{id}"),
             }.Save(projectDirectory);
-            await File.WriteAllTextAsync(Path.Combine(projectDirectory, Gaya.Packages.ProjectManifest.DirectoryName, ".gitignore"),
-                $"{Gaya.Packages.ProjectManifest.LinksFileName}\n{Gaya.Packages.ProjectManifest.UserFileName}\n");
+            await File.WriteAllTextAsync(Path.Combine(projectDirectory, MASS4.Bricks.ProjectManifest.DirectoryName, ".gitignore"),
+                $"{MASS4.Bricks.ProjectManifest.LinksFileName}\n{MASS4.Bricks.ProjectManifest.UserFileName}\n");
 
             // Scripts get the engine, its attributes and the input key codes without per-file usings.
             var globalsPath = Path.Combine(assetsDir, "Globals.cs");
