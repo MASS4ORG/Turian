@@ -1,20 +1,13 @@
 namespace Gaya.Plugin.Turian;
 
 /// <summary>
-/// Watches the editor for the moments the Output console's "clear on …" toggles listen for — entering
-/// play, a completed standalone build (Build &amp; Run or Export), or a fresh user assembly from a
-/// recompile — and empties the log buffer when the matching toggle is on. <see cref="Tick"/> runs on
-/// the UI thread once a frame, so events that arrive from a background task's completion only mark a
-/// pending clear there, and <see cref="Tick"/> applies it where it cannot race the panel's own render.
+/// Clears Output when a play, build or recompile operation starts, preserving that operation's diagnostics.
+/// The panel reads immutable log snapshots and resets its selection on the next UI tick.
 /// </summary>
 public sealed class OutputLogBridge
 {
     readonly OutputPanelSettings settings;
-    readonly BuildManager build;
-
-    Assembly? lastAssembly;
-    volatile bool pendingPlay;
-    volatile bool pendingBuild;
+    long pendingClears;
     long generation;
 
     /// <summary>Creates the bridge and starts following the editor's play and build lifecycle.</summary>
@@ -28,12 +21,8 @@ public sealed class OutputLogBridge
         ArgumentNullException.ThrowIfNull(build);
 
         this.settings = settings;
-        this.build = build;
-
-        lastAssembly = build.ActiveUserAssembly;
-
-        playMode.StateChanged += OnPlayState;
-        build.TaskRunner.TaskCompleted += OnBuildTask;
+        playMode.Starting += OnPlayStarting;
+        build.TaskRunner.TaskStarted += OnBuildStarting;
     }
 
     /// <summary>
@@ -43,60 +32,33 @@ public sealed class OutputLogBridge
     public long Generation => Interlocked.Read(ref generation);
 
     /// <summary>
-    /// Applies whatever clear is pending. Called once a frame from the plugin's tick — the same
-    /// thread that renders the panel, so the buffer cannot change mid-frame.
+    /// Publishes operation-start clears to the panel so its selection resets on the UI thread.
     /// </summary>
     public void Tick()
     {
-        if (settings.ClearOnPlay && pendingPlay)
+        Interlocked.Add(ref generation, Interlocked.Exchange(ref pendingClears, 0));
+    }
+
+    void OnPlayStarting()
+    {
+        if (settings.ClearOnPlay)
         {
-            pendingPlay = false;
             Apply();
         }
+    }
 
-        if (settings.ClearOnBuild && pendingBuild)
+    void OnBuildStarting(string taskName)
+    {
+        if (settings.ClearOnRecompile && taskName == "Compile & Load"
+            || settings.ClearOnBuild && taskName is "Play" or "Export")
         {
-            pendingBuild = false;
             Apply();
-        }
-
-        if (settings.ClearOnRecompile)
-        {
-            CheckRecompile();
-        }
-    }
-
-    void CheckRecompile()
-    {
-        var current = build.ActiveUserAssembly;
-        if (ReferenceEquals(current, lastAssembly))
-        {
-            return;
-        }
-
-        lastAssembly = current;
-        Apply();
-    }
-
-    void OnPlayState(PlayState state)
-    {
-        if (state == PlayState.Playing)
-        {
-            pendingPlay = true;
-        }
-    }
-
-    void OnBuildTask(BuildTaskStatus status)
-    {
-        if (status is { State: BuildTaskState.Succeeded, TaskName: "Play" or "Export" })
-        {
-            pendingBuild = true;
         }
     }
 
     void Apply()
     {
         LogBuffer.Clear();
-        Interlocked.Increment(ref generation);
+        Interlocked.Increment(ref pendingClears);
     }
 }

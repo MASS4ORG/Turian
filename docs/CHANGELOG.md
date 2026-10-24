@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: standalone physics bricks #64.
+- Fixed: brick-resolution errors stay actionable.
 - Fixed: cached brick bakes honor host compatibility.
 - Fixed: malformed store answers name their endpoint #322.
 

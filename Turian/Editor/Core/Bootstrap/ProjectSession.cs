@@ -61,7 +61,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         return true;
     }
 
-    void ImportAndCompile(IProgressSink? progress = null)
+    bool ImportAndCompile(IProgressSink? progress = null)
     {
         progress ??= NullProgressSink.Instance;
         progress.PlanChildren(5);
@@ -72,15 +72,19 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
 
         RestoreAssetCatalog(services.GetRequiredService<AssetDatabase>(), Settings!, progress);
         services.GetRequiredService<AssetImporter>().StartMonitoring(progress);
-        using (progress.BeginChild(BackgroundTaskKind.Compile, "Compiling scripts"))
+        bool compiled;
+        using (var phase = progress.BeginChild(BackgroundTaskKind.Compile, "Compiling scripts"))
         {
-            CompileUserScripts();
+            compiled = CompileUserScripts();
+            phase.Finish(compiled);
         }
 
         using (progress.BeginChild(BackgroundTaskKind.Scan, "Starting file monitoring"))
         {
             services.GetRequiredService<BuildManager>().EnableHotReload();
         }
+
+        return compiled;
     }
 
     void LoadProjectPackages()
@@ -204,7 +208,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
     {
         var build = services.GetRequiredService<BuildManager>();
 
-        return services.GetRequiredService<BackgroundTaskRunner>().Run(
+        return services.GetRequiredService<BackgroundTaskRunner>().RunWithResult(
             new BackgroundTaskSpec
             {
                 Label = "Compile scripts",
@@ -217,12 +221,8 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
             {
                 progress.Report(0, "Building user assembly");
                 var status = await build.CompileAndLoadAssemblyAsync().ConfigureAwait(false);
-                if (status.State != BuildTaskState.Succeeded)
-                {
-                    throw new InvalidOperationException(status.Message);
-                }
-
-                progress.Report(1, status.Message);
+                progress.Report(status.State == BuildTaskState.Succeeded ? 1 : 0, status.Message);
+                return new BackgroundTaskResult(status.State == BuildTaskState.Succeeded, status.Message);
             });
     }
 
@@ -270,7 +270,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         return true;
     }
 
-    void CompileUserScripts()
+    bool CompileUserScripts()
     {
         var id = RecompileScripts();
         var tasks = services.GetRequiredService<BackgroundTaskManager>();
@@ -282,11 +282,12 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
             Thread.Sleep(25);
         }
 
-        if (tasks.Get(id) is { Status: BackgroundTaskStatus.Failed } failed)
+        if (tasks.Get(id) is { Status: BackgroundTaskStatus.Failed })
         {
-            log.LogWarning("User scripts did not compile: {Message}. Components from them will be missing",
-                failed.Note);
+            log.LogWarning("User scripts are unavailable. Fix the errors in Output, then recompile scripts");
         }
+
+        return tasks.Get(id) is { Status: BackgroundTaskStatus.Completed };
     }
 
     void RestoreSession(AppSettings settings)

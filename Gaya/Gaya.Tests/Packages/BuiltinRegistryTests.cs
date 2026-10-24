@@ -218,6 +218,23 @@ public sealed class BuiltinRegistryTests : IDisposable
         Assert.Contains(controller.Catalog, static brick => brick.Id == Shipped && brick.IsBuiltin);
     }
 
+    /// <summary>An unpublished replacement explains the stale built-in declaration and the available source choices.</summary>
+    [Fact]
+    public async Task MissingExtractedBuiltinExplainsItsDeclaration()
+    {
+        Publish(Shipped);
+        Project(Registry());
+
+        var error = await Assert.ThrowsAsync<PackageException>(() =>
+            Resolver().ResolveAsync(project, TestContext.Current.CancellationToken));
+
+        Assert.Contains($"declared as builtin:{Extracted}", error.Message);
+        Assert.Contains("this host no longer ships it", error.Message);
+        Assert.Contains("does not serve", error.Message);
+        Assert.Contains("a folder, a .brick file or a git URL", error.Message);
+        Assert.Contains(Extracted, Assert.Single(error.Problems));
+    }
+
     PackageResolver Resolver(bool locked = false) => new(store, new PackageResolverOptions
     {
         BuiltinDirectory = builtins,

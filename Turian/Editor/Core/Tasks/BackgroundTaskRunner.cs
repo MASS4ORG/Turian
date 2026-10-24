@@ -24,6 +24,21 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
     /// <returns>The task id to watch.</returns>
     public long Run(BackgroundTaskSpec spec, Func<IProgressSink, CancellationToken, Task> work)
     {
+        ArgumentNullException.ThrowIfNull(work);
+        return RunWithResult(spec, async (progress, ct) =>
+        {
+            await work(progress, ct).ConfigureAwait(false);
+            return new BackgroundTaskResult(true, "");
+        });
+    }
+
+    /// <summary>Runs work whose expected failure is reported as a result, preserving its task status and message.</summary>
+    /// <param name="spec">What to track.</param>
+    /// <param name="work">The operation, returning success or an actionable failure message.</param>
+    /// <returns>The task id to watch.</returns>
+    public long RunWithResult(BackgroundTaskSpec spec,
+        Func<IProgressSink, CancellationToken, Task<BackgroundTaskResult>> work)
+    {
         ArgumentNullException.ThrowIfNull(spec);
         ArgumentNullException.ThrowIfNull(work);
 
@@ -69,11 +84,16 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
             return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
         }
 
-        await ExecuteAsync(id, spec, work).ConfigureAwait(false);
+        await ExecuteAsync(id, spec, async (progress, ct) =>
+        {
+            await work(progress, ct).ConfigureAwait(false);
+            return new BackgroundTaskResult(true, "");
+        }).ConfigureAwait(false);
         return tasks.Get(id)?.Status ?? BackgroundTaskStatus.Completed;
     }
 
-    async Task ExecuteAsync(long id, BackgroundTaskSpec spec, Func<IProgressSink, CancellationToken, Task> work)
+    async Task ExecuteAsync(long id, BackgroundTaskSpec spec,
+        Func<IProgressSink, CancellationToken, Task<BackgroundTaskResult>> work)
     {
         do
         {
@@ -89,14 +109,15 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
             try
             {
                 using var progress = tasks.ProgressFor(id);
-                await work(progress, cts.Token).ConfigureAwait(false);
+                var result = await work(progress, cts.Token).ConfigureAwait(false);
                 if (tasks.IsCancelRequested(id))
                 {
                     tasks.Cancel(id);
                 }
                 else
                 {
-                    tasks.Complete(id);
+                    progress.Report(result.Succeeded ? 1 : 0, result.Message);
+                    progress.Finish(result.Succeeded);
                 }
             }
             catch (OperationCanceledException)
@@ -109,16 +130,7 @@ public sealed class BackgroundTaskRunner(BackgroundTaskManager tasks, ILogger lo
                 tasks.Fail(id, ex.Message);
             }
         }
-        while (tasks.TakeRerunRequest(id) && Restart(id));
-    }
-
-    bool Restart(long id)
-    {
-        // A coalesced duplicate arrived mid-flight: reuse the same entry for the extra run rather
-        // than queueing one job per click.
-        tasks.SetProgress(id, 0);
-        tasks.Start(id);
-        return tasks.Get(id) is not null;
+        while (tasks.TakeRerunRequest(id) && tasks.Restart(id));
     }
 
     async Task<bool> WaitForDependenciesAsync(long id)

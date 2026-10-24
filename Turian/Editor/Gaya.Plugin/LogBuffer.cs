@@ -59,7 +59,8 @@ public static class LogBuffer
                 message = $"{message}{Environment.NewLine}{exception}";
             }
 
-            Add(LogOrigin.Capture(logLevel, message, category));
+            var line = LogOrigin.Capture(logLevel, message, category);
+            Add(eventId == ProjectPackages.ResolutionFailedEvent ? line with { IsInternal = false } : line);
         }
     }
 }

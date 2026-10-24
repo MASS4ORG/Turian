@@ -44,7 +44,7 @@ public sealed class BrickRegistryServiceTests : IDisposable
         Assert.Single(BrickService.Registries(project));
     }
 
-    /// <summary>The public registry is the asset store, falls back to the static mirror, and is trusted with the MASS4 key that ships with the editor.</summary>
+    /// <summary>The public registry preserves its original key and accepts the approved official CI signing key.</summary>
     [Fact]
     public void PublicRegistryCarriesTheMass4Key()
     {
@@ -54,7 +54,11 @@ public sealed class BrickRegistryServiceTests : IDisposable
         Assert.Equal("https://bricks.mass4.org/v1", registry.Url);
         Assert.Equal(["https://store.mass4.org/v1"], registry.Mirrors);
         Assert.Empty(registry.Scopes);
-        Assert.StartsWith("SHA256:", SshSignature.Fingerprint(Assert.Single(registry.Keys)), StringComparison.Ordinal);
+        Assert.Equal(
+        [
+            "SHA256:LhZqbxnJxs8Z+wQ9/3Cx8SaK2T00wsy1O2LDowh8FPw",
+            "SHA256:FfUqyqfiCegjmLD0rKdMqxDWMpxkDuGZ0pKwkrE8sdQ",
+        ], registry.Keys.Select(SshSignature.Fingerprint));
         Assert.True(registry.Serves("org.mass4.turian.ui"));
         Assert.True(registry.Serves("user.mateo.rules"));
         Assert.True(registry.Serves("com.acme.rules"));

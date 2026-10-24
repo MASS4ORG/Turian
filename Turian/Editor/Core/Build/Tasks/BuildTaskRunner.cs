@@ -101,6 +101,13 @@ public sealed class BuildTaskRunner : IDisposable
             status = new BuildTaskStatus(task.Name, BuildTaskState.Cancelled, "Cancelled.", task.LocksUi);
             logger.LogWarning("[BuildTask] Cancelled: {TaskName}", task.Name);
         }
+        catch (MASS4.Bricks.PackageException ex)
+        {
+            var message = $"The project's bricks could not be resolved. Fix the brick sources or registry trust, then retry.{Environment.NewLine}{ex.Message}";
+            status = new BuildTaskStatus(task.Name, BuildTaskState.Failed, message, task.LocksUi);
+            logger.LogError(ProjectPackages.ResolutionFailedEvent, "[BuildTask] Cannot {TaskName}: {Problem}",
+                task.Name, message);
+        }
         catch (Exception ex)
         {
             status = new BuildTaskStatus(task.Name, BuildTaskState.Failed, ex.Message, task.LocksUi);

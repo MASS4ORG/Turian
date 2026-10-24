@@ -66,6 +66,7 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Packages/registry-mass4.pub" LogicalName="registry-mass4.pub"/>
+        <EmbeddedResource Include="Packages/registry-mass4-ci.pub" LogicalName="registry-mass4-ci.pub"/>
     </ItemGroup>
 
     <!-- Where the built-in bricks live when run from a checkout (ProjectPackages.BuiltinDirectory); publishing ships them

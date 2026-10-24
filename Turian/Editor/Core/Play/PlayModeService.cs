@@ -45,6 +45,9 @@ public sealed class PlayModeService(
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event Action<PlayState>? StateChanged;
 
+    /// <summary>Raised before a new play attempt prepares services or runs scene callbacks.</summary>
+    public event Action? Starting;
+
     /// <summary>Gets a value indicating whether a session is running, whether playing or paused.</summary>
     public bool IsActive => State != PlayState.Stopped;
 
@@ -81,6 +84,7 @@ public sealed class PlayModeService(
             return false;
         }
 
+        Starting?.Invoke();
         var editorRoot = sceneTree.CurrentSceneRoot;
         if (editorRoot is null)
         {
