@@ -17,7 +17,7 @@ public static class BrickArchive
     /// <summary>The file extension.</summary>
     public const string Extension = ".brick";
 
-    /// <summary>What a bake twin's id adds to its source brick's id.</summary>
+    /// <summary>What the id of a bake twin packed before variants adds to its source brick's id.</summary>
     public const string TwinSuffix = ".bake";
 
     static readonly DateTimeOffset FixedTime = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -26,14 +26,24 @@ public static class BrickArchive
         ".git", ".vs", ".idea", "bin", "obj", "node_modules",
     };
 
-    /// <summary>The file name a brick is packed under: <c>id-version.brick</c>.</summary>
+    /// <summary>
+    /// The file name a brick is packed under: <c>id-version--variant.brick</c>. The name is only a label; what an
+    /// archive is comes from its <c>package.json</c>.
+    /// </summary>
     /// <param name="manifest">The brick's manifest.</param>
     /// <returns>The file name.</returns>
     public static string FileNameFor(PackageManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        return $"{manifest.Name}-{manifest.Version}{Extension}";
+        return FileNameFor(manifest.Name, manifest.Version!.ToString(), manifest.Variant ?? PackageVariant.Source);
     }
+
+    /// <summary>The file name of one variant of a release: <c>id-version--variant.brick</c>.</summary>
+    /// <param name="id">The brick id.</param>
+    /// <param name="version">The version.</param>
+    /// <param name="variant">The variant key.</param>
+    /// <returns>The file name.</returns>
+    public static string FileNameFor(string id, string version, string variant) => $"{id}-{version}--{variant}{Extension}";
 
     /// <summary>Packs the package folder at <paramref name="packageRoot"/> into <paramref name="outputDirectory"/>.</summary>
     /// <param name="packageRoot">The package folder.</param>
@@ -45,14 +55,15 @@ public static class BrickArchive
     /// </param>
     /// <param name="exclude">Globs left out besides the manifest's <see cref="PackageManifest.Exclude"/>.</param>
     /// <param name="bakeOf">
-    /// Packs the folder as the bake twin of this source file instead: the id gains <see cref="TwinSuffix"/> and the
-    /// file's <c>package.json</c> records the source.
+    /// Packs the folder as a bake of this source file instead: same id and version, and the file's
+    /// <c>package.json</c> records the source and <paramref name="variant"/>.
     /// </param>
+    /// <param name="variant">The bake's variant key, such as <c>turian3.3</c>; required with <paramref name="bakeOf"/>.</param>
     /// <returns>The packed file, its hash and the manifest.</returns>
-    /// <exception cref="PackageException">The folder is not a valid package.</exception>
+    /// <exception cref="PackageException">The folder is not a valid package, or the bake does not match its source.</exception>
     public static BrickPackResult Pack(string packageRoot, string outputDirectory,
         IReadOnlyCollection<string>? reservedCategoryPrefixes = null, PackagePrecast? precast = null,
-        IReadOnlyCollection<string>? exclude = null, PackageBakeOf? bakeOf = null)
+        IReadOnlyCollection<string>? exclude = null, PackageBakeOf? bakeOf = null, string? variant = null)
     {
         packageRoot = Path.GetFullPath(packageRoot);
         var manifest = PackageManifest.Load(packageRoot, reservedCategoryPrefixes);
@@ -65,8 +76,7 @@ public static class BrickArchive
 
         if (bakeOf is not null)
         {
-            manifest.Name = TwinIdOf(bakeOf.Brick);
-            manifest.BakeOf = bakeOf;
+            manifest = AsBake(manifest, bakeOf, variant, $"{packageRoot} as {variant}", reservedCategoryPrefixes);
         }
 
         string[] globs = [.. manifest.Exclude, .. exclude ?? []];
@@ -99,6 +109,23 @@ public static class BrickArchive
         return new BrickPackResult(path, integrity, manifest);
     }
 
+    /// <summary>
+    /// The manifest of a bake of <paramref name="bakeOf"/> as <paramref name="variant"/>, checked against the variant
+    /// rules the folder's own manifest did not face: the same id and version as its source.
+    /// </summary>
+    static PackageManifest AsBake(PackageManifest manifest, PackageBakeOf bakeOf, string? variant, string path,
+        IReadOnlyCollection<string>? reservedCategoryPrefixes)
+    {
+        if (variant is null || variant == PackageVariant.Source)
+        {
+            throw new PackageException($"{manifest.Name}: a bake needs a variant other than '{PackageVariant.Source}'.");
+        }
+
+        manifest.BakeOf = bakeOf;
+        manifest.Variant = variant;
+        return PackageManifest.Parse(manifest.ToJson(), path, reservedCategoryPrefixes);
+    }
+
     /// <summary>Checks that a brick can be distributed without referring to its producer's filesystem.</summary>
     /// <param name="packageRoot">The brick folder.</param>
     /// <param name="manifest">Its loaded manifest.</param>
@@ -119,7 +146,7 @@ public static class BrickArchive
         }
     }
 
-    /// <summary>The id of <paramref name="sourceId"/>'s bake twin.</summary>
+    /// <summary>The id <paramref name="sourceId"/>'s bake twin had before variants, which older registries still serve.</summary>
     /// <param name="sourceId">The source brick's id.</param>
     /// <returns>The twin's id.</returns>
     public static string TwinIdOf(string sourceId) => sourceId + TwinSuffix;

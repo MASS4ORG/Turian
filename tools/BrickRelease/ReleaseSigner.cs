@@ -7,8 +7,18 @@ namespace Mass4.BrickRelease;
 
 static partial class ReleaseSigner
 {
+    static readonly JsonSerializerOptions ReleaseJson = new(ReleaseArchive.Json)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    /// <summary>
+    /// Signs a qualified archive's release metadata with the CI key. The build provenance, when given, is written
+    /// beside the signatures, which do not cover it.
+    /// </summary>
     internal static async Task SignAsync(string root, string archive, string qualificationFile, string output,
-        string publicKey, string privateKey, string temporaryRoot, CancellationToken cancellationToken)
+        string publicKey, string privateKey, string temporaryRoot, CancellationToken cancellationToken,
+        ReleaseBuild? build = null)
     {
         var qualification = ReleaseArchive.Validate(archive, qualificationFile);
         ValidateIdentity(root, publicKey);
@@ -40,8 +50,9 @@ static partial class ReleaseSigner
                 signature = signatures[0],
                 publisherSignature = signatures[1],
                 isPrivate = false,
+                build,
             };
-            await File.WriteAllTextAsync(output, JsonSerializer.Serialize(metadata, ReleaseArchive.Json) + "\n",
+            await File.WriteAllTextAsync(output, JsonSerializer.Serialize(metadata, ReleaseJson) + "\n",
                 cancellationToken);
         }
         finally

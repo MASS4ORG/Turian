@@ -60,8 +60,13 @@ public sealed class BrickBakeTests : IDisposable
         Assert.Equal(("Runtime/notes.txt", NotesId), (entry.Path, entry.Guid));
         Assert.NotEmpty(entry.Artifacts);
 
-        using (var source = ZipFile.OpenRead(Directory.GetFiles(Path.Combine(root, "out"), "user.mateo.notes-*.brick").Single()))
-        using (var twin = ZipFile.OpenRead(Directory.GetFiles(Path.Combine(root, "out"), "user.mateo.notes.bake-*.brick").Single()))
+        // Each archive is classified by its manifest; the twin is a variant of the source's id and version.
+        var packed = Directory.GetFiles(Path.Combine(root, "out"), "*.brick")
+            .ToLookup(static file => BrickArchive.ReadManifest(file, ["gaya", "turian"]).Variant);
+        var twinFile = packed[PackageVariant.ForHost("turian", ProjectPackages.EngineVersion)].Single();
+        Assert.Equal("user.mateo.notes", BrickArchive.ReadManifest(twinFile, ["gaya", "turian"]).Name);
+        using (var source = ZipFile.OpenRead(packed[null].Single()))
+        using (var twin = ZipFile.OpenRead(twinFile))
         {
             Assert.DoesNotContain(source.Entries, e => e.FullName.StartsWith(relative, StringComparison.Ordinal));
             Assert.Contains(twin.Entries, e => e.FullName == $"{relative}/{BrickBake.SyncFileName}");

@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Gaya.Tests;
 
 /// <summary>
@@ -158,12 +160,188 @@ public sealed class RegistryTwinTests : IDisposable
         Assert.Contains("its source cannot be verified", error.Message, StringComparison.Ordinal);
     }
 
-    PackageResolver Resolver(bool locked = false, bool updateAll = false) => new(store, new PackageResolverOptions
+    /// <summary>
+    /// A bake published as a variant keeps the source's id: the host takes its own major and minor, else an older
+    /// minor of its major, and locks the variant; another major takes the source.
+    /// </summary>
+    [Fact]
+    public async Task VariantsAreChosenForThisHostAndLocked()
     {
-        ReservedCategoryPrefixes = ["engine"],
-        Locked = locked,
-        Update = updateAll ? null : new HashSet<string>(),
-    });
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.1");
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2");
+        PublishVariant("user.mateo.rules", "1.1.0", "engine2.0");
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+
+        var exact = await Resolver(host: "1.2.5").ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal(["user.mateo.rules", "user.mateo.shop"], exact.Packages.Select(static p => p.Id));
+        Assert.Equal("engine1.2", exact.Packages[0].Manifest.Variant);
+        Assert.Empty(exact.Warnings);
+        var locked = exact.Lock.Dependencies["user.mateo.rules"];
+        Assert.Equal(("engine1.2", "user.mateo.rules"), (locked.Variant, locked.BakeOf!.Brick));
+        Assert.Equal(["engine1.1", "engine1.2", "engine2.0"], Index().Bricks["user.mateo.rules"].Versions["1.1.0"].Variants!.Keys);
+
+        Assert.Equal("engine1.2", (await Resolver(host: "1.4.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Packages[0].Manifest.Variant);
+        Assert.Equal("engine1.1", (await Resolver(host: "1.1.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Packages[0].Manifest.Variant);
+        var otherMajor = await Resolver(host: "3.0.0").ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Null(otherMajor.Packages[0].Manifest.BakeOf);
+
+        // A locked older variant is downloaded again as locked, over the newer one this host would choose.
+        (await Resolver(host: "1.1.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Lock.Save(project);
+        Directory.Delete(Path.Combine(root, "store"), recursive: true);
+        var relocked = await Resolver(host: "1.2.5").ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal("engine1.1", relocked.Packages[0].Manifest.Variant);
+
+        File.Delete(Path.Combine(project, ProjectManifest.DirectoryName, LockFile.FileName));
+        (await Resolver(host: "1.2.5").ResolveAsync(project, TestContext.Current.CancellationToken)).Lock.Save(project);
+        Directory.Delete(registry, recursive: true);
+        var offline = await Resolver(locked: true, host: "1.2.5").ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal("engine1.2", offline.Packages[0].Manifest.Variant);
+    }
+
+    /// <summary>
+    /// A static registry takes a bake only after the exact source file it names, as a variant of that entry, and
+    /// never twice; the source entry itself stays.
+    /// </summary>
+    [Fact]
+    public void BakesNeedTheirSourceAndAreImmutable()
+    {
+        var bakeOf = new PackageBakeOf { Brick = "user.mateo.rules", Version = SemanticVersion.Parse("1.1.0"), Integrity = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" };
+        var orphan = Pack(new PackageManifest { Name = "user.mateo.rules", Version = SemanticVersion.Parse("1.1.0") }, bakeOf: bakeOf, variant: "engine1.2");
+        Assert.Contains("publish that source first", Assert.Throws<PackageException>(() =>
+            RegistryPublisher.Publish(registry, orphan.Path, registrySigner, mateo, reservedCategoryPrefixes: ["engine"])).Message, StringComparison.Ordinal);
+
+        var source = Publish("user.mateo.rules", "1.1.0", mateo);
+        Assert.Contains("publish that source first", Assert.Throws<PackageException>(() =>
+            RegistryPublisher.Publish(registry, orphan.Path, registrySigner, mateo, reservedCategoryPrefixes: ["engine"])).Message, StringComparison.Ordinal);
+
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2");
+        Assert.Contains("already published", Assert.Throws<PackageException>(() =>
+            PublishVariant("user.mateo.rules", "1.1.0", "engine1.2")).Message, StringComparison.Ordinal);
+        var entry = Index().Bricks["user.mateo.rules"].Versions["1.1.0"];
+        Assert.Equal(source, entry.Integrity);
+        Assert.Equal(("user.mateo.rules", "1.1.0", "engine1.2"),
+            (entry.Variants!["engine1.2"].PackageId, entry.Variants["engine1.2"].Version, entry.Variants["engine1.2"].Variant));
+    }
+
+    /// <summary>A locked bake is never taken for its source once the project keeps the brick as source.</summary>
+    [Fact]
+    public async Task LockedVariantsAreNotTakenForTheSource()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2");
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+        (await Resolver(host: "1.2.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Lock.Save(project);
+        var manifest = ProjectManifest.Load(project).Manifest;
+        manifest.Sources.Add("user.mateo.rules");
+        manifest.Save(project);
+
+        var resolution = await Resolver(host: "1.2.0").ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.Null(resolution.Packages[0].Manifest.BakeOf);
+        Assert.Null(resolution.Lock.Dependencies["user.mateo.rules"].Variant);
+    }
+
+    /// <summary>A bake whose precast this host cannot load falls back to its source, with a warning.</summary>
+    [Fact]
+    public async Task UnloadableVariantsFallBackToTheSource()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2",
+            new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse("1.1.0") } });
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+
+        var resolution = await Resolver(host: "1.2.0").ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.Null(resolution.Packages[0].Manifest.BakeOf);
+        Assert.Contains("which engine 1.2.0 does not load", Assert.Single(resolution.Warnings), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A store's curator advisory refusing the build of a bake leaves the source, linking the record; a warning-only
+    /// one keeps the bake and is reported. Without a recorded build, the bake's precast version is matched.
+    /// </summary>
+    [Fact]
+    public async Task StoreAdvisoriesRefuseOrWarnAboutBakes()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine3.3",
+            new PackagePrecast { BuiltWith = { ["engine"] = SemanticVersion.Parse("3.3.0") } });
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+        var http = new RegistryFolderHandler(RegistryPublisher.LocationOf(registry));
+        var manifest = ProjectManifest.Load(project).Manifest;
+        manifest.ScopedRegistries[0].Url = "https://store.test/v1";
+        manifest.Save(project);
+
+        http.Advisories = """[ { "id": "11111111-1111-1111-1111-111111111111", "packagePrefix": "user.mateo", "turianVersionRange": ">=3.3.0 <3.4.0", "message": "Broken bakes.", "reject": true } ]""";
+        var refused = await Resolver(host: "3.3.1", buildHost: true, http: http).ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Null(refused.Packages[0].Manifest.BakeOf);
+        Assert.Contains("https://store.test/api/v1/build-advisories/11111111-1111-1111-1111-111111111111", Assert.Single(refused.Warnings), StringComparison.Ordinal);
+
+        http.Advisories = """[ { "id": "22222222-2222-2222-2222-222222222222", "packagePrefix": "user.mateo.rules", "turianVersionRange": ">=3.0.0", "message": "Rebake soon.", "reject": false } ]""";
+        var warned = await Resolver(host: "3.3.1", buildHost: true, http: http).ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Equal("engine3.3", warned.Packages[0].Manifest.Variant);
+        Assert.Contains("Rebake soon.", Assert.Single(warned.Warnings), StringComparison.Ordinal);
+
+        // A host that records no build version for itself matches no precast version, so the range advisory is moot.
+        var unmatched = await Resolver(host: "3.3.1", http: http).ResolveAsync(project, TestContext.Current.CancellationToken);
+        Assert.Empty(unmatched.Warnings);
+    }
+
+    /// <summary>A bake the store recorded as built by another major of the build host is left for its source.</summary>
+    [Fact]
+    public async Task BakesBuiltByAnotherMajorFallBackToTheSource()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2");
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+        var index = Index();
+        index.Bricks["user.mateo.rules"].Versions["1.1.0"].Variants!["engine1.2"].Build =
+            new RegistryBuild($"ghcr.io/example/cli@sha256:{new string('a', 64)}", "2.0.0");
+        File.WriteAllText(Path.Combine(RegistryPublisher.LocationOf(registry), "index.json"), index.Serialize());
+
+        var resolution = await Resolver(host: "1.2.0", buildHost: true).ResolveAsync(project, TestContext.Current.CancellationToken);
+
+        Assert.Null(resolution.Packages[0].Manifest.BakeOf);
+        Assert.Contains("another major version than 1.2.0", Assert.Single(resolution.Warnings), StringComparison.Ordinal);
+    }
+
+    PackageResolver Resolver(bool locked = false, bool updateAll = false, string? host = null, bool buildHost = false,
+        HttpMessageHandler? http = null) => new(store, new PackageResolverOptions
+        {
+            ReservedCategoryPrefixes = ["engine"],
+            Locked = locked,
+            Update = updateAll ? null : new HashSet<string>(),
+            Hosts = host is not null ? new Dictionary<string, SemanticVersion> { ["engine"] = SemanticVersion.Parse(host) }
+                : new Dictionary<string, SemanticVersion>(),
+            BuildHost = buildHost ? "engine" : null,
+            Http = http is null ? null : new HttpClient(http),
+        });
+
+    /// <summary>Publishes a bake of the source version the registry serves as a variant with the source's id.</summary>
+    void PublishVariant(string id, string version, string variant, PackagePrecast? precast = null)
+    {
+        var bakeOf = new PackageBakeOf { Brick = id, Version = SemanticVersion.Parse(version), Integrity = Index().Bricks[id].Versions[version].Integrity };
+        var packed = Pack(new PackageManifest { Name = id, Version = SemanticVersion.Parse(version) }, precast, bakeOf, variant);
+        RegistryPublisher.Publish(registry, packed.Path, registrySigner, mateo, reservedCategoryPrefixes: ["engine"]);
+    }
+
+    /// <summary>Serves a static registry folder over https at <c>store.test/v1</c>, with a store's advisories beside it.</summary>
+    sealed class RegistryFolderHandler(string location) : HttpMessageHandler
+    {
+        public string Advisories { get; set; } = "[]";
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var file = path.StartsWith("/v1/", StringComparison.Ordinal) ? Path.Combine(location, path["/v1/".Length..]) : null;
+            return Task.FromResult(path == "/api/v1/build-advisories"
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Advisories) }
+                : file is not null && File.Exists(file)
+                    ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(File.ReadAllBytes(file)) }
+                    : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
 
     RegistryIndex Index() => RegistryIndex.Parse(File.ReadAllText(Path.Combine(RegistryPublisher.LocationOf(registry), "index.json")));
 
@@ -205,12 +383,13 @@ public sealed class RegistryTwinTests : IDisposable
         RegistryPublisher.Publish(registry, Pack(manifest).Path, registrySigner, publisher, reservedCategoryPrefixes: ["engine"]);
     }
 
-    BrickPackResult Pack(PackageManifest manifest)
+    BrickPackResult Pack(PackageManifest manifest, PackagePrecast? precast = null, PackageBakeOf? bakeOf = null, string? variant = null)
     {
         var folder = Path.Combine(root, "sources", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(folder, "Runtime"));
         manifest.Save(folder);
         File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{manifest.Name} {manifest.Version}");
-        return BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"]);
+        return BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"], precast,
+            bakeOf: bakeOf, variant: variant);
     }
 }

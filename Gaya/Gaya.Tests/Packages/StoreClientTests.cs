@@ -154,9 +154,136 @@ public sealed class StoreClientTests : IDisposable
         var release = await store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(release.Approved);
-        var body = Assert.Single(handler.Requests).Body.Replace(" ", "", StringComparison.Ordinal);
+        Assert.Equal(["GET", "GET", "POST"], handler.Requests.Select(static r => r.Method));
+        var body = handler.Requests[^1].Body.Replace(" ", "", StringComparison.Ordinal);
         Assert.Contains("\"signature\":\"sig\"", body, StringComparison.Ordinal);
         Assert.Contains("\"sourceRevision\":\"workstation-1\"", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A re-run is read back by exact id, version and variant before upload: other bytes or another build image than
+    /// the recorded one are refused without uploading, and identical bytes upload and bring back the store's warnings.
+    /// </summary>
+    [Fact]
+    public async Task RerunsAreCheckedAgainstTheRecordedRelease()
+    {
+        var brick = Brick("org.mass4.demo", "1.2.0");
+        var integrity = BrickArchive.ComputeIntegrity(brick);
+        var releaseFile = SignedRelease(integrity, Image('b'));
+        var handler = new StoreHandler();
+        handler.Routes["/api/v1/releases/org.mass4.demo/1.2.0"] = Receipt("sha256-other", Image('a'));
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+
+        var bytes = await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("with other bytes", bytes.Message, StringComparison.Ordinal);
+        Assert.Contains(handler.Uris, static u => u.Contains("variant=source", StringComparison.Ordinal));
+
+        handler.Routes["/api/v1/releases/org.mass4.demo/1.2.0"] = Receipt(integrity, Image('a'));
+        var image = await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains($"first built by {Image('a')}", image.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(handler.Requests, static r => r.Method == "POST");
+
+        handler.Routes["/api/v1/publish"] = Receipt(integrity, Image('a'), "\"sourceRevision differs\"");
+        var rerun = await store.PublishSignedAsync(brick, SignedRelease(integrity, Image('a')), cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(["sourceRevision differs"], rerun.Warnings);
+        Assert.Equal((Image('a'), "3.3.0"), (rerun.Build!.Image, rerun.Build.TurianVersion));
+        Assert.Equal(("pending", PackageVariant.Source), (rerun.Status, rerun.Variant));
+    }
+
+    /// <summary>
+    /// Curator advisories refuse a build before upload, linking the record, also when the upload omits its build and
+    /// only the recorded one matches; warning-only advisories come back with the release.
+    /// </summary>
+    [Fact]
+    public async Task AdvisoriesAreConsultedForSubmittedAndRecordedBuilds()
+    {
+        var brick = Brick("org.mass4.demo", "1.2.0");
+        var integrity = BrickArchive.ComputeIntegrity(brick);
+        var handler = new StoreHandler();
+        handler.Routes["/api/v1/releases/org.mass4.demo/1.2.0"] = Receipt(integrity, Image('a'));
+        handler.Routes["/api/v1/build-advisories"] = $$"""
+            [ { "id": "11111111-1111-1111-1111-111111111111", "packagePrefix": "org.mass4", "image": "{{Image('a')}}", "message": "Bad packer.", "reject": true },
+              { "id": "22222222-2222-2222-2222-222222222222", "packagePrefix": "com.other", "turianVersionRange": ">=0.0.0", "message": "Other.", "reject": true } ]
+            """;
+        var store = new StoreClient("store.example", "secret", new HttpClient(handler));
+
+        var omitted = await Assert.ThrowsAsync<PackageException>(() => store.PublishSignedAsync(brick, SignedRelease(integrity, null), cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("advisory 11111111-1111-1111-1111-111111111111: Bad packer. See https://store.example/api/v1/build-advisories/11111111-1111-1111-1111-111111111111", omitted.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(handler.Requests, static r => r.Method == "POST");
+
+        handler.Routes.Remove("/api/v1/releases/org.mass4.demo/1.2.0");
+        handler.Routes["/api/v1/build-advisories"] = """
+            [ { "id": "33333333-3333-3333-3333-333333333333", "packagePrefix": "org.mass4.demo", "turianVersionRange": ">=3.0.0 <4.0.0", "message": "Rebake soon.", "reject": false } ]
+            """;
+        handler.Routes["/api/v1/publish"] = Receipt(integrity, Image('b'));
+        var warned = await store.PublishSignedAsync(brick, SignedRelease(integrity, Image('b')), cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Contains("Rebake soon.", Assert.Single(warned.Warnings!), StringComparison.Ordinal);
+    }
+
+    /// <summary>A partial build object is refused before any request, as the store would refuse it.</summary>
+    [Fact]
+    public async Task PartialBuildsAreRefused()
+    {
+        var brick = Brick("org.mass4.demo", "1.2.0");
+        var releaseFile = Path.Combine(root, "partial.json");
+        File.WriteAllText(releaseFile, $$"""
+            { "packageId": "org.mass4.demo", "version": "1.2.0", "integrity": "{{BrickArchive.ComputeIntegrity(brick)}}",
+              "signature": "sig", "signedBy": "SHA256:abc", "build": { "image": "{{Image('a')}}" } }
+            """);
+        var handler = new StoreHandler();
+
+        var error = await Assert.ThrowsAsync<PackageException>(() => new StoreClient("store.example", "secret", new HttpClient(handler))
+            .PublishSignedAsync(brick, releaseFile, cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("image and turianVersion", error.Message, StringComparison.Ordinal);
+        Assert.Empty(handler.Requests);
+    }
+
+    /// <summary>An exact read the store answers with 404 is no release; advisories a store does not serve are none.</summary>
+    [Fact]
+    public async Task MissingReleasesAndAdvisoriesAreEmpty()
+    {
+        var store = new StoreClient("store.example", "secret", new HttpClient(new StoreHandler()));
+
+        Assert.Null(await store.ReleaseAsync("org.mass4.demo", "1.2.0", "turian3.3", TestContext.Current.CancellationToken));
+        Assert.Empty(await store.BuildAdvisoriesAsync(TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>A store that cannot be reached is reported as such rather than taken for an absent release.</summary>
+    [Fact]
+    public async Task UnreachableStoresAreReported()
+    {
+        var store = new StoreClient("store.example", "secret", new HttpClient(new UnreachableHandler()));
+
+        var error = await Assert.ThrowsAsync<PackageException>(() => store.ReleaseAsync("org.mass4.demo", "1.2.0",
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("could not be reached", error.Message, StringComparison.Ordinal);
+    }
+
+    sealed class UnreachableHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("connection refused");
+    }
+
+    static string Image(char digit) => $"ghcr.io/example/cli@sha256:{new string(digit, 64)}";
+
+    static string Receipt(string integrity, string image, string warnings = "") => $$"""
+        { "id": "6f9619ff-8b86-d011-b42d-00cf4fc964ff", "packageId": "org.mass4.demo", "version": "1.2.0", "variant": "source",
+          "integrity": "{{integrity}}", "status": "pending", "approved": false, "isPrivate": false, "sourceRevision": "first",
+          "build": { "image": "{{image}}", "turianVersion": "3.3.0" }, "warnings": [{{warnings}}] }
+        """;
+
+    string SignedRelease(string integrity, string? image)
+    {
+        var path = Path.Combine(root, $"release-{Guid.NewGuid():N}.json");
+        var build = image is null ? "" : $$""", "build": { "image": "{{image}}", "turianVersion": "3.3.0" }""";
+        File.WriteAllText(path, $$"""
+            { "packageId": "org.mass4.demo", "version": "1.2.0", "integrity": "{{integrity}}",
+              "signature": "sig", "signedBy": "SHA256:abc", "sourceRevision": "second"{{build}} }
+            """);
+        return path;
     }
 
     /// <summary>Metadata for another archive, unsigned metadata or a file that is not JSON is refused before any upload.</summary>
@@ -344,12 +471,15 @@ public sealed class StoreClientTests : IDisposable
 
         public List<(string Method, string? Token, string Body)> Requests { get; } = [];
 
+        public List<string> Uris { get; } = [];
+
         public HttpStatusCode Status { get; init; } = HttpStatusCode.OK;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             Requests.Add((request.Method.Method, request.Headers.Authorization?.Parameter, body));
+            Uris.Add(request.RequestUri!.PathAndQuery);
             return Routes.TryGetValue(request.RequestUri!.AbsolutePath, out var response)
                 ? new HttpResponseMessage(Status) { Content = new StringContent(response) }
                 : new HttpResponseMessage(HttpStatusCode.NotFound);

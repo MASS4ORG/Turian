@@ -84,7 +84,36 @@ public sealed class RegistryVersion
     /// the twin's own signed <c>bakeOf</c> before using it.
     /// </summary>
     public List<RegistryBakeLink>? Bakes { get; set; }
+
+    /// <summary>Which archive of the release this entry is; <see cref="PackageVariant.Source"/> when absent.</summary>
+    public string? Variant { get; set; }
+
+    /// <summary>
+    /// Variant key → its archive, the source's among them, so a client picks a bake without another lookup. Advisory
+    /// like <see cref="Bakes"/>: each entry is verified under its own signed <see cref="PackageId"/> and
+    /// <see cref="Version"/>, and the archive's own <c>bakeOf</c> is checked before use.
+    /// </summary>
+    public SortedDictionary<string, RegistryVersion>? Variants { get; set; }
+
+    /// <summary>The id the entry's signatures cover, inside <see cref="Variants"/>; a bake from before variants keeps its own.</summary>
+    public string? PackageId { get; set; }
+
+    /// <summary>The version the entry's signatures cover, inside <see cref="Variants"/>.</summary>
+    public string? Version { get; set; }
+
+    /// <summary>What the store first recorded built the archive; unsigned, so it informs and never authorizes.</summary>
+    public RegistryBuild? Build { get; set; }
+
+    /// <summary>The source revision the store first recorded for the archive; unsigned.</summary>
+    public string? SourceRevision { get; set; }
 }
+
+/// <summary>The toolchain a store recorded as having built an archive.</summary>
+/// <param name="Image">The container image, pinned as <c>name@sha256:digest</c>.</param>
+/// <param name="TurianVersion">
+/// The exact version of the host that image runs; <see cref="PackageResolverOptions.BuildHost"/> names that host.
+/// </param>
+public sealed record RegistryBuild(string Image, string TurianVersion);
 
 /// <summary>A bake twin of a registry version, as the index links it.</summary>
 public sealed class RegistryBakeLink

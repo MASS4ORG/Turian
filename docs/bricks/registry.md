@@ -11,7 +11,7 @@ The location's path shape, `/v1/index.json`, is the one permanent commitment; fi
 ```
 v1/index.json                                 the index
 v1/keys                                       the registry's public keys
-v1/bricks/<id>/<version>/<id>-<version>.brick  the brick files (any path works; the index says where)
+v1/bricks/<id>/<version>/<id>-<version>--<variant>.brick  the brick files (any path works; the index says where)
 ```
 
 ## Names
@@ -30,7 +30,7 @@ A brick id is lowercase reverse-DNS: `org.mass4.turian.ui`, `com.acme.inventory`
     "user.mateo.rules": {
       "versions": {
         "1.0.0": {
-          "url": "bricks/user.mateo.rules/1.0.0/user.mateo.rules-1.0.0.brick",
+          "url": "bricks/user.mateo.rules/1.0.0/user.mateo.rules-1.0.0--source.brick",
           "integrity": "sha256-<base64>",
           "signature": "<base64 of the registry's SSH signature>",
           "signedBy": "SHA256:<fingerprint of the registry key>",
@@ -54,6 +54,53 @@ A brick id is lowercase reverse-DNS: `org.mass4.turian.ui`, `com.acme.inventory`
   downloading it.
 - `yanked` hides a version from new resolutions. It stays downloadable, so a project that locked it keeps working.
 - Versions are immutable. A version is published once; fixing it means publishing the next one.
+
+## Variants
+
+A release is identified by its id, version and **variant**. The source archive is variant `source`; a bake, the
+prebuilt and imported form of that source, keeps the same id and version and names its target, such as `turian3.3`
+for one baked by Turian 3.3. The variant comes only from the archive's own `package.json`, never from its file name or
+from release metadata:
+
+```json
+{ "id": "user.mateo.rules", "version": "1.0.0", "variant": "turian3.3",
+  "bakeOf": { "brick": "user.mateo.rules", "version": "1.0.0", "integrity": "sha256-<base64 of the source file>" } }
+```
+
+A source omits `variant` or sets it to `source` and never declares `bakeOf`; every other variant declares it, with the
+source's id and exact version. Keys are ASCII letters, digits and interior `.`, `-` or `_`, at most 100 characters;
+`legacy-` is reserved for bakes published before variants, which stores key by their archive hash and which keep their
+own `<id>.bake` ids and signatures.
+
+The source stays the version entry, so clients that know no variants keep working. `variants` maps each key to its
+archive's entry, with the `packageId` and `version` its signatures cover:
+
+```json
+"1.0.0": {
+  "url": "…--source.brick", "integrity": "…", "signature": "…", "variant": "source",
+  "variants": {
+    "source": { "url": "…--source.brick", "packageId": "user.mateo.rules", "version": "1.0.0", "…": "…" },
+    "turian3.3": { "url": "…--turian3.3.brick", "packageId": "user.mateo.rules", "version": "1.0.0", "…": "…" }
+  }
+}
+```
+
+A host taking bakes picks, for each brick, the variant of its own major and minor version, else an older minor of its
+major, else the source. Another major version always takes the source, and so does a bake whose precast assemblies this
+version cannot load. The bake's signature, its `bakeOf` against the source the registry serves, and the source's
+publisher or trusted bakers are checked before use; the lock records the variant taken.
+
+## Build provenance and advisories
+
+A store may record, unsigned, what built each archive: `"build": { "image": "<name>@sha256:<digest>",
+"turianVersion": "3.3.0" }`, with `sourceRevision`, both as first received. Neither is covered by a signature, so they
+inform and never authorize.
+
+A store also serves curator advisories at `api/v1/build-advisories`, beside its registry: records naming a
+`packagePrefix` and a digest-pinned `image` and/or a `turianVersionRange`, a `message`, and whether matching builds are
+refused (`reject`). A host warns about a bake a warning advisory matches, and takes the source instead of one a refusing
+advisory matches, matched on the recorded build or, when none was recorded, the version its precast records. A
+toolchain's age alone never refuses a bake.
 
 ## Signatures
 

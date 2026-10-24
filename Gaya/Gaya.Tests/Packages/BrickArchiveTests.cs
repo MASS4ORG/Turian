@@ -31,7 +31,7 @@ public sealed class BrickArchiveTests : IDisposable
         var second = BrickArchive.Pack(brick, Path.Combine(root, "out2"));
 
         Assert.Equal(first.Integrity, second.Integrity);
-        Assert.Equal("com.acme.rules-1.0.0.brick", Path.GetFileName(first.Path));
+        Assert.Equal("com.acme.rules-1.0.0--source.brick", Path.GetFileName(first.Path));
         Assert.Contains(Path.GetFileName(first.Path), File.ReadAllText($"{first.Path}.sha256"), StringComparison.Ordinal);
     }
 
@@ -144,21 +144,83 @@ public sealed class BrickArchiveTests : IDisposable
     public void GlobsMatchLikeGitIgnore(string glob, string path, bool expected) =>
         Assert.Equal(expected, BrickGlob.Matches(glob, path));
 
-    /// <summary>A twin is packed under the source id plus .bake and records the source file it was baked from.</summary>
+    /// <summary>
+    /// A twin keeps its source's id and version as a variant, is named after it, and records the source file it was
+    /// baked from; the variant is what classifies it, never the file name.
+    /// </summary>
     [Fact]
-    public void TwinsRecordTheirSource()
+    public void TwinsAreVariantsOfTheirSource()
     {
         var brick = Brick("rules", "com.acme.rules", "1.2.0");
         var source = BrickArchive.Pack(brick, Path.Combine(root, "out"));
 
         var twin = BrickArchive.Pack(brick, Path.Combine(root, "out"),
-            bakeOf: new PackageBakeOf { Brick = "com.acme.rules", Version = source.Manifest.Version, Integrity = source.Integrity });
+            bakeOf: new PackageBakeOf { Brick = "com.acme.rules", Version = source.Manifest.Version, Integrity = source.Integrity },
+            variant: "turian3.3");
 
         var manifest = BrickArchive.ReadManifest(twin.Path);
-        Assert.Equal("com.acme.rules.bake-1.2.0.brick", Path.GetFileName(twin.Path));
-        Assert.Equal("com.acme.rules.bake", manifest.Name);
+        Assert.Equal("com.acme.rules-1.2.0--turian3.3.brick", Path.GetFileName(twin.Path));
+        Assert.Equal(("com.acme.rules", "turian3.3"), (manifest.Name, manifest.Variant));
         Assert.Equal(source.Integrity, manifest.BakeOf!.Integrity);
         Assert.Equal("1.2.0", manifest.BakeOf.Version!.ToString());
+        Assert.Equal("turian3.3", PackageVariant.Of(manifest, twin.Integrity));
+        Assert.Equal(PackageVariant.Source, PackageVariant.Of(source.Manifest, source.Integrity));
+
+        File.Move(twin.Path, Path.Combine(root, "out", "renamed.brick"));
+        Assert.Equal("turian3.3", BrickArchive.ReadManifest(Path.Combine(root, "out", "renamed.brick")).Variant);
+    }
+
+    /// <summary>A bake needs a variant other than source, and a variant cannot change its source's id or version.</summary>
+    [Fact]
+    public void BakesWithoutAMatchingVariantAreRefused()
+    {
+        var brick = Brick("rules", "com.acme.rules", "1.2.0");
+        var source = BrickArchive.Pack(brick, Path.Combine(root, "out"));
+        var bakeOf = new PackageBakeOf { Brick = "com.acme.rules", Version = source.Manifest.Version, Integrity = source.Integrity };
+
+        Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "a"), bakeOf: bakeOf));
+        Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "b"), bakeOf: bakeOf, variant: PackageVariant.Source));
+        Assert.Throws<PackageException>(() => BrickArchive.Pack(brick, Path.Combine(root, "c"), variant: "legacy-x",
+            bakeOf: bakeOf));
+        var other = new PackageBakeOf { Brick = "com.acme.other", Version = source.Manifest.Version, Integrity = source.Integrity };
+        Assert.Contains("keep its source's id", Assert.Throws<PackageException>(() =>
+            BrickArchive.Pack(brick, Path.Combine(root, "d"), bakeOf: other, variant: "turian3.3")).Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>Manifest variant rules: source never declares bakeOf, every bake does, and keys stay portable.</summary>
+    [Theory]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "source" }""", true)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "turian3.3" }""", false)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "source", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.0", "integrity": "sha256-x" } }""", false)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "bad key", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.0", "integrity": "sha256-x" } }""", false)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "turian3.3", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.1", "integrity": "sha256-x" } }""", false)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "variant": "turian3.3", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.0", "integrity": "sha256-x" } }""", true)]
+    [InlineData("""{ "id": "com.acme.rules", "version": "1.0.0", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.0", "integrity": "sha256-x" } }""", false)]
+    public void VariantsFollowTheStoreRules(string json, bool valid)
+    {
+        var parse = () => PackageManifest.Parse(json, "package.json");
+        if (valid)
+        {
+            _ = parse();
+        }
+        else
+        {
+            Assert.Throws<PackageException>(parse);
+        }
+    }
+
+    /// <summary>A bake from before variants gets the store's hash-derived legacy key.</summary>
+    [Fact]
+    public void LegacyBakesGetTheStoresKey()
+    {
+        var integrity = $"sha256-{Convert.ToBase64String(Enumerable.Repeat((byte)0xfb, 32).ToArray())}";
+        var legacy = PackageManifest.Parse(
+            $$"""{ "id": "com.acme.rules.bake", "version": "1.0.0", "bakeOf": { "brick": "com.acme.rules", "version": "1.0.0", "integrity": "{{integrity}}" } }""",
+            "package.json");
+
+        // 0xfb bytes encode as "+/v7" in base64: unpadded base64url "-_v7", ending "-_s" for the last two bytes.
+        Assert.Equal("legacy-" + string.Concat(Enumerable.Repeat("-_v7", 10)) + "-_s", PackageVariant.Of(legacy, integrity));
+        Assert.Equal("engine3.4", PackageVariant.ForHost("engine", SemanticVersion.Parse("3.4.1")));
     }
 
     /// <summary>A brick file is read back as the same manifest and extracts to the same files.</summary>

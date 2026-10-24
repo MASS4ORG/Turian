@@ -10,8 +10,15 @@ namespace MASS4.Bricks;
 /// <param name="IsPrivate">Only readers with access to its owner's bricks can download it.</param>
 /// <param name="Integrity">The archive's content hash.</param>
 /// <param name="DeprecationReason">Why consumers should move off it; null when it is not deprecated.</param>
+/// <param name="Variant">Which archive of the release it is, as its manifest says.</param>
+/// <param name="Status">The store's lifecycle state: quarantined, pending, yanked or published.</param>
+/// <param name="SourceRevision">The source revision the store first recorded; later uploads never replace it.</param>
+/// <param name="Build">What the store first recorded built the archive; later uploads never replace it.</param>
+/// <param name="Warnings">What the store accepted but the publisher should know, such as metadata differing from the first upload.</param>
 public sealed record StoreRelease(Guid Id, string PackageId, string Version, bool Approved, bool Yanked = false,
-    bool Quarantined = false, bool IsPrivate = false, string? Integrity = null, string? DeprecationReason = null);
+    bool Quarantined = false, bool IsPrivate = false, string? Integrity = null, string? DeprecationReason = null,
+    string? Variant = null, string? Status = null, string? SourceRevision = null, RegistryBuild? Build = null,
+    IReadOnlyList<string>? Warnings = null);
 
 /// <summary>A change to a release's state; null members stay as they are.</summary>
 /// <param name="Yanked">Withdraw the release, or put it back.</param>
@@ -128,14 +135,20 @@ public sealed class StoreClient
     /// <summary>
     /// Uploads a <c>.brick</c> file with release metadata signed elsewhere, such as on the publisher's workstation, so
     /// the private keys never reach this machine. The metadata is sent as it is, once its id, version and hash are
-    /// checked against the archive.
+    /// checked against the archive. A re-run is checked first against what the store recorded, as
+    /// <see cref="CheckRerunAsync"/> describes.
     /// </summary>
     /// <param name="brickFile">The packed brick that was signed.</param>
     /// <param name="releaseFile">The signed release JSON: <c>packageId</c>, <c>version</c>, <c>integrity</c>, signatures and provenance.</param>
     /// <param name="reservedCategoryPrefixes">Category prefixes the manifest may use without depending on them.</param>
     /// <param name="cancellationToken">Cancels the upload.</param>
-    /// <returns>The release; check <see cref="StoreRelease.Approved"/> before telling consumers it is available.</returns>
-    /// <exception cref="PackageException">The metadata does not describe the archive, or the store refused the release.</exception>
+    /// <returns>
+    /// The release, with the store's warnings and those of matching curator advisories; check
+    /// <see cref="StoreRelease.Approved"/> before telling consumers it is available.
+    /// </returns>
+    /// <exception cref="PackageException">
+    /// The metadata does not describe the archive, the re-run check refuses it, or the store refused the release.
+    /// </exception>
     public async Task<StoreRelease> PublishSignedAsync(string brickFile, string releaseFile,
         IReadOnlyCollection<string>? reservedCategoryPrefixes = null, CancellationToken cancellationToken = default)
     {
@@ -165,7 +178,93 @@ public sealed class StoreClient
             throw new PackageException($"{releaseFile} carries no registry signature; sign the release before uploading it.");
         }
 
-        return await UploadAsync(brickFile, release, id, version, cancellationToken).ConfigureAwait(false);
+        var build = ReadBuild(release, releaseFile);
+        var advisories = await CheckRerunAsync(id, version, PackageVariant.Of(manifest, expected.Item3), expected.Item3, build,
+            cancellationToken).ConfigureAwait(false);
+        var published = await UploadAsync(brickFile, release, id, version, cancellationToken).ConfigureAwait(false);
+        return published with { Warnings = [.. published.Warnings ?? [], .. advisories] };
+    }
+
+    /// <summary>
+    /// Checks an upload against the release the store already holds for the same id, version and variant, before
+    /// sending it: different bytes are refused, as is a re-run built by another image than the one recorded, and so is
+    /// any build a curator advisory rejects, matched on the recorded build as well as this one.
+    /// </summary>
+    /// <param name="id">The brick id.</param>
+    /// <param name="version">The version.</param>
+    /// <param name="variant">The archive's variant, from its manifest.</param>
+    /// <param name="integrity">The archive's hash.</param>
+    /// <param name="build">The build the upload records; null when it records none.</param>
+    /// <param name="cancellationToken">Cancels the requests.</param>
+    /// <returns>The messages of advisories that warn about the build.</returns>
+    /// <exception cref="PackageException">The upload must not proceed, or the store cannot be asked.</exception>
+    public async Task<IReadOnlyList<string>> CheckRerunAsync(string id, string version, string variant, string integrity,
+        RegistryBuild? build, CancellationToken cancellationToken = default)
+    {
+        var recorded = await ReleaseAsync(id, version, variant, cancellationToken).ConfigureAwait(false);
+        if (recorded is not null && recorded.Integrity != integrity)
+        {
+            throw new PackageException(
+                $"{Origin.Host} already holds {id} {version} ({variant}) with other bytes ({recorded.Integrity}); versions are immutable, publish a new one.");
+        }
+
+        if (recorded?.Build is { } first && build is not null && first.Image != build.Image)
+        {
+            throw new PackageException(
+                $"{id} {version} ({variant}) was first built by {first.Image}; this re-run was built by {build.Image}. Re-run the release with the recorded image.");
+        }
+
+        var (rejected, warnings) = BuildAdvisory.Evaluate(await BuildAdvisoriesAsync(cancellationToken).ConfigureAwait(false), id,
+            [(build?.Image, build?.TurianVersion), (recorded?.Build?.Image, recorded?.Build?.TurianVersion)]);
+        return rejected is not null
+            ? throw new PackageException($"{id} {version} ({variant}): build rejected by curator advisory {rejected.Id}: {rejected.Message} See {new Uri(Origin, rejected.Path)}.")
+            : [.. warnings.Select(a => $"Curator advisory {a.Id}: {a.Message} See {new Uri(Origin, a.Path)}.")];
+    }
+
+    /// <summary>
+    /// The release the store holds for an exact id, version and variant, including one still waiting for approval;
+    /// null when there is none the token's owner may see.
+    /// </summary>
+    /// <param name="id">The brick id.</param>
+    /// <param name="version">The version.</param>
+    /// <param name="variant">The variant; <see cref="PackageVariant.Source"/> for the source.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The release with its first recorded provenance, or null.</returns>
+    /// <exception cref="PackageException">The token may not read releases, or the store cannot be reached.</exception>
+    public async Task<StoreRelease?> ReleaseAsync(string id, string version, string variant = PackageVariant.Source,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        ArgumentException.ThrowIfNullOrWhiteSpace(variant);
+        using var request = Request(HttpMethod.Get,
+            $"api/v1/releases/{Uri.EscapeDataString(id)}/{Uri.EscapeDataString(version)}?variant={Uri.EscapeDataString(variant)}", null);
+        return await SendAsync<StoreRelease>(request, $"read {id} {version} ({variant})", cancellationToken, notFound: true)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>The curator's build advisories the store serves; none when it serves none.</summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The advisories.</returns>
+    /// <exception cref="PackageException">The store refused the request or cannot be reached.</exception>
+    public async Task<IReadOnlyList<BuildAdvisory>> BuildAdvisoriesAsync(CancellationToken cancellationToken = default)
+    {
+        using var request = Request(HttpMethod.Get, "api/v1/build-advisories", null, anonymous: token is null);
+        return await SendAsync<List<BuildAdvisory>>(request, "read build advisories", cancellationToken,
+            anonymous: token is null, notFound: true).ConfigureAwait(false) ?? [];
+    }
+
+    static RegistryBuild? ReadBuild(JsonObject release, string releaseFile)
+    {
+        if (release["build"] is not { } node)
+        {
+            return null;
+        }
+
+        return node is JsonObject { Count: 2 } build && build["image"] is JsonValue image && image.TryGetValue<string>(out var name)
+               && build["turianVersion"] is JsonValue host && host.TryGetValue<string>(out var version)
+            ? new RegistryBuild(name, version)
+            : throw new PackageException($"{releaseFile}: build must hold exactly image and turianVersion.");
     }
 
     async Task<StoreRelease> UploadAsync(string brickFile, JsonObject release, string id, string version,
@@ -269,7 +368,7 @@ public sealed class StoreClient
     }
 
     async Task<T?> SendAsync<T>(HttpRequestMessage request, string action, CancellationToken cancellationToken,
-        bool anonymous = false)
+        bool anonymous = false, bool notFound = false)
     {
         if (token is null && !anonymous)
         {
@@ -291,6 +390,11 @@ public sealed class StoreClient
         using (response)
         {
             var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            if (notFound && response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return default;
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 throw new PackageException($"{Origin.Host} refused to {action}: {Reason(response.StatusCode, text)}");

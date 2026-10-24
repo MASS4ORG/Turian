@@ -170,6 +170,12 @@ public sealed class PackageManifest
     public PackageBakeOf? BakeOf { get; set; }
 
     /// <summary>
+    /// Which archive of the release this is: <see cref="PackageVariant.Source"/> when absent, else a bake target such
+    /// as <c>turian3.3</c>, which keeps its source's id and version and names it in <see cref="BakeOf"/>.
+    /// </summary>
+    public string? Variant { get; set; }
+
+    /// <summary>
     /// Whether bake twins of the package may exist: <c>auto</c>, the default, lets consumers take one when it is
     /// published; <c>none</c> means the package itself is the consumable form and twins of it are refused.
     /// </summary>
@@ -395,14 +401,19 @@ public sealed class PackageManifest
 
     void ValidateBakeOf(string path)
     {
-        if (BakeOf is not { } bakeOf)
+        if (BakeOf is { } bakeOf)
         {
-            return;
+            ValidateSource(path, bakeOf);
         }
 
-        if (!PackageId.IsValid(bakeOf.Brick) || bakeOf.Brick == Name)
+        ValidateVariant(path);
+    }
+
+    void ValidateSource(string path, PackageBakeOf bakeOf)
+    {
+        if (!PackageId.IsValid(bakeOf.Brick) || (Variant is null && bakeOf.Brick == Name))
         {
-            throw new PackageException($"{path}: bakeOf.brick '{bakeOf.Brick}' must be the id of another brick.");
+            throw new PackageException($"{path}: bakeOf.brick '{bakeOf.Brick}' must be the id of another brick, or the same id with a variant.");
         }
 
         if (bakeOf.Version is null)
@@ -413,6 +424,29 @@ public sealed class PackageManifest
         if (!bakeOf.Integrity.StartsWith("sha256-", StringComparison.Ordinal))
         {
             throw new PackageException($"{path}: bakeOf.integrity must be the source file's sha256- hash.");
+        }
+    }
+
+    void ValidateVariant(string path)
+    {
+        if (Variant is null)
+        {
+            return;
+        }
+
+        if (!PackageVariant.IsValid(Variant) || Variant.StartsWith(PackageVariant.LegacyPrefix, StringComparison.Ordinal))
+        {
+            throw new PackageException($"{path}: variant '{Variant}' must be at most 100 ASCII letters, digits, '.', '-' or '_', and not start with '{PackageVariant.LegacyPrefix}'.");
+        }
+
+        if ((Variant == PackageVariant.Source) != (BakeOf is null))
+        {
+            throw new PackageException($"{path}: a {PackageVariant.Source} variant cannot declare bakeOf, and every other variant must.");
+        }
+
+        if (BakeOf is { } bakeOf && (bakeOf.Brick != Name || bakeOf.Version != Version))
+        {
+            throw new PackageException($"{path}: variant '{Variant}' must keep its source's id and version, {bakeOf.Brick} {bakeOf.Version}.");
         }
     }
 

@@ -26,8 +26,8 @@ public static partial class BrickService
 
     /// <summary>
     /// Packs a brick folder as a source brick and its bake twin. The source file leaves out the precast payload and the
-    /// bake; the twin, <c>id.bake</c>, carries them with the assets, without the C# sources or scripts, and records the
-    /// source file it was baked from.
+    /// bake; the twin keeps the source's id and version as variant <c>turian&lt;major&gt;.&lt;minor&gt;</c>, carries
+    /// the payload with the assets, without the C# sources or scripts, and records the source file it was baked from.
     /// </summary>
     /// <param name="packageRoot">The brick folder, with its precast payload built when it has code, and baked.</param>
     /// <param name="outputDirectory">Where both files and their hashes are written.</param>
@@ -53,7 +53,8 @@ public static partial class BrickService
             exclude: [.. payloads.Concat(bakes).Select(path => Path.GetRelativePath(packageRoot, path).Replace('\\', '/'))]);
         string[] sources = [.. SourcePaths(manifest), "*.cs", "*.cs.meta"];
         var twin = BrickArchive.Pack(packageRoot, outputDirectory, prefixes, precast, sources,
-            new PackageBakeOf { Brick = source.Manifest.Name, Version = source.Manifest.Version, Integrity = source.Integrity });
+            new PackageBakeOf { Brick = source.Manifest.Name, Version = source.Manifest.Version, Integrity = source.Integrity },
+            PackageVariant.ForHost(ProjectPackages.HostName, ProjectPackages.EngineVersion));
         return (source, twin);
     }
 

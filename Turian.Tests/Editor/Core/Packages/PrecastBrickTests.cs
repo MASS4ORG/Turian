@@ -137,12 +137,16 @@ public sealed class PrecastBrickTests(PrecastBrickFixture fixture) : IClassFixtu
             Assert.DoesNotContain(twinZip.Entries, static e => e.FullName.EndsWith(".cs", StringComparison.Ordinal) || e.FullName.EndsWith(".cs.meta", StringComparison.Ordinal));
         }
 
-        Assert.Equal(("user.mateo.inventory.bake", source.Integrity), (twin.Manifest.Name, twin.Manifest.BakeOf!.Integrity));
+        var variant = PackageVariant.ForHost(ProjectPackages.HostName, ProjectPackages.EngineVersion);
+        Assert.Equal(("user.mateo.inventory", variant, source.Integrity),
+            (twin.Manifest.Name, twin.Manifest.Variant, twin.Manifest.BakeOf!.Integrity));
+        Assert.Equal($"user.mateo.inventory-{source.Manifest.Version}--{variant}.brick", Path.GetFileName(twin.Path));
         Assert.Equal(["Mateo.Inventory"], twin.Manifest.Precast!.Assemblies);
 
         var project = (await new ProjectBootstrapper().CreateAsync(Path.Combine(root, "project")))!;
-        var brick = BrickService.Add(project, "user.mateo.inventory.bake", $"file:{twin.Path}").Packages
-            .Single(static p => p.Id == "user.mateo.inventory.bake");
+        var brick = BrickService.Add(project, "user.mateo.inventory", $"file:{twin.Path}").Packages
+            .Single(static p => p.Id == "user.mateo.inventory");
+        Assert.Equal(variant, brick.Manifest.Variant);
         Assert.True(BrickAssemblies.IsPrecast(brick));
         File.WriteAllText(Path.Combine(project, "Assets", "Bag.cs"),
             "namespace Usercode; public class Bag : Mateo.Inventory.InventoryComponent { }");

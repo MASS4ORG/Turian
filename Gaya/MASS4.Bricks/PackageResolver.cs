@@ -82,6 +82,12 @@ public sealed record PackageResolverOptions
     /// <summary>Host → its version, checked against each package's <see cref="PackageManifest.Engines"/>.</summary>
     public IReadOnlyDictionary<string, SemanticVersion> Hosts { get; init; } = new Dictionary<string, SemanticVersion>();
 
+    /// <summary>
+    /// The host whose version a store records as an archive's build version, so bakes of another major are left for
+    /// their source and curator advisories can match a bake's precast version; null when stores record none for it.
+    /// </summary>
+    public string? BuildHost { get; init; }
+
     /// <summary>What the packages are installed into; a package must list it among its scopes.</summary>
     public PackageScope Scope { get; init; } = PackageScope.Project;
 
@@ -388,6 +394,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 Integrity = package.Integrity,
                 SignedBy = package.SignedBy,
                 BakeOf = package.Manifest.BakeOf,
+                Variant = package.Manifest.BakeOf is null ? null : package.Manifest.Variant,
                 Depth = package.Depth,
                 Dependencies = new SortedDictionary<string, string>(package.Manifest.Dependencies, StringComparer.Ordinal),
             };
@@ -431,7 +438,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
                 {
                     Constraints.Add((next.Id, range.Range, next.RequiredBy, next.Depth));
                 }
-                else if (Twins.TryGetValue(next.Id, out var twin))
+                else if (Twins.TryGetValue(next.Id, out var twin) && twin.Id != next.Id)
                 {
                     throw BothInstalled(next.Id, twin.Id);
                 }
@@ -559,7 +566,8 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
         {
             if (package.Manifest.BakeOf is { } bakeOf)
             {
-                if (Resolved.ContainsKey(bakeOf.Brick) || (Twins.TryGetValue(bakeOf.Brick, out var other) && other.Id != package.Id))
+                if ((bakeOf.Brick != package.Id && Resolved.ContainsKey(bakeOf.Brick))
+                    || (Twins.TryGetValue(bakeOf.Brick, out var other) && other.Id != package.Id))
                 {
                     throw BothInstalled(bakeOf.Brick, package.Id);
                 }

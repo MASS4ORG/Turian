@@ -66,7 +66,7 @@ public static partial class Program
         foreach (var brick in resolution.Packages.Where(static p => p.Origin is PackageOrigin.Registry or PackageOrigin.Embedded or PackageOrigin.Link))
         {
             Console.WriteLine(brick.Manifest.BakeOf is { } bakeOf
-                ? $"  {bakeOf.Brick} {bakeOf.Version}: twin {brick.Id}"
+                ? $"  {bakeOf.Brick} {bakeOf.Version}: twin {brick.Manifest.Variant ?? brick.Id}"
                 : brick.Origin == PackageOrigin.Link
                     ? $"  {brick.Id} {brick.Version}: source, linked to {brick.RootPath}"
                 : brick.Origin == PackageOrigin.Embedded

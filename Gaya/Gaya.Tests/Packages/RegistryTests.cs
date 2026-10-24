@@ -359,16 +359,17 @@ public sealed class RegistryTests : IDisposable
             manifest.Store = new PackageStoreInfo { Entitlement = entitlement };
         }
 
-        manifest.Save(folder);
-        File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
-        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"]);
+        // A twin from before variants: its own id, naming the source it stands in for.
         if (twinOf is not null)
         {
             var source = RegistryIndex.Parse(File.ReadAllText(Path.Combine(registry, "v1", "index.json"))).Bricks[twinOf].Versions[version];
-            File.Delete(packed.Path);
-            packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"],
-                bakeOf: new PackageBakeOf { Brick = twinOf, Version = SemanticVersion.Parse(version), Integrity = source.Integrity });
+            manifest.Name = BrickArchive.TwinIdOf(twinOf);
+            manifest.BakeOf = new PackageBakeOf { Brick = twinOf, Version = SemanticVersion.Parse(version), Integrity = source.Integrity };
         }
+
+        manifest.Save(folder);
+        File.WriteAllText(Path.Combine(folder, "Runtime", "Content.txt"), $"{id} {version}");
+        var packed = BrickArchive.Pack(folder, Path.Combine(root, "packed", Guid.NewGuid().ToString("N")), ["engine"]);
 
         RegistryPublisher.Publish(into ?? registry, packed.Path, registrySigner, publisher ?? (claim is null && id.StartsWith("user.mateo", StringComparison.Ordinal) ? mateo : publisher), claim, ["engine"]);
     }

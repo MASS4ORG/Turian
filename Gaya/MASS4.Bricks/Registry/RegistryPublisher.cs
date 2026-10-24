@@ -127,17 +127,14 @@ public static class RegistryPublisher
         var location = LocationOf(registryRoot);
         var indexPath = Path.Combine(location, "index.json");
         var index = File.Exists(indexPath) ? RegistryIndex.Parse(File.ReadAllText(indexPath)) : new RegistryIndex();
-
-        if (index.Bricks.TryGetValue(id, out var existing) && existing.Versions.ContainsKey(version))
-        {
-            throw new PackageException($"{id} {version} is already published; versions are immutable, publish a new one.");
-        }
+        var variant = manifest.BakeOf is not null ? manifest.Variant : null;
+        var integrity = BrickArchive.ComputeIntegrity(brickFile);
+        var source = Unpublished(index, manifest, variant);
 
         var publisherKey = publisherSigner?.PublicKey;
         var publisherFingerprint = publisherKey is null ? null : SshSignature.Fingerprint(publisherKey);
         Authorize(index, id, claim, publisherFingerprint);
 
-        var integrity = BrickArchive.ComputeIntegrity(brickFile);
         var message = RegistrySignatures.Message(id, version, integrity);
         var file = Path.GetFileName(brickFile);
         var relative = $"bricks/{id}/{version}/{file}";
@@ -168,19 +165,62 @@ public static class RegistryPublisher
             entry.PublisherKey = publisherKey;
         }
 
-        if (existing is null)
-        {
-            index.Bricks[id] = existing = new RegistryBrick();
-        }
-
-        existing.Versions[version] = entry;
-        LinkBake(index, manifest.BakeOf, id, version);
+        Place(index, manifest, entry, source, variant);
         index.GeneratedAt = DateTimeOffset.UtcNow;
 
         Directory.CreateDirectory(location);
         File.WriteAllText(indexPath, index.Serialize());
         WriteKeys(Path.Combine(location, "keys"), registryKey);
         return new RegistryPublishResult(id, version, relative);
+    }
+
+    /// <summary>
+    /// Checks the archive is not published yet. A bake keeps its source's id and version, so it needs that exact source
+    /// file published first, which it then joins as a variant: the source's entry is returned.
+    /// </summary>
+    /// <exception cref="PackageException">The version or variant exists, or a bake's source file is not held.</exception>
+    static RegistryVersion? Unpublished(RegistryIndex index, PackageManifest manifest, string? variant)
+    {
+        var (id, version) = (manifest.Name, manifest.Version!.ToString());
+        var published = index.Bricks.GetValueOrDefault(id)?.Versions.GetValueOrDefault(version);
+        if (variant is null)
+        {
+            return published is null
+                ? null
+                : throw new PackageException($"{id} {version} is already published; versions are immutable, publish a new one.");
+        }
+
+        if (published is null || published.Integrity != manifest.BakeOf!.Integrity)
+        {
+            throw new PackageException($"{id} {version} ({variant}) is a bake of a source file this registry does not hold; publish that source first.");
+        }
+
+        return published.Variants?.ContainsKey(variant) == true
+            ? throw new PackageException($"{id} {version} ({variant}) is already published; versions are immutable, publish a new one.")
+            : published;
+    }
+
+    /// <summary>Adds the entry as a variant of its source's entry, or as its own version linked from a source it bakes.</summary>
+    static void Place(RegistryIndex index, PackageManifest manifest, RegistryVersion entry, RegistryVersion? source, string? variant)
+    {
+        var (id, version) = (manifest.Name, manifest.Version!.ToString());
+        if (source is not null)
+        {
+            entry.Variant = variant;
+            entry.PackageId = id;
+            entry.Version = version;
+            source.Variants ??= new SortedDictionary<string, RegistryVersion>(StringComparer.Ordinal);
+            source.Variants[variant!] = entry;
+            return;
+        }
+
+        if (!index.Bricks.TryGetValue(id, out var existing))
+        {
+            index.Bricks[id] = existing = new RegistryBrick();
+        }
+
+        existing.Versions[version] = entry;
+        LinkBake(index, manifest.BakeOf, id, version);
     }
 
     /// <summary>Withdraws a version: it stays downloadable for projects that locked it and is never chosen again.</summary>

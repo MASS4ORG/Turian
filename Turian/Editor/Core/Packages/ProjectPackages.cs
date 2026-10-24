@@ -220,6 +220,7 @@ public static class ProjectPackages
         {
             Registries = [PublicRegistry],
             Hosts = new Dictionary<string, SemanticVersion> { [HostName] = EngineVersion },
+            BuildHost = HostName,
             BuiltinDirectory = BuiltinDirectory,
             ReservedCategoryPrefixes = ["gaya", HostName],
             Locked = locked,

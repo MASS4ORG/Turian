@@ -179,10 +179,24 @@ public static partial class Program
         return command;
     }
 
-    /// <summary>Tells whether a release the store received is offered to consumers yet.</summary>
+    /// <summary>
+    /// Tells whether a release the store received is offered to consumers yet, what the store recorded built it, and
+    /// what it accepted but warns about.
+    /// </summary>
     static void ReportPublished(StoreClient store, StoreRelease release)
     {
-        Console.WriteLine($"Published {release.PackageId} {release.Version} to {store.Origin.Host}{ReleaseState(release)}");
+        var variant = release.Variant is { } key && key != PackageVariant.Source ? $" ({key})" : string.Empty;
+        Console.WriteLine($"Published {release.PackageId} {release.Version}{variant} to {store.Origin.Host}{ReleaseState(release)}");
+        if (release.Build is { } build)
+        {
+            Console.WriteLine($"Recorded build: {build.Image}, Turian {build.TurianVersion}");
+        }
+
+        foreach (var warning in release.Warnings ?? [])
+        {
+            Console.Error.WriteLine($"warning: {warning}");
+        }
+
         if (!release.Approved)
         {
             Console.WriteLine("It waits for the store's approval and is not offered to consumers until then.");
@@ -210,11 +224,15 @@ public static partial class Program
         string[] states =
         [
             .. release.Approved ? Array.Empty<string>() : ["awaiting approval"],
-            .. release.Yanked ? ["yanked"] : Array.Empty<string>(),
-            .. release.Quarantined ? ["quarantined"] : Array.Empty<string>(),
+            .. Flagged(release.Yanked, release, "yanked"),
+            .. Flagged(release.Quarantined, release, "quarantined"),
             .. release.IsPrivate ? ["private"] : Array.Empty<string>(),
             .. release.DeprecationReason is { Length: > 0 } reason ? [$"deprecated: {reason}"] : Array.Empty<string>(),
         ];
         return states.Length == 0 ? string.Empty : $"  ({string.Join(", ", states)})";
     }
+
+    /// <summary>The state, when the managed-release flag or the upload receipt's status says so.</summary>
+    static string[] Flagged(bool flag, StoreRelease release, string status) =>
+        flag || release.Status == status ? [status] : [];
 }

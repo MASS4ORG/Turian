@@ -8,7 +8,7 @@ namespace Turian.Tests;
 public sealed class BrickReleaseTests : IAsyncLifetime
 {
     readonly string root = Directory.CreateTempSubdirectory("brick-release-tests-").FullName;
-    string Archive => Path.Combine(root, "org.mass4.fixture-1.0.0.brick");
+    string Archive => Path.Combine(root, "org.mass4.fixture-1.0.0--source.brick");
     string QualificationFile => Path.Combine(root, "qualification.json");
     string Output => Path.Combine(root, "release.json");
     string Key => Path.Combine(root, "fixture-key");
@@ -60,6 +60,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
 
         Assert.Equal(SshSignature.Fingerprint(PublicKey), release.GetProperty("signedBy").GetString());
         Assert.Equal(new string('a', 40), release.GetProperty("sourceRevision").GetString());
+        Assert.False(release.TryGetProperty("build", out _));
         Assert.Equal(bytes, File.ReadAllBytes(Archive));
         Assert.DoesNotContain(File.ReadAllText(Key).Trim(), File.ReadAllText(Output));
         AssertClean();
@@ -204,26 +205,62 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// A bake twin is qualified beside its source under prefixed outputs, and a manifest naming the brick by its v2
-    /// <c>id</c> is read like one using <c>name</c>.
+    /// A bake twin is qualified beside its source under prefixed outputs, under the source's id and the variant its
+    /// manifest declares, and a manifest naming the brick by its v2 <c>id</c> is read like one using <c>name</c>.
     /// </summary>
     [Fact]
     public void TwinsQualifyUnderPrefixedOutputs()
     {
-        var twin = Path.Combine(root, "user.mateo.rules.bake-1.0.0.brick");
-        using (var packed = ZipFile.Open(twin, ZipArchiveMode.Create))
-        {
-            using var writer = new StreamWriter(packed.CreateEntry("package.json").Open());
-            writer.Write("""{ "id": "user.mateo.rules.bake", "version": "1.0.0" }""");
-        }
+        const string bakeOf = "\"bakeOf\": { \"brick\": \"user.mateo.rules\", \"version\": \"1.0.0\", \"integrity\": \"sha256-x\" }";
+        var twin = Path.Combine(root, "user.mateo.rules-1.0.0--turian3.3.brick");
+        WriteManifest(twin, $$"""{ "id": "user.mateo.rules", "version": "1.0.0", "variant": "turian3.3", {{bakeOf}} }""");
 
         var outputs = Path.Combine(root, "github-output");
         var qualification = ReleaseArchive.Qualify(twin, "v1.0.0", new string('a', 40), QualificationFile, outputs, "twin-");
 
-        Assert.Equal("user.mateo.rules.bake", qualification.PackageId);
+        Assert.Equal("user.mateo.rules", qualification.PackageId);
         Assert.Equal("twin-archive=" + Path.GetFileName(twin), File.ReadAllLines(outputs)[1]);
         Assert.Throws<InvalidDataException>(() => ReleaseArchive.Qualify(twin, "v1.0.0", new string('a', 40),
             QualificationFile, outputs, "twin\narchive=evil-"));
+
+        // A bake without a declared variant, or a name the manifest does not back, cannot be released.
+        var legacy = Path.Combine(root, "user.mateo.rules.bake-1.0.0--source.brick");
+        WriteManifest(legacy, $$"""{ "id": "user.mateo.rules.bake", "version": "1.0.0", {{bakeOf}} }""");
+        Assert.Throws<InvalidDataException>(() => ReleaseArchive.Qualify(legacy, "v1.0.0", new string('a', 40),
+            QualificationFile, outputs, "twin-"));
+        var misnamed = Path.Combine(root, "user.mateo.rules-1.0.0--source.brick");
+        File.Copy(twin, misnamed);
+        Assert.Throws<InvalidDataException>(() => ReleaseArchive.Qualify(misnamed, "v1.0.0", new string('a', 40),
+            QualificationFile, outputs, "twin-"));
+    }
+
+    /// <summary>
+    /// The signer writes build provenance beside the signatures when given both a digest-pinned image and an exact
+    /// Turian version; a plain tag, a partial build or a floating version is refused before any key is read.
+    /// </summary>
+    [Fact]
+    public async Task SigningRecordsTheBuild()
+    {
+        var image = "ghcr.io/mass4org/turian-cli@sha256:" + new string('c', 64);
+        await ReleaseSigner.SignAsync(root, Archive, QualificationFile, Output, PublicKey, File.ReadAllText(Key), root,
+            TestContext.Current.CancellationToken, ReleaseArchive.ValidateBuild(image, "3.4.0"));
+
+        using var metadata = JsonDocument.Parse(File.ReadAllText(Output));
+        var build = metadata.RootElement.GetProperty("build");
+        Assert.Equal((image, "3.4.0"), (build.GetProperty("image").GetString(), build.GetProperty("turianVersion").GetString()));
+        Assert.Equal(2, build.EnumerateObject().Count());
+
+        foreach (var (reference, version) in new[] { ("ghcr.io/mass4org/turian-cli:3.4.0", "3.4.0"), (image, "3.x"), (image, "latest") })
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() => ReleaseProgram.ExecuteAsync(
+                ["sign", Archive, QualificationFile, Output, "--build", reference, version], root, TestContext.Current.CancellationToken));
+        }
+
+        await Assert.ThrowsAsync<ArgumentException>(() => ReleaseProgram.ExecuteAsync(
+            ["sign", Archive, QualificationFile, Output, "--build", image], root, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => ReleaseProgram.ExecuteAsync(
+            ["sign", Archive, QualificationFile, Output, "--image", image, "3.4.0"], root, TestContext.Current.CancellationToken));
+        AssertClean();
     }
 
     /// <summary>The command dispatcher qualifies and validates without shell argument interpretation.</summary>
@@ -391,6 +428,13 @@ public sealed class BrickReleaseTests : IAsyncLifetime
             privateKey ?? File.ReadAllText(Key), root, TestContext.Current.CancellationToken);
 
     void AssertClean() => Assert.Empty(Directory.GetDirectories(root, "brick-signing-*"));
+
+    static void WriteManifest(string archive, string json)
+    {
+        using var packed = ZipFile.Open(archive, ZipArchiveMode.Create);
+        using var writer = new StreamWriter(packed.CreateEntry("package.json").Open());
+        writer.Write(json);
+    }
 
     void WriteArchive(string id = "org.mass4.fixture", string version = "1.0.0", string content = "original",
         string[]? scopes = null)

@@ -73,8 +73,14 @@ static class Program
 
     static Task SignCommand(string[] args, string root, CancellationToken cancellationToken)
     {
-        RequireArguments(args, 4, 4);
-        return SignAsync(root, args[1], args[2], args[3], cancellationToken);
+        // The build is both fields or none: the store refuses a partial one.
+        if (args.Length is not (4 or 7) || (args.Length == 7 && args[4] != "--build"))
+        {
+            throw Usage();
+        }
+
+        var build = args.Length == 7 ? ReleaseArchive.ValidateBuild(args[5], args[6]) : null;
+        return SignAsync(root, args[1], args[2], args[3], build, cancellationToken);
     }
 
     static Task ConsumerCommand(string[] args, CancellationToken cancellationToken)
@@ -94,16 +100,17 @@ static class Program
     }
 
     static ArgumentException Usage() => new("Expected qualify ARCHIVE TAG REVISION OUTPUT [--github-output [PREFIX]], " +
-                                            "validate ARCHIVE QUALIFICATION, sign ARCHIVE QUALIFICATION OUTPUT, " +
+                                            "validate ARCHIVE QUALIFICATION, " +
+                                            "sign ARCHIVE QUALIFICATION OUTPUT [--build IMAGE@sha256:DIGEST TURIAN_VERSION], " +
                                             "or consumer ARCHIVE [IMAGE] (without IMAGE, with the turian-cli on PATH).");
 
-    static async Task SignAsync(string root, string archive, string qualification, string output,
+    static async Task SignAsync(string root, string archive, string qualification, string output, ReleaseBuild? build,
         CancellationToken cancellationToken)
     {
         var key = Required("MASS4_BRICKS_CI_SIGNING_KEY");
         Environment.SetEnvironmentVariable("MASS4_BRICKS_CI_SIGNING_KEY", null);
         await ReleaseSigner.SignAsync(root, archive, qualification, output,
-            Required("MASS4_BRICKS_CI_PUBLIC_KEY"), key, Required("RUNNER_TEMP"), cancellationToken);
+            Required("MASS4_BRICKS_CI_PUBLIC_KEY"), key, Required("RUNNER_TEMP"), cancellationToken, build);
     }
 
     static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value

@@ -24,6 +24,9 @@ public sealed class LockEntry
     /// <summary>For a bake twin: the source brick it stands in for, with that source file's integrity.</summary>
     public PackageBakeOf? BakeOf { get; set; }
 
+    /// <summary>For a bake that keeps its source's id: the variant it is, which a locked install takes again.</summary>
+    public string? Variant { get; set; }
+
     /// <summary>1 for a package the project installs itself, deeper for what those depend on.</summary>
     public int Depth { get; set; }
 

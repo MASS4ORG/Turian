@@ -24,13 +24,17 @@ public sealed partial class PackageResolver
 
     /// <summary>
     /// The lock entry a registry brick stays at: one from this registry, with a version every range accepts, unless
-    /// the brick is being updated; null when it is resolved anew.
+    /// the brick is being updated; null when it is resolved anew. A bake locked under its source's id is not the source.
     /// </summary>
     LockEntry? LockedFromRegistry(string id, ScopedRegistry registry, List<VersionRange> ranges, LockFile? existingLock) =>
         existingLock?.Dependencies.GetValueOrDefault(id) is { Version: { } version, Integrity: not null } locked
-        && locked.Source == $"registry:{registry.Name}" && ranges.All(range => range.IsSatisfiedBy(version)) && KeepsLocked(id)
+        && locked.BakeOf?.Brick != id && StaysLocked(id, locked, version, registry, ranges)
             ? locked
             : null;
+
+    /// <summary>Whether a lock entry from this registry still holds: every range accepts it and the brick is not being updated.</summary>
+    bool StaysLocked(string id, LockEntry locked, SemanticVersion version, ScopedRegistry registry, List<VersionRange> ranges) =>
+        locked.Source == $"registry:{registry.Name}" && ranges.All(range => range.IsSatisfiedBy(version)) && KeepsLocked(id);
 
     /// <summary>
     /// The version to download: the locked one, else the newest every range accepts; checked against the keys the
