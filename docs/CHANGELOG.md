@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Fixed: cached brick bakes honor host compatibility.
+- Fixed: malformed store answers name their endpoint #322.
 
 ## [3.4.0] - 2026-10-24
 

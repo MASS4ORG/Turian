@@ -400,6 +400,25 @@ public sealed class RegistryTwinTests : IDisposable
         Assert.Empty(resolution.Warnings);
     }
 
+    /// <summary>Malformed advisories are a store defect that stops resolution and names the endpoint, never "no advisories".</summary>
+    [Fact]
+    public async Task MalformedBuildAdvisoriesStopResolution()
+    {
+        Publish("user.mateo.rules", "1.1.0", mateo);
+        PublishVariant("user.mateo.rules", "1.1.0", "engine1.2");
+        Publish("user.mateo.shop", "1.0.0", mateo, dependency: ("user.mateo.rules", "^1.0.0"));
+        var http = new RegistryFolderHandler(RegistryPublisher.LocationOf(registry)) { Advisories = "[{" };
+        var manifest = ProjectManifest.Load(project).Manifest;
+        manifest.ScopedRegistries[0].Url = "https://store.test/v1";
+        manifest.Save(project);
+
+        var error = await Assert.ThrowsAsync<System.Text.Json.JsonException>(() => Resolver(host: "1.2.0", http: http)
+            .ResolveAsync(project, TestContext.Current.CancellationToken));
+
+        Assert.Contains("store.test answered GET /api/v1/build-advisories with malformed JSON, a store defect",
+            error.Message, StringComparison.Ordinal);
+    }
+
     /// <summary>Cached precast assemblies are checked against the running host before reuse.</summary>
     [Fact]
     public async Task CachedPrecastFromAnotherMinorFallsBackToSource()

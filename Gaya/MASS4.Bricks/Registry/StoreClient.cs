@@ -400,7 +400,17 @@ public sealed class StoreClient
                 throw new PackageException($"{Origin.Host} refused to {action}: {Reason(response.StatusCode, text)}");
             }
 
-            return text.Length == 0 ? default : JsonSerializer.Deserialize<T>(text, Web);
+            try
+            {
+                return text.Length == 0 ? default : JsonSerializer.Deserialize<T>(text, Web);
+            }
+            catch (JsonException ex)
+            {
+                // A malformed success is a store defect, not a refusal, so no PackageException handler may absorb it.
+                throw new JsonException(
+                    $"{Origin.Host} answered {request.Method} {request.RequestUri!.AbsolutePath} with malformed JSON, a store defect: {ex.Message}",
+                    ex);
+            }
         }
     }
 
