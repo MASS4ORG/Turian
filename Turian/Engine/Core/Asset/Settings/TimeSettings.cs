@@ -10,4 +10,10 @@ public class TimeSettings : ProjectSettingsAsset
 
     /// <summary>Maximum ticks executed per driver frame; excess accumulated time is retained.</summary>
     public int MaxTicksPerFrame { get; set; } = 8;
+
+    /// <summary>
+    /// Drops the time a frame cannot simulate within <see cref="MaxTicksPerFrame"/>, keeping only the partial tick, so
+    /// an overloaded game slows down instead of spending later frames catching up. Authoritative servers keep it off.
+    /// </summary>
+    public bool DropBacklog { get; set; }
 }
