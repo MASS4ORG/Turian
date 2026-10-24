@@ -8,7 +8,6 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Gaya.Host</RootNamespace>
         <AssemblyName>Gaya.Host</AssemblyName>
-        <PackageId>MASS4.Gaya.Host</PackageId>
         <Title>Gaya Host</Title>
         <Description>The Gaya workbench host: plugin discovery and activation, the docking workbench, command palette, settings panel, menus and layout persistence. Referenced by the application shell, not by plugins.</Description>
     </PropertyGroup>

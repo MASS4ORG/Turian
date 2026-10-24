@@ -8,7 +8,6 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <RootNamespace>Turian.Engine.Core</RootNamespace>
-        <PackageId>MASS4.Turian.Engine.Vulkan</PackageId>
     </PropertyGroup>
 
     <ItemGroup>

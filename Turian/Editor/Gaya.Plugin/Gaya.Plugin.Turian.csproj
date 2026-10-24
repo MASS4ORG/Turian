@@ -6,7 +6,6 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <PackageId>Gaya.Plugin.Turian</PackageId>
     </PropertyGroup>
 
     <ItemGroup>
