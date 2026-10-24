@@ -8,7 +8,7 @@ public sealed class SceneToolSettings
     public bool CenterPivot { get; set; }
 
     /// <summary>Gets or sets whether transform gestures snap to the configured intervals.</summary>
-    public bool SnapEnabled { get; set; }
+    public bool SnapEnabled { get; set; } = true;
 
     /// <summary>Gets or sets the translation interval in world units.</summary>
     [Range(0f, 100f)]

@@ -33,9 +33,9 @@ sealed partial class OutputPanel(
     bool collapse;
     bool showErrors = true;
     bool showWarnings = true;
-    bool showLog = true;
+    bool showLog = log.IsEnabled(LogLevel.Debug);
     bool showInformation = true;
-    bool showStudio;
+    bool showStudio = true;
 
     int selectedIndex = -1;
     bool followTail = true;

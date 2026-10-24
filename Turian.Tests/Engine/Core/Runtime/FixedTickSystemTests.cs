@@ -1,6 +1,7 @@
 namespace Turian.Tests;
 
 /// <summary>Session systems driven on the fixed-tick boundary, transform versions and brick module discovery.</summary>
+[Collection(SerialTests.Name)]
 public class FixedTickSystemTests
 {
     sealed class RecordingComponent(List<string> log) : Component
@@ -104,8 +105,9 @@ public class FixedTickSystemTests
     [Fact]
     public void Graph_IncludesRegisteredBrickAssemblies()
     {
-        var brick = typeof(global::Turian.Engine.UI.UiModule).Assembly;
-        var game = typeof(global::Turian.Engine.Save.SaveService).Assembly;
+        var brick = System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName($"Brick{Guid.NewGuid():N}"), System.Reflection.Emit.AssemblyBuilderAccess.Run);
+        var game = typeof(FixedTickSystemTests).Assembly;
 
         PrecastAssemblies.Register(brick);
         PrecastAssemblies.Register(brick);

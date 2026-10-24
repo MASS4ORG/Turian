@@ -262,13 +262,10 @@ public static class BrickAssemblies
 
     static void RegisterPackageProbing(string package)
     {
-        foreach (var folder in new[] { "lib/net10.0", "lib/netstandard2.0", "lib/netstandard2.1" })
+        if (BrickService.PreferredLibFrameworks.Select(f => Path.Combine(package, "lib", f))
+                .FirstOrDefault(Directory.Exists) is { } directory)
         {
-            var directory = Path.Combine(package, folder);
-            if (Directory.Exists(directory))
-            {
-                _ = ProbeDirectories.Add(directory);
-            }
+            _ = ProbeDirectories.Add(directory);
         }
     }
 

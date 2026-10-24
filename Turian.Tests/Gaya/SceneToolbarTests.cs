@@ -48,7 +48,7 @@ public sealed class SceneToolbarTests
         Click("scene/toolbar/space");
         Assert.Equal(TransformGizmoSpace.Local, viewport.Gizmo.Space);
         Click("scene/toolbar/snap");
-        Assert.True(settings.Tools.SnapEnabled);
+        Assert.False(settings.Tools.SnapEnabled);
         Assert.Equal(1, settings.Tools.TranslationSnap);
         Click("scene/toolbar/snapOptions");
         Assert.NotNull(Find("scene/options/value/move"));
@@ -64,7 +64,7 @@ public sealed class SceneToolbarTests
         Assert.Equal(TransformGizmoSpace.World, viewport.Gizmo.Space);
         Click("scene/toolbar/Transform");
         MenuClick(1);
-        Assert.False(settings.Tools.SnapEnabled);
+        Assert.True(settings.Tools.SnapEnabled);
         settings.Tools.TranslationSnap = 4;
         settings.Tools.RotationSnap = 35;
         settings.Tools.ScaleSnap = 0.7f;
