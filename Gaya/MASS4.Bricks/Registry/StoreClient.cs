@@ -409,7 +409,8 @@ public sealed class StoreClient
     {
         try
         {
-            if (JsonNode.Parse(body)?["title"]?.GetValue<string>() is { Length: > 0 } title)
+            if (JsonNode.Parse(body) is JsonObject problem && problem["title"] is JsonValue value
+                && value.TryGetValue<string>(out var title) && title.Length > 0)
             {
                 return title;
             }

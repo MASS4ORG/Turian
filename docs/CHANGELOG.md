@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: cached brick bakes honor host compatibility.
+
 ## [3.4.0] - 2026-10-24
 
 - Changed: bake twins are store variants.

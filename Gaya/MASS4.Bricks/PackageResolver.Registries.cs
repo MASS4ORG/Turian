@@ -10,7 +10,8 @@ public sealed partial class PackageResolver
         var registry = client.Registry;
         var ranges = asked.Select(static a => a.Range).ToList();
         var depth = asked.Min(static a => a.Depth);
-        var locked = LockedFromRegistry(id, registry, ranges, existingLock);
+        var locked = LockedFromRegistry(id, registry, ranges, existingLock)
+                     ?? SourceOfLockedTwin(id, registry, ranges, existingLock);
         if (locked is not null && Directory.Exists(store.PackagePath(id, store.ArchiveFolderName(locked.Integrity!))))
         {
             return FromRegistry(id, store.PackagePath(id, store.ArchiveFolderName(locked.Integrity!)), locked.Integrity!,
@@ -30,6 +31,12 @@ public sealed partial class PackageResolver
         existingLock?.Dependencies.GetValueOrDefault(id) is { Version: { } version, Integrity: not null } locked
         && locked.BakeOf?.Brick != id && StaysLocked(id, locked, version, registry, ranges)
             ? locked
+            : null;
+
+    /// <summary>A refused locked bake falls back to the exact source archive it pins.</summary>
+    LockEntry? SourceOfLockedTwin(string id, ScopedRegistry registry, List<VersionRange> ranges, LockFile? existingLock) =>
+        LockedTwin(id, registry, ranges, existingLock)?.Entry.BakeOf is { } source
+            ? new LockEntry { Version = source.Version, Integrity = source.Integrity }
             : null;
 
     /// <summary>Whether a lock entry from this registry still holds: every range accepts it and the brick is not being updated.</summary>

@@ -13,32 +13,55 @@ public sealed partial class PackageResolver
     /// The trusted twin of the version of <paramref name="id"/> the ranges resolve to; null when none is published or
     /// the one published is refused, with the reason added to <paramref name="warnings"/>.
     /// </summary>
-    async Task<ResolvedPackage?> MaterializeTwinAsync(RegistryClient client, string id,
+    Task<ResolvedPackage?> MaterializeTwinAsync(RegistryClient client, string id,
         IReadOnlyList<(string Id, VersionRange Range, string RequiredBy, int Depth)> asked, LockFile? existingLock,
         RegistryIndex? knownIndex, List<string> warnings, CancellationToken cancellationToken)
     {
-        var registry = client.Registry;
+        var request = TwinRequestOf(client.Registry, id, asked, existingLock);
+
+        // A strict install without a locked bake keeps its source.
+        return request.LockedTwin is null && options.Locked
+            ? Task.FromResult<ResolvedPackage?>(null)
+            : TwinOfAsync(client, request, knownIndex, warnings, cancellationToken);
+    }
+
+    /// <summary>What a bake is looked for: the source brick, the ranges asking for it and any bake the lock pins.</summary>
+    readonly record struct TwinRequest(string Id, List<VersionRange> Ranges, string RequiredBy, int Depth,
+        LockFile? ExistingLock, (string Id, LockEntry Entry)? LockedTwin);
+
+    /// <summary>The bake request for a brick asked for by <paramref name="asked"/> from this registry.</summary>
+    TwinRequest TwinRequestOf(ScopedRegistry registry, string id,
+        IReadOnlyList<(string Id, VersionRange Range, string RequiredBy, int Depth)> asked, LockFile? existingLock)
+    {
         var ranges = asked.Select(static a => a.Range).ToList();
-        var depth = asked.Min(static a => a.Depth);
-        var lockedTwin = LockedTwin(id, registry, ranges, existingLock);
-        if (lockedTwin is { Id: var lockedId, Entry.Integrity: { } lockedIntegrity }
-            && Directory.Exists(store.PackagePath(lockedId, store.ArchiveFolderName(lockedIntegrity))))
+        return new TwinRequest(id, ranges, asked[0].RequiredBy, asked.Min(static a => a.Depth), existingLock,
+            LockedTwin(id, registry, ranges, existingLock));
+    }
+
+    /// <summary>The locked bake from the package store when present, else one the registry index publishes.</summary>
+    async Task<ResolvedPackage?> TwinOfAsync(RegistryClient client, TwinRequest request, RegistryIndex? knownIndex,
+        List<string> warnings, CancellationToken cancellationToken)
+    {
+        var index = knownIndex ?? await TryGetIndexAsync(client, cancellationToken).ConfigureAwait(false);
+        if (CachedTwin(client.Registry, request.LockedTwin, request.Depth) is { } cached)
         {
-            return FromRegistry(lockedId, store.PackagePath(lockedId, store.ArchiveFolderName(lockedIntegrity)),
-                lockedIntegrity, lockedTwin.Value.Entry.SignedBy, registry, depth);
+            var recorded = CachedTwinEntry(index, cached, request.LockedTwin!.Value.Entry.Variant);
+            return await CheckedTwinAsync(client, cached, recorded, request.Id, warnings, cancellationToken).ConfigureAwait(false);
         }
 
-        // Installing locked follows the lock, which pins the source here; an index that cannot be read leaves the
-        // source path to use what the store holds or report why it cannot.
-        if (lockedTwin is null && options.Locked
-            || (knownIndex ?? await TryGetIndexAsync(client, cancellationToken).ConfigureAwait(false)) is not { } index)
-        {
-            return null;
-        }
+        return index is null
+            ? null
+            : await AvailableTwinAsync(client, request, index, warnings, cancellationToken).ConfigureAwait(false);
+    }
 
-        var sourceLock = LockedFromRegistry(id, registry, ranges, existingLock)
-                         ?? (lockedTwin?.Entry.BakeOf is { Version: { } bakedVersion } ? new LockEntry { Version = bakedVersion } : null);
-        var (version, source, _) = Choose(index, id, registry, ranges, asked[0].RequiredBy, sourceLock);
+    /// <summary>Chooses a published bake for the locked or requested source version.</summary>
+    async Task<ResolvedPackage?> AvailableTwinAsync(RegistryClient client, TwinRequest request, RegistryIndex index,
+        List<string> warnings, CancellationToken cancellationToken)
+    {
+        var (id, ranges, requiredBy, depth, existingLock, lockedTwin) = request;
+        var sourceLock = LockedFromRegistry(id, client.Registry, ranges, existingLock)
+                         ?? SourceOfLockedTwin(id, client.Registry, ranges, existingLock);
+        var (version, source, _) = Choose(index, id, client.Registry, ranges, requiredBy, sourceLock);
         return TwinEntry(index, id, version, source, lockedTwin?.Entry.Variant, locked: lockedTwin is not null) is { } found
             ? await TakeTwinAsync(client, found, (id, version, source), lockedTwin?.Entry.SignedBy, depth, warnings,
                 cancellationToken).ConfigureAwait(false)
@@ -71,23 +94,87 @@ public sealed partial class PackageResolver
         }
 
         var twin = await DownloadAsync(client, found.Id, found.Version, found.Entry, signer, depth, cancellationToken).ConfigureAwait(false);
-        var problem = await TwinProblemAsync(client, twin, found.Entry, source.Id, source.Version, source.Entry, cancellationToken).ConfigureAwait(false)
-                      ?? Unloadable(twin, found.Entry)
-                      ?? await AdvisoryProblemAsync(client, twin, found.Entry, warnings, cancellationToken).ConfigureAwait(false);
+        var problem = await TwinProblemAsync(client, twin, found.Entry, source.Id, source.Version, source.Entry, cancellationToken).ConfigureAwait(false);
         if (problem is not null)
         {
             warnings.Add($"{problem} Using {source.Id} {source.Version} as source.");
             return null;
         }
 
-        return twin;
+        return await CheckedTwinAsync(client, twin, found.Entry, source.Id, warnings, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>The locked bake already extracted into the package store, when present.</summary>
+    ResolvedPackage? CachedTwin(ScopedRegistry registry, (string Id, LockEntry Entry)? lockedTwin, int depth)
+    {
+        if (lockedTwin is not { } locked)
+        {
+            return null;
+        }
+
+        var integrity = locked.Entry.Integrity!;
+        var folder = store.PackagePath(locked.Id, store.ArchiveFolderName(integrity));
+        return Directory.Exists(folder)
+            ? FromRegistry(locked.Id, folder, integrity, locked.Entry.SignedBy, registry, depth)
+            : null;
+    }
+
+    /// <summary>The current metadata for the cached archive's exact hash, or an empty entry when unavailable.</summary>
+    static RegistryVersion CachedTwinEntry(RegistryIndex? index, ResolvedPackage twin, string? variant)
+    {
+        var bakeOf = twin.Manifest.BakeOf!;
+        var source = RegistryEntry(index, bakeOf.Brick, bakeOf.Version!.ToString());
+        var entry = variant is not null ? source?.Variants?.GetValueOrDefault(variant)
+            : RegistryEntry(index, twin.Id, twin.Version.ToString());
+        return entry is not null && entry.Integrity == twin.Integrity ? entry : new RegistryVersion();
+    }
+
+    /// <summary>A registry's default entry for an exact signed identity, when available.</summary>
+    static RegistryVersion? RegistryEntry(RegistryIndex? index, string id, string version) =>
+        index?.Bricks.GetValueOrDefault(id)?.Versions.GetValueOrDefault(version);
+
+    /// <summary>Checks host compatibility and curator policy before using either a downloaded or cached bake.</summary>
+    async Task<ResolvedPackage?> CheckedTwinAsync(RegistryClient client, ResolvedPackage twin, RegistryVersion entry,
+        string sourceId, List<string> warnings, CancellationToken cancellationToken)
+    {
+        var problem = Unloadable(twin, entry)
+                      ?? await AdvisoryProblemAsync(client, twin, entry, warnings, cancellationToken).ConfigureAwait(false);
+        if (problem is null)
+        {
+            return twin;
+        }
+
+        warnings.Add($"{problem} Using {sourceId} {twin.Manifest.BakeOf!.Version} as source.");
+        return null;
     }
 
     /// <summary>
     /// Why this host cannot load a bake, which is then left for its source: precast assemblies built by another
     /// major or minor version of a host, or a bake recorded as built by another major of the build host.
     /// </summary>
-    string? Unloadable(ResolvedPackage twin, RegistryVersion entry) => PrecastProblem(twin) ?? BuildMajorProblem(twin, entry);
+    string? Unloadable(ResolvedPackage twin, RegistryVersion entry) =>
+        VariantMajorProblem(twin) ?? PrecastProblem(twin) ?? BuildMajorProblem(twin, entry);
+
+    /// <summary>A host-targeted variant from another major cannot be reused from a lock or cache.</summary>
+    string? VariantMajorProblem(ResolvedPackage twin)
+    {
+        if (twin.Manifest.Variant is not { } variant)
+        {
+            return null;
+        }
+
+        foreach (var (host, running) in options.Hosts)
+        {
+            if (variant.StartsWith(host, StringComparison.Ordinal)
+                && SemanticVersion.TryParse(variant[host.Length..] + ".0", out var target)
+                && target.Major != running.Major)
+            {
+                return $"{twin.Id} {twin.Version} targets {variant}, another major version than {host} {running}.";
+            }
+        }
+
+        return null;
+    }
 
     string? PrecastProblem(ResolvedPackage twin)
     {

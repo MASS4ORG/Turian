@@ -90,6 +90,8 @@ major, else the source. Another major version always takes the source, and so do
 version cannot load. The bake's signature, its `bakeOf` against the source the registry serves, and the source's
 publisher or trusted bakers are checked before use; the lock records the variant taken.
 
+Cached and locked bakes undergo the same host compatibility and advisory checks. A refused bake falls back to the exact source archive pinned by its `bakeOf`. A `--locked` restore fails when that fallback changes the lock; resolve without `--locked` and commit the updated lock before building again.
+
 ## Build provenance and advisories
 
 A store may record, unsigned, what built each archive: `"build": { "image": "<name>@sha256:<digest>",

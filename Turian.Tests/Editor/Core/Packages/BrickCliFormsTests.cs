@@ -72,6 +72,9 @@ public sealed class BrickCliFormsTests
             Yanked: true, Variant: PackageVariant.Source));
         Assert.Equal("Published com.acme.rules 1.0.0 to store.example  (yanked)", plain.Trim());
         Assert.Empty(quiet);
+
+        var (offered, _) = Capture("ReportPublished", store, new StoreRelease(Guid.Empty, "com.acme.rules", "1.0.0", Approved: true));
+        Assert.Equal("Published com.acme.rules 1.0.0 to store.example", offered.Trim());
     }
 
     static (string Out, string Error) Capture(string name, params object[] arguments)
