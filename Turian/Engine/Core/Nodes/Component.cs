@@ -211,6 +211,57 @@ public abstract class Component : IdObject
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
+    /// <summary>The per-frame callbacks a component type overrides; the ticker skips the empty base methods.</summary>
+    [Flags]
+    internal enum FrameCallbacks : byte
+    {
+        None = 0,
+        Update = 1,
+        LateUpdate = 2,
+        FixedUpdate = 4,
+        Known = 8,
+    }
+
+    // Weak keys let collectible user-code types unload.
+    static readonly ConditionalWeakTable<Type, StrongBox<FrameCallbacks>> OverriddenCallbacks = [];
+    FrameCallbacks frameCallbacks;
+
+    /// <summary>Whether this component's type overrides <paramref name="callback"/>, resolved once per type.</summary>
+    internal bool Overrides(FrameCallbacks callback)
+    {
+        if (frameCallbacks == FrameCallbacks.None)
+        {
+            frameCallbacks = OverriddenCallbacks.GetValue(GetType(), static type => new(FindOverrides(type))).Value;
+        }
+
+        return (frameCallbacks & callback) != 0;
+    }
+
+    static FrameCallbacks FindOverrides(Type type)
+    {
+        var callbacks = FrameCallbacks.Known;
+        if (Overridden(type, nameof(OnUpdate)))
+        {
+            callbacks |= FrameCallbacks.Update;
+        }
+
+        if (Overridden(type, nameof(OnLateUpdate)))
+        {
+            callbacks |= FrameCallbacks.LateUpdate;
+        }
+
+        if (Overridden(type, nameof(OnFixedUpdate)))
+        {
+            callbacks |= FrameCallbacks.FixedUpdate;
+        }
+
+        return callbacks;
+    }
+
+    // A method hiding the callback with "new" also counts, which only costs an empty call.
+    static bool Overridden(Type type, string name) =>
+        type.GetMethod(name, BindingFlags.Public | BindingFlags.Instance, [typeof(float)])?.DeclaringType != typeof(Component);
+
     /// <summary>
     /// Checks if multiple instances of the specified component type are allowed on a single node.
     /// </summary>

@@ -219,16 +219,18 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             for (var i = 0; i < components.Count; i++)
             {
                 var component = components[i];
-                if (component.IsActive)
+                if (!component.IsActive || !component.Overrides(Component.FrameCallbacks.FixedUpdate))
                 {
-                    try
-                    {
-                        component.OnFixedUpdate(fixedDeltaTime);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogComponentException(component, nameof(Component.OnFixedUpdate), ex);
-                    }
+                    continue;
+                }
+
+                try
+                {
+                    component.OnFixedUpdate(fixedDeltaTime);
+                }
+                catch (Exception ex)
+                {
+                    LogComponentException(component, nameof(Component.OnFixedUpdate), ex);
                 }
 
                 i = IndexAfterCallback(components, component, i);
@@ -248,17 +250,19 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             for (var i = 0; i < components.Count; i++)
             {
                 var component = components[i];
-                if (component.IsActive)
+                if (!component.IsActive || (component.IsStarted && !component.Overrides(Component.FrameCallbacks.Update)))
                 {
-                    try
-                    {
-                        component.EnsureStarted();
-                        component.OnUpdate(deltaTime);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogComponentException(component, nameof(Component.OnUpdate), ex);
-                    }
+                    continue;
+                }
+
+                try
+                {
+                    component.EnsureStarted();
+                    component.OnUpdate(deltaTime);
+                }
+                catch (Exception ex)
+                {
+                    LogComponentException(component, nameof(Component.OnUpdate), ex);
                 }
 
                 i = IndexAfterCallback(components, component, i);
@@ -278,16 +282,18 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             for (var i = 0; i < components.Count; i++)
             {
                 var component = components[i];
-                if (component.IsActive)
+                if (!component.IsActive || !component.Overrides(Component.FrameCallbacks.LateUpdate))
                 {
-                    try
-                    {
-                        component.OnLateUpdate(deltaTime);
-                    }
-                    catch (Exception ex)
-                    {
-                        LogComponentException(component, nameof(Component.OnLateUpdate), ex);
-                    }
+                    continue;
+                }
+
+                try
+                {
+                    component.OnLateUpdate(deltaTime);
+                }
+                catch (Exception ex)
+                {
+                    LogComponentException(component, nameof(Component.OnLateUpdate), ex);
                 }
 
                 i = IndexAfterCallback(components, component, i);

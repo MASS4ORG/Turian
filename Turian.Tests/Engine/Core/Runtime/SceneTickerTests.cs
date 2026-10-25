@@ -391,6 +391,52 @@ public class SceneTickerTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Only overridden frame callbacks are dispatched: an inherited override still runs, and a component without one
+    /// still starts once.
+    /// </summary>
+    [Fact]
+    public void Tick_DispatchesOverriddenCallbacksOnly()
+    {
+        var root = new Node();
+        var derived = new DerivedUpdatingComponent();
+        var starting = new StartingComponent();
+        root.Components.Add(derived);
+        root.Components.Add(starting);
+        root.Awake(null);
+        var manager = new SceneManager(assetDatabase);
+        manager.AdoptScene(Guid.NewGuid(), root);
+        var ticker = new SceneTicker(manager);
+
+        ticker.StepFrame();
+        ticker.StepFrame();
+
+        Assert.Equal(2, derived.UpdateCount);
+        Assert.Equal(1, starting.StartCount);
+        Assert.True(starting.IsStarted);
+        Assert.True(derived.Overrides(Component.FrameCallbacks.Update));
+        Assert.False(derived.Overrides(Component.FrameCallbacks.LateUpdate | Component.FrameCallbacks.FixedUpdate));
+        Assert.False(starting.Overrides(Component.FrameCallbacks.Update | Component.FrameCallbacks.LateUpdate |
+                                        Component.FrameCallbacks.FixedUpdate));
+        Assert.True(new CountingComponent().Overrides(Component.FrameCallbacks.FixedUpdate));
+    }
+
+    class UpdatingComponent : Component
+    {
+        public int UpdateCount { get; private set; }
+
+        public override void OnUpdate(float deltaTime) => UpdateCount++;
+    }
+
+    sealed class DerivedUpdatingComponent : UpdatingComponent;
+
+    sealed class StartingComponent : Component
+    {
+        public int StartCount { get; private set; }
+
+        public override void OnStart() => StartCount++;
+    }
+
     /// <summary>Presentation durations cannot change the fixed simulation interval or accept invalid time.</summary>
     [Fact]
     public void StepFrame_UsesFixedIntervalAndValidatesPresentationTime()
