@@ -151,6 +151,30 @@ public sealed class TagsAndLayersTests
         Assert.Empty(root.FindAllWithTag("Enemy"));
     }
 
+    /// <summary>Implicit Untagged queries keep registration order, skip inactive and re-tagged nodes, and see reentry.</summary>
+    [Fact]
+    public void UntaggedQueriesFollowRegistrationOrderAndActivity()
+    {
+        var first = new Node();
+        var second = new Node();
+        var third = new Node { Tags = ["Enemy", "Untagged"] };
+        var root = new Node { Tags = ["Root"], Children = [first, second, third] };
+        root.Awake(null);
+
+        Assert.Same(first, root.FindWithTag("Untagged"));
+        Assert.Equal([first, second, third], root.FindAllWithTag("Untagged"));
+        first.IsActive = false;
+        second.Tags[0] = "Enemy";
+        Assert.Same(third, root.FindWithTag("Untagged"));
+        Assert.Equal([second, third], root.FindAllWithTag("Enemy"));
+        root.Children.Remove(third);
+        Assert.Null(root.FindWithTag("Untagged"));
+        Assert.Empty(root.FindAllWithTag("Untagged"));
+        root.Children.Add(third);
+        first.IsActive = true;
+        Assert.Equal([first, third], root.FindAllWithTag("Untagged"));
+    }
+
     /// <summary>Reparent, collection replacement, removal, destruction and additive unload maintain separate registries.</summary>
     [Fact]
     public void RegistryTracksReparentDestroyAndUnload()

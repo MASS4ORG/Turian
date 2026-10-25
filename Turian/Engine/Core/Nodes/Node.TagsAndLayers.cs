@@ -7,7 +7,8 @@ public partial class Node
 {
     TagRegistry? tagRegistry;
     LayerFilter? layerFilter;
-    readonly HashSet<Node> knownChildren = [];
+    // How many times each child is listed, by reference, so add, remove and reparent need no scan of Children.
+    Dictionary<Node, int> childEntries = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Creates a node with observable tags and hierarchy membership.</summary>
     public Node()
@@ -122,25 +123,37 @@ public partial class Node
 
     void TagsChanged(object? sender, NotifyCollectionChangedEventArgs args) => tagRegistry?.Refresh(this);
 
-    // Adds and removes visit only the changed items: a full resync per add makes building n siblings cubic.
+    // Adds, removes and replacements visit only the changed items and moves change nothing: a full resync per add makes
+    // building n siblings cubic, and a scan per remove makes clearing them quadratic.
     void ChildrenChanged(object? sender, NotifyCollectionChangedEventArgs args)
     {
-        if (args.Action == NotifyCollectionChangedAction.Move)
+        switch (args.Action)
         {
-            return;
+            case NotifyCollectionChangedAction.Move:
+                return;
+            case NotifyCollectionChangedAction.Add when args.NewItems is { } added:
+                Adopt(added);
+                break;
+            case NotifyCollectionChangedAction.Remove when args.OldItems is { } removed:
+                Release(removed);
+                break;
+            case NotifyCollectionChangedAction.Replace when args.NewItems is { } added && args.OldItems is { } removed:
+                // Adopting first keeps a node replaced by itself a child throughout.
+                Adopt(added);
+                Release(removed);
+                break;
+            default:
+                Resync();
+                break;
         }
+    }
 
-        if (args.Action == NotifyCollectionChangedAction.Add && args.NewItems is { } added)
+    // Removes this node's entry from its previous parent's children, unless that parent already let it go.
+    void LeaveParent(Node previous)
+    {
+        if (previous.childEntries.ContainsKey(this))
         {
-            Adopt(added);
-        }
-        else if (args.Action == NotifyCollectionChangedAction.Remove && args.OldItems is { } removed)
-        {
-            Release(removed);
-        }
-        else
-        {
-            Resync();
+            previous.Children.Remove(this);
         }
     }
 
@@ -148,7 +161,9 @@ public partial class Node
     {
         foreach (Node child in added)
         {
-            if (knownChildren.Add(child))
+            var entries = childEntries.GetValueOrDefault(child) + 1;
+            childEntries[child] = entries;
+            if (entries == 1)
             {
                 child.Parent = this;
             }
@@ -160,11 +175,18 @@ public partial class Node
         foreach (Node child in removed)
         {
             // A node listed twice stays a child until its last entry goes.
-            if (Children.Contains(child) || !knownChildren.Remove(child))
+            if (!childEntries.TryGetValue(child, out var entries))
             {
                 continue;
             }
 
+            if (entries > 1)
+            {
+                childEntries[child] = entries - 1;
+                continue;
+            }
+
+            childEntries.Remove(child);
             if (ReferenceEquals(child.Parent, this))
             {
                 child.Parent = null;
@@ -174,15 +196,27 @@ public partial class Node
 
     void Resync()
     {
-        foreach (var child in knownChildren.Where(child => !Children.Contains(child)).ToArray())
+        var previous = childEntries;
+        childEntries = new Dictionary<Node, int>(ReferenceEqualityComparer.Instance);
+        foreach (var child in Children)
         {
-            knownChildren.Remove(child);
-            if (ReferenceEquals(child.Parent, this))
+            childEntries[child] = childEntries.GetValueOrDefault(child) + 1;
+        }
+
+        foreach (var child in previous.Keys)
+        {
+            if (!childEntries.ContainsKey(child) && ReferenceEquals(child.Parent, this))
             {
                 child.Parent = null;
             }
         }
 
-        Adopt(Children);
+        foreach (var child in childEntries.Keys)
+        {
+            if (!previous.ContainsKey(child))
+            {
+                child.Parent = this;
+            }
+        }
     }
 }

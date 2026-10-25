@@ -89,7 +89,11 @@ public partial class Node : IdObject
 
             var previous = field;
             field = value;
-            previous?.Children.Remove(this);
+            if (previous is not null)
+            {
+                LeaveParent(previous);
+            }
+
             BindTagRegistry(value?.tagRegistry);
             RefreshActiveHierarchy();
             InvalidateGlobalTransformCache();

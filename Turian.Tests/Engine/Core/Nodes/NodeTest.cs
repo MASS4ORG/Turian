@@ -182,6 +182,95 @@ public class NodeTest
         Assert.Equal(19_998, root.Children.Count);
     }
 
+    /// <summary>
+    /// Clearing and reparenting many siblings compares each removed node a bounded number of times, rather than scanning
+    /// the remaining siblings on every removal.
+    /// </summary>
+    [Fact]
+    public void DespawnStormComparesSiblingsLinearly()
+    {
+        const int count = 2000;
+        var parent = new Node();
+        var other = new Node();
+        var nodes = Enumerable.Range(0, count).Select(static _ => new ComparedNode()).ToArray();
+        foreach (var node in nodes)
+        {
+            parent.Children.Add(node);
+        }
+
+        ComparedNode.Comparisons = 0;
+        foreach (var node in nodes[..(count / 2)])
+        {
+            parent.Children.Remove(node);
+        }
+
+        foreach (var node in nodes[(count / 2)..])
+        {
+            other.Children.Add(node);
+        }
+
+        Assert.True(ComparedNode.Comparisons <= 2 * count, $"{ComparedNode.Comparisons} comparisons for {count} nodes");
+        Assert.Empty(parent.Children);
+        Assert.All(nodes[..(count / 2)], static node => Assert.Null(node.Parent));
+        Assert.All(nodes[(count / 2)..], node => Assert.Same(other, node.Parent));
+    }
+
+    /// <summary>Moves, replacements, reparenting and resets keep each child's parent and entry count consistent.</summary>
+    [Fact]
+    public void ChildEntriesFollowMoveReplaceReparentAndReset()
+    {
+        var parent = new Node();
+        var other = new Node();
+        Node a = new(), b = new(), c = new();
+        parent.Children = [a, b, c];
+
+        parent.Children.Move(0, 2);
+        Assert.All(parent.Children, child => Assert.Same(parent, child.Parent));
+        parent.Children.Remove(a);
+        Assert.Null(a.Parent);
+
+        parent.Children[0] = b;
+        Assert.Same(parent, b.Parent);
+        parent.Children[0] = a;
+        Assert.Same(parent, a.Parent);
+        Assert.Null(b.Parent);
+
+        other.Children.Add(c);
+        Assert.Same(other, c.Parent);
+        Assert.Equal([a], parent.Children);
+        parent.Children.Add(c);
+        Assert.Same(parent, c.Parent);
+        Assert.Empty(other.Children);
+
+        c.Parent = other;
+        Assert.Equal([a], parent.Children);
+        other.Children.Add(c);
+        parent.Children.Add(b);
+        parent.Children.Add(b);
+        parent.Children = [b];
+        Assert.Null(a.Parent);
+        Assert.Same(parent, b.Parent);
+        parent.Children.Remove(b);
+        Assert.Null(b.Parent);
+        parent.Children.Clear();
+        Assert.Same(other, c.Parent);
+        Assert.Equal([c], other.Children);
+    }
+
+    /// <summary>A node that counts equality comparisons, which every child-list scan performs.</summary>
+    sealed class ComparedNode : Node
+    {
+        public static int Comparisons { get; set; }
+
+        public override bool Equals(object? obj)
+        {
+            Comparisons++;
+            return base.Equals(obj);
+        }
+
+        public override int GetHashCode() => base.GetHashCode();
+    }
+
     [TypeId("a3000004-0000-4000-8000-000000000005")]
     class TestComponent : Component { }
 

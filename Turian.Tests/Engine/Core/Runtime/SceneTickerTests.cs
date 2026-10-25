@@ -329,6 +329,58 @@ public class SceneTickerTests : IDisposable
         Assert.Single(root.GetComponents<CountingComponent>(), c => !ReferenceEquals(c, sibling));
     }
 
+    /// <summary>
+    /// Despawning nodes from an update, including the updating node and siblings before and after it, does not abort
+    /// the frame. Nodes already listed for the running pass finish it, then get no later pass or frame.
+    /// </summary>
+    [Fact]
+    public void Tick_ToleratesDespawningNodesDuringUpdate()
+    {
+        var root = new Node();
+        Node early = new(), despawner = new(), late = new(), survivor = new();
+        var counters = new[] { early, despawner, late, survivor }.Select(static node =>
+        {
+            var counter = new CountingComponent();
+            node.Components.Add(counter);
+            return counter;
+        }).ToArray();
+        despawner.Components.Insert(0, new DespawningComponent { Targets = [early, despawner, late] });
+        root.Children = [early, despawner, late, survivor];
+        root.Awake(null);
+        var manager = new SceneManager(assetDatabase);
+        manager.AdoptScene(Guid.NewGuid(), root);
+        var ticker = new SceneTicker(manager);
+
+        ticker.StepFrame();
+        ticker.StepFrame();
+
+        Assert.Equal([survivor], root.Children);
+        Assert.All(new[] { early, despawner, late }, static node => Assert.Null(node.Parent));
+        Assert.All(counters[..3], static counter =>
+        {
+            Assert.Equal(1, counter.FixedUpdateCount);
+            Assert.Equal(1, counter.UpdateCount);
+            Assert.Equal(0, counter.LateUpdateCount);
+        });
+        Assert.Equal(2, counters[3].UpdateCount);
+        Assert.Equal(2, counters[3].LateUpdateCount);
+    }
+
+    sealed class DespawningComponent : Component
+    {
+        public List<Node> Targets { get; init; } = [];
+
+        public override void OnUpdate(float deltaTime)
+        {
+            foreach (var target in Targets)
+            {
+                target.Parent?.Children.Remove(target);
+            }
+
+            Targets.Clear();
+        }
+    }
+
     sealed class ReplacingComponent : Component
     {
         public override void OnUpdate(float deltaTime)
