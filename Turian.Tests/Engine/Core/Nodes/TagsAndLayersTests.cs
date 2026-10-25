@@ -124,6 +124,33 @@ public sealed class TagsAndLayersTests
         Assert.Null(root.FindWithTag("Enemy"));
     }
 
+    /// <summary>Large tag lists keep registration order through removals, re-tags of early nodes and late additions.</summary>
+    [Fact]
+    public void LargeTagListsKeepRegistrationOrder()
+    {
+        var root = new Node();
+        root.Awake(null);
+        Assert.Equal([root], root.FindAllWithTag("Untagged"));
+        var nodes = Enumerable.Range(0, 2000).Select(static _ => new Node()).ToArray();
+        foreach (var node in nodes)
+        {
+            root.Children.Add(node);
+        }
+
+        for (var i = 0; i < nodes.Length; i += 2)
+        {
+            root.Children.Remove(nodes[i]);
+        }
+
+        nodes[1].Tags = ["Enemy"];
+        nodes[1].Tags = ["Untagged"];
+        var late = new Node();
+        root.Children.Add(late);
+
+        Assert.Equal([root, .. nodes.Where(static (_, i) => i % 2 == 1), late], root.FindAllWithTag("Untagged"));
+        Assert.Empty(root.FindAllWithTag("Enemy"));
+    }
+
     /// <summary>Reparent, collection replacement, removal, destruction and additive unload maintain separate registries.</summary>
     [Fact]
     public void RegistryTracksReparentDestroyAndUnload()

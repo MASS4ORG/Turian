@@ -28,6 +28,13 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     readonly ISceneManager sceneManager =
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
 
+    // Per-frame traversal state is reused so a frame does not allocate in proportion to the node count.
+    readonly List<Node> roots = [];
+    readonly Stack<Node> pending = new();
+    List<Node>? nodeBuffer = [];
+    Action<long, double>? fixedTick;
+    Action? completedTick;
+
     /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
     public SimulationClock Clock { get; } = clock ?? new SimulationClock();
 
@@ -91,15 +98,15 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 
-        var roots = CollectRoots();
+        CollectRoots();
 
-        Clock.AdvanceWithCompletion(unscaledDeltaTime,
-            (tick, interval) => RunFixedTick(roots, tick, interval), PublishCompletedTick);
+        Clock.AdvanceWithCompletion(unscaledDeltaTime, fixedTick ??= RunFixedTick,
+            completedTick ??= PublishCompletedTick);
 
         RunAfterFixedTicks();
-        RunUpdate(roots, (float)deltaTime);
+        RunUpdate((float)deltaTime);
         Async.DrainUpdate();
-        RunLateUpdate(roots, (float)deltaTime);
+        RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
 
         InputSource?.NewFrame();
@@ -126,14 +133,14 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 
-        var roots = CollectRoots();
+        CollectRoots();
 
-        Clock.Step((tick, interval) => RunFixedTick(roots, tick, interval));
+        Clock.Step(fixedTick ??= RunFixedTick);
         PublishCompletedTick();
         RunAfterFixedTicks();
-        RunUpdate(roots, (float)deltaTime);
+        RunUpdate((float)deltaTime);
         Async.DrainUpdate();
-        RunLateUpdate(roots, (float)deltaTime);
+        RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
 
         InputSource?.NewFrame();
@@ -142,12 +149,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>Discards accumulated fixed-step time, e.g. after resuming from a pause.</summary>
     public void ResetAccumulator() => Clock.ResetAccumulator();
 
-    List<Node> CollectRoots() =>
-        [.. sceneManager.LoadedScenes
-            .Select(static scene => scene.RootNode)
-            .Prepend(sceneManager.PersistentRoot)];
+    void CollectRoots()
+    {
+        roots.Clear();
+        roots.Add(sceneManager.PersistentRoot);
+        foreach (var scene in sceneManager.LoadedScenes)
+        {
+            roots.Add(scene.RootNode);
+        }
+    }
 
-    void RunFixedTick(List<Node> roots, long tick, double interval)
+    void RunFixedTick(long tick, double interval)
     {
         var simulation = Simulation;
         if (simulation is not null && !ReferenceEquals(simulation.Clock, Clock))
@@ -155,7 +167,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             throw new InvalidOperationException("The scene and simulation must share one clock.");
         }
 
-        RunFixedUpdate(roots, (float)interval);
+        RunFixedUpdate((float)interval);
         foreach (var system in Systems)
         {
             system.FixedTick(tick, interval);
@@ -184,77 +196,114 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Async.CompleteFixedStep(Clock.FixedDeltaTime);
     }
 
-    static void RunFixedUpdate(List<Node> roots, float fixedDeltaTime)
+    void RunFixedUpdate(float fixedDeltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnFixedUpdate(fixedDeltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (component.IsActive)
                 {
-                    continue;
+                    try
+                    {
+                        component.OnFixedUpdate(fixedDeltaTime);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogComponentException(component, nameof(Component.OnFixedUpdate), ex);
+                    }
                 }
 
-                try
-                {
-                    component.OnFixedUpdate(fixedDeltaTime);
-                }
-                catch (Exception ex)
-                {
-                    LogComponentException(component, nameof(Component.OnFixedUpdate), ex);
-                }
+                i = IndexAfterCallback(components, component, i);
             }
         }
+
+        ReturnActiveNodes(nodes);
     }
 
-    static void RunUpdate(List<Node> roots, float deltaTime)
+    void RunUpdate(float deltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnUpdate(deltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (component.IsActive)
                 {
-                    continue;
+                    try
+                    {
+                        component.EnsureStarted();
+                        component.OnUpdate(deltaTime);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogComponentException(component, nameof(Component.OnUpdate), ex);
+                    }
                 }
 
-                try
-                {
-                    component.EnsureStarted();
-                    component.OnUpdate(deltaTime);
-                }
-                catch (Exception ex)
-                {
-                    LogComponentException(component, nameof(Component.OnUpdate), ex);
-                }
+                i = IndexAfterCallback(components, component, i);
             }
         }
+
+        ReturnActiveNodes(nodes);
     }
 
-    static void RunLateUpdate(List<Node> roots, float deltaTime)
+    void RunLateUpdate(float deltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnLateUpdate(deltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (component.IsActive)
                 {
-                    continue;
+                    try
+                    {
+                        component.OnLateUpdate(deltaTime);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogComponentException(component, nameof(Component.OnLateUpdate), ex);
+                    }
                 }
 
-                try
-                {
-                    component.OnLateUpdate(deltaTime);
-                }
-                catch (Exception ex)
-                {
-                    LogComponentException(component, nameof(Component.OnLateUpdate), ex);
-                }
+                i = IndexAfterCallback(components, component, i);
             }
         }
+
+        ReturnActiveNodes(nodes);
+    }
+
+    /// <summary>
+    /// Returns the index the pass continues after, because a callback may add components or remove its own or an
+    /// earlier one; a removed current component resumes at the slot it vacated.
+    /// </summary>
+    static int IndexAfterCallback(Collection<Component> components, Component current, int index)
+    {
+        if (index < components.Count && ReferenceEquals(components[index], current))
+        {
+            return index;
+        }
+
+        for (var i = 0; i < components.Count; i++)
+        {
+            if (ReferenceEquals(components[i], current))
+            {
+                return i;
+            }
+        }
+
+        return index - 1;
     }
 
     /// <summary>
@@ -274,12 +323,14 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     }
 
     /// <summary>
-    /// Materialises the active nodes of every root up-front so that lifecycle callbacks
-    /// may add or remove nodes without invalidating the iteration.
+    /// Materialises the active nodes of every root up-front, depth-first in hierarchy order, so that lifecycle
+    /// callbacks may add or remove nodes without invalidating the iteration. The reused buffer is taken while a pass
+    /// runs, so a re-entrant tick gets its own list.
     /// </summary>
-    static List<Node> ActiveNodes(List<Node> roots)
+    List<Node> RentActiveNodes()
     {
-        var nodes = new List<Node>();
+        var nodes = nodeBuffer ?? [];
+        nodeBuffer = null;
         foreach (var root in roots)
         {
             if (!root.IsActive)
@@ -288,8 +339,20 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             }
 
             nodes.Add(root);
-            nodes.AddRange(Node.GetChildren(root));
+            Node.PushActiveChildren(root, pending);
+            while (pending.TryPop(out var current))
+            {
+                nodes.Add(current);
+                Node.PushActiveChildren(current, pending);
+            }
         }
+
         return nodes;
+    }
+
+    void ReturnActiveNodes(List<Node> nodes)
+    {
+        nodes.Clear();
+        nodeBuffer = nodes;
     }
 }

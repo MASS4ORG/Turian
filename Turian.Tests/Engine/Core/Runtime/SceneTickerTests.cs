@@ -273,6 +273,72 @@ public class SceneTickerTests : IDisposable
         Assert.Equal(0, clock.AccumulatorSeconds);
     }
 
+    /// <summary>Lifecycle passes reuse their traversal buffers, so a frame's allocations do not grow with the node count.</summary>
+    [Fact]
+    public void Tick_AllocationsDoNotGrowWithNodeCount()
+    {
+        var small = MeasureTickAllocations(10);
+        var large = MeasureTickAllocations(5000);
+
+        Assert.True(large - small < 1024, $"10 nodes allocated {small} B per frame, 5000 nodes {large} B.");
+    }
+
+    long MeasureTickAllocations(int nodeCount)
+    {
+        var root = new Node();
+        for (var i = 0; i < nodeCount; i++)
+        {
+            var child = new Node();
+            child.Components.Add(new CountingComponent());
+            root.Children.Add(child);
+        }
+
+        root.Awake(null);
+        var manager = new SceneManager(assetDatabase);
+        manager.AdoptScene(Guid.NewGuid(), root);
+        var ticker = new SceneTicker(manager);
+        for (var i = 0; i < 3; i++)
+        {
+            ticker.StepFrame();
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        ticker.StepFrame();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    /// <summary>A component that removes itself and adds another mid-pass neither aborts the frame nor skips its sibling.</summary>
+    [Fact]
+    public void Tick_ToleratesComponentsChangingTheirNodeDuringAPass()
+    {
+        var root = new Node();
+        var replacing = new ReplacingComponent();
+        var sibling = new CountingComponent();
+        root.Components.Add(replacing);
+        root.Components.Add(sibling);
+        root.Awake(null);
+        var manager = new SceneManager(assetDatabase);
+        manager.AdoptScene(Guid.NewGuid(), root);
+        var ticker = new SceneTicker(manager);
+
+        ticker.StepFrame();
+
+        Assert.DoesNotContain(replacing, root.Components);
+        Assert.Equal(1, sibling.UpdateCount);
+        Assert.Equal(1, sibling.LateUpdateCount);
+        Assert.Single(root.GetComponents<CountingComponent>(), c => !ReferenceEquals(c, sibling));
+    }
+
+    sealed class ReplacingComponent : Component
+    {
+        public override void OnUpdate(float deltaTime)
+        {
+            var node = Node!;
+            node.RemoveComponent(this);
+            node.AddComponent(new CountingComponent());
+        }
+    }
+
     /// <summary>Presentation durations cannot change the fixed simulation interval or accept invalid time.</summary>
     [Fact]
     public void StepFrame_UsesFixedIntervalAndValidatesPresentationTime()

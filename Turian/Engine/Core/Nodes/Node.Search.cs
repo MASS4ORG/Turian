@@ -85,7 +85,7 @@ public partial class Node
     }
 
     // An inactive child hides its whole subtree, as Unity's activeInHierarchy does.
-    static void PushActiveChildren(Node node, Stack<Node> pending)
+    internal static void PushActiveChildren(Node node, Stack<Node> pending)
     {
         var children = node.Children;
         for (var i = children.Count - 1; i >= 0; i--)

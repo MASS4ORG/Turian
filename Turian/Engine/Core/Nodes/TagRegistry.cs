@@ -19,15 +19,17 @@ sealed class TagRegistry
 
     internal void Unregister(Node node)
     {
-        if (!registered.Remove(node, out var entry))
+        if (!registered.TryGetValue(node, out var entry))
         {
             return;
         }
 
         foreach (var tag in entry.Tags)
         {
-            Remove(tag, node);
+            Remove(tag, node, entry.Order);
         }
+
+        registered.Remove(node);
     }
 
     internal void Refresh(Node node)
@@ -37,10 +39,10 @@ sealed class TagRegistry
             return;
         }
 
-        var tags = node.Tags.Where(tag => !string.IsNullOrWhiteSpace(tag)).ToHashSet(StringComparer.Ordinal);
+        var tags = node.Tags.Where(static tag => !string.IsNullOrWhiteSpace(tag)).ToHashSet(StringComparer.Ordinal);
         foreach (var tag in entry.Tags.Except(tags))
         {
-            Remove(tag, node);
+            Remove(tag, node, entry.Order);
         }
 
         foreach (var tag in tags.Except(entry.Tags))
@@ -50,8 +52,7 @@ sealed class TagRegistry
                 byTag[tag] = nodes = [];
             }
 
-            var at = nodes.FindIndex(other => registered[other].Order > entry.Order);
-            nodes.Insert(at < 0 ? nodes.Count : at, node);
+            nodes.Insert(IndexOf(nodes, entry.Order), node);
         }
 
         registered[node] = (entry.Order, tags);
@@ -65,17 +66,43 @@ sealed class TagRegistry
         ? nodes.Where(static node => node.IsActiveInHierarchy).ToArray()
         : [];
 
-    void Remove(string tag, Node node)
+    void Remove(string tag, Node node, long order)
     {
         if (!byTag.TryGetValue(tag, out var nodes))
         {
             return;
         }
 
-        nodes.Remove(node);
+        var at = IndexOf(nodes, order);
+        if (at < nodes.Count && ReferenceEquals(nodes[at], node))
+        {
+            nodes.RemoveAt(at);
+        }
+
         if (nodes.Count == 0)
         {
             byTag.Remove(tag);
         }
+    }
+
+    // Every node starts Untagged, so one list can hold the whole scene; it stays sorted by registration order and is
+    // bisected rather than scanned.
+    int IndexOf(List<Node> nodes, long order)
+    {
+        int low = 0, high = nodes.Count;
+        while (low < high)
+        {
+            var middle = (low + high) >>> 1;
+            if (registered[nodes[middle]].Order < order)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
     }
 }
