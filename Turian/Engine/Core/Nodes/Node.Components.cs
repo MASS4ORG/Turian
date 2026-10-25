@@ -45,7 +45,6 @@ public partial class Node
             return;
         }
 
-        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach.
         var components = node.Components;
         for (var i = 0; i < components.Count; i++)
         {

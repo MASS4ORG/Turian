@@ -12,6 +12,7 @@ public partial class Node
     {
         Tags.CollectionChanged += TagsChanged;
         children = new NodeCollection(this);
+        components = new ComponentCollection(this);
     }
 
     /// <summary>The node's tags, serialized as strings; absent serialized tags default to Untagged.</summary>

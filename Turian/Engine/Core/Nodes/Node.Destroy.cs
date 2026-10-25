@@ -2,8 +2,9 @@ namespace Turian.Engine.Core;
 
 public partial class Node
 {
-    // Destructions requested in this hierarchy, held by its root in request order until the game loop flushes them.
-    List<Node>? destroyQueue;
+    // Node and component destructions requested in this hierarchy, held by its root in request order until the game
+    // loop flushes them.
+    List<IdObject>? destroyQueue;
     List<NodeCollection>? destroyNotifications;
 
     /// <summary>Whether <see cref="Destroy"/> or <see cref="DestroyImmediate"/> was requested for this node.</summary>
@@ -25,6 +26,8 @@ public partial class Node
         DestroyQueued = true;
         (HierarchyRoot().destroyQueue ??= []).Add(this);
     }
+
+    internal void QueueDestroy(Component component) => (HierarchyRoot().destroyQueue ??= []).Add(component);
 
     /// <summary>
     /// Destroys this node and its subtree now and removes it from its parent, for editor and tool code outside the game
@@ -85,10 +88,14 @@ public partial class Node
         {
             for (var i = 0; i < queue.Count; i++)
             {
-                var node = queue[i];
-                if (node.IsDestroyed) { continue; }
-
-                DestroyQueuedNode(node, notifications);
+                if (queue[i] is Node node)
+                {
+                    DestroyQueuedNode(node, notifications);
+                }
+                else
+                {
+                    DestroyQueuedComponent((Component)queue[i]);
+                }
             }
 
             queue.Clear();
@@ -102,6 +109,7 @@ public partial class Node
 
     static void DestroyQueuedNode(Node node, List<NodeCollection> notifications)
     {
+        if (node.IsDestroyed) { return; }
         try
         {
             node.Teardown();
@@ -116,6 +124,19 @@ public partial class Node
         var children = parent.Children;
         if (children.BeginDestructionNotifications()) { notifications.Add(children); }
         children.Remove(node);
+    }
+
+    static void DestroyQueuedComponent(Component component)
+    {
+        if (component.IsDestroyed) { return; }
+        try
+        {
+            component.DestroyImmediate();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogError(ex, "Destroying {Component} threw", component.GetType().Name);
+        }
     }
 
     static void PublishDestructionNotifications(List<NodeCollection> notifications)

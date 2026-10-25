@@ -8,6 +8,7 @@ namespace Turian.Engine.Core;
 public partial class Node : IdObject
 {
     readonly NodeCollection children;
+    readonly ComponentCollection components;
     Node? parent;
     static long hierarchyVersion;
 
@@ -78,6 +79,7 @@ public partial class Node : IdObject
             if (value)
             {
                 tagRegistry?.Unregister(this);
+                BoundIndex?.Unregister(this);
             }
 
             RefreshActiveHierarchy();
@@ -115,6 +117,7 @@ public partial class Node : IdObject
         parent = value;
         if (value is not null) { MoveDestroyQueue(value); }
         BindTagRegistry(value?.tagRegistry);
+        BindSceneIndex(value?.BoundIndex);
         RefreshActiveHierarchy();
         InvalidateGlobalTransformCache();
     }
@@ -138,11 +141,15 @@ public partial class Node : IdObject
     }
 
     /// <summary>
-    /// Gets the list of components attached to this node.
+    /// Gets the owned components collection or replaces its contents with an assigned sequence of unique references.
     /// </summary>
     [JsonConverter(typeof(ComponentJsonConverter))]
     [Hide]
-    public Collection<Component> Components { get; init; } = [];
+    public ComponentCollection Components
+    {
+        get => components;
+        set => components.ReplaceWith(value);
+    }
 
     /// <summary>
     /// The prefab this node was instantiated from, or null when the node is not the root of a prefab instance.

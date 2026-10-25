@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Added: standalone physics bricks; engine-owned node children (breaking); cached camera traversal and draw preparation; lifecycle passes skip callbacks a component does not override #64.
+- Added: standalone physics bricks #64;
+- Added: cached camera traversal and draw preparation.
+- Changed: engine-managed node children and components.
 - Fixed: brick-resolution errors stay actionable.
 - Fixed: cached brick bakes honor host compatibility.
 - Fixed: malformed store answers name their endpoint #322.

@@ -160,6 +160,7 @@ public class CameraComponent : Component, ICamera
     public static CameraComponent? FindPrimary(Node? root)
     {
         if (root is null) { return null; }
+        if (root.Parent is null) { return FindIndexed(root); }
         var pending = primaryTraversal ?? new Stack<Node>();
         primaryTraversal = null;
         CameraComponent? primary = null;
@@ -179,6 +180,18 @@ public class CameraComponent : Component, ICamera
             pending.Clear();
             primaryTraversal = pending;
         }
+    }
+
+    // A hierarchy root's scene index lists its camera nodes in hierarchy order, so no walk is needed.
+    static CameraComponent? FindIndexed(Node root)
+    {
+        CameraComponent? primary = null;
+        if (!root.IsActive) { return null; }
+        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Cameras))
+        {
+            if (node.IsActiveInHierarchy) { primary = SelectPrimary(node, primary); }
+        }
+        return primary;
     }
 
     static CameraComponent? SelectPrimary(Node node, CameraComponent? primary)

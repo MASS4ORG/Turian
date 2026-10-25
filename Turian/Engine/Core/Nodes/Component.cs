@@ -93,6 +93,57 @@ public abstract class Component : IdObject
     [JsonIgnore, Hide]
     public bool IsStarted { get; private set; }
 
+    /// <summary>Whether <see cref="Destroy"/> or <see cref="DestroyImmediate"/> was requested for this component.</summary>
+    [JsonIgnore, Hide]
+    public bool DestroyQueued { get; private set; }
+
+    /// <summary>The node components collection listing this component, which may precede attachment.</summary>
+    internal ComponentCollection? ListedIn { get; set; }
+
+    /// <summary>
+    /// Removes and destroys this component at the next boundary of the running game loop, as <see cref="Node.Destroy"/>
+    /// does: the end of the fixed tick when requested from a fixed update, otherwise the end of the frame. Until then
+    /// it stays attached and keeps updating.
+    /// </summary>
+    public void Destroy()
+    {
+        if (IsDestroyed || DestroyQueued)
+        {
+            return;
+        }
+
+        if (Node is not { } node)
+        {
+            DestroyImmediate();
+            return;
+        }
+
+        DestroyQueued = true;
+        node.QueueDestroy(this);
+    }
+
+    /// <summary>Removes and destroys this component now, for editor and tool code outside the game loop.</summary>
+    public void DestroyImmediate()
+    {
+        if (IsDestroyed)
+        {
+            return;
+        }
+
+        DestroyQueued = true;
+        ListedIn?.Remove(this);
+        if (Node is null)
+        {
+            IsDestroyed = true;
+        }
+
+        Detach();
+        if (this is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+
     /// <summary>
     /// Attaches this component to a node and runs Awake if not yet awoken.
     /// </summary>

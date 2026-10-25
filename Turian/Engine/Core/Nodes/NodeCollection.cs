@@ -304,7 +304,11 @@ public sealed class NodeCollection : IList<Node>, IReadOnlyList<Node>
     void Changed()
     {
         Version = unchecked(Version + 1);
-        if (owner is not null) { Node.NotifyHierarchyChanged(); }
+        if (owner is not null)
+        {
+            Node.NotifyHierarchyChanged();
+            owner.ChildrenChanged();
+        }
         PublishChange();
     }
 

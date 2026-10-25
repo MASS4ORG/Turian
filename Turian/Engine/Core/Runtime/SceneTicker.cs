@@ -28,9 +28,8 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     readonly ISceneManager sceneManager =
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
 
-    // Per-frame traversal state is reused so a frame does not allocate in proportion to the node count.
+    // Per-frame pass state is reused so a frame does not allocate in proportion to the node count.
     readonly List<Node> roots = [];
-    readonly Stack<Node> pending = new();
     List<Node>? nodeBuffer = [];
     Action<long, double>? fixedTick;
     Action? completedTick;
@@ -267,6 +266,12 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
                 i = IndexAfterCallback(components, component, i);
             }
+
+            // Started components without frame callbacks leave the index.
+            if ((node.IndexedKinds & SceneIndex.Kinds.Unstarted) != 0)
+            {
+                node.RefreshSceneIndex();
+            }
         }
 
         ReturnActiveNodes(nodes);
@@ -307,7 +312,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// Returns the index the pass continues after, because a callback may add components or remove its own or an
     /// earlier one; a removed current component resumes at the slot it vacated.
     /// </summary>
-    static int IndexAfterCallback(Collection<Component> components, Component current, int index)
+    static int IndexAfterCallback(ComponentCollection components, Component current, int index)
     {
         if (index < components.Count && ReferenceEquals(components[index], current))
         {
@@ -342,9 +347,10 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     }
 
     /// <summary>
-    /// Materialises the active nodes of every root up-front, depth-first in hierarchy order, so that lifecycle
-    /// callbacks may add or remove nodes without invalidating the iteration. The reused buffer is taken while a pass
-    /// runs, so a re-entrant tick gets its own list.
+    /// Materialises, at the start of a pass, the active nodes of every root that have frame callbacks or unstarted
+    /// components, depth-first in hierarchy order, so that lifecycle callbacks may add or remove nodes without
+    /// invalidating the iteration. The scene index supplies them, so steady frames do not walk the hierarchy. The reused
+    /// buffer is taken while a pass runs, so a re-entrant tick gets its own list.
     /// </summary>
     List<Node> RentActiveNodes()
     {
@@ -357,12 +363,12 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 continue;
             }
 
-            nodes.Add(root);
-            Node.PushActiveChildren(root, pending);
-            while (pending.TryPop(out var current))
+            foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks))
             {
-                nodes.Add(current);
-                Node.PushActiveChildren(current, pending);
+                if (node.IsActiveInHierarchy)
+                {
+                    nodes.Add(node);
+                }
             }
         }
 

@@ -33,19 +33,53 @@ public static class RenderStatisticsTargets
             return null;
         }
 
-        var components = root.Components;
-        for (var i = 0; i < components.Count; i++)
+        return root.Parent is null ? FindIndexed(root) : FindInSubtree(root);
+    }
+
+    // A hierarchy root's scene index lists its display nodes in hierarchy order, so no walk is needed.
+    static IRenderStatisticsTarget? FindIndexed(Node root)
+    {
+        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Statistics))
         {
-            var component = components[i];
-            if (component.IsActive && component is IRenderStatisticsTarget { IsRecording: true } target)
+            if (node.IsActiveInHierarchy && RecordingOn(node) is { } target)
             {
                 return target;
             }
         }
-        var children = root.Children;
+
+        return null;
+    }
+
+    static IRenderStatisticsTarget? FindInSubtree(Node node)
+    {
+        if (!node.IsActive)
+        {
+            return null;
+        }
+
+        if (RecordingOn(node) is { } target)
+        {
+            return target;
+        }
+
+        var children = node.Children;
         for (var i = 0; i < children.Count; i++)
         {
-            if (Find(children[i]) is { } target)
+            if (FindInSubtree(children[i]) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    static IRenderStatisticsTarget? RecordingOn(Node node)
+    {
+        var components = node.Components;
+        for (var i = 0; i < components.Count; i++)
+        {
+            if (components[i] is { IsActive: true } and IRenderStatisticsTarget { IsRecording: true } target)
             {
                 return target;
             }

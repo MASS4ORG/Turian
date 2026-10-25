@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Turian.Engine.Core;
 
 public partial class Node
@@ -133,7 +135,6 @@ public partial class Node
     public T? GetComponent<T>()
         where T : Component
     {
-        // Indexing avoids the boxed enumerator Collection<T> allocates per foreach; this runs per node in queries.
         var components = Components;
         for (var i = 0; i < components.Count; i++)
         {
@@ -144,6 +145,17 @@ public partial class Node
         }
 
         return null;
+    }
+
+    /// <summary>Gets the component of type <typeparamref name="T"/> attached to this node, if there is one.</summary>
+    /// <typeparam name="T">The type of component to retrieve.</typeparam>
+    /// <param name="component">The component found, or null.</param>
+    /// <returns>True when a matching component exists; otherwise false.</returns>
+    public bool TryGetComponent<T>([NotNullWhen(true)] out T? component)
+        where T : Component
+    {
+        component = GetComponent<T>();
+        return component is not null;
     }
 
     /// <summary>
