@@ -210,6 +210,47 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
         Assert.Equal(new RenderCullingStats(1, 0), viewer.CullingStats);
     }
 
+    /// <summary>Gathered bounds follow live components through reordering, filtering, replacement and scene switches.</summary>
+    [Fact]
+    public void PreparedBoundsFollowChangingSceneMembership()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        var quad = PreviewQuadMesh.Get(fixture.Vulkan);
+        var root = QuadScene(quad, withLight: false);
+        var visible = root.Children[0];
+        var hidden = new Node { Position = new Vector3(1000f, 0f, 4f), Parent = root };
+        hidden.AddComponent(new ModelComponent { ModelOverride = quad });
+        root.Children.Add(hidden);
+        using var viewer = new SceneViewerService(fixture.Vulkan, new AssetDatabase(), size, size);
+        var expected = new byte[size * size * 4];
+        var actual = new byte[expected.Length];
+        viewer.Render(root, 0.016);
+        viewer.CopyPixels(expected);
+        Assert.Equal(new RenderCullingStats(1, 1), viewer.CullingStats);
+
+        root.Children.Move(0, 1);
+        viewer.Render(root, 0.016);
+        viewer.CopyPixels(actual);
+        Assert.Equal(expected, actual);
+        Assert.Equal(new RenderCullingStats(1, 1), viewer.CullingStats);
+        visible.IsActive = false;
+        viewer.Render(root, 0.016);
+        Assert.Equal(new RenderCullingStats(0, 1), viewer.CullingStats);
+        visible.IsActive = true;
+        hidden.GetComponent<ModelComponent>()!.ModelOverride = null;
+        viewer.Render(root, 0.016);
+        Assert.Equal(new RenderCullingStats(1, 0), viewer.CullingStats);
+        hidden.GetComponent<ModelComponent>()!.ModelOverride = quad;
+        viewer.Render(root, 0.016);
+        Assert.Equal(new RenderCullingStats(1, 1), viewer.CullingStats);
+        viewer.Render(new Node(), 0.016);
+        Assert.Equal(new RenderCullingStats(0, 0), viewer.CullingStats);
+        viewer.Render(root, 0.016);
+        viewer.CopyPixels(actual);
+        Assert.Equal(expected, actual);
+        Assert.Equal(new RenderCullingStats(1, 1), viewer.CullingStats);
+    }
+
     /// <summary>A resized viewer retains its culling setting and treats negative scale conservatively.</summary>
     [Fact]
     public void ResizePreservesCullingSetting()
