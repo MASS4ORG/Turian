@@ -94,6 +94,11 @@ public partial class Node : IdObject
                 LeaveParent(previous);
             }
 
+            if (value is not null)
+            {
+                MoveDestroyQueue(value);
+            }
+
             BindTagRegistry(value?.tagRegistry);
             RefreshActiveHierarchy();
             InvalidateGlobalTransformCache();
@@ -109,7 +114,8 @@ public partial class Node : IdObject
     internal bool AllowMissingServices { get; private set; }
 
     /// <summary>
-    /// Gets or sets the list of child nodes.
+    /// Gets or sets the list of child nodes. An assigned collection is copied into the node's own one unless it already
+    /// is one.
     /// </summary>
     [Hide]
     public ObservableCollection<Node> Children
@@ -124,12 +130,12 @@ public partial class Node : IdObject
             }
 
             field.CollectionChanged -= ChildrenChanged;
-            field = value;
+            field = value as NodeCollection ?? new NodeCollection(value);
             field.CollectionChanged += ChildrenChanged;
             ChildrenChanged(this, new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
                 System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
         }
-    } = [];
+    } = new NodeCollection();
 
     /// <summary>
     /// Gets the list of components attached to this node.

@@ -131,6 +131,9 @@ public partial class Node
         {
             case NotifyCollectionChangedAction.Move:
                 return;
+            case NotifyCollectionChangedAction.Reset when sender is NodeCollection { Compacting: true }:
+                // The compaction's owner releases exactly the removed children itself.
+                return;
             case NotifyCollectionChangedAction.Add when args.NewItems is { } added:
                 Adopt(added);
                 break;

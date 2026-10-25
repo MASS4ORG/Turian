@@ -108,6 +108,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Async.DrainUpdate();
         RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
+        FlushDestroyed();
 
         InputSource?.NewFrame();
     }
@@ -142,6 +143,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Async.DrainUpdate();
         RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
+        FlushDestroyed();
 
         InputSource?.NewFrame();
     }
@@ -174,6 +176,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         }
 
         simulation?.RunTick(tick, interval);
+        FlushDestroyed();
+    }
+
+    // Applies the destructions requested since the last boundary, root by root in scene order. Fixed-tick requests flush
+    // with their tick, so how many catch-up ticks a frame runs cannot change when a destroyed node leaves.
+    void FlushDestroyed()
+    {
+        foreach (var root in roots)
+        {
+            root.FlushDestroyQueue();
+        }
     }
 
     void RunAfterFixedTicks()
