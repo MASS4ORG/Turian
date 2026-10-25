@@ -243,18 +243,36 @@ public class StandardRenderSystem : IRenderSystem
 
             var slot = i - start;
             var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
-            var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
-            if (!ReferenceEquals(order.Material, material))
-            {
-                order.Material = material;
-                order.MaterialOrder = renderList.OrderOf(material);
-            }
-
+            var material = ResolveDrawMaterial(ref order, modelAssetId, model.SubMeshes[i].MaterialIndex,
+                overrideReference);
             var key = RenderList.SortKey(order.MaterialOrder, order.ModelOrder);
             renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
                 renderList.Draws.Count, cached.Bounds[i - start], component.Node!.RenderLayer, component.Color,
                 component.CustomData));
         }
+    }
+
+    // Consecutive draws of one model and material slot reuse the previous resolution within a BuildDraws call.
+    MaterialResource ResolveDrawMaterial(ref DrawOrder order, Guid modelAssetId, int? materialIndex,
+        AssetReference<MaterialAsset>? overrideReference)
+    {
+        if (order.Material is { } resolved && order.MaterialModelId == modelAssetId &&
+            order.MaterialIndex == materialIndex && ReferenceEquals(order.MaterialOverride, overrideReference))
+        {
+            return resolved;
+        }
+
+        var material = ResolveMaterial(modelAssetId, materialIndex, overrideReference);
+        if (!ReferenceEquals(order.Material, material))
+        {
+            order.Material = material;
+            order.MaterialOrder = renderList.OrderOf(material);
+        }
+
+        order.MaterialModelId = modelAssetId;
+        order.MaterialIndex = materialIndex;
+        order.MaterialOverride = overrideReference;
+        return material;
     }
 
     struct DrawOrder
@@ -263,6 +281,9 @@ public class StandardRenderSystem : IRenderSystem
         public int ModelOrder;
         public MaterialResource? Material;
         public int MaterialOrder;
+        public Guid MaterialModelId;
+        public int? MaterialIndex;
+        public AssetReference<MaterialAsset>? MaterialOverride;
     }
 
     void RecordDraws(CommandBuffer commandBuffer, int frameIndex)

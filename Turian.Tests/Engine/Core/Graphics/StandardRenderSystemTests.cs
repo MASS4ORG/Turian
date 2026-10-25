@@ -130,6 +130,53 @@ public sealed class StandardRenderSystemTests(VulkanFixture fixture) : IClassFix
         }
     }
 
+    /// <summary>Draws of one model alternating between an override and no override each bind their own material.</summary>
+    [Fact]
+    public void AlternatingMaterialSlotsResolvePerDraw()
+    {
+        Assert.SkipUnless(fixture.Available, fixture.SkipReason);
+        var directory = Directory.CreateTempSubdirectory("turian-render-materials-");
+        var database = new AssetDatabase();
+        var red = new MaterialAsset { Id = Guid.NewGuid(), BaseColorFactor = new Vector4(1, 0, 0, 1) };
+        red.RelativePath = Path.Combine(directory.CreateSubdirectory("Assets").FullName, "Red.material");
+        var path = Path.Combine(directory.FullName, "Red.material.json");
+        File.WriteAllText(path, Serializer.Serialize(red));
+        Assert.True(database.RegisterAsset(red, path));
+        var quad = PreviewQuadMesh.Get(fixture.Vulkan);
+        var root = QuadScene(quad, withLight: true);
+        root.Children.RemoveAt(0);
+        // World +X is screen left: red, default and red again, in draw order.
+        foreach (var (x, tinted) in new[] { (2.1f, true), (0f, false), (-2.1f, true) })
+        {
+            var node = new Node { Position = new Vector3(x, 0, 4), Scale = new Vector3(2f), Parent = root };
+            var model = new ModelComponent { ModelOverride = quad };
+            if (tinted) { model.Materials = [new AssetReference<MaterialAsset>(red.Id)]; }
+            node.AddComponent(model);
+            root.Children.Insert(root.Children.Count - 1, node);
+        }
+
+        try
+        {
+            using var viewer = new SceneViewerService(fixture.Vulkan, database, size, size);
+            viewer.Render(root, 0.016);
+            var pixels = new byte[size * size * 4];
+            viewer.CopyPixels(pixels);
+            // Pixels are BGRA.
+            int Red(int column) =>
+                pixels[((size / 2 * size) + column) * 4 + 2] - pixels[((size / 2 * size) + column) * 4 + 1];
+
+            var (left, middle, right) = (Red(size / 4), Red(size / 2), Red(size * 3 / 4));
+            Assert.Equal(3, viewer.CullingStats.Submitted);
+            Assert.True(left > middle + 25 && right > middle + 25 && middle < 10,
+                $"red excess left={left}, middle={middle}, right={right}");
+        }
+        finally
+        {
+            MaterialAsset.InvalidateCacheEntry(red.Id);
+            directory.Delete(recursive: true);
+        }
+    }
+
     /// <summary>Consecutive frames through the sorted draw list render the same image.</summary>
     [Fact]
     public void RepeatedFramesRenderTheSameImage()
