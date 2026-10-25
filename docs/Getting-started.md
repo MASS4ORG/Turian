@@ -67,5 +67,5 @@ project's startup scene.
 ## 6. Build a standalone game
 
 **Project → Export** (or `turian-cli export MyGame`) compiles the project and writes a self-contained executable into
-`MyGame/Output/`, along with its packed assets. Players do not need .NET installed. **Project → Build & Run** builds a
+`MyGame/Output/MyGame/`, along with its packed assets. The game folder and executable share the same filename-safe name. Explicit `--profile` exports use `Output/<profile>/<game>/` to keep builds separate. Players do not need .NET installed. **Project → Build & Run** builds a
 quicker debug version and launches it in its own window.

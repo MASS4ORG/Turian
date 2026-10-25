@@ -324,8 +324,8 @@ public sealed class BuildManager : IDisposable
     // ── Export ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Exports the project as a standalone packaged game, following the active build profile into
-    /// <c>Output/&lt;profile&gt;</c>, or as a client for this machine when none is active.
+    /// Exports the project into <c>Output/&lt;game&gt;</c>, following the active build profile
+    /// or building a client for this machine when none is active.
     /// </summary>
     /// <param name="configuration">
     /// Override the build configuration without an active profile. Defaults to <see cref="BuildConfiguration.Release"/>.
@@ -341,7 +341,7 @@ public sealed class BuildManager : IDisposable
             }));
 
     /// <summary>
-    /// Exports the project with <paramref name="profile"/>, active or not, into <c>Output/&lt;profile&gt;</c>: what
+    /// Exports the project with <paramref name="profile"/>, active or not, into <c>Output/&lt;profile&gt;/&lt;game&gt;</c>: what
     /// the Build Profiles window's Build does.
     /// </summary>
     /// <param name="profile">The profile to build.</param>
@@ -353,7 +353,9 @@ public sealed class BuildManager : IDisposable
             locksUi: true,
             run: async _ =>
             {
-                var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile);
+                var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
+                    settings.TitleToPathFriendly ?? "Game");
+                var exporter = new ExportUserCode(settings, logger, profile.Profile.Configuration, profile, output);
                 return $"Exported to: {await exporter.ExecuteAsync().ConfigureAwait(false)}";
             }));
     }
