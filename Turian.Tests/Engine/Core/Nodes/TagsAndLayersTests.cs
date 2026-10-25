@@ -227,10 +227,10 @@ public sealed class TagsAndLayersTests
 
         parent.Tags = ["Deep"];
         root.Awake(null);
-        // Removing the backing collection without a change event makes a tree walk unable to find the node.
+        // Replacing storage without changing membership makes a tree walk unable to find the node.
         var backing = typeof(Node).GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(static field => field.FieldType == typeof(ObservableCollection<Node>));
-        backing.SetValue(root, new ObservableCollection<Node>());
+            .Single(static field => field.FieldType == typeof(NodeCollection));
+        backing.SetValue(root, new NodeCollection());
         Assert.Same(parent, root.FindWithTag("Deep"));
         Assert.Equal([parent], root.FindAllWithTag("Deep"));
         Assert.Empty(root.FindAllWithTag("Missing"));

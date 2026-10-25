@@ -1,5 +1,3 @@
-using System.Collections.Specialized;
-
 namespace Turian.Tests;
 
 /// <summary>Deferred node destruction through <see cref="Node.Destroy"/> and its flush points in the game loop.</summary>
@@ -63,10 +61,10 @@ public class NodeDestroyTests
 
     /// <summary>
     /// Destroying many siblings from an update leaves them in place for the frame, then tears them down in request order
-    /// and removes them with one reset rather than one notification per child.
+    /// and advances the collection version for each removal.
     /// </summary>
     [Fact]
-    public void Destroy_FromUpdateFlushesAtFrameEndWithOneReset()
+    public void Destroy_FromUpdateFlushesAtFrameEndWithVersionChanges()
     {
         var log = new List<string>();
         var group = new Node();
@@ -82,13 +80,22 @@ public class NodeDestroyTests
         var root = new Node { Children = [group] };
         root.Components.Add(destroyer);
         var ticker = Play(root);
-        var actions = new List<NotifyCollectionChangedAction>();
-        group.Children.CollectionChanged += (_, args) => actions.Add(args.Action);
+        var version = group.Children.Version;
+        var notifications = 0;
+        var observedComplete = false;
+        group.Children.StructureChanged += (_, _) =>
+        {
+            notifications++;
+            observedComplete = group.Children.SequenceEqual([keep]) &&
+                nodes.All(static node => node.IsDestroyed && node.Parent is null);
+        };
 
         ticker.StepFrame();
 
         Assert.Equal([keep], group.Children);
-        Assert.Equal([NotifyCollectionChangedAction.Reset], actions);
+        Assert.Equal(version + nodes.Length, group.Children.Version);
+        Assert.Equal(1, notifications);
+        Assert.True(observedComplete);
         Assert.Equal(nodes.Reverse().Select(static node => node.Name), log);
         Assert.All(nodes, static node =>
         {
@@ -188,17 +195,17 @@ public class NodeDestroyTests
         Assert.True(node.DestroyQueued);
     }
 
-    /// <summary>A children collection swapped in without the node's own type still drops flushed destructions.</summary>
+    /// <summary>Assigned children are copied into the owned collection and participate in deferred destruction.</summary>
     [Fact]
-    public void Destroy_CompactsAForeignChildrenCollection()
+    public void Destroy_RemovesChildrenCopiedFromABuilder()
     {
         Node kept = new(), destroyed = new();
         var root = new Node();
-        var backing = typeof(Node).GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(static field => field.FieldType == typeof(ObservableCollection<Node>));
-        backing.SetValue(root, new ObservableCollection<Node> { destroyed, kept });
-        destroyed.Parent = root;
-        kept.Parent = root;
+        NodeCollection builder = [destroyed, kept];
+        var owned = root.Children;
+        root.Children = builder;
+        builder.Clear();
+        Assert.Same(owned, root.Children);
         var ticker = Play(root);
 
         destroyed.Destroy();
@@ -206,5 +213,61 @@ public class NodeDestroyTests
 
         Assert.Equal([kept], root.Children);
         Assert.True(destroyed.IsDestroyed);
+    }
+
+    /// <summary>A failing parent observer cannot suppress another parent's notification or future flushes.</summary>
+    [Fact]
+    public void Destroy_ObserverFailureDoesNotBlockOtherParents()
+    {
+        var left = new Node { Children = [new Node(), new Node()] };
+        var right = new Node { Children = [new Node()] };
+        var root = new Node { Children = [left, right] };
+        var ticker = Play(root);
+        EventHandler throwing = (_, _) => throw new InvalidOperationException("observer failed");
+        left.Children.StructureChanged += throwing;
+        var rightNotifications = 0;
+        right.Children.StructureChanged += (_, _) => rightNotifications++;
+        left.Children[0].Destroy();
+        right.Children[0].Destroy();
+
+        ticker.StepFrame();
+
+        Assert.Single(left.Children);
+        Assert.Empty(right.Children);
+        Assert.Equal(1, rightNotifications);
+        left.Children.StructureChanged -= throwing;
+        var leftNotifications = 0;
+        left.Children.StructureChanged += (_, _) => leftNotifications++;
+        left.Children[0].Destroy();
+        ticker.StepFrame();
+        Assert.Empty(left.Children);
+        Assert.Equal(1, leftNotifications);
+    }
+
+    /// <summary>A destruction requested by a structural observer remains queued for the next flush boundary.</summary>
+    [Fact]
+    public void Destroy_NotificationKeepsNewRequestsForTheNextBoundary()
+    {
+        Node first = new(), second = new();
+        var group = new Node { Children = [first, second] };
+        var ticker = Play(new Node { Children = [group] });
+        var notifications = 0;
+        group.Children.StructureChanged += (_, _) =>
+        {
+            notifications++;
+            second.Destroy();
+        };
+        first.Destroy();
+
+        ticker.Tick(0);
+
+        Assert.True(first.IsDestroyed);
+        Assert.False(second.IsDestroyed);
+        Assert.True(second.DestroyQueued);
+        Assert.Equal([second], group.Children);
+        ticker.Tick(0);
+        Assert.True(second.IsDestroyed);
+        Assert.Empty(group.Children);
+        Assert.Equal(2, notifications);
     }
 }

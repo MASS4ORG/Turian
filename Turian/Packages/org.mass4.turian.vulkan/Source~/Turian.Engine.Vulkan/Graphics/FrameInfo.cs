@@ -34,7 +34,7 @@ public struct FrameInfo
     /// <summary>
     /// Gets or sets the list of nodes included in the frame.
     /// </summary>
-    public ObservableCollection<Node> Nodes { get; set; }
+    public NodeCollection Nodes { get; set; }
 
     /// <summary>Gets or sets the width of the framebuffer in pixels.</summary>
     public uint ViewportWidth { get; set; }

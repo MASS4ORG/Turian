@@ -152,7 +152,7 @@ public class NodeTest
 
     /// <summary>
     /// Adding siblings one at a time stays linear, so a scene of many props builds quickly, and removals and
-    /// duplicate entries keep parent links consistent.
+    /// moving an existing child keeps parent links consistent without duplicating it.
     /// </summary>
     [Fact(Timeout = 30_000)]
     public async Task ManySiblingsAddAndRemoveKeepParentsInLinearTime()
@@ -172,6 +172,8 @@ public class NodeTest
         Assert.All(root.Children, child => Assert.Same(root, child.Parent));
         var duplicated = root.Children[0];
         root.Children.Add(duplicated);
+        Assert.Equal(20_000, root.Children.Count);
+        Assert.Same(duplicated, root.Children[^1]);
         root.Children.RemoveAt(0);
         Assert.Same(root, duplicated.Parent);
         root.Children.Remove(duplicated);
@@ -179,7 +181,7 @@ public class NodeTest
         var detached = root.Children[^1];
         detached.Parent = null;
         Assert.DoesNotContain(detached, root.Children);
-        Assert.Equal(19_998, root.Children.Count);
+        Assert.Equal(19_997, root.Children.Count);
     }
 
     /// <summary>
@@ -209,13 +211,13 @@ public class NodeTest
             other.Children.Add(node);
         }
 
-        Assert.True(ComparedNode.Comparisons <= 2 * count, $"{ComparedNode.Comparisons} comparisons for {count} nodes");
+        Assert.Equal(0, ComparedNode.Comparisons);
         Assert.Empty(parent.Children);
         Assert.All(nodes[..(count / 2)], static node => Assert.Null(node.Parent));
         Assert.All(nodes[(count / 2)..], node => Assert.Same(other, node.Parent));
     }
 
-    /// <summary>Moves, replacements, reparenting and resets keep each child's parent and entry count consistent.</summary>
+    /// <summary>Moves, replacements, reparenting and resets keep each child listed once with its parent.</summary>
     [Fact]
     public void ChildEntriesFollowMoveReplaceReparentAndReset()
     {
