@@ -133,17 +133,29 @@ sealed class RenderList
     /// Orders <see cref="Draws"/> by material, model, then submesh, so recording rebinds as little as possible and
     /// draws of the same submesh are contiguous and can merge into one instanced draw.
     /// </summary>
-    public void Sort() =>
-        CollectionsMarshal.AsSpan(Draws).Sort(static (a, b) =>
+    public void Sort()
+    {
+        var draws = CollectionsMarshal.AsSpan(Draws);
+        for (var i = 1; i < draws.Length; i++)
         {
-            var order = a.SortKey.CompareTo(b.SortKey);
-            if (order == 0)
+            if (Compare(in draws[i - 1], in draws[i]) > 0)
             {
-                order = a.SubMesh.CompareTo(b.SubMesh);
+                draws.Sort(static (a, b) => Compare(in a, in b));
+                return;
             }
+        }
+    }
 
-            return order != 0 ? order : a.Sequence.CompareTo(b.Sequence);
-        });
+    static int Compare(in DrawItem a, in DrawItem b)
+    {
+        var order = a.SortKey.CompareTo(b.SortKey);
+        if (order == 0)
+        {
+            order = a.SubMesh.CompareTo(b.SubMesh);
+        }
+
+        return order != 0 ? order : a.Sequence.CompareTo(b.Sequence);
+    }
 
     /// <summary>Counts the draws from <paramref name="start"/> that share its model, submesh and material.</summary>
     /// <param name="draws">The sorted draws.</param>
