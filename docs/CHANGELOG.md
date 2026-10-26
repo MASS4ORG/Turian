@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: rag dolls #64 #111;
+
 ## [3.5.0] - 2026-10-26
 
 - Added: standalone physics bricks #64;

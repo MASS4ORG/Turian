@@ -62,7 +62,7 @@ sealed class SceneViewport : IDisposable
     /// <param name="sceneTree">Supplies the hierarchy to render and raises framing requests.</param>
     /// <param name="inspector">Receives picks and supplies the node the gizmo transforms.</param>
     /// <param name="gizmos">Resolves the per-component gizmo drawers.</param>
-    /// <param name="playMode">Consulted so gizmos and picking stay out of a running session.</param>
+    /// <param name="playMode">Keeps transform handles and picking out of a running session.</param>
     /// <param name="cameraSettings">How the free camera responds to input.</param>
     /// <param name="log">Where an unusable device is reported.</param>
     /// <param name="undo">Records a whole gizmo drag as one step.</param>
@@ -521,7 +521,7 @@ sealed class SceneViewport : IDisposable
 
     void PopulateGizmos(Gizmos g)
     {
-        if (playMode.IsActive || service is null)
+        if (service is null)
         {
             return;
         }
@@ -544,7 +544,10 @@ sealed class SceneViewport : IDisposable
             }
         }
 
-        Gizmo.Draw(g, service.Camera, ViewportSize);
+        if (!playMode.IsActive)
+        {
+            Gizmo.Draw(g, service.Camera, ViewportSize);
+        }
     }
 
     void OnGizmoDragStarted()
