@@ -34,30 +34,22 @@ public partial class Node
     {
         ArgumentNullException.ThrowIfNull(results);
         results.Clear();
-        CollectComponentsInChildren(this, results);
-    }
-
-    static void CollectComponentsInChildren<T>(Node node, List<T> results)
-        where T : Component
-    {
-        if (!node.IsActive)
+        if (!IsActive || IsDestroyed)
         {
             return;
         }
 
-        var components = node.Components;
-        for (var i = 0; i < components.Count; i++)
+        foreach (var node in EnsureSceneIndex().Nodes(SceneIndex.For<T>()))
         {
-            if (components[i] is T { IsActive: true } component)
+            if (!node.IsActiveUnder(this))
             {
-                results.Add(component);
+                continue;
             }
-        }
 
-        var children = node.Children;
-        for (var i = 0; i < children.Count; i++)
-        {
-            CollectComponentsInChildren(children[i], results);
+            foreach (var component in node.Components)
+            {
+                if (component is T { IsActive: true } match) { results.Add(match); }
+            }
         }
     }
 

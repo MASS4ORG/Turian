@@ -1,42 +1,32 @@
 namespace Turian.Engine.Core;
 
 /// <summary>
-/// The nodes of one scene hierarchy that the game loop and the renderer look up every frame, kept current from
-/// structural changes rather than searched for: nodes with frame callbacks or unstarted components, nodes with
-/// cameras and nodes with statistics displays. A list is compacted and sorted into hierarchy order when read after a
-/// change, so steady frames do no work.
+/// Maintains pluggable node categories from structural changes, normalizing each listing into hierarchy order only
+/// when read after a change. Consumers filter activity and other mutable values when reading.
 /// </summary>
-sealed class SceneIndex
+sealed class SceneIndex(Node root)
 {
-    /// <summary>What a node is listed for.</summary>
-    [Flags]
-    internal enum Kinds : byte
+    /// <summary>A structural membership rule shared by every scene that a consumer queries.</summary>
+    internal sealed class Category(Func<Node, bool> matches)
     {
-        None = 0,
-        Callbacks = 1,
-        Unstarted = 2,
-        Cameras = 4,
-        Statistics = 8,
+        internal bool Matches(Node node) => !node.IsDestroyed && matches(node);
     }
 
-    const Component.FrameCallbacks AnyCallback =
-        Component.FrameCallbacks.Update | Component.FrameCallbacks.LateUpdate | Component.FrameCallbacks.FixedUpdate;
+    /// <summary>The category containing nodes with components assignable to a type or interface.</summary>
+    internal static Category For<T>() where T : class => ComponentCategory<T>.Instance;
 
-    readonly Listing callbacks = new(Kinds.Callbacks);
-    readonly Listing cameras = new(Kinds.Cameras);
-    readonly Listing statistics = new(Kinds.Statistics);
+    readonly Dictionary<Category, Listing> listings = [];
     int version;
 
-    /// <summary>The listed nodes of one kind in hierarchy order, including inactive ones; not to be modified.</summary>
-    internal List<Node> Nodes(Kinds kind)
+    /// <summary>The category's nodes in hierarchy order, including inactive ones; not to be modified.</summary>
+    internal List<Node> Nodes(Category category)
     {
-        var listing = kind switch
+        if (!listings.TryGetValue(category, out var listing))
         {
-            Kinds.Callbacks => callbacks,
-            Kinds.Cameras => cameras,
-            Kinds.Statistics => statistics,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-        };
+            listing = new Listing(category);
+            listings.Add(category, listing);
+            listing.Seed(root);
+        }
 
         if (listing.Version != version)
         {
@@ -47,74 +37,39 @@ sealed class SceneIndex
         return listing.Nodes;
     }
 
-    internal void Register(Node node)
-    {
-        node.IndexedKinds = Kinds.None;
-        Refresh(node);
-    }
+    internal void Register(Node node) => Refresh(node);
 
     internal void Unregister(Node node)
     {
-        if (node.IndexedKinds != Kinds.None)
+        foreach (var listing in listings.Values)
         {
-            node.IndexedKinds = Kinds.None;
-            version++;
+            if (listing.SetMembership(node, false)) { version++; }
         }
     }
 
     /// <summary>Reclassifies a node after its components changed or started.</summary>
     internal void Refresh(Node node)
     {
-        var kinds = node.IsDestroyed ? Kinds.None : Classify(node);
-        if (kinds == node.IndexedKinds)
+        foreach (var listing in listings.Values)
         {
-            return;
+            if (listing.SetMembership(node, listing.Category.Matches(node))) { version++; }
         }
-
-        if (!ReferenceEquals(node.ListedIndex, this))
-        {
-            node.ListedIndex = this;
-            node.ListedKinds = Kinds.None;
-        }
-
-        node.IndexedKinds = kinds;
-        callbacks.Append(node, kinds);
-        cameras.Append(node, kinds);
-        statistics.Append(node, kinds);
-        version++;
     }
 
     /// <summary>Sibling order or membership changed somewhere in the hierarchy.</summary>
     internal void OrderChanged() => version++;
 
-    static Kinds Classify(Node node)
+    static class ComponentCategory<T> where T : class
     {
-        var kinds = Node.OverridesFrameCallbacks(node.GetType()) ? Kinds.Callbacks : Kinds.None;
-        var components = node.Components;
-        for (var i = 0; i < components.Count; i++)
+        internal static readonly Category Instance = new(static node =>
         {
-            var component = components[i];
-            if (!component.IsStarted)
+            foreach (var component in node.Components)
             {
-                kinds |= Kinds.Callbacks | Kinds.Unstarted;
-            }
-            else if (component.Overrides(AnyCallback))
-            {
-                kinds |= Kinds.Callbacks;
+                if (component is T) { return true; }
             }
 
-            if (component is CameraComponent)
-            {
-                kinds |= Kinds.Cameras;
-            }
-
-            if (component is IRenderStatisticsTarget)
-            {
-                kinds |= Kinds.Statistics;
-            }
-        }
-
-        return kinds;
+            return false;
+        });
     }
 
     // Preorder position: an ancestor precedes its descendants, and siblings follow their storage slots, which keep
@@ -169,20 +124,36 @@ sealed class SceneIndex
         public int Compare(Node? x, Node? y) => SceneIndex.Compare(x!, y!);
     }
 
-    // Nodes are appended when they gain a kind and dropped lazily, so a node that leaves and rejoins between reads is
-    // listed once.
-    sealed class Listing(Kinds kind)
+    // Membership and physical entries are separate so leaving and rejoining between reads never appends twice.
+    sealed class Listing(Category category)
     {
+        readonly Dictionary<Node, bool> membership = new(ReferenceEqualityComparer.Instance);
+        internal Category Category { get; } = category;
         internal List<Node> Nodes { get; } = [];
         internal int Version { get; set; } = -1;
 
-        internal void Append(Node node, Kinds kinds)
+        internal void Seed(Node node)
         {
-            if ((kinds & kind) != 0 && (node.ListedKinds & kind) == 0)
+            SetMembership(node, Category.Matches(node));
+            foreach (var child in node.Children) { Seed(child); }
+        }
+
+        internal bool SetMembership(Node node, bool included)
+        {
+            if (membership.TryGetValue(node, out var previous))
             {
-                node.ListedKinds |= kind;
+                if (previous == included) { return false; }
+                membership[node] = included;
+                return true;
+            }
+
+            if (included)
+            {
+                membership.Add(node, true);
                 Nodes.Add(node);
             }
+
+            return included;
         }
 
         internal void Normalize(SceneIndex index)
@@ -190,42 +161,19 @@ sealed class SceneIndex
             var write = 0;
             for (var read = 0; read < Nodes.Count; read++)
             {
-                if (Keeps(Nodes[read], index))
+                var node = Nodes[read];
+                if (membership[node] && ReferenceEquals(node.BoundIndex, index))
                 {
-                    Nodes[write++] = Nodes[read];
+                    Nodes[write++] = node;
+                }
+                else
+                {
+                    membership.Remove(node);
                 }
             }
 
             Nodes.RemoveRange(write, Nodes.Count - write);
             Nodes.Sort(HierarchyComparer.Instance);
-
-            // A node that rejoined through another hierarchy between reads was appended twice.
-            write = 0;
-            for (var read = 0; read < Nodes.Count; read++)
-            {
-                if (write == 0 || !ReferenceEquals(Nodes[write - 1], Nodes[read]))
-                {
-                    Nodes[write++] = Nodes[read];
-                }
-            }
-
-            Nodes.RemoveRange(write, Nodes.Count - write);
-        }
-
-        bool Keeps(Node node, SceneIndex index)
-        {
-            if (!ReferenceEquals(node.ListedIndex, index))
-            {
-                return false;
-            }
-
-            if (ReferenceEquals(node.BoundIndex, index) && (node.IndexedKinds & kind) != 0)
-            {
-                return true;
-            }
-
-            node.ListedKinds &= ~kind;
-            return false;
         }
     }
 }

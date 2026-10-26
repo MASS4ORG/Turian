@@ -6,11 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Fixed: Scene view component gizmos during play and pause #48.
+- Added: line and trail renderers with world-space SDF text #110.
 - Added: standalone physics bricks #64;
 - Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
 - Changed: engine-managed node children and components.
+- Fixed: Scene view component gizmos during play and pause #48.
 - Fixed: brick-resolution errors stay actionable.
 
 ## [3.4.1] - 2026-10-25

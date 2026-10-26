@@ -8,14 +8,6 @@ public partial class Node
     /// <summary>The index of this node's hierarchy, bound from its root down like the tag registry.</summary>
     internal SceneIndex? BoundIndex { get; private set; }
 
-    /// <summary>What the bound index currently lists this node for.</summary>
-    internal SceneIndex.Kinds IndexedKinds { get; set; }
-
-    /// <summary>The index whose lists physically hold this node, and for which kinds; entries are dropped lazily.</summary>
-    internal SceneIndex? ListedIndex { get; set; }
-
-    internal SceneIndex.Kinds ListedKinds { get; set; }
-
     /// <summary>The index of this node's hierarchy, created at the root on first use.</summary>
     internal SceneIndex EnsureSceneIndex()
     {
@@ -29,7 +21,7 @@ public partial class Node
             return Parent.EnsureSceneIndex();
         }
 
-        BindSceneIndex(new SceneIndex());
+        BindSceneIndex(new SceneIndex(this));
         return BoundIndex!;
     }
 
@@ -59,6 +51,19 @@ public partial class Node
     internal void ComponentsChanged() => BoundIndex?.Refresh(this);
 
     internal void ChildrenChanged() => BoundIndex?.OrderChanged();
+
+    /// <summary>Whether this indexed node is active within the requested subtree, ignoring ancestors above it.</summary>
+    internal bool IsActiveUnder(Node root)
+    {
+        if (root.Parent is null) { return IsActiveInHierarchy; }
+        for (var current = this; current is not null; current = current.Parent)
+        {
+            if (!current.IsActive || current.IsDestroyed) { return false; }
+            if (ReferenceEquals(current, root)) { return true; }
+        }
+
+        return false;
+    }
 
     /// <summary>Whether a node type overrides one of the per-frame callbacks, resolved once per type.</summary>
     internal static bool OverridesFrameCallbacks(Type type)

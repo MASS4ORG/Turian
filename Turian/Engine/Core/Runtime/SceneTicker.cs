@@ -17,6 +17,19 @@ namespace Turian.Engine.Core;
 /// <param name="clock">The session's authoritative clock, or a fresh clock with default settings.</param>
 public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clock)
 {
+    internal static readonly SceneIndex.Category CallbackNodes = new(static node =>
+    {
+        if (Node.OverridesFrameCallbacks(node.GetType())) { return true; }
+        const Component.FrameCallbacks anyCallback = Component.FrameCallbacks.Update |
+            Component.FrameCallbacks.LateUpdate | Component.FrameCallbacks.FixedUpdate;
+        foreach (var component in node.Components)
+        {
+            if (!component.IsStarted || component.Overrides(anyCallback)) { return true; }
+        }
+
+        return false;
+    });
+
     /// <summary>Creates a scene driver with a fresh simulation clock using default timing settings.</summary>
     public SceneTicker(ISceneManager sceneManager) : this(sceneManager, null) { }
 
@@ -267,11 +280,6 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 i = IndexAfterCallback(components, component, i);
             }
 
-            // Started components without frame callbacks leave the index.
-            if ((node.IndexedKinds & SceneIndex.Kinds.Unstarted) != 0)
-            {
-                node.RefreshSceneIndex();
-            }
         }
 
         ReturnActiveNodes(nodes);
@@ -363,7 +371,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 continue;
             }
 
-            foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks))
+            foreach (var node in root.EnsureSceneIndex().Nodes(CallbackNodes))
             {
                 if (node.IsActiveInHierarchy)
                 {

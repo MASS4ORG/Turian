@@ -39,7 +39,7 @@ public static class RenderStatisticsTargets
     // A hierarchy root's scene index lists its display nodes in hierarchy order, so no walk is needed.
     static IRenderStatisticsTarget? FindIndexed(Node root)
     {
-        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Statistics))
+        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.For<IRenderStatisticsTarget>()))
         {
             if (node.IsActiveInHierarchy && RecordingOn(node) is { } target)
             {

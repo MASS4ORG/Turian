@@ -28,7 +28,7 @@ public class RenderListTests
 
     static Vector4 ReadVector(byte[] bytes, int offset) => MemoryMarshal.Read<Vector4>(bytes.AsSpan(offset));
 
-    /// <summary>One walk collects active models and lights in hierarchy order and skips inactive ones.</summary>
+    /// <summary>Indexed gathering collects active models and lights in hierarchy order and skips inactive ones.</summary>
     [Fact]
     public void GatherCollectsActiveModelsAndLightsInOrder()
     {
@@ -96,6 +96,67 @@ public class RenderListTests
         list.Gather([parent], LayerMask.Nothing);
         Assert.Empty(list.Models);
         Assert.Empty(list.Lights);
+    }
+
+    /// <summary>The shared index follows component replacement, reparenting, sibling order and current filters.</summary>
+    [Fact]
+    public void GatherTracksStructuralEditsAndLiveFilters()
+    {
+        var first = new ModelComponent();
+        var second = new ModelComponent();
+        var light = new LightComponent();
+        var instanced = new InstancedModelComponent();
+        var root = NodeWith("root");
+        var a = Child(root, NodeWith("a", first, light));
+        var b = Child(root, NodeWith("b", second, instanced));
+        var list = new RenderList();
+        list.Gather([root]);
+        Assert.Equal([first, second], list.Models);
+
+        root.Children.Move(1, 0);
+        a.Components.Add(second);
+        list.Gather([root]);
+        Assert.Equal([first, second], list.Models);
+        Assert.Equal([instanced], list.InstancedModels);
+        a.Components.Move(2, 0);
+        list.Gather([root]);
+        Assert.Equal([second, first], list.Models);
+
+        a.IsActive = false;
+        instanced.IsActive = false;
+        list.Gather([root]);
+        Assert.Empty(list.Models);
+        Assert.Empty(list.Lights);
+        Assert.Empty(list.InstancedModels);
+
+        a.IsActive = true;
+        a.Components.Clear();
+        b.Components.Add(light);
+        b.RenderLayer = 3;
+        list.Gather([root], LayerMask.FromLayer(0));
+        Assert.Empty(list.Lights);
+        list.Gather([root], LayerMask.FromLayer(3));
+        Assert.Equal([light], list.Lights);
+        b.DestroyImmediate();
+        list.Gather([root]);
+        Assert.Empty(list.Lights);
+    }
+
+    /// <summary>A render rooted inside another hierarchy includes only that subtree and ignores outside activity.</summary>
+    [Fact]
+    public void GatherUsesTheRequestedSubtreeBoundary()
+    {
+        var root = NodeWith("root", new ModelComponent());
+        var model = new ModelComponent();
+        var branch = Child(root, NodeWith("branch", model));
+        root.IsActive = false;
+        var list = new RenderList();
+
+        list.Gather([branch]);
+        Assert.Equal([model], list.Models);
+        branch.IsActive = false;
+        list.Gather([branch]);
+        Assert.Empty(list.Models);
     }
 
     /// <summary>State numbers are stable per object, first-seen order, and restart after a reset.</summary>

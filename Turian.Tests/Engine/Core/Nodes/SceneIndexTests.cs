@@ -87,7 +87,7 @@ public class SceneIndexTests
         ticker.StepFrame();
         string[] order = ["r1", "r2", "a1", "custom", "b1", "c1"];
         Assert.Equal(Expected(order, "fixed").Concat(Expected(order, "update")).Concat(Expected(order, "late")), log);
-        Assert.DoesNotContain(plain, root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks));
+        Assert.DoesNotContain(plain, root.EnsureSceneIndex().Nodes(SceneTicker.CallbackNodes));
 
         log.Clear();
         root.Children.Move(2, 0);
@@ -101,9 +101,8 @@ public class SceneIndexTests
         labels.Where(label => pass == "update" || label != "custom").Select(label => $"{label}:{pass}");
 
     /// <summary>
-    /// Membership is captured at the start of each pass, as the hierarchy walk did: a node, or a callback component on a
-    /// node without callbacks, added during Update joins from the late pass, and a removed node keeps the running pass
-    /// but no later one.
+    /// Pass-start callback membership defers a callback added to a previously callback-less node until the next pass;
+    /// removed nodes keep the running pass but no later one.
     /// </summary>
     [Fact]
     public void MidFrameChangesJoinAtTheNextPass()
@@ -141,6 +140,49 @@ public class SceneIndexTests
             log);
     }
 
+    /// <summary>Components added to an already captured callback node retain same-pass delivery in collection order.</summary>
+    [Fact]
+    public void MidPassComponentsOnCapturedNodesRunInTheSamePass()
+    {
+        var log = new List<string>();
+        var root = new Node();
+        var child = new Node();
+        Record(child, log, "existing");
+        root.Children.Add(child);
+        var frames = 0;
+        root.Components.Add(new Spawner
+        {
+            Spawn = () =>
+            {
+                if (frames++ == 1) { Record(child, log, "added"); }
+            },
+        });
+        var ticker = Adopt(root);
+        ticker.StepFrame();
+        log.Clear();
+
+        ticker.StepFrame();
+
+        Assert.Equal(["existing:fixed", "existing:update", "added:update", "existing:late", "added:late"], log);
+    }
+
+    /// <summary>Starting through either the gameplay API or a raw listing immediately updates callback membership.</summary>
+    [Fact]
+    public void StartedPlainComponentsLeaveTheCallbackCategory()
+    {
+        var root = new Node();
+        var index = root.EnsureSceneIndex();
+        Assert.Empty(index.Nodes(SceneTicker.CallbackNodes));
+
+        root.AddComponent(new Plain());
+        Assert.Empty(index.Nodes(SceneTicker.CallbackNodes));
+        var raw = new Plain();
+        root.Components.Add(raw);
+        Assert.Equal([root], index.Nodes(SceneTicker.CallbackNodes));
+        raw.EnsureStarted();
+        Assert.Empty(index.Nodes(SceneTicker.CallbackNodes));
+    }
+
     /// <summary>A node moved to another scene and back between frames is listed once in each hierarchy it joins.</summary>
     [Fact]
     public void MovesBetweenHierarchiesListOnce()
@@ -160,12 +202,12 @@ public class SceneIndexTests
         ticker.StepFrame();
 
         Assert.Equal(["t:fixed", "t:update", "t:late"], log);
-        Assert.Empty(first.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks));
-        Assert.Equal([traveller], second.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks));
+        Assert.Empty(first.EnsureSceneIndex().Nodes(SceneTicker.CallbackNodes));
+        Assert.Equal([traveller], second.EnsureSceneIndex().Nodes(SceneTicker.CallbackNodes));
 
         traveller.Parent = null;
         traveller.DestroyImmediate();
-        Assert.Empty(second.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks));
+        Assert.Empty(second.EnsureSceneIndex().Nodes(SceneTicker.CallbackNodes));
     }
 
     /// <summary>The statistics display is the first recording, active one in hierarchy order, kept current by edits.</summary>
