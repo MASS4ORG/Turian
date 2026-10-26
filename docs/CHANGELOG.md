@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: Scene view component gizmos during play and pause #48.
 - Added: standalone physics bricks #64;
 - Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
