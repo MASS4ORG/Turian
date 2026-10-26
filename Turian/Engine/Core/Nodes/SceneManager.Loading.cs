@@ -239,29 +239,6 @@ public partial class SceneManager
         return clone;
     }
 
-    static void RecursiveCleanup(Node node)
-    {
-        node.OnDisable();
-
-        foreach (var component in node.Components.ToList())
-        {
-            component.Detach();
-
-            if (component is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-        }
-
-        foreach (var child in node.Children.ToList())
-        {
-            RecursiveCleanup(child);
-        }
-
-        node.OnDestroy();
-        node.IsDestroyed = true;
-    }
-
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5351:DoNotUseBrokenCryptographicAlgorithms",
         Justification = "MD5 preserves existing deterministic path identities; not used for security.")]
     static Guid HashPathToGuid(string absolutePath)

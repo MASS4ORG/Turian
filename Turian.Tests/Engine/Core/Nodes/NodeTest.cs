@@ -152,7 +152,7 @@ public class NodeTest
 
     /// <summary>
     /// Adding siblings one at a time stays linear, so a scene of many props builds quickly, and removals and
-    /// duplicate entries keep parent links consistent.
+    /// moving an existing child keeps parent links consistent without duplicating it.
     /// </summary>
     [Fact(Timeout = 30_000)]
     public async Task ManySiblingsAddAndRemoveKeepParentsInLinearTime()
@@ -172,6 +172,8 @@ public class NodeTest
         Assert.All(root.Children, child => Assert.Same(root, child.Parent));
         var duplicated = root.Children[0];
         root.Children.Add(duplicated);
+        Assert.Equal(20_000, root.Children.Count);
+        Assert.Same(duplicated, root.Children[^1]);
         root.Children.RemoveAt(0);
         Assert.Same(root, duplicated.Parent);
         root.Children.Remove(duplicated);
@@ -179,7 +181,96 @@ public class NodeTest
         var detached = root.Children[^1];
         detached.Parent = null;
         Assert.DoesNotContain(detached, root.Children);
-        Assert.Equal(19_998, root.Children.Count);
+        Assert.Equal(19_997, root.Children.Count);
+    }
+
+    /// <summary>
+    /// Clearing and reparenting many siblings compares each removed node a bounded number of times, rather than scanning
+    /// the remaining siblings on every removal.
+    /// </summary>
+    [Fact]
+    public void DespawnStormComparesSiblingsLinearly()
+    {
+        const int count = 2000;
+        var parent = new Node();
+        var other = new Node();
+        var nodes = Enumerable.Range(0, count).Select(static _ => new ComparedNode()).ToArray();
+        foreach (var node in nodes)
+        {
+            parent.Children.Add(node);
+        }
+
+        ComparedNode.Comparisons = 0;
+        foreach (var node in nodes[..(count / 2)])
+        {
+            parent.Children.Remove(node);
+        }
+
+        foreach (var node in nodes[(count / 2)..])
+        {
+            other.Children.Add(node);
+        }
+
+        Assert.Equal(0, ComparedNode.Comparisons);
+        Assert.Empty(parent.Children);
+        Assert.All(nodes[..(count / 2)], static node => Assert.Null(node.Parent));
+        Assert.All(nodes[(count / 2)..], node => Assert.Same(other, node.Parent));
+    }
+
+    /// <summary>Moves, replacements, reparenting and resets keep each child listed once with its parent.</summary>
+    [Fact]
+    public void ChildEntriesFollowMoveReplaceReparentAndReset()
+    {
+        var parent = new Node();
+        var other = new Node();
+        Node a = new(), b = new(), c = new();
+        parent.Children = [a, b, c];
+
+        parent.Children.Move(0, 2);
+        Assert.All(parent.Children, child => Assert.Same(parent, child.Parent));
+        parent.Children.Remove(a);
+        Assert.Null(a.Parent);
+
+        parent.Children[0] = b;
+        Assert.Same(parent, b.Parent);
+        parent.Children[0] = a;
+        Assert.Same(parent, a.Parent);
+        Assert.Null(b.Parent);
+
+        other.Children.Add(c);
+        Assert.Same(other, c.Parent);
+        Assert.Equal([a], parent.Children);
+        parent.Children.Add(c);
+        Assert.Same(parent, c.Parent);
+        Assert.Empty(other.Children);
+
+        c.Parent = other;
+        Assert.Equal([a], parent.Children);
+        other.Children.Add(c);
+        parent.Children.Add(b);
+        parent.Children.Add(b);
+        parent.Children = [b];
+        Assert.Null(a.Parent);
+        Assert.Same(parent, b.Parent);
+        parent.Children.Remove(b);
+        Assert.Null(b.Parent);
+        parent.Children.Clear();
+        Assert.Same(other, c.Parent);
+        Assert.Equal([c], other.Children);
+    }
+
+    /// <summary>A node that counts equality comparisons, which every child-list scan performs.</summary>
+    sealed class ComparedNode : Node
+    {
+        public static int Comparisons { get; set; }
+
+        public override bool Equals(object? obj)
+        {
+            Comparisons++;
+            return base.Equals(obj);
+        }
+
+        public override int GetHashCode() => base.GetHashCode();
     }
 
     [TypeId("a3000004-0000-4000-8000-000000000005")]

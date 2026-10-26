@@ -11,6 +11,8 @@ public sealed partial class PackageResolver
         /// <summary>Registry name → why its index could not be read.</summary>
         readonly Dictionary<string, string> unreadable = new(StringComparer.Ordinal);
 
+        readonly HashSet<string> externalBuiltins = new(StringComparer.Ordinal);
+
         /// <summary>
         /// Throws one <see cref="PackageException"/> naming every brick that is still missing: those no registry could
         /// give and those no configured registry serves, with the state of each registry and what to do next.
@@ -19,7 +21,9 @@ public sealed partial class PackageResolver
         /// <exception cref="PackageException">A brick is missing.</exception>
         public async Task ThrowIfUnresolvedAsync()
         {
-            var problems = unresolved.Values.ToList();
+            var problems = unresolved.Select(pair => externalBuiltins.Contains(pair.Key)
+                ? $"{pair.Key} is declared as builtin:{pair.Key}, but this host no longer ships it. {pair.Value}"
+                : pair.Value).ToList();
             problems.AddRange(Constraints
                 .Where(c => !Resolved.ContainsKey(c.Id) && !Twins.ContainsKey(c.Id) && !unresolved.ContainsKey(c.Id))
                 .GroupBy(static c => c.Id)
@@ -35,6 +39,11 @@ public sealed partial class PackageResolver
                 _ = await IndexAsync(registry).ConfigureAwait(false);
             }
 
+            throw UnresolvedFailure(problems);
+        }
+
+        PackageException UnresolvedFailure(List<string> problems)
+        {
             var lines = problems.Count == 1
                 ? [problems[0]]
                 : new List<string> { $"{problems.Count} bricks could not be resolved:" }.Concat(problems.Select(static p => "- " + p)).ToList();
@@ -47,7 +56,7 @@ public sealed partial class PackageResolver
                           + "or declare where each comes from: a folder, a .brick file or a git URL.");
             }
 
-            throw new PackageException(string.Join(Environment.NewLine, lines)) { Problems = problems };
+            return new PackageException(string.Join(Environment.NewLine, lines)) { Problems = problems };
         }
 
         /// <summary>Whether no registry scoped to the brick lists it in an index that could be read.</summary>

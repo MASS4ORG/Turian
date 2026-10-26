@@ -10,6 +10,9 @@ namespace Turian.Engine.Core;
 [TypeId("1e9919ae-f343-569f-8715-8aa2baab3e39")]
 public class CameraComponent : Component, ICamera
 {
+    [ThreadStatic]
+    static Stack<Node>? primaryTraversal;
+
     /// <summary>The rendering layers included by this camera.</summary>
     public LayerMask CullingMask { get; set; } = LayerMask.Everything;
 
@@ -156,17 +159,52 @@ public class CameraComponent : Component, ICamera
     /// <param name="root">Root of the hierarchy to search.</param>
     public static CameraComponent? FindPrimary(Node? root)
     {
-        // A plain scan instead of OrderByDescending: hosts ask for the active camera every frame. The first camera
-        // wins a tie, as the stable sort did.
+        if (root is null) { return null; }
+        if (root.Parent is null) { return FindIndexed(root); }
+        var pending = primaryTraversal ?? new Stack<Node>();
+        primaryTraversal = null;
         CameraComponent? primary = null;
-        foreach (var camera in Node.GetComponentsInChildren<CameraComponent>(root))
+        try
         {
-            if (primary is null || camera.Priority > primary.Priority)
+            pending.Push(root);
+            while (pending.TryPop(out var current))
+            {
+                if (!current.IsActive) { continue; }
+                primary = SelectPrimary(current, primary);
+                Node.PushActiveChildren(current, pending);
+            }
+            return primary;
+        }
+        finally
+        {
+            pending.Clear();
+            primaryTraversal = pending;
+        }
+    }
+
+    // A hierarchy root's scene index lists its camera nodes in hierarchy order, so no walk is needed.
+    static CameraComponent? FindIndexed(Node root)
+    {
+        CameraComponent? primary = null;
+        if (!root.IsActive) { return null; }
+        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Cameras))
+        {
+            if (node.IsActiveInHierarchy) { primary = SelectPrimary(node, primary); }
+        }
+        return primary;
+    }
+
+    static CameraComponent? SelectPrimary(Node node, CameraComponent? primary)
+    {
+        var components = node.Components;
+        for (var i = 0; i < components.Count; i++)
+        {
+            if (components[i] is CameraComponent { IsActive: true } camera &&
+                (primary is null || camera.Priority > primary.Priority))
             {
                 primary = camera;
             }
         }
-
         return primary;
     }
 

@@ -13,6 +13,20 @@ public static class PrecastAssemblies
     /// <summary>The brick assemblies loaded from manifests, in load order.</summary>
     public static IReadOnlyCollection<Assembly> Loaded => LoadedAssemblies;
 
+    /// <summary>Adds a brick assembly a host loaded itself, such as the editor, so its modules are registered.</summary>
+    /// <param name="assembly">The brick's runtime assembly.</param>
+    public static void Register(Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        lock (LoadedAssemblies)
+        {
+            if (!LoadedAssemblies.Contains(assembly))
+            {
+                LoadedAssemblies.Enqueue(assembly);
+            }
+        }
+    }
+
     /// <summary>
     /// Loads each listed assembly by name and registers its <see cref="TypeIdAttribute"/> types. A missing manifest
     /// or list loads nothing.
@@ -54,10 +68,7 @@ public static class PrecastAssemblies
             {
                 var assembly = Assembly.Load(new AssemblyName(name));
                 TypeRegistry.ScanAssembly(assembly);
-                if (!LoadedAssemblies.Contains(assembly))
-                {
-                    LoadedAssemblies.Enqueue(assembly);
-                }
+                Register(assembly);
             }
             catch (Exception ex) when (ex is FileNotFoundException or FileLoadException or BadImageFormatException)
             {

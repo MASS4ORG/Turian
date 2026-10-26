@@ -11,6 +11,9 @@ public static class ProjectPackages
     /// <summary>The host name packages state engine ranges and categories for.</summary>
     public const string HostName = "turian";
 
+    /// <summary>Marks actionable project dependency errors so Output keeps them visible when Studio logs are hidden.</summary>
+    public static readonly EventId ResolutionFailedEvent = new(3101, "BrickResolutionFailed");
+
     /// <summary>
     /// The engine's built-in packages: the <c>packages</c> folder beside a published engine's assemblies, else the
     /// checkout's <c>Turian/Packages</c> it was built from.
@@ -171,7 +174,7 @@ public static class ProjectPackages
             // The editor's callers each note what they leave out; what is missing and why is told here, once per failure.
             if (Reported.TryAdd(ex, Reported))
             {
-                Log.Logger.LogError("The project's bricks could not be resolved: {Problem}", ex.Message);
+                Log.Logger.LogError(ResolutionFailedEvent, "The project's bricks could not be resolved: {Problem}", ex.Message);
             }
 
             throw;
@@ -198,19 +201,19 @@ public static class ProjectPackages
 
     /// <summary>
     /// The public registry every project can take bricks from, accepting all brick names and trusted with
-    /// MASS4's signing key. Its name is what lock files record, so it stays fixed while the asset store's address moves.
+    /// MASS4's original and approved CI signing keys. Its name is what lock files record, so it stays fixed while the asset store's address moves.
     /// </summary>
     public static ScopedRegistry PublicRegistry { get; } = new()
     {
         Name = "bricks.mass4.org",
         Url = "https://bricks.mass4.org/v1",
         Mirrors = ["https://store.mass4.org/v1"],
-        Keys = [ReadEmbeddedKey()],
+        Keys = [ReadEmbeddedKey("registry-mass4.pub"), ReadEmbeddedKey("registry-mass4-ci.pub")],
     };
 
-    static string ReadEmbeddedKey()
+    static string ReadEmbeddedKey(string resource)
     {
-        using var stream = typeof(ProjectPackages).Assembly.GetManifestResourceStream("registry-mass4.pub")!;
+        using var stream = typeof(ProjectPackages).Assembly.GetManifestResourceStream(resource)!;
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd().Trim();
     }

@@ -2,8 +2,8 @@ namespace Gaya.Plugin.Turian;
 
 /// <summary>
 /// The Output console's preferences: what it shows (timestamp, monospace, how many lines an entry
-/// may occupy) and when it empties itself (entering play, a completed build, a fresh user assembly
-/// from a recompile). Stored with the user as a hidden settings page, and bound by the panel's own
+/// may occupy) and when it empties itself (before play, a standalone build or a script recompile
+/// starts). Stored with the user as a hidden settings page, and bound by the panel's own
 /// settings row — the same object the Settings panel would edit if it were not hidden.
 /// </summary>
 [EditorSetting("Studio/Output", Id = PageId, Hidden = true, Description = "How the Output console displays its entries and when it clears itself.")]
@@ -21,10 +21,10 @@ public sealed class OutputPanelSettings
     /// <summary>Whether the console clears when a play session starts.</summary>
     public bool ClearOnPlay { get; set; } = true;
 
-    /// <summary>Whether the console clears when a standalone build (Build &amp; Run or Export) completes.</summary>
+    /// <summary>Whether the console clears before a standalone build (Build &amp; Run or Export) starts.</summary>
     public bool ClearOnBuild { get; set; } = true;
 
-    /// <summary>Whether the console clears when user code recompiles and a new assembly is loaded.</summary>
+    /// <summary>Whether the console clears before a user-code recompile starts.</summary>
     public bool ClearOnRecompile { get; set; } = true;
 
     /// <summary>How many lines of a message an entry in the main list shows at most.</summary>

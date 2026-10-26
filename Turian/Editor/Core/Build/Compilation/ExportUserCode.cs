@@ -2,17 +2,22 @@ namespace Turian.Editor.Core;
 
 /// <summary>
 /// Publishes the user project as a standalone executable and packages assets. A build profile chooses the target,
-/// platform, configuration and script symbols, and exports into <c>Output/&lt;profile&gt;</c>.
+/// platform, configuration and script symbols. The exported folder is named after the game.
 /// </summary>
 public sealed class ExportUserCode(
     IAppSettings settings,
     ILogger logger,
     BuildConfiguration configuration = BuildConfiguration.Release,
-    ProjectBuildProfile? profile = null)
+    ProjectBuildProfile? profile = null,
+    string? outputDirectory = null)
     : CompilerBase(settings, logger), IUserCodeCompiler
 {
     /// <inheritdoc />
     protected override ProjectSettingsCollection? SettingsOverrides => profile?.Profile;
+
+    /// <summary>The destination folder containing the executable and its content.</summary>
+    internal string OutputDirectory => outputDirectory ?? ExportOutputDir(Settings.ProjectAbsoluteDir,
+        Path.Combine("Output", Settings.TitleToPathFriendly ?? "Game"));
 
     /// <summary>Publishes the project and returns the export output directory.</summary>
     public async Task<string> ExecuteAsync()
@@ -25,8 +30,7 @@ public sealed class ExportUserCode(
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
 
-        var exportOutputPath = ExportOutputDir(Settings.ProjectAbsoluteDir,
-            profile is null ? "Output" : Path.Combine("Output", profile.Name.SanitizeFilename(' ')));
+        var exportOutputPath = OutputDirectory;
         Logger.LogInformation("Export output path: {Path}", exportOutputPath);
         EnsureDirectory(exportOutputPath + Path.DirectorySeparatorChar);
         if (RunsHeadlessByAccident(Settings.ProjectAbsoluteDir, profile?.Profile))

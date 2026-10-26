@@ -1,3 +1,5 @@
+using Codeuctivity;
+
 namespace Turian.Editor.CLI;
 
 /// <summary>
@@ -134,8 +136,8 @@ public static partial class Program
     {
         var profileOption = new Option<string[]>("--profile")
         {
-            Description = "Build profile to export, into Output/<profile>; repeat it to build several in one run. "
-                          + "Without it, the project's active profile"
+            Description = "Build profile to export, into Output/<profile>/<game>; repeat it to build several in one run. "
+                          + "Without it, export the active profile into Output/<game>"
         };
         var cmd = new Command("export", "Build and export as a standalone packaged game")
         {
@@ -168,7 +170,9 @@ public static partial class Program
             foreach (var profile in profiles)
             {
                 Log.Logger.LogInformation("Build profile {Profile}: {Target}", profile.Name, profile.Profile.Target);
-                await new ExportUserCode(settings, Log.Logger, config, profile).ExecuteAsync();
+                var output = Path.Combine(settings.ProjectAbsoluteDir, "Output", profile.Name.SanitizeFilename(' '),
+                    settings.TitleToPathFriendly ?? "Game");
+                await new ExportUserCode(settings, Log.Logger, config, profile, output).ExecuteAsync();
             }
         });
 

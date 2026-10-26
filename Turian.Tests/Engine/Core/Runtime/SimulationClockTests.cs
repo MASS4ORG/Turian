@@ -53,6 +53,24 @@ public sealed class SimulationClockTests
         Assert.Equal(0, clock.Advance(0, IgnoreTick));
     }
 
+    /// <summary>
+    /// Dropping backlog runs the budget and keeps only the partial tick; frames within budget are unchanged.
+    /// </summary>
+    [Fact]
+    public void Advance_DropsBacklogBeyondTheBudget()
+    {
+        var settings = new TimeSettings { FixedDeltaTime = 0.01, MaxTicksPerFrame = 2, DropBacklog = true };
+        var clock = new SimulationClock(settings);
+
+        Assert.Equal(2, clock.Advance(0.105, IgnoreTick));
+        Assert.Equal(0.005, clock.AccumulatorSeconds, 12);
+        Assert.Equal(1, clock.Advance(0.006, IgnoreTick));
+        Assert.Equal(0.001, clock.AccumulatorSeconds, 12);
+        Assert.Equal(0, clock.Advance(0, IgnoreTick));
+        Assert.Equal(3, clock.TickIndex);
+        Assert.True(clock.DropsBacklog);
+    }
+
     /// <summary>Pause and zero speed preserve backlog; explicit stepping advances one completed tick.</summary>
     [Fact]
     public void PauseAndStep_PreserveSpeedAndBacklog()

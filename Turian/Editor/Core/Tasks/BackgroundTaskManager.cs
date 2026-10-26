@@ -328,6 +328,25 @@ public sealed partial class BackgroundTaskManager
         }
     }
 
+    /// <summary>Requeues a retained task for a coalesced retry, with a fresh progress and cancellation state.</summary>
+    internal bool Restart(long id)
+    {
+        var found = false;
+        Mutate(id, task =>
+        {
+            found = true;
+            task.Status = BackgroundTaskStatus.Queued;
+            task.Progress = 0;
+            task.UnitsDone = 0;
+            task.UnitsTotal = 0;
+            task.Note = "";
+            task.CancelRequested = false;
+            task.StartedAt = clock.GetUtcNow();
+            task.FinishedAt = null;
+        });
+        return found;
+    }
+
     /// <summary>Marks a task completed; progress is forced to full.</summary>
     /// <param name="id">The task that finished.</param>
     public void Complete(long id) => Finish(id, BackgroundTaskStatus.Completed, "");

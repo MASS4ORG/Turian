@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Specialized;
 
 namespace Turian.Engine.Core;
@@ -7,13 +6,13 @@ public partial class Node
 {
     TagRegistry? tagRegistry;
     LayerFilter? layerFilter;
-    readonly HashSet<Node> knownChildren = [];
 
-    /// <summary>Creates a node with observable tags and hierarchy membership.</summary>
+    /// <summary>Creates a node with observable tags and owned hierarchy membership.</summary>
     public Node()
     {
         Tags.CollectionChanged += TagsChanged;
-        Children.CollectionChanged += ChildrenChanged;
+        children = new NodeCollection(this);
+        components = new ComponentCollection(this);
     }
 
     /// <summary>The node's tags, serialized as strings; absent serialized tags default to Untagged.</summary>
@@ -122,67 +121,4 @@ public partial class Node
 
     void TagsChanged(object? sender, NotifyCollectionChangedEventArgs args) => tagRegistry?.Refresh(this);
 
-    // Adds and removes visit only the changed items: a full resync per add makes building n siblings cubic.
-    void ChildrenChanged(object? sender, NotifyCollectionChangedEventArgs args)
-    {
-        if (args.Action == NotifyCollectionChangedAction.Move)
-        {
-            return;
-        }
-
-        if (args.Action == NotifyCollectionChangedAction.Add && args.NewItems is { } added)
-        {
-            Adopt(added);
-        }
-        else if (args.Action == NotifyCollectionChangedAction.Remove && args.OldItems is { } removed)
-        {
-            Release(removed);
-        }
-        else
-        {
-            Resync();
-        }
-    }
-
-    void Adopt(IList added)
-    {
-        foreach (Node child in added)
-        {
-            if (knownChildren.Add(child))
-            {
-                child.Parent = this;
-            }
-        }
-    }
-
-    void Release(IList removed)
-    {
-        foreach (Node child in removed)
-        {
-            // A node listed twice stays a child until its last entry goes.
-            if (Children.Contains(child) || !knownChildren.Remove(child))
-            {
-                continue;
-            }
-
-            if (ReferenceEquals(child.Parent, this))
-            {
-                child.Parent = null;
-            }
-        }
-    }
-
-    void Resync()
-    {
-        foreach (var child in knownChildren.Where(child => !Children.Contains(child)).ToArray())
-        {
-            knownChildren.Remove(child);
-            if (ReferenceEquals(child.Parent, this))
-            {
-                child.Parent = null;
-            }
-        }
-
-        Adopt(Children);
-    }
 }

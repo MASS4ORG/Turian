@@ -149,6 +149,49 @@ public class RenderListTests
         Assert.Equal([1, 3, 0, 2, 4], list.Draws.Select(static draw => draw.Sequence));
     }
 
+    /// <summary>Ordered draws retain all payloads in place, including draws with identical ordering fields.</summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(128)]
+    public void SortKeepsOrderedDrawPayloads(int count)
+    {
+        var list = new RenderList();
+        for (var i = 0; i < count; i++)
+        {
+            list.Draws.Add(new DrawItem(null!, 0, null!, Matrix4x4.CreateTranslation(i, 0, 0), default, 0));
+        }
+
+        var expected = list.Draws.ToArray();
+        list.Sort();
+
+        Assert.Equal(expected, list.Draws);
+    }
+
+    /// <summary>A late inversion in any ordering field still sorts the entire draw list.</summary>
+    [Theory]
+    [InlineData("key")]
+    [InlineData("submesh")]
+    [InlineData("sequence")]
+    public void SortFindsLateInversions(string field)
+    {
+        var list = new RenderList();
+        for (var i = 0; i < 128; i++)
+        {
+            var position = i == 127 ? 0 : i + 1;
+            var key = field == "key" ? position : 0;
+            var submesh = field == "submesh" ? position : 0;
+            var sequence = field == "sequence" ? position : i;
+            list.Draws.Add(new DrawItem(null!, submesh, null!, default, default, key, sequence));
+        }
+
+        var expected = list.Draws.OrderBy(static draw => draw.SortKey).ThenBy(static draw => draw.SubMesh)
+            .ThenBy(static draw => draw.Sequence).ToArray();
+        list.Sort();
+
+        Assert.Equal(expected, list.Draws);
+    }
+
     /// <summary>A run merges only draws sharing model, submesh and material; any difference starts a new draw.</summary>
     [Fact]
     public void RunLengthSplitsOnModelSubmeshOrMaterial()

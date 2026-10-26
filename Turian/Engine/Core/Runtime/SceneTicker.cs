@@ -28,6 +28,12 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     readonly ISceneManager sceneManager =
         sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
 
+    // Per-frame pass state is reused so a frame does not allocate in proportion to the node count.
+    readonly List<Node> roots = [];
+    List<Node>? nodeBuffer = [];
+    Action<long, double>? fixedTick;
+    Action? completedTick;
+
     /// <summary>The authoritative fixed-tick clock shared with the running game's services.</summary>
     public SimulationClock Clock { get; } = clock ?? new SimulationClock();
 
@@ -36,6 +42,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
 
     /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
     public SimulationSession? Simulation { get; init; }
+
+    /// <summary>Session systems run after the components of every fixed tick, in list order.</summary>
+    public IReadOnlyList<IFixedTickSystem> Systems { get; init; } = [];
 
     /// <summary>
     /// Multiplier for simulation time. Zero freezes elapsed game time, but still polls input and runs updates with zero delta.
@@ -88,15 +97,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 
-        var roots = CollectRoots();
+        CollectRoots();
 
-        Clock.AdvanceWithCompletion(unscaledDeltaTime,
-            (tick, interval) => RunFixedTick(roots, tick, interval), PublishCompletedTick);
+        Clock.AdvanceWithCompletion(unscaledDeltaTime, fixedTick ??= RunFixedTick,
+            completedTick ??= PublishCompletedTick);
 
-        RunUpdate(roots, (float)deltaTime);
+        RunAfterFixedTicks();
+        RunUpdate((float)deltaTime);
         Async.DrainUpdate();
-        RunLateUpdate(roots, (float)deltaTime);
+        RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
+        FlushDestroyed();
 
         InputSource?.NewFrame();
     }
@@ -122,14 +133,16 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         sceneManager.EnsureScenesStarted();
         Actions?.Update();
 
-        var roots = CollectRoots();
+        CollectRoots();
 
-        Clock.Step((tick, interval) => RunFixedTick(roots, tick, interval));
+        Clock.Step(fixedTick ??= RunFixedTick);
         PublishCompletedTick();
-        RunUpdate(roots, (float)deltaTime);
+        RunAfterFixedTicks();
+        RunUpdate((float)deltaTime);
         Async.DrainUpdate();
-        RunLateUpdate(roots, (float)deltaTime);
+        RunLateUpdate((float)deltaTime);
         Async.DrainLateUpdate();
+        FlushDestroyed();
 
         InputSource?.NewFrame();
     }
@@ -137,12 +150,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>Discards accumulated fixed-step time, e.g. after resuming from a pause.</summary>
     public void ResetAccumulator() => Clock.ResetAccumulator();
 
-    List<Node> CollectRoots() =>
-        [.. sceneManager.LoadedScenes
-            .Select(static scene => scene.RootNode)
-            .Prepend(sceneManager.PersistentRoot)];
+    void CollectRoots()
+    {
+        roots.Clear();
+        roots.Add(sceneManager.PersistentRoot);
+        foreach (var scene in sceneManager.LoadedScenes)
+        {
+            roots.Add(scene.RootNode);
+        }
+    }
 
-    void RunFixedTick(List<Node> roots, long tick, double interval)
+    void RunFixedTick(long tick, double interval)
     {
         var simulation = Simulation;
         if (simulation is not null && !ReferenceEquals(simulation.Clock, Clock))
@@ -150,8 +168,38 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
             throw new InvalidOperationException("The scene and simulation must share one clock.");
         }
 
-        RunFixedUpdate(roots, (float)interval);
+        RunFixedUpdate((float)interval);
+        foreach (var system in Systems)
+        {
+            system.FixedTick(tick, interval);
+        }
+
         simulation?.RunTick(tick, interval);
+        FlushDestroyed();
+    }
+
+    // Applies the destructions requested since the last boundary, root by root in scene order. Fixed-tick requests flush
+    // with their tick, so how many catch-up ticks a frame runs cannot change when a destroyed node leaves.
+    void FlushDestroyed()
+    {
+        foreach (var root in roots)
+        {
+            root.FlushDestroyQueue();
+        }
+    }
+
+    void RunAfterFixedTicks()
+    {
+        if (Systems.Count == 0)
+        {
+            return;
+        }
+
+        var alpha = Math.Clamp(Clock.AccumulatorSeconds / Clock.FixedDeltaTime, 0d, 1d);
+        foreach (var system in Systems)
+        {
+            system.AfterFixedTicks(alpha);
+        }
     }
 
     void PublishCompletedTick()
@@ -160,14 +208,17 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         Async.CompleteFixedStep(Clock.FixedDeltaTime);
     }
 
-    static void RunFixedUpdate(List<Node> roots, float fixedDeltaTime)
+    void RunFixedUpdate(float fixedDeltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnFixedUpdate(fixedDeltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (!component.IsActive || !component.Overrides(Component.FrameCallbacks.FixedUpdate))
                 {
                     continue;
                 }
@@ -180,18 +231,25 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 {
                     LogComponentException(component, nameof(Component.OnFixedUpdate), ex);
                 }
+
+                i = IndexAfterCallback(components, component, i);
             }
         }
+
+        ReturnActiveNodes(nodes);
     }
 
-    static void RunUpdate(List<Node> roots, float deltaTime)
+    void RunUpdate(float deltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnUpdate(deltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (!component.IsActive || (component.IsStarted && !component.Overrides(Component.FrameCallbacks.Update)))
                 {
                     continue;
                 }
@@ -205,18 +263,31 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 {
                     LogComponentException(component, nameof(Component.OnUpdate), ex);
                 }
+
+                i = IndexAfterCallback(components, component, i);
+            }
+
+            // Started components without frame callbacks leave the index.
+            if ((node.IndexedKinds & SceneIndex.Kinds.Unstarted) != 0)
+            {
+                node.RefreshSceneIndex();
             }
         }
+
+        ReturnActiveNodes(nodes);
     }
 
-    static void RunLateUpdate(List<Node> roots, float deltaTime)
+    void RunLateUpdate(float deltaTime)
     {
-        foreach (var node in ActiveNodes(roots))
+        var nodes = RentActiveNodes();
+        foreach (var node in nodes)
         {
             node.OnLateUpdate(deltaTime);
-            foreach (var component in node.Components)
+            var components = node.Components;
+            for (var i = 0; i < components.Count; i++)
             {
-                if (!component.IsActive)
+                var component = components[i];
+                if (!component.IsActive || !component.Overrides(Component.FrameCallbacks.LateUpdate))
                 {
                     continue;
                 }
@@ -229,8 +300,34 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 {
                     LogComponentException(component, nameof(Component.OnLateUpdate), ex);
                 }
+
+                i = IndexAfterCallback(components, component, i);
             }
         }
+
+        ReturnActiveNodes(nodes);
+    }
+
+    /// <summary>
+    /// Returns the index the pass continues after, because a callback may add components or remove its own or an
+    /// earlier one; a removed current component resumes at the slot it vacated.
+    /// </summary>
+    static int IndexAfterCallback(ComponentCollection components, Component current, int index)
+    {
+        if (index < components.Count && ReferenceEquals(components[index], current))
+        {
+            return index;
+        }
+
+        for (var i = 0; i < components.Count; i++)
+        {
+            if (ReferenceEquals(components[i], current))
+            {
+                return i;
+            }
+        }
+
+        return index - 1;
     }
 
     /// <summary>
@@ -250,12 +347,15 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     }
 
     /// <summary>
-    /// Materialises the active nodes of every root up-front so that lifecycle callbacks
-    /// may add or remove nodes without invalidating the iteration.
+    /// Materialises, at the start of a pass, the active nodes of every root that have frame callbacks or unstarted
+    /// components, depth-first in hierarchy order, so that lifecycle callbacks may add or remove nodes without
+    /// invalidating the iteration. The scene index supplies them, so steady frames do not walk the hierarchy. The reused
+    /// buffer is taken while a pass runs, so a re-entrant tick gets its own list.
     /// </summary>
-    static List<Node> ActiveNodes(List<Node> roots)
+    List<Node> RentActiveNodes()
     {
-        var nodes = new List<Node>();
+        var nodes = nodeBuffer ?? [];
+        nodeBuffer = null;
         foreach (var root in roots)
         {
             if (!root.IsActive)
@@ -263,9 +363,21 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
                 continue;
             }
 
-            nodes.Add(root);
-            nodes.AddRange(Node.GetChildren(root));
+            foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Callbacks))
+            {
+                if (node.IsActiveInHierarchy)
+                {
+                    nodes.Add(node);
+                }
+            }
         }
+
         return nodes;
+    }
+
+    void ReturnActiveNodes(List<Node> nodes)
+    {
+        nodes.Clear();
+        nodeBuffer = nodes;
     }
 }

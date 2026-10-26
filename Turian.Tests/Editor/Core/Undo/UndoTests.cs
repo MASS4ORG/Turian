@@ -98,6 +98,25 @@ public class UndoTests
         Assert.Equal(4, root.Children.Count);
     }
 
+    /// <summary>Indexed attachments clamp against the destination after removing an existing child.</summary>
+    [Fact]
+    public void AttachNodePreservesRequestedSiblingOrder()
+    {
+        var first = AddChild("First");
+        var second = AddChild("Second");
+        var third = AddChild("Third");
+        var inserted = new Node();
+        sceneTree.AttachNode(inserted, root, 1);
+        Assert.Equal([first, inserted, second, third], root.Children);
+        sceneTree.AttachNode(first, root, root.Children.Count);
+        Assert.Equal([inserted, second, third, first], root.Children);
+        sceneTree.AttachNode(first, root, -1);
+        Assert.Equal([first, inserted, second, third], root.Children);
+        sceneTree.AttachNode(inserted, null, 0);
+        Assert.Null(inserted.Parent);
+        Assert.Equal([first, second, third], root.Children);
+    }
+
     /// <summary>Batch reparenting preserves world placement and undo restores hierarchy and local transforms.</summary>
     [Fact]
     public void MultiReparentPreservesWorldAndRejectsCycles()

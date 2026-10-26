@@ -41,8 +41,8 @@ public sealed partial class ProjectSession
                 BlocksUi = true,
             }, async (progress, _) =>
             {
-                await Task.Run(() => ImportAndCompile(progress)).ConfigureAwait(false);
-                progress.Report(1, "Project ready");
+                var compiled = await Task.Run(() => ImportAndCompile(progress)).ConfigureAwait(false);
+                progress.Report(1, compiled ? "Project ready" : "Project opened with script errors; see Output");
             });
         }
         if (startupTask is not { IsCompleted: true } completed)

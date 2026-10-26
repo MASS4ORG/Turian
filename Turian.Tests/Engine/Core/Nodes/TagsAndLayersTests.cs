@@ -124,6 +124,57 @@ public sealed class TagsAndLayersTests
         Assert.Null(root.FindWithTag("Enemy"));
     }
 
+    /// <summary>Large tag lists keep registration order through removals, re-tags of early nodes and late additions.</summary>
+    [Fact]
+    public void LargeTagListsKeepRegistrationOrder()
+    {
+        var root = new Node();
+        root.Awake(null);
+        Assert.Equal([root], root.FindAllWithTag("Untagged"));
+        var nodes = Enumerable.Range(0, 2000).Select(static _ => new Node()).ToArray();
+        foreach (var node in nodes)
+        {
+            root.Children.Add(node);
+        }
+
+        for (var i = 0; i < nodes.Length; i += 2)
+        {
+            root.Children.Remove(nodes[i]);
+        }
+
+        nodes[1].Tags = ["Enemy"];
+        nodes[1].Tags = ["Untagged"];
+        var late = new Node();
+        root.Children.Add(late);
+
+        Assert.Equal([root, .. nodes.Where(static (_, i) => i % 2 == 1), late], root.FindAllWithTag("Untagged"));
+        Assert.Empty(root.FindAllWithTag("Enemy"));
+    }
+
+    /// <summary>Implicit Untagged queries keep registration order, skip inactive and re-tagged nodes, and see reentry.</summary>
+    [Fact]
+    public void UntaggedQueriesFollowRegistrationOrderAndActivity()
+    {
+        var first = new Node();
+        var second = new Node();
+        var third = new Node { Tags = ["Enemy", "Untagged"] };
+        var root = new Node { Tags = ["Root"], Children = [first, second, third] };
+        root.Awake(null);
+
+        Assert.Same(first, root.FindWithTag("Untagged"));
+        Assert.Equal([first, second, third], root.FindAllWithTag("Untagged"));
+        first.IsActive = false;
+        second.Tags[0] = "Enemy";
+        Assert.Same(third, root.FindWithTag("Untagged"));
+        Assert.Equal([second, third], root.FindAllWithTag("Enemy"));
+        root.Children.Remove(third);
+        Assert.Null(root.FindWithTag("Untagged"));
+        Assert.Empty(root.FindAllWithTag("Untagged"));
+        root.Children.Add(third);
+        first.IsActive = true;
+        Assert.Equal([first, third], root.FindAllWithTag("Untagged"));
+    }
+
     /// <summary>Reparent, collection replacement, removal, destruction and additive unload maintain separate registries.</summary>
     [Fact]
     public void RegistryTracksReparentDestroyAndUnload()
@@ -176,10 +227,10 @@ public sealed class TagsAndLayersTests
 
         parent.Tags = ["Deep"];
         root.Awake(null);
-        // Removing the backing collection without a change event makes a tree walk unable to find the node.
+        // Replacing storage without changing membership makes a tree walk unable to find the node.
         var backing = typeof(Node).GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(static field => field.FieldType == typeof(ObservableCollection<Node>));
-        backing.SetValue(root, new ObservableCollection<Node>());
+            .Single(static field => field.FieldType == typeof(NodeCollection));
+        backing.SetValue(root, new NodeCollection());
         Assert.Same(parent, root.FindWithTag("Deep"));
         Assert.Equal([parent], root.FindAllWithTag("Deep"));
         Assert.Empty(root.FindAllWithTag("Missing"));

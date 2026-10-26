@@ -20,6 +20,7 @@ public class StandardRenderSystem : IRenderSystem
     readonly Dictionary<(Guid Model, int Index), MaterialAsset> derivedMaterials = [];
     readonly Dictionary<Guid, MaterialAsset> overrideMaterials = [];
     readonly ConditionalWeakTable<ModelComponent, WorldBoundsCache> worldBounds = [];
+    readonly List<(ModelComponent? Component, WorldBoundsCache? Bounds)> preparedBounds = [];
     readonly Plane[] frustumPlanes = new Plane[6];
     bool prepared;
     readonly Silk.NET.Vulkan.DescriptorSetLayout globalLayout;
@@ -179,11 +180,34 @@ public class StandardRenderSystem : IRenderSystem
 
     void BuildDraws()
     {
-        foreach (var component in renderList.Models)
+        while (preparedBounds.Count < renderList.Models.Count)
         {
+            preparedBounds.Add(default);
+        }
+
+        if (preparedBounds.Count > renderList.Models.Count)
+        {
+            preparedBounds.RemoveRange(renderList.Models.Count, preparedBounds.Count - renderList.Models.Count);
+        }
+
+        var order = new DrawOrder();
+        var bounds = CollectionsMarshal.AsSpan(preparedBounds);
+        for (var i = 0; i < renderList.Models.Count; i++)
+        {
+            var component = renderList.Models[i];
             if (component.ModelInstance is VulkanModel model && component.Node is { } node)
             {
-                AddDraws(component, model, node.GlobalTransform);
+                ref var entry = ref bounds[i];
+                if (!ReferenceEquals(entry.Component, component))
+                {
+                    entry = (component, worldBounds.GetValue(component, static _ => new WorldBoundsCache()));
+                }
+
+                AddDraws(component, model, node.GlobalTransform, entry.Bounds!, ref order);
+            }
+            else
+            {
+                bounds[i] = default;
             }
         }
 
@@ -191,7 +215,8 @@ public class StandardRenderSystem : IRenderSystem
         CullingStats = CullingStats with { Submitted = renderList.Draws.Count };
     }
 
-    void AddDraws(ModelComponent component, VulkanModel model, Transform global)
+    void AddDraws(ModelComponent component, VulkanModel model, Transform global, WorldBoundsCache cached,
+        ref DrawOrder order)
     {
         var start = 0;
         var last = model.SubMeshes.Count;
@@ -201,10 +226,13 @@ public class StandardRenderSystem : IRenderSystem
             last = Math.Min(rangeStart + rangeCount, model.SubMeshes.Count);
         }
 
-        var cached = worldBounds.GetValue(component, static _ => new WorldBoundsCache());
         cached.Update(model, global, start, Math.Max(0, last - start));
         var modelAssetId = component.ModelAssetId;
-        var modelOrder = renderList.OrderOf(model);
+        if (!ReferenceEquals(order.Model, model))
+        {
+            order.Model = model;
+            order.ModelOrder = renderList.OrderOf(model);
+        }
         for (var i = start; i < last; i++)
         {
             if (UseFrustumCulling && !GeometryUtility.TestPlanesAabb(frustumPlanes, cached.Bounds[i - start]))
@@ -215,12 +243,47 @@ public class StandardRenderSystem : IRenderSystem
 
             var slot = i - start;
             var overrideReference = slot < component.Materials.Count ? component.Materials[slot] : null;
-            var material = ResolveMaterial(modelAssetId, model.SubMeshes[i].MaterialIndex, overrideReference);
-            var key = RenderList.SortKey(renderList.OrderOf(material), modelOrder);
+            var material = ResolveDrawMaterial(ref order, modelAssetId, model.SubMeshes[i].MaterialIndex,
+                overrideReference);
+            var key = RenderList.SortKey(order.MaterialOrder, order.ModelOrder);
             renderList.Draws.Add(new DrawItem(model, i, material, cached.ModelMatrix, cached.NormalMatrix, key,
                 renderList.Draws.Count, cached.Bounds[i - start], component.Node!.RenderLayer, component.Color,
                 component.CustomData));
         }
+    }
+
+    // Consecutive draws of one model and material slot reuse the previous resolution within a BuildDraws call.
+    MaterialResource ResolveDrawMaterial(ref DrawOrder order, Guid modelAssetId, int? materialIndex,
+        AssetReference<MaterialAsset>? overrideReference)
+    {
+        if (order.Material is { } resolved && order.MaterialModelId == modelAssetId &&
+            order.MaterialIndex == materialIndex && ReferenceEquals(order.MaterialOverride, overrideReference))
+        {
+            return resolved;
+        }
+
+        var material = ResolveMaterial(modelAssetId, materialIndex, overrideReference);
+        if (!ReferenceEquals(order.Material, material))
+        {
+            order.Material = material;
+            order.MaterialOrder = renderList.OrderOf(material);
+        }
+
+        order.MaterialModelId = modelAssetId;
+        order.MaterialIndex = materialIndex;
+        order.MaterialOverride = overrideReference;
+        return material;
+    }
+
+    struct DrawOrder
+    {
+        public VulkanModel? Model;
+        public int ModelOrder;
+        public MaterialResource? Material;
+        public int MaterialOrder;
+        public Guid MaterialModelId;
+        public int? MaterialIndex;
+        public AssetReference<MaterialAsset>? MaterialOverride;
     }
 
     void RecordDraws(CommandBuffer commandBuffer, int frameIndex)
@@ -453,6 +516,7 @@ public class StandardRenderSystem : IRenderSystem
         retired.Dispose();
         instanceLayout.Dispose();
         worldBounds.Clear();
+        preparedBounds.Clear();
         derivedMaterials.Clear();
         overrideMaterials.Clear();
         pipeline.Dispose();

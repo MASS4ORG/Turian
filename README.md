@@ -3,13 +3,14 @@
 [![CI](https://github.com/MASS4ORG/Turian/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/MASS4ORG/Turian/actions/workflows/build-and-test.yml)
 [![Release](https://img.shields.io/github/v/release/MASS4ORG/Turian)](https://github.com/MASS4ORG/Turian/releases/latest)
 [![License: MPL-2.0](https://img.shields.io/github/license/MASS4ORG/Turian)](docs/LICENSE.md)
+[![Discord](https://img.shields.io/discord/1104509879269457982?label=Discord&logo=discord&logoColor=white)](https://discord.gg/uVmtZwkzfs)
 
 **Turian** is a component-based 3D game engine, fully in **.NET/C#**, with a Unity-style workflow. Its editor, Turian Studio, is built on the [Gaya](Gaya/) platform and drawn with [Guinevere](https://github.com/MASS4ORG/Guinevere).
 
 - **[Site & documentation](https://turian.mass4.org)**
 - **[Releases](https://github.com/MASS4ORG/Turian/releases)**
 - **[Issues](https://github.com/MASS4ORG/Turian/issues)** and **[Milestones](https://github.com/MASS4ORG/Turian/milestones)**
-- **[Discord](https://discord.com/channels/1104509879269457982/1384499574281867274)** and **[Matrix](https://matrix.to/#/!vRaFlDqBZyMXNRKDch:matrix.org)**
+- **[Discord](https://discord.gg/uVmtZwkzfs)**, **[Matrix](https://matrix.to/#/#mass4:matrix.org)** and **[Mastodon](https://fosstodon.org/@turian)**
 
 ![Turian Studio: scene tree, scene view, inspector and asset browser](docs/images/studio-overview.webp)
 

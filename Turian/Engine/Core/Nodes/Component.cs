@@ -93,6 +93,57 @@ public abstract class Component : IdObject
     [JsonIgnore, Hide]
     public bool IsStarted { get; private set; }
 
+    /// <summary>Whether <see cref="Destroy"/> or <see cref="DestroyImmediate"/> was requested for this component.</summary>
+    [JsonIgnore, Hide]
+    public bool DestroyQueued { get; private set; }
+
+    /// <summary>The node components collection listing this component, which may precede attachment.</summary>
+    internal ComponentCollection? ListedIn { get; set; }
+
+    /// <summary>
+    /// Removes and destroys this component at the next boundary of the running game loop, as <see cref="Node.Destroy"/>
+    /// does: the end of the fixed tick when requested from a fixed update, otherwise the end of the frame. Until then
+    /// it stays attached and keeps updating.
+    /// </summary>
+    public void Destroy()
+    {
+        if (IsDestroyed || DestroyQueued)
+        {
+            return;
+        }
+
+        if (Node is not { } node)
+        {
+            DestroyImmediate();
+            return;
+        }
+
+        DestroyQueued = true;
+        node.QueueDestroy(this);
+    }
+
+    /// <summary>Removes and destroys this component now, for editor and tool code outside the game loop.</summary>
+    public void DestroyImmediate()
+    {
+        if (IsDestroyed)
+        {
+            return;
+        }
+
+        DestroyQueued = true;
+        ListedIn?.Remove(this);
+        if (Node is null)
+        {
+            IsDestroyed = true;
+        }
+
+        Detach();
+        if (this is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+
     /// <summary>
     /// Attaches this component to a node and runs Awake if not yet awoken.
     /// </summary>
@@ -210,6 +261,57 @@ public abstract class Component : IdObject
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    /// <summary>The per-frame callbacks a component type overrides; the ticker skips the empty base methods.</summary>
+    [Flags]
+    internal enum FrameCallbacks : byte
+    {
+        None = 0,
+        Update = 1,
+        LateUpdate = 2,
+        FixedUpdate = 4,
+        Known = 8,
+    }
+
+    // Weak keys let collectible user-code types unload.
+    static readonly ConditionalWeakTable<Type, StrongBox<FrameCallbacks>> OverriddenCallbacks = [];
+    FrameCallbacks frameCallbacks;
+
+    /// <summary>Whether this component's type overrides <paramref name="callback"/>, resolved once per type.</summary>
+    internal bool Overrides(FrameCallbacks callback)
+    {
+        if (frameCallbacks == FrameCallbacks.None)
+        {
+            frameCallbacks = OverriddenCallbacks.GetValue(GetType(), static type => new(FindOverrides(type))).Value;
+        }
+
+        return (frameCallbacks & callback) != 0;
+    }
+
+    static FrameCallbacks FindOverrides(Type type)
+    {
+        var callbacks = FrameCallbacks.Known;
+        if (Overridden(type, nameof(OnUpdate)))
+        {
+            callbacks |= FrameCallbacks.Update;
+        }
+
+        if (Overridden(type, nameof(OnLateUpdate)))
+        {
+            callbacks |= FrameCallbacks.LateUpdate;
+        }
+
+        if (Overridden(type, nameof(OnFixedUpdate)))
+        {
+            callbacks |= FrameCallbacks.FixedUpdate;
+        }
+
+        return callbacks;
+    }
+
+    // A method hiding the callback with "new" also counts, which only costs an empty call.
+    static bool Overridden(Type type, string name) =>
+        type.GetMethod(name, BindingFlags.Public | BindingFlags.Instance, [typeof(float)])?.DeclaringType != typeof(Component);
 
     /// <summary>
     /// Checks if multiple instances of the specified component type are allowed on a single node.

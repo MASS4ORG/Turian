@@ -461,6 +461,7 @@ public sealed partial class PackageResolver(PackageStore store, PackageResolverO
             }
 
             Constraints.Add((id, VersionRange.Parse("*"), requiredBy, depth));
+            externalBuiltins.Add(id);
             Warnings.Add($"{id} no longer ships with this host; resolving it from the configured registries.");
             return true;
         }

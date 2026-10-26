@@ -117,6 +117,7 @@ public static class BrickAssemblies
             foreach (var brick in installed)
             {
                 RegisterTypes(brick, logger);
+                RegisterModules(brick);
             }
         }
 
@@ -261,13 +262,10 @@ public static class BrickAssemblies
 
     static void RegisterPackageProbing(string package)
     {
-        foreach (var folder in new[] { "lib/net10.0", "lib/netstandard2.0", "lib/netstandard2.1" })
+        if (BrickService.PreferredLibFrameworks.Select(f => Path.Combine(package, "lib", f))
+                .FirstOrDefault(Directory.Exists) is { } directory)
         {
-            var directory = Path.Combine(package, folder);
-            if (Directory.Exists(directory))
-            {
-                _ = ProbeDirectories.Add(directory);
-            }
+            _ = ProbeDirectories.Add(directory);
         }
     }
 
@@ -280,6 +278,16 @@ public static class BrickAssemblies
         catch (Exception ex) when (ex is IOException or BadImageFormatException or FileLoadException)
         {
             return null;
+        }
+    }
+
+    // Games scan loaded bricks for engine modules, including bricks their own code never names.
+    static void RegisterModules(ResolvedPackage brick)
+    {
+        var names = RuntimeAssemblies(brick).Select(static path => Path.GetFileNameWithoutExtension(path)).ToHashSet();
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => a.GetName().Name is { } name && names.Contains(name)))
+        {
+            PrecastAssemblies.Register(assembly);
         }
     }
 

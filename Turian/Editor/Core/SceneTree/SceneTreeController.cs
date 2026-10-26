@@ -323,11 +323,15 @@ public sealed class SceneTreeController(
     public void AttachNode(Node node, Node? parent, int index)
     {
         ArgumentNullException.ThrowIfNull(node);
-        node.Parent = parent;
         if (parent is not null)
         {
-            var safeIndex = Math.Clamp(index, 0, parent.Children.Count);
+            var count = parent.Children.Count - (ReferenceEquals(node.Parent, parent) ? 1 : 0);
+            var safeIndex = Math.Clamp(index, 0, count);
             parent.Children.Insert(safeIndex, node);
+        }
+        else
+        {
+            node.Parent = null;
         }
     }
 

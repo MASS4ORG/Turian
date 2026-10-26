@@ -7,6 +7,18 @@ namespace Turian.Engine.Core;
 [TypeId("f7cc675d-54f2-510b-8e5d-807281e3012d")]
 public partial class Node : IdObject
 {
+    readonly NodeCollection children;
+    readonly ComponentCollection components;
+    Node? parent;
+    static long hierarchyVersion;
+
+    internal int SlotIndex { get; set; } = -1;
+
+    /// <summary>Gets the global hierarchy mutation stamp for polling scene-tree changes.</summary>
+    public static long HierarchyVersion => Interlocked.Read(ref hierarchyVersion);
+
+    internal static void NotifyHierarchyChanged() => Interlocked.Increment(ref hierarchyVersion);
+
     /// <summary>
     /// Gets or sets a value indicating whether the node is active.
     /// </summary>
@@ -67,6 +79,7 @@ public partial class Node : IdObject
             if (value)
             {
                 tagRegistry?.Unregister(this);
+                BoundIndex?.Unregister(this);
             }
 
             RefreshActiveHierarchy();
@@ -74,26 +87,39 @@ public partial class Node : IdObject
     }
 
     /// <summary>
-    /// Gets or sets the parent node of this node.
+    /// Gets or sets the parent, moving this node into the parent's children or detaching it when null.
     /// </summary>
     [JsonIgnore, Hide]
     public Node? Parent
     {
-        get;
+        get => parent;
         set
         {
-            if (ReferenceEquals(field, value))
+            if (ReferenceEquals(parent, value))
             {
                 return;
             }
 
-            var previous = field;
-            field = value;
-            previous?.Children.Remove(this);
-            BindTagRegistry(value?.tagRegistry);
-            RefreshActiveHierarchy();
-            InvalidateGlobalTransformCache();
+            if (value is null)
+            {
+                parent?.Children.Remove(this);
+            }
+            else
+            {
+                value.Children.Add(this);
+            }
         }
+    }
+
+    internal void SetParentCore(Node? value)
+    {
+        if (ReferenceEquals(parent, value)) { return; }
+        parent = value;
+        if (value is not null) { MoveDestroyQueue(value); }
+        BindTagRegistry(value?.tagRegistry);
+        BindSceneIndex(value?.BoundIndex);
+        RefreshActiveHierarchy();
+        InvalidateGlobalTransformCache();
     }
 
     /// <summary>Gets the services bound to this scene hierarchy.</summary>
@@ -105,34 +131,25 @@ public partial class Node : IdObject
     internal bool AllowMissingServices { get; private set; }
 
     /// <summary>
-    /// Gets or sets the list of child nodes.
+    /// Gets the owned children collection or replaces its contents with an assigned sequence of unique references.
     /// </summary>
     [Hide]
-    public ObservableCollection<Node> Children
+    public NodeCollection Children
     {
-        get;
-        set
-        {
-            ArgumentNullException.ThrowIfNull(value);
-            if (ReferenceEquals(field, value))
-            {
-                return;
-            }
-
-            field.CollectionChanged -= ChildrenChanged;
-            field = value;
-            field.CollectionChanged += ChildrenChanged;
-            ChildrenChanged(this, new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
-                System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
-        }
-    } = [];
+        get => children;
+        set => children.ReplaceWith(value);
+    }
 
     /// <summary>
-    /// Gets the list of components attached to this node.
+    /// Gets the owned components collection or replaces its contents with an assigned sequence of unique references.
     /// </summary>
     [JsonConverter(typeof(ComponentJsonConverter))]
     [Hide]
-    public Collection<Component> Components { get; init; } = [];
+    public ComponentCollection Components
+    {
+        get => components;
+        set => components.ReplaceWith(value);
+    }
 
     /// <summary>
     /// The prefab this node was instantiated from, or null when the node is not the root of a prefab instance.

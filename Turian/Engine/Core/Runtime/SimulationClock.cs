@@ -23,6 +23,7 @@ public sealed class SimulationClock
 
         FixedDeltaTime = settings.FixedDeltaTime;
         MaxTicksPerFrame = settings.MaxTicksPerFrame;
+        DropsBacklog = settings.DropBacklog;
     }
 
     /// <summary>The fixed simulation interval captured when this clock was created.</summary>
@@ -30,6 +31,9 @@ public sealed class SimulationClock
 
     /// <summary>The maximum number of fixed ticks executed by one call to <see cref="Advance"/>.</summary>
     public int MaxTicksPerFrame { get; }
+
+    /// <summary>Whether a frame that spends its whole tick budget drops the rest of its time, as configured.</summary>
+    public bool DropsBacklog { get; }
 
     /// <summary>The last successfully completed authoritative tick.</summary>
     public long TickIndex { get; private set; }
@@ -82,6 +86,13 @@ public sealed class SimulationClock
             count++;
             completed?.Invoke();
         }
+
+        // The partial tick is kept, so presentation interpolation stays smooth.
+        if (DropsBacklog && count == MaxTicksPerFrame && CanAdvance())
+        {
+            AccumulatorSeconds %= FixedDeltaTime;
+        }
+
         return count;
     }
 

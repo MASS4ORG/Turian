@@ -300,7 +300,7 @@ public partial class SceneManager : ISceneManager
         }
 
         scene.RootNode.BindTagRegistry(null);
-        RecursiveCleanup(scene.RootNode);
+        scene.RootNode.Teardown();
         DetachNodeHierarchy(scene.RootNode);
         scene.ResetRuntimeState();
     }
