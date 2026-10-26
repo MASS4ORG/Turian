@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: cached camera traversal and draw preparation.
 - Changed: engine-managed node children and components.
 - Fixed: brick-resolution errors stay actionable.
+
+## [3.4.1] - 2026-10-25
+
 - Fixed: cached brick bakes honor host compatibility.
 - Fixed: malformed store answers name their endpoint #322.
 
@@ -149,7 +152,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.4.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.4.1...HEAD
+[3.4.1]: https://github.com/MASS4ORG/Turian/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/MASS4ORG/Turian/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/MASS4ORG/Turian/compare/v3.3.1...v3.3.2
 [3.3.0]: https://github.com/MASS4ORG/Turian/compare/v3.2.0...v3.3.0
