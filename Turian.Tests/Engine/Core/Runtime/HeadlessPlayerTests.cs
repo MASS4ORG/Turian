@@ -64,6 +64,32 @@ public sealed class HeadlessPlayerTests : IDisposable
         Assert.Same(cached.Actions, cached.Services.GetService(typeof(IInputActions)));
     }
 
+    /// <summary>Starting a runtime logs the engine build and the loaded time settings.</summary>
+    [Theory]
+    [InlineData(8, false)]
+    [InlineData(3, true)]
+    public void RuntimeLogsItsBuildAndTimeSettings(int maxTicks, bool dropBacklog)
+    {
+        var logger = Substitute.For<ILogger>();
+        logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+        var time = new TimeSettings { MaxTicksPerFrame = maxTicks, DropBacklog = dropBacklog };
+        var source = Path.Combine(project, "Assets", "TimeSettings.dataasset");
+        Serializer.Save(source, time);
+        Serializer.Save(source + ".meta", new DataAssetAsset { Id = time.Id, RelativePath = "Assets/TimeSettings.dataasset" });
+
+        GameRuntime.Start(new GamePlayerContext(project, logger, static services => services.BuildServiceProvider()),
+            new BufferedInputSource());
+
+        var engine = GameRuntime.BuildVersion(typeof(GameRuntime).Assembly);
+        var line = logger.ReceivedCalls()
+            .Where(static call => call.GetMethodInfo().Name == nameof(ILogger.Log))
+            .Select(static call => call.GetArguments()[2]?.ToString())
+            .Single(static message => message?.StartsWith("Engine ", StringComparison.Ordinal) == true);
+        Assert.Contains(engine, line);
+        Assert.Contains($"at most {maxTicks} tick(s) per frame, drop backlog {dropBacklog}", line);
+        Assert.Equal("none", GameRuntime.BuildVersion(null));
+    }
+
     /// <summary>A launcher runs the player its loaded render brick declares, and the headless one without any.</summary>
     [Fact]
     public void LaunchersFindTheBrickPlayer()

@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: standalone physics bricks #64;
+- Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
 - Changed: engine-managed node children and components.
 - Fixed: brick-resolution errors stay actionable.

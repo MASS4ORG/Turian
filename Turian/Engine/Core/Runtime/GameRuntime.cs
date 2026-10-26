@@ -79,8 +79,28 @@ public sealed class GameRuntime
 
         var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
         runtime.BindServices(context, loader, input, addServices);
+        LogBuild(context.Logger, settings.Get<TimeSettings>());
         return runtime;
     }
+
+    /// <summary>
+    /// Logs the engine and game builds with the simulation budget in force, so every log, benchmark included, names
+    /// exactly what produced it.
+    /// </summary>
+    static void LogBuild(ILogger logger, TimeSettings time)
+    {
+        TypeRegistry.TryGetType("Usercode.Game", out var gameType);
+        logger.LogInformation(
+            "Engine {Engine}, game {Game}; fixed step {FixedDeltaTime:F4} s, at most {MaxTicksPerFrame} tick(s) per frame, drop backlog {DropBacklog}",
+            BuildVersion(typeof(GameRuntime).Assembly), BuildVersion(gameType?.Assembly), time.FixedDeltaTime,
+            time.MaxTicksPerFrame, time.DropBacklog);
+    }
+
+    /// <summary>The informational version of <paramref name="assembly"/>, which carries the source commit when built from git.</summary>
+    internal static string BuildVersion(Assembly? assembly) =>
+        assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? assembly?.GetName().Version?.ToString()
+        ?? "none";
 
     /// <summary>Loads the startup scene the player settings name, if any.</summary>
     public void LoadStartupScene()
