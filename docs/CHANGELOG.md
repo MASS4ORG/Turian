@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Fixed: Scene view component gizmos during play and pause #48.
+- Added: rag dolls #64 #111;
+
+## [3.5.0] - 2026-10-26
+
 - Added: standalone physics bricks #64;
 - Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
@@ -153,7 +156,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.4.1...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/MASS4ORG/Turian/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/MASS4ORG/Turian/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/MASS4ORG/Turian/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/MASS4ORG/Turian/compare/v3.3.1...v3.3.2
