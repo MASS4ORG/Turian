@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: brick CI template uses the current CLI and workflow names.
 - Added: rag dolls #64 #111;
 
 ## [3.5.0] - 2026-10-26
