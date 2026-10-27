@@ -3,10 +3,7 @@ namespace Turian.Engine.Core;
 /// <summary>A reflection-free gameplay broker; implementations own subscriptions and typed worker queues.</summary>
 interface IDataAssetEventBus : IDisposable
 {
-    void Prepare<T>(Guid topic);
-    IDisposable Subscribe<T>(Guid topic, Action<T> listener, int priority, Guid owner);
-    void Raise<T>(Guid topic, T payload);
-    bool TryQueue<T>(Guid topic, T payload);
+    DataAssetEventChannel<T> Prepare<T>(Guid topic);
     void Drain();
     IReadOnlyList<DataAssetSubscription> Listeners(Guid topic);
 }
