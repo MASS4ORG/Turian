@@ -9,6 +9,12 @@ namespace Turian.Engine.Core;
 [TypeId("ee655586-70ea-58b3-93c4-6888f7b0d97d")]
 public class InputActionsAsset : DataAsset
 {
+    internal override void ResetRuntime()
+    {
+        base.ResetRuntime();
+        foreach (var action in Actions) { action.Reset(); }
+    }
+
     /// <summary>The maps this asset defines.</summary>
     public List<InputActionMap> Maps { get; set; } = [];
 

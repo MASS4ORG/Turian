@@ -20,6 +20,7 @@ public sealed class AssetCreationCatalog
     readonly SettingsService settings;
     readonly BuildManager buildManager;
     readonly ILogger log;
+    readonly IReadOnlyList<IAssetCreationProvider> providers;
 
     readonly List<AssetCreationKind> kinds = [];
     ReflectionAssembly? scanned;
@@ -30,8 +31,9 @@ public sealed class AssetCreationCatalog
     /// <param name="settings">Resolves the project directory a data asset's path is relative to.</param>
     /// <param name="buildManager">Supplies the user assembly the annotated types come from.</param>
     /// <param name="log">Where a failed creation is reported.</param>
+    /// <param name="providers">Asset creation entries contributed by editor bricks.</param>
     public AssetCreationCatalog(AssetFileSystem fileSystem, SettingsService settings,
-        BuildManager buildManager, ILogger log)
+        BuildManager buildManager, ILogger log, IEnumerable<IAssetCreationProvider>? providers = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(settings);
@@ -42,6 +44,7 @@ public sealed class AssetCreationCatalog
         this.settings = settings;
         this.buildManager = buildManager;
         this.log = log;
+        this.providers = providers?.ToArray() ?? [];
     }
 
     /// <summary>The kinds currently offered, built-ins first.</summary>
@@ -71,6 +74,7 @@ public sealed class AssetCreationCatalog
         kinds.Add(new AssetCreationKind("Scene", fileSystem.DefaultSceneName));
         kinds.Add(new AssetCreationKind("Material", fileSystem.DefaultMaterialName));
         kinds.AddRange(DiscoverDataAssets());
+        kinds.AddRange(providers.SelectMany(static provider => provider.Kinds));
     }
 
     /// <summary>

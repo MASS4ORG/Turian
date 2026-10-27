@@ -69,7 +69,8 @@ public sealed class GameRuntime
         var content = context.ContentDirectory;
         var assets = new AssetDatabase();
         LoadCatalog(assets, content, context.ProjectDirectory);
-        var loader = new RuntimeAssetLoader(assets);
+        var dataAssets = new DataAssetSession();
+        var loader = new RuntimeAssetLoader(assets, dataAssets);
         var settings = new AppSettings
         {
             ProjectAbsoluteDir = context.ProjectDirectory,
@@ -78,7 +79,7 @@ public sealed class GameRuntime
         ProjectSettingsLoader.Load(settings, loader, content);
 
         var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
-        runtime.BindServices(context, loader, input, addServices);
+        runtime.BindServices(context, loader, input, dataAssets, addServices);
         LogBuild(context.Logger, settings.Get<TimeSettings>());
         return runtime;
     }
@@ -120,7 +121,7 @@ public sealed class GameRuntime
     }
 
     void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource input,
-        Action<IServiceCollection>? addServices)
+        DataAssetSession dataAssets, Action<IServiceCollection>? addServices)
     {
         Actions = new InputActionService(input);
         var clock = new SimulationClock(Settings.Get<TimeSettings>());
@@ -131,6 +132,7 @@ public sealed class GameRuntime
             .AddSingleton(Assets)
             .AddSingleton<ISceneManager>(Scenes)
             .AddSingleton(loader)
+            .AddSingleton(dataAssets)
             .AddSingleton(clock)
             .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input)
@@ -147,6 +149,7 @@ public sealed class GameRuntime
         Ticker = new SceneTicker(Scenes, clock)
         {
             Async = Services.GetRequiredService<GameLoopScheduler>(),
+            DataAssets = dataAssets,
             Simulation = Services.GetService<SimulationSession>(),
             Systems = [.. Services.GetServices<IFixedTickSystem>()],
             InputSource = input,

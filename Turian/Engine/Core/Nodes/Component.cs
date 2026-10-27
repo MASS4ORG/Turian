@@ -56,10 +56,12 @@ public abstract class Component : IdObject
             {
                 if (value)
                 {
+                    (this as IDataAssetWiring)?.SubscribeDataAssetEvents();
                     OnEnable();
                 }
                 else
                 {
+                    (this as IDataAssetWiring)?.DisposeDataAssetEvents();
                     OnDisable();
                 }
             }
@@ -168,6 +170,7 @@ public abstract class Component : IdObject
 
         if (IsActive)
         {
+            (this as IDataAssetWiring)?.SubscribeDataAssetEvents();
             OnEnable();
         }
     }
@@ -185,6 +188,7 @@ public abstract class Component : IdObject
         destructionStarted = true;
         try { destruction?.Cancel(); }
         catch (Exception ex) { GameLoopScheduler.Report(ex, this); }
+        (this as IDataAssetWiring)?.DisposeDataAssetEvents();
         OnDisable();
         OnDetached();
         OnDestroy();

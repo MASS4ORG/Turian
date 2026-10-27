@@ -110,7 +110,7 @@ public class DataAssetAsset : Asset
     DataAsset? ReadImported(Func<Guid, string?> readBase, IAssetFileProvider provider)
     {
         using var reader = new StreamReader(provider.GetAssetStream());
-        return Serializer.LoadData<DataAsset>(
+        return DataAsset.DeserializePayload(
             DataAssetVariants.Flatten(reader.ReadToEnd(), readBase, Id));
     }
 
@@ -126,7 +126,8 @@ public class DataAssetAsset : Asset
                          | BindingFlags.DeclaredOnly))
             {
                 // Event subscribers belong to the live instance, not to the data.
-                if (typeof(Delegate).IsAssignableFrom(field.FieldType))
+                if (typeof(Delegate).IsAssignableFrom(field.FieldType)
+                    || field.GetCustomAttribute<NonSerializedAttribute>() is not null)
                 {
                     continue;
                 }

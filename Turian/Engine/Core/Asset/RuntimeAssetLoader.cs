@@ -10,6 +10,7 @@ namespace Turian.Engine.Core;
 public sealed class RuntimeAssetLoader : IAssetLoader
 {
     readonly AssetDatabase assetDatabase;
+    readonly DataAssetSession? dataAssets;
     readonly Dictionary<Guid, Asset> cache = new();
     readonly Dictionary<Guid, Task<Asset?>> inflight = new();
     readonly object gate = new();
@@ -18,9 +19,10 @@ public sealed class RuntimeAssetLoader : IAssetLoader
     /// <summary>
     /// Initializes a new instance of the <see cref="RuntimeAssetLoader"/> class.
     /// </summary>
-    public RuntimeAssetLoader(AssetDatabase assetDatabase)
+    public RuntimeAssetLoader(AssetDatabase assetDatabase, DataAssetSession? dataAssets = null)
     {
         this.assetDatabase = assetDatabase ?? throw new ArgumentNullException(nameof(assetDatabase));
+        this.dataAssets = dataAssets;
     }
 
     /// <inheritdoc />
@@ -66,6 +68,7 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         var content = metadata.GetContent(projectPath, ReadBaseFromSession, GetProvider(assetId));
         if (content is not null)
         {
+            dataAssets?.Attach(content);
             await ObjectReferences.ResolveAsync(content, this).ConfigureAwait(false);
         }
 

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: DataAsset-Driven Design #55.
+
 ## [3.6.0] - 2026-10-27
 
 - Fixed: brick CI template uses the current CLI and workflow names.

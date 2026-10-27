@@ -58,7 +58,7 @@ public static class Serializer
                             return [];
                         }
                     })
-                    .Where(t => t.IsClass && !t.IsAbstract && t.IsSubclassOf(amObjectType));
+                    .Where(t => t.IsClass && !t.IsAbstract && !t.ContainsGenericParameters && t.IsSubclassOf(amObjectType));
 
                 foreach (var derivedType in derivedTypes)
                 {

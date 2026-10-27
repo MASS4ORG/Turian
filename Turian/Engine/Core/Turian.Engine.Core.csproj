@@ -17,6 +17,9 @@
         <InternalsVisibleTo Include="Turian.Tests"/>
         <InternalsVisibleTo Include="Turian.Benchmarks"/>
         <InternalsVisibleTo Include="Turian.Engine.Vulkan"/>
+        <InternalsVisibleTo Include="Turian.Engine.DataAssetDriven"/>
+        <InternalsVisibleTo Include="Turian.DataAssetDriven.Tests"/>
+        <InternalsVisibleTo Include="Turian.DataAssetDriven.Benchmarks"/>
     </ItemGroup>
 
     <!-- Internal libraries -->
