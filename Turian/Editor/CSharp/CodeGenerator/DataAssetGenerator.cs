@@ -212,7 +212,9 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 FastPathOf(memberType),
                 IgnoreCondition(member),
                 DerivesFrom(type, componentName),
-                reference ? ReferenceElement(memberType).ToDisplayString(TypeFormat) : null));
+                reference ? ReferenceElement(memberType).ToDisplayString(TypeFormat) : null,
+                memberType is INamedTypeSymbol embedded && embedded.AllInterfaces.Any(static implemented =>
+                    implemented.OriginalDefinition.ToDisplayString() == "Turian.Engine.Core.IEmbeddedAssetValue<TSelf>")));
             return true;
         }
     }
@@ -412,6 +414,12 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var general = $"{{ writer.WritePropertyName(\"{name}\"); "
                       + $"{core}.GeneratedJson.Write(writer, o.{id}, options); }}";
 
+        if (member.IsEmbedded)
+        {
+            return $"{indent}writer.WritePropertyName(\"{name}\"); "
+                   + $"{core}.EmbeddedAssetValues.Write(writer, o.{id}, options, o, \"{name}\");\n";
+        }
+
         if (member.IsReference)
         {
             return $"{indent}if (!{core}.ObjectReferences.TryWrite("
@@ -435,6 +443,12 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var name = member.Name;
         var id = Identifier(name);
         var general = $"{core}.GeneratedJson.Read<{member.Type}>(property.Value, options)";
+
+        if (member.IsEmbedded)
+        {
+            return $"{indent}case \"{name}\": o.{id} = {core}.EmbeddedAssetValues.Read<{member.Type}>("
+                   + $"property.Value, options, o, \"{name}\")!; return true;\n";
+        }
 
         if (member.IsReference)
         {
@@ -518,7 +532,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     }
 
     sealed record MemberModel(string Name, string Type, bool IsReference, string? FastPath,
-        int? IgnoreCondition, bool AllowSceneObjects, string? ReferenceElementType);
+        int? IgnoreCondition, bool AllowSceneObjects, string? ReferenceElementType, bool IsEmbedded);
 
     sealed record ObservableModel(string Name, string Type, string Accessibility, string GetModifier, string? Setter);
 }

@@ -65,8 +65,11 @@ public static class AssetQuery
 
     static bool MatchesType(AssetEntry entry, AssetFilter filter, AssetTypeCatalog catalog)
     {
-        var kind = entry.IsDirectory ? FolderType : catalog.Resolve(entry.AbsolutePath)?.Id ?? OtherType;
-        return filter.Types.Count == 0 || filter.Types.Contains(kind);
+        if (filter.Types.Count == 0) { return true; }
+        var kind = entry.IsDirectory ? FolderType : catalog.Resolve(entry)?.Id ?? OtherType;
+        return filter.Types.Contains(kind) || !entry.IsDirectory
+            && (filter.Types.Contains(catalog.Resolve(entry.AbsolutePath)?.Id ?? OtherType)
+                || catalog.MatchesPresentation(entry, filter.Types));
     }
 
     static bool MatchesLabels(AssetEntry entry, IReadOnlySet<string> labels) => labels.Count == 0

@@ -2,6 +2,7 @@ namespace Gaya.Plugin.Turian;
 
 sealed partial class AssetBrowserPanel
 {
+    readonly Dictionary<string, Icon> presentationIcons = new(StringComparer.Ordinal);
     void Append(AssetEntry entry, int depth)
     {
         rows.Add(new TreeItem(
@@ -46,6 +47,20 @@ sealed partial class AssetBrowserPanel
 
     void DrawAssetIcon(Gui gui, AssetEntry entry, float size)
     {
+        if (types.PresentationFor(entry) is { } presentation)
+        {
+            var presentedIcon = gui.ResolveIcon(presentation.Icon);
+            if (presentedIcon is null && presentation.Glyph is { } glyph)
+            {
+                if (!presentationIcons.TryGetValue(glyph, out presentedIcon))
+                {
+                    presentationIcons[glyph] = presentedIcon = Icon.FromGlyph(glyph);
+                }
+            }
+            var color = presentation.Color;
+            gui.Icon(presentedIcon, size * 0.8f, GuiColor.FromArgb(color.A, color.R, color.G, color.B));
+            return;
+        }
         var icon = entry.IsDirectory ? Icons.AssetFolder : types.Resolve(entry.AbsolutePath)?.DefaultIcon ?? Icons.AssetFile;
         gui.ThemedIcon(icon, size * 0.8f, entry.IsDirectory ? 1f : 0.8f);
     }

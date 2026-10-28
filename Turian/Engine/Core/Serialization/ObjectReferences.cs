@@ -10,7 +10,7 @@ namespace Turian.Engine.Core;
 /// in parallel. An id whose target is missing is kept and written back, so saving never drops it, and resolves when
 /// its target loads. A destroyed target is written as null. <see cref="SerializeInlineAttribute"/> opts a member out.
 /// </remarks>
-public static class ObjectReferences
+public static partial class ObjectReferences
 {
     /// <summary>Property name of a serialized reference.</summary>
     public const string RefProperty = "$ref";
@@ -135,6 +135,7 @@ public static class ObjectReferences
     public static void Forget(IdObject owner, string member)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        ForgetEmbedded(owner, member);
         if (owner.PendingReferences is not { } table)
         {
             return;
@@ -399,6 +400,7 @@ public static class ObjectReferences
     static int AssignMember(IdObject owner, string member, Guid[] ids, Func<Guid, IdObject?> find,
         GeneratedSerializer? generated)
     {
+        if (TryAssignEmbedded(owner, member, ids, find, out var embeddedMissing)) { return embeddedMissing; }
         if (ReferenceMemberType(owner, member, generated, out var info) is not { } memberType)
         {
             return 0;

@@ -1,6 +1,6 @@
 namespace Turian.Editor.Core;
 
-/// <summary>One entry in the asset browser's New menu.</summary>
+/// <summary>One entry in the asset browser's Create menu.</summary>
 /// <param name="MenuPath">Slash-separated path, e.g. <c>Gameplay/Puzzle Data</c>.</param>
 /// <param name="DefaultName">The name a freshly created one gets.</param>
 /// <param name="PayloadType">The <see cref="DataAsset"/> type to write, or null for a built-in kind.</param>
@@ -126,6 +126,7 @@ public sealed class AssetCreationCatalog
         }
 
         var assetPath = UniquePath(targetDirectory, kind.DefaultName);
+        if (payload is EnumValueAsset named) { named.Name = Path.GetFileNameWithoutExtension(assetPath); }
         var meta = new DataAssetAsset
         {
             RelativePath = Path.GetRelativePath(appSettings.ProjectAbsoluteDir, assetPath)
