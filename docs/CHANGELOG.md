@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Fixed: Studio brick changes report when plugin activation requires a restart.
 - Added: DataAsset-Driven Design #55.
 - Added: generated startup metadata for NativeAOT server exports #292.
 

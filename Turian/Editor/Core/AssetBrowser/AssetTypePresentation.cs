@@ -12,6 +12,9 @@ public sealed record AssetTypePresentation(Type PayloadType, string Id, string D
 {
     /// <summary>A readable glyph fallback when the active icon theme does not define this identifier.</summary>
     public string? Glyph { get; init; }
+
+    /// <summary>Encoded default raster icon supplied by the owning Studio brick.</summary>
+    public byte[]? ImageData { get; init; }
 }
 
 /// <summary>Contributes typed asset appearance without referencing concrete assets from Studio itself.</summary>

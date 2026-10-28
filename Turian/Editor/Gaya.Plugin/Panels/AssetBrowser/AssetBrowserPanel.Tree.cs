@@ -49,20 +49,34 @@ sealed partial class AssetBrowserPanel
     {
         if (types.PresentationFor(entry) is { } presentation)
         {
-            var presentedIcon = gui.ResolveIcon(presentation.Icon);
-            if (presentedIcon is null && presentation.Glyph is { } glyph)
-            {
-                if (!presentationIcons.TryGetValue(glyph, out presentedIcon))
-                {
-                    presentationIcons[glyph] = presentedIcon = Icon.FromGlyph(glyph);
-                }
-            }
+            var presentedIcon = PresentationIcon(gui, presentation);
             var color = presentation.Color;
             gui.Icon(presentedIcon, size * 0.8f, GuiColor.FromArgb(color.A, color.R, color.G, color.B));
             return;
         }
         var icon = entry.IsDirectory ? Icons.AssetFolder : types.Resolve(entry.AbsolutePath)?.DefaultIcon ?? Icons.AssetFile;
         gui.ThemedIcon(icon, size * 0.8f, entry.IsDirectory ? 1f : 0.8f);
+    }
+
+    Icon? PresentationIcon(Gui gui, AssetTypePresentation presentation)
+    {
+        var presentedIcon = gui.ResolveIcon(presentation.Icon);
+        if (presentedIcon is null && presentation.ImageData is { } encoded)
+        {
+            if (!presentationIcons.TryGetValue(presentation.Id, out presentedIcon)
+                && SKImage.FromEncodedData(encoded) is { } decoded)
+            {
+                presentationIcons[presentation.Id] = presentedIcon = Icon.FromImage(decoded);
+            }
+        }
+        if (presentedIcon is null && presentation.Glyph is { } glyph)
+        {
+            if (!presentationIcons.TryGetValue(glyph, out presentedIcon))
+            {
+                presentationIcons[glyph] = presentedIcon = Icon.FromGlyph(glyph);
+            }
+        }
+        return presentedIcon;
     }
 
     IEnumerable<AssetEntry> ChildrenOf(string? parentPath) => parentPath is null

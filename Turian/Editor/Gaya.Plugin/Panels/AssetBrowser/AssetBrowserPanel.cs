@@ -374,6 +374,8 @@ sealed partial class AssetBrowserPanel : IPanel, IDisposable
         }
 
         thumbnails.Dispose();
+        foreach (var icon in presentationIcons.Values) { icon.Image?.Dispose(); }
+        presentationIcons.Clear();
         thumbnailRenderer?.Dispose();
     }
 

@@ -44,6 +44,9 @@ public sealed class BuildManager : IDisposable
     /// <summary>Raised when a play process stops (either by request or natural exit).</summary>
     public event Action<string>? OnPlayStopped;
 
+    /// <summary>Raised after the active project assemblies are replaced or unloaded.</summary>
+    public event Action? UserAssembliesChanged;
+
     // ── Constructor ────────────────────────────────────────────────────────────
 
     /// <param name="settings">Initial application settings.</param>
@@ -88,6 +91,7 @@ public sealed class BuildManager : IDisposable
             slotManager.Unload();
             slotManager = new AssemblySlotManager(updatedRoot, logger);
             Serializer.ResetOptions();
+            UserAssembliesChanged?.Invoke();
         }
 
         settings = updated;
@@ -101,9 +105,13 @@ public sealed class BuildManager : IDisposable
     /// <summary>Every user assembly in force: the default one and one per assembly definition.</summary>
     public IReadOnlyList<ReflectionAssembly> ActiveUserAssemblies => slotManager.UserAssemblies;
 
-    /// <summary>All assemblies visible to the editor (entry + user assemblies).</summary>
+    /// <summary>
+    /// All assemblies visible to editor discovery: the editor's, the open project's bricks and the user assemblies,
+    /// without bricks the open project no longer enables.
+    /// </summary>
     public IEnumerable<ReflectionAssembly> LoadedAssemblies =>
         AppDomain.CurrentDomain.GetAssemblies()
+            .Where(static assembly => !BrickAssemblies.IsRetired(assembly))
             .Concat(slotManager.LoadedAssemblies)
             .Distinct();
 
@@ -262,6 +270,8 @@ public sealed class BuildManager : IDisposable
                     throw new InvalidOperationException("Assembly swap failed. Previous assembly retained.");
                 }
 
+                UserAssembliesChanged?.Invoke();
+
                 return $"Loaded: {assemblyPath}";
             }));
     }
@@ -377,6 +387,7 @@ public sealed class BuildManager : IDisposable
         StopPlayProcessInternal(notify: false);
         TaskRunner.Dispose();
         slotManager.Unload();
+        UserAssembliesChanged?.Invoke();
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────────

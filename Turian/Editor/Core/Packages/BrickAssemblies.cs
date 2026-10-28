@@ -6,7 +6,7 @@ namespace Turian.Editor.Core;
 /// The prebuilt assemblies a brick ships: <c>Precast~/lib</c> for what games run and the editor loads, and
 /// <c>Precast~/editor</c> for what only the editor loads.
 /// </summary>
-public static class BrickAssemblies
+public static partial class BrickAssemblies
 {
     /// <summary>The folder, at a v1 brick's root, that holds its prebuilt payload; v2 bricks name it by role.</summary>
     public const string PrecastFolder = "Precast~";
