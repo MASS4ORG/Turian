@@ -8,13 +8,22 @@ namespace Turian.Engine.Core;
 /// <param name="readMember">Reads one JSON property into its member; false when no member has that name.</param>
 /// <param name="setMember">Assigns a member by name; false when no writable member has that name.</param>
 /// <param name="memberType">The declared type of a member by name, or null.</param>
+/// <param name="getMember">Reads a reference member when provided by generated code.</param>
 public sealed class GeneratedSerializer(
     Func<IdObject> create,
     Action<Utf8JsonWriter, IdObject, JsonSerializerOptions> writeMembers,
     Func<IdObject, JsonProperty, JsonSerializerOptions, bool> readMember,
     Func<IdObject, string, object?, bool> setMember,
-    Func<string, Type?> memberType)
+    Func<string, Type?> memberType,
+    Func<IdObject, string, object?>? getMember)
 {
+    /// <summary>Creates generated access without reference getters for previously compiled assemblies.</summary>
+    public GeneratedSerializer(Func<IdObject> create,
+        Action<Utf8JsonWriter, IdObject, JsonSerializerOptions> writeMembers,
+        Func<IdObject, JsonProperty, JsonSerializerOptions, bool> readMember,
+        Func<IdObject, string, object?, bool> setMember, Func<string, Type?> memberType)
+        : this(create, writeMembers, readMember, setMember, memberType, null) { }
+
     /// <summary>Creates an empty instance.</summary>
     public IdObject Create() => create();
 
@@ -44,6 +53,12 @@ public sealed class GeneratedSerializer(
     /// <param name="member">The member name.</param>
     /// <returns>The member type.</returns>
     public Type? MemberType(string member) => memberType(member);
+
+    /// <summary>Gets whether reference member getters were generated.</summary>
+    public bool HasMemberGetter => getMember is not null;
+
+    /// <summary>Reads a reference member without reflection.</summary>
+    public object? GetMember(IdObject value, string member) => getMember?.Invoke(value, member);
 }
 
 /// <summary>
@@ -53,6 +68,13 @@ public sealed class GeneratedSerializer(
 public static class GeneratedSerializers
 {
     static readonly ConcurrentDictionary<Type, GeneratedSerializer> Serializers = new();
+
+    /// <summary>Registers generated member access and a closed polymorphic JSON contract.</summary>
+    public static void Register<T>(GeneratedSerializer serializer) where T : IdObject
+    {
+        Register(typeof(T), serializer);
+        GeneratedJson.RegisterObject<T>();
+    }
 
     /// <summary>Registers the generated serializer for <paramref name="type"/>.</summary>
     /// <param name="type">The serializable type.</param>

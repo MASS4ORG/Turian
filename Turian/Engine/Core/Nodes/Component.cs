@@ -295,6 +295,18 @@ public abstract class Component : IdObject
     static FrameCallbacks FindOverrides(Type type)
     {
         var callbacks = FrameCallbacks.Known;
+        if (GeneratedComponentMetadata.TryGet(type, out var metadata))
+        {
+            return callbacks | (metadata.Update ? FrameCallbacks.Update : 0)
+                   | (metadata.LateUpdate ? FrameCallbacks.LateUpdate : 0)
+                   | (metadata.FixedUpdate ? FrameCallbacks.FixedUpdate : 0);
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new InvalidOperationException($"No generated lifecycle metadata for '{type.FullName}'.");
+        }
+
         if (Overridden(type, nameof(OnUpdate)))
         {
             callbacks |= FrameCallbacks.Update;
@@ -321,7 +333,11 @@ public abstract class Component : IdObject
     /// Checks if multiple instances of the specified component type are allowed on a single node.
     /// </summary>
     public static bool AllowsMultiple(Type componentType)
-        => componentType.GetCustomAttribute<DisallowMultipleComponentAttribute>(inherit: true) is null;
+        => GeneratedComponentMetadata.TryGet(componentType, out var metadata)
+            ? metadata.AllowsMultiple
+            : RuntimeFeature.IsDynamicCodeSupported
+                ? componentType.GetCustomAttribute<DisallowMultipleComponentAttribute>(inherit: true) is null
+                : throw new InvalidOperationException($"No generated component metadata for '{componentType.FullName}'.");
 
     /// <summary>
     /// Gets the required component types for the specified component type.
@@ -329,6 +345,16 @@ public abstract class Component : IdObject
     public static IEnumerable<Type> GetRequiredComponents(Type componentType)
     {
         ArgumentNullException.ThrowIfNull(componentType);
+        if (GeneratedComponentMetadata.TryGet(componentType, out var metadata))
+        {
+            return metadata.RequiredComponents;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new InvalidOperationException($"No generated component metadata for '{componentType.FullName}'.");
+        }
+
         return componentType
             .GetCustomAttributes(typeof(RequireComponentAttribute))
             .OfType<RequireComponentAttribute>()

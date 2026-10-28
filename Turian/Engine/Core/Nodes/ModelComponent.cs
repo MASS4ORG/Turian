@@ -6,7 +6,7 @@ namespace Turian.Engine.Core;
 [ComponentContextMenu("Rendering/Model")]
 [TypeId("9acb4142-14f8-5681-bd8b-d35fddd41ed1")]
 [PublicAPI]
-public class ModelComponent : Component, IDisposable
+public partial class ModelComponent : Component, IDisposable
 {
     /// <summary>
     /// Gets or sets the model asset reference. Every submesh of the model is drawn.

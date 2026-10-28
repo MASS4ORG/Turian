@@ -198,7 +198,7 @@ public class AssetReference<TAsset>
             return null;
         }
 
-        if (Activator.CreateInstance(expectedType) is not TAsset asset)
+        if (GeneratedObjectFactory.Create(expectedType) is not TAsset asset)
         {
             return null;
         }

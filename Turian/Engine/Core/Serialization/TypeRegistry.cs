@@ -26,6 +26,11 @@ public static class TypeRegistry
     /// </summary>
     public static void ScanLoadedAssemblies()
     {
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            return;
+        }
+
         lock (ScanLock)
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -184,7 +189,7 @@ public static class TypeRegistry
             return id;
         }
 
-        var attr = type.GetCustomAttribute<TypeIdAttribute>(inherit: false);
+        var attr = RuntimeFeature.IsDynamicCodeSupported ? type.GetCustomAttribute<TypeIdAttribute>(inherit: false) : null;
         if (attr is not null)
         {
             Register(attr.Id, type);

@@ -46,12 +46,27 @@ public sealed class CollectibleAssembliesTests : IDisposable
         var assembly = context.LoadFromAssemblyPath(path);
         TypeRegistry.ScanAssembly(assembly);
         var type = Exercise(assembly, typeId);
-        GeneratedSerializers.Register(type, new GeneratedSerializer(() => (IdObject)Activator.CreateInstance(type)!,
-            static (_, _, _) => { }, static (_, _, _) => false, static (_, _, _) => false, static _ => null));
+        var serializer = new GeneratedSerializer(() => (IdObject)Activator.CreateInstance(type)!,
+            static (_, _, _) => { }, static (_, _, _) => false, static (_, _, _) => false, static _ => null);
+        typeof(GeneratedSerializers).GetMethods().Single(static method => method is { Name: "Register", IsGenericMethod: true })
+            .MakeGenericMethod(type).Invoke(null, [serializer]);
+        typeof(GeneratedObjectFactory).GetMethod(nameof(GeneratedObjectFactory.Register))!
+            .MakeGenericMethod(type).Invoke(null, null);
+        typeof(GeneratedComponentMetadata).GetMethod(nameof(GeneratedComponentMetadata.Register))!
+            .MakeGenericMethod(type).Invoke(null, [new GeneratedComponentMetadata(false, false, false, true, [],
+                static (_, _, _) => { })]);
+        var nodeType = assembly.GetType("ProbeNode")!;
+        typeof(GeneratedNodeMetadata).GetMethod(nameof(GeneratedNodeMetadata.Register))!
+            .MakeGenericMethod(nodeType).Invoke(null, [new GeneratedNodeMetadata(false, static (_, _, _) => { })]);
+        var contextFactory = type.GetMethod("CreateResolver")!
+            .CreateDelegate<Func<JsonSerializerOptions, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver>>();
+        GeneratedJson.Configure(contextFactory);
 
         CollectibleAssemblies.Release(context.Assemblies.ToArray());
         Assert.False(TypeRegistry.TryGetType(typeId, out _));
         Assert.False(GeneratedSerializers.TryGet(type, out _));
+        Assert.False(GeneratedComponentMetadata.TryGet(type, out _));
+        Assert.False(GeneratedNodeMetadata.TryGet(nodeType, out _));
         Assert.True(CollectibleAssemblies.IsReleased(typeof(List<>).MakeGenericType(type).MakeArrayType()));
         context.Unload();
         return new WeakReference(context);
@@ -104,7 +119,11 @@ public sealed class CollectibleAssembliesTests : IDisposable
                 public Turian.Engine.Core.Component? Other { get; set; }
                 [Turian.Engine.Core.InjectService(Optional = true), System.Text.Json.Serialization.JsonIgnore]
                 public System.IServiceProvider? Services { get; set; }
+                public static System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver CreateResolver(
+                    System.Text.Json.JsonSerializerOptions options) =>
+                    new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver();
             }
+            public sealed class ProbeNode : Turian.Engine.Core.Node { }
             """;
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Select(static p => MetadataReference.CreateFromFile(p))

@@ -47,6 +47,22 @@ public class ComponentJsonConverter : JsonConverter<Component>
             return missing;
         }
 
+        if (GeneratedSerializers.TryGet(type, out var generated))
+        {
+            var created = (Component)generated.Create();
+            foreach (var property in root.EnumerateObject())
+            {
+                generated.ReadMember(created, property, options);
+            }
+
+            return created;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new JsonException($"No generated serializer for '{type.FullName}'.");
+        }
+
         var instance = Activator.CreateInstance(type) as Component
             ?? throw new JsonException($"Cannot instantiate {type.FullName}");
 
@@ -85,6 +101,18 @@ public class ComponentJsonConverter : JsonConverter<Component>
 
         var typeId = TypeRegistry.GetIdOrThrow(value.GetType());
         writer.WriteString(ObjectJsonSerializer<Component>.TypeIdProperty, typeId.ToString());
+
+        if (GeneratedSerializers.TryGet(value.GetType(), out var generated))
+        {
+            generated.WriteMembers(writer, value, options);
+            writer.WriteEndObject();
+            return;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new JsonException($"No generated serializer for '{value.GetType().FullName}'.");
+        }
 
         var members = value.GetType()
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

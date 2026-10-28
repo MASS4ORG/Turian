@@ -55,3 +55,15 @@ dotnet run --project Turian/Editor/CLI -- screenshot path/to/example-01/ --out s
 Building `Turian.Editor.Core` builds the launcher and generates `obj/<configuration>/<framework>/Turian.RuntimeDependencies.txt` with resolved framework, runtime, and native package versions plus assembly references, embedding it in the editor.
 
 `BuildAppSettings` uses this snapshot for project generation. It uses the launcher graph (excluding build-only packages), keeps local paths relative, and resolves external assemblies from launcher output. Published editors load internal assemblies from `lib/`. The list contains resolved runtime packages (including transitive and native dependencies). Release packaging copies runtime assemblies to `lib/` using the same graph.
+
+## NativeAOT desktop servers
+
+In Studio's Build Profiles window, select a desktop Server profile, enable `NativeAot`, and choose the runtime identifier. The CLI uses the same profile:
+
+```sh
+dotnet run --project Turian/Editor/CLI -- export path/to/project --profile NativeAOT
+```
+
+Export generates direct type, constructor and service-module registration plus JSON value contracts. The native launcher uses this composition to load packaged content. Scene references retain their GUIDs; declared type identifiers remain readable when a script's metadata supplies its canonical identifier.
+
+Use public, non-generic, top-level component and node classes for this export path. Private injected setters require partial classes so the generator can assign them directly. Native execution requires generated serialization metadata; it fails explicitly when a contract is missing. This option currently supports desktop servers. Client and Android NativeAOT exports are not qualified.

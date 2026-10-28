@@ -55,6 +55,9 @@ public class BuildProfile : ProjectSettingsCollection
     /// </summary>
     public bool Development { get; set; }
 
+    /// <summary>Uses generated startup composition and NativeAOT for a desktop server export.</summary>
+    public bool NativeAot { get; set; }
+
     /// <summary>Extra conditional compilation symbols for the game's scripts, separated by semicolons.</summary>
     public string? ScriptingDefines { get; set; }
 

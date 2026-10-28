@@ -25,6 +25,10 @@ public static class CollectibleAssemblies
 
         TypeRegistry.ReleaseCollectible();
         GeneratedSerializers.ReleaseCollectible();
+        GeneratedJson.ReleaseCollectible();
+        GeneratedComponentMetadata.ReleaseCollectible();
+        GeneratedNodeMetadata.ReleaseCollectible();
+        GeneratedObjectFactory.ReleaseCollectible();
         ObjectReferences.ReleaseCollectible();
         RemoveReleased(ObjectJsonSerializerCache.Members, static type => type);
         SceneServiceInjector.ReleaseCollectible();

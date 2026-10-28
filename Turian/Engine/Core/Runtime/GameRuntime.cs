@@ -140,7 +140,12 @@ public sealed class GameRuntime
             .AddSingleton<IInputActions>(Actions)
             .AddSingleton(Locale);
         addServices?.Invoke(registrations);
-        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        if (ExportRuntime.ConfigureServices is { } configure)
+        {
+            configure(registrations);
+        }
+        else if (RuntimeFeature.IsDynamicCodeSupported
+                 && TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
             registrations.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }

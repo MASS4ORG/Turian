@@ -40,41 +40,58 @@ public static class Serializer
                     WriteIndented = true
                 };
 
+                GeneratedJson.Register(new ComponentJsonConverter());
+                GeneratedJson.RegisterCollection<ComponentCollection, Component>();
+                GeneratedJson.RegisterCollection<NodeCollection, Node>();
+                GeneratedJson.RegisterCollection<List<Component>, Component>();
+                ObjectReferences.RegisterCollections<Component>();
+
                 options.Converters.Add(new ComponentJsonConverter());
-                options.Converters.Add(new AssetReferenceJsonConverterFactory());
                 options.Converters.Add(new Color32JsonConverter());
+                options.TypeInfoResolver = GeneratedJson.CreateResolver(options);
 
-                var amObjectType = typeof(IdObject);
-                var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(static a => !CollectibleAssemblies.IsReleased(a))
-                    .SelectMany(a =>
-                    {
-                        try
-                        {
-                            return a.GetTypes();
-                        }
-                        catch
-                        {
-                            return [];
-                        }
-                    })
-                    .Where(t => t.IsClass && !t.IsAbstract && !t.ContainsGenericParameters && t.IsSubclassOf(amObjectType));
-
-                foreach (var derivedType in derivedTypes)
+                if (JsonSerializer.IsReflectionEnabledByDefault)
                 {
-                    var converterType = typeof(ObjectJsonSerializer<>).MakeGenericType(derivedType);
-                    if (Activator.CreateInstance(converterType) is JsonConverter converterInstance)
-                    {
-                        options.Converters.Add(converterInstance);
-                    }
+                    AddDynamicConverters(options);
                 }
-
-                options.Converters.Add(new ObjectJsonSerializerFactory());
 
                 _jsonOptions = options;
                 return options;
             }
         }
+    }
+
+    static void AddDynamicConverters(JsonSerializerOptions options)
+    {
+        options.Converters.Add(new AssetReferenceJsonConverterFactory());
+
+        var amObjectType = typeof(IdObject);
+        var derivedTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(static a => !CollectibleAssemblies.IsReleased(a))
+            .SelectMany(a =>
+            {
+                try
+                {
+                    return a.GetTypes();
+                }
+                catch
+                {
+                    return [];
+                }
+            })
+            .Where(t => t.IsClass && !t.IsAbstract && !t.ContainsGenericParameters && t.IsSubclassOf(amObjectType));
+
+        foreach (var derivedType in derivedTypes)
+        {
+            var converterType = typeof(ObjectJsonSerializer<>).MakeGenericType(derivedType);
+            if (Activator.CreateInstance(converterType) is JsonConverter converterInstance)
+            {
+                options.Converters.Add(converterInstance);
+            }
+        }
+
+        options.Converters.Add(new ObjectJsonSerializerFactory());
+
     }
 
     /// <summary>
@@ -122,7 +139,8 @@ public static class Serializer
     /// Without a loader, unresolved DataAsset ids remain pending until explicitly resolved.
     /// </summary>
     public static T? LoadData<T>(string data, IAssetLoader? loader) =>
-        ObjectReferences.DeserializeWithLoader(loader, () => JsonSerializer.Deserialize<T>(data, JsonOptions));
+        ObjectReferences.DeserializeWithLoader(loader, () => JsonSerializer.Deserialize(data,
+            (System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>)JsonOptions.GetTypeInfo(typeof(T))));
 
     /// <summary>
     /// Save the Object content to the given path
@@ -151,6 +169,7 @@ public static class Serializer
     /// <returns></returns>
     public static string Serialize<T>(T value) //where T : IdObject
     {
-        return JsonSerializer.Serialize(value, JsonOptions);
+        return JsonSerializer.Serialize(value,
+            (System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>)JsonOptions.GetTypeInfo(typeof(T)));
     }
 }

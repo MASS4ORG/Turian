@@ -285,7 +285,7 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         if (!TypeRegistry.TryGetType(record.AssetTypeName, out var type)
             || type is null
             || !typeof(Asset).IsAssignableFrom(type)
-            || Activator.CreateInstance(type) is not Asset asset)
+            || GeneratedObjectFactory.Create(type) is not Asset asset)
         {
             return null;
         }

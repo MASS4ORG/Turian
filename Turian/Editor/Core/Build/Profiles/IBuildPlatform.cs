@@ -225,7 +225,19 @@ sealed class DesktopBuildPlatform : IBuildPlatform
         {
             group.AddProperty("DebugType", "None");
             group.AddProperty("DebugSymbols", "false");
-            group.AddProperty("PublishSingleFile", "true");
+            var nativeAot = context.Profile?.NativeAot == true;
+            if (nativeAot && context.Profile?.Target != BuildTarget.Server)
+            {
+                throw new InvalidOperationException("NativeAOT currently requires a desktop Server profile.");
+            }
+
+            group.AddProperty("PublishSingleFile", nativeAot ? "false" : "true");
+            if (nativeAot)
+            {
+                group.AddProperty("PublishAot", "true");
+                group.AddProperty("TrimmerSingleWarn", "false");
+                group.AddProperty("DefineConstants", "$(DefineConstants);TURIAN_STATIC_RUNTIME");
+            }
             group.AddProperty("SelfContained", "true");
             // In the project rather than on the command line, so restore resolves the same runtime packs.
             if (!string.IsNullOrWhiteSpace(context.Profile?.RuntimeIdentifier))
@@ -253,6 +265,10 @@ sealed class DesktopBuildPlatform : IBuildPlatform
         if (context.Profile is { } profile)
         {
             arguments.Add($"-p:TurianDefines={string.Join("%3B", profile.Symbols)}");
+            if (profile.NativeAot)
+            {
+                arguments.Add("-m:4");
+            }
         }
 
         return arguments;

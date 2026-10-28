@@ -7,6 +7,15 @@ namespace Turian.Engine.Core;
 /// </summary>
 public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
 {
+    /// <summary>Registers a closed asset-reference converter and its statically compiled Guid constructor.</summary>
+    public static void Register<TReference, TAsset>(Func<Guid, TReference> create)
+        where TReference : AssetReference<TAsset>
+        where TAsset : Asset
+    {
+        ArgumentNullException.ThrowIfNull(create);
+        GeneratedJson.Register(new AssetReferenceJsonConverter<TReference, TAsset>(create));
+    }
+
     /// <inheritdoc />
     public override bool CanConvert(Type typeToConvert)
     {
@@ -46,6 +55,12 @@ public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
         where TReference : AssetReference<TAsset>
         where TAsset : Asset
     {
+        readonly Func<Guid, TReference>? create;
+
+        public AssetReferenceJsonConverter() { }
+
+        public AssetReferenceJsonConverter(Func<Guid, TReference> create) => this.create = create;
+
         public override TReference Read(
             ref Utf8JsonReader reader,
             Type typeToConvert,
@@ -55,7 +70,7 @@ public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
             ArgumentNullException.ThrowIfNull(options);
 
             var assetId = ReadAssetId(ref reader);
-            return CreateReference(typeToConvert, assetId);
+            return create is not null ? create(assetId) : CreateReference(typeToConvert, assetId);
         }
 
         public override void Write(
@@ -114,7 +129,8 @@ public sealed class AssetReferenceJsonConverterFactory : JsonConverterFactory
 
         static TReference CreateReference(Type typeToConvert, Guid assetId)
         {
-            if (Activator.CreateInstance(typeToConvert, assetId) is TReference reference)
+            if (RuntimeFeature.IsDynamicCodeSupported
+                && Activator.CreateInstance(typeToConvert, assetId) is TReference reference)
             {
                 return reference;
             }
