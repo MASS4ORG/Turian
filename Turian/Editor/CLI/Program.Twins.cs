@@ -54,8 +54,10 @@ public static partial class Program
         };
         command.SetAction(async (result, _) => await RunBrickAsync(async () =>
         {
-            var sync = await BrickBake.BakeAsync(result.GetValue(pathArg)!.FullName, Log.Logger).ConfigureAwait(false);
-            Console.WriteLine($"Baked {sync.Entries.Count} asset(s) of {sync.Brick} {sync.Version}");
+            var path = result.GetValue(pathArg)!.FullName;
+            var sync = await BrickBake.BakeAsync(path, Log.Logger).ConfigureAwait(false);
+            Console.WriteLine($"Baked {sync.Entries.Count} asset(s) of {sync.Brick} {sync.Version}"
+                              + (BrickService.HasTwin(path) ? string.Empty : ": it is installed only in the studio, so it has no twin"));
         }).ConfigureAwait(false));
         return command;
     }

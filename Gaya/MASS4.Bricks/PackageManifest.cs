@@ -238,6 +238,10 @@ public sealed class PackageManifest
     [JsonIgnore]
     public IReadOnlyList<PackageScope> EffectiveScopes => Scopes.Count > 0 ? Scopes : [PackageScope.Project];
 
+    /// <summary>Whether a project can install the package; one only the studio installs is never baked and has no twin.</summary>
+    [JsonIgnore]
+    public bool InstallsInProject => EffectiveScopes.Contains(PackageScope.Project);
+
     /// <summary>Reads the <c>package.json</c> in <paramref name="packageRoot"/> and checks it.</summary>
     /// <param name="packageRoot">The package folder.</param>
     /// <param name="reservedCategoryPrefixes">Category prefixes any package may use, such as a host's name.</param>

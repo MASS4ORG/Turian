@@ -10,6 +10,27 @@ dotnet run --project Turian/Editor/CLI -- --help
 
 Requires .NET 10. Rendering commands also require Vulkan. Commands share their implementation with Studio through [Editor Core](../Core/).
 
+## Materialize producer sources
+
+`brick materialize` downloads a pinned dependency's producer layout into a writable folder without changing a project manifest or lock. Store sources verify the registry signature, SHA256, identity, version and source variant before extraction. A destination must be absent or empty; failed fetches leave it untouched.
+
+```sh
+turian-cli brick materialize org.mass4.turian.physics@1.0.0
+turian-cli brick materialize com.example.rules@1.2.3 --path Bricks/com.example.rules --store https://bricks.example.com --key path/to/store.pub --variant source
+```
+
+The default destination is `Bricks/<id>` and the default store is `https://bricks.mass4.org`, with its embedded signing trust. `--store` accepts a custom store origin or its `/v1` registry URL; use `--key` for independently verified public keys (repeat the option or separate key lines with newlines). Fetch authentication reads `SOURCE_DEP_TOKEN`, or the store's existing `GAYA_REGISTRY_TOKEN_<HOST>` environment variable and saved login. Public downloads require no token. The command never saves a supplied token.
+
+The same command accepts typed JSON for reusable workflow dependencies. JSON paths are relative to `--root` (default `Bricks`); `--path` explicitly overrides the destination. The workflow caller's `brick` path is reserved.
+
+```sh
+turian-cli brick materialize '{"type":"store","id":"com.example.rules","version":"1.2.3","path":"com.example.rules"}'
+turian-cli brick materialize '{"type":"git","url":"https://gitlab.com/team/rules.git","ref":"0123456789abcdef0123456789abcdef01234567","path":"com.example.rules"}'
+turian-cli brick materialize '{"type":"archive","url":"https://example.com/rules.tar.gz","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","path":"com.example.rules"}'
+```
+
+Git requires HTTPS and a full commit SHA; protected `v<semver>` tags are also accepted for first-party `MASS4ORG` GitHub repositories. Legacy `repository/ref/path` JSON expands to a GitHub HTTPS source. Git metadata and fetch credentials are removed from the resulting layout. Archives require SHA256 and support ZIP, tar and tar.gz, with one optional enclosing folder. Archive traversal, symbolic links and hard links are refused. Fetch failures emit `::error::` and exit with status 1.
+
 ## Frame statistics
 
 The optional UI brick provides a **Frame Statistics HUD** component (`FrameStatisticsHudComponent`), authored on a scene node through **Add Component → UI → Frame Statistics HUD**. Bistro includes a node named **Frame Statistics HUD**. Its Inspector exposes **Show Hud**, position, size and font size; disabling or removing the component disables its own frame collection. The GUI runs only during Play in the Game view or game player. Stopped previews and the Scene viewer exclude it. The HUD shows its latest 60 frames: actual FPS and frame interval, render CPU elapsed time, submitted standard geometry draws and triangles, CPU frustum culling, material descriptor binds and rendering-thread managed allocations. Numeric formatting uses BCL spans and the drawable reuses ASCII glyphs.

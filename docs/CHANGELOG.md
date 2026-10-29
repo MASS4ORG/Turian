@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: typed source-test dependencies for brick workflows #337.
+- Added: bricks pinned store, git and archive sources #338.
+- Fixed: baking, packing or publishing a studio-only brick.
+
 ## [3.7.0] - 2026-10-29
 
 - Fixed: Studio brick changes report when plugin activation requires a restart.
