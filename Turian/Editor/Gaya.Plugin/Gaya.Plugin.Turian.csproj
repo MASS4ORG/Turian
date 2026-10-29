@@ -41,6 +41,7 @@
 
     <!-- External libraries -->
     <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     </ItemGroup>
 
