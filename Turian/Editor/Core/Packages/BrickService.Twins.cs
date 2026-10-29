@@ -5,17 +5,24 @@ namespace Turian.Editor.Core;
 /// <summary>Bake twins: packing a brick with its twin, and choosing, per project, which of the two a brick resolves to.</summary>
 public static partial class BrickService
 {
-    /// <summary>Packs a brick folder, and its bake twin when <paramref name="twin"/> is set.</summary>
+    /// <summary>Whether a brick can have a bake twin: one only the studio installs is never imported into a project, so it has nothing to bake.</summary>
+    /// <param name="packageRoot">The brick folder.</param>
+    /// <returns>False for a brick only the studio installs, which is packed alone.</returns>
+    /// <exception cref="PackageException">The folder holds no valid manifest.</exception>
+    public static bool HasTwin(string packageRoot) =>
+        PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]).InstallsInProject;
+
+    /// <summary>Packs a brick folder, and its bake twin when <paramref name="twin"/> is set and the brick has one.</summary>
     /// <param name="packageRoot">The brick folder.</param>
     /// <param name="outputDirectory">Where the files and their hashes are written.</param>
     /// <param name="precast">What the folder's precast payload was built with.</param>
-    /// <param name="twin">Whether to pack the twin too, as <see cref="PackWithTwin"/> does.</param>
+    /// <param name="twin">Whether to pack the twin too, as <see cref="PackWithTwin"/> does; ignored when <see cref="HasTwin"/> is false.</param>
     /// <returns>The brick, then its twin.</returns>
     /// <exception cref="PackageException">The brick cannot be packed.</exception>
     public static IReadOnlyList<BrickPackResult> PackFiles(string packageRoot, string outputDirectory, PackagePrecast? precast,
         bool twin)
     {
-        if (!twin)
+        if (!twin || !HasTwin(packageRoot))
         {
             return [Pack(packageRoot, outputDirectory, precast)];
         }
@@ -33,7 +40,7 @@ public static partial class BrickService
     /// <param name="outputDirectory">Where both files and their hashes are written.</param>
     /// <param name="precast">What the payload was built with, from <see cref="PrecastAsync"/>.</param>
     /// <returns>The source file and the twin.</returns>
-    /// <exception cref="PackageException">The brick fails verification, refuses twins, or has nothing to bake.</exception>
+    /// <exception cref="PackageException">The brick fails verification, refuses twins, is installed only in the studio (see <see cref="HasTwin"/>), or has nothing to bake.</exception>
     public static (BrickPackResult Source, BrickPackResult Twin) PackWithTwin(string packageRoot, string outputDirectory,
         PackagePrecast? precast = null)
     {
@@ -43,6 +50,11 @@ public static partial class BrickService
         if (!manifest.AllowsTwins)
         {
             throw new PackageException($"{packageRoot} sets bake to '{PackageManifest.BakeNone}': it is its own consumable form and has no twin.");
+        }
+
+        if (!manifest.InstallsInProject)
+        {
+            throw new PackageException($"{packageRoot} is installed only in the studio, so it has no twin.");
         }
 
         var payloads = BrickLayout.PathsOf(packageRoot, manifest, BrickLayout.Precast);

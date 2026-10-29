@@ -86,7 +86,7 @@ public static class BrickBake
     /// <param name="packageRoot">The brick folder; its assets must carry committed meta files.</param>
     /// <param name="logger">Receives import progress.</param>
     /// <param name="baker">The fingerprint of the key that will publish the twin, recorded when given.</param>
-    /// <returns>What was baked.</returns>
+    /// <returns>What was baked; nothing for a brick only the studio installs, which has no twin.</returns>
     /// <exception cref="PackageException">The brick fails verification or its scratch project cannot be made.</exception>
     public static async Task<BakeSync> BakeAsync(string packageRoot, ILogger logger, string? baker = null)
     {
@@ -97,6 +97,19 @@ public static class BrickBake
         }
 
         var manifest = PackageManifest.Load(packageRoot, ["gaya", ProjectPackages.HostName]);
+        if (!manifest.InstallsInProject)
+        {
+            // Nothing is imported into a project for it, so the studio takes its bytes as they are: a pass-through, with no twin.
+            logger.LogInformation("{Brick} is installed only in the studio: nothing to import, so it is baked as it is", manifest.Name);
+            return new BakeSync
+            {
+                Brick = manifest.Name,
+                Version = manifest.Version!.ToString(),
+                Baker = baker,
+                BakedWith = ProjectPackages.EngineVersion.ToString(),
+            };
+        }
+
         var bake = BrickLayout.PathOf(packageRoot, manifest, BrickLayout.Bake);
         if (BrickLayout.IsV2(manifest) && manifest.RolePaths(BrickLayout.Bake).Count == 0)
         {

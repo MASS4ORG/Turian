@@ -78,6 +78,40 @@ public sealed class BrickBakeTests : IDisposable
         Assert.Equal(first, Snapshot(bake));
     }
 
+    /// <summary>A brick only the studio installs is never imported into a project: packing with a twin packs it alone.</summary>
+    [Fact]
+    public async Task StudioOnlyBricksPackWithoutATwin()
+    {
+        SaveStudioOnly();
+
+        var (exitCode, output) = await PrecastBrickFixture.RunCli(root, "brick", "pack", brick, "--twin", "--out", Path.Combine(root, "out"));
+
+        Assert.True(exitCode == 0, output);
+        Assert.Contains("so it has no twin", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("could not be resolved", output, StringComparison.Ordinal);
+        var packed = Assert.Single(Directory.GetFiles(Path.Combine(root, "out"), "*.brick"));
+        Assert.Null(BrickArchive.ReadManifest(packed, ["gaya", "turian"]).Variant);
+        Assert.False(Directory.Exists(Path.Combine(brick, BrickBake.Folder)));
+    }
+
+    /// <summary>Baking a brick only the studio installs imports nothing and leaves no bake folder, rather than refusing.</summary>
+    [Fact]
+    public async Task StudioOnlyBricksBakeWithoutATwin()
+    {
+        SaveStudioOnly();
+
+        var (exitCode, output) = await PrecastBrickFixture.RunCli(root, "brick", "bake", brick);
+
+        Assert.True(exitCode == 0, output);
+        Assert.Contains("Baked 0 asset(s) of user.mateo.notes 1.0.0", output, StringComparison.Ordinal);
+        Assert.Contains("so it has no twin", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("could not be resolved", output, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(brick, BrickBake.Folder)));
+    }
+
+    void SaveStudioOnly() =>
+        new PackageManifest { Name = "user.mateo.notes", Version = SemanticVersion.Parse("1.0.0"), Scopes = { PackageScope.Studio } }.Save(brick);
+
     /// <summary>
     /// A project installing only the twin mounts the baked import, without importing; a bake whose settings no longer
     /// match is imported instead, with a warning.
