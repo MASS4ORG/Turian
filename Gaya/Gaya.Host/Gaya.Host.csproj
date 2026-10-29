@@ -31,7 +31,7 @@
 
     <!-- External libraries -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.14" />
         <PackageReference Include="MASS4.Guinevere.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
         <PackageReference Include="MASS4.Autoformers.Excalibur" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
         <PackageReference Include="MASS4.Guinevere.Styling" Version="6.*" Condition="'$(GuinevereLocalPath)' == ''" />
