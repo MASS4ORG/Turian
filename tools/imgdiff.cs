@@ -6,8 +6,8 @@
 //   --tolerance  largest per-channel difference still counted as equal (default: 2)
 //   --out        writes a mask: differing pixels white, matching pixels black
 
-#:package SkiaSharp@4.153.1
-#:package SkiaSharp.NativeAssets.Linux@4.153.1
+#:package SkiaSharp@4.154.0
+#:package SkiaSharp.NativeAssets.Linux@4.154.0
 
 using System.Globalization;
 using SkiaSharp;

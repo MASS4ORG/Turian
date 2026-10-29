@@ -105,7 +105,10 @@ public sealed class DataAssetWiringGenerator : IIncrementalGenerator
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == name) { return true; }
+            if (current.WithNullableAnnotation(NullableAnnotation.NotAnnotated).ToDisplayString() == name)
+            {
+                return true;
+            }
         }
         return false;
     }

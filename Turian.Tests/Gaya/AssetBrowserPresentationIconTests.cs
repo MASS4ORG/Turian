@@ -4,6 +4,30 @@ namespace Turian.Tests;
 [Collection(SerialTests.Name)]
 public sealed class AssetBrowserPresentationIconTests
 {
+    /// <summary>Serialized payload presentations draw visible pixels in the actual tree and grid.</summary>
+    [Theory]
+    [InlineData(AssetBrowserViewMode.Grid)]
+    [InlineData(AssetBrowserViewMode.Tree)]
+    public void PayloadIconsAreVisibleInTheBrowser(AssetBrowserViewMode mode)
+    {
+        using var browser = new AssetBrowserHarness(mode);
+        using var surface = SKSurface.Create(new SKImageInfo(16, 16));
+        surface.Canvas.Clear(SKColors.Lime);
+        using var icon = surface.Snapshot();
+        using var data = icon.Encode(SKEncodedImageFormat.Png, 100);
+        browser.Field<AssetTypeCatalog>("types").Register(new AssetTypePresentation(typeof(DataAssetTest),
+            "test.payload", "Payload", "test.missing", new Color32(255, 255, 255), "Test")
+        { ImageData = data.ToArray() });
+        Serializer.Save(Path.Combine(browser.Root, "payload.dataasset"), new DataAssetTest());
+        browser.Importer.GenerateMetaFiles(browser.Root);
+        browser.Invoke("Refresh");
+        browser.State.SetExpanded(browser.Root, true);
+        using var captured = browser.Capture();
+        using var bitmap = SKBitmap.FromImage(captured);
+        Assert.True(bitmap.Pixels.Count(static pixel => pixel.Green > 220 && pixel.Red < 30 && pixel.Blue < 30) > 20,
+            "The browser must draw the payload's raster icon, not just cache its decoded image.");
+    }
+
     /// <summary>Raster icons decode once; malformed images use the contributed glyph.</summary>
     [Theory]
     [InlineData(true)]

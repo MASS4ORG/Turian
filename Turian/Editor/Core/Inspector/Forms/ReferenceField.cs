@@ -73,6 +73,15 @@ public sealed class ReferenceField
 
         // Typed subclasses are drawn as the AssetReference they extend.
         var type = field.ValueType;
+        if (typeof(IdObject).IsAssignableFrom(type))
+        {
+            return TryCreateDirect(field);
+        }
+        return TryCreateAssetHandle(field, type);
+    }
+
+    static ReferenceField? TryCreateAssetHandle(FormField field, Type type)
+    {
         Type? payloadType = null;
         for (var current = type; current is not null; current = current.BaseType)
         {
@@ -191,7 +200,8 @@ public sealed class ReferenceField
     static ReferenceField? TryCreateDirect(FormField field)
     {
         var type = field.ValueType;
-        if (!ObjectReferences.IsReferenceMember(type, allowSceneObjects: true) || type.IsArray || type.IsGenericType)
+        if (!typeof(IdObject).IsAssignableFrom(type) || type.ContainsGenericParameters
+            || !ObjectReferences.IsReferenceMember(type, allowSceneObjects: true))
         {
             return null;
         }
