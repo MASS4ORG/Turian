@@ -17,8 +17,10 @@ BuildManager.MsBuildLocatorRegisterDefaults();
 
 // Built-in plugins are compiled in; the rest come from the studio packages the user installed.
 var studioBricks = TurianStudioBricks.Workspace();
-var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }
-    .Concat(PackagedPlugins.Load(studioBricks, Log.Logger).Assemblies);
+var studioPackages = PackagedPlugins.Load(studioBricks, Log.Logger);
+// Game bricks loaded for the studio are discoverable in a project only while that project enables them.
+BrickAssemblies.RecordGameBricks(studioPackages.Packages);
+var pluginAssemblies = new[] { typeof(GayaPlugin).Assembly }.Concat(studioPackages.Assemblies);
 var shell = new ShellHost();
 var dispatcher = new CommandDispatcher();
 var panelAccessor = new PanelAccessor();

@@ -10,7 +10,7 @@ namespace Turian.Engine.Core;
 /// in parallel. An id whose target is missing is kept and written back, so saving never drops it, and resolves when
 /// its target loads. A destroyed target is written as null. <see cref="SerializeInlineAttribute"/> opts a member out.
 /// </remarks>
-public static class ObjectReferences
+public static partial class ObjectReferences
 {
     /// <summary>Property name of a serialized reference.</summary>
     public const string RefProperty = "$ref";
@@ -18,6 +18,23 @@ public static class ObjectReferences
     static readonly ConcurrentDictionary<(Type, bool), bool> ReferenceMembers = new();
     static readonly ConcurrentDictionary<MemberInfo, bool> InlineMembers = new();
     static readonly ConcurrentDictionary<(Type, string), MemberInfo?> Members = new();
+    static readonly ConcurrentDictionary<Type, Func<int, System.Collections.IList>> Collections = new();
+
+    /// <summary>Registers closed list and array factories for reference placeholders and hydration.</summary>
+    public static void RegisterCollections<T>() where T : IdObject
+    {
+        Collections[typeof(T[])] = static count => new T[count];
+        Collections[typeof(List<T>)] = static count =>
+        {
+            var items = new List<T>(count);
+            for (var index = 0; index < count; index++)
+            {
+                items.Add(null!);
+            }
+
+            return items;
+        };
+    }
 
     [ThreadStatic] static int _nodeReadDepth;
     static readonly AsyncLocal<LoaderContext?> DeserializationLoader = new();
@@ -30,6 +47,7 @@ public static class ObjectReferences
         CollectibleAssemblies.RemoveReleased(ReferenceMembers, static key => key.Item1);
         CollectibleAssemblies.RemoveReleased(InlineMembers, static member => member.ReflectedType);
         CollectibleAssemblies.RemoveReleased(Members, static key => key.Item1);
+        CollectibleAssemblies.RemoveReleased(Collections, static type => type);
     }
 
     internal static T DeserializeWithLoader<T>(IAssetLoader? loader, Func<T> deserialize)
@@ -117,6 +135,7 @@ public static class ObjectReferences
     public static void Forget(IdObject owner, string member)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        ForgetEmbedded(owner, member);
         if (owner.PendingReferences is not { } table)
         {
             return;
@@ -381,6 +400,7 @@ public static class ObjectReferences
     static int AssignMember(IdObject owner, string member, Guid[] ids, Func<Guid, IdObject?> find,
         GeneratedSerializer? generated)
     {
+        if (TryAssignEmbedded(owner, member, ids, find, out var embeddedMissing)) { return embeddedMissing; }
         if (ReferenceMemberType(owner, member, generated, out var info) is not { } memberType)
         {
             return 0;
@@ -416,7 +436,7 @@ public static class ObjectReferences
     static Type? ReferenceMemberType(IdObject owner, string member, GeneratedSerializer? generated,
         out MemberInfo? info)
     {
-        info = generated is null ? FindMember(owner.GetType(), member) : null;
+        info = generated is null && RuntimeFeature.IsDynamicCodeSupported ? FindMember(owner.GetType(), member) : null;
         return generated?.MemberType(member) ?? (info is null ? null : MemberType(info));
     }
 
@@ -464,12 +484,14 @@ public static class ObjectReferences
     }
 
     static System.Collections.IList? ExistingList(IdObject owner, string member) =>
-        FindMember(owner.GetType(), member) switch
-        {
-            PropertyInfo property => property.GetValue(owner) as System.Collections.IList,
-            FieldInfo field => field.GetValue(owner) as System.Collections.IList,
-            _ => null,
-        };
+        GeneratedSerializers.TryGet(owner.GetType(), out var generated) && generated.HasMemberGetter
+            ? generated.GetMember(owner, member) as System.Collections.IList
+            : RuntimeFeature.IsDynamicCodeSupported ? FindMember(owner.GetType(), member) switch
+            {
+                PropertyInfo property => property.GetValue(owner) as System.Collections.IList,
+                FieldInfo field => field.GetValue(owner) as System.Collections.IList,
+                _ => null,
+            } : throw new InvalidOperationException($"No generated reference getter for '{owner.GetType().FullName}.{member}'.");
 
     static object? Match(IdObject? target, Type type) =>
         !IsMissing(target) && type.IsInstanceOfType(target) ? target : null;
@@ -584,6 +606,16 @@ public static class ObjectReferences
 
     static System.Collections.IList CreateList(Type memberType, Type elementType, int count)
     {
+        if (Collections.TryGetValue(memberType, out var create))
+        {
+            return create(count);
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new InvalidOperationException($"No generated reference collection for '{memberType.FullName}'.");
+        }
+
         if (memberType.IsArray)
         {
             return Array.CreateInstance(elementType, count);

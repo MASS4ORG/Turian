@@ -1,7 +1,7 @@
 namespace Turian.CSharp.CodeGenerator;
 
 /// <summary>
-/// Generates, for every DataAsset type, reflection-free member access registered with
+/// Generates, for serializable engine object types, reflection-free member access registered with
 /// <c>GeneratedSerializers</c>, and the implementation of each <c>[Observable]</c> partial property.
 /// </summary>
 /// <remarks>
@@ -13,6 +13,9 @@ namespace Turian.CSharp.CodeGenerator;
 public sealed class DataAssetGenerator : IIncrementalGenerator
 {
     const string dataAssetName = "Turian.Engine.Core.DataAsset";
+    const string idObjectName = "Turian.Engine.Core.IdObject";
+    const string componentName = "Turian.Engine.Core.Component";
+    const string nodeName = "Turian.Engine.Core.Node";
     const string assetName = "Turian.Engine.Core.Asset";
     const string jsonIgnoreName = "System.Text.Json.Serialization.JsonIgnoreAttribute";
     const string jsonIncludeName = "System.Text.Json.Serialization.JsonIncludeAttribute";
@@ -34,7 +37,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 static (node, _) => node is ClassDeclarationSyntax { BaseList: not null },
                 static (syntax, token) =>
                     syntax.SemanticModel.GetDeclaredSymbol(syntax.Node, token) as INamedTypeSymbol)
-            .Where(static type => type is not null && DerivesFromDataAsset(type))
+            .Where(static type => type is not null && DerivesFrom(type, idObjectName))
             .Select(static (type, _) => Describe(type!))
             .Where(static model => model is not null)
             .Collect();
@@ -54,19 +57,6 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                     SourceText.From(EmitObservables(model), Encoding.UTF8));
             }
         });
-    }
-
-    static bool DerivesFromDataAsset(INamedTypeSymbol type)
-    {
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            if (current.ToDisplayString() == dataAssetName)
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     static TypeModel Describe(INamedTypeSymbol type)
@@ -153,7 +143,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (HasAttribute(property, jsonIgnoreName) || property.SetMethod is null)
+            if (IsIgnored(property) || property.SetMethod is null)
             {
                 continue;
             }
@@ -187,7 +177,7 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (HasAttribute(field, jsonIgnoreName))
+            if (IsIgnored(field))
             {
                 continue;
             }
@@ -213,11 +203,18 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                 return false;
             }
 
+            var reference = !HasAttribute(member, serializeInlineName)
+                            && IsObjectReference(memberType, DerivesFrom(type, componentName));
             members.Add(new MemberModel(
                 name,
                 memberType.ToDisplayString(TypeFormat),
-                !HasAttribute(member, serializeInlineName) && IsDataAssetReference(memberType),
-                FastPathOf(memberType)));
+                reference,
+                FastPathOf(memberType),
+                IgnoreCondition(member),
+                DerivesFrom(type, componentName),
+                reference ? ReferenceElement(memberType).ToDisplayString(TypeFormat) : null,
+                memberType is INamedTypeSymbol embedded && embedded.AllInterfaces.Any(static implemented =>
+                    implemented.OriginalDefinition.ToDisplayString() == "Turian.Engine.Core.IEmbeddedAssetValue<TSelf>")));
             return true;
         }
     }
@@ -236,24 +233,27 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         return true;
     }
 
-    static bool IsDataAssetReference(ITypeSymbol type)
+    static bool IsObjectReference(ITypeSymbol type, bool allowSceneObjects)
     {
-        var element = type switch
-        {
-            IArrayTypeSymbol array => array.ElementType,
-            INamedTypeSymbol { IsGenericType: true } named
-                when named.ConstructedFrom.ToDisplayString() == "System.Collections.Generic.List<T>" =>
-                named.TypeArguments[0],
-            _ => type,
-        };
-        return DerivesFrom(element, dataAssetName);
+        var element = ReferenceElement(type);
+        return DerivesFrom(element, dataAssetName)
+               || (allowSceneObjects && (DerivesFrom(element, componentName) || DerivesFrom(element, nodeName)));
     }
+
+    static ITypeSymbol ReferenceElement(ITypeSymbol type) => type switch
+    {
+        IArrayTypeSymbol array => array.ElementType,
+        INamedTypeSymbol { IsGenericType: true } named
+            when named.ConstructedFrom.ToDisplayString() == "System.Collections.Generic.List<T>" =>
+            named.TypeArguments[0],
+        _ => type,
+    };
 
     static bool DerivesFrom(ITypeSymbol type, string baseName)
     {
         for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
         {
-            if (current.ToDisplayString() == baseName)
+            if (current.WithNullableAnnotation(NullableAnnotation.None).ToDisplayString() == baseName)
             {
                 return true;
             }
@@ -283,6 +283,15 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
     static bool HasAttribute(ISymbol symbol, string name) =>
         symbol.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == name);
 
+    static int? IgnoreCondition(ISymbol symbol)
+    {
+        var attribute = symbol.GetAttributes().FirstOrDefault(static a => a.AttributeClass?.ToDisplayString() == jsonIgnoreName);
+        return attribute is null ? null
+            : attribute.NamedArguments.FirstOrDefault(static a => a.Key == "Condition").Value.Value as int? ?? 1;
+    }
+
+    static bool IsIgnored(ISymbol symbol) => IgnoreCondition(symbol) == 1;
+
     static string Keyword(Accessibility accessibility) => accessibility switch
     {
         Accessibility.Public => "public",
@@ -310,7 +319,12 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             var members = model.Members!.Value;
             var references = members.Where(static m => m.IsReference).ToList();
 
-            code.AppendLine($"        global::Turian.Engine.Core.GeneratedSerializers.Register(typeof({t}),");
+            foreach (var element in references.Select(static member => member.ReferenceElementType).Distinct())
+            {
+                code.AppendLine($"        {core}.GeneratedJson.RegisterObject<{element}>();");
+            }
+
+            code.AppendLine($"        global::Turian.Engine.Core.GeneratedSerializers.Register<{t}>(");
             code.AppendLine("            new global::Turian.Engine.Core.GeneratedSerializer(");
             code.AppendLine($"                static () => new {t}(),");
 
@@ -319,7 +333,19 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             code.AppendLine($"                    var o = ({t})value;");
             foreach (var member in members)
             {
-                code.Append(EmitWrite(member));
+                if (member.IgnoreCondition is 2 or 3)
+                {
+                    var condition = member.IgnoreCondition == 3
+                        ? $"o.{Identifier(member.Name)} is not null"
+                        : $"!global::System.Collections.Generic.EqualityComparer<{member.Type}>.Default.Equals(o.{Identifier(member.Name)}, default)";
+                    code.AppendLine($"                    if ({condition}) {{");
+                    code.Append(EmitWrite(member));
+                    code.AppendLine("                    }");
+                }
+                else
+                {
+                    code.Append(EmitWrite(member));
+                }
             }
 
             code.AppendLine("                },");
@@ -361,6 +387,14 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
             }
 
             code.AppendLine("                    _ => null,");
+            code.AppendLine("                },");
+            code.AppendLine("                static (value, member) => member switch");
+            code.AppendLine("                {");
+            foreach (var member in references)
+            {
+                code.AppendLine($"                    \"{member.Name}\" => (({t})value).{Identifier(member.Name)},");
+            }
+            code.AppendLine("                    _ => null,");
             code.AppendLine("                }));");
         }
 
@@ -378,12 +412,18 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         var name = member.Name;
         var id = Identifier(name);
         var general = $"{{ writer.WritePropertyName(\"{name}\"); "
-                      + $"{json}.JsonSerializer.Serialize(writer, o.{id}, options); }}";
+                      + $"{core}.GeneratedJson.Write(writer, o.{id}, options); }}";
+
+        if (member.IsEmbedded)
+        {
+            return $"{indent}writer.WritePropertyName(\"{name}\"); "
+                   + $"{core}.EmbeddedAssetValues.Write(writer, o.{id}, options, o, \"{name}\");\n";
+        }
 
         if (member.IsReference)
         {
             return $"{indent}if (!{core}.ObjectReferences.TryWrite("
-                   + $"writer, o, \"{name}\", typeof({member.Type}), o.{id}, false)) {general}\n";
+                   + $"writer, o, \"{name}\", typeof({member.Type}), o.{id}, {member.AllowSceneObjects.ToString().ToLowerInvariant()})) {general}\n";
         }
 
         return member.FastPath switch
@@ -402,12 +442,18 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
         const string indent = "                        ";
         var name = member.Name;
         var id = Identifier(name);
-        var general = $"{json}.JsonSerializer.Deserialize<{member.Type}>(property.Value, options)";
+        var general = $"{core}.GeneratedJson.Read<{member.Type}>(property.Value, options)";
+
+        if (member.IsEmbedded)
+        {
+            return $"{indent}case \"{name}\": o.{id} = {core}.EmbeddedAssetValues.Read<{member.Type}>("
+                   + $"property.Value, options, o, \"{name}\")!; return true;\n";
+        }
 
         if (member.IsReference)
         {
             return $"{indent}case \"{name}\": o.{id} = {core}.ObjectReferences.TryRead("
-                   + $"o, \"{name}\", typeof({member.Type}), property.Value, false, out var {name}Reference) "
+                   + $"o, \"{name}\", typeof({member.Type}), property.Value, {member.AllowSceneObjects.ToString().ToLowerInvariant()}, out var {name}Reference) "
                    + $"? ({member.Type}){name}Reference : {general}; return true;\n";
         }
 
@@ -485,7 +531,8 @@ public sealed class DataAssetGenerator : IIncrementalGenerator
                                   + string.Join(".", Containers.Concat([Name]));
     }
 
-    sealed record MemberModel(string Name, string Type, bool IsReference, string? FastPath);
+    sealed record MemberModel(string Name, string Type, bool IsReference, string? FastPath,
+        int? IgnoreCondition, bool AllowSceneObjects, string? ReferenceElementType, bool IsEmbedded);
 
     sealed record ObservableModel(string Name, string Type, string Accessibility, string GetModifier, string? Setter);
 }

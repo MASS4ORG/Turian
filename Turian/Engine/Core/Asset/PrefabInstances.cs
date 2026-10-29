@@ -375,7 +375,9 @@ public static class PrefabInstances
             return;
         }
 
-        var data = link.Deserialize<PrefabInstance>(Serializer.JsonOptions) ?? new PrefabInstance();
+        var data = JsonSerializer.Deserialize(link,
+            (System.Text.Json.Serialization.Metadata.JsonTypeInfo<PrefabInstance>)Serializer.JsonOptions
+                .GetTypeInfo(typeof(PrefabInstance))) ?? new PrefabInstance();
         var index = Index(source);
 
         foreach (var removed in data.Removed)
@@ -406,7 +408,7 @@ public static class PrefabInstances
             if (addition.Child?.DeepClone() is JsonObject child)
             {
                 ExpandTree(child, loadPrefab, chain);
-                ArrayOf(parent.Object, childrenMember).Add(child);
+                ArrayOf(parent.Object, childrenMember).Add((JsonNode)child);
             }
 
             if (addition.Component is not null)

@@ -42,6 +42,9 @@ public sealed class PlayModeService(
     /// <summary>Gets the running game's locale service, if one was configured.</summary>
     public LocaleService? Locale => playServices?.GetService<LocaleService>();
 
+    /// <summary>The current session's hydrated gameplay assets and diagnostics, or null outside Play Mode.</summary>
+    public DataAssetSession? DataAssets => playServices?.GetService<DataAssetSession>();
+
     /// <summary>Raised whenever <see cref="State"/> changes.</summary>
     public event Action<PlayState>? StateChanged;
 
@@ -94,7 +97,14 @@ public sealed class PlayModeService(
 
         Input.Clear();
 
-        var sceneManager = PreparePlayServices(localeOverride);
+        ISceneManager sceneManager;
+        try { sceneManager = PreparePlayServices(localeOverride); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cannot enter play mode: failed to prepare runtime services");
+            AbandonPlayServices();
+            return false;
+        }
         using var asyncContext = playServices.GetRequiredService<GameLoopScheduler>().EnterContext();
 
         Node? clone;
@@ -117,13 +127,23 @@ public sealed class PlayModeService(
             return false;
         }
 
-        sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), clone);
-        clone.Awake(null, playServices);
+        try
+        {
+            sceneManager.AdoptScene(sceneTree.CurrentAsset?.Id ?? Guid.NewGuid(), clone);
+            clone.Awake(null, playServices);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Cannot enter play mode: failed to activate the scene");
+            AbandonPlayServices();
+            return false;
+        }
 
         PlayRoot = clone;
         ticker = new SceneTicker(sceneManager, playServices.GetRequiredService<SimulationClock>())
         {
             Async = playServices.GetRequiredService<GameLoopScheduler>(),
+            DataAssets = playServices.GetRequiredService<DataAssetSession>(),
             Simulation = playServices.GetService<SimulationSession>(),
             Systems = [.. playServices.GetServices<IFixedTickSystem>()],
             InputSource = Input,
@@ -344,7 +364,12 @@ public sealed class PlayModeService(
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
             .AddSingleton<GameLoopScheduler>()
-            .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(assetDatabase))
+            .AddSingleton(_ => new DataAssetSession
+            {
+                Observer = editorServices.GetService<IDataAssetEventObserver>()
+            })
+            .AddSingleton<IAssetLoader>(provider =>
+                new RuntimeAssetLoader(assetDatabase, provider.GetRequiredService<DataAssetSession>()))
             .AddSingleton<IInputSource>(Input)
             .AddSingleton(_ => new InputActionService(Input))
             .AddSingleton<IInputActions>(sp => sp.GetRequiredService<InputActionService>());
@@ -369,8 +394,16 @@ public sealed class PlayModeService(
         }
 
         var provider = services.BuildServiceProvider();
-        LoadActionMaps(provider);
-        return provider;
+        try
+        {
+            LoadActionMaps(provider);
+            return provider;
+        }
+        catch
+        {
+            provider.Dispose();
+            throw;
+        }
     }
 
     /// <summary>

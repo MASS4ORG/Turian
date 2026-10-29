@@ -42,7 +42,7 @@ public sealed record AssetTypeDescriptor(
 /// so both the Guinevere studio and the CLI reach the same answer.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class AssetTypeCatalog
+public sealed partial class AssetTypeCatalog
 {
     readonly Dictionary<string, AssetTypeDescriptor> byExtension =
         new(StringComparer.OrdinalIgnoreCase);

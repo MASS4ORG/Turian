@@ -128,14 +128,14 @@ sealed class ReferenceDrawer(ReferencePicker picker, NodeInspectorController ins
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        if (openFieldId is null || openField is not { } reference)
+        var reference = openField;
+        var open = openFieldId is not null && reference is not null;
+        // A closed frame resets the popup before another reference field opens it.
+        gui.Popup(ref open, () =>
         {
-            return;
-        }
-
-        var open = true;
-        gui.Popup(ref open, () => PickerContent(gui, reference), pickerWidth, pickerHeight,
-            $"Select {reference.TargetType.Name}",
+            if (reference is not null) { PickerContent(gui, reference); }
+        }, pickerWidth, pickerHeight,
+            reference is null ? "Select reference" : $"Select {reference.TargetType.Name}",
             PopupAnchor.Below(gui, openAnchor, pickerWidth, pickerHeight));
 
         if (open)

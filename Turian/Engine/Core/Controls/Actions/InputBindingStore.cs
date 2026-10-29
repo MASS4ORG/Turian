@@ -9,9 +9,13 @@ namespace Turian.Engine.Core;
 /// The file is a convenience, never a requirement: an unreadable one, or an entry naming an action
 /// the asset no longer has, is discarded and the authored binding stands.
 /// </remarks>
-public static class InputBindingStore
+public static partial class InputBindingStore
 {
     static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    static readonly InputBindingJsonContext JsonContext = new(JsonOptions);
+
+    [JsonSerializable(typeof(Dictionary<string, string>))]
+    sealed partial class InputBindingJsonContext : JsonSerializerContext;
 
     /// <summary>The file a game stores its rebindings in, under the user's application data.</summary>
     /// <param name="productName">The folder the game keeps its user data in.</param>
@@ -36,7 +40,7 @@ public static class InputBindingStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(path, JsonSerializer.Serialize(service.CaptureOverrides(), JsonOptions));
+            File.WriteAllText(path, JsonSerializer.Serialize(service.CaptureOverrides(), JsonContext.DictionaryStringString));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -62,7 +66,7 @@ public static class InputBindingStore
                 return false;
             }
 
-            var stored = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path));
+            var stored = JsonSerializer.Deserialize(File.ReadAllText(path), JsonContext.DictionaryStringString);
             service.ApplyOverrides(stored);
             return stored is not null;
         }

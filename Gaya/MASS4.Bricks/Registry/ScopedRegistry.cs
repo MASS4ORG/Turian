@@ -29,7 +29,7 @@ public sealed class ScopedRegistry
     public List<string> Scopes { get; set; } = [];
 
     /// <summary>The keys whose signatures are trusted, as OpenSSH public key lines.</summary>
-    [Tooltip("Optional: trusted OpenSSH ed25519 public keys; the registry's own keys are trusted when left empty. A registry cannot replace them later.")]
+    [Tooltip("Trusted OpenSSH ed25519 public keys; signed bricks require a matching pinned key. A registry cannot replace them later.")]
     public List<string> Keys { get; set; } = [];
 
     /// <summary>Accept bricks without a signature, which only a registry the studio runs itself should be allowed.</summary>

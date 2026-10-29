@@ -76,6 +76,13 @@ sealed class AssetBrowserHarness : IDisposable
     internal void Frame() => InspectorFormsRenderingTests.Frame(Gui, surface, font, Panel.Render);
     internal void Frame(Action<Gui> render) => InspectorFormsRenderingTests.Frame(Gui, surface, font, render);
 
+    internal SKImage Capture()
+    {
+        surface.Canvas.Clear(SKColors.Black);
+        Frame();
+        return surface.Snapshot();
+    }
+
     internal void Click(string id, GMouseButton button = GMouseButton.Left)
     {
         Input.MousePosition.Returns(Find(id).Rect.Center);

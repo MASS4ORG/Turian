@@ -92,13 +92,22 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         // The catalog names asset types by full name, and some of those live in bricks' prebuilt assemblies.
         try
         {
-            BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
+            LoadEnabledBricks();
         }
         catch (MASS4.Bricks.PackageException)
         {
             // ProjectPackages has logged what is missing and what to do.
             log.LogWarning("The bricks' types are unavailable until the project's bricks resolve");
+            BrickAssemblies.Enable([]);
         }
+    }
+
+    // Discovery follows the enabled bricks; assemblies of bricks this project leaves out stay loaded but hidden.
+    void LoadEnabledBricks()
+    {
+        var bricks = ProjectPackages.ResolveOrEmpty(Settings!.ProjectAbsoluteDir);
+        BrickAssemblies.Load(bricks, log, Settings.ProjectAbsoluteDir);
+        BrickAssemblies.Enable(bricks);
     }
 
     void CompleteOpen(string? openScene)
@@ -170,7 +179,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         }
 
         ProjectPackages.Invalidate(Settings.ProjectAbsoluteDir);
-        BrickAssemblies.Load(ProjectPackages.ResolveOrEmpty(Settings.ProjectAbsoluteDir), log, Settings.ProjectAbsoluteDir);
+        LoadEnabledBricks();
         services.GetRequiredService<AssetImporter>().StartMonitoring();
         _ = RecompileScripts();
     }

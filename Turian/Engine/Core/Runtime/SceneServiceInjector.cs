@@ -13,6 +13,23 @@ static class SceneServiceInjector
             return;
         }
 
+        if (instance is Component component && GeneratedComponentMetadata.TryGet(instance.GetType(), out var metadata))
+        {
+            metadata.Inject(component, services, allowMissingServices);
+            return;
+        }
+
+        if (instance is Node node && GeneratedNodeMetadata.TryGet(instance.GetType(), out var nodeMetadata))
+        {
+            nodeMetadata.Inject(node, services, allowMissingServices);
+            return;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new InvalidOperationException($"No generated injection metadata for '{instance.GetType().FullName}'.");
+        }
+
         var properties = Properties.GetOrAdd(instance.GetType(), static type =>
             [.. type.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                 .Select(static property => (Property: property, Attribute: property.GetCustomAttribute<InjectServiceAttribute>(inherit: true)))

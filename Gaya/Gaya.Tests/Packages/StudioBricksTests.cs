@@ -2,7 +2,7 @@ namespace Gaya.Tests;
 
 /// <summary>Studio-scope bricks managed through the Bricks panel with no project open.</summary>
 [Collection(SerialTests.Name)]
-public sealed class StudioBricksTests : IDisposable
+public sealed partial class StudioBricksTests : IDisposable
 {
     static readonly Dictionary<string, SemanticVersion> Hosts = new() { ["gaya"] = SemanticVersion.Parse("1.0.0") };
 

@@ -166,7 +166,7 @@ public sealed partial class DataAssetGeneratorTests
 
         var generated = output.SyntaxTrees.Single(static t => t.FilePath.EndsWith("TurianGeneratedSerializers.g.cs",
             StringComparison.Ordinal)).ToString();
-        Assert.Contains("typeof(global::Game.Data.Outer.Stats)", generated);
+        Assert.Contains("Register<global::Game.Data.Outer.Stats>", generated);
         Assert.DoesNotContain("Skipped", generated);
     }
 

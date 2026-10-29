@@ -41,7 +41,7 @@ public sealed record BrickRow(string Id, string Version, string? DisplayName, Pa
 /// <param name="project">Supplies the open workspace, or null when the host has no workspaces.</param>
 /// <param name="runner">Runs the actions in the background; the thread pool when null.</param>
 /// <param name="logger">Receives failures the panel only summarises.</param>
-public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? project, IBrickTaskRunner? runner = null,
+public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBricks? project, IBrickTaskRunner? runner = null,
     ILogger? logger = null)
 {
     readonly IBrickTaskRunner tasks = runner ?? new ThreadPoolBrickTaskRunner();
@@ -420,7 +420,7 @@ public sealed class BricksController(IBrickWorkspace? studio, IProjectBricks? pr
             {
                 try
                 {
-                    work(workspace);
+                    ApplyWork(workspace, work, applyToProject);
                 }
                 catch (PackageException ex)
                 {

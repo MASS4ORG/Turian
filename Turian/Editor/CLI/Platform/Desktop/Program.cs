@@ -4,6 +4,9 @@ static class Program
 {
     static int Main(string[] args)
     {
+#if TURIAN_STATIC_RUNTIME
+        GeneratedExportRuntime.Initialize();
+#endif
         var projectPath = GetProjectPath();
 
         // The default builder wires console logging (ILoggerFactory/ILogger<T>) out of the box.
@@ -13,9 +16,11 @@ static class Program
         var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Turian");
 
         // The bricks' [TypeId] types, and the player a render brick provides, register before anything loads.
+#if !TURIAN_STATIC_RUNTIME
         var manifestPath = Path.Combine(AppContext.BaseDirectory, "usercode.typeids.json");
         PrecastAssemblies.Load(manifestPath, logger);
         TypeRegistry.RegisterFromManifest(manifestPath, logger);
+#endif
         Log.Logger.Lap("startup", "types registered");
 
         var context = new GamePlayerContext(projectPath, logger, static services => services.BuildServiceProvider(),
@@ -26,7 +31,11 @@ static class Program
 #endif
         try
         {
+#if TURIAN_STATIC_RUNTIME
+            return ExportRuntime.CreatePlayer!().Run(context);
+#else
             return GamePlayers.FindOrHeadless().Run(context);
+#endif
         }
         catch (Exception ex)
         {
