@@ -11,7 +11,9 @@ public sealed partial class StudioBricksTests
         File.WriteAllBytes(Path.Combine(path, "Precast~", "lib", "Plugin.dll"), [1, 2, 3]);
         new PackageManifest
         {
-            Name = "com.acme.plugin", Version = SemanticVersion.Parse("1.0.0"), Scopes = [PackageScope.Studio],
+            Name = "com.acme.plugin",
+            Version = SemanticVersion.Parse("1.0.0"),
+            Scopes = [PackageScope.Studio],
         }.Save(path);
         var controller = new BricksController(studio, null) { Scope = BrickScope.Studio };
         Assert.True(await controller.RestoreAsync());

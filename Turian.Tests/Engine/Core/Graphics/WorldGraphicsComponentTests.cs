@@ -144,7 +144,8 @@ public sealed class WorldGraphicsComponentTests
         var node = new Node();
         var trail = new TrailRenderer
         {
-            Time = 1, MinVertexDistance = 0,
+            Time = 1,
+            MinVertexDistance = 0,
             WidthCurve = new() { Keys = [new(0, 0), new(0.5f, 1), new(1, 0)] },
         };
         node.AddComponent(trail);
