@@ -37,6 +37,7 @@ sealed class GameViewport : IDisposable
 
     SceneViewerService? service;
     IUiPresenter? uiPresenter;
+    IServiceProvider? uiServices;
     Node? overlayRoot;
     IRenderStatisticsTarget? statisticsTarget;
     CameraComponent? lastResizedCamera;
@@ -225,7 +226,14 @@ sealed class GameViewport : IDisposable
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
     IUiPresenter? UiPresenter()
     {
-        uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, playMode.Locale);
+        var services = playMode.Services;
+        if (!ReferenceEquals(uiServices, services))
+        {
+            uiPresenter?.Dispose();
+            uiPresenter = null;
+            uiServices = services;
+        }
+        uiPresenter ??= UiPresenters.Find()?.Create(vulkan, playMode.Input, services);
         if (uiPresenter is not null)
         {
             uiPresenter.IsPlaying = playMode.State == PlayState.Playing;
@@ -259,11 +267,6 @@ sealed class GameViewport : IDisposable
             log.LogError(ex, "The game viewport could not start");
             failure = "Game rendering is unavailable — see the log.";
             return false;
-        }
-
-        if (uiPresenter is { } presenter)
-        {
-            presenter.Locale = playMode.Locale;
         }
 
         if (pixels.Length != width * height * 4)
@@ -392,7 +395,12 @@ sealed class GameViewport : IDisposable
     /// <summary>Whichever camera just became the active one has to match the panel's current size.</summary>
     void OnPlayStateChanged(PlayState state)
     {
-        _ = state;
+        if (state == PlayState.Stopped)
+        {
+            uiPresenter?.Dispose();
+            uiPresenter = null;
+            uiServices = null;
+        }
         lastResizedCamera = null;
         statisticsTarget?.Statistics.Clear();
         panelStatistics.Clear();

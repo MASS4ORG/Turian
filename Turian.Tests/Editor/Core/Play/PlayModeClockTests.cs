@@ -104,6 +104,7 @@ public sealed class PlayModeClockTests
                                  { FixedDeltaTime = 0.04, MaxTicksPerFrame = 1 }));
                                  services.AddSingleton(provider => new SimulationSession(new World(),
                                      provider.GetRequiredService<SimulationClock>(), 10, "module-fixture-v1"));
+                                 services.AddSingleton(new MASS4.Localization.LocaleService());
                              }
                          }
                          public sealed class World : ISimulationWorld
@@ -146,6 +147,8 @@ public sealed class PlayModeClockTests
             using var project = global::Turian.Editor.CLI.HeadlessProject.Open(settings, NullLogger.Instance, false);
             var loaded = project.LoadScene(sceneFile);
             Assert.Equal(0.04, Assert.IsType<ClockComponent>(loaded.Components.Single()).Clock!.FixedDeltaTime);
+            Assert.True(project.Locale!.SetLocale("pt-BR"));
+            Assert.Equal("pt-BR", project.Services.GetRequiredService<LocaleService>().ActiveLocale);
 
             build.Dispose();
             Assert.False(build.IsAssemblyLoaded);
@@ -177,6 +180,10 @@ public sealed class PlayModeClockTests
             Assert.Equal(1, simulation.CaptureState().World.GetProperty("lastTick").GetInt64());
             Assert.Single(simulation.LastResults);
             Assert.Equal("fixed-input", simulation.LastResults[0].Command.Kind);
+            play.Stop();
+
+            Assert.True(play.Start("pt-BR"));
+            Assert.Equal("pt-BR", play.Services!.GetRequiredService<LocaleService>().ActiveLocale);
         }
         finally
         {

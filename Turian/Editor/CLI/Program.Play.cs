@@ -284,7 +284,14 @@ public static partial class Program
 
             if (result.GetValue(localeOption) is { } locale)
             {
-                project.Locale.SetLocale(locale);
+                if (project.Locale is { } service)
+                {
+                    service.SetLocale(locale);
+                }
+                else
+                {
+                    Log.Logger.LogWarning("Ignoring --locale {Locale}: the project has no localization brick", locale);
+                }
             }
 
             var report = SceneReport.Collect(root, loadModels: true);
@@ -311,7 +318,7 @@ public static partial class Program
                 Path.GetFullPath(result.GetValue(outputOption)!),
                 Log.Logger,
                 drawGizmos: result.GetValue(gizmosOption),
-                locale: project.Locale);
+                services: project.Services);
         });
 
         return cmd;

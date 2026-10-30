@@ -22,12 +22,12 @@ public sealed class PlayerFrames(
     /// <param name="factory">The interface package's factory, or <c>null</c> when none is installed.</param>
     /// <param name="vulkan">The device interface textures are created on.</param>
     /// <param name="input">Input for interface controls.</param>
-    /// <param name="locale">Resolves localized text.</param>
+    /// <param name="services">The running game's services.</param>
     /// <returns>The presenter, or <c>null</c> without an interface package.</returns>
     public static IUiPresenter? CreatePresenter(IUiPresenterFactory? factory, Vulkan vulkan, IInputSource input,
-        LocaleService locale)
+        IServiceProvider services)
     {
-        if (factory?.Create(vulkan, input, locale) is not { } created)
+        if (factory?.Create(vulkan, input, services) is not { } created)
         {
             return null;
         }

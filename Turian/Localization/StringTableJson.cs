@@ -1,9 +1,9 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// JSON serialization for a <see cref="StringTable"/>. The shape is shared by the <c>.strings</c>
 /// source files, their baked import artifacts, and the
-/// <c>Turian.Editor.Core.LocalizationExchange</c> exporters:
+/// <c>LocalizationExchange</c> exporters:
 ///
 /// <code>
 /// {

@@ -72,7 +72,7 @@ static class HeadlessPlay
             return null;
         }
 
-        return new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Locale,
+        return new PlayRenderer(project.Vulkan, project.Database, play.Input, play.Services,
             options.Width, options.Height);
     }
 
@@ -132,9 +132,9 @@ static class HeadlessPlay
         Node? overlayRoot;
 
         public PlayRenderer(
-            Vulkan vulkan, AssetDatabase assets, IInputSource inputSource, LocaleService? locale, uint width, uint height)
+            Vulkan vulkan, AssetDatabase assets, IInputSource inputSource, IServiceProvider? services, uint width, uint height)
         {
-            uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, locale);
+            uiPresenter = UiPresenters.Find()?.Create(vulkan, inputSource, services);
             if (uiPresenter is not null)
             {
                 uiPresenter.IsPlaying = true;

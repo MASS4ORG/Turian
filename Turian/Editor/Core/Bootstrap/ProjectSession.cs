@@ -116,7 +116,7 @@ public sealed partial class ProjectSession(IServiceProvider services, ILogger lo
         // the catalog is indexed. Hosts that do not register a LocaleService simply skip this.
         if (services.GetService(typeof(LocaleService)) is LocaleService locale)
         {
-            LocalizationLoader.Load(locale, Settings!, services.GetRequiredService<AssetDatabase>());
+            ProjectStringTables.Load(locale, services.GetRequiredService<AssetDatabase>(), log);
         }
 
         log.LogInformation("Opened project {Project}", Settings!.ProjectAbsoluteDir);

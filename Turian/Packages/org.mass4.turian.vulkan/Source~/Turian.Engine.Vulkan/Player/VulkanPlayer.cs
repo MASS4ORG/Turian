@@ -29,7 +29,7 @@ public sealed class VulkanPlayer : IGamePlayer
         window.Initialize();
         var renderer = new RendererManager(window, vulkan, runtime.Assets, context.Logger);
         renderer.Initialize();
-        var presenter = PlayerFrames.CreatePresenter(UiPresenters.Find(), vulkan, inputSource, runtime.Locale);
+        var presenter = PlayerFrames.CreatePresenter(UiPresenters.Find(), vulkan, inputSource, runtime.Services);
         var frames = new PlayerFrames(runtime, presenter,
             () => window.FramebufferSize,
             texture => renderer.OverlayTexture = texture,
