@@ -42,6 +42,31 @@ public sealed class NodeSelectionOperations(SceneTreeController sceneTree, NodeI
         return clones;
     }
 
+    /// <summary>
+    /// Attaches freshly copied subtrees to <paramref name="target"/>: beneath it when <paramref name="asChild"/> is
+    /// set, otherwise beside it. Each copy keeps a name unique among its new siblings.
+    /// </summary>
+    public IReadOnlyList<Node> Paste(IReadOnlyList<Node> nodes, Node target, bool asChild)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (nodes.Count == 0)
+        {
+            return [];
+        }
+
+        var parent = asChild ? target : target.Parent ?? target;
+        Run("Paste", [parent], () =>
+        {
+            foreach (var node in nodes)
+            {
+                node.Name = NodeNaming.GetNextAvailable(node.Name, parent.Children.Select(child => child.Name));
+                sceneTree.AttachNode(node, parent, parent.Children.Count);
+                node.Awake(parent);
+            }
+        });
+        return nodes;
+    }
+
     /// <summary>Moves selected roots beneath a target, refusing cycles and preserving their world transforms.</summary>
     public void Reparent(IEnumerable<Node> selection, Node target)
     {

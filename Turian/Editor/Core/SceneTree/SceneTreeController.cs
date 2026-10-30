@@ -353,6 +353,22 @@ public sealed class SceneTreeController(
     public IReadOnlyList<Node> DuplicateNodes(IReadOnlyList<Node> nodes) =>
         NodeDuplication.Copy(nodes, assetLoader, id => PrefabInstances.ReadPrefabJson(database, id));
 
+    /// <summary>Serializes selected subtrees to the JSON clipboard envelope, so they can be pasted elsewhere.</summary>
+    /// <param name="nodes">The top-level nodes to copy; their descendants travel with them.</param>
+    /// <returns>The clipboard text.</returns>
+    public string SerializeNodes(IReadOnlyList<Node> nodes) => NodeClipboard.WriteNodes(nodes);
+
+    /// <summary>
+    /// Rebuilds nodes from clipboard JSON as independent copies with fresh ids, keeping references inside each copied
+    /// subtree pointing at the copies.
+    /// </summary>
+    /// <param name="json">The clipboard text written by <see cref="SerializeNodes"/>.</param>
+    /// <returns>The copied nodes, or an empty list when the clipboard holds no nodes.</returns>
+    public IReadOnlyList<Node> PasteNodes(string json) =>
+        NodeClipboard.TryReadNodes(json, assetLoader, out var parsed)
+            ? NodeDuplication.Copy(parsed, assetLoader, id => PrefabInstances.ReadPrefabJson(database, id))
+            : [];
+
     /// <summary>
     /// Marks the current asset as modified. Does nothing while a play session is displayed:
     /// edits made to running objects are discarded when play stops, so they must not dirty the

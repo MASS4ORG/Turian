@@ -114,6 +114,32 @@ public sealed class ObjectState
         }
     }
 
+    /// <summary>
+    /// Copies this snapshot's member values onto <paramref name="target"/>, leaving its id and structure alone.
+    /// A reference member whose value is null keeps the target's current value, so pasting values never clears a
+    /// reference the snapshot could not resolve.
+    /// </summary>
+    /// <param name="target">The object to receive the values.</param>
+    public void ApplyValues(IdObject target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        foreach (var (member, type, json, reference) in values)
+        {
+            if (ObjectReferences.IsReferenceMember(type, allowSceneObjects: true))
+            {
+                if (reference is not null)
+                {
+                    Set(member, target, CopyContainer(reference));
+                }
+
+                continue;
+            }
+
+            Set(member, target, JsonSerializer.Deserialize(json, type, Serializer.JsonOptions));
+        }
+    }
+
     /// <summary>Whether both snapshots hold the same values and structure.</summary>
     /// <param name="other">A snapshot of the same object.</param>
     /// <returns>True when nothing differs.</returns>

@@ -70,6 +70,8 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
     {
         ArgumentNullException.ThrowIfNull(gui);
 
+        CacheClipboard(gui);
+
         var target = FrameSelection(gui);
         if (target is null)
         {
@@ -538,26 +540,42 @@ sealed partial class InspectorPanel(NodeInspectorController inspector, AssetMana
             menu.Item("Move Up", () => MoveComponent(component, up: true), enabled: !prefabOwned && index > 0);
             menu.Item("Move Down", () => MoveComponent(component, up: false),
                 enabled: !prefabOwned && index >= 0 && index < count - 1);
-            if (!added && !overridden)
-            {
-                return;
-            }
-
             menu.Separator();
-            menu.Item(added ? "Remove Added Component" : "Revert Component", () =>
+            BuildComponentClipboardMenu(menu, component);
+            BuildComponentPrefabMenu(menu, component, added, overridden);
+        });
+    }
+
+    void BuildComponentPrefabMenu(FlyoutBuilder menu, Component component, bool added, bool overridden)
+    {
+        if (!added && !overridden)
+        {
+            return;
+        }
+
+        menu.Separator();
+        menu.Item(added ? "Remove Added Component" : "Revert Component", () =>
+        {
+            prefabOperations.RevertComponent(component);
+            Edited(true);
+        });
+        if (!added)
+        {
+            menu.Item("Apply Component to Prefab", () =>
             {
-                prefabOperations.RevertComponent(component);
+                prefabOperations.ApplyComponent(component);
                 Edited(true);
             });
-            if (!added)
-            {
-                menu.Item("Apply Component to Prefab", () =>
-                {
-                    prefabOperations.ApplyComponent(component);
-                    Edited(true);
-                });
-            }
-        });
+        }
+    }
+
+    void BuildComponentClipboardMenu(FlyoutBuilder menu, Component component)
+    {
+        var copied = ReadClipboardComponent();
+        menu.Item("Copy Component", () => CopyComponent(component));
+        menu.Item("Paste Component Values", () => PasteComponentValues(component, copied),
+            enabled: copied?.GetType() == component.GetType());
+        menu.Item("Paste Component as New", () => PasteComponentAsNew(copied), enabled: copied is not null);
     }
 
     void MoveComponent(Component component, bool up)

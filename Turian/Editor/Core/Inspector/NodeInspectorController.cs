@@ -196,6 +196,68 @@ public sealed class NodeInspectorController
         }
     }
 
+    /// <summary>
+    /// Copies the serialized values of <paramref name="source"/> onto <paramref name="target"/>, which must be a
+    /// component of the same type. The target keeps its id, node and position.
+    /// </summary>
+    /// <param name="target">The component receiving the values.</param>
+    /// <param name="source">The component whose values are copied.</param>
+    /// <returns>True when the values were applied.</returns>
+    public bool ApplyComponentValues(Component target, Component source)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (target.Node is null || target.GetType() != source.GetType())
+        {
+            return false;
+        }
+
+        ObjectState.Capture(source).ApplyValues(target);
+        NotifyMutation(target);
+        return true;
+    }
+
+    /// <summary>
+    /// Adds a new component of <paramref name="source"/>'s type to <see cref="SelectedNode"/> and copies its values,
+    /// as Unity's "Paste Component as New" does.
+    /// </summary>
+    /// <param name="source">The copied component supplying the type and values.</param>
+    /// <returns>The new component, or null when it could not be added.</returns>
+    public Component? PasteComponentAsNew(Component source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        if (SelectedNode is not { } node)
+        {
+            return null;
+        }
+
+        var type = source.GetType();
+        if (!ComponentRegistry.CanAddTo(node, type))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (Activator.CreateInstance(type) is not Component instance)
+            {
+                return null;
+            }
+
+            ObjectState.Capture(source).ApplyValues(instance);
+            node.AddComponent(instance);
+            NotifyNodeChanged();
+            return instance;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.LogError(ex, "Failed to paste component {Type}", type.FullName);
+            return null;
+        }
+    }
+
     /// <summary>Returns components matching a representative's type and occurrence across the supplied nodes.</summary>
     public static IReadOnlyList<Component> MatchingComponents(IReadOnlyList<Node> nodes, Component representative)
     {

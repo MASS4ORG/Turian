@@ -32,7 +32,7 @@ sealed class SceneTreePanel : IPanel
     bool menuOpen;
     Vector2 menuAt;
     Node? menuNode;
-    Node? clipboard;
+    IClipboard? systemClipboard;
     Vector2 pointer;
 
     /// <summary>Creates the panel and follows the controller's scene changes.</summary>
@@ -89,6 +89,8 @@ sealed class SceneTreePanel : IPanel
             pointer = gui.Input.MousePosition;
         }
 
+        CacheClipboard(gui);
+
         // Flattening a scene the size of Bistro allocates thousands of rows, so it only happens when
         // the hierarchy changes rather than every frame.
         if (gui.Pass == Pass.Pass1Build)
@@ -113,6 +115,14 @@ sealed class SceneTreePanel : IPanel
         }
 
         gui.CascadeMenu(ref menuOpen, menuAt, BuildContextMenu);
+    }
+
+    void CacheClipboard(Gui gui)
+    {
+        if (systemClipboard is null && gui.Platform.TryGet<IClipboard>(out var clipboard))
+        {
+            systemClipboard = clipboard;
+        }
     }
 
     void PrepareTree(Node root)
@@ -285,18 +295,31 @@ sealed class SceneTreePanel : IPanel
         menu.Item("Rename", () => BeginRename(node), enabled: node is not null && !isRoot);
         menu.Item("Delete", DeleteSelected, enabled: HasEditableSelection);
         menu.Item("Duplicate", DuplicateSelected, enabled: HasEditableSelection);
-        menu.Item("Move Up", () => Restructure(node!, () => MoveBy(node!, -1)),
-            enabled: node?.Parent is { } above && above.Children.IndexOf(node) > 0);
-        menu.Item("Move Down", () => Restructure(node!, () => MoveBy(node!, 1)),
-            enabled: node?.Parent is { } below && below.Children.IndexOf(node) < below.Children.Count - 1);
+        BuildMoveMenu(menu, node);
         menu.Separator();
-        menu.Item("Copy", () => clipboard = node, enabled: node is not null);
-        menu.Item("Paste", () => Paste(node), enabled: clipboard is not null && node is not null);
+        BuildClipboardMenu(menu, node);
         menu.Separator();
         menu.Item("New Node", () => Create(node, asChild: false), enabled: node is not null);
         menu.Item("New Child Node", () => Create(node, asChild: true), enabled: node is not null);
         menu.Separator();
         BuildPrefabMenu(menu, node, isRoot);
+    }
+
+    void BuildMoveMenu(FlyoutBuilder menu, Node? node)
+    {
+        menu.Item("Move Up", () => Restructure(node!, () => MoveBy(node!, -1)),
+            enabled: node?.Parent is { } above && above.Children.IndexOf(node) > 0);
+        menu.Item("Move Down", () => Restructure(node!, () => MoveBy(node!, 1)),
+            enabled: node?.Parent is { } below && below.Children.IndexOf(node) < below.Children.Count - 1);
+    }
+
+    void BuildClipboardMenu(FlyoutBuilder menu, Node? node)
+    {
+        var canPaste = CanPaste && node is not null;
+        menu.Item("Cut", CutSelected, enabled: HasEditableSelection);
+        menu.Item("Copy", CopySelected, enabled: HasEditableSelection);
+        menu.Item("Paste", () => Paste(node, asChild: false), enabled: canPaste);
+        menu.Item("Paste as Child", () => Paste(node, asChild: true), enabled: canPaste);
     }
 
     void BuildPrefabMenu(FlyoutBuilder menu, Node? node, bool isRoot)
@@ -454,20 +477,65 @@ sealed class SceneTreePanel : IPanel
         Invalidate();
     }
 
-    void Paste(Node? target)
+    /// <summary>Copies the selected subtrees to the system clipboard. What the panel's Copy shortcut runs.</summary>
+    public void CopySelected() => CopyToClipboard(EditableSelection());
+
+    /// <summary>Copies the selected subtrees, then deletes them, as the panel's Cut shortcut runs.</summary>
+    public void CutSelected()
     {
-        if (clipboard is null || target is null)
+        // Deleting without a clipboard would lose the nodes, so a cut only happens once the copy is written.
+        if (CopyToClipboard(EditableSelection()))
+        {
+            DeleteSelected();
+        }
+    }
+
+    /// <summary>Pastes the clipboard beside the selected node. What the panel's Paste shortcut runs.</summary>
+    public void PasteSelected() => Paste(inspector.SelectedNode ?? sceneTree.CurrentSceneRoot, asChild: false);
+
+    /// <summary>Whether the system clipboard holds a node hierarchy that can be pasted.</summary>
+    public bool CanPaste => systemClipboard is not null && NodeClipboard.HoldsNodes(systemClipboard.GetClipboardText());
+
+    /// <summary>The selected nodes that can be copied: everything but the scene root, descendants folded into parents.</summary>
+    IReadOnlyList<Node> EditableSelection() =>
+        [.. SelectionService.TopLevelNodes(inspector.SelectedNodes).Where(node => node.Parent is not null)];
+
+    bool CopyToClipboard(IReadOnlyList<Node> nodes)
+    {
+        if (nodes.Count == 0 || systemClipboard is null)
+        {
+            return false;
+        }
+
+        systemClipboard.SetClipboardText(sceneTree.SerializeNodes(nodes));
+        return true;
+    }
+
+    void Paste(Node? target, bool asChild)
+    {
+        if (target is null || systemClipboard is null)
         {
             return;
         }
 
-        var parent = target.Parent ?? target;
-        var clone = sceneTree.CloneNode(clipboard, NodeName(clipboard.Name, parent));
+        var clones = sceneTree.PasteNodes(systemClipboard.GetClipboardText());
+        if (clones.Count == 0)
+        {
+            return;
+        }
 
-        undo.RecordObject(parent, "Paste");
-        sceneTree.AttachNode(clone, parent, parent.Children.Count);
-        sceneTree.MarkAssetModified();
+        AttachPasted(clones, target, asChild);
+    }
+
+    void AttachPasted(IReadOnlyList<Node> clones, Node target, bool asChild)
+    {
+        Operations.Paste(clones, target, asChild);
         Invalidate();
+        inspector.SelectMany(clones);
+        if (asChild && keysByNode.GetValueOrDefault(target) is { } key)
+        {
+            state.SetExpanded(key, true);
+        }
     }
 
     void Create(Node? reference, bool asChild)
@@ -492,9 +560,6 @@ sealed class SceneTreePanel : IPanel
 
         Select(node);
     }
-
-    string NodeName(string requested, Node parent) =>
-        NodeNaming.GetNextAvailable(requested, SiblingNames(parent));
 
     static IEnumerable<string> SiblingNames(Node? parent, Node? except = null) =>
         parent is null ? [] : parent.Children.Where(child => !ReferenceEquals(child, except)).Select(child => child.Name);
