@@ -104,7 +104,9 @@ public sealed class PlayModeClockTests
                                  { FixedDeltaTime = 0.04, MaxTicksPerFrame = 1 }));
                                  services.AddSingleton(provider => new SimulationSession(new World(),
                                      provider.GetRequiredService<SimulationClock>(), 10, "module-fixture-v1"));
-                                 services.AddSingleton(new MASS4.Localization.LocaleService());
+                                 var locale = new MASS4.Localization.LocaleService();
+                                 services.AddSingleton(locale);
+                                 services.AddSingleton<MASS4.Localization.ILocaleContext>(locale);
                              }
                          }
                          public sealed class World : ISimulationWorld
@@ -148,7 +150,7 @@ public sealed class PlayModeClockTests
             var loaded = project.LoadScene(sceneFile);
             Assert.Equal(0.04, Assert.IsType<ClockComponent>(loaded.Components.Single()).Clock!.FixedDeltaTime);
             Assert.True(project.Locale!.SetLocale("pt-BR"));
-            Assert.Equal("pt-BR", project.Services.GetRequiredService<LocaleService>().ActiveLocale);
+            Assert.Equal("pt-BR", project.Services.GetRequiredService<ILocaleContext>().ActiveLocale);
 
             build.Dispose();
             Assert.False(build.IsAssemblyLoaded);
@@ -183,7 +185,7 @@ public sealed class PlayModeClockTests
             play.Stop();
 
             Assert.True(play.Start("pt-BR"));
-            Assert.Equal("pt-BR", play.Services!.GetRequiredService<LocaleService>().ActiveLocale);
+            Assert.Equal("pt-BR", play.Services!.GetRequiredService<ILocaleContext>().ActiveLocale);
         }
         finally
         {

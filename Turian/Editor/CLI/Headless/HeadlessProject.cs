@@ -22,7 +22,7 @@ sealed class HeadlessProject : IDisposable
     public Vulkan? Vulkan { get; }
 
     /// <summary>Gets the locale service the project's localization brick registered, or <c>null</c> without one.</summary>
-    public LocaleService? Locale => services.GetService<LocaleService>();
+    public ILocaleContext? Locale => services.GetService<ILocaleContext>();
 
     /// <summary>Gets the project's services for interface construction.</summary>
     public IServiceProvider Services => services;

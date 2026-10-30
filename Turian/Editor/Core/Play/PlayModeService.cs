@@ -40,7 +40,7 @@ public sealed class PlayModeService(
     public BufferedInputSource Input { get; } = new();
 
     /// <summary>Gets the running game's locale service, if one was configured.</summary>
-    public LocaleService? Locale => playServices?.GetService<LocaleService>();
+    public ILocaleContext? Locale => playServices?.GetService<ILocaleContext>();
 
     /// <summary>The running game's services, or <c>null</c> outside play mode.</summary>
     public IServiceProvider? Services => playServices;
@@ -318,7 +318,7 @@ public sealed class PlayModeService(
 
         if (localeOverride is not null)
         {
-            if (playServices.GetService<LocaleService>() is { } locale)
+            if (playServices.GetService<ILocaleContext>() is { } locale)
             {
                 locale.SetLocale(localeOverride);
             }

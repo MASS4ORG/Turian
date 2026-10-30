@@ -13,7 +13,7 @@ public sealed class SceneScreenshotCullingTests(VulkanFixture fixture) : IClassF
         Assert.SkipUnless(fixture.Available, fixture.SkipReason);
         var locale = new LocaleService();
         locale.SetLocale("pt-BR");
-        using var services = new ServiceCollection().AddSingleton(locale).BuildServiceProvider();
+        using var services = new ServiceCollection().AddSingleton<ILocaleContext>(locale).BuildServiceProvider();
         var factory = Substitute.For<IUiPresenterFactory>();
         var presenter = Substitute.For<IUiPresenter>();
         factory.Create(fixture.Vulkan, null, services).Returns(presenter);
@@ -24,7 +24,7 @@ public sealed class SceneScreenshotCullingTests(VulkanFixture fixture) : IClassF
             SceneScreenshot.Capture(fixture.Vulkan, new AssetDatabase(), new Node(), options, Bounds.Empty,
                 Path.Combine(directory.FullName, "shot.png"), NullLogger.Instance, services: services, factory: factory);
             factory.Received(1).Create(fixture.Vulkan, null, services);
-            Assert.Equal("pt-BR", services.GetRequiredService<LocaleService>().ActiveLocale);
+            Assert.Equal("pt-BR", services.GetRequiredService<ILocaleContext>().ActiveLocale);
         }
         finally
         {

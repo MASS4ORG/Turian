@@ -90,7 +90,7 @@ sealed class SceneViewport : IDisposable
         this.cameraSettings = cameraSettings;
         this.log = log;
         this.undo = undo;
-        uiServices = new ServiceCollection().AddSingleton(locale).BuildServiceProvider();
+        uiServices = new ServiceCollection().AddSingleton<ILocaleContext>(locale).BuildServiceProvider();
         this.layers = layers ?? new LayerFilter();
         gridSettings = cameraSettings.Grid;
         Gizmo.Settings = cameraSettings.Gizmos;

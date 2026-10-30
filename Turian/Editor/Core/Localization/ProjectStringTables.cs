@@ -9,14 +9,19 @@ public static class ProjectStringTables
 {
     const string extension = ".strings";
 
-    /// <summary>Replaces the service's tables with the ones the catalog indexes.</summary>
+    /// <summary>Replaces the service's tables with the ones the catalog indexes and selects the project's locale.</summary>
     /// <param name="service">The service to populate in place.</param>
     /// <param name="database">The indexed catalog to read tables from.</param>
+    /// <param name="settings">The project's settings, which the policies read the starting locale from.</param>
+    /// <param name="policies">Chooses the starting locale; the service's default applies when none does.</param>
     /// <param name="log">Where an unreadable table is reported.</param>
-    public static void Load(LocaleService service, AssetDatabase database, ILogger log)
+    public static void Load(LocaleService service, AssetDatabase database, IAppSettings settings,
+        IEnumerable<IProjectLocalePolicy> policies, ILogger log)
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(policies);
         ArgumentNullException.ThrowIfNull(log);
 
         service.ClearTables();
@@ -40,5 +45,7 @@ public static class ProjectStringTables
                     record.AssetId, record.SourceRelativePath);
             }
         }
+
+        service.SetLocale(ProjectLocalePolicies.DefaultLocale(policies, settings) ?? service.DefaultLocale);
     }
 }
