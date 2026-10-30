@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <PackageId>MASS4.Localization.Abstractions</PackageId>
-        <Version>0.1.0</Version>
+        <Version>3.8.0</Version>
         <Description>The locale contract that interface and host code resolve text through, independent of any localization implementation.</Description>
     </PropertyGroup>
 </Project>
