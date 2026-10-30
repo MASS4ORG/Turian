@@ -25,6 +25,7 @@ global using Guinevere;
 global using Ktx2;
 global using MASS4.Attributes;
 global using MASS4.Bricks;
+global using MASS4.Localization;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;
 global using Microsoft.CodeAnalysis.Diagnostics;

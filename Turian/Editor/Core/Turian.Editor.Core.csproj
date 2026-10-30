@@ -19,6 +19,7 @@
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/MASS4.Bricks/MASS4.Bricks.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/Gaya.Attributes/Gaya.Attributes.csproj"/>
+        <ProjectReference Include="$(SolutionDir)/Turian/Localization/MASS4.Localization.csproj"/>
         <ProjectReference Include="../CLI/Platform/Turian.Editor.Build.Platform.Desktop.csproj"
                           ReferenceOutputAssembly="false" PrivateAssets="all"/>
     </ItemGroup>

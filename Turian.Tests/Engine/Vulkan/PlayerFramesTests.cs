@@ -149,10 +149,10 @@ public sealed class PlayerFramesTests : IDisposable
         var runtime = Runtime();
         var factory = Substitute.For<IUiPresenterFactory>();
         var presenter = Substitute.For<IUiPresenter>();
-        factory.Create(null!, Arg.Any<IInputSource>(), Arg.Any<LocaleService>()).Returns(presenter);
+        factory.Create(null!, Arg.Any<IInputSource>(), Arg.Any<IServiceProvider>()).Returns(presenter);
 
-        Assert.Null(PlayerFrames.CreatePresenter(null, null!, new BufferedInputSource(), runtime.Locale));
-        Assert.Same(presenter, PlayerFrames.CreatePresenter(factory, null!, new BufferedInputSource(), runtime.Locale));
+        Assert.Null(PlayerFrames.CreatePresenter(null, null!, new BufferedInputSource(), runtime.Services));
+        Assert.Same(presenter, PlayerFrames.CreatePresenter(factory, null!, new BufferedInputSource(), runtime.Services));
         Assert.True(presenter.IsPlaying);
     }
 

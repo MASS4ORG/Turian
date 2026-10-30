@@ -53,7 +53,6 @@ public sealed partial class DataAssetGeneratorTests
     [InlineData(typeof(DataAssetTest))]
     [InlineData(typeof(GraphicsSettings))]
     [InlineData(typeof(InputSettings))]
-    [InlineData(typeof(LocalizationSettings))]
     [InlineData(typeof(PlayerSettings))]
     [InlineData(typeof(InputActionsAsset))]
     [InlineData(typeof(Sample))]

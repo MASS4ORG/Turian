@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: shared MASS4.Localization library and the localization brick #344.
 - Added: typed source-test dependencies for brick workflows #337.
 - Added: bricks pinned store, git and archive sources #338.
 - Fixed: baking, packing or publishing a studio-only brick.

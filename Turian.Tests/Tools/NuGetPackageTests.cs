@@ -23,7 +23,7 @@ public sealed class NuGetPackageTests
             .ToArray();
 
         Assert.Equal(
-            ["MASS4.Bricks", "MASS4.Gaya.Attributes", "MASS4.Gaya.Sdk", "MASS4.Turian.Attributes", "MASS4.Turian.Engine"],
+            ["MASS4.Bricks", "MASS4.Gaya.Attributes", "MASS4.Gaya.Sdk", "MASS4.Localization", "MASS4.Localization.Abstractions", "MASS4.Turian.Attributes", "MASS4.Turian.Engine"],
             packageIds);
     }
 }

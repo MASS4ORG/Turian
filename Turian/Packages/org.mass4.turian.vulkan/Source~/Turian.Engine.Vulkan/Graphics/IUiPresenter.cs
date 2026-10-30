@@ -7,9 +7,6 @@ namespace Turian.Engine.Core;
 /// </summary>
 public interface IUiPresenter : IDisposable
 {
-    /// <summary>Resolves localized text; <c>null</c> shows authored text. Hosts update it as the session changes.</summary>
-    LocaleService? Locale { get; set; }
-
     /// <summary>Whether this viewport renders a running game, allowing panels restricted to Play mode.</summary>
     bool IsPlaying { get => false; set { } }
 
@@ -37,9 +34,9 @@ public interface IUiPresenterFactory
     /// <summary>Creates a presenter on the shared Vulkan context.</summary>
     /// <param name="vulkan">The context interface textures are created on.</param>
     /// <param name="input">Input for interface controls, or <c>null</c> for neutral input.</param>
-    /// <param name="locale">Resolves localized text, or <c>null</c> to show authored text.</param>
+    /// <param name="services">Services used to construct the interface, or <c>null</c>.</param>
     /// <returns>The presenter, owned by the caller.</returns>
-    IUiPresenter Create(Vulkan vulkan, IInputSource? input, LocaleService? locale);
+    IUiPresenter Create(Vulkan vulkan, IInputSource? input, IServiceProvider? services);
 }
 
 /// <summary>An interface package's way to draw one document on the CPU, without a scene or a GPU: what previews and CI use.</summary>

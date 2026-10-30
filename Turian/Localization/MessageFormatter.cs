@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// Formats the ICU MessageFormat subset a string table may use: plain <c>{name}</c> substitution, the

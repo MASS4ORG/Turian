@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// The localization service shared by the Studio and running games: holds one <see cref="StringTable"/>
@@ -7,7 +7,7 @@ namespace Turian.Engine.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Registered as a plain singleton rather than through <see cref="InternalServiceAttribute"/>, because
+/// Registered as a plain singleton by hosts, because
 /// a table-less instance is useless: each host loads the project's tables into it (or a fresh play
 /// scope) before anything reads a key. Inject it where localized text is needed.
 /// </para>
@@ -16,7 +16,7 @@ namespace Turian.Engine.Core;
 /// and immediate-mode UI re-resolves its text every frame, so nothing needs reloading.
 /// </para>
 /// </remarks>
-public sealed class LocaleService
+public sealed class LocaleService : ILocaleContext
 {
     readonly Dictionary<string, StringTable> tables = new(StringComparer.OrdinalIgnoreCase);
 

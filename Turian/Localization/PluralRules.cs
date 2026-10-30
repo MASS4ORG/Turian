@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// Small, allocation-free CLDR cardinal plural rule set covering the locales a game is likely to

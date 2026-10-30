@@ -12,6 +12,7 @@ global using Gaya.Sdk;
 global using Guinevere;
 global using MASS4.Attributes;
 global using MASS4.Bricks;
+global using MASS4.Localization;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using SkiaSharp;

@@ -38,9 +38,6 @@ public sealed class GameRuntime
     /// <summary>The project's action maps, read from the input source the player supplied.</summary>
     public InputActionService Actions { get; private set; } = null!;
 
-    /// <summary>Resolves the game's localized text.</summary>
-    public LocaleService Locale { get; } = new();
-
     /// <summary>The services scene components are injected from.</summary>
     public IServiceProvider Services { get; private set; } = null!;
 
@@ -137,8 +134,7 @@ public sealed class GameRuntime
             .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input)
             .AddSingleton(Actions)
-            .AddSingleton<IInputActions>(Actions)
-            .AddSingleton(Locale);
+            .AddSingleton<IInputActions>(Actions);
         addServices?.Invoke(registrations);
         if (ExportRuntime.ConfigureServices is { } configure)
         {
@@ -162,7 +158,6 @@ public sealed class GameRuntime
         };
         Scenes.BindServices(Services);
 
-        LocalizationLoader.Load(Locale, Settings, Assets);
         LoadActionMaps(loader);
     }
 

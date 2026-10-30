@@ -40,7 +40,10 @@ public sealed class PlayModeService(
     public BufferedInputSource Input { get; } = new();
 
     /// <summary>Gets the running game's locale service, if one was configured.</summary>
-    public LocaleService? Locale => playServices?.GetService<LocaleService>();
+    public ILocaleContext? Locale => playServices?.GetService<ILocaleContext>();
+
+    /// <summary>The running game's services, or <c>null</c> outside play mode.</summary>
+    public IServiceProvider? Services => playServices;
 
     /// <summary>The current session's hydrated gameplay assets and diagnostics, or null outside Play Mode.</summary>
     public DataAssetSession? DataAssets => playServices?.GetService<DataAssetSession>();
@@ -75,7 +78,7 @@ public sealed class PlayModeService(
 
     /// <summary>
     /// Starts a session on a copy of the currently open scene, optionally overriding the locale the
-    /// project's <see cref="LocalizationSettings"/> selects. Headless runs use the override to verify
+    /// project's localization settings select. Headless runs use the override to verify
     /// localization without touching the authored settings.
     /// </summary>
     /// <param name="localeOverride">A BCP-47 locale to force for the session, or <c>null</c> to use the project's default.</param>
@@ -313,9 +316,16 @@ public sealed class PlayModeService(
             concreteSceneManager.BindServices(playServices);
         }
 
-        if (localeOverride is not null && playServices.GetService<LocaleService>() is { } locale)
+        if (localeOverride is not null)
         {
-            locale.SetLocale(localeOverride);
+            if (playServices.GetService<ILocaleContext>() is { } locale)
+            {
+                locale.SetLocale(localeOverride);
+            }
+            else
+            {
+                logger.LogWarning("Ignoring locale {Locale}: the project has no localization brick", localeOverride);
+            }
         }
 
         return sceneManager;
@@ -328,10 +338,6 @@ public sealed class PlayModeService(
         services.AddSingleton<LayerFilter>();
         services.AddSingleton<IPhysicsQueries, PhysicsQueries>();
         services.AddSingleton(new SimulationClock(settings?.Get<TimeSettings>()));
-        if (settings is not null)
-        {
-            services.AddSingleton(_ => LocalizationLoader.Create(settings, assetDatabase));
-        }
     }
 
     /// <summary>
