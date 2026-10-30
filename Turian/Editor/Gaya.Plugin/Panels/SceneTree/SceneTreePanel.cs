@@ -498,7 +498,7 @@ sealed class SceneTreePanel : IPanel
 
     /// <summary>The selected nodes that can be copied: everything but the scene root, descendants folded into parents.</summary>
     IReadOnlyList<Node> EditableSelection() =>
-        [.. SelectionService.TopLevelNodes(inspector.SelectedNodes).Where(node => node.Parent is not null)];
+        [.. SelectionService.TopLevelNodes(inspector.SelectedNodes).Where(static node => node.Parent is not null)];
 
     bool CopyToClipboard(IReadOnlyList<Node> nodes)
     {

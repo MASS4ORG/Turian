@@ -80,7 +80,7 @@ public sealed class NodeClipboardTests
 
         Assert.Single(undo.History.UndoSteps);
         undo.Undo();
-        Assert.Equal(["Source"], root.Children.Select(child => child.Name));
+        Assert.Equal(["Source"], root.Children.Select(static child => child.Name));
         Assert.Empty(source.Children);
     }
 
@@ -133,6 +133,37 @@ public sealed class NodeClipboardTests
         var component = NodeClipboard.WriteComponent(new LinkComponent { Value = 2f });
         Assert.True(NodeClipboard.HoldsComponent(component));
         Assert.False(NodeClipboard.HoldsNodes(component));
+    }
+
+    /// <summary>Envelopes with the wrong shape, or an unknown component type, read as empty.</summary>
+    [Fact]
+    public void MalformedEnvelopesReadAsEmpty()
+    {
+        Assert.False(NodeClipboard.TryReadNodes("""{"kind":"turian.nodes","version":1,"nodes":{}}""", null,
+            out var noArray));
+        Assert.Empty(noArray);
+
+        Assert.False(NodeClipboard.TryReadNodes("""{"kind":"turian.nodes","version":1,"nodes":[null]}""", null,
+            out var onlyNulls));
+        Assert.Empty(onlyNulls);
+
+        Assert.False(NodeClipboard.TryReadComponent("""{"kind":"turian.component","version":1}""", null,
+            out var missing));
+        Assert.Null(missing);
+
+        Assert.False(NodeClipboard.TryReadComponent(
+            """{"kind":"turian.component","version":1,"component":{"__TypeId":"does.not.exist"}}""", null, out _));
+
+        Assert.Empty(sceneTree.PasteNodes("hello"));
+    }
+
+    /// <summary>Paste as new needs a selected node to receive the component.</summary>
+    [Fact]
+    public void PasteComponentAsNewNeedsASelectedNode()
+    {
+        inspector.ClearSelection();
+
+        Assert.Null(inspector.PasteComponentAsNew(new LinkComponent { Value = 1f }));
     }
 
     [TypeId("c1b0f2a0-0000-4000-8000-000000000001")]

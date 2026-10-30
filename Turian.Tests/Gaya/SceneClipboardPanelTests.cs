@@ -61,9 +61,9 @@ public sealed class SceneClipboardPanelTests
         Assert.True(NodeClipboard.HoldsNodes(clipboard.Text));
 
         var paste = typeof(SceneTreePanel).GetMethod("Paste", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var target = root.Children[0];
-        paste.Invoke(panel, [target, true]);
-        Assert.Single(target.Children);
+        paste.Invoke(panel, [root, true]);
+        Assert.Equal(2, root.Children.Count);
+        Assert.Same(root, root.Children[1].Parent);
 
         clipboard.Text = "not a node";
         Assert.False(panel.CanPaste);
@@ -103,7 +103,7 @@ public sealed class SceneClipboardPanelTests
         Assert.Equal(first.Value, second.Value);
 
         // Right-clicking the component header builds the clipboard submenu with a matching component copied.
-        var section = Descendants(gui.RootNode!).Single(item => item.Id == "inspector/section1");
+        var section = Descendants(gui.RootNode!).Single(static item => item.Id == "inspector/section1");
         input.MousePosition.Returns(section.Rect.Center);
         input.IsMouseButtonPressed(GMouseButton.Right).Returns(true);
         Frame(panel);
@@ -115,6 +115,51 @@ public sealed class SceneClipboardPanelTests
         pasteNew.Invoke(panel, [first]);
         Assert.Equal(3, node.Components.OfType<ClipboardComponent>().Count());
     }
+
+    /// <summary>The context menu's clipboard and move items run the panel's actions on the selection.</summary>
+    [Fact]
+    public void ContextMenuItemsActOnTheSelection()
+    {
+        var tree = new SceneTreeController(assets, settings, null!, loader, Substitute.For<ISceneManager>(), database);
+        var inspector = new NodeInspectorController(assets);
+        using var undo = new UndoService(tree, inspector, assets, loader);
+        tree.OpenAsset(scene);
+        typeof(SceneTreeController).GetField("sceneRoot", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(tree, root);
+        var first = new Node { Name = "First", Parent = root };
+        var second = new Node { Name = "Second", Parent = root };
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var panel = new SceneTreePanel(tree, inspector, assets, null!, null!, settings, undo, null!, null!, null!,
+            database);
+        Frame(panel);
+        inspector.Select(first);
+
+        var clipboardItems = Build(panel, "BuildClipboardMenu", first);
+        Assert.Equal(["Cut", "Copy", "Paste", "Paste as Child"], Text(clipboardItems));
+        var copy = clipboardItems.Single(static item => item.Text == "Copy");
+        Assert.True(copy.Enabled);
+        copy.Action!();
+        Assert.True(NodeClipboard.HoldsNodes(clipboard.Text));
+
+        var moveItems = Build(panel, "BuildMoveMenu", first);
+        Assert.Equal(["Move Up", "Move Down"], Text(moveItems));
+        Assert.False(moveItems[0].Enabled);
+        moveItems[1].Action!();
+        Assert.Same(first, root.Children[1]);
+    }
+
+    static List<FlyoutItem> Build(SceneTreePanel panel, string builder, Node node)
+    {
+        var menu = new FlyoutBuilder();
+        typeof(SceneTreePanel).GetMethod(builder, BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(panel, [menu, node]);
+        return (List<FlyoutItem>)typeof(FlyoutBuilder).GetField("Items", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(menu)!;
+    }
+
+    static IEnumerable<string> Text(List<FlyoutItem> items) =>
+        items.Select(static item => item.Text).Where(static text => text.Length > 0);
 
     void Frame(SceneTreePanel panel) => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
 
