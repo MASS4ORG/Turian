@@ -58,6 +58,7 @@ public sealed class SceneViewerService : IDisposable
     IRenderSystem meshSystem = null!;
     GizmoRenderSystem gizmoSystem = null!;
     WorldUiRenderSystem worldUiSystem = null!;
+    WorldGraphicsRenderSystem worldGraphicsSystem = null!;
     OverlayRenderSystem overlayUiSystem = null!;
 
     /// <summary>Gets the submitted and culled submesh counts from this viewer's latest frame.</summary>
@@ -203,6 +204,7 @@ public sealed class SceneViewerService : IDisposable
         // Gathering fills the light slots, so it runs before the upload or lights reach the GPU a frame late.
         measurement.BeginPreparation();
         standardSystem.Prepare(frameInfo, ubo);
+        worldGraphicsSystem.Prepare(frameInfo, ubo);
         uboBuffer.WriteBytesToBuffer(ubo.AsBytes());
         standardSystem.RecordBeforeRenderPass(frameInfo);
 
@@ -213,6 +215,7 @@ public sealed class SceneViewerService : IDisposable
         standardSystem.Render(frameInfo, ref ubo);
         meshSystem.Render(frameInfo, ref ubo);
         gizmoSystem.Render(frameInfo, ref ubo);
+        worldGraphicsSystem.Render(frameInfo, ref ubo);
         worldUiSystem.Render(frameInfo, ref ubo);
         overlayUiSystem.Render(frameInfo, ref ubo);
 
@@ -285,6 +288,7 @@ public sealed class SceneViewerService : IDisposable
         meshSystem.Dispose();
         gizmoSystem.Dispose();
         worldUiSystem.Dispose();
+        worldGraphicsSystem.Dispose();
         overlayUiSystem.Dispose();
         InitializeRenderSystems();
         UseFrustumCulling = useFrustumCulling;
@@ -302,6 +306,7 @@ public sealed class SceneViewerService : IDisposable
         meshSystem.Dispose();
         gizmoSystem.Dispose();
         worldUiSystem.Dispose();
+        worldGraphicsSystem.Dispose();
         overlayUiSystem.Dispose();
         globalSetLayout.Dispose();
         globalPool.Dispose();
@@ -376,6 +381,7 @@ public sealed class SceneViewerService : IDisposable
         gizmoSystem = new GizmoRenderSystem(
             vulkan, frameTarget.RenderPass, globalSetLayout.GetDescriptorSetLayout(), Gizmos);
         worldUiSystem = new WorldUiRenderSystem(vulkan, frameTarget.RenderPass, globalSetLayout);
+        worldGraphicsSystem = new WorldGraphicsRenderSystem(vulkan, assets, frameTarget.RenderPass, globalSetLayout);
         overlayUiSystem = new OverlayRenderSystem(vulkan, frameTarget.RenderPass);
     }
 }

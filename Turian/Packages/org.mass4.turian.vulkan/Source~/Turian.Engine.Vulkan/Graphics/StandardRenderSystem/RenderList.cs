@@ -26,11 +26,21 @@ readonly record struct DrawItem(
     Vector4 CustomData = default);
 
 /// <summary>
-/// The scene content one frame draws: models and lights gathered in a single walk, and the submesh draws sorted so
+/// The scene content one frame draws: models and lights gathered from a structural index, and the submesh draws sorted so
 /// consecutive draws share a material and model. Every collection is reused, so steady frames allocate nothing.
 /// </summary>
 sealed class RenderList
 {
+    static readonly SceneIndex.Category Renderables = new(static node =>
+    {
+        foreach (var component in node.Components)
+        {
+            if (component is ModelComponent or InstancedModelComponent or LightComponent) { return true; }
+        }
+
+        return false;
+    });
+
     // Weak keys, so a model or material released by a scene switch is not kept alive by its number.
     readonly ConditionalWeakTable<object, StrongBox<int>> stateOrder = [];
     int nextOrder;
@@ -47,7 +57,7 @@ sealed class RenderList
     /// <summary>The submesh draws, in recording order after <see cref="Sort"/>.</summary>
     public List<DrawItem> Draws { get; } = [];
 
-    /// <summary>Collects the active models and lights under <paramref name="roots"/>, depth-first.</summary>
+    /// <summary>Collects the active models, instances and lights under <paramref name="roots"/>, depth-first.</summary>
     /// <param name="roots">The scene's top-level nodes.</param>
     /// <param name="cullingMask">Rendering layers accepted by the camera; null includes all layers.</param>
     public void Gather(IList<Node> roots, LayerMask? cullingMask = null)
@@ -62,27 +72,21 @@ sealed class RenderList
         }
     }
 
-    void Collect(Node node, LayerMask cullingMask)
+    void Collect(Node root, LayerMask cullingMask)
     {
-        // An inactive node hides its whole subtree, as Unity's activeInHierarchy does.
-        if (!node.IsActive || node.IsDestroyed)
+        if (!root.IsActive || root.IsDestroyed)
         {
             return;
         }
 
-        if (cullingMask.Contains(node.RenderLayer))
+        foreach (var node in root.EnsureSceneIndex().Nodes(Renderables))
         {
+            if (!node.IsActiveUnder(root) || !cullingMask.Contains(node.RenderLayer)) { continue; }
             var components = node.Components;
             for (var i = 0; i < components.Count; i++)
             {
                 Add(components[i]);
             }
-        }
-
-        var children = node.Children;
-        for (var i = 0; i < children.Count; i++)
-        {
-            Collect(children[i], cullingMask);
         }
     }
 

@@ -257,6 +257,7 @@ public class RendererManager(ISurfaceHost surfaceHost, Vulkan vulkan, AssetDatab
             )
         );
 
+        renderSystems.Add(new WorldGraphicsRenderSystem(vulkan, assets, Renderer.SwapChainRenderPass, globalSetLayout));
         overlayUiSystem = new OverlayRenderSystem(vulkan, Renderer.SwapChainRenderPass);
         renderSystems.Add(overlayUiSystem);
 

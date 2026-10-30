@@ -187,7 +187,7 @@ public class CameraComponent : Component, ICamera
     {
         CameraComponent? primary = null;
         if (!root.IsActive) { return null; }
-        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.Kinds.Cameras))
+        foreach (var node in root.EnsureSceneIndex().Nodes(SceneIndex.For<CameraComponent>()))
         {
             if (node.IsActiveInHierarchy) { primary = SelectPrimary(node, primary); }
         }

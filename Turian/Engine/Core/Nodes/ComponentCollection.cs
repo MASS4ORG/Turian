@@ -192,6 +192,8 @@ public sealed class ComponentCollection : IList<Component>, IReadOnlyList<Compon
         PublishChange();
     }
 
+    internal void ComponentStarted() => owner?.RefreshSceneIndex();
+
     ChangeScope DeferNotifications() => new(this);
 
     void EndNotifications()

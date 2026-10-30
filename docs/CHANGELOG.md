@@ -6,9 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- Changed: shared MASS4.Localization library and the localization brick #344.
+- Added: line and trail renderers with world-space SDF text #110.
 - Added: typed source-test dependencies for brick workflows #337.
 - Added: bricks pinned store, git and archive sources #338.
+- Changed: shared MASS4.Localization library and the localization brick #344.
 - Fixed: baking, packing or publishing a studio-only brick.
 
 ## [3.7.0] - 2026-10-29
@@ -28,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
 - Changed: engine-managed node children and components.
+- Fixed: Scene view component gizmos during play and pause #48.
 - Fixed: brick-resolution errors stay actionable.
 
 ## [3.4.1] - 2026-10-25

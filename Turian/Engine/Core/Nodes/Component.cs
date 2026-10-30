@@ -209,6 +209,7 @@ public abstract class Component : IdObject
         }
 
         IsStarted = true;
+        ListedIn?.ComponentStarted();
         OnStart();
     }
 
