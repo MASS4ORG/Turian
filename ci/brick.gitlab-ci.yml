@@ -1,5 +1,5 @@
 # GitLab CI template for repositories that author bricks (Turian packages); the GitHub counterparts are the
-# MASS4ORG/action-brick-build action and the MASS4ORG/action-brick-release workflows.
+# MASS4ORG/brick-action-build action and the MASS4ORG/brick-workflows workflows.
 #
 #   include:
 #     - remote: https://raw.githubusercontent.com/MASS4ORG/Turian/main/ci/brick.gitlab-ci.yml
@@ -9,14 +9,14 @@
 #       BRICK_TWIN: ""                 # skip the bake twin for a brick declaring bake: none
 #
 # This job verifies and packs without publication credentials. Protected release jobs sign and upload these exact
-# qualified archives; the GitHub implementation is MASS4ORG/action-brick-release with tools/BrickRelease.
+# qualified archives; the GitHub implementation is MASS4ORG/brick-workflows with tools/BrickRelease.
 .turian-brick:
   image:
     name: ${TURIAN_CLI_IMAGE}
     entrypoint: [""]
   variables:
     # The official image, pinned by digest; a project or group variable overrides it.
-    TURIAN_CLI_IMAGE: ghcr.io/mass4org/turian-cli@sha256:88dd379139cf1718368ff478ae6f5ed37c0333d26ddb2b2ce2bcabda4ae8406d
+    TURIAN_CLI_IMAGE: ghcr.io/mass4org/turian-cli@sha256:c6b5d67b48b6df3119cef2d7f040dd16827cc0e67a1190e9d8d46222e9868808
     BRICK_PATH: "."
     BRICK_PRECAST: "--precast"
     BRICK_TWIN: "--twin"

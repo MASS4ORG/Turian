@@ -21,7 +21,7 @@ public sealed class RegistryClient
         ArgumentNullException.ThrowIfNull(registry);
         this.registry = registry;
         this.http = http ?? SharedHttp;
-        this.token = token ?? TokenFor(registry);
+        this.token = token is null ? TokenFor(registry) : string.IsNullOrWhiteSpace(token) ? null : token;
     }
 
     /// <summary>The registry this client reads.</summary>
@@ -178,7 +178,7 @@ public sealed class RegistryClient
         var baseUri = new Uri(location.EndsWith('/') ? location : location + "/");
         var uri = Uri.TryCreate(relative, UriKind.Absolute, out var absolute) ? absolute : new Uri(baseUri, relative);
         using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        if (token is not null && uri.Host == baseUri.Host)
+        if (token is not null && uri.GetLeftPart(UriPartial.Authority) == baseUri.GetLeftPart(UriPartial.Authority))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }

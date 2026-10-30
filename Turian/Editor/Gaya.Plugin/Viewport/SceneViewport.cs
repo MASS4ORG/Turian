@@ -26,7 +26,7 @@ sealed class SceneViewport : IDisposable
     readonly LayerFilter layers;
     readonly ILogger log;
     readonly UndoService undo;
-    readonly LocaleService locale;
+    readonly ServiceProvider uiServices;
     readonly SceneGridSettings gridSettings;
     readonly SceneOrientationWidget orientationWidget = new();
 
@@ -90,7 +90,7 @@ sealed class SceneViewport : IDisposable
         this.cameraSettings = cameraSettings;
         this.log = log;
         this.undo = undo;
-        this.locale = locale;
+        uiServices = new ServiceCollection().AddSingleton<ILocaleContext>(locale).BuildServiceProvider();
         this.layers = layers ?? new LayerFilter();
         gridSettings = cameraSettings.Grid;
         Gizmo.Settings = cameraSettings.Gizmos;
@@ -199,7 +199,7 @@ sealed class SceneViewport : IDisposable
     }
 
     /// <summary>The installed interface package's presenter, created on first use; null when the project has none.</summary>
-    IUiPresenter? UiPresenter() => uiPresenter ??= UiPresenters.Find()?.Create(vulkan, null, locale);
+    IUiPresenter? UiPresenter() => uiPresenter ??= UiPresenters.Find()?.Create(vulkan, null, uiServices);
 
     /// <summary>Creates the renderer on the first frame and follows the node's size after that.</summary>
     bool EnsureService(uint width, uint height)
@@ -676,5 +676,6 @@ sealed class SceneViewport : IDisposable
         service = null;
         uiPresenter?.Dispose();
         uiPresenter = null;
+        uiServices.Dispose();
     }
 }

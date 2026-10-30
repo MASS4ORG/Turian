@@ -29,7 +29,8 @@ public sealed partial class AssetDatabase
 
         try
         {
-            return Serializer.LoadData<AssetCatalog>(content.ReadAllText(path)) ?? new AssetCatalog();
+            return JsonSerializer.Deserialize(content.ReadAllText(path), AssetCatalogJsonContext.Default.AssetCatalog)
+                   ?? new AssetCatalog();
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -81,7 +82,8 @@ public sealed partial class AssetDatabase
         {
             // A truncated catalog — a zero-byte file left by a crash or a full disk mid-write — either
             // throws here or deserialises to null, depending on how much of it survived.
-            if (Serializer.Load<AssetCatalog>(path) is { } catalog)
+            if (JsonSerializer.Deserialize(File.ReadAllText(path), AssetCatalogJsonContext.Default.AssetCatalog)
+                is { } catalog)
             {
                 status = AssetCatalogLoadStatus.Loaded;
                 return catalog;
@@ -99,7 +101,7 @@ public sealed partial class AssetDatabase
     static void SaveCatalog(AssetCatalog catalog, string path)
     {
         EnsureParentDirectory(path);
-        Serializer.Save(path, catalog);
+        File.WriteAllText(path, JsonSerializer.Serialize(catalog, AssetCatalogJsonContext.Default.AssetCatalog));
     }
 
     static string GetProjectCatalogPath(string projectRoot)

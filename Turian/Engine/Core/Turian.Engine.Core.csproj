@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>3.4.1</Version>
+        <Version>3.7.0</Version>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -17,6 +17,9 @@
         <InternalsVisibleTo Include="Turian.Tests"/>
         <InternalsVisibleTo Include="Turian.Benchmarks"/>
         <InternalsVisibleTo Include="Turian.Engine.Vulkan"/>
+        <InternalsVisibleTo Include="Turian.Engine.DataAssetDriven"/>
+        <InternalsVisibleTo Include="Turian.DataAssetDriven.Tests"/>
+        <InternalsVisibleTo Include="Turian.DataAssetDriven.Benchmarks"/>
     </ItemGroup>
 
     <!-- Internal libraries -->
@@ -51,9 +54,9 @@
     <ItemGroup>
         <!-- Key/MouseButton/Gamepad enums of the input contract; managed only, no window or native backend. -->
         <PackageReference Include="Silk.NET.Input.Common" Version="2.23.0"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.13" />
-        <PackageReference Include="System.IO.Hashing" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+        <PackageReference Include="System.IO.Hashing" Version="10.0.14" />
         <PackageReference Include="MASS4.Ktx2" Version="1.*" Condition="'$(Ktx2LocalPath)' == ''"/>
         <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*" Condition="'$(OapLocalPath)' == ''"/>
     </ItemGroup>

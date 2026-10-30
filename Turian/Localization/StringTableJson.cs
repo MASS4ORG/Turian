@@ -1,9 +1,9 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// JSON serialization for a <see cref="StringTable"/>. The shape is shared by the <c>.strings</c>
 /// source files, their baked import artifacts, and the
-/// <c>Turian.Editor.Core.LocalizationExchange</c> exporters:
+/// <c>LocalizationExchange</c> exporters:
 ///
 /// <code>
 /// {
@@ -15,15 +15,19 @@ namespace Turian.Engine.Core;
 /// }
 /// </code>
 /// </summary>
-public static class StringTableJson
+public static partial class StringTableJson
 {
     static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+        Converters = { new JsonStringEnumConverter<PluralCategory>(JsonNamingPolicy.CamelCase) },
     };
+    static readonly StringTableJsonContext JsonContext = new(Options);
+
+    [JsonSerializable(typeof(TableDto))]
+    sealed partial class StringTableJsonContext : JsonSerializerContext;
 
     /// <summary>Parses a table from its JSON text.</summary>
     /// <param name="json">The JSON text.</param>
@@ -34,7 +38,7 @@ public static class StringTableJson
     {
         ArgumentNullException.ThrowIfNull(json);
 
-        var dto = JsonSerializer.Deserialize<TableDto>(json, Options);
+        var dto = JsonSerializer.Deserialize(json, JsonContext.TableDto);
         if (string.IsNullOrWhiteSpace(dto?.Locale))
         {
             throw new ArgumentException("A string table JSON document requires a locale.", nameof(json));
@@ -83,7 +87,7 @@ public static class StringTableJson
                 })],
         };
 
-        return JsonSerializer.Serialize(dto, Options);
+        return JsonSerializer.Serialize(dto, JsonContext.TableDto);
     }
 
     sealed class TableDto

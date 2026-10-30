@@ -21,8 +21,11 @@ sealed class HeadlessProject : IDisposable
     /// <summary>Gets the headless Vulkan device, or <c>null</c> when the project was opened without graphics.</summary>
     public Vulkan? Vulkan { get; }
 
-    /// <summary>Gets the project's loaded locale service.</summary>
-    public LocaleService Locale => services.GetRequiredService<LocaleService>();
+    /// <summary>Gets the locale service the project's localization brick registered, or <c>null</c> without one.</summary>
+    public ILocaleContext? Locale => services.GetService<ILocaleContext>();
+
+    /// <summary>Gets the project's services for interface construction.</summary>
+    public IServiceProvider Services => services;
 
     HeadlessProject(BuildAppSettings settings, ILogger logger, bool withGraphics)
     {
@@ -61,8 +64,7 @@ sealed class HeadlessProject : IDisposable
             .AddSingleton(Database)
             .AddSingleton<ISceneManager>(SceneManager)
             .AddSingleton<IAssetLoader>(new RuntimeAssetLoader(Database))
-            .AddSingleton(new SimulationClock(settings.Get<TimeSettings>()))
-            .AddSingleton(_ => LocalizationLoader.Create(settings, Database));
+            .AddSingleton(new SimulationClock(settings.Get<TimeSettings>()));
 
         if (Vulkan is not null)
         {

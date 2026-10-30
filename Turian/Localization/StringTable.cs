@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>
 /// A locale-tagged collection of stable localization keys. One table is one <c>.strings</c> asset,

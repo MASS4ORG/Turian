@@ -24,11 +24,12 @@ public sealed class VulkanPlayer : IGamePlayer
             services.AddSingleton(sp => new Vulkan(window, context.Logger, sp.GetService<IAppSettings>()));
             services.AddSingleton<IRenderDevice>(sp => sp.GetRequiredService<Vulkan>());
         });
+        using var dataAssets = runtime.Services.GetRequiredService<DataAssetSession>();
         var vulkan = runtime.Services.GetRequiredService<Vulkan>();
         window.Initialize();
         var renderer = new RendererManager(window, vulkan, runtime.Assets, context.Logger);
         renderer.Initialize();
-        var presenter = PlayerFrames.CreatePresenter(UiPresenters.Find(), vulkan, inputSource, runtime.Locale);
+        var presenter = PlayerFrames.CreatePresenter(UiPresenters.Find(), vulkan, inputSource, runtime.Services);
         var frames = new PlayerFrames(runtime, presenter,
             () => window.FramebufferSize,
             texture => renderer.OverlayTexture = texture,

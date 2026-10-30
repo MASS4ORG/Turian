@@ -13,6 +13,7 @@ public class ReferenceFieldTests
     [InlineData(nameof(Holder.DirectNode), ReferenceKind.Node, typeof(Node))]
     [InlineData(nameof(Holder.DirectCamera), ReferenceKind.Component, typeof(CameraComponent))]
     [InlineData(nameof(Holder.DirectData), ReferenceKind.Asset, typeof(DataAssetTest))]
+    [InlineData(nameof(Holder.Shared), ReferenceKind.Asset, typeof(PresentationBase<int>))]
     public void ReferenceFieldsAreRecognised(string member, ReferenceKind kind, Type targetType)
     {
         var reference = ReferenceFor(member);
@@ -28,6 +29,7 @@ public class ReferenceFieldTests
     {
         Assert.Null(ReferenceFor(nameof(Holder.Count)));
         Assert.False(ReferenceField.IsReference(FieldFor(nameof(Holder.Count))));
+        Assert.Null(ReferenceFor(nameof(Holder.SharedList)));
     }
 
     /// <summary>An unset direct reference reads as empty.</summary>
@@ -104,6 +106,23 @@ public class ReferenceFieldTests
         Assert.Null(holder.DirectNode);
     }
 
+    /// <summary>A closed generic DataAsset slot accepts a concrete asset and remains clearable.</summary>
+    [Fact]
+    public void ClosedGenericDataAssetUsesTheReferencePicker()
+    {
+        var holder = new Holder();
+        var field = ReferenceField.TryCreate(FieldFor(nameof(Holder.Shared), holder));
+        Assert.NotNull(field);
+        var asset = new PresentationAsset();
+        Assert.True(field.IsDirect);
+        Assert.Equal(typeof(PresentationBase<int>), field.DataAssetPayloadType);
+        Assert.True(field.SetTarget(asset));
+        Assert.Same(asset, holder.Shared);
+        Assert.False(field.SetTarget(new DataAssetTest()));
+        Assert.True(field.Clear());
+        Assert.Null(holder.Shared);
+    }
+
     static FormField FieldFor(string member, Holder? holder = null) =>
         InspectorForms.Build(holder ?? new Holder()).Sections[0].Fields.First(f => f.Name == member);
 
@@ -115,6 +134,10 @@ public class ReferenceFieldTests
         public Node? DirectNode { get; set; }
         public CameraComponent? DirectCamera { get; set; }
         public DataAssetTest? DirectData { get; set; }
+        /// <summary>A closed generic DataAsset field with a concrete selectable payload.</summary>
+        public PresentationBase<int>? Shared { get; set; }
+        /// <summary>A collection edited as individual slots rather than one reference.</summary>
+        public List<PresentationBase<int>> SharedList { get; set; } = [];
         public int Count { get; set; }
     }
 }

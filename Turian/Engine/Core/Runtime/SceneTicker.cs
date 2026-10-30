@@ -53,6 +53,9 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
     /// <summary>The gameplay scheduler owned by this running session.</summary>
     public GameLoopScheduler Async { get; init; } = new();
 
+    /// <summary>Gameplay assets whose worker events drain after fixed-tick systems, before tick completion.</summary>
+    public DataAssetSession? DataAssets { get; init; }
+
     /// <summary>The optional authoritative world sharing this driver's clock and fixed-tick boundary.</summary>
     public SimulationSession? Simulation { get; init; }
 
@@ -188,6 +191,7 @@ public sealed class SceneTicker(ISceneManager sceneManager, SimulationClock? clo
         }
 
         simulation?.RunTick(tick, interval);
+        DataAssets?.Drain();
         FlushDestroyed();
     }
 

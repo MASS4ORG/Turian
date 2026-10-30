@@ -1,0 +1,499 @@
+Running as unit: run-p228100-i234842.scope; invocation ID: 0c30b3369ee743f78a682648d666f47a
+GNU bash, version 5.3.9(1)-release (x86_64-pc-linux-gnu)
+Microsoft (R) .NET SDK version 10.0.114
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.60
+​
+███╗   ██╗██╗   ██╗██╗  ██╗███████╗
+████╗  ██║██║   ██║██║ ██╔╝██╔════╝
+██╔██╗ ██║██║   ██║█████╔╝ █████╗  
+██║╚██╗██║██║   ██║██╔═██╗ ██╔══╝  
+██║ ╚████║╚██████╔╝██║  ██╗███████╗
+╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+​
+NUKE Execution Engine version 10.1.0 (Linux,.NETCoreApp,Version=v10.0)
+​
+​
+╬════════════
+║ Restore
+╬═══
+​
+09:26:27 [INF] > /usr/bin/dotnet restore /mass4/dev/Turian/.local/localization-extraction/Turian.slnx --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:28 [DBG]   Determining projects to restore...
+09:26:28 [DBG]   All projects are up-to-date for restore.
+​
+╬════════════
+║ Compile
+╬═══
+​
+09:26:28 [DBG] Config Debug
+09:26:28 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/.nuke/Build.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:29 [DBG]   Build -> /mass4/dev/Turian/.local/localization-extraction/.nuke/bin/Debug/Build.dll
+09:26:29 [DBG] 
+09:26:29 [DBG] Build succeeded.
+09:26:29 [DBG]     0 Warning(s)
+09:26:29 [DBG]     0 Error(s)
+09:26:29 [DBG] 
+09:26:29 [DBG] Time Elapsed 00:00:00.35
+09:26:29 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/Turian.Tests.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:30 [DBG]   BrickRelease -> /mass4/dev/Turian/.local/localization-extraction/tools/BrickRelease/bin/Debug/net10.0/Mass4.BrickRelease.dll
+09:26:30 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:30 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:30 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:30 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:30 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:30 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:30 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:30 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:30 [DBG]   Gaya.Host -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/bin/Debug/net10.0/Gaya.Host.dll
+09:26:30 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:30 [DBG]   Turian.Editor.Build.Platform.Desktop -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform/bin/Debug/net10.0/Turian.Editor.Build.Platform.Desktop.dll
+09:26:30 [DBG]   Turian.Editor.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/bin/Debug/net10.0/Turian.Editor.Core.dll
+09:26:31 [DBG]   Turian.Editor.CLI -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/bin/Debug/net10.0/Turian.Editor.CLI.dll
+09:26:31 [DBG]   Gaya.Plugin.Turian -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Gaya.Plugin/bin/Debug/net10.0/Gaya.Plugin.Turian.dll
+09:26:34 [DBG]   Turian.Tests -> /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll
+09:26:34 [DBG] 
+09:26:34 [DBG] Build succeeded.
+09:26:34 [DBG]     0 Warning(s)
+09:26:34 [DBG]     0 Error(s)
+09:26:34 [DBG] 
+09:26:34 [DBG] Time Elapsed 00:00:05.51
+09:26:34 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Benchmarks/Turian.Benchmarks.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:35 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:35 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:35 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:35 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:36 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:36 [DBG]   Turian.Benchmarks -> /mass4/dev/Turian/.local/localization-extraction/Turian/Benchmarks/bin/Debug/net10.0/Turian.Benchmarks.dll
+09:26:36 [DBG] 
+09:26:36 [DBG] Build succeeded.
+09:26:36 [DBG]     0 Warning(s)
+09:26:36 [DBG]     0 Error(s)
+09:26:36 [DBG] 
+09:26:36 [DBG] Time Elapsed 00:00:01.16
+09:26:36 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Bootstrap/Turian.Editor.Bootstrap.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:36 [DBG]   Turian.Editor.Bootstrap -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Bootstrap/bin/Debug/net10.0/Turian.Editor.Bootstrap.dll
+09:26:36 [DBG] 
+09:26:36 [DBG] Build succeeded.
+09:26:36 [DBG]     0 Warning(s)
+09:26:36 [DBG]     0 Error(s)
+09:26:36 [DBG] 
+09:26:36 [DBG] Time Elapsed 00:00:00.34
+09:26:36 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Turian.Editor.CLI.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:37 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:37 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:37 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:37 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:37 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:37 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:37 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:37 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:37 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:38 [DBG]   Gaya.Host -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/bin/Debug/net10.0/Gaya.Host.dll
+09:26:38 [DBG]   Turian.Editor.Build.Platform.Desktop -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform/bin/Debug/net10.0/Turian.Editor.Build.Platform.Desktop.dll
+09:26:38 [DBG]   Turian.Editor.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/bin/Debug/net10.0/Turian.Editor.Core.dll
+09:26:38 [DBG]   Turian.Editor.CLI -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/bin/Debug/net10.0/Turian.Editor.CLI.dll
+09:26:38 [DBG] 
+09:26:38 [DBG] Build succeeded.
+09:26:38 [DBG]     0 Warning(s)
+09:26:38 [DBG]     0 Error(s)
+09:26:38 [DBG] 
+09:26:38 [DBG] Time Elapsed 00:00:01.49
+09:26:38 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/Turian.Editor.Core.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:39 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:39 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:39 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:39 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:39 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:39 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:39 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:39 [DBG]   Turian.Editor.Build.Platform.Desktop -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform/bin/Debug/net10.0/Turian.Editor.Build.Platform.Desktop.dll
+09:26:39 [DBG]   Turian.Editor.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/bin/Debug/net10.0/Turian.Editor.Core.dll
+09:26:39 [DBG] 
+09:26:39 [DBG] Build succeeded.
+09:26:39 [DBG]     0 Warning(s)
+09:26:39 [DBG]     0 Error(s)
+09:26:39 [DBG] 
+09:26:39 [DBG] Time Elapsed 00:00:01.35
+09:26:39 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Gaya.Plugin/Gaya.Plugin.Turian.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:40 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:40 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:40 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:40 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:40 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:40 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:40 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:41 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:41 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:41 [DBG]   Turian.Editor.Build.Platform.Desktop -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform/bin/Debug/net10.0/Turian.Editor.Build.Platform.Desktop.dll
+09:26:41 [DBG]   Turian.Editor.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/bin/Debug/net10.0/Turian.Editor.Core.dll
+09:26:41 [DBG]   Gaya.Plugin.Turian -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Gaya.Plugin/bin/Debug/net10.0/Gaya.Plugin.Turian.dll
+09:26:41 [DBG] 
+09:26:41 [DBG] Build succeeded.
+09:26:41 [DBG]     0 Warning(s)
+09:26:41 [DBG]     0 Error(s)
+09:26:41 [DBG] 
+09:26:41 [DBG] Time Elapsed 00:00:01.58
+09:26:41 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Studio/Turian.Editor.Studio.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:42 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:42 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:42 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:42 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:42 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:42 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:42 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:42 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:42 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:42 [DBG]   Gaya.Host -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/bin/Debug/net10.0/Gaya.Host.dll
+09:26:43 [DBG]   Turian.Editor.Build.Platform.Desktop -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform/bin/Debug/net10.0/Turian.Editor.Build.Platform.Desktop.dll
+09:26:43 [DBG]   Turian.Editor.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Core/bin/Debug/net10.0/Turian.Editor.Core.dll
+09:26:43 [DBG]   Gaya.Plugin.Turian -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Gaya.Plugin/bin/Debug/net10.0/Gaya.Plugin.Turian.dll
+09:26:43 [DBG]   Turian.Editor.Studio -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Studio/bin/Debug/net10.0/Turian.Editor.Studio.dll
+09:26:43 [DBG] 
+09:26:43 [DBG] Build succeeded.
+09:26:43 [DBG]     0 Warning(s)
+09:26:43 [DBG]     0 Error(s)
+09:26:43 [DBG] 
+09:26:43 [DBG] Time Elapsed 00:00:01.70
+09:26:43 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeAnalyzers/Turian.CSharp.CodeAnalyzers.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:43 [DBG]   Turian.CSharp.CodeAnalyzers -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeAnalyzers/bin/Debug/netstandard2.0/Turian.CSharp.CodeAnalyzers.dll
+09:26:43 [DBG] 
+09:26:43 [DBG] Build succeeded.
+09:26:43 [DBG]     0 Warning(s)
+09:26:43 [DBG]     0 Error(s)
+09:26:43 [DBG] 
+09:26:43 [DBG] Time Elapsed 00:00:00.28
+09:26:43 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/Turian.CSharp.CodeGenerator.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:44 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:44 [DBG] 
+09:26:44 [DBG] Build succeeded.
+09:26:44 [DBG]     0 Warning(s)
+09:26:44 [DBG]     0 Error(s)
+09:26:44 [DBG] 
+09:26:44 [DBG] Time Elapsed 00:00:00.28
+09:26:44 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/Turian.Engine.Attributes.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:44 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:44 [DBG] 
+09:26:44 [DBG] Build succeeded.
+09:26:44 [DBG]     0 Warning(s)
+09:26:44 [DBG]     0 Error(s)
+09:26:44 [DBG] 
+09:26:44 [DBG] Time Elapsed 00:00:00.31
+09:26:44 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/Turian.Engine.Core.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:45 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:45 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:45 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:45 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:45 [DBG] 
+09:26:45 [DBG] Build succeeded.
+09:26:45 [DBG]     0 Warning(s)
+09:26:45 [DBG]     0 Error(s)
+09:26:45 [DBG] 
+09:26:45 [DBG] Time Elapsed 00:00:00.83
+09:26:45 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/Gaya.Attributes.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:46 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:46 [DBG] 
+09:26:46 [DBG] Build succeeded.
+09:26:46 [DBG]     0 Warning(s)
+09:26:46 [DBG]     0 Error(s)
+09:26:46 [DBG] 
+09:26:46 [DBG] Time Elapsed 00:00:00.30
+09:26:46 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/Gaya.Host.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:46 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:46 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:46 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:47 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:47 [DBG]   Gaya.Host -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/bin/Debug/net10.0/Gaya.Host.dll
+09:26:47 [DBG] 
+09:26:47 [DBG] Build succeeded.
+09:26:47 [DBG]     0 Warning(s)
+09:26:47 [DBG]     0 Error(s)
+09:26:47 [DBG] 
+09:26:47 [DBG] Time Elapsed 00:00:00.93
+09:26:47 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/Gaya.Packages.Editor.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:47 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:47 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:47 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:48 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:48 [DBG] 
+09:26:48 [DBG] Build succeeded.
+09:26:48 [DBG]     0 Warning(s)
+09:26:48 [DBG]     0 Error(s)
+09:26:48 [DBG] 
+09:26:48 [DBG] Time Elapsed 00:00:00.80
+09:26:48 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/Gaya.Sdk.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:48 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:48 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:48 [DBG] 
+09:26:48 [DBG] Build succeeded.
+09:26:48 [DBG]     0 Warning(s)
+09:26:48 [DBG]     0 Error(s)
+09:26:48 [DBG] 
+09:26:48 [DBG] Time Elapsed 00:00:00.41
+09:26:48 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Tests/Gaya.Tests.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:49 [DBG]   Gaya.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Attributes/bin/Debug/net10.0/Gaya.Attributes.dll
+09:26:49 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:49 [DBG]   Gaya.Sdk -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Sdk/bin/Debug/net10.0/Gaya.Sdk.dll
+09:26:49 [DBG]   Gaya.Packages.Editor -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Packages.Editor/bin/Debug/net10.0/Gaya.Packages.Editor.dll
+09:26:49 [DBG]   Gaya.Host -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Host/bin/Debug/net10.0/Gaya.Host.dll
+09:26:49 [DBG]   Gaya.Tests -> /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Tests/bin/Debug/net10.0/Gaya.Tests.dll
+09:26:49 [DBG] 
+09:26:49 [DBG] Build succeeded.
+09:26:49 [DBG]     0 Warning(s)
+09:26:49 [DBG]     0 Error(s)
+09:26:49 [DBG] 
+09:26:49 [DBG] Time Elapsed 00:00:01.12
+09:26:49 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/MASS4.Bricks.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:50 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:50 [DBG] 
+09:26:50 [DBG] Build succeeded.
+09:26:50 [DBG]     0 Warning(s)
+09:26:50 [DBG]     0 Error(s)
+09:26:50 [DBG] 
+09:26:50 [DBG] Time Elapsed 00:00:00.32
+09:26:50 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/MASS4.Localization.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:50 [DBG]   MASS4.Localization -> /mass4/dev/Turian/.local/localization-extraction/Turian/Localization/bin/Debug/net10.0/MASS4.Localization.dll
+09:26:50 [DBG] 
+09:26:50 [DBG] Build succeeded.
+09:26:50 [DBG]     0 Warning(s)
+09:26:50 [DBG]     0 Error(s)
+09:26:50 [DBG] 
+09:26:50 [DBG] Time Elapsed 00:00:00.31
+09:26:50 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:51 [DBG]   MASS4.Bricks -> /mass4/dev/Turian/.local/localization-extraction/Gaya/MASS4.Bricks/bin/Debug/net10.0/MASS4.Bricks.dll
+09:26:51 [DBG]   Turian.Engine.Attributes -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Attributes/bin/Debug/net10.0/Turian.Engine.Attributes.dll
+09:26:51 [DBG]   Turian.CSharp.CodeGenerator -> /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CSharp/CodeGenerator/bin/Debug/netstandard2.0/Turian.CSharp.CodeGenerator.dll
+09:26:51 [DBG]   Turian.Engine.Core -> /mass4/dev/Turian/.local/localization-extraction/Turian/Engine/Core/bin/Debug/net10.0/Turian.Engine.Core.dll
+09:26:51 [DBG]   Turian.Engine.Vulkan -> /mass4/dev/Turian/.local/localization-extraction/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/bin/Debug/net10.0/Turian.Engine.Vulkan.dll
+09:26:51 [DBG] 
+09:26:51 [DBG] Build succeeded.
+09:26:51 [DBG]     0 Warning(s)
+09:26:51 [DBG]     0 Error(s)
+09:26:51 [DBG] 
+09:26:51 [DBG] Time Elapsed 00:00:00.86
+09:26:51 [INF] > /usr/bin/dotnet build /mass4/dev/Turian/.local/localization-extraction/tools/BrickRelease/BrickRelease.csproj --nologo --configuration Debug --no-restore --property:NoLocalPackages=false --property:SkipShaders=false
+09:26:52 [DBG]   BrickRelease -> /mass4/dev/Turian/.local/localization-extraction/tools/BrickRelease/bin/Debug/net10.0/Mass4.BrickRelease.dll
+09:26:52 [DBG] 
+09:26:52 [DBG] Build succeeded.
+09:26:52 [DBG]     0 Warning(s)
+09:26:52 [DBG]     0 Error(s)
+09:26:52 [DBG] 
+09:26:52 [DBG] Time Elapsed 00:00:00.31
+09:26:52 [INF] Copying platform assets from /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/CLI/Platform to /mass4/dev/Turian/.local/localization-extraction/Turian/Editor/Studio/bin/Debug/net10.0/Platform
+​
+╬═════════
+║ Test
+╬══
+​
+09:26:52 [INF] > /usr/bin/dotnet test --configuration Debug /property:NoLocalPackages=false /property:SkipShaders=false --coverage --coverage-settings /mass4/dev/Turian/.local/localization-extraction/CodeCoverage.runsettings --coverage-output-format cobertura --report-xunit-trx --minimum-expected-tests 1 --results-directory /mass4/dev/Turian/.local/localization-extraction/coverage
+09:26:56 [DBG] Running tests from /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Tests/bin/Debug/net10.0/Gaya.Tests.dll (net10.0|x64)
+09:26:57 [DBG] Running tests from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:26:58 [DBG] [+290/x0/?0] Gaya.Tests.dll (net10.0|x64)(2s)
+09:26:58 [DBG] [+212/x0/?0] Turian.Tests.dll (net10.0|x64)(0s)
+09:26:58 [DBG] 
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DecodedPng_IsValidKtx2(fileName: "Surface_Normal.png") (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DecodedPng_IsValidKtx2(fileName: "Albedo.png") (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.MaxResolutionCap_IsValidKtx2 (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DdsPassthrough_IsValidKtx2(fileName: "Antenna_Metal_Emissive.dds", fourCc: "DXT5", blockBytes: 16) (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DdsPassthrough_IsValidKtx2(fileName: "Antenna_Metal_Normal.dds", fourCc: "ATI2", blockBytes: 16) (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DdsPassthrough_IsValidKtx2(fileName: "Antenna_Metal_BaseColor.dds", fourCc: "DXT1", blockBytes: 8) (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DdsPassthrough_IsValidKtx2(fileName: "Antenna_Metal_Mask.dds", fourCc: "ATI1", blockBytes: 8) (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:00 [DBG] skipped Turian.Tests.TextureCookValidationTests.DdsPassthrough_IsValidKtx2(fileName: "Antenna_Metal_Specular.dds", fourCc: "DXT1", blockBytes: 8) (0ms)
+09:27:00 [DBG]   KTX_VALIDATE is unset; point it at a KTX-Software 'ktx' binary to validate cooked textures
+09:27:00 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:27:01 [DBG] [+386/x0/?0] Gaya.Tests.dll (net10.0|x64)(5s)
+09:27:01 [DBG] [+1158/x0/?8] Turian.Tests.dll (net10.0|x64)(3s)
+09:27:01 [DBG] 
+09:27:04 [DBG] [+418/x0/?0] Gaya.Tests.dll (net10.0|x64)(8s)
+09:27:04 [DBG] [+1565/x0/?8] Turian.Tests.dll (net10.0|x64)(6s)
+09:27:04 [DBG] 
+09:27:05 [DBG] /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Tests/bin/Debug/net10.0/Gaya.Tests.dll (net10.0|x64) passed (8s 966ms)
+09:27:07 [DBG] [+1578/x0/?8] Turian.Tests.dll (net10.0|x64)(9s)
+09:27:07 [DBG] 
+09:27:10 [DBG] [+1582/x0/?8] Turian.Tests.dll (net10.0|x64)(12s)
+09:27:10 [DBG] 
+09:27:13 [DBG] [+1588/x0/?8] Turian.Tests.dll (net10.0|x64)(15s)
+09:27:13 [DBG] 
+09:27:16 [DBG] [+1592/x0/?8] Turian.Tests.dll (net10.0|x64)(18s)
+09:27:16 [DBG] 
+09:27:19 [DBG] [+1595/x0/?8] Turian.Tests.dll (net10.0|x64)(21s)
+09:27:19 [DBG] 
+09:27:22 [DBG] [+1598/x0/?8] Turian.Tests.dll (net10.0|x64)(24s)
+09:27:22 [DBG] 
+09:27:25 [DBG] [+1608/x0/?8] Turian.Tests.dll (net10.0|x64)(27s)
+09:27:25 [DBG] 
+09:27:28 [DBG] [+1611/x0/?8] Turian.Tests.dll (net10.0|x64)(30s)
+09:27:28 [DBG] 
+09:27:31 [DBG] [+1615/x0/?8] Turian.Tests.dll (net10.0|x64)(33s)
+09:27:31 [DBG] 
+09:27:34 [DBG] [+1620/x0/?8] Turian.Tests.dll (net10.0|x64)(36s)
+09:27:34 [DBG] 
+09:27:37 [DBG] [+1625/x0/?8] Turian.Tests.dll (net10.0|x64)(39s)
+09:27:37 [DBG] 
+09:27:40 [DBG] [+1626/x0/?8] Turian.Tests.dll (net10.0|x64)(42s)
+09:27:40 [DBG] 
+09:27:43 [DBG] [+1626/x0/?8] Turian.Tests.dll (net10.0|x64)(45s)
+09:27:43 [DBG] 
+09:27:46 [DBG] [+1626/x0/?8] Turian.Tests.dll (net10.0|x64)(48s)
+09:27:46 [DBG] 
+09:27:49 [DBG] [+1629/x0/?8] Turian.Tests.dll (net10.0|x64)(51s)
+09:27:49 [DBG] 
+09:27:52 [DBG] [+1629/x0/?8] Turian.Tests.dll (net10.0|x64)(54s)
+09:27:52 [DBG] 
+09:27:55 [DBG] [+1630/x0/?8] Turian.Tests.dll (net10.0|x64)(57s)
+09:27:55 [DBG] 
+09:27:58 [DBG] [+1630/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 00s)
+09:27:58 [DBG] 
+09:28:01 [DBG] [+1632/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 03s)
+09:28:01 [DBG] 
+09:28:04 [DBG] [+1632/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 06s)
+09:28:04 [DBG] 
+09:28:07 [DBG] [+1633/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 09s)
+09:28:07 [DBG] 
+09:28:10 [DBG] [+1633/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 12s)
+09:28:10 [DBG] 
+09:28:13 [DBG] [+1634/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 15s)
+09:28:13 [DBG] 
+09:28:16 [DBG] [+1634/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 18s)
+09:28:16 [DBG] 
+09:28:19 [DBG] [+1635/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 21s)
+09:28:19 [DBG] 
+09:28:22 [DBG] [+1635/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 24s)
+09:28:22 [DBG] 
+09:28:25 [DBG] [+1636/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 27s)
+09:28:25 [DBG] 
+09:28:28 [DBG] [+1636/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 30s)
+09:28:28 [DBG] 
+09:28:31 [DBG] [+1653/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 33s)
+09:28:31 [DBG] 
+09:28:34 [DBG] [+1662/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 36s)
+09:28:34 [DBG] 
+09:28:37 [DBG] [+1663/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 39s)
+09:28:37 [DBG] 
+09:28:40 [DBG] [+1669/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 42s)
+09:28:40 [DBG] 
+09:28:43 [DBG] [+1672/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 45s)
+09:28:43 [DBG] 
+09:28:46 [DBG] [+1691/x0/?8] Turian.Tests.dll (net10.0|x64)(1m 48s)
+09:28:46 [DBG] 
+09:28:46 [DBG] skipped Turian.Tests.SurfaceLossStressTests.HundredMinimizeRestoreCyclesKeepRendering (0ms)
+09:28:46 [DBG]   opens a window; set TURIAN_WINDOWED_TESTS=1 on a desktop with a Vulkan GPU
+09:28:46 [DBG]   from /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64)
+09:28:49 [DBG] [+1727/x0/?9] Turian.Tests.dll (net10.0|x64)(1m 51s)
+09:28:49 [DBG] 
+09:28:52 [DBG] [+1727/x0/?9] Turian.Tests.dll (net10.0|x64)(1m 54s)
+09:28:52 [DBG] 
+09:28:55 [DBG] [+1728/x0/?9] Turian.Tests.dll (net10.0|x64)(1m 57s)
+09:28:55 [DBG] 
+09:28:58 [DBG] [+1728/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 00s)
+09:28:58 [DBG] 
+09:29:01 [DBG] [+1735/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 03s)
+09:29:01 [DBG] 
+09:29:04 [DBG] [+1790/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 06s)
+09:29:04 [DBG] 
+09:29:07 [DBG] [+1792/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 09s)
+09:29:07 [DBG] 
+09:29:10 [DBG] [+1792/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 12s)
+09:29:10 [DBG] 
+09:29:13 [DBG] [+1803/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 15s)
+09:29:13 [DBG] 
+09:29:16 [DBG] [+1811/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 18s)
+09:29:16 [DBG] 
+09:29:19 [DBG] [+1814/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 21s)
+09:29:19 [DBG] 
+09:29:22 [DBG] [+1822/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 24s)
+09:29:22 [DBG] 
+09:29:25 [DBG] [+1824/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 27s)
+09:29:25 [DBG] 
+09:29:28 [DBG] [+1824/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 30s)
+09:29:28 [DBG] 
+09:29:31 [DBG] [+1825/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 33s)
+09:29:31 [DBG] 
+09:29:34 [DBG] [+1825/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 36s)
+09:29:34 [DBG] 
+09:29:37 [DBG] [+1846/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 39s)
+09:29:37 [DBG] 
+09:29:40 [DBG] [+1852/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 42s)
+09:29:40 [DBG] 
+09:29:43 [DBG] [+1852/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 45s)
+09:29:43 [DBG] 
+09:29:46 [DBG] [+1853/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 48s)
+09:29:46 [DBG] 
+09:29:49 [DBG] [+1853/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 51s)
+09:29:49 [DBG] 
+09:29:52 [DBG] [+1853/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 54s)
+09:29:52 [DBG] 
+09:29:55 [DBG] [+1854/x0/?9] Turian.Tests.dll (net10.0|x64)(2m 57s)
+09:29:55 [DBG] 
+09:29:58 [DBG] [+1854/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 00s)
+09:29:58 [DBG] 
+09:30:01 [DBG] [+1854/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 03s)
+09:30:01 [DBG] 
+09:30:04 [DBG] [+1855/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 06s)
+09:30:04 [DBG] 
+09:30:07 [DBG] [+1855/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 09s)
+09:30:07 [DBG] 
+09:30:10 [DBG] [+1868/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 12s)
+09:30:10 [DBG] 
+09:30:13 [DBG] [+1917/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 15s)
+09:30:13 [DBG] 
+09:30:16 [DBG] [+1920/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 18s)
+09:30:16 [DBG] 
+09:30:19 [DBG] [+1965/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 21s)
+09:30:19 [DBG] 
+09:30:22 [DBG] [+1976/x0/?9] Turian.Tests.dll (net10.0|x64)(3m 24s)
+09:30:22 [DBG] 
+09:30:22 [DBG] /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64) passed (3m 24s 723ms)
+09:30:22 [DBG] 
+09:30:22 [DBG]   In process file artifacts produced:
+09:30:22 [DBG]     - /mass4/dev/Turian/.local/localization-extraction/coverage/brmassa_MassaPCLinux_2026-10-30_12_26_55.930805.trx
+09:30:22 [DBG]     - /mass4/dev/Turian/.local/localization-extraction/coverage/0eb87130-c1ff-42b7-90a1-39cef97d0a03.cobertura.xml
+09:30:22 [DBG]     - /mass4/dev/Turian/.local/localization-extraction/coverage/brmassa_MassaPCLinux_2026-10-30_12_26_57.393966.trx
+09:30:22 [DBG]     - /mass4/dev/Turian/.local/localization-extraction/coverage/f08dfa55-08ce-4eb2-8663-6687d2b84de1.cobertura.xml
+09:30:22 [DBG] 
+09:30:22 [DBG] Test run summary: Passed!
+09:30:22 [DBG]   /mass4/dev/Turian/.local/localization-extraction/Turian.Tests/bin/Debug/net10.0/Turian.Tests.dll (net10.0|x64) passed (3m 24s 723ms)
+09:30:22 [DBG]   /mass4/dev/Turian/.local/localization-extraction/Gaya/Gaya.Tests/bin/Debug/net10.0/Gaya.Tests.dll (net10.0|x64) passed (8s 966ms)
+09:30:22 [DBG] 
+09:30:22 [DBG]   total: 2410
+09:30:22 [DBG]   failed: 0
+09:30:22 [DBG]   succeeded: 2401
+09:30:22 [DBG]   skipped: 9
+09:30:22 [DBG]   duration: 3m 27s 079ms
+09:30:22 [INF] > /usr/bin/dotnet /home/brmassa/.nuget/packages/reportgenerator/5.5.11/tools/net10.0/ReportGenerator.dll -reports:/mass4/dev/Turian/.local/localization-extraction/coverage/0eb87130-c1ff-42b7-90a1-39cef97d0a03.cobertura.xml;/mass4/dev/Turian/.local/localization-extraction/coverage/f08dfa55-08ce-4eb2-8663-6687d2b84de1.cobertura.xml -targetdir:/mass4/dev/Turian/.local/localization-extraction/coverage/merged -reporttypes:Cobertura
+09:30:22 [DBG] 2026-10-30T09:30:22: Arguments
+09:30:22 [DBG] 2026-10-30T09:30:22:  -reports:/mass4/dev/Turian/.local/localization-extraction/coverage/0eb87130-c1ff-42b7-90a1-39cef97d0a03.cobertura.xml;/mass4/dev/Turian/.local/localization-extraction/coverage/f08dfa55-08ce-4eb2-8663-6687d2b84de1.cobertura.xml
+09:30:22 [DBG] 2026-10-30T09:30:22:  -targetdir:/mass4/dev/Turian/.local/localization-extraction/coverage/merged
+09:30:22 [DBG] 2026-10-30T09:30:22:  -reporttypes:Cobertura
+09:30:23 [DBG] 2026-10-30T09:30:23: Writing report file '/mass4/dev/Turian/.local/localization-extraction/coverage/merged/Cobertura.xml'
+09:30:23 [DBG] 2026-10-30T09:30:23: Report generation took 1.1 seconds
+​
+═══════════════════════════════════════
+Target             Status      Duration
+───────────────────────────────────────
+Restore            Succeeded       0:01
+Compile            Succeeded       0:23
+Test               Succeeded       3:31
+───────────────────────────────────────
+Total                              3:56
+═══════════════════════════════════════
+​
+Build succeeded on 10/30/2026 9:30:23 AM. ＼（＾ᴗ＾）／

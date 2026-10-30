@@ -20,6 +20,7 @@ public static partial class Program
         return new Command("brick", "Manage a project's or the studio's bricks (packages): add, remove, list, restore, update, embed; author, verify, sync-precast and pack your own")
         {
             BrickNewCommand(),
+            BrickMaterializeCommand(),
             BrickAddCommand(projectOption, studioOption),
             BrickRemoveCommand(projectOption, studioOption),
             BrickListCommand(projectOption, studioOption),
@@ -423,7 +424,7 @@ public static partial class Program
         var claimOption = new Option<string?>("--claim") { Description = "Static registry: a name prefix to claim with the publisher key, such as com.acme (user.<name> is claimed on first publish)" };
         var privateOption = new Option<bool>("--private") { Description = "Store: only readers with access to your bricks can download it" };
         var precastOption = new Option<bool>("--precast") { Description = "Compile the brick's assemblies into Precast~ first" };
-        var twinOption = new Option<bool>("--twin") { Description = "Bake the brick, then publish the source brick and its bake twin <id>.bake with it" };
+        var twinOption = new Option<bool>("--twin") { Description = "Bake the brick, then publish the source brick and its bake twin <id>.bake with it; a brick only the studio installs has none and is published alone" };
 
         var command = new Command("publish", "Pack a brick and upload it, signed, to an asset store (--store) or a static registry folder (--registry)")
         {
@@ -441,7 +442,7 @@ public static partial class Program
             var precast = result.GetValue(precastOption) ? await BrickService.PrecastAsync(path, Log.Logger).ConfigureAwait(false) : null;
             if (result.GetValue(twinOption))
             {
-                _ = await BrickBake.BakeAsync(path, Log.Logger).ConfigureAwait(false);
+                await BakeForTwinAsync(path).ConfigureAwait(false);
             }
 
             if (store is not null)
@@ -633,7 +634,7 @@ public static partial class Program
 
         var twinOption = new Option<bool>("--twin")
         {
-            Description = "Bake the brick, then pack the source brick without Precast~ or Bake~, and its bake twin <id>.bake: Precast~, Bake~ and the assets, without Source~ or C# scripts",
+            Description = "Bake the brick, then pack the source brick without Precast~ or Bake~, and its bake twin <id>.bake: Precast~, Bake~ and the assets, without Source~ or C# scripts; a brick only the studio installs has no twin and is packed alone",
         };
 
         var command = new Command("pack", "Verify a brick and pack it into a .brick file") { pathArg, outOption, precastOption, twinOption };
@@ -643,7 +644,7 @@ public static partial class Program
             var precast = result.GetValue(precastOption) ? await BrickService.PrecastAsync(path, Log.Logger).ConfigureAwait(false) : null;
             if (result.GetValue(twinOption))
             {
-                await BrickBake.BakeAsync(path, Log.Logger).ConfigureAwait(false);
+                await BakeForTwinAsync(path).ConfigureAwait(false);
             }
 
             foreach (var packed in BrickService.PackFiles(path, result.GetValue(outOption)!.FullName, precast, result.GetValue(twinOption)))
@@ -671,6 +672,16 @@ public static partial class Program
             }
         }));
         return command;
+    }
+
+    /// <summary>Bakes a brick for its twin, saying so when it has none because only the studio installs it.</summary>
+    static async Task BakeForTwinAsync(string path)
+    {
+        _ = await BrickBake.BakeAsync(path, Log.Logger).ConfigureAwait(false);
+        if (!BrickService.HasTwin(path))
+        {
+            Console.Error.WriteLine($"{path} is installed only in the studio, so it has no twin: packing it alone.");
+        }
     }
 
     static async Task<int> RunBrickAsync(Func<Task> action)

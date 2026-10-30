@@ -1,18 +1,18 @@
 namespace Turian.Editor.Core;
 
-/// <summary>One entry in the asset browser's New menu.</summary>
+/// <summary>One entry in the asset browser's Create menu.</summary>
 /// <param name="MenuPath">Slash-separated path, e.g. <c>Gameplay/Puzzle Data</c>.</param>
 /// <param name="DefaultName">The name a freshly created one gets.</param>
 /// <param name="PayloadType">The <see cref="DataAsset"/> type to write, or null for a built-in kind.</param>
 public sealed record AssetCreationKind(string MenuPath, string DefaultName, Type? PayloadType = null);
 
 /// <summary>
-/// What the asset browser can create: the built-in folder, scene and material, plus every user
-/// <see cref="DataAsset"/> carrying <see cref="CreateAssetMenuAttribute"/>. Rescans when the user
-/// assembly has been swapped since the last call, which is what makes the menu follow a recompile.
+/// What the asset browser can create: built-in assets and constructible
+/// <see cref="DataAsset"/> types carrying <see cref="CreateAssetMenuAttribute"/>.
+/// Discovery follows the active project assemblies and loaded editor bricks.
 /// </summary>
 [InternalService(InternalServiceLifetime.Singleton)]
-public sealed class AssetCreationCatalog
+public sealed class AssetCreationCatalog : IDisposable
 {
     const string dataAssetExtension = ".dataasset";
 
@@ -20,9 +20,10 @@ public sealed class AssetCreationCatalog
     readonly SettingsService settings;
     readonly BuildManager buildManager;
     readonly ILogger log;
+    readonly IReadOnlyList<IAssetCreationProvider> providers;
 
     readonly List<AssetCreationKind> kinds = [];
-    ReflectionAssembly? scanned;
+    ReflectionAssembly[] scanned = [];
     bool scannedOnce;
 
     /// <summary>Creates the catalog over the services that write the files.</summary>
@@ -30,8 +31,9 @@ public sealed class AssetCreationCatalog
     /// <param name="settings">Resolves the project directory a data asset's path is relative to.</param>
     /// <param name="buildManager">Supplies the user assembly the annotated types come from.</param>
     /// <param name="log">Where a failed creation is reported.</param>
+    /// <param name="providers">Asset creation entries contributed by editor bricks.</param>
     public AssetCreationCatalog(AssetFileSystem fileSystem, SettingsService settings,
-        BuildManager buildManager, ILogger log)
+        BuildManager buildManager, ILogger log, IEnumerable<IAssetCreationProvider>? providers = null)
     {
         ArgumentNullException.ThrowIfNull(fileSystem);
         ArgumentNullException.ThrowIfNull(settings);
@@ -42,6 +44,8 @@ public sealed class AssetCreationCatalog
         this.settings = settings;
         this.buildManager = buildManager;
         this.log = log;
+        this.providers = providers?.ToArray() ?? [];
+        buildManager.UserAssembliesChanged += Invalidate;
     }
 
     /// <summary>The kinds currently offered, built-ins first.</summary>
@@ -54,11 +58,11 @@ public sealed class AssetCreationCatalog
         }
     }
 
-    /// <summary>Rescans if the user assembly changed. Cheap when it has not.</summary>
+    /// <summary>Rescans when the eligible assemblies change, including newly loaded bricks.</summary>
     public void EnsureRefreshed()
     {
-        var current = buildManager.ActiveUserAssembly;
-        if (scannedOnce && ReferenceEquals(current, scanned))
+        var current = CandidateAssemblies(buildManager.LoadedAssemblies, buildManager.ActiveUserAssemblies).ToArray();
+        if (scannedOnce && current.SequenceEqual(scanned))
         {
             return;
         }
@@ -70,7 +74,25 @@ public sealed class AssetCreationCatalog
         kinds.Add(new AssetCreationKind("Folder", fileSystem.DefaultFolderName));
         kinds.Add(new AssetCreationKind("Scene", fileSystem.DefaultSceneName));
         kinds.Add(new AssetCreationKind("Material", fileSystem.DefaultMaterialName));
-        kinds.AddRange(DiscoverDataAssets());
+        // Providers outlive brick changes until restart, so their kinds follow the same enabled-brick filter.
+        kinds.AddRange(Scan(current, log)
+            .Concat(providers.SelectMany(static provider => provider.Kinds)
+                .Where(static kind => kind.PayloadType is null || !BrickAssemblies.IsRetired(kind.PayloadType.Assembly)))
+            .DistinctBy(static kind => kind.PayloadType));
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        buildManager.UserAssembliesChanged -= Invalidate;
+        Invalidate();
+    }
+
+    void Invalidate()
+    {
+        scanned = [];
+        scannedOnce = false;
+        kinds.Clear();
     }
 
     /// <summary>
@@ -122,6 +144,7 @@ public sealed class AssetCreationCatalog
         }
 
         var assetPath = UniquePath(targetDirectory, kind.DefaultName);
+        if (payload is EnumValueAsset named) { named.Name = Path.GetFileNameWithoutExtension(assetPath); }
         var meta = new DataAssetAsset
         {
             RelativePath = Path.GetRelativePath(appSettings.ProjectAbsoluteDir, assetPath)
@@ -134,9 +157,6 @@ public sealed class AssetCreationCatalog
         ProjectSettingsFiles.RegisterCreated(appSettings, payload, meta.Id);
         return true;
     }
-
-    IEnumerable<AssetCreationKind> DiscoverDataAssets() =>
-        Scan(CandidateAssemblies(buildManager.LoadedAssemblies, buildManager.ActiveUserAssemblies), log);
 
     /// <summary>
     /// The assemblies worth scanning: the engine and whatever references it, with every user assembly but
@@ -154,14 +174,14 @@ public sealed class AssetCreationCatalog
 
         var engine = typeof(DataAsset).Assembly;
         var engineName = engine.GetName().Name;
-        var userNames = activeUserAssemblies.Select(static assembly => assembly.GetName().Name).ToHashSet();
+        var attributesName = typeof(CreateAssetMenuAttribute).Assembly.GetName().Name;
 
         return loaded
             .Where(static assembly => !assembly.IsDynamic)
+            .Where(assembly => !assembly.IsCollectible || activeUserAssemblies.Contains(assembly))
             .Where(assembly => assembly == engine
-                               || assembly.GetReferencedAssemblies().Any(reference => reference.Name == engineName))
-            .Where(assembly => activeUserAssemblies.Contains(assembly)
-                               || !userNames.Contains(assembly.GetName().Name))
+                               || assembly.GetReferencedAssemblies().Any(reference => reference.Name == engineName
+                                   || reference.Name == attributesName))
             .Distinct();
     }
 
@@ -177,38 +197,32 @@ public sealed class AssetCreationCatalog
         ArgumentNullException.ThrowIfNull(assemblies);
         ArgumentNullException.ThrowIfNull(log);
 
-        var found = new List<AssetCreationKind>();
+        var found = assemblies.SelectMany(LoadableTypes)
+            .Select(type => CreationKind(type, log)).OfType<AssetCreationKind>();
+        return [.. found.OrderBy(static kind => kind.MenuPath, StringComparer.OrdinalIgnoreCase)];
+    }
 
-        foreach (var type in assemblies.SelectMany(LoadableTypes))
+    static bool IsCreatableDataAsset(Type type) =>
+        type is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false }
+        && typeof(DataAsset).IsAssignableFrom(type) && !typeof(Asset).IsAssignableFrom(type)
+        && type.GetConstructor(Type.EmptyTypes) is not null;
+
+    static AssetCreationKind? CreationKind(Type type, ILogger log)
+    {
+        try
         {
-            try
+            if (IsCreatableDataAsset(type)
+                && type.GetCustomAttribute<CreateAssetMenuAttribute>(false) is { } attribute)
             {
-                if (type is not { IsClass: true, IsAbstract: false })
-                {
-                    continue;
-                }
-
-                if (!typeof(DataAsset).IsAssignableFrom(type) || typeof(Asset).IsAssignableFrom(type))
-                {
-                    continue;
-                }
-
-                if (type.GetCustomAttribute<CreateAssetMenuAttribute>(false) is not { } attribute)
-                {
-                    continue;
-                }
-
-                found.Add(new AssetCreationKind(MenuPath(attribute.Path, type), FileName(attribute.FileName, type),
-                    type));
-            }
-            catch (Exception ex) when (ex is TypeLoadException or FileNotFoundException or FileLoadException
-                                           or BadImageFormatException)
-            {
-                log.LogDebug(ex, "New menu: skipped {Type}", type.FullName);
+                return new AssetCreationKind(MenuPath(attribute.Path, type), FileName(attribute.FileName, type), type);
             }
         }
-
-        return [.. found.OrderBy(static kind => kind.MenuPath, StringComparer.OrdinalIgnoreCase)];
+        catch (Exception ex) when (ex is TypeLoadException or FileNotFoundException or FileLoadException
+                                       or BadImageFormatException)
+        {
+            log.LogDebug(ex, "New menu: skipped {Type}", type.FullName);
+        }
+        return null;
     }
 
     static IEnumerable<Type> LoadableTypes(ReflectionAssembly assembly)

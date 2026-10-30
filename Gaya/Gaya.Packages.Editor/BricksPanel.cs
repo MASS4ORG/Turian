@@ -395,6 +395,10 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
 
     void Notice(Gui gui)
     {
+        if (controller.StudioRestartRequired)
+        {
+            Line(gui, "Restart Studio to activate the changed plugin assemblies, menus and panels.", Theme.Ink);
+        }
         if (controller.IsBusy)
         {
             Line(gui, "Working…", Theme.InkDim);

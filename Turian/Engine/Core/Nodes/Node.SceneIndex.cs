@@ -73,6 +73,16 @@ public partial class Node
             return false;
         }
 
+        if (GeneratedNodeMetadata.TryGet(type, out var metadata))
+        {
+            return metadata.HasFrameCallbacks;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new InvalidOperationException($"No generated node metadata for '{type.FullName}'.");
+        }
+
         return NodeCallbackOverrides.GetValue(type, static candidate => new(
             Overridden(candidate, nameof(OnUpdate)) || Overridden(candidate, nameof(OnLateUpdate)) ||
             Overridden(candidate, nameof(OnFixedUpdate)))).Value;

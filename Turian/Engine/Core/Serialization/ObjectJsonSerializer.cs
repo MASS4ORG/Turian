@@ -30,32 +30,21 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
         var root = doc.RootElement;
         var type = ResolveTypeFromJson(root);
 
-        if (GeneratedSerializers.TryGet(type, out var generated))
-        {
-            var created = (T)generated.Create();
-            foreach (var property in root.EnumerateObject())
-            {
-                if (property.Name != TypeIdProperty)
-                {
-                    generated.ReadMember(created, property, options);
-                }
-            }
-
-            return created;
-        }
-
-        var result = CreateInstance(type);
+        GeneratedSerializers.TryGet(type, out var generated);
+        var result = generated is not null ? (T)generated.Create()
+            : RuntimeFeature.IsDynamicCodeSupported ? CreateInstance(type)
+            : throw new JsonException($"No generated serializer for '{type.FullName}'.");
 
         if (result is not Node node)
         {
-            ReadMembers(root, type, result, options);
+            ReadObject(root, type, result, generated, options);
             return result;
         }
 
         ObjectReferences.EnterNode();
         try
         {
-            ReadMembers(root, type, result, options);
+            ReadObject(root, type, result, generated, options);
         }
         catch
         {
@@ -65,6 +54,29 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
 
         ObjectReferences.ExitNode(node);
         return result;
+    }
+
+    static void ReadObject(JsonElement root, Type type, T result, GeneratedSerializer? generated,
+        JsonSerializerOptions options)
+    {
+        if (generated is null)
+        {
+            if (!RuntimeFeature.IsDynamicCodeSupported)
+            {
+                throw new JsonException($"No generated serializer for '{type.FullName}'.");
+            }
+
+            ReadMembers(root, type, result, options);
+            return;
+        }
+
+        foreach (var property in root.EnumerateObject())
+        {
+            if (property.Name != TypeIdProperty)
+            {
+                generated.ReadMember(result, property, options);
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -81,6 +93,11 @@ public class ObjectJsonSerializer<T> : JsonConverter<T>
             generated.WriteMembers(writer, value, options);
             writer.WriteEndObject();
             return;
+        }
+
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            throw new JsonException($"No generated serializer for '{value.GetType().FullName}'.");
         }
 
         var members = GetCachedMembers(value.GetType());

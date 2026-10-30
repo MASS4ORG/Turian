@@ -1,4 +1,4 @@
-namespace Turian.Editor.Core;
+namespace MASS4.Localization;
 
 /// <summary>Lossless XLIFF 1.2 and RFC-4180 CSV interchange for string tables.</summary>
 /// <remarks>

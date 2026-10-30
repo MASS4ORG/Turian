@@ -7,6 +7,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: line and trail renderers with world-space SDF text #110.
+- Added: typed source-test dependencies for brick workflows #337.
+- Added: bricks pinned store, git and archive sources #338.
+- Changed: shared MASS4.Localization library and the localization brick #344.
+- Fixed: baking, packing or publishing a studio-only brick.
+
+## [3.7.0] - 2026-10-29
+
+- Fixed: Studio brick changes report when plugin activation requires a restart.
+- Added: DataAsset-Driven Design #55.
+- Added: generated startup metadata for NativeAOT server exports #292.
+
+## [3.6.0] - 2026-10-27
+
+- Fixed: brick CI template uses the current CLI and workflow names.
+- Added: rag dolls #64 #111;
+
+## [3.5.0] - 2026-10-26
+
 - Added: standalone physics bricks #64;
 - Added: build and simulation settings diagnostics #324.
 - Added: cached camera traversal and draw preparation.
@@ -154,7 +172,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.4.1...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.7.0...HEAD
+[3.7.0]: https://github.com/MASS4ORG/Turian/compare/v3.6.0...v3.7.0
+[3.6.0]: https://github.com/MASS4ORG/Turian/compare/v3.5.0...v3.6.0
+[3.5.0]: https://github.com/MASS4ORG/Turian/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/MASS4ORG/Turian/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/MASS4ORG/Turian/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/MASS4ORG/Turian/compare/v3.3.1...v3.3.2

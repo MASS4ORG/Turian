@@ -14,6 +14,7 @@ public sealed class HeadlessPlayer : IGamePlayer
 
         using var interrupt = Application.QuitOnInterrupt();
         var runtime = GameRuntime.Start(context, new BufferedInputSource());
+        using var dataAssets = runtime.Services.GetRequiredService<DataAssetSession>();
         using var asyncSession = runtime.Ticker.Async;
         runtime.LoadStartupScene();
         context.Logger.LogInformation("{Product} running headless at {Rate:F0} ticks per second",

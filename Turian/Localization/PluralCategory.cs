@@ -1,4 +1,4 @@
-namespace Turian.Engine.Core;
+namespace MASS4.Localization;
 
 /// <summary>CLDR cardinal plural categories used by <see cref="PluralRules"/> and message plural blocks.</summary>
 public enum PluralCategory

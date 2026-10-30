@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Version>3.4.1</Version>
+        <Version>3.7.0</Version>
         <OutputType>exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -29,7 +29,7 @@
 
     <!-- External libraries. The renderer and window come from the game's render brick, never from the launcher. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
     </ItemGroup>
 
     <Import Project="../../Core/Build/Settings/RuntimeDependencies.targets"/>

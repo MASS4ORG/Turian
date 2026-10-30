@@ -19,7 +19,8 @@ static class SceneScreenshot
     /// When <c>true</c>, populates a representative set of gizmos (axis lines, a wire cube, a wire
     /// sphere and an overlay ring) so the gizmo renderer can be verified headlessly.
     /// </param>
-    /// <param name="locale">The project locale, or <c>null</c> for authored source text.</param>
+    /// <param name="services">Project services used to construct the interface, or <c>null</c>.</param>
+    /// <param name="factory">The interface factory, or <c>null</c> to discover it.</param>
     public static void Capture(
         Vulkan vulkan,
         AssetDatabase assets,
@@ -29,7 +30,8 @@ static class SceneScreenshot
         string outputPath,
         ILogger logger,
         bool drawGizmos = false,
-        LocaleService? locale = null)
+        IServiceProvider? services = null,
+        IUiPresenterFactory? factory = null)
     {
         ArgumentNullException.ThrowIfNull(vulkan);
         ArgumentNullException.ThrowIfNull(assets);
@@ -37,7 +39,7 @@ static class SceneScreenshot
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
-        using var runner = new ScreenshotRunner(vulkan, assets, root, options, bounds, logger, drawGizmos, locale);
+        using var runner = new ScreenshotRunner(vulkan, assets, root, options, bounds, logger, drawGizmos, services, factory);
         runner.CaptureAndSave(outputPath, logger);
     }
 
@@ -62,7 +64,8 @@ static class SceneScreenshot
             Bounds bounds,
             ILogger logger,
             bool drawGizmos,
-            LocaleService? locale)
+            IServiceProvider? services,
+            IUiPresenterFactory? factory)
         {
             this.root = root;
             frames = options.Frames;
@@ -72,7 +75,7 @@ static class SceneScreenshot
                 viewer.OnPopulateGizmos = DrawTestGizmos;
             }
 
-            uiPresenter = UiPresenters.Find()?.Create(vulkan, null, locale);
+            uiPresenter = (factory ?? UiPresenters.Find())?.Create(vulkan, null, services);
             if (uiPresenter is not null)
             {
                 viewer.OverlaySource = (w, h, dt) => uiPresenter.TryRenderOverlay(root, (int)w, (int)h, dt);

@@ -38,9 +38,6 @@ public sealed class GameRuntime
     /// <summary>The project's action maps, read from the input source the player supplied.</summary>
     public InputActionService Actions { get; private set; } = null!;
 
-    /// <summary>Resolves the game's localized text.</summary>
-    public LocaleService Locale { get; } = new();
-
     /// <summary>The services scene components are injected from.</summary>
     public IServiceProvider Services { get; private set; } = null!;
 
@@ -69,7 +66,8 @@ public sealed class GameRuntime
         var content = context.ContentDirectory;
         var assets = new AssetDatabase();
         LoadCatalog(assets, content, context.ProjectDirectory);
-        var loader = new RuntimeAssetLoader(assets);
+        var dataAssets = new DataAssetSession();
+        var loader = new RuntimeAssetLoader(assets, dataAssets);
         var settings = new AppSettings
         {
             ProjectAbsoluteDir = context.ProjectDirectory,
@@ -78,7 +76,7 @@ public sealed class GameRuntime
         ProjectSettingsLoader.Load(settings, loader, content);
 
         var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
-        runtime.BindServices(context, loader, input, addServices);
+        runtime.BindServices(context, loader, input, dataAssets, addServices);
         LogBuild(context.Logger, settings.Get<TimeSettings>());
         return runtime;
     }
@@ -120,7 +118,7 @@ public sealed class GameRuntime
     }
 
     void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource input,
-        Action<IServiceCollection>? addServices)
+        DataAssetSession dataAssets, Action<IServiceCollection>? addServices)
     {
         Actions = new InputActionService(input);
         var clock = new SimulationClock(Settings.Get<TimeSettings>());
@@ -131,14 +129,19 @@ public sealed class GameRuntime
             .AddSingleton(Assets)
             .AddSingleton<ISceneManager>(Scenes)
             .AddSingleton(loader)
+            .AddSingleton(dataAssets)
             .AddSingleton(clock)
             .AddSingleton<GameLoopScheduler>()
             .AddSingleton(input)
             .AddSingleton(Actions)
-            .AddSingleton<IInputActions>(Actions)
-            .AddSingleton(Locale);
+            .AddSingleton<IInputActions>(Actions);
         addServices?.Invoke(registrations);
-        if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
+        if (ExportRuntime.ConfigureServices is { } configure)
+        {
+            configure(registrations);
+        }
+        else if (RuntimeFeature.IsDynamicCodeSupported
+                 && TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
             registrations.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }
@@ -147,6 +150,7 @@ public sealed class GameRuntime
         Ticker = new SceneTicker(Scenes, clock)
         {
             Async = Services.GetRequiredService<GameLoopScheduler>(),
+            DataAssets = dataAssets,
             Simulation = Services.GetService<SimulationSession>(),
             Systems = [.. Services.GetServices<IFixedTickSystem>()],
             InputSource = input,
@@ -154,7 +158,6 @@ public sealed class GameRuntime
         };
         Scenes.BindServices(Services);
 
-        LocalizationLoader.Load(Locale, Settings, Assets);
         LoadActionMaps(loader);
     }
 

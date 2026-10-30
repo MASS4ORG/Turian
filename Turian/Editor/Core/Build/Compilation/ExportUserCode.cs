@@ -29,6 +29,11 @@ public sealed class ExportUserCode(
 
         var csprojFilePath = await SetupAsync(GenerateCsProjFile).ConfigureAwait(false);
         EnsureDirectory(csprojFilePath);
+        if (profile?.Profile is { NativeAot: true } nativeProfile)
+        {
+            await ExportRuntimeGenerator.GenerateAsync(csprojFilePath, Settings, nativeProfile, Logger)
+                .ConfigureAwait(false);
+        }
 
         var exportOutputPath = OutputDirectory;
         Logger.LogInformation("Export output path: {Path}", exportOutputPath);
@@ -65,13 +70,21 @@ public sealed class ExportUserCode(
         using var process = new Process();
         process.StartInfo = startInfo;
         process.Start();
-        var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
-        process.WaitForExit();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync().ConfigureAwait(false);
+        var output = await outputTask.ConfigureAwait(false);
+        var error = await errorTask.ConfigureAwait(false);
 
         if (process.ExitCode != 0)
         {
-            Logger.LogError("Export failed: {Output}", output);
+            Logger.LogError("Export failed: {Output}\n{Error}", output, error);
             throw new InvalidOperationException("Export failed.");
+        }
+
+        if (profile?.Profile.NativeAot == true)
+        {
+            Logger.LogInformation("NativeAOT publish: {Output}\n{Error}", output, error);
         }
 
         var artifact = await platform.FinalizeAsync(context, CancellationToken.None).ConfigureAwait(false);

@@ -77,7 +77,7 @@ sealed partial class AssetBrowserPanel
 
     void BuildCreationMenu(FlyoutBuilder menu, AssetEntry? entry)
     {
-        menu.Submenu("New", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0),
+        menu.Submenu("Create", submenu => BuildNewMenu(submenu, creation.Kinds, depth: 0),
             enabled: entries.Any(candidate => candidate.AbsolutePath == DirectoryFor(entry) && !candidate.IsReadOnly));
 
         if (entry is { IsDirectory: false, IsReadOnly: false } prefab
@@ -98,7 +98,7 @@ sealed partial class AssetBrowserPanel
     }
 
     /// <summary>
-    /// Emits one level of the New menu: kinds whose path ends here become items, and the rest are
+    /// Emits one level of the Create menu: kinds whose path ends here become items, and the rest are
     /// gathered by their next path segment into a submenu that recurses.
     /// </summary>
     void BuildNewMenu(FlyoutBuilder menu, IReadOnlyList<AssetCreationKind> kinds, int depth)
@@ -106,7 +106,9 @@ sealed partial class AssetBrowserPanel
         foreach (var kind in kinds.Where(k => Segments(k).Length == depth + 1))
         {
             var created = kind;
-            menu.Item(Segments(kind)[depth], () => Create(created));
+            var glyph = types.PresentationFor(kind.PayloadType)?.Glyph;
+            var label = glyph is null ? Segments(kind)[depth] : $"{glyph} {Segments(kind)[depth]}";
+            menu.Item(label, () => Create(created));
         }
 
         foreach (var group in kinds.Where(k => Segments(k).Length > depth + 1)
