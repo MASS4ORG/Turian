@@ -38,6 +38,24 @@ static class PanelCommands
             services => Panel<SceneTreePanel>(services, panelId)?.DuplicateSelected(),
             services => Panel<SceneTreePanel>(services, panelId)?.HasEditableSelection ?? false)
         { MenuLabel = "Duplicate Node" }, KeyModifiers.Ctrl);
+
+        Add(context, panelId, KeyboardKey.C, new CommandDescriptor(
+            "gaya.turian.sceneTree.copy", "Scene Tree: Copy Node",
+            services => Panel<SceneTreePanel>(services, panelId)?.CopySelected(),
+            services => Panel<SceneTreePanel>(services, panelId)?.HasEditableSelection ?? false)
+        { MenuLabel = "Copy Node" }, KeyModifiers.Ctrl);
+
+        Add(context, panelId, KeyboardKey.X, new CommandDescriptor(
+            "gaya.turian.sceneTree.cut", "Scene Tree: Cut Node",
+            services => Panel<SceneTreePanel>(services, panelId)?.CutSelected(),
+            services => Panel<SceneTreePanel>(services, panelId)?.HasEditableSelection ?? false)
+        { MenuLabel = "Cut Node" }, KeyModifiers.Ctrl);
+
+        Add(context, panelId, KeyboardKey.V, new CommandDescriptor(
+            "gaya.turian.sceneTree.paste", "Scene Tree: Paste Node",
+            services => Panel<SceneTreePanel>(services, panelId)?.PasteSelected(),
+            services => Panel<SceneTreePanel>(services, panelId)?.CanPaste ?? false)
+        { MenuLabel = "Paste Node" }, KeyModifiers.Ctrl);
     }
 
     static void Assets(IPluginContext context)

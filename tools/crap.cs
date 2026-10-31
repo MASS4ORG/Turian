@@ -30,7 +30,10 @@ var rows = new List<(double Crap, int Complexity, double Coverage, string Locati
 foreach (var type in XDocument.Load(coveragePath).Descendants("class"))
 {
     var file = Path.GetFullPath((string?)type.Attribute("filename") ?? "");
-    if (!changed.TryGetValue(file, out var ranges)) continue;
+    if (!changed.TryGetValue(file, out var ranges))
+    {
+        continue;
+    }
 
     foreach (var method in type.Descendants("method"))
     {
@@ -52,7 +55,11 @@ Console.WriteLine($"{"CRAP",7} {"cc",3} {"cov",5}  method (changed since {baseRe
 foreach (var row in rows.OrderByDescending(row => row.Crap).ThenBy(row => row.Location, StringComparer.Ordinal))
 {
     var flag = row.Crap > limit ? "  <-- over " + limit.ToString(CultureInfo.InvariantCulture) : "";
-    if (row.Crap > limit) over++;
+    if (row.Crap > limit)
+    {
+        over++;
+    }
+
     Console.WriteLine($"{row.Crap,7:F1} {row.Complexity,3} {row.Coverage,5:P0}  {row.Method}  {row.Location}{flag}");
 }
 
@@ -92,7 +99,11 @@ static Dictionary<string, List<(int Start, int End)>> ChangedRanges(string repos
             continue;
         }
 
-        if (current is null || hunk.Match(line) is not { Success: true } match) continue;
+        if (current is null || hunk.Match(line) is not { Success: true } match)
+        {
+            continue;
+        }
+
         var start = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         var count = match.Groups[2].Success ? int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : 1;
         // A pure deletion still changes the method around it: mark the line it happened at.
@@ -100,8 +111,12 @@ static Dictionary<string, List<(int Start, int End)>> ChangedRanges(string repos
     }
 
     foreach (var file in Git("ls-files", "--others", "--exclude-standard", "--", "*.cs").Split('\n'))
+    {
         if (file.Length > 0)
+        {
             For(ranges, Path.Combine(repository, file)).Add((1, int.MaxValue));
+        }
+    }
 
     return ranges;
 }
@@ -109,14 +124,22 @@ static Dictionary<string, List<(int Start, int End)>> ChangedRanges(string repos
 static List<(int Start, int End)> For(Dictionary<string, List<(int Start, int End)>> ranges, string path)
 {
     path = Path.GetFullPath(path);
-    if (!ranges.TryGetValue(path, out var list)) ranges[path] = list = [];
+    if (!ranges.TryGetValue(path, out var list))
+    {
+        ranges[path] = list = [];
+    }
+
     return list;
 }
 
 static string Git(params string[] arguments)
 {
     var start = new ProcessStartInfo("git") { RedirectStandardOutput = true, UseShellExecute = false };
-    foreach (var argument in arguments) start.ArgumentList.Add(argument);
+    foreach (var argument in arguments)
+    {
+        start.ArgumentList.Add(argument);
+    }
+
     using var process = Process.Start(start)!;
     var output = process.StandardOutput.ReadToEnd();
     process.WaitForExit();

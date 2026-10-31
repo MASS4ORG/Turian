@@ -70,7 +70,7 @@ static partial class ReleaseSigner
         }
 
         var revoked = JsonSerializer.Deserialize<string[]>(
-            File.ReadAllText(Path.Combine(root, "signing/revoked-keys.json")))
+            File.ReadAllText(Path.Combine(root, "tools/BrickRelease/revoked-keys.json")))
                       ?? throw new InvalidDataException("Missing revocation list.");
         if (revoked.Any(static value => !FingerprintPattern().IsMatch(value ?? "")))
         {

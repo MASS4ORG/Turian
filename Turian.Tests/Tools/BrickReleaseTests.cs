@@ -17,8 +17,8 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
-        Directory.CreateDirectory(Path.Combine(root, "signing"));
-        File.WriteAllText(Path.Combine(root, "signing/revoked-keys.json"), "[]");
+        Directory.CreateDirectory(Path.Combine(root, "tools/BrickRelease"));
+        File.WriteAllText(Path.Combine(root, "tools/BrickRelease/revoked-keys.json"), "[]");
         await GenerateKeyAsync(Key);
         var master = Path.Combine(root, "master");
         await GenerateKeyAsync(master);
@@ -93,7 +93,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
         }
         else if (reason == "revoked")
         {
-            File.WriteAllText(Path.Combine(root, "signing/revoked-keys.json"),
+            File.WriteAllText(Path.Combine(root, "tools/BrickRelease/revoked-keys.json"),
                 JsonSerializer.Serialize(new[] { ReleaseSigner.Fingerprint(publicKey) }));
         }
         else
@@ -135,7 +135,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     [InlineData("[\"invalid fingerprint\"]")]
     public void InvalidRevocationConfigurationIsRejected(string json)
     {
-        File.WriteAllText(Path.Combine(root, "signing/revoked-keys.json"), json);
+        File.WriteAllText(Path.Combine(root, "tools/BrickRelease/revoked-keys.json"), json);
         Assert.ThrowsAny<Exception>(() => ReleaseSigner.ValidateIdentity(root, PublicKey));
     }
 
@@ -143,7 +143,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     [Fact]
     public void MissingRevocationsAndWrongKeyAlgorithmAreRejected()
     {
-        File.Delete(Path.Combine(root, "signing/revoked-keys.json"));
+        File.Delete(Path.Combine(root, "tools/BrickRelease/revoked-keys.json"));
         Assert.Throws<FileNotFoundException>(() => ReleaseSigner.ValidateIdentity(root, PublicKey));
         Assert.Throws<InvalidDataException>(() => ReleaseSigner.Fingerprint("ssh-rsa AAAA"));
     }

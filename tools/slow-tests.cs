@@ -48,7 +48,9 @@ Console.WriteLine($"{Path.GetFileName(report)}: {results.Count} tests, {total.To
 Console.WriteLine();
 Console.WriteLine($"Slowest {top} tests (duration, then start offset from the first test)");
 foreach (var result in results.OrderByDescending(result => result.Duration).Take(top))
+{
     Console.WriteLine($"{result.Duration.TotalSeconds,8:F2} s  @{(result.Start - first).TotalSeconds,6:F1} s  {result.Name}");
+}
 
 Console.WriteLine();
 Console.WriteLine($"Slowest {top} classes (summed)");
@@ -56,7 +58,9 @@ foreach (var group in results.GroupBy(result => result.Class)
              .Select(group => (Class: group.Key, Count: group.Count(),
                  Duration: group.Aggregate(TimeSpan.Zero, (sum, result) => sum + result.Duration)))
              .OrderByDescending(group => group.Duration).Take(top))
+{
     Console.WriteLine($"{group.Duration.TotalSeconds,8:F2} s  {group.Count,4} tests  {group.Class}");
+}
 
 return 0;
 
