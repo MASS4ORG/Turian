@@ -27,7 +27,7 @@ RUN dotnet publish tools/BrickRelease/BrickRelease.csproj \
     -c Release \
     -o /app/publish/tools/brick-release \
     -p:Version=${VERSION} -p:AssemblyVersion=${VERSION} -p:InformationalVersion=${VERSION} \
-    && install -D -m 0644 signing/revoked-keys.json /app/publish/tools/brick-release/signing/revoked-keys.json \
+    && install -D -m 0644 tools/BrickRelease/revoked-keys.json /app/publish/tools/brick-release/tools/BrickRelease/revoked-keys.json \
     && install -D -m 0644 Turian/Editor/Core/Packages/registry-mass4.pub \
        /app/publish/tools/brick-release/Turian/Editor/Core/Packages/registry-mass4.pub \
     && printf '#!/bin/sh\nexec dotnet /app/tools/brick-release/Mass4.BrickRelease.dll "$@"\n' > /app/publish/brick-release \
