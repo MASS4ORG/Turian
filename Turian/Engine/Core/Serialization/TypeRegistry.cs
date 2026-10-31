@@ -1,3 +1,5 @@
+using MASS4.StableIdentity;
+
 namespace Turian.Engine.Core;
 
 /// <summary>
@@ -131,8 +133,11 @@ public static class TypeRegistry
         return IdToType.TryGetValue(id, out type);
     }
 
-    /// <summary>Resolves built-in legacy type identifiers to the identifiers written by current serializers.</summary>
-    public static Guid CanonicalId(Guid id) => BuiltInTypeIds.Aliases.GetValueOrDefault(id, id);
+    /// <summary>
+    /// Resolves built-in legacy type identifiers to the identifiers written by current serializers, following the
+    /// shared MASS4.StableIdentity rename map.
+    /// </summary>
+    public static Guid CanonicalId(Guid id) => BuiltInTypeIds.Aliases.Canonicalize(new StableId(id)).Value;
 
     /// <summary>
     /// Tries to look up a registered <see cref="Type"/> by its full name, the form asset catalogs

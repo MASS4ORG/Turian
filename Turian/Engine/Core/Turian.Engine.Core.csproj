@@ -48,6 +48,7 @@
     <ItemGroup>
         <ProjectReference Include="$(OapLocalPath)/csharp/OpenAssetPackage.csproj" Condition="'$(OapLocalPath)' != ''"/>
         <ProjectReference Include="$(Ktx2LocalPath)/Ktx2/Ktx2.csproj" Condition="'$(Ktx2LocalPath)' != ''"/>
+        <ProjectReference Include="$(StableIdentityLocalPath)/StableIdentity/StableIdentity.csproj" Condition="'$(StableIdentityLocalPath)' != ''"/>
     </ItemGroup>
 
     <!-- External libraries -->
@@ -59,5 +60,6 @@
         <PackageReference Include="System.IO.Hashing" Version="10.0.14" />
         <PackageReference Include="MASS4.Ktx2" Version="1.*" Condition="'$(Ktx2LocalPath)' == ''"/>
         <PackageReference Include="MASS4.OpenAssetPackage" Version="1.*" Condition="'$(OapLocalPath)' == ''"/>
+        <PackageReference Include="MASS4.StableIdentity" Version="1.*" Condition="'$(StableIdentityLocalPath)' == ''"/>
     </ItemGroup>
 </Project>

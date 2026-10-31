@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: built-in type aliases resolve through the shared MASS4.StableIdentity rename map #331.
+
 ## [3.8.0] - 2026-10-30
 
 - Added: line and trail renderers with world-space SDF text #110.

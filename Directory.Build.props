@@ -19,11 +19,12 @@
         <GuinevereLocalPath></GuinevereLocalPath>
         <Ktx2LocalPath></Ktx2LocalPath>
         <OapLocalPath></OapLocalPath>
+        <StableIdentityLocalPath></StableIdentityLocalPath>
     </PropertyGroup>
 
     <!-- Checked by Directory.Build.targets before a pack or publish; list each local checkout here -->
     <PropertyGroup>
-        <UsesLocalPackages Condition="'$(GuinevereLocalPath)' != '' Or '$(Ktx2LocalPath)' != '' Or '$(OapLocalPath)' != ''">true</UsesLocalPackages>
+        <UsesLocalPackages Condition="'$(GuinevereLocalPath)' != '' Or '$(Ktx2LocalPath)' != '' Or '$(OapLocalPath)' != '' Or '$(StableIdentityLocalPath)' != ''">true</UsesLocalPackages>
     </PropertyGroup>
 
     <!-- External libraries included in every project -->
