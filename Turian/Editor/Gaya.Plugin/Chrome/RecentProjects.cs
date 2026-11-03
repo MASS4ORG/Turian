@@ -266,7 +266,7 @@ sealed class ProjectSwitcherChrome(
             return cached;
         }
 
-        var image = ProjectIcon.FindSource(projectDirectory) is { } source ? SKImage.FromEncodedData(source) : null;
+        var image = ProjectIcon.FindSource(projectDirectory) is { } source ? SKImage.FromEncodedData(File.ReadAllBytes(source)) : null;
         icons[projectDirectory] = image;
         return image;
     }

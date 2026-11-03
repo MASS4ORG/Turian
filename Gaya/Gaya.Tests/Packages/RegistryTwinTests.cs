@@ -188,7 +188,7 @@ public sealed class RegistryTwinTests : IDisposable
 
         // A locked older variant is downloaded again as locked, over the newer one this host would choose.
         (await Resolver(host: "1.1.0").ResolveAsync(project, TestContext.Current.CancellationToken)).Lock.Save(project);
-        Directory.Delete(Path.Combine(root, "store"), recursive: true);
+        TestFiles.Delete(Path.Combine(root, "store"));
         var relocked = await Resolver(host: "1.2.5").ResolveAsync(project, TestContext.Current.CancellationToken);
         Assert.Equal("engine1.1", relocked.Packages[0].Manifest.Variant);
 
@@ -319,7 +319,7 @@ public sealed class RegistryTwinTests : IDisposable
         Publish("user.mateo.rules", "1.2.0", mateo);
         if (!cached)
         {
-            Directory.Delete(Path.Combine(root, "store"), recursive: true);
+            TestFiles.Delete(Path.Combine(root, "store"));
         }
 
         var resolution = await Resolver(host: "3.0.0").ResolveAsync(project, TestContext.Current.CancellationToken);

@@ -11,7 +11,7 @@ public sealed class BrickMaterializerGitTests : IDisposable
     public void Dispose()
     {
         Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", previousConfig);
-        Directory.Delete(root, recursive: true);
+        TestFiles.Delete(root);
     }
 
     /// <summary>An HTTPS source resolves the exact commit and leaves no credentials in producer files.</summary>

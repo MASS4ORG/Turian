@@ -12,7 +12,15 @@ static class AtomicFile
         try
         {
             File.WriteAllText(temporary, content);
-            File.Move(temporary, absolute, overwrite: true);
+            if (File.Exists(absolute))
+            {
+                // Unlike a move, a replace succeeds on Windows while a reader holds the destination open.
+                File.Replace(temporary, absolute, null, ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporary, absolute);
+            }
         }
         finally
         {

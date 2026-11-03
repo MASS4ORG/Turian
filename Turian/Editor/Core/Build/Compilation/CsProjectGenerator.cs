@@ -149,7 +149,7 @@ public static class CsProjectGenerator
         var itemGroup = projectRoot.AddItemGroup();
         foreach (var directory in assembly.Directories)
         {
-            itemGroup.AddItem("Compile", $"{Path.GetRelativePath(projectDirectory, directory)}/**/*.cs").Exclude = exclude;
+            itemGroup.AddItem("Compile", $"{RelativeTo(projectDirectory, directory)}/**/*.cs").Exclude = exclude;
         }
 
         foreach (var relative in assembly.EmbeddedResources ?? [])
@@ -179,8 +179,11 @@ public static class CsProjectGenerator
         assemblyName,
         $"{assemblyName}.csproj");
 
+    /// <summary>A relative path with forward slashes, which MSBuild accepts on every OS inside item patterns.</summary>
+    static string RelativeTo(string from, string to) => Path.GetRelativePath(from, to).Replace('\\', '/');
+
     static IEnumerable<string> ExcludePatterns(string projectDirectory, IEnumerable<string> excludedDirectories) =>
-        excludedDirectories.Select(directory => $"{Path.GetRelativePath(projectDirectory, directory)}/**")
+        excludedDirectories.Select(directory => $"{RelativeTo(projectDirectory, directory)}/**")
             .Prepend("**/*~/**")
             .Prepend("**/obj/**");
 
@@ -351,7 +354,7 @@ public static class CsProjectGenerator
             foreach (var name in assemblyNames)
             {
                 itemGroup.AddItem("ProjectReference",
-                    Path.GetRelativePath(projectDirectory, AssemblyCsProjFullPath(settings, name)));
+                    RelativeTo(projectDirectory, AssemblyCsProjFullPath(settings, name)));
             }
 
             return projectRoot;

@@ -32,7 +32,10 @@ public sealed class PrecastBrickFixture : IAsyncLifetime
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Deletes a folder, clearing the read-only flags packing leaves on files.</summary>
+    /// <summary>
+    /// Deletes a folder, clearing the read-only flags packing leaves on files. On Windows, assemblies the process
+    /// loaded stay locked, so those files are left for the temp folder sweep.
+    /// </summary>
     /// <param name="path">The folder to delete.</param>
     public static void DeleteTree(string path)
     {
@@ -46,7 +49,13 @@ public sealed class PrecastBrickFixture : IAsyncLifetime
             File.SetAttributes(file, FileAttributes.Normal);
         }
 
-        Directory.Delete(path, recursive: true);
+        try
+        {
+            Directory.Delete(path, recursive: true);
+        }
+        catch (UnauthorizedAccessException) when (OperatingSystem.IsWindows())
+        {
+        }
     }
 
     /// <summary>

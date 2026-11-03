@@ -13,7 +13,7 @@ public sealed class BrickEnablementTests : IDisposable
     public void Dispose()
     {
         BrickAssemblies.ResetEnablement();
-        Directory.Delete(root, recursive: true);
+        PrecastBrickFixture.DeleteTree(root);
     }
 
     /// <summary>Disabling a precast game brick removes its Create entries and types from discovery.</summary>

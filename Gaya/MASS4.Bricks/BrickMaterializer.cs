@@ -62,7 +62,7 @@ public sealed partial class BrickMaterializer(HttpClient? http = null,
         }
         finally
         {
-            Directory.Delete(staging, recursive: true);
+            ReadOnlyTree.Delete(staging);
         }
     }
 

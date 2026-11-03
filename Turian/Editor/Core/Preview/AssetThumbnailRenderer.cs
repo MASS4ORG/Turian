@@ -82,7 +82,9 @@ public sealed class AssetThumbnailRenderer(Vulkan vulkan, AssetDatabase assets, 
 
     static SKImage? Decode(string path, int size)
     {
-        using var codec = SKCodec.Create(path);
+        // Reading the bytes keeps the file from staying memory-mapped, which blocks deleting it on Windows.
+        using var data = SKData.CreateCopy(File.ReadAllBytes(path));
+        using var codec = SKCodec.Create(data);
         if (codec is null)
         {
             return null;

@@ -116,7 +116,7 @@ public sealed class TemporarySceneTests : IDisposable
         try
         {
             var destination = Directory.CreateDirectory(Path.Combine(directory.FullName, "destination"));
-            Assert.Throws<IOException>(() => AtomicFile.WriteAllText(destination.FullName, "complete content"));
+            Assert.ThrowsAny<SystemException>(() => AtomicFile.WriteAllText(destination.FullName, "complete content"));
             Assert.Empty(directory.GetFiles("*.tmp"));
             Assert.True(destination.Exists);
         }

@@ -316,7 +316,8 @@ public sealed partial class AssetImporter
             return absolutePath;
         }
 
-        return Path.GetRelativePath(projectRootPath, absolutePath);
+        var relative = Path.GetRelativePath(projectRootPath, absolutePath);
+        return Path.IsPathRooted(relative) ? relative : relative.Replace('\\', '/');
     }
 
     static string ComputeFileHash(string filePath)

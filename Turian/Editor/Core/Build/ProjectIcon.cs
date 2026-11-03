@@ -75,7 +75,7 @@ public static class ProjectIcon
         var pngPath = Path.Combine(outputDirectory, PngFileName);
         var icoPath = Path.Combine(outputDirectory, IcoFileName);
 
-        using var image = FindSource(project) is { } source ? SKBitmap.Decode(source) : null;
+        using var image = FindSource(project) is { } source ? SKBitmap.Decode(File.ReadAllBytes(source)) : null;
         if (image is null)
         {
             File.Delete(pngPath);

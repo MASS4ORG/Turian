@@ -25,7 +25,7 @@ public static class DataAssetVariantFactory
         }
 
         var baseId = Guid.Parse((string)JsonNode.Parse(File.ReadAllText(baseMeta))!["Id"]!);
-        var directory = Path.Combine(projectRoot, folder);
+        var directory = Path.GetFullPath(Path.Combine(projectRoot, folder));
         var path = Path.Combine(directory, $"{name}.dataasset");
         if (File.Exists(path))
         {

@@ -306,7 +306,7 @@ public sealed class AssemblyGraphTests : IDisposable
         File.WriteAllText(path,
             $$"""{ "__TypeId": "{{AssemblyDefinitionReference.TypeIdValue}}", "Definition": { "AssetId": "{{definition}}" }, "Id": "{{id}}" }""");
         File.WriteAllText($"{path}.meta",
-            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{id}}" }""");
+            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{RelativeToProject(path)}}", "Id": "{{id}}" }""");
     }
 
     string Script(params string[] parts) => Path.Combine([assetsDirectory, .. parts]);
@@ -338,8 +338,10 @@ public sealed class AssemblyGraphTests : IDisposable
         };
         File.WriteAllText(path, json.ToJsonString());
         File.WriteAllText($"{path}.meta",
-            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{Path.GetRelativePath(projectDirectory, path)}}", "Id": "{{assetId}}" }""");
+            $$"""{ "__TypeId": "aab4f92b-7216-52d8-b722-7399613c929c", "RelativePath": "{{RelativeToProject(path)}}", "Id": "{{assetId}}" }""");
 
         return assetId;
     }
+
+    string RelativeToProject(string path) => Path.GetRelativePath(projectDirectory, path).Replace('\\', '/');
 }
