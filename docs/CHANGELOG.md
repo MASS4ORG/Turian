@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Changed: built-in type aliases resolve through the shared MASS4.StableIdentity rename map #331.
+- Fixed: the Windows installer skipped the user `PATH` when it was longer than 1024 characters, and its .NET SDK prompt blocked silent installs; Windows artifacts are now built and installer-tested on Windows CI runners.
 
 ## [3.8.0] - 2026-10-30
 

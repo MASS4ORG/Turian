@@ -39,6 +39,15 @@ cache:
     before_script:
         - chmod +x ./build.sh
 
+# Windows artifacts are built on Windows, where the installer can be installed, used and uninstalled.
+# GitLab.com provides this tag; a self-managed instance needs a Windows runner (PowerShell shell) with the same tag.
+.windows_job_template: &windows_job_template
+    tags: ["saas-windows-medium-amd64"]
+    before_script:
+        - choco install nsis --no-progress -y
+    artifacts:
+        expire_in: 1 week
+
 # install GLSL compiler to convert GLSL shader to SPIR-V (Vulkan)
 .build_glsl: &build_glsl
     before_script:
@@ -84,7 +93,7 @@ package-check:
         CONTAINERS_STORAGE_DRIVER: vfs
     before_script:
         - !reference [.build_glsl, before_script]
-        - apt-get install -yqq podman nsis
+        - apt-get install -yqq podman
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
@@ -94,20 +103,26 @@ package-check:
               --no-local-packages \
               --verbosity minimal
         - |
-            ./build.sh WingetManifest \
-              --configuration "Release" \
-              --runtime-identifier "win-x64" \
-              --skip-shaders \
-              --no-local-packages \
-              --packaging-dry-run \
-              --verbosity minimal
-        - |
             ./build.sh Pack \
               --configuration "Release" \
               --runtime-identifier "osx-x64" \
               --skip-shaders \
               --no-local-packages \
               --verbosity minimal
+
+# Pack, install, use and uninstall the Windows installer, then validate the Winget manifests.
+package-check-windows:
+    <<: *windows_job_template
+    stage: package-check
+    rules:
+        - if: '$CI_COMMIT_TAG'
+          when: never
+        - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "web"'
+    script:
+        - ./build.ps1 Pack WingetManifest WindowsInstallerTest WingetValidate --configuration Release --runtime-identifier win-x64 --skip-shaders --no-local-packages --packaging-dry-run --verbosity minimal
+    artifacts:
+        paths:
+            - artifacts/*
 
 qodana:
     stage: test
@@ -148,7 +163,6 @@ build:
     <<: *build_job_template
     parallel:
         matrix:
-            - RID: "win-x64"
             - RID: "linux-x64"
     stage: build
     rules:
@@ -157,7 +171,6 @@ build:
     before_script:
         - !reference [.build_glsl, before_script]
         - !reference [.build_fontconfig, before_script]
-        - apt-get install -yqq nsis
         - !reference [.dotnet_nuke_template, before_script]
     script:
         - |
@@ -168,6 +181,19 @@ build:
               --publish-single-file "${PUBLISH_SINGLE_FILE:-true}" \
               --publish-trimmed "${PUBLISH_TRIMMED:-false}" \
               --verbosity minimal
+    artifacts:
+        paths:
+            - artifacts/*
+
+# Pack the Windows archive and installer on every tag, installing, using and uninstalling the installer first.
+build-windows:
+    <<: *windows_job_template
+    stage: build
+    rules:
+        - if: '$CI_COMMIT_TAG'
+          allow_failure: false
+    script:
+        - ./build.ps1 Pack WindowsInstallerTest --configuration Release --runtime-identifier win-x64 --skip-shaders --publish-self-contained "$env:PUBLISH_SELF_CONTAINED" --publish-single-file "$env:PUBLISH_SINGLE_FILE" --publish-trimmed "$env:PUBLISH_TRIMMED" --verbosity minimal
     artifacts:
         paths:
             - artifacts/*
@@ -207,6 +233,7 @@ gitlab-release:
           allow_failure: false
     needs:
         - build
+        - build-windows
         - job: build-macos
           optional: true
     before_script:

@@ -71,4 +71,47 @@ sealed partial class Build
                 ManifestVersion: 1.12.0
                 """ + "\n");
         });
+
+    /// <summary>Validates the generated manifests with `winget validate`, which only exists on Windows.</summary>
+    public Target WingetValidate => td => td
+        .DependsOn(WingetManifest)
+        .OnlyWhenStatic(() => RuntimeIdentifier == "win-x64")
+        .Executes(() =>
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                throw new InvalidOperationException("WingetValidate needs Windows: winget has no Linux or macOS client.");
+            }
+
+            var winget = FindWinget() ?? (IsServerBuild ? InstallWinget() : null)
+                ?? throw new InvalidOperationException("winget was not found: install App Installer from the Microsoft Store.");
+            ProcessTasks.StartProcess(winget,
+                    $"validate --manifest \"{ArtifactsDirectory / "winget" / Version}\" --disable-interactivity")
+                .AssertZeroExitCode();
+        });
+
+    /// <summary>Finds winget on the PATH or at its per-user App Installer alias, or returns null.</summary>
+    static string FindWinget() =>
+        FindOnPath("winget") ?? new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Microsoft", "WindowsApps", "winget.exe")
+            }
+            .FirstOrDefault(File.Exists);
+
+    /// <summary>
+    /// Installs winget through the Microsoft.WinGet.Client module, because CI Windows images may not ship it.
+    /// Only CI does this; a developer machine gets winget from the Microsoft Store instead.
+    /// </summary>
+    static string InstallWinget()
+    {
+        var shell = FindOnPath("pwsh") ?? "powershell";
+        ProcessTasks.StartProcess(shell,
+                "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" +
+                "Install-PackageProvider -Name NuGet -Force | Out-Null; " +
+                "Install-Module -Name Microsoft.WinGet.Client -Force -Repository PSGallery | Out-Null; " +
+                "Repair-WinGetPackageManager -AllUsers -Latest -Force\"")
+            .AssertZeroExitCode();
+        return FindWinget();
+    }
 }

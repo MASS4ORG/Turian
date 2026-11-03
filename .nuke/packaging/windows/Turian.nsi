@@ -1,8 +1,5 @@
 Unicode true
 !include "WinMessages.nsh"
-!include "StrFunc.nsh"
-${StrStr}
-${UnStrRep}
 
 Name "Turian"
 OutFile "${OUTPUT_FILE}"
@@ -19,7 +16,7 @@ Function .onInit
   FindFirst $0 $1 "$PROGRAMFILES64\dotnet\sdk\10.*"
   FindClose $0
   StrCmp $1 "" 0 sdkFound
-    MessageBox MB_YESNO|MB_ICONEXCLAMATION "Turian needs the .NET 10 SDK, which was not found.$\r$\n$\r$\nOpen the download page now? Installation continues either way." IDNO sdkFound
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION "Turian needs the .NET 10 SDK, which was not found.$\r$\n$\r$\nOpen the download page now? Installation continues either way." /SD IDNO IDNO sdkFound
     ExecShell "open" "https://dotnet.microsoft.com/download/dotnet/10.0"
   sdkFound:
 FunctionEnd
@@ -39,52 +36,33 @@ Section "Turian" SecMain
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Turian" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Turian" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Turian" "NoRepair" 1
-  Call AddToUserPath
+  StrCpy $0 "add"
+  Call UpdateUserPath
 SectionEnd
 
-; Appends $INSTDIR to the user PATH so turian-cli and turian-studio work from any terminal. NSIS strings are
-; capped at NSIS_MAX_STRLEN, so a PATH that long is left untouched rather than written back truncated.
-Function AddToUserPath
-  ReadRegStr $0 HKCU "Environment" "Path"
-  ${StrStr} $1 ";$0;" ";$INSTDIR;"
-  StrCmp $1 "" 0 done
-  StrLen $2 "$0;$INSTDIR"
-  IntCmp $2 ${NSIS_MAX_STRLEN} tooLong 0 tooLong
-  StrCmp $0 "" 0 append
-    WriteRegExpandStr HKCU "Environment" "Path" "$INSTDIR"
-    Goto notify
-  append:
-    WriteRegExpandStr HKCU "Environment" "Path" "$0;$INSTDIR"
-  notify:
-    SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
-    Goto done
-  tooLong:
-    DetailPrint "PATH is too long to update safely; add $INSTDIR to it manually."
-  done:
+; Adds ($0 = "add") or removes ($0 = "remove") $INSTDIR in the user PATH through user-path.ps1, so turian-cli and
+; turian-studio work from any terminal. NSIS strings are capped at 1024 characters and would truncate a long PATH.
+; Warns instead of failing when PowerShell errors.
+!macro UPDATE_USER_PATH PREFIX
+Function ${PREFIX}UpdateUserPath
+  InitPluginsDir
+  File "/oname=$PLUGINSDIR\user-path.ps1" "user-path.ps1"
+  nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\user-path.ps1" $0 "$INSTDIR"'
+  Pop $1
+  StrCmp $1 "0" UpdateUserPathBroadcast
+  MessageBox MB_OK|MB_ICONEXCLAMATION "Could not update the user PATH ($1). Please $0 $INSTDIR manually." /SD IDOK
+  Return
+UpdateUserPathBroadcast:
+  SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
 FunctionEnd
+!macroend
 
-Function un.RemoveFromUserPath
-  ReadRegStr $0 HKCU "Environment" "Path"
-  StrCmp $0 "" done
-  StrLen $2 $0
-  IntOp $2 $2 + 2
-  IntCmp $2 ${NSIS_MAX_STRLEN} done 0 done
-  ${UnStrRep} $1 ";$0;" ";$INSTDIR;" ";"
-  StrCpy $1 $1 "" 1
-  StrCpy $1 $1 -1
-  StrCmp $1 $0 done
-  StrCmp $1 "" 0 write
-    DeleteRegValue HKCU "Environment" "Path"
-    Goto notify
-  write:
-    WriteRegExpandStr HKCU "Environment" "Path" $1
-  notify:
-    SendMessage ${HWND_BROADCAST} ${WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
-  done:
-FunctionEnd
+!insertmacro UPDATE_USER_PATH ""
+!insertmacro UPDATE_USER_PATH "un."
 
 Section "Uninstall"
-  Call un.RemoveFromUserPath
+  StrCpy $0 "remove"
+  Call un.UpdateUserPath
   Delete "$SMPROGRAMS\Turian\Turian Studio.lnk"
   Delete "$SMPROGRAMS\Turian\Uninstall.lnk"
   RMDir "$SMPROGRAMS\Turian"

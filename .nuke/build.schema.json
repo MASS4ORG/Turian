@@ -50,7 +50,9 @@
         "UpdateChangelog",
         "UpdateProjectVersions",
         "WindowsInstaller",
-        "WingetManifest"
+        "WindowsInstallerTest",
+        "WingetManifest",
+        "WingetValidate"
       ]
     },
     "Verbosity": {
