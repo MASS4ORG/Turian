@@ -205,4 +205,28 @@ public sealed class BrickServiceTests : IDisposable
         Assert.DoesNotContain("user.mateo.missing", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
         Assert.True(BrickService.Remove(project, "user.mateo.inventory"));
     }
+
+    /// <summary>A project whose bricks cannot be fetched still lets each one be disabled, instead of reverting.</summary>
+    [Fact]
+    public void BricksWithUnreachableSourcesCanBeDisabled()
+    {
+        var project = Path.Combine(root, "project");
+        Directory.CreateDirectory(Path.Combine(project, "Assets"));
+        new ProjectManifest
+        {
+            Dependencies =
+            {
+                [ProjectPackages.RenderBrick] = null,
+                ["user.mateo.first"] = "file:../nowhere-1",
+                ["user.mateo.second"] = "file:../nowhere-2",
+            },
+        }.Save(project);
+        Assert.Throws<PackageException>(() => ProjectPackages.Resolve(project));
+
+        BrickService.Disable(project, "user.mateo.first");
+        Assert.DoesNotContain("user.mateo.first", ProjectManifest.Load(project).Manifest.Dependencies.Keys);
+
+        Assert.True(BrickService.Remove(project, "user.mateo.second"));
+        Assert.Empty(ProjectPackages.Resolve(project).Packages);
+    }
 }

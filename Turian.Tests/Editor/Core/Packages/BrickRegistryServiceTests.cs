@@ -44,6 +44,27 @@ public sealed class BrickRegistryServiceTests : IDisposable
         Assert.Single(BrickService.Registries(project));
     }
 
+    /// <summary>A registry only this machine's override declares is listed, and removing it leaves the rest of that file.</summary>
+    [Fact]
+    public void RegistriesOfThePersonalOverrideCanBeRemoved()
+    {
+        var project = Path.Combine(root, "game");
+        Directory.CreateDirectory(Path.Combine(project, "Bricks"));
+        const string key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETjciFivC4Q7z6o7KhiydqNS1Z5D6+ZZFbGUxQgL7ur test";
+        File.WriteAllText(Path.Combine(project, "Bricks", ProjectManifest.UserFileName), $$"""
+            { "scopedRegistries": [ { "name": "local", "url": "http://local.example/v1", "scopes": ["a"], "keys": ["{{key}}"] } ],
+              "sources": ["user.mateo.rules"] }
+            """);
+        Assert.Equal(["local", "bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
+
+        Assert.True(BrickService.RemoveRegistry(project, "local"));
+
+        Assert.Equal(["bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
+        Assert.Contains("user.mateo.rules", File.ReadAllText(Path.Combine(project, "Bricks", ProjectManifest.UserFileName)),
+            StringComparison.Ordinal);
+        Assert.False(BrickService.RemoveRegistry(project, "local"));
+    }
+
     /// <summary>The public registry preserves its original key and accepts the approved official CI signing key.</summary>
     [Fact]
     public void PublicRegistryCarriesTheMass4Key()

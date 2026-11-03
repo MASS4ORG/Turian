@@ -98,6 +98,13 @@ public sealed class PlayModeService(
             return false;
         }
 
+        if (MissingBrickProblem(editorRoot) is { } problem)
+        {
+            logger.LogError("Cannot enter play mode: the scene uses components from bricks that are not available. "
+                            + "Fix or disable them in the Bricks panel. {Problem}", problem);
+            return false;
+        }
+
         Input.Clear();
 
         ISceneManager sceneManager;
@@ -304,6 +311,29 @@ public sealed class PlayModeService(
     }
 
     // ── Internals ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Why the project's bricks do not resolve, when the scene also holds components whose types are unavailable;
+    /// null when play can go on. A project with unreachable bricks the scene never uses still plays.
+    /// </summary>
+    string? MissingBrickProblem(Node sceneRoot)
+    {
+        if (ProjectSettings() is not { ProjectAbsoluteDir.Length: > 0 } settings
+            || !sceneRoot.GetComponentsInChildren(typeof(MissingComponent)).Any())
+        {
+            return null;
+        }
+
+        try
+        {
+            _ = ProjectPackages.Resolve(settings.ProjectAbsoluteDir);
+            return null;
+        }
+        catch (MASS4.Bricks.PackageException ex)
+        {
+            return ex.Message;
+        }
+    }
 
     [System.Diagnostics.CodeAnalysis.MemberNotNull(nameof(playServices))]
     ISceneManager PreparePlayServices(string? localeOverride)

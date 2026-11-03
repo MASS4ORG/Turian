@@ -94,6 +94,37 @@ public sealed class BricksPanelLayoutTests : IDisposable
         Assert.Equal(settings.Settings!.Bricks, Assert.IsType<FormInspection>(selection.SelectedObject).Target);
     }
 
+    /// <summary>
+    /// A panel first drawn before any project opened shows the studio's bricks, then the project's once one opens, so
+    /// the project's registries and unresolved bricks are not hidden behind the studio scope.
+    /// </summary>
+    [Fact]
+    public void ScopeFollowsTheProjectUntilTheUserPicksOne()
+    {
+        var settings = new SettingsService();
+        var studio = Substitute.For<IBrickWorkspace>();
+        studio.Registries().Returns([]);
+        var controller = TestBricks.Controller(settings,
+            new BackgroundTaskRunner(new BackgroundTaskManager(), NullLogger.Instance),
+            Substitute.For<IBrickApplier>(), studio);
+        var panel = new BricksPanel(controller);
+        var gui = new Gui { Input = Substitute.For<IInputHandler>() };
+        using var surface = SKSurface.Create(new SKImageInfo(640, 480));
+        var font = Font.FromFamilyName("sans-serif", 14);
+        void Render() => InspectorFormsRenderingTests.Frame(gui, surface, font, panel.Render);
+
+        Render();
+        Assert.Equal(BrickScope.Studio, controller.Scope);
+
+        settings.Set(new AppSettings { ProjectAbsoluteDir = root });
+        Render();
+        Assert.Equal(BrickScope.Project, controller.Scope);
+
+        settings.Set(new AppSettings { ProjectAbsoluteDir = "" });
+        Render();
+        Assert.Equal(BrickScope.Studio, controller.Scope);
+    }
+
     static IEnumerable<LayoutNode> Descendants(LayoutNode node)
     {
         yield return node;

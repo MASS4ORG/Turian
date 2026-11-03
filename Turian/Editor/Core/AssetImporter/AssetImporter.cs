@@ -28,7 +28,7 @@ public sealed partial class AssetImporter : IDisposable
     readonly AssetDatabase assetDatabase;
     readonly SettingsService settingsService;
     List<IAssetImporter> assetImporters;
-    int importerAssemblyCount;
+    int importerAssemblyStamp;
     readonly object syncRoot = new();
 
     AssetFolderWatcher? folderWatcher;
@@ -158,18 +158,22 @@ public sealed partial class AssetImporter : IDisposable
     IEnumerable<ReflectionAssembly> LoadedAssemblies => build?.LoadedAssemblies ?? AppDomain.CurrentDomain.GetAssemblies();
 
     /// <summary>Rebuilds the importer list when assemblies have loaded since it was made.</summary>
-    void RefreshImporters()
+    internal void RefreshImporters()
     {
-        if (LoadedAssemblies.Count() != importerAssemblyCount)
+        if (ImporterAssemblyStamp() != importerAssemblyStamp)
         {
             assetImporters = BuildImporterList();
         }
     }
 
+    // Loaded assemblies never unload, so a brick the project stops using must also change the stamp.
+    int ImporterAssemblyStamp() => HashCode.Combine(LoadedAssemblies.Count(), LoadedAssemblies.Count(BrickAssemblies.IsRetired));
+
     List<IAssetImporter> BuildImporterList()
     {
-        importerAssemblyCount = LoadedAssemblies.Count();
+        importerAssemblyStamp = ImporterAssemblyStamp();
         return [.. LoadedAssemblies
+            .Where(static assembly => !BrickAssemblies.IsRetired(assembly))
             .SelectMany(static assembly => GetLoadableTypes(assembly))
             .Where(static type =>
                 typeof(IAssetImporter).IsAssignableFrom(type)

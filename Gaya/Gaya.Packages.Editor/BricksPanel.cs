@@ -70,15 +70,18 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
     {
         ArgumentNullException.ThrowIfNull(gui);
 
-        if (!loaded)
+        // Until the user picks a scope, follow the project: a panel first drawn before a project opened must not stay
+        // on the studio's bricks once one is open, or the project's registries and broken bricks are silently hidden.
+        var first = !loaded;
+        loaded = true;
+        var followed = !scopeChosen && FollowProject();
+        if (first && !followed)
         {
-            loaded = true;
-            if (!scopeChosen && !controller.HasProject && controller.HasStudio)
-            {
-                controller.Scope = BrickScope.Studio;
-            }
-
             controller.Refresh();
+        }
+
+        if (first || followed)
+        {
             _ = controller.RefreshRegistriesAsync();
         }
 
@@ -157,6 +160,20 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
                 Scopes(gui);
             }
         }
+    }
+
+    // Shows the open project's bricks, or the studio's when no project is open; returns whether the scope changed.
+    bool FollowProject()
+    {
+        var scope = controller.HasProject || !controller.HasStudio ? BrickScope.Project : BrickScope.Studio;
+        if (controller.Scope == scope)
+        {
+            return false;
+        }
+
+        controller.Scope = scope;
+        inspector?.ShowSelection(controller);
+        return true;
     }
 
     void Scopes(Gui gui)
@@ -405,7 +422,11 @@ public sealed class BricksPanel(BricksController controller, IBrickFileDialogs? 
         }
         else if (controller.Error is { } error)
         {
-            Line(gui, error, Theme.Error);
+            foreach (var line in error.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .Distinct(StringComparer.Ordinal))
+            {
+                Line(gui, line, Theme.Error);
+            }
         }
     }
 

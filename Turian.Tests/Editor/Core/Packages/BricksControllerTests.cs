@@ -104,6 +104,27 @@ public sealed class BricksControllerTests : IDisposable
         Assert.Equal(ProjectPackages.DefaultBuiltins.Count, controller.Rows.Count);
     }
 
+    /// <summary>Bricks whose sources cannot be reached stay listed as in use, and can each be disabled.</summary>
+    [Fact]
+    public async Task UnreachableBricksStayListedAndCanBeDisabled()
+    {
+        var manifest = ProjectManifest.Load(project, includeUserOverride: false).Manifest;
+        manifest.Dependencies["user.mateo.first"] = "file:../nowhere-1";
+        manifest.Dependencies["user.mateo.second"] = "file:../nowhere-2";
+        manifest.Save(project);
+        ProjectPackages.Invalidate(project);
+
+        controller.Refresh();
+
+        Assert.NotNull(controller.Error);
+        Assert.All(["user.mateo.first", "user.mateo.second"], id =>
+            Assert.Equal(BrickState.Enabled, Assert.Single(controller.Catalog, b => b.Id == id).State));
+
+        Assert.True(await controller.DisableAsync("user.mateo.first"), controller.Error);
+        Assert.DoesNotContain(controller.Catalog, static b => b.Id == "user.mateo.first" && b.State == BrickState.Enabled);
+        Assert.Contains(controller.Catalog, static b => b.Id == "user.mateo.second" && b.State == BrickState.Enabled);
+    }
+
     /// <summary>Details say what a brick needs and what requires it.</summary>
     [Fact]
     public async Task DependenciesShowWhyABrickIsInstalled()
