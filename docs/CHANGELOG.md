@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: registries from the personal brick override could not be removed, and a disabled brick's asset importer kept running.
 - Fixed: Windows artifacts are now built and tested on Windows CI runners.
 
+## [3.8.0] - 2026-10-31
+
+- Changed: built-in type aliases resolve through the shared MASS4.StableIdentity rename map #331.
+
 ## [3.8.0] - 2026-10-30
 
 - Added: line and trail renderers with world-space SDF text #110.
