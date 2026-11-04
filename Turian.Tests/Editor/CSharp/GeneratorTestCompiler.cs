@@ -4,7 +4,7 @@ namespace Turian.Tests;
 static class GeneratorTestCompiler
 {
     // Metadata images are immutable and safe to share between independent compilations.
-    static readonly Lazy<ImmutableArray<MetadataReference>> References = new(() =>
+    static readonly Lazy<ImmutableArray<MetadataReference>> References = new(static () =>
         [.. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))]);
 
