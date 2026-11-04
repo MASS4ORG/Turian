@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: reuse compiled test outputs.
 - Changed: built-in type aliases through MASS4.StableIdentity #331.
 - Fixed: internals working on Windows and Linux #75.
 - Fixed: allow disable impossible to reach bricks.

@@ -4,7 +4,7 @@ using ReleaseProgram = Mass4.BrickRelease.Program;
 namespace Turian.Tests;
 
 /// <summary>Checks release qualification, SSHSIG interoperability and private-key cleanup with disposable identities.</summary>
-[Collection("SerialTests")]
+[Collection(SerialTests.Name)]
 public sealed class BrickReleaseTests : IAsyncLifetime
 {
     readonly string root = Directory.CreateTempSubdirectory("brick-release-tests-").FullName;

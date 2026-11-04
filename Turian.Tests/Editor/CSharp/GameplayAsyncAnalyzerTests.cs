@@ -1,6 +1,9 @@
+using static Turian.Tests.GeneratorTestCompiler;
+
 namespace Turian.Tests;
 
-public sealed partial class DataAssetGeneratorTests
+/// <summary>Analyzes independent gameplay compilations without loading game assemblies.</summary>
+public sealed class GameplayAsyncAnalyzerTests
 {
     /// <summary>Methods, local functions, lambdas and anonymous delegates cannot escape gameplay observation.</summary>
     [Theory]

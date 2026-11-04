@@ -127,7 +127,7 @@ public sealed class BackgroundTaskRunnerTests
                 return Task.FromResult(new BackgroundTaskResult(true, "compiled"));
             });
         Assert.Equal(BackgroundTaskStatus.Blocked, tasks.Get(id)!.Status);
-        await Task.Delay(150, TestContext.Current.CancellationToken);
+        Assert.False(ran);
         if (succeeds)
         {
             tasks.Complete(dependency);
@@ -172,11 +172,25 @@ public sealed class BackgroundTaskRunnerTests
 
     internal static async Task WaitForCompletion(BackgroundTaskManager tasks, long id)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (tasks.Get(id) is { IsActive: true })
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void ObserveCompletion()
         {
-            await Task.Delay(10, timeout.Token);
+            if (tasks.Get(id) is { IsActive: false })
+            {
+                completed.TrySetResult();
+            }
+        }
+
+        tasks.Changed += ObserveCompletion;
+        try
+        {
+            // Subscribe before checking: completion can race with attaching the observer.
+            ObserveCompletion();
+            await completed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            tasks.Changed -= ObserveCompletion;
         }
     }
 }
