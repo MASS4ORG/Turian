@@ -70,6 +70,38 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  # The full suite on Windows and macOS, where paths, file locking and atomic replaces differ from Linux.
+  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan.
+  test-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore, compile, test
+        shell: pwsh
+        run: ./build.ps1 Restore Compile TestReport --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-${{ matrix.os }}
+          path: coverage/
+          retention-days: 7
+
   # Validate the Linux, macOS, NuGet and container release formats without tagging or pushing.
   package:
     runs-on: ubuntu-latest

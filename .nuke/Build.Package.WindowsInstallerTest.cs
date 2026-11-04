@@ -47,7 +47,7 @@ sealed partial class Build
         var originalKind = originalPath is null ? RegistryValueKind.ExpandString : environment.GetValueKind("Path");
 
         // Longer than the 1024-character NSIS string limit, proving the installer neither drops nor truncates it.
-        var longPath = string.Join(';', Enumerable.Range(1, 40).Select(index => $@"C:\{ProductName}-test\entry-{index}"));
+        var longPath = string.Join(';', Enumerable.Range(1, 40).Select(static index => $@"C:\{ProductName}-test\entry-{index}"));
         var installDirectory = (AbsolutePath)Path.GetTempPath() / $"{ProductName}-installer-test";
         installDirectory.DeleteDirectory();
         try

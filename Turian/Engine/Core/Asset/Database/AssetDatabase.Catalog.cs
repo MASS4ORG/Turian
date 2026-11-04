@@ -254,6 +254,16 @@ public sealed partial class AssetDatabase
             record.ProjectRootPath = projectRoot;
         }
 
+        // Catalogs written on Windows may hold '\', which other OSes read as part of a file name.
+        record.SourceRelativePath = PortableRelativePath(record.SourceRelativePath);
+        record.MetaRelativePath = PortableRelativePath(record.MetaRelativePath);
+        record.ImportedRelativePath = PortableRelativePath(record.ImportedRelativePath);
+        record.Artifacts = record.Artifacts.ConvertAll(PortableRelativePath);
+        foreach (var target in record.TargetArtifacts.Keys.ToArray())
+        {
+            record.TargetArtifacts[target] = PortableRelativePath(record.TargetArtifacts[target]);
+        }
+
         if (record.AssetId != Guid.Empty && string.IsNullOrWhiteSpace(record.PrimaryContentKey))
         {
             record.PrimaryContentKey = AssetRecord.CreatePrimaryContentKey(record.AssetId);
@@ -269,6 +279,10 @@ public sealed partial class AssetDatabase
             record.Artifacts.Add(record.ImportedRelativePath);
         }
     }
+
+    /// <summary>A project-relative path with forward slashes; rooted paths are left as the OS wrote them.</summary>
+    static string PortableRelativePath(string path) =>
+        string.IsNullOrEmpty(path) || Path.IsPathRooted(path) ? path : path.Replace('\\', '/');
 
     static AssetStorageKind GuessStorageKind(AssetRecord record)
     {

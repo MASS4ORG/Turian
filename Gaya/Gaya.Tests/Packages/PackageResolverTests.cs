@@ -290,6 +290,26 @@ public sealed class PackageResolverTests : IDisposable
         Assert.Equal("1.0.1", updated.Version.ToString());
     }
 
+    /// <summary>
+    /// A git source extracts the committed bytes whatever the user's line-ending settings, so its integrity, and the
+    /// lock recording it, is the same on every OS.
+    /// </summary>
+    [Fact]
+    public async Task GitSourcesExtractTheSameBytesOnEveryOs()
+    {
+        var repository = Package("rules-repo", "com.acme.rules", "1.0.0");
+        File.WriteAllText(Path.Combine(repository, ".gitattributes"), "* text=auto\n");
+        File.WriteAllText(Path.Combine(repository, "rules.txt"), "first\nsecond\n");
+        Git(repository, "init", "--quiet", "--initial-branch=main");
+        Commit(repository, "v1.0.0");
+        Manifest(("com.acme.rules", $"git+file://{repository}#v1.0.0"));
+
+        var package = Assert.Single((await Resolver().ResolveAsync(project, TestContext.Current.CancellationToken)).Packages);
+
+        Assert.Equal("first\nsecond\n", File.ReadAllText(Path.Combine(package.RootPath, "rules.txt")));
+        Assert.DoesNotContain('\r', File.ReadAllText(Path.Combine(package.RootPath, PackageManifest.FileName)));
+    }
+
     /// <summary>Installing locked fails when the manifest asks for something the lock does not record.</summary>
     [Fact]
     public async Task LockedInstallsFailOnDrift()

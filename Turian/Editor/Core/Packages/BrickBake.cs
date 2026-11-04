@@ -152,10 +152,26 @@ public static class BrickBake
         }
         finally
         {
+            DeleteScratch(scratch, logger);
+        }
+    }
+
+    /// <summary>
+    /// Removes the bake's scratch folder. Brick assemblies loaded from it stay mapped for the life of the process,
+    /// which Windows does not let a delete remove, so a folder that cannot go is left in the temp folder.
+    /// </summary>
+    static void DeleteScratch(string scratch, ILogger logger)
+    {
+        try
+        {
             if (Directory.Exists(scratch))
             {
                 Directory.Delete(scratch, recursive: true);
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogDebug(ex, "Left the bake scratch folder {Folder}, which still holds loaded assemblies", scratch);
         }
     }
 

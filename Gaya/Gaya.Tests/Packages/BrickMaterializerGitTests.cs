@@ -31,7 +31,7 @@ public sealed class BrickMaterializerGitTests : IDisposable
         var destination = Path.Combine(root, "output");
         await new BrickMaterializer().MaterializeAsync(source, destination, token: authenticated ? "fixture-read-token" : null,
             cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal("producer", File.ReadAllText(Path.Combine(destination, "Producer.cs")));
+        Assert.Equal("producer\n", File.ReadAllText(Path.Combine(destination, "Producer.cs")));
         Assert.False(Directory.Exists(Path.Combine(destination, ".git")));
         Assert.DoesNotContain("fixture-read-token", string.Join("", Directory.GetFiles(destination, "*", SearchOption.AllDirectories)
             .Select(File.ReadAllText)), StringComparison.Ordinal);
@@ -62,14 +62,15 @@ public sealed class BrickMaterializerGitTests : IDisposable
         var repository = Path.Combine(root, "repo");
         Directory.CreateDirectory(repository);
         new PackageManifest { Name = "com.example.producer", Version = SemanticVersion.Parse("1.0.0") }.Save(repository);
-        File.WriteAllText(Path.Combine(repository, "Producer.cs"), "producer");
+        File.WriteAllText(Path.Combine(repository, "Producer.cs"), "producer\n");
         await Git("init", repository);
         await Git("-C", repository, "add", ".");
         await Git("-C", repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.com",
             "-c", "commit.gpgsign=false", "commit", "-m", "fixture");
         var commit = (await Git("-C", repository, "rev-parse", "HEAD")).Trim();
         var config = Path.Combine(root, "gitconfig");
-        File.WriteAllText(config, $"[url \"{new Uri(repository + "/").AbsoluteUri}\"]\n\tinsteadOf = https://gitlab.example/team/producer.git\n");
+        // A Windows user's usual setting, which must not change the materialized bytes.
+        File.WriteAllText(config, $"[core]\n\tautocrlf = true\n[url \"{new Uri(repository + "/").AbsoluteUri}\"]\n\tinsteadOf = https://gitlab.example/team/producer.git\n");
         Environment.SetEnvironmentVariable("GIT_CONFIG_GLOBAL", config);
         return commit;
     }

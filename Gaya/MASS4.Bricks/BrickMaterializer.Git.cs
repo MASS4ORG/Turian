@@ -37,7 +37,7 @@ public sealed partial class BrickMaterializer
         start.ArgumentList.Add("credential.helper=");
         start.ArgumentList.Add("-c");
         start.ArgumentList.Add("http.followRedirects=false");
-        foreach (var argument in arguments)
+        foreach (var argument in GitLineEndings.Arguments.Concat(arguments))
         {
             start.ArgumentList.Add(argument);
         }

@@ -55,11 +55,11 @@ public sealed class BrickRegistryServiceTests : IDisposable
             { "scopedRegistries": [ { "name": "local", "url": "http://local.example/v1", "scopes": ["a"], "keys": ["{{key}}"] } ],
               "sources": ["user.mateo.rules"] }
             """);
-        Assert.Equal(["local", "bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
+        Assert.Equal(["local", "bricks.mass4.org"], BrickService.Registries(project).Select(static r => r.Name));
 
         Assert.True(BrickService.RemoveRegistry(project, "local"));
 
-        Assert.Equal(["bricks.mass4.org"], BrickService.Registries(project).Select(r => r.Name));
+        Assert.Equal(["bricks.mass4.org"], BrickService.Registries(project).Select(static r => r.Name));
         Assert.Contains("user.mateo.rules", File.ReadAllText(Path.Combine(project, "Bricks", ProjectManifest.UserFileName)),
             StringComparison.Ordinal);
         Assert.False(BrickService.RemoveRegistry(project, "local"));
