@@ -37,10 +37,7 @@ public sealed class ProjectSessionHotReloadTests
         }
         finally
         {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            PrecastBrickFixture.DeleteTree(root);
         }
     }
 }

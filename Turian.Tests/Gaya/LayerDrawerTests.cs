@@ -118,14 +118,14 @@ public sealed class LayerDrawerTests
         Assert.NotNull(host.Gui.GetScrollState(list.Id));
         Assert.True(list.Rect.H <= ThemeTokens.Current.Scale(ThemeTokens.Current.RowHeight) * 6 + 0.01f);
         Assert.True(list.Rect.BottomRight.Y <= 260);
-        host.Save("/tmp/turian-layer-picker-top.png");
+        host.Save(Path.Combine(Path.GetTempPath(), "turian-layer-picker-top.png"));
         host.ScrollToEnd();
         Assert.True(host.Gui.GetScrollState(list.Id)!.ScrollOffset.Y > 0,
             $"Offset: {host.Gui.GetScrollState(list.Id)!.ScrollOffset}; content: "
             + $"{host.Gui.GetScrollState(list.Id)!.ContentSize}; viewport: {host.List.Rect}");
         Assert.True(host.List.Rect.Contains(host.Option(31).Rect.Center),
             $"Viewport: {host.List.Rect}; last row: {host.Option(31).Rect}");
-        host.Save("/tmp/turian-layer-picker-bottom.png");
+        host.Save(Path.Combine(Path.GetTempPath(), "turian-layer-picker-bottom.png"));
         host.Click(host.Option(31).Rect.Center);
         Assert.Equal(31, (int)typeof(Node).GetProperty(member)!.GetValue(node)!);
     }

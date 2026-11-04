@@ -7,14 +7,17 @@ public sealed class AssetBrowserQueryTests
     static AssetEntry Entry(string path, bool folder = false, params string[] labels) =>
         new(path, folder, folder ? null : new Asset { Labels = [.. labels] }, Path.GetDirectoryName(path));
 
+    static string Native(string path) => path.Replace('/', Path.DirectorySeparatorChar);
+
     /// <summary>Unfiltered browsing shows only immediate children, with folders first.</summary>
     [Fact]
     public void BrowsingIsScopedAndSorted()
     {
-        var entries = new[] { Entry("/Assets/z.png"), Entry("/Assets/a.png"), Entry("/Assets/Folder", true),
-            Entry("/Assets/Folder/deep.png"), new AssetEntry("/Assets", true, null, null) };
-        Assert.Equal(["/Assets/Folder", "/Assets/a.png", "/Assets/z.png"],
-            AssetQuery.Apply(entries, "/Assets", new AssetFilter(), catalog, new HashSet<string>())
+        var entries = new[] { Entry(Native("/Assets/z.png")), Entry(Native("/Assets/a.png")),
+            Entry(Native("/Assets/Folder"), true), Entry(Native("/Assets/Folder/deep.png")),
+            new AssetEntry(Native("/Assets"), true, null, null) };
+        Assert.Equal([Native("/Assets/Folder"), Native("/Assets/a.png"), Native("/Assets/z.png")],
+            AssetQuery.Apply(entries, Native("/Assets"), new AssetFilter(), catalog, new HashSet<string>())
                 .Select(static entry => entry.AbsolutePath));
     }
 
@@ -64,24 +67,25 @@ public sealed class AssetBrowserQueryTests
         Assert.Null(navigation.Current);
         navigation.Back();
         navigation.Forward();
-        navigation.Reset("/Assets");
-        navigation.Visit("/Assets");
+        navigation.Reset(Native("/Assets"));
+        navigation.Visit(Native("/Assets"));
         Assert.False(navigation.CanBack);
-        navigation.Visit("/Assets/Folder");
-        navigation.Visit("/Assets/Folder/Sub");
+        navigation.Visit(Native("/Assets/Folder"));
+        navigation.Visit(Native("/Assets/Folder/Sub"));
         navigation.Back();
         Assert.True(navigation.CanForward);
         navigation.Forward();
-        Assert.Equal("/Assets/Folder/Sub", navigation.Current);
-        navigation.Remap("/Assets/Folder", "/Assets/Moved");
-        Assert.Equal("/Assets/Moved/Sub", navigation.Current);
+        Assert.Equal(Native("/Assets/Folder/Sub"), navigation.Current);
+        navigation.Remap(Native("/Assets/Folder"), Native("/Assets/Moved"));
+        Assert.Equal(Native("/Assets/Moved/Sub"), navigation.Current);
         navigation.Back();
-        navigation.Visit("/Assets/Other");
+        navigation.Visit(Native("/Assets/Other"));
         Assert.False(navigation.CanForward);
-        Assert.Equal("/Assets/Folder2", AssetPathSegments.Remap("/Assets/Folder2", "/Assets/Folder", "/else"));
+        Assert.Equal(Native("/Assets/Folder2"), AssetPathSegments.Remap(Native("/Assets/Folder2"),
+            Native("/Assets/Folder"), Native("/else")));
         for (var i = 0; i < 40; i++)
         {
-            navigation.Visit($"/Assets/{i}");
+            navigation.Visit(Native($"/Assets/{i}"));
         }
 
         var backCount = 0;

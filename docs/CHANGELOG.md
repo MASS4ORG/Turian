@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Changed: built-in type aliases through MASS4.StableIdentity #331.
+- Fixed: internals working on Windows and Linux #75.
+- Fixed: allow disable impossible to reach bricks.
+- Fixed: Play Mode refuses a scene using components of bricks that cannot be resolved, and the Bricks panel lists each problem.
+- Fixed: registries from the personal brick override could not be removed, and a disabled brick's asset importer kept running.
+- Fixed: Windows artifacts are now built and tested on Windows CI runners.
+
 ## [3.8.0] - 2026-10-31
 
 - Changed: built-in type aliases resolve through the shared MASS4.StableIdentity rename map #331.

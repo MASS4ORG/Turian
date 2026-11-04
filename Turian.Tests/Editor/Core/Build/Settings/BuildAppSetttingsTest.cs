@@ -26,9 +26,9 @@ public class BuildAppSetttingsTest
     public void CheckPaths()
     {
         Assert.Equal("/folder/app", settings.ProjectAbsoluteDir);
-        Assert.Equal(Path.GetDirectoryName("/folder/app/Assets/"), settings.AssetsAbsoluteDir);
-        Assert.Equal(Path.GetDirectoryName("/folder/app/.Cache/"), settings.CacheAbsoluteDir);
-        Assert.Equal(Path.GetDirectoryName("../../Assets/"), settings.CacheSourceRelativeDir);
+        Assert.Equal(Path.Combine("/folder/app", "Assets"), settings.AssetsAbsoluteDir);
+        Assert.Equal(Path.Combine("/folder/app", ".Cache"), settings.CacheAbsoluteDir);
+        Assert.Equal(Path.Combine("..", "..", "Assets"), settings.CacheSourceRelativeDir);
     }
 
     /// <summary>

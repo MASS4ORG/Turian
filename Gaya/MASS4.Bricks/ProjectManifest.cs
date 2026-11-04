@@ -166,6 +166,58 @@ public class ProjectManifest
         File.WriteAllText(Path.Combine(directory, FileName), node.ToJsonString(PackageJson.Options));
     }
 
+    /// <summary>Removes a registry the project's per-user override declares, leaving the rest of that file as it is.</summary>
+    /// <param name="projectRoot">The project folder.</param>
+    /// <param name="name">The registry's name.</param>
+    /// <returns>Whether the override declared it.</returns>
+    public static bool RemoveUserRegistry(string projectRoot, string name)
+    {
+        var path = Path.Combine(projectRoot, DirectoryName, UserFileName);
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        JsonObject node;
+        try
+        {
+            node = JsonNode.Parse(File.ReadAllText(path), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip })?.AsObject()
+                ?? throw new PackageException($"{path} is not a valid project manifest.");
+        }
+        catch (JsonException ex)
+        {
+            throw new PackageException($"{path} is not a valid project manifest: {ex.Message}", ex);
+        }
+
+        if (node["scopedRegistries"] is not JsonArray registries)
+        {
+            return false;
+        }
+
+        var removed = false;
+        for (var index = registries.Count - 1; index >= 0; index--)
+        {
+            if (registries[index]?["name"]?.GetValue<string>() == name)
+            {
+                registries.RemoveAt(index);
+                removed = true;
+            }
+        }
+
+        if (!removed)
+        {
+            return false;
+        }
+
+        if (registries.Count == 0)
+        {
+            node.Remove("scopedRegistries");
+        }
+
+        File.WriteAllText(path, node.ToJsonString(PackageJson.Options));
+        return true;
+    }
+
     static ProjectManifest? Read(string path)
     {
         if (!File.Exists(path))

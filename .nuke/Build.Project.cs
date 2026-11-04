@@ -74,6 +74,18 @@ sealed partial class Build
 
     partial void OnPublished() => PublishEditorExtras();
 
+    /// <summary>
+    /// Runs the installed CLI launcher, proving it finds .NET and loads the CLI. DOTNET_ROOT points the framework-dependent
+    /// launcher at the runtime running this build, which CI may have installed outside Program Files.
+    /// </summary>
+    partial void TestInstalledProduct(AbsolutePath installDirectory)
+    {
+        var runtimeDirectory = (AbsolutePath)Path.GetDirectoryName(typeof(object).Assembly.Location);
+        Environment.SetEnvironmentVariable("DOTNET_ROOT", runtimeDirectory.Parent.Parent.Parent);
+        ProcessTasks.StartProcess(installDirectory / $"{CliLauncherName}.exe", "--help").AssertZeroExitCode();
+        Check((installDirectory / $"{StudioLauncherName}.exe").FileExists(), "The installer did not install Studio.");
+    }
+
     bool HasPackageManifest(Project project)
     {
         for (var directory = project.Directory; directory.ToString().StartsWith(RootDirectory, StringComparison.Ordinal); directory = directory.Parent)

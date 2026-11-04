@@ -66,7 +66,7 @@ public class ProjectIconTests : IDisposable
     {
         Assert.True(ProjectIcon.Write(ProjectWithIcon(), output));
 
-        using var png = SKBitmap.Decode(Path.Combine(output, ProjectIcon.PngFileName));
+        using var png = SKBitmap.Decode(File.ReadAllBytes(Path.Combine(output, ProjectIcon.PngFileName)));
         Assert.Equal(256, png.Width);
         Assert.Equal(256, png.Height);
         Assert.True(File.Exists(Path.Combine(output, ProjectIcon.IcoFileName)));

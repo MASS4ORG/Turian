@@ -34,13 +34,30 @@ sealed class UserAssemblyLoadContext : AssemblyLoadContext
         if (probingDirectory != null && assemblyName.Name is { } name
             && Path.Combine(probingDirectory, $"{name}.dll") is var sibling && File.Exists(sibling))
         {
-            return LoadFromAssemblyPath(sibling);
+            return LoadFromFileBytes(sibling);
         }
 
         try { return Default.LoadFromAssemblyName(assemblyName); }
         catch { /* fallthrough */ }
 
         return null;
+    }
+
+    /// <summary>
+    /// Loads an assembly, and its symbols when present, from a copy in memory. A path load maps the file until the
+    /// context is collected, and Windows then refuses the next compile into the slot or deleting it.
+    /// </summary>
+    public ReflectionAssembly LoadFromFileBytes(string path)
+    {
+        using var assembly = new MemoryStream(File.ReadAllBytes(path));
+        var pdb = Path.ChangeExtension(path, ".pdb");
+        if (!File.Exists(pdb))
+        {
+            return LoadFromStream(assembly);
+        }
+
+        using var symbols = new MemoryStream(File.ReadAllBytes(pdb));
+        return LoadFromStream(assembly, symbols);
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)

@@ -13,7 +13,7 @@ public sealed class BrickEnablementTests : IDisposable
     public void Dispose()
     {
         BrickAssemblies.ResetEnablement();
-        Directory.Delete(root, recursive: true);
+        PrecastBrickFixture.DeleteTree(root);
     }
 
     /// <summary>Disabling a precast game brick removes its Create entries and types from discovery.</summary>
@@ -46,6 +46,39 @@ public sealed class BrickEnablementTests : IDisposable
         Assert.Contains(catalog.Kinds, kind => kind.PayloadType?.Assembly == assembly);
     }
 
+    /// <summary>A disabled brick's asset importer stops claiming files, although its assembly stays loaded.</summary>
+    [Fact]
+    public void DisabledBrickImporterStopsClaimingFiles()
+    {
+        var name = "Importer" + Guid.NewGuid().ToString("N");
+        var extension = $".{name[^6..].ToLowerInvariant()}";
+        var brick = PrecastBrick(name, [PackageScope.Project], $$"""
+            public class {{name}}Importer : Turian.Editor.Core.IAssetImporter
+            {
+                public bool IsValid(string filePath) => filePath.EndsWith("{{extension}}");
+                public Turian.Engine.Core.Asset CreateAsset(string filePath) => new Turian.Engine.Core.Asset();
+            }
+            """);
+        Assert.True(BrickAssemblies.Load([brick], NullLogger.Instance));
+
+        var settings = new SettingsService();
+        var app = new AppSettings { ProjectAbsoluteDir = root };
+        settings.Set(app);
+        var log = Substitute.For<ILogger>();
+        using var build = new BuildManager(app, log);
+        using var importer = new AssetImporter(log, new AssetDatabase(), settings, build);
+        importer.StopMonitoring();
+        var file = Path.Combine(root, "model" + extension);
+
+        BrickAssemblies.Enable([brick]);
+        importer.RefreshImporters();
+        Assert.Equal($"{name}Importer", importer.ImporterFor(file)?.GetType().Name);
+
+        BrickAssemblies.Enable([]);
+        importer.RefreshImporters();
+        Assert.NotEqual($"{name}Importer", importer.ImporterFor(file)?.GetType().Name);
+    }
+
     /// <summary>Studio-only bricks stay discoverable; a game brick loaded by the studio follows the project.</summary>
     [Fact]
     public void OnlyGameBricksRetire()
@@ -66,24 +99,25 @@ public sealed class BrickEnablementTests : IDisposable
         Assert.False(BrickAssemblies.IsRetired(typeof(DataAsset).Assembly));
     }
 
-    ResolvedPackage PrecastBrick(string name, List<PackageScope> scopes)
+    ResolvedPackage PrecastBrick(string name, List<PackageScope> scopes, string? source = null)
     {
         var id = "test." + name.ToLowerInvariant();
         var folder = Directory.CreateDirectory(Path.Combine(root, id)).FullName;
         var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(folder), "lib")).FullName;
-        Compile(name, Path.Combine(lib, name + ".dll"));
+        Compile(name, Path.Combine(lib, name + ".dll"), source);
         var manifest = new PackageManifest { Name = id, Version = SemanticVersion.Parse("0.1.0"), Scopes = scopes };
         return new ResolvedPackage(id, manifest, folder, PackageOrigin.Builtin, $"builtin:{id}", null, null, 1, false);
     }
 
-    static void Compile(string name, string path)
+    static void Compile(string name, string path, string? source = null)
     {
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Append(typeof(DataAsset).Assembly.Location)
+            .Append(typeof(AssetImporter).Assembly.Location)
             .Distinct()
             .Select(static reference => MetadataReference.CreateFromFile(reference));
         var compilation = CSharpCompilation.Create(name,
-            [CSharpSyntaxTree.ParseText($$"""
+            [CSharpSyntaxTree.ParseText(source ?? $$"""
                 [Turian.CreateAssetMenu("Tests/{{name}}")]
                 public class {{name}}Data : Turian.Engine.Core.DataAsset { }
                 """)],

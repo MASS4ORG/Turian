@@ -382,7 +382,8 @@ public sealed partial class AssetDatabase
 
         try
         {
-            return Path.GetRelativePath(projectRoot, normalizedPath);
+            var relative = Path.GetRelativePath(projectRoot, normalizedPath);
+            return Path.IsPathRooted(relative) ? relative : relative.Replace('\\', '/');
         }
         catch
         {

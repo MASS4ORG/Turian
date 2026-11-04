@@ -60,7 +60,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: windows-2025
             rid: win-x64
           - os: ubuntu-latest
             rid: linux-x64
@@ -76,10 +76,9 @@ jobs:
         with:
           global-json-file: global.json
 
-      # makensis builds the Windows installer on Linux, so every release asset except macOS is built here.
       - name: Install NSIS
-        if: matrix.rid == 'win-x64'
-        run: sudo apt-get update -yqq && sudo apt-get install -yqq nsis
+        if: runner.os == 'Windows'
+        run: choco install nsis --no-progress -y
 
       # Shaders ship from the .spv committed in the tag (--skip-shaders), but glslc must still be
       # reachable so an un-skipped shader build fails on the shader rather than on exit 127.
@@ -92,7 +91,13 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install shaderc
 
+      # Windows artifacts are built on Windows so the installer is installed, used and uninstalled before release.
+      - name: Pack and test ${{ matrix.rid }}
+        if: runner.os == 'Windows'
+        run: ./build.ps1 Pack WindowsInstallerTest --configuration Release --runtime-identifier "${{ matrix.rid }}" --skip-shaders --publish-self-contained "$env:PUBLISH_SELF_CONTAINED" --publish-single-file "$env:PUBLISH_SINGLE_FILE" --publish-trimmed "$env:PUBLISH_TRIMMED" --verbosity minimal
+
       - name: Pack ${{ matrix.rid }}
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           chmod +x ./build.sh

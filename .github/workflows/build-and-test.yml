@@ -70,7 +70,39 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # Validate all release formats on one runner without tagging or pushing.
+  # The full suite on Windows and macOS, where paths, file locking and atomic replaces differ from Linux.
+  # Compiled shaders are tracked, so glslc is not needed; GPU tests skip on runners without Vulkan.
+  test-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore, compile, test
+        shell: pwsh
+        run: ./build.ps1 Restore Compile TestReport --configuration Debug --skip-shaders --no-local-packages --verbosity minimal
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-${{ matrix.os }}
+          path: coverage/
+          retention-days: 7
+
+  # Validate the Linux, macOS, NuGet and container release formats without tagging or pushing.
   package:
     runs-on: ubuntu-latest
     permissions:
@@ -87,7 +119,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update -yqq
-          sudo apt-get install -yqq glslc podman nsis
+          sudo apt-get install -yqq glslc podman
 
       - name: Build Linux packages, NuGet packages and container image
         run: |
@@ -112,16 +144,6 @@ jobs:
           test -n "$(ls -A "$work/sample/Output")"
           test -s "$work/screenshot.png"
 
-      - name: Build Windows installer and Winget manifests
-        run: |
-          ./build.sh WingetManifest \
-            --configuration "Release" \
-            --runtime-identifier "win-x64" \
-            --skip-shaders \
-            --no-local-packages \
-            --packaging-dry-run \
-            --verbosity minimal
-
       - name: Build macOS archive
         run: |
           ./build.sh Pack \
@@ -130,3 +152,30 @@ jobs:
             --skip-shaders \
             --no-local-packages \
             --verbosity minimal
+
+  # Windows artifacts are built where they can run: pack, install, use and uninstall the installer, then
+  # validate the Winget manifests. Mirrors the GitLab `package-check-windows` job.
+  windows:
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
+
+      - name: Pack, test the installer and validate the Winget manifests
+        run: ./build.ps1 Pack WingetManifest WindowsInstallerTest WingetValidate --configuration Release --runtime-identifier win-x64 --skip-shaders --no-local-packages --packaging-dry-run --verbosity minimal
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-packages
+          path: artifacts/*
+          retention-days: 7

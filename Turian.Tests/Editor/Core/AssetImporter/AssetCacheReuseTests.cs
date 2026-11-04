@@ -66,6 +66,42 @@ public sealed class AssetCacheReuseTests : IDisposable
         Assert.Equal(children.Length, repaired.GetChildAssets(parent.AssetId).Count());
     }
 
+    /// <summary>
+    /// A cache whose catalog paths use either separator, as Windows and Linux editors have written them, reopens on
+    /// any OS without reimporting or reindexing, and its records resolve with forward slashes.
+    /// </summary>
+    [Theory]
+    [InlineData(@"\\")]
+    [InlineData("/")]
+    public void ReopeningACatalogWrittenWithEitherSeparatorReusesTheCache(string jsonSeparator)
+    {
+        var models = Path.Combine(root, "Assets", "Models");
+        Directory.CreateDirectory(models);
+        File.Copy(Path.Combine(AppContext.BaseDirectory, "Fixtures", "cube.fbx"), Path.Combine(models, "cube.fbx"));
+        Scan();
+        var catalogPath = Path.Combine(root, ".Cache", "assetCatalog.json");
+        File.WriteAllText(catalogPath, File.ReadAllText(catalogPath).Replace("/", jsonSeparator, StringComparison.Ordinal));
+        var imported = Directory.GetFiles(Path.Combine(root, ".Cache", "Assets"), "import.json", SearchOption.AllDirectories)
+            .ToDictionary(static path => path, static path => Serializer.Load<ImportedAssetManifest>(path)!.ImportedAtUtc);
+        var progress = Substitute.For<IProgressSink>();
+        var indexing = Substitute.For<IProgressScope>();
+        progress.BeginChild(BackgroundTaskKind.Import, "Indexing assets").Returns(indexing);
+
+        var records = Scan(progress).GetAssetsSnapshot();
+
+        indexing.Received().Units(0, 0);
+        Assert.All(imported, static entry =>
+            Assert.Equal(entry.Value, Serializer.Load<ImportedAssetManifest>(entry.Key)!.ImportedAtUtc));
+        Assert.Contains(records, static record => record.ParentAssetId != Guid.Empty);
+        Assert.All(records, static record =>
+        {
+            string[] paths = [record.SourceRelativePath, record.MetaRelativePath, record.ImportedRelativePath,
+                .. record.Artifacts, .. record.TargetArtifacts.Values];
+            Assert.All(paths, static path => Assert.DoesNotContain('\\', path));
+            Assert.True(File.Exists(record.ResolveContentPath()), record.ImportedRelativePath);
+        });
+    }
+
     /// <summary>Malformed cached metadata is replaced so the source can still be imported after reopening.</summary>
     [Fact]
     public void ReopeningRepairsNullMetadata()

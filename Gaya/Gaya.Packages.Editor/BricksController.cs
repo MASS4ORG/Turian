@@ -459,8 +459,8 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
         LoadRegistryCache(workspace?.Root);
         Catalog = workspace is null
             ? []
-            : BrickCatalog.WithRegistries(BrickCatalog.Local(bricks, workspace.BuiltinDirectory, Store,
-                workspace.ReservedCategoryPrefixes, workspace.Scope), registryBricks);
+            : WithUnresolved(BrickCatalog.WithRegistries(BrickCatalog.Local(bricks, workspace.BuiltinDirectory, Store,
+                workspace.ReservedCategoryPrefixes, workspace.Scope), registryBricks), workspace.Root, bricks);
         Rows =
         [
             .. bricks.Select(p => new BrickRow(p.Id, p.Version.ToString(), p.Manifest.DisplayName, p.Origin, p.Source,
@@ -475,6 +475,41 @@ public sealed partial class BricksController(IBrickWorkspace? studio, IProjectBr
 
         Revision++;
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Lists the bricks the manifest declares but the resolution did not return, as in use, so a brick whose source
+    /// cannot be reached can still be seen and disabled.
+    /// </summary>
+    static IReadOnlyList<CatalogBrick> WithUnresolved(IReadOnlyList<CatalogBrick> catalog, string root,
+        IReadOnlyList<ResolvedPackage> resolved)
+    {
+        Dictionary<string, string?> declared;
+        try
+        {
+            declared = ProjectManifest.Load(root, includeUserOverride: false).Manifest.Dependencies;
+        }
+        catch (PackageException)
+        {
+            return catalog;
+        }
+
+        var missing = declared.Where(pair => pair.Value is not null && resolved.All(p => p.Id != pair.Key)).ToList();
+        if (missing.Count == 0)
+        {
+            return catalog;
+        }
+
+        var merged = catalog.ToDictionary(static b => b.Id, StringComparer.Ordinal);
+        foreach (var (id, source) in missing)
+        {
+            merged[id] = merged.TryGetValue(id, out var known)
+                ? known with { State = BrickState.Enabled, Origin = source }
+                : new CatalogBrick(id, null, "Declared by the project, but its source could not be resolved.", null,
+                    BrickState.Enabled, null, null, source, source, IsBuiltin: false);
+        }
+
+        return [.. merged.Values.OrderBy(static b => b.DisplayName ?? b.Id, StringComparer.OrdinalIgnoreCase)];
     }
 
     static IReadOnlyList<ScopedRegistry> ReadRegistries(IBrickWorkspace workspace)

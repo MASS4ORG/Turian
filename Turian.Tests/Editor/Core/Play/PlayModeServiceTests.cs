@@ -407,6 +407,44 @@ public class PlayModeServiceTests : IDisposable
     }
 
     /// <summary>
+    /// A scene holding a component whose brick cannot be resolved refuses to play, while unreachable bricks the scene
+    /// does not use leave Play available.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void PlayIsRefusedOnlyForMissingBrickComponents(bool sceneUsesMissingBrick, bool starts)
+    {
+        var project = Path.Combine(Path.GetTempPath(), $"turian-play-bricks-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(project, "Assets"));
+        try
+        {
+            new ProjectManifest { Dependencies = { ["user.mateo.gone"] = "file:../nowhere" } }.Save(project);
+            var settings = new SettingsService();
+            settings.Set(new AppSettings { Title = "Game", ProjectAbsoluteDir = project });
+            var root = GiveControllerAnOpenScene();
+            if (sceneUsesMissingBrick)
+            {
+                root.AddComponent(new MissingComponent { UnresolvedTypeId = Guid.NewGuid() });
+            }
+
+            var service = new PlayModeService(sceneTree, assetDatabase, new SettingsOnlyServiceProvider(settings), Log.Logger);
+
+            Assert.Equal(starts, service.Start());
+            service.Stop();
+        }
+        finally
+        {
+            Directory.Delete(project, recursive: true);
+        }
+    }
+
+    sealed class SettingsOnlyServiceProvider(SettingsService settings) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType == typeof(SettingsService) ? settings : null;
+    }
+
+    /// <summary>
     /// Gameplay receives its play-scoped services before Awake; stopping discards that scene scope.
     /// </summary>
     [Fact]

@@ -287,7 +287,7 @@ public sealed class PackageStore(string root)
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in arguments)
+        foreach (var argument in GitLineEndings.Arguments.Concat(arguments))
         {
             startInfo.ArgumentList.Add(argument);
         }

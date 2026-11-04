@@ -93,7 +93,7 @@ public static partial class BrickService
     /// <returns>Whether the project declared or embedded it.</returns>
     public static bool Remove(string projectRoot, string id)
     {
-        var bricks = List(projectRoot);
+        var bricks = ResolvedOrEmpty(projectRoot);
         if (bricks.Any(p => p.Id == id && p.Origin == PackageOrigin.Embedded))
         {
             var dependents = bricks.Where(p => p.Id != id && p.Manifest.Dependencies.ContainsKey(id))
@@ -124,9 +124,10 @@ public static partial class BrickService
     public static void Disable(string projectRoot, string id)
     {
         var (before, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
+        var wasResolved = TryResolve(projectRoot);
         if (!before.Dependencies.ContainsKey(id) && !ProjectPackages.DefaultDependencies.ContainsKey(id))
         {
-            var needers = List(projectRoot).Where(p => p.Manifest.Dependencies.ContainsKey(id)).Select(p => p.Id).ToArray();
+            var needers = ResolvedOrEmpty(projectRoot).Where(p => p.Manifest.Dependencies.ContainsKey(id)).Select(p => p.Id).ToArray();
             throw new PackageException(needers.Length > 0
                 ? $"{id} is needed by {string.Join(", ", needers)}; stop using those first."
                 : $"The project does not declare {id}; a local brick is stopped by uninstalling it.");
@@ -148,11 +149,40 @@ public static partial class BrickService
         {
             _ = ProjectPackages.Resolve(projectRoot);
         }
-        catch (PackageException)
+        catch (PackageException) when (wasResolved)
         {
             before.Save(projectRoot);
             ProjectPackages.Invalidate(projectRoot);
             throw;
+        }
+        catch (PackageException)
+        {
+            // The project did not resolve before either, so a brick whose source is out of reach can be dropped.
+        }
+    }
+
+    static IReadOnlyList<ResolvedPackage> ResolvedOrEmpty(string projectRoot)
+    {
+        try
+        {
+            return List(projectRoot);
+        }
+        catch (PackageException)
+        {
+            return [];
+        }
+    }
+
+    static bool TryResolve(string projectRoot)
+    {
+        try
+        {
+            _ = ProjectPackages.Resolve(projectRoot);
+            return true;
+        }
+        catch (PackageException)
+        {
+            return false;
         }
     }
 
@@ -309,14 +339,20 @@ public static partial class BrickService
     public static bool RemoveRegistry(string projectRoot, string name)
     {
         var (manifest, _) = ProjectManifest.Load(projectRoot, includeUserOverride: false);
-        if (manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) == 0)
+        var shared = manifest.ScopedRegistries.RemoveAll(existing => existing.Name == name) > 0;
+        if (shared)
         {
-            return false;
+            manifest.Save(projectRoot);
         }
 
-        manifest.Save(projectRoot);
-        ProjectPackages.Invalidate(projectRoot);
-        return true;
+        // A registry may be declared only in this machine's override, which the panel lists like any other.
+        var personal = ProjectManifest.RemoveUserRegistry(projectRoot, name);
+        if (shared || personal)
+        {
+            ProjectPackages.Invalidate(projectRoot);
+        }
+
+        return shared || personal;
     }
 
     /// <summary>Finds bricks in the project's registries whose id contains <paramref name="query"/>.</summary>

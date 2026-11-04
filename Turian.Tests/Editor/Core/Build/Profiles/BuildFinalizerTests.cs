@@ -29,7 +29,8 @@ public sealed class BuildFinalizerTests : IDisposable
     {
         var output = Path.Combine(project, "Output");
         Directory.CreateDirectory(output);
-        foreach (var file in new[] { "Game.pdb", "Game.xml", "Game.deps.json", "Game.dll", "project" })
+        var extension = DesktopBuildPlatform.ExecutableExtension(null);
+        foreach (var file in new[] { "Game.pdb", "Game.xml", "Game.deps.json", "Game.dll", $"project{extension}" })
         {
             File.WriteAllText(Path.Combine(output, file), string.Empty);
         }
@@ -41,7 +42,7 @@ public sealed class BuildFinalizerTests : IDisposable
         Assert.False(File.Exists(Path.Combine(output, "Game.pdb")));
         Assert.False(File.Exists(Path.Combine(output, "Game.xml")));
         Assert.True(File.Exists(Path.Combine(output, "Game.dll")));
-        Assert.True(File.Exists(Path.Combine(output, "Game")));
+        Assert.True(File.Exists(Path.Combine(output, $"Game{extension}")));
     }
 
     /// <summary>A published Windows executable is renamed to the title keeping its extension.</summary>

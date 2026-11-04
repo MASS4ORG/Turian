@@ -20,7 +20,7 @@ public sealed partial class BrickMaterializer
         }
 
         // Git metadata is unnecessary for producer project references and may contain local transport configuration.
-        Directory.Delete(Path.Combine(payload, ".git"), recursive: true);
+        ReadOnlyTree.Delete(Path.Combine(payload, ".git"));
     }
 
     static async Task RunGitAsync(string[] arguments, BrickMaterializationSource source, string? token,
@@ -37,7 +37,7 @@ public sealed partial class BrickMaterializer
         start.ArgumentList.Add("credential.helper=");
         start.ArgumentList.Add("-c");
         start.ArgumentList.Add("http.followRedirects=false");
-        foreach (var argument in arguments)
+        foreach (var argument in GitLineEndings.Arguments.Concat(arguments))
         {
             start.ArgumentList.Add(argument);
         }

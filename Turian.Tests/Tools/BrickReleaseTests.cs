@@ -152,6 +152,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     [Fact]
     public async Task ProcessCancellationStopsOnlyTheStartedChild()
     {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "the release tools and this child process are POSIX-only");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromMilliseconds(100));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
@@ -286,6 +287,7 @@ public sealed class BrickReleaseTests : IAsyncLifetime
     [InlineData(true)]
     public async Task ConsumerRestoreStartsColdAndHonorsScope(bool studio)
     {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "the container consumer maps the host's POSIX user id");
         WriteArchive(scopes: studio ? ["studio"] : null);
         var image = "ghcr.io/mass4org/turian-cli@sha256:" + new string('a', 64);
         var calls = new List<string[]>();

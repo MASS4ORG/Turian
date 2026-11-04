@@ -18,7 +18,7 @@ public sealed class PackagedPluginsTests : IDisposable
     }
 
     /// <inheritdoc/>
-    public void Dispose() => Directory.Delete(root, recursive: true);
+    public void Dispose() => TestFiles.Delete(root);
 
     /// <summary>A studio package's compiled plugin is loaded and discoverable by the host.</summary>
     [Fact]

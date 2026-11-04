@@ -49,14 +49,22 @@ public class SceneManagerSynchronizationContextTests
             thread.IsBackground = true;
             thread.Start();
 
-            Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Loading the scene deadlocked.");
+            // A deadlock never finishes, so the limit only has to outlast a starved thread pool on a loaded machine.
+            Assert.True(thread.Join(TimeSpan.FromSeconds(120)), "Loading the scene deadlocked.");
             Assert.Null(failure);
             Assert.NotNull(root);
             Assert.Equal("SceneRoot", root.Name);
         }
         finally
         {
-            File.Delete(scenePath);
+            try
+            {
+                File.Delete(scenePath);
+            }
+            catch (IOException)
+            {
+                // A still-running loader keeps the file open; the failed assertion above is the real error.
+            }
         }
     }
 }

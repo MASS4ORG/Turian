@@ -83,10 +83,10 @@ public sealed class AssemblySlotManager
                          .Where(path => !string.Equals(Path.GetFullPath(path), fullPath, StringComparison.Ordinal))
                          .Order(StringComparer.Ordinal))
             {
-                userAssemblies.Add(newContext.LoadFromAssemblyPath(path));
+                userAssemblies.Add(newContext.LoadFromFileBytes(path));
             }
 
-            var primary = newContext.LoadFromAssemblyPath(fullPath);
+            var primary = newContext.LoadFromFileBytes(fullPath);
             userAssemblies.Add(primary);
 
             // Success – unload the old context first
