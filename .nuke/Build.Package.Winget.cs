@@ -85,10 +85,18 @@ sealed partial class Build
 
             var winget = FindWinget() ?? (IsServerBuild ? InstallWinget() : null)
                 ?? throw new InvalidOperationException("winget was not found: install App Installer from the Microsoft Store.");
-            ProcessTasks.StartProcess(winget,
-                    $"validate --manifest \"{ArtifactsDirectory / "winget" / Version}\" --disable-interactivity")
-                .AssertZeroExitCode();
+            var validate = ProcessTasks.StartProcess(winget,
+                $"validate --manifest \"{ArtifactsDirectory / "winget" / Version}\" --disable-interactivity");
+            validate.AssertWaitForExit();
+            // Older winget clients on CI images warn about schema headers that current clients accept.
+            if (validate.ExitCode is not (0 or WingetValidationSucceededWithWarnings))
+            {
+                throw new InvalidOperationException($"winget validate failed with exit code {validate.ExitCode}.");
+            }
         });
+
+    /// <summary>The exit code of `winget validate` when the manifests are valid but it reported warnings.</summary>
+    const int WingetValidationSucceededWithWarnings = unchecked((int)0x8A150028);
 
     /// <summary>Finds winget on the PATH or at its per-user App Installer alias, or returns null.</summary>
     static string FindWinget() =>
