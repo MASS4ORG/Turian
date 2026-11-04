@@ -52,7 +52,10 @@ public sealed class BrickAssemblyLoadTests : IDisposable
 
         var resolved = new AssemblyDependencyResolver(assembly).ResolveAssemblyToPath(new AssemblyName("Dep"));
 
-        Assert.Equal(Path.Combine(root, "Dep.dll"), resolved);
+        // The resolver returns the real path, which on macOS goes through the /var -> /private/var symlink.
+        Assert.NotNull(resolved);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(root, "Dep.dll")), File.ReadAllBytes(resolved));
+        Assert.Equal("Dep.dll", Path.GetFileName(resolved));
     }
 
     /// <summary>Loading with a project root restores nothing when no brick maps a package.</summary>
