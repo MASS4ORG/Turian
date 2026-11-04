@@ -35,12 +35,23 @@ public sealed class HeadlessPlayerTests : IDisposable
     public void LoopTicksUntilCancelled()
     {
         var ticker = new SceneTicker(new SceneManager(new AssetDatabase()));
-        using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(80));
+        using var scheduler = ticker.Async;
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var ticks = StopAfterTicks();
 
         HeadlessPlayer.Loop(ticker, stop.Token);
 
+        Assert.True(ticks.IsCompletedSuccessfully, "The loop did not complete two fixed ticks before the timeout.");
         Assert.True(ticker.ElapsedSeconds > 0);
-        Assert.True(ticker.Clock.TickIndex > 0);
+        Assert.True(ticker.Clock.TickIndex >= 2);
+
+        async Task StopAfterTicks()
+        {
+            // Cancel from observed simulation progress; runner scheduling must not decide whether ticks occur.
+            await scheduler.FixedUpdate();
+            await scheduler.FixedUpdate();
+            stop.Cancel();
+        }
     }
 
     /// <summary>
