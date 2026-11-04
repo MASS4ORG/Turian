@@ -9,27 +9,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed: built-in type aliases through MASS4.StableIdentity #331.
 - Fixed: internals working on Windows and Linux #75.
 - Fixed: allow disable impossible to reach bricks.
-- Fixed: Play Mode refuses a scene using components of bricks that cannot be resolved, and the Bricks panel lists each problem.
-- Fixed: registries from the personal brick override could not be removed, and a disabled brick's asset importer kept running.
 - Fixed: Windows artifacts are now built and tested on Windows CI runners.
+- Fixed: Windows fails when two brick downloads.
 
 ## [3.8.0] - 2026-10-31
 
 - Changed: built-in type aliases resolve through the shared MASS4.StableIdentity rename map #331.
 
-## [3.8.0] - 2026-10-30
+## [3.7.0] - 2026-10-30
 
+- Added: DataAsset-Driven Design #55.
+- Added: generated startup metadata for NativeAOT server exports #292.
 - Added: line and trail renderers with world-space SDF text #110.
 - Added: typed source-test dependencies for brick workflows #337.
 - Added: bricks pinned store, git and archive sources #338.
 - Changed: shared MASS4.Localization library and the localization brick #344.
 - Fixed: baking, packing or publishing a studio-only brick.
-
-## [3.7.0] - 2026-10-29
-
 - Fixed: Studio brick changes report when plugin activation requires a restart.
-- Added: DataAsset-Driven Design #55.
-- Added: generated startup metadata for NativeAOT server exports #292.
 
 ## [3.6.0] - 2026-10-27
 
