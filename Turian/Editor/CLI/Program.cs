@@ -84,13 +84,14 @@ public static partial class Program
     {
         var pathArg = new Argument<DirectoryInfo>("ProjectPath")
         {
-            Description = "Folder to create the project in; it must not exist yet or be empty"
+            Description = "Folder to create the project in; it must be empty or contain only repository metadata"
         };
         var cmd = new Command("new", "Create a new project") { pathArg };
         cmd.SetAction(async (result, _) =>
         {
             var directory = result.GetValue(pathArg)!;
-            if (directory.Exists && directory.EnumerateFileSystemInfos().Any())
+            var existing = directory.Exists ? directory.EnumerateFileSystemInfos().ToArray() : [];
+            if (existing.Any(static entry => !IsRepositoryMetadata(entry)))
             {
                 Log.Logger.LogError("{Path} already exists and is not empty", directory.FullName);
                 return 1;
@@ -103,9 +104,36 @@ public static partial class Program
             }
 
             Log.Logger.LogInformation("Created project {Path}", created);
+            foreach (var entry in existing)
+            {
+                Log.Logger.LogInformation("Kept existing {Path}", entry.FullName);
+            }
+
             return 0;
         });
         return cmd;
+    }
+
+    static bool IsRepositoryMetadata(FileSystemInfo entry)
+    {
+        // A worktree can use a .git file instead of a directory. Never follow metadata links.
+        if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            return false;
+        }
+
+        if (entry.Name == ".git")
+        {
+            return true;
+        }
+
+        if (entry is DirectoryInfo)
+        {
+            return entry.Name == ".github";
+        }
+
+        return entry.Name is ".gitattributes" or ".gitignore" or "README.md" or ".gitlab-ci.yml"
+               || entry.Name.StartsWith("LICENSE", StringComparison.Ordinal);
     }
 
     static Command CompileCommand(Argument<FileSystemInfo> projectArg)
