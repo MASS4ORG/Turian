@@ -78,7 +78,7 @@ jobs:
 
       - name: Install NSIS
         if: runner.os == 'Windows'
-        run: choco install nsis --no-progress -y
+        run: ./ci/install-nsis.ps1
 
       # Shaders ship from the .spv committed in the tag (--skip-shaders), but glslc must still be
       # reachable so an un-skipped shader build fails on the shader rather than on exit 127.

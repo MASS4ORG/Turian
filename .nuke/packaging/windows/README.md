@@ -6,6 +6,8 @@ the user `PATH` (so `turian-studio` and `turian-cli` work from any terminal) and
 It warns, without blocking, when the .NET 10 SDK is missing. Uninstalling removes the `PATH` entry. [`user-path.ps1`](user-path.ps1) edits the `PATH`, because NSIS strings are capped at 1024 characters and would truncate a longer one.
 
 1. Install .NET 10 SDK and NSIS (`choco install nsis` on Windows, `sudo apt install nsis` on Debian/Ubuntu). `WindowsInstaller` finds `makensis` on the `PATH` or in the default NSIS folder.
+
+   Windows CI uses `ci/install-nsis.ps1`: it reuses an available compiler, retries Chocolatey installation up to three times, and fails before packaging if `makensis.exe` is still absent, even when Chocolatey exits successfully. It adds the discovered compiler directory to the process `PATH` and, on GitHub Actions, to `GITHUB_PATH` for subsequent steps.
 2. Build the installer and, on Windows, install, use and uninstall it:
 
    ```sh
