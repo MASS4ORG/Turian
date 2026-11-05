@@ -44,7 +44,7 @@ cache:
 .windows_job_template: &windows_job_template
     tags: ["saas-windows-medium-amd64"]
     before_script:
-        - choco install nsis --no-progress -y
+        - ./ci/install-nsis.ps1
     artifacts:
         expire_in: 1 week
 

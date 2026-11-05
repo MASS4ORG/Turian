@@ -551,14 +551,7 @@ public sealed class AssetFileSystem(SettingsService settingsService, AssetImport
             ?? throw new InvalidOperationException("CreateAssetMetadata returned null.");
     }
 
-    static string SerializeAssetMetadata(Asset asset)
-    {
-        var method = typeof(AssetImporter)
-            .GetMethod("SerializeAssetMetadata", BindingFlags.Static | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("SerializeAssetMetadata not found on AssetImporter.");
-        return method.Invoke(null, [asset]) as string
-            ?? throw new InvalidOperationException("SerializeAssetMetadata returned null.");
-    }
+    static string SerializeAssetMetadata(Asset asset) => AssetImporter.SerializeAssetMetadata(asset);
 
     static void UpdateMetaRelativePath(string metaPath, string assetPath)
     {

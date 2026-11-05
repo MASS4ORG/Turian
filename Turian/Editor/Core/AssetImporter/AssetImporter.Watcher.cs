@@ -211,7 +211,10 @@ public sealed partial class AssetImporter
         return node?.ToJsonString() ?? string.Empty;
     }
 
-    internal static string SerializeAssetMetadata(Asset asset)
+    /// <summary>Serializes asset metadata with its concrete importer settings and type identity.</summary>
+    /// <param name="asset">The metadata to write beside an asset.</param>
+    /// <returns>The serialized metadata.</returns>
+    public static string SerializeAssetMetadata(Asset asset)
     {
         return asset switch
         {

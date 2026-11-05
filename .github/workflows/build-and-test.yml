@@ -169,7 +169,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install NSIS
-        run: choco install nsis --no-progress -y
+        run: ./ci/install-nsis.ps1
 
       - name: Pack, test the installer and validate the Winget manifests
         run: ./build.ps1 Pack WingetManifest WindowsInstallerTest WingetValidate --configuration Release --runtime-identifier win-x64 --skip-shaders --no-local-packages --packaging-dry-run --verbosity minimal

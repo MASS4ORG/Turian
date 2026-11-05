@@ -5,6 +5,7 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/Editor/">
+    <Project Path="Turian/Editor/Cli.Sdk/Turian.Cli.Sdk.csproj" />
     <Project Path="Turian/Editor/CLI/Turian.Editor.CLI.csproj" />
     <Project Path="Turian/Editor/Bootstrap/Turian.Editor.Bootstrap.csproj" />
     <Project Path="Turian/Editor/Core/Turian.Editor.Core.csproj" />

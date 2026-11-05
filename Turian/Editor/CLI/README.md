@@ -1,5 +1,28 @@
 # Turian CLI
 
+## Brick commands
+
+The CLI discovers public `ICliPlugin` implementations in the compiled runtime and editor assemblies of installed bricks before parsing commands. Plugins reference `MASS4.Turian.Cli.Sdk` and `System.CommandLine`; they receive their brick folder, selected project and logger through `CliPluginContext`. Providers must have a public parameterless constructor and keep command creation free of workspace changes.
+
+Project bricks come from the nearest `Bricks/manifest.json` above the current directory. Use the global `--cli-project <folder>` option to select a different project, independently of a command's destination options. Bricks installed with `brick add --studio` also contribute commands outside projects. A project installation takes precedence over a studio installation of the same brick. Discovery uses compiled precast payloads; build a source brick before linking it for CLI development. The CLI does not compile or execute project scripts while displaying help.
+
+Each provider returns `CliCommand` registrations. An empty parent path adds a top-level command; `new CliCommand(command, "import")` adds a command under a shared `import` group. Multiple plugins may share groups. Built-in commands, existing commands and aliases cannot be replaced; an invalid provider's registrations are rejected together and logged without disabling other providers.
+
+Unity package conversion is supplied by the optional `org.mass4.turian.unity-import` brick. Install its compiled distribution into the studio to import into arbitrary destinations:
+
+```sh
+turian-cli brick add org.mass4.turian.unity-import --studio
+turian-cli import unitypackage assets.unitypackage --project path/to/game
+```
+
+The UI brick supplies the headless `ui` command. Select the project containing its compiled installation:
+
+```sh
+turian-cli --cli-project path/to/game ui --file path/to/menu.ui --out menu.png
+```
+
+Plugin commands and their options appear in normal `--help` output only when their provider brick is installed and compiled.
+
 Headless tools for project compilation, asset import, builds, scene diagnostics and brick distribution.
 
 From the repository root:
