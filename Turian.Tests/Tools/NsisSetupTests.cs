@@ -104,7 +104,7 @@ public sealed class NsisSetupTests : IDisposable
             start.ArgumentList.Add(argument);
         }
 
-        foreach (var key in start.Environment.Keys.Where(key =>
+        foreach (var key in start.Environment.Keys.Where(static key =>
                      new[] { "PATH", "PATHEXT", "ProgramFiles", "ProgramFiles(x86)", "GITHUB_PATH", "NSIS_TEST_ROOT" }
                          .Contains(key, StringComparer.OrdinalIgnoreCase)).ToArray())
         {
