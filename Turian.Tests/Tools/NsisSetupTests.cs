@@ -31,8 +31,8 @@ public sealed class NsisSetupTests : IDisposable
                 echo retry>"%NSIS_TEST_ROOT%\retry.flag"
                 exit /b 1
             )
-            mkdir "%ProgramFiles%\NSIS\Bin"
-            type nul > "%ProgramFiles%\NSIS\Bin\makensis.exe"
+            mkdir "%NSIS_TEST_ROOT%\program-files\NSIS\Bin"
+            type nul > "%NSIS_TEST_ROOT%\program-files\NSIS\Bin\makensis.exe"
             exit /b 0
             """);
 
@@ -48,8 +48,8 @@ public sealed class NsisSetupTests : IDisposable
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "NSIS setup runs on Windows CI.");
         var result = await RunAsync("""
-            mkdir "%ProgramFiles%\NSIS"
-            type nul > "%ProgramFiles%\NSIS\makensis.exe"
+            mkdir "%NSIS_TEST_ROOT%\program-files\NSIS"
+            type nul > "%NSIS_TEST_ROOT%\program-files\NSIS\makensis.exe"
             exit /b 3010
             """);
 
@@ -88,6 +88,12 @@ public sealed class NsisSetupTests : IDisposable
         }
 
         Assert.NotNull(repository);
+        var wrapper = Path.Combine(root, "setup.ps1");
+        await File.WriteAllTextAsync(wrapper, """
+            $env:ProgramFiles = Join-Path $env:NSIS_TEST_ROOT 'program-files'
+            ${env:ProgramFiles(x86)} = Join-Path $env:NSIS_TEST_ROOT 'program-files-x86'
+            & $env:NSIS_SETUP_SCRIPT -Attempts 3 -RetryDelaySeconds 0
+            """, TestContext.Current.CancellationToken);
         var shell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
             "WindowsPowerShell", "v1.0", "powershell.exe");
         var start = new ProcessStartInfo(shell)
@@ -98,8 +104,7 @@ public sealed class NsisSetupTests : IDisposable
             CreateNoWindow = true,
         };
         foreach (var argument in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                     Path.Combine(repository.FullName, "ci", "install-nsis.ps1"),
-                     "-Attempts", "3", "-RetryDelaySeconds", "0" })
+                     wrapper })
         {
             start.ArgumentList.Add(argument);
         }
@@ -117,6 +122,7 @@ public sealed class NsisSetupTests : IDisposable
         start.Environment["ProgramFiles(x86)"] = Path.Combine(root, "program-files-x86");
         start.Environment["GITHUB_PATH"] = Path.Combine(root, "github-path.txt");
         start.Environment["NSIS_TEST_ROOT"] = root;
+        start.Environment["NSIS_SETUP_SCRIPT"] = Path.Combine(repository.FullName, "ci", "install-nsis.ps1");
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
         var error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
