@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-11-05
+
 - Added: brick CLI plugins #340.
 - Changed: reuse compiled test outputs.
 
@@ -186,7 +188,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - First commit!
 
-[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.9.0...HEAD
+[Unreleased]: https://github.com/MASS4ORG/Turian/compare/v3.10.0...HEAD
+[3.10.0]: https://github.com/MASS4ORG/Turian/compare/v3.9.0...v3.10.0
 [3.9.0]: https://github.com/MASS4ORG/Turian/compare/v3.8.0...v3.9.0
 [3.8.0]: https://github.com/MASS4ORG/Turian/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/MASS4ORG/Turian/compare/v3.6.0...v3.7.0
