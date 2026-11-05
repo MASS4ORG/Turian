@@ -20,6 +20,9 @@ sealed partial class Build
     string DefaultConfiguration => IsLocalBuild ? ConfigurationOptions.Debug : ConfigurationOptions.Release;
     const string TestReportArgument = "--report-xunit-trx";
 
+    partial void ConfigureFastTests(ref DotNetTestSettings settings) =>
+        settings = settings.AddProcessAdditionalArguments("--filter-not-trait", "Category=E2E");
+
     const string PackageAuthors = "Bruno Massa";
     const string PackageCopyrightOwner = "Bruno Massa";
     const string PackageProjectUrl = "https://turian.mass4.org/";

@@ -26,8 +26,8 @@ public sealed class BrickArchiveTests : IDisposable
         var brick = Brick("rules", "com.acme.rules", "1.0.0");
 
         var first = BrickArchive.Pack(brick, Path.Combine(root, "out1"));
-        Thread.Sleep(20);
-        File.SetLastWriteTimeUtc(Path.Combine(brick, "Runtime", "Rule.txt"), DateTime.UtcNow);
+        var payload = Path.Combine(brick, "Runtime", "Rule.txt");
+        File.SetLastWriteTimeUtc(payload, File.GetLastWriteTimeUtc(payload).AddDays(-7));
         var second = BrickArchive.Pack(brick, Path.Combine(root, "out2"));
 
         Assert.Equal(first.Integrity, second.Integrity);

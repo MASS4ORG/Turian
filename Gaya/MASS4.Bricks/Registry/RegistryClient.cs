@@ -132,7 +132,9 @@ public sealed class RegistryClient
         }
 
         Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, $"{id}-{version}{BrickArchive.Extension}");
+        // Unique per download: resolutions running in parallel can fetch the same brick, and Windows refuses a second
+        // writer on a file another download still holds open.
+        var path = Path.Combine(directory, $"{id}-{version}-{Guid.NewGuid():N}{BrickArchive.Extension}");
         await File.WriteAllBytesAsync(path, bytes, cancellationToken).ConfigureAwait(false);
         return path;
     }

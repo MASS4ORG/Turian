@@ -206,11 +206,19 @@ public sealed class LayerInterningTests
     {
         var registry = Registry(TypedSettings());
         var memberships = new NodeLayers();
-        registry.TryGetGroupSlot<Physics>(out _);
-        registry.TryGetLayerIndex<Physics, Water>(out _);
-        registry.TryGetTagId<Player>(out _);
         memberships[1000] = 255;
+        // Exercise the complete workload before measuring, including first-use coverage probes.
+        RunRuntimeLookups(registry, ref memberships);
         var before = GC.GetAllocatedBytesForCurrentThread();
+        var count = RunRuntimeLookups(registry, ref memberships);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.Equal(2_560_000, count);
+        Assert.Equal(0, allocated);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static int RunRuntimeLookups(LayerInterningService registry, ref NodeLayers memberships)
+    {
         var count = 0;
         for (var iteration = 0; iteration < 10_000; iteration++)
         {
@@ -222,8 +230,6 @@ public sealed class LayerInterningTests
             memberships[2000] = 0;
             count += memberships[slot] + memberships[1000];
         }
-        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-        Assert.Equal(2_560_000, count);
-        Assert.Equal(0, allocated);
+        return count;
     }
 }
