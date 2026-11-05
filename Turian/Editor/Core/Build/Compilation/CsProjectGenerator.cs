@@ -128,6 +128,10 @@ public static class CsProjectGenerator
             {
                 projectRoot.AddItemGroup().AddItem("Reference", "Turian.Editor.Core")
                     .AddMetadata("HintPath", typeof(IAssetImporter).Assembly.Location, true);
+                projectRoot.AddItemGroup().AddItem("Reference", "Turian.Cli.Sdk")
+                    .AddMetadata("HintPath", typeof(Cli.Sdk.ICliPlugin).Assembly.Location, true);
+                projectRoot.AddItemGroup().AddItem("Reference", "System.CommandLine")
+                    .AddMetadata("HintPath", typeof(System.CommandLine.Command).Assembly.Location, true);
             }
         }
 

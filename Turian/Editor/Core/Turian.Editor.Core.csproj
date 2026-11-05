@@ -15,6 +15,7 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <ProjectReference Include="../Cli.Sdk/Turian.Cli.Sdk.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Engine/Core/Turian.Engine.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.vulkan/Source~/Turian.Engine.Vulkan/Turian.Engine.Vulkan.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Gaya/MASS4.Bricks/MASS4.Bricks.csproj"/>

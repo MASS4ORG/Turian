@@ -37,10 +37,15 @@ public static partial class Program
             OapCommand(projectArg),
             BrickCommand(),
             VariantCommand(),
-            ImportCommand(),
             ThemeCommand()
         };
 
+        root.Options.Add(new Option<DirectoryInfo?>("--cli-project")
+        {
+            Description = "Load CLI plugins from this project's bricks (defaults to the current project)",
+            Recursive = true,
+        });
+        CliPlugins.Load(root, args, Log.Logger);
         return await root.Parse(args).InvokeAsync();
     }
 
