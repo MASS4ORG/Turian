@@ -33,6 +33,10 @@
                           OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.android/Source~/Turian.Android.Host/Turian.Android.Host.csproj" />
+    </ItemGroup>
+
     <!-- External libraries -->
     <ItemGroup>
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />

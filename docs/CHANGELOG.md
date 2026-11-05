@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- Added: Android launcher and surface lifecycle #255.
+
 ## [3.11.0] - 2026-11-09
 
 - Added: audio playback #61 #95.
