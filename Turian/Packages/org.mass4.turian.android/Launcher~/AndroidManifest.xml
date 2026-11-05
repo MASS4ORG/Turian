@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-sdk android:minSdkVersion="33" android:targetSdkVersion="36" />
+  <uses-feature android:name="android.hardware.vulkan.version" android:version="0x403000" android:required="true" />
+  <application android:allowBackup="false" android:hasCode="true" android:enableOnBackInvokedCallback="true" />
+</manifest>

@@ -161,7 +161,7 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.Same(desktop.GetType(), BuildPlatforms.Find("DESKTOP").GetType());
         Assert.Equal("Desktop", desktop.DisplayName);
         Assert.True(Directory.Exists(desktop.LauncherDirectory));
-        Assert.Contains("desktop", Assert.Throws<InvalidOperationException>(static () => BuildPlatforms.Find("android")).Message);
+        Assert.IsType<AndroidBuildPlatform>(BuildPlatforms.Find("android"));
         Assert.Equal(["publish", "game.csproj", "-o", "out", "-c", "Release", "--no-restore"],
             desktop.PublishArguments(new BuildPlatformContext(Settings, NullLogger.Instance,
                 "game.csproj", "out", "Release", null)));

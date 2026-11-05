@@ -1,0 +1,24 @@
+{
+  "name": "org.mass4.turian.android",
+  "version": "1.0.0",
+  "displayName": "Android Platform",
+  "description": "Android CoreCLR export, surface host and packaged content.",
+  "author": "MASS4",
+  "license": "MPL-2.0",
+  "clientOnly": true,
+  "dependencies": {
+    "org.mass4.turian.vulkan": "builtin:org.mass4.turian.vulkan"
+  },
+  "platformNuget": {
+    "android": {
+      "SkiaSharp.NativeAssets.Android": "4.153.1"
+    }
+  },
+  "categories": [
+    "turian:platform"
+  ],
+  "keywords": [
+    "android",
+    "coreclr"
+  ]
+}

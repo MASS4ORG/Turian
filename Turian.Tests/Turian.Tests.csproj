@@ -21,6 +21,9 @@
 
     <!-- Internal libraries -->
     <ItemGroup>
+        <ProjectReference Include="$(SolutionDir)/Turian/Packages/org.mass4.turian.android/Source~/Turian.Editor.Build.Platform.Android/Turian.Editor.Build.Platform.Android.csproj" />
+    </ItemGroup>
+    <ItemGroup>
         <ProjectReference Include="$(SolutionDir)/tools/BrickRelease/BrickRelease.csproj" />
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/Core/Turian.Editor.Core.csproj"/>
         <ProjectReference Include="$(SolutionDir)/Turian/Editor/CLI/Turian.Editor.CLI.csproj"/>

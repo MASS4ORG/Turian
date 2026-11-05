@@ -52,9 +52,12 @@ public sealed class ExportUserCode(
         var context = new BuildPlatformContext(Settings, Logger, csprojFilePath, exportOutputPath, configName,
             profile?.Profile);
 
+        await platform.PrepareAsync(context, CancellationToken.None).ConfigureAwait(false);
+
         // SetupAsync already restored this project, so skip the implicit restore of `dotnet publish`.
         var startInfo = new ProcessStartInfo(DotnetLocator.Find())
         {
+            WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(context.ProjectFile)),
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,

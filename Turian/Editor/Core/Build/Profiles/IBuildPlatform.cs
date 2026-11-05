@@ -54,6 +54,9 @@ public interface IBuildPlatform
     /// <summary>The target framework the platform's exported project builds for, such as <c>net10.0</c>.</summary>
     string TargetFramework { get; }
 
+    /// <summary>The SDK version pinned in generated launcher projects, or null to inherit the project's SDK.</summary>
+    string? SdkVersion => null;
+
     /// <summary>The <see cref="TextureBuildTarget"/> key whose artifacts the platform ships.</summary>
     string TextureTarget { get; }
 
@@ -87,6 +90,11 @@ public interface IBuildPlatform
     /// <returns>What the user must fix, or <c>null</c> when the settings are acceptable.</returns>
     string? ValidateSettings(IAppSettings settings) => null;
 
+    /// <summary>Stages content that a platform must include inside its published artifact.</summary>
+    /// <param name="context">The generated project and export settings.</param>
+    /// <param name="cancellationToken">Cancels preparation before publishing.</param>
+    Task PrepareAsync(BuildPlatformContext context, CancellationToken cancellationToken) => Task.CompletedTask;
+
     /// <summary>Finishes a published build: strips artifacts, names the executable, and places content.</summary>
     /// <param name="context">The published project, output, configuration and profile.</param>
     /// <param name="cancellationToken">A token to cancel the finalize step.</param>
@@ -111,7 +119,10 @@ public static class BuildPlatforms
 
     /// <summary>The built-in desktop platform, then those of the loaded editor bricks.</summary>
     /// <returns>The platforms.</returns>
-    public static IReadOnlyList<IBuildPlatform> All() =>
+    public static IReadOnlyList<IBuildPlatform> All()
+    {
+        LoadBuiltinPlatforms();
+        return
     [
         new DesktopBuildPlatform(),
         .. AppDomain.CurrentDomain.GetAssemblies()
@@ -119,6 +130,31 @@ public static class BuildPlatforms
             .SelectMany(static assembly => assembly.GetCustomAttributes<BuildPlatformAttribute>())
             .Select(static attribute => (IBuildPlatform)Activator.CreateInstance(attribute.PlatformType)!),
     ];
+    }
+
+    static void LoadBuiltinPlatforms()
+    {
+        if (!Directory.Exists(ProjectPackages.BuiltinDirectory))
+        {
+            return;
+        }
+        foreach (var brick in Directory.EnumerateDirectories(ProjectPackages.BuiltinDirectory))
+        {
+            var editor = Path.Combine(brick, "Precast~", "editor");
+            if (!Directory.Exists(editor))
+            {
+                continue;
+            }
+            foreach (var assembly in Directory.EnumerateFiles(editor, "Turian.Editor.Build.Platform.*.dll"))
+            {
+                var name = Path.GetFileNameWithoutExtension(assembly);
+                if (!AppDomain.CurrentDomain.GetAssemblies().Any(loaded => loaded.GetName().Name == name))
+                {
+                    AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(assembly));
+                }
+            }
+        }
+    }
 
     /// <summary>The platform with id <paramref name="id"/>, ignoring case; the desktop platform for none.</summary>
     /// <param name="id">A platform id, or <c>null</c>.</param>
