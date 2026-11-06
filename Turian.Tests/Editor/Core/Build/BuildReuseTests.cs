@@ -51,7 +51,7 @@ public sealed class BuildReuseTests : IDisposable
         Assert.True(File.Exists(output));
     }
 
-    /// <summary>A valid active-slot cache is reused when the inactive slot has no compiled output.</summary>
+    /// <summary>A valid active-slot cache refreshes its type manifest without recompiling into the inactive slot.</summary>
     [Fact]
     public async Task CompilationReusesTheOtherSlot()
     {
@@ -69,7 +69,10 @@ public sealed class BuildReuseTests : IDisposable
         var compiler = new CompileUserCode(settings, NullLogger.Instance, inactive, reuseDirectory: active);
         Assert.Equal(assembly, await compiler.ExecuteAsync());
         var timestamp = File.GetLastWriteTimeUtc(project);
+        UserCodeTypeManifest.Save(new UserCodeTypeManifest { AssemblyName = "Stale" }, assembly);
         Assert.Equal(assembly, await compiler.ExecuteAsync());
+        using var manifest = JsonDocument.Parse(File.ReadAllText(UserCodeTypeManifest.ManifestPathFor(assembly)));
+        Assert.Equal("Example", manifest.RootElement.GetProperty("AssemblyName").GetString());
         Assert.Equal(timestamp, File.GetLastWriteTimeUtc(project));
         Assert.Empty(Directory.GetFiles(inactive, "*.dll"));
     }

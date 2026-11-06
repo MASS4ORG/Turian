@@ -33,10 +33,7 @@ public sealed class CompileUserCode(
         if (CachedAssembly(cache, graph, csprojFilePath) is { } cached)
         {
             Logger.LogInformation("Compilation skipped. Cached assembly is still valid: {Path}", cached);
-            if (!UserCodeTypeManifest.Exists(cached))
-            {
-                GenerateAndSaveTypeManifest(cached, graph);
-            }
+            GenerateAndSaveTypeManifest(cached, graph);
 
             return cached;
         }
