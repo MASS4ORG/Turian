@@ -15,6 +15,8 @@
         <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+        <RuntimeLauncherAssets>$(SolutionDir)/Turian/Editor/CLI/Platform/obj/project.assets.json</RuntimeLauncherAssets>
+        <RuntimeLauncherAssets Condition="'$(UseArtifactsOutput)' == 'true'">$(ArtifactsPath)/obj/Turian.Editor.Build.Platform.Desktop/project.assets.json</RuntimeLauncherAssets>
     </PropertyGroup>
 
     <!-- Internal libraries -->
@@ -42,7 +44,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="$(SolutionDir)/Turian/Editor/CLI/Platform/obj/project.assets.json"
+        <EmbeddedResource Include="$(RuntimeLauncherAssets)"
                           LogicalName="Turian.Tests.RuntimeLauncherAssets" />
         <Compile Include="$(SolutionDir)/Turian/Editor/Studio/WindowPlatform.cs" Link="Studio/WindowPlatform.cs" />
         <Compile Include="$(SolutionDir)/Gaya/Gaya.Tests/WorkbenchFrame.cs" Link="Gaya/WorkbenchFrame.cs" />

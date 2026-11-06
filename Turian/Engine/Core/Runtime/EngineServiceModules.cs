@@ -44,18 +44,30 @@ public static class EngineServiceModules
     public static IReadOnlyList<Assembly> Graph(Assembly root)
     {
         ArgumentNullException.ThrowIfNull(root);
+        return OrderedGraph(root);
+    }
+
+    /// <summary>Orders loaded bricks by their dependencies when a session has no user-code entry assembly.</summary>
+    public static IReadOnlyList<Assembly> LoadedGraph() => OrderedGraph(null);
+
+    static IReadOnlyList<Assembly> OrderedGraph(Assembly? root)
+    {
         var core = typeof(IEngineServiceModule).Assembly.GetName().Name!;
         var ordered = new List<Assembly>();
         var visited = new HashSet<string>(StringComparer.Ordinal) { core };
 
         // The compiler drops references to bricks the game never names, so loaded bricks are visited explicitly.
-        foreach (var assembly in PrecastAssemblies.Loaded.Append(root))
+        foreach (var assembly in PrecastAssemblies.Loaded)
         {
             Visit(assembly, core, visited, ordered);
         }
 
-        ordered.Remove(root);
-        ordered.Add(root);
+        if (root is not null)
+        {
+            Visit(root, core, visited, ordered);
+            ordered.Remove(root);
+            ordered.Add(root);
+        }
         return ordered;
     }
 

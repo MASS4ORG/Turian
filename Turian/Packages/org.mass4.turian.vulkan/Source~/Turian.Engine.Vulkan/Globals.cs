@@ -8,7 +8,6 @@ global using System.Runtime.CompilerServices;
 global using System.Runtime.InteropServices;
 global using System.Text;
 global using Ktx2;
-global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 global using Silk.NET.Core;
 global using Silk.NET.Core.Native;

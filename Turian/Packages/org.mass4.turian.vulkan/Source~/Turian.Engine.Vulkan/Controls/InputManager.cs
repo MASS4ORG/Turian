@@ -78,7 +78,7 @@ public class InputManager : IDisposable
     /// </summary>
     public void Dispose()
     {
-        Input.Dispose();
+        Input?.Dispose();
 
         GC.SuppressFinalize(this);
     }

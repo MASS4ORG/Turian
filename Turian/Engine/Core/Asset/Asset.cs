@@ -6,6 +6,10 @@ namespace Turian.Engine.Core;
 [TypeId("2af5e114-fb34-54c7-8f14-04aed6c7eb74")]
 public class Asset : IdObject
 {
+    /// <summary>Resolved payload storage for this metadata instance, independent of file or package layout.</summary>
+    [JsonIgnore, Hide]
+    public IAssetFileProvider? ContentProvider { get; internal set; }
+
     string relativePath = string.Empty;
 
     /// <summary>

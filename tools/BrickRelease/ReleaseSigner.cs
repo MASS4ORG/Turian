@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -28,6 +30,19 @@ static partial class ReleaseSigner
             : Directory.CreateDirectory(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         try
         {
+            if (OperatingSystem.IsWindows())
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                var owner = identity.User
+                    ?? throw new InvalidOperationException("A signing identity is required.");
+                var permissions = new DirectorySecurity();
+                permissions.SetOwner(owner);
+                permissions.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+                permissions.AddAccessRule(new(owner, FileSystemRights.FullControl,
+                    InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None, AccessControlType.Allow));
+                temporary.SetAccessControl(permissions);
+            }
             var key = Path.Combine(temporary.FullName, "key");
             await WriteKeyAsync(key, privateKey, cancellationToken);
             var derived = await ToolProcess.RunAsync("ssh-keygen", ["-y", "-P", "", "-f", key], cancellationToken);

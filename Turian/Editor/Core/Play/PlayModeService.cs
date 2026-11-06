@@ -340,6 +340,7 @@ public sealed class PlayModeService(
     {
         playServices = BuildPlayServices();
         _ = playServices.GetRequiredService<SimulationClock>();
+        playServices.GetRequiredService<EngineSessionLifetime>().Start();
         var sceneManager = playServices.GetRequiredService<ISceneManager>();
         if (sceneManager is SceneManager concreteSceneManager)
         {
@@ -396,6 +397,9 @@ public sealed class PlayModeService(
     ServiceProvider BuildPlayServices()
     {
         var services = new ServiceCollection()
+            .AddSingleton(new EngineSessionContext(EngineSessionKind.Editor,
+                Interactive: editorServices.GetService<EngineSessionContext>()?.Interactive == true))
+            .AddSingleton<EngineSessionLifetime>()
             .AddSingleton(logger)
             .AddSingleton(assetDatabase)
             .AddSingleton<ISceneManager>(new SceneManager(assetDatabase))
@@ -423,10 +427,18 @@ public sealed class PlayModeService(
             {
                 services.AddEngineModules([.. EngineServiceModules.Graph(userAssembly)]);
             }
+            else
+            {
+                services.AddEngineModules([.. EngineServiceModules.LoadedGraph()]);
+            }
         }
         else if (TypeRegistry.TryGetType("Usercode.Game", out var gameType) && gameType is not null)
         {
             services.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
+        }
+        else
+        {
+            services.AddEngineModules([.. EngineServiceModules.LoadedGraph()]);
         }
 
         var provider = services.BuildServiceProvider();

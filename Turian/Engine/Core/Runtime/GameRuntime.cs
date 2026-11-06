@@ -5,16 +5,19 @@ namespace Turian.Engine.Core;
 /// input actions, localization and the scene ticker. A player adds its loop, and for a client its window,
 /// renderer and input device.
 /// </summary>
-public sealed class GameRuntime
+public sealed class GameRuntime : IDisposable
 {
+    bool disposed;
+    readonly DataAssetSession dataAssets;
     GameRuntime(string projectDirectory, IContentDirectory content, AssetDatabase assets, AppSettings settings,
-        SceneManager scenes)
+        SceneManager scenes, DataAssetSession dataAssets)
     {
         ProjectDirectory = projectDirectory;
         Content = content;
         Assets = assets;
         Settings = settings;
         Scenes = scenes;
+        this.dataAssets = dataAssets;
     }
 
     /// <summary>The folder the game runs from.</summary>
@@ -60,8 +63,21 @@ public sealed class GameRuntime
     public static GameRuntime Start(GamePlayerContext context, IInputSource input,
         Action<IServiceCollection>? addServices = null)
     {
-        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(input);
+        return StartCore(context, input, EngineSessionKind.Headless, addServices);
+    }
+
+    /// <summary>Composes a session whose input and host are supplied by installed feature modules.</summary>
+    public static GameRuntime Start(GamePlayerContext context, EngineSessionKind kind)
+        => StartCore(context, null, kind, null);
+
+    internal static GameRuntime StartClient(GamePlayerContext context, IClientRuntimeHost? host)
+        => StartCore(context, null, EngineSessionKind.Client, null, host);
+
+    static GameRuntime StartCore(GamePlayerContext context, IInputSource? input, EngineSessionKind kind,
+        Action<IServiceCollection>? addServices, IClientRuntimeHost? host = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
 
         var content = context.ContentDirectory;
         var assets = new AssetDatabase();
@@ -73,12 +89,20 @@ public sealed class GameRuntime
             ProjectAbsoluteDir = context.ProjectDirectory,
             Title = Path.GetFileName(context.ProjectDirectory),
         };
-        ProjectSettingsLoader.Load(settings, loader, content);
-
-        var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets));
-        runtime.BindServices(context, loader, input, dataAssets, addServices);
-        LogBuild(context.Logger, settings.Get<TimeSettings>());
-        return runtime;
+        var runtime = new GameRuntime(context.ProjectDirectory, content, assets, settings, new SceneManager(assets), dataAssets);
+        try
+        {
+            ProjectSettingsLoader.Load(settings, loader, content);
+            host?.Prepare(new(settings, context.Logger, context.Development));
+            runtime.BindServices(context, loader, input, dataAssets, kind, addServices, host);
+            LogBuild(context.Logger, settings.Get<TimeSettings>());
+            return runtime;
+        }
+        catch
+        {
+            runtime.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -117,12 +141,14 @@ public sealed class GameRuntime
         StartupRoot = load.GetAwaiter().GetResult().RootNode;
     }
 
-    void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource input,
-        DataAssetSession dataAssets, Action<IServiceCollection>? addServices)
+    void BindServices(GamePlayerContext context, IAssetLoader loader, IInputSource? input,
+        DataAssetSession dataAssets, EngineSessionKind kind, Action<IServiceCollection>? addServices,
+        IClientRuntimeHost? host)
     {
-        Actions = new InputActionService(input);
         var clock = new SimulationClock(Settings.Get<TimeSettings>());
         var registrations = new ServiceCollection()
+            .AddSingleton(new EngineSessionContext(kind, Interactive: kind == EngineSessionKind.Client))
+            .AddSingleton(context.Logger)
             .AddSingleton<IAppSettings>(Settings)
             .AddSingleton<LayerFilter>()
             .AddSingleton<IPhysicsQueries, PhysicsQueries>()
@@ -132,9 +158,15 @@ public sealed class GameRuntime
             .AddSingleton(dataAssets)
             .AddSingleton(clock)
             .AddSingleton<GameLoopScheduler>()
-            .AddSingleton(input)
-            .AddSingleton(Actions)
-            .AddSingleton<IInputActions>(Actions);
+            .AddSingleton(input ?? host?.Input ?? new BufferedInputSource())
+            .AddSingleton(static sp => new InputActionService(sp.GetRequiredService<IInputSource>()))
+            .AddSingleton<IInputActions>(static sp => sp.GetRequiredService<InputActionService>())
+            .AddSingleton<EngineSessionLifetime>();
+        if (host is not null)
+        {
+            registrations.AddSingleton(host);
+            registrations.AddSingleton(host.RenderDevice);
+        }
         addServices?.Invoke(registrations);
         if (ExportRuntime.ConfigureServices is { } configure)
         {
@@ -145,8 +177,14 @@ public sealed class GameRuntime
         {
             registrations.AddEngineModules([.. EngineServiceModules.Graph(gameType.Assembly)]);
         }
+        else if (RuntimeFeature.IsDynamicCodeSupported)
+        {
+            registrations.AddEngineModules([.. EngineServiceModules.LoadedGraph()]);
+        }
 
         Services = context.BuildServices(registrations);
+        Actions = Services.GetRequiredService<InputActionService>();
+        input = Services.GetRequiredService<IInputSource>();
         Ticker = new SceneTicker(Scenes, clock)
         {
             Async = Services.GetRequiredService<GameLoopScheduler>(),
@@ -159,6 +197,20 @@ public sealed class GameRuntime
         Scenes.BindServices(Services);
 
         LoadActionMaps(loader);
+        Services.GetRequiredService<EngineSessionLifetime>().Start();
+    }
+
+    /// <summary>Stops installed session features independently of the rendering host.</summary>
+    public void Dispose()
+    {
+        if (disposed) { return; }
+        disposed = true;
+        try { Services?.GetService<EngineSessionLifetime>()?.Dispose(); }
+        finally
+        {
+            try { Ticker?.Async.Dispose(); }
+            finally { dataAssets.Dispose(); }
+        }
     }
 
     /// <summary>
