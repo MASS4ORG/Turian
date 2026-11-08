@@ -66,6 +66,54 @@ public sealed class BrickAssemblyLoadTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(root, "Bricks", BrickNuGetRestore.RestoreDirectoryName)));
     }
 
+    /// <summary>A brick requiring a newer shared library is rejected before it can fail during rendering.</summary>
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    public void LoadChecksAlreadyLoadedDependencyVersions(int hostVersion, bool compatible)
+    {
+        var name = "Shared" + Guid.NewGuid().ToString("N");
+        var host = Compile(name, $$"""
+            [assembly: System.Reflection.AssemblyVersion("{{hostVersion}}.0.0.0")]
+            public sealed class SharedType { }
+            """);
+        using var stream = new MemoryStream(host);
+        AssemblyLoadContext.Default.LoadFromStream(stream);
+        var required = Compile(name, """
+            [assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
+            public sealed class SharedType { }
+            """);
+        var brickName = "Consumer" + Guid.NewGuid().ToString("N");
+        var brick = Brick("test." + brickName.ToLowerInvariant());
+        var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(brick), "lib")).FullName;
+        File.WriteAllBytes(Path.Combine(lib, brickName + ".dll"), Compile(brickName,
+            "public sealed class Consumer { public SharedType Value; }", MetadataReference.CreateFromImage(required)));
+
+        var logger = Substitute.For<ILogger>();
+        Assert.Equal(compatible, BrickAssemblies.Load([brick], logger));
+        Assert.Equal(compatible, AssemblyLoadContext.Default.Assemblies.Any(a => a.GetName().Name == brickName));
+        if (!compatible)
+        {
+            Assert.Contains(logger.ReceivedCalls(), static call => call.GetArguments().OfType<FileLoadException>()
+                .Any(static exception => exception.Message.Contains("host already loaded", StringComparison.Ordinal)));
+        }
+    }
+
+    static byte[] Compile(string name, string source, params MetadataReference[] extraReferences)
+    {
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Cast<MetadataReference>()
+            .Concat(extraReferences);
+        var compilation = CSharpCompilation.Create(name, [CSharpSyntaxTree.ParseText(source)], references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        return stream.ToArray();
+    }
+
     ResolvedPackage Brick(string id)
     {
         var folder = Directory.CreateDirectory(Path.Combine(root, id)).FullName;
