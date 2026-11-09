@@ -31,6 +31,11 @@ static class BrickNativeAssets
                         continue;
                     }
                     staged.Add(name, file);
+                    if (AndroidAbi(rid) is { } abi)
+                    {
+                        project.AddItemGroup().AddItem("AndroidNativeLibrary", file).AddMetadata("Abi", abi, true);
+                        continue;
+                    }
                     var content = project.AddItemGroup().AddItem("Content", file);
                     content.AddMetadata("Link", name, true);
                     content.AddMetadata("CopyToOutputDirectory", "PreserveNewest", true);
@@ -40,4 +45,11 @@ static class BrickNativeAssets
             }
         }
     }
+
+    static string? AndroidAbi(string runtimeIdentifier) => runtimeIdentifier switch
+    {
+        "android-arm64" => "arm64-v8a",
+        "android-x64" => "x86_64",
+        _ => null,
+    };
 }

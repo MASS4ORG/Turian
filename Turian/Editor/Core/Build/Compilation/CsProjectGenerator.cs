@@ -231,8 +231,12 @@ public static class CsProjectGenerator
             .AddNugetPackageReferences(platform.Dependencies.Packages)
             .AddAssetsDir(settings)
             .CopyLauncherFiles(platform);
+        // Desktop falls back to the host's runtime; other platforms always build for one of their own.
+        var nativeRuntime = string.IsNullOrWhiteSpace(profile?.RuntimeIdentifier) && platform.Id != BuildPlatforms.Desktop
+            ? platform.RuntimeIdentifiers[0]
+            : profile?.RuntimeIdentifier;
         BrickNativeAssets.AddToProject(projectRoot,
-            ReferencedBricks(settings, true, profile?.Target ?? BuildTarget.Client), profile?.RuntimeIdentifier);
+            ReferencedBricks(settings, true, profile?.Target ?? BuildTarget.Client), nativeRuntime);
         if (profile?.Target == BuildTarget.Server)
         {
             projectRoot.AddServerVerification(settings, platform.Dependencies.Packages);
