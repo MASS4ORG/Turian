@@ -19,6 +19,12 @@ namespace Turian.Android;
         | ConfigChanges.SmallestScreenSize | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden)]
 public class MainActivity : Activity, ISurfaceHolderCallback
 {
+#if DEBUG || DEVELOPMENT_BUILD
+    const bool Development = true;
+#else
+    const bool Development = false;
+#endif
+
     AndroidSurfaceHost? surface;
     readonly BufferedInputSource input = new();
     Thread? gameThread;
@@ -115,7 +121,9 @@ public class MainActivity : Activity, ISurfaceHolderCallback
                 unsupportedGraphics = true;
                 throw new NotSupportedException(graphics.Diagnostics);
             }
-            using var host = Host.CreateDefaultBuilder().Build();
+            var level = AndroidLogProvider.LevelFor(Development);
+            using var host = Host.CreateDefaultBuilder().ConfigureLogging(logging => logging.ClearProviders()
+                .SetMinimumLevel(level).AddProvider(new AndroidLogProvider(level))).Build();
             var factory = host.Services.GetRequiredService<ILoggerFactory>();
             Log.Configure(factory);
             var logger = factory.CreateLogger("Turian");
@@ -125,7 +133,7 @@ public class MainActivity : Activity, ISurfaceHolderCallback
             PrecastAssemblies.Load(content, "usercode.typeids.json", logger);
             TypeRegistry.RegisterFromManifest(content, "usercode.typeids.json", logger);
             var context = new GamePlayerContext(FilesDir!.AbsolutePath, logger,
-                static services => services.BuildServiceProvider(), Content: content);
+                static services => services.BuildServiceProvider(), Development, Content: content);
             if (content.Probe("android-player.json") is not null)
             {
                 backQuits = content.ReadAllText("android-player.json").Trim() != "false";

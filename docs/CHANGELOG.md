@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: Android launcher and surface lifecycle #255.
 - Added: in-place APK content reads #257.
 - Fixed: Android native libraries and APK validation for 16 KB pages #274.
+- Added: Android logcat logger provider #258.
 
 ## [3.11.0] - 2026-11-09
 
