@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - Added: audio playback #61 #95.
+- Fixed: Windows cleanup of brick dependency-version tests #61.
 
 ## [3.10.0] - 2026-11-05
 
