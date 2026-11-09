@@ -40,8 +40,15 @@ public class MainActivity : Activity, ISurfaceHolderCallback
     {
         base.OnCreate(savedInstanceState);
         surface = new AndroidSurfaceHost(NativeWindow.Release);
+        Window!.Attributes!.LayoutInDisplayCutoutMode = LayoutInDisplayCutoutMode.Always;
         var view = new SurfaceView(this);
         view.Holder!.AddCallback(this);
+        view.Touch += (_, touch) =>
+        {
+            ForwardTouch(touch.Event!);
+            touch.Handled = true;
+        };
+        view.SetOnApplyWindowInsetsListener(new InsetsListener(ForwardInsets));
         SetContentView(view);
         back = new BackCallback(() => surface.Post(() =>
         {
@@ -88,7 +95,7 @@ public class MainActivity : Activity, ISurfaceHolderCallback
             OnBackInvokedDispatcher.UnregisterOnBackInvokedCallback(back);
         }
         surface?.Close();
-        gameThread?.Join();
+        gameThread?.Join(AndroidSurfaceHost.DefaultDetachTimeout);
         back?.Dispose();
         base.OnDestroy();
     }
@@ -107,6 +114,24 @@ public class MainActivity : Activity, ISurfaceHolderCallback
 
     /// <inheritdoc />
     public void SurfaceDestroyed(ISurfaceHolder holder) => surface?.Detach();
+
+    void ForwardTouch(MotionEvent motion)
+    {
+        var action = (int)motion.ActionMasked;
+        var actionPointer = motion.GetPointerId(motion.ActionIndex);
+        var pointers = new AndroidPointer[motion.PointerCount];
+        for (var i = 0; i < pointers.Length; i++)
+        {
+            pointers[i] = new AndroidPointer(motion.GetPointerId(i), motion.GetX(i), motion.GetY(i), motion.GetPressure(i));
+        }
+        surface?.Post(() => AndroidTouchInput.Apply(input, action, actionPointer, pointers));
+    }
+
+    void ForwardInsets(WindowInsets insets)
+    {
+        var area = insets.GetInsets(WindowInsets.Type.SystemBars() | WindowInsets.Type.DisplayCutout());
+        surface?.SetInsets(new SafeAreaInsets(area.Left, area.Top, area.Right, area.Bottom));
+    }
 
     void RunPlayer()
     {
@@ -175,6 +200,16 @@ public class MainActivity : Activity, ISurfaceHolderCallback
                         .SetPositiveButton(global::Android.Resource.String.Ok, (_, _) => Finish())!.Show();
                 }
             });
+        }
+    }
+
+    sealed class InsetsListener(Action<WindowInsets> apply) : Java.Lang.Object, View.IOnApplyWindowInsetsListener
+    {
+        /// <inheritdoc />
+        public WindowInsets OnApplyWindowInsets(View view, WindowInsets insets)
+        {
+            apply(insets);
+            return insets;
         }
     }
 

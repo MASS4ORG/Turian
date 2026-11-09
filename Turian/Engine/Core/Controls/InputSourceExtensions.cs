@@ -31,9 +31,16 @@ public static class InputSourceExtensions
                 source.IsGamepadButtonDown((GamepadButton)control.Code, playerIndex) ? 1f : 0f,
             InputControlKind.GamepadAxis =>
                 source.GetGamepadAxis((GamepadAxis)control.Code, playerIndex),
+            InputControlKind.TouchButton => Finger(source, control.Code) is { Phase: not (TouchPhase.Ended or TouchPhase.Canceled) } ? 1f : 0f,
+            InputControlKind.TouchAxis => Finger(source, 0) is { } first
+                ? (TouchAxis)control.Code == TouchAxis.DeltaX ? first.Delta.X : first.Delta.Y
+                : 0f,
             _ => 0f,
         };
     }
+
+    static TouchPoint? Finger(IInputSource source, int index) =>
+        source.Touches is var touches && index < touches.Count ? touches[index] : null;
 
     /// <summary>Whether the control went down this frame, for a rebinding listener.</summary>
     /// <param name="source">The source to read from.</param>
@@ -47,6 +54,7 @@ public static class InputSourceExtensions
             InputControlKind.Key => source.WasKeyPressed((Key)control.Code),
             InputControlKind.MouseButton => source.WasMouseButtonPressed((MouseButton)control.Code),
             InputControlKind.GamepadButton => source.WasGamepadButtonPressed((GamepadButton)control.Code),
+            InputControlKind.TouchButton => Finger(source, control.Code) is { Phase: TouchPhase.Began },
             _ => false,
         };
     }

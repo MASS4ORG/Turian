@@ -20,6 +20,10 @@ public sealed class AndroidPlayer(AndroidSurfaceHost surface, BufferedInputSourc
         });
         using var dataAssets = runtime.Services.GetRequiredService<DataAssetSession>();
         var vulkan = runtime.Services.GetRequiredService<Vulkan>();
+        input.TouchEmulatesMouse = runtime.Settings.Get<InputSettings>().TouchEmulatesMouse;
+        var safeArea = runtime.Services.GetRequiredService<SafeAreaService>();
+        safeArea.SetInsets(surface.Insets);
+        surface.InsetsChanged += safeArea.SetInsets;
         try
         {
             using var renderer = new RendererManager(surface, vulkan, runtime.Assets, context.Logger);
@@ -48,6 +52,7 @@ public sealed class AndroidPlayer(AndroidSurfaceHost surface, BufferedInputSourc
         }
         finally
         {
+            surface.InsetsChanged -= safeArea.SetInsets;
             vulkan.Device.Dispose();
             (runtime.Services as IDisposable)?.Dispose();
         }

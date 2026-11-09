@@ -36,6 +36,39 @@ public sealed class AndroidSurfaceHostTests
         Assert.Equal(default, host.FramebufferSize);
     }
 
+    /// <summary>A game thread busy initializing cannot hold the Android UI thread past the bounded wait.</summary>
+    [Fact]
+    public void DetachReturnsWhenTheGameThreadIsBusy()
+    {
+        List<nint> released = [];
+        using var host = new AndroidSurfaceHost(released.Add);
+        host.Attach(42, new Int2(800, 600));
+        host.PumpEvents();
+
+        Assert.False(host.Detach(TimeSpan.FromMilliseconds(20)));
+        Assert.Empty(released);
+
+        host.PumpEvents();
+        Assert.Equal([42], released);
+    }
+
+    /// <summary>Insets change on the game thread, in order with the rest of the surface's events.</summary>
+    [Fact]
+    public void InsetsAreMarshaledToTheGameThread()
+    {
+        using var host = new AndroidSurfaceHost(static _ => { });
+        SafeAreaInsets? seen = null;
+        host.InsetsChanged += insets => seen = insets;
+        var expected = new SafeAreaInsets(1, 2, 3, 4);
+
+        host.SetInsets(expected);
+        Assert.Null(seen);
+
+        host.PumpEvents();
+        Assert.Equal(expected, seen);
+        Assert.Equal(expected, host.Insets);
+    }
+
     /// <summary>Pause releases the Vulkan surface while retaining the native-window reference for resume.</summary>
     [Fact]
     public void PauseResumeAndResizeKeepWindowOwnership()

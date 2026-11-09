@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: Android native libraries and APK validation for 16 KB pages #274.
 - Added: Android logcat logger provider #258.
 - Added: Vulkan validation layers setting and Android development packaging #261.
+- Added: touch input with action bindings and mouse emulation #269.
+- Added: runtime safe-area service #343.
+- Fixed: Android UI thread no longer blocks on slow game startup #255.
 
 ## [3.11.0] - 2026-11-09
 

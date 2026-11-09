@@ -10,6 +10,9 @@ namespace Turian.Android;
 /// <summary>Marshals Android surface callbacks onto the dedicated rendering thread.</summary>
 public sealed class AndroidSurfaceHost(Action<nint> releaseWindow) : ISurfaceHost
 {
+    /// <summary>How long a surface loss may block the Android UI thread, well under its unresponsive-app limit.</summary>
+    public static readonly TimeSpan DefaultDetachTimeout = TimeSpan.FromSeconds(2);
+
     readonly ConcurrentQueue<Action> commands = new();
     readonly AutoResetEvent wake = new(false);
     readonly object gate = new();
@@ -73,15 +76,34 @@ public sealed class AndroidSurfaceHost(Action<nint> releaseWindow) : ISurfaceHos
         }
     }
 
-    /// <summary>Waits until Vulkan has released the surface before Android destroys the native surface.</summary>
-    public void Detach()
+    /// <summary>The platform's latest safe-area insets, in surface pixels.</summary>
+    public SafeAreaInsets Insets { get; private set; }
+
+    /// <summary>Raised on the game thread when the platform's insets change.</summary>
+    public event Action<SafeAreaInsets>? InsetsChanged;
+
+    /// <summary>Queues a change of the platform's insets.</summary>
+    /// <param name="insets">The insets in surface pixels.</param>
+    public void SetInsets(SafeAreaInsets insets) => Post(() =>
+    {
+        Insets = insets;
+        InsetsChanged?.Invoke(insets);
+    });
+
+    /// <summary>
+    /// Queues the surface's release and waits for the game thread to do it. A game thread still in slow initialization
+    /// holds no Vulkan surface, so the wait is bounded to keep the Android UI thread responsive.
+    /// </summary>
+    /// <param name="timeout">The longest time to block the calling thread; <see cref="DefaultDetachTimeout"/> when null.</param>
+    /// <returns>True when the surface was released before the wait ended.</returns>
+    public bool Detach(TimeSpan? timeout = null)
     {
         TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (gate)
         {
             if (disposed)
             {
-                return;
+                return true;
             }
             releases.Add(completion);
             commands.Enqueue(() =>
@@ -101,7 +123,7 @@ public sealed class AndroidSurfaceHost(Action<nint> releaseWindow) : ISurfaceHos
             });
             wake.Set();
         }
-        completion.Task.GetAwaiter().GetResult();
+        return completion.Task.Wait(timeout ?? DefaultDetachTimeout);
     }
 
     /// <summary>Queues pause/resume without blocking the Android UI thread.</summary>

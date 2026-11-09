@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Turian.Engine.Core;
 
 /// <summary>
@@ -38,6 +40,7 @@ public sealed class PlayerFrames(
 
     bool paused;
     bool resumed;
+    SafeAreaService? safeArea;
 
     /// <summary>
     /// Gets or sets whether the game is paused because its surface is lost: frames neither tick nor render, and the
@@ -131,6 +134,8 @@ public sealed class PlayerFrames(
     void RenderOverlay(double deltaTime)
     {
         var size = framebufferSize();
+        safeArea ??= runtime.Services.GetService<SafeAreaService>();
+        safeArea?.SetScreen(size);
         if (presenter is null || size.X <= 0 || size.Y <= 0)
         {
             return;

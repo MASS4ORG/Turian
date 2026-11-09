@@ -151,6 +151,7 @@ public sealed class GameRuntime : IDisposable
             .AddSingleton(context.Logger)
             .AddSingleton<IAppSettings>(Settings)
             .AddSingleton<LayerFilter>()
+            .AddSingleton<SafeAreaService>()
             .AddSingleton<IPhysicsQueries, PhysicsQueries>()
             .AddSingleton(Assets)
             .AddSingleton<ISceneManager>(Scenes)

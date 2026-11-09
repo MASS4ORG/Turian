@@ -20,6 +20,32 @@ public enum InputControlKind
 
     /// <summary>A gamepad stick or trigger axis.</summary>
     GamepadAxis,
+
+    /// <summary>A finger on the touch screen, read as held while it is down.</summary>
+    TouchButton,
+
+    /// <summary>A touch movement axis, read as a per-frame delta of the first finger.</summary>
+    TouchAxis,
+}
+
+/// <summary>The fingers a binding can name, in the order they touched the screen.</summary>
+public enum TouchButton
+{
+    /// <summary>The oldest finger on the screen.</summary>
+    Primary,
+
+    /// <summary>The second-oldest finger on the screen.</summary>
+    Secondary,
+}
+
+/// <summary>The first finger's movement, reported as the distance accumulated in a frame.</summary>
+public enum TouchAxis
+{
+    /// <summary>Horizontal movement, in pixels.</summary>
+    DeltaX,
+
+    /// <summary>Vertical movement, in pixels.</summary>
+    DeltaY,
 }
 
 /// <summary>The mouse's continuous controls, reported as the movement accumulated in a frame.</summary>
@@ -116,7 +142,7 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
     public static InputControl None => default;
 
     /// <summary>Whether this control reports a continuous value rather than a press.</summary>
-    public bool IsAxis => Kind is InputControlKind.MouseAxis or InputControlKind.GamepadAxis;
+    public bool IsAxis => Kind is InputControlKind.MouseAxis or InputControlKind.GamepadAxis or InputControlKind.TouchAxis;
 
     /// <summary>Names a keyboard key.</summary>
     /// <param name="key">The key.</param>
@@ -138,6 +164,14 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
     /// <param name="axis">The axis.</param>
     public static InputControl GamepadStick(GamepadAxis axis) => new(InputControlKind.GamepadAxis, (int)axis);
 
+    /// <summary>Names a finger on the touch screen.</summary>
+    /// <param name="button">The finger.</param>
+    public static InputControl Touch(TouchButton button) => new(InputControlKind.TouchButton, (int)button);
+
+    /// <summary>Names a touch movement axis.</summary>
+    /// <param name="axis">The axis.</param>
+    public static InputControl TouchMotion(TouchAxis axis) => new(InputControlKind.TouchAxis, (int)axis);
+
     /// <summary>The control as a binding path, e.g. <c>Keyboard/W</c> or <c>Gamepad/LeftStickX</c>.</summary>
     /// <returns>The path, or an empty string for <see cref="None"/>.</returns>
     public override string ToString() => Kind switch
@@ -147,6 +181,8 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
         InputControlKind.MouseAxis => $"Mouse/{(MouseAxis)Code}",
         InputControlKind.GamepadButton => $"Gamepad/{(GamepadButton)Code}",
         InputControlKind.GamepadAxis => $"Gamepad/{(GamepadAxis)Code}",
+        InputControlKind.TouchButton => $"Touch/{(TouchButton)Code}",
+        InputControlKind.TouchAxis => $"Touch/{(TouchAxis)Code}",
         _ => string.Empty,
     };
 
@@ -187,6 +223,14 @@ public readonly record struct InputControl(InputControlKind Kind, int Code)
 
             case "GAMEPAD" when Enum.TryParse<GamepadButton>(name, ignoreCase: true, out var pad):
                 control = Gamepad(pad);
+                return true;
+
+            case "TOUCH" when Enum.TryParse<TouchAxis>(name, ignoreCase: true, out var motion):
+                control = TouchMotion(motion);
+                return true;
+
+            case "TOUCH" when Enum.TryParse<TouchButton>(name, ignoreCase: true, out var finger):
+                control = Touch(finger);
                 return true;
 
             default:
