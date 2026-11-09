@@ -19,8 +19,8 @@ public sealed record GamePlayerContext(
 }
 
 /// <summary>
-/// Runs a game until it quits: owns the loop and, for a client, the window, renderer and input. A render brick
-/// declares its player with <see cref="GamePlayerAttribute"/>; without one the launcher uses <see cref="HeadlessPlayer"/>.
+/// Runs a session until it quits. Rendering bricks declare <see cref="ClientRuntimeHostAttribute"/>;
+/// Core's <see cref="ClientPlayer"/> owns composition and the session lifecycle.
 /// </summary>
 public interface IGamePlayer
 {
@@ -30,7 +30,7 @@ public interface IGamePlayer
     int Run(GamePlayerContext context);
 }
 
-/// <summary>Identifies the <see cref="IGamePlayer"/> provided by a loaded brick.</summary>
+/// <summary>Identifies a custom entry point provided by a loaded assembly.</summary>
 /// <param name="playerType">A type with a public parameterless constructor implementing the player.</param>
 [AttributeUsage(AttributeTargets.Assembly)]
 public sealed class GamePlayerAttribute(Type playerType) : Attribute
@@ -54,6 +54,10 @@ public static class GamePlayers
             {
                 return (IGamePlayer)Activator.CreateInstance(attribute.PlayerType)!;
             }
+            if (!assembly.IsDynamic && assembly.GetCustomAttribute<ClientRuntimeHostAttribute>() is { } host)
+            {
+                return new ClientPlayer(() => (IClientRuntimeHost)Activator.CreateInstance(host.HostType)!);
+            }
         }
 
         return null;
@@ -61,5 +65,8 @@ public static class GamePlayers
 
     /// <summary>The loaded brick's player, or the <see cref="HeadlessPlayer"/> when no brick provides one.</summary>
     /// <returns>The player to run the game with.</returns>
-    public static IGamePlayer FindOrHeadless() => Find(AppDomain.CurrentDomain.GetAssemblies()) ?? new HeadlessPlayer();
+    public static IGamePlayer FindOrHeadless()
+    {
+        return Find(AppDomain.CurrentDomain.GetAssemblies()) ?? new HeadlessPlayer();
+    }
 }

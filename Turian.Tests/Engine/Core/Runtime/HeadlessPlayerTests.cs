@@ -105,8 +105,8 @@ public sealed class HeadlessPlayerTests : IDisposable
     [Fact]
     public void LaunchersFindTheBrickPlayer()
     {
-        Assert.IsType<VulkanPlayer>(GamePlayers.Find([typeof(VulkanPlayer).Assembly]));
+        Assert.IsType<ClientPlayer>(GamePlayers.Find([typeof(VulkanRuntimeHost).Assembly]));
         Assert.Null(GamePlayers.Find([typeof(Node).Assembly]));
-        Assert.IsType<VulkanPlayer>(GamePlayers.FindOrHeadless());
+        Assert.IsType<ClientPlayer>(GamePlayers.FindOrHeadless());
     }
 }

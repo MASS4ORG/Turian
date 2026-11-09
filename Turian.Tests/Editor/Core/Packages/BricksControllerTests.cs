@@ -242,8 +242,8 @@ public sealed class BricksControllerTests : IDisposable
     {
         controller.Refresh();
         var stored = Path.Combine(controller.Store.Root, "user.mateo.old@abc");
-        Directory.CreateDirectory(controller.Store.Root);
-        Directory.Move(BrickService.New(root, "user.mateo.old"), stored);
+        Directory.CreateDirectory(stored);
+        new PackageManifest { Name = "user.mateo.old", Version = SemanticVersion.Parse("0.1.0") }.Save(stored);
         controller.Refresh();
 
         Assert.False(await controller.EnableAsync(controller.Catalog.Single(static b => b.Id == "user.mateo.old")));

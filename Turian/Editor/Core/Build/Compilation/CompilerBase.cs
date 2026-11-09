@@ -44,6 +44,7 @@ public abstract class CompilerBase(IAppSettings settings, ILogger logger)
             ProjectSettingsLoader.LoadFromSources(Settings, overrides);
         }
 
+        UserCodeValidation.Report(Settings.AssetsAbsoluteDir, Logger);
         ValidateStartupSceneSettings();
         ProjectSettingsLoader.WriteIndex(Settings.AssetsAbsoluteDir,
             Path.Combine(Settings.CacheAbsoluteDir, ProjectSettingsLoader.IndexFileName), SettingsOverrides);

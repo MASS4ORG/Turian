@@ -238,12 +238,12 @@ public sealed class RuntimeAssetLoader : IAssetLoader
         }
 
         var asset = assetDatabase.Content is { } content ? LoadMeta(content, record) : LoadMeta(record);
-        if (asset is null)
+        asset ??= CreateFromRecord(record);
+        if (asset is not null)
         {
-            return CreateFromRecord(record);
+            asset.RelativePath = record.SourceRelativePath;
+            asset.ContentProvider = GetProvider(assetId);
         }
-
-        asset.RelativePath = record.SourceRelativePath;
         return asset;
     }
 

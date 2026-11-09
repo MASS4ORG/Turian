@@ -66,6 +66,143 @@ public sealed class BrickAssemblyLoadTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(root, "Bricks", BrickNuGetRestore.RestoreDirectoryName)));
     }
 
+    /// <summary>A brick requiring a newer shared library is rejected before it can fail during rendering.</summary>
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    public async Task LoadChecksAlreadyLoadedDependencyVersions(int hostVersion, bool compatible)
+    {
+        var name = "Shared" + Guid.NewGuid().ToString("N");
+        var host = Compile(name, $$"""
+            [assembly: System.Reflection.AssemblyVersion("{{hostVersion}}.0.0.0")]
+            public sealed class SharedType { }
+            """);
+        var hostPath = Path.Combine(root, name + ".dll");
+        File.WriteAllBytes(hostPath, host);
+        var required = Compile(name, """
+            [assembly: System.Reflection.AssemblyVersion("2.0.0.0")]
+            public sealed class SharedType { }
+            """);
+        var brickName = "Consumer" + Guid.NewGuid().ToString("N");
+        var brick = Brick("test." + brickName.ToLowerInvariant());
+        var lib = Directory.CreateDirectory(Path.Combine(BrickAssemblies.PrecastDirectory(brick), "lib")).FullName;
+        File.WriteAllBytes(Path.Combine(lib, brickName + ".dll"), Compile(brickName,
+            "public sealed class Consumer { public SharedType Value; }", MetadataReference.CreateFromImage(required)));
+
+        await RunDependencyProbe(hostPath, brick, brickName, compatible);
+        Assert.DoesNotContain(AssemblyLoadContext.Default.Assemblies, a => a.GetName().Name == brickName);
+    }
+
+    static byte[] Compile(string name, string source, params MetadataReference[] extraReferences)
+        => Compile(name, source, OutputKind.DynamicallyLinkedLibrary, extraReferences);
+
+    static byte[] Compile(string name, string source, OutputKind outputKind, params MetadataReference[] extraReferences)
+    {
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+            .Select(static path => MetadataReference.CreateFromFile(path))
+            .Cast<MetadataReference>()
+            .Concat(extraReferences);
+        var compilation = CSharpCompilation.Create(name, [CSharpSyntaxTree.ParseText(source)], references,
+            new CSharpCompilationOptions(outputKind));
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        return stream.ToArray();
+    }
+
+    async Task RunDependencyProbe(string hostPath, ResolvedPackage brick, string consumerName, bool compatible)
+    {
+        var assembly = Path.Combine(root, "DependencyProbe.dll");
+        File.WriteAllBytes(assembly, Compile("DependencyProbe", DependencyProbeSource, OutputKind.ConsoleApplication));
+        File.Copy(Path.ChangeExtension(typeof(BrickAssemblyLoadTests).Assembly.Location, ".runtimeconfig.json"),
+            Path.ChangeExtension(assembly, ".runtimeconfig.json"));
+        var start = new ProcessStartInfo(DotnetLocator.Find())
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[]
+                 { assembly, AppContext.BaseDirectory, hostPath, brick.RootPath, brick.Id, consumerName, compatible.ToString() })
+        {
+            start.ArgumentList.Add(argument);
+        }
+        using var process = Process.Start(start)!;
+        var token = TestContext.Current.CancellationToken;
+        var output = process.StandardOutput.ReadToEndAsync(token);
+        var error = process.StandardError.ReadToEndAsync(token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) { process.Kill(entireProcessTree: true); }
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
+        Assert.True(process.ExitCode == 0, $"Dependency probe exited with {process.ExitCode}: {await output}{await error}");
+    }
+
+    // Default-context assemblies retain Windows file mappings until process exit, so the parent owns cleanup.
+    const string DependencyProbeSource = """
+        using System;
+        using System.IO;
+        using System.Linq;
+        using System.Reflection;
+        using System.Runtime.CompilerServices;
+        using System.Runtime.Loader;
+        using MASS4.Bricks;
+        using Microsoft.Extensions.Logging;
+        using Turian.Editor.Core;
+
+        static class DependencyProbe
+        {
+            static int Main(string[] args)
+            {
+                AssemblyLoadContext.Default.Resolving += (_, name) =>
+                {
+                    var path = Path.Combine(args[0], name.Name + ".dll");
+                    return File.Exists(path) ? AssemblyLoadContext.Default.LoadFromAssemblyPath(path) : null;
+                };
+                return Check(args);
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static int Check(string[] args)
+            {
+                AssemblyLoadContext.Default.LoadFromAssemblyPath(args[1]);
+                var manifest = new PackageManifest { Name = args[3], Version = SemanticVersion.Parse("0.1.0") };
+                var brick = new ResolvedPackage(args[3], manifest, args[2], PackageOrigin.Builtin,
+                    "builtin:" + args[3], null, null, 1, false);
+                var expected = bool.Parse(args[5]);
+                var logger = new ProbeLogger();
+                var loaded = BrickAssemblies.Load(new[] { brick }, logger);
+                var present = AssemblyLoadContext.Default.Assemblies.Any(a => a.GetName().Name == args[4]);
+                Console.WriteLine($"loaded={loaded}; present={present}; rejected={logger.Rejected}");
+                if (loaded != expected) return 1;
+                if (present != expected) return 2;
+                return !expected && !logger.Rejected ? 3 : 0;
+            }
+
+            sealed class ProbeLogger : ILogger
+            {
+                public bool Rejected;
+                public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+                public bool IsEnabled(LogLevel level) => true;
+                public void Log<TState>(LogLevel level, EventId id, TState state, Exception exception,
+                    Func<TState, Exception, string> formatter)
+                {
+                    Rejected |= exception is FileLoadException
+                        && exception.Message.Contains("host already loaded", StringComparison.Ordinal);
+                }
+            }
+        }
+        """;
+
     ResolvedPackage Brick(string id)
     {
         var folder = Directory.CreateDirectory(Path.Combine(root, id)).FullName;

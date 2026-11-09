@@ -105,6 +105,7 @@ public static partial class BrickAssemblies
                         continue;
                     }
 
+                    VerifyLoadedDependencies(path);
                     TypeRegistry.ScanAssembly(AssemblyLoadContext.Default.LoadFromAssemblyPath(path));
                     loadedAny = true;
                 }

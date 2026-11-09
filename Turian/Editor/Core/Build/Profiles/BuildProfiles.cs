@@ -183,7 +183,7 @@ public static class BuildProfiles
     /// Whether any of <paramref name="bricks"/> provides a game player, which a client build needs to open a window.
     /// </summary>
     /// <param name="bricks">The shipped bricks.</param>
-    /// <returns>True when a client-only brick, such as the renderer, is among them.</returns>
+    /// <returns>True when a runtime host or custom player marker is declared.</returns>
     public static bool HasPlayer(IEnumerable<ResolvedPackage> bricks) =>
-        bricks.Any(static b => b.Manifest.ClientOnly);
+        bricks.Any(RuntimeHostMetadata.ProvidesHost);
 }

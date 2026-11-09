@@ -231,6 +231,8 @@ public static class CsProjectGenerator
             .AddNugetPackageReferences(platform.Dependencies.Packages)
             .AddAssetsDir(settings)
             .CopyLauncherFiles(platform);
+        BrickNativeAssets.AddToProject(projectRoot,
+            ReferencedBricks(settings, true, profile?.Target ?? BuildTarget.Client), profile?.RuntimeIdentifier);
         if (profile?.Target == BuildTarget.Server)
         {
             projectRoot.AddServerVerification(settings, platform.Dependencies.Packages);
@@ -444,6 +446,10 @@ public static class CsProjectGenerator
             IReadOnlyList<(string, string)>? packages = null, string platform = BuildPlatforms.Desktop)
         {
             var bricks = ReferencedBricks(settings, shipping, target);
+            if (!shipping)
+            {
+                BrickNativeAssets.AddToProject(projectRoot, bricks, publish: false);
+            }
             if (shipping)
             {
                 BuildProfiles.EnsureSupported(bricks, platform);

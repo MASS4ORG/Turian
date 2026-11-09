@@ -322,6 +322,20 @@ public sealed class BuildProfilesTests : IDisposable
         Assert.False(ExportUserCode.RunsHeadlessByAccident(project, new BuildProfile { Target = BuildTarget.Server }));
     }
 
+    /// <summary>Client-only features do not masquerade as window hosts.</summary>
+    [Fact]
+    public void ClientOnlyFeatureDoesNotProvideAPlayer()
+    {
+        var root = Path.Combine(fixtures, "client-feature");
+        var runtime = Directory.CreateDirectory(Path.Combine(root, "Runtime"));
+        var manifest = new PackageManifest { Name = "test.client-feature", ClientOnly = true };
+        var brick = new ResolvedPackage(manifest.Name, manifest, root, PackageOrigin.File, "file:" + root, null, null, 1, false);
+        Assert.False(BuildProfiles.HasPlayer([brick]));
+        File.WriteAllText(Path.Combine(runtime.FullName, "Host.cs"),
+            "[assembly: Turian.Engine.Core.ClientRuntimeHost(typeof(RenderHost))]");
+        Assert.True(BuildProfiles.HasPlayer([brick]));
+    }
+
     /// <summary>Disabling a brick the project neither declares nor gets by default is refused.</summary>
     [Fact]
     public void DisablingAnUndeclaredBrickIsRefused()
