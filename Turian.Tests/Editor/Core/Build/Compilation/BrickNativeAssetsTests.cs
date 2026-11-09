@@ -55,6 +55,7 @@ public sealed class BrickNativeAssetsTests
         {
             var native = Directory.CreateDirectory(Path.Combine(root.FullName, "a", "runtimes", rid, "native"));
             File.WriteAllBytes(Path.Combine(native.FullName, "libsound.so"), [1]);
+            File.WriteAllText(Path.Combine(native.FullName, "libsound.so.meta"), "{}");
             var project = ProjectRootElement.Create();
 
             BrickNativeAssets.AddToProject(project, [Brick(Path.Combine(root.FullName, "a"), "a.native")], rid);

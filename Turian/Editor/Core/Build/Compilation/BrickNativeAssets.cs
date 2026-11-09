@@ -19,7 +19,9 @@ static class BrickNativeAssets
             {
                 var directory = Path.Combine(root, "runtimes", rid, "native");
                 if (!Directory.Exists(directory)) { continue; }
-                foreach (var file in Directory.EnumerateFiles(directory).Order(StringComparer.Ordinal))
+                foreach (var file in Directory.EnumerateFiles(directory)
+                             .Where(static path => !path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                             .Order(StringComparer.Ordinal))
                 {
                     var name = Path.GetFileName(file);
                     if (staged.TryGetValue(name, out var previous))

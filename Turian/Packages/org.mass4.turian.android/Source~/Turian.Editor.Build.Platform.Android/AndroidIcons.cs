@@ -54,15 +54,15 @@ public static class AndroidIcons
     }
 
     /// <summary>Centers the image in the middle two thirds of the canvas, the part no launcher mask can cut off.</summary>
-    [Obsolete]
     static byte[] EncodeForeground(SKBitmap image, int size)
     {
         var inner = size * 2 / 3;
         using var surface = SKSurface.Create(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Premul));
         surface.Canvas.Clear(SKColors.Transparent);
-        using (var fitted = SKBitmap.Decode(ProjectIcon.EncodePng(image, inner)))
+        using (var fitted = SKImage.FromEncodedData(ProjectIcon.EncodePng(image, inner)))
         {
-            surface.Canvas.DrawBitmap(fitted, (size - inner) / 2f, (size - inner) / 2f);
+            var offset = (size - inner) / 2f;
+            surface.Canvas.DrawImage(fitted, SKRect.Create(offset, offset, inner, inner), new SKSamplingOptions(SKFilterMode.Nearest));
         }
 
         using var snapshot = surface.Snapshot();
