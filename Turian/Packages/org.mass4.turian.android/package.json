@@ -11,7 +11,7 @@
   },
   "platformNuget": {
     "android": {
-      "SkiaSharp.NativeAssets.Android": "4.153.1"
+      "SkiaSharp.NativeAssets.Android": "4.154.0"
     }
   },
   "categories": [
