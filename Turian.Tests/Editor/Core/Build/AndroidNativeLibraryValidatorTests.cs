@@ -117,7 +117,7 @@ public sealed class AndroidNativeLibraryValidatorTests
         Assert.Throws<InvalidDataException>(() => AndroidNativeLibraryValidator.Validate(image, "invalid.so"));
     }
 
-    static MemoryStream CreateImage(ulong alignment, ulong offset, ulong address)
+    internal static MemoryStream CreateImage(ulong alignment, ulong offset, ulong address)
     {
         var image = new MemoryStream(120);
         image.SetLength(120);

@@ -11,6 +11,8 @@ namespace Turian.Editor.Core;
 /// <summary>Exports an Android CoreCLR application with its content stored inside the APK.</summary>
 public sealed partial class AndroidBuildPlatform : IBuildPlatform
 {
+    const string ValidationBrickPrefix = "org.mass4.turian.android.validation.";
+
     static readonly Lazy<RuntimeDependencies> Graph = new(LoadDependencies);
 
     /// <inheritdoc />
@@ -77,6 +79,31 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
                 "AndroidNative");
         }
         project.AddImport(Path.Combine(nativeDirectory, "AndroidNative.targets"));
+        if (context.Profile?.Development == true)
+        {
+            AddValidationLayer(project, context, string.IsNullOrEmpty(rid) ? "android-arm64" : rid);
+        }
+    }
+
+    /// <summary>Packages the validation layer from the project's brick for the exported architecture, when installed.</summary>
+    static void AddValidationLayer(ProjectRootElement project, BuildPlatformContext context, string runtimeIdentifier)
+    {
+        var (architecture, abi) = runtimeIdentifier == "android-x64" ? ("x64", "x86_64") : ("arm64", "arm64-v8a");
+        var id = ValidationBrickPrefix + architecture;
+        var brick = ProjectPackages.ResolveOrEmpty(context.Settings.ProjectAbsoluteDir)
+            .FirstOrDefault(package => package.Id == id);
+        if (brick is null)
+        {
+            context.Logger.LogInformation(
+                "This Android development build has no Vulkan validation layer; add the {Brick} brick to include it.", id);
+            return;
+        }
+        var layer = Path.Combine(brick.RootPath, "Brick~", "Native", AndroidPackageValidator.ValidationLayerFile);
+        if (!File.Exists(layer))
+        {
+            throw new InvalidOperationException($"The {id} brick has no {AndroidPackageValidator.ValidationLayerFile}.");
+        }
+        project.AddItemGroup().AddItem("AndroidNativeLibrary", layer).AddMetadata("Abi", abi, true);
     }
 
     string? ValidateExportContext(BuildPlatformContext context)
@@ -206,7 +233,7 @@ public sealed partial class AndroidBuildPlatform : IBuildPlatform
         }
         foreach (var package in packages)
         {
-            AndroidPackageValidator.Validate(package);
+            AndroidPackageValidator.Validate(package, context.Profile?.Development == true);
         }
         return Task.FromResult(new BuildArtifact(context.OutputDirectory));
     }

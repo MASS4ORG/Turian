@@ -7,12 +7,16 @@ namespace Turian.Editor.Core;
 /// <summary>Checks APK runtime content and native-library page alignment.</summary>
 public static class AndroidPackageValidator
 {
-    /// <summary>Rejects incomplete content, compressed OAPs and native libraries incompatible with 16 KB pages.</summary>
+    /// <summary>The Vulkan validation layer library, which only development builds may ship.</summary>
+    public const string ValidationLayerFile = "libVkLayer_khronos_validation.so";
+
+    /// <summary>Rejects incomplete content, compressed OAPs, misplaced debug layers and libraries incompatible with 16 KB pages.</summary>
     /// <param name="path">The APK to inspect.</param>
-    public static void Validate(string path)
+    /// <param name="development">Whether the APK is a development build, the only kind allowed the validation layer.</param>
+    public static void Validate(string path, bool development = false)
     {
         using var stream = File.OpenRead(path);
-        ValidateContentDirectory(stream);
+        ValidateContentDirectory(stream, development);
         ValidateNativeLibraries(stream);
     }
 
@@ -31,7 +35,7 @@ public static class AndroidPackageValidator
         return (count, offset);
     }
 
-    static void ValidateContentDirectory(Stream stream)
+    static void ValidateContentDirectory(Stream stream, bool development)
     {
         var (count, offset) = ReadDirectoryLocation(stream);
         stream.Position = offset;
@@ -49,6 +53,10 @@ public static class AndroidPackageValidator
                 ValidateNativeZipAlignment(stream, entry.Header, entry.Name);
             }
             required.Remove(entry.Name);
+            if (!development && entry.Name.EndsWith("/" + ValidationLayerFile, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException($"APK entry '{entry.Name}' is a Vulkan validation layer, which only development builds may ship.");
+            }
             if (ValidateContentEntry(entry))
             {
                 storedPackages++;

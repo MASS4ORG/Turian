@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: in-place APK content reads #257.
 - Fixed: Android native libraries and APK validation for 16 KB pages #274.
 - Added: Android logcat logger provider #258.
+- Added: Vulkan validation layers setting and Android development packaging #261.
 
 ## [3.11.0] - 2026-11-09
 

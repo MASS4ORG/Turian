@@ -124,8 +124,12 @@ public unsafe partial class Device : IDisposable
     bool IsHeadless => surfaceHost is null;
 
     ExtDebugUtils debugUtils = null!;
-    readonly bool enableValidationLayers = false;
+    bool enableValidationLayers;
     readonly string[] validationLayers = ["VK_LAYER_KHRONOS_validation"];
+    readonly ILogger logger;
+
+    // Native code holds this callback for the instance's lifetime, so the delegate must not be collected.
+    readonly DebugUtilsMessengerCallbackFunctionEXT debugCallback;
 
     const string meshShaderExtension = "VK_EXT_mesh_shader";
 
@@ -163,12 +167,18 @@ public unsafe partial class Device : IDisposable
     /// <param name="vk">The Vulkan instance.</param>
     /// <param name="surfaceHost">The host presented to. Pass <c>null</c> for headless (editor) mode.</param>
     /// <param name="requestedMsaaSamples">The MSAA sample count to request, capped at the device's maximum.</param>
+    /// <param name="validationLayers">Whether to run with the Vulkan validation layer, when it is installed.</param>
+    /// <param name="logger">Receives validation reports; the ambient logger when <c>null</c>.</param>
     public Device(Vk vk, ISurfaceHost? surfaceHost = null,
-        int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples)
+        int requestedMsaaSamples = GraphicsSettings.DefaultMsaaSamples,
+        bool validationLayers = false, ILogger? logger = null)
     {
         this.vk = vk;
         this.surfaceHost = surfaceHost;
         this.requestedMsaaSamples = requestedMsaaSamples;
+        this.logger = logger ?? Log.Logger;
+        debugCallback = DebugCallback;
+        enableValidationLayers = validationLayers;
         CreateInstance();
         SetupDebugMessenger();
         if (!IsHeadless)

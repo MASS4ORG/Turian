@@ -177,6 +177,70 @@ public sealed class AndroidBuildPlatformTests : IDisposable
         }
     }
 
+    /// <summary>Only development profiles package a layer, and only from the brick of the exported architecture.</summary>
+    [Theory]
+    [InlineData(true, "android-x64", "x64", "x86_64")]
+    [InlineData(true, null, "arm64", "arm64-v8a")]
+    [InlineData(true, "android-x64", "arm64", null)]
+    [InlineData(false, "android-arm64", "arm64", null)]
+    public void PackagesValidationLayerOnlyForDevelopment(bool development, string? rid, string architecture, string? abi)
+    {
+        Directory.CreateDirectory(Path.Combine(directory, "Assets"));
+        var id = "org.mass4.turian.android.validation." + architecture;
+        var brickRoot = Path.Combine(directory, "brick-source");
+        Directory.CreateDirectory(Path.Combine(brickRoot, "Brick~", "Native"));
+        File.WriteAllText(Path.Combine(brickRoot, "package.json"), $$"""{ "id": "{{id}}", "version": "1.0.0", "bake": "none" }""");
+        File.WriteAllBytes(Path.Combine(brickRoot, "Brick~", "Native", AndroidPackageValidator.ValidationLayerFile), [0]);
+        var manifest = new ProjectManifest();
+        manifest.Dependencies[id] = "file:" + brickRoot;
+        manifest.Save(directory);
+        var settings = new BuildAppSettings { ProjectAbsoluteDir = directory, Title = "Example" };
+        settings.Loaded.Use(new PlayerSettings { ApplicationIdentifier = "org.example.app" });
+        var project = Microsoft.Build.Construction.ProjectRootElement.Create(Path.Combine(directory, "app.csproj"));
+        var profile = new BuildProfile { Platform = "android", RuntimeIdentifier = rid, Development = development };
+
+        new AndroidBuildPlatform().ConfigureProject(project, new BuildPlatformContext(settings, NullLogger.Instance,
+            project.FullPath, directory, "Release", profile));
+
+        var layers = project.Items.Where(static item => item.ItemType == "AndroidNativeLibrary").ToArray();
+        if (abi is null)
+        {
+            Assert.Empty(layers);
+            return;
+        }
+        var layer = Assert.Single(layers);
+        Assert.Equal(abi, Assert.Single(layer.Metadata, static metadata => metadata.Name == "Abi").Value);
+        Assert.Equal(AndroidPackageValidator.ValidationLayerFile, Path.GetFileName(layer.Include));
+        Assert.True(File.Exists(layer.Include));
+    }
+
+    /// <summary>Validation refuses a layer inside a non-development APK and permits it in a development one.</summary>
+    [Fact]
+    public void RejectsValidationLayerOutsideDevelopment()
+    {
+        Directory.CreateDirectory(directory);
+        var apk = Path.Combine(directory, "app.apk");
+        using (var archive = ZipFile.Open(apk, ZipArchiveMode.Create))
+        {
+            foreach (var name in new[] { "projectSettings.json", "usercode.typeids.json", "Content/assetCatalog.json" })
+            {
+                using var writer = new StreamWriter(archive.CreateEntry("assets/" + name).Open());
+                writer.Write("{}");
+            }
+            using (var package = archive.CreateEntry("assets/Content/example.oap", CompressionLevel.NoCompression).Open())
+            {
+                package.Write(new byte[16]);
+            }
+            using var layer = archive.CreateEntry("lib/arm64-v8a/" + AndroidPackageValidator.ValidationLayerFile).Open();
+            using var image = AndroidNativeLibraryValidatorTests.CreateImage(16384, 0, 0);
+            image.CopyTo(layer);
+        }
+
+        Assert.Contains("validation layer",
+            Assert.Throws<InvalidDataException>(() => AndroidPackageValidator.Validate(apk)).Message);
+        AndroidPackageValidator.Validate(apk, development: true);
+    }
+
     /// <summary>An APK without runtime content cannot pass export validation.</summary>
     [Fact]
     public void RejectsMissingRuntimeContent()

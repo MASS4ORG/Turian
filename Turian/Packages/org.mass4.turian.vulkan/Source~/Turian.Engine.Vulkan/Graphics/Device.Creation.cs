@@ -4,10 +4,7 @@ public unsafe partial class Device
 {
     void CreateInstance()
     {
-        if (enableValidationLayers && !CheckValidationLayerSupport())
-        {
-            throw new VulkanException("validation layers requested, but not available!");
-        }
+        enableValidationLayers = ResolveValidation(enableValidationLayers, CheckValidationLayerSupport, logger);
 
         ApplicationInfo appInfo = new()
         {
@@ -204,16 +201,6 @@ public unsafe partial class Device
             PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(extensions)
         };
 
-        if (enableValidationLayers)
-        {
-            createInfo.EnabledLayerCount = (uint)validationLayers.Length;
-            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(validationLayers);
-        }
-        else
-        {
-            createInfo.EnabledLayerCount = 0;
-        }
-
         var resultVulkan = vk.CreateDevice(candidatePhysicalDevice, in createInfo, null, out var logicalDevice);
         if (resultVulkan != Result.Success)
         {
@@ -222,11 +209,6 @@ public unsafe partial class Device
 
         vk.GetDeviceQueue(logicalDevice, indices.GraphicsFamily!.Value, 0, out graphicsQueue);
         vk.GetDeviceQueue(logicalDevice, indices.PresentFamily!.Value, 0, out presentQueue);
-
-        if (enableValidationLayers)
-        {
-            _ = SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
-        }
 
         _ = SilkMarshal.Free((nint)createInfo.PpEnabledExtensionNames);
 
@@ -321,7 +303,7 @@ public unsafe partial class Device
             DebugUtilsMessageTypeFlagsEXT.GeneralBitExt
             | DebugUtilsMessageTypeFlagsEXT.PerformanceBitExt
             | DebugUtilsMessageTypeFlagsEXT.ValidationBitExt;
-        createInfo.PfnUserCallback = (DebugUtilsMessengerCallbackFunctionEXT)DebugCallback;
+        createInfo.PfnUserCallback = debugCallback;
     }
 
 }

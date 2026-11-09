@@ -33,16 +33,34 @@ public unsafe partial class Device
         void* pUserData
     )
     {
-        if (messageSeverity == DebugUtilsMessageSeverityFlagsEXT.VerboseBitExt)
-        {
-            return Vk.False;
-        }
-
-        var msg = Marshal.PtrToStringAnsi((nint)pCallbackData->PMessage);
-
-        Debug.WriteLine($"{messageSeverity} | validation layer: {msg}");
+        ReportValidationMessage(logger, messageSeverity, Marshal.PtrToStringUTF8((nint)pCallbackData->PMessage));
 
         return Vk.False;
+    }
+
+    /// <summary>Decides whether validation runs, warning when it was requested but the layer is not installed.</summary>
+    internal static bool ResolveValidation(bool requested, Func<bool> layerAvailable, ILogger logger)
+    {
+        if (!requested || layerAvailable())
+        {
+            return requested;
+        }
+
+        logger.LogWarning("Vulkan validation layers were requested but are not installed; running without them.");
+        return false;
+    }
+
+    /// <summary>Logs a validation report at the level matching its severity, dropping verbose chatter.</summary>
+    internal static void ReportValidationMessage(ILogger logger, DebugUtilsMessageSeverityFlagsEXT severity, string? message)
+    {
+        if (severity.HasFlag(DebugUtilsMessageSeverityFlagsEXT.ErrorBitExt))
+        {
+            logger.LogError("Vulkan validation: {Message}", message);
+        }
+        else if (severity.HasFlag(DebugUtilsMessageSeverityFlagsEXT.WarningBitExt))
+        {
+            logger.LogWarning("Vulkan validation: {Message}", message);
+        }
     }
 
     SwapChainSupportDetails QuerySwapChainSupportInternal(PhysicalDevice candidatePhysicalDevice)
