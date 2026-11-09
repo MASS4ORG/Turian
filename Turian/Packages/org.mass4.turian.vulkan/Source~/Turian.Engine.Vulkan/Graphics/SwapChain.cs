@@ -198,7 +198,8 @@ public partial class SwapChain : IDisposable
             PCommandBuffers = &commandBuffer
         };
 
-        var signalSemaphores = stackalloc[] { renderFinishedSemaphores[currentFrame] };
+        // Present keeps this semaphore until its image is reacquired, so it belongs to the image, not the frame slot.
+        var signalSemaphores = stackalloc[] { renderFinishedSemaphores[imageIndex] };
         submitInfo = submitInfo with
         {
             SignalSemaphoreCount = 1,
@@ -266,9 +267,13 @@ public partial class SwapChain : IDisposable
         vk.DestroyRenderPass(device.VkDevice, renderPass, null);
 
         // cleanup synchronization objects
+        foreach (var semaphore in renderFinishedSemaphores)
+        {
+            vk.DestroySemaphore(device.VkDevice, semaphore, null);
+        }
+
         for (var i = 0; i < MaxFramesInFlight; i++)
         {
-            vk.DestroySemaphore(device.VkDevice, renderFinishedSemaphores[i], null);
             vk.DestroySemaphore(device.VkDevice, imageAvailableSemaphores[i], null);
             vk.DestroyFence(device.VkDevice, inFlightFences[i], null);
         }

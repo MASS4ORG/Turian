@@ -448,7 +448,7 @@ public partial class SwapChain
     unsafe void CreateSyncObjects()
     {
         imageAvailableSemaphores = new Silk.NET.Vulkan.Semaphore[MaxFramesInFlight];
-        renderFinishedSemaphores = new Silk.NET.Vulkan.Semaphore[MaxFramesInFlight];
+        renderFinishedSemaphores = new Silk.NET.Vulkan.Semaphore[swapChainImages.Length];
         inFlightFences = new Fence[MaxFramesInFlight];
         imagesInFlight = new Fence[swapChainImages.Length];
 
@@ -466,17 +466,20 @@ public partial class SwapChain
                     resultVulkan);
             }
 
-            resultVulkan = vk.CreateSemaphore(vkDevice, in semaphoreInfo, null, out renderFinishedSemaphores[i]);
+            resultVulkan = vk.CreateFence(vkDevice, in fenceInfo, null, out inFlightFences[i]);
             if (resultVulkan != Result.Success)
             {
                 throw new VulkanException("Vulkan: failed to create synchronization objects for a frame: {0}",
                     resultVulkan);
             }
+        }
 
-            resultVulkan = vk.CreateFence(vkDevice, in fenceInfo, null, out inFlightFences[i]);
+        for (var i = 0; i < renderFinishedSemaphores.Length; i++)
+        {
+            var resultVulkan = vk.CreateSemaphore(vkDevice, in semaphoreInfo, null, out renderFinishedSemaphores[i]);
             if (resultVulkan != Result.Success)
             {
-                throw new VulkanException("Vulkan: failed to create synchronization objects for a frame: {0}",
+                throw new VulkanException("Vulkan: failed to create synchronization objects for an image: {0}",
                     resultVulkan);
             }
         }

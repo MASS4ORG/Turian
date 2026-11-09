@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added: touch input with action bindings and mouse emulation #269.
 - Added: runtime safe-area service #343.
 - Fixed: Android UI thread no longer blocks on slow game startup #255.
+- Fixed: Vulkan render-finished semaphores are per swapchain image.
 
 ## [3.11.0] - 2026-11-09
 
