@@ -6,7 +6,6 @@ using Android.OS;
 using Android.Runtime;
 using Android.Views;
 using Android.Window;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using EngineApplication = Turian.Engine.Core.Application;
 
@@ -147,11 +146,11 @@ public class MainActivity : Activity, ISurfaceHolderCallback
                 throw new NotSupportedException(graphics.Diagnostics);
             }
             var level = AndroidLogProvider.LevelFor(Development);
-            using var host = Host.CreateDefaultBuilder().ConfigureLogging(logging => logging.ClearProviders()
-                .SetMinimumLevel(level).AddProvider(new AndroidLogProvider(level))).Build();
-            var factory = host.Services.GetRequiredService<ILoggerFactory>();
+            using var factory = LoggerFactory.Create(logging =>
+                logging.SetMinimumLevel(level).AddProvider(new AndroidLogProvider(level)));
             Log.Configure(factory);
             var logger = factory.CreateLogger("Turian");
+            logger.LogInformation("Starting the engine.");
             var package = PackageManager!.GetPackageInfo(PackageName!, PackageManager.PackageInfoFlags.Of(0L))!;
             var content = new ApkContentDirectory(Assets!, PackageName!, package.LongVersionCode);
             OapRuntimeKey.Set(GetContentKey());
