@@ -5,6 +5,7 @@ public sealed partial class BufferedInputSource
 {
     readonly List<ActiveTouch> touches = [];
     int? primaryTouch;
+    bool pressPending;
 
     /// <summary>Whether the first finger also drives the mouse, so pointer-based interfaces work on a touch screen.</summary>
     public bool TouchEmulatesMouse { get; set; } = true;
@@ -35,10 +36,7 @@ public sealed partial class BufferedInputSource
             {
                 primaryTouch = id;
                 mousePosition = position;
-                if (buttonsDown.Add(MouseButton.Left))
-                {
-                    buttonsPressed.Add(MouseButton.Left);
-                }
+                pressPending = true;
             }
         }
     }
@@ -109,15 +107,32 @@ public sealed partial class BufferedInputSource
         }
 
         primaryTouch = null;
+        pressPending = false;
         if (buttonsDown.Remove(MouseButton.Left) && touch.Phase == TouchPhase.Ended)
         {
             buttonsReleased.Add(MouseButton.Left);
         }
     }
 
+    // Applied at the frame roll so the press edge survives into the interface pass that follows the tick.
+    void ApplyPendingPress()
+    {
+        if (!pressPending || primaryTouch is not { } id)
+        {
+            return;
+        }
+
+        pressPending = false;
+        if (Find(id)?.PendingEnd != TouchPhase.Canceled && buttonsDown.Add(MouseButton.Left))
+        {
+            buttonsPressed.Add(MouseButton.Left);
+        }
+    }
+
     void RollTouches()
     {
         touches.RemoveAll(static touch => touch.Phase is TouchPhase.Ended or TouchPhase.Canceled);
+        ApplyPendingPress();
         foreach (var touch in touches)
         {
             touch.Delta = Vector2.Zero;

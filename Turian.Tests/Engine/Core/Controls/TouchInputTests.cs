@@ -55,9 +55,9 @@ public class TouchInputTests
         input.PushTouchUp(1);
 
         Assert.Equal(TouchPhase.Began, Assert.Single(input.Touches).Phase);
-        Assert.True(input.WasMouseButtonPressed(SilkMouseButton.Left));
 
         input.NewFrame();
+        Assert.True(input.WasMouseButtonPressed(SilkMouseButton.Left));
         Assert.True(input.IsMouseButtonDown(SilkMouseButton.Left));
 
         input.NewFrame();
@@ -78,9 +78,14 @@ public class TouchInputTests
 
         Assert.Equal(Start, input.MousePosition);
         Assert.Equal(Vector2.Zero, input.MouseDelta);
+
+        // The tick's end rolls the frame before the interface draws, so the press must appear at that roll.
+        Assert.False(input.WasMouseButtonPressed(SilkMouseButton.Left));
+        input.NewFrame();
         Assert.True(input.WasMouseButtonPressed(SilkMouseButton.Left));
 
         input.NewFrame();
+        Assert.False(input.WasMouseButtonPressed(SilkMouseButton.Left));
         input.PushTouchMove(1, End);
         Assert.Equal(End, input.MousePosition);
         Assert.Equal(End - Start, input.MouseDelta);

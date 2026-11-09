@@ -349,6 +349,7 @@ public sealed partial class BufferedInputSource : IInputSource
             gamepads.Clear();
             touches.Clear();
             primaryTouch = null;
+            pressPending = false;
         }
     }
 }
