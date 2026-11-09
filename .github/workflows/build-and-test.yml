@@ -32,6 +32,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
+          dotnet-version: 10.0.x
           global-json-file: global.json
 
       # glslc: shader compilation (CompileShaders). fontconfig/dejavu: SkiaSharp text rendering
@@ -88,6 +89,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
+          dotnet-version: 10.0.x
           global-json-file: global.json
 
       - name: Restore, compile, test
@@ -102,6 +104,46 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  # A new project exported for Android with the pinned toolchain, then checked for signature, identity and alignment.
+  android-export:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          global-json-file: global.json
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install the Android toolchain
+        run: bash ci/android-toolchain.sh
+
+      - name: Build the editor
+        run: dotnet build Turian.slnx -p:NoLocalPackages=true -m:4
+
+      - name: Export a new project for Android
+        run: bash ci/android-smoke.sh "$RUNNER_TEMP/android-smoke"
+
+      - name: Upload the APK
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-smoke-apk
+          path: ${{ runner.temp }}/android-smoke/sample/Output/**/*-Signed.apk
+          retention-days: 7
+
   # Validate the Linux, macOS, NuGet and container release formats without tagging or pushing.
   package:
     runs-on: ubuntu-latest
@@ -114,6 +156,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
+          dotnet-version: 10.0.x
           global-json-file: global.json
 
       - name: Install packaging tools
@@ -166,6 +209,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
+          dotnet-version: 10.0.x
           global-json-file: global.json
 
       - name: Install NSIS

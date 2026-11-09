@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed: Vulkan render-finished semaphores are per swapchain image.
 - Added: Android release signing and App Bundle output #271.
 - Added: Android launcher and adaptive icons #272.
+- Added: Android export smoke job and pinned toolchain #275.
+- Changed: CI and the CLI image build with the .NET 11 SDK.
 
 ## [3.11.0] - 2026-11-09
 

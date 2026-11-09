@@ -1,7 +1,7 @@
 # Turian CLI: headless editor automation (compile, playmode, screenshot, pick, oap, brick)
 # for gamedevs to build their Turian projects in their own CI/CD, plus brick-release for brick release workflows.
 # Built with Podman.
-ARG DOTNET_VERSION=10.0
+ARG DOTNET_VERSION=11.0.100-rc.3
 
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 ARG VERSION=0.0.0
@@ -46,16 +46,23 @@ LABEL org.opencontainers.image.title="Turian CLI" \
 # glslc: shader compilation. fontconfig/dejavu: SkiaSharp text rendering (Guinevere UI).
 # libvulkan1/mesa-vulkan-drivers: software Vulkan (lavapipe) for headless screenshot/playmode.
 # openssh-client: ssh-keygen signs bricks published to a registry or asset store.
+# curl/unzip: the Android toolchain script downloads its pinned tools at job time.
 RUN apt-get update -yqq \
     && apt-get install -yqq --no-install-recommends \
        glslc \
        libfontconfig1 fontconfig fonts-dejavu-core \
        libvulkan1 mesa-vulkan-drivers \
-       openssh-client \
+       openssh-client curl unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# The editor runs on .NET 10 and hosts that SDK's MSBuild, while Android exports use the .NET 11 SDK of this image.
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
+    && bash /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet \
+    && rm /tmp/dotnet-install.sh
 
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY ci/android-toolchain.env ci/android-toolchain.sh ci/android-verify.sh ci/android-smoke.sh /app/ci/
 ENV PATH="/app:${PATH}" \
     BRICK_RELEASE_ROOT=/app/tools/brick-release
 
